@@ -2,7 +2,6 @@
 const path = require('path');
 
 const { DockerComposeEnvironment, Wait } = require('testcontainers');
-const AWS = require('aws-sdk');
 const AuroraServerlessMySqlDriver = require('../driver/AuroraServerlessMySqlDriver');
 
 const DUMMY_SECRET_ARN = 'arn:aws:secretsmanager:us-east-1:123456789012:secret:dummy';
@@ -28,19 +27,13 @@ describe('AuroraServerlessMySqlDriver', () => {
       .withWaitStrategy('mysql', Wait.forHealthCheck())
       .up();
 
-    // Configure the AWS SDK so that it doesn't get mad
-    // AWS.config.credentials = new AWS.Credentials({ accessKeyId: 'awstest', secretAccessKey: 'awstest' });
-    AWS.config.accessKeyId = 'awstest';
-    AWS.config.secretAccessKey = 'awstest';
-    AWS.config.region = 'us-east-1';
-    AWS.config.sslEnabled = false;
-
     driver = new AuroraServerlessMySqlDriver({
       secretArn: DUMMY_SECRET_ARN,
       resourceArn: DUMMY_RESOURCE_ARN,
       database: 'mysql',
       options: {
-        sslEnabled: false,
+        region: 'us-east-1',
+        credentials: { accessKeyId: 'awstest', secretAccessKey: 'awstest' },
         endpoint: `http://${env.getContainer('router').getHost()}:${env.getContainer('router').getMappedPort(80)}`,
       }
     });

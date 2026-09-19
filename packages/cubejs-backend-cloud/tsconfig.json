@@ -5,13 +5,16 @@
     "test"
   ],
   "compilerOptions": {
+    "types": ["node", "jest"],
     "outDir": "dist",
     "rootDir": ".",
-    "baseUrl": ".",
     "noImplicitAny": true,
     "strictNullChecks": true,
     "strictFunctionTypes": true,
     "strictBindCallApply": true,
     "strictPropertyInitialization": true,
-  }
+  },
+  "references": [
+    { "path": "../cubejs-backend-shared" }
+  ]
 }

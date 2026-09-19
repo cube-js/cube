@@ -60,6 +60,7 @@ export interface QueueInitedOptions {
 
 export interface QueryInitedOptions {
   queueOptions: (dataSource: string) => Promise<QueueInitedOptions>;
+  localRefreshKey: boolean;
   refreshKeyRenewalThreshold?: number;
   backgroundRenew?: boolean;
   externalQueueOptions?: QueueOptions;
@@ -165,9 +166,9 @@ export type DriverFactoryFn = (context: DriverContext) =>
   Promise<BaseDriver | DriverConfig> | BaseDriver | DriverConfig;
 
 export type DbTypeInternalFn = (context: DbTypeInternalContext) =>
-  Promise<DatabaseType>;
+Promise<DatabaseType>;
 export type DriverFactoryInternalFn = (context: DriverContext) =>
-  Promise<BaseDriver | DriverConfig>;
+Promise<BaseDriver | DriverConfig>;
 
 export type DialectFactoryFn = (context: DialectContext) => typeof BaseQuery;
 

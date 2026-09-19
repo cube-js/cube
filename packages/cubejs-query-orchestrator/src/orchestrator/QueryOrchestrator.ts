@@ -97,7 +97,7 @@ export class QueryOrchestrator {
         throw new Error('It`s not possible to use Cube Store as queue/cache driver without using it as external');
       }
 
-      throw new Error('Cube Store was specified as queue/cache driver. Please set CUBEJS_CUBESTORE_HOST and CUBEJS_CUBESTORE_PORT variables. Please see https://cube.dev/docs/deployment/production-checklist#set-up-cube-store to learn more.');
+      throw new Error('Cube Store was specified as queue/cache driver. Please set CUBEJS_CUBESTORE_HOST and CUBEJS_CUBESTORE_PORT variables. Please see https://docs.cube.dev/cube-core/deployment#set-up-cube-store to learn more.');
     } : undefined;
 
     this.queryCache = new QueryCache(
@@ -232,6 +232,8 @@ export class QueryOrchestrator {
         targetTableName: pa.targetTableName,
         refreshKeyValues: pa.refreshKeyValues,
         lastUpdatedAt: pa.lastUpdatedAt,
+        preAggregationId: pa.preAggregationId,
+        type: pa.type,
       })),
     )(preAggregationsTablesToTempTables);
 
@@ -252,7 +254,7 @@ export class QueryOrchestrator {
       // /cubejs-system/v1/pre-aggregations/jobs endpoint).
       if (queryBody.isJob) {
         return preAggregationsTablesToTempTables.map((pa) => ({
-          preAggregation: queryBody.preAggregations[0].preAggregationId,
+          preAggregation: pa[1].preAggregationId || queryBody.preAggregations[0].preAggregationId,
           tableName: pa[0],
           ...pa[1],
         }));
@@ -359,7 +361,7 @@ export class QueryOrchestrator {
   }
 
   public async getPreAggregationVersionEntries(
-    preAggregations: { preAggregation: any, partitions: any[]}[],
+    preAggregations: { preAggregation: any, partitions: any[] }[],
     preAggregationsSchema: string,
     requestId: string,
   ) {

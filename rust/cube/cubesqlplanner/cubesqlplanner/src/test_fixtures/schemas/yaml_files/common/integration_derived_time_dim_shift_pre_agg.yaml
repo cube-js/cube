@@ -1,0 +1,57 @@
+cubes:
+    - name: pa_customers
+      sql: "SELECT * FROM pa_customers"
+      joins:
+          - name: pa_returns
+            relationship: one_to_many
+            sql: "{pa_customers}.id = {pa_returns.customer_id}"
+      dimensions:
+          - name: id
+            type: number
+            sql: id
+            primary_key: true
+
+          # Time dimension derived from another cube's time dimension:
+          # not owned by its cube and not a plain reference, so its shift
+          # is keyed by the owned member it wraps.
+          - name: return_day
+            type: time
+            sql: "DATE_TRUNC('day', {pa_returns.created_at})"
+      measures:
+          - name: total_value
+            type: sum
+            sql: lifetime_value
+
+          - name: total_value_prev_month
+            type: number
+            sql: "{CUBE.total_value}"
+            multi_stage: true
+            time_shift:
+                - interval: "1 month"
+                  type: prior
+                  timeDimension: pa_customers.return_day
+
+      pre_aggregations:
+          - name: value_by_return_day_month
+            type: rollup
+            measures:
+                - total_value
+            time_dimension: pa_customers.return_day
+            granularity: month
+
+    - name: pa_returns
+      sql: "SELECT * FROM pa_returns"
+      dimensions:
+          - name: id
+            type: number
+            sql: id
+            primary_key: true
+          - name: customer_id
+            type: number
+            sql: customer_id
+          - name: created_at
+            type: time
+            sql: created_at
+      measures:
+          - name: count
+            type: count

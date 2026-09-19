@@ -40,6 +40,7 @@ function splitTopLevel(str: string, sepChar: string): string[] {
   const out: string[] = [];
   let cur = '';
   let inStr = false;
+
   for (let i = 0; i < str.length; i++) {
     const ch = str[i];
     if (ch === '\'' && inStr && str[i + 1] === '\'') {
@@ -64,6 +65,7 @@ function splitUnionAll(sql: string): string[] {
   let cur = '';
   let inStr = false;
   const lower = sql.toLowerCase();
+
   for (let i = 0; i < sql.length; i++) {
     const ch = sql[i];
     if (ch === '\'' && inStr && sql[i + 1] === '\'') {
@@ -246,6 +248,7 @@ function writeCsv(table: string, cols: string[], data: Row[], dateCols: string[]
   const dir = path.join(ROOT, 'rawdata', name);
   fs.mkdirpSync(dir);
   const lines = [cols.join(',')];
+
   for (const rec of data) {
     lines.push(cols.map((c) => {
       let v = rec[c];
@@ -281,6 +284,7 @@ function tableData(table: string): Parsed {
 
 function main(): void {
   fs.mkdirpSync(ROOT);
+
   for (const table of Object.keys(SPECS)) {
     const spec = SPECS[table];
     const { cols, data } = tableData(table);

@@ -20,7 +20,7 @@ impl FilterOperationSql for LikeOp {
             .into_iter()
             .map(|v| {
                 ctx.plan_templates.ilike(
-                    ctx.member_sql,
+                    ctx.member_sql(),
                     &v,
                     self.start_wild,
                     self.end_wild,
@@ -37,7 +37,7 @@ impl FilterOperationSql for LikeOp {
         };
         let null_check = if need_null_check {
             ctx.plan_templates
-                .or_is_null_check(ctx.member_sql.to_string())?
+                .or_is_null_check(ctx.member_sql().to_string())?
         } else {
             "".to_string()
         };

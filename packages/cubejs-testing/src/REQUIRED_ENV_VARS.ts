@@ -2,7 +2,7 @@
  * Environment variables that cannot be hardcoded, and instead must be specified via the cli.
  * Usually cloud db config & auth variables.
  */
-export const REQUIRED_ENV_VARS: {[key: string]: string[]} = {
+export const REQUIRED_ENV_VARS: { [key: string]: string[] } = {
   athena: [
     'CUBEJS_AWS_KEY',
     'CUBEJS_AWS_SECRET',

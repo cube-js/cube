@@ -1,46 +1,42 @@
 {
   "name": "@cubejs-client/ws-transport",
-  "version": "1.7.16",
+  "version": "1.7.42",
   "engines": {},
   "repository": {
     "type": "git",
     "url": "https://github.com/cube-js/cube.git",
     "directory": "packages/cubejs-client-ws-transport"
   },
-  "description": "Cube.js WebSocket transport",
+  "description": "Cube WebSocket transport",
   "main": "dist/cubejs-client-ws-transport.cjs.js",
   "typings": "dist/index.d.ts",
   "author": "Cube Dev, Inc.",
   "scripts": {
     "build": "npm run tsc",
     "tsc": "tsc && rm -rf temp",
-    "watch": "tsc -w",
-    "lint": "eslint src/* --ext .ts",
-    "lint:fix": "eslint --fix src/* --ext .ts"
+    "watch": "tsc -w"
   },
   "dependencies": {
-    "@babel/runtime": "^7.1.2",
-    "@cubejs-client/core": "1.7.16",
-    "core-js": "^3.6.5",
+    "@babel/runtime": "^7.13.9",
+    "@cubejs-client/core": "1.7.42",
+    "core-js": "^3.34.0",
     "isomorphic-ws": "^4.0.1",
-    "ws": "^7.3.1"
+    "ws": "^7.5.3"
   },
   "files": [
     "dist"
   ],
   "license": "MIT",
   "devDependencies": {
-    "@babel/core": "^7.3.3",
-    "@babel/preset-env": "^7.3.1",
-    "@babel/preset-typescript": "^7.12.1",
-    "@cubejs-backend/linter": "1.7.16",
-    "@types/ws": "^7.2.9",
-    "typescript": "~5.2.2"
+    "@babel/core": "^7.24.5",
+    "@babel/preset-env": "^7.24.5",
+    "@babel/preset-typescript": "^7.13.0",
+    "@cubejs-backend/linter": "1.7.42",
+    "@types/node": "^22",
+    "@types/ws": "^7.4.0",
+    "typescript": "~6.0.3"
   },
   "publishConfig": {
     "access": "public"
-  },
-  "eslintConfig": {
-    "extends": "../cubejs-linter"
   }
 }

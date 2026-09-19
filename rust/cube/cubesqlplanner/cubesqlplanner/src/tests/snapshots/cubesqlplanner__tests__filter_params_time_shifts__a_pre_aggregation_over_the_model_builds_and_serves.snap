@@ -1,0 +1,13 @@
+---
+source: cubesqlplanner/cubesqlplanner/src/tests/filter_params_time_shifts.rs
+expression: result
+---
+fpts_sales__day_d_day | fpts_sales__amount
+----------------------+-------------------
+2024-12-29 00:00:00   | 729               
+2024-12-30 00:00:00   | 730               
+2024-12-31 00:00:00   | 731               
+2025-01-01 00:00:00   | 732               
+2025-01-02 00:00:00   | 733               
+2025-01-03 00:00:00   | 734               
+2025-01-04 00:00:00   | 735

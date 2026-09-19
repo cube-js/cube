@@ -3,6 +3,132 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.7.42](https://github.com/cube-js/cube/compare/v1.7.41...v1.7.42) (2026-09-18)
+
+**Note:** Version bump only for package @cubejs-backend/native
+
+## [1.7.41](https://github.com/cube-js/cube/compare/v1.7.40...v1.7.41) (2026-09-18)
+
+**Note:** Version bump only for package @cubejs-backend/native
+
+## [1.7.40](https://github.com/cube-js/cube/compare/v1.7.39...v1.7.40) (2026-09-16)
+
+**Note:** Version bump only for package @cubejs-backend/native
+
+## [1.7.39](https://github.com/cube-js/cube/compare/v1.7.38...v1.7.39) (2026-09-15)
+
+### Features
+
+- **server-core:** Redact query values in log events ([#11854](https://github.com/cube-js/cube/issues/11854)) ([99cceac](https://github.com/cube-js/cube/commit/99cceac77f00c8c0a13c0f2c0f4b237b4d97460f))
+- Upgrade rust 1.90.0 -> 1.98.1 (stable) ([#11879](https://github.com/cube-js/cube/issues/11879)) ([da47602](https://github.com/cube-js/cube/commit/da4760206dbc86d2e987f184fc14b7fc4f5b884e))
+
+## [1.7.38](https://github.com/cube-js/cube/compare/v1.7.37...v1.7.38) (2026-09-14)
+
+**Note:** Version bump only for package @cubejs-backend/native
+
+## [1.7.37](https://github.com/cube-js/cube/compare/v1.7.35...v1.7.37) (2026-09-10)
+
+### Features
+
+- Migrate to TypeScript 6.0.3 (prepare for 7) ([#11767](https://github.com/cube-js/cube/issues/11767)) ([98ac580](https://github.com/cube-js/cube/commit/98ac58039be36e7392ac617562d0dad03f17de3c))
+
+## [1.7.36](https://github.com/cube-js/cube/compare/v1.7.35...v1.7.36) (2026-09-09)
+
+### Features
+
+- Migrate to TypeScript 6.0.3 (prepare for 7) ([#11767](https://github.com/cube-js/cube/issues/11767)) ([98ac580](https://github.com/cube-js/cube/commit/98ac58039be36e7392ac617562d0dad03f17de3c))
+
+## [1.7.35](https://github.com/cube-js/cube/compare/v1.7.34...v1.7.35) (2026-09-07)
+
+**Note:** Version bump only for package @cubejs-backend/native
+
+## [1.7.34](https://github.com/cube-js/cube/compare/v1.7.33...v1.7.34) (2026-09-04)
+
+**Note:** Version bump only for package @cubejs-backend/native
+
+## [1.7.33](https://github.com/cube-js/cube/compare/v1.7.32...v1.7.33) (2026-09-03)
+
+### Bug Fixes
+
+- **cubesql:** Coerce `CASE` branch types to a common type ([#11724](https://github.com/cube-js/cube/issues/11724)) ([1842d93](https://github.com/cube-js/cube/commit/1842d93a305a4fe0a4923c64be0aefe852dcef3a))
+- **cubesql:** stop reporting `Continue wait` as a SQL API error ([#11717](https://github.com/cube-js/cube/issues/11717)) ([221e83e](https://github.com/cube-js/cube/commit/221e83e213088a479a0ae7639aa406ab3216b091)), closes [#10649](https://github.com/cube-js/cube/issues/10649)
+
+### Features
+
+- **api-gateway:** Expose `usedPreAggregations` on data responses ([#11591](https://github.com/cube-js/cube/issues/11591)) ([4931901](https://github.com/cube-js/cube/commit/49319017f5ecc556f38859f008c478d8799a4aa9))
+
+## [1.7.32](https://github.com/cube-js/cube/compare/v1.7.31...v1.7.32) (2026-09-01)
+
+**Note:** Version bump only for package @cubejs-backend/native
+
+## [1.7.31](https://github.com/cube-js/cube/compare/v1.7.30...v1.7.31) (2026-08-31)
+
+**Note:** Version bump only for package @cubejs-backend/native
+
+## [1.7.30](https://github.com/cube-js/cube/compare/v1.7.29...v1.7.30) (2026-08-28)
+
+**Note:** Version bump only for package @cubejs-backend/native
+
+## [1.7.29](https://github.com/cube-js/cube/compare/v1.7.28...v1.7.29) (2026-08-27)
+
+**Note:** Version bump only for package @cubejs-backend/native
+
+## [1.7.28](https://github.com/cube-js/cube/compare/v1.7.27...v1.7.28) (2026-08-26)
+
+**Note:** Version bump only for package @cubejs-backend/native
+
+## [1.7.27](https://github.com/cube-js/cube/compare/v1.7.26...v1.7.27) (2026-08-26)
+
+### Bug Fixes
+
+- **backend-native:** treat a client disconnect on /v1/cubesql as a graceful end ([#11649](https://github.com/cube-js/cube/issues/11649)) ([e803c6c](https://github.com/cube-js/cube/commit/e803c6cb58610c5da1a0710664a99d3047a6b3de))
+
+## [1.7.26](https://github.com/cube-js/cube/compare/v1.7.25...v1.7.26) (2026-08-24)
+
+**Note:** Version bump only for package @cubejs-backend/native
+
+## [1.7.25](https://github.com/cube-js/cube/compare/v1.7.24...v1.7.25) (2026-08-21)
+
+**Note:** Version bump only for package @cubejs-backend/native
+
+## [1.7.24](https://github.com/cube-js/cube/compare/v1.7.23...v1.7.24) (2026-08-19)
+
+**Note:** Version bump only for package @cubejs-backend/native
+
+## [1.7.23](https://github.com/cube-js/cube/compare/v1.7.22...v1.7.23) (2026-08-18)
+
+**Note:** Version bump only for package @cubejs-backend/native
+
+## [1.7.22](https://github.com/cube-js/cube/compare/v1.7.21...v1.7.22) (2026-08-18)
+
+### Bug Fixes
+
+- **backend-native:** move to post-installer ^0.1.2, dropping decompress ([#11580](https://github.com/cube-js/cube/issues/11580)) ([06bb751](https://github.com/cube-js/cube/commit/06bb7511c02b57d07d46c050b5c922949e9190e8))
+
+## [1.7.21](https://github.com/cube-js/cube/compare/v1.7.20...v1.7.21) (2026-08-17)
+
+**Note:** Version bump only for package @cubejs-backend/native
+
+## [1.7.20](https://github.com/cube-js/cube/compare/v1.7.19...v1.7.20) (2026-08-16)
+
+### Bug Fixes
+
+- **deps:** bump uuid from 8.3.2 to 11.1.1 across the packages that declare it ([#11534](https://github.com/cube-js/cube/issues/11534)) ([c66cbbe](https://github.com/cube-js/cube/commit/c66cbbe06c0269351395583cef8df64c0d1720ab))
+
+## [1.7.19](https://github.com/cube-js/cube/compare/v1.7.18...v1.7.19) (2026-08-12)
+
+**Note:** Version bump only for package @cubejs-backend/native
+
+## [1.7.18](https://github.com/cube-js/cube/compare/v1.7.17...v1.7.18) (2026-08-09)
+
+**Note:** Version bump only for package @cubejs-backend/native
+
+## [1.7.17](https://github.com/cube-js/cube/compare/v1.7.16...v1.7.17) (2026-08-07)
+
+### Bug Fixes
+
+- **cubesql:** Preserve `lastRefreshTime` with post-processing and SQL pushdown ([#11394](https://github.com/cube-js/cube/issues/11394)) ([3728d62](https://github.com/cube-js/cube/commit/3728d62b260c5d4481c12c918fe260c533a7f47d))
+
 ## [1.7.16](https://github.com/cube-js/cube/compare/v1.7.15...v1.7.16) (2026-07-31)
 
 **Note:** Version bump only for package @cubejs-backend/native

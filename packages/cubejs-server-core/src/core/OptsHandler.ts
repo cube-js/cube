@@ -30,38 +30,25 @@ import {
 } from './types';
 import { lookupDriverClass, isDriver } from './DriverResolvers';
 import type { CubejsServerCore } from './server';
-import optionsValidate from './optionsValidate';
+import { validateOptions } from './optionsValidate';
 
 const { version } = require('../../../package.json');
 
-/**
- * Driver service class.
- */
 export class OptsHandler {
-  /**
-   * Class constructor.
-   */
   public constructor(
     private core: CubejsServerCore,
     private createOptions: CreateOptions,
     private systemOptions?: SystemOptions,
   ) {
-    this.assertOptions(createOptions);
-    const options = cloneDeep(this.createOptions);
+    const options = this.sanitizeOptions(cloneDeep(this.createOptions));
     const driverFactory = this.getDriverFactory(options);
     options.driverFactory = driverFactory;
     options.dbType = this.getDbType(driverFactory);
     this.initializedOptions = this.initializeCoreOptions(options);
   }
 
-  /**
-   * Decorated driverFactory flag.
-   */
   private decoratedFactory = false;
 
-  /**
-   * Returns true if the user provided a custom driverFactory.
-   */
   public isCustomDriverFactory(): boolean {
     return !this.decoratedFactory;
   }
@@ -71,15 +58,9 @@ export class OptsHandler {
    */
   private driverFactoryType: undefined | 'BaseDriver' | 'DriverConfig';
 
-  /**
-   * Initialized options.
-   */
   private initializedOptions: ServerCoreInitializedOptions;
 
-  /**
-   * Assert create options.
-   */
-  private assertOptions(opts: CreateOptions) {
+  private sanitizeOptions<T extends CreateOptions>(opts: T): T {
     if ((opts as any).dbType) {
       throw new Error(
         'CreateOptions.dbType was removed in v1.7.0. ' +
@@ -89,7 +70,10 @@ export class OptsHandler {
       );
     }
 
-    optionsValidate(opts);
+    const validated = validateOptions(opts);
+
+    // Probed for its throw: the only consumer is per-request code (normalizeQuery)
+    getEnv('defaultTimezone');
 
     if (
       !this.isDevMode() &&
@@ -100,6 +84,8 @@ export class OptsHandler {
         'Either CUBEJS_DB_TYPE or CreateOptions.driverFactory must be specified'
       );
     }
+
+    return validated;
   }
 
   /**
@@ -347,7 +333,7 @@ export class OptsHandler {
       displayCLIWarning(
         'Cube Store is not found. Please follow this documentation ' +
         'to configure Cube Store ' +
-        'https://cube.dev/docs/caching/running-in-production'
+        'https://docs.cube.dev/cube-core/running-in-production'
       );
     }
 
@@ -355,7 +341,7 @@ export class OptsHandler {
       displayCLIWarning(
         `Using ${externalDbType} as an external database is deprecated. ` +
         'Please use Cube Store instead: ' +
-        'https://cube.dev/docs/caching/running-in-production'
+        'https://docs.cube.dev/cube-core/running-in-production'
       );
     }
 
@@ -421,6 +407,7 @@ export class OptsHandler {
       dashboardAppPort: 3000,
       scheduledRefreshConcurrency: getEnv('scheduledRefreshQueriesPerAppId'),
       scheduledRefreshBatchSize: getEnv('scheduledRefreshBatchSize'),
+      compilerCacheSize: getEnv('compilerCacheSize'),
       preAggregationsSchema:
         getEnv('preAggregationsSchema') ||
         (this.isDevMode()
@@ -449,8 +436,8 @@ export class OptsHandler {
         warning: (
           'You are using multitenancy without configuring scheduledRefreshContexts, ' +
           'which can lead to issues where the security context will be undefined ' +
-          'while Cube.js will do background refreshing: ' +
-          'https://cube.dev/docs/config#options-reference-scheduled-refresh-contexts'
+          'while Cube will do background refreshing: ' +
+          'https://docs.cube.dev/reference/configuration/config#scheduled_refresh_contexts'
         ),
       });
     }
@@ -616,8 +603,10 @@ export class OptsHandler {
       ? clone.rollupOnlyMode
       : getEnv('rollupOnlyMode');
 
-    // query queue options
     clone.queryCacheOptions = clone.queryCacheOptions || {};
+    clone.queryCacheOptions.localRefreshKey = getEnv('refreshKeyLocalTime');
+
+    // query queue options
     clone.queryCacheOptions.queueOptions = this.queueOptionsWrapper(
       context,
       clone.queryCacheOptions.queueOptions,

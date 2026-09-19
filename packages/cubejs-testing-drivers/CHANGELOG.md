@@ -3,6 +3,132 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.7.42](https://github.com/cube-js/cube/compare/v1.7.41...v1.7.42) (2026-09-18)
+
+**Note:** Version bump only for package @cubejs-backend/testing-drivers
+
+## [1.7.41](https://github.com/cube-js/cube/compare/v1.7.40...v1.7.41) (2026-09-18)
+
+### Features
+
+- Upgrade deps (clear 52 Dependabot alerts) ([#11853](https://github.com/cube-js/cube/issues/11853)) ([c3ba115](https://github.com/cube-js/cube/commit/c3ba11507d94389941e1f78a39286277a1e112c7))
+
+## [1.7.40](https://github.com/cube-js/cube/compare/v1.7.39...v1.7.40) (2026-09-16)
+
+**Note:** Version bump only for package @cubejs-backend/testing-drivers
+
+## [1.7.39](https://github.com/cube-js/cube/compare/v1.7.38...v1.7.39) (2026-09-15)
+
+### Bug Fixes
+
+- **tesseract:** bound a rolling window's base scan by literals ([#11870](https://github.com/cube-js/cube/issues/11870)) ([af79bfe](https://github.com/cube-js/cube/commit/af79bfe4802277a34b5cc593917b83826238016d)), closes [#11770](https://github.com/cube-js/cube/issues/11770) [high-cardinality](https://github.com/hi/issues/cardinality)
+
+## [1.7.38](https://github.com/cube-js/cube/compare/v1.7.37...v1.7.38) (2026-09-14)
+
+**Note:** Version bump only for package @cubejs-backend/testing-drivers
+
+## [1.7.37](https://github.com/cube-js/cube/compare/v1.7.35...v1.7.37) (2026-09-10)
+
+### Bug Fixes
+
+- **tesseract:** generate the time series in SQL on Snowflake ([#11785](https://github.com/cube-js/cube/issues/11785)) ([bd426cb](https://github.com/cube-js/cube/commit/bd426cb1c1d431eccd2c35958e5a1e1574335b6a))
+
+### Features
+
+- Migrate to TypeScript 6.0.3 (prepare for 7) ([#11767](https://github.com/cube-js/cube/issues/11767)) ([98ac580](https://github.com/cube-js/cube/commit/98ac58039be36e7392ac617562d0dad03f17de3c))
+
+## [1.7.36](https://github.com/cube-js/cube/compare/v1.7.35...v1.7.36) (2026-09-09)
+
+### Bug Fixes
+
+- **tesseract:** generate the time series in SQL on Snowflake ([#11785](https://github.com/cube-js/cube/issues/11785)) ([bd426cb](https://github.com/cube-js/cube/commit/bd426cb1c1d431eccd2c35958e5a1e1574335b6a))
+
+### Features
+
+- Migrate to TypeScript 6.0.3 (prepare for 7) ([#11767](https://github.com/cube-js/cube/issues/11767)) ([98ac580](https://github.com/cube-js/cube/commit/98ac58039be36e7392ac617562d0dad03f17de3c))
+
+## [1.7.35](https://github.com/cube-js/cube/compare/v1.7.34...v1.7.35) (2026-09-07)
+
+**Note:** Version bump only for package @cubejs-backend/testing-drivers
+
+## [1.7.34](https://github.com/cube-js/cube/compare/v1.7.33...v1.7.34) (2026-09-04)
+
+### Bug Fixes
+
+- **tesseract:** honour a custom granularity origin on single-unit intervals ([#11742](https://github.com/cube-js/cube/issues/11742)) ([4335ea5](https://github.com/cube-js/cube/commit/4335ea512069d6ec6603a5b81cfa71fd23f4c801))
+
+## [1.7.33](https://github.com/cube-js/cube/compare/v1.7.32...v1.7.33) (2026-09-03)
+
+### Features
+
+- **api-gateway:** Expose `usedPreAggregations` on data responses ([#11591](https://github.com/cube-js/cube/issues/11591)) ([4931901](https://github.com/cube-js/cube/commit/49319017f5ecc556f38859f008c478d8799a4aa9))
+
+## [1.7.32](https://github.com/cube-js/cube/compare/v1.7.31...v1.7.32) (2026-09-01)
+
+**Note:** Version bump only for package @cubejs-backend/testing-drivers
+
+## [1.7.31](https://github.com/cube-js/cube/compare/v1.7.30...v1.7.31) (2026-08-31)
+
+**Note:** Version bump only for package @cubejs-backend/testing-drivers
+
+## [1.7.30](https://github.com/cube-js/cube/compare/v1.7.29...v1.7.30) (2026-08-28)
+
+**Note:** Version bump only for package @cubejs-backend/testing-drivers
+
+## [1.7.29](https://github.com/cube-js/cube/compare/v1.7.28...v1.7.29) (2026-08-27)
+
+**Note:** Version bump only for package @cubejs-backend/testing-drivers
+
+## [1.7.28](https://github.com/cube-js/cube/compare/v1.7.27...v1.7.28) (2026-08-26)
+
+**Note:** Version bump only for package @cubejs-backend/testing-drivers
+
+## [1.7.27](https://github.com/cube-js/cube/compare/v1.7.26...v1.7.27) (2026-08-26)
+
+**Note:** Version bump only for package @cubejs-backend/testing-drivers
+
+## [1.7.26](https://github.com/cube-js/cube/compare/v1.7.25...v1.7.26) (2026-08-24)
+
+**Note:** Version bump only for package @cubejs-backend/testing-drivers
+
+## [1.7.25](https://github.com/cube-js/cube/compare/v1.7.24...v1.7.25) (2026-08-21)
+
+**Note:** Version bump only for package @cubejs-backend/testing-drivers
+
+## [1.7.24](https://github.com/cube-js/cube/compare/v1.7.23...v1.7.24) (2026-08-19)
+
+**Note:** Version bump only for package @cubejs-backend/testing-drivers
+
+## [1.7.23](https://github.com/cube-js/cube/compare/v1.7.22...v1.7.23) (2026-08-18)
+
+**Note:** Version bump only for package @cubejs-backend/testing-drivers
+
+## [1.7.22](https://github.com/cube-js/cube/compare/v1.7.21...v1.7.22) (2026-08-18)
+
+**Note:** Version bump only for package @cubejs-backend/testing-drivers
+
+## [1.7.21](https://github.com/cube-js/cube/compare/v1.7.20...v1.7.21) (2026-08-17)
+
+**Note:** Version bump only for package @cubejs-backend/testing-drivers
+
+## [1.7.20](https://github.com/cube-js/cube/compare/v1.7.19...v1.7.20) (2026-08-16)
+
+### Bug Fixes
+
+- **schema-compiler:** escape LIKE wildcards on the native planner ([#11569](https://github.com/cube-js/cube/issues/11569)) ([f050c08](https://github.com/cube-js/cube/commit/f050c080aab52eefbd7c20fef257f3852c66f634)), closes [#11570](https://github.com/cube-js/cube/issues/11570)
+
+## [1.7.19](https://github.com/cube-js/cube/compare/v1.7.18...v1.7.19) (2026-08-12)
+
+**Note:** Version bump only for package @cubejs-backend/testing-drivers
+
+## [1.7.18](https://github.com/cube-js/cube/compare/v1.7.17...v1.7.18) (2026-08-09)
+
+**Note:** Version bump only for package @cubejs-backend/testing-drivers
+
+## [1.7.17](https://github.com/cube-js/cube/compare/v1.7.16...v1.7.17) (2026-08-07)
+
+**Note:** Version bump only for package @cubejs-backend/testing-drivers
+
 ## [1.7.16](https://github.com/cube-js/cube/compare/v1.7.15...v1.7.16) (2026-07-31)
 
 **Note:** Version bump only for package @cubejs-backend/testing-drivers

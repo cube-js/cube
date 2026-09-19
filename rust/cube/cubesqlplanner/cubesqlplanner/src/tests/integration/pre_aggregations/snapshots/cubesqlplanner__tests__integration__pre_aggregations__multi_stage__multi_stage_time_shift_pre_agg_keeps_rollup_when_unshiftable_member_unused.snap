@@ -1,0 +1,9 @@
+---
+source: cubesqlplanner/cubesqlplanner/src/tests/integration/pre_aggregations/multi_stage.rs
+expression: result
+---
+mdd_events__batch_at_month | mdd_events__total | mdd_events__total_prev_month
+---------------------------+-------------------+-----------------------------
+2024-01-01T00:00:00.000Z   | 1000              | 1000                        
+2024-02-01T00:00:00.000Z   | 2500              | 2500                        
+2024-03-01T00:00:00.000Z   | 1000              | 1000

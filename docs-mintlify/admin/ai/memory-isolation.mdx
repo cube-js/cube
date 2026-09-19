@@ -11,7 +11,9 @@ Memories are scoped and enforced at the Tenant/Space boundary. Cube applies both
 
 ### Space-Scoped Memories
 
-Cube memories are stored at the Space level. Agents only learn from and retrieve memories within the current Space, ensuring no cross-Space exposure by design. 
+Cube memories are stored at the Space level. Agents only learn from and retrieve memories within the current Space, ensuring no cross-Space exposure by design.
+
+Because a Space can be [scoped globally or to a single deployment](/admin/ai/multi-agent#space-scope), that boundary also decides whether memories are shared across deployments: agents in different deployments that use the same global Space share its memories, while a Space scoped to one deployment keeps them to that deployment.
 
 ### Tenant-Aware Security Context
 

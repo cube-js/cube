@@ -407,6 +407,66 @@ ORDER BY 1;
 | 9m            |                2610 |                810 |
 | 12m           |                3300 |               1440 |
 
+## Pre-aggregations
+
+Add a [`rollup`][ref-rollup] over the per-window measures to accelerate these
+queries. `growth_window` is a [`switch` dimension][ref-switch], so it does not
+have to be included: [pre-aggregation matching][ref-matching-switch-dimensions]
+applies the selected value over the rollup scan. Leaving it out also keeps the
+rollup small — including it would multiply the rows by every window in the set.
+
+List the per-window measures, not the four `case` measures: the `case` measures
+are [multi-stage][ref-multi-stage] and dispatch to the per-window ones, and it's
+those that the rollup has to name to be matched.
+
+In the JavaScript model, reference them through `CUBE[...]` rather than by name
+as strings. Cube resolves member references by recording them as they're
+accessed, so a string never registers as one — the rollup compiles with an empty
+measure list and silently matches nothing.
+
+<CodeGroup>
+
+```yaml title="YAML"
+{%- set windows = [3, 6, 9, 12] -%}
+
+cubes:
+  - name: gross_sales
+    # ...
+
+    pre_aggregations:
+      - name: rolling
+        measures:
+          {%- for months in windows %}
+          - r{{ months }}_gross_sales
+          {%- endfor %}
+        time_dimension: month
+        granularity: month
+```
+
+```javascript title="JavaScript"
+const windows = [3, 6, 9, 12];
+
+cube(`gross_sales`, {
+  // ...
+
+  pre_aggregations: {
+    rolling: {
+      measures: windows.map(months => CUBE[`r${months}_gross_sales`]),
+      time_dimension: month,
+      granularity: `month`
+    }
+  }
+});
+```
+
+</CodeGroup>
+
+Query the view exactly as above. When querying through the REST (JSON) API,
+provide the date range via [`timeDimensions`][ref-time-dimensions-format] rather
+than an [`inDateRange` filter][ref-in-date-range] — a filter is matched as a
+generic dimension filter, which requires the time dimension to be listed in the
+rollup's `dimensions`.
+
 ## Related recipes
 
 - If you need a single fixed window rather than a consumer-selectable one, see
@@ -423,6 +483,11 @@ ORDER BY 1;
 
 [ref-switch]: /reference/data-modeling/dimensions#type
 [ref-case]: /reference/data-modeling/measures#case
+[ref-rollup]: /reference/data-modeling/pre-aggregations#rollup
+[ref-multi-stage]: /reference/data-modeling/measures#multi_stage
+[ref-matching-switch-dimensions]: /docs/pre-aggregations/matching-pre-aggregations#matching-switch-dimensions
+[ref-time-dimensions-format]: /reference/core-data-apis/rest-api/query-format#time-dimensions-format
+[ref-in-date-range]: /reference/core-data-apis/rest-api/query-format#indaterange
 [ref-rolling-window]: /reference/data-modeling/measures#rolling_window
 [ref-time-shift]: /reference/data-modeling/measures#time_shift
 [ref-view]: /reference/data-modeling/view

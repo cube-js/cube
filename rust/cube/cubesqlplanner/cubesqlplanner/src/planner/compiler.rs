@@ -252,12 +252,36 @@ impl Compiler {
         cube_name: &String,
         member_sql: Rc<dyn MemberSql>,
     ) -> Result<Rc<SqlCall>, CubeError> {
+        self.compile_sql_call_impl(cube_name, member_sql, false)
+    }
+
+    /// Compiles a cube's own `sql`, where a member reference is rejected
+    /// rather than resolved.
+    pub fn compile_cube_sql_call(
+        &mut self,
+        cube_name: &String,
+        member_sql: Rc<dyn MemberSql>,
+    ) -> Result<Rc<SqlCall>, CubeError> {
+        self.compile_sql_call_impl(cube_name, member_sql, true)
+    }
+
+    fn compile_sql_call_impl(
+        &mut self,
+        cube_name: &String,
+        member_sql: Rc<dyn MemberSql>,
+        is_cube_sql: bool,
+    ) -> Result<Rc<SqlCall>, CubeError> {
         let call_builder = SqlCallBuilder::new(
             self,
             self.cube_evaluator.clone(),
             self.base_tools.clone(),
             self.security_context.clone(),
         );
+        let call_builder = if is_cube_sql {
+            call_builder.for_cube_sql()
+        } else {
+            call_builder
+        };
         let sql_call = call_builder.build(&cube_name, member_sql.clone())?;
         Ok(Rc::new(sql_call))
     }

@@ -25,8 +25,8 @@ export const writePackageJson = async (json: any) => fs.writeJson('package.json'
   EOL: os.EOL
 });
 
-export const npmInstall = (dependencies: string[], isDev?: boolean) => executeCommand(
-  'npm', ['install', isDev ? '--save-dev' : '--save'].concat(dependencies)
+export const npmInstallDev = (dependencies: string[]) => executeCommand(
+  'npm', ['install', '--save-dev'].concat(dependencies)
 );
 
 export const displayWarning = (message: string) => {

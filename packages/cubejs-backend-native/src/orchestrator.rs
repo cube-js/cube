@@ -38,6 +38,7 @@ pub struct ResultWrapper {
     transformed_data: Option<TransformedData>,
     pub last_refresh_time: Option<String>,
     pub external: bool,
+    pub used_pre_aggregations: Option<serde_json::Value>,
 }
 
 impl ResultWrapper {
@@ -115,6 +116,7 @@ impl ResultWrapper {
             transformed_data: None,
             last_refresh_time: None,
             external: false,
+            used_pre_aggregations: None,
         })
     }
 
@@ -267,8 +269,8 @@ pub fn get_cubestore_result(mut cx: FunctionContext) -> JsResult<JsValue> {
             let js_row = cx.execute_scoped(|mut cx| {
                 let js_row = JsObject::new(&mut cx);
 
-                for (col_idx, js_key) in js_keys.iter().enumerate() {
-                    let value = &columns[col_idx][row_idx];
+                for (js_key, column) in js_keys.iter().zip(columns.iter()) {
+                    let value = &column[row_idx];
                     let js_value: Handle<'_, JsValue> = match value {
                         DBResponsePrimitive::Null => cx.null().upcast(),
                         // For compatibility, we convert all primitives to strings

@@ -5,9 +5,7 @@ import { CSS_PROPERTIES } from '../variables';
 const GlobalStyles = createGlobalStyle`
   body {
     ${Object.entries(CSS_PROPERTIES)
-      .map(([key, value]) => {
-        return `${key}: ${value};`;
-      })
+      .map(([key, value]) => `${key}: ${value};`)
       .join('\n    ')}
   }
 

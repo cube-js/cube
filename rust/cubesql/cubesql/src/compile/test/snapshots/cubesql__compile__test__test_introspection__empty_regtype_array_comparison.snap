@@ -1,0 +1,9 @@
+---
+source: cubesql/src/compile/test/test_introspection.rs
+expression: "execute_query(r#\"\n            SELECT\n              a.atttypid = ANY ('{}'::regtype[]) AS is_matched,\n              a.atttypid::regtype = ANY ('{}'::regtype[]) AS is_matched_as_regtype,\n              a.atttypid::regtype = ANY (ARRAY[]) AS is_matched_in_untyped_array\n            FROM pg_catalog.pg_attribute a\n              JOIN pg_catalog.pg_class c ON a.attrelid = c.oid\n            WHERE c.relname = 'KibanaSampleDataEcommerce'\n              AND a.attnum = 1\n            \"#.to_string(),\nDatabaseProtocol::PostgreSQL).await?"
+---
++------------+-----------------------+-----------------------------+
+| is_matched | is_matched_as_regtype | is_matched_in_untyped_array |
++------------+-----------------------+-----------------------------+
+| false      | false                 | false                       |
++------------+-----------------------+-----------------------------+

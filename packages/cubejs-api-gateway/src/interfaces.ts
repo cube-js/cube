@@ -92,11 +92,11 @@ export {
  * Context rejection middleware.
  */
 export type ContextRejectionMiddlewareFn =
- (
-   req: Request,
-   res: ExpressResponse,
-   next: ExpressNextFunction,
- ) => void;
+  (
+    req: Request,
+    res: ExpressResponse,
+    next: ExpressNextFunction,
+  ) => void;
 
 type ContextAcceptorResult = { accepted: boolean; rejectMessage?: any };
 

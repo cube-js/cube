@@ -1,0 +1,9 @@
+---
+source: cubesqlplanner/cubesqlplanner/src/tests/integration/calculated_multi_fact.rs
+expression: result
+---
+payment_meta__value | payments__success_count | payments__count
+--------------------+-------------------------+----------------
+A                   | 2                       | 3              
+B                   | 1                       | 1              
+C                   | 1                       | 1

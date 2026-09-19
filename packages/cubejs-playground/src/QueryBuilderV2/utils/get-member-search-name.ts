@@ -8,13 +8,17 @@ export function getMemberSearchName(
 ) {
   const name = member.name.split('.')[1] ?? member.name;
 
-  return (
-    (memberViewType === 'name'
-      ? name
-      : 'shortTitle' in member
-        ? member.shortTitle
-        : 'title' in member
-          ? member.title
-          : name) ?? name
-  );
+  if (memberViewType === 'name') {
+    return name;
+  }
+
+  if ('shortTitle' in member) {
+    return member.shortTitle ?? name;
+  }
+
+  if ('title' in member) {
+    return member.title ?? name;
+  }
+
+  return name;
 }

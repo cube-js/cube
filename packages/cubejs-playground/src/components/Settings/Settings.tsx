@@ -62,7 +62,7 @@ export default function Settings({
         show={orderShown}
         disabled={!isQueryPresent || disabled}
         style={{ border: 0 }}
-        overlay={
+        overlay={(
           <div
             style={{
               padding: '8px',
@@ -77,7 +77,7 @@ export default function Settings({
               onOrderChange={onOrderChange}
             />
           </div>
-        }
+        )}
         onOverlayOpen={() => setOrderShown(true)}
         onOverlayClose={() => setOrderShown(false)}
       >
@@ -89,29 +89,28 @@ export default function Settings({
         show={limitShown}
         disabled={!isQueryPresent || disabled}
         style={{ border: 0 }}
-        overlay={
+        overlay={(
           <div
             style={{
               padding: '8px',
               background: 'white',
             }}
           >
-            <label>
-              <InputNumber
-                prefix="Limit"
-                type="number"
-                value={limit}
-                step={500}
-                min={0}
-                onChange={setLimit}
-                onPressEnter={() => {
-                  onUpdate({ limit });
-                  setLimitShown(false);
-                }}
-              />
-            </label>
+            <InputNumber
+              aria-label="Limit"
+              prefix="Limit"
+              type="number"
+              value={limit}
+              step={500}
+              min={0}
+              onChange={setLimit}
+              onPressEnter={() => {
+                onUpdate({ limit });
+                setLimitShown(false);
+              }}
+            />
           </div>
-        }
+        )}
         onOverlayOpen={() => setLimitShown(true)}
         onOverlayClose={() => setLimitShown(false)}
       >

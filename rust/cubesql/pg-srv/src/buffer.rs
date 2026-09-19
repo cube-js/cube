@@ -61,6 +61,9 @@ impl MessageTagParser for MessageTagParserDefaultImpl {
             b'X' => FrontendMessage::Terminate,
             b'H' => FrontendMessage::Flush,
             b'S' => FrontendMessage::Sync,
+            b'd' => FrontendMessage::CopyData(protocol::CopyData::deserialize(cursor).await?),
+            b'c' => FrontendMessage::CopyDone,
+            b'f' => FrontendMessage::CopyFail(protocol::CopyFail::deserialize(cursor).await?),
             identifier => {
                 return Err(ErrorResponse::error(
                     ErrorCode::DataException,
@@ -92,10 +95,11 @@ pub async fn read_message<Reader: AsyncReadExt + Unpin + Send>(
 pub const MAX_STARTUP_PACKET_LENGTH: u32 = 10 * 1024;
 pub const MAX_AUTH_MESSAGE_LENGTH: u32 = 64 * 1024;
 
-/// Upper bound for any frontend message on an authenticated connection.
-/// PostgreSQL allows ~1 GiB (`PQ_LARGE_MESSAGE_LIMIT`), but without COPY
-/// support the largest legitimate messages are query texts (Query/Parse)
-/// and Bind parameters; 10 MiB covers machine-generated SQL from BI tools.
+/// Upper bound for any frontend message on an authenticated connection, CopyData
+/// of a `COPY ... FROM STDIN` included. PostgreSQL allows ~1 GiB
+/// (`PQ_LARGE_MESSAGE_LIMIT`), but the whole message is buffered before it is
+/// parsed, and no more data than this can be loaded into a temporary table
+/// anyway; 10 MiB also covers machine-generated SQL from BI tools.
 pub const MAX_FRONTEND_MESSAGE_LENGTH: u32 = 10 * 1024 * 1024;
 
 /// Upper bound for a single Bind parameter value. A parameter can never

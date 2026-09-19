@@ -95,6 +95,7 @@ describe('SQL Generation', () => {
           'ORDER BY  2  DESC';
       expect(queryAndParams[0]).toEqual(expected);
     });
+
     it('Simple query - time dimension', async () => {
       await compilers.compiler.compile();
 
@@ -122,6 +123,66 @@ describe('SQL Generation', () => {
       expect(queryAndParams[0]).toContain('GROUP BY 1, 2');
       expect(queryAndParams[0]).toContain('ORDER BY  2');
     });
+
+    const buildTimezoneQuery = (timezone: string) => new PostgresQuery(compilers, {
+      measures: ['cards.count'],
+      timeDimensions: [
+        {
+          dimension: 'cards.createdAt',
+          granularity: 'day',
+          dateRange: ['2021-01-01', '2021-01-02']
+        }
+      ],
+      timezone,
+      filters: [],
+    });
+
+    it.each([
+      'Not/AZone',
+      '+05:00',
+      '+05',
+      '05',
+      'foo/bar',
+    ])('rejects invalid timezone %j', async (timezone) => {
+      await compilers.compiler.compile();
+      expect(() => buildTimezoneQuery(timezone)).toThrow(UserError);
+    });
+
+    it.each([
+      'America/New_York',
+      'america/new_york',
+      'AMERICA/NEW_YORK',
+      'utc',
+      'uTc',
+    ])('accepts valid timezone regardless of case: %s', async (timezone) => {
+      await compilers.compiler.compile();
+      expect(() => buildTimezoneQuery(timezone)).not.toThrow();
+    });
+
+    it('renders a canonical timezone into SQL', async () => {
+      await compilers.compiler.compile();
+      const [sql] = buildTimezoneQuery('America/New_York').buildSqlAndParams();
+      expect(sql).toContain("AT TIME ZONE 'America/New_York'");
+    });
+
+    // Counterpart: query_tools.rs `format!("Incorrect timezone {}", timezone)`.
+    it('reports the invalid zone with the same message as the native planner', async () => {
+      await compilers.compiler.compile();
+      expect(() => buildTimezoneQuery('Not/AZone')).toThrow('Incorrect timezone Not/AZone');
+    });
+
+    // The native planner parses the zone case-sensitively, so the name reaching the
+    // dialects has to be the canonical one whichever planner runs.
+    it.each([
+      ['utc', 'UTC'],
+      ['america/new_york', 'America/New_York'],
+    ])('canonicalizes timezone %j to %j', async (timezone, expected) => {
+      await compilers.compiler.compile();
+      const query = buildTimezoneQuery(timezone);
+      expect(query.timezone).toBe(expected);
+      expect(query.buildSqlAndParams()[0]).toContain(`AT TIME ZONE '${expected}'`);
+    });
+
     it('Simple query - complex measure', async () => {
       await compilers.compiler.compile();
 
@@ -137,6 +198,7 @@ describe('SQL Generation', () => {
           'FROM  card_tbl  AS "cards"';
       expect(queryAndParams[0]).toEqual(expected);
     });
+
     it('Simple query - complex dimension', async () => {
       await compilers.compiler.compile();
 
@@ -157,6 +219,7 @@ describe('SQL Generation', () => {
           'ORDER BY  2  DESC';
       expect(queryAndParams[0]).toEqual(expected);
     });
+
     it('Simple query - CUBE dimension', async () => {
       await compilers.compiler.compile();
 
@@ -177,6 +240,7 @@ describe('SQL Generation', () => {
           'ORDER BY  2  DESC';
       expect(queryAndParams[0]).toEqual(expected);
     });
+
     it('Simple query - CUBE id', async () => {
       await compilers.compiler.compile();
 
@@ -197,6 +261,7 @@ describe('SQL Generation', () => {
           'ORDER BY  2  DESC';
       expect(queryAndParams[0]).toEqual(expected);
     });
+
     it('Simple query - simple filter', async () => {
       await compilers.compiler.compile();
 
@@ -241,6 +306,7 @@ describe('SQL Generation', () => {
       const expectedParams = ['type_value', 'not_type_value', 'type_value'];
       expect(queryAndParams[1]).toEqual(expectedParams);
     });
+
     it('Simple query - null and many equals filter', async () => {
       await compilers.compiler.compile();
 
@@ -1301,6 +1367,75 @@ describe('SQL Generation', () => {
         expect(error).toBeInstanceOf(UserError);
       }
     });
+
+    it('Test for everyRefreshKeyParts', async () => {
+      await compilers.compiler.compile();
+
+      const timezone = 'America/Los_Angeles';
+      const query = new PostgresQuery(compilers, {
+        measures: ['cards.count'],
+        timeDimensions: [],
+        filters: [],
+        timezone,
+      });
+
+      const utcOffset = moment.tz(timezone).utcOffset() * 60;
+
+      expect(query.everyRefreshKeyParts({ every: '1 hour' }))
+        .toEqual({ utcOffset, interval: 3600, dayOffset: 0, cron: false });
+      expect(query.everyRefreshKeyParts({ every: '10 seconds' }))
+        .toEqual({ utcOffset, interval: 10, dayOffset: 0, cron: false });
+      expect(query.everyRefreshKeyParts({ every: '10 minute' }))
+        .toEqual({ utcOffset, interval: 600, dayOffset: 0, cron: false });
+
+      expect(query.everyRefreshKeyParts({ every: '0 * * * *', timezone }))
+        .toEqual({ utcOffset, interval: 3600, dayOffset: 0, cron: true });
+      expect(query.everyRefreshKeyParts({ every: '0 10 * * *', timezone }))
+        .toEqual({ utcOffset, interval: 86400, dayOffset: 36000, cron: true });
+      expect(query.everyRefreshKeyParts({ every: '30 5 * * 5', timezone }))
+        .toEqual({ utcOffset, interval: 604800, dayOffset: 106200, cron: true });
+    });
+
+    it('everyRefreshKeyParts agrees with the SQL it renders', async () => {
+      await compilers.compiler.compile();
+
+      const timezone = 'America/Los_Angeles';
+      const query = new PostgresQuery(compilers, {
+        measures: ['cards.count'],
+        timeDimensions: [],
+        filters: [],
+        timezone,
+      });
+
+      // Pins the clock to `t` so the emitted SQL can be compared against what the
+      // orchestrator now computes from the descriptor instead.
+      const evalSql = (sql: string, t: number) => {
+        const asJs = sql
+          .split('EXTRACT(EPOCH FROM NOW())').join(String(t))
+          .split('FLOOR').join('Math.floor');
+        // eslint-disable-next-line no-new-func
+        return Function(`"use strict"; return (${asJs});`)();
+      };
+
+      const refreshKeys = [
+        { every: '10 seconds' },
+        { every: '10 minute' },
+        { every: '1 hour' },
+        { every: '7 day' },
+        { every: '0 * * * *', timezone },
+        { every: '0 10 * * *', timezone },
+        { every: '30 5 * * 5', timezone },
+      ];
+
+      for (const refreshKey of refreshKeys) {
+        const [sql] = query.everyRefreshKeySql(refreshKey);
+        const { utcOffset, interval, dayOffset } = query.everyRefreshKeyParts(refreshKey);
+
+        for (const t of [0, 1, 1_500_000_000, 1_767_225_600]) {
+          expect(Math.floor((utcOffset + t - dayOffset) / interval)).toEqual(evalSql(sql, t));
+        }
+      }
+    });
   });
 
   describe('refreshKey from schema', () => {
@@ -1523,6 +1658,188 @@ describe('SQL Generation', () => {
           }
         ]
       ]);
+    });
+  });
+
+  describe('refreshKey local time evaluation', () => {
+    const compilers = /** @type Compilers */ prepareJsCompiler(
+      createCubeSchema({
+        name: 'cards',
+        refreshKey: `
+        refreshKey: {
+          every: '10 minute',
+        },
+      `,
+        preAggregations: `
+        countCreatedAt: {
+            type: 'rollup',
+            external: true,
+            measureReferences: [count],
+            timeDimensionReference: createdAt,
+            granularity: \`day\`,
+            partitionGranularity: \`month\`,
+            refreshKey: {
+              every: '1 hour',
+            },
+            scheduledRefresh: true,
+        },
+        maxCreatedAt: {
+            type: 'rollup',
+            external: true,
+            measureReferences: [max],
+            timeDimensionReference: createdAt,
+            granularity: \`day\`,
+            partitionGranularity: \`month\`,
+            refreshKey: {
+              sql: 'SELECT MAX(created_at) FROM cards',
+            },
+            scheduledRefresh: true,
+        },
+        minCreatedAt: {
+            type: 'rollup',
+            external: false,
+            measureReferences: [min],
+            timeDimensionReference: createdAt,
+            granularity: \`day\`,
+            partitionGranularity: \`month\`,
+            refreshKey: {
+              every: '1 hour',
+              incremental: true,
+            },
+            scheduledRefresh: true,
+        },
+      `
+      })
+    );
+
+    const timezone = 'America/Los_Angeles';
+
+    const newQuery = (query: any) => new PostgresQuery(compilers, {
+      timeDimensions: [],
+      filters: [],
+      timezone,
+      localRefreshKey: true,
+      ...query,
+    });
+
+    it('carries the descriptor on a cube refreshKey.every', async () => {
+      await compilers.compiler.compile();
+
+      const utcOffset = moment.tz(timezone).utcOffset() * 60;
+      const query = newQuery({ measures: ['cards.sum'], externalQueryClass: MssqlQuery });
+
+      expect(query.cacheKeyQueries()).toEqual([
+        [
+          `SELECT FLOOR((${utcOffset} + DATEDIFF(SECOND,'1970-01-01', GETUTCDATE())) / 600) as refresh_key`,
+          [],
+          {
+            external: true,
+            renewalThreshold: 60,
+            localRefreshKey: { utcOffset, interval: 600, dayOffset: 0, cron: false },
+          }
+        ]
+      ]);
+    });
+
+    it('carries the descriptor on a pre-aggregation refreshKey.every', async () => {
+      await compilers.compiler.compile();
+
+      const utcOffset = moment.tz(timezone).utcOffset() * 60;
+      const query = newQuery({ measures: ['cards.count'], externalQueryClass: MssqlQuery });
+
+      const preAggregations: any = query.newPreAggregations().preAggregationsDescription();
+      expect(preAggregations.length).toEqual(1);
+      expect(preAggregations[0].invalidateKeyQueries).toEqual([
+        [
+          `SELECT FLOOR((${utcOffset} + DATEDIFF(SECOND,'1970-01-01', GETUTCDATE())) / 3600) as refresh_key`,
+          [],
+          {
+            external: true,
+            renewalThreshold: 300,
+            localRefreshKey: { utcOffset, interval: 3600, dayOffset: 0, cron: false },
+          }
+        ]
+      ]);
+    });
+
+    it('leaves refreshKey.sql on the SQL path', async () => {
+      await compilers.compiler.compile();
+
+      const query = newQuery({ measures: ['cards.max'], externalQueryClass: MssqlQuery });
+
+      const preAggregations: any = query.newPreAggregations().preAggregationsDescription();
+      expect(preAggregations.length).toEqual(1);
+      expect(preAggregations[0].invalidateKeyQueries[0][2]).not.toHaveProperty('localRefreshKey');
+    });
+
+    it('leaves an incremental refreshKey on the SQL path', async () => {
+      await compilers.compiler.compile();
+
+      const query = newQuery({
+        measures: ['cards.min'],
+        timeDimensions: [{
+          dimension: 'cards.createdAt',
+          granularity: 'day',
+          dateRange: ['2016-12-30', '2017-01-05']
+        }],
+        externalQueryClass: MssqlQuery,
+      });
+
+      const preAggregations: any = query.newPreAggregations().preAggregationsDescription();
+      expect(preAggregations.length).toEqual(1);
+      expect(preAggregations[0].invalidateKeyQueries[0][2]).toMatchObject({ incremental: true });
+      expect(preAggregations[0].invalidateKeyQueries[0][2]).not.toHaveProperty('localRefreshKey');
+    });
+  });
+
+  describe('refreshKey local time evaluation (cube without refreshKey)', () => {
+    const compilers = /** @type Compilers */ prepareJsCompiler(
+      createCubeSchema({
+        name: 'cards',
+        preAggregations: `
+        countCreatedAt: {
+            type: 'rollup',
+            external: true,
+            measureReferences: [count],
+            timeDimensionReference: createdAt,
+            granularity: \`day\`,
+            partitionGranularity: \`month\`,
+            scheduledRefresh: true,
+        },
+      `
+      })
+    );
+
+    it('falls back to the hourly default with a descriptor', async () => {
+      await compilers.compiler.compile();
+
+      const query = new PostgresQuery(compilers, {
+        measures: ['cards.count'],
+        timeDimensions: [],
+        filters: [],
+        timezone: 'UTC',
+        localRefreshKey: true,
+      });
+
+      const preAggregations: any = query.newPreAggregations().preAggregationsDescription();
+      expect(preAggregations.length).toEqual(1);
+      expect(preAggregations[0].invalidateKeyQueries[0][2].localRefreshKey)
+        .toEqual({ utcOffset: 0, interval: 3600, dayOffset: 0, cron: false });
+    });
+
+    it('emits no descriptor when the flag is off', async () => {
+      await compilers.compiler.compile();
+
+      const query = new PostgresQuery(compilers, {
+        measures: ['cards.count'],
+        timeDimensions: [],
+        filters: [],
+        timezone: 'UTC',
+      });
+
+      const preAggregations: any = query.newPreAggregations().preAggregationsDescription();
+      expect(preAggregations.length).toEqual(1);
+      expect(preAggregations[0].invalidateKeyQueries[0][2]).not.toHaveProperty('localRefreshKey');
     });
   });
 
@@ -2109,7 +2426,7 @@ describe('SQL Generation', () => {
       const queryString = queryAndParams[0];
       expect(queryString).toContain('1 = 1 "order__proxied"');
       expect(queryString).toContain('(select * from order where 1 = 1)  AS "order"');
-      expect(queryString).toContain('WHERE (1 = 1 = ?)');
+      expect(queryString).toContain('WHERE ((1 = 1) = ?)');
     });
 
     it('correctly substitute filter params in cube\'s query measure used in filter', async () => {

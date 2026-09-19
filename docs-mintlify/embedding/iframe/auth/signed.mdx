@@ -31,8 +31,10 @@ Signed embedding works through a two-step authentication flow:
 
 **Session lifecycle:**
 - **Sessions** are valid for **5 minutes** and must be exchanged within this window
-- **Tokens** are valid for **24 hours** after exchange
+- **Tokens** are usable for about **23 hours** after exchange — they're minted with a 24-hour expiry, but the iframe stops trusting one an hour early so an in-flight request can't lapse mid-call
 - Sessions are single-use and expire after being exchanged
+- A long-lived tab can renew its token **in place**, without reloading the iframe — see [Events & actions → Keeping a signed session alive](/embedding/iframe/events#keeping-a-signed-session-alive)
+- A session (or the token it was exchanged for) can also be ended server-side from your application's logout handler, using an admin-scoped key — see [Revoke an embed session](/api-reference/embed/revoke-an-embed-session)
 
 This ensures secure authentication while maintaining a smooth user experience.
 
@@ -42,13 +44,15 @@ This ensures secure authentication while maintaining a smooth user experience.
 
 To use signed embedding, you need an [API key][ref-api-keys]:
 
-- Go to **Access → API Keys** in your Cube admin panel
+- Go to **Admin → API Keys** in your Cube admin panel
 - Generate or copy your existing API key
 - You'll use this key to authenticate API calls for generating embed sessions
 
 ### Generate an embed session
 
 Use the [Generate Session API][ref-generate-session] to create a session for your user. This endpoint will automatically create (insert) or update the external user based on the `externalId` provided.
+
+To point the embed at a staging or development branch instead of production, pass that branch's name as `branchName` — see [Branch selection][ref-branch-selection].
 
 <Warning>
   Accounts are limited to 10,000 external users. To increase this limit, please
@@ -184,3 +188,4 @@ You can clone the repository, configure it with your Cube credentials, and run i
 
 [ref-api-keys]: /admin/account-billing/api-keys
 [ref-generate-session]: /reference/embed-apis/generate-session
+[ref-branch-selection]: /reference/embed-apis/generate-session#branch-selection

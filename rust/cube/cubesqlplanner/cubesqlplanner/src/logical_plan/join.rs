@@ -11,6 +11,10 @@ use typed_builder::TypedBuilder;
 pub struct LogicalJoinItem {
     cube: Rc<Cube>,
     on_sql: Rc<SqlCall>,
+    /// Required, with no default: `false` is the answer that lets a rollup
+    /// collapsing this edge's rows serve a raw-row query, so a construction site
+    /// must not be able to omit it.
+    splits_rows: bool,
 }
 
 impl LogicalJoinItem {
@@ -20,6 +24,12 @@ impl LogicalJoinItem {
 
     pub fn on_sql(&self) -> &Rc<SqlCall> {
         &self.on_sql
+    }
+
+    /// Whether joining this cube in splits a row of its parent into
+    /// several, i.e. it sits on the `one_to_many` side of its edge.
+    pub fn splits_rows(&self) -> bool {
+        self.splits_rows
     }
 }
 
@@ -129,6 +139,7 @@ impl LogicalNode for LogicalJoin {
                 Ok(LogicalJoinItem::builder()
                     .cube(item.clone().into_logical_node()?)
                     .on_sql(self_item.on_sql().clone())
+                    .splits_rows(self_item.splits_rows())
                     .build())
             })
             .collect::<Result<Vec<_>, _>>()?;

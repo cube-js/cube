@@ -54,7 +54,9 @@ const EXTRA_PATHS = {
       description:
         'Run a SQL query against the Cube [SQL API](/reference/core-data-apis/sql-api) ' +
         'and stream the results. The response is newline-delimited JSON: the first line ' +
-        'carries the `schema` (column names and types) and optionally `lastRefreshTime`; ' +
+        'carries the `schema` (column names and types), optionally `lastRefreshTime`, and ' +
+        'optionally `usedPreAggregations` naming the pre-aggregations the result was served ' +
+        'from; ' +
         'each subsequent line carries a `data` chunk with one or more result rows.',
       requestBody: {
         required: true,
@@ -95,7 +97,8 @@ const EXTRA_PATHS = {
         '200': {
           description:
             'Newline-delimited JSON stream. The first line carries `schema` (and optionally ' +
-            '`lastRefreshTime`); subsequent lines carry `data` chunks.',
+            '`lastRefreshTime`, `external` and `usedPreAggregations`); subsequent lines carry ' +
+            '`data` chunks.',
           content: {
             'application/json': {
               schema: {
@@ -112,6 +115,18 @@ const EXTRA_PATHS = {
                     },
                   },
                   lastRefreshTime: { type: 'string', format: 'date-time' },
+                  external: { type: 'boolean' },
+                  usedPreAggregations: {
+                    type: 'object',
+                    additionalProperties: {
+                      type: 'object',
+                      properties: {
+                        preAggregationId: { type: 'string' },
+                        lastUpdatedAt: { type: 'integer' },
+                        type: { type: 'string' },
+                      },
+                    },
+                  },
                   data: { type: 'array', items: { type: 'array', items: {} } },
                 },
               },
@@ -121,6 +136,13 @@ const EXTRA_PATHS = {
                   value: {
                     schema: [{ name: 'value', column_type: 'Int64' }],
                     lastRefreshTime: '2025-01-13T12:00:00.000Z',
+                    usedPreAggregations: {
+                      'schema.orders_main20240101': {
+                        preAggregationId: 'Orders.main',
+                        lastUpdatedAt: 1712000000000,
+                        type: 'rollup',
+                      },
+                    },
                   },
                 },
                 dataLine: { summary: 'Data chunk', value: { data: [['123']] } },

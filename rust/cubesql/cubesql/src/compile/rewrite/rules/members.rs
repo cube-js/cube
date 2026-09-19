@@ -1566,7 +1566,7 @@ impl MemberRules {
                 };
                 for right in right_list {
                     let output = egraph.add(LogicalPlanLanguage::CubeScanMembers(
-                        left.into_iter().chain(right.into_iter()).collect(),
+                        left.into_iter().chain(right).collect(),
                     ));
                     subst.insert(concat_output_var, output);
                     return true;
@@ -2139,11 +2139,6 @@ impl MemberRules {
             for fetch in var_iter!(egraph[subst[fetch_var]], LimitFetch) {
                 fetch_value = *fetch;
                 break;
-            }
-            // TODO support this case
-            if fetch_value == Some(0) {
-                // Broken and unsupported case for now
-                return false;
             }
 
             let mut inner_skip_value = None;
@@ -3067,8 +3062,7 @@ impl MemberRules {
 
                             let Some(left_cube) = left_join_hints
                                 .iter()
-                                .filter(|hint| !hint.is_empty())
-                                .next_back()
+                                .rfind(|hint| !hint.is_empty())
                                 .and_then(|hint| hint.last())
                                 .or_else(|| left_alias_to_cube.first().map(|(_, cube)| cube))
                                 .cloned()
@@ -3096,7 +3090,7 @@ impl MemberRules {
                                     CubeScanAliasToCube(
                                         left_alias_to_cube
                                             .into_iter()
-                                            .chain(right_alias_to_cube.into_iter())
+                                            .chain(right_alias_to_cube)
                                             .collect(),
                                     ),
                                 )),

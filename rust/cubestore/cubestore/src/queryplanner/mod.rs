@@ -3,6 +3,7 @@ pub mod optimizations;
 pub mod panic;
 mod partition_filter;
 mod planning;
+mod planning_throttle;
 use datafusion::execution::runtime_env::RuntimeEnv;
 use datafusion::logical_expr::planner::ExprPlanner;
 use datafusion::physical_plan::execution_plan::{Boundedness, EmissionType};
@@ -49,6 +50,7 @@ use crate::queryplanner::info_schema::{
     TablesInfoSchemaTableDef,
 };
 use crate::queryplanner::planning::{choose_index_ext, ClusterSendNode};
+use crate::queryplanner::planning_throttle::PlanningThrottle;
 // TODO upgrade DF
 // use crate::queryplanner::projection_above_limit::ProjectionAboveLimit;
 use crate::queryplanner::query_executor::{
@@ -103,7 +105,7 @@ use std::collections::{HashMap, HashSet};
 use std::fmt::Debug;
 use std::hash::{Hash, Hasher};
 use std::sync::Arc;
-use std::time::SystemTime;
+use std::time::{Duration, SystemTime};
 
 #[automock]
 #[async_trait]
@@ -125,6 +127,7 @@ pub struct QueryPlannerImpl {
     config: Arc<dyn ConfigObj>,
     cache: Arc<SqlResultCache>,
     metadata_cache_factory: Arc<dyn MetadataCacheFactory>,
+    throttle: Arc<PlanningThrottle>,
 }
 
 crate::di_service!(QueryPlannerImpl, [QueryPlanner]);
@@ -142,6 +145,8 @@ impl QueryPlanner for QueryPlannerImpl {
         inline_tables: &InlineTables,
         trace_obj: Option<String>,
     ) -> Result<QueryPlan, CubeError> {
+        let _planning_permit = self.throttle.acquire().await?;
+
         let pre_execution_context_time = SystemTime::now();
         let ec_guard = OpGuard::start(OpKind::Planning, "plan.session_context");
         let ctx = self.execution_context()?;
@@ -232,6 +237,7 @@ impl QueryPlanner for QueryPlannerImpl {
                 logical_plan,
                 &self.meta_store.as_ref(),
                 self.config.enable_topk(),
+                self.config.limit_pushdown(),
             )
             .await?;
             let workers = compute_workers(
@@ -284,12 +290,18 @@ impl QueryPlannerImpl {
         cache: Arc<SqlResultCache>,
         metadata_cache_factory: Arc<dyn MetadataCacheFactory>,
     ) -> Arc<QueryPlannerImpl> {
+        let throttle = PlanningThrottle::new(
+            config.max_concurrent_query_plans(),
+            config.max_queued_query_plans(),
+            Duration::from_secs(config.query_timeout()),
+        );
         Arc::new(QueryPlannerImpl {
             meta_store,
             cache_store,
             config,
             cache,
             metadata_cache_factory,
+            throttle,
         })
     }
 }

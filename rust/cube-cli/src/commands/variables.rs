@@ -17,6 +17,12 @@ enum Cmd {
     List {
         /// Deployment id
         deployment: i64,
+        /// Page size for cursor-based pagination
+        #[arg(long)]
+        first: Option<u64>,
+        /// Cursor for the next page (from a previous pageInfo.endCursor)
+        #[arg(long)]
+        after: Option<String>,
     },
     /// Upsert environment variables; omitted variables keep their values
     Set {
@@ -31,11 +37,18 @@ enum Cmd {
 pub async fn command(args: Args, ctx: &Ctx) -> Result<()> {
     let api = ctx.api()?;
     match args.cmd {
-        Cmd::List { deployment } => {
+        Cmd::List {
+            deployment,
+            first,
+            after,
+        } => {
+            let mut query = Vec::new();
+            util::push(&mut query, "first", &first);
+            util::push(&mut query, "after", &after);
             let res = api
                 .get(
                     &format!("/api/v1/deployments/{deployment}/env-vars"),
-                    &Vec::new(),
+                    &query,
                 )
                 .await?;
             output::print_list(ctx.json, &res, &[("NAME", "name"), ("VALUE", "value")]);

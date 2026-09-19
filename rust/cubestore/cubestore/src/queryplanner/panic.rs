@@ -1,4 +1,3 @@
-use crate::cluster::WorkerPlanningParams;
 use crate::queryplanner::planning::WorkerExec;
 use async_trait::async_trait;
 use datafusion::arrow::datatypes::Schema;
@@ -184,8 +183,7 @@ pub fn plan_panic_worker() -> Result<Arc<dyn ExecutionPlan>, DataFusionError> {
         // a WorkerExec for some reason. (Also, it's important that DF optimizations run identically
         // when it comes to aggregates pushed down through ClusterSend and the like -- it's actually
         // NOT important for panic worker planning.)
-        WorkerPlanningParams {
-            worker_partition_count: 1,
-        },
+        /* worker_partition_count */
+        1,
     )))
 }

@@ -463,7 +463,75 @@ for the series of time windows.
 With Tesseract, the [next-generation data modeling engine][link-tesseract],
 rolling window calculations don't require the date range for the time dimension. In versions before v1.7.0, Tesseract was not enabled by default.
 
+Omitting the date range requires the data source to generate the time series in
+SQL. It is supported for Amazon Athena, Databricks, Google BigQuery, Microsoft SQL
+Server, Postgres, Presto, Snowflake, and Trino, as well as for MySQL with the
+`CUBEJS_DB_MYSQL_USE_GENERATED_TIME_SERIES` environment variable set. With other
+data sources, and with [custom granularities][ref-custom-granularities] on Google
+BigQuery, Microsoft SQL Server, and Snowflake, the date range is still required.
+
 </Warning>
+
+#### `type` and `granularity`
+
+Set `type` to `to_date` to accumulate from the start of the period that contains each
+data point, instead of over a window of fixed size. A `to_date` window also requires
+`granularity`, which names that period: a default granularity such as `week`, `month`,
+`quarter`, or `year`, or a [custom granularity][ref-custom-granularities]. Omitting it
+fails validation.
+
+<Warning>
+
+A custom granularity here is only available in Tesseract, the [next-generation data
+modeling engine][link-tesseract]. In versions before v1.7.0, it was not enabled by
+default. Without Tesseract, the model still compiles and the query fails.
+
+</Warning>
+
+<CodeGroup>
+
+```yaml title="YAML"
+cubes:
+  - name: orders
+    # ...
+
+    measures:
+      - name: revenue_year_to_date
+        sql: amount
+        type: sum
+        rolling_window:
+          type: to_date
+          granularity: year
+```
+
+```javascript title="JavaScript"
+cube(`orders`, {
+  // ...
+
+  measures: {
+    revenue_year_to_date: {
+      sql: `amount`,
+      type: `sum`,
+      rolling_window: {
+        type: `to_date`,
+        granularity: `year`
+      }
+    }
+  }
+})
+```
+
+</CodeGroup>
+
+A window of type `to_date` takes none of the `offset`, `trailing`, or `leading`
+parameters documented below; those apply to fixed-size windows, which are selected by
+`type: fixed` — the default when `type` is omitted. To apply the same
+period-to-date logic across many measures without writing each one by hand, see
+[reusing period-to-date logic][ref-recipe-period-to-date].
+
+The `year_to_date`, `quarter_to_date`, and `month_to_date` types are deprecated. On the
+legacy planner they are equivalent to `to_date` with the matching `granularity`.
+Tesseract does not recognize them. Use `to_date` with an explicit `granularity`.
 
 #### `offset`
 
@@ -1289,6 +1357,13 @@ cube(`orders`, {
 
 </CodeGroup>
 
+When `case` measures span multiple cubes, define the `switch` dimension on a
+single shared cube joined into every fact cube, rather than defining a separate
+one on each cube. All `case` measures then dispatch on the same dimension, so one
+filter resolves every measure. With a `switch` dimension per cube, a single
+filter pins only one of them; the others fall back to their full set of values,
+and each value emits its own row — so the query returns extra rows.
+
 ### `format`
 
 `format` is an optional parameter. It controls how measure values are
@@ -1497,9 +1572,11 @@ cube(`orders`, {
 [ref-nested-aggregate]: /docs/data-modeling/measures#nested-aggregates
 [ref-calendar-cubes]: /docs/data-modeling/concepts/calendar-cubes
 [ref-switch-dimensions]: /reference/data-modeling/dimensions#type
+[ref-custom-granularities]: /reference/data-modeling/dimensions#granularities
 [ref-filters-query]: /reference/core-data-apis/rest-api/query-format#filters-format
 [ref-data-masking]: /docs/data-modeling/data-access-policies#data-masking
 [link-d3-format]: https://d3js.org/d3-format
 [link-iso-4217]: https://en.wikipedia.org/wiki/ISO_4217
 [ref-calculated-measures]: /docs/data-modeling/measures#calculated-measures
 [ref-schema-ref-preaggs-rollup]: /reference/data-modeling/pre-aggregations#rollup
+[ref-recipe-period-to-date]: /recipes/data-modeling/reusable-period-to-date

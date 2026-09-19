@@ -3,21 +3,17 @@ const formatterCurrency = new Intl.NumberFormat('en-US', {
   currency: 'USD',
 });
 
-export const getNumberFixedFormatter = (digits = 2, minDigits = 2) => {
-  return new Intl.NumberFormat('en-US', {
-    style: 'decimal',
-    minimumFractionDigits: minDigits,
-    maximumFractionDigits: digits,
-  });
-};
-
-const getCurrencyFixedFormatter = (digits = 2, minDigits = 2) =>
-  new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency: 'USD',
-    minimumFractionDigits: minDigits,
-    maximumFractionDigits: digits,
-  });
+export const getNumberFixedFormatter = (digits = 2, minDigits = 2) => new Intl.NumberFormat('en-US', {
+  style: 'decimal',
+  minimumFractionDigits: minDigits,
+  maximumFractionDigits: digits,
+});
+const getCurrencyFixedFormatter = (digits = 2, minDigits = 2) => new Intl.NumberFormat('en-US', {
+  style: 'currency',
+  currency: 'USD',
+  minimumFractionDigits: minDigits,
+  maximumFractionDigits: digits,
+});
 
 const formatterNumber = getNumberFixedFormatter(3, 0);
 

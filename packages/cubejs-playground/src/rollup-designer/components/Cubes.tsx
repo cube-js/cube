@@ -129,9 +129,8 @@ export function Cubes({
   onSelect,
   onOpenKeysChange,
 }: CubesProps) {
-  const allCubeKeys = useDeepMemo(() => {
-    return getMembersByCube(memberTypeCubeMap).map(({ cubeName }) => cubeName);
-  }, [memberTypeCubeMap]);
+  const allCubeKeys = useDeepMemo(() => getMembersByCube(memberTypeCubeMap).map(({ cubeName }) => cubeName),
+    [memberTypeCubeMap]);
 
   const { keys, search, inputProps } = useCubeMemberSearch(memberTypeCubeMap);
 
@@ -179,60 +178,57 @@ export function Cubes({
           );
         }}
       >
-        {membersByCube.map((cube) => {
-          return (
-            <SubMenu
-              key={cube.cubeName}
-              data-cube={cube.cubeName}
-              title={cube.cubeTitle}
-              onTitleClick={({ key }) => {
-                if (openKeys.includes(key)) {
-                  onOpenKeysChange(openKeys.filter((value) => value !== key));
-                } else {
-                  onOpenKeysChange([...openKeys, key]);
-                }
-              }}
-            >
-              {MEMBER_TYPES.map((memberType) => {
-                if (!cube[memberType].length) {
-                  return null;
-                }
+        {membersByCube.map((cube) => (
+          <SubMenu
+            key={cube.cubeName}
+            data-cube={cube.cubeName}
+            title={cube.cubeTitle}
+            onTitleClick={({ key }) => {
+              if (openKeys.includes(key)) {
+                onOpenKeysChange(openKeys.filter((value) => value !== key));
+              } else {
+                onOpenKeysChange([...openKeys, key]);
+              }
+            }}
+          >
+            {MEMBER_TYPES.map((memberType) => {
+              if (!cube[memberType].length) {
+                return null;
+              }
 
-                return (
-                  <Menu.ItemGroup
-                    key={memberType}
-                    title={
-                      memberType === 'timeDimensions'
-                        ? 'time dimensions'
-                        : memberType
-                    }
-                  >
-                    {cube[memberType].map((member) => {
-                      const key =
-                        memberType === 'timeDimensions'
-                          ? `td:${member.name}`
-                          : member.name;
+              return (
+                <Menu.ItemGroup
+                  key={memberType}
+                  title={
+                    memberType === 'timeDimensions'
+                      ? 'time dimensions'
+                      : memberType
+                  }
+                >
+                  {cube[memberType].map((member) => {
+                    const key = memberType === 'timeDimensions'
+                      ? `td:${member.name}`
+                      : member.name;
 
-                      return (
-                        <Menu.Item key={key} data-membertype={memberType}>
-                          <CheckOutlined
-                            style={{
-                              visibility: selectedKeys.includes(key)
-                                ? 'visible'
-                                : 'hidden',
-                            }}
-                          />
+                    return (
+                      <Menu.Item key={key} data-membertype={memberType}>
+                        <CheckOutlined
+                          style={{
+                            visibility: selectedKeys.includes(key)
+                              ? 'visible'
+                              : 'hidden',
+                          }}
+                        />
 
-                          {member.shortTitle}
-                        </Menu.Item>
-                      );
-                    })}
-                  </Menu.ItemGroup>
-                );
-              })}
-            </SubMenu>
-          );
-        })}
+                        {member.shortTitle}
+                      </Menu.Item>
+                    );
+                  })}
+                </Menu.ItemGroup>
+              );
+            })}
+          </SubMenu>
+        ))}
       </StyledMenu>
     </>
   );

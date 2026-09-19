@@ -36,7 +36,7 @@ jobs:
       actions: read
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           fetch-depth: 1
 
@@ -58,6 +58,7 @@ jobs:
     permissions:
       contents: read
       pull-requests: write
+      issues: read
       id-token: write
     uses: ./.github/workflows/claude-code-review.yml
     with:
@@ -76,6 +77,7 @@ jobs:
     permissions:
       contents: read
       pull-requests: write
+      issues: read
       id-token: write
     uses: ./.github/workflows/claude-code-review.yml
     with:

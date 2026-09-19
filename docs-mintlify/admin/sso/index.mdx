@@ -18,10 +18,6 @@ Cube Cloud also provides single sign-on (SSO) via identity providers supporting
 
 </Info>
 
-<Frame>
-  <img src="https://ucarecdn.com/e3b3bce2-117e-4cbc-b516-c71b51b98888/" />
-</Frame>
-
 ## Configuration
 
 To manage authentication settings, navigate to **Admin → Settings**
@@ -46,6 +42,34 @@ Check the following guides to get tool-specific instructions on configuration:
   <Card title="Okta" img="https://static.cube.dev/icons/okta.svg" href="/admin/sso/okta">
   </Card>
 </CardGroup>
+
+#### Match SAML service provider identifiers
+
+Cube shows two service provider values in the SAML settings:
+
+| Cube setting | Identity provider setting |
+| --- | --- |
+| **Single Sign-On URL** | ACS URL or Reply URL |
+| **Audience (SP Entity ID)** | Audience, Entity ID, or SP Entity ID |
+
+The **Audience (SP Entity ID)** value validates the audience in SAML responses.
+It must exactly match the value configured in your identity provider. Leaving
+the field blank disables audience validation and is supported only for
+compatibility with existing configurations.
+
+Some identity providers, including Amazon Federate, use one service provider
+identifier for both the AuthnRequest issuer and the response audience. For
+these providers, set **Audience (SP Entity ID)** in Cube to the **Single
+Sign-On URL**, then use that same value as the identity provider's Entity ID
+or Audience.
+
+<Note>
+
+Existing working SAML integrations do not need to change their Audience. When
+you change an existing configuration, keep another authentication method
+enabled until you have tested SAML sign-in in a separate browser session.
+
+</Note>
 
 [wiki-saml]: https://en.wikipedia.org/wiki/SAML_2.0
 [ref-apis]: /reference

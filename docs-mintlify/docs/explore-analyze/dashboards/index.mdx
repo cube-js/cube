@@ -18,6 +18,47 @@ Dashboards enable you to:
 
 In the dashboard builder inside your [workbook][ref-workbooks], select the reports you want to include and arrange them on the canvas alongside other [widgets][ref-widgets] to tell your data story, then publish the dashboard. This gives stakeholders direct access to the insights that matter most, without the complexity of the underlying analysis.
 
+Prefer to manage dashboards from source control? You can also apply dashboards,
+workbooks, and reports to a deployment through the REST API and keep their
+definitions in Git — see [Dashboards as code](/docs/explore-analyze/dashboards/dashboards-as-code).
+
+## Publishing and versions
+
+A workbook holds a single dashboard, which stays a **draft** until you publish
+it. Click **Publish** in the dashboard builder to publish the current draft as a
+new **version** — viewers always see the latest published version, never your
+in-progress edits. Publishing is a workbook-level operation — the same one the
+[as-code flow](/docs/explore-analyze/dashboards/dashboards-as-code#4-publish)
+performs over the API.
+
+The button next to **Publish** reflects the dashboard's state — click it to open
+the [revision history](#revision-history):
+
+- **`v{N}`** — the published version and your draft match.
+- **Draft** — you have unpublished changes.
+
+Before the first publish, no button is shown.
+
+While editing, **Undo** and **Redo** step through your draft changes, and
+**Revert** discards all unpublished changes to restore the currently published
+version.
+
+### Revision history
+
+The revision history lists every published version alongside the current draft.
+Each row shows the version number, when it was published, and by whom. Select a
+version to preview it, then **Restore** to make it your current draft — publish
+again to make it the live version.
+
+### What viewers see
+
+When someone opens a published dashboard, a version chip in the header shows the
+live version (e.g. `v3`). Opening it reveals when that version was published and
+a summary of what changed since the previous version — added, updated, or removed
+widgets — so viewers can see which version they're looking at and what changed in
+it. (The chip is in-app only; it doesn't appear on [embedded
+dashboards](/embedding/iframe/dashboards).)
+
 ## Data freshness
 
 Each widget shows a [freshness](/docs/explore-analyze/workbooks/querying-data#result-freshness-and-provenance) leaf indicating how recently its data was refreshed. The dashboard's own leaf reflects its least-recently-refreshed widget, so you can see at a glance whether everything on the dashboard is up to date.
@@ -62,25 +103,41 @@ options sidebar warns you to update those links.)
 
 </Note>
 
-## Download as PNG or PDF
+## Download as PNG, PDF, or CSV {#download-as-png-or-pdf}
 
 Open a published dashboard, click the **More actions** (`⋯`) button in the
 header, and choose **Download as PNG** or **Download as PDF**. The file is
 named after the dashboard's title.
 
-The download is a server-rendered snapshot — Cube re-opens the dashboard,
-waits for every widget to finish rendering, and captures the result. This
-can take up to a couple of minutes for large dashboards. Filter or time
-grain selections you change in your browser before clicking **Download**
-are not applied; the snapshot uses the dashboard's saved state.
+To export a **single chart** instead of the whole dashboard, hover the chart
+widget, open its **⋮** menu, and choose **Download as PNG** or **Download as
+PDF** — the same menu also offers **Download as CSV** for the chart's
+underlying data. The image captures just that chart, named after the chart's
+title.
 
-Available to users with **Manage** permission on the workbook that owns
-the dashboard. The same screenshot mechanism powers PNG/PDF attachments on
-[notifications][ref-notifications] sent after a [scheduled
-refresh][ref-scheduled-refreshes].
+PNG and PDF downloads are server-rendered snapshots — Cube re-opens the
+dashboard (or, for a single chart, that chart on its own), waits for rendering
+to finish, and captures the result. This can take up to a couple of minutes
+for large dashboards. The control selections you currently have applied in your
+browser are carried into a download you start yourself — filters, time
+granularity switchers and [field switchers][ref-controls] alike. A scheduled
+notification has no browser session, so its attachment renders the dashboard's
+own defaults, unless that notification carries selections of its own. (CSV is
+generated from the data already loaded in the chart and downloads immediately.)
+
+Downloading the whole dashboard requires **Manage** permission on the workbook
+that owns it; exporting a single chart requires the **Download data**
+permission. Both are hidden entirely when an admin turns off the account-wide
+[data download controls][ref-data-download-controls]. The same screenshot
+mechanism powers PNG/PDF attachments on [notifications][ref-notifications] sent
+after a [scheduled refresh][ref-scheduled-refreshes], and is also available
+programmatically — see the [Control Plane API][ref-control-plane-api].
 
 [ref-workbooks]: /docs/explore-analyze/workbooks
 [ref-widgets]: /docs/explore-analyze/dashboards/widgets
+[ref-controls]: /docs/explore-analyze/dashboards/widgets/controls
 [ref-dimension-links]: /docs/data-modeling/dimensions#links
 [ref-notifications]: /docs/explore-analyze/notifications
 [ref-scheduled-refreshes]: /docs/explore-analyze/scheduled-refreshes
+[ref-data-download-controls]: /admin/users-and-permissions/roles-and-permissions#restricting-data-downloads
+[ref-control-plane-api]: /reference/control-plane-api#apiv1deploymentsdeployment_iddashboard-exports

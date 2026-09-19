@@ -6,6 +6,9 @@ title: Workbooks
 Workbooks allow you to build reports and explore data with AI agents, organize the results of your
 analysis, and share trusted insights with your team.
 
+A report inside a workbook and a standalone [exploration](/docs/explore-analyze/explore#saving-explorations)
+are the same kind of object — the only difference is whether it's filed inside a workbook.
+
 ## Tabs
 
 Workbooks can contain one or more tabs, each providing a different way to query and analyze your data. Tabs enable you to organize multiple analyses within a single workbook, making it easy to explore different aspects of your data or combine insights from different sources.
@@ -129,8 +132,21 @@ and paste it as a new tab in any workbook using the same workflow.
 ## Duplicating workbooks
 
 You can duplicate a workbook by selecting **Duplicate** from the row
-actions menu on the workspace page. This creates a full copy of the
-workbook, including all its tabs, reports, and any published dashboard.
+actions menu on the workspace page, from the workbook menu while the
+workbook is open, or from a published dashboard's options menu. This
+creates a full copy of the workbook, including all its tabs, reports, and
+any published dashboard.
+
+A duplicate does not carry the original's sharing over by default. The
+copy is visible only to you, plus anyone with access to the folder it is
+created in.
+
+If the original is shared — with people, with groups, with your whole
+organization, or through signed embedding — the duplicate dialog offers
+**Copy sharing and embedding settings**. Selecting it gives the copy the
+same audience. The option appears only if you have **Full access** to the
+original, since copying its sharing means granting that access again. See
+[Duplicates][ref-sharing-duplicates] for what does and doesn't carry over.
 
 ## Workbook versions
 
@@ -151,4 +167,5 @@ has not been published will be lost.
 </Warning>
 
 [ref-dashboards]: /docs/explore-analyze/dashboards
+[ref-sharing-duplicates]: /docs/organize-content/sharing#duplicates
 

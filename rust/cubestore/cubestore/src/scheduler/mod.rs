@@ -1781,10 +1781,10 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn schedule_table_import_hash_placement_by_default() {
+    async fn schedule_table_import_hash_placement() {
         let config = Config::test("schedule_table_import_hash").update_config(|mut c| {
             c.select_workers = (0..4).map(|i| format!("worker{}", i)).collect();
-            // load_aware_import_placement_enabled defaults to false (old behavior).
+            c.load_aware_import_placement_enabled = false;
             c
         });
         let (meta_store, scheduler) =
@@ -1816,7 +1816,7 @@ mod tests {
             assert_eq!(
                 placement.get(l),
                 Some(&expected),
-                "default placement must follow the stateless hash"
+                "hash placement must follow the stateless hash"
             );
         }
 

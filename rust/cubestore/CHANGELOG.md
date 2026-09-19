@@ -3,6 +3,146 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.7.42](https://github.com/cube-js/cube/compare/v1.7.41...v1.7.42) (2026-09-18)
+
+**Note:** Version bump only for package @cubejs-backend/cubestore
+
+## [1.7.41](https://github.com/cube-js/cube/compare/v1.7.40...v1.7.41) (2026-09-18)
+
+### Features
+
+- **cubestore:** Limit how many logical plans are built at once ([#11924](https://github.com/cube-js/cube/issues/11924)) ([7338c00](https://github.com/cube-js/cube/commit/7338c00aa27af7b46b122f08a4df8d5488150a62))
+- Upgrade deps (clear 52 Dependabot alerts) ([#11853](https://github.com/cube-js/cube/issues/11853)) ([c3ba115](https://github.com/cube-js/cube/commit/c3ba11507d94389941e1f78a39286277a1e112c7))
+
+## [1.7.40](https://github.com/cube-js/cube/compare/v1.7.39...v1.7.40) (2026-09-16)
+
+### Bug Fixes
+
+- **cubestore:** Bump msql-srv to v0.9.3 to drop the failure crate ([#11898](https://github.com/cube-js/cube/issues/11898)) ([9b444bd](https://github.com/cube-js/cube/commit/9b444bd66055731c0de7ed8ccc858d59f3cb8727))
+- **cubestore:** scope the limit pushdown to the aggregate that owns it ([#11886](https://github.com/cube-js/cube/issues/11886)) ([54c795b](https://github.com/cube-js/cube/commit/54c795bf6f6de35dee1cf412653eeb7c04293aab)), closes [#11545](https://github.com/cube-js/cube/issues/11545) [#11545](https://github.com/cube-js/cube/issues/11545) [#11545](https://github.com/cube-js/cube/issues/11545) [#11833](https://github.com/cube-js/cube/issues/11833)
+- **cubestore:** stop reporting remote files nothing references ([#11601](https://github.com/cube-js/cube/issues/11601)) ([49956f1](https://github.com/cube-js/cube/commit/49956f143c362faad2cae3b7016db62be5c1d4ba))
+
+## [1.7.39](https://github.com/cube-js/cube/compare/v1.7.38...v1.7.39) (2026-09-15)
+
+**Note:** Version bump only for package @cubejs-backend/cubestore
+
+## [1.7.38](https://github.com/cube-js/cube/compare/v1.7.37...v1.7.38) (2026-09-14)
+
+### Bug Fixes
+
+- **cubestore:** Build with large pagesize support for AMR64, thanks [@vltmn](https://github.com/vltmn) ([#10152](https://github.com/cube-js/cube/issues/10152)) ([460173d](https://github.com/cube-js/cube/commit/460173dd498f3c3bc7346b102d4c15ab137d5440))
+
+## [1.7.37](https://github.com/cube-js/cube/compare/v1.7.35...v1.7.37) (2026-09-10)
+
+### Bug Fixes
+
+- **cross:** Restore host Python interpreter in aarch64 images ([#11823](https://github.com/cube-js/cube/issues/11823)) ([e9d267f](https://github.com/cube-js/cube/commit/e9d267f8f09df616a7203531081db936d706c5ff))
+- **cubestore:** Report a websocket peer that goes away as debug, not error ([#11786](https://github.com/cube-js/cube/issues/11786)) ([fe263b9](https://github.com/cube-js/cube/commit/fe263b9243c8b1e6c37cb05837dcd0e0b758a48b))
+
+### Features
+
+- Migrate to TypeScript 6.0.3 (prepare for 7) ([#11767](https://github.com/cube-js/cube/issues/11767)) ([98ac580](https://github.com/cube-js/cube/commit/98ac58039be36e7392ac617562d0dad03f17de3c))
+
+## [1.7.36](https://github.com/cube-js/cube/compare/v1.7.35...v1.7.36) (2026-09-09)
+
+### Features
+
+- Migrate to TypeScript 6.0.3 (prepare for 7) ([#11767](https://github.com/cube-js/cube/issues/11767)) ([98ac580](https://github.com/cube-js/cube/commit/98ac58039be36e7392ac617562d0dad03f17de3c))
+
+## [1.7.35](https://github.com/cube-js/cube/compare/v1.7.34...v1.7.35) (2026-09-07)
+
+**Note:** Version bump only for package @cubejs-backend/cubestore
+
+## [1.7.34](https://github.com/cube-js/cube/compare/v1.7.33...v1.7.34) (2026-09-04)
+
+**Note:** Version bump only for package @cubejs-backend/cubestore
+
+## [1.7.33](https://github.com/cube-js/cube/compare/v1.7.32...v1.7.33) (2026-09-03)
+
+**Note:** Version bump only for package @cubejs-backend/cubestore
+
+## [1.7.32](https://github.com/cube-js/cube/compare/v1.7.31...v1.7.32) (2026-09-01)
+
+**Note:** Version bump only for package @cubejs-backend/cubestore
+
+## [1.7.31](https://github.com/cube-js/cube/compare/v1.7.30...v1.7.31) (2026-08-31)
+
+### Performance Improvements
+
+- **cubestore:** turn on the performance toggles by default ([#11600](https://github.com/cube-js/cube/issues/11600)) ([33dc677](https://github.com/cube-js/cube/commit/33dc677fb65cdd34765832920f6ceb68c52370d1))
+
+## [1.7.30](https://github.com/cube-js/cube/compare/v1.7.29...v1.7.30) (2026-08-28)
+
+**Note:** Version bump only for package @cubejs-backend/cubestore
+
+## [1.7.29](https://github.com/cube-js/cube/compare/v1.7.28...v1.7.29) (2026-08-27)
+
+### Features
+
+- **cubestore:** cap concurrent websocket connections per user ([#11667](https://github.com/cube-js/cube/issues/11667)) ([111eb3e](https://github.com/cube-js/cube/commit/111eb3ec049b9be1fa2f31186a7f83f58b5a0291))
+
+## [1.7.28](https://github.com/cube-js/cube/compare/v1.7.27...v1.7.28) (2026-08-26)
+
+### Bug Fixes
+
+- **cubestore-driver:** don't fail queries on `write EPIPE`, report over-limit messages readably ([#11490](https://github.com/cube-js/cube/issues/11490)) ([d9ff741](https://github.com/cube-js/cube/commit/d9ff741b991ae9fb0bde5b742f6d514f3a7f94d7)), closes [#11655](https://github.com/cube-js/cube/issues/11655)
+
+## [1.7.27](https://github.com/cube-js/cube/compare/v1.7.26...v1.7.27) (2026-08-26)
+
+### Bug Fixes
+
+- **cubestore:** inline aggregate dropped rows past the first partition ([#11631](https://github.com/cube-js/cube/issues/11631)) ([6f3e66d](https://github.com/cube-js/cube/commit/6f3e66d4fcf89733a21d730d3e90fcb493a72dd0))
+
+## [1.7.26](https://github.com/cube-js/cube/compare/v1.7.25...v1.7.26) (2026-08-24)
+
+### Bug Fixes
+
+- **cubestore:** transmit the router's planning flags with the query ([#11628](https://github.com/cube-js/cube/issues/11628)) ([d48a64e](https://github.com/cube-js/cube/commit/d48a64ee7a9c1f00cbab243ff303ee66fabcbc87))
+
+## [1.7.25](https://github.com/cube-js/cube/compare/v1.7.24...v1.7.25) (2026-08-21)
+
+### Features
+
+- **cubestore:** Support QUEUE ADD_AND_RETRIEVE command ([#11590](https://github.com/cube-js/cube/issues/11590)) ([73ec070](https://github.com/cube-js/cube/commit/73ec070d55edf2c2fa4d70bbce1f37d735ce40cd))
+
+## [1.7.24](https://github.com/cube-js/cube/compare/v1.7.23...v1.7.24) (2026-08-19)
+
+**Note:** Version bump only for package @cubejs-backend/cubestore
+
+## [1.7.23](https://github.com/cube-js/cube/compare/v1.7.22...v1.7.23) (2026-08-18)
+
+**Note:** Version bump only for package @cubejs-backend/cubestore
+
+## [1.7.22](https://github.com/cube-js/cube/compare/v1.7.21...v1.7.22) (2026-08-18)
+
+**Note:** Version bump only for package @cubejs-backend/cubestore
+
+## [1.7.21](https://github.com/cube-js/cube/compare/v1.7.20...v1.7.21) (2026-08-17)
+
+**Note:** Version bump only for package @cubejs-backend/cubestore
+
+## [1.7.20](https://github.com/cube-js/cube/compare/v1.7.19...v1.7.20) (2026-08-16)
+
+### Bug Fixes
+
+- **cubestore:** bump lru to 0.18.2 to clear two use-after-free advisories ([#11531](https://github.com/cube-js/cube/issues/11531)) ([387e1ad](https://github.com/cube-js/cube/commit/387e1ad644030401d12bafd01f991e06fd97f441))
+- **cubestore:** drop async-std to clear the crossbeam advisories ([#11546](https://github.com/cube-js/cube/issues/11546)) ([58f3cd7](https://github.com/cube-js/cube/commit/58f3cd7825a1a8c0fb2d031ee021ce01173584e5))
+
+## [1.7.19](https://github.com/cube-js/cube/compare/v1.7.18...v1.7.19) (2026-08-12)
+
+**Note:** Version bump only for package @cubejs-backend/cubestore
+
+## [1.7.18](https://github.com/cube-js/cube/compare/v1.7.17...v1.7.18) (2026-08-09)
+
+**Note:** Version bump only for package @cubejs-backend/cubestore
+
+## [1.7.17](https://github.com/cube-js/cube/compare/v1.7.16...v1.7.17) (2026-08-07)
+
+### Bug Fixes
+
+- **cubestore:** advertise INCR, not INC, in the CACHE unknown-command error ([#11434](https://github.com/cube-js/cube/issues/11434)) ([a6fbbb4](https://github.com/cube-js/cube/commit/a6fbbb48b93e54a8dcb63cba6c838c3174b56724))
+- **cubestore:** GCS - list_prefix infinite collection causing OOM, thanks @Xuxiaotuan ([#11381](https://github.com/cube-js/cube/issues/11381)) ([bf6a069](https://github.com/cube-js/cube/commit/bf6a0699e62b375ccff95faae98d1b86fd69c798))
+
 ## [1.7.16](https://github.com/cube-js/cube/compare/v1.7.15...v1.7.16) (2026-07-31)
 
 **Note:** Version bump only for package @cubejs-backend/cubestore

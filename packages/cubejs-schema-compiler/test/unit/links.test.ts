@@ -162,6 +162,7 @@ cubes:
             url: "{full_name}"
 `;
     const compilers = prepareYamlCompiler(schema);
+
     try {
       await compilers.compiler.compile();
       fail('Should have thrown for duplicate link name');
@@ -188,6 +189,7 @@ cubes:
         type: string
 `;
     const compilers = prepareYamlCompiler(schema);
+
     try {
       await compilers.compiler.compile();
       fail('Should have thrown for collision');
@@ -216,6 +218,7 @@ cubes:
             primary: true
 `;
     const compilers = prepareYamlCompiler(schema);
+
     try {
       await compilers.compiler.compile();
       fail('Should have thrown for multiple primary links');

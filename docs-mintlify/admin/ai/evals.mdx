@@ -22,7 +22,7 @@ sub-tabs: **Evals** (runs) and **Questions** (the benchmark set).
 | Term | What it is |
 |------|------------|
 | **Question** | A natural-language question plus its **ground truth** (the correct answer, as SQL or a certified-query reference). Authored as code in your data model. |
-| **Eval (run)** | One execution of the agent against the whole question set, on a specific branch and agent. |
+| **Eval (run)** | One execution of the agent against the question set — the whole set, or a single question file — on a specific branch and agent. |
 | **Result** | The agent's answer to a single question in a run, graded against that question's ground truth. |
 | **Accuracy** | `passed / total` for a run, shown as `NN% (passed/total)`. |
 
@@ -34,7 +34,8 @@ top-level `agents/eval_questions.yml` file — the simplest place to start — o
 split them across any number of `agents/eval_questions/*.yml` files as your set
 grows. The parser picks up both and merges every file's `eval_questions` list
 into one set, so you can move from one file to many at any time without changing
-anything else.
+anything else. A run can also be scoped to a single file (see
+[Running an eval](#running-an-eval)).
 
 Each file has a top-level `eval_questions` list. A question needs a unique
 `name`, a `question`, and exactly one ground truth: a `certifiedQuery`
@@ -66,9 +67,9 @@ eval_questions:
 
 <Note>
 
-The **Questions** tab is a read-only view of these files. To add or edit
-questions, edit the YAML in the IDE — there's no in-product question editor
-yet.
+The **Questions** tab is a read-only view of these files — its **File**
+column shows which file defined each question. To add or edit questions, edit
+the YAML in the IDE — there's no in-product question editor yet.
 
 </Note>
 
@@ -78,6 +79,11 @@ On the **Evals** tab, click **Run eval** and choose:
 
 - **Branch** — which branch's data model and agent configuration to run
   against. Defaults to the active branch.
+- **Questions** — **All questions** (the default) or a single question file,
+  to run only that file's questions. The selector appears only when the
+  selected branch's questions come from more than one file, and each file
+  option shows how many questions it holds. Switching branches resets it to
+  **All questions**.
 - **Agent** — `auto` (the implicit auto-agent) or a configured agent name.
 
 The run starts immediately and you can close the dialog — it executes in the
@@ -89,6 +95,7 @@ background. The run list shows live progress and then the outcome:
 | **Environment** | Where it ran — **dev** (your personal dev-mode branch, shown as "*Name* Dev Mode"), **staging**, or **prod** (the deploy branch, e.g. `master` or `main`). |
 | **Agent** | The agent used. |
 | **Execution status** | Running, Completed, or Failed. |
+| **Questions** | The file the run was scoped to, or **All questions**. |
 | **Accuracy** | `NN% (passed/total)`. |
 | **Created by** | Who triggered the run. |
 | **Last updated** | When it finished. |
@@ -96,7 +103,8 @@ background. The run list shows live progress and then the outcome:
 ## Reading the results
 
 Open a run to see per-question results: the question list on the left, with a
-pass/fail icon for each, and the selected question's detail on the right.
+pass/fail icon for each, and the selected question's detail on the right. The
+run's scope is repeated in the header, next to **Questions**.
 
 - **Assessment** — `pass`, `fail`, `review`, or `error`.
 - **Score reason** — when a question doesn't pass, a tag categorizing why:
@@ -141,6 +149,7 @@ Verdicts:
 ## Limitations
 
 - Questions are authored as code only; the **Questions** tab is read-only.
-- Very large question sets can be slow to run.
+- Very large question sets can be slow to run in full. To iterate faster, split
+  them across `agents/eval_questions/*.yml` files and scope the run to one file.
 - Grading is execution-based on the result set; it does not semantically judge
   prose answers.

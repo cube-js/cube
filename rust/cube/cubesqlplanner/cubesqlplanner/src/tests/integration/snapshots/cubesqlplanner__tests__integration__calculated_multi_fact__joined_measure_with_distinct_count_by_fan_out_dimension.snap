@@ -1,0 +1,9 @@
+---
+source: cubesqlplanner/cubesqlplanner/src/tests/integration/calculated_multi_fact.rs
+expression: result
+---
+payment_meta__value | payments__converted_value | payments__count
+--------------------+---------------------------+----------------
+A                   | 600.0000000000000000      | 3              
+B                   | 200.0000000000000000      | 1              
+C                   | 500.0000000000000000      | 1

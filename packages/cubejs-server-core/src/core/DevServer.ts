@@ -194,7 +194,7 @@ export class DevServer {
       await fs.writeFile(path.join(options.schemaPath, 'views', 'example_view.yml'), `# In Cube, views are used to expose slices of your data graph and act as data marts.
 # You can control which measures and dimensions are exposed to BIs or data apps,
 # as well as the direction of joins between the exposed cubes.
-# You can learn more about views in documentation here - https://cube.dev/docs/schema/reference/view
+# You can learn more about views in documentation here - https://docs.cube.dev/reference/data-modeling/view
 
 
 # The following example shows a view defined on top of orders and customers cubes.

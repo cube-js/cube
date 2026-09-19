@@ -1,7 +1,11 @@
 version: 2
 updates:
   - package-ecosystem: "npm"
-    directory: "/packages"
+    directories:
+      - "/"
+      - "/docs-mintlify"
+      - "/packages/cubejs-playground/vizard"
+      - "/packages/cubejs-playground/vizard/apps/*"
     schedule:
       interval: "weekly"
   - package-ecosystem: "npm"
@@ -11,3 +15,10 @@ updates:
     labels: [ ]
     ignore:
       - dependency-name: "*"
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    groups:
+      actions:
+        patterns: [ "*" ]

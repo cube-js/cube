@@ -1,0 +1,9 @@
+---
+source: cubesqlplanner/cubesqlplanner/src/tests/integration/filter_member_operand.rs
+expression: result
+---
+orders__status
+--------------
+cancelled     
+completed     
+pending

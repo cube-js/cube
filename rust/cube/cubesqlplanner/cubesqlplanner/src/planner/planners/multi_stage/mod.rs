@@ -10,4 +10,4 @@ pub use member_query_planner::MultiStageMemberQueryPlanner;
 pub use multi_stage_query_planner::MultiStageQueryPlanner;
 pub use planning_scope::{EvaluationContext, PlanningScope};
 pub use query_description::MultiStageQueryDescription;
-pub use time_shift_state::TimeShiftState;
+pub use time_shift_state::{FilterParamsTimeShift, FilterParamsTimeShifts, TimeShiftState};

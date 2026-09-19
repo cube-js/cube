@@ -1,4 +1,3 @@
-use crate::cluster::WorkerPlanningParams;
 use crate::queryplanner::check_memory::CheckMemoryExec;
 use crate::queryplanner::group_by_limit_aggregate::GroupByLimitAggregateExec;
 use crate::queryplanner::inline_aggregate::{InlineAggregateExec, InlineAggregateMode};
@@ -106,9 +105,7 @@ pub fn push_aggregate_to_workers(
                     .next()
                     .unwrap(),
                 w.worker_sort_and_limit.clone(),
-                WorkerPlanningParams {
-                    worker_partition_count: w.properties().output_partitioning().partition_count(),
-                },
+                w.properties().output_partitioning().partition_count(),
             ))
         } else {
             return Ok(p_final);
@@ -293,8 +290,9 @@ pub fn push_worker_sort_and_limit(
 ) -> Result<Arc<dyn ExecutionPlan>, DataFusionError> {
     // Worker side: bound the partial aggregate's output. A hash aggregate uses the trimming top-k
     // when factor > 0, otherwise (and for the sorted/inline aggregate, whose group count is unknown)
-    // it is bounded with a per-partition Sort(fetch). `resort_worker_subtree` returns None only when
-    // there is no locatable partial aggregate, leaving the plan as planned.
+    // it is bounded with a per-partition Sort(fetch). `resort_worker_subtree` returns None when there is
+    // no locatable partial aggregate, or when the descriptor's arity is not this aggregate's group
+    // key -- either way the plan is left as planned.
     if let Some(w) = p.as_any().downcast_ref::<WorkerExec>() {
         let Some((cols, fetch)) = w.worker_sort_and_limit.clone() else {
             return Ok(p);
@@ -314,9 +312,7 @@ pub fn push_worker_sort_and_limit(
             w.limit_and_reverse.clone(),
             w.required_input_ordering.clone(),
             w.worker_sort_and_limit.clone(),
-            WorkerPlanningParams {
-                worker_partition_count: w.properties().output_partitioning().partition_count(),
-            },
+            w.properties().output_partitioning().partition_count(),
         )));
     }
 
@@ -423,7 +419,8 @@ fn worker_ordering(
 ///   partition with a sort. For hash this is the pre-trim behavior, kept as the `factor == 0`
 ///   fallback so disabling the trim still bounds the worker rather than leaving it unbounded.
 ///
-/// Returns `None` for an unrecognized subtree (no locatable partial aggregate), otherwise the
+/// Returns `None` for an unrecognized subtree (no locatable partial aggregate) and for a
+/// descriptor whose arity is not the aggregate's group key -- otherwise the
 /// rebuilt subtree paired with `is_hash` (true for the hash path) so the caller doesn't have to
 /// walk down to the partial aggregate a second time to decide the router shape.
 fn resort_worker_subtree(
@@ -433,7 +430,16 @@ fn resort_worker_subtree(
     group_by_limit_factor: usize,
     group_by_limit_per_partition: bool,
 ) -> Option<(Arc<dyn ExecutionPlan>, bool)> {
-    let partial = locate_partial_aggregate(worker_subtree)?;
+    let (partial, group_count) = locate_partial_aggregate(worker_subtree)?;
+
+    // A descriptor of a different arity than this aggregate's group key is not ours, and skipping
+    // the bound is always correct. Equal arity is not proof -- the scoping in `ChooseIndexContext`
+    // is what guarantees the descriptor belongs to this aggregate; this only catches the case that
+    // would silently index the wrong columns. Router and worker reach it with the same aggregate,
+    // so the two halves of a split plan agree on whether it fired.
+    if cols.len() != group_count {
+        return None;
+    }
 
     // Hash path: trim during aggregation, emit unsorted for the router's hash final. Engaged only
     // when factor > 0; with it off, the hash aggregate falls through to the sorted-bounding path
@@ -441,13 +447,13 @@ fn resort_worker_subtree(
     // the trim bounds the worker exactly as before, not leaving it unbounded.
     if partial.as_any().is::<AggregateExec>() && group_by_limit_factor > 0 {
         // CUBESTORE_GROUP_BY_LIMIT_PER_PARTITION decides where the worker's hash table lives:
-        //  - off (default): coalesce the aggregate's input to a single partition, so the worker
-        //    builds ONE hash table over the merged partitions ("over merge"). Peak memory ~k, no
-        //    intra-worker parallelism on the aggregation.
-        //  - on: keep the raw multi-partition input, so the aggregate runs once per partition
-        //    ("under merge"): N parallel hash tables -- more parallelism, peak ~N*k. The trim keeps
-        //    each per-partition output to ~factor*k, and the global top-k argument (full group key)
-        //    guarantees a surviving group stays within every partition's local top-k.
+        //  - on (default): keep the raw multi-partition input, so the aggregate runs once per
+        //    partition ("under merge"): N parallel hash tables -- more parallelism, peak ~N*k. The
+        //    trim keeps each per-partition output to ~factor*k, and the global top-k argument (full
+        //    group key) guarantees a surviving group stays within every partition's local top-k.
+        //  - off: coalesce the aggregate's input to a single partition, so the worker builds ONE
+        //    hash table over the merged partitions ("over merge"). Peak memory ~k, no intra-worker
+        //    parallelism on the aggregation.
         let partial = if group_by_limit_per_partition {
             partial
         } else {
@@ -586,18 +592,21 @@ fn find_cluster_send(p: &Arc<dyn ExecutionPlan>) -> Option<Arc<dyn ExecutionPlan
     None
 }
 
-/// The partial aggregate inside a worker subtree, reached through merge/coalesce wrappers. Returns
-/// `None` for any other shape (including an already-rewritten subtree, whose partial now sits under
-/// a `SortExec` -- not a wrapper we descend -- keeping the pass idempotent).
-fn locate_partial_aggregate(p: &Arc<dyn ExecutionPlan>) -> Option<Arc<dyn ExecutionPlan>> {
+/// The partial aggregate inside a worker subtree, with its group-by column count, reached through
+/// merge/coalesce wrappers. Returns `None` for any other shape (including an already-rewritten
+/// subtree, whose partial now sits under a `SortExec` -- not a wrapper we descend -- keeping the
+/// pass idempotent).
+fn locate_partial_aggregate(p: &Arc<dyn ExecutionPlan>) -> Option<(Arc<dyn ExecutionPlan>, usize)> {
     let mut candidate = p.clone();
     loop {
         let any = candidate.as_any();
         if let Some(a) = any.downcast_ref::<InlineAggregateExec>() {
-            return (*a.mode() == InlineAggregateMode::Partial).then_some(candidate.clone());
+            return (*a.mode() == InlineAggregateMode::Partial)
+                .then(|| (candidate.clone(), a.group_expr().expr().len()));
         }
         if let Some(a) = any.downcast_ref::<AggregateExec>() {
-            return (*a.mode() == AggregateMode::Partial).then_some(candidate.clone());
+            return (*a.mode() == AggregateMode::Partial)
+                .then(|| (candidate.clone(), a.group_expr().expr().len()));
         }
         if any.is::<SortPreservingMergeExec>()
             || any.is::<CoalescePartitionsExec>()
@@ -1254,16 +1263,63 @@ mod tests {
         input: Arc<dyn ExecutionPlan>,
         limit_and_reverse: Option<(usize, bool)>,
     ) -> Arc<dyn ExecutionPlan> {
+        worker_with_sort_and_limit(input, limit_and_reverse, None)
+    }
+
+    fn worker_with_sort_and_limit(
+        input: Arc<dyn ExecutionPlan>,
+        limit_and_reverse: Option<(usize, bool)>,
+        worker_sort_and_limit: Option<crate::queryplanner::planning::WorkerSortAndLimit>,
+    ) -> Arc<dyn ExecutionPlan> {
         Arc::new(WorkerExec::new(
             input,
             4096,
             limit_and_reverse,
             None,
-            None,
-            WorkerPlanningParams {
-                worker_partition_count: 1,
-            },
+            worker_sort_and_limit,
+            1,
         ))
+    }
+
+    /// The descriptor is a permutation of the aggregate's own full group key. One that is shorter
+    /// belongs to a different relation, and applying it would reorder this aggregate's output by
+    /// whatever columns sit at those positions -- which breaks any parent that was planned against
+    /// the old order. Skipping the bound is always correct, so the pass leaves the plan alone.
+    #[test]
+    fn worker_sort_and_limit_skipped_for_a_descriptor_that_is_not_the_full_group_key() {
+        let schema = test_schema();
+        let source = two_partition_source(&schema);
+        let agg = sum_aggregate(AggregateMode::Partial, "k", source);
+        // `k` is the only group column, so a two-column descriptor cannot be this aggregate's.
+        let original = worker_with_sort_and_limit(
+            agg,
+            None,
+            Some((vec![(1, true, true), (0, true, true)], 10)),
+        );
+
+        let rewritten = push_worker_sort_and_limit(original.clone(), 2, true).unwrap();
+
+        assert!(
+            Arc::ptr_eq(&rewritten, &original),
+            "expected the plan to be left alone, got:\n{}",
+            crate::queryplanner::pretty_printers::pp_phys_plan(rewritten.as_ref())
+        );
+    }
+
+    /// The matching descriptor still applies, so the guard above is not simply disabling the pass.
+    #[test]
+    fn worker_sort_and_limit_applies_for_the_full_group_key() {
+        let schema = test_schema();
+        let source = two_partition_source(&schema);
+        let agg = sum_aggregate(AggregateMode::Partial, "k", source);
+        let original = worker_with_sort_and_limit(agg, None, Some((vec![(0, true, true)], 10)));
+
+        let rewritten = push_worker_sort_and_limit(original.clone(), 2, true).unwrap();
+
+        assert!(
+            !Arc::ptr_eq(&rewritten, &original),
+            "expected the descriptor to be applied"
+        );
     }
 
     /// Worker plan with the partial aggregate below the merge: merge of per-partition partial

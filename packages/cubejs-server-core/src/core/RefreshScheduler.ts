@@ -5,7 +5,8 @@ import crypto from 'crypto';
 import { Required } from '@cubejs-backend/shared';
 import {
   PreAggregationDescription,
-  PreAggregationPartitionRangeLoader
+  PreAggregationPartitionRangeLoader,
+  QueuePriority
 } from '@cubejs-backend/query-orchestrator';
 
 import { CubejsServerCore } from './server';
@@ -56,7 +57,7 @@ type JobedPreAggregation = {
   tableName: string,
   targetTableName: string,
   // eslint-disable-next-line camelcase
-  refreshKeyValues: {refresh_key: string}[][],
+  refreshKeyValues: { refresh_key: string }[][],
   queryKey: any[],
   lastUpdatedAt: string,
   type: string,
@@ -342,6 +343,12 @@ export class RefreshScheduler {
     const compilers = await compilerApi.getCompilers();
     const queryForEvaluation = await compilerApi.createQueryByDataSource(compilers, {});
 
+    const orchestratorApi = await this.serverCore.getOrchestratorApi(context);
+    const localRefreshKey = orchestratorApi
+      .getQueryOrchestrator()
+      .getQueryCache()
+      .isLocalRefreshKeyActive();
+
     await Promise.all(queryForEvaluation.cubeEvaluator.cubeNames().map(async cube => {
       const cubeFromPath = queryForEvaluation.cubeEvaluator.cubeFromPath(cube);
       const measuresCount = Object.keys(cubeFromPath.measures || {}).length;
@@ -349,6 +356,16 @@ export class RefreshScheduler {
       if (measuresCount === 0 && dimensionsCount === 0) {
         return;
       }
+
+      // This method exists only to warm the shared refresh key cache, and a locally evaluated
+      // key has no cache entry to warm — the getSql plus executeQuery per timezone below would
+      // be spent on a result that is thrown away. A `sql` key still hits the data source, and
+      // so do interval keys whenever the cache declines to evaluate them locally.
+      const sqlRefreshKey = !!cubeFromPath.refreshKey && 'sql' in cubeFromPath.refreshKey;
+      if (localRefreshKey && !sqlRefreshKey) {
+        return;
+      }
+
       await Promise.all(queryingOptions.timezones.map(async timezone => {
         const query = {
           ...queryingOptions,
@@ -363,7 +380,6 @@ export class RefreshScheduler {
           timezone
         };
         const sqlQuery = await compilerApi.getSql(query);
-        const orchestratorApi = await this.serverCore.getOrchestratorApi(context);
         await orchestratorApi.executeQuery({
           ...sqlQuery,
           sql: null,
@@ -432,6 +448,7 @@ export class RefreshScheduler {
       const partitionsWithDependencies = queriesForPreAggregation
         .map(query => {
           let dependencies: PreAggregationDescription[] = [];
+
           for (let i = 0; i < query.groupedPartitions.length - 1; i++) {
             dependencies = dependencies.concat(query.groupedPartitions[i]);
           }
@@ -507,6 +524,7 @@ export class RefreshScheduler {
         ).then(
           ({ groupedPartitions }) => (groupedPartitions[groupedPartitions.length - 1] || []).map(partition => {
             let cascadedPartitions: PreAggregationDescription[] = [];
+
             for (let j = 0; j < groupedPartitions.length - 1; j++) {
               cascadedPartitions = cascadedPartitions.concat(groupedPartitions[j]);
             }
@@ -526,6 +544,7 @@ export class RefreshScheduler {
       const initialTimezoneCursor = timezoneCursor;
       const initialPartitionCursor = partitionCursor;
       const initialPartitionCounter = partitionCounter;
+
       try {
         preAggregationCursor += 1;
         if (preAggregationCursor >= scheduledPreAggregations.length) {
@@ -576,7 +595,9 @@ export class RefreshScheduler {
           return {
             preAggregations: partitions.map(partition => ({
               ...partition,
-              priority: preAggregationsWarmup ? 1 : queryCursor - queries.length
+              priority: preAggregationsWarmup
+                ? QueuePriority.Warmup
+                : QueuePriority.Scheduled - (queries.length - 1 - queryCursor)
             })),
             cacheMode: 'must-revalidate',
             requestId: context.requestId,
@@ -611,6 +632,7 @@ export class RefreshScheduler {
         if (queryIteratorState) {
           queryIteratorState[queryIteratorStateKey] = queryIterator;
         }
+
         for (;;) {
           const currentQuery = await queryIterator.current();
           if (currentQuery && queryIterator.partitionCounter() % concurrency === workerIndex) {
@@ -787,8 +809,11 @@ export class RefreshScheduler {
                       metadata: queryingOptions.metadata,
                       isJob: true,
                     });
-                    job[0].dataSource = partition.dataSource;
-                    job[0].timezone = partition.timezone;
+                    job.forEach((j: JobedPreAggregation) => {
+                      j.dataSource = j.dataSource || partition.dataSource;
+                      j.timezone = j.timezone || partition.timezone;
+                    });
+
                     return job;
                   }
                 )

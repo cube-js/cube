@@ -1,0 +1,63 @@
+---
+title: Apps
+description: Build custom, interactive data experiences backed by governed data from your Cube semantic layer.
+---
+
+<Warning>
+
+Apps are currently in preview, and their capabilities and authoring experience may
+still change. Reach out to the [Cube support team](/admin/account-billing/support)
+to activate this feature for your account.
+
+</Warning>
+
+Apps let you go beyond a dashboard's grid of widgets. An app is a custom,
+interactive interface with its own layout, components, and controls, powered by
+live data from reports in a Cube workbook.
+
+Use an app when you need a guided workflow, a custom visual presentation, or an
+interactive data tool that does not fit a standard dashboard layout.
+
+## Create an app with the Cube agent
+
+Open a workbook, switch to **Dashboard Builder**, and describe the app you want in
+the agent chat. Include the business question, the data you want to show, and how
+people should interact with it. For example:
+
+> Build a revenue performance app with headline metrics, a monthly trend chart,
+> and a searchable status filter. Use the company's brand colors.
+
+The agent creates the workbook reports, writes the app, and installs reusable
+components for common elements such as charts, tables, KPI cards, tabs, and
+searchable controls. Continue prompting the agent to adjust the layout, behavior,
+or styling.
+
+## Preview and edit the app
+
+Use **Preview** to interact with the running app. Select **Code** to inspect or
+edit its files directly. After making code changes, click **Run** to apply them
+and refresh the preview.
+
+App components are copied into the app's source, so you can customize their code
+and styling for that specific experience.
+
+## Governed data access
+
+An app reads the results of reports in its workbook. Cube runs those reports using
+the viewer's existing permissions and passes the results to the app. The app does
+not receive credentials for your data source or Cube APIs, and it cannot query
+your warehouse directly.
+
+Apps run inside a sandboxed frame, isolated from the Cube interface. The app's
+data access remains governed by the semantic model and the permissions already
+configured in Cube.
+
+## Preview limitations
+
+During preview:
+
+- Apps are created and viewed from the workbook's Dashboard Builder.
+- Publishing, embedding, scheduled refreshes, and deliveries are not yet
+  supported for Apps.
+- Apps can read workbook report results but cannot write data back to a source.
+- Available components and APIs may change as the feature develops.

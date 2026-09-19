@@ -1,4 +1,4 @@
-import { parseSqlInterval } from '@cubejs-backend/shared';
+import { parseSqlInterval, splitSqlInterval } from '@cubejs-backend/shared';
 import { BaseQuery } from './BaseQuery';
 import { BaseFilter } from './BaseFilter';
 import { BaseTimeDimension } from './BaseTimeDimension';
@@ -127,6 +127,12 @@ export class BigqueryQuery extends BaseQuery {
       return [`'${intervalParsed.hour}:${intervalParsed.minute}:${intervalParsed.second}' HOUR TO SECOND`, 'SECOND'];
     } else if (intervalParsed.minute && intervalParsed.second && intKeys === 2) {
       return [`'${intervalParsed.minute}:${intervalParsed.second}' MINUTE TO SECOND`, 'SECOND'];
+    } else if (intervalParsed.hour && intKeys === 1) {
+      return [`${intervalParsed.hour} HOUR`, 'HOUR'];
+    } else if (intervalParsed.minute && intKeys === 1) {
+      return [`${intervalParsed.minute} MINUTE`, 'MINUTE'];
+    } else if (intervalParsed.second && intKeys === 1) {
+      return [`${intervalParsed.second} SECOND`, 'SECOND'];
     } else if (intervalParsed.millisecond && intKeys === 1) {
       return [`'${intervalParsed.millisecond}' MILLISECOND`, 'MILLISECOND'];
     }
@@ -158,21 +164,28 @@ export class BigqueryQuery extends BaseQuery {
   }
 
   public subtractInterval(date, interval) {
-    const [intervalFormatted, timeUnit] = this.formatInterval(interval);
-    if (['YEAR', 'MONTH', 'QUARTER'].includes(timeUnit) || intervalFormatted.includes('WEEK')) {
-      return this.timeStampCast(`DATETIME_SUB(DATETIME(${date}), INTERVAL ${intervalFormatted})`);
-    }
-
-    return `TIMESTAMP_SUB(${date}, INTERVAL ${intervalFormatted})`;
+    return this.applyInterval('SUB', date, interval);
   }
 
   public addInterval(date, interval) {
-    const [intervalFormatted, timeUnit] = this.formatInterval(interval);
-    if (['YEAR', 'MONTH', 'QUARTER'].includes(timeUnit) || intervalFormatted.includes('WEEK')) {
-      return this.timeStampCast(`DATETIME_ADD(DATETIME(${date}), INTERVAL ${intervalFormatted})`);
-    }
+    return this.applyInterval('ADD', date, interval);
+  }
 
-    return `TIMESTAMP_ADD(${date}, INTERVAL ${intervalFormatted})`;
+  /**
+   * DATETIME_ADD and friends take an INTERVAL of one date part — a range literal such as
+   * `INTERVAL '3 14' MONTH TO DAY` parses on its own but not as their argument — so a compound
+   * interval is applied one unit at a time, coarsest first.
+   */
+  private applyInterval(direction: 'SUB' | 'ADD', date: string, interval: string): string {
+    const parts = splitSqlInterval(interval).map(part => this.formatInterval(part));
+
+    return parts.reduce((acc, [intervalFormatted, timeUnit]) => {
+      if (['YEAR', 'MONTH', 'QUARTER'].includes(timeUnit) || intervalFormatted.includes('WEEK')) {
+        return this.timeStampCast(`DATETIME_${direction}(DATETIME(${acc}), INTERVAL ${intervalFormatted})`);
+      }
+
+      return `TIMESTAMP_${direction}(${acc}, INTERVAL ${intervalFormatted})`;
+    }, date);
   }
 
   public subtractTimestampInterval(timestamp, interval) {
@@ -335,6 +348,7 @@ export class BigqueryQuery extends BaseQuery {
     templates.functions.UTCTIMESTAMP = 'CURRENT_TIMESTAMP()';
     delete templates.functions.TO_CHAR;
     delete templates.functions.PERCENTILECONT;
+    delete templates.functions.WIDTH_BUCKET;
     templates.expressions.binary = '{% if op == \'%\' %}MOD({{ left }}, {{ right }}){% else %}({{ left }} {{ op }} {{ right }}){% endif %}';
     templates.expressions.interval = 'INTERVAL {{ interval }}';
     // BigQuery `/` on INT64 operands returns FLOAT64; DIV() is integer division
@@ -382,6 +396,14 @@ export class BigqueryQuery extends BaseQuery {
     'GENERATE_TIMESTAMP_ARRAY(TIMESTAMP({{ range_source }}.{{ min_name }}), TIMESTAMP({{ range_source }}.{{ max_name }}), INTERVAL {{ granularity }})\n' +
     '{% endif %}' +
     ') AS d';
+    // GoogleSQL requires a set operator to say which mode it is: a bare UNION does not parse.
+    templates.statements.union = '{% for query in queries %}(\n' +
+      '{{ query | indent(2, true) }}\n' +
+      ')' +
+      '{% if not loop.last %}\nUNION {% if distinct %}DISTINCT{% else %}ALL{% endif %} {% endif %}' +
+      '{% endfor %}' +
+      '{% if limit is not none %}\nLIMIT {{ limit }}{% endif %}';
+
     return templates;
   }
 }

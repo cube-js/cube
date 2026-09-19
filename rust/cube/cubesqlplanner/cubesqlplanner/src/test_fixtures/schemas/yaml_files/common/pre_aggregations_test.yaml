@@ -126,6 +126,18 @@ cubes:
           - visitor_checkins.for_lambda
           - visitor_checkins2.for_lambda
 
+      # Same cross-cube shape as joined_rollup, but grouped by the primary keys
+      # of both cubes, so each stored row is one raw joined row
+      - name: joined_keys_rollup
+        type: rollup
+        measures:
+          - count
+        dimensions:
+          - id
+          - visitor_id
+          - visitors.id
+          - visitors.source
+
   # Second cube for rollupLambda example
   - name: visitor_checkins2
     sql: "SELECT * FROM visitor_checkins"
@@ -154,3 +166,20 @@ cubes:
         time_dimension: created_at
         granularity: day
         partition_granularity: day
+
+views:
+  # Renames every member (prefix), so view members are references whose names
+  # differ from the cube members the pre-aggregations are declared over.
+  - name: visitors_view
+    cubes:
+      - join_path: visitors
+        includes:
+          - id
+          - source
+        prefix: true
+      - join_path: visitors.visitor_checkins
+        includes:
+          - id
+          - visitor_id
+          - count
+        prefix: true

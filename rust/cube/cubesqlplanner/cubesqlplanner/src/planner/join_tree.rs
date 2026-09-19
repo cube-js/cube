@@ -10,14 +10,21 @@ pub struct JoinTreeItem {
     cube: Rc<BaseCube>,
     original_from: String,
     on_sql: Rc<SqlCall>,
+    splits_rows: bool,
 }
 
 impl JoinTreeItem {
-    pub fn new(cube: Rc<BaseCube>, original_from: String, on_sql: Rc<SqlCall>) -> Self {
+    pub fn new(
+        cube: Rc<BaseCube>,
+        original_from: String,
+        on_sql: Rc<SqlCall>,
+        splits_rows: bool,
+    ) -> Self {
         Self {
             cube,
             original_from,
             on_sql,
+            splits_rows,
         }
     }
 
@@ -31,6 +38,16 @@ impl JoinTreeItem {
 
     pub fn on_sql(&self) -> &Rc<SqlCall> {
         &self.on_sql
+    }
+
+    /// Whether joining this cube in splits a row of its parent into
+    /// several — true exactly for the `one_to_many` side of an edge.
+    /// Unlike `JoinTree::is_multiplied`, which answers whether a cube's
+    /// own rows repeat and is only populated for the cubes the query
+    /// asked for, this is a property of the edge itself and so also
+    /// holds for cubes that merely transit the tree.
+    pub fn splits_rows(&self) -> bool {
+        self.splits_rows
     }
 }
 

@@ -3,6 +3,8 @@ title: Administration
 description: TODO
 ---
 
+import DevModeWarning from '/snippets/dev-mode-warning.mdx';
+
 Cube is configured via [environment variables][link-env-vars] and
 [configuration options][link-config] in a configuration file. Usually,
 both would be used to configure a Cube deployment in production.
@@ -181,12 +183,13 @@ Cube Cloud automatically installs dependencies from `requirements.txt` and
 
 ## Development mode
 
+<DevModeWarning />
+
 Cube can be run in an insecure, development mode by setting the
 [`CUBEJS_DEV_MODE`](/reference/configuration/environment-variables#cubejs_dev_mode) environment variable to `true`. Putting Cube in development
 mode does the following:
 
-- Disables authentication checks.
-- Disables [member-level access control][ref-mls].
+- Disables [member-level access control][ref-mls] when listing the data model.
 - Enables Cube Store in single instance mode.
 - Enables background refresh for in-memory cache and [scheduled
   pre-aggregations][link-scheduled-refresh].

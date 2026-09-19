@@ -1,6 +1,7 @@
 use crate::{
     compile::rewrite::{
-        agg_fun_expr, agg_fun_expr_within_group, agg_fun_expr_within_group_empty_tail, rewrite,
+        agg_fun_expr_args, agg_fun_expr_args_empty_tail, agg_fun_expr_var_arg,
+        agg_fun_expr_within_group, agg_fun_expr_within_group_empty_tail, rewrite,
         rewriter::{CubeEGraph, CubeRewrite},
         rules::wrapper::WrapperRules,
         transforming_rewrite, wrapper_pullup_replacer, wrapper_pushdown_replacer,
@@ -15,25 +16,28 @@ use egg::Subst;
 impl WrapperRules {
     pub fn aggregate_function_rules(&self, rules: &mut Vec<CubeRewrite>) {
         rules.extend(vec![
+            // Matched over the whole argument list rather than a single argument: an
+            // aggregate can take more than one, as `APPROX_PERCENTILE_CONT(expr, 0.5)`
+            // does, and a one-argument pattern silently leaves those behind
             rewrite(
                 "wrapper-push-down-aggregate-function",
                 wrapper_pushdown_replacer(
-                    agg_fun_expr("?fun", vec!["?expr"], "?distinct", "?within_group"),
+                    agg_fun_expr_var_arg("?fun", "?args", "?distinct", "?within_group"),
                     "?context",
                 ),
-                agg_fun_expr(
+                agg_fun_expr_var_arg(
                     "?fun",
-                    vec![wrapper_pushdown_replacer("?expr", "?context")],
+                    wrapper_pushdown_replacer("?args", "?context"),
                     "?distinct",
                     wrapper_pushdown_replacer("?within_group", "?context"),
                 ),
             ),
             transforming_rewrite(
                 "wrapper-pull-up-aggregate-function",
-                agg_fun_expr(
+                agg_fun_expr_var_arg(
                     "?fun",
-                    vec![wrapper_pullup_replacer(
-                        "?expr",
+                    wrapper_pullup_replacer(
+                        "?args",
                         wrapper_replacer_context(
                             "?alias_to_cube",
                             "?push_to_cube",
@@ -43,7 +47,7 @@ impl WrapperRules {
                             "?ungrouped_scan",
                             "?input_data_source",
                         ),
-                    )],
+                    ),
                     "?distinct",
                     wrapper_pullup_replacer(
                         "?within_group",
@@ -59,7 +63,7 @@ impl WrapperRules {
                     ),
                 ),
                 wrapper_pullup_replacer(
-                    agg_fun_expr("?fun", vec!["?expr"], "?distinct", "?within_group"),
+                    agg_fun_expr_var_arg("?fun", "?args", "?distinct", "?within_group"),
                     wrapper_replacer_context(
                         "?alias_to_cube",
                         "?push_to_cube",
@@ -97,6 +101,27 @@ impl WrapperRules {
                     wrapper_pullup_replacer("?right", "?context"),
                 ),
                 wrapper_pullup_replacer(agg_fun_expr_within_group("?left", "?right"), "?context"),
+            ),
+            rewrite(
+                "wrapper-push-down-aggregate-function-args",
+                wrapper_pushdown_replacer(agg_fun_expr_args("?left", "?right"), "?context"),
+                agg_fun_expr_args(
+                    wrapper_pushdown_replacer("?left", "?context"),
+                    wrapper_pushdown_replacer("?right", "?context"),
+                ),
+            ),
+            rewrite(
+                "wrapper-pull-up-aggregate-function-args",
+                agg_fun_expr_args(
+                    wrapper_pullup_replacer("?left", "?context"),
+                    wrapper_pullup_replacer("?right", "?context"),
+                ),
+                wrapper_pullup_replacer(agg_fun_expr_args("?left", "?right"), "?context"),
+            ),
+            rewrite(
+                "wrapper-push-down-aggregate-function-args-empty-tail",
+                wrapper_pushdown_replacer(agg_fun_expr_args_empty_tail(), "?context"),
+                wrapper_pullup_replacer(agg_fun_expr_args_empty_tail(), "?context"),
             ),
         ]);
     }

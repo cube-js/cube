@@ -30,6 +30,7 @@ export class MSSqlDbRunner extends BaseDbRunner {
       testQueries: async (queries, _fixture) => {
         await this.prepareFixture(driver);
         let result;
+
         for (const query of queries) {
           result = await driver.query(query[0], query[1] || []);
         }

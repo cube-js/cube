@@ -128,9 +128,9 @@ export function codeSandboxDefinition(
                 [name]: version,
                 ...(peerDependencies[name]
                   ? {
-                      [peerDependencies[name]]:
+                    [peerDependencies[name]]:
                         fixes[peerDependencies[name]] || 'latest',
-                    }
+                  }
                   : null),
               };
             }, {}),
@@ -213,9 +213,7 @@ export function fetchWithTimeout(
 ): Promise<Response> {
   return Promise.race([
     fetch(url, options),
-    new Promise<Response>((_, reject) =>
-      setTimeout(() => reject(new Error('timeout')), timeout)
-    ),
+    new Promise<Response>((_, reject) => setTimeout(() => reject(new Error('timeout')), timeout)),
   ]);
 }
 
@@ -268,9 +266,9 @@ export function containsPrivateFields(queryMembers: string[], meta: any) {
         ...config.measures,
         ...config.dimensions,
         ...config.segments,
-      ].some((m) => {
-        return m.name === member && m.isVisible === false;
-      });
+      ].some((m) => m.name === member && m.isVisible === false);
     }
+
+    return false;
   });
 }

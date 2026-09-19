@@ -4,11 +4,9 @@ import { AvailableCube, AvailableMembers } from '@cubejs-client/react';
 export function getNameMemberPairs(members: AvailableCube[]) {
   const items: [memberName: string, member: BaseCubeMember & MemberType][] = [];
 
-  members.forEach((cube) =>
-    cube.members.forEach((member) => {
-      items.push([member.name, member]);
-    })
-  );
+  members.forEach((cube) => cube.members.forEach((member) => {
+    items.push([member.name, member]);
+  }));
 
   return items;
 }

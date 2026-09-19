@@ -12,6 +12,11 @@ use std::{
 };
 use tokio::{sync::mpsc::error::SendError, time::error::Elapsed};
 
+/// Canonical spelling of the queue's "not finished yet" signal. It is the wire
+/// value the api-gateway sends and the event name query history reads, so it is
+/// also what a `ContinueWait` error normalizes back to.
+pub const CONTINUE_WAIT_MESSAGE: &str = "Continue wait";
+
 #[derive(thiserror::Error, Debug)]
 pub struct CubeError {
     pub message: String,
@@ -127,7 +132,7 @@ impl CubeError {
 
     pub fn continue_wait() -> Self {
         Self {
-            message: "Continue wait".to_string(),
+            message: CONTINUE_WAIT_MESSAGE.to_string(),
             cause: CubeErrorCauseType::ContinueWait,
             backtrace: None,
         }
@@ -149,6 +154,101 @@ impl CubeError {
 }
 
 impl CubeError {
+    /// Whether this error is the queue's `Continue wait` signal rather than a
+    /// failure. Nothing user-visible may be reported for it - see
+    /// `handle_sql_query` in `cubejs-backend-native`, which must not log a
+    /// `Cube SQL Error` load event for one.
+    ///
+    /// The cause is the reliable half; the message check is the fallback for an
+    /// error that lost its cause on the way here. That happens: DataFusion's
+    /// `RepartitionExec` has to hand one error to every output partition and a
+    /// boxed error is not `Clone`, so `wait_for_task` flattens it to its
+    /// `Display` string and re-wraps it as `DataFusionError::Execution`. The
+    /// typed `CubeError` is gone at that point and the message has grown a
+    /// prefix (`Execution error: Continue wait`), which is why the message check
+    /// is not an equality one - and why every prefix would otherwise compound
+    /// through the next wrapping layer.
+    pub fn is_continue_wait(&self) -> bool {
+        matches!(self.cause, CubeErrorCauseType::ContinueWait)
+            || Self::is_continue_wait_message(&self.message)
+    }
+
+    /// `is_continue_wait` for a bare message, when no cause is available - a
+    /// message carried over the JS bridge, or one already flattened to a string.
+    ///
+    /// These messages have a structure, and the check follows it rather than
+    /// scanning for the phrase anywhere in the text. Each wrapping layer prepends
+    /// its own label and a colon (`Execution error: `, `Database Execution Error: `,
+    /// and these compound), and a message that arrived over the JS bridge can have
+    /// a stack appended, which puts the message on the first line and the frames
+    /// after it (`errorString` in `js/index.ts` falls back to `err.stack`). So the
+    /// phrase always lands as a whole `:`- or newline-delimited part, however many
+    /// layers wrapped it - and splitting on both separators matches every one of
+    /// those shapes without enumerating them.
+    ///
+    /// Matching parts rather than a substring is what keeps a real failure intact.
+    /// A false positive is expensive here, more so than at the original site where
+    /// it only meant one more retry. Two consumers are new to this predicate.
+    /// `normalize_continue_wait` runs on every DataFusion and Arrow conversion and
+    /// *replaces* the message, so the original text is gone before anything
+    /// downstream sees it. And `load_data` (`scan.rs`) held an equality check
+    /// until this change: a real database error misread here is minted with the
+    /// `ContinueWait` cause locally, so - unlike a genuine continue wait, which
+    /// the transport retries and never surfaces on the Postgres path - nothing
+    /// re-classifies it, and `sql/postgres/error.rs` answers the client
+    /// `SqlStatementNotYetComplete` (`03000`) instead of their failure. These
+    /// messages interpolate user-controlled SQL, so the phrase turns up inside
+    /// one as an identifier or a literal (`No field named 'continue wait'`,
+    /// `status = Utf8("continue wait")`); as part of a larger part it is not the
+    /// signal, and a substring test could not tell the two apart.
+    ///
+    /// The trade runs the other way for a wrapper that appends instead of
+    /// prepending: `Continue wait.` or `Continue wait (retrying)` is one part and
+    /// does not match. Exactly one such wrapper exists, and it is in this file -
+    /// the `Rewrite` arm of `Display` renders
+    /// `Rewrite Error: {}. Please check logs for additional information`, where
+    /// every other arm is `<Label>: {}`. A continue wait never carries that
+    /// cause, and the reason is not that the cause is only minted locally - it is
+    /// stamped onto *foreign* errors too (`query_engine.rs` re-labels whatever
+    /// `compiler_cache.rewrite` and `find_best_plan` return; `converter.rs` wraps
+    /// a `MemberError` with it). What makes it safe is one level down: the rewrite
+    /// phase never calls the transport. It works against an already-fetched
+    /// `MetaContext` / `CompilerCacheEntry`, and `compile/rewrite/` contains no
+    /// `transport.` call at all, so no continue wait can arise there to be
+    /// re-labelled - a continue wait comes from `transport.load` at execution
+    /// time, after rewriting. `every_cause_renders_a_matchable_continue_wait` pins
+    /// the `Display` half, so a new appending wrapper - or an existing arm taught
+    /// to append - fails there rather than silently swallowing the signal.
+    pub fn is_continue_wait_message(message: &str) -> bool {
+        message
+            .split(['\n', ':'])
+            .any(|part| part.trim().eq_ignore_ascii_case(CONTINUE_WAIT_MESSAGE))
+    }
+
+    /// Restores the `ContinueWait` cause on an error that reached us as a
+    /// stringified continue wait (see `is_continue_wait` for how the cause gets
+    /// lost), and resets the message to its canonical spelling so the accumulated
+    /// prefixes do not travel any further.
+    ///
+    /// Applied at the DataFusion and Arrow conversion boundaries, which is where
+    /// the flattening happens, so consumers downstream of them can match on the
+    /// cause.
+    ///
+    /// Both halves are normalized, not just the cause-less one: an error can
+    /// arrive carrying the cause *and* a prefixed message - `CubeScanMemoryStream`
+    /// sets the cause without rewriting the message, and the `CubeError` downcast
+    /// arm hands that straight back here - and the message still has to be
+    /// canonical, because JS matches it exactly in places (`gateway.ts`'s
+    /// `err.message === 'Continue wait'`).
+    fn normalize_continue_wait(mut self) -> Self {
+        if self.is_continue_wait() {
+            self.message = CONTINUE_WAIT_MESSAGE.to_string();
+            self.cause = CubeErrorCauseType::ContinueWait;
+        }
+
+        self
+    }
+
     pub fn backtrace(&self) -> Option<&Backtrace> {
         self.backtrace.as_ref()
     }
@@ -351,7 +451,7 @@ impl From<tokio::sync::broadcast::error::RecvError> for CubeError {
 
 impl From<datafusion::error::DataFusionError> for CubeError {
     fn from(v: datafusion::error::DataFusionError) -> Self {
-        match v {
+        let converted = match v {
             datafusion::error::DataFusionError::ArrowError(e) => CubeError::from(e),
             datafusion::error::DataFusionError::SQL(e) => CubeError::from(e),
             datafusion::error::DataFusionError::NotImplemented(e) => CubeError::unsupported(e),
@@ -362,17 +462,27 @@ impl From<datafusion::error::DataFusionError> for CubeError {
                 Ok(e) => *e,
                 Err(e) => match e.downcast::<arrow::error::ArrowError>() {
                     Ok(e) => CubeError::from(*e),
-                    Err(e) => CubeError::internal(e.to_string()),
+                    // `From<ArrowError>` tries `DataFusionError` here as well,
+                    // and a `DataFusionError` does end up boxed inside
+                    // `External` - `From<DataFusionError> for ArrowError` in the
+                    // fork boxes anything it cannot map. Without this arm such
+                    // an error only ever reached us as its `Display` string.
+                    Err(e) => match e.downcast::<datafusion::error::DataFusionError>() {
+                        Ok(e) => CubeError::from(*e),
+                        Err(e) => CubeError::internal(e.to_string()),
+                    },
                 },
             },
             _ => CubeError::internal(v.to_string()),
-        }
+        };
+
+        converted.normalize_continue_wait()
     }
 }
 
 impl From<arrow::error::ArrowError> for CubeError {
     fn from(v: arrow::error::ArrowError) -> Self {
-        match v {
+        let converted = match v {
             arrow::error::ArrowError::NotYetImplemented(e) => CubeError::unsupported(e),
             arrow::error::ArrowError::ExternalError(e) => match e.downcast::<CubeError>() {
                 Ok(e) => *e,
@@ -388,7 +498,9 @@ impl From<arrow::error::ArrowError> for CubeError {
                 CubeError::post_processing(v.to_string())
             }
             _ => CubeError::internal(v.to_string()),
-        }
+        };
+
+        converted.normalize_continue_wait()
     }
 }
 
@@ -460,5 +572,220 @@ impl From<base64::DecodeError> for CubeError {
 impl From<tokio::sync::AcquireError> for CubeError {
     fn from(v: tokio::sync::AcquireError) -> Self {
         CubeError::internal(v.to_string())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use datafusion::error::DataFusionError;
+
+    /// The shape a continue wait actually arrives in once DataFusion has
+    /// parallelized the plan. `RepartitionExec::wait_for_task` has to deliver one
+    /// error to every output partition, and a boxed error is not `Clone`, so it
+    /// flattens ours to its `Display` string and re-wraps it as
+    /// `DataFusionError::Execution` - then `From<DataFusionError> for ArrowError`
+    /// boxes that into `ExternalError` on the way back into the record batch
+    /// stream. `target_partitions` defaults to `num_cpus::get()` and
+    /// `repartition_aggregations` / `repartition_windows` default to true, so any
+    /// GROUP BY or window function over a `CubeScan` takes this path.
+    fn repartitioned(message: &str) -> arrow::error::ArrowError {
+        arrow::error::ArrowError::ExternalError(Box::new(DataFusionError::Execution(
+            message.to_string(),
+        )))
+    }
+
+    #[test]
+    fn continue_wait_survives_repartition_flattening() {
+        let err = CubeError::from(repartitioned(CONTINUE_WAIT_MESSAGE));
+
+        assert!(err.is_continue_wait());
+        assert!(matches!(err.cause, CubeErrorCauseType::ContinueWait));
+        // Normalized, so the prefix cannot compound if it is wrapped again.
+        assert_eq!(err.message, CONTINUE_WAIT_MESSAGE);
+        assert_eq!(err.to_string(), CONTINUE_WAIT_MESSAGE);
+    }
+
+    /// The regression this guards: the flattened error's `Display` already
+    /// carries DataFusion's `Execution error: ` prefix, so a second wrapping
+    /// layer produces a doubly-prefixed message. An equality check against
+    /// `"continue wait"` matches neither, which is how the queue signal reached
+    /// query history as a failed request.
+    #[test]
+    fn continue_wait_survives_a_prefixed_message() {
+        for message in [
+            "Execution error: Continue wait",
+            "Execution error: Execution error: Continue wait",
+            "Database Execution Error: Continue wait",
+            "CONTINUE WAIT",
+        ] {
+            let err = CubeError::from(repartitioned(message));
+
+            assert!(err.is_continue_wait(), "not detected: {}", message);
+            assert!(matches!(err.cause, CubeErrorCauseType::ContinueWait));
+            assert_eq!(err.message, CONTINUE_WAIT_MESSAGE);
+        }
+    }
+
+    #[test]
+    fn continue_wait_survives_as_a_typed_external_error() {
+        let err = CubeError::from(arrow::error::ArrowError::ExternalError(Box::new(
+            CubeError::continue_wait(),
+        )));
+
+        assert!(err.is_continue_wait());
+        assert!(matches!(err.cause, CubeErrorCauseType::ContinueWait));
+    }
+
+    /// `DataFusionError::External` can hold a `DataFusionError` - the fork's
+    /// `From<DataFusionError> for ArrowError` boxes anything it cannot map, and
+    /// the round trip back lands here. Only `From<ArrowError>` used to try that
+    /// downcast, so this direction reported the inner error as its `Display`
+    /// string and lost the cause with it.
+    #[test]
+    fn nested_datafusion_error_keeps_its_cause() {
+        let err = CubeError::from(DataFusionError::External(Box::new(
+            DataFusionError::Execution(CONTINUE_WAIT_MESSAGE.to_string()),
+        )));
+
+        assert!(err.is_continue_wait());
+        assert!(matches!(err.cause, CubeErrorCauseType::ContinueWait));
+    }
+
+    /// An error can arrive with the cause already set *and* a prefixed message:
+    /// `CubeScanMemoryStream` sets the cause without rewriting the message, and
+    /// the `CubeError` downcast arm returns it unchanged. The message still has to
+    /// end up canonical, because JS compares it exactly (`gateway.ts`'s
+    /// `err.message === 'Continue wait'`).
+    #[test]
+    fn a_typed_continue_wait_still_gets_a_canonical_message() {
+        let mut err = CubeError::continue_wait();
+        err.message = "Database Execution Error: Continue wait".to_string();
+
+        let err = CubeError::from(arrow::error::ArrowError::ExternalError(Box::new(err)));
+
+        assert!(err.is_continue_wait());
+        assert!(matches!(err.cause, CubeErrorCauseType::ContinueWait));
+        assert_eq!(err.message, CONTINUE_WAIT_MESSAGE);
+    }
+
+    /// A message carried over the JS bridge can have a stack appended:
+    /// `errorString` falls back to `err.stack`, which renders the message on the
+    /// first line and the frames after it.
+    #[test]
+    fn continue_wait_survives_an_appended_stack() {
+        let err = CubeError::from(repartitioned(
+            "Error: Continue wait\n    at load (/app/js/index.js:12:34)",
+        ));
+
+        assert!(err.is_continue_wait());
+        assert!(matches!(err.cause, CubeErrorCauseType::ContinueWait));
+        assert_eq!(err.message, CONTINUE_WAIT_MESSAGE);
+    }
+
+    /// A message that does not carry the phrase at all, including shapes that
+    /// have tripped up earlier implementations: empty, shorter than the phrase,
+    /// and non-ASCII.
+    #[test]
+    fn a_message_without_the_phrase_is_not_a_continue_wait() {
+        for message in ["", "wait", "Ошибка: продолжить ожидание"] {
+            assert!(
+                !CubeError::is_continue_wait_message(message),
+                "wrongly detected: {}",
+                message
+            );
+        }
+    }
+
+    /// The phrase is matched as a whole part, so it still resolves however many
+    /// layers wrapped it and wherever the split lands it - including a part that
+    /// a stack frame's own colons cut out of the first line.
+    #[test]
+    fn the_phrase_is_matched_as_a_whole_part() {
+        for message in [
+            CONTINUE_WAIT_MESSAGE,
+            "Execution error: Continue wait",
+            "Post-Processing Error: Execution error: Continue wait",
+            "Error: Continue wait\n    at load (/app/js/index.js:12:34)",
+        ] {
+            assert!(
+                CubeError::is_continue_wait_message(message),
+                "not detected: {}",
+                message
+            );
+        }
+    }
+
+    /// `RepartitionExec` flattens through `Display`, so every cause's rendering
+    /// of a continue wait has to stay matchable by the predicate.
+    ///
+    /// The `Rewrite` arm is the one that also *appends*
+    /// (`. Please check logs for additional information`), so it is the one that
+    /// does not survive the round trip - and it is unreachable for a continue
+    /// wait, because the rewrite phase never calls the transport (see
+    /// `is_continue_wait_message`; the cause itself is stamped onto foreign
+    /// errors, so it is the phase, not the constructor, that rules this out).
+    ///
+    /// The inner match is exhaustive on purpose: a new cause variant, or an
+    /// existing one taught to append, stops compiling here rather than silently
+    /// swallowing the queue's signal.
+    #[test]
+    fn every_cause_renders_a_matchable_continue_wait() {
+        use CubeErrorCauseType::*;
+
+        for cause in [
+            User(None),
+            Internal(None),
+            RestApi(None),
+            SqlParser(None),
+            Unsupported(None),
+            Planning(None),
+            PostProcessing(None),
+            Rewrite(None),
+            DatabaseExecution(None),
+            ContinueWait,
+        ] {
+            let appends = match &cause {
+                Rewrite(_) => true,
+                User(_) | Internal(_) | RestApi(_) | SqlParser(_) | Unsupported(_)
+                | Planning(_) | PostProcessing(_) | DatabaseExecution(_) | ContinueWait => false,
+            };
+
+            let rendered = CubeError {
+                message: CONTINUE_WAIT_MESSAGE.to_string(),
+                cause,
+                backtrace: None,
+            }
+            .to_string();
+
+            assert_eq!(
+                CubeError::is_continue_wait_message(&rendered),
+                !appends,
+                "unexpected verdict for: {}",
+                rendered
+            );
+        }
+    }
+
+    #[test]
+    fn a_real_failure_is_left_alone() {
+        for message in [
+            "Table 'orders' not found",
+            "Database Execution Error: syntax error at or near \"SELCT\"",
+            // The phrase is the user's identifier or literal, carried inside a
+            // larger part rather than being one - and its text has to survive,
+            // because `normalize_continue_wait` would otherwise replace it.
+            "No field named 'continue wait' in table 'orders'",
+            "Unsupported filter: status = Utf8(\"Continue wait\")",
+            "Can't find column `continue wait` in projection",
+            "Execution error: No field named 'continue wait'",
+            "Execution error: continue wait is not a column\n    at plan (/app/js/index.js:1:2)",
+        ] {
+            let err = CubeError::from(repartitioned(message));
+
+            assert!(!err.is_continue_wait(), "wrongly swallowed: {}", message);
+            assert!(matches!(err.cause, CubeErrorCauseType::PostProcessing(_)));
+            assert_eq!(err.message, message);
+        }
     }
 }

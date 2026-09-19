@@ -1,167 +1,172 @@
 ---
 title: Implementing custom calendars
-description: Map fact tables to irregular retail or fiscal calendars—illustrated with the 4-5-4 pattern—using dedicated calendar cubes and proxy dimensions.
+description: Model a 4-5-4 retail calendar as a calendar cube, overriding the week, month, quarter, and year granularities with pre-calculated columns.
 ---
 
-This recipe explains the implementation of the [4-5-4 calendar][link-454], a common
-retail calendar used in the US and Canada. However, the same approach can be used
-to implement other custom calendars.
+A _custom calendar_ divides the year into periods that do not line up with the Gregorian
+calendar. This recipe implements the [4-5-4 calendar][link-454], a retail calendar common
+in the US and Canada, as a [calendar cube][ref-calendar-cubes]. The same approach applies
+to any other custom calendar, such as a fiscal one.
 
-Unlike [custom time dimension granularities][ref-custom-granularities], custom
-calendars provide more flexibility and can be used when time units have variable
-lengths, such as the months and quarters in the 4-5-4 calendar. See the [custom
-granularities recipe][ref-custom-granularities-recipe] for more information.
+<Warning>
+
+Calendar cubes are powered by Tesseract, the [next-generation data modeling
+engine][link-tesseract]. In versions before v1.7.0, it was not enabled by default.
+Querying a [to-date rolling window][ref-rolling-window] over an overridden granularity
+also requires v1.7.32 or later.
+
+</Warning>
 
 ## Use case
 
-The 4-5-4 calendar ensures sales comparability between years by dividing the year
-into months based on a 4 weeks – 5 weeks – 4 weeks format. The layout of the calendar
-lines up holidays and ensures the same number of Saturdays and Sundays in comparable
-months. Hence, like days are compared to like days for sales reporting purposes.
+The 4-5-4 calendar makes sales comparable between years. It divides each retail year into
+quarters of three months, and each quarter into weeks in a 4 – 5 – 4 pattern, so a retail
+month is either four or five weeks long. Every month therefore begins on the same weekday
+and contains the same number of Saturdays and Sundays as its counterpart a year earlier,
+which is what makes like-for-like sales reporting possible.
+
+Because a retail month varies in length, it cannot be derived arithmetically from a
+fixed-length interval. It has to be read from a calendar table that states, for every
+date, which retail period that date belongs to.
 
 ## Data modeling
 
-The data modeling includes the following steps:
+The implementation has two parts:
 
-* Create a calendar cube, e.g., `calendar_454`.
-* Extend it a number of times, so there's one calendar cube for every time dimension
-in cubes with facts that needs translation to a custom calendar.
-* Define joins from your cubes with facts to those calendar cubes, e.g., `base_orders`,
-and bring relevant calendar attributes as [proxy dimensions][ref-proxy-dimensions].
-
-The last two steps require a few lines of code but it can totally be optimized with
-a [Jinja macro][ref-jinja-macro] if needed.
+* A [calendar cube][ref-calendar-cubes] over the calendar table, where the `week`,
+`month`, `quarter`, and `year` granularities are overridden with pre-calculated columns.
+* A join from each cube with facts to that calendar cube.
 
 ### Calendar table
 
-Consider the following calendar cube. It was generated using a large language model
-(LLM) and then tested against the [official calendar][link-454-official-calendar].
-In this example, it's generated on the fly, however, in production, it should be
-materialized as a table using a data transformation tool:
+Consider the following calendar table. Every row is a date, and the remaining columns
+state the retail periods that the date belongs to. In production, generate it with a data
+transformation tool and materialize it as a table:
 
-```yaml
+| `date_value` | `retail_week_begins` | `retail_month_begins` | `retail_quarter_begins` | `retail_year_begins` | `date_prev_month` | `date_prev_year` |
+| --- | --- | --- | --- | --- | --- | --- |
+| 2024-02-04 | 2024-02-04 | 2024-02-04 | 2024-02-04 | 2024-02-04 | 2024-01-07 | 2023-02-05 |
+| 2024-02-05 | 2024-02-04 | 2024-02-04 | 2024-02-04 | 2024-02-04 | 2024-01-08 | 2023-02-06 |
+| … | … | … | … | … | … | … |
+| 2024-03-03 | 2024-03-03 | 2024-03-03 | 2024-02-04 | 2024-02-04 | 2024-02-04 | 2023-03-05 |
+| … | … | … | … | … | … | … |
+| 2024-04-07 | 2024-04-07 | 2024-04-07 | 2024-02-04 | 2024-02-04 | 2024-03-03 | 2023-04-09 |
+| … | … | … | … | … | … | … |
+| 2024-05-05 | 2024-05-05 | 2024-05-05 | 2024-05-05 | 2024-02-04 | 2024-04-07 | 2023-05-07 |
+
+The retail year 2024 begins on 2024-02-04. The month beginning on that date is four weeks
+long, so the next one begins on 2024-03-03; that one is five weeks long, so the third
+begins on 2024-04-07. Those three months make up the first retail quarter, and the second
+one begins on 2024-05-05. That 4 – 5 – 4 sequence is exactly what no `interval` can
+express, and it is why these dates are pre-calculated rather than computed at query time.
+
+The last two columns hold the date one retail month and one retail year earlier. They are
+what make [time shifts](#comparing-with-a-prior-period) follow the retail calendar as
+well.
+
+### Calendar cube
+
+Set [`calendar`][ref-cubes-calendar] to `true` on the cube over the calendar table, and
+override the granularities of its [`primary_key`][ref-primary-key] dimension:
+
+<CodeGroup>
+
+```yaml title="YAML"
 cubes:
-  - name: calendar_454
-    public: false
-    sql: |
-      WITH RECURSIVE fiscal_weeks AS (
-          -- Step 1: Define the start of the fiscal years (Sunday closest to Feb 1st)
-          SELECT 
-              year AS fiscal_year, 
-              CASE 
-                  WHEN strftime('%w', date_trunc('week', make_date(year, 2, 1)))::INTEGER <= 3 
-                  THEN date_trunc('week', make_date(year, 2, 1)) + INTERVAL 6 DAY 
-                  ELSE date_trunc('week', make_date(year, 2, 1) + INTERVAL 7 DAY) + INTERVAL 7 DAY
-              END AS week_start,
-              1 AS week_number,
-              1 AS month_number,
-              1 AS month_week_count
-          FROM range(2015, 2031) t(year)
-          
-          UNION ALL
-          
-          -- Step 2: Generate weeks recursively following the 4-5-4 pattern
-          SELECT 
-              fiscal_year,
-              week_start + INTERVAL 7 DAY AS week_start,
-              week_number + 1,
-              CASE 
-                  WHEN month_number = 12 AND ((month_week_count = 4 AND month_number % 3 = 1) OR 
-                                              (month_week_count = 5 AND month_number % 3 = 2) OR 
-                                              (month_week_count = 4 AND month_number % 3 = 0)) 
-                  THEN 1 
-                  WHEN month_week_count = 4 AND (month_number % 3 = 1) THEN month_number + 1
-                  WHEN month_week_count = 5 AND (month_number % 3 = 2) THEN month_number + 1
-                  WHEN month_week_count = 4 AND (month_number % 3 = 0) THEN month_number + 1
-                  ELSE month_number
-              END AS month_number,
-              CASE 
-                  WHEN month_week_count = 4 AND (month_number % 3 = 1) THEN 1
-                  WHEN month_week_count = 5 AND (month_number % 3 = 2) THEN 1
-                  WHEN month_week_count = 4 AND (month_number % 3 = 0) THEN 1
-                  ELSE month_week_count + 1
-              END AS month_week_count
-          FROM fiscal_weeks
-          WHERE week_number < 52 OR (week_number = 52 AND (fiscal_year % 5 = 2)) -- Account for 53rd week
-      )
-
-      SELECT 
-          fiscal_year,
-          week_number,
-          month_number,
-          make_timestamp(fiscal_year, month_number, 1, 0, 0, 0) AS fiscal_month_date,
-          week_start AS week_start_date,
-          make_timestamp(year(week_start + INTERVAL 6 DAY), 
-              month(week_start + INTERVAL 6 DAY), 
-              day(week_start + INTERVAL 6 DAY), 
-              23, 59, 59.999) AS week_end_date
-      FROM fiscal_weeks
-      ORDER BY fiscal_year, week_number
+  - name: retail_calendar
+    calendar: true
+    sql_table: retail_calendar
 
     dimensions:
-      - name: retail_year
-        sql: fiscal_year
-        type: number
-
-      - name: week_number
-        sql: week_number
-        type: number
-
-      - name: month_number
-        sql: month_number
-        type: number
-
-      - name: retail_month_date
-        sql: fiscal_month_date
+      - name: date
+        sql: date_value
         type: time
+        primary_key: true
 
-      - name: week_start_date
-        sql: week_start_date
-        type: time
+        granularities:
+          - name: week
+            sql: "{CUBE}.retail_week_begins"
 
-      - name: week_end_date
-        sql: week_end_date
-        type: time
+          # 4 or 5 weeks long, so no interval can reproduce it
+          - name: month
+            sql: "{CUBE}.retail_month_begins"
+
+          - name: quarter
+            sql: "{CUBE}.retail_quarter_begins"
+
+          - name: year
+            sql: "{CUBE}.retail_year_begins"
+
+        time_shift:
+          - type: prior
+            interval: 1 month
+            sql: "{CUBE}.date_prev_month"
+
+          - type: prior
+            interval: 1 year
+            sql: "{CUBE}.date_prev_year"
 ```
 
-As you can see, this cube defines `week_start_date` and `week_end_date` time dimensions
-as the start and end dates of the retail week. They can be used to join this cube to
-cubes with facts.
+```javascript title="JavaScript"
+cube(`retail_calendar`, {
+  calendar: true,
+  sql_table: `retail_calendar`,
 
-### Auxiliary calendar cubes
+  dimensions: {
+    date: {
+      sql: `date_value`,
+      type: `time`,
+      primary_key: true,
 
-We will also extend the `calendar_454` cube to create auxiliary calendar cubes for
-three time dimensions that we'd like to translate to the 4-5-4 calendar:
+      granularities: {
+        week: { sql: `${CUBE}.retail_week_begins` },
+        // 4 or 5 weeks long, so no interval can reproduce it
+        month: { sql: `${CUBE}.retail_month_begins` },
+        quarter: { sql: `${CUBE}.retail_quarter_begins` },
+        year: { sql: `${CUBE}.retail_year_begins` }
+      },
 
-```yaml
-cubes:
-  - name: calendar_454__base_orders__created_at
-    extends: calendar_454
-
-  - name: calendar_454__base_orders__completed_at
-    extends: calendar_454
+      time_shift: [
+        { type: `prior`, interval: `1 month`, sql: `${CUBE}.date_prev_month` },
+        { type: `prior`, interval: `1 year`, sql: `${CUBE}.date_prev_year` }
+      ]
+    }
+  }
+})
 ```
+
+</CodeGroup>
+
+Each granularity keeps the name of the default granularity it replaces. A granularity
+defined with `sql` must be named after a default one; `retail_month` would not compile.
+See [naming a granularity defined with `sql`][ref-calendar-cubes-naming] for the rule and
+for when to use `interval` instead.
+
+<Info>
+
+**Override the granularities on the dimension you group by.** A calendar cube can expose
+more than one time dimension, and an override applies only to the dimension it is defined
+on. A query that groups by a dimension without the override falls back to `DATE_TRUNC` and
+returns Gregorian months, with no error. The same is true per granularity: this cube still
+answers `day` with `DATE_TRUNC`, because `day` is not overridden.
+
+</Info>
 
 ### Cubes with facts
 
-Finally, we define joins from the `base_orders` cube to the auxiliary calendar cubes.
-We also bring the `week_number` and `month_number` attributes as proxy dimensions:
+Join each cube with facts to the calendar cube on its own time dimension:
 
-```yaml
+<CodeGroup>
+
+```yaml title="YAML"
 cubes:
-  - name: base_orders
-    sql: SELECT * FROM 's3://cube-tutorial/orders.csv'
+  - name: orders
+    sql_table: orders
 
     joins:
-      # BEGIN — Joins to calendar tables
-      - name: calendar_454__base_orders__created_at
-        sql: "{CUBE.created_at} BETWEEN {calendar_454__base_orders__created_at.week_start_date} AND {calendar_454__base_orders__created_at.week_end_date}"
+      - name: retail_calendar
+        sql: "{CUBE}.created_at = {retail_calendar.date}"
         relationship: many_to_one
-
-      - name: calendar_454__base_orders__completed_at
-        sql: "{CUBE.completed_at} BETWEEN {calendar_454__base_orders__completed_at.week_start_date} AND {calendar_454__base_orders__completed_at.week_end_date}"
-        relationship: many_to_one
-      # END — Joins to calendar tables
 
     dimensions:
       - name: id
@@ -169,49 +174,303 @@ cubes:
         type: number
         primary_key: true
 
-      - name: status
-        sql: status
-        type: string
-
-      # BEGIN — Regular time dimension + ones derived from calendar table
       - name: created_at
-        sql: "{CUBE}.created_at::TIMESTAMP"
+        sql: created_at
         type: time
 
-      - name: created_at_retail_month
-        sql: "{calendar_454__base_orders__created_at.retail_month_date}"
-        type: time
+    measures:
+      - name: count
+        type: count
+```
 
-      - name: created_at_retail_week
-        sql: "{calendar_454__base_orders__created_at.week_number}"
-        type: number
+```javascript title="JavaScript"
+cube(`orders`, {
+  sql_table: `orders`,
+
+  joins: {
+    retail_calendar: {
+      sql: `${CUBE}.created_at = ${retail_calendar.date}`,
+      relationship: `many_to_one`
+    }
+  },
+
+  dimensions: {
+    id: {
+      sql: `id`,
+      type: `number`,
+      primary_key: true
+    },
+
+    created_at: {
+      sql: `created_at`,
+      type: `time`
+    }
+  },
+
+  measures: {
+    count: {
+      type: `count`
+    }
+  }
+})
+```
+
+</CodeGroup>
+
+Both sides of the join must be time dimensions, and the calendar cube's side must be its
+`primary_key`.
+
+A pair of cubes can only be joined once, so translating a second time dimension, such as
+`completed_at`, needs a second calendar cube. Define it with
+[`extends`][ref-extending-cubes] to inherit the granularities and time shifts, and repeat
+`calendar` on it:
+
+<CodeGroup>
+
+```yaml title="YAML"
+cubes:
+  - name: retail_calendar_completed
+    extends: retail_calendar
+    calendar: true
+```
+
+```javascript title="JavaScript"
+cube(`retail_calendar_completed`, {
+  extends: retail_calendar,
+  calendar: true
+})
+```
+
+</CodeGroup>
+
+Then join it to `orders` as well, on the second time dimension:
+
+<CodeGroup>
+
+```yaml title="YAML"
+cubes:
+  - name: orders
+    sql_table: orders
+
+    joins:
+      - name: retail_calendar
+        sql: "{CUBE}.created_at = {retail_calendar.date}"
+        relationship: many_to_one
+
+      - name: retail_calendar_completed
+        sql: "{CUBE}.completed_at = {retail_calendar_completed.date}"
+        relationship: many_to_one
+
+    dimensions:
+      # ...
 
       - name: completed_at
-        sql: "{CUBE}.completed_at::TIMESTAMP"
+        sql: completed_at
         type: time
+```
 
-      - name: completed_at_retail_month
-        sql: "{calendar_454__base_orders__completed_at.retail_month_date}"
-        type: time
+```javascript title="JavaScript"
+cube(`orders`, {
+  sql_table: `orders`,
 
-      - name: completed_at_retail_week
-        sql: "{calendar_454__base_orders__completed_at.week_number}"
-        type: number
-      # END — Regular time dimension + ones derived from calendar table
+  joins: {
+    retail_calendar: {
+      sql: `${CUBE}.created_at = ${retail_calendar.date}`,
+      relationship: `many_to_one`
+    },
+
+    retail_calendar_completed: {
+      sql: `${CUBE}.completed_at = ${retail_calendar_completed.date}`,
+      relationship: `many_to_one`
+    }
+  },
+
+  dimensions: {
+    // ...
+
+    completed_at: {
+      sql: `completed_at`,
+      type: `time`
+    }
+  }
+})
+```
+
+</CodeGroup>
+
+<Warning>
+
+**Repeat `calendar: true` on the extending cube.** A cube inherits it from its parent, but
+inherited cube-level parameters are not always passed to the query engine. Without it, the
+granularity overrides still apply, but the time shifts silently revert to interval
+arithmetic: `prior` + `1 month` adds `INTERVAL '1 month'` instead of reading
+`date_prev_month`, and returns different numbers with no error.
+
+</Warning>
+
+## Querying
+
+Query `orders.count` by `retail_calendar.date` with the `month` granularity. The result is
+grouped by retail months, not Gregorian ones:
+
+| `retail_calendar.date` | `orders.count` |
+| --- | --- |
+| 2024-02-04 | 3 |
+| 2024-03-03 | 5 |
+| 2024-04-07 | 4 |
+
+The month beginning on 2024-03-03 spans five weeks; the ones around it span four. Grouping
+by `week`, `quarter`, and `year` works the same way, and each returns the retail period
+rather than the Gregorian one.
+
+### Comparing with a prior period
+
+Because the calendar cube also overrides the time shifts, a [period-over-period
+measure][ref-recipe-period-over-period] compares a retail month with the retail month
+before it. Define it on the cube with facts, next to the measure it shifts:
+
+<CodeGroup>
+
+```yaml title="YAML"
+cubes:
+  - name: orders
+    # ...
 
     measures:
       - name: count
         type: count
 
-      - name: completed_count
-        type: count
-        filters:
-          - sql: "{CUBE}.status = 'completed'"
+      - name: count_prior_month
+        type: number
+        multi_stage: true
+        sql: "{count}"
+        time_shift:
+          - interval: 1 month
+            type: prior
 ```
 
+```javascript title="JavaScript"
+cube(`orders`, {
+  // ...
+
+  measures: {
+    count: {
+      type: `count`
+    },
+
+    count_prior_month: {
+      type: `number`,
+      multi_stage: true,
+      sql: `${count}`,
+      time_shift: [
+        { interval: `1 month`, type: `prior` }
+      ]
+    }
+  }
+})
+```
+
+</CodeGroup>
+
+The shift resolves through the `date_prev_month` column, so it lands on the equivalent day
+of the previous retail month rather than a calendar month earlier.
+
+### Measuring a period to date
+
+A [rolling window][ref-rolling-window] of type `to_date` also follows the calendar. It
+belongs on the cube with facts as well:
+
+<CodeGroup>
+
+```yaml title="YAML"
+cubes:
+  - name: orders
+    # ...
+
+    measures:
+      - name: count_month_to_date
+        type: count
+        rolling_window:
+          type: to_date
+          granularity: month
+```
+
+```javascript title="JavaScript"
+cube(`orders`, {
+  // ...
+
+  measures: {
+    count_month_to_date: {
+      type: `count`,
+      rolling_window: {
+        type: `to_date`,
+        granularity: `month`
+      }
+    }
+  }
+})
+```
+
+</CodeGroup>
+
+Each window opens on the retail month's own first day and closes on its last, so a
+five-week month accumulates over all five of its weeks.
+
+## Pre-aggregations
+
+A [pre-aggregation][ref-pre-aggregations] over an overridden granularity must declare that
+granularity. A rollup on `month` is built from the `retail_month_begins` column and serves
+queries at `month`:
+
+<CodeGroup>
+
+```yaml title="YAML"
+cubes:
+  - name: orders
+    # ...
+
+    pre_aggregations:
+      - name: orders_by_retail_month
+        measures:
+          - count
+        time_dimension: retail_calendar.date
+        granularity: month
+```
+
+```javascript title="JavaScript"
+cube(`orders`, {
+  // ...
+
+  pre_aggregations: {
+    orders_by_retail_month: {
+      measures: [count],
+      time_dimension: retail_calendar.date,
+      granularity: `month`
+    }
+  }
+})
+```
+
+</CodeGroup>
+
+<Warning>
+
+**Declare the overridden granularity explicitly rather than relying on a finer rollup.**
+Cube can match a `day` rollup for a `month` query through the granularity hierarchy, but
+that rollup holds `DATE_TRUNC` buckets, and retail months cannot be assembled from them.
+The query then either fails or returns Gregorian months.
+
+Add a rollup for each retail period you query.
+
+</Warning>
+
 [link-454]: https://nrf.com/resources/4-5-4-calendar
-[link-454-official-calendar]: https://2fb5c46100c1b71985e2-011e70369171d43105aff38e48482379.ssl.cf1.rackcdn.com/4-5-4%20calendar/3-Year-Calendar-5-27.pdf
-[ref-custom-granularities]: /reference/data-modeling/dimensions#granularities
-[ref-custom-granularities-recipe]: /recipes/data-modeling/custom-granularity
-[ref-proxy-dimensions]: /docs/data-modeling/dimensions#proxy-dimensions
-[ref-jinja-macro]: /docs/data-modeling/dynamic/jinja#macros
+[link-tesseract]: https://cube.dev/blog/introducing-next-generation-data-modeling-engine
+[ref-calendar-cubes]: /docs/data-modeling/concepts/calendar-cubes
+[ref-calendar-cubes-naming]: /docs/data-modeling/concepts/calendar-cubes#naming-a-granularity-defined-with-sql
+[ref-cubes-calendar]: /reference/data-modeling/cube#calendar
+[ref-primary-key]: /reference/data-modeling/dimensions#primary_key
+[ref-extending-cubes]: /docs/data-modeling/extending-cubes
+[ref-rolling-window]: /reference/data-modeling/measures#rolling_window
+[ref-pre-aggregations]: /docs/pre-aggregations/matching-pre-aggregations
+[ref-recipe-period-over-period]: /recipes/data-modeling/period-over-period

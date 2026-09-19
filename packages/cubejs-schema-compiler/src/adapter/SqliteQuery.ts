@@ -1,4 +1,5 @@
 import moment from 'moment-timezone';
+import { splitSqlInterval } from '@cubejs-backend/shared';
 
 import { BaseQuery } from './BaseQuery';
 import { BaseFilter } from './BaseFilter';
@@ -54,11 +55,24 @@ export class SqliteQuery extends BaseQuery {
   }
 
   public subtractInterval(date, interval) {
-    return `strftime('%Y-%m-%dT%H:%M:%f', ${date}, '${interval.replace('-', '+').replace(/(^\+|^)/, '-')}')`;
+    return this.applyInterval(
+      date,
+      splitSqlInterval(interval).map(part => part.replace('-', '+').replace(/(^\+|^)/, '-'))
+    );
   }
 
   public addInterval(date, interval) {
-    return `strftime('%Y-%m-%dT%H:%M:%f', ${date}, '${interval}')`;
+    return this.applyInterval(date, splitSqlInterval(interval));
+  }
+
+  /**
+   * A strftime modifier carries a single unit, so a compound interval becomes one modifier
+   * argument per unit, coarsest first.
+   */
+  private applyInterval(date: string, parts: string[]): string {
+    const modifiers = parts.map(part => `'${part}'`).join(', ');
+
+    return `strftime('%Y-%m-%dT%H:%M:%f', ${date}, ${modifiers})`;
   }
 
   public timeGroupedColumn(granularity, dimension) {
@@ -80,5 +94,14 @@ export class SqliteQuery extends BaseQuery {
   public unixTimestampSql() {
     // eslint-disable-next-line quotes
     return `strftime('%s','now')`;
+  }
+
+  public sqlTemplates() {
+    const templates = super.sqlTemplates();
+    delete templates.functions.WIDTH_BUCKET;
+    // A compound select takes no parenthesised operands in SQLite, so the SQL API leaves
+    // set operations to post processing here rather than pushing them down.
+    delete templates.statements.union;
+    return templates;
   }
 }

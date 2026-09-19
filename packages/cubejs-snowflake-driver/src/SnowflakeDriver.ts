@@ -53,7 +53,10 @@ const SnowflakeToGenericType: Record<string, GenericDataBaseType> = {
   // For some reason, snowflake SDK returns `fixed` type for DWH types like NUMBER(38, 15)
   // @see https://docs.snowflake.com/en/sql-reference/data-types-numeric for more info on types
   fixed: 'decimal',
-  timestamp_ntz: 'timestamp'
+  // @see https://docs.snowflake.com/en/sql-reference/data-types-datetime
+  timestamp_ntz: 'timestamp',
+  timestamp_ltz: 'timestamp',
+  timestamp_tz: 'timestamp'
 };
 
 // User can create own stage to pass permission restrictions.
@@ -836,7 +839,7 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
       },
       (stmt, rows) => {
         const hydrationMap = this.generateHydrationMap(stmt.getColumns() ?? []);
-        const types: {name: string, type: string}[] =
+        const types: { name: string, type: string }[] =
           this.getTypes(stmt);
         if (rows?.length && Object.keys(hydrationMap).length) {
           for (const row of rows) {
@@ -878,7 +881,7 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
     const abort = stmtPromise.cancel;
 
     const promise = <CancelablePromise<StreamTableDataWithTypes>>stmtPromise.then((stmt) => {
-      const types: {name: string, type: string}[] =
+      const types: { name: string, type: string }[] =
         this.getTypes(stmt);
       const hydrationMap = this.generateHydrationMap(stmt.getColumns() ?? []);
 

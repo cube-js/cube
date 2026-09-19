@@ -57,12 +57,12 @@ function filterMembersByKeys(
 
   return members
     .filter(({ cubeName }) => cubeNames.includes(cubeName))
-    .map((cube) => {
-      return {
+    .map((cube) => (
+      {
         ...cube,
         members: cube.members.filter(({ name }) => keys.includes(name)),
-      };
-    });
+      }
+    ));
 }
 
 type MemberDropdownProps = {
@@ -85,9 +85,7 @@ export default function MemberMenu({
   const hasMembers = availableCubes.some((cube) => cube.members.length > 0);
 
   const indexedMembers = useDeepMemo(() => {
-    getNameMemberPairs(availableCubes).forEach(([name, { title }]) =>
-      index.add(name as any, title)
-    );
+    getNameMemberPairs(availableCubes).forEach(([name, { title }]) => index.add(name as any, title));
 
     return Object.fromEntries(getNameMemberPairs(availableCubes));
   }, [availableCubes]);
@@ -136,7 +134,7 @@ export default function MemberMenu({
           searchInputRef.current?.focus({ preventScroll: true });
         });
       }}
-      overlay={
+      overlay={(
         <div className="test">
           <Menu
             className="ant-dropdown-menu ant-dropdown-menu-root"
@@ -156,8 +154,7 @@ export default function MemberMenu({
                 return;
               }
 
-              if (document.activeElement === searchInputRef.current?.input)
-                return;
+              if (document.activeElement === searchInputRef.current?.input) return;
 
               searchInputRef.current?.focus({ preventScroll: true });
             }}
@@ -173,7 +170,7 @@ export default function MemberMenu({
               setShow(false);
             }}
           >
-            {hasMembers ? (
+            {hasMembers && (
               <>
                 <SearchMenuItem id="hhhh" className="ant-menu-item ant-menu-item-active ant-menu-item-disabled ant-menu-item-only-child">
                   <Input
@@ -242,14 +239,15 @@ export default function MemberMenu({
                   );
                 })}
               </>
-            ) : showNoMembersPlaceholder ? (
+            )}
+            {!hasMembers && showNoMembersPlaceholder && (
               <Menu.Item key="__not-found__" disabled>
                 No members found
               </Menu.Item>
-            ) : null}
+            )}
           </Menu>
         </div>
-      }
+      )}
     />
   );
 }

@@ -126,10 +126,7 @@ const RawImg = styled.img<TRawImgProps>(
 `
 );
 
-const Cube = (props: any) => {
-  return <RawImg role="presentation" src={cubeImage} alt="" {...props} />;
-};
-
+const Cube = (props: any) => <RawImg role="presentation" src={cubeImage} alt="" {...props} />;
 const Centered = styled.div`
   display: flex;
   align-items: center;

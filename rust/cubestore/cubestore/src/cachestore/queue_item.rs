@@ -13,8 +13,8 @@ use std::sync::Arc;
 use crate::cachestore::QueueKey;
 use serde::{Deserialize, Deserializer, Serialize};
 
-// We use ${uuidv4()}-span-${u32}, it's 36 + 6 + 8 = 50, let's limit to 96
-pub const QUEUE_ITEM_PROCESS_ID_MAX_LEN: usize = 96;
+// It's the x-process-id header, a uuid (36 chars), bounded on ingress in src/http
+pub const QUEUE_ITEM_PROCESS_ID_MAX_LEN: usize = 64;
 // We use ${uuidv4()}, it's 36, let's limit to 48
 pub const QUEUE_ITEM_EXTERNAL_ID_MAX_LEN: usize = 48;
 
@@ -309,6 +309,15 @@ pub enum QueueRetrieveResponse {
     },
 }
 
+/// Wire format of the `active` column, shared by all commands which report it
+pub fn active_keys_to_value(active: Vec<String>) -> TableValue {
+    if active.is_empty() {
+        TableValue::Null
+    } else {
+        TableValue::String(active.join(","))
+    }
+}
+
 impl QueueRetrieveResponse {
     pub fn into_queue_retrieve_rows(self, extended: bool) -> Vec<Row> {
         match self {
@@ -326,11 +335,7 @@ impl QueueRetrieveResponse {
                     TableValue::Null
                 },
                 TableValue::Int(pending as i64),
-                if active.len() > 0 {
-                    TableValue::String(active.join(","))
-                } else {
-                    TableValue::Null
-                },
+                active_keys_to_value(active),
                 TableValue::String(id.to_string()),
             ])],
             QueueRetrieveResponse::LockFailed { pending, active }
@@ -342,11 +347,7 @@ impl QueueRetrieveResponse {
                         TableValue::Null,
                         TableValue::Null,
                         TableValue::Int(pending as i64),
-                        if active.len() > 0 {
-                            TableValue::String(active.join(","))
-                        } else {
-                            TableValue::Null
-                        },
+                        active_keys_to_value(active),
                         TableValue::Null,
                     ])]
                 } else {

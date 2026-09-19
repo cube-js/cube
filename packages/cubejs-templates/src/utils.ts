@@ -42,7 +42,7 @@ export async function fileContentsRecursive(dir: string, rootPath?: string, incl
         }
       })
     )
-  ).reduce((a, b) => a.concat(b), []);
+  ).reduce<File[]>((a, b) => a.concat(b), []);
 }
 
 export async function proxyFetch(url) {

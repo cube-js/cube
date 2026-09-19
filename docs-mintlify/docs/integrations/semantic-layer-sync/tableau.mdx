@@ -43,6 +43,22 @@ your personal access token before it expires.
 
 </Info>
 
+<Note>
+
+If your Tableau Server instance is served with a certificate from a private
+or internal CA, the sync fails at the connection step with a
+`SELF_SIGNED_CERT_IN_CHAIN` / "self-signed certificate in certificate chain"
+error. Commit the CA certificate (PEM) to your
+data model's Git repository, e.g., as `certs/my-ca.pem`, and set the
+[`NODE_EXTRA_CA_CERTS`][ref-node-extra-ca-certs] environment variable to its
+absolute path, e.g., `/cube/conf/certs/my-ca.pem` — the sync's outbound
+requests run in Node.js, so this is what makes it trust the certificate.
+This doesn't apply
+to Tableau Cloud, which Tableau itself serves with a publicly trusted
+certificate.
+
+</Note>
+
 ### Tableau Cloud
 
 For Tableau Cloud, you need to specify a `region` and a `site` name. Consider the
@@ -68,7 +84,7 @@ def semantic_layer_sync(ctx: dict) -> list[dict]:
         'site': 'mytableausite',
         'personalAccessToken': 'cube-cloud',
         'personalAccessTokenSecret': os.environ['CUBEJS_TABLEAU_PAT_SECRET'],
-        'database': 'Cube Cloud: production-deployment',
+        'database': 'Cube: production-deployment',
       },
     },
   ]
@@ -86,7 +102,7 @@ module.exports = {
           site: "mytableausite",
           personalAccessToken: "cube-cloud",
           personalAccessTokenSecret: process.env.CUBEJS_TABLEAU_PAT_SECRET,
-          database: "Cube Cloud: production-deployment"
+          database: "Cube: production-deployment"
         }
       }
     ]
@@ -103,7 +119,7 @@ For Tableau Server, you need to specify a `hostname`, `site`, and `apiVersion`.
 To find your site name, look at your Tableau Server URL: the site name is
 the value that follows `/site/` in the URL. If there is no `/site/` segment in
 the URL, you are using the Default site — leave the `site` field blank
-in the Cube Cloud configuration.
+in the Cube configuration.
 
 Example configuration for Tableau Server:
 
@@ -125,7 +141,7 @@ def semantic_layer_sync(ctx: dict) -> list[dict]:
         'apiVersion': '3.19',
         'personalAccessToken': 'cube-cloud',
         'personalAccessTokenSecret': os.environ['CUBEJS_TABLEAU_PAT_SECRET'],
-        'database': 'Cube Cloud: production-deployment',
+        'database': 'Cube: production-deployment',
       },
     },
   ]
@@ -144,7 +160,7 @@ module.exports = {
           apiVersion: "3.19",
           personalAccessToken: "cube-cloud",
           personalAccessTokenSecret: process.env.CUBEJS_TABLEAU_PAT_SECRET,
-          database: "Cube Cloud: production-deployment"
+          database: "Cube: production-deployment"
         }
       }
     ]
@@ -164,9 +180,9 @@ or `process.env.CUBEJS_TABLEAU_PAT_SECRET` in JavaScript.
 
 </Tip>
 
-When connecting a Cube Cloud data source to your Tableau workbook, you will be prompted
-to enter the user name and password for Cube Cloud. You can find them at the&nbsp;**SQL
-API Connection** tab on the&nbsp;**IDE → Integrations** page in Cube Cloud.
+When connecting a Cube data source to your Tableau workbook, you will be prompted
+to enter the user name and password for Cube. You can find them at the&nbsp;**SQL
+API Connection** tab on the&nbsp;**IDE → Integrations** page in Cube.
 
 ### Least-privilege mode
 
@@ -232,6 +248,7 @@ per cube or view. You can open these files in Tableau to create data sources.
 
 
 [tds]: https://help.tableau.com/current/pro/desktop/en-us/export_connection.htm
+[ref-node-extra-ca-certs]: /reference/configuration/environment-variables#node_extra_ca_certs
 [tableau-api]: https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api.htm
 [tableau-api-authentication]: https://help.tableau.com/current/server/en-us/security_personal_access_tokens.htm#create-personal-access-tokens
 [tableau-pat]: https://help.tableau.com/current/server/en-us/security_personal_access_tokens.htm

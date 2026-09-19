@@ -17,6 +17,7 @@ use crate::planner::join_hints::JoinHints;
 use crate::planner::multi_fact_join_groups::{MeasuresJoinHints, MultiFactJoinGroups};
 use crate::planner::planners::multi_stage::TimeShiftState;
 use crate::planner::symbols::transforms;
+use crate::planner::time_dimension::SeriesSpan;
 use crate::planner::{DimensionTimeShift, JoinTree, MeasureTimeShifts};
 use cubenativeutils::CubeError;
 use itertools::Itertools;
@@ -61,8 +62,8 @@ impl PartialEq for OrderByItem {
     }
 }
 
-// Compare two member symbols by their reference-chain-resolved full name.
-fn member_chain_eq(a: &Rc<MemberSymbol>, b: &Rc<MemberSymbol>) -> bool {
+/// Compare two member symbols by their reference-chain-resolved full name.
+pub fn member_chain_eq(a: &Rc<MemberSymbol>, b: &Rc<MemberSymbol>) -> bool {
     a.clone().resolve_reference_chain().full_name()
         == b.clone().resolve_reference_chain().full_name()
 }
@@ -234,10 +235,51 @@ impl QueryProperties {
     }
 
     // Push every entry of `dimensions_filters` into matching `case`
-    // expressions on each member, filter and order item. Run once at
-    // construction; mutators do not re-apply it.
+    // expressions, and mark every FILTER_PARAMS binding by whether the query
+    // filters the members it renders from. Both cover each member, filter and
+    // order item. Run once at construction; mutators do not re-apply it.
     fn apply_static_filters(&mut self) -> Result<(), CubeError> {
         let dimensions_filters = self.dimensions_filters.clone();
+        // A FILTER_PARAMS binding may name any filtered member, not only a
+        // dimension, so its activity is read from the whole set.
+        //
+        // A multi-stage stage may then filter more than the query around it. It
+        // builds its own `QueryProperties` from its state, so this runs again for
+        // it and settles activity against the set that stage renders with.
+        let all_filters = transforms::filter_params_activity_filters(&self.all_filter_items());
+        for dim in self.dimensions.iter_mut() {
+            *dim = transforms::apply_filter_params_activity_to_symbol(dim, &all_filters)?;
+        }
+        for dim in self.time_dimensions.iter_mut() {
+            *dim = transforms::apply_filter_params_activity_to_symbol(dim, &all_filters)?;
+        }
+        for meas in self.measures.iter_mut() {
+            *meas = transforms::apply_filter_params_activity_to_symbol(meas, &all_filters)?;
+        }
+        // A column renders wherever its symbol does, which includes the symbols
+        // a query reaches only through a filter, a segment or an order item.
+        for filter_item in self.dimensions_filters.iter_mut() {
+            *filter_item =
+                transforms::apply_filter_params_activity_to_filter_item(filter_item, &all_filters)?;
+        }
+        for filter_item in self.measures_filters.iter_mut() {
+            *filter_item =
+                transforms::apply_filter_params_activity_to_filter_item(filter_item, &all_filters)?;
+        }
+        for filter_item in self.time_dimensions_filters.iter_mut() {
+            *filter_item =
+                transforms::apply_filter_params_activity_to_filter_item(filter_item, &all_filters)?;
+        }
+        for filter_item in self.segments.iter_mut() {
+            *filter_item =
+                transforms::apply_filter_params_activity_to_filter_item(filter_item, &all_filters)?;
+        }
+        for order_item in self.order_by.iter_mut().flatten() {
+            order_item.member_evaluator = transforms::apply_filter_params_activity_to_symbol(
+                &order_item.member_evaluator,
+                &all_filters,
+            )?;
+        }
         for dim in self.dimensions.iter_mut() {
             *dim = transforms::apply_static_filter_to_symbol(dim, &dimensions_filters)?;
         }
@@ -281,7 +323,19 @@ impl QueryProperties {
             .add_filters(&self.dimensions_filters)
             .add_filters(&self.segments)
             .build(&self.all_used_measures()?)?;
-        MultiFactJoinGroups::try_new(self.query_tools.clone(), measures_join_hints)
+        // An ungrouped query returns raw rows rather than aggregates, so the
+        // replication the wider join tree introduces would reach the result
+        // directly. A pre-aggregation query describes the rollup to build, and
+        // matching compares its groups against the query's, so both sides have
+        // to be grouped the same way.
+        if self.ungrouped || self.pre_aggregation_query {
+            MultiFactJoinGroups::try_new(self.query_tools.clone(), measures_join_hints)
+        } else {
+            MultiFactJoinGroups::try_new_merging_nested(
+                self.query_tools.clone(),
+                measures_join_hints,
+            )
+        }
     }
 
     fn multi_fact_join_groups(&self) -> Result<&MultiFactJoinGroups, CubeError> {
@@ -395,14 +449,20 @@ impl QueryProperties {
 
     /// Concatenation of `time_dimensions_filters`, `dimensions_filters`, and
     /// `segments` into a single `Filter`. `measures_filters` are not included.
-    pub fn all_filters(&self) -> Option<Filter> {
-        let items = self
-            .time_dimensions_filters
+    /// `time_dimensions_filters`, `dimensions_filters` and `segments` as a flat
+    /// list. `measures_filters` are HAVING-style and stay out.
+    pub fn all_filter_items(&self) -> Vec<FilterItem> {
+        self.time_dimensions_filters
             .iter()
             .chain(self.dimensions_filters.iter())
             .chain(self.segments.iter())
             .cloned()
-            .collect_vec();
+            .collect_vec()
+    }
+
+    /// The same set as `all_filter_items`, as a single `Filter`.
+    pub fn all_filters(&self) -> Option<Filter> {
+        let items = self.all_filter_items();
         if items.is_empty() {
             None
         } else {
@@ -664,13 +724,24 @@ impl QueryProperties {
     }
 
     /// Append `dimensions` to the existing list, deduplicating by
-    /// reference-chain-resolved full name.
+    /// reference-chain-resolved full name. A dimension the grain already
+    /// carries as a time dimension is dropped rather than appended: a time
+    /// dimension's full name pins its granularity, so an entry that matches
+    /// one would render the very same column under the very same alias.
     pub fn add_dimensions(&mut self, dimensions: Vec<Rc<MemberSymbol>>) {
+        let time_dimension_names = self
+            .time_dimensions
+            .iter()
+            .map(|d| d.clone().resolve_reference_chain().full_name())
+            .collect::<HashSet<_>>();
+        let added = dimensions.into_iter().filter(|d| {
+            !time_dimension_names.contains(&d.clone().resolve_reference_chain().full_name())
+        });
         self.dimensions = self
             .dimensions
             .iter()
             .cloned()
-            .chain(dimensions.into_iter())
+            .chain(added)
             .unique_by(|d| d.clone().resolve_reference_chain().full_name())
             .collect_vec();
         self.invalidate_join_groups_cache();
@@ -744,7 +815,7 @@ impl QueryProperties {
                     if let Some(new_interval) = ts.interval {
                         exists.interval = Some(interval + new_interval);
                     } else {
-                        return Err(CubeError::internal(format!(
+                        return Err(CubeError::user(format!(
                             "Cannot use both named ({}) and interval ({}) shifts for the same dimension: {}.",
                             ts.name.clone().unwrap_or("-".to_string()),
                             interval.to_sql(),
@@ -753,14 +824,14 @@ impl QueryProperties {
                     }
                 } else if let Some(named_shift) = exists.name.clone() {
                     return if let Some(new_interval) = ts.interval {
-                        Err(CubeError::internal(format!(
+                        Err(CubeError::user(format!(
                             "Cannot use both named ({}) and interval ({}) shifts for the same dimension: {}.",
                             named_shift,
                             new_interval.to_sql(),
                             ts.dimension.full_name(),
                         )))
                     } else {
-                        Err(CubeError::internal(format!(
+                        Err(CubeError::user(format!(
                             "Cannot use more than one named shifts ({}, {}) for the same dimension: {}.",
                             ts.name.clone().unwrap_or("-".to_string()),
                             named_shift,
@@ -957,17 +1028,23 @@ impl QueryProperties {
         Ok(())
     }
 
+    /// Rewrite the `InDateRange` filter on `member_name` into a regular
+    /// rolling-window filter. The filter carries
+    /// `[from, to, trailing, leading]`, followed by the span the base scan
+    /// reads when that is known at plan time.
     pub fn replace_regular_date_range_filter(
         &mut self,
         member_name: &str,
         left_interval: Option<String>,
         right_interval: Option<String>,
+        scan_range: Option<SeriesSpan>,
     ) -> Result<(), CubeError> {
         let operator = FilterOperator::RegularRollingWindowDateRange;
-        let values = vec![
+        let mut values = vec![
             FilterValue::from(left_interval),
             FilterValue::from(right_interval),
         ];
+        values.extend(series_span_values(scan_range));
         self.time_dimensions_filters = self.change_date_range_filter_impl(
             member_name,
             &self.time_dimensions_filters,
@@ -980,13 +1057,18 @@ impl QueryProperties {
         Ok(())
     }
 
+    /// Rewrite the `InDateRange` filter on `member_name` into a `to_date`
+    /// rolling-window filter. The filter carries `[from, to, granularity]`,
+    /// followed by the span the window reads when that is known at plan time.
     pub fn replace_to_date_date_range_filter(
         &mut self,
         member_name: &str,
         granularity: &String,
+        window_range: Option<SeriesSpan>,
     ) -> Result<(), CubeError> {
         let operator = FilterOperator::ToDateRollingWindowDateRange;
-        let values = vec![FilterValue::Str(granularity.clone())];
+        let mut values = vec![FilterValue::Str(granularity.clone())];
+        values.extend(series_span_values(window_range));
         self.time_dimensions_filters = self.change_date_range_filter_impl(
             member_name,
             &self.time_dimensions_filters,
@@ -1105,14 +1187,30 @@ impl QueryProperties {
     /// Equality over members (chain-resolved), the three filter slots,
     /// segments and time-shifts. Excludes ordering, limits, planner flags
     /// and join hints; for those fields use the full [`PartialEq`].
+    ///
+    /// Filters are compared with [`tree_ops::eq_with_member`] rather than with
+    /// `FilterItem`'s own equality, which looks at a filter's operator and
+    /// values but not at the member it restricts. Two states filtering
+    /// different dimensions to the same value are different states, and
+    /// conflating them makes a CTE serve a filter it was never built for.
     pub fn eq_as_state(&self, other: &Self) -> bool {
         Self::members_equivalent(&self.dimensions, &other.dimensions)
+            && Self::filters_equivalent(&self.dimensions_filters, &other.dimensions_filters)
             && Self::members_equivalent(&self.time_dimensions, &other.time_dimensions)
-            && self.dimensions_filters == other.dimensions_filters
-            && self.time_dimensions_filters == other.time_dimensions_filters
-            && self.measures_filters == other.measures_filters
-            && self.segments == other.segments
+            && Self::filters_equivalent(
+                &self.time_dimensions_filters,
+                &other.time_dimensions_filters,
+            )
+            && Self::filters_equivalent(&self.measures_filters, &other.measures_filters)
+            && Self::filters_equivalent(&self.segments, &other.segments)
             && self.time_shifts == other.time_shifts
+    }
+
+    fn filters_equivalent(a: &[FilterItem], b: &[FilterItem]) -> bool {
+        a.len() == b.len()
+            && a.iter()
+                .zip(b.iter())
+                .all(|(a, b)| tree_ops::eq_with_member(a, b))
     }
 }
 
@@ -1187,5 +1285,20 @@ impl PartialEq for QueryProperties {
                         && a.join_type == b.join_type
                         && a.on_sql.struct_eq(&b.on_sql)
                 })
+    }
+}
+
+/// Tail a rolling-window filter carries its scan span in: the lower bound, the
+/// two upper bounds one per series shape, and whether the granularity is a
+/// predefined one. Empty where the span is not derivable while planning.
+fn series_span_values(span: Option<SeriesSpan>) -> Vec<FilterValue> {
+    match span {
+        Some(span) => vec![
+            FilterValue::Str(span.from),
+            FilterValue::Str(span.to_aligned),
+            FilterValue::Str(span.to_stepped),
+            FilterValue::Bool(span.predefined_granularity),
+        ],
+        None => vec![],
     }
 }

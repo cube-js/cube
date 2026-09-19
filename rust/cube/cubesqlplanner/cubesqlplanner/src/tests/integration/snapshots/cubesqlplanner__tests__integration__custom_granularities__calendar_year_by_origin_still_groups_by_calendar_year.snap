@@ -1,0 +1,8 @@
+---
+source: cubesqlplanner/src/tests/integration/custom_granularities.rs
+expression: result
+---
+orders__created_at_calendar_year_by_origin | orders__count
+-------------------------------------------+--------------
+2024-01-01 00:00:00                        | 3            
+2025-01-01 00:00:00                        | 5

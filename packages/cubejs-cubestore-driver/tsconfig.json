@@ -6,9 +6,15 @@
     "test"
   ],
   "compilerOptions": {
+    "types": ["node", "jest"],
     "noImplicitAny": false,
     "outDir": "dist",
     "rootDir": ".",
-    "baseUrl": "."
-  }
+  },
+  "references": [
+    { "path": "../../rust/cubestore" },
+    { "path": "../cubejs-backend-native" },
+    { "path": "../cubejs-backend-shared" },
+    { "path": "../cubejs-base-driver" }
+  ]
 }

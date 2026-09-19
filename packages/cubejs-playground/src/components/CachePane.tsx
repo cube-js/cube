@@ -23,12 +23,12 @@ const CachePane = ({ query }) => (
       return (
         <Tabs
           defaultActiveKey="refreshKeys"
-          tabBarExtraContent={
+          tabBarExtraContent={(
             <span>
               Last Refresh Time:&nbsp;
               <b>{loadResponse?.lastRefreshTime}</b>
             </span>
-          }
+          )}
         >
           <Tabs.TabPane tab="Refresh Keys" key="refreshKeys">
             <Table
@@ -49,9 +49,9 @@ const CachePane = ({ query }) => (
                   render: (text, record) => (
                     <PrismCode
                       code={
-                        loadResponse?.refreshKeyValues &&
-                        rawQuery &&
-                        JSON.stringify(
+                        loadResponse?.refreshKeyValues
+                        && rawQuery
+                        && JSON.stringify(
                           loadResponse.refreshKeyValues[
                             rawQuery.cacheKeyQueries.indexOf(record)
                           ],
@@ -82,10 +82,9 @@ const CachePane = ({ query }) => (
                   title: 'Refresh Key SQL',
                   key: 'refreshKey',
                   dataIndex: 'invalidateKeyQueries',
-                  render: (refreshKeyQueries) =>
-                    refreshKeyQueries.map((q) => (
-                      <PrismCode key={q[0]} code={format(q[0])} />
-                    )),
+                  render: (refreshKeyQueries) => refreshKeyQueries.map((q) => (
+                    <PrismCode key={q[0]} code={format(q[0])} />
+                  )),
                 },
                 {
                   title: 'Refresh Key Value',
@@ -93,7 +92,7 @@ const CachePane = ({ query }) => (
                   render: (text, record) => {
                     let refreshKeyValues = loadResponse?.usedPreAggregations?.[
                       record.tableName
-                      ]?.refreshKeyValues;
+                    ]?.refreshKeyValues;
                     if (Array.isArray(refreshKeyValues)) {
                       refreshKeyValues = refreshKeyValues.reduce((a, b) => a.concat(b), []);
                     }
@@ -102,7 +101,7 @@ const CachePane = ({ query }) => (
                         key={JSON.stringify(k)}
                         code={JSON.stringify(k, null, 2)}
                       />
-                    ))
+                    ));
                   }
                 },
               ]}
@@ -133,22 +132,21 @@ const CachePane = ({ query }) => (
                   title: 'Can Be Used',
                   key: 'canUsePreAggregation',
                   dataIndex: 'canUsePreAggregation',
-                  render: (text) =>
-                    text ? (
-                      <CheckOutlined
-                        style={{
-                          color: '#52c41a',
-                          fontSize: '2em',
-                        }}
-                      />
-                    ) : (
-                      <CloseOutlined
-                        style={{
-                          color: '#c2371b',
-                          fontSize: '2em',
-                        }}
-                      />
-                    ),
+                  render: (text) => (text ? (
+                    <CheckOutlined
+                      style={{
+                        color: '#52c41a',
+                        fontSize: '2em',
+                      }}
+                    />
+                  ) : (
+                    <CloseOutlined
+                      style={{
+                        color: '#c2371b',
+                        fontSize: '2em',
+                      }}
+                    />
+                  )),
                 },
               ]}
               dataSource={rawQuery?.rollupMatchResults}

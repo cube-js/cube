@@ -78,7 +78,7 @@ describe('AthenaDriver', () => {
     // Aggressive pollTimeout (5s) so the test doesn't depend on the
     // ambient CUBEJS_DB_QUERY_TIMEOUT. Constructor multiplies by 1000.
     const cancelDriver = new AthenaDriver({ pollTimeout: 5 });
-    const athena = (cancelDriver as any).athena;
+    const { athena } = (cancelDriver as any);
 
     const startOriginal = athena.startQueryExecution.bind(athena);
     let queryExecutionId = '';

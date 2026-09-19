@@ -1,7 +1,9 @@
 use super::super::context::PushDownBuilderContext;
 use super::super::{LogicalNodeProcessor, ProcessableNode};
 use crate::logical_plan::MultiStageTimeSeries;
-use crate::physical_plan::{QueryPlan, TimeSeries, TimeSeriesDateRange};
+use crate::physical_plan::{
+    CalendarPeriodSource, QueryPlan, TimeSeries, TimeSeriesDateRange, TimeSeriesSource,
+};
 use crate::physical_plan_builder::PhysicalPlanBuilder;
 use cubenativeutils::CubeError;
 use std::rc::Rc;
@@ -19,7 +21,7 @@ impl<'a> LogicalNodeProcessor<'a, MultiStageTimeSeries> for MultiStageTimeSeries
     fn process(
         &self,
         time_series: &MultiStageTimeSeries,
-        _context: &PushDownBuilderContext,
+        context: &PushDownBuilderContext,
     ) -> Result<Self::PhysycalNode, CubeError> {
         let (query_tools, plan_sql_templates) = self.builder.qtools_and_templates();
         let time_dimension = time_series.time_dimension().clone();
@@ -33,6 +35,59 @@ impl<'a> LogicalNodeProcessor<'a, MultiStageTimeSeries> for MultiStageTimeSeries
                 "Time dimension granularity is required for rolling window".to_string(),
             ));
         };
+
+        if let Some(calendar_source) = time_series.calendar_source() {
+            let source = self
+                .builder
+                .process_node(calendar_source.as_ref(), context)?;
+            let schema = source.schema();
+            let date_from_alias = schema.resolve_member_alias(&time_dimension);
+            let period_aliases = time_series
+                .period_dimensions()
+                .iter()
+                .map(|dimension| {
+                    let Some(granularity) = dimension.as_time_dimension()?.granularity().clone()
+                    else {
+                        return Err(CubeError::internal(format!(
+                            "Calendar period dimension '{}' must have a granularity",
+                            dimension.full_name()
+                        )));
+                    };
+                    Ok((granularity, schema.resolve_member_alias(dimension)))
+                })
+                .collect::<Result<Vec<_>, CubeError>>()?;
+
+            // Taken raw: the aligned range snaps its start to the granularity's
+            // interval, which for a calendar period means an arbitrary point
+            // inside the period the range opens in.
+            let range = if let Some(date_range) = &date_range {
+                if date_range.len() != 2 {
+                    return Err(CubeError::user(format!(
+                        "Invalid date range: {:?}",
+                        date_range
+                    )));
+                }
+                TimeSeriesDateRange::Filter(date_range[0].clone(), date_range[1].clone())
+            } else if let Some(date_range_cte) = time_series.get_date_range_multistage_ref() {
+                TimeSeriesDateRange::Generated(date_range_cte.clone())
+            } else {
+                return Err(CubeError::internal(
+                    "Date range cte is required for time series without date range".to_string(),
+                ));
+            };
+
+            let time_series = TimeSeries::new(
+                &time_dimension,
+                TimeSeriesSource::Calendar(CalendarPeriodSource::new(
+                    Rc::new(QueryPlan::Select(source)),
+                    date_from_alias,
+                    period_aliases,
+                    range,
+                )),
+                granularity_obj,
+            );
+            return Ok(QueryPlan::TimeSeries(Rc::new(time_series)));
+        }
 
         let ts_date_range = if plan_sql_templates
             .supports_generated_time_series(granularity_obj.is_predefined_granularity())?
@@ -60,7 +115,11 @@ impl<'a> LogicalNodeProcessor<'a, MultiStageTimeSeries> for MultiStageTimeSeries
             }
         };
 
-        let time_series = TimeSeries::new(&time_dimension, ts_date_range, granularity_obj);
+        let time_series = TimeSeries::new(
+            &time_dimension,
+            TimeSeriesSource::Range(ts_date_range),
+            granularity_obj,
+        );
         let query_plan = QueryPlan::TimeSeries(Rc::new(time_series));
         Ok(query_plan)
     }

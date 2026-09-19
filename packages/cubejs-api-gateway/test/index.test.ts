@@ -20,6 +20,16 @@ import {
 import { ApiScopesTuple } from '../src/types/auth';
 import { PreAggJob } from '../src/types/request';
 
+// The redaction pass lives in the native module; only its plumbing is under test here.
+// A Proxy rather than a spread: the module's exports are non-enumerable getters.
+jest.mock('@cubejs-backend/native', () => {
+  const actual = jest.requireActual('@cubejs-backend/native');
+  const redactSqlLiterals = (sql: string) => sql.replace(/'[^']*'/g, "'redacted'");
+  return new Proxy(actual, {
+    get: (target, prop) => (prop === 'redactSqlLiterals' ? redactSqlLiterals : target[prop]),
+  });
+});
+
 const logger = (type, message) => console.log({ type, ...message });
 
 async function requestBothGetAndPost(app, { url, query, body }, assert) {
@@ -1231,10 +1241,111 @@ describe('API Gateway', () => {
         }),
       };
 
-      const status = await (apiGateway as any).getPreAggJobQueueStatus(orchestrator, job);
+      const status = await (apiGateway as any).getPreAggJobQueueStatus(orchestrator, job, job.dataSource);
 
       expect(orchestrator.getPreAggregationQueueStates).toHaveBeenCalledWith(job.dataSource);
       expect(status).toEqual('processing');
+    });
+
+    // https://github.com/cube-js/cube/issues/11615
+    describe('job result status', () => {
+      const jobFor = (overrides: Partial<PreAggJob> = {}): PreAggJob => ({
+        request: 'request-id',
+        context: { securityContext: {} },
+        preagg: 'orders_test.main',
+        table: 'orders_test_main',
+        target: 'orders_test_main_20200101',
+        structure: 'structure-version',
+        content: 'content-version',
+        updated: 1,
+        key: [],
+        status: 'posted',
+        timezone: 'UTC',
+        dataSource: 'test_ds',
+        ...overrides,
+      });
+
+      const compiler = {
+        preAggregations: async () => ([
+          { id: 'orders_dep.main', cube: 'orders_dep', dataSource: 'dep_ds', preAggregation: { external: false } },
+          { id: 'orders_test.main', cube: 'orders_test', dataSource: 'model_ds', preAggregation: { external: true } },
+        ]),
+        preAggregationsSchema: 'stb_pre_aggregations',
+      };
+
+      const resultStatus = async (job: PreAggJob, orchestrator: any) => {
+        const apiGateway = Object.create(ApiGateway.prototype);
+        return (apiGateway as any).getPreAggJobResultStatus(
+          job.request,
+          orchestrator,
+          compiler,
+          job,
+          job.dataSource,
+          'job-token',
+        );
+      };
+
+      test('is checked on the data source resolved for the job', async () => {
+        const orchestrator = { isPartitionExist: jest.fn(async () => [true, 'done']) };
+        const job = jobFor();
+
+        await expect(resultStatus(job, orchestrator)).resolves.toEqual('done');
+
+        expect(orchestrator.isPartitionExist).toHaveBeenCalledWith(
+          job.request,
+          true,
+          'test_ds',
+          compiler.preAggregationsSchema,
+          job.target,
+          job.key,
+          'job-token',
+        );
+      });
+
+      test('reports a pre-aggregation the model no longer has', async () => {
+        const orchestrator = { isPartitionExist: jest.fn() };
+
+        await expect(
+          resultStatus(jobFor({ preagg: 'orders_test.dropped' }), orchestrator)
+        ).resolves.toEqual('pre_agg_not_found');
+
+        expect(orchestrator.isPartitionExist).not.toHaveBeenCalled();
+      });
+
+      // Everywhere, because a queue lookup left on the default data source finds nothing
+      // and a build that is still scheduled then reads as a missing partition.
+      // TODO(1.8): goes away with the fallback in preAggregationsJobsGET.
+      test('a job with no recorded data source resolves it from the model everywhere', async () => {
+        const apiGateway = Object.create(ApiGateway.prototype);
+        const job = jobFor({ dataSource: undefined as any, status: 'scheduled' });
+        const orchestrator = {
+          getPreAggregationQueueStates: jest.fn(async () => []),
+          isPartitionExist: jest.fn(async () => [false, 'missing_partition']),
+        };
+        apiGateway.refreshScheduler = () => ({
+          getCachedBuildJobs: async () => [{ job, token: 'job-token' }],
+        });
+        apiGateway.getAdapterApi = async () => orchestrator;
+        apiGateway.getCompilerApi = async () => compiler;
+
+        const [item] = await (apiGateway as any).preAggregationsJobsGET(
+          { requestId: 'request-id' },
+          ['job-token'],
+        );
+
+        expect(item.status).toEqual('missing_partition');
+        expect(item.selector.dataSources).toEqual(['model_ds']);
+        expect(orchestrator.getPreAggregationQueueStates).toHaveBeenCalledWith('model_ds');
+        expect(orchestrator.isPartitionExist).toHaveBeenCalledWith(
+          'request-id',
+          true,
+          'model_ds',
+          compiler.preAggregationsSchema,
+          job.target,
+          job.key,
+          'job-token',
+        );
+      });
     });
   });
 
@@ -1320,6 +1431,56 @@ describe('API Gateway', () => {
   });
 
   describe('/v1/cubesql', () => {
+    describe('with log redaction on', () => {
+      beforeEach(() => {
+        process.env.CUBEJS_LOG_REDACTION = 'true';
+      });
+
+      afterEach(() => {
+        delete process.env.CUBEJS_LOG_REDACTION;
+      });
+
+      test('a malformed body is still a 400 and its User Error is still logged', async () => {
+        const { app, apiGateway } = await createApiGateway();
+        const logSpy = jest.spyOn(apiGateway, 'log');
+
+        const res = await request(app)
+          .post('/cubejs-api/v1/cubesql')
+          .set('Content-type', 'application/json')
+          .set('Authorization', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.e30.t-IDcSemACt8x4iTMCda8Yhe3iZaWbvV5XKSTbuAn0M')
+          .send({ query: 42 })
+          .expect(400);
+
+        expect(res.body.error).toMatch(/Invalid query format/);
+        const userError = logSpy.mock.calls.find(([event]) => event.type === 'User Error');
+        expect(userError).toBeDefined();
+        expect(userError![0]).toMatchObject({ query: { sql: 42 } });
+        expect(userError![0]).not.toHaveProperty('redactedQuery');
+      });
+
+      test('a failing statement is logged with its redacted twin', async () => {
+        const { app, apiGateway } = await createApiGateway();
+        const logSpy = jest.spyOn(apiGateway, 'log');
+        apiGateway.getSQLServer().execSql = jest.fn(async () => {
+          throw new Error('boom');
+        });
+
+        await request(app)
+          .post('/cubejs-api/v1/cubesql')
+          .set('Content-type', 'application/json')
+          .set('Authorization', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.e30.t-IDcSemACt8x4iTMCda8Yhe3iZaWbvV5XKSTbuAn0M')
+          .send({ query: "SELECT id FROM test WHERE email = 'john@example.com'" })
+          .expect(500);
+
+        const event = logSpy.mock.calls.find(([e]) => e.type === 'Internal Server Error');
+        expect(event).toBeDefined();
+        expect(event![0]).toMatchObject({
+          query: { sql: "SELECT id FROM test WHERE email = 'john@example.com'" },
+          redactedQuery: { sql: "SELECT id FROM test WHERE email = 'redacted'" },
+        });
+      });
+    });
+
     test('simple query works', async () => {
       const { app, apiGateway } = await createApiGateway();
 
@@ -1508,7 +1669,7 @@ describe('API Gateway', () => {
   describe('external pre-aggregation indicator', () => {
     // Helper mock that lets a test pretend the query orchestrator served
     // the result from an external (CubeStore) pre-aggregation, optionally
-    // with the dev-only `usedPreAggregations` object as well.
+    // with the `usedPreAggregations` object as well.
     class AdapterApiMockWithFlags extends AdapterApiMock {
       public constructor(
         private readonly external: boolean | undefined,
@@ -1536,16 +1697,25 @@ describe('API Gateway', () => {
         .expect(200);
 
       expect(res.body.external).toBe(false);
-      // Full pre-agg object stays dev/playground-only.
+      // No pre-aggregation was used, so there is nothing to name.
       expect(res.body.usedPreAggregations).toBeUndefined();
     });
 
-    test('external=true when query was served from an external pre-aggregation (no leak of names)', async () => {
+    // Pre-aggregation identity is reported to every API consumer so a client
+    // can match a result to the build it is waiting on. Refresh key values and
+    // the physical table name of the build are not: the former are rows of the
+    // refresh key queries, which are often written without the security context
+    // filtering the cube itself applies, and the latter describes storage
+    // layout a data API consumer cannot query anyway.
+    test('external=true exposes pre-aggregation identity only', async () => {
       const { app } = await createApiGateway(
         new AdapterApiMockWithFlags(true, {
           'Foo.fooMain': {
+            preAggregationId: 'Foo.fooMain',
             targetTableName: 'stb_pre_aggs.foo_foo_main',
+            lastUpdatedAt: 1712000000000,
             type: 'rollup',
+            refreshKeyValues: [[{ max_updated_at: '2024-01-01T00:00:00.000Z' }]],
           },
         }),
       );
@@ -1556,16 +1726,23 @@ describe('API Gateway', () => {
         .expect(200);
 
       expect(res.body.external).toBe(true);
-      // Pre-aggregation names / table names must NOT be exposed to ordinary
-      // API consumers — only the boolean flag is safe.
-      expect(res.body.usedPreAggregations).toBeUndefined();
+      expect(res.body.usedPreAggregations).toEqual({
+        'Foo.fooMain': {
+          preAggregationId: 'Foo.fooMain',
+          lastUpdatedAt: 1712000000000,
+          type: 'rollup',
+        },
+      });
     });
 
-    test('usedPreAggregations is exposed under playground auth alongside external', async () => {
+    test('the full pre-aggregation object is exposed under playground auth', async () => {
       const usedPreAggregations = {
         'Foo.fooMain': {
+          preAggregationId: 'Foo.fooMain',
           targetTableName: 'stb_pre_aggs.foo_foo_main',
+          lastUpdatedAt: 1712000000000,
           type: 'rollup',
+          refreshKeyValues: [[{ max_updated_at: '2024-01-01T00:00:00.000Z' }]],
         },
       };
       const { app } = await createApiGateway(

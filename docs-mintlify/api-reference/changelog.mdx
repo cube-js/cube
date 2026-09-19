@@ -5,7 +5,149 @@ rss: true
 ---
 
 {/* GENERATED FILE — do not edit by hand. */}
-{/* Run scripts/extract-changelog.js against the platform client CHANGELOG.md. */}
+{/* Run scripts/extract-changelog.mjs against the platform client CHANGELOG.md. */}
+
+<Update label="2026-09-15" description="v0.11.0" tags={["Added"]}>
+  ### Added
+
+  - `FolderDto` gained `user` (CUB-4611) — the folder's owner, resolved the same way workbook owners are; `null` on a folder shared from the main workspace, which stays masked. Fixes the embed workspace's Owner column always rendering a dash, including for a folder the caller just created.
+  - `GenerateSession` gained `branchName` (CUB-4151) — the deployment branch an embed session queries. Omit it (or pass the deployment's production branch) for the production environment, which stays the default; any other branch of the deployment — one with a staging environment enabled, a shared branch, or a personal dev branch — points every Cube query the embedded dashboards, Creator Mode workspace and chat make at that branch's runtime (`<deploymentUrl>/dev-mode/{branchName}/cubejs-api/v1`) instead. The branch must be served when the session is generated: a name that is not a branch of the deployment returns `404`, and a branch nothing is running returns `400` — a branch without a staging environment is only running while someone has it open in Cube, so enable its staging environment for a branch an embedded app should reach at any time. Content is not branch-scoped: the same dashboards and workbooks are rendered against the chosen branch's data model. The embedded chat and AI widgets follow the session onto the branch as well, so an agent answers from the same data model the dashboards show.
+  - New public REST endpoint `POST /api/v1/embed/session/revoke` (`EmbedPublicController.revokeSession`) (CUB-4508) ends a signed embed session from the server side — call it from your application's logout handler with the `sessionId` that `POST /api/v1/embed/generate-session` returned. Works on either state a session can be in: an unexchanged id can no longer be redeemed via `POST /api/v1/embed/session/token`, and a token an already-exchanged id produced is rejected with `401` from that point on. Idempotent — revoking an unknown, expired, or already-revoked id also responds `204`, so the response alone never tells you whether a token was still revocable. That depends on Cube, not on the client library you call from: only tokens Cube issued after this endpoint shipped carry the revocation claim, and an older token keeps working until it expires on its own, within 24 hours. Requires admin access and that embedding be enabled for the account. New schema: `RevokeEmbedSessionInput`.
+</Update>
+
+<Update label="2026-09-14" description="v0.10.0" tags={["Added"]}>
+  ### Added
+
+  - `GET /api/v1/deployments/{deploymentId}/dbt-sync/{syncJobId}/generated-files` (`DbtSyncPublicController.getDbtSyncGeneratedFiles`) returns the cube files a dbt sync generated when it did not commit them, with cursor pagination (CUB-4489). The files are held for one hour after the sync completes and then dropped, so collect them promptly; a sync that committed to a branch instead, or a stale/unknown job, gets a 404. Requires deployment read access. New schemas: `DbtSyncGeneratedFilesListResponse`, `DbtGeneratedFileContent`.
+  - `StartDbtSyncInput` gained `output` (CUB-4489): `'branch'` (the default, unchanged) commits the generated cubes to a new Cube branch for review; `'files'` commits nothing and creates no branch, so the files can be read back from the new `generated-files` endpoint and committed through your own CI's review instead.
+  - New RBAC action `ChatHistoryRead` (CUB-3277) for scoping read access to chat history independently of `ChatThreadRead`. Assignable wherever a policy action is: `Policy.actions`, `RoleWithAccess.actions`, and the resource/group/user policy DTOs.
+  - `PivotItems` / `PivotItemsInput` gained `showAppliedFilters` (CUB-4639): a per-exploration override for whether a report written to a worksheet carries the applied-filter summary, above the existing account- and user-level settings of the same name. Omitting it means the exploration has no opinion — the user's (or account's) setting stands — rather than turning the annotation off.
+</Update>
+
+<Update label="2026-09-12" description="v0.9.0" tags={["Added","Fixed"]}>
+  ### Added
+
+  - New public REST API for managing Databricks Metric View publication settings (CUB-4443): `GET /api/v1/deployments/{deploymentId}/databricks-metric-view-integrations/{dataSourceName}` (`DatabricksMetricViewIntegrationPublicController.getIntegration`) reads the current configuration and requires `SchemaRead` or `SchemaUpdate` access; `PUT` (`saveIntegration`) creates or updates it using optimistic `configurationVersion`-based concurrency (pass `expectedConfigurationVersion: 0` to create) and requires `SchemaUpdate` access. Both require a Databricks datasource; this is currently in preview — reach out to the Cube support team to activate it for your account. New schemas: `DatabricksMetricViewIntegrationResponse`, `DatabricksMetricViewIntegrationConfigurationResponse`, `SaveDatabricksMetricViewIntegrationInput`.
+  - New public REST API for listing the workbooks an embed tenant can access (CUB-4509): `GET /api/v1/deployments/{deploymentId}/embed-tenants/{embedTenantName}/workbooks` (`DashboardEmbedAccessPublicController.listEmbedTenantWorkbooks`) returns the tenant's effective access — direct tenant shares, all-embed-user shares, and access inherited from shared folders — with optional `accessSource` (`tenant` | `allEmbedUsers` | `folder`) filtering and cursor pagination. Requires administrator privileges. New schema: `EmbedTenantWorkbooksListResponse`.
+  - New public REST API for commenting on embeddable dashboards (CUB-3637): `GET /api/v1/embed/dashboard/{publicId}/comments` (`EmbedPublicController.listDashboardComments`) lists comment threads; `POST` (`createDashboardComment`) starts a thread or replies to one; `PATCH .../comments/{commentId}` (`updateDashboardComment`) and `DELETE .../comments/{commentId}` (`removeDashboardComment`) edit or soft-delete a comment (author only); `POST .../comments/{commentId}/resolve` (`setDashboardCommentResolved`) resolves or re-opens a thread (author only); `GET .../comments/mentionable-users` (`listMentionableEmbedUsers`) lists the caller's fellow embed users for a mention autocomplete. Requires a signed embed session scoped to an embed tenant. New schemas: `EmbedDashboardCommentDto`, `EmbedDashboardCommentThreadDto`, `EmbedDashboardCommentThreadsListResponse`, `CreateEmbedDashboardCommentBody`, `UpdateEmbedDashboardCommentBody`, `SetEmbedDashboardCommentResolvedBody`, `EmbedMentionableUserDto`, `EmbedMentionableUsersListResponse`.
+  - `EmbedSessionSettings` gained `locale` and `timezone` (CUB-4604) — a session's own language and time zone, resolved host message → launch param → session → account → built-in default; and four per-session Creator Mode opt-outs (CUB-4147): `showWorkbookShare`, `showDashboardSettings`, `showMemberNames`, `showGroupByCube`.
+  - `AppConfigResponse` gained `sheetsAgentChatEnabled` (CUB-4574) — whether the Sheets add-in's chat can act on the spreadsheet (run a query into cells, read a range) rather than only describe changes it cannot make.
+
+  ### Fixed
+
+  - `DatabricksMetricViewPublicationPublicController.startPreview` and the new Databricks Metric View integration endpoints no longer name the internal `useDatabricksMetricViewsPush` feature flag (or an internal codename) in their descriptions — both now point readers at the Cube support team to activate the preview feature, matching every other preview-gated endpoint.
+</Update>
+
+<Update label="2026-09-11" description="v0.8.0" tags={["Added"]}>
+  ### Added
+
+  - New public REST API for previewing a Databricks Metric View publication (CUB-4442): `POST /api/v1/deployments/{deploymentId}/databricks-metric-view-previews` (`DatabricksMetricViewPublicationPublicController.startPreview`) queues an offline conversion of the deployment's latest successful build and returns `202` with polling URLs; `GET .../databricks-metric-view-previews/{previewId}` (`previewStatus`) polls progress; `GET .../databricks-metric-view-previews/{previewId}/result` (`previewResult`) returns the completed result (`409` while still running or if it ended without one); `DELETE .../databricks-metric-view-previews/{previewId}` (`cancelPreview`) requests cancellation. Requires `SchemaRead` or `SchemaUpdate` access; this is currently in preview — reach out to the Cube support team to activate it for your account. Preview payloads and results are retained for at most seven days. New schemas: `DatabricksMetricViewPublicationPreviewInput`, `DatabricksMetricViewPublicationPreviewStartResponse`, `DatabricksMetricViewPublicationPreviewStatusResponse`, `DatabricksMetricViewPublicationPreviewResultResponse`, `DatabricksMetricViewPublicationViewResult`, `DatabricksMetricViewPublicationIssue`, `DatabricksMetricViewPublicationCounts`, `DatabricksMetricViewPublicationDatasetSource`, `DatabricksMetricViewPublicationRuntime`, `DatabricksMetricViewPublicationProgress`.
+  - `StartDbtSyncInput` gained `source` (`"git"` | `"manifest"`) and `manifest` — pass an uploaded `manifest.json` directly instead of having Cube clone the dbt repository and run dbt itself (CUB-4492). The corresponding `DbtSyncRun` response gained `source` (which pull path a run used), and `DbtSyncRunStats` gained `dbtVersion` and `manifestGeneratedAt`, populated for manifest-sourced runs.
+  - `EmbedSessionSettings` / `EmbedSettings` gained `allowAi`, `showAiWidgets`, and `showWorkbookChat` (CUB-2615) — per-session AI opt-outs for embeds. `allowAi` disables every AI surface, including the standalone embed chat, and is enforced server-side so a client holding the token can't work around it; the `show*` keys (alongside the existing `showDashboardChat`) only hide specific entry points — the dashboard agent, workspace chat, and AI-summary widget generation, respectively.
+</Update>
+
+<Update label="2026-09-09" description="v0.7.0" tags={["Added","Changed"]}>
+  ### Added
+
+  - New public REST API for rendering a published dashboard to PNG or PDF (CUB-4302): `POST /api/v1/deployments/{deploymentId}/dashboard-exports` (`DashboardExportsPublicController.startExport`) submits a render, `GET .../dashboard-exports/{jobId}` (`getExportStatus`) polls its status, and `GET .../dashboard-exports/{jobId}/download` (`downloadExport`) streams the finished file. Asynchronous because a render waits for every widget to finish querying — the job and its file are dropped 5 minutes after submission. By default the render runs under the caller's own security context (requires manage access to the dashboard's workbook); a tenant admin can instead pass `renderAs` to render as another console or embed user, the same subject vocabulary a scheduled notification's recipients use. New schemas: `StartDashboardExportInput`, `DashboardExportJobResponse`, `DashboardExportStatusResponse`, `ExportSubjectInput`.
+  - `CreateNotificationInput` / `UpdateNotificationInput` gained `memberSwitchers` — Field-switcher selections applied when the notification's dashboard is rendered — read back on the notification response too. New schema: `DashboardMemberSwitcherInput` / `DashboardMemberSwitcher`.
+  - `ConnectReportToWorkbookInput`, `CreateReportInput`, `UpdateReportInput` and `RefreshReportInput` gained `resultChecksum` — a client-computed fingerprint of the cells a write just placed on the sheet, echoed back on `ReportPlacement.resultChecksum` so a client can tell whether a placement has been hand-edited since. New schemas: `ReportPlacementResultChecksumInput` / `ReportPlacementResultChecksum`, `ReportPlacementResultChunkInput` / `ReportPlacementResultChunk`. `ConnectReportToWorkbookInput` also gained `addressOnly`, for an address-only correction (e.g. a renamed sheet tab) that should not erase the stored fingerprint.
+  - `PivotItems` / `PivotItemsInput` gained `displayScale` (`"model"` | `"absolute"` | `"thousands"` | `"millions"` | `"billions"`) and `showColumnTotals`.
+  - `WorkbookDashboardInput.dashboardDraft` now accepts a widget without an `id` — the server assigns one. New schema `DashboardConfigDraftInput` (with `DashboardWidgetDraftInput`); publishing or creating a dashboard still requires an `id` on every widget via the existing `DashboardConfigInput`.
+
+  ### Changed
+
+  - `CreateReportInput.name` / `.title`, `UpdateReportInput.name` / `.title`, and the `Report.name` response field now enforce `maxLength: 255` (CUB-4440) — matching the column's real storage limit, so a name or title over that limit now returns `400` instead of failing less predictably downstream.
+</Update>
+
+<Update label="2026-09-02" description="v0.6.0" tags={["Added","Changed","Deprecated"]}>
+  ### Added
+
+  - `User` (`GET /api/v1/users/me`, `UsersPublicController.getMe`) gained `userPolicies` — the caller's effective resource policies: direct grants, organization-wide grants and grants inherited from their groups. This is the set the console has always read over GraphQL; on REST it lets an embedded Creator Mode session resolve a workbook another embed user shared with it, which previously granted nothing beyond viewing. New schemas: `Policy`, `PolicyResourceType`.
+  - Re-added `POST /api/v1/deployments/{deploymentId}/workbooks/{workbookId}/dashboard/ai-widget-thread` (`WorkbooksPublicController.updatePublishedDashboardAiWidgetThread`) and its `UpdatePublishedAiWidgetThreadInput` schema (`widgetId`, `threadId`, optional `checksum`) — reverting the `0.4.0` removal. Regenerating an AI-analysis widget on a **published** dashboard persists the new thread id (+ checksum) back to the published config so an immediate reload shows the fresh result instead of the stale one. It stores **only** the thread id and checksum — never summary text (CUB-4031).
+  - `PATCH /api/v1/users/me/settings` (`UsersPublicController.updateMySettings`) — merge a partial patch into your own settings; omitted fields are left as they are, and `sheets` merges field-by-field (an explicit `null` clears it). `UserSettingsInput` gained `sheets`. New schema: `SheetsUserSettingsInput` (`autoRunQueryOnChange`, `openExplorationFromSheet`, `revealSheetOnOpen`, `showAppliedFilters`, `suppressDuplicateValues`).
+  - `POST /api/v1/deployments/{id}/token` (`DeploymentsPublicController.deploymentToken`) now accepts an optional body to request a shorter token lifetime than the 24-hour default. New schema: `CreateDeploymentTokenInput` (`expiresIn`, 60–86400 seconds) — recommended for tokens held outside a browser session (scripts, BI tools, scheduled jobs).
+  - `AppTheme` / `AppThemeResponse` (`GET /api/v1/app-theme`, `GET /api/v1/app-config`) gained `palette` and `logoUrl` — the new theme model: base/accent color seeds, contrast level, a pastel toggle, surface mode, and per-semantic color overrides (danger/warning/success/note/code). New schemas: `AppThemePalette`, `AppThemePaletteSeed`, `AppThemePaletteThemes`, `AppThemeCodePalette`, `AppThemeSurfaceMode`.
+  - `DashboardWidgetDtoType` / `DashboardWidgetInputType` gained a new `"FIELD"` enum value, for the Field switcher dashboard control.
+  - `ReportPlacement` gained `queryChecksum` and `syncStatus` (new schema `ReportPlacementSyncStatus`: `"UP_TO_DATE"` | `"CHANGED"` | `"UNKNOWN"`), and `Report` gained `currentQueryChecksum` — together they let a client tell whether the cells at a placement still reflect the exploration as it stands now.
+
+  ### Changed
+
+  - `POST /api/v1/usage-analytics/token` — corrected docs: tokens expire after 1 hour, not ~24 hours as previously stated. `expiresAt` on the response has always reflected the real value.
+
+  ### Deprecated
+
+  - `AppTheme.light` / `AppTheme.dark` — use `palette` and `logoUrl` instead.
+  - `UserSettingsInput.lastSeenChangelogId` — ignored; the changelog now arrives in the notification inbox, which carries its own read state. Accepted for backward compatibility but never read or written.
+</Update>
+
+<Update label="2026-08-30" description="v0.5.0" tags={["Added"]}>
+  ### Added
+
+  - `POST /api/v1/usage-analytics/token` (`UsageAnalyticsPublicController.createToken`) — issues a short-lived Cube API token scoped to your account, for querying your own Usage Analytics (usage/billing) data programmatically instead of only through the embedded Admin page. New schema: `UsageAnalyticsTokenResponse`. Admin-only.
+  - `CreateNotificationInput` / `UpdateNotificationInput` gained `notificationAiSummary` — include an AI-generated "what changed" summary in the notification body. Read back as `notificationAiSummary` on the corresponding notification response schema.
+  - `EmbedSettings` gained `enableDashboardComments` — controls whether embedded published dashboards allow comments.
+  - `UserSettingsInput` gained `defaultDeploymentId` — a personal override for the deployment a user lands on when opening the workspace without one specified in the URL; `null`/unset inherits the account-wide default. It is readable via the existing `settings` object on the `User` schema.
+  - `UserCreateInput` gained `settings` — seed a new user's personal settings (the `UserSettingsInput` fields, e.g. `locale`, `theme`, `defaultDeploymentId`) at creation time instead of a follow-up update. Typed as a free-form object in the spec.
+  - `ReportSnapshotDtoKind` gained a new `"sankey"` enum value.
+</Update>
+
+<Update label="2026-08-27" description="v0.4.0" tags={["Added","Changed","Removed"]}>
+  ### Added
+
+  #### dbt Sync — status, results and history
+
+  - `GET /api/v1/deployments/{deploymentId}/dbt-sync` (`DbtSyncPublicController.listDbtSyncs`) — sync run history, filterable by `status`/`trigger`, cursor-paginated. New schemas: `DbtSyncRun`, `DbtSyncRunListResponse`, `DbtSyncRunPhase`, `DbtSyncRunStats`, `DbtSyncRunTriggerContext`, `DbtSyncRunsQueryStatus`, `DbtSyncRunsQueryTrigger`.
+  - `GET /api/v1/deployments/{deploymentId}/dbt-sync/{syncJobId}` (`getDbtSyncStatus`) — poll a running sync. New schemas: `DbtSyncStatusResponse`, `DbtSyncProgress`.
+  - `GET .../dbt-sync/{syncJobId}/result` (`getDbtSyncResult`) and `GET .../dbt-sync/{syncJobId}/logs` (`getDbtSyncLogs`). New schemas: `DbtSyncResultResponse`, `DbtSyncGeneratedFile`, `DbtSyncManifestStats`, `DbtSyncLogEntry`, `DbtSyncLogEntriesListResponse`.
+  - `DELETE .../dbt-sync/{syncJobId}` (`cancelDbtSync`) — cancel a running sync. New schema: `DbtSyncCancelResponse`.
+
+  #### Data model — branch cleanup, staging environments and validation
+
+  - `DELETE /build/api/v1/deployments/{deploymentId}/branches` (`DataModelPublicController.removeBranch`, `branchName` as a query param since branch names contain slashes) — deletes a branch and its git ref, re-parenting any children onto the deleted branch's own parent; `removeOnUpstream` additionally deletes the ref on the connected GitHub/GitLab remote. New schema: `DataModelWriteResponse` (shared with the existing file-write endpoints).
+  - `PUT .../branches/staging-environment` (`setBranchStagingEnvironment`) — enable or disable a branch's always-on staging environment (`<deploymentUrl>/dev-mode/{branchName}/cubejs-api/v1`). New schemas: `SetBranchStagingEnvironmentRequest`, `SetBranchStagingEnvironmentResponse`. `BranchResponse` (from `listBranches`) reads the flag back via a new `isStagingEnvironmentEnabled`.
+  - `GET .../data-model/validate` (`validateDataModel`) — compiles the deploy branch, a named branch, or the caller's dev-mode branch and reports compilation errors as a 200 response (`valid: false`), not a request error. New schemas: `DataModelValidationResponse`, `DataModelValidationError`, `DataModelValidationResponseMode`.
+
+  #### Deployment settings, versions and the spec endpoint
+
+  - `GET /api/v1/deployments/{deploymentId}/settings` (`DeploymentsPublicController.getDeploymentSettings`) — every deployment setting in one payload (secrets excluded); writes go through the existing `PUT /:deploymentId`. New schema: `DeploymentSettings` (+ its `cloudProvider`/`creationMethod`/`deployMode`/`releaseChannel`/`repoType`/`template` enums).
+  - `GET /api/v1/deployments/{deploymentId}/versions` (`listDeploymentVersions`) — the Cube versions this deployment can switch to (release-channel heads plus prior versions run before). New schemas: `DeploymentVersion`, `DeploymentVersionsResponse`, `DeploymentVersionReleaseChannel`.
+  - `PUT /api/v1/deployments/{deploymentId}` (`updateDeployment`) / `UpdateDeploymentInput` now accepts `cloudProvider`, `region`, `releaseChannel`, `releaseChannelVersion`, `releaseChannelVersionHold`, `template`, `templateVariables`, `defaultLaunchpadViewGroup`, and `launchpadTabs` — the same settings surface `GET .../settings` now reads back. `releaseChannelVersion` must be one of the versions `GET .../versions` lists for the target channel.
+  - `GET /api/v1/spec` (`OpenApiSpecPublicController.getSpec`) — the full OpenAPI 3.1 document served by the build handling the request, for runtime discovery by clients and agents.
+
+  #### Reports
+
+  - `DELETE /api/v1/deployments/{deploymentId}/reports/{reportId}/connect-workbook` (`ReportsPublicController.disconnectReportFromWorkbook`) — removes a single sheet+anchor placement of a report from a spreadsheet, leaving every other placement (in this workbook and others) alone. Addressed by `placementId`, or by `externalWorkbookId` + `sheetName` + `anchorCell`. New schema: `DisconnectReportFromWorkbookInput`.
+  - `PUT .../reports/{reportId}/refresh` now takes a body: new schema `RefreshReportInput` (`placementId`, or `externalWorkbookId` + `sheetName`/`sheetId`/`anchorCell`), addressing the same way as disconnect.
+  - Report placements are now individually addressable and trackable (new `ConnectReportToWorkbookInputHost` / `CreateReportInputHost` / `UpdateReportInputHost` enums, `"GOOGLE_SHEETS" | "EXCEL"`): `ConnectReportToWorkbookInput` gained `placementId`, `sheetId`, `sheetName`, `anchorCell`, `workbookName` and `host`; `CreateReportInput` gained `host`, `sheetId` and `workbookName`; `UpdateReportInput` gained `host`, `placementId`, `sheetId` and `workbookName`. `ReportPlacement` gained the matching `id`, `host`, `sheetId`, `sheetName`, `anchorCell`, `workbookName`, plus `placedAt`/`placedByUserId` and `refreshedAt`/`refreshedByUserId` (new `ReportPlacementHost` enum). `ReportSnapshot` gained `isSourceReport` and `pythonCode`.
+
+  #### Cursor pagination on previously offset-only or unpaginated lists
+
+  - `first`/`after` → `items` + `pageInfo` cursor pagination added to: deployment env variables (`GET .../env-vars`), GitHub branches/installations/repositories (`GitHubPublicController.*`), user attributes (previously `offset`/`limit`), `GET /api/v1/regions/`, report folders, data-model branches and files (`listBranches`/`listFiles`, `BranchesListResponse`/`SourceTreeResponse`), and deployment logs/pods (`DeploymentLogsResponse`/`DeploymentPodsResponse` gain `pageInfo`). Newly-paginated responses keep the legacy `data`/`count`/`pagination` fields, marked `@deprecated`.
+  - `UserGroupsPublicController.listGroups` and `UsersPublicController.getUsers` already had `first`/`after`; what's new on both is a `search` query param (case-insensitive substring match on group name / first name, username, email).
+  - `DashboardFilterOperator` / `DashboardFilterInputOperator` gained `is_empty` / `is_not_empty`.
+
+  #### Other new fields
+
+  - New `TimezoneSettings` schema, plus `timezoneSettings` on `AppConfigResponse` and `resolvedTimezone` / `deployBranchName` / `timezoneSettings` on `AIEngineerSettings`.
+  - New `CspsConfig` schema (customer-storage-provider config, mirrored on the existing `CspsConfigInput`).
+  - `scopeDeploymentId` added to the agent-space config schemas.
+  - `measuresAxis` / `measuresPosition` added to `PivotItems` / `PivotItemsInput` (new `PivotItemsMeasuresAxis` / `PivotItemsMeasuresPosition` / `PivotItemsInputMeasuresAxis` / `PivotItemsInputMeasuresPosition` enums, `"columns" | "rows"` and `"before" | "after"`).
+  - `name` / `userCount` added to `InheritedGroupPolicyDto` and `ResourceGroupPolicyDto`.
+  - `allowChatWorkspaceAuthoring` added to `EmbedSessionSettings`.
+  - `ref` added to `StartDbtSyncInput`.
+
+  ### Changed
+
+  - **BREAKING (TypeScript):** `DeploymentEnvironmentsListResponse.pagination` and `DeploymentEnvironmentTokensListResponse.pagination` moved from required to `pagination?: DeploymentsPagination | null` now that both responses also carry `items`/`pageInfo`. Code under `strictNullChecks` reading `res.pagination.currentPage` without a null check no longer compiles.
+  - **BREAKING (TypeScript):** `NotificationsPublicController.getRecipients`'s cursor params were narrowed — `first?: number | string | null` → `first?: number | null` and `after?: string | number | null` → `after?: string | null` — cleaning up a hand-declared `@OpenAPI({ parameters })` that had merged positionally with the real cursor-param types. A caller passing a numeric `after` or a stringified `first` (both accepted, if oddly typed, before) no longer compiles.
+  - `DashboardWidgetDtoType` / `DashboardWidgetInputType` no longer advertise `TABS_CONTAINER` in the type — replaced by `PARENT`, `SPACER`, `DIVIDER`, `CONTAINER` (a `CONTAINER` with `config.layout: 'tabs'` is the current shape for a tabbed container). Existing stored or sent `TABS_CONTAINER` values are still healed server-side for backward compatibility (CUB-3634), so this narrows the advertised type rather than breaking existing integrations at runtime — new code should target `CONTAINER` + `layout`.
+  - `PUT /api/v1/deployments/{deploymentId}` (`updateDeployment`) description clarified: writes are a partial merge (omitted fields are left alone, `templateVariables` is merged key-by-key), and `releaseChannelVersion` is validated against `GET .../versions`.
+
+  ### Removed
+
+  - **BREAKING:** `POST /api/v1/deployments/{deploymentId}/workbooks/{workbookId}/dashboard/ai-widget-thread` (`WorkbooksPublicController.updatePublishedDashboardAiWidgetThread`) and its `UpdatePublishedAiWidgetThreadInput` schema (added in `0.2.0`). It persisted an AI-analysis thread id + checksum into the published dashboard config — the mechanism that caused read-only/anonymous viewers to hit `WorkbookEdit`/403s and let one viewer's filter state clobber the shared config (CUB-3898). AI-analysis results are recovered by replaying the chat thread whose id the dashboard config stores, so no client-facing endpoint replaces it (CUB-4031). This is a deliberate breaking removal; SDK consumers referencing the operation or schema should drop those references.
+</Update>
 
 <Update label="2026-07-30" description="v0.3.0" tags={["Added","Changed","Removed"]}>
   > Supersedes `0.2.1`, which never reached npm because its publish job failed.

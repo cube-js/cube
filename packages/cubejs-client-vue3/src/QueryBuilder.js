@@ -21,52 +21,47 @@ const toOrderMember = (member) => ({
   title: member.title,
 });
 
-const reduceOrderMembers = (array) =>
-  array.reduce((acc, { id, order }) => (order !== 'none' ? [...acc, [id, order]] : acc), []);
+const reduceOrderMembers = (array) => array.reduce(
+  (acc, { id, order }) => (order !== 'none' ? [...acc, [id, order]] : acc),
+  []
+);
 
-const operators = [ 'and', 'or' ]
+const operators = ['and', 'or'];
 
-const validateFilters = (filters) =>
-  filters.reduce((acc, raw) => {
-    if (raw.operator) {
-      return [...acc, raw];
+const validateFilters = (filters) => filters.reduce((acc, raw) => {
+  if (raw.operator) {
+    return [...acc, raw];
+  }
+
+  const validBooleanFilter = operators.reduce((booleanAcc, operator) => {
+    const booleanFilters = validateFilters(raw[operator] || []);
+
+    if (booleanFilters.length) {
+      return { ...booleanAcc, [operator]: booleanFilters };
     }
 
-    const validBooleanFilter = operators.reduce((acc, operator) => {
-      const filters = raw[operator];
+    return booleanAcc;
+  }, {});
 
-      const booleanFilters = validateFilters(filters || []);
+  if (operators.some((operator) => validBooleanFilter[operator])) {
+    return [...acc, validBooleanFilter];
+  }
 
-      if (booleanFilters.length) {
-        return { ...acc, [operator]: booleanFilters };
-      }
-
-      return acc;
-    }, {});
-
-    if (operators.some((operator) => validBooleanFilter[operator])) {
-      return [...acc, validBooleanFilter];
-    }
-
-    return acc;
-  }, []);
+  return acc;
+}, []);
 
 const getDimensionOrMeasure = (meta, m) => {
   const memberName = m.member || m.dimension;
   return memberName && meta.resolveMember(memberName, ['dimensions', 'measures']);
 };
 
-const resolveMembers = (meta, arr) =>
-  arr &&
-  arr.map((e, index) => {
-    return {
-      ...e,
-      member: getDimensionOrMeasure(meta, e),
-      index,
-      and: resolveMembers(meta, e.and),
-      or: resolveMembers(meta, e.or),
-    };
-  });
+const resolveMembers = (meta, arr) => arr && arr.map((e, index) => ({
+  ...e,
+  member: getDimensionOrMeasure(meta, e),
+  index,
+  and: resolveMembers(meta, e.and),
+  or: resolveMembers(meta, e.or),
+}));
 
 export default {
   components: {
@@ -139,7 +134,6 @@ export default {
       segments,
       timeDimensions,
       validatedQuery,
-      isQueryPresent,
       availableSegments,
       availableTimeDimensions,
       availableDimensions,
@@ -160,7 +154,7 @@ export default {
       builderProps = {
         query,
         validatedQuery,
-        isQueryPresent,
+        isQueryPresent: this.isQueryPresent,
         chartType,
         measures,
         dimensions,
@@ -329,7 +323,7 @@ export default {
       });
 
       if (validatedQuery.filters) {
-        validatedQuery.filters = validateFilters(validatedQuery.filters)
+        validatedQuery.filters = validateFilters(validatedQuery.filters);
       }
 
       // only set limit and offset if there are elements otherwise an invalid request with just limit/offset
@@ -374,7 +368,7 @@ export default {
         };
 
         this.chartType = chartType || this.chartType;
-        let pivot = ResultSet.getNormalizedPivotConfig(
+        const pivot = ResultSet.getNormalizedPivotConfig(
           validatedQuery,
           pivotConfig !== undefined ? pivotConfig : this.pivotConfig
         );
@@ -496,7 +490,7 @@ export default {
           and: resolveMembers(this.meta, member.and),
           or: resolveMembers(this.meta, member.or),
           member: getDimensionOrMeasure(this.meta, member),
-        }
+        };
       } else {
         mem = this[`available${name}`].find((m) => m.name === member);
       }

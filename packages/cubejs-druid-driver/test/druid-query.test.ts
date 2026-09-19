@@ -74,4 +74,13 @@ describe('DruidQuery', () => {
     const queryAndParams = query.buildSqlAndParams();
     expect(queryAndParams[0]).toContain('CAST(TIME_FORMAT("visitors".created_at, \'yyyy-MM-dd HH:mm:ss\', \'Europe/Kiev\') AS TIMESTAMP)');
   }));
+
+  // A rolling window, a shifted date range and a custom granularity offset all reach the dialect
+  // through these two, and only the sign tells them apart.
+  it('subtracts and adds an interval in opposite directions', () => {
+    const query = new DruidQuery({ joinGraph, cubeEvaluator, compiler }, {});
+
+    expect(query.subtractInterval('d', '7 day')).toEqual('(d - INTERVAL 7 day)');
+    expect(query.addInterval('d', '7 day')).toEqual('(d + INTERVAL 7 day)');
+  });
 });

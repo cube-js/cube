@@ -11,6 +11,14 @@ JavaScript (`basePath`).
 
 </Info>
 
+<Warning>
+
+A `cube.ts` configuration file is no longer supported — use `cube.js` or
+`cube.py` instead. A server that finds only `cube.ts` fails to start with
+`Configuration in cube.ts is no longer supported`.
+
+</Warning>
+
 Every configuration option that is a function (e.g., `query_rewrite`)
 can be defined as either synchronous or asynchronous. Cube will await for
 the completion of asynchronous functions.
@@ -51,9 +59,27 @@ or when a more flexible setup is needed.
 
 It's a [multitenancy][ref-multitenancy] option.
 
-`context_to_app_id` is a function to determine an app id which is used as
-caching key for various in-memory structures like data model compilation
-results, etc.
+`context_to_app_id` is a function to determine an app id which is used as the
+caching key for the compiled data model and other data model-related in-memory
+structures. Each distinct app id gets its own data model compilation, which is
+what enables [`COMPILE_CONTEXT`][ref-compile-context] and per-tenant
+[`repository_factory`][self-repofactory].
+
+<Warning>
+
+`context_to_app_id` enables multitenancy for data model compilation only. On its
+own, it leaves querying and caching shared across app ids. To isolate those per
+tenant as well:
+
+- [`pre_aggregations_schema`][self-pre-aggregations-schema] gives each tenant its
+  own pre-aggregation tables. It is resolved per app id, so a schema name derived
+  from the security context requires `context_to_app_id` to be defined as well.
+- [`context_to_orchestrator_id`][self-orchestrator-id] gives each tenant its own
+  database connections, query queues, and query results cache.
+
+See [multitenancy][ref-multitenancy] for details.
+
+</Warning>
 
 Called on each request.
 
@@ -198,6 +224,7 @@ module.exports = {
 Maximum number of compiled data models to persist with in-memory cache. Defaults
 to 250, but optimum value will depend on deployed environment. When the max is
 reached, will start dropping the least recently used data models from the cache.
+Must be a positive integer; the cache can not be disabled.
 
 <CodeGroup>
 
@@ -214,6 +241,11 @@ module.exports = {
 ```
 
 </CodeGroup>
+
+This configuration option can also be set using the [`CUBEJS_COMPILER_CACHE_SIZE`](/reference/configuration/environment-variables#cubejs_compiler_cache_size)
+environment variable, and takes precedence over it. Note that the environment
+variable also sizes the SQL API's compiler cache, which this option does not
+affect.
 
 ### `max_compiler_cache_keep_alive`
 
@@ -489,6 +521,12 @@ module.exports = {
 }
 ```
 
+Cube's own drivers can also be loaded with a named ESM import instead of `require`:
+
+```javascript
+import { PostgresDriver } from '@cubejs-backend/postgres-driver'
+```
+
 ### `orchestrator_options`
 
 <Warning>
@@ -632,6 +670,16 @@ be used exclusively by Cube and shall not be shared with any application.
 </Warning>
 
 Called once per [`app_id`][self-opts-ctx-to-appid].
+
+<Warning>
+
+Because this option is evaluated once per app id, deriving the schema name from
+the security context requires [`context_to_app_id`][self-opts-ctx-to-appid] to be
+defined as well. Otherwise all tenants share a single app id, and every one of
+them ends up pinned to the schema name resolved for whichever tenant triggered
+the first data model compilation.
+
+</Warning>
 
 <CodeGroup>
 
@@ -1452,6 +1500,12 @@ Accepts the following arguments:
 - `message`: the message to be logged
 - `params`: additional parameters
 
+Filter values, SQL parameters, and string literals in SQL API statements in `params`
+arrive as `redacted` when
+[`CUBEJS_LOG_REDACTION`](/reference/configuration/environment-variables#cubejs_log_redaction)
+is on (the default outside development mode); error messages from a data source arrive as
+returned, and a SQL API error that quotes the statement has it redacted.
+
 <CodeGroup>
 
 ```python title="Python"
@@ -1477,9 +1531,9 @@ See also the [`CUBEJS_LOG_LEVEL`](/reference/configuration/environment-variables
 ### `telemetry`
 
 Cube collects high-level anonymous usage statistics for servers started in
-development mode. It doesn't track any credentials, data model contents or
-queries issued. This statistics is used solely for the purpose of constant
-cube.js improvement.
+[development mode][ref-development-mode]. It doesn't track any credentials, data
+model contents or queries issued. This statistics is used solely for the purpose of
+constant cube.js improvement.
 
 You can opt out of it any time by setting `telemetry` option to `False` or,
 alternatively, by setting [`CUBEJS_TELEMETRY`](/reference/configuration/environment-variables#cubejs_telemetry) environment variable to `false`.
@@ -1509,7 +1563,7 @@ module.exports = {
 [link-jwt-ref-sub]: https://tools.ietf.org/html/rfc7519#section-4.1.2
 [link-jwt-ref-aud]: https://tools.ietf.org/html/rfc7519#section-4.1.3
 [link-wiki-tz]: https://en.wikipedia.org/wiki/Tz_database
-[ref-development-mode]: /docs/data-modeling/dev-mode
+[ref-development-mode]: /reference/configuration/environment-variables#cubejs_dev_mode
 [ref-multitenancy]: /embedding/multitenancy
 [ref-preagg-data-source]: /docs/pre-aggregations/refreshing-pre-aggregations#pre-aggregation-data-source
 [ref-rest-api]: /reference/core-data-apis/rest-api
@@ -1527,6 +1581,7 @@ module.exports = {
 [ref-rest-scopes]: /reference/core-data-apis/rest-api#api-scopes
 [ref-config-options]: /admin/connect-to-data#configuration-options
 [self-orchestrator-id]: #context_to_orchestrator_id
+[ref-compile-context]: /reference/data-modeling/context-variables#compile_context
 [ref-multiple-data-sources]: /admin/connect-to-data/multiple-data-sources
 [ref-websockets]: /recipes/core-data-api/real-time-data-fetch
 [ref-matching-preaggs]: /docs/pre-aggregations/matching-pre-aggregations

@@ -216,6 +216,7 @@ export class PinotQuery extends BaseQuery {
     // epoch-millis representation produced by the timestamp_literal template
     templates.functions.UTCTIMESTAMP = 'NOW()';
     templates.functions.STRING_AGG = 'LISTAGG({% if distinct %}DISTINCT {% endif %}{{ args_concat }})';
+    delete templates.functions.WIDTH_BUCKET;
     templates.statements.select = '{% if ctes %} WITH \n' +
       '{{ ctes | join(\',\n\') }}\n' +
       '{% endif %}' +

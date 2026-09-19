@@ -1,5 +1,5 @@
 # syntax=docker/dockerfile-upstream:master-experimental
-FROM node:24.18.0-trixie-slim AS builder
+FROM node:24.21.0-trixie-slim AS builder
 
 WORKDIR /cube
 COPY . .
@@ -19,11 +19,12 @@ RUN apt-get update \
 # We are copying root yarn.lock file to the context folder during the Publish GH
 # action. So, a process will use the root lock file here.
 RUN yarn install --prod \
-    # Remove DuckDB sources to reduce image size
-    && rm -rf /cube/node_modules/duckdb/src \
+    # Yarn v1 filters optional deps by os/cpu only and ignores npm's `libc` field,
+    # so it installs the musl DuckDB bindings next to the glibc ones this image loads
+    && rm -rf /cube/node_modules/@duckdb/node-bindings-*-musl \
     && yarn cache clean
 
-FROM node:24.18.0-trixie-slim
+FROM node:24.21.0-trixie-slim
 
 ARG IMAGE_VERSION=unknown
 

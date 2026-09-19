@@ -15,6 +15,15 @@ pub struct MultiStageTimeSeries {
     date_range: Option<Vec<String>>,
     #[builder(default)]
     get_date_range_multistage_ref: Option<String>,
+    /// Query over the calendar cube supplying the period each series point
+    /// belongs to, for `to_date` windows whose granularity defines its own SQL.
+    /// `None` when every window on this series bounds itself by interval math.
+    #[builder(default)]
+    calendar_source: Option<Rc<Query>>,
+    /// The time dimension at each granularity `calendar_source` projects a
+    /// period for.
+    #[builder(default)]
+    period_dimensions: Vec<Rc<MemberSymbol>>,
 }
 
 impl MultiStageTimeSeries {
@@ -28,6 +37,14 @@ impl MultiStageTimeSeries {
 
     pub fn get_date_range_multistage_ref(&self) -> &Option<String> {
         &self.get_date_range_multistage_ref
+    }
+
+    pub fn calendar_source(&self) -> &Option<Rc<Query>> {
+        &self.calendar_source
+    }
+
+    pub fn period_dimensions(&self) -> &Vec<Rc<MemberSymbol>> {
+        &self.period_dimensions
     }
 }
 
@@ -44,6 +61,23 @@ impl PrettyPrint for MultiStageTimeSeries {
                 &format!("date_range: [{}, {}]", date_range[0], date_range[1]),
                 &state,
             );
+        }
+        if !self.period_dimensions.is_empty() {
+            result.println(
+                &format!(
+                    "period_dimensions: {}",
+                    self.period_dimensions
+                        .iter()
+                        .map(|d| d.full_name())
+                        .collect::<Vec<_>>()
+                        .join(", ")
+                ),
+                &state,
+            );
+        }
+        if let Some(calendar_source) = self.calendar_source() {
+            result.println("calendar_source:", &state);
+            calendar_source.pretty_print(result, &state.new_level());
         }
         if let Some(get_date_range_multistage_ref) = self.get_date_range_multistage_ref() {
             result.println(
@@ -63,12 +97,26 @@ impl LogicalNode for MultiStageTimeSeries {
     }
 
     fn inputs(&self) -> Vec<PlanNode> {
-        vec![] // MultiStageTimeSeries has no inputs
+        self.calendar_source
+            .iter()
+            .map(|source| source.as_plan_node())
+            .collect()
     }
 
     fn with_inputs(self: Rc<Self>, inputs: Vec<PlanNode>) -> Result<Rc<Self>, CubeError> {
-        check_inputs_len(&inputs, 0, self.node_name())?;
-        Ok(self)
+        let expected = if self.calendar_source.is_some() { 1 } else { 0 };
+        check_inputs_len(&inputs, expected, self.node_name())?;
+        if let Some(source) = inputs.into_iter().next() {
+            Ok(Rc::new(Self {
+                time_dimension: self.time_dimension.clone(),
+                date_range: self.date_range.clone(),
+                get_date_range_multistage_ref: self.get_date_range_multistage_ref.clone(),
+                calendar_source: Some(source.into_logical_node()?),
+                period_dimensions: self.period_dimensions.clone(),
+            }))
+        } else {
+            Ok(self)
+        }
     }
 
     fn referenced_cte_names(&self) -> Vec<String> {

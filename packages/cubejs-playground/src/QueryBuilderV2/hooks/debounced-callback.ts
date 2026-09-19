@@ -43,7 +43,7 @@ export function useDebouncedCallback<
       clear();
     };
 
-    const wrapped = function (this, ...args) {
+    const wrapped = function wrapped(this, ...args) {
       return new Promise<Awaited<ResType>>((resolve, reject) => {
         if (timeout.current) {
           clearTimeout(timeout.current);

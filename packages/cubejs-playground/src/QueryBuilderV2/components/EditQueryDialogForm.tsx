@@ -1,6 +1,5 @@
-import { DialogForm, LoadingIcon, Radio, Space, TextArea, useForm } from '@cube-dev/ui-kit';
-import { Meta, Query } from '@cubejs-client/core';
-import { ValidationRule } from '@cube-dev/ui-kit/types/shared';
+import { DialogForm, LoadingIcon, Radio, Space, TextArea, useForm, ValidationRule } from '@cube-dev/ui-kit';
+import { Query } from '@cubejs-client/core';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { parse as BestEffortJsonParse } from 'best-effort-json-parser';
 
@@ -23,8 +22,8 @@ const DEFAULT_GRAPHQL_QUERY = `query CubeQuery {
 function validateJsonQuery(json: string) {
   try {
     return validateQuery(BestEffortJsonParse(json));
-  } catch (e: any) {
-    throw 'Invalid query';
+  } catch {
+    throw new Error('Invalid query');
   }
 }
 
@@ -35,37 +34,12 @@ function getGraphQLValidator(apiUrl: string, apiToken: string | null) {
         return convertGraphQLToJsonQuery({
           apiUrl,
           apiToken,
-          query: query,
+          query,
         }).then(
           (json) => validateJsonQuery(json),
           () => {
-            throw '';
-          }
-        );
-      },
-    },
-  ];
-}
-
-function getJSONValidator(apiUrl: string, apiToken: string | null, meta?: Meta | null) {
-  return [
-    {
-      async validator(rule: ValidationRule, query: string) {
-        const originalQuery = JSON.stringify(BestEffortJsonParse(query));
-        const graphQLQuery = convertJsonQueryToGraphQL({
-          meta,
-          query: BestEffortJsonParse(query),
-        });
-
-        return convertGraphQLToJsonQuery({
-          apiUrl,
-          apiToken,
-          query: graphQLQuery,
-        }).then(
-          (json) => {
-            return originalQuery === json;
-          },
-          (e) => {
+            // async-validator only reads `.message` when truthy: '' means no message shown
+            // eslint-disable-next-line no-throw-literal
             throw '';
           }
         );
@@ -77,7 +51,7 @@ function getJSONValidator(apiUrl: string, apiToken: string | null, meta?: Meta |
 const QUERY_VALIDATOR = {
   async validator(rule: ValidationRule, value: string) {
     if (!validateJsonQuery) {
-      throw 'Invalid query';
+      throw new Error('Invalid query');
     }
   },
 };
@@ -85,8 +59,10 @@ const JSON_VALIDATOR = {
   async validator(rule: ValidationRule, value: string) {
     try {
       BestEffortJsonParse(value);
-    } catch (e: any) {
-      throw ''; // do not show any error message
+    } catch {
+      // async-validator only reads `.message` when truthy: '' means no message shown
+      // eslint-disable-next-line no-throw-literal
+      throw '';
     }
   },
 };
@@ -111,23 +87,23 @@ export function EditQueryDialogForm(props: PasteQueryDialogFormProps) {
     apiUrl = apiUrl.replace(/\/v1$/, '');
   }
 
-  async function parseAndPrepareQuery(query: string, type: QueryType) {
-    if (type === 'graphql') {
+  async function parseAndPrepareQuery(queryString: string, queryType: QueryType) {
+    if (queryType === 'graphql') {
       return validateQuery(
-        JSON.parse(await convertGraphQLToJsonQuery({ query, apiUrl, apiToken })) || {}
+        JSON.parse(await convertGraphQLToJsonQuery({ query: queryString, apiUrl, apiToken })) || {}
       );
     }
 
-    return validateQuery(BestEffortJsonParse(query) || {});
+    return validateQuery(BestEffortJsonParse(queryString) || {});
   }
 
   const onJsonBlur = useCallback(async () => {
-    const type = form.getFieldValue('type');
+    const blurType = form.getFieldValue('type');
 
     await pause(100);
 
     // check if onblur was triggered by type switch, skip if so
-    if (type !== 'json') {
+    if (blurType !== 'json') {
       return;
     }
 
@@ -135,23 +111,23 @@ export function EditQueryDialogForm(props: PasteQueryDialogFormProps) {
     let sanitizedQuery = {};
     try {
       sanitizedQuery = validateQuery(BestEffortJsonParse(jsonQuery));
-    } catch (e) {
+    } catch {
       // do nothing
     }
 
-    const query = sanitizedQuery;
+    const sanitized = sanitizedQuery;
 
-    form.setFieldValue('jsonQuery', JSON.stringify(query, null, 2));
+    form.setFieldValue('jsonQuery', JSON.stringify(sanitized, null, 2));
   }, [meta]);
 
   const onGraphqlBlur = useCallback(async () => {
     await pause(100);
 
     const graphqlQuery = form.getFieldValue('graphqlQuery');
-    const type = form.getFieldValue('type');
+    const blurType = form.getFieldValue('type');
 
     // check if onblur was triggered by type switch, skip if so
-    if (type !== 'graphql') {
+    if (blurType !== 'graphql') {
       return;
     }
 
@@ -159,43 +135,45 @@ export function EditQueryDialogForm(props: PasteQueryDialogFormProps) {
 
     return convertGraphQLToJsonQuery({ query: graphqlQuery, apiUrl, apiToken })
       .then((jsonQuery) => {
-        const query = validateQuery(JSON.parse(jsonQuery) || {});
-        const graphqlQuery = convertJsonQueryToGraphQL({ meta, query });
+        const jsonParsedQuery = validateQuery(JSON.parse(jsonQuery) || {});
+        const convertedGraphqlQuery = convertJsonQueryToGraphQL({ meta, query: jsonParsedQuery });
 
-        form.setFieldValue('graphqlQuery', graphqlQuery);
+        form.setFieldValue('graphqlQuery', convertedGraphqlQuery);
       })
       .finally(() => {
         setIsBlocked(false);
       });
   }, [meta]);
 
-  const defaultQueryValue =
-    type === 'json'
-      ? JSON.stringify(query || {}, null, 2)
-      : meta && query
-        ? convertJsonQueryToGraphQL({ meta, query })
-        : '';
+  const defaultQueryValue = useMemo(() => {
+    if (type === 'json') {
+      return JSON.stringify(query || {}, null, 2);
+    }
 
-  const onTypeChange = useCallback((type) => {
-    setType(type);
-    const originalQuery = form.getFieldValue(type === 'json' ? 'graphqlQuery' : 'jsonQuery');
+    return meta && query ? convertJsonQueryToGraphQL({ meta, query }) : '';
+  }, [type, meta, query]);
+
+  const onTypeChange = useCallback((nextType) => {
+    setType(nextType);
+    const originalQuery = form.getFieldValue(nextType === 'json' ? 'graphqlQuery' : 'jsonQuery');
     setIsBlocked(true);
 
-    void parseAndPrepareQuery(originalQuery, type === 'json' ? 'graphql' : 'json')
-      .then((query) => {
-        const value =
-          type === 'json'
-            ? JSON.stringify(query || {}, null, 2)
-            : query
-              ? convertJsonQueryToGraphQL({ meta, query })
-              : '';
+    parseAndPrepareQuery(originalQuery, nextType === 'json' ? 'graphql' : 'json')
+      .then((parsedQuery) => {
+        let value = '';
 
-        form.setFieldValue(type === 'json' ? 'jsonQuery' : 'graphqlQuery', value);
+        if (nextType === 'json') {
+          value = JSON.stringify(parsedQuery || {}, null, 2);
+        } else if (parsedQuery) {
+          value = convertJsonQueryToGraphQL({ meta, query: parsedQuery });
+        }
+
+        form.setFieldValue(nextType === 'json' ? 'jsonQuery' : 'graphqlQuery', value);
       })
       .catch((e) => {
         form.setFieldValue(
-          type === 'json' ? 'jsonQuery' : 'graphqlQuery',
-          type === 'json' ? '{}' : DEFAULT_GRAPHQL_QUERY
+          nextType === 'json' ? 'jsonQuery' : 'graphqlQuery',
+          nextType === 'json' ? '{}' : DEFAULT_GRAPHQL_QUERY
         );
 
         return 'Unable to convert query';
@@ -213,13 +191,12 @@ export function EditQueryDialogForm(props: PasteQueryDialogFormProps) {
     form.setFieldValue('type', defaultType);
   }, [defaultType]);
 
-  const onSubmitLocal = useCallback(async ({ type }) => {
-    await (type === 'json' ? onJsonBlur() : onGraphqlBlur());
+  const onSubmitLocal = useCallback(async ({ type: submittedType }) => {
+    await (submittedType === 'json' ? onJsonBlur() : onGraphqlBlur());
 
-    const query =
-      type === 'json' ? form.getFieldValue('jsonQuery') : form.getFieldValue('graphqlQuery');
+    const rawQuery = submittedType === 'json' ? form.getFieldValue('jsonQuery') : form.getFieldValue('graphqlQuery');
 
-    await parseAndPrepareQuery(query, type).then((query) => onSubmit(query));
+    await parseAndPrepareQuery(rawQuery, submittedType).then((preparedQuery) => onSubmit(preparedQuery));
   }, []);
 
   const graphqlRules = useMemo(() => [getGraphQLValidator(apiUrl, apiToken)], [apiUrl, apiToken]);

@@ -8,6 +8,7 @@ import {
   DriverCapabilities,
   DriverInterface,
   isDownloadTableCSVData,
+  QueuePriority,
   SaveCancelFn,
   StreamOptions,
   UnloadOptions
@@ -20,6 +21,7 @@ import {
   getStructureVersion,
   InvalidationKeys,
   LoadPreAggregationResult,
+  PreAggregationBuildStatus,
   PreAggregations,
   PreAggregationTableToTempTable,
   tablesToVersionEntries,
@@ -100,6 +102,8 @@ export class PreAggregationLoader {
 
   private readonly externalRefresh: boolean;
 
+  private buildLanded: boolean = false;
+
   public constructor(
     private readonly driverFactory: DriverFactory,
     private readonly logger: LoggerFn,
@@ -131,14 +135,14 @@ export class PreAggregationLoader {
   public async loadPreAggregation(
     throwOnMissingPartition: boolean,
   ): Promise<null | LoadPreAggregationResult> {
-    const notLoadedKey = (this.preAggregation.invalidateKeyQueries || [])
-      .find(keyQuery => !this.loadCache.hasKeyQueryResult(keyQuery));
+    // A thunk: hashing a cache key per invalidation key is wasted whenever the cheaper terms of
+    // the condition below already decide it.
+    const invalidationKeysLoaded = () => (this.preAggregation.invalidateKeyQueries || [])
+      .every(keyQuery => this.loadCache.hasKeyQueryResult(keyQuery));
 
-    if (this.isJob || !(notLoadedKey && !this.waitForRenew)) {
-      // Case 1: pre-agg build job processing.
-      // Case 2: either we have no data cached for this rollup or waitForRenew
-      // is true, either way, synchronously renew what data is needed so that
-      // the most current data will be returned fo the current request.
+    // Outside of a build job, `externalRefresh` must reach the branch below: it owns the "partition
+    // is not built yet" handling and may not enqueue a build here.
+    if (this.isJob || (!this.externalRefresh && (this.waitForRenew || invalidationKeysLoaded()))) {
       const result = await this.loadPreAggregationWithKeys();
       const refreshKeyValues = await this.getInvalidationKeyValues();
       return {
@@ -153,7 +157,7 @@ export class PreAggregationLoader {
           : undefined,
       };
     } else {
-      // Case 3: pre-agg exists
+      // Serve whatever version already exists rather than making this request wait for a build
       const structureVersion = getStructureVersion(this.preAggregation);
       const getVersionsStarted = new Date();
       const { byStructure } = await this.loadCache.getVersionEntries(this.preAggregation);
@@ -297,7 +301,7 @@ export class PreAggregationLoader {
         // We don't want to wait for the jobed build query result. So we run the
         // executeInQueue method and immediately return the LoadPreAggregationResult object.
         this
-          .executeInQueue(invalidationKeys, this.priority(10), newVersionEntry)
+          .executeInQueue(invalidationKeys, this.priority(QueuePriority.Interactive), newVersionEntry)
           .catch((e: any) => {
             this.logger('Pre-aggregations build job error', {
               preAggregation: this.preAggregation,
@@ -315,7 +319,7 @@ export class PreAggregationLoader {
           buildRangeEnd: this.preAggregation.buildRangeEnd,
         };
       } else {
-        await this.executeInQueue(invalidationKeys, this.priority(10), newVersionEntry);
+        await this.executeInQueue(invalidationKeys, this.priority(QueuePriority.Interactive), newVersionEntry);
         return mostRecentResult();
       }
     }
@@ -328,7 +332,7 @@ export class PreAggregationLoader {
           queryKey: this.preAggregationQueryKey(invalidationKeys),
           newVersionEntry
         });
-        await this.executeInQueue(invalidationKeys, this.priority(10), newVersionEntry);
+        await this.executeInQueue(invalidationKeys, this.priority(QueuePriority.Interactive), newVersionEntry);
         return mostRecentResult();
       } else if (versionEntry.content_version !== newVersionEntry.content_version) {
         if (this.waitForRenew) {
@@ -338,7 +342,7 @@ export class PreAggregationLoader {
             queryKey: this.preAggregationQueryKey(invalidationKeys),
             newVersionEntry
           });
-          await this.executeInQueue(invalidationKeys, this.priority(0), newVersionEntry);
+          await this.executeInQueue(invalidationKeys, this.priority(QueuePriority.Background), newVersionEntry);
           return mostRecentResult();
         } else {
           this.scheduleRefresh(invalidationKeys, newVersionEntry);
@@ -351,7 +355,7 @@ export class PreAggregationLoader {
         queryKey: this.preAggregationQueryKey(invalidationKeys),
         newVersionEntry
       });
-      await this.executeInQueue(invalidationKeys, this.priority(10), newVersionEntry);
+      await this.executeInQueue(invalidationKeys, this.priority(QueuePriority.Interactive), newVersionEntry);
       return mostRecentResult();
     }
     const targetTableName = this.targetTableName(versionEntry);
@@ -387,14 +391,14 @@ export class PreAggregationLoader {
     return version(versionArray);
   }
 
-  protected priority(defaultValue: number): number {
+  protected priority(defaultValue: QueuePriority): QueuePriority {
     return this.preAggregation.priority != null ? this.preAggregation.priority : defaultValue;
   }
 
   protected getInvalidationKeyValues() {
     return Promise.all(
       (this.preAggregation.invalidateKeyQueries || []).map(
-        (sqlQuery) => this.loadCache.keyQueryResult(sqlQuery, this.waitForRenew, this.priority(10))
+        (sqlQuery) => this.loadCache.keyQueryResult(sqlQuery, this.waitForRenew, this.priority(QueuePriority.Interactive))
       )
     );
   }
@@ -403,7 +407,7 @@ export class PreAggregationLoader {
     if (this.preAggregation.partitionInvalidateKeyQueries) {
       return Promise.all(
         (this.preAggregation.partitionInvalidateKeyQueries || []).map(
-          (sqlQuery) => this.loadCache.keyQueryResult(sqlQuery, this.waitForRenew, this.priority(10))
+          (sqlQuery) => this.loadCache.keyQueryResult(sqlQuery, this.waitForRenew, this.priority(QueuePriority.Interactive))
         )
       );
     } else {
@@ -418,7 +422,7 @@ export class PreAggregationLoader {
       queryKey: this.preAggregationQueryKey(invalidationKeys),
       newVersionEntry
     });
-    this.executeInQueue(invalidationKeys, this.priority(0), newVersionEntry)
+    this.executeInQueue(invalidationKeys, this.priority(QueuePriority.Background), newVersionEntry)
       .catch(e => {
         if (!(e instanceof ContinueWaitError)) {
           this.logger('Error refreshing pre-aggregation', {
@@ -428,7 +432,7 @@ export class PreAggregationLoader {
       });
   }
 
-  protected async executeInQueue(invalidationKeys: InvalidationKeys, priority: number, newVersionEntry: VersionEntry) {
+  protected async executeInQueue(invalidationKeys: InvalidationKeys, priority: QueuePriority, newVersionEntry: VersionEntry) {
     const queue = await this.preAggregations.getQueue(this.preAggregation.dataSource);
     return queue.executeInQueue(
       'query',
@@ -486,6 +490,11 @@ export class PreAggregationLoader {
 
     return cancelCombinator(
       async saveCancelFn => {
+        await this.reportBuildStatus(targetTableName, {
+          status: 'building',
+          startedAt: new Date().getTime(),
+        });
+
         try {
           return await refreshStrategy.bind(this)(
             client,
@@ -493,7 +502,17 @@ export class PreAggregationLoader {
             saveCancelFn,
             invalidationKeys
           );
-        } catch (e) {
+        } catch (e: any) {
+          // Post-build cleanup runs after the rows have landed and can fail on
+          // its own. The partition is complete either way, so it keeps the
+          // outcome the strategy already reported.
+          if (!this.buildLanded) {
+            await this.reportBuildStatus(targetTableName, {
+              status: 'failure',
+              error: (e.message || e).toString(),
+            });
+          }
+
           // It's required to remove touch keys, because they are unique per run/table, and it causes
           // a large number of touch keys in the cache store
           try {
@@ -520,6 +539,40 @@ export class PreAggregationLoader {
     );
   }
 
+  /**
+   * Marks the rows as landed in the partition table. From here on the table
+   * speaks for itself, so the record that a build is in flight goes away and
+   * nothing but a live build is left behind in the cache store.
+   */
+  protected async reportBuildLanded(targetTableName: string): Promise<void> {
+    this.buildLanded = true;
+
+    try {
+      await this.preAggregations.removePreAggregationBuildStatus(targetTableName);
+    } catch (e: any) {
+      this.logger('Error on dropping pre-aggregation build status', {
+        error: (e.stack || e), preAggregation: this.preAggregation, requestId: this.requestId,
+      });
+    }
+  }
+
+  /**
+   * Persists that a build is running or has failed, so the jobs API can tell an
+   * unfinished build from a versioned table that merely exists. Recorded for
+   * every build, not just for the ones a job started: the queue de-duplicates
+   * on the query key, so a job regularly ends up waiting on a build some other
+   * request enqueued.
+   */
+  private async reportBuildStatus(targetTableName: string, status: PreAggregationBuildStatus): Promise<void> {
+    try {
+      await this.preAggregations.setPreAggregationBuildStatus(targetTableName, status);
+    } catch (e: any) {
+      this.logger('Error on saving pre-aggregation build status', {
+        error: (e.stack || e), preAggregation: this.preAggregation, requestId: this.requestId,
+      });
+    }
+  }
+
   protected logExecutingSql(payload) {
     this.logger(
       'Executing Load Pre Aggregation SQL',
@@ -544,14 +597,11 @@ export class PreAggregationLoader {
     saveCancelFn: SaveCancelFn,
     invalidationKeys: InvalidationKeys
   ) {
-    const [loadSql, params] =
-      Array.isArray(this.preAggregation.loadSql) ? this.preAggregation.loadSql : [this.preAggregation.loadSql, []];
+    const [loadSql, params] = this.preAggregation.loadSql;
     const targetTableName = this.targetTableName(newVersionEntry);
-    const query = (
-      <string>QueryCache.replacePreAggregationTableNames(
-        loadSql,
-        this.preAggregationsTablesToTempTables,
-      )
+    const query = QueryCache.replacePreAggregationTableNamesInSql(
+      loadSql,
+      this.preAggregationsTablesToTempTables,
     ).replace(
       this.preAggregation.tableName,
       targetTableName
@@ -573,6 +623,7 @@ export class PreAggregationLoader {
       ));
 
       await this.createIndexes(client, newVersionEntry, saveCancelFn, queryOptions);
+      await this.reportBuildLanded(targetTableName);
       await this.loadCache.fetchTables(this.preAggregation);
     } finally {
       // We must clean orphaned in any cases: success or exception
@@ -672,7 +723,7 @@ export class PreAggregationLoader {
         const actualTables = await client.getTablesQuery(this.preAggregation.preAggregationsSchema);
         const mappedActualTables = actualTables.map(t => `${this.preAggregation.preAggregationsSchema}.${t.table_name || t.TABLE_NAME}`);
         if (mappedActualTables.includes(targetTableName)) {
-          await client.dropTable(targetTableName);
+          await client.dropTable(targetTableName, queryOptions);
         }
       });
     }
@@ -694,14 +745,11 @@ export class PreAggregationLoader {
     withTempTable: boolean
   ): Promise<QueryOptions> {
     if (withTempTable) {
-      const [loadSql, params] =
-        Array.isArray(this.preAggregation.loadSql) ? this.preAggregation.loadSql : [this.preAggregation.loadSql, []];
+      const [loadSql, params] = this.preAggregation.loadSql;
 
-      const query = (
-        <string>QueryCache.replacePreAggregationTableNames(
-          loadSql,
-          this.preAggregationsTablesToTempTables,
-        )
+      const query = QueryCache.replacePreAggregationTableNamesInSql(
+        loadSql,
+        this.preAggregationsTablesToTempTables,
       ).replace(
         this.preAggregation.tableName,
         targetTableName
@@ -721,8 +769,7 @@ export class PreAggregationLoader {
 
       return queryOptions;
     } else {
-      const [sql, params] =
-        Array.isArray(this.preAggregation.sql) ? this.preAggregation.sql : [this.preAggregation.sql, []];
+      const [sql, params] = this.preAggregation.sql;
       const queryOptions = this.queryOptions(invalidationKeys, sql, params, targetTableName, newVersionEntry);
       this.logExecutingSql(queryOptions);
       return queryOptions;
@@ -738,8 +785,7 @@ export class PreAggregationLoader {
     saveCancelFn: SaveCancelFn,
     invalidationKeys: InvalidationKeys
   ) {
-    const [sql, params] =
-      Array.isArray(this.preAggregation.sql) ? this.preAggregation.sql : [this.preAggregation.sql, []];
+    const [sql, params] = this.preAggregation.sql;
 
     const queryOptions = this.queryOptions(invalidationKeys, sql, params, this.targetTableName(newVersionEntry), newVersionEntry);
     this.logExecutingSql(queryOptions);
@@ -801,14 +847,16 @@ export class PreAggregationLoader {
   protected getUnloadOptions(): UnloadOptions {
     return {
       // Default: 16mb for Snowflake, Should be specified in MBs, because drivers convert it
-      maxFileSize: 64
+      maxFileSize: 64,
+      requestId: this.requestId,
     };
   }
 
   protected getStreamingOptions(): StreamOptions {
     return {
       // Default: 16384 (16KB), or 16 for objectMode streams. PostgreSQL/MySQL use object streams
-      highWaterMark: 10000
+      highWaterMark: 10000,
+      requestId: this.requestId,
     };
   }
 
@@ -895,8 +943,7 @@ export class PreAggregationLoader {
    * prepares download data when temp table = false
    */
   protected async getTableDataWithoutTempTable(client: DriverInterface, table: string, saveCancelFn: SaveCancelFn, queryOptions: QueryOptions, externalDriverCapabilities: DriverCapabilities) {
-    const [sql, params] =
-      Array.isArray(this.preAggregation.sql) ? this.preAggregation.sql : [this.preAggregation.sql, []];
+    const [sql, params] = this.preAggregation.sql;
 
     let tableData: DownloadTableData;
 
@@ -923,11 +970,11 @@ export class PreAggregationLoader {
         tableData.rowStream = stream;
       }
     } else {
-      tableData = { rows: await saveCancelFn(client.query(sql, params)) };
+      tableData = { rows: await saveCancelFn(client.query(sql, params, queryOptions)) };
     }
 
     if (!tableData.types && client.queryColumnTypes) {
-      tableData.types = await saveCancelFn(client.queryColumnTypes(sql, params));
+      tableData.types = await saveCancelFn(client.queryColumnTypes(sql, params, queryOptions));
     }
 
     return tableData;
@@ -957,24 +1004,45 @@ export class PreAggregationLoader {
           sealAt: this.preAggregation.sealAt
         }
       )
-    ).catch((error: any) => {
+    ).catch(async (error: any) => {
       this.logger('Uploading external pre-aggregation error', {
         ...queryOptions,
         error: error?.stack || error?.message
       });
+      // A half-built table is the newest version of the partition, so it shadows
+      // the previous correct one and orphaned tables cleanup always keeps it.
+      await this.dropPartiallyBuiltTable(externalDriver, table, queryOptions);
       throw error;
     });
     this.logger('Uploading external pre-aggregation completed', queryOptions);
+    await this.reportBuildLanded(table);
 
     await this.loadCache.fetchTables(this.preAggregation);
     await this.dropOrphanedTables(externalDriver, table, saveCancelFn, true, queryOptions);
   }
 
+  private async dropPartiallyBuiltTable(driver: DriverInterface, table: string, queryOptions: QueryOptions) {
+    this.logger('Dropping partially built external pre-aggregation', queryOptions);
+
+    try {
+      // Dropped without checking that it is there: `CREATE TABLE` carries no
+      // `IF NOT EXISTS`, so a leftover table fails every later attempt at this
+      // version until it is gone
+      await driver.dropTable(table);
+    } catch (e: any) {
+      this.logger('Dropping partially built external pre-aggregation error', {
+        ...queryOptions,
+        error: e?.stack || e?.message
+      });
+    }
+  }
+
   protected async createIndexes(driver: DriverInterface, newVersionEntry: VersionEntry, saveCancelFn: SaveCancelFn, queryOptions: QueryOptions) {
     const indexesSql = this.prepareIndexesSql(newVersionEntry, queryOptions);
+
     for (let i = 0; i < indexesSql.length; i++) {
       const [query, params] = indexesSql[i].sql;
-      await saveCancelFn(driver.query(query, params));
+      await saveCancelFn(driver.query(query, params, queryOptions));
     }
   }
 
@@ -990,7 +1058,7 @@ export class PreAggregationLoader {
       };
       this.logger('Creating pre-aggregation index', queryOptions);
       const preAggTableToTempTableNames = this.preAggregationsTablesToTempTables as PreAggTableToTempTableNames[];
-      const resultingSql = QueryCache.replacePreAggregationTableNames(
+      const resultingSql = QueryCache.replacePreAggregationTableNamesInSql(
         query,
         preAggTableToTempTableNames.concat([
           [this.preAggregation.tableName, { targetTableName: this.targetTableName(newVersionEntry) }],
@@ -1078,7 +1146,7 @@ export class PreAggregationLoader {
         .map(t => `${this.preAggregation.preAggregationsSchema}.${t.table_name || t.TABLE_NAME}`)
         .filter(t => toSave.indexOf(t) === -1);
 
-      await Promise.all(toDrop.map(table => saveCancelFn(client.dropTable(table))));
+      await Promise.all(toDrop.map(table => saveCancelFn(client.dropTable(table, queryOptions))));
       this.logger('Dropping orphaned tables completed', {
         ...queryOptions,
         external,

@@ -190,6 +190,9 @@ impl ExecutionPlan for AggregateTopKExec {
             having: self.having.clone(),
             cluster,
             schema: self.schema.clone(),
+            // Safe to carry over: built from this node's own output schema plus constants, and
+            // the input's partition count is read live in `execute`. A node whose properties do
+            // follow the input -- output partitioning above all -- must recompute them here.
             cache: self.cache.clone(),
             sort_requirement: self.sort_requirement.clone(),
             merge_version: self.merge_version,

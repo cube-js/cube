@@ -175,6 +175,10 @@ export class DatabricksQuery extends BaseQuery {
     templates.functions.LTRIM = 'LTRIM({{ args|reverse|join(", ") }})';
     templates.functions.RTRIM = 'RTRIM({{ args|reverse|join(", ") }})';
     templates.functions.DATEDIFF = 'DATEDIFF({{ date_part }}, DATE_TRUNC(\'{{ date_part }}\', {{ args[1] }}), DATE_TRUNC(\'{{ date_part }}\', {{ args[2] }}))';
+    // DATEADD is being rewritten to DATE_ADD. The unquoted multi-unit form is used
+    // because the ANSI form, INTERVAL '2' HOUR, only spans YEAR to SECOND, while sub-day
+    // intervals are reported in milliseconds
+    templates.functions.DATE_ADD = '({{ args[0] }} + INTERVAL {{ interval }} {{ date_part }})';
     templates.functions.LEAST = 'LEAST({{ args_concat }})';
     templates.functions.GREATEST = 'GREATEST({{ args_concat }})';
     templates.functions.TRUNC = 'CASE WHEN ({{ args[0] }}) >= 0 THEN FLOOR({{ args_concat }}) ELSE CEIL({{ args_concat }}) END';
@@ -217,7 +221,7 @@ export class DatabricksQuery extends BaseQuery {
       '    from_utc_timestamp({{ start }}, \'UTC\'), from_utc_timestamp({{ end }}, \'UTC\'), INTERVAL {{ granularity }}\n' +
       '  )) AS d)';
     templates.statements.generated_time_series_with_cte_range_source =
-    'SELECT d AS date_from,\n' +
+      'SELECT d AS date_from,\n' +
     '(d + INTERVAL {{ granularity }}) - INTERVAL 1 MILLISECOND AS date_to\n' +
     'FROM {{ range_source }}\n' +
     'LATERAL VIEW explode(\n' +

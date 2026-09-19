@@ -102,3 +102,30 @@ pub fn has_filter_for_member(member_name: &String, filters: &[FilterItem]) -> bo
     }
     false
 }
+
+/// Structural equality that also compares the member each leaf filter targets.
+/// `FilterItem`'s own `PartialEq` compares a filter's type, operator and values
+/// but not its member, so two filters differing only in the dimension they
+/// restrict count as equal there. Groups are compared element-wise in order.
+/// Segments carry their member in `full_name` and compare as-is.
+pub fn eq_with_member(a: &FilterItem, b: &FilterItem) -> bool {
+    match (a, b) {
+        (FilterItem::Item(a), FilterItem::Item(b)) => a.member_name() == b.member_name() && a == b,
+        (FilterItem::Group(a), FilterItem::Group(b)) => {
+            a.operator == b.operator
+                && a.items.len() == b.items.len()
+                && a.items
+                    .iter()
+                    .zip(b.items.iter())
+                    .all(|(a, b)| eq_with_member(a, b))
+        }
+        _ => a == b,
+    }
+}
+
+/// True when `items` holds a filter equal to `item` under [`eq_with_member`].
+pub fn contains_with_member(items: &[FilterItem], item: &FilterItem) -> bool {
+    items
+        .iter()
+        .any(|candidate| eq_with_member(item, candidate))
+}

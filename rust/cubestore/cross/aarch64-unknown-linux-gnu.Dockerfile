@@ -10,7 +10,6 @@ RUN apt-get update \
     && DEBIAN_FRONTEND=noninteractive apt-get install -y software-properties-common pkg-config wget curl apt-transport-https ca-certificates \
     && wget -O - https://apt.llvm.org/llvm-snapshot.gpg.key | apt-key add - \
     && add-apt-repository "deb https://apt.llvm.org/focal/ llvm-toolchain-focal-$LLVM_VERSION main"  \
-    && add-apt-repository -y ppa:deadsnakes/ppa \
     && apt-get update \
     && DEBIAN_FRONTEND=noninteractive apt-get install -y libffi-dev binutils-multiarch binutils-aarch64-linux-gnu gcc-multilib g++-multilib \
     # llvm14-dev will install python 3.8 as bin/python3
@@ -38,8 +37,8 @@ ENV ARCH=arm \
     LD=aarch64-linux-gnu-ld \
     RUNLIB=aarch64-linux-gnu-ranlib
 
-ENV ZLIB_VERSION=1.3.1
-RUN wget https://zlib.net/zlib-${ZLIB_VERSION}.tar.gz -O - | tar -xz && \
+ENV ZLIB_VERSION=1.3.2
+RUN wget https://github.com/madler/zlib/releases/download/v${ZLIB_VERSION}/zlib-${ZLIB_VERSION}.tar.gz -O - | tar -xz && \
     cd zlib-${ZLIB_VERSION} && \
     ./configure --prefix=/usr/aarch64-linux-gnu && \
     make -j $(nproc) && \

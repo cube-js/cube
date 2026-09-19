@@ -3,6 +3,131 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.7.42](https://github.com/cube-js/cube/compare/v1.7.41...v1.7.42) (2026-09-18)
+
+**Note:** Version bump only for package @cubejs-backend/server-core
+
+## [1.7.41](https://github.com/cube-js/cube/compare/v1.7.40...v1.7.41) (2026-09-18)
+
+**Note:** Version bump only for package @cubejs-backend/server-core
+
+## [1.7.40](https://github.com/cube-js/cube/compare/v1.7.39...v1.7.40) (2026-09-16)
+
+**Note:** Version bump only for package @cubejs-backend/server-core
+
+## [1.7.39](https://github.com/cube-js/cube/compare/v1.7.38...v1.7.39) (2026-09-15)
+
+### Features
+
+- **server-core:** Redact query values in log events ([#11854](https://github.com/cube-js/cube/issues/11854)) ([99cceac](https://github.com/cube-js/cube/commit/99cceac77f00c8c0a13c0f2c0f4b237b4d97460f))
+
+## [1.7.38](https://github.com/cube-js/cube/compare/v1.7.37...v1.7.38) (2026-09-14)
+
+### Bug Fixes
+
+- **server-core:** build one orchestrator api per id, not one per concurrent caller ([#11834](https://github.com/cube-js/cube/issues/11834)) ([97282f0](https://github.com/cube-js/cube/commit/97282f03ef381317b49df2d058e3350083885a00)), closes [#11661](https://github.com/cube-js/cube/issues/11661)
+
+## [1.7.37](https://github.com/cube-js/cube/compare/v1.7.35...v1.7.37) (2026-09-10)
+
+### Features
+
+- Migrate to TypeScript 6.0.3 (prepare for 7) ([#11767](https://github.com/cube-js/cube/issues/11767)) ([98ac580](https://github.com/cube-js/cube/commit/98ac58039be36e7392ac617562d0dad03f17de3c))
+
+## [1.7.36](https://github.com/cube-js/cube/compare/v1.7.35...v1.7.36) (2026-09-09)
+
+### Features
+
+- Migrate to TypeScript 6.0.3 (prepare for 7) ([#11767](https://github.com/cube-js/cube/issues/11767)) ([98ac580](https://github.com/cube-js/cube/commit/98ac58039be36e7392ac617562d0dad03f17de3c))
+
+## [1.7.35](https://github.com/cube-js/cube/compare/v1.7.34...v1.7.35) (2026-09-07)
+
+**Note:** Version bump only for package @cubejs-backend/server-core
+
+## [1.7.34](https://github.com/cube-js/cube/compare/v1.7.33...v1.7.34) (2026-09-04)
+
+**Note:** Version bump only for package @cubejs-backend/server-core
+
+## [1.7.33](https://github.com/cube-js/cube/compare/v1.7.32...v1.7.33) (2026-09-03)
+
+### Features
+
+- **server-core:** size the data model compiler cache from `CUBEJS_COMPILER_CACHE_SIZE` ([#11732](https://github.com/cube-js/cube/issues/11732)) ([6c75c60](https://github.com/cube-js/cube/commit/6c75c601a2e2ba07b376d26950d5844a480cc1a5))
+
+## [1.7.32](https://github.com/cube-js/cube/compare/v1.7.31...v1.7.32) (2026-09-01)
+
+**Note:** Version bump only for package @cubejs-backend/server-core
+
+## [1.7.31](https://github.com/cube-js/cube/compare/v1.7.30...v1.7.31) (2026-08-31)
+
+### Features
+
+- Support local computeing for interval refresh keys (behind flag) ([#11614](https://github.com/cube-js/cube/issues/11614)) ([d2b43a4](https://github.com/cube-js/cube/commit/d2b43a4accd2c5d116342f9ad5be648920197a7e))
+
+## [1.7.30](https://github.com/cube-js/cube/compare/v1.7.29...v1.7.30) (2026-08-28)
+
+**Note:** Version bump only for package @cubejs-backend/server-core
+
+## [1.7.29](https://github.com/cube-js/cube/compare/v1.7.28...v1.7.29) (2026-08-27)
+
+### Bug Fixes
+
+- **api-gateway:** Make pre-agg build job status per-entry and data-source aware ([#11666](https://github.com/cube-js/cube/issues/11666)) ([694955f](https://github.com/cube-js/cube/commit/694955f864375515d84d463e9e7ee89a156a4a2b))
+- **server-core:** release orchestrators evicted from the LRU ([#11661](https://github.com/cube-js/cube/issues/11661)) ([b82c58a](https://github.com/cube-js/cube/commit/b82c58aa245919a36e3d20f79105b639d0c16863))
+
+## [1.7.28](https://github.com/cube-js/cube/compare/v1.7.27...v1.7.28) (2026-08-26)
+
+**Note:** Version bump only for package @cubejs-backend/server-core
+
+## [1.7.27](https://github.com/cube-js/cube/compare/v1.7.26...v1.7.27) (2026-08-26)
+
+**Note:** Version bump only for package @cubejs-backend/server-core
+
+## [1.7.26](https://github.com/cube-js/cube/compare/v1.7.25...v1.7.26) (2026-08-24)
+
+### Features
+
+- Queue - support fast track feature ([#11618](https://github.com/cube-js/cube/issues/11618)) ([749e0ab](https://github.com/cube-js/cube/commit/749e0abe7b59db7c2a71a2e781361bf0ce2c3edb))
+
+## [1.7.25](https://github.com/cube-js/cube/compare/v1.7.24...v1.7.25) (2026-08-21)
+
+**Note:** Version bump only for package @cubejs-backend/server-core
+
+## [1.7.24](https://github.com/cube-js/cube/compare/v1.7.23...v1.7.24) (2026-08-19)
+
+### Bug Fixes
+
+- Validate query timezone against IANA zones ([#11575](https://github.com/cube-js/cube/issues/11575)) ([d1ba22a](https://github.com/cube-js/cube/commit/d1ba22a31cdfdeb07b50cb3fc0763be6c2c57c4a))
+
+## [1.7.23](https://github.com/cube-js/cube/compare/v1.7.22...v1.7.23) (2026-08-18)
+
+**Note:** Version bump only for package @cubejs-backend/server-core
+
+## [1.7.22](https://github.com/cube-js/cube/compare/v1.7.21...v1.7.22) (2026-08-18)
+
+**Note:** Version bump only for package @cubejs-backend/server-core
+
+## [1.7.21](https://github.com/cube-js/cube/compare/v1.7.20...v1.7.21) (2026-08-17)
+
+**Note:** Version bump only for package @cubejs-backend/server-core
+
+## [1.7.20](https://github.com/cube-js/cube/compare/v1.7.19...v1.7.20) (2026-08-16)
+
+### Bug Fixes
+
+- **deps:** bump uuid from 8.3.2 to 11.1.1 across the packages that declare it ([#11534](https://github.com/cube-js/cube/issues/11534)) ([c66cbbe](https://github.com/cube-js/cube/commit/c66cbbe06c0269351395583cef8df64c0d1720ab))
+
+## [1.7.19](https://github.com/cube-js/cube/compare/v1.7.18...v1.7.19) (2026-08-12)
+
+**Note:** Version bump only for package @cubejs-backend/server-core
+
+## [1.7.18](https://github.com/cube-js/cube/compare/v1.7.17...v1.7.18) (2026-08-09)
+
+**Note:** Version bump only for package @cubejs-backend/server-core
+
+## [1.7.17](https://github.com/cube-js/cube/compare/v1.7.16...v1.7.17) (2026-08-07)
+
+**Note:** Version bump only for package @cubejs-backend/server-core
+
 ## [1.7.16](https://github.com/cube-js/cube/compare/v1.7.15...v1.7.16) (2026-07-31)
 
 **Note:** Version bump only for package @cubejs-backend/server-core

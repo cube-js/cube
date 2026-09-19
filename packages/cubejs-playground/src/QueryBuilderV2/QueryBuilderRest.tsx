@@ -18,11 +18,11 @@ export function QueryBuilderRest() {
       </Block>
     ) : (
       <TabPaneWithToolbar
-        actions={
+        actions={(
           <CopyButton type="secondary" value={stringifiedQuery || ''}>
             Copy
           </CopyButton>
-        }
+        )}
       >
         <ScrollableCodeContainer value={stringifiedQuery || ''} />
       </TabPaneWithToolbar>

@@ -1,10 +1,7 @@
 # Cube Documentation (Mintlify)
 
-This is the **active** Cube documentation site, built with [Mintlify](https://mintlify.com).
+The Cube documentation site, built with [Mintlify](https://mintlify.com).
 All documentation work should happen here.
-
-> The `/docs` directory at the repo root is the **legacy** Nextra docs site and is
-> **deprecated** — do not add or edit content there.
 
 ## Local development
 
@@ -122,9 +119,16 @@ Make sure to use correct terms. On billing, pricing, and support pages, use **on
           - Charts
           - Text
           - Controls 
-            - Filter widget
-            - Time grain switcher
+            - Filter
+            - Time granularity
+            - Field switcher
+            - Parent
           - AI summary
+          - Layout
+            - Spacer
+            - Divider
+            - Stack
+            - Grid
     - **Dashboard**
       - Scheduled refresh
     - **Semantic Model**

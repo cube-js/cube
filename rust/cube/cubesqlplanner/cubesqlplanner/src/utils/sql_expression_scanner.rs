@@ -57,6 +57,10 @@ struct Tokenizer<'a> {
     bytes: &'a [u8],
     pos: usize,
     depth: usize,
+    // Set when a line comment ran to the end of the input, cleared when one ends
+    // at its newline. Whatever the last line comment left here says whether the
+    // input as a whole ends inside a comment.
+    open_line_comment: bool,
 }
 
 impl<'a> Tokenizer<'a> {
@@ -66,6 +70,7 @@ impl<'a> Tokenizer<'a> {
             bytes: src.as_bytes(),
             pos: 0,
             depth: 0,
+            open_line_comment: false,
         }
     }
 
@@ -88,16 +93,12 @@ impl<'a> Tokenizer<'a> {
                 }
                 b'-' if self.peek(1) == Some(b'-') => {
                     self.pos += 2;
-                    while !self.at_eof() && self.peek(0) != Some(b'\n') {
-                        self.pos += 1;
-                    }
+                    self.skip_to_line_end();
                 }
                 b'/' if self.peek(1) == Some(b'/') => {
                     // Line comment variant in BigQuery and Snowflake.
                     self.pos += 2;
-                    while !self.at_eof() && self.peek(0) != Some(b'\n') {
-                        self.pos += 1;
-                    }
+                    self.skip_to_line_end();
                 }
                 b'/' if self.peek(1) == Some(b'*') => {
                     self.pos += 2;
@@ -120,6 +121,13 @@ impl<'a> Tokenizer<'a> {
                 _ => return,
             }
         }
+    }
+
+    fn skip_to_line_end(&mut self) {
+        while !self.at_eof() && self.peek(0) != Some(b'\n') {
+            self.pos += 1;
+        }
+        self.open_line_comment = self.at_eof();
     }
 
     fn next_token(&mut self) -> Option<Token<'a>> {
@@ -574,6 +582,14 @@ pub fn is_top_level_compound(sql: &str) -> bool {
     false
 }
 
+/// Returns `true` if `sql` ends inside a line comment, so anything appended on
+/// the same line would be commented out.
+pub fn ends_in_line_comment(sql: &str) -> bool {
+    let mut tokenizer = Tokenizer::new(sql);
+    while tokenizer.next_token().is_some() {}
+    tokenizer.open_line_comment
+}
+
 // ---------- Template analyzer: compile-time placeholder contexts ----------
 
 /// Analyses an `SqlCall` template and returns, for each `{arg:N}` index present,
@@ -855,6 +871,29 @@ mod tests {
     fn clickhouse_opaque_braces() {
         // {name:Type} is a CH parameter, should be treated as opaque atom.
         assert!(!is_top_level_compound("{user_id:Int64}"));
+    }
+
+    // ----- ends_in_line_comment -----
+
+    #[test]
+    fn line_comment_running_to_the_end() {
+        assert!(ends_in_line_comment("a + b -- note"));
+        assert!(ends_in_line_comment("a + b // note"));
+        assert!(ends_in_line_comment("a -- note\n + b -- tail"));
+    }
+
+    #[test]
+    fn line_comment_closed_by_newline() {
+        assert!(!ends_in_line_comment("a -- note\n + b"));
+        assert!(!ends_in_line_comment("a + b -- note\n"));
+    }
+
+    #[test]
+    fn no_line_comment_at_all() {
+        assert!(!ends_in_line_comment("a + b"));
+        assert!(!ends_in_line_comment(""));
+        assert!(!ends_in_line_comment("'-- not a comment'"));
+        assert!(!ends_in_line_comment("a /* block */"));
     }
 
     #[test]

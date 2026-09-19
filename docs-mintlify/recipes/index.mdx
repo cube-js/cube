@@ -4,7 +4,7 @@ description: Step-by-step tutorials and best practices for getting the most out 
 mode: wide
 ---
 
-Explore **39 recipes** across data modeling, calculations, analytics patterns,
+Explore **41 recipes** across data modeling, calculations, analytics patterns,
 pre-aggregations, configuration, APIs, and AI.
 
 ## Data Modeling
@@ -28,6 +28,9 @@ pre-aggregations, configuration, APIs, and AI.
   <Card title="Dynamic union tables" icon="stack-2" href="/recipes/data-modeling/dynamic-union-tables">
     Combine multiple database tables that relate to the same entity into a single cube.
   </Card>
+  <Card title="Querying across data sources" icon="arrow-merge" href="/recipes/data-modeling/cross-data-source-queries">
+    Append rows from cubes in different databases into one result set with a UNION ALL query.
+  </Card>
   <Card title="Custom ordering" icon="sort-ascending-shapes" href="/recipes/data-modeling/custom-order">
     Define a custom sort order for categorical values like pipeline stages that don't sort alphabetically.
   </Card>
@@ -50,6 +53,9 @@ pre-aggregations, configuration, APIs, and AI.
   </Card>
   <Card title="Period-over-period changes" icon="trending-up" href="/recipes/data-modeling/period-over-period">
     Calculate week-over-week, month-over-month, and other changes over a fixed period.
+  </Card>
+  <Card title="Reusable period-to-date logic" icon="calendar-stats" href="/recipes/data-modeling/reusable-period-to-date">
+    Define WTD, MTD, QTD, and YTD logic once in a Jinja macro and apply it across measures.
   </Card>
 </CardGroup>
 
@@ -80,7 +86,7 @@ member to query), see [Dynamic data models](/recipes/data-modeling/using-dynamic
     Implement custom time dimension granularities like fiscal quarters or custom week definitions.
   </Card>
   <Card title="Custom calendars" icon="calendar" href="/recipes/data-modeling/custom-calendar">
-    Map fact tables to retail or fiscal calendars using dedicated calendar cubes and proxy dimensions.
+    Model a 4-5-4 retail calendar as a calendar cube that overrides the month, week, and year granularities.
   </Card>
   <Card title="Data snapshots" icon="camera" href="/recipes/data-modeling/snapshots">
     Build point-in-time snapshots from change-history data to report status as of any date.

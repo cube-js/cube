@@ -18,6 +18,11 @@ efficient for large volumes of data.
 The other situation in which data blending could be a better approach than joining 
 on date is when the two tables have mostly the same columns, such as in the example below.
 
+This pattern builds one cube over a union of the underlying cubes' SQL, so all of
+them must live in the same data source. To append rows from cubes in *different*
+databases, see [querying across data
+sources](/recipes/data-modeling/cross-data-source-queries).
+
 For an example, consider an omnichannel store which has both online and offline sales. Let's
 calculate summary metrics for revenue, customer count, etc. We have a
 `retail_orders` cube for offline sales:

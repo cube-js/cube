@@ -2,94 +2,68 @@
 import 'source-map-support/register';
 
 import { CubeStoreDriver } from '@cubejs-backend/cubestore-driver';
-import { pausePromise } from '@cubejs-backend/shared';
 import { QueryQueue } from '../../src';
+import { countEvent, createBenchQueue, createCounters } from './instrument';
+import { counterSnapshot, WorkerMessage, WorkerStartMessage } from './protocol';
 
 if (!process.send) {
   throw new Error('QueueBenchWorker must be run as a child process with IPC');
 }
 
-const counters = {
-  handlersStarted: 0,
-  handlersFinished: 0,
-  events: {} as Record<string, number>,
-};
+// A killed run must not leave a worker polling Cube Store forever
+process.on('disconnect', () => process.exit(0));
+
+const RECONCILE_ERROR_EVENT = 'bench reconcile poll error';
+
+const counters = createCounters();
 
 let cubeStoreDriver: CubeStoreDriver;
 let queue: QueryQueue;
 let reconcileId: ReturnType<typeof setInterval>;
-let progressId: ReturnType<typeof setInterval>;
 
-process.on('message', async (msg: { type: string; tenantPrefix?: string; benchSettings?: { queueResponseSize: number; currency: number; handlerLatencyMs?: number }; reconcileInterval?: number }) => {
+process.on('message', async (msg: WorkerMessage) => {
   if (msg.type === 'start') {
-    const { tenantPrefix, benchSettings, reconcileInterval } = msg as Required<typeof msg>;
+    const { tenantPrefix, benchSettings, reconcileIntervalMs } = msg as WorkerStartMessage;
 
     cubeStoreDriver = new CubeStoreDriver({});
 
-    queue = new QueryQueue(`${tenantPrefix}#test_query_queue`, {
-      queryHandlers: {
-        query: async () => {
-          counters.handlersStarted++;
-          await pausePromise(benchSettings.handlerLatencyMs || 1500);
-          counters.handlersFinished++;
-
-          return {
-            payload: 'a'.repeat(benchSettings.queueResponseSize),
-          };
-        },
-        stream: async () => {
-          throw new Error('streaming handler is not supported for testing');
-        }
+    queue = createBenchQueue(
+      `${tenantPrefix}#test_query_queue`,
+      counters,
+      benchSettings,
+      {
+        cacheAndQueueDriver: 'cubestore',
+        cubeStoreDriverFactory: async () => cubeStoreDriver,
       },
-      cancelHandlers: {
-        query: async () => {
-          console.error('[Worker] Cancel handler was called for query');
-        },
-      },
-      continueWaitTimeout: 60 * 2,
-      executionTimeout: 20,
-      orphanedTimeout: 60 * 5,
-      concurrency: benchSettings.currency,
-      cacheAndQueueDriver: 'cubestore',
-      cubeStoreDriverFactory: async () => cubeStoreDriver,
-      logger: (event, _params) => {
-        if (event in counters.events) {
-          counters.events[event]++;
-        } else {
-          counters.events[event] = 1;
-        }
+      '[Worker] ',
+    );
 
-        if (event.includes('error')) {
-          console.log('[Worker]', event, _params);
-        }
-      },
-    });
-
-    // Periodically reconcile to pick up pending queries from CubeStore
+    // A worker never submits, so it has no submit-time reconcile to bootstrap from. This poll is
+    // an artifact of the harness — production reconcile is event-driven — which is why its
+    // interval is a setting and lands in the reported run settings.
     reconcileId = setInterval(() => {
-      queue.reconcileQueue();
-    }, reconcileInterval);
-
-    // Report counters to main process periodically
-    progressId = setInterval(() => {
-      process.send!({
-        type: 'counters',
-        data: { ...counters, events: { ...counters.events } },
+      // reconcileQueue rethrows, and an unhandled rejection takes the process down under
+      // Node's default policy — the run would then keep reporting as if the worker were here
+      queue.reconcileQueue().catch((e) => {
+        countEvent(counters, RECONCILE_ERROR_EVENT);
+        console.error('[Worker]', RECONCILE_ERROR_EVENT, e);
       });
-    }, 1000);
+    }, reconcileIntervalMs);
+  }
+
+  // Answering on request instead of pushing on a timer keeps the worker numbers inside the tick
+  // they belong to
+  if (msg.type === 'tickRequest') {
+    process.send!({ type: 'counters', seq: msg.seq, data: counterSnapshot(counters) });
   }
 
   if (msg.type === 'shutdown') {
     clearInterval(reconcileId);
-    clearInterval(progressId);
 
     await queue.shutdown();
     await cubeStoreDriver.release();
 
-    process.send!({
-      type: 'counters',
-      data: { ...counters, events: { ...counters.events } },
-    });
+    process.send!({ type: 'counters', seq: -1, data: counterSnapshot(counters) });
     process.send!({ type: 'done' });
     process.disconnect();
     process.exit(0);

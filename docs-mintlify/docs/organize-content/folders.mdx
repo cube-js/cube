@@ -122,11 +122,32 @@ To delete a folder:
 
 1. Open the folder's action menu.
 2. Select **Delete**.
+3. Confirm the deletion.
 
 <Warning>
 
-A folder can only be deleted if it contains no subfolders. Move or delete
-any subfolders first.
+Deleting a folder deletes everything inside it — subfolders, workbooks,
+dashboards, and explorations — along with it; this cannot be undone.
+
+</Warning>
+
+If anything inside the folder has its own permissions and you don't have Full
+access there too, deletion is blocked entirely and nothing is deleted.
+
+Asking [Analytics Chat](/docs/explore-analyze/analytics-chat), the Excel or Google
+Sheets chat pane, an MCP client, or the [REST API](/api-reference/folders/delete-a-folder)
+to delete a folder is narrower in what it destroys than deleting it here: it only
+removes the folder itself — contents move to the workspace root instead of being
+deleted — and it refuses a folder that still has subfolders, rather than deleting
+the whole subtree.
+
+<Warning>
+
+These paths are **wider** in who can do it. They only check that you have
+**Full access** (**manage** access, for the REST API) to the folder itself —
+they never apply the content-permission check above. Full access to a folder
+alone is enough to scatter its contents to the workspace root, even contents
+you don't otherwise have access to.
 
 </Warning>
 

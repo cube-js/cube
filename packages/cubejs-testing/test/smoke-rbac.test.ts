@@ -11,6 +11,7 @@ import {
   DEFAULT_CONFIG,
   JEST_AFTER_ALL_DEFAULT_TIMEOUT,
   JEST_BEFORE_ALL_DEFAULT_TIMEOUT,
+  stopIfStarted,
 } from './smoke-tests';
 
 const PG_PORT = 5656;
@@ -83,8 +84,8 @@ describe('Cube RBAC Engine', () => {
   }, JEST_BEFORE_ALL_DEFAULT_TIMEOUT);
 
   afterAll(async () => {
-    await birdbox.stop();
-    await db.stop();
+    await stopIfStarted('birdbox', birdbox);
+    await stopIfStarted('db', db);
   }, JEST_AFTER_ALL_DEFAULT_TIMEOUT);
 
   describe('RBAC via SQL API', () => {
@@ -120,6 +121,7 @@ describe('Cube RBAC Engine', () => {
 
     test('SELECT * from orders', async () => {
       let failed = false;
+
       try {
         // Orders cube does not expose any members so, the query should fail
         await connection.query('SELECT * FROM orders');
@@ -466,6 +468,7 @@ describe('Cube RBAC Engine', () => {
         'SELECT * FROM masking_test LIMIT 5'
       );
       expect(res.rows.length).toBeGreaterThan(0);
+
       for (const row of res.rows) {
         expect(row.secret_number).toBe(-1);
         expect(row.secret_boolean).toBe(false);
@@ -493,6 +496,7 @@ describe('Cube RBAC Engine', () => {
         'SELECT * FROM masking_test LIMIT 5'
       );
       expect(res.rows.length).toBeGreaterThan(0);
+
       for (const row of res.rows) {
         // Full access user should see actual values, not masks
         expect(row.secret_number).not.toBe(-1);
@@ -517,6 +521,7 @@ describe('Cube RBAC Engine', () => {
         'SELECT * FROM masking_test LIMIT 5'
       );
       expect(res.rows.length).toBeGreaterThan(0);
+
       for (const row of res.rows) {
         expect(row.public_dim).not.toBeNull();
         expect(row.total_quantity).not.toBeNull();
@@ -530,6 +535,7 @@ describe('Cube RBAC Engine', () => {
         'SELECT public_dim, MEASURE("masking_test"."count") AS "count" FROM masking_test GROUP BY 1 ORDER BY 1 LIMIT 5'
       );
       expect(res.rows.length).toBeGreaterThan(0);
+
       for (const row of res.rows) {
         expect(row.public_dim).not.toBeNull();
         expect(Number(row.count)).toBe(12345);
@@ -541,6 +547,7 @@ describe('Cube RBAC Engine', () => {
         'SELECT secret_number, MEASURE("masking_test"."count") AS "count" FROM masking_test GROUP BY 1 LIMIT 5'
       );
       expect(res.rows.length).toBeGreaterThan(0);
+
       for (const row of res.rows) {
         expect(row.secret_number).toBe(-1);
         expect(Number(row.count)).toBe(12345);
@@ -576,6 +583,7 @@ describe('Cube RBAC Engine', () => {
         'SELECT product_id, price FROM conditional_masking_test ORDER BY product_id LIMIT 10'
       );
       expect(res.rows.length).toBeGreaterThan(0);
+
       for (const row of res.rows) {
         if (Number(row.product_id) <= 3) {
           // Rows matching the row filter should have real (unmasked) price
@@ -597,6 +605,7 @@ describe('Cube RBAC Engine', () => {
         'SELECT price, MEASURE("conditional_masking_test"."total_price") AS total_price FROM conditional_masking_test GROUP BY 1 ORDER BY 1 LIMIT 10'
       );
       expect(res.rows.length).toBeGreaterThan(0);
+
       for (const row of res.rows) {
         // product_id (the row filter member) is not in the GROUP BY, so total_price
         // is masked (NULL) rather than rendered as an invalid CASE WHEN over the
@@ -627,6 +636,7 @@ describe('Cube RBAC Engine', () => {
         'SELECT product_id, price FROM conditional_masking_test WHERE product_id <= 2 ORDER BY product_id LIMIT 10'
       );
       expect(res.rows.length).toBeGreaterThan(0);
+
       for (const row of res.rows) {
         // All rows are within product_id <= 2 ⊆ product_id <= 3, so price is real.
         expect(Number(row.price)).not.toBe(-1);
@@ -646,6 +656,7 @@ describe('Cube RBAC Engine', () => {
       // Not unmasked: product_id <= 10 is broader than the mask filter
       // product_id <= 3, so the measure stays masked (NULL) for every row.
       expect(res.rows.length).toBeGreaterThan(0);
+
       for (const row of res.rows) {
         expect(row.total_price).toBeNull();
       }
@@ -676,6 +687,7 @@ describe('Cube RBAC Engine', () => {
         'SELECT product_id, price FROM conditional_masking_test ORDER BY product_id LIMIT 10'
       );
       expect(res.rows.length).toBeGreaterThan(0);
+
       for (const row of res.rows) {
         const pid = Number(row.product_id);
         if (pid <= 3 || pid === 5) {
@@ -699,6 +711,7 @@ describe('Cube RBAC Engine', () => {
         'SELECT price, MEASURE("conditional_masking_test"."total_price") AS total_price FROM conditional_masking_test GROUP BY 1 ORDER BY 1 LIMIT 10'
       );
       expect(res.rows.length).toBeGreaterThan(0);
+
       for (const row of res.rows) {
         expect(row.total_price).toBeNull();
       }
@@ -774,6 +787,7 @@ describe('Cube RBAC Engine', () => {
     test('masking_view_masked returns masked values for default group', async () => {
       const res = await connection.query('SELECT * FROM masking_view_masked LIMIT 5');
       expect(res.rows.length).toBeGreaterThan(0);
+
       for (const row of res.rows) {
         expect(row.secret_number).toBe(-1);
         expect(row.public_dim).toBeNull();
@@ -785,6 +799,7 @@ describe('Cube RBAC Engine', () => {
     test('masking_view_over_hidden_cube returns masked values for default group', async () => {
       const res = await connection.query('SELECT * FROM masking_view_over_hidden_cube LIMIT 5');
       expect(res.rows.length).toBeGreaterThan(0);
+
       for (const row of res.rows) {
         expect(row.public_dim).not.toBeNull();
         expect(row.total_quantity).not.toBeNull();
@@ -808,6 +823,7 @@ describe('Cube RBAC Engine', () => {
     test('masking_view_masked returns real values for masking_full_access group', async () => {
       const res = await connection.query('SELECT * FROM masking_view_masked LIMIT 5');
       expect(res.rows.length).toBeGreaterThan(0);
+
       for (const row of res.rows) {
         expect(row.secret_number).not.toBe(-1);
         expect(Number(row.count)).not.toBe(12345);
@@ -819,6 +835,7 @@ describe('Cube RBAC Engine', () => {
       // gets full access through the view's own policy.
       const res = await connection.query('SELECT * FROM masking_view_over_hidden_cube LIMIT 5');
       expect(res.rows.length).toBeGreaterThan(0);
+
       for (const row of res.rows) {
         expect(row.secret_number).not.toBe(-1);
         expect(Number(row.count)).not.toBe(12345);
@@ -879,6 +896,7 @@ describe('Cube RBAC Engine', () => {
       });
       const rows = result.rawData();
       expect(rows.length).toBeGreaterThan(0);
+
       for (const row of rows) {
         expect(row['masking_test.secret_number']).toBe('-1');
         expect(row['masking_test.count']).toBe('12345');
@@ -894,6 +912,7 @@ describe('Cube RBAC Engine', () => {
       });
       const rows = result.rawData();
       expect(rows.length).toBeGreaterThan(0);
+
       for (const row of rows) {
         expect(row['masking_test.count']).not.toBe('12345');
       }
@@ -908,6 +927,7 @@ describe('Cube RBAC Engine', () => {
       });
       const rows = result.rawData();
       expect(rows.length).toBeGreaterThan(0);
+
       for (const row of rows) {
         expect(row['masking_test.total_quantity']).not.toBeNull();
         expect(row['masking_test.count']).toBe('12345');
@@ -923,6 +943,7 @@ describe('Cube RBAC Engine', () => {
       });
       const rows = result.rawData();
       expect(rows.length).toBeGreaterThan(0);
+
       for (const row of rows) {
         expect(row['masking_test.secret_number']).toBe('-1');
         expect(row['masking_test.count']).toBe('12345');
@@ -938,6 +959,7 @@ describe('Cube RBAC Engine', () => {
       });
       const rows = result.rawData();
       expect(rows.length).toBeGreaterThan(0);
+
       for (const row of rows) {
         expect(row['masking_test.public_dim']).not.toBeNull();
         expect(row['masking_test.count']).toBe('12345');
@@ -953,6 +975,7 @@ describe('Cube RBAC Engine', () => {
       });
       const rows = result.rawData();
       expect(rows.length).toBeGreaterThan(0);
+
       for (const row of rows) {
         expect(row['masking_test.public_dim']).not.toBeNull();
         // count is masked, total_quantity is real
@@ -968,6 +991,7 @@ describe('Cube RBAC Engine', () => {
       });
       const rows = result.rawData();
       expect(rows.length).toBeGreaterThan(0);
+
       for (const row of rows) {
         expect(row['masking_view_masked.secret_number']).toBe('-1');
         expect(row['masking_view_masked.count']).toBe('12345');
@@ -983,6 +1007,7 @@ describe('Cube RBAC Engine', () => {
       });
       const rows = result.rawData();
       expect(rows.length).toBeGreaterThan(0);
+
       for (const row of rows) {
         expect(row['masking_view_masked.count']).not.toBe('12345');
       }
@@ -998,6 +1023,7 @@ describe('Cube RBAC Engine', () => {
       });
       const rows = result.rawData();
       expect(rows.length).toBeGreaterThan(0);
+
       for (const row of rows) {
         expect(row['masking_view.secret_number']).toBe('-1');
         expect(row['masking_view.count']).toBe('12345');
@@ -1014,6 +1040,7 @@ describe('Cube RBAC Engine', () => {
       });
       const rows = result.rawData();
       expect(rows.length).toBeGreaterThan(0);
+
       for (const row of rows) {
         // public_dim, total_quantity in view memberLevel → real values
         expect(row['masking_view_over_hidden_cube.total_quantity']).not.toBeNull();
@@ -1032,6 +1059,7 @@ describe('Cube RBAC Engine', () => {
       });
       const rows = result.rawData();
       expect(rows.length).toBeGreaterThan(0);
+
       for (const row of rows) {
         expect(row['masking_view_over_hidden_cube.count']).not.toBe('12345');
       }
@@ -1082,6 +1110,7 @@ describe('Cube RBAC Engine', () => {
         'SELECT * FROM sc_ua_mask_test LIMIT 5'
       );
       expect(res.rows.length).toBeGreaterThan(0);
+
       for (const row of res.rows) {
         // mask.sql is CAST(${userAttributes.tenantId} AS INTEGER)
         // sc_test user has tenantId = '1', so masked_price should be 1
@@ -1094,6 +1123,7 @@ describe('Cube RBAC Engine', () => {
         'SELECT * FROM sc_cube_mask_test LIMIT 5'
       );
       expect(res.rows.length).toBeGreaterThan(0);
+
       for (const row of res.rows) {
         // mask.sql is ${CUBE}.product_id * -1, so masked_product should be negative
         expect(row.masked_product).toBeLessThan(0);
@@ -1105,6 +1135,7 @@ describe('Cube RBAC Engine', () => {
         'SELECT * FROM yaml_ua_mask_test LIMIT 5'
       );
       expect(res.rows.length).toBeGreaterThan(0);
+
       for (const row of res.rows) {
         // sc_test user has tenantId = '1', so the CASE WHEN evaluates to true
         // and masked_status should be the actual product_id (positive)
@@ -1117,6 +1148,7 @@ describe('Cube RBAC Engine', () => {
         'SELECT * FROM sc_joined_mask_test LIMIT 5'
       );
       expect(res.rows.length).toBeGreaterThan(0);
+
       for (const row of res.rows) {
         // mask.sql is ${orders.id} which joins orders and returns orders.id
         // The join should be resolved and masked_order_id should be a positive integer
@@ -1140,6 +1172,7 @@ describe('Cube RBAC Engine', () => {
          FROM view_mask_test LIMIT 5`
       );
       expect(res.rows.length).toBeGreaterThan(0);
+
       for (const row of res.rows) {
         // sc_test groups=['1','2'] doesn't include 'sensitive_data_access',
         // mask evaluates to -1 for all masked_* columns.
@@ -1219,6 +1252,7 @@ describe('Cube RBAC Engine', () => {
       });
       const rows = result.rawData();
       expect(rows.length).toBeGreaterThan(0);
+
       for (const row of rows) {
         // mask.sql is CAST(${userAttributes.tenantId} AS INTEGER)
         // sc_test user has tenantId = '1', so masked_price should be 1
@@ -1233,6 +1267,7 @@ describe('Cube RBAC Engine', () => {
       });
       const rows = result.rawData();
       expect(rows.length).toBeGreaterThan(0);
+
       for (const row of rows) {
         // mask.sql is ${CUBE}.product_id * -1, so masked_product should be negative
         expect(Number(row['sc_cube_mask_test.masked_product'])).toBeLessThan(0);
@@ -1246,6 +1281,7 @@ describe('Cube RBAC Engine', () => {
       });
       const rows = result.rawData();
       expect(rows.length).toBeGreaterThan(0);
+
       for (const row of rows) {
         // sc_test user has tenantId = '1', so masked_status should be actual product_id
         expect(Number(row['yaml_ua_mask_test.masked_status'])).toBeGreaterThan(0);
@@ -1259,6 +1295,7 @@ describe('Cube RBAC Engine', () => {
       });
       const rows = result.rawData();
       expect(rows.length).toBeGreaterThan(0);
+
       for (const row of rows) {
         // mask.sql references ${orders.id} from a joined cube — the join must be resolved
         expect(Number(row['sc_joined_mask_test.masked_order_id'])).toBeGreaterThan(0);
@@ -1272,6 +1309,7 @@ describe('Cube RBAC Engine', () => {
       });
       const rows = result.rawData();
       expect(rows.length).toBeGreaterThan(0);
+
       for (const row of rows) {
         expect(row['view_mask_test.view_mask_base_pid_full']).toBe('-1');
       }
@@ -1284,6 +1322,7 @@ describe('Cube RBAC Engine', () => {
       });
       const rows = result.rawData();
       expect(rows.length).toBeGreaterThan(0);
+
       for (const row of rows) {
         expect(row['view_mask_test.view_mask_base_pid_cube_ref']).toBe('-1');
       }
@@ -1296,6 +1335,7 @@ describe('Cube RBAC Engine', () => {
       });
       const rows = result.rawData();
       expect(rows.length).toBeGreaterThan(0);
+
       for (const row of rows) {
         expect(row['view_mask_test.view_mask_base_pid_cube_col']).toBe('-1');
       }
@@ -1308,6 +1348,7 @@ describe('Cube RBAC Engine', () => {
       });
       const rows = result.rawData();
       expect(rows.length).toBeGreaterThan(0);
+
       for (const row of rows) {
         expect(row['view_mask_test.view_mask_base_pid_cube_name']).toBe('-1');
       }
@@ -1357,6 +1398,7 @@ describe('Cube RBAC Engine', () => {
         'SELECT * FROM region_test_view ORDER BY id LIMIT 50'
       );
       expect(res.rows.length).toBeGreaterThan(0);
+
       for (const row of res.rows) {
         expect([1, 2]).toContain(row.product_id);
       }
@@ -1422,6 +1464,7 @@ describe('Cube RBAC Engine', () => {
         },
       };
       let error = '';
+
       try {
         await client.load(query, {});
       } catch (e: any) {
@@ -1443,6 +1486,7 @@ describe('Cube RBAC Engine', () => {
 
     test('orders_view and cube with default policy', async () => {
       let error = '';
+
       try {
         await defaultClient.load({
           measures: ['orders.count'],
@@ -1453,6 +1497,7 @@ describe('Cube RBAC Engine', () => {
       expect(error).toContain('You requested hidden member');
 
       error = '';
+
       try {
         await defaultClient.load({
           measures: ['orders_view.count'],
@@ -1513,8 +1558,8 @@ describe('Cube RBAC Engine [Tesseract]', () => {
   }, JEST_BEFORE_ALL_DEFAULT_TIMEOUT);
 
   afterAll(async () => {
-    await birdbox.stop();
-    await db.stop();
+    await stopIfStarted('birdbox', birdbox);
+    await stopIfStarted('db', db);
   }, JEST_AFTER_ALL_DEFAULT_TIMEOUT);
 
   describe('Shorthand and mask tests via SQL API [Tesseract]', () => {
@@ -1533,6 +1578,7 @@ describe('Cube RBAC Engine [Tesseract]', () => {
         'SELECT * FROM sc_ua_mask_test LIMIT 5'
       );
       expect(res.rows.length).toBeGreaterThan(0);
+
       for (const row of res.rows) {
         expect(row.masked_price).toBe(1);
       }
@@ -1543,6 +1589,7 @@ describe('Cube RBAC Engine [Tesseract]', () => {
         'SELECT * FROM sc_cube_mask_test LIMIT 5'
       );
       expect(res.rows.length).toBeGreaterThan(0);
+
       for (const row of res.rows) {
         expect(row.masked_product).toBeLessThan(0);
       }
@@ -1553,6 +1600,7 @@ describe('Cube RBAC Engine [Tesseract]', () => {
         'SELECT * FROM yaml_ua_mask_test LIMIT 5'
       );
       expect(res.rows.length).toBeGreaterThan(0);
+
       for (const row of res.rows) {
         expect(row.masked_status).toBeGreaterThan(0);
       }
@@ -1563,6 +1611,7 @@ describe('Cube RBAC Engine [Tesseract]', () => {
         'SELECT * FROM sc_joined_mask_test LIMIT 5'
       );
       expect(res.rows.length).toBeGreaterThan(0);
+
       for (const row of res.rows) {
         expect(row.masked_order_id).toBeGreaterThan(0);
       }
@@ -1586,6 +1635,7 @@ describe('Cube RBAC Engine [Tesseract]', () => {
          FROM view_mask_test LIMIT 5`
       );
       expect(res.rows.length).toBeGreaterThan(0);
+
       for (const row of res.rows) {
         expect(row.view_mask_base_pid_full).toBe(-1);
         expect(row.view_mask_base_pid_cube_ref).toBe(-1);
@@ -1627,6 +1677,7 @@ describe('Cube RBAC Engine [Tesseract]', () => {
       });
       const rows = result.rawData();
       expect(rows.length).toBeGreaterThan(0);
+
       for (const row of rows) {
         expect(row['sc_ua_mask_test.masked_price']).toBe('1');
       }
@@ -1639,6 +1690,7 @@ describe('Cube RBAC Engine [Tesseract]', () => {
       });
       const rows = result.rawData();
       expect(rows.length).toBeGreaterThan(0);
+
       for (const row of rows) {
         expect(Number(row['sc_cube_mask_test.masked_product'])).toBeLessThan(0);
       }
@@ -1651,6 +1703,7 @@ describe('Cube RBAC Engine [Tesseract]', () => {
       });
       const rows = result.rawData();
       expect(rows.length).toBeGreaterThan(0);
+
       for (const row of rows) {
         expect(Number(row['yaml_ua_mask_test.masked_status'])).toBeGreaterThan(0);
       }
@@ -1663,6 +1716,7 @@ describe('Cube RBAC Engine [Tesseract]', () => {
       });
       const rows = result.rawData();
       expect(rows.length).toBeGreaterThan(0);
+
       for (const row of rows) {
         expect(Number(row['sc_joined_mask_test.masked_order_id'])).toBeGreaterThan(0);
       }
@@ -1675,6 +1729,7 @@ describe('Cube RBAC Engine [Tesseract]', () => {
       });
       const rows = result.rawData();
       expect(rows.length).toBeGreaterThan(0);
+
       for (const row of rows) {
         expect(row['view_mask_test.view_mask_base_pid_full']).toBe('-1');
       }
@@ -1687,6 +1742,7 @@ describe('Cube RBAC Engine [Tesseract]', () => {
       });
       const rows = result.rawData();
       expect(rows.length).toBeGreaterThan(0);
+
       for (const row of rows) {
         expect(row['view_mask_test.view_mask_base_pid_cube_ref']).toBe('-1');
       }
@@ -1699,6 +1755,7 @@ describe('Cube RBAC Engine [Tesseract]', () => {
       });
       const rows = result.rawData();
       expect(rows.length).toBeGreaterThan(0);
+
       for (const row of rows) {
         expect(row['view_mask_test.view_mask_base_pid_cube_col']).toBe('-1');
       }
@@ -1711,6 +1768,7 @@ describe('Cube RBAC Engine [Tesseract]', () => {
       });
       const rows = result.rawData();
       expect(rows.length).toBeGreaterThan(0);
+
       for (const row of rows) {
         expect(row['view_mask_test.view_mask_base_pid_cube_name']).toBe('-1');
       }
@@ -1756,14 +1814,15 @@ describe('Cube RBAC Engine [dev mode]', () => {
   }, JEST_BEFORE_ALL_DEFAULT_TIMEOUT);
 
   afterAll(async () => {
-    await birdbox.stop();
-    await db.stop();
+    await stopIfStarted('birdbox', birdbox);
+    await stopIfStarted('db', db);
   }, JEST_AFTER_ALL_DEFAULT_TIMEOUT);
 
   test('line_items hidden created_at', async () => {
     const meta = await client.meta();
     const dimensions = meta.meta.cubes.find(c => c.name === 'orders')?.dimensions;
     expect(dimensions?.length).toBe(2);
+
     for (const dim of dimensions || []) {
       expect(dim.isVisible).toBe(false);
       expect(dim.public).toBe(false);
@@ -1812,8 +1871,8 @@ describe('Cube RBAC Engine [Python config]', () => {
   }, JEST_BEFORE_ALL_DEFAULT_TIMEOUT);
 
   afterAll(async () => {
-    await birdbox.stop();
-    await db.stop();
+    await stopIfStarted('birdbox', birdbox);
+    await stopIfStarted('db', db);
   }, JEST_AFTER_ALL_DEFAULT_TIMEOUT);
 
   describe('RBAC via SQL API [python config]', () => {
@@ -1879,8 +1938,8 @@ describe('Cube RBAC Engine [Python config][dev mode]', () => {
   }, JEST_BEFORE_ALL_DEFAULT_TIMEOUT);
 
   afterAll(async () => {
-    await birdbox.stop();
-    await db.stop();
+    await stopIfStarted('birdbox', birdbox);
+    await stopIfStarted('db', db);
   }, JEST_AFTER_ALL_DEFAULT_TIMEOUT);
 
   test('products with no matching policy', async () => {

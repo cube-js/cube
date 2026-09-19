@@ -1,0 +1,354 @@
+---
+title: Cube Store SQL commands
+description: "Reference for the diagnostic, maintenance, and recovery SQL commands supported by Cube Store."
+---
+
+Cube Store, the [pre-aggregation storage engine][ref-cube-store-architecture],
+partially supports the MySQL protocol. Alongside queries, it accepts a set of
+administrative commands, which fall into three tiers:
+
+- [Diagnostics](#diagnostics) — inspect pre-aggregations and query plans. These
+  don't change cluster state.
+- [Cache and queue](#cache-and-queue) — inspect and manipulate the cache and the
+  queue used for pre-aggregation builds.
+- [Store maintenance and recovery](#store-maintenance-and-recovery) — operate on
+  the underlying stores. Includes destructive commands.
+
+<Warning>
+
+Apart from the [diagnostic commands](#diagnostics), which only read state, the
+commands on this page are intended for recovering a Cube Store cluster that is
+already in a bad state. Several of them discard data irreversibly, and the
+distinction between them is not obvious from their names — `CLEAR` and
+`TRUNCATE` do different things, and `WIPE` is unrecoverable by design.
+
+Don't run them unless you understand what a given command does and why you need
+it. If you're not sure, they're not the right tool.
+
+</Warning>
+
+## Connecting
+
+Cube Store's MySQL protocol is served by the router on port `3306` by default
+(configurable via `CUBESTORE_PORT`, or `CUBESTORE_BIND_ADDR` for the full
+address). Connect with the MySQL CLI client:
+
+```bash
+mysql -h <CUBESTORE_IP> --user=cubestore -pcubestore --protocol=TCP
+```
+
+<Warning>
+
+Only Linux and Mac OS versions of MySQL client are supported as of right now.
+You can install one on ubuntu using `apt-get install default-mysql-client`
+command or `brew install mysql-client` on Mac OS. Windows versions of the MySQL
+client aren't supported.
+
+</Warning>
+
+<Note>
+
+This connection is available when you run Cube Store yourself. Cube's cloud
+platform doesn't expose the Cube Store port, so you can't attach a MySQL client
+to it.
+
+You can still inspect query plans there: in the SQL Runner, pick the `cache` data
+source and run `EXPLAIN` or `EXPLAIN ANALYZE` against Cube Store. That path only
+accepts read-only statements, so the [cache and queue](#cache-and-queue) and
+[store maintenance and recovery](#store-maintenance-and-recovery) commands below
+are rejected before they reach Cube Store. If you need one of those, contact
+support.
+
+Avoid `DUMP` there. It wraps a `SELECT`, so it reads as a query and gets through,
+but it writes to the router's local disk and nothing cleans it up.
+
+</Note>
+
+## Diagnostics
+
+These commands don't change cluster state and are safe to run on a healthy
+cluster. `DUMP` is the one exception to watch: it doesn't touch cluster state
+either, but it does write to the router's local disk — see below.
+
+### `information_schema.tables`
+
+To check which pre-aggregations are managed by Cube Store, query
+`information_schema.tables`:
+
+```sql
+SELECT * FROM information_schema.tables;
++----------------------+-----------------------------------------------+
+| table_schema         | table_name                                    |
++----------------------+-----------------------------------------------+
+| dev_pre_aggregations | orders_main20190101_23jnqarg_uiyfxd0f_1gifflf |
+| dev_pre_aggregations | orders_main20190301_24ph0a1c_utzntnv_1gifflf  |
+| dev_pre_aggregations | orders_main20190201_zhrh5kj1_rkmsrffi_1gifflf |
+| dev_pre_aggregations | orders_main20191001_mdw2hxku_waxajvwc_1gifflf |
+| dev_pre_aggregations | orders_main20190701_izc2tl0h_bxsf1zlb_1gifflf |
++----------------------+-----------------------------------------------+
+5 rows in set (0.01 sec)
+```
+
+These pre-aggregations are stored as Parquet files under the `.cubestore/`
+folder in the project root during development.
+
+### `EXPLAIN`
+
+Synopsis:
+
+```sql
+EXPLAIN select_statement;
+```
+
+`EXPLAIN` shows the logical plan for a query:
+
+```sql
+ EXPLAIN SELECT orders__platform, orders__gender, sum(orders__count) FROM dev_pre_aggregations.orders_general_o32v4dvq_vbyemtl2_1h5hs8r
+ GROUP BY orders__gender, orders__platform;
++-------------------------------------------------------------------------------------------------------------------------------------+
+| logical plan                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
++--------------------------------------------------------------------------------------------------------------------------------------+
+| Projection, [dev_pre_aggregations.orders_general_o32v4dvq_vbyemtl2_1h5hs8r.orders__platform, dev_pre_aggregations.orders_general_o32v4dvq_vbyemtl2_1h5hs8r.orders__gender, SUM(dev_pre_aggregations.orders_general_o32v4dvq_vbyemtl2_1h5hs8r.orders__count)]
+  Aggregate
+    ClusterSend, indices: [[96]]
+      Scan dev_pre_aggregations.orders_general_o32v4dvq_vbyemtl2_1h5hs8r, source: CubeTable(index: orders_general_plat_gender_o32v4dvq_vbyemtl2_1h5hs8r:96:[123, 126]), fields: [orders__gender, orders__platform, orders__count] |
++-------------------------------------------------------------------------------------------------------------------------------------+
+```
+
+### `EXPLAIN ANALYZE`
+
+Synopsis:
+
+```sql
+EXPLAIN ANALYZE select_statement;
+```
+
+`EXPLAIN ANALYZE` shows the physical plan for the router and all workers used for
+query processing:
+
+```sql
+ EXPLAIN ANALYZE SELECT orders__platform, orders__gender, sum(orders__count) FROM dev_pre_aggregations.orders_general_o32v4dvq_vbyemtl2_1h5hs8r
+ GROUP BY orders__gender, orders__platform
+
++-----------+-----------------+--------------------------------------------------------------------------------------------------------------------------+
+| node type | node name       | physical plan                                                                                                                                                                                                                                                                                                                                                   |
++-----------+-----------------+--------------------------------------------------------------------------------------------------------------------------+
+| router    |                 | Projection, [orders__platform, orders__gender, SUM(dev_pre_aggregations.orders_general_o32v4dvq_vbyemtl2_1h5hs8r.orders__count)@2:SUM(orders__count)]
+  FinalInplaceAggregate
+    ClusterSend, partitions: [[123, 126]]                                                                                                                                         |
+| worker    | 127.0.0.1:10001 | PartialInplaceAggregate
+  Merge
+    Scan, index: orders_general_plat_gender_o32v4dvq_vbyemtl2_1h5hs8r:96:[123, 126], fields: [orders__gender, orders__platform, orders__count]
+      Projection, [orders__gender, orders__platform, orders__count]
+        ParquetScan, files: /.cubestore/data/126-0qtyakym.parquet |
++-----------+-----------------+--------------------------------------------------------------------------------------------------------------------------+
+```
+
+System-table selects don't produce a distributable plan, so neither `EXPLAIN
+ANALYZE` nor `EXPLAIN ANALYZE DETAILED` accepts one. Plain `EXPLAIN` is the only
+one of the three that works on `information_schema.tables`.
+
+### `EXPLAIN ANALYZE DETAILED`
+
+Synopsis:
+
+```sql
+EXPLAIN ANALYZE DETAILED select_statement;
+```
+
+Unlike `EXPLAIN` and `EXPLAIN ANALYZE`, which only show the plan, `EXPLAIN ANALYZE
+DETAILED` actually executes the query under per-query tracing and renders a
+detailed execution trace as a tree with a per-category timing summary. Use it to
+diagnose where time is spent within a query:
+
+```sql
+EXPLAIN ANALYZE DETAILED SELECT orders__platform, sum(orders__count) FROM dev_pre_aggregations.orders_general_o32v4dvq_vbyemtl2_1h5hs8r
+GROUP BY orders__platform;
+```
+
+### Reading a query plan
+
+When you're debugging performance, one thing to keep in mind is that Cube Store, due to its design, will always use some index to query data, and usage of the index itself doesn't necessarily tell if the particular query is performing optimally or not.
+What's important to look at is aggregation and partition merge strategies.
+In most of the cases for aggregation, Cube Store will use `HashAggregate` or `InplaceAggregate` strategy as well as `Merge` and `MergeSort` operators to merge different partitions.
+Even for larger datasets, scan operations on sorted data will almost always be much more efficient and faster than hash aggregate as the Cube Store optimizer decides to use those only if there's an index with appropriate sorting.
+So, as a rule of thumb, if you see in your plan `PartialHashAggregate` and `FinalHashAggregate` nodes together with `Merge` operators, those queries most likely perform sub-optimally.
+On the other hand, if you see `PartialInplaceAggregate`, `FinalInplaceAggregate`, and `FullInplaceAggregate` together with `MergeSort` operators in your plan, then there's a high chance the query performs optimally.
+Sometimes, there can be exceptions to this rule.
+For example, a total count query run on top of the index will perform `HashAggregate` strategy on top of `MergeSort` nodes even if all required indexes are in place.
+This query would be optimal as well.
+
+### `DUMP`
+
+Synopsis:
+
+```sql
+DUMP select_statement;
+```
+
+`DUMP` plans the query, then writes a metastore backup together with the Parquet
+files the query reads into a new directory under `dumps/` and returns its path.
+Use it to capture the exact state behind a query for offline inspection.
+
+<Warning>
+
+Unlike the other diagnostic commands, `DUMP` writes to the router's local disk,
+and the directory it creates is never cleaned up automatically. A query that
+touches many partitions copies every Parquet file it reads, so repeated dumps on
+a production router accumulate without bound. Delete the directory once you're
+done with it.
+
+</Warning>
+
+## Cache and queue
+
+Cube Store keeps a key-value cache and a job queue in its cache store. These
+commands operate on them directly.
+
+### `CACHE`
+
+Synopsis:
+
+```sql
+CACHE SET [NX] [TTL ttl] key 'value';
+CACHE GET key;
+CACHE KEYS prefix;
+CACHE INCR key;
+CACHE REMOVE key;
+CACHE CLEAR;
+```
+
+`CACHE SET` stores a value, optionally only if the key doesn't exist (`NX`) and
+optionally with a time to live in seconds (`TTL`). `CACHE GET` reads a single
+key, `CACHE KEYS` lists keys under a prefix, `CACHE INCR` atomically increments a
+counter, and `CACHE REMOVE` deletes a single key.
+
+`CACHE CLEAR` removes every entry by iterating over them and deleting each one.
+It requires a cache store healthy enough to be read.
+
+### `QUEUE`
+
+Synopsis:
+
+```sql
+QUEUE ADD [EXCLUSIVE] [PRIORITY priority] [ORPHANED timeout] [EXTERNAL_ID 'id'] key 'value';
+QUEUE ADD_AND_RETRIEVE [EXCLUSIVE] [PRIORITY priority] [ORPHANED timeout] [EXTERNAL_ID 'id'] key 'value' concurrency;
+QUEUE GET key;
+QUEUE LIST [WITH_PAYLOAD] prefix;
+QUEUE PENDING [WITH_PAYLOAD] prefix;
+QUEUE ACTIVE [WITH_PAYLOAD] prefix;
+QUEUE RESULT [EXTERNAL_ID 'id'] key;
+QUEUE RESULT_BLOCKING timeout key;
+QUEUE ACK key { result | NULL };
+QUEUE CANCEL key;
+QUEUE HEARTBEAT key;
+QUEUE RETRIEVE [EXTENDED] [CONCURRENCY n] key;
+QUEUE STALLED heartbeat_timeout prefix;
+QUEUE ORPHANED orphaned_timeout prefix;
+QUEUE TO_CANCEL heartbeat_timeout orphaned_timeout prefix;
+QUEUE MERGE_EXTRA key 'payload';
+QUEUE CLEAR;
+```
+
+The queue coordinates pre-aggregation builds. `QUEUE LIST`, `QUEUE PENDING`, and
+`QUEUE ACTIVE` inspect it; `QUEUE STALLED`, `QUEUE ORPHANED`, and `QUEUE
+TO_CANCEL` list jobs that have stopped making progress. The remaining commands
+add, claim, acknowledge, and cancel individual jobs.
+
+`QUEUE ADD`'s options may be given in any order. For `GET`, `ACK`, `CANCEL`,
+`HEARTBEAT`, `RESULT`, `RESULT_BLOCKING`, and `MERGE_EXTRA`, `key` is either the
+job's path or its numeric queue id.
+
+`QUEUE ADD_AND_RETRIEVE` adds an item and, in the same atomic operation, claims
+it — moving it straight to the active status — if the prefix's `concurrency`
+budget allows. It combines what otherwise takes a separate `QUEUE ADD`
+followed by `QUEUE RETRIEVE`.
+
+`QUEUE CLEAR` empties the queue by iterating over its entries, the same way
+`CACHE CLEAR` does.
+
+## Store maintenance and recovery
+
+Cube Store keeps two RocksDB-backed stores: the **metastore**, which holds
+pre-aggregation metadata (tables, partitions, indexes, jobs), and the
+**cachestore**, which holds the cache and queue above.
+
+### `SYS METASTORE`
+
+Synopsis:
+
+```sql
+SYS METASTORE HEALTHCHECK;
+SYS METASTORE COMPACTION;
+SYS METASTORE SET_CURRENT snapshot_id;
+SYS METASTORE TRUNCATE;
+```
+
+`HEALTHCHECK` verifies the store is readable. `COMPACTION` triggers a RocksDB
+compaction. `SET_CURRENT` switches the metastore to a specific snapshot by id.
+
+<Warning>
+
+`SYS METASTORE TRUNCATE` erases the entire metastore keyspace — all
+pre-aggregation metadata — with a single low-level RocksDB range deletion, with
+no per-row reads. That is precisely why it exists: it still works when the store
+is too damaged to iterate. It is not a cache flush, and it cannot be undone.
+
+</Warning>
+
+### `SYS CACHESTORE`
+
+Synopsis:
+
+```sql
+SYS CACHESTORE HEALTHCHECK;
+SYS CACHESTORE INFO;
+SYS CACHESTORE COMPACTION;
+SYS CACHESTORE PERSIST;
+SYS CACHESTORE EVICTION;
+SYS CACHESTORE TRUNCATE;
+SYS CACHESTORE WIPE;
+```
+
+`HEALTHCHECK` verifies the store is readable and `INFO` reports its current
+state. `COMPACTION` triggers a RocksDB compaction, `PERSIST` flushes to durable
+storage, and `EVICTION` runs the eviction pass that reclaims space.
+
+<Warning>
+
+`SYS CACHESTORE TRUNCATE` erases the entire cachestore keyspace — cache and queue
+alike — as a single low-level range deletion, in the same way as `SYS METASTORE
+TRUNCATE` and for the same reason.
+
+`SYS CACHESTORE WIPE` goes further: it stops the store's background loops, then
+destroys and reopens RocksDB from scratch to force a clean snapshot. Once the
+teardown begins the previous state cannot be restored. If the teardown then fails
+to finish, the cachestore is left closed and rejects every operation until the
+node is restarted. Use it only when the cachestore is unrecoverable by other
+means.
+
+</Warning>
+
+### `SYS`
+
+Synopsis:
+
+```sql
+SYS KILL ALL JOBS;
+SYS REPARTITION partition_id;
+SYS DROP CACHE;
+SYS DROP QUERY CACHE;
+SYS PANIC WORKER;
+```
+
+`SYS KILL ALL JOBS` deletes every queued job from the metastore, which is how a
+cluster stuck on a wedged build is cleared. `SYS REPARTITION` schedules a
+repartition of a single partition by id.
+
+`SYS DROP CACHE` and `SYS DROP QUERY CACHE` both clear the in-memory query result
+cache; they are currently equivalent.
+
+`SYS PANIC WORKER` deliberately panics a worker process. It exists for testing
+failure handling and has no operational use.
+
+[ref-cube-store-architecture]: /docs/pre-aggregations/cube-store-architecture

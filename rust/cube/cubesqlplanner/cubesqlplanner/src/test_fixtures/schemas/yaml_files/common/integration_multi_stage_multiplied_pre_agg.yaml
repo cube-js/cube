@@ -142,3 +142,14 @@ cubes:
                 - count
             time_dimension: created_at
             granularity: month
+
+views:
+    - name: customers_view
+      cubes:
+          - join_path: customers
+            includes:
+                - total_lifetime_value
+                - total_lifetime_value_prev_month_by_returns
+          - join_path: customers.returns
+            includes:
+                - created_at

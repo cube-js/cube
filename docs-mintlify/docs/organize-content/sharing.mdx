@@ -141,6 +141,23 @@ This ensures users can always navigate to content they have permission to
 view, even if they don't have explicit access to every folder along the
 path.
 
+### Duplicates
+
+Duplicating a workbook or dashboard does not carry its sharing over by
+default — the copy starts visible only to you, plus anyone with access to
+the folder it is created in.
+
+When the original is shared, the duplicate dialog offers **Copy sharing
+and embedding settings**. Selecting it re-grants the original's users,
+groups, and organization-wide access on the copy, and carries over
+[signed embedding][ref-signed-embedding] if it was enabled. Access that
+the original inherits from a folder is not copied — the duplicate derives
+it from the folder it is created in, like any other new content there.
+
+The option requires **Full access** to the original, since copying its
+sharing means granting that access again. With **Can edit** or
+**Can view**, duplicating still works and the copy starts unshared.
+
 ## Sharing folders
 
 Sharing a folder is the most efficient way to manage access for a
@@ -175,3 +192,4 @@ interface.
 [ref-roles]: /admin/users-and-permissions/roles-and-permissions
 [ref-google-sheets]: /docs/integrations/google-sheets
 [ref-excel]: /docs/integrations/microsoft-excel
+[ref-signed-embedding]: /embedding/iframe/auth/signed

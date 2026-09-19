@@ -1,0 +1,286 @@
+---
+title: Dashboard Comments
+description: HTTP reference for reading and writing comment threads on an embedded published dashboard, on behalf of a signed-in embed user.
+---
+
+The Dashboard Comments API lets an embed viewer hold a conversation on an embedded [published dashboard](/embedding/iframe/dashboards): start a thread, reply to one, edit or delete their own message, and mark a thread resolved.
+
+<Note>
+
+The Dashboard Comments API is available on [Premium and above plans](https://cube.dev/pricing).
+
+</Note>
+
+## Enable the comment panel
+
+**The account decides whether the comment UI appears.** Turn on **Allow comments on embedded dashboards** under **Embed → Settings** in the Cube console — see [Show and hide features](/embedding/iframe/feature-visibility#account-settings). It is the host account's switch alone: an embed user cannot turn it on, and there is no per-session override.
+
+<Warning>
+
+**The setting hides the panel; it does not close the API.** It governs whether the built-in comment panel renders on an embedded dashboard, and nothing more — **the endpoints below answer either way**. With the setting off, any embed session that can read the dashboard can still post and read comments through the API.
+
+That is what makes the endpoints usable for your own comment UI. It also means **there is no server-side switch that stops comments being written**: for an embed session scoped to an embed tenant, read access to the dashboard is all it takes to read and post — nothing further is checked before a comment is accepted. The credentials these endpoints refuse — an `internalId` session, an API key, a console session — are the ones that cannot carry an embed tenant, so none of them is a way to keep serving a customer-facing embed while withholding comments. If comments must not be accepted at all, do not embed that dashboard. To cut off a viewer who already holds a token, end their session with [Revoke an embed session][ref-revoke-session] — without that, the token keeps working until it expires, up to 24 hours later.
+
+</Warning>
+
+**The two commenting surfaces are independent.** Comments on embedded dashboards and comments inside the Cube app have separate storage and separate settings, and a thread written on one surface is not visible on the other.
+
+## Authentication
+
+Every endpoint requires a **signed embed session scoped to an embed tenant**. Mint one with [Generate Session][ref-generate-session] using `externalId`. `embedTenantName` is optional and these endpoints answer either way, but it is what separates one customer's conversation from another's — see [A conversation lives inside a single embed tenant](#a-conversation-lives-inside-a-single-embed-tenant).
+
+A session minted with `internalId` cannot comment. Such a session resolves its user from Cube's own user table and so carries no embed tenant by design, and these endpoints reject it with `403 Forbidden`. A [Cube API key][ref-api-keys] and a console session are rejected the same way.
+
+The calling embed user is taken from the session; no endpoint accepts an author in the request body.
+
+The caller must also be able to read the dashboard. The same access check guards `GET /dashboard/{publicId}`, so a viewer who cannot open a dashboard cannot reach its conversation either.
+
+## Endpoints
+
+All paths are relative to `https://{accountName}.cubecloud.dev/api/v1/embed`, and `{publicId}` is the dashboard's public identifier — the same one the [embed URL](/embedding/iframe/dashboards) carries.
+
+| Method and path | Body or query | Response |
+| --- | --- | --- |
+| `GET /dashboard/{publicId}/comments` | `includeResolved`, `resolvedOnly`, `first`, `after` | [Thread list](#thread-list) |
+| `POST /dashboard/{publicId}/comments` | `{ body, parentId? }` | [Comment](#comment) |
+| `GET /dashboard/{publicId}/comments/mentionable-users` | `search`, `first`, `after` | [Mentionable user list](#mentionable-users) |
+| `PATCH /dashboard/{publicId}/comments/{commentId}` | `{ body }` | [Comment](#comment) |
+| `DELETE /dashboard/{publicId}/comments/{commentId}` | — | `204 No Content` |
+| `POST /dashboard/{publicId}/comments/{commentId}/resolve` | `{ resolved }` | [Thread](#thread) |
+
+### Request headers
+
+| Header | Value | Required |
+| --- | --- | --- |
+| `Content-Type` | `application/json` | For `POST` and `PATCH` |
+| `Authorization` | `Embed-Token YOUR_EMBED_TOKEN` | Yes |
+
+The embed token is the signed session's own JWT. Exchange the `sessionId` from [Generate Session][ref-generate-session] for one with [`POST /api/v1/embed/session/token`][ref-session-token], which needs no `Authorization` header of its own — the session id is the credential. A session id is single-use and expires 5 minutes after it is minted, so exchange it at once; the token it returns lasts 24 hours. An embedded dashboard performs the exchange itself, so the comment UI inside an iframe is already authenticated — supply the header yourself only when you call these endpoints from your own code. **The iframe consumes the session id it was loaded with**, so mint a second session for your own calls rather than reusing that one: a redeemed id returns `401`.
+
+`Bearer YOUR_EMBED_TOKEN` is accepted as well, and resolves the same embed user. Prefer `Embed-Token`: it names the credential you are actually presenting, and the prefix is matched case-sensitively either way.
+
+## Who may edit, delete, and resolve
+
+**Authorship is the whole permission.** An embed user may edit, delete, and resolve only their own comments. Editing or deleting somebody else's comment returns `403`, and so does resolving a thread somebody else started.
+
+This is narrower than commenting in the Cube app, where a user with edit rights on the workbook may also resolve a thread another person started. A viewer of a published dashboard holds no rights on the workbook a thread would belong to, so that branch has no counterpart here.
+
+| Action | Cube app | Embedded dashboard |
+| --- | --- | --- |
+| Edit a comment | Author | Author |
+| Delete a comment | Author | Author |
+| Resolve or re-open a thread | Author, or a workbook editor | Author |
+
+Reading is wider than writing — but only inside one embed tenant. Every embed user of the caller's own embed tenant who can read the dashboard sees the whole conversation, including threads they did not start.
+
+## A conversation lives inside a single embed tenant
+
+Threads are stored per embed tenant, and `GET /dashboard/{publicId}/comments` returns only the caller's own tenant's threads. A user in `acme` never sees a thread written in `globex`, and neither can reply to the other. Expect an empty list on a dashboard your own tenant has not commented on yet, however busy it looks to someone else.
+
+<Warning>
+
+**`embedTenantName` is what creates the separation.** Pass a distinct one per customer when you [generate a session](#authentication). It is optional, and a session that omits it falls back to your own account's tenant name — so **every session minted without it shares one embed tenant**, and therefore one conversation. Embed the same dashboard for two customers that way and each reads the other's threads, and each sees the other's users in [mentionable users](#mentionable-users).
+
+</Warning>
+
+## Threads and replies
+
+A thread is one root comment plus its replies, oldest first. **Nesting is one level deep** — pass `parentId` to reply to a thread root, and replying to a reply returns `400`. A `parentId` that names nothing, a deleted thread, or a comment on another dashboard returns `404`.
+
+Threads are listed **newest-first by when they started**, so a thread holds its place while it is being replied to — a busy thread does not climb back to the top. Open threads are returned by default. Pass `includeResolved=true` to widen the page to resolved threads as well, or `resolvedOnly=true` to return only those; `resolvedOnly` wins when both are set.
+
+Deletion is soft on the server, but **nothing deleted comes back from `GET /dashboard/{publicId}/comments`** — neither surfaces as a tombstone, so a client never has to render an empty bubble. **Deleting a reply** removes it from its thread's `replies`; the rest of the thread stands and keeps its position. **Deleting a thread root takes the whole thread with it**, replies included — the thread stops appearing in the list altogether.
+
+Resolving applies to threads only. Passing a reply's id returns `400`, because a reply carries no resolve state of its own.
+
+## Response shapes
+
+A field typed `| null` below may also be **absent** — only `id`, `dashboardId`, `body`, `createdAt`, and `isOwn` are guaranteed on a comment, `root` and `replies` on a thread, and `id` and `username` on a mentionable user. Test with `== null`, which catches both, rather than `=== null`: an open thread can omit `resolvedAt` entirely, and `thread.resolvedAt === null` then reads `false` and reports every open thread as resolved.
+
+### Comment
+
+Returned by `POST /dashboard/{publicId}/comments` and `PATCH /dashboard/{publicId}/comments/{commentId}`, and nested inside every thread.
+
+```json
+{
+  "id": 41,
+  "dashboardId": "a1b2c3d4e5f6",
+  "userId": 7,
+  "body": "Revenue looks off for the EU region.",
+  "editedAt": null,
+  "removedAt": null,
+  "createdAt": "2025-04-17T09:12:44.000Z",
+  "isOwn": true
+}
+```
+
+| Field | Type | Notes |
+| --- | --- | --- |
+| `id` | number | The comment's identifier. Pass it as `{commentId}`. |
+| `dashboardId` | string | The dashboard's `publicId`, not a numeric id — embed routes address a dashboard by `publicId` throughout. |
+| `userId` | number \| null | Identifier of the author's embed user. `null` once that embed user is deleted; the comment outlives them. |
+| `body` | string | The comment text, up to 10,000 characters. |
+| `editedAt` | string \| null | When the author last edited the comment, or `null` if never. |
+| `removedAt` | string \| null | `null` or absent on anything the API returns — a deleted comment is dropped rather than handed back as a tombstone. |
+| `createdAt` | string | When the comment was posted. |
+| `isOwn` | boolean | Whether the calling embed user wrote this comment. Stamped by the server — use it to decide which controls to render, rather than comparing `userId` yourself. |
+
+<Info>
+
+**`userId` is an embed user's identifier, not a Cube user's.** Embed users
+and Cube users are numbered independently, so the same value names a
+different person on each surface. Resolve it against
+[mentionable users](#mentionable-users), which reads embed users only.
+
+</Info>
+
+### Thread
+
+Returned by `POST /dashboard/{publicId}/comments/{commentId}/resolve`, and as each item of the thread list. `root` and each reply carry the full [Comment](#comment) shape; the samples below abbreviate them.
+
+```json
+{
+  "root": { "id": 41, "body": "Revenue looks off for the EU region.", "isOwn": true },
+  "replies": [
+    { "id": 42, "body": "The EU rollup finished late — refreshed now.", "isOwn": false }
+  ],
+  "resolvedAt": "2025-04-17T11:40:02.000Z",
+  "resolvedBy": 7
+}
+```
+
+| Field | Type | Notes |
+| --- | --- | --- |
+| `root` | object | The thread's first comment, in the [Comment](#comment) shape. |
+| `replies` | array | Replies to the root, oldest first, each in the [Comment](#comment) shape. |
+| `resolvedAt` | string \| null | When the thread was resolved. `null` or absent while it is open. |
+| `resolvedBy` | number \| null | Embed user who resolved it. `null` or absent while it is open. |
+
+### Thread list
+
+Returned by `GET /dashboard/{publicId}/comments`.
+
+```json
+{
+  "items": [
+    {
+      "root": { "id": 41, "body": "Revenue looks off for the EU region.", "isOwn": true },
+      "replies": []
+    }
+  ],
+  "pageInfo": {
+    "hasNextPage": true,
+    "hasPreviousPage": false,
+    "startCursor": "MQ==",
+    "endCursor": "MTA="
+  }
+}
+```
+
+Pagination is cursor-based: pass `first` for the page size and `after` with the previous page's `endCursor`. Drive the loop off `hasNextPage` — only it and `hasPreviousPage` are guaranteed; the two cursors are `null` or absent on an empty page, and passing that back as `after` is a bogus cursor rather than a request to start over. Filter server-side with `includeResolved` and `resolvedOnly` rather than filtering a page yourself — a page is a window, so a client-side filter can come back empty while matching threads sit below it.
+
+**`first` defaults to 100 and is capped at 200** — the OpenAPI schema records only the floor, so the generated reference shows neither. Omit it and you get up to 100 threads. A larger value is clamped rather than rejected, so `first=1000` returns 200 threads with `hasNextPage: true` — page through the rest rather than asking for them at once. A `first` below 1 is a `400`. The same default and ceiling apply to [mentionable users](#mentionable-users).
+
+Only threads are paged. **A thread carries all of its replies**, so a page of 200 busy threads is a large response — keep `first` modest where threads run long.
+
+### Mentionable users
+
+Returned by `GET /dashboard/{publicId}/comments/mentionable-users`. Use it to back a mention autocomplete.
+
+```json
+{
+  "items": [
+    { "id": 7, "username": "jane", "email": "jane@example.com", "firstName": "Jane" },
+    { "id": 9, "username": "sam", "email": null, "firstName": null }
+  ],
+  "pageInfo": {
+    "hasNextPage": false,
+    "hasPreviousPage": false,
+    "startCursor": "MQ==",
+    "endCursor": "Mg=="
+  }
+}
+```
+
+| Field | Type | Notes |
+| --- | --- | --- |
+| `id` | number | The embed user's identifier, matching `userId` on a comment. |
+| `username` | string | The only identity field an embed user always has. Fall back to it for display. |
+| `email` | string \| null | May be `null`. |
+| `firstName` | string \| null | May be `null`. |
+
+**The directory is scoped to the caller's own embed tenant, and to embed users only.** An embed user can mention their colleagues in the same embed tenant. They cannot mention a Cube user of the host account, and they never see another embed tenant's users — which, as [above](#a-conversation-lives-inside-a-single-embed-tenant), depends on your minting sessions with a distinct `embedTenantName` per customer. Pass `search` to filter by username or email, up to 255 characters; results are ordered by username. Paginate as for [threads](#thread-list), `hasNextPage` included — a `search` that matches nobody returns an empty page whose cursors are `null` or absent.
+
+<Info>
+
+**There is no mention syntax to write.** `body` is stored and returned verbatim,
+and nothing on the server reads it for mentions — no parsing, no linking, no
+notification. Picking a user from this directory is a client-side concern: choose
+whatever markup you like, render it yourself, and expect Cube to hand it back
+byte for byte.
+
+</Info>
+
+## Example: start a thread, reply, resolve
+
+The embed token below identifies the commenting user, so every comment created here is attributed to them.
+
+```javascript
+const BASE = `https://${ACCOUNT_NAME}.cubecloud.dev/api/v1/embed`;
+const headers = {
+  "Content-Type": "application/json",
+  Authorization: `Embed-Token ${EMBED_TOKEN}`,
+};
+
+// Always check the status. An unchecked error body parses fine, so `root.id`
+// comes back undefined and the reply below posts as a second thread instead
+const send = async (path, body) => {
+  const res = await fetch(`${BASE}${path}`, {
+    method: "POST",
+    headers,
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) throw new Error(`${res.status} ${await res.text()}`);
+  return res.json();
+};
+
+// 1. Start a thread on the dashboard
+const root = await send(`/dashboard/${PUBLIC_ID}/comments`, {
+  body: "Revenue looks off for the EU region.",
+});
+
+// 2. Reply to it — pass the root's id as parentId
+await send(`/dashboard/${PUBLIC_ID}/comments`, {
+  body: "The EU rollup finished late — refreshed now.",
+  parentId: root.id,
+});
+
+// 3. Resolve the thread. Only the embed user who started it may do this
+const thread = await send(
+  `/dashboard/${PUBLIC_ID}/comments/${root.id}/resolve`,
+  { resolved: true }
+);
+
+// thread.resolvedAt is set; pass resolved: false to re-open the thread
+```
+
+Read the conversation back, resolved threads included:
+
+```bash
+curl "https://your-account.cubecloud.dev/api/v1/embed/dashboard/PUBLIC_ID/comments?includeResolved=true&first=20" \
+  -H "Authorization: Embed-Token YOUR_EMBED_TOKEN"
+```
+
+## Errors
+
+| Status | When |
+| --- | --- |
+| `400` | Replying to a reply, resolving a reply's id, a `body` that is empty or over 10,000 characters, or a query parameter out of range — `search` over 255 characters, `first` below 1. |
+| `401` | The `Embed-Token` is invalid or expired, or the `sessionId` you tried to exchange was already redeemed — an iframe spends its own. Mint a fresh session and exchange that. |
+| `403` | The credential carries no embed tenant — an API key, a console session, or an `internalId` session; the dashboard resolves but the caller may not read it; or the comment belongs to another embed user. |
+| `404` | The dashboard, the comment, or a `parentId` does not exist on this dashboard. A dashboard is looked up before access is checked, so one that does not resolve is `404` and one the caller merely may not read is `403`. |
+
+[ref-generate-session]: /reference/embed-apis/generate-session
+[ref-session-token]: /api-reference/embed/exchange-a-session-for-an-embed-token
+[ref-revoke-session]: /api-reference/embed/revoke-an-embed-session
+[ref-api-keys]: /admin/account-billing/api-keys

@@ -8,6 +8,7 @@ import {
   JEST_AFTER_ALL_DEFAULT_TIMEOUT,
   JEST_BEFORE_ALL_DEFAULT_TIMEOUT,
   testQueryMeasure,
+  stopIfStarted,
 } from './smoke-tests';
 
 describe('duckdb', () => {
@@ -33,7 +34,7 @@ describe('duckdb', () => {
   }, JEST_BEFORE_ALL_DEFAULT_TIMEOUT);
 
   afterAll(async () => {
-    await birdbox.stop();
+    await stopIfStarted('birdbox', birdbox);
   }, JEST_AFTER_ALL_DEFAULT_TIMEOUT);
 
   test('query measure', () => testQueryMeasure(client));

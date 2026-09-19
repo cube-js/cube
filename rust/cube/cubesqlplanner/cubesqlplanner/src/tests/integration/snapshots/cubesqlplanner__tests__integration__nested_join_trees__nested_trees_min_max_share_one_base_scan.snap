@@ -1,0 +1,8 @@
+---
+source: cubesqlplanner/cubesqlplanner/src/tests/integration/nested_join_trees.rs
+expression: result
+---
+sites__country | carts__max_value | carts__min_value | checkouts__unique_msid
+---------------+------------------+------------------+-----------------------
+DE             | 40.00            | 40.00            | 0                     
+US             | 30.00            | 10.00            | 2

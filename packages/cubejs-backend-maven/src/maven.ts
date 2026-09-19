@@ -27,10 +27,17 @@ export function generateXml(dependencies: MavenDependency[]) {
       'xsi:schemaLocation': 'http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd',
     })
     // project->
-    .ele('modelVersion').txt('4.0.0').up()
-    .ele('groupId').txt('com.mycompany.app').up()
-    .ele('artifactId').txt('my-app').up()
-    .ele('version').txt('1.0-SNAPSHOT').up()
+    .ele('modelVersion').txt('4.0.0')
+    .up()
+    .ele('groupId')
+    .txt('com.mycompany.app')
+    .up()
+    .ele('artifactId')
+    .txt('my-app')
+    .up()
+    .ele('version')
+    .txt('1.0-SNAPSHOT')
+    .up()
     // // project->properties
     // .ele('properties')
     // .ele('maven.compiler.source').txt('1.8').up()

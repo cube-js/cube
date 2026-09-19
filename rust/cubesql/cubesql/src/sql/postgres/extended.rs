@@ -1,5 +1,5 @@
 use crate::{
-    compile::QueryPlan,
+    compile::{CommandCompletion, CopyFromPlan, CreateEmptyTempTablePlan, QueryPlan},
     sql::{
         dataframe::{batches_to_dataframe, DataFrame, TableValue},
         statement::PostgresStatementParamsBinder,
@@ -237,6 +237,14 @@ pub enum PortalState {
     Finished(FinishedState),
 }
 
+/// What PostgreSQL says when IF NOT EXISTS keeps it from creating a table.
+fn skipped_notice(name: &str) -> protocol::NoticeResponse {
+    protocol::NoticeResponse::notice(
+        protocol::ErrorCode::DuplicateTable,
+        format!("relation \"{}\" already exists, skipping", name),
+    )
+}
+
 #[derive(Debug, PartialEq)]
 pub enum PortalFrom {
     Simple,
@@ -247,6 +255,8 @@ pub enum PortalFrom {
 #[derive(Debug)]
 pub enum PortalBatch {
     Description(protocol::RowDescription),
+    /// Something worth telling the client which is not an error
+    Notice(protocol::NoticeResponse),
     Rows(BatchWriter),
     Completion(protocol::PortalCompletion),
 }
@@ -333,6 +343,28 @@ impl Portal {
             Some(PortalState::Empty) => true,
             _ => false,
         }
+    }
+
+    /// Take the plan of a `COPY ... FROM STDIN` out of the portal. Such a copy reads
+    /// its data from the connection, so it is executed there rather than by the portal.
+    pub fn take_copy_from(&mut self) -> Option<Box<CopyFromPlan>> {
+        let Some(PortalState::Prepared(PreparedState {
+            plan: QueryPlan::CopyFrom(_),
+        })) = &self.state
+        else {
+            return None;
+        };
+
+        let Some(PortalState::Prepared(PreparedState {
+            plan: QueryPlan::CopyFrom(plan),
+        })) = self
+            .state
+            .replace(PortalState::Finished(FinishedState { description: None }))
+        else {
+            unreachable!("the state was just checked to be a COPY FROM plan");
+        };
+
+        Some(plan)
     }
 
     fn hand_execution_frame_state<'a>(
@@ -568,7 +600,58 @@ impl Portal {
                                 Err(err) => return yield Err(CubeError::panic(err).into()),
                             }
                         }
-                        QueryPlan::CreateTempTable(plan, ctx, name, temp_tables) => {
+                        QueryPlan::CreateEmptyTempTable(plan) => {
+                            let CreateEmptyTempTablePlan {
+                                table_name,
+                                schema,
+                                if_not_exists,
+                                temp_tables,
+                            } = *plan;
+
+                            self.state = Some(PortalState::Finished(FinishedState { description }));
+
+                            if if_not_exists && temp_tables.has(&table_name) {
+                                yield Ok(PortalBatch::Notice(skipped_notice(&table_name)));
+
+                                return yield Ok(PortalBatch::Completion(PortalCompletion::Complete(
+                                    CommandCompletion::CreateTable.to_pg_command(),
+                                )));
+                            }
+
+                            let save_result = tokio::task::spawn_blocking(move || {
+                                temp_tables.save(
+                                    &table_name,
+                                    TempTable::from_arrow_schema(schema, vec![vec![]]),
+                                )
+                            })
+                            .await?;
+                            if let Err(err) = save_result {
+                                return yield Err(err.into());
+                            }
+
+                            return yield Ok(PortalBatch::Completion(PortalCompletion::Complete(
+                                CommandCompletion::CreateTable.to_pg_command(),
+                            )));
+                        }
+                        QueryPlan::CopyFrom(_) => {
+                            return yield Err(CubeError::internal(
+                                "COPY FROM STDIN must be executed by the connection, not by a portal (it's a bug)".to_string(),
+                            )
+                            .into());
+                        }
+                        QueryPlan::CreateTempTable(plan, ctx, name, temp_tables, if_not_exists) => {
+                            // An existing table makes the statement a no-op, and the
+                            // query is not run at all
+                            if if_not_exists && temp_tables.has(&name) {
+                                self.state = Some(PortalState::Finished(FinishedState { description }));
+
+                                yield Ok(PortalBatch::Notice(skipped_notice(&name)));
+
+                                return yield Ok(PortalBatch::Completion(PortalCompletion::Complete(
+                                    CommandCompletion::CreateTable.to_pg_command(),
+                                )));
+                            }
+
                             let df = DFDataFrame::new(ctx.state.clone(), &plan);
                             let record_batch = df.collect();
                             let row_count = match record_batch.await {

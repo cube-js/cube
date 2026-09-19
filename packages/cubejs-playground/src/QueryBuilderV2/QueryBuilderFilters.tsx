@@ -118,27 +118,27 @@ export function QueryBuilderFilters({ onToggle }: { onToggle?: (isExpanded: bool
         ) : null
       }
       contentStyles={{ border: 'top' }}
-      onToggle={(isExpanded) => {
-        setIsExpanded(isExpanded);
-        onToggle?.(isExpanded);
+      onToggle={(nextIsExpanded) => {
+        setIsExpanded(nextIsExpanded);
+        onToggle?.(nextIsExpanded);
       }}
     >
       <Flow ref={filtersRef}>
         <Flex flow="column" gap=".75x" padding="1x">
           {dateRanges.list.map((dimensionName, i) => {
             const timeDimension = timeDimensions.find(
-              (timeDimension) => timeDimension.dimension === dimensionName
+              (candidateTimeDimension) => candidateTimeDimension.dimension === dimensionName
             );
 
             const dimension = members.dimensions[dimensionName];
             const cubeName = dimensionName.split('.')[0];
-            const cube = cubes.find((cube) => cube.name === cubeName);
+            const cube = cubes.find((candidateCube) => candidateCube.name === cubeName);
             const memberName = dimensionName.split('.')[1];
             const member = members.measures[dimensionName] || members.dimensions[dimensionName];
 
             return (
               <DateRangeFilter
-                key={i}
+                key={dimensionName}
                 isMissing={!dimension}
                 isCompact={isCompact}
                 name={dimensionName}
@@ -161,6 +161,8 @@ export function QueryBuilderFilters({ onToggle }: { onToggle?: (isExpanded: bool
             if ('and' in filter) {
               return (
                 <LogicalFilter
+                  // filters have no stable id, and a content-derived key would remount their inputs
+                  // eslint-disable-next-line react/no-array-index-key
                   key={index}
                   type="and"
                   values={filter.and}
@@ -169,8 +171,8 @@ export function QueryBuilderFilters({ onToggle }: { onToggle?: (isExpanded: bool
                   onRemove={() => {
                     filtersUpdater.remove(index);
                   }}
-                  onChange={(filter) => {
-                    filtersUpdater.update(index, filter);
+                  onChange={(nextFilter) => {
+                    filtersUpdater.update(index, nextFilter);
                   }}
                   onUnwrap={() => {
                     if (filter.and.length === 1) {
@@ -180,8 +182,8 @@ export function QueryBuilderFilters({ onToggle }: { onToggle?: (isExpanded: bool
                     }
 
                     filtersUpdater.remove(index);
-                    filter.and.forEach((filter) => {
-                      filtersUpdater.add(filter);
+                    filter.and.forEach((subFilter) => {
+                      filtersUpdater.add(subFilter);
                     });
                   }}
                 />
@@ -191,6 +193,8 @@ export function QueryBuilderFilters({ onToggle }: { onToggle?: (isExpanded: bool
             if ('or' in filter) {
               return (
                 <LogicalFilter
+                  // filters have no stable id, and a content-derived key would remount their inputs
+                  // eslint-disable-next-line react/no-array-index-key
                   key={index}
                   type="or"
                   values={filter.or}
@@ -199,8 +203,8 @@ export function QueryBuilderFilters({ onToggle }: { onToggle?: (isExpanded: bool
                   onRemove={() => {
                     filtersUpdater.remove(index);
                   }}
-                  onChange={(filter) => {
-                    filtersUpdater.update(index, filter);
+                  onChange={(nextFilter) => {
+                    filtersUpdater.update(index, nextFilter);
                   }}
                   onUnwrap={() => {
                     if (filter.or.length === 1) {
@@ -210,8 +214,8 @@ export function QueryBuilderFilters({ onToggle }: { onToggle?: (isExpanded: bool
                     }
 
                     filtersUpdater.remove(index);
-                    filter.or.forEach((filter) => {
-                      filtersUpdater.add(filter);
+                    filter.or.forEach((subFilter) => {
+                      filtersUpdater.add(subFilter);
                     });
                   }}
                 />
@@ -224,12 +228,14 @@ export function QueryBuilderFilters({ onToggle }: { onToggle?: (isExpanded: bool
 
             const memberFullName = filter.member;
             const cubeName = memberFullName.split('.')[0];
-            const cube = cubes.find((cube) => cube.name === cubeName);
+            const cube = cubes.find((candidateCube) => candidateCube.name === cubeName);
             const memberName = memberFullName.split('.')[1];
             const member = members.measures[memberFullName] || members.dimensions[memberFullName];
 
             return (
               <FilterMember
+                // filters have no stable id, and a content-derived key would remount their inputs
+                // eslint-disable-next-line react/no-array-index-key
                 key={index}
                 isMissing={!member}
                 isCompact={isCompact}
@@ -253,7 +259,7 @@ export function QueryBuilderFilters({ onToggle }: { onToggle?: (isExpanded: bool
           {segments.map((segment, i) => {
             const member = members.segments[segment];
             const cubeName = segment.split('.')[0];
-            const cube = cubes.find((cube) => cube.name === cubeName);
+            const cube = cubes.find((candidateCube) => candidateCube.name === cubeName);
             const memberName = segment.split('.')[1];
 
             return (

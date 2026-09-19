@@ -90,10 +90,11 @@ export function TimeListMember(props: TimeListMemberProps) {
   const name = member.name.replace(`${cube.name}.`, '').trim();
   const title = 'shortTitle' in member ? member.shortTitle : undefined;
   // @ts-ignore
-  const description = member.description;
+  const { description } = member;
   const isTimestampSelected = isSelected();
-  const definedGranularities =
-    (member.type === 'time' ? ('granularities' in member ? member?.granularities : []) : []) ?? [];
+  const definedGranularities = (member.type === 'time' && 'granularities' in member
+    ? member?.granularities
+    : []) ?? [];
   const definedGranularityNames = definedGranularities.map((g) => g.name);
   const nonPredefinedGranularityNames = [...definedGranularityNames];
   const { shownMemberName } = useShownMemberName({
@@ -106,23 +107,21 @@ export function TimeListMember(props: TimeListMemberProps) {
 
   selectedGranularities.forEach((granularity) => {
     if (
-      !nonPredefinedGranularityNames.includes(granularity) &&
-      !PREDEFINED_GRANULARITIES.includes(granularity)
+      !nonPredefinedGranularityNames.includes(granularity)
+      && !PREDEFINED_GRANULARITIES.includes(granularity)
     ) {
       nonPredefinedGranularityNames.push(granularity);
     }
   });
 
   const missingGranularities = selectedGranularities.filter(
-    (granularity) =>
-      !definedGranularityNames.includes(granularity) &&
-      !PREDEFINED_GRANULARITIES.includes(granularity)
+    (granularity) => !definedGranularityNames.includes(granularity)
+      && !PREDEFINED_GRANULARITIES.includes(granularity)
   );
 
-  const definedGranularitiesTitleMap = useMemo(() => {
-    return (
-      member.type === 'time' &&
-      definedGranularities?.reduce(
+  const definedGranularitiesTitleMap = useMemo(() => (
+    member.type === 'time'
+      && definedGranularities?.reduce(
         (map, granularity) => {
           map[granularity.name] = granularity.title;
 
@@ -130,8 +129,8 @@ export function TimeListMember(props: TimeListMemberProps) {
         },
         {} as Record<string, string>
       )
-    );
-  }, [member.type === 'time' ? definedGranularities : null]);
+  ),
+  [member.type === 'time' ? definedGranularities : null]);
 
   const allGranularityNames = nonPredefinedGranularityNames.concat(PREDEFINED_GRANULARITIES);
   const isGranularitySelectedMap: Record<string, boolean> = {};
@@ -142,33 +141,30 @@ export function TimeListMember(props: TimeListMemberProps) {
 
   const selectedGranularity = allGranularityNames.find((granularity) => isSelected(granularity));
 
-  const granularityItems = (items: string[], isCustom?: boolean) => {
-    return items.map((granularity: string) => {
-      if (!isOpen && !isGranularitySelectedMap[granularity]) {
-        return null;
-      }
+  const granularityItems = (items: string[], isCustom?: boolean) => items.map((granularity: string) => {
+    if (!isOpen && !isGranularitySelectedMap[granularity]) {
+      return null;
+    }
 
-      const title = definedGranularitiesTitleMap
-        ? definedGranularitiesTitleMap[granularity]
-        : titleize(granularity);
+    const granularityTitle = definedGranularitiesTitleMap
+      ? definedGranularitiesTitleMap[granularity]
+      : titleize(granularity);
 
-      return (
-        <GranularityListMember
-          key={`${name}.${granularity}`}
-          name={granularity}
-          title={title}
-          memberViewType={memberViewType}
-          isMissing={missingGranularities.includes(granularity)}
-          isCustom={isCustom}
-          isSelected={isGranularitySelectedMap[granularity]}
-          onToggle={() => {
-            onGranularityToggle(member.name, granularity);
-          }}
-        />
-      );
-    });
-  };
-
+    return (
+      <GranularityListMember
+        key={`${name}.${granularity}`}
+        name={granularity}
+        title={granularityTitle}
+        memberViewType={memberViewType}
+        isMissing={missingGranularities.includes(granularity)}
+        isCustom={isCustom}
+        isSelected={isGranularitySelectedMap[granularity]}
+        onToggle={() => {
+          onGranularityToggle(member.name, granularity);
+        }}
+      />
+    );
+  });
   const onPress = useEvent(() => {
     onToggle(!isOpen, member.name);
   });
@@ -176,8 +172,8 @@ export function TimeListMember(props: TimeListMemberProps) {
   const filterMenu = useMemo(() => {
     const dangerProps = isFiltered
       ? {
-          color: '#danger-text',
-        }
+        color: '#danger-text',
+      }
       : {};
     const disabledMenuKeys: string[] = [];
 
@@ -212,7 +208,7 @@ export function TimeListMember(props: TimeListMemberProps) {
                 onRemoveDataRange?.(member.name);
                 break;
               default:
-                return;
+                break;
             }
           }}
         >

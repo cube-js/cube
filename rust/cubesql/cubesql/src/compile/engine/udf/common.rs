@@ -463,7 +463,7 @@ pub fn create_if_udf() -> ScalarUDF {
         let base_type = common_type_coercion(&types[1], &types[2]).ok_or_else(|| {
             DataFusionError::Execution(format!(
                 "Positive and negative results must be the same type, actual: [{}, {}]",
-                &types[1], &types[2],
+                types[1], types[2],
             ))
         })?;
 
@@ -494,7 +494,7 @@ pub fn create_least_udf() -> ScalarUDF {
             base_type = common_type_coercion(&base_type, arg.data_type()).ok_or_else(|| {
                 DataFusionError::Execution(format!(
                     "Unable to coercion types, actual: [{}, {}]",
-                    &base_type,
+                    base_type,
                     arg.data_type(),
                 ))
             })?;
@@ -599,7 +599,7 @@ pub fn create_least_udf() -> ScalarUDF {
             base_type = common_type_coercion(&base_type, t).ok_or_else(|| {
                 DataFusionError::Execution(format!(
                     "Unable to coercion types, actual: [{}, {}]",
-                    &base_type, t,
+                    base_type, t,
                 ))
             })?;
         }
@@ -634,7 +634,7 @@ pub fn create_greatest_udf() -> ScalarUDF {
             base_type = common_type_coercion(&base_type, arg.data_type()).ok_or_else(|| {
                 DataFusionError::Execution(format!(
                     "Unable to coercion types, actual: [{}, {}]",
-                    &base_type,
+                    base_type,
                     arg.data_type(),
                 ))
             })?;
@@ -739,7 +739,7 @@ pub fn create_greatest_udf() -> ScalarUDF {
             base_type = common_type_coercion(&base_type, t).ok_or_else(|| {
                 DataFusionError::Execution(format!(
                     "Unable to coercion types, actual: [{}, {}]",
-                    &base_type, t,
+                    base_type, t,
                 ))
             })?;
         }
@@ -5382,10 +5382,16 @@ pub fn register_fun_stubs(mut ctx: SessionContext) -> SessionContext {
         vol = Stable
     );
     register_fun_stub!(udf, "unistr", tsig = [Utf8], rettyp = Utf8);
+    // In Postgres the bucket count is int4, but integer literals are parsed as Int64 here,
+    // and Int64 is never coerced down to Int32. Accept both so that a plain literal count
+    // like "width_bucket(x, 0, 100, 10)" plans.
     register_fun_stub!(
         udf,
         "width_bucket",
-        tsig = [Float64, Float64, Float64, Int32],
+        tsigs = [
+            [Float64, Float64, Float64, Int32],
+            [Float64, Float64, Float64, Int64],
+        ],
         rettyp = Int32
     );
     // TODO: "width_bucket" also has a two-arg variant with anyarray args

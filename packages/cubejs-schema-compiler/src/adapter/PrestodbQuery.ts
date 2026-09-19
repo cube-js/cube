@@ -1,4 +1,4 @@
-import { parseSqlInterval } from '@cubejs-backend/shared';
+import { parseSqlInterval, splitSqlInterval } from '@cubejs-backend/shared';
 import { BaseQuery } from './BaseQuery';
 import { BaseFilter } from './BaseFilter';
 
@@ -49,11 +49,34 @@ export class PrestodbQuery extends BaseQuery {
     return `from_iso8601_timestamp(${value})`;
   }
 
+  /**
+   * Lifts a DATE expression to a timestamp so that timezone arithmetic accepts
+   * it. `COALESCE` with a NULL timestamp resolves to the common supertype,
+   * which triggers the implicit DATE -> TIMESTAMP coercion while leaving both
+   * timestamp types intact. Deliberately not `CAST(... AS TIMESTAMP)`: that
+   * strips the zone off a `timestamp with time zone` expression, so the
+   * subsequent `AT TIME ZONE` reinterprets its wall clock in the session
+   * timezone and shifts the result.
+   *
+   * A promoted DATE lands on midnight and is then converted like any other
+   * naive timestamp, which moves its calendar date under a negative offset:
+   * `DATE '2024-01-15'` day-truncates to `2024-01-14` for `America/Los_Angeles`.
+   * That is what every other dialect does with a date column — `PostgresQuery`
+   * reaches the same bucket via `::timestamptz AT TIME ZONE` — so treating DATE
+   * specially here would diverge instead.
+   */
+  protected promoteDateToTimestamp(field: string): string {
+    return `COALESCE(${field}, CAST(NULL AS TIMESTAMP))`;
+  }
+
   public override convertTz(field) {
-    const atTimezone = `${field} AT TIME ZONE '${this.timezone}'`;
-    return this.timezone ?
-      `CAST(date_add('minute', timezone_minute(${atTimezone}), date_add('hour', timezone_hour(${atTimezone}), ${field})) AS TIMESTAMP)` :
-      field;
+    if (!this.timezone) {
+      return field;
+    }
+
+    const timestampField = this.promoteDateToTimestamp(field);
+    const atTimezone = `${timestampField} AT TIME ZONE '${this.timezone}'`;
+    return `CAST(date_add('minute', timezone_minute(${atTimezone}), date_add('hour', timezone_hour(${atTimezone}), ${timestampField})) AS TIMESTAMP)`;
   }
 
   /**
@@ -85,6 +108,25 @@ export class PrestodbQuery extends BaseQuery {
 
   public timeGroupedColumn(granularity, dimension) {
     return `date_trunc('${GRANULARITY_TO_INTERVAL[granularity]}', ${dimension})`;
+  }
+
+  public subtractInterval(date: string, interval: string): string {
+    return this.applyInterval('-', date, interval);
+  }
+
+  public addInterval(date: string, interval: string): string {
+    return this.applyInterval('+', date, interval);
+  }
+
+  /**
+   * A Presto INTERVAL literal carries a single unit, so a compound interval is applied one unit at
+   * a time, coarsest first.
+   */
+  private applyInterval(operator: '+' | '-', date: string, interval: string): string {
+    return splitSqlInterval(interval).reduce(
+      (acc, part) => `${acc} ${operator} interval ${this.intervalString(part)}`,
+      date
+    );
   }
 
   public intervalString(interval: string): string {
@@ -140,11 +182,18 @@ export class PrestodbQuery extends BaseQuery {
     templates.functions.DATETRUNC = 'DATE_TRUNC({{ args_concat }})';
     templates.functions.DATEPART = 'DATE_PART({{ args_concat }})';
     templates.functions.DATEDIFF = 'DATE_DIFF(\'{{ date_part }}\', {{ args[1] }}, {{ args[2] }})';
+    // DATEADD is being rewritten to DATE_ADD
+    templates.functions.DATE_ADD = 'DATE_ADD(\'{{ date_part }}\', {{ interval }}, {{ args[0] }})';
     templates.functions.CURRENTDATE = 'CURRENT_DATE';
     templates.functions.UTCTIMESTAMP = 'CAST(NOW() AT TIME ZONE \'UTC\' AS TIMESTAMP)';
     templates.functions.TRUNC = 'TRUNCATE({{ args_concat }})';
     templates.functions.STRING_AGG = 'ARRAY_JOIN(ARRAY_AGG({% if distinct %}DISTINCT {% endif %}{{ args[0] }}), COALESCE({{ args[1] }}, \'\'))';
+    // Presto has no exact percentile aggregate, so PERCENTILE_CONT cannot be pushed
+    // down. APPROX_PERCENTILE is the approximate one it does have, and it is the only
+    // way to evaluate a median here - including the one DataFusion rewrites
+    // APPROX_MEDIAN(expr) into, APPROXPERCENTILECONT(expr, 0.5).
     delete templates.functions.PERCENTILECONT;
+    templates.functions.APPROXPERCENTILECONT = 'APPROX_PERCENTILE({{ args_concat }})';
     templates.statements.select = '{% if ctes %} WITH \n' +
           '{{ ctes | join(\',\n\') }}\n' +
           '{% endif %}' +
@@ -177,6 +226,10 @@ export class PrestodbQuery extends BaseQuery {
     templates.tesseract.bool_param_cast = 'CAST({{ expr }} AS BOOLEAN)';
     templates.tesseract.number_param_cast = 'CAST({{ expr }} AS DOUBLE)';
     templates.filters.like_pattern = 'CONCAT({% if start_wild %}\'%\'{% else %}\'\'{% endif %}, LOWER({{ value }}), {% if end_wild %}\'%\'{% else %}\'\'{% endif %}) ESCAPE \'\\\'';
+    // Deliberately restated even though it currently matches the base value:
+    // the ESCAPE clause in the like_pattern above hardcodes this character, so
+    // the two have to move together. Inheriting it would let a change to the
+    // base silently desynchronise the escaping from the clause interpreting it.
     templates.filters.like_escape_char = '\\';
     templates.statements.time_series_select = 'SELECT from_iso8601_timestamp(dates.f) date_from, from_iso8601_timestamp(dates.t) date_to \n' +
     'FROM (\n' +

@@ -5,8 +5,13 @@
     "test"
   ],
   "compilerOptions": {
+    "types": ["node", "jest"],
     "outDir": "dist",
     "rootDir": ".",
-    "baseUrl": "."
-  }
+  },
+  "references": [
+    { "path": "../cubejs-backend-shared" },
+    { "path": "../cubejs-base-driver" },
+    { "path": "../cubejs-schema-compiler" }
+  ]
 }

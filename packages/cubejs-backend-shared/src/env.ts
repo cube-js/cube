@@ -2,6 +2,7 @@
 import { get } from 'env-var';
 import { displayCLIWarning, displayCLIWarningOnce } from './cli';
 import { isNativeSupported } from './platform';
+import { canonicalTimezone } from './timezone';
 
 export class InvalidConfiguration extends Error {
   public constructor(key: string, value: any, description: string) {
@@ -207,11 +208,22 @@ function asBoolOrTime(input: string, envName: string): number | boolean {
   );
 }
 
+const devMode = () => get('CUBEJS_DEV_MODE')
+  .default('false')
+  .asBoolStrict();
+
 const variables: Record<string, (...args: any) => any> = {
-  devMode: () => get('CUBEJS_DEV_MODE')
-    .default('false')
-    .asBoolStrict(),
+  devMode,
   logLevel: () => get('CUBEJS_LOG_LEVEL').asString(),
+  logRedaction: () => {
+    // Off in development mode as OptsHandler.isDevMode decides it: there the console is
+    // the log sink and runnable SQL is wanted
+    const isDevMode = process.env.NODE_ENV !== 'production' || devMode();
+
+    return get('CUBEJS_LOG_REDACTION')
+      .default(isDevMode ? 'false' : 'true')
+      .asBoolStrict();
+  },
   port: () => asPortOrSocket(process.env.PORT || '4000', 'PORT'),
   tls: () => get('CUBEJS_ENABLE_TLS')
     .default('false')
@@ -269,13 +281,25 @@ const variables: Record<string, (...args: any) => any> = {
   scheduledRefreshQueriesPerAppId: () => get('CUBEJS_SCHEDULED_REFRESH_QUERIES_PER_APP_ID').asIntPositive(),
   refreshWorkerConcurrency: () => get('CUBEJS_REFRESH_WORKER_CONCURRENCY')
     .asIntPositive(),
-  // eslint-disable-next-line consistent-return
   scheduledRefreshTimezones: () => {
-    const timezones = get('CUBEJS_SCHEDULED_REFRESH_TIMEZONES').asString();
+    const timezones = get('CUBEJS_SCHEDULED_REFRESH_TIMEZONES')
+      .default('')
+      .asArray()
+      .map(timezone => timezone.trim())
+      .filter(Boolean);
 
-    if (timezones) {
-      return timezones.split(',').map(t => t.trim());
-    }
+    return timezones.map(raw => {
+      const timezone = canonicalTimezone(raw);
+      if (!timezone) {
+        throw new InvalidConfiguration(
+          'CUBEJS_SCHEDULED_REFRESH_TIMEZONES',
+          raw,
+          'Must be a comma-separated list of valid IANA time zone names, e.g. UTC,America/Los_Angeles.'
+        );
+      }
+
+      return timezone;
+    });
   },
   preAggregationsBuilder: () => get('CUBEJS_PRE_AGGREGATIONS_BUILDER').asBool(),
   gracefulShutdown: () => get('CUBEJS_GRACEFUL_SHUTDOWN')
@@ -299,6 +323,27 @@ const variables: Record<string, (...args: any) => any> = {
   scheduledRefreshBatchSize: () => get('CUBEJS_SCHEDULED_REFRESH_BATCH_SIZE')
     .default('1')
     .asInt(),
+  /**
+   * Maximum number of compiled data models to keep in the in-memory compiler cache.
+   */
+  compilerCacheSize: () => {
+    const size = get('CUBEJS_COMPILER_CACHE_SIZE')
+      .default('250')
+      .asIntPositive();
+
+    // env-var's asIntPositive() lets 0 through, but every consumer of this option
+    // falls back to the default on a falsy value, so 0 would quietly mean 250
+    // instead of doing what it looks like it does.
+    if (size === 0) {
+      throw new InvalidConfiguration(
+        'CUBEJS_COMPILER_CACHE_SIZE',
+        size,
+        'Must be a positive integer. The compiler cache can not be disabled.',
+      );
+    }
+
+    return size;
+  },
   nativeSqlPlanner: () => {
     const explicitlySet = process.env.CUBEJS_TESSERACT_SQL_PLANNER !== undefined;
     const enabled = get('CUBEJS_TESSERACT_SQL_PLANNER').default('true').asBool();
@@ -338,10 +383,24 @@ const variables: Record<string, (...args: any) => any> = {
   nestedFoldersDelimiter: () => get('CUBEJS_NESTED_FOLDERS_DELIMITER')
     .default('')
     .asString(),
-  defaultTimezone: () => get('CUBEJS_DEFAULT_TIMEZONE')
-    .default('UTC')
-    .asString(),
+  defaultTimezone: () => {
+    const value = (get('CUBEJS_DEFAULT_TIMEZONE').asString() || '').trim() || 'UTC';
+
+    const timezone = canonicalTimezone(value);
+    if (!timezone) {
+      throw new InvalidConfiguration(
+        'CUBEJS_DEFAULT_TIMEZONE',
+        value,
+        'Must be a valid IANA time zone name, e.g. UTC or America/Los_Angeles.'
+      );
+    }
+
+    return timezone;
+  },
   preciseDecimalInCubestore: () => get('CUBEJS_DB_PRECISE_DECIMAL_IN_CUBESTORE')
+    .default('false')
+    .asBoolStrict(),
+  refreshKeyLocalTime: () => get('CUBEJS_REFRESH_KEY_LOCAL_TIME')
     .default('false')
     .asBoolStrict(),
 
@@ -1877,6 +1936,19 @@ const variables: Record<string, (...args: any) => any> = {
   cubeStoreNoHeartBeatTimeout: () => get('CUBEJS_CUBESTORE_NO_HEART_BEAT_TIMEOUT')
     .default('30')
     .asInt(),
+  /**
+   * Maximum size in bytes of a single message exchanged with Cube Store, both
+   * of a query sent to it and of a response received from it.
+   *
+   * It is the only limit that applies to responses, since Cube Store doesn't
+   * cap what it sends. For queries it is independent of, and by default looser
+   * than, CUBESTORE_TRANSPORT_MAX_MESSAGE_SIZE (64 MB), which is what Cube
+   * Store itself accepts: a query over that but under this one is refused by
+   * Cube Store rather than by this limit.
+   */
+  cubeStoreMaxMessageSize: () => get('CUBEJS_CUBESTORE_MAX_MESSAGE_SIZE')
+    .default(String(100 * 1024 * 1024))
+    .asIntPositive(),
   cubeStoreRollingWindowJoin: () => get('CUBEJS_CUBESTORE_ROLLING_WINDOW_JOIN')
     .default('true')
     .asBoolStrict(),
@@ -2001,6 +2073,7 @@ const variables: Record<string, (...args: any) => any> = {
     .default('true')
     .asBoolStrict(),
   queueExternalId: () => get('CUBEJS_QUEUE_EXTERNAL_ID').default('false').asBool(),
+  queueFastTrack: () => get('CUBEJS_QUEUE_FAST_TRACK').default('false').asBool(),
   scheduledRefreshDefault: () => get(
     'CUBEJS_SCHEDULED_REFRESH_DEFAULT'
   ).default('true').asBoolStrict(),
@@ -2053,7 +2126,7 @@ const variables: Record<string, (...args: any) => any> = {
 
 type Vars = typeof variables;
 
-export function getEnv<T extends keyof Vars>(key: T, opts?: Parameters<Vars[T]>): ReturnType<Vars[T]> {
+export function getEnv<T extends keyof Vars>(key: T, opts?: Parameters<Vars[T]>[0]): ReturnType<Vars[T]> {
   if (key in variables) {
     return variables[key](opts);
   }

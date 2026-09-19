@@ -1,16 +1,20 @@
 ---
 title: Controls
-description: Filter and time granularity switcher widgets that let dashboard viewers change what's shown on the dashboard.
+description: Filter, time granularity switcher, field switcher, and parent widgets that let dashboard viewers change what's shown on the dashboard.
 ---
 
-Controls are widgets that let dashboard viewers change what's shown without leaving the dashboard. The dashboard builder offers two control types — both target a dimension from your semantic model and apply the selected value to every [chart][ref-charts] on the dashboard whose query references that dimension.
+Controls are widgets that let dashboard viewers change what's shown without leaving the dashboard. The dashboard builder offers four control types:
 
 - [Filter](#filter) — Narrow the data shown on the dashboard
 - [Time granularity switcher](#time-granularity-switcher) — Change the granularity of time-based dimensions
+- [Field switcher](#field-switcher) — Swap which dimension or measure the charts are built on
+- [Parent](#parent) — Re-point several other controls at once from a single dropdown
+
+The first three each target a member from your semantic model, and apply the viewer's choice to every [chart][ref-charts] on the dashboard whose query references that member. Filters and time granularity switchers change *how a member is queried* — which rows come back, which buckets they fall into. A field switcher goes further and changes *which member is queried at all*. A parent control works one level up: it targets no member of its own and drives *other controls* instead.
 
 ## Filter
 
-Filter widgets let viewers narrow down the data shown on the dashboard. In the [dashboard builder][ref-workbooks], click **Filter** under **Add Controls** in the toolbar. The new filter is added in an unconfigured state — click **Configure Filter** (or open the widget's settings menu) to pick a semantic view and a dimension.
+Filter widgets let viewers narrow down the data shown on the dashboard. In the [dashboard builder][ref-workbooks], open the **Add Controls** menu in the toolbar and choose **Filter**. The new filter is added in an unconfigured state — click **Configure Filter** (or open the widget's settings menu) to pick a semantic view and a dimension.
 
 ### Operators by dimension type
 
@@ -33,7 +37,7 @@ You can set a default value that's applied when the dashboard loads. Defaults ar
 There are two ways to set a default:
 
 - **Static default** — pick a value (or values) directly in the filter. Every viewer sees the same default.
-- **User attribute default** — resolve the default from the viewer's [user attribute][ref-user-attributes] at load time, so each viewer sees their own personalized default.
+- **User attribute default** — resolve the default from the viewer's [user attribute][ref-user-attributes] at load time, so each viewer sees their own personalized default. [Time granularity switchers](#time-granularity-user-attribute-default), [field switchers](#field-switcher-user-attribute-default) and [parent controls](#parent-user-attribute-default) support this too.
 
 Static defaults are configured by interacting with the filter in the dashboard builder — the value you select is saved on the widget and applied to every viewer when the dashboard loads.
 
@@ -66,7 +70,9 @@ How the attribute value is matched to the filter:
 
 Empty, `null`, or unresolvable attribute values are skipped — the filter falls back to whatever static default it has, or no default if none is set.
 
-The user attribute default only seeds the filter's *initial* value. Viewers can still change the filter unless its [visibility](#visibility) is set to **Disabled**, in which case the resolved attribute value is locked in for that viewer. Values passed via URL parameters also take precedence over user attribute defaults, so deep links continue to work.
+The user attribute default only seeds the filter's *initial* value. Viewers can still change the filter unless its [visibility](#visibility) is set to **Disabled**, in which case the resolved attribute value is locked against their own edits. Values passed via URL parameters also take precedence over user attribute defaults, so deep links continue to work.
+
+If a [parent control](#parent) drives this filter, the option the viewer is on decides it — unless the link they opened carries a value for this filter, which [wins at load](#sharing-the-current-selection). One that [keeps the filter as-is](#children) lets the attribute seed it, and one set to **Reset to default** returns the filter to the value it opens on *for that viewer* — the attribute value when one resolves, otherwise its own static default; with neither, its default is no value, so the reset clears it. One set to **Clear** empties it and the attribute does *not* seed it back: the filter stays unfiltered until the viewer sets it or a value arrives [in the URL](#sharing-the-current-selection).
 
 ### Faceted filters
 
@@ -78,7 +84,7 @@ For example, on a sales dashboard with a **Country** filter and a **City** filte
 
 Time granularity switchers let viewers change the granularity of time-based dimensions on the dashboard — for example, switching a revenue chart from daily to weekly or monthly. The widget targets a single time dimension and applies the chosen [granularity][ref-granularities] to every chart that groups by that dimension.
 
-In the [dashboard builder][ref-workbooks], click **Time Granularity** under **Add Controls** in the toolbar. The new switcher is added in an unconfigured state — open its settings to pick a semantic view and a time dimension.
+In the [dashboard builder][ref-workbooks], open the **Add Controls** menu in the toolbar and choose **Time Granularity**. The new switcher is added in an unconfigured state — open its settings to pick a semantic view and a time dimension.
 
 ### Allowed granularities
 
@@ -86,31 +92,299 @@ By default, viewers can choose between **day**, **week**, **month**, **quarter**
 
 For time dimensions backed by a `TIMESTAMP` or `DATETIME` column, sub-day granularities (**second**, **minute**, **hour**) are also available. `DATE`-typed columns don't expose sub-day granularities, since they would bucket the entire day into a single point.
 
-Custom granularities defined in the [data model][ref-granularities] appear in the list alongside the built-in granularities.
+Custom granularities defined in the [data model][ref-granularities] aren't offered in this list yet — the switcher exposes the built-in granularities only.
 
 ### Default granularity
 
 You can configure a default granularity that's applied when the dashboard loads. If no default is set, charts use the granularity that was saved on the underlying report — viewers can still switch granularities, but the dashboard opens with each chart at its original granularity.
 
+#### User attribute default {#time-granularity-user-attribute-default}
+
+The default above is one granularity for everyone. To give each viewer their own, turn on **User attribute default** in the switcher's settings and pick a [user attribute][ref-user-attributes]. When the dashboard loads, Cube reads that attribute for the current viewer and opens the control on the granularity it names.
+
+This is how one dashboard opens at the interval each audience works in — daily for the operations team, monthly for the executives who read the same charts — from a single published dashboard.
+
+To configure it:
+
+<Steps>
+ <Step title="Open the switcher's settings">
+   In the dashboard builder, open the widget's settings menu and choose **Edit Control**.
+ </Step>
+ <Step title="Enable User attribute default">
+   Below **Visibility**, turn on the **User attribute default** switch.
+ </Step>
+ <Step title="Pick the attribute">
+   Select the [user attribute][ref-user-attributes] to resolve. Only attributes defined in your account appear in the picker.
+ </Step>
+</Steps>
+
+The attribute value is matched against the **granularity names** the switcher [allows](#allowed-granularities) — `day`, `week`, `month`, `quarter`, `year`, and `second`, `minute`, `hour` where the dimension exposes them — ignoring case and surrounding spaces, so an attribute reading `Week` resolves to `week`. The names are matched, not the labels the control displays, so one attribute works the same for viewers in every language.
+
+| Attribute type | How it's applied |
+|---|---|
+| **String**, **Number** | Matched against the granularity names as a single value. |
+| **String array**, **Number array** | The first entry that names an allowed granularity wins. The switcher is single-select, so the rest are ignored. |
+
+A value that isn't one of the switcher's [allowed granularities](#allowed-granularities) — or is empty, `null`, or unresolvable — is ignored rather than forced, and the control falls back to the [default granularity](#default-granularity). Attributes are set per user and the allowed list per dashboard, so the two can drift apart without anyone editing either; the safe reading of an unusable value is "no opinion".
+
+<Note>
+The attribute is resolved for the viewer, not baked into the dashboard. Editing the attribute's value changes what that viewer opens on the next time the dashboard loads; it never rewrites the published dashboard, so the default granularity you set in the builder stays intact for everyone else.
+</Note>
+
+Viewers can still switch granularities unless the control's [visibility](#visibility) is set to **Disabled**, and their own pick outranks the attribute for the rest of the session. A granularity passed [in the URL](#sharing-the-current-selection) outranks both, so deep links continue to work. If a [parent control](#parent) drives this switcher and the option the viewer is on maps a granularity to it, that mapping decides the granularity — a mapping the author made for that arrangement is more specific than a per-viewer starting point — unless a granularity for this switcher came [in the link](#sharing-the-current-selection), which wins at load. An option that [keeps the switcher as-is](#children) has no opinion, so the attribute still seeds it. One set to **Reset to default** returns the switcher to the granularity it opens on *for that viewer* — the attribute granularity when one resolves, otherwise the saved [default granularity](#default-granularity) — and clears it when neither resolves, a grain control's default being no grain. An option set to **Clear** empties the switcher and the attribute does *not* seed it back: it stays empty until the viewer picks a granularity or one arrives [in the URL](#sharing-the-current-selection), so each chart falls to the granularity it was built with.
+
+## Field switcher
+
+A field switcher lets viewers change *which* dimension or measure the charts are built on — swapping a revenue chart's breakdown from **Status** to **City**, or its measure from **Order count** to **Total revenue** — without leaving the dashboard or opening the report.
+
+Where a [filter](#filter) narrows the rows and a [time granularity switcher](#time-granularity-switcher) rebuckets them, a field switcher replaces the member itself in the chart's query. One dashboard can then answer several questions that would otherwise need a chart each.
+
+In the [dashboard builder][ref-workbooks], open the **Add Controls** menu in the toolbar and choose **Field Switcher**, then click **Configure Field Switcher** to set it up.
+
+### Choosing what it switches
+
+A field switcher works on one member kind at a time — set **Field Type** to either **Dimension** or **Measure**. The rest of the settings follow from that choice:
+
+| Setting | What it does |
+|---|---|
+| **Field Type** | Whether this control swaps a dimension or a measure. Switching the type resets the settings below it, since the two draw from different pools. |
+| **Dimension to Replace** / **Measure to Replace** | The member the charts are currently built on — the one this control stands in for. |
+| **Alternatives** | The members viewers may switch to. The replaced member is always offered as well, so a viewer can get back to the original view. |
+
+Alternatives come from the control's own semantic view, and must be the same kind as the replaced member — a dimension switcher offers dimensions, a measure switcher offers measures.
+
+### Default option {#field-switcher-default-option}
+
+The member a viewer starts on is set the same way a filter's static default is: by picking it in the control while you're in the dashboard builder. The selection is saved on the widget and applied to every viewer when the dashboard loads. If you never pick one, the dashboard opens on the replaced member.
+
+Removing a member from **Alternatives** after it was serving as the default clears the default, so viewers can't start on a member the control no longer offers.
+
+### Default granularity per option
+
+When a dimension switcher offers **time** dimensions, each of them can carry its own granularity, set under **Default granularity per option**.
+
+This exists because a swap otherwise inherits whatever granularity the chart already had. A viewer moving from **Created at** to a **Completed at** that only makes sense monthly would get the replaced dimension's daily buckets, and the author would have no way to say otherwise.
+
+Each time option is either pinned to a granularity or left at **Inherit from the chart**, which is the default and the behavior of every control configured before this setting existed. Non-time options don't have the setting, and a measure switcher has no granularities to speak of.
+
+If the dashboard also has a [time granularity switcher](#time-granularity-switcher) pointed at the swapped-in dimension, the viewer's own pick wins over the per-option granularity — a granularity a viewer actively chose outranks one the author set as a starting point. A granularity control nobody has touched does not.
+
+### User attribute default {#field-switcher-user-attribute-default}
+
+Like [filters](#user-attribute-default), [time granularity switchers](#time-granularity-user-attribute-default) and [parent controls](#parent-user-attribute-default), a field switcher can start each viewer on their own member. Turn on **User attribute default** in the control's settings and pick a [user attribute][ref-user-attributes]; when the dashboard loads, Cube reads that attribute for the current viewer and opens the control on the member it names.
+
+This is how one dashboard opens on the breakdown each audience cares about — a **Breakdown** switcher opening on `region` for one team and `channel` for another, from a single published dashboard.
+
+The attribute seeds the *selection*, exactly as the [default option](#field-switcher-default-option) does, and loses to a pick the viewer has already made. A member passed [in the URL](#sharing-the-current-selection) outranks both, so deep links keep working. If a [parent control](#parent) drives this switcher and the option the viewer is on maps a member to it, that mapping decides the member — unless a member for this switcher came [in the link](#sharing-the-current-selection), which wins at load. An option that [keeps the switcher as-is](#children) has no opinion, so the attribute still seeds it. One set to **Reset to default** returns the switcher to the member it opens on *for that viewer* — the attribute member when the switcher still offers it, otherwise its [default option](#field-switcher-default-option), and the member it replaces when no default option is set. A value that isn't among the **Alternatives** is ignored rather than forced: the attribute is set per user and the options are set per dashboard, so the two can drift apart without anyone editing either, and the safe reading of an unusable value is "no opinion" — the control falls back to the default option.
+
+### What the swap preserves
+
+The swapped-in member is queried under the replaced member's output name, so everything the chart configured against that column keeps working across a switch — column formatting, sorting, pivots, and conditional formatting rules all survive, rather than resetting each time the viewer picks a different member.
+
+### When a chart can't take the switch {#when-a-chart-cant-take-the-switch}
+
+Cube applies the switch in two places: to the SQL that runs, and to the query description the chart formats its results with. It applies the switch only if **both** take it — otherwise the chart would be labelled and formatted as one member while showing another's numbers, which nothing on screen would reveal.
+
+When only one half can take it, the chart keeps rendering the member it was built on and shows a notice reading **"The Field switcher could not be applied to this chart"**. The usual reason is a query Cube can't read back as semantic members — a hand-written one, or one built with a `JOIN` or `UNION`. The rest of the dashboard still switches.
+
+A chart whose query doesn't use the replaced member at all is a different case: it is simply out of the control's scope, exactly as it would be for a filter, and shows no notice.
+
+A chart with a [period comparison][ref-charts] is a narrower case: the comparison can't follow a member switch, so the chart applies the switch and drops the comparison, saying so in its own notice rather than silently showing a comparison that no longer matches the data.
+
+## Parent
+
+A parent control is a dropdown of options you define. Picking one re-points a whole row of other controls at once — so a viewer makes a single choice instead of adjusting three or four filters by hand.
+
+Unlike the other control types, a parent control targets no member and never touches a chart query directly. It applies values to the controls it *drives* — its **children** — and those children then apply themselves to charts exactly as if the viewer had operated each one. Filters, time granularity switchers and [field switchers](#field-switcher) can all be children; a parent control cannot be a child of another parent control.
+
+For example, an **Analysis** parent with the options `Retail`, `Wholesale` and `Promo` can set a **Channel** filter, a **Minimum order value** filter, and a **Date range** filter to a different combination for each option. Viewers see one dropdown; you can [hide](#visibility) the children if the individual values aren't worth showing.
+
+In the [dashboard builder][ref-workbooks], open the **Add Controls** menu in the toolbar and choose **Parent**, then click **Configure Parent** to set it up. The editor gives each option its own tab, and lists every filter, time granularity switcher and [field switcher](#field-switcher) on the dashboard inside it — so one tab is one complete arrangement, and you can read off what an option does to the whole row at a glance.
+
+<Info>
+A parent added to an empty dashboard has nothing to drive yet. A control added later appears in the tabs by itself, but is not driven until you save the parent's settings again.
+</Info>
+
+### Options
+
+Each option is a tab across the top of the editor. Add one with **+** at the end of the tab strip, double-click a tab's title to rename it — or press <kbd>F2</kbd> with the tab focused — and delete one with the ✕ that appears on it when you hover. The first tab cannot be deleted. A parent control can hold up to 50 options.
+
+A parent control created without options opens on a single tab named **Default**. That is a real option — saved with the control and offered in the viewer's dropdown like any other — so rename it if that label isn't what viewers should see.
+
+Renaming an option later doesn't disturb the values you've mapped to it, so you can reword a label without redoing the mapping — but if the control has a [user attribute default](#parent-user-attribute-default), that match is by label, so rename the attribute's values with it.
+
+### Children
+
+Each control on an option's tab carries a dropdown saying what that option does to it. Every option/child pair is in one of four states:
+
+| State | What happens when the viewer picks that option |
+|---|---|
+| **Set to** | The child is set to the value you choose. The row renders *that child's own control* — a time granularity switcher shows its granularity picker, limited to the granularities that switcher allows; a filter shows its operator and value inputs; a field switcher shows its member picker, limited to the members that switcher offers — its **Alternatives**, plus the replaced member. So the values you can offer are exactly the ones a viewer could pick in the child itself. |
+| **Clear** | The child stops applying, as if the viewer had cleared it: a filter leaves its charts unfiltered, a time granularity switcher hands each chart back to the granularity it was built with. Offered for filters and time granularity switchers only — a field switcher always resolves to some member, so it has no cleared state. |
+| **Reset to default** | The child is put back to the value it opens on *for that viewer*. When the child takes its default from a **User attribute default** — a [filter](#user-attribute-default)'s, a [time granularity switcher](#time-granularity-user-attribute-default)'s, or a [field switcher](#field-switcher-user-attribute-default)'s — that's the attribute value; otherwise it's the child's own static default: a filter's [default value](#default-values), a time granularity switcher's [default granularity](#default-granularity), a field switcher's [default option](#field-switcher-default-option) — and where the child has none, its default *is* no value, so the reset clears it: the filter stops filtering, the time granularity switcher stops imposing a granularity. (A field switcher never ends up empty: with no default option it resets to the member it replaces.) |
+| **Keep as-is** | The child is left alone — it keeps whatever value the viewer already had. Use this deliberately when an option shouldn't have an opinion about a particular child. |
+
+A control you haven't touched on a tab still reads as one of these: the **first** tab starts every control on **Reset to default**, and every later tab starts them on **Keep as-is**, so a new option changes only what you actually set. The first tab's displayed defaults become real mappings when you save — see [what a save writes](#mapping-status-on-child-controls).
+
+While the parent's settings are open, the controls it drives are outlined on the canvas, so you can see the scope of the mapping at a glance.
+
+### One parent per child
+
+A control can be driven by only one parent control at a time. Saving a parent **moves** onto it every control it drives, rather than sharing them — and that includes rows you never touched on the **first** option's tab, since [the save](#mapping-status-on-child-controls) writes the **Reset to default** they display. The row names the parent that currently owns it, on any row this parent would drive. A row left **Keep as-is** is the exception: it's the one state that doesn't drive, so it moves nothing.
+
+### Mapping status on child controls
+
+Once a dashboard has at least one parent control, every filter, time granularity switcher and [field switcher](#field-switcher) on it shows a small indicator reporting how it's driven:
+
+| Status | Meaning |
+|---|---|
+| **Fully driven** | Every option of the owning parent drives this control. |
+| **Partly driven** | Only some of the owning parent's options drive this control; the rest keep it as-is. |
+| **Not driven** | No parent control drives this one — the parent hasn't been saved since this control was added, every option keeps it as-is, or it was detached with [**Driven by parent** → **None**](#driven-by-parent). |
+
+**Set to**, **Clear** and **Reset to default** all count as driving — each is something the option does to the control; only **Keep as-is** doesn't.
+
+Saving the parent's settings fills in the **first** option's tab: every row there with no mapping yet is written as the [**Reset to default** it displays](#children), and no later tab is touched. So a parent that still has only its first option drives *every* control on the dashboard the moment you save it, each reading **Fully driven** before you have mapped anything by hand. Add a second option and saving moves them the other way: it leaves untouched controls as-is, so those same controls read **Partly driven** until that option drives them too.
+
+This reaches controls another parent already drove. [Only one parent drives a control](#one-parent-per-child), so saving a second parent takes them over.
+
+The [**Keep as-is** exception](#one-parent-per-child) is how you keep a control with its original parent: set it to **Keep as-is** on the second parent's first option, so its save writes nothing for that control — and leave the control alone on that parent's other options, since any one of them driving it claims the control anyway.
+
+So on a dashboard with more than one parent control, map the one you are editing deliberately rather than saving it to dismiss the dialog — the [owner note](#one-parent-per-child) tells you which controls a save would claim, but only if you read the rows.
+
+Click the indicator to open that control's own settings, at its **Driven by parent** section.
+
+### Driven by parent
+
+Once a dashboard has a parent control, every filter, time granularity switcher and [field switcher](#field-switcher) carries a **Driven by parent** section in its own settings. It names the parent driving the control, or offers only **None** when nothing drives it yet, so you can see what drives a control without opening the parent. Picking **None** detaches a driven control: the parent's mappings for it are dropped on every option, so it stops driving, and the control keeps whatever value it is showing.
+
+That detachment is not durable on its own: it holds only until the parent's settings are next saved, which drives the control again. To survive that parent's own saves, set the control to **Keep as-is** on the parent's **first** option — that is a mapping of its own, and [the save](#mapping-status-on-child-controls) fills in only controls that have none. The later options need nothing, since **None** has already cleared their mappings and untouched means **Keep as-is** there. That binds only the parent you set it in — a *different* parent claims the control on its own save unless you set it to **Keep as-is** on that parent's first option too.
+
+Mapping is the one thing you cannot do from here — the values belong to the parent's options. To map a control, or hand it to a different parent, open that parent's settings and set the control's row on each option's tab.
+
+### Default option
+
+A parent control's default is set the same way a filter's static default is — by interacting with the control in the dashboard builder. The option you select is saved on the widget and applied to every viewer when the dashboard loads; there's no static default field in the parent's settings.
+
+Picking in the builder also applies that option to the children and saves the result, so a published dashboard opens in a consistent state. What each state saves:
+
+| State | What picking it in the builder saves |
+|---|---|
+| **Set to** | Its value, as the child's default. |
+| **Clear** | The child empty, discarding the default it had. |
+| **Reset to default** | The child's own default — or the child empty where it has none, which is a clear for a filter or a time granularity switcher, and for a field switcher means no saved member, so it opens on the one it replaces. |
+| **Keep as-is** | Nothing, so that child keeps the default it already had and is not part of the arrangement you picked. |
+
+A reset that resolved its value from *your* [user attribute](#user-attribute-default) saves the child empty, so your own value is never pinned onto everyone and each viewer re-seeds from their own attribute. That clears the child's saved default too: a viewer whose attribute doesn't resolve then has nothing to fall back on, so re-set that default by hand if you want it kept.
+
+If you never pick an option, the parent opens with nothing selected and the children use their own defaults. [Clearing the parent](#clearing-and-resetting) later leaves the children where they are. So a parent that opens on nothing is not the same as children on their original defaults: pick an option in the builder and then clear the parent, and the children keep the defaults that option wrote. Set them by hand if that isn't what you want to publish. Deleting the option that was serving as the default clears it, and the parent goes back to opening on nothing.
+
+#### User attribute default {#parent-user-attribute-default}
+
+The default above is one arrangement for everyone. To give each viewer their own, turn on **User attribute default** in the parent control's settings and pick a [user attribute][ref-user-attributes]. When the dashboard loads, Cube reads that attribute for the current viewer and opens the control on the option it names — and drives the children with it, exactly as if the viewer had picked that option themselves.
+
+This is how you ship one dashboard that opens differently per audience: a **Reporting period** parent whose options are `Month` and `Quarter`, opening on whichever one the viewer's `reporting_period` attribute says, with every control behind it already set to match.
+
+To configure it:
+
+<Steps>
+ <Step title="Open the parent control's settings">
+   In the dashboard builder, click **Configure Parent** on the control.
+ </Step>
+ <Step title="Enable User attribute default">
+   Below the option tabs — next to **Visibility** — turn on the **User attribute default** switch.
+ </Step>
+ <Step title="Pick the attribute">
+   Select the [user attribute][ref-user-attributes] to resolve. Only attributes defined in your account appear in the picker.
+ </Step>
+</Steps>
+
+The attribute value is matched against the **option labels**, ignoring case and surrounding spaces — an attribute reading `quarter` selects the option labelled `Quarter`. Give the options the labels your attribute already uses, or adjust the attribute values to match.
+
+<Warning>
+Renaming an option leaves its child mappings intact, but the attribute match is by label — so a rename that moves a label away from the values your attribute holds silently stops it resolving, with no error. The control falls back to the option you picked as the default. Rename labels and attribute values together.
+</Warning>
+
+| Attribute type | How it's applied |
+|---|---|
+| **String**, **Number** | Matched against the option labels as a single value. |
+| **String array**, **Number array** | The first entry that names an option wins. A parent control is single-select, so the rest are ignored. |
+
+If the value matches no option — or is empty, `null`, or unresolvable — the control falls back to the [default option](#default-option) you picked, and the children keep the arrangement that goes with it.
+
+<Note>
+The attribute is resolved for the viewer, not baked into the dashboard. Editing the attribute's value changes what that viewer opens on the next time the dashboard loads; it never rewrites the published dashboard, so the default you picked in the builder stays intact for everyone else.
+</Note>
+
+Viewers can still switch to another option unless the control's [visibility](#visibility) is set to **Disabled**, and their own pick outranks the attribute for the rest of the session. A shared link never changes which option the recipient opens on: a parent control has no parameter of its own, so they resolve their own attribute, or the [default option](#default-option), exactly as they would without a link. What a link does carry is the children of an option the sharer picked **by hand** — the values of the ones it **Set to** — and [those win at load](#sharing-the-current-selection) over what the recipient's own option would have set. An option that resolved from the sharer's own attribute puts [nothing in the link](#sharing-the-current-selection), children included, so the recipient's own option decides every child it drives. A control the sharer set by hand still travels by the ordinary rules.
+
+## Clearing and resetting
+
+Every control offers at most one of two actions in the control itself, beside its dropdown arrow:
+
+| Action | When it shows | What it does |
+|---|---|---|
+| **Clear** (✕) | The control has a value, and is not a [field switcher](#field-switcher) — that one carries no ✕. | Stops applying the control: a cleared filter leaves its charts unfiltered, and a cleared switcher hands each chart back to the granularity or member it was built with. Clearing a [parent control](#parent) mid-session only deselects it: the parent stops driving, and each child keeps the value it is showing rather than reverting. |
+| **Reset to default** (↩) | The control has been changed, it has a value published in the last dashboard version, and the two differ. | Puts the control back on that published value. |
+
+<Note>
+This is the control's *own* published value, which is not always what a [parent control](#parent) means by its **Reset to default** [child mapping](#children): despite the shared label, that one returns the child to the value it opens on *for that viewer*.
+</Note>
+
+**Reset to default** takes the one action slot in the control whenever it applies, so a control that has drifted from its published value offers the way back rather than the way to empty. The dropdown header is not limited that way — whichever of the two apply are there as text links, **Reset** to the left of **Clear** — and neither closes the dropdown.
+
+On a published dashboard, clearing or resetting changes only what that viewer sees, and writes nothing back to the dashboard. [Neither action is recorded in the URL](#sharing-the-current-selection), so a reload reopens the control on whatever it opens on for that viewer. A control whose [visibility](#visibility) is **Disabled** greys out whichever action it shows, so a viewer can see the state without changing it.
+
+In the [dashboard builder][ref-workbooks] both write the draft. **Reset to default** returns the control to the published value, so that control has no unsaved change left on it. **Clear** removes the control's saved default, which viewers see once you publish; clearing a [parent control](#parent) removes its own saved option and leaves the children's saved defaults alone.
+
+## Sharing the current selection
+
+On a published dashboard, the values a viewer picks in the controls are reflected in the URL, so the view they are looking at is bookmarkable and shareable. Copy the address bar, send it on, and the recipient opens the dashboard with the same filters, granularities and member choices applied.
+
+Each control type has its own parameter:
+
+| Control | Parameter | Example |
+|---|---|---|
+| [Filter](#filter) | `f_<semantic_view>.<dimension>=<JSON>` | `f_orders.status={"value":"shipped"}` |
+| [Time granularity switcher](#time-granularity-switcher) | `tg_<semantic_view>.<dimension>=<granularity>` | `tg_orders.created_at=week` |
+| [Field switcher](#field-switcher) | `ms_<semantic_view>.<replaced_member>=<selected_member>` | `ms_orders.status=users_city` |
+
+The semantic view and member are the **internal names** configured on the control — not the display titles you see in the picker. A view shown as `Orders` is usually `orders` in the parameter. The same goes for the member on the right-hand side of `ms_`: it is the internal name of the member to switch to, and it is a measure rather than a dimension when the switcher's **Field Type** is **Measure**. Granularities are lowercase and must be one of the switcher's [allowed granularities](#allowed-granularities) — `day`, `week`, `month`, `quarter`, `year`, plus `second`, `minute`, and `hour` for time dimensions that expose them.
+
+You can also write these parameters by hand to open a dashboard in a particular state — see [Pre-set dashboard filters and granularities via URL][ref-embed-url-filters] for the embedded case, which uses the same format.
+
+What travels in the link, and what wins when a link value arrives:
+
+- **Only what the viewer chose.** Values that came from the control's own configuration — a static default, a [default granularity](#default-granularity) — are not written into the URL. Every viewer already gets those from the dashboard itself, and leaving them out means a link stays correct after the dashboard's defaults change.
+- **Never a personalized default.** A value resolved from a [user attribute](#user-attribute-default) stays out of the link — whether it seeded a filter, a [time granularity switcher](#time-granularity-user-attribute-default) or a [field switcher](#field-switcher-user-attribute-default) directly, or reached one through a [parent control](#parent) opening on the viewer's own option. Sharing a dashboard never pins your attribute value onto the recipient; they see it through their own attributes.
+- **Every control's pick, together.** Picking in several controls puts them all in the link, including when a [parent control](#parent) sets several children at once — filters, time granularity switchers and [field switchers](#field-switcher) alike. A parent control isn't serialized itself — the link carries the values the **Set to** children of an option the sharer *picked* ended up with, while the parent dropdown opens on whatever default it resolves for the recipient, which may not be that option. An option the sharer never picked, resolved from the default or their own attribute, seeds its children as defaults and puts nothing in the link. What happens to children the option cleared or reset is the bullet below.
+- **Neither a clear nor a reset.** [Clearing or resetting](#clearing-and-resetting) a control drops its parameter rather than recording the result, so the control is indistinguishable in the link from one nobody touched and the recipient opens it on whatever it opens on for them. The same holds for [what a parent option did](#children) to its children: of the four states, only **Set to** puts a value in the link by way of the option. **Clear** leaves the child empty, and **Reset to default** lands it on a configuration or attribute value — or clears it where the child has no default — none of which go in the URL, by **Only what the viewer chose** and **Never a personalized default** above. So for either state the link carries nothing for that child. A child left **Keep as-is** is untouched by the option, so it travels or not by the rules above: the viewer's own earlier pick is in the link, a default is not.
+- **A link value wins at load.** A parent opening on its own resolved option leaves alone any control the link claimed, so the recipient sees the shared value rather than what that option maps. For a child the link carries nothing for, their own option decides: the same option as the sharer's re-applies that clear or reset, a different one does whatever it maps, and a parent resolving no option leaves the control on its own default. Picking an option by hand afterwards applies it, link or no link.
+- **Written out on published dashboards only.** Reading these parameters works anywhere, including [embedded][ref-embed-url-filters] dashboards; it's the writing that is published-only. In the dashboard builder the URL is left to the editing session, so changing a control there doesn't rewrite it.
+
+When a dashboard opens with these parameters, they are applied on top of whatever defaults the controls carry. A parameter is ignored when nothing on the dashboard can honor it — there is no matching control for that member, the requested granularity isn't in the switcher's [allowed granularities](#allowed-granularities), or the selected member is one the field switcher doesn't offer — its **Alternatives**, plus the replaced member.
+
 ## Visibility
 
-Each control has a **Visibility** setting that determines how it appears on the published dashboard. The setting applies to both filters and time granularity switchers.
+Each control has a **Visibility** setting that determines how it appears on the published dashboard. The setting applies to all four control types.
 
 | Visibility | Behavior on the published dashboard |
 |---|---|
 | **Visible** (default) | Shown on the dashboard and viewers can change its value. |
-| **Hidden** | Not shown to viewers, but the control's value is still applied to the charts it targets. Use this to scope a dashboard with a fixed value — e.g., always filter to the current quarter — without exposing the control. |
-| **Disabled** | Shown on the dashboard so viewers can see the active value, but they cannot change it. |
+| **Hidden** | Not shown to viewers, but the control's value is still applied to the charts it targets. Use this to scope a dashboard with a fixed value — e.g., always filter to the current quarter — without exposing the control. Hiding the *children* of a [parent control](#parent) is the usual way to present one dropdown instead of the row of controls behind it. |
+| **Disabled** | Shown on the dashboard so viewers can see the active value, but they cannot change it. A [parent control](#parent) still drives a Disabled child — the setting stops the viewer, not the parent. |
 
 Set the visibility from the **Visibility** dropdown when editing the control. **Hidden** controls remain visible in the dashboard builder so editors can reconfigure them, but disappear from the published view.
 
 ## Interaction with charts
 
-When a control is added to a dashboard, it's automatically wired up to every [chart][ref-charts] whose query already uses the same dimension. Charts that don't reference that dimension are left alone, so a dashboard can mix scoped and unscoped views by default. You can override this default per chart from its [Controls mapping](#controls-mapping) — disable the control for that chart, or remap it onto a different dimension.
+This section applies to filters, time granularity switchers and field switchers. A [parent control](#parent) has no member of its own and never applies to a chart itself, so it doesn't appear in any chart's [Controls mapping](#controls-mapping) — it acts only through the children it drives, and it's those children that show up here.
+
+When a control is added to a dashboard, it's automatically wired up to every [chart][ref-charts] whose query already uses the same member. Charts that don't reference that member are left alone, so a dashboard can mix scoped and unscoped views by default. Filters and time granularity switchers always target a dimension; a [field switcher](#field-switcher) targets a dimension or a measure depending on its **Field Type**, and scopes on whichever it is set to. You can override this default per chart from its [Controls mapping](#controls-mapping) — disable the control for that chart, or remap it onto a different member.
 
 ### Incompatible controls
 
-If controls of a certain type are incompatible with a particular chart's query, the chart skips all controls of that type and renders the data without them. Controls of the other type still apply — for example, if filters fail but a time granularity switcher works, the chart shows the granularity-adjusted data without filtering, and vice versa.
+If controls of a certain type are incompatible with a particular chart's query, the chart skips all controls of that type and renders the data without them. Each type is skipped independently — if filters fail but a time granularity switcher works, the chart shows the granularity-adjusted data without filtering, and vice versa. A [field switcher](#field-switcher) that can't be applied says so [on the chart itself](#when-a-chart-cant-take-the-switch) rather than through the icons below.
 
 The chart displays a warning icon to indicate the problem:
 
@@ -123,26 +397,34 @@ Hover over the icon for details. Click it to open the chart's [Controls mapping]
 
 ### Controls mapping
 
-Each chart decides which controls apply to it through its **Controls mapping**. The mapping is resolved automatically in most cases and only needs manual attention when a control targets a dimension the chart doesn't have.
+Each chart decides which controls apply to it through its **Controls mapping**. The mapping is resolved automatically in most cases and only needs manual attention when a control targets a member the chart doesn't have.
 
 Open **Controls mapping** from a chart's settings menu to inspect or override the mapping for that chart. For each control on the dashboard you can:
 
 - **Toggle the control on or off** for the chart, even when a mapping exists
-- **Pick a different dimension** from the chart's semantic view to remap the control to
+- **Pick a different member** from the chart's semantic view to remap the control to
 
 Three states show up in the mapping sidebar:
 
 | Status | What it means |
 |---|---|
-| **Mapped automatically** | The control's dimension exists on the chart's semantic view, so it's wired up without configuration. |
-| **Manually mapped** | You (or an AI agent) picked a specific dimension for this chart. **Reset** restores the automatic mapping. |
-| **Can't map automatically** | The control targets a dimension that doesn't exist on the chart's semantic view. The chart is unaffected by the control until you map it manually. |
+| **Mapped automatically** | The control's member exists on the chart's semantic view, so it's wired up without configuration. |
+| **Manually mapped** | You (or an AI agent) picked a specific member for this chart. **Reset** restores the automatic mapping. |
+| **Can't map automatically** | The control targets a member that doesn't exist on the chart's semantic view. The chart is unaffected by the control until you map it manually. |
 
-For [time granularity switchers][ref-time-grain], the dimension picker is restricted to time-typed dimensions on the chart's semantic view, since other dimension types can't be resolved by the time granularity pipeline.
+Each control's picker offers only the members it can actually be resolved against, so a mapping you can stage is a mapping that will work:
 
-Mappings are also configurable by AI agents when they build or edit a dashboard, so an agent can wire controls across charts that use different semantic views without you needing to revisit each chart manually.
+| Control | What the picker offers |
+|---|---|
+| [Filter](#filter) | Dimensions on the chart's semantic view. |
+| [Time granularity switcher](#time-granularity-switcher) | Time-typed dimensions only — other types can't be resolved by the time granularity pipeline. |
+| [Field switcher](#field-switcher) set to **Dimension** | Dimensions. |
+| [Field switcher](#field-switcher) set to **Measure** | Measures, since the control replaces a measure. |
 
-[ref-time-grain]: #time-granularity-switcher
+For filter, time granularity, and field switcher controls — the three that map onto a member — the [Workbook Agent][ref-workbook-agent] can set the same per-chart overrides you would from **Controls mapping**: exclude a chart from a filter, or remap any of the three onto a different member for one chart. That lets it wire these controls across charts on different semantic views without you revisiting each chart manually.
+
+[ref-embed-url-filters]: /embedding/iframe/dashboards#pre-set-dashboard-filters-via-url
+[ref-workbook-agent]: /docs/explore-analyze/workbooks/workbook-agent
 
 [ref-workbooks]: /docs/explore-analyze/workbooks
 [ref-charts]: /docs/explore-analyze/dashboards/widgets/charts

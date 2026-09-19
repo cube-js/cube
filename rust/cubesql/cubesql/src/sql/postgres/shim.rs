@@ -7,18 +7,22 @@ use super::{
     ast_helpers::parse_fetch_limit, error::ConnectionError, extended::PreparedStatement,
     pg_auth_service::AuthenticationStatus,
 };
+use crate::sql::statement::{redact_error_message, redact_sql_literals, redacted_query_key};
 use crate::{
     compile::{
         convert_statement_to_cube_query,
         parser::{parse_sql_to_statement, parse_sql_to_statements},
         qtrace::Qtrace,
-        CommandCompletion, CompilationError, DatabaseProtocol, QueryPlan, StatusFlags,
+        CommandCompletion, CompilationError, CopyFromPlan, DatabaseProtocol, QueryPlan,
+        StatusFlags,
     },
     sql::{
         compiler_cache::CompilerCacheEntry,
         df_type_to_pg_tid,
         extended::{Cursor, Portal, PortalBatch, PortalFrom, ResultFormat},
+        postgres::copy::CopyFromDecoder,
         statement::{PostgresStatementParamsFinder, StatementPlaceholderReplacer},
+        temp_tables::TempTableManager,
         AuthContextRef, Session, SessionState,
     },
     telemetry::ContextLogger,
@@ -76,7 +80,11 @@ impl QueryPlanExt for QueryPlan {
         format: &ResultFormat,
     ) -> Result<Option<protocol::RowDescription>, ConnectionError> {
         match &self {
-            QueryPlan::MetaOk(_, _) | QueryPlan::CreateTempTable(_, _, _, _) => Ok(None),
+            // COPY FROM STDIN replies with CopyInResponse instead of a row description
+            QueryPlan::MetaOk(_, _)
+            | QueryPlan::CopyFrom(_)
+            | QueryPlan::CreateEmptyTempTable(_)
+            | QueryPlan::CreateTempTable(_, _, _, _, _) => Ok(None),
             QueryPlan::MetaTabular(_, frame) => {
                 let mut result = vec![];
 
@@ -250,7 +258,7 @@ impl AsyncPostgresShim {
 
             let result = match message {
                 protocol::FrontendMessage::Query(body) => {
-                    let span_id = Self::new_span_id(body.query.clone());
+                    let span_id = self.new_span_id(body.query.clone());
                     let mut qtrace = Qtrace::new(&body.query);
                     if let Some(qtrace) = &qtrace {
                         debug!("Assigned query UUID: {}", qtrace.uuid())
@@ -258,7 +266,7 @@ impl AsyncPostgresShim {
                     let result = self
                         .process_query(body.query, &mut qtrace, span_id.clone())
                         .await
-                        .map_err(|e| e.with_span_id(span_id));
+                        .map_err(|e| e.with_span_id(Some(span_id)));
                     if let Some(qtrace) = &qtrace {
                         qtrace.save_json()
                     }
@@ -273,7 +281,7 @@ impl AsyncPostgresShim {
                     }
                     doing_extended_query_message = true;
                     let mut qtrace = Qtrace::new(&body.query);
-                    let span_id = Self::new_span_id(body.query.clone());
+                    let span_id = self.new_span_id(body.query.clone());
                     if let Some(qtrace) = &qtrace {
                         debug!("Assigned query UUID: {}", qtrace.uuid())
                     }
@@ -283,12 +291,12 @@ impl AsyncPostgresShim {
                             .server
                             .transport
                             .log_load_state(
-                                span_id.clone(),
+                                Some(span_id.clone()),
                                 auth_context,
                                 self.session.state.get_load_request_meta("sql"),
                                 "Load Request".to_string(),
                                 serde_json::json!({
-                                    "query": span_id.as_ref().unwrap().query_key.clone(),
+                                    "query": span_id.query_key.clone(),
                                     // Hide query by default until Execute
                                     "isDataQuery": false,
                                 }),
@@ -296,9 +304,9 @@ impl AsyncPostgresShim {
                             .await?;
                     }
                     let result = self
-                        .parse(body, &mut qtrace, span_id.clone())
+                        .parse(body, &mut qtrace, Some(span_id.clone()))
                         .await
-                        .map_err(|e| e.with_span_id(span_id));
+                        .map_err(|e| e.with_span_id(Some(span_id)));
                     if let Err(err) = &result {
                         if let Some(qtrace) = &mut qtrace {
                             qtrace.set_query_error_message(&err.to_string())
@@ -419,6 +427,14 @@ impl AsyncPostgresShim {
 
                     continue;
                 }
+                // PostgreSQL drops leftovers of an aborted or finished copy
+                protocol::FrontendMessage::CopyData(_)
+                | protocol::FrontendMessage::CopyDone
+                | protocol::FrontendMessage::CopyFail(_) => {
+                    trace!("[pg] Ignoring COPY data received outside of a COPY FROM STDIN");
+
+                    continue;
+                }
                 command_id => {
                     return Err(ConnectionError::Protocol(
                         ErrorResponse::error(
@@ -440,11 +456,23 @@ impl AsyncPostgresShim {
         }
     }
 
-    fn new_span_id(sql: String) -> Option<Arc<SpanId>> {
-        Some(Arc::new(SpanId::new(
-            Uuid::new_v4().to_string(),
-            serde_json::json!({ "sql": sql }),
-        )))
+    fn new_span_id(&self, sql: String) -> Arc<SpanId> {
+        let redacted_query_key = redacted_query_key(&sql, self.log_redaction());
+        Arc::new(
+            SpanId::new(
+                Uuid::new_v4().to_string(),
+                serde_json::json!({ "sql": sql }),
+            )
+            .with_redacted_query_key(redacted_query_key),
+        )
+    }
+
+    fn log_redaction(&self) -> bool {
+        self.session
+            .session_manager
+            .server
+            .config_obj
+            .log_redaction()
     }
 
     pub async fn handle_connection_error(
@@ -492,8 +520,30 @@ impl AsyncPostgresShim {
             trace!("Backtrace: not found");
         }
 
+        // Redacted twins travel beside the originals: the log sink swaps them in,
+        // APM events and the client keep the statement and message as sent
+        let query = props
+            .as_ref()
+            .filter(|_| self.log_redaction())
+            .and_then(|props| props.get("query"));
+        let (redacted_query, redacted_error) = match query {
+            Some(query) => (
+                Some(redact_sql_literals(query)),
+                Some(redact_error_message(&message, query)),
+            ),
+            None => (None, None),
+        };
+
         if let Some(auth_context) = self.session.state.auth_context() {
             if let Some(span_id) = err.span_id() {
+                let mut properties = serde_json::json!({
+                    "query": span_id.query_key.clone(),
+                    "error": message.clone(),
+                    "duration": span_id.duration(),
+                });
+                if let Some(redacted_error) = &redacted_error {
+                    properties["redactedError"] = serde_json::json!(redacted_error);
+                }
                 self.session
                     .session_manager
                     .server
@@ -503,11 +553,7 @@ impl AsyncPostgresShim {
                         auth_context,
                         self.session.state.get_load_request_meta("sql"),
                         "SQL API Error".to_string(),
-                        serde_json::json!({
-                            "query": span_id.query_key.clone(),
-                            "error": message.clone(),
-                            "duration": span_id.duration(),
-                        }),
+                        properties,
                     )
                     .await?;
             }
@@ -526,7 +572,16 @@ impl AsyncPostgresShim {
             None => err.to_error_response(),
         };
 
-        self.logger.error(message.as_str(), props);
+        let log_props = props.map(|mut props| {
+            if let Some(redacted_query) = redacted_query {
+                props.insert("redactedQuery".to_string(), redacted_query);
+            }
+            if let Some(redacted_error) = redacted_error {
+                props.insert("redactedError".to_string(), redacted_error);
+            }
+            props
+        });
+        self.logger.error(message.as_str(), log_props);
 
         self.write(err_response).await?;
 
@@ -862,6 +917,23 @@ impl AsyncPostgresShim {
 
     /// https://github.com/postgres/postgres/blob/REL_14_4/src/backend/commands/portalcmds.c#L167
     pub async fn execute(&mut self, execute: protocol::Execute) -> Result<(), ConnectionError> {
+        // COPY FROM STDIN reads its data from the connection, so it is executed here
+        // rather than by the portal
+        let copy_from = self
+            .portals
+            .get_mut(&execute.portal)
+            .and_then(|portal| portal.take_copy_from());
+        if let Some(plan) = copy_from {
+            let cancel = self
+                .session
+                .state
+                .begin_query(format!("portal #{}", execute.portal));
+            let result = self.handle_copy_in(*plan, cancel).await;
+            self.session.state.end_query();
+
+            return result;
+        }
+
         if let Some(portal) = self.portals.get_mut(&execute.portal) {
             if portal.is_empty() {
                 self.write(protocol::EmptyQueryResponse::new()).await?;
@@ -902,6 +974,7 @@ impl AsyncPostgresShim {
 
                             match chunk {
                                 PortalBatch::Rows(writer) if writer.has_data() => buffer::write_direct(&mut self.partial_write_buf, &mut self.socket, writer).await?,
+                                PortalBatch::Notice(notice) => buffer::write_message(&mut self.partial_write_buf, &mut self.socket, notice).await?,
                                 PortalBatch::Completion(completion) => {
                                     self.session.state.end_query();
 
@@ -1106,13 +1179,7 @@ impl AsyncPostgresShim {
                     Ok(plan) => {
                         let description = plan
                             .to_row_description(&ResultFormat::AllText)?
-                            .and_then(|description| {
-                                if description.len() > 0 {
-                                    Some(description)
-                                } else {
-                                    None
-                                }
-                            });
+                            .filter(|description| description.len() > 0);
 
                         (
                             PreparedStatement::Query {
@@ -1711,6 +1778,12 @@ impl AsyncPostgresShim {
                 )
                 .await?;
 
+                // COPY FROM STDIN reads its data from the connection, so it is not
+                // something a portal can execute
+                if let QueryPlan::CopyFrom(plan) = plan {
+                    return self.handle_copy_in(*plan, cancel).await;
+                }
+
                 self.write_portal(
                     &mut Portal::new(
                         plan,
@@ -1726,6 +1799,116 @@ impl AsyncPostgresShim {
         };
 
         Ok(())
+    }
+
+    /// Read the data of a `COPY ... FROM STDIN` from the connection and append it to
+    /// the target temporary table.
+    ///
+    /// The copy ends when the client sends CopyDone, when it aborts with CopyFail,
+    /// or when the data holds the end-of-copy marker. An error stops the copy right
+    /// away: the caller turns it into an ErrorResponse, and the CopyData messages the
+    /// client keeps sending are dropped by the main loop, as PostgreSQL does.
+    pub async fn handle_copy_in(
+        &mut self,
+        plan: CopyFromPlan,
+        cancel: CancellationToken,
+    ) -> Result<(), ConnectionError> {
+        let CopyFromPlan {
+            table_name,
+            schema,
+            column_indices,
+            options,
+            temp_tables,
+        } = plan;
+
+        // The copy may only use what the session has not taken yet, so that a copy
+        // into a nearly full session fails at once instead of after reading it all
+        let budget =
+            TempTableManager::session_memory_limit().saturating_sub(temp_tables.physical_size());
+
+        let mut decoder = CopyFromDecoder::new(
+            table_name.clone(),
+            Arc::clone(&schema),
+            column_indices.clone(),
+            options,
+            budget,
+        )?;
+
+        // The count of the columns travels as an i16 in CopyInResponse
+        if column_indices.len() > i16::MAX as usize {
+            return Err(protocol::ErrorResponse::error(
+                protocol::ErrorCode::ProgramLimitExceeded,
+                format!("tables can have at most {} columns for COPY", i16::MAX),
+            )
+            .into());
+        }
+
+        self.write(protocol::CopyInResponse::new(
+            Format::Text,
+            column_indices.len(),
+        ))
+        .await?;
+
+        let message_tag_parser = self.session.server.pg_auth.get_pg_message_tag_parser();
+
+        while !decoder.is_finished() {
+            let message = tokio::select! {
+                _ = cancel.cancelled() => {
+                    return Err(protocol::ErrorResponse::query_canceled().into());
+                },
+                message = buffer::read_message(
+                    &mut self.socket,
+                    Arc::clone(&message_tag_parser),
+                    buffer::MAX_FRONTEND_MESSAGE_LENGTH,
+                ) => message?,
+            };
+
+            match message {
+                protocol::FrontendMessage::CopyData(body) => decoder.push(&body.data)?,
+                protocol::FrontendMessage::CopyDone => break,
+                protocol::FrontendMessage::CopyFail(body) => {
+                    return Err(protocol::ErrorResponse::error(
+                        protocol::ErrorCode::QueryCanceled,
+                        format!("COPY from stdin failed: {}", body.message),
+                    )
+                    .into());
+                }
+                // PostgreSQL ignores these while it is reading copy data, for the
+                // convenience of clients which always send them after Execute
+                protocol::FrontendMessage::Flush | protocol::FrontendMessage::Sync => (),
+                // The client is closing the connection, and is not waiting for an
+                // answer to the copy it abandoned
+                protocol::FrontendMessage::Terminate => return Ok(()),
+                // Any other message aborts the copy
+                other => {
+                    return Err(protocol::ErrorResponse::error(
+                        protocol::ErrorCode::ProtocolViolation,
+                        format!(
+                            "unexpected message type 0x{:02X} during COPY from stdin",
+                            other.tag()
+                        ),
+                    )
+                    .into());
+                }
+            }
+        }
+
+        let (batch, rows) = decoder.finish()?;
+
+        // An empty copy is still a copy into the table, and has to find it there
+        let batches = match rows {
+            0 => vec![],
+            _ => vec![batch],
+        };
+        let appended_to = table_name.clone();
+        tokio::task::spawn_blocking(move || temp_tables.append(&appended_to, batches))
+            .await
+            .map_err(CubeError::from)??;
+
+        self.write_completion(PortalCompletion::Complete(protocol::CommandComplete::Copy(
+            rows as u32,
+        )))
+        .await
     }
 
     pub async fn write_portal(
@@ -1761,6 +1944,7 @@ impl AsyncPostgresShim {
                                 buffer::write_direct(&mut self.partial_write_buf, &mut self.socket, writer).await?
                             }
                         }
+                        PortalBatch::Notice(notice) => self.write(notice).await?,
                         PortalBatch::Completion(completion) => return self.write_completion(completion).await,
                     }
                 }
@@ -1827,7 +2011,7 @@ impl AsyncPostgresShim {
         &mut self,
         query: String,
         qtrace: &mut Option<Qtrace>,
-        span_id: Option<Arc<SpanId>>,
+        span_id: Arc<SpanId>,
     ) -> Result<(), ConnectionError> {
         let start_time = SystemTime::now();
         if let Some(auth_context) = self.session.state.auth_context() {
@@ -1836,52 +2020,47 @@ impl AsyncPostgresShim {
                 .server
                 .transport
                 .log_load_state(
-                    span_id.clone(),
+                    Some(span_id.clone()),
                     auth_context,
                     self.session.state.get_load_request_meta("sql"),
                     "Load Request".to_string(),
                     serde_json::json!({
-                        "query": {
-                            "sql": query.clone(),
-                        }
+                        "query": span_id.query_key.clone(),
                     }),
                 )
                 .await?;
         }
         debug!("Query: {}", query);
 
-        if let Err(err) = self.execute_query(&query, qtrace, span_id.clone()).await {
+        if let Err(err) = self
+            .execute_query(&query, qtrace, Some(span_id.clone()))
+            .await
+        {
             if let Some(qtrace) = qtrace {
                 qtrace.set_query_error_message(&err.to_string())
             }
-            let err = err.with_span_id(span_id.clone());
+            let err = err.with_span_id(Some(span_id.clone()));
             self.handle_connection_error(err).await?;
-        } else {
-            if let Some(auth_context) = self.session.state.auth_context() {
-                if let Some(span_id) = span_id {
-                    self.session
-                        .session_manager
-                        .server
-                        .transport
-                        .log_load_state(
-                            Some(span_id.clone()),
-                            auth_context,
-                            self.session.state.get_load_request_meta("sql"),
-                            "Load Request Success".to_string(),
-                            serde_json::json!({
-                                "query": {
-                                    "sql": query,
-                                },
-                                "apiType": "sql",
-                                "duration": start_time.elapsed().unwrap().as_millis() as u64,
-                                "isDataQuery": span_id.is_data_query().await,
-                                "lastRefreshTime": span_id.last_refresh_time().await,
-                            }),
-                        )
-                        .await?;
-                }
-            }
-        };
+        } else if let Some(auth_context) = self.session.state.auth_context() {
+            self.session
+                .session_manager
+                .server
+                .transport
+                .log_load_state(
+                    Some(span_id.clone()),
+                    auth_context,
+                    self.session.state.get_load_request_meta("sql"),
+                    "Load Request Success".to_string(),
+                    serde_json::json!({
+                        "query": span_id.query_key.clone(),
+                        "apiType": "sql",
+                        "duration": start_time.elapsed().unwrap().as_millis() as u64,
+                        "isDataQuery": span_id.is_data_query().await,
+                        "lastRefreshTime": span_id.last_refresh_time().await,
+                    }),
+                )
+                .await?;
+        }
 
         self.write_ready().await
     }

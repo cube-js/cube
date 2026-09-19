@@ -26,10 +26,10 @@ enum Cmd {
         /// External workbook
         #[arg(long)]
         external_workbook: Option<String>,
-        /// Maximum number of items to return
+        /// Deprecated: maximum number of items to return (use --first)
         #[arg(long)]
         limit: Option<u64>,
-        /// Page number
+        /// Deprecated: page number (use --after)
         #[arg(long)]
         page: Option<u64>,
         /// Sort by: name, createdAt, updatedAt, lastViewedAt
@@ -150,6 +150,13 @@ pub async fn command(args: Args, ctx: &Ctx) -> Result<()> {
             first,
             after,
         } => {
+            let page_field = util::paging_field(
+                util::LIMIT_PAGE_IN_QUERY,
+                limit,
+                page,
+                first,
+                after.as_deref(),
+            )?;
             let mut query = Vec::new();
             util::push(&mut query, "workbookId", &workbook);
             util::push(&mut query, "folderId", &folder);
@@ -163,9 +170,16 @@ pub async fn command(args: Args, ctx: &Ctx) -> Result<()> {
             let res = api
                 .get(&format!("/api/v1/deployments/{deployment}/reports"), &query)
                 .await?;
-            output::print_list(
+            // Reports page in the database: `items` already holds exactly the
+            // requested page and keeps doing so once the deprecated `data` is
+            // removed, so render `items`. Asking for `data` here would turn a
+            // future no-op into a failure on a command the server still honors.
+            // The flags are still validated: the two paging styles can't mix.
+            // The server rejects that too; catching it here names the flags.
+            output::print_list_from(
                 ctx.json,
                 &res,
+                page_field,
                 &[
                     ("ID", "id"),
                     ("NAME", "name"),
@@ -174,7 +188,7 @@ pub async fn command(args: Args, ctx: &Ctx) -> Result<()> {
                     ("OWNER", "user.email"),
                     ("UPDATED", "updatedAt"),
                 ],
-            );
+            )?;
         }
         Cmd::Get { deployment, report } => {
             let res = api

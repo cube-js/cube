@@ -37,6 +37,7 @@ export interface CompilerApiOptions {
   preAggregationsSchema?: string | ((context: Context) => string | Promise<string>);
   allowUngroupedWithoutPrimaryKey?: boolean;
   convertTzForRawTimeDimension?: boolean;
+  localRefreshKey?: boolean;
   schemaVersion?: () => string | object | Promise<string | object>;
   contextToGroups?: (context: Context) => string[] | Promise<string[]>;
   compileContext?: any;
@@ -105,6 +106,8 @@ export class CompilerApi {
 
   protected readonly convertTzForRawTimeDimension?: boolean;
 
+  protected readonly localRefreshKey?: boolean;
+
   public schemaVersion?: () => string | object | Promise<string | object>;
 
   protected readonly contextToGroups?: (context: Context) => string[] | Promise<string[]>;
@@ -146,6 +149,7 @@ export class CompilerApi {
     this.preAggregationsSchema = this.options.preAggregationsSchema;
     this.allowUngroupedWithoutPrimaryKey = this.options.allowUngroupedWithoutPrimaryKey;
     this.convertTzForRawTimeDimension = this.options.convertTzForRawTimeDimension;
+    this.localRefreshKey = this.options.localRefreshKey;
     this.schemaVersion = this.options.schemaVersion;
     this.contextToGroups = this.options.contextToGroups;
     this.compileContext = options.compileContext;
@@ -252,6 +256,7 @@ export class CompilerApi {
 
   public async compileSchema(compilerVersion: string, requestId?: string): Promise<Compiler> {
     const startCompilingTime = new Date().getTime();
+
     try {
       this.logger(this.compilers ? 'Recompiling schema' : 'Compiling schema', {
         version: compilerVersion,
@@ -507,6 +512,7 @@ export class CompilerApi {
     // When a cube is accessed via a view, we skip the cube's member-level restrictions
     // and only apply row-level filters. The view controls what members are exposed.
     const cubesAccessedViaView = new Set<string>();
+
     for (const cubeName of queryCubes) {
       const cube = cubeEvaluator.cubeFromPath(cubeName);
       if (cube.isView) {
@@ -967,6 +973,7 @@ export class CompilerApi {
         preAggregationsSchema: this.preAggregationsSchema,
         allowUngroupedWithoutPrimaryKey: this.allowUngroupedWithoutPrimaryKey,
         convertTzForRawTimeDimension: this.convertTzForRawTimeDimension,
+        localRefreshKey: this.localRefreshKey,
         queryFactory: this.queryFactory,
       }
     );

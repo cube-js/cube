@@ -2,6 +2,7 @@ import fetch from 'node-fetch';
 import { execSync } from 'child_process';
 import { GenericContainer, StartedTestContainer } from 'testcontainers';
 import { DbRunnerAbstract, DBRunnerContainerOptions } from './db-runner.abstract';
+import { startContainerWithRetry } from './start-with-retry';
 
 export class PostgresDBRunner extends DbRunnerAbstract {
   public static startContainer(options: DBRunnerContainerOptions) {
@@ -29,7 +30,7 @@ export class PostgresDBRunner extends DbRunnerAbstract {
       container.withBindMounts(binds);
     }
 
-    return container.start();
+    return startContainerWithRetry(container);
   }
 
   public static async loadEcom(db: StartedTestContainer) {

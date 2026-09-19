@@ -340,8 +340,9 @@ scans on sorted data, and if `GROUP BY` matches index ordering, merge
 sort-based algorithms are used for querying, which are usually much faster
 than hash-based `GROUP BY` in case index ordering doesn't match the query.
 
-If in doubt, always [use `EXPLAIN` and `EXPLAIN ANALYZE`](#explain-queries)
-to figure out the final query plan.
+If in doubt, always
+[use `EXPLAIN` and `EXPLAIN ANALYZE`][ref-cubestore-sql-commands] to figure out
+the final query plan.
 
 #### Example
 
@@ -784,8 +785,8 @@ first for the single-value filter, then the rest) lets it serve the query with a
 fast merge scan.
 
 With both indexes defined, each query is routed to the most efficient one without
-any change to the query itself. Use [`EXPLAIN`](#explain-queries) to confirm which
-index a given query selects.
+any change to the query itself. Use [`EXPLAIN`][ref-cubestore-sql-commands] to
+confirm which index a given query selects.
 
 ### Compaction
 
@@ -832,67 +833,15 @@ SELECT * FROM information_schema.tables;
 These pre-aggregations are stored as Parquet files under the `.cubestore/`
 folder in the project root during development.
 
-### `EXPLAIN` queries
+### `EXPLAIN` queries {#explain-queries}
 
-Cube Store's MySQL protocol also supports `EXPLAIN` and `EXPLAIN ANALYZE`
-queries both of which are useful for determining how much processing a query
-will require.
+Cube Store's MySQL protocol also supports `EXPLAIN`, `EXPLAIN ANALYZE`, and
+`EXPLAIN ANALYZE DETAILED`, all of which are useful for determining how much
+processing a query will require, and for seeing where time is spent within it.
 
-`EXPLAIN` queries show the logical plan for a query:
-
-```sql
- EXPLAIN SELECT orders__platform, orders__gender, sum(orders__count) FROM dev_pre_aggregations.orders_general_o32v4dvq_vbyemtl2_1h5hs8r
- GROUP BY orders__gender, orders__platform;
-+-------------------------------------------------------------------------------------------------------------------------------------+
-| logical plan                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
-+--------------------------------------------------------------------------------------------------------------------------------------+
-| Projection, [dev_pre_aggregations.orders_general_o32v4dvq_vbyemtl2_1h5hs8r.orders__platform, dev_pre_aggregations.orders_general_o32v4dvq_vbyemtl2_1h5hs8r.orders__gender, SUM(dev_pre_aggregations.orders_general_o32v4dvq_vbyemtl2_1h5hs8r.orders__count)]
-  Aggregate
-    ClusterSend, indices: [[96]]
-      Scan dev_pre_aggregations.orders_general_o32v4dvq_vbyemtl2_1h5hs8r, source: CubeTable(index: orders_general_plat_gender_o32v4dvq_vbyemtl2_1h5hs8r:96:[123, 126]), fields: [orders__gender, orders__platform, orders__count] |
-+-------------------------------------------------------------------------------------------------------------------------------------+
-```
-
-`EXPLAIN ANALYZE` queries show the physical plan for the router and all workers
-used for query processing:
-
-```sql
- EXPLAIN ANALYZE SELECT orders__platform, orders__gender, sum(orders__count) FROM dev_pre_aggregations.orders_general_o32v4dvq_vbyemtl2_1h5hs8r
- GROUP BY orders__gender, orders__platform
-
-+-----------+-----------------+--------------------------------------------------------------------------------------------------------------------------+
-| node type | node name       | physical plan                                                                                                                                                                                                                                                                                                                                                   |
-+-----------+-----------------+--------------------------------------------------------------------------------------------------------------------------+
-| router    |                 | Projection, [orders__platform, orders__gender, SUM(dev_pre_aggregations.orders_general_o32v4dvq_vbyemtl2_1h5hs8r.orders__count)@2:SUM(orders__count)]
-  FinalInplaceAggregate
-    ClusterSend, partitions: [[123, 126]]                                                                                                                                         |
-| worker    | 127.0.0.1:10001 | PartialInplaceAggregate
-  Merge
-    Scan, index: orders_general_plat_gender_o32v4dvq_vbyemtl2_1h5hs8r:96:[123, 126], fields: [orders__gender, orders__platform, orders__count]
-      Projection, [orders__gender, orders__platform, orders__count]
-        ParquetScan, files: /.cubestore/data/126-0qtyakym.parquet |
-+-----------+-----------------+--------------------------------------------------------------------------------------------------------------------------+
-```
-
-Unlike `EXPLAIN` and `EXPLAIN ANALYZE`, which only show the plan, `EXPLAIN ANALYZE
-DETAILED` actually executes the query under per-query tracing and renders a
-detailed execution trace as a tree with a per-category timing summary. Use it to
-diagnose where time is spent within a query:
-
-```sql
-EXPLAIN ANALYZE DETAILED SELECT orders__platform, sum(orders__count) FROM dev_pre_aggregations.orders_general_o32v4dvq_vbyemtl2_1h5hs8r
-GROUP BY orders__platform;
-```
-
-When you're debugging performance, one thing to keep in mind is that Cube Store, due to its design, will always use some index to query data, and usage of the index itself doesn't necessarily tell if the particular query is performing optimally or not.
-What's important to look at is aggregation and partition merge strategies.
-In most of the cases for aggregation, Cube Store will use `HashAggregate` or `InplaceAggregate` strategy as well as `Merge` and `MergeSort` operators to merge different partitions.
-Even for larger datasets, scan operations on sorted data will almost always be much more efficient and faster than hash aggregate as the Cube Store optimizer decides to use those only if there's an index with appropriate sorting.
-So, as a rule of thumb, if you see in your plan `PartialHashAggregate` and `FinalHashAggregate` nodes together with `Merge` operators, those queries most likely perform sub-optimally.
-On the other hand, if you see `PartialInplaceAggregate`, `FinalInplaceAggregate`, and `FullInplaceAggregate` together with `MergeSort` operators in your plan, then there's a high chance the query performs optimally.
-Sometimes, there can be exceptions to this rule. 
-For example, a total count query run on top of the index will perform `HashAggregate` strategy on top of `MergeSort` nodes even if all required indexes are in place.
-This query would be optimal as well.
+See [Cube Store SQL commands][ref-cubestore-sql-commands] for their syntax and
+output, guidance on reading a query plan, and the rest of Cube Store's command
+surface.
 
 ## Pre-aggregations storage
 
@@ -1082,6 +1031,95 @@ With all of the above set up, making a query such as the following will now use
 }
 ```
 
+### Indexing the joined rollup for partition pruning
+
+A `rollup_join` can only be planned if each side of the join can be scanned in
+join-key order — either from the rollup's default index, where dimensions come
+first, or from an explicit index whose leading columns cover the join key, like
+`user_index` above. However, an index that *starts* with the join key gives you
+no partition pruning: Cube Store partitions are ranged by index order, so a
+filter only prunes partitions when it constrains the index's leading column. A
+filter on the second column of an index prunes nothing unless a partition
+happens to cover a single value of the first column.
+
+**When queries filter the joined rollup by a highly selective, single-value
+dimension, define an index that puts that dimension before the join key.**
+Suppose `users` has such a dimension, `alt_key`, and queries commonly filter on
+it. Add it to `users_rollup` and index it ahead of the join key:
+
+<CodeGroup>
+
+```yaml title="YAML"
+cubes:
+  - name: users
+    # ...
+
+    pre_aggregations:
+      - name: users_rollup
+        dimensions:
+          - CUBE.id
+          - CUBE.name
+          - CUBE.alt_key
+
+        indexes:
+          - name: alt_key_index
+            columns:
+              - CUBE.alt_key
+              - CUBE.id
+```
+
+```javascript title="JavaScript"
+cube(`users`, {
+  // ...
+
+  pre_aggregations: {
+    users_rollup: {
+      dimensions: [CUBE.id, CUBE.name, CUBE.alt_key],
+
+      indexes: {
+        alt_key_index: {
+          columns: [CUBE.alt_key, CUBE.id]
+        }
+      }
+    }
+  }
+})
+```
+
+</CodeGroup>
+
+Cube Store will pick `alt_key_index` for the joined side of such a query — the
+join key is still covered by the index's leading columns, it just doesn't come
+first — and prune every partition whose range excludes the filtered value.
+
+This pays off twice over, because the joined rollup's partitions are never split
+up: only the left-most rollup is divided into batches, and every batch carries
+all partitions of the joined one. Those partitions also consume the per-batch
+join budget that bounds how large the right side of a rollup join can be, so
+pruning them can be what keeps a query planning at all.
+
+A few things to keep in mind:
+
+- Only single-value (equality) filters let the filtered dimension sit ahead of
+  the join key. A range filter, including a time dimension filter, won't make
+  such an index eligible for the join — though a range filter on an index's
+  leading column does prune partitions normally.
+- The join key must still be part of the index's leading columns, together with
+  the filtered dimension. Listing the filtered dimension alone, without the join
+  key, makes the index unusable for the join.
+- Queries that hit the rollup join without the equality filter are planned on a
+  join-key-leading scan instead, so keep one available — the default index
+  serves that as long as the join key is the rollup's first dimension.
+- The other side of the join — typically the large rollup carrying the time
+  dimension — still needs to be scanned in join-key order, and its time
+  dimension filter will not prune partitions there.
+- Each extra index adds build time and storage, so add one when the filter is
+  both common and selective.
+
+As always,
+[use `EXPLAIN` and `EXPLAIN ANALYZE`][ref-cubestore-sql-commands] to confirm
+which index was picked and how many partitions were scanned.
+
 ## Pre-Aggregation build strategies
 
 <Info>
@@ -1231,7 +1269,7 @@ or a decimal type, depending on the nature of your data.
 [ref-schema-ref-preaggs-refresh-key-every]: /reference/data-modeling/pre-aggregations#every
 [ref-schema-ref-preaggs-refresh-key-sql]: /reference/data-modeling/pre-aggregations#sql
 [ref-deploy-refresh-wrkr]: /cube-core/architecture#refresh-worker
-[ref-prod-list-refresh]: /cube-core/running-in-production#set-up-refresh-worker
+[ref-prod-list-refresh]: /cube-core/deployment#set-up-refresh-worker
 [ref-original-sql]: /reference/data-modeling/pre-aggregations#original_sql
 [self-batching]: #batching
 [self-export-bucket]: #export-bucket
@@ -1244,6 +1282,7 @@ or a decimal type, depending on the nature of your data.
 [ref-build-history]: /admin/monitoring/pre-aggregations#build-history
 [ref-matching-preaggs]: /docs/pre-aggregations/matching-pre-aggregations
 [ref-cube-store]: /docs/pre-aggregations/running-in-production#architecture
+[ref-cubestore-sql-commands]: /reference/cubestore/sql-commands
 [ref-cube-store-storage]: /docs/pre-aggregations/running-in-production#storage
 [ref-member-sql]: /reference/data-modeling/dimensions#sql
 [ref-incremental-refresh-recipe]: /recipes/pre-aggregations/incrementally-building-pre-aggregations-for-a-date-range

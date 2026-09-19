@@ -41,8 +41,8 @@ export default function SqlQueryTab({ query, onChange }: SqlQueryTabProps) {
         }
 
         // in the case of a compareDateRange query the SQL will be the same
-        const [query] = Array.isArray(sqlQuery) ? sqlQuery : [sqlQuery];
-        const value = query && format(query.sql());
+        const [firstSqlQuery] = Array.isArray(sqlQuery) ? sqlQuery : [sqlQuery];
+        const value = firstSqlQuery && format(firstSqlQuery.sql());
 
         return (
           <>

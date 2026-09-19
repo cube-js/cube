@@ -45,8 +45,10 @@ export type PreAggregationForQuery = {
   references: PreAggregationReferences;
   preAggregationsToJoin?: PreAggregationForQuery[];
   referencedPreAggregations?: PreAggregationForQuery[];
+  // Resolved on demand: only rendering the pre-aggregation's own SQL needs the
+  // join, and the native planner resolves its own.
   // eslint-disable-next-line no-use-before-define
-  rollupJoin?: RollupJoin;
+  resolveRollupJoin?: () => RollupJoin;
   sqlAlias?: string;
 };
 
@@ -537,6 +539,7 @@ export class PreAggregations {
 
     function allValuesEq1(map) {
       if (!map) return false;
+
       // eslint-disable-next-line no-restricted-syntax
       for (const v of map?.values()) {
         if (v !== 1) return false;
@@ -1089,8 +1092,7 @@ export class PreAggregations {
     join: JoinEdgeWithMembers,
     rollupJoinPreAggName: string,
   ): PreAggregationForQuery {
-    const fromPreAggObj = preAggObjsToJoin
-      .filter(p => joinMembers.every(m => !!p.references.dimensions.find(d => m === d)));
+    const fromPreAggObj = this.rollupsCarryingJoinMembers(preAggObjsToJoin, joinMembers);
     if (!fromPreAggObj.length) {
       const msg = `No rollups found that can be used for a rollup join from "${
         join.from}" (fromMembers: ${JSON.stringify(join.fromMembers)}) to "${join.to}" (toMembers: ${
@@ -1104,6 +1106,25 @@ export class PreAggregations {
       );
     }
     return fromPreAggObj[0];
+  }
+
+  /**
+   * Rollups that can stand on one side of a hop. The wider reading — a key declared as a
+   * rollup's time dimension — is limited to the native planner, the only one that renders the
+   * granularity-suffixed column such a key lives in.
+   */
+  private rollupsCarryingJoinMembers(
+    preAggObjsToJoin: PreAggregationForQuery[],
+    joinMembers: string[],
+  ): PreAggregationForQuery[] {
+    const declaredAsDimensions = preAggObjsToJoin
+      .filter(p => joinMembers.every(m => !!p.references.dimensions.find(d => m === d)));
+    if (declaredAsDimensions.length || !this.query.canUseNativeSqlPlannerPreAggregation) {
+      return declaredAsDimensions;
+    }
+    return preAggObjsToJoin
+      .filter(p => joinMembers.every(m => !!p.references.dimensions.find(d => m === d) ||
+        !!p.references.timeDimensions.find(td => m === td.dimension)));
   }
 
   private resolveJoinMembers(join: FinishedJoinTree): JoinEdgeWithMembers[] {
@@ -1182,7 +1203,6 @@ export class PreAggregations {
       preAggregationsToJoin.forEach(preAgg => {
         references.rollupsReferences.push(preAgg.references);
       });
-      const rollupJoin = this.buildRollupJoin(preAggObj, preAggregationsToJoin);
       const joinResult = canUsePreAggregation(references);
 
       return {
@@ -1190,7 +1210,7 @@ export class PreAggregations {
         canUsePreAggregation: joinResult.canUse,
         leafMeasureMatch: joinResult.leafMeasureMatch,
         preAggregationsToJoin,
-        rollupJoin,
+        resolveRollupJoin: () => this.buildRollupJoin(preAggObj, preAggregationsToJoin),
       };
     } else if (preAggregation.type === 'rollupLambda') {
       // TODO evaluation optimizations. Should be cached or moved to compile time.
@@ -1577,7 +1597,7 @@ export class PreAggregations {
     });
 
     if (preAggregationForQuery.preAggregation.type === 'rollupJoin') {
-      const join = preAggregationForQuery.rollupJoin!;
+      const join = preAggregationForQuery.resolveRollupJoin!();
 
       toJoin = [
         sqlAndAlias(join[0].fromPreAggObj),
@@ -1624,8 +1644,10 @@ export class PreAggregations {
 
     return this.query.evaluateSymbolSqlWithContext(
       () => {
+        // zeroRowLimitTopClause() is empty for every dialect that can express a zero row
+        // limit as a trailing clause; T-SQL can not, and this statement has no topLimit()
         // eslint-disable-next-line prefer-template
-        const query = `SELECT ${this.query.selectAllDimensionsAndMeasures(measures)} FROM ${from} ${this.query.baseWhere(replacedFilters)}` +
+        const query = `SELECT${this.query.zeroRowLimitTopClause()} ${this.query.selectAllDimensionsAndMeasures(measures)} FROM ${from} ${this.query.baseWhere(replacedFilters)}` +
           this.query.groupByClause();
         return isFullSimpleQuery ?
           this.query.baseHaving(query, this.query.measureFilters) +

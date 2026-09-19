@@ -48,8 +48,7 @@ function CustomDot(props: any) {
 }
 
 const intlNumberFormatter = Intl.NumberFormat('en', { notation: 'compact' });
-const numberFormatter = (item: any) =>
-  typeof item === 'number' ? intlNumberFormatter.format(item) : item;
+const numberFormatter = (item: any) => (typeof item === 'number' ? intlNumberFormatter.format(item) : item);
 
 const StyledStatistic = styled(Statistic)`
   .ant-statistic-content {
@@ -67,8 +66,8 @@ const LegendTextElement = tasty({
 
 function isValidISOTimestamp(timestamp: string) {
   try {
-    return new Date(timestamp + 'Z').toISOString() === timestamp + 'Z';
-  } catch (e: any) {
+    return new Date(`${timestamp}Z`).toISOString() === `${timestamp}Z`;
+  } catch {
     return false;
   }
 }
@@ -95,15 +94,14 @@ function CartesianChart({
   );
 
   const granularityField = Object.keys(resultSet?.loadResponse.results[0].data[0] || {}).find(
-    (key) => {
-      return (key as string).split('.').length === 3;
-    }
+    (key) => (key as string).split('.').length === 3
+    
   ) as string;
   let granularity = granularityField?.split('.')[2];
 
   if (!isPredefinedGranularity(granularity)) {
-    const granularityInfo =
-      resultSet?.loadResponse.results[0]?.annotation.timeDimensions[granularityField]?.granularity;
+    const granularityInfo = resultSet?.loadResponse.results[0]
+      ?.annotation.timeDimensions[granularityField]?.granularity;
     if (granularityInfo) {
       granularity = minGranularityForIntervals(
         granularityInfo.interval,
@@ -114,15 +112,13 @@ function CartesianChart({
 
   const formatDate = useMemo(() => {
     if (dateFormat) {
-      return (item: string) =>
-        isValidISOTimestamp(item) ? formatDateByPattern(new Date(item), dateFormat) : item;
+      return (item: string) => (isValidISOTimestamp(item) ? formatDateByPattern(new Date(item), dateFormat) : item);
     }
 
     return granularity
-      ? (item: string) =>
-          isValidISOTimestamp(item)
-            ? formatDateByGranularity(new Date(item), granularity as TimeDimensionGranularity)
-            : item
+      ? (item: string) => (isValidISOTimestamp(item)
+        ? formatDateByGranularity(new Date(item), granularity as TimeDimensionGranularity)
+        : item)
       : (item: string) => item;
   }, [dateFormat]);
 
@@ -130,7 +126,7 @@ function CartesianChart({
     (item) => {
       try {
         return formatDate(item);
-      } catch (e: any) {
+      } catch {
         return item;
       }
     },
@@ -138,16 +134,14 @@ function CartesianChart({
   );
 
   const chartPivot = useMemo(() => {
-    let chartPivot = resultSet.chartPivot(pivotConfig);
+    let pivotedRows = resultSet.chartPivot(pivotConfig);
     if (dataTransformer) {
-      chartPivot = dataTransformer(chartPivot, { granularity });
+      pivotedRows = dataTransformer(pivotedRows, { granularity });
     }
 
-    return chartPivot.map((series: any) => {
+    return pivotedRows.map((series: any) => {
       series.x = series.xValues
-        .map((value: string) => {
-          return formatDate(value);
-        })
+        .map((value: string) => formatDate(value))
         .join(',');
 
       return series;
@@ -223,7 +217,7 @@ const TypeToChartComponent = {
     tooltipCursor,
     extra,
   }: any) => {
-    let seriesNames = resultSet.seriesNames(pivotConfig);
+    const seriesNames = resultSet.seriesNames(pivotConfig);
 
     if (nameTransform) {
       nameTransform(seriesNames);
@@ -276,7 +270,7 @@ const TypeToChartComponent = {
     syncId,
     tooltipCursor,
   }: any) => {
-    let seriesNames = resultSet.seriesNames(pivotConfig);
+    const seriesNames = resultSet.seriesNames(pivotConfig);
 
     if (nameTransform) {
       nameTransform(seriesNames);
@@ -327,7 +321,7 @@ const TypeToChartComponent = {
     tooltipCursor,
     dataTransformer,
   }: any) => {
-    let seriesNames = resultSet.seriesNames(pivotConfig);
+    const seriesNames = resultSet.seriesNames(pivotConfig);
 
     if (nameTransform) {
       nameTransform(seriesNames);
@@ -367,7 +361,7 @@ const TypeToChartComponent = {
   },
 
   pie: ({ resultSet, nameTransform, pivotConfig, height, fill, stroke }: any) => {
-    let seriesNames = resultSet.seriesNames(pivotConfig);
+    const seriesNames = resultSet.seriesNames(pivotConfig);
 
     if (nameTransform) {
       nameTransform(seriesNames);
@@ -388,7 +382,7 @@ const TypeToChartComponent = {
 
               return (
                 <Cell
-                  key={index}
+                  key={e.x}
                   stroke={stroke?.[i] ?? getChartSolidColorByIndex(i)}
                   fill={fill?.[i] ?? getChartSolidColorByIndex(i)}
                 />
@@ -419,7 +413,9 @@ const TypeToChartComponent = {
 
     columnData.forEach((field: any, i: number) => {
       if (field.key && typeof field.key === 'string') {
-        granularityMap[field.key] = field.key.split('.')[2];
+        const [, , granularity] = field.key.split('.');
+
+        granularityMap[field.key] = granularity;
       } else {
         field.key = `key${i}`; // fallback index
       }
@@ -443,36 +439,36 @@ const TypeToChartComponent = {
             ...column,
             render: granularity
               ? (text: any) => {
-                  try {
-                    return isValidISOTimestamp(text)
-                      ? formatDateByGranularity(
-                          new Date(text),
-                          granularity as TimeDimensionGranularity
-                        )
-                      : text;
-                  } catch (e: any) {
-                    return text;
-                  }
+                try {
+                  return isValidISOTimestamp(text)
+                    ? formatDateByGranularity(
+                      new Date(text),
+                      granularity as TimeDimensionGranularity
+                    )
+                    : text;
+                } catch {
+                  return text;
                 }
+              }
               : (text: any) => {
-                  switch (typeof text) {
-                    case 'boolean':
-                      return text ? 'true' : 'false';
-                    case 'undefined':
-                    case 'object':
-                      return text === null ? <Tag>NULL</Tag> : <Tag>OBJECT</Tag>;
-                    default:
-                      if (c.type === 'boolean') {
-                        return text && text !== '0' ? 'true' : 'false';
-                      }
+                switch (typeof text) {
+                  case 'boolean':
+                    return text ? 'true' : 'false';
+                  case 'undefined':
+                  case 'object':
+                    return text === null ? <Tag>NULL</Tag> : <Tag>OBJECT</Tag>;
+                  default:
+                    if (c.type === 'boolean') {
+                      return text && text !== '0' ? 'true' : 'false';
+                    }
 
-                      if (c.format === 'percent' && text != null) {
-                        return `${(parseFloat(text) * 100).toFixed(2)}%`;
-                      }
+                    if (c.format === 'percent' && text != null) {
+                      return `${(parseFloat(text) * 100).toFixed(2)}%`;
+                    }
 
-                      return text;
-                  }
-                },
+                    return text;
+                }
+              },
           };
         })}
         dataSource={dataSet}
@@ -504,33 +500,32 @@ const TypeToMemoChartComponent = Object.keys(TypeToChartComponent)
   }))
   .reduce((a: any, b: any) => ({ ...a, ...b }));
 
-const renderChart = (Component: ComponentType<any>) =>
-  function (
-    {
-      resultSet,
-      error,
-      ...restParams
-    }: UseCubeQueryResult<any, any> & {
-      height: number;
-      stroke?: string[];
-      fill?: string[];
-    },
-    chartType: ChartType
-  ) {
-    if (error) {
-      return <LocalError error={error} />;
-    }
+const renderChart = (Component: ComponentType<any>) => function renderChartComponent(
+  {
+    resultSet,
+    error,
+    ...restParams
+  }: UseCubeQueryResult<any, any> & {
+    height: number;
+    stroke?: string[];
+    fill?: string[];
+  },
+  chartType: ChartType
+) {
+  if (error) {
+    return <LocalError error={error} />;
+  }
 
-    if (chartType === 'table') {
-      return <Component {...restParams} resultSet={resultSet} />;
-    }
+  if (chartType === 'table') {
+    return <Component {...restParams} resultSet={resultSet} />;
+  }
 
-    return (
-      (resultSet && <Component {...restParams} resultSet={resultSet} />) || (
-        <Skeleton layout="chart" fill="#white" height={restParams.height} />
-      )
-    );
-  };
+  return (
+    (resultSet && <Component {...restParams} resultSet={resultSet} />) || (
+      <Skeleton layout="chart" fill="#white" height={restParams.height} />
+    )
+  );
+};
 
 export function PlaygroundChartRenderer({
   query,

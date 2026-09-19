@@ -396,7 +396,7 @@ describe('normalizeQuery: date-range filter resolution', () => {
       timezone: 'UTC',
       filters: [{ or: [
         { member: 'Orders.createdAt', operator: 'inDateRange', values: ['today'] },
-      ]}],
+      ] }],
     }, false);
 
     const la = normalizeQuery({
@@ -404,7 +404,7 @@ describe('normalizeQuery: date-range filter resolution', () => {
       timezone: 'America/Los_Angeles',
       filters: [{ or: [
         { member: 'Orders.createdAt', operator: 'inDateRange', values: ['today'] },
-      ]}],
+      ] }],
     }, false);
 
     expect(utc.filters[0].or[0].values[0]).toMatch(/^2026-06-25T/);

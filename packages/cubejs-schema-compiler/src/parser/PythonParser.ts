@@ -168,6 +168,7 @@ export class PythonParser {
             return children[0];
           } else if (children.length > 1) {
             let expr = children[0];
+
             for (let i = 1; i < children.length; i++) {
               if (children[i].call) {
                 expr = t.callExpression(expr, children[i].call);

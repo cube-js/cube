@@ -36,7 +36,11 @@ export class OracleQuery extends BaseQuery {
    * TODO replace with limitOffsetClause override
    */
   public groupByDimensionLimit() {
-    const limitClause = this.rowLimit === null ? '' : ` FETCH NEXT ${this.rowLimit && parseInt(this.rowLimit, 10) || 10000} ROWS ONLY`;
+    // `rowLimit: 0` is a valid limit that returns no rows, so it must not fall back to the
+    // default below the way a truthy check would. Same null policy as MssqlQuery#topLimit:
+    // an explicit `rowLimit: null` means "no limit", an absent one keeps the 10000 default
+    const rowLimit = this.parsedRowLimit() ?? 10000;
+    const limitClause = this.rowLimit === null ? '' : ` FETCH NEXT ${rowLimit} ROWS ONLY`;
     const offsetClause = this.offset ? ` OFFSET ${parseInt(this.offset, 10)} ROWS` : '';
     return `${offsetClause}${limitClause}`;
   }
@@ -245,6 +249,13 @@ export class OracleQuery extends BaseQuery {
       '{% if order_by %}\nORDER BY {{ order_by | map(attribute=\'expr\') | join(\', \') }}{% endif %}' +
       '{% if offset is not none %}\nOFFSET {{ offset }} ROWS{% endif %}' +
       '{% if limit is not none %}\nFETCH NEXT {{ limit }} ROWS ONLY{% endif %}';
+    // Oracle row-limiting syntax again: the base template ends a set operation with LIMIT.
+    templates.statements.union = '{% for query in queries %}(\n' +
+      '{{ query | indent(2, true) }}\n' +
+      ')' +
+      '{% if not loop.last %}\nUNION {% if not distinct %}ALL {% endif %}{% endif %}' +
+      '{% endfor %}' +
+      '{% if limit is not none %}\nFETCH NEXT {{ limit }} ROWS ONLY{% endif %}';
     // Oracle has no `::` cast and no `VALUES` row-constructor table source. Build the
     // series with TO_TIMESTAMP + UNION ALL SELECT ... FROM DUAL, and no `AS` before
     // the derived-table alias (Oracle forbids it). `seria` items are [from, to] pairs.
@@ -259,7 +270,11 @@ export class OracleQuery extends BaseQuery {
 
     templates.expressions.like = '{{ expr }} {% if negated %}NOT {% endif %}LIKE {{ pattern }}{% if default_escape %} ESCAPE \'\\\'{% endif %}';
     delete templates.expressions.ilike;
-    templates.tesseract.ilike = 'LOWER({{ expr }}) {% if negated %}NOT {% endif %}LIKE LOWER({{ pattern }}){% if default_escape %} ESCAPE \'\\\'{% endif %}';
+    // Unconditional, unlike the `expressions.like` variant above: the native
+    // planner's filter path never sets `default_escape`, so gating on it left
+    // Oracle - which has no default LIKE escape character - applying the
+    // planner's escaping with nothing to interpret it.
+    templates.tesseract.ilike = 'LOWER({{ expr }}) {% if negated %}NOT {% endif %}LIKE LOWER({{ pattern }}) ESCAPE \'\\\'';
 
     // Oracle has no `STRING` type (used by the default in CAST(... AS STRING),
     // e.g. the multi-column count() concatenation). CAST to VARCHAR2 requires a

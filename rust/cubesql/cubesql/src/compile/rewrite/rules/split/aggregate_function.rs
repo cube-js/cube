@@ -273,7 +273,23 @@ impl SplitRules {
             rules,
         );
         // TODO: workaround for PowerBI, it uses COUNT(DISTINCT(col)) + MAX(CASE ...) to count in NULLs
-        // as a distinct value. We don't support that yet, so don't count them
+        // as a distinct value. We don't support that yet, so don't count them: the MAX(CASE ...)
+        // half is replaced with a literal 0, so a group containing a NULL comes back one lower
+        // than the query asks for. For rows (city, customer_key) = (Berlin, c1), (Berlin, c1),
+        // (Berlin, c2), (Lisbon, c3), (Lisbon, NULL), (Oslo, NULL), grouped by city:
+        //
+        //     city   | asked for | returned
+        //     -------+-----------+---------
+        //     Berlin |         2 |        2
+        //     Lisbon |         2 |        1
+        //     Oslo   |         1 |        0
+        //
+        // The term adds at most 1, so it can only turn a tie into a strict order or back, never
+        // rank a group above one the query ranks higher -- but an outer ORDER BY with a LIMIT
+        // can still return a different one of the tied groups.
+        //
+        // Keep in sync with "wrapper-push-down-powerbi-count-distinct-max-case": narrowing one
+        // alone would make results depend on whether the query has an ORDER BY.
         self.single_arg_split_point_rules_aggregate_function(
             "aggregate-function-powerbi-count-distinct-max-case",
             || {

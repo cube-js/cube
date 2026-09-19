@@ -26,9 +26,9 @@ export function TimeDateRangeSelector(props: TimeDateRangeSelectorProps) {
 
     return startDate && endDate
       ? {
-          start: startDate,
-          end: endDate,
-        }
+        start: startDate,
+        end: endDate,
+      }
       : null;
   }, [value[0], value[1]]);
 

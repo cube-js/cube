@@ -1,6 +1,6 @@
 use cubeclient::models::{V1LoadRequestQuery, V1LoadRequestQueryTimeDimension};
 use datafusion::{
-    logical_plan::{JoinType, LogicalPlan, PlanVisitor},
+    logical_plan::{plan::Extension, JoinType, LogicalPlan, PlanVisitor},
     physical_plan::displayable,
     scalar::ScalarValue,
 };
@@ -11,11 +11,16 @@ use std::sync::Arc;
 
 use crate::{
     compile::{
-        engine::df::scan::MemberField,
+        engine::df::scan::{CubeScanNode, MemberField},
         rewrite::rewriter::Rewriter,
         test::{
             convert_select_to_query_plan, convert_select_to_query_plan_customized,
-            convert_select_to_query_plan_with_config, init_testing_logger, LogicalPlanTestUtils,
+            convert_select_to_query_plan_with_config, convert_sql_to_cube_query, get_test_session,
+            get_test_session_with_config, get_test_tenant_ctx,
+            get_test_tenant_ctx_with_cube_data_sources,
+            get_test_tenant_ctx_with_multi_data_source_view,
+            get_test_tenant_ctx_with_multi_data_source_view_and_templates, init_testing_logger,
+            member_expression_sql, LogicalPlanTestUtils, TestContext,
         },
         DatabaseProtocol,
     },
@@ -1084,6 +1089,51 @@ async fn test_case_wrapper_escaping() {
         .sql
         // Expect 6 backslashes as output is JSON and it's escaped one more time
         .contains("\\\\\\\\\\\\`"));
+}
+
+/// A NULL is pushed down as a cast that gives it a type. Where the dialect's types hold no
+/// NULL of their own, that cast has to name the nullable form instead, or the data source
+/// rejects the query it is handed.
+#[tokio::test]
+async fn wrapper_typed_null_casts_to_the_nullable_type_of_the_dialect() {
+    if !Rewriter::sql_push_down_enabled() {
+        return;
+    }
+    init_testing_logger();
+
+    let query_plan = convert_select_to_query_plan_customized(
+        // language=PostgreSQL
+        r#"
+        SELECT
+            dim_str0,
+            AVG(avgPrice),
+            CASE
+                WHEN SUM((NULLIF(0.0, 0.0))) IS NOT NULL THEN SUM((NULLIF(0.0, 0.0)))
+                ELSE 0
+                END
+        FROM MultiTypeCube
+        GROUP BY 1
+        ;"#
+        .to_string(),
+        DatabaseProtocol::PostgreSQL,
+        vec![(
+            "types/nullable".to_string(),
+            "Nullable({{ data_type }})".to_string(),
+        )],
+    )
+    .await;
+
+    let sql = query_plan
+        .as_logical_plan()
+        .find_cube_scan_wrapped_sql()
+        .wrapped_sql
+        .sql;
+
+    assert!(
+        sql.contains("SUM(CAST(NULL AS Nullable(DOUBLE)))"),
+        "the NULL names the nullable form of its type: {}",
+        sql
+    );
 }
 
 #[tokio::test]
@@ -2343,7 +2393,7 @@ async fn select_agg_where_false() {
 
     let sql = logical_plan.find_cube_scan_wrapped_sql().wrapped_sql.sql;
 
-    // Final query uses grouped query to Cube.js with WHERE FALSE, but without LIMIT 0
+    // Final query uses grouped query to Cube with WHERE FALSE, but without LIMIT 0
     assert!(!sql.contains("\"ungrouped\":"));
     assert!(sql.contains(r#"\"sql\":\"FALSE\""#));
     assert!(sql.contains(r#""limit": 50000"#));
@@ -2394,7 +2444,7 @@ async fn wrapper_dimension_agg_where_false() {
 
     let sql = logical_plan.find_cube_scan_wrapped_sql().wrapped_sql.sql;
 
-    // Final query uses grouped query to Cube.js with WHERE FALSE, but without LIMIT 0
+    // Final query uses grouped query to Cube with WHERE FALSE, but without LIMIT 0
     assert!(!sql.contains("\"ungrouped\":"));
     assert!(sql.contains(r#"\"sql\":\"FALSE\""#));
     assert!(!sql.contains(r#""limit""#));
@@ -2808,4 +2858,2055 @@ async fn test_case_wrapper_sum_case_date_only_string() {
         "Physical plan: {}",
         displayable(physical_plan.as_ref()).indent()
     );
+}
+
+/// Query can reference no members at all, only synthetic fields.
+/// Data source is resolved from cubes of the scan node in that case.
+#[tokio::test]
+async fn test_wrapper_only_system_fields() {
+    if !Rewriter::sql_push_down_enabled() {
+        return;
+    }
+    init_testing_logger();
+
+    let query_plan = convert_select_to_query_plan(
+        r#"
+        SELECT COUNT(DISTINCT "F0"."__user") AS "user_count",
+               COUNT(1) AS "row_count",
+               MIN("F0"."__user") AS "user_min",
+               MAX("F0"."__user") AS "user_max",
+               COUNT(DISTINCT "F0"."__cubeJoinField") AS "join_field_count",
+               MIN("F0"."__cubeJoinField") AS "join_field_min",
+               MAX("F0"."__cubeJoinField") AS "join_field_max"
+        FROM (
+            SELECT "T1"."__user" AS "__user", "T1"."__cubeJoinField" AS "__cubeJoinField"
+            FROM KibanaSampleDataEcommerce AS "T1"
+        ) AS "F0"
+        LIMIT 1
+        "#
+        .to_string(),
+        DatabaseProtocol::PostgreSQL,
+    )
+    .await;
+
+    let logical_plan = query_plan.as_logical_plan();
+    let sql = logical_plan.find_cube_scan_wrapped_sql().wrapped_sql.sql;
+    assert!(
+        sql.contains(r#"\"cubeName\":\"KibanaSampleDataEcommerce\""#),
+        "SQL contains member expressions for the scanned cube: {}",
+        sql
+    );
+
+    let physical_plan = query_plan.as_physical_plan().await.unwrap();
+    println!(
+        "Physical plan: {}",
+        displayable(physical_plan.as_ref()).indent()
+    );
+}
+
+/// A per-group aggregate in a CTE, date-filtered and counted on the outside, must be
+/// pushed down whole: `DATEADD` in the outer filter is rewritten to `DATE_ADD`, so the
+/// filter and the aggregate above it only push down when the data source has a
+/// `functions/DATE_ADD` template.
+#[tokio::test]
+async fn test_wrapper_cte_aggregate_then_date_filter() {
+    if !Rewriter::sql_push_down_enabled() {
+        return;
+    }
+    init_testing_logger();
+
+    let query_plan = convert_select_to_query_plan(
+        r#"
+        WITH first_orders AS (
+            SELECT customer_gender, MIN(order_date) AS first_order_at
+            FROM KibanaSampleDataEcommerce
+            WHERE has_subscription = true
+            GROUP BY 1
+        )
+        SELECT COUNT(DISTINCT customer_gender) AS customers
+        FROM first_orders
+        WHERE first_order_at >= DATEADD('month', -12, CURRENT_DATE())
+          AND first_order_at < CURRENT_DATE()
+        "#
+        .to_string(),
+        DatabaseProtocol::PostgreSQL,
+    )
+    .await;
+
+    let logical_plan = query_plan.as_logical_plan();
+    let sql = logical_plan.find_cube_scan_wrapped_sql().wrapped_sql.sql;
+    assert!(
+        sql.contains("COUNT(DISTINCT"),
+        "outer aggregate is pushed down: {}",
+        sql
+    );
+    assert!(
+        sql.contains("DATE_ADD"),
+        "outer date filter is pushed down: {}",
+        sql
+    );
+
+    let _physical_plan = query_plan.as_physical_plan().await.unwrap();
+}
+
+/// `DATEADD` is rewritten to `date_add`, and the dialect template renders it from the
+/// `date_part` and `interval` variables rather than from the arguments. The rewrite maps
+/// every unit onto one of three parts - sub-day units become `MILLISECOND`, `day` and
+/// `week` become `DAY`, and `month`, `quarter` and `year` become `MONTH` - so each dialect
+/// has to render all three. These are the real templates from the query classes; the ones
+/// used elsewhere in these tests take `args_concat` and would not catch a wrong unit.
+#[tokio::test]
+async fn test_wrapper_date_add_dialect_templates() {
+    if !Rewriter::sql_push_down_enabled() {
+        return;
+    }
+    init_testing_logger();
+
+    let dialects = [
+        (
+            // PostgresQuery, RedshiftQuery inherits it, DuckDBQuery repeats it
+            "({{ args[0] }} + '{{ interval }} {{ date_part }}'::interval)",
+            [
+                "(CURRENT_DATE() + '7200000 MILLISECOND'::interval)",
+                "(CURRENT_DATE() + '14 DAY'::interval)",
+                "(CURRENT_DATE() + '24 MONTH'::interval)",
+            ],
+        ),
+        (
+            // SnowflakeQuery, MssqlQuery, RedshiftQuery
+            "DATEADD({{ date_part }}, {{ interval }}, {{ args[0] }})",
+            [
+                "DATEADD(MILLISECOND, 7200000, CURRENT_DATE())",
+                "DATEADD(DAY, 14, CURRENT_DATE())",
+                "DATEADD(MONTH, 24, CURRENT_DATE())",
+            ],
+        ),
+        (
+            // MysqlQuery: MySQL has no MILLISECOND unit, so those become microseconds
+            "DATE_ADD({{ args[0] }}, INTERVAL {% if date_part == \"MILLISECOND\" %}\
+             {{ interval }}000 MICROSECOND{% else %}{{ interval }} {{ date_part }}{% endif %})",
+            [
+                "DATE_ADD(CURRENT_DATE(), INTERVAL 7200000000 MICROSECOND)",
+                "DATE_ADD(CURRENT_DATE(), INTERVAL 14 DAY)",
+                "DATE_ADD(CURRENT_DATE(), INTERVAL 24 MONTH)",
+            ],
+        ),
+        (
+            // ClickHouseQuery, DatabricksQuery
+            "({{ args[0] }} + INTERVAL {{ interval }} {{ date_part }})",
+            [
+                "(CURRENT_DATE() + INTERVAL 7200000 MILLISECOND)",
+                "(CURRENT_DATE() + INTERVAL 14 DAY)",
+                "(CURRENT_DATE() + INTERVAL 24 MONTH)",
+            ],
+        ),
+        (
+            // PrestodbQuery, TrinoQuery and AthenaQuery inherit it
+            "DATE_ADD('{{ date_part }}', {{ interval }}, {{ args[0] }})",
+            [
+                "DATE_ADD('MILLISECOND', 7200000, CURRENT_DATE())",
+                "DATE_ADD('DAY', 14, CURRENT_DATE())",
+                "DATE_ADD('MONTH', 24, CURRENT_DATE())",
+            ],
+        ),
+    ];
+
+    for (template, expected) in dialects {
+        for (unit, expected) in ["hour", "week", "year"].iter().zip(expected) {
+            // A filter over a per-group aggregate cannot become a Cube filter, so the
+            // whole expression has to be rendered by the template
+            let sql = convert_select_to_query_plan_customized(
+                format!(
+                    r#"
+                    WITH first_orders AS (
+                        SELECT customer_gender, MIN(order_date) AS first_order_at
+                        FROM KibanaSampleDataEcommerce
+                        GROUP BY 1
+                    )
+                    SELECT COUNT(DISTINCT customer_gender) AS customers
+                    FROM first_orders
+                    WHERE first_order_at > DATEADD('{unit}', 2, CURRENT_DATE())
+                    "#
+                ),
+                DatabaseProtocol::PostgreSQL,
+                vec![("functions/DATE_ADD".to_string(), template.to_string())],
+            )
+            .await
+            .as_logical_plan()
+            .find_cube_scan_wrapped_sql()
+            .wrapped_sql
+            .sql;
+
+            assert!(
+                sql.contains(expected),
+                "`{}` renders as `{}` with template `{}`, got: {}",
+                unit,
+                expected,
+                template,
+                sql
+            );
+        }
+    }
+}
+
+/// Sub-day units are reported as a millisecond count inside an `IntervalDayTime`, which
+/// keeps days and milliseconds in separate halves of an i64 and reads them back
+/// separately. A negative offset used to decode as a mixed interval and fail the query,
+/// and a count past the 31 bit half used to wrap silently to a different amount of time,
+/// so both signs and the range boundary are covered here. Whole days are carried into the
+/// other half, which is what keeps ordinary spans past that boundary expressible. The
+/// encoding is the same for every dialect, so one template stands in for all of them.
+#[tokio::test]
+async fn test_wrapper_date_add_negative_and_out_of_range_intervals() {
+    if !Rewriter::sql_push_down_enabled() {
+        return;
+    }
+    init_testing_logger();
+
+    let context = TestContext::with_custom_templates(
+        DatabaseProtocol::PostgreSQL,
+        vec![(
+            "functions/DATE_ADD".to_string(),
+            "DATEADD({{ date_part }}, {{ interval }}, {{ args[0] }})".to_string(),
+        )],
+    )
+    .await;
+
+    let cases = [
+        ("hour", "-2", Some("DATEADD(MILLISECOND, -7200000, ")),
+        ("minute", "-30", Some("DATEADD(MILLISECOND, -1800000, ")),
+        ("second", "-90", Some("DATEADD(MILLISECOND, -90000, ")),
+        ("day", "-2", Some("DATEADD(DAY, -2, ")),
+        ("week", "-2", Some("DATEADD(DAY, -14, ")),
+        ("month", "-12", Some("DATEADD(MONTH, -12, ")),
+        ("year", "-1", Some("DATEADD(MONTH, -12, ")),
+        // The last span the millisecond half can hold on its own, and the first one past
+        // it, which is day aligned and so is carried into the other half
+        ("hour", "596", Some("DATEADD(MILLISECOND, 2145600000, ")),
+        ("hour", "720", Some("DATEADD(DAY, 30, ")),
+        ("hour", "-720", Some("DATEADD(DAY, -30, ")),
+        ("minute", "43200", Some("DATEADD(DAY, 30, ")),
+        // Neither day aligned nor small enough to count in milliseconds. The rewrite is
+        // skipped, which leaves the `dateadd` stub to report `NotImplemented` at
+        // execution rather than answering with a different date
+        ("hour", "597", None),
+        ("hour", "1000000", None),
+    ];
+
+    for (unit, amount, expected) in cases {
+        let logical_plan = context
+            .convert_sql_to_cube_query(&format!(
+                r#"
+                WITH first_orders AS (
+                    SELECT customer_gender, MIN(order_date) AS first_order_at
+                    FROM KibanaSampleDataEcommerce
+                    GROUP BY 1
+                )
+                SELECT COUNT(DISTINCT customer_gender) AS customers
+                FROM first_orders
+                WHERE first_order_at > DATEADD('{unit}', {amount}, CURRENT_DATE())
+                "#
+            ))
+            .await
+            .unwrap_or_else(|error| panic!("`{}` by {} should compile: {}", unit, amount, error))
+            .as_logical_plan();
+
+        let Some(expected) = expected else {
+            assert!(
+                logical_plan.find_filter().is_some(),
+                "`{}` by {} is not rewritten: {:?}",
+                unit,
+                amount,
+                logical_plan
+            );
+            continue;
+        };
+
+        let sql = logical_plan.find_cube_scan_wrapped_sql().wrapped_sql.sql;
+        assert!(
+            sql.contains(expected),
+            "`{}` by {} renders as `{}`, got: {}",
+            unit,
+            amount,
+            expected,
+            sql
+        );
+    }
+}
+
+/// A Cube query is capped at the maximum row limit when the user does not limit it, so
+/// sorting, filtering or joining its result in DataFusion would read an arbitrary slice
+/// of the population. Such a query has to be pushed down in full.
+const LIMITLESS_POST_PROCESSING_QUERY: &str = r#"
+    WITH first_orders AS (
+        SELECT customer_gender, MIN(order_date) AS first_order_at
+        FROM KibanaSampleDataEcommerce
+        GROUP BY 1
+    )
+    SELECT COUNT(DISTINCT customer_gender) AS customers
+    FROM first_orders
+    WHERE first_order_at >= '2024-01-01'::timestamp
+"#;
+
+/// The same shape, with a filter the data source has no template for (`ROUND`), so the
+/// filter cannot leave DataFusion and the truncated read is unavoidable.
+const UNPUSHABLE_LIMITLESS_POST_PROCESSING_QUERY: &str = r#"
+    WITH first_orders AS (
+        SELECT customer_gender, MIN(taxful_total_price) AS cheapest
+        FROM KibanaSampleDataEcommerce
+        GROUP BY 1
+    )
+    SELECT COUNT(DISTINCT customer_gender) AS customers
+    FROM first_orders
+    WHERE ROUND(cheapest) > 10
+"#;
+
+#[tokio::test]
+async fn test_wrapper_limitless_post_processing_pushed_down() {
+    if !Rewriter::sql_push_down_enabled() {
+        return;
+    }
+    init_testing_logger();
+
+    let query_plan = convert_select_to_query_plan(
+        LIMITLESS_POST_PROCESSING_QUERY.to_string(),
+        DatabaseProtocol::PostgreSQL,
+    )
+    .await;
+
+    let logical_plan = query_plan.as_logical_plan();
+    assert!(
+        logical_plan.find_filter().is_none(),
+        "no filter is left to post processing: {:?}",
+        logical_plan
+    );
+
+    let sql = logical_plan.find_cube_scan_wrapped_sql().wrapped_sql.sql;
+    assert!(
+        sql.contains("COUNT(DISTINCT"),
+        "outer aggregate is pushed down: {}",
+        sql
+    );
+    assert!(
+        sql.contains(r#"WHERE ("first_orders"."first_order_at" >= "#),
+        "outer filter is pushed down against the aggregate of the inner query: {}",
+        sql
+    );
+}
+
+#[tokio::test]
+async fn test_wrapper_limitless_post_processing_allowed_by_default() {
+    if !Rewriter::sql_push_down_enabled() {
+        return;
+    }
+    init_testing_logger();
+
+    // Without the flag the query still runs, and still reads a truncated result
+    let query_plan = convert_select_to_query_plan(
+        UNPUSHABLE_LIMITLESS_POST_PROCESSING_QUERY.to_string(),
+        DatabaseProtocol::PostgreSQL,
+    )
+    .await;
+
+    let logical_plan = query_plan.as_logical_plan();
+    assert!(
+        logical_plan.find_filter().is_some(),
+        "filter is left to post processing: {:?}",
+        logical_plan
+    );
+}
+
+#[tokio::test]
+async fn test_wrapper_limitless_post_processing_fails_when_enabled() {
+    if !Rewriter::sql_push_down_enabled() {
+        return;
+    }
+    init_testing_logger();
+
+    let mut config = ConfigObjImpl::default();
+    config.fail_on_limitless_post_processing = true;
+    let context = TestContext::with_config(DatabaseProtocol::PostgreSQL, Arc::new(config)).await;
+
+    // A query that can be pushed down in full is unaffected
+    context
+        .convert_sql_to_cube_query(LIMITLESS_POST_PROCESSING_QUERY)
+        .await
+        .expect("fully pushed down query should compile");
+
+    let error = context
+        .convert_sql_to_cube_query(UNPUSHABLE_LIMITLESS_POST_PROCESSING_QUERY)
+        .await
+        .expect_err("query with unavoidable post processing should fail");
+    assert!(
+        error
+            .to_string()
+            .contains("CUBESQL_FAIL_ON_LIMITLESS_POST_PROCESSING"),
+        "unexpected error: {}",
+        error
+    );
+}
+
+#[tokio::test]
+async fn test_wrapper_limitless_post_processing_ignored_in_stream_mode() {
+    if !Rewriter::sql_push_down_enabled() {
+        return;
+    }
+    init_testing_logger();
+
+    // Streaming reads every row rather than capping the query, so post processing over it
+    // is correct and there is nothing to prefer pushing down or to fail on
+    let mut config = ConfigObjImpl::default();
+    config.stream_mode = true;
+    config.fail_on_limitless_post_processing = true;
+    let context = TestContext::with_config(DatabaseProtocol::PostgreSQL, Arc::new(config)).await;
+
+    let logical_plan = context
+        .convert_sql_to_cube_query(UNPUSHABLE_LIMITLESS_POST_PROCESSING_QUERY)
+        .await
+        .expect("stream mode should not fail on post processing")
+        .as_logical_plan();
+    assert!(
+        logical_plan.find_filter().is_some(),
+        "filter is left to post processing: {:?}",
+        logical_plan
+    );
+
+    // And a query that the penalty would have reshaped keeps the plan it has without it
+    let logical_plan = context
+        .convert_sql_to_cube_query(
+            "SELECT -taxful_total_price AS neg FROM KibanaSampleDataEcommerce GROUP BY 1 ORDER BY 1 DESC",
+        )
+        .await
+        .expect("stream mode should not fail on post processing")
+        .as_logical_plan();
+    assert_eq!(
+        logical_plan.find_cube_scan().request,
+        V1LoadRequestQuery {
+            measures: Some(vec![]),
+            dimensions: Some(vec![
+                "KibanaSampleDataEcommerce.taxful_total_price".to_string()
+            ]),
+            segments: Some(vec![]),
+            order: Some(vec![]),
+            ..Default::default()
+        }
+    );
+}
+
+/// A limit bounds the rows of the query it sits on, not of a query beside it. Summing
+/// limits and limitless scans over the whole plan would let the limited query here stand in
+/// for the unlimited one, and the union would read a truncated half without saying so.
+///
+/// The two queries read different data sources, so the union cannot be pushed down and is
+/// left to post processing, which is what makes the pairing observable at all.
+#[tokio::test]
+async fn test_wrapper_limitless_post_processing_sibling_without_limit() {
+    if !Rewriter::sql_push_down_enabled() {
+        return;
+    }
+    init_testing_logger();
+
+    let mut config = ConfigObjImpl::default();
+    config.fail_on_limitless_post_processing = true;
+    let meta = get_test_tenant_ctx_with_cube_data_sources(vec![("Logs", "other")]);
+    let session =
+        get_test_session_with_config(DatabaseProtocol::PostgreSQL, Arc::new(config), meta.clone())
+            .await;
+
+    let error = convert_sql_to_cube_query(
+        &"(SELECT customer_gender AS g FROM KibanaSampleDataEcommerce GROUP BY 1 LIMIT 10) \
+          UNION ALL \
+          (SELECT content AS g FROM Logs GROUP BY 1)"
+            .to_string(),
+        meta,
+        session,
+    )
+    .await
+    .expect_err("union with an unlimited query should fail");
+    assert!(
+        error
+            .to_string()
+            .contains("CUBESQL_FAIL_ON_LIMITLESS_POST_PROCESSING"),
+        "unexpected error: {}",
+        error
+    );
+}
+
+/// A limit only bounds the query while it is at or below the row cap. Anything above is
+/// clamped back down to the cap before the request is sent, so it truncates exactly like
+/// no limit at all - and a large defensive limit is a shape BI tools emit routinely.
+#[tokio::test]
+async fn test_wrapper_limitless_post_processing_limit_above_row_cap() {
+    if !Rewriter::sql_push_down_enabled() {
+        return;
+    }
+    init_testing_logger();
+
+    // Matches `non_streaming_query_max_row_limit` for the default config under test
+    let max_row_limit = ConfigObjImpl::default().non_streaming_query_max_row_limit as i64;
+
+    for (limit, bounded) in [
+        (10, true),
+        (max_row_limit, true),
+        (max_row_limit + 1, false),
+        (max_row_limit * 20, false),
+    ] {
+        let mut config = ConfigObjImpl::default();
+        config.fail_on_limitless_post_processing = true;
+        let context =
+            TestContext::with_config(DatabaseProtocol::PostgreSQL, Arc::new(config)).await;
+
+        // `ROUND` has no template here, so the filter cannot leave post processing
+        let result = context
+            .convert_sql_to_cube_query(&format!(
+                "SELECT COUNT(*) \
+                 FROM ( \
+                     SELECT customer_gender AS gender, MIN(taxful_total_price) AS cheapest \
+                     FROM KibanaSampleDataEcommerce \
+                     GROUP BY 1 \
+                     LIMIT {limit} \
+                 ) first_orders \
+                 WHERE ROUND(cheapest) > 10"
+            ))
+            .await;
+
+        if bounded {
+            result.unwrap_or_else(|error| {
+                panic!(
+                    "LIMIT {} is within the row cap and should compile: {}",
+                    limit, error
+                )
+            });
+        } else {
+            let error = result.err().unwrap_or_else(|| {
+                panic!("LIMIT {} is clamped to the row cap and should fail", limit)
+            });
+            assert!(
+                error
+                    .to_string()
+                    .contains("CUBESQL_FAIL_ON_LIMITLESS_POST_PROCESSING"),
+                "unexpected error for LIMIT {}: {}",
+                limit,
+                error
+            );
+        }
+    }
+}
+
+/// An `Aggregate` over an ungrouped scan is priced by `ungrouped_aggregates` rather than
+/// by `limitless_post_processing`, so extraction already accounts for it. The rows it
+/// reads are still raw and capped, though, so the operator who turned the check on to be
+/// told about truncated results has to hear about this one too.
+#[tokio::test]
+async fn test_wrapper_limitless_post_processing_ungrouped_aggregate() {
+    if !Rewriter::sql_push_down_enabled() {
+        return;
+    }
+    init_testing_logger();
+
+    // The day of quarter grouping cannot be pushed down, so the aggregate stays in post
+    // processing over an ungrouped scan, and nothing above it drops or reorders rows
+    let query = r#"
+        SELECT
+            CAST("inner_query"."order_date" AS date)
+                - CAST("inner_query"."quarter_start" AS date)
+                + 1 AS "day_of_quarter",
+            MEASURE("inner_query"."sumPrice") AS "revenue"
+        FROM (
+            SELECT
+                "ta_1"."order_date" AS "order_date",
+                CAST(
+                    EXTRACT(YEAR FROM "ta_1"."order_date") || '-'
+                    || EXTRACT(MONTH FROM "ta_1"."order_date") || '-01'
+                AS DATE)
+                + (((MOD(CAST((EXTRACT(MONTH FROM "ta_1"."order_date") - 1)
+                      AS numeric), 3) + 1) - 1) * -1)
+                  * INTERVAL '1 month'
+                AS "quarter_start",
+                CASE WHEN "ta_1"."customer_gender" = 'female'
+                     THEN "ta_1"."sumPrice" END AS "sumPrice"
+            FROM "db"."public"."KibanaSampleDataEcommerce" AS "ta_1"
+        ) "inner_query"
+        GROUP BY 1
+    "#;
+
+    // Without the check the query still runs, reading a capped slice of raw rows
+    let logical_plan =
+        convert_select_to_query_plan(query.to_string(), DatabaseProtocol::PostgreSQL)
+            .await
+            .as_logical_plan();
+    let request = logical_plan.find_cube_scan().request;
+    assert_eq!(request.ungrouped, Some(true));
+    assert_eq!(request.limit, None);
+
+    let mut config = ConfigObjImpl::default();
+    config.fail_on_limitless_post_processing = true;
+    let context = TestContext::with_config(DatabaseProtocol::PostgreSQL, Arc::new(config)).await;
+    let error = context
+        .convert_sql_to_cube_query(query)
+        .await
+        .expect_err("aggregate over an unlimited ungrouped scan should fail");
+    assert!(
+        error
+            .to_string()
+            .contains("CUBESQL_FAIL_ON_LIMITLESS_POST_PROCESSING"),
+        "unexpected error: {}",
+        error
+    );
+}
+
+/// A `UNION` of two `SELECT DISTINCT`s over different cubes, the shape a BI user writes to
+/// list the values of a dimension across two views.
+///
+/// It used to be planned as a `DISTINCT` over a `UNION` of two ungrouped scans, both of them
+/// truncated to the row cap before the deduplication ever saw them, so values missing from
+/// the answer went missing silently. Both queries reach the same data source, so the whole
+/// set operation is pushed down to it instead.
+#[tokio::test]
+async fn test_wrapper_limitless_post_processing_union_of_distinct_selects() {
+    if !Rewriter::sql_push_down_enabled() {
+        return;
+    }
+    init_testing_logger();
+
+    let query = "SELECT DISTINCT 'Medical Claims (MX)' AS table_type, customer_gender AS market \
+                 FROM KibanaSampleDataEcommerce \
+                 UNION \
+                 SELECT DISTINCT 'Pharmacy Claims (RX)' AS table_type, content AS market \
+                 FROM Logs";
+
+    let mut config = ConfigObjImpl::default();
+    config.fail_on_limitless_post_processing = true;
+    let context = TestContext::with_config(DatabaseProtocol::PostgreSQL, Arc::new(config)).await;
+
+    let logical_plan = context
+        .convert_sql_to_cube_query(query)
+        .await
+        .expect("union of two queries to the same data source should compile")
+        .as_logical_plan();
+
+    // Nothing is left above the pushed down query
+    let sql = logical_plan.find_cube_scan_wrapped_sql().wrapped_sql.sql;
+    assert!(sql.contains("UNION"), "union is pushed down: {}", sql);
+    assert!(
+        logical_plan
+            .find_cube_scans()
+            .iter()
+            .all(|scan| { scan.request.ungrouped == Some(true) && scan.request.limit.is_none() }),
+        "the queries themselves stay unlimited, inside the pushed down SQL: {:?}",
+        logical_plan
+    );
+}
+
+/// The queries of a `UNION` reach the same data source, so the data source can evaluate the
+/// whole set operation and nothing is left for DataFusion to do on top of two truncated
+/// halves.
+#[tokio::test]
+async fn test_wrapper_union_all_push_down() {
+    if !Rewriter::sql_push_down_enabled() {
+        return;
+    }
+    init_testing_logger();
+
+    let query_plan = convert_select_to_query_plan(
+        "SELECT 'MX' AS table_type, customer_gender AS market \
+         FROM KibanaSampleDataEcommerce GROUP BY 1, 2 \
+         UNION ALL \
+         SELECT 'RX' AS table_type, content AS market FROM Logs GROUP BY 1, 2"
+            .to_string(),
+        DatabaseProtocol::PostgreSQL,
+    )
+    .await;
+
+    let logical_plan = query_plan.as_logical_plan();
+    let sql = logical_plan.find_cube_scan_wrapped_sql().wrapped_sql.sql;
+    assert!(sql.contains("UNION ALL"), "union is pushed down: {}", sql);
+    assert!(
+        sql.contains("KibanaSampleDataEcommerce.customer_gender") && sql.contains("Logs.content"),
+        "both queries are in the pushed down SQL: {}",
+        sql
+    );
+    // The row cap lands on the result of the whole set operation, not on either query
+    assert!(
+        sql.trim_end().ends_with(&format!(
+            "LIMIT {}",
+            ConfigObjImpl::default().non_streaming_query_max_row_limit
+        )),
+        "the row cap bounds the union: {}",
+        sql
+    );
+}
+
+/// A plain `UNION` drops duplicates, which the data source does as part of the same set
+/// operation: it is `UNION ALL` with `ALL` left off, not a separate deduplication.
+#[tokio::test]
+async fn test_wrapper_union_distinct_push_down() {
+    if !Rewriter::sql_push_down_enabled() {
+        return;
+    }
+    init_testing_logger();
+
+    let query_plan = convert_select_to_query_plan(
+        "SELECT DISTINCT 'MX' AS table_type, customer_gender AS market \
+         FROM KibanaSampleDataEcommerce \
+         UNION \
+         SELECT DISTINCT 'RX' AS table_type, content AS market FROM Logs"
+            .to_string(),
+        DatabaseProtocol::PostgreSQL,
+    )
+    .await;
+
+    let logical_plan = query_plan.as_logical_plan();
+    let sql = logical_plan.find_cube_scan_wrapped_sql().wrapped_sql.sql;
+    assert!(
+        sql.contains("UNION") && !sql.contains("UNION ALL"),
+        "distinct union is pushed down as UNION: {}",
+        sql
+    );
+}
+
+/// The queries of a `UNION` are a list, not a pair
+#[tokio::test]
+async fn test_wrapper_union_three_queries_push_down() {
+    if !Rewriter::sql_push_down_enabled() {
+        return;
+    }
+    init_testing_logger();
+
+    let query_plan = convert_select_to_query_plan(
+        "SELECT 'MX' AS table_type, customer_gender AS market \
+         FROM KibanaSampleDataEcommerce GROUP BY 1, 2 \
+         UNION ALL \
+         SELECT 'RX' AS table_type, content AS market FROM Logs GROUP BY 1, 2 \
+         UNION ALL \
+         SELECT 'DX' AS table_type, notes AS market \
+         FROM KibanaSampleDataEcommerce GROUP BY 1, 2"
+            .to_string(),
+        DatabaseProtocol::PostgreSQL,
+    )
+    .await;
+
+    let sql = query_plan
+        .as_logical_plan()
+        .find_cube_scan_wrapped_sql()
+        .wrapped_sql
+        .sql;
+    assert_eq!(
+        sql.matches("UNION ALL").count(),
+        2,
+        "all three queries are pushed down: {}",
+        sql
+    );
+}
+
+/// A pushed down union is a query like any other, so a projection and a filter above it are
+/// pushed into a select that reads from it.
+#[tokio::test]
+async fn test_wrapper_union_filter_push_down() {
+    if !Rewriter::sql_push_down_enabled() {
+        return;
+    }
+    init_testing_logger();
+
+    let query_plan = convert_select_to_query_plan(
+        "SELECT market FROM ( \
+           SELECT 'MX' AS table_type, customer_gender AS market \
+           FROM KibanaSampleDataEcommerce GROUP BY 1, 2 \
+           UNION ALL \
+           SELECT 'RX' AS table_type, content AS market FROM Logs GROUP BY 1, 2 \
+         ) markets WHERE market = 'female'"
+            .to_string(),
+        DatabaseProtocol::PostgreSQL,
+    )
+    .await;
+
+    let logical_plan = query_plan.as_logical_plan();
+    assert!(
+        logical_plan.find_filter().is_none(),
+        "no filter is left to post processing: {:?}",
+        logical_plan
+    );
+    let sql = logical_plan.find_cube_scan_wrapped_sql().wrapped_sql.sql;
+    assert!(sql.contains("UNION ALL"), "union is pushed down: {}", sql);
+    assert!(
+        sql.contains("WHERE"),
+        "the filter reads from the pushed down union: {}",
+        sql
+    );
+}
+
+/// A set operation is evaluated by one data source, so queries that reach two of them cannot
+/// be pushed down and the union stays in DataFusion.
+#[tokio::test]
+async fn test_wrapper_union_different_data_sources_not_pushed_down() {
+    if !Rewriter::sql_push_down_enabled() {
+        return;
+    }
+    init_testing_logger();
+
+    let meta = get_test_tenant_ctx_with_cube_data_sources(vec![("Logs", "other")]);
+    let session = get_test_session_with_config(
+        DatabaseProtocol::PostgreSQL,
+        Arc::new(ConfigObjImpl::default()),
+        meta.clone(),
+    )
+    .await;
+
+    let logical_plan = convert_sql_to_cube_query(
+        &"SELECT 'MX' AS table_type, customer_gender AS market \
+          FROM KibanaSampleDataEcommerce GROUP BY 1, 2 \
+          UNION ALL \
+          SELECT 'RX' AS table_type, content AS market FROM Logs GROUP BY 1, 2"
+            .to_string(),
+        meta,
+        session,
+    )
+    .await
+    .expect("union of two data sources should compile")
+    .as_logical_plan();
+
+    assert_eq!(
+        logical_plan.find_cube_scans().len(),
+        2,
+        "every query keeps its own scan: {:?}",
+        logical_plan
+    );
+    assert!(
+        matches!(logical_plan, LogicalPlan::Union(_)),
+        "the union is left to post processing: {:?}",
+        logical_plan
+    );
+}
+
+/// A data source with no union template cannot render a set operation. The rule has to
+/// know that before the plan is chosen, because SQL generation has no way back to post
+/// processing.
+#[tokio::test]
+async fn test_wrapper_union_without_template_not_pushed_down() {
+    if !Rewriter::sql_push_down_enabled() {
+        return;
+    }
+    init_testing_logger();
+
+    let logical_plan = convert_select_to_query_plan_customized(
+        "SELECT 'MX' AS table_type, customer_gender AS market \
+         FROM KibanaSampleDataEcommerce GROUP BY 1, 2 \
+         UNION ALL \
+         SELECT 'RX' AS table_type, content AS market FROM Logs GROUP BY 1, 2"
+            .to_string(),
+        DatabaseProtocol::PostgreSQL,
+        // An empty template removes it from this data source
+        vec![("statements/union".to_string(), "".to_string())],
+    )
+    .await
+    .as_logical_plan();
+
+    assert!(
+        matches!(logical_plan, LogicalPlan::Union(_)),
+        "the union is left to post processing: {:?}",
+        logical_plan
+    );
+}
+
+/// A union left to post processing keeps every one of its queries. `UnionInputs` is a flat
+/// list, so the converter reads it back with `match_list_node_ids!` rather than by walking
+/// cons cells — this pins that round trip at more than two queries, where the two shapes
+/// differ.
+#[tokio::test]
+async fn test_wrapper_union_three_queries_not_pushed_down_keeps_every_query() {
+    if !Rewriter::sql_push_down_enabled() {
+        return;
+    }
+    init_testing_logger();
+
+    let logical_plan = convert_select_to_query_plan_customized(
+        "SELECT 'MX' AS table_type, customer_gender AS market \
+         FROM KibanaSampleDataEcommerce GROUP BY 1, 2 \
+         UNION ALL \
+         SELECT 'RX' AS table_type, content AS market FROM Logs GROUP BY 1, 2 \
+         UNION ALL \
+         SELECT 'DX' AS table_type, notes AS market \
+         FROM KibanaSampleDataEcommerce GROUP BY 1, 2"
+            .to_string(),
+        DatabaseProtocol::PostgreSQL,
+        // An empty template removes it from this data source
+        vec![("statements/union".to_string(), "".to_string())],
+    )
+    .await
+    .as_logical_plan();
+
+    let LogicalPlan::Union(union) = &logical_plan else {
+        panic!("the union is left to post processing: {:?}", logical_plan);
+    };
+    assert_eq!(
+        union.inputs.len(),
+        3,
+        "one input per query: {:?}",
+        logical_plan
+    );
+    // The list is written and read back positionally, so identity and order are what the
+    // flat conversion put at risk: a reader that reversed it, or yielded one query twice,
+    // would still leave three of everything. Order is not cosmetic for a union — the output
+    // column names come from the first query, and `WrappedUnionNode` renders it specially.
+    assert_eq!(
+        logical_plan
+            .find_cube_scans()
+            .iter()
+            .map(|scan| member_expression_sql(&scan.request.dimensions))
+            .collect::<Vec<_>>(),
+        vec![
+            vec!["KibanaSampleDataEcommerce.customer_gender".to_string()],
+            vec!["Logs.content".to_string()],
+            vec!["KibanaSampleDataEcommerce.notes".to_string()],
+        ],
+        "every query survives the round trip, in order: {:?}",
+        logical_plan
+    );
+}
+
+/// A `Sort` directly above a union is not pushed down yet: the select it would be pushed
+/// into projects nothing, and a query without a projection is not SQL. The union itself is
+/// still pushed down, and the sort of its truncated result is still post processing that
+/// `CUBESQL_FAIL_ON_LIMITLESS_POST_PROCESSING` reports.
+#[tokio::test]
+async fn test_wrapper_union_sort_left_to_post_processing() {
+    if !Rewriter::sql_push_down_enabled() {
+        return;
+    }
+    init_testing_logger();
+
+    let query = "SELECT 'MX' AS table_type, customer_gender AS market \
+                 FROM KibanaSampleDataEcommerce GROUP BY 1, 2 \
+                 UNION ALL \
+                 SELECT 'RX' AS table_type, content AS market FROM Logs GROUP BY 1, 2 \
+                 ORDER BY 1, 2";
+
+    let logical_plan =
+        convert_select_to_query_plan(query.to_string(), DatabaseProtocol::PostgreSQL)
+            .await
+            .as_logical_plan();
+    assert!(
+        matches!(logical_plan, LogicalPlan::Sort(_)),
+        "the sort is left to post processing: {:?}",
+        logical_plan
+    );
+    let sql = logical_plan
+        .find_cube_scan_wrapped_sql_deep()
+        .wrapped_sql
+        .sql;
+    assert!(sql.contains("UNION ALL"), "union is pushed down: {}", sql);
+
+    let mut config = ConfigObjImpl::default();
+    config.fail_on_limitless_post_processing = true;
+    let context = TestContext::with_config(DatabaseProtocol::PostgreSQL, Arc::new(config)).await;
+    let error = context
+        .convert_sql_to_cube_query(query)
+        .await
+        .expect_err("sorting a truncated union should fail");
+    assert!(
+        error
+            .to_string()
+            .contains("CUBESQL_FAIL_ON_LIMITLESS_POST_PROCESSING"),
+        "unexpected error: {}",
+        error
+    );
+}
+
+/// A limit on one query of a union bounds that query, and the row cap bounds the result of
+/// the whole set operation. Both end up in the pushed down SQL, so neither query is read
+/// through the other's limit.
+#[tokio::test]
+async fn test_wrapper_union_limited_query_push_down() {
+    if !Rewriter::sql_push_down_enabled() {
+        return;
+    }
+    init_testing_logger();
+
+    let logical_plan = convert_select_to_query_plan(
+        "(SELECT customer_gender AS g FROM KibanaSampleDataEcommerce GROUP BY 1 LIMIT 10) \
+         UNION ALL \
+         (SELECT content AS g FROM Logs GROUP BY 1)"
+            .to_string(),
+        DatabaseProtocol::PostgreSQL,
+    )
+    .await
+    .as_logical_plan();
+
+    let limits = logical_plan
+        .find_cube_scans()
+        .into_iter()
+        .map(|scan| scan.request.limit)
+        .collect::<Vec<_>>();
+    assert_eq!(
+        limits,
+        vec![Some(10), None],
+        "the limit stays with the query it was written on"
+    );
+
+    let sql = logical_plan.find_cube_scan_wrapped_sql().wrapped_sql.sql;
+    assert!(sql.contains("UNION ALL"), "union is pushed down: {}", sql);
+    assert!(
+        sql.trim_end().ends_with(&format!(
+            "LIMIT {}",
+            ConfigObjImpl::default().non_streaming_query_max_row_limit
+        )),
+        "the row cap bounds the union: {}",
+        sql
+    );
+}
+
+/// A pushed down union is a query the rest of the wrapper can build on: joining against one
+/// reads it as a subquery of the Cube query, rather than leaving the union to DataFusion.
+#[tokio::test]
+async fn test_wrapper_union_in_join_push_down() {
+    if !Rewriter::sql_push_down_enabled() {
+        return;
+    }
+    init_testing_logger();
+
+    let sql = convert_select_to_query_plan(
+        "SELECT k.customer_gender, u.market \
+         FROM KibanaSampleDataEcommerce k \
+         JOIN ( \
+           SELECT 'MX' AS table_type, customer_gender AS market \
+           FROM KibanaSampleDataEcommerce GROUP BY 1, 2 \
+           UNION ALL \
+           SELECT 'RX' AS table_type, content AS market FROM Logs GROUP BY 1, 2 \
+         ) u ON k.customer_gender = u.market \
+         GROUP BY 1, 2"
+            .to_string(),
+        DatabaseProtocol::PostgreSQL,
+    )
+    .await
+    .as_logical_plan()
+    .find_cube_scan_wrapped_sql()
+    .wrapped_sql
+    .sql;
+
+    // The union has to be in the SQL as the join's subquery, not merely somewhere in it:
+    // a union that lost its join, or a join that lost its union, would both be wrong
+    assert!(
+        sql.contains("UNION ALL"),
+        "the union is pushed down: {}",
+        sql
+    );
+    assert!(
+        sql.contains("subqueryJoins"),
+        "the union is read as the join's subquery: {}",
+        sql
+    );
+    assert!(
+        sql.contains("KibanaSampleDataEcommerce.customer_gender") && sql.contains("Logs.content"),
+        "both queries of the union are in the pushed down SQL: {}",
+        sql
+    );
+}
+
+/// A window function is looked up as `functions/<NAME>` like any other function, so a
+/// built-in without a template is never pushed down - and because the window sits under
+/// everything else in the query, that leaves the whole plan above it to post processing.
+/// `LAG` and `LEAD` were once the only built-ins with a template, which left a query as
+/// ordinary as `ROW_NUMBER() OVER (...)` reading a row-capped scan.
+#[tokio::test]
+async fn test_wrapper_built_in_window_functions() {
+    if !Rewriter::sql_push_down_enabled() {
+        return;
+    }
+    init_testing_logger();
+
+    for (call, expected) in [
+        ("ROW_NUMBER()", "ROW_NUMBER()"),
+        ("RANK()", "RANK()"),
+        ("DENSE_RANK()", "DENSE_RANK()"),
+        ("PERCENT_RANK()", "PERCENT_RANK()"),
+        ("CUME_DIST()", "CUME_DIST()"),
+        // NTILE is left out - see test_wrapper_ntile_does_not_plan, which pins why and
+        // goes red when it can be added back here as ("NTILE(4)", "NTILE(4)")
+        ("FIRST_VALUE(notes)", "FIRST_VALUE("),
+        ("LAST_VALUE(notes)", "LAST_VALUE("),
+        ("NTH_VALUE(notes, 2)", "NTH_VALUE("),
+        ("LAG(notes)", "LAG("),
+        ("LEAD(notes)", "LEAD("),
+    ] {
+        let query_plan = convert_select_to_query_plan(
+            format!(
+                r#"
+                SELECT
+                    customer_gender,
+                    {call} OVER (
+                        PARTITION BY customer_gender
+                        ORDER BY notes
+                    ) AS w
+                FROM (
+                    SELECT customer_gender, notes
+                    FROM KibanaSampleDataEcommerce
+                    GROUP BY 1, 2
+                ) t
+                "#
+            ),
+            DatabaseProtocol::PostgreSQL,
+        )
+        .await;
+
+        let logical_plan = query_plan.as_logical_plan();
+        let sql = logical_plan.find_cube_scan_wrapped_sql().wrapped_sql.sql;
+        assert!(
+            sql.contains(expected),
+            "{} is not pushed down, generated SQL: {}",
+            call,
+            sql
+        );
+    }
+}
+
+/// The reported shape: a CTE that sequences rows with `LAG` and `ROW_NUMBER`, a second CTE
+/// deriving values from them, and an aggregation over the result. Without a `ROW_NUMBER`
+/// template the window blocked the push down of everything above it, and the final
+/// aggregate ran in DataFusion over the capped rows of a raw scan.
+#[tokio::test]
+async fn test_wrapper_window_sequenced_cte_aggregation() {
+    if !Rewriter::sql_push_down_enabled() {
+        return;
+    }
+    init_testing_logger();
+
+    let query_plan = convert_select_to_query_plan(
+        // language=PostgreSQL
+        r#"
+        WITH sequenced AS (
+            SELECT
+                customer_gender,
+                notes,
+                CAST(order_date AS DATE) AS order_date,
+                CAST(taxful_total_price AS DECIMAL(18,2)) AS price,
+                LAG(CAST(order_date AS DATE)) OVER (
+                    PARTITION BY customer_gender
+                    ORDER BY CAST(order_date AS DATE), notes
+                ) AS prev_order_date,
+                ROW_NUMBER() OVER (
+                    PARTITION BY customer_gender
+                    ORDER BY CAST(order_date AS DATE), notes
+                ) AS order_seq
+            FROM KibanaSampleDataEcommerce
+            WHERE customer_gender = 'female'
+        ),
+        gaps AS (
+            SELECT
+                *,
+                DATEDIFF('day', prev_order_date, order_date) AS days_since,
+                CASE
+                    WHEN prev_order_date IS NULL THEN '1. first'
+                    WHEN DATEDIFF('day', prev_order_date, order_date) > 180 THEN '3. gap'
+                    ELSE '2. continuous'
+                END AS category
+            FROM sequenced
+        )
+        SELECT
+            customer_gender,
+            category,
+            COUNT(DISTINCT notes) AS notes_count,
+            ROUND(AVG(days_since), 2) AS avg_gap,
+            SUM(price) AS total_price
+        FROM gaps
+        GROUP BY customer_gender, category
+        ORDER BY customer_gender, notes_count DESC
+        "#
+        .to_string(),
+        DatabaseProtocol::PostgreSQL,
+    )
+    .await;
+
+    // The whole query reaches the data source: nothing is left above the wrapper
+    let logical_plan = query_plan.as_logical_plan();
+    let sql = logical_plan
+        .find_cube_scan_wrapped_sql_deep()
+        .wrapped_sql
+        .sql;
+    for expected in [
+        "ROW_NUMBER() OVER",
+        "LAG(",
+        "DATEDIFF(",
+        "COUNT(DISTINCT",
+        "GROUP BY",
+        "ORDER BY",
+    ] {
+        assert!(
+            sql.contains(expected),
+            "no {} in generated SQL: {}",
+            expected,
+            sql
+        );
+    }
+
+    // Only the projection renaming the pushed down columns is left on top of the wrapper:
+    // nothing that would read the row-capped result of an unlimited query
+    let plan = format!("{:?}", logical_plan);
+    for unexpected in ["WindowAggr:", "Aggregate:", "Sort:", "Filter:"] {
+        assert!(
+            !plan.contains(unexpected),
+            "{} left in plan: {}",
+            unexpected,
+            plan
+        );
+    }
+}
+
+/// A window column is referred to by the name DataFusion derived for the window expression,
+/// so the wrapped select has to keep that name when it takes the window over. Flattening a
+/// qualified column inside the expression renames it - `LAG(ta_3.ca_1) OVER (...)` becomes
+/// `LAG(ca_1) OVER (...)` - and a filter above is then left pointing at a field that is not
+/// in the schema, which fails the whole plan rather than falling back to post processing.
+#[tokio::test]
+async fn test_wrapper_filter_on_window_over_grouped_join() {
+    if !Rewriter::sql_push_down_enabled() {
+        return;
+    }
+    init_testing_logger();
+
+    let query_plan = convert_select_to_query_plan(
+        // language=PostgreSQL
+        r#"
+        WITH
+        "qt_0" AS (
+            SELECT
+                "ta_1".content "ca_1",
+                DATE_TRUNC('month', "ta_2".order_date) "ca_2",
+                CASE WHEN sum("ta_2"."sumPrice") IS NOT NULL THEN sum("ta_2"."sumPrice") ELSE 0 END "ca_3"
+            FROM KibanaSampleDataEcommerce "ta_2"
+            JOIN Logs "ta_1" ON "ta_2".__cubeJoinField = "ta_1".__cubeJoinField
+            GROUP BY "ca_1", "ca_2"
+        ),
+        "qt_1" AS (
+            SELECT
+                LAG("ta_3"."ca_1") OVER (
+                    PARTITION BY DATE_TRUNC('month', "ta_3"."ca_2")
+                    ORDER BY DATE_TRUNC('month', "ta_3"."ca_2"), "ta_3"."ca_1"
+                ) "ca_4",
+                DATE_TRUNC('month', "ta_3"."ca_2") "ca_5",
+                "ta_3"."ca_1" "ca_6"
+            FROM "qt_0" "ta_3"
+            GROUP BY "ca_5", "ca_6"
+        )
+        SELECT "ta_4"."ca_5" "ca_7", "ta_4"."ca_6" "ca_8"
+        FROM "qt_1" "ta_4"
+        WHERE "ta_4"."ca_4" <= 'x'
+        "#
+        .to_string(),
+        DatabaseProtocol::PostgreSQL,
+    )
+    .await;
+
+    let sql = query_plan
+        .as_logical_plan()
+        .find_cube_scan_wrapped_sql()
+        .wrapped_sql
+        .sql;
+    assert!(sql.contains("LAG("), "generated SQL: {}", sql);
+}
+
+/// An aggregate can take more than one argument. `APPROX_PERCENTILE_CONT(expr, 0.5)` is the
+/// only way to get a median out of a dialect without an exact percentile aggregate - Presto,
+/// Trino and Athena among them - and it is also what DataFusion rewrites `APPROX_MEDIAN(expr)`
+/// into, so leaving multi-argument aggregates unpushable left those dialects with no median
+/// at all.
+#[tokio::test]
+async fn test_wrapper_multi_arg_aggregate_function() {
+    if !Rewriter::sql_push_down_enabled() {
+        return;
+    }
+    init_testing_logger();
+
+    // Not a base template: only dialects with an approximate percentile define it
+    let approx_percentile = vec![(
+        "functions/APPROXPERCENTILECONT".to_string(),
+        "APPROX_PERCENTILE({{ args_concat }})".to_string(),
+    )];
+
+    for call in [
+        "APPROX_PERCENTILE_CONT(taxful_total_price, 0.5)",
+        "APPROX_MEDIAN(taxful_total_price)",
+    ] {
+        let query_plan = convert_select_to_query_plan_customized(
+            format!("SELECT customer_gender, {call} FROM KibanaSampleDataEcommerce GROUP BY 1"),
+            DatabaseProtocol::PostgreSQL,
+            approx_percentile.clone(),
+        )
+        .await;
+
+        assert_eq!(
+            member_expression_sql(
+                &query_plan
+                    .as_logical_plan()
+                    .find_cube_scan_wrapped_sql()
+                    .request
+                    .measures
+            ),
+            vec!["APPROX_PERCENTILE(${KibanaSampleDataEcommerce.taxful_total_price}, 0.5)"],
+            "{} is not pushed down",
+            call
+        );
+    }
+}
+
+/// NTILE is the one built-in window function that cannot be pushed down. DataFusion types
+/// its argument `Exact([UInt64])` and will not coerce the `Int64` an integer literal plans
+/// as, so `NTILE(4)` fails the whole query before rewriting ever sees it. Its SQL template
+/// is correct, so the fix belongs in the fork's signature rather than in a cast bolted onto
+/// the statement - CORE-831.
+///
+/// When this test starts failing, that fix has landed: delete it and add
+/// `("NTILE(4)", "NTILE(4)")` to the case list in `test_wrapper_built_in_window_functions`.
+///
+/// One other thing can turn it red. `Exact([UInt64])` is the `Debug` rendering of a
+/// `TypeSignature`, not a stable string, so a DataFusion bump that reformats the coercion
+/// error fails this assertion while NTILE still does not plan. The error text says which
+/// happened: if it no longer mentions a coercion at all, the signature was relaxed and the
+/// case can move back; if it still refuses the argument in different words, only the
+/// assertion needs updating.
+#[tokio::test]
+async fn test_wrapper_ntile_does_not_plan() {
+    if !Rewriter::sql_push_down_enabled() {
+        return;
+    }
+    init_testing_logger();
+
+    let error = convert_sql_to_cube_query(
+        &r#"
+        SELECT customer_gender, NTILE(4) OVER (ORDER BY notes) AS w
+        FROM (
+            SELECT customer_gender, notes
+            FROM KibanaSampleDataEcommerce
+            GROUP BY 1, 2
+        ) t
+        "#
+        .to_string(),
+        get_test_tenant_ctx(),
+        get_test_session(DatabaseProtocol::PostgreSQL, get_test_tenant_ctx()).await,
+    )
+    .await
+    .expect_err("NTILE should not plan until CORE-831 lands");
+
+    assert!(
+        error.to_string().contains("Exact([UInt64])"),
+        "unexpected error: {}",
+        error
+    );
+}
+
+/// The two functions disagree about a third argument - DataFusion's weighted variant is
+/// `approx_percentile_cont_with_weight(x, w, percentile)` while Presto reads
+/// `approx_percentile(x, w, percentage)` - so a template rendering every argument would
+/// mis-map one against the other. It cannot: `APPROXPERCENTILECONT` is two arguments here
+/// and a third is rejected before rewriting, and the weighted variant is a different
+/// function with a template name of its own, which no dialect defines.
+#[tokio::test]
+async fn test_wrapper_approx_percentile_cont_is_binary() {
+    if !Rewriter::sql_push_down_enabled() {
+        return;
+    }
+    init_testing_logger();
+
+    let error = convert_sql_to_cube_query(
+        &"SELECT customer_gender, APPROX_PERCENTILE_CONT(taxful_total_price, 0.5, 100) FROM KibanaSampleDataEcommerce GROUP BY 1".to_string(),
+        get_test_tenant_ctx(),
+        get_test_session(DatabaseProtocol::PostgreSQL, get_test_tenant_ctx()).await,
+    )
+    .await
+    .expect_err("a third argument should not plan");
+
+    assert!(
+        error
+            .to_string()
+            .contains("does not accept 3 function arguments"),
+        "unexpected error: {}",
+        error
+    );
+}
+
+/// A dialect without the template does not get the aggregate. It does not fall back either:
+/// nothing rewrites the expression, and an approximate percentile over a dimension is not a
+/// Cube measure, so the query ends up with no plan at all. That hard failure - rather than
+/// post processing - is what a user on such a dialect hits, so pin the error it fails with
+/// instead of accepting any failure at all.
+#[tokio::test]
+async fn test_wrapper_multi_arg_aggregate_function_without_template() {
+    if !Rewriter::sql_push_down_enabled() {
+        return;
+    }
+    init_testing_logger();
+
+    let error = convert_sql_to_cube_query(
+        &"SELECT customer_gender, APPROX_PERCENTILE_CONT(taxful_total_price, 0.5) FROM KibanaSampleDataEcommerce GROUP BY 1".to_string(),
+        get_test_tenant_ctx(),
+        get_test_session(DatabaseProtocol::PostgreSQL, get_test_tenant_ctx()).await,
+    )
+    .await
+    .expect_err("aggregate without a template should not be pushed down");
+
+    assert!(
+        error.to_string().contains("Can't detect Cube query"),
+        "unexpected error: {}",
+        error
+    );
+}
+
+/// A pivot with subtotals on both axes: a four-way union of
+/// aggregations, one per grouping set, each filtered before and after aggregating and
+/// projected with literals, under a grouping, sort and limit that read the union. Every
+/// query has several pushed down forms, and a union that spelled out every combination of
+/// them would blow past the node limit of the rewrite before rules on top of the union even
+/// start multiplying it.
+#[tokio::test]
+async fn test_wrapper_union_of_many_form_queries_stays_within_node_limit() {
+    if !Rewriter::sql_push_down_enabled() {
+        return;
+    }
+    init_testing_logger();
+
+    let query = |gender: bool, note: bool| {
+        let group_by = match (gender, note) {
+            (true, true) => "GROUP BY 1, 2",
+            (true, false) | (false, true) => "GROUP BY 1",
+            (false, false) => "",
+        };
+        format!(
+            "SELECT {gender_expr} AS market, {note_expr} AS note, \
+             {gender_total} AS is_market_total, {note_total} AS is_note_total, s AS total \
+             FROM (\
+               SELECT {gender_col}{note_col}SUM(sumPrice) AS s FROM KibanaSampleDataEcommerce \
+               WHERE order_date >= '2024-01-01' {group_by}\
+             ) q WHERE s IS NOT NULL",
+            gender_expr = if gender {
+                "customer_gender"
+            } else {
+                "CAST(NULL AS TEXT)"
+            },
+            note_expr = if note { "notes" } else { "CAST(NULL AS TEXT)" },
+            gender_total = if gender { "FALSE" } else { "TRUE" },
+            note_total = if note { "FALSE" } else { "TRUE" },
+            gender_col = if gender { "customer_gender, " } else { "" },
+            note_col = if note { "notes, " } else { "" },
+        )
+    };
+    let sql = format!(
+        "SELECT note, is_note_total FROM ({} UNION ALL {} UNION ALL {} UNION ALL {}) core \
+         GROUP BY 1, 2 ORDER BY 2, 1 LIMIT 102",
+        query(true, true),
+        query(true, false),
+        query(false, true),
+        query(false, false),
+    );
+
+    let sql = convert_select_to_query_plan(sql, DatabaseProtocol::PostgreSQL)
+        .await
+        .as_logical_plan()
+        .find_cube_scan_wrapped_sql()
+        .wrapped_sql
+        .sql;
+
+    assert_eq!(
+        sql.matches("UNION ALL").count(),
+        3,
+        "all four queries are pushed down in one union: {}",
+        sql
+    );
+    // Each query keeps its own grouping: the subtotal queries stand in a NULL for the
+    // column they roll up, two for each column and none twice over
+    assert_eq!(
+        sql.matches("CAST(NULL AS STRING) \"market\"").count(),
+        2,
+        "two queries roll up the market: {}",
+        sql
+    );
+    assert_eq!(
+        sql.matches("CAST(NULL AS STRING) \"note\"").count(),
+        2,
+        "two queries roll up the note: {}",
+        sql
+    );
+    // Each query keeps both of its filters: the one before aggregating and the one after
+    assert_eq!(
+        sql.matches("afterOrOnDate").count(),
+        4,
+        "every query filters by date before aggregating: {}",
+        sql
+    );
+    assert_eq!(
+        sql.matches("\"operator\": \"set\"").count(),
+        4,
+        "every query drops empty totals after aggregating: {}",
+        sql
+    );
+    assert!(
+        sql.contains("GROUP BY 1, 2") && sql.contains("LIMIT 102"),
+        "the grouping and limit above the union are pushed down with it: {}",
+        sql
+    );
+}
+
+/// A view can include cubes from different data sources. Until a rewrite narrows a scan over
+/// it to the members a query references, the scan names every member of the view and their
+/// data sources conflict. That used to deny SQL pushdown to every query over such a view,
+/// even one that reads a single data source. A filtered measure, the shape a DAX `CALCULATE`
+/// with a column filter produces, has no plan without pushdown, so it has to keep it.
+#[tokio::test]
+async fn test_wrapper_filtered_measure_over_multi_data_source_view() {
+    if !Rewriter::sql_push_down_enabled() {
+        return;
+    }
+    init_testing_logger();
+
+    let meta = get_test_tenant_ctx_with_multi_data_source_view();
+    let query_plan = convert_sql_to_cube_query(
+        &"SELECT SUM(CASE WHEN customer_gender = 'female' THEN sumPrice END) AS filtered \
+          FROM MultiSourceView"
+            .to_string(),
+        meta.clone(),
+        get_test_session(DatabaseProtocol::PostgreSQL, meta).await,
+    )
+    .await
+    .expect("a query over one data source of the view should compile");
+
+    let request = query_plan
+        .as_logical_plan()
+        .find_cube_scan_wrapped_sql()
+        .request;
+    let measures = request
+        .measures
+        .expect("the filtered measure is pushed to Cube");
+    assert_eq!(measures.len(), 1, "unexpected measures: {:?}", measures);
+    let measure: serde_json::Value = serde_json::from_str(&measures[0]).unwrap();
+    assert_eq!(measure["expr"]["type"], "PatchMeasure", "{}", measures[0]);
+    assert_eq!(
+        measure["expr"]["sourceMeasure"], "MultiSourceView.sumPrice",
+        "{}",
+        measures[0]
+    );
+    assert_eq!(
+        measure["expr"]["addFilters"].as_array().map(Vec::len),
+        Some(1),
+        "{}",
+        measures[0]
+    );
+}
+
+/// The view's data sources are visited in a stable order, and every other test here reads the
+/// first one. A query over the second one alone pins that it gets its own context too, and
+/// that the filtered measure resolves to its own member.
+#[tokio::test]
+async fn test_wrapper_filtered_measure_over_multi_data_source_view_second_source() {
+    if !Rewriter::sql_push_down_enabled() {
+        return;
+    }
+    init_testing_logger();
+
+    let meta = get_test_tenant_ctx_with_multi_data_source_view();
+    let query_plan = convert_sql_to_cube_query(
+        &"SELECT COUNT(DISTINCT CASE WHEN content = 'error' THEN agentCount END) AS filtered \
+          FROM MultiSourceView"
+            .to_string(),
+        meta.clone(),
+        get_test_session(DatabaseProtocol::PostgreSQL, meta).await,
+    )
+    .await
+    .expect("a query over the view's second data source should compile");
+
+    let request = query_plan
+        .as_logical_plan()
+        .find_cube_scan_wrapped_sql()
+        .request;
+    let measures = request
+        .measures
+        .expect("the filtered measure is pushed to Cube");
+    assert_eq!(measures.len(), 1, "unexpected measures: {:?}", measures);
+    let measure: serde_json::Value = serde_json::from_str(&measures[0]).unwrap();
+    assert_eq!(measure["expr"]["type"], "PatchMeasure", "{}", measures[0]);
+    assert_eq!(
+        measure["expr"]["sourceMeasure"], "MultiSourceView.agentCount",
+        "{}",
+        measures[0]
+    );
+    assert_eq!(
+        measure["expr"]["addFilters"].as_array().map(Vec::len),
+        Some(1),
+        "{}",
+        measures[0]
+    );
+}
+
+/// The same view read across both of its data sources has no single data source to run on.
+/// Each data source has its own wrapper context and only takes members of its own, so no
+/// pushed down form of the query completes, and it is refused like any other query without
+/// a plan.
+#[tokio::test]
+async fn test_wrapper_multi_data_source_view_across_data_sources_fails() {
+    if !Rewriter::sql_push_down_enabled() {
+        return;
+    }
+    init_testing_logger();
+
+    let meta = get_test_tenant_ctx_with_multi_data_source_view();
+    let error = convert_sql_to_cube_query(
+        &"SELECT SUM(CASE WHEN content = 'error' THEN sumPrice END) AS filtered \
+          FROM MultiSourceView"
+            .to_string(),
+        meta.clone(),
+        get_test_session(DatabaseProtocol::PostgreSQL, meta).await,
+    )
+    .await
+    .expect_err("a query across two data sources should not compile");
+
+    assert!(
+        error.to_string().contains("Can't detect Cube query"),
+        "unexpected error: {}",
+        error
+    );
+}
+
+/// Plain members over a view spanning data sources need no pushdown, and keep going to Cube
+/// as a regular scan.
+#[tokio::test]
+async fn test_wrapper_multi_data_source_view_plain_query_not_wrapped() {
+    if !Rewriter::sql_push_down_enabled() {
+        return;
+    }
+    init_testing_logger();
+
+    let meta = get_test_tenant_ctx_with_multi_data_source_view();
+    let logical_plan = convert_sql_to_cube_query(
+        &"SELECT customer_gender, SUM(sumPrice) AS total FROM MultiSourceView GROUP BY 1"
+            .to_string(),
+        meta.clone(),
+        get_test_session(DatabaseProtocol::PostgreSQL, meta).await,
+    )
+    .await
+    .expect("a plain query over the view should compile")
+    .as_logical_plan();
+
+    let root_is_plain_scan = match &logical_plan {
+        LogicalPlan::Extension(Extension { node }) => {
+            node.as_any().downcast_ref::<CubeScanNode>().is_some()
+        }
+        _ => false,
+    };
+    assert!(
+        root_is_plain_scan,
+        "plain members should not need SQL pushdown: {:?}",
+        logical_plan
+    );
+}
+
+/// A wrapper context over a view spanning data sources is bound to the data source of the
+/// members the query references, and a template it cannot render keeps the expression in
+/// post processing. A window function is a shape the cost model always prefers to push down.
+#[tokio::test]
+async fn test_wrapper_multi_data_source_view_missing_template_stays_post_processed() {
+    if !Rewriter::sql_push_down_enabled() {
+        return;
+    }
+    init_testing_logger();
+
+    let no_window_function = vec![("expressions/window_function".to_string(), "".to_string())];
+    let meta = get_test_tenant_ctx_with_multi_data_source_view_and_templates(vec![
+        ("default", no_window_function.clone()),
+        ("other", no_window_function),
+    ]);
+    let logical_plan = convert_sql_to_cube_query(
+        &"SELECT g, ROW_NUMBER() OVER (ORDER BY g) AS rn \
+          FROM (SELECT customer_gender AS g, SUM(sumPrice) AS s FROM MultiSourceView GROUP BY 1) q"
+            .to_string(),
+        meta.clone(),
+        get_test_session(DatabaseProtocol::PostgreSQL, meta).await,
+    )
+    .await
+    .expect("a window function without a template should compile through post processing")
+    .as_logical_plan();
+
+    assert!(
+        matches!(logical_plan, LogicalPlan::Projection(_)),
+        "the window function is left to post processing: {:?}",
+        logical_plan
+    );
+}
+
+/// The wrapper context of a query over a view spanning data sources is bound to the data
+/// source of the members it references, so a template check is exact: the window function
+/// here lands on `default`, which can render it, and only `other` cannot.
+#[tokio::test]
+async fn test_wrapper_multi_data_source_view_template_missing_in_other_source_pushes_down() {
+    if !Rewriter::sql_push_down_enabled() {
+        return;
+    }
+    init_testing_logger();
+
+    let meta = get_test_tenant_ctx_with_multi_data_source_view_and_templates(vec![(
+        "other",
+        vec![("expressions/window_function".to_string(), "".to_string())],
+    )]);
+    let logical_plan = convert_sql_to_cube_query(
+        &"SELECT f, ROW_NUMBER() OVER (ORDER BY f) AS rn \
+          FROM (SELECT SUM(CASE WHEN customer_gender = 'female' THEN sumPrice END) AS f \
+                FROM MultiSourceView) q"
+            .to_string(),
+        meta.clone(),
+        get_test_session(DatabaseProtocol::PostgreSQL, meta).await,
+    )
+    .await
+    .expect("a window function over a filtered measure should compile")
+    .as_logical_plan();
+
+    let sql = logical_plan.find_cube_scan_wrapped_sql().wrapped_sql.sql;
+    assert!(
+        sql.contains("OVER"),
+        "the window function is pushed down to the data source that renders it: {}",
+        sql
+    );
+}
+
+/// Queries over a view spanning data sources are each bound to the data source of the members
+/// they reference. Two of them on the same data source push down as one set operation.
+#[tokio::test]
+async fn test_wrapper_union_over_multi_data_source_view_same_source_pushed_down() {
+    if !Rewriter::sql_push_down_enabled() {
+        return;
+    }
+    init_testing_logger();
+
+    let meta = get_test_tenant_ctx_with_multi_data_source_view();
+    let logical_plan = convert_sql_to_cube_query(
+        &"SELECT SUM(CASE WHEN customer_gender = 'female' THEN sumPrice END) AS f \
+          FROM MultiSourceView \
+          UNION ALL \
+          SELECT SUM(CASE WHEN customer_gender = 'male' THEN sumPrice END) AS f \
+          FROM MultiSourceView"
+            .to_string(),
+        meta.clone(),
+        get_test_session(DatabaseProtocol::PostgreSQL, meta).await,
+    )
+    .await
+    .expect("a union over the view should compile")
+    .as_logical_plan();
+
+    let sql = logical_plan.find_cube_scan_wrapped_sql().wrapped_sql.sql;
+    assert!(
+        sql.contains("UNION ALL"),
+        "the union is pushed down: {}",
+        sql
+    );
+}
+
+/// Two queries over the same view bound to different data sources cannot be rendered by one
+/// of them, so the union stays in post processing.
+#[tokio::test]
+async fn test_wrapper_union_over_multi_data_source_view_across_sources_not_pushed_down() {
+    if !Rewriter::sql_push_down_enabled() {
+        return;
+    }
+    init_testing_logger();
+
+    let meta = get_test_tenant_ctx_with_multi_data_source_view();
+    let logical_plan = convert_sql_to_cube_query(
+        &"SELECT SUM(CASE WHEN customer_gender = 'female' THEN sumPrice END) AS f \
+          FROM MultiSourceView \
+          UNION ALL \
+          SELECT COUNT(DISTINCT CASE WHEN content = 'error' THEN agentCount END) AS f \
+          FROM MultiSourceView"
+            .to_string(),
+        meta.clone(),
+        get_test_session(DatabaseProtocol::PostgreSQL, meta).await,
+    )
+    .await
+    .expect("a union across the view's data sources should compile")
+    .as_logical_plan();
+
+    assert!(
+        matches!(logical_plan, LogicalPlan::Union(_)),
+        "the union is left to post processing: {:?}",
+        logical_plan
+    );
+    assert_eq!(
+        logical_plan.find_cube_scans().len(),
+        2,
+        "every query keeps its own scan: {:?}",
+        logical_plan
+    );
+}
+
+/// A query grouping members from both data sources of the view has no pushed down form, but
+/// Cube can still serve it as a plain scan (a rollup join pre-aggregation, for one). Shapes
+/// the cost model likes to push down, a window function or a limit with an ordering
+/// expression, must keep that plain scan under post processing rather than pick a pushed
+/// down form that SQL generation cannot render.
+#[tokio::test]
+async fn test_wrapper_multi_data_source_view_cross_source_query_stays_plain() {
+    if !Rewriter::sql_push_down_enabled() {
+        return;
+    }
+    init_testing_logger();
+
+    for sql in [
+        "SELECT g, c, ROW_NUMBER() OVER (ORDER BY g) AS rn \
+         FROM (SELECT customer_gender AS g, content AS c, SUM(sumPrice) AS s \
+               FROM MultiSourceView GROUP BY 1, 2) q",
+        "SELECT customer_gender, content, SUM(sumPrice) AS s FROM MultiSourceView \
+         GROUP BY 1, 2 ORDER BY LOWER(content) LIMIT 5",
+    ] {
+        let meta = get_test_tenant_ctx_with_multi_data_source_view();
+        let logical_plan = convert_sql_to_cube_query(
+            &sql.to_string(),
+            meta.clone(),
+            get_test_session(DatabaseProtocol::PostgreSQL, meta).await,
+        )
+        .await
+        .expect("a query across the view's data sources should compile as a plain scan")
+        .as_logical_plan();
+
+        let cube_scan = logical_plan.find_cube_scan();
+        assert_eq!(
+            cube_scan.request.dimensions.as_deref().map(<[String]>::len),
+            Some(2),
+            "both dimensions go to Cube in one plain scan: {:?}",
+            logical_plan
+        );
+    }
+}
+
+#[tokio::test]
+async fn test_wrapper_binary_expr_timestamp_computed_date_bound() {
+    if !Rewriter::sql_push_down_enabled() {
+        return;
+    }
+    init_testing_logger();
+
+    // The window function forces the SQL push down of the `DATE - INTERVAL` bound.
+    let query_plan = convert_select_to_query_plan(
+        // language=PostgreSQL
+        r#"
+        SELECT
+            customer_gender AS step,
+            MEASURE(count) AS total_conversions,
+            ROW_NUMBER() OVER (ORDER BY customer_gender) AS step_order
+        FROM KibanaSampleDataEcommerce
+        WHERE KibanaSampleDataEcommerce.order_date >= CURRENT_DATE - INTERVAL '28 days'
+        GROUP BY customer_gender
+        ORDER BY customer_gender
+        ;"#
+        .to_string(),
+        DatabaseProtocol::PostgreSQL,
+    )
+    .await;
+
+    let sql = query_plan
+        .as_logical_plan()
+        .find_cube_scan_wrapped_sql()
+        .wrapped_sql
+        .sql;
+    println!("Generated SQL: {sql}");
+
+    assert!(
+        sql.contains(
+            "${KibanaSampleDataEcommerce.order_date} >= CAST((CURRENT_DATE() - INTERVAL '28 DAY') AS TIMESTAMP)"
+        ),
+        "expected the DATE arithmetic explicitly casted to TIMESTAMP, got: {}",
+        sql
+    );
+}
+
+#[tokio::test]
+async fn test_wrapper_binary_expr_date_side_computed_date_bound() {
+    if !Rewriter::sql_push_down_enabled() {
+        return;
+    }
+    init_testing_logger();
+
+    // A DATE tested side is casted up to the TIMESTAMP the bound is typed as.
+    let query_plan = convert_select_to_query_plan(
+        // language=PostgreSQL
+        r#"
+        SELECT
+            customer_gender AS step,
+            MEASURE(count) AS total_conversions,
+            ROW_NUMBER() OVER (ORDER BY customer_gender) AS step_order
+        FROM KibanaSampleDataEcommerce
+        WHERE CAST(KibanaSampleDataEcommerce.order_date AS DATE) >= CURRENT_DATE - INTERVAL '28 days'
+        GROUP BY customer_gender
+        ORDER BY customer_gender
+        ;"#
+        .to_string(),
+        DatabaseProtocol::PostgreSQL,
+    )
+    .await;
+
+    let sql = query_plan
+        .as_logical_plan()
+        .find_cube_scan_wrapped_sql()
+        .wrapped_sql
+        .sql;
+    println!("Generated SQL: {sql}");
+
+    assert!(
+        sql.contains(
+            "CAST(CAST(${KibanaSampleDataEcommerce.order_date} AS DATE) AS TIMESTAMP) >= CAST((CURRENT_DATE() - INTERVAL '28 DAY') AS TIMESTAMP)"
+        ),
+        "expected both sides explicitly casted to TIMESTAMP, got: {}",
+        sql
+    );
+}
+
+#[tokio::test]
+async fn test_wrapper_binary_expr_computed_date_bound_bigquery_templates() {
+    if !Rewriter::sql_push_down_enabled() {
+        return;
+    }
+    init_testing_logger();
+
+    // BigQuery-shaped templates: `CURRENT_DATE - INTERVAL 28 DAY` is a DATETIME there, and
+    // `CAST(... AS TIMESTAMP)` is a valid DATETIME to TIMESTAMP conversion.
+    let query_plan = convert_select_to_query_plan_customized(
+        // language=PostgreSQL
+        r#"
+        SELECT
+            customer_gender AS step,
+            MEASURE(count) AS total_conversions,
+            ROW_NUMBER() OVER (ORDER BY customer_gender) AS step_order
+        FROM KibanaSampleDataEcommerce
+        WHERE KibanaSampleDataEcommerce.order_date >= CURRENT_DATE - INTERVAL '28 days'
+        GROUP BY customer_gender
+        ORDER BY customer_gender
+        ;"#
+        .to_string(),
+        DatabaseProtocol::PostgreSQL,
+        vec![
+            (
+                "functions/CURRENTDATE".to_string(),
+                "CURRENT_DATE".to_string(),
+            ),
+            (
+                "expressions/binary".to_string(),
+                "{% if op == '%' %}MOD({{ left }}, {{ right }}){% else %}({{ left }} {{ op }} {{ right }}){% endif %}".to_string(),
+            ),
+            (
+                "expressions/interval".to_string(),
+                "INTERVAL {{ interval }}".to_string(),
+            ),
+            (
+                "expressions/timestamp_literal".to_string(),
+                "TIMESTAMP('{{ value }}')".to_string(),
+            ),
+        ],
+    )
+    .await;
+
+    let sql = query_plan
+        .as_logical_plan()
+        .find_cube_scan_wrapped_sql()
+        .wrapped_sql
+        .sql;
+    println!("Generated SQL: {sql}");
+
+    assert!(
+        sql.contains(
+            "${KibanaSampleDataEcommerce.order_date} >= CAST((CURRENT_DATE - INTERVAL 28 DAY) AS TIMESTAMP)"
+        ),
+        "expected BigQuery DATE arithmetic explicitly casted to TIMESTAMP, got: {}",
+        sql
+    );
+}
+
+#[tokio::test]
+async fn test_binary_expr_computed_date_bound_cube_scan_filter() {
+    init_testing_logger();
+
+    // Without a shape that needs the SQL push down, the explicit cast over the constant
+    // `DATE - INTERVAL` bound still folds to a literal and becomes a CubeScan date filter.
+    let query_plan = convert_select_to_query_plan(
+        // language=PostgreSQL
+        r#"
+        SELECT
+            customer_gender,
+            MEASURE(count)
+        FROM KibanaSampleDataEcommerce
+        WHERE KibanaSampleDataEcommerce.order_date >= CURRENT_DATE - INTERVAL '28 days'
+        GROUP BY customer_gender
+        ;"#
+        .to_string(),
+        DatabaseProtocol::PostgreSQL,
+    )
+    .await;
+
+    let logical_plan = query_plan.as_logical_plan();
+    assert!(
+        logical_plan.try_expect_root_cube_scan().is_some(),
+        "expected a plain CubeScan, got: {:?}",
+        logical_plan
+    );
+    let filters = logical_plan.find_cube_scan().request.filters.unwrap();
+    assert_eq!(filters.len(), 1, "filters: {:?}", filters);
+    assert_eq!(
+        filters[0].member.as_deref(),
+        Some("KibanaSampleDataEcommerce.order_date")
+    );
+    assert_eq!(filters[0].operator.as_deref(), Some("afterOrOnDate"));
+    // Midnight 28 days before the plan-time (UTC) date. The test may straddle midnight, so
+    // the previous day is accepted too.
+    let values = filters[0].values.clone().unwrap();
+    let today = chrono::Utc::now().date_naive();
+    let expected = [today, today - chrono::Duration::days(1)]
+        .iter()
+        .map(|day| {
+            (*day - chrono::Duration::days(28))
+                .format("%Y-%m-%dT00:00:00.000Z")
+                .to_string()
+        })
+        .collect::<Vec<_>>();
+    assert!(
+        values.len() == 1 && expected.contains(&values[0]),
+        "expected one of {:?}, got: {:?}",
+        expected,
+        values
+    );
+}
+
+#[tokio::test]
+async fn test_wrapper_cast_without_template_folds_to_cube_scan_filter() {
+    if !Rewriter::sql_push_down_enabled() {
+        return;
+    }
+    init_testing_logger();
+
+    // Without a cast template the explicit cast cannot be pushed down; the bound folds to a
+    // CubeScan date filter instead.
+    let query_plan = convert_select_to_query_plan_customized(
+        // language=PostgreSQL
+        r#"
+        SELECT
+            customer_gender AS step,
+            MEASURE(count) AS total_conversions,
+            ROW_NUMBER() OVER (ORDER BY customer_gender) AS step_order
+        FROM KibanaSampleDataEcommerce
+        WHERE KibanaSampleDataEcommerce.order_date >= CURRENT_DATE - INTERVAL '28 days'
+        GROUP BY customer_gender
+        ORDER BY customer_gender
+        ;"#
+        .to_string(),
+        DatabaseProtocol::PostgreSQL,
+        vec![("expressions/cast".to_string(), "".to_string())],
+    )
+    .await;
+
+    let logical_plan = query_plan.as_logical_plan();
+    let sql = logical_plan.find_cube_scan_wrapped_sql().wrapped_sql.sql;
+    println!("Generated SQL: {sql}");
+    assert!(
+        !sql.contains("CAST("),
+        "no cast may reach the pushed down SQL without its template: {}",
+        sql
+    );
+    let filters = logical_plan.find_cube_scan().request.filters.unwrap();
+    assert_eq!(filters.len(), 1, "filters: {:?}", filters);
+    assert_eq!(
+        filters[0].member.as_deref(),
+        Some("KibanaSampleDataEcommerce.order_date")
+    );
+    assert_eq!(filters[0].operator.as_deref(), Some("afterOrOnDate"));
 }

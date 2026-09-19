@@ -8,6 +8,7 @@ import {
   DEFAULT_CONFIG,
   JEST_AFTER_ALL_DEFAULT_TIMEOUT,
   JEST_BEFORE_ALL_DEFAULT_TIMEOUT,
+  stopIfStarted,
 } from './smoke-tests';
 
 describe('GraphQL Schema Caching and RBAC', () => {
@@ -31,7 +32,7 @@ describe('GraphQL Schema Caching and RBAC', () => {
   }, JEST_BEFORE_ALL_DEFAULT_TIMEOUT);
 
   afterAll(async () => {
-    await birdbox.stop();
+    await stopIfStarted('birdbox', birdbox);
   }, JEST_AFTER_ALL_DEFAULT_TIMEOUT);
 
   async function graphqlRequest(group: string, query: string): Promise<any> {

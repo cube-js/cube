@@ -1,0 +1,140 @@
+---
+title: Time zones
+description: Run queries in the time zone your readers actually work in — account-wide, per user, and per dashboard.
+---
+
+By default, every query Cube runs buckets time in the deployment's
+[default time zone](/docs/data-modeling/configuration#default-time-zone) — the
+[`CUBEJS_DEFAULT_TIMEZONE`](/reference/configuration/environment-variables#cubejs_default_timezone)
+environment variable, `UTC` unless you change it. That means "orders today" answers the
+same question for everyone, regardless of where they sit — which is wrong by up to a day
+for anyone outside that zone.
+
+Turning on **user time zones** lets a zone be resolved per account, per user, and per
+dashboard instead.
+
+<Warning>
+
+This feature is **off by default**, and turning it on **moves numbers**. While it is
+off, nothing changes for anyone. Once it is on, a reader whose effective zone differs
+from that default sees different daily, weekly, and monthly totals — because the days
+are cut in a different place.
+
+</Warning>
+
+## What a time zone changes
+
+The effective zone is applied to every query Cube runs on your behalf:
+
+- **Time dimension bucketing** — which rows fall into which day, week, month, or quarter.
+- **Relative dates** — `today`, `yesterday`, `this week`, `last 7 days`, and the dates
+  the agent resolves when you ask about "today".
+- **Date range filters** — the boundaries you type are interpreted in the effective zone.
+
+It applies to charts, dashboards, drill-downs, subtotals and totals, sparklines, period
+comparison, [Analytics Chat](/docs/explore-analyze/analytics-chat), and embedded
+surfaces alike, so a dashboard's charts and its agent panel always agree.
+
+A time zone is a **display and bucketing** concern only. It never affects what data a
+user can see — access control still comes from roles and the security context.
+
+## Turn it on
+
+Go to **Admin → Settings → Time Zones**. Three controls, in the order the decisions are
+made:
+
+| Control | What it does |
+| --- | --- |
+| **Enable user time zones** | The master switch. Off by default; while off, no surface resolves a zone at all. |
+| **Tenant time zone** | The account-wide zone: everyone gets it unless they override it. Leave it as **Deployment default** to keep using each deployment's own default. |
+| **Allow personal time zones** | Whether users may choose their own zone on their Preferences page. On by default once the feature is enabled. |
+
+The last two appear only while the feature is enabled, and they apply to every user in
+the account. The UI labels the middle control **Tenant time zone**; this page calls the
+zone it sets the *account-wide zone*, matching how the docs scope things.
+
+{/* TODO: screenshot — Admin → Settings → Time Zones card with the three controls */}
+
+## Personal time zone
+
+When **Allow personal time zones** is on, each user can pick their own zone under
+**Preferences → Time zone** (see [Preferences](/docs/preferences#time-zone)). Only a zone
+the user has explicitly chosen is ever applied — Cube never silently uses the browser's
+zone, though it will offer the detected zone as a suggestion.
+
+Turning **Allow personal time zones** off makes everyone query in the account-wide zone again,
+and existing personal choices stop applying.
+
+## Dashboard time zone
+
+A dashboard is one artifact many people read, so its zone is a property of the dashboard
+rather than of whoever opens it. Set it in the dashboard builder under
+**Options → Time zone**, which offers three choices:
+
+| Choice | Behavior |
+| --- | --- |
+| **Deployment default** | Inherit — follow the account-wide zone, or the deployment's own default when no account-wide zone is set. |
+| **Viewer time zone** | Resolve per reader, so each viewer sees their own local day. Use this for an operational board. |
+| A named zone | Pin the dashboard — "this dashboard reports in `America/New_York`", and keeps doing so after an admin changes the account-wide zone. |
+
+The zone is stored with the **published** version, so editing a draft does not move the
+numbers on the dashboard people are currently reading. Publish to apply it.
+
+**Viewer time zone** is offered only while **Allow personal time zones** is on — without
+it, a per-reader promise is one Cube would not keep.
+
+### Reading a dashboard in another zone
+
+A published dashboard shows the zone its numbers are bucketed in, next to its title,
+along with where that zone came from — **Set by this dashboard**, **Your own time zone**,
+or **Deployment default**.
+
+Where the dashboard leaves the choice open, that control is also a dropdown: pick another
+zone to look at the same dashboard in it. This is a temporary lens, not an edit — nothing
+is saved, nobody else is affected, and leaving the dashboard drops it.
+
+The zone is shown but **not changeable** when the dashboard is pinned to a named zone, or
+when the account does not allow personal time zones. In both cases the zone is not the
+reader's to reinterpret.
+
+## Exploration time zone
+
+A saved exploration carries a zone the same way, chosen from the **Time zone** control in
+the Explore header. The rows mean what they mean on a dashboard: inherit, resolve per
+viewer, or pin a named zone. It saves as soon as you pick it, so anyone who opens the
+exploration afterwards gets that zone; readers with view-only access see the zone but
+cannot change it.
+
+## How the zone is resolved
+
+Highest priority first.
+
+**A dashboard or a saved exploration:**
+
+1. A reader's temporary lens, or an embed host's `?timezone=` (see
+   [embedded time zones](/embedding/iframe/time-zones)).
+2. The artifact's own pinned zone.
+3. The reader's personal zone — only when the artifact is set to **Viewer time zone**,
+   and only when the account allows personal zones.
+4. What the artifact inherits: the account-wide embed zone for an embed, otherwise the
+   account-wide zone.
+5. The deployment's default time zone.
+
+**Ad-hoc surfaces** — a new exploration, a standalone chat — resolve the reader's own
+personal zone first, then the account-wide zone. Here the only reader is the person asking, so
+their own zone is the right answer.
+
+**Embedded surfaces** follow their own chain, documented in
+[embedded time zones](/embedding/iframe/time-zones).
+
+At every level, if nothing resolves, Cube sends no zone and the deployment applies its
+default time zone — exactly as it did before this feature existed.
+
+## Valid time zone values
+
+Cube accepts [IANA time zone names][link-tzdb] such as `America/New_York` or
+`Asia/Tokyo`. Bare UTC offsets like `+05:30` are **rejected** rather than accepted,
+because Cube would compute them in UTC while reporting the offset back — silently wrong.
+Legacy aliases are understood (`US/Eastern` resolves to `America/New_York`).
+
+[link-tzdb]: https://en.wikipedia.org/wiki/List_of_tz_database_time_zones

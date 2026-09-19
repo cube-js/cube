@@ -28,11 +28,15 @@ tags:
   - name: GitHub
   - name: GitHub Connection
   - name: dbt Sync
+  - name: Databricks Metric View Publication
+  - name: Databricks Metric View Integration
   - name: Folders
   - name: Reports
   - name: Workbooks
+  - name: Dashboard Exports
   - name: Notifications
   - name: Workspace
+  - name: Users
   - name: Users Admin
   - name: User Attributes
   - name: User Attribute Values
@@ -44,6 +48,8 @@ tags:
   - name: Embed
   - name: Embed Tenants
   - name: Dashboard Embed Access
+  - name: Usage Analytics
+  - name: OpenAPI Spec
 paths:
   /api/v1/app-config:
     get:
@@ -104,19 +110,14 @@ paths:
             type: integer
             minimum: 0
         - in: query
-          name: first
-          required: false
-          schema:
-            type: integer
-            minimum: 1
-          description: Page size for cursor-based pagination
-        - in: query
           name: after
-          required: false
+          schema:
+            type: string
+        - in: query
+          name: first
           schema:
             minimum: 1
-            type: string
-          description: Cursor for fetching the next page
+            type: integer
       responses:
         '200':
           content:
@@ -184,11 +185,22 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Deployment'
+                $ref: '#/components/schemas/DeploymentSettings'
           description: ''
-      summary: Update deployment
+      summary: Update a deployment
       tags:
         - Deployments
+      x-mint:
+        content: >-
+          Update any subset of a deployment’s settings — everything the console’s Settings pages own
+          — and read the full settings back. Fields you omit are left alone, and `templateVariables`
+          is merged key-by-key rather than replaced, so setting one configuration flag never clears
+          the others. `releaseChannelVersion` must be one of the versions `GET
+          /:deploymentId/versions` lists for the target channel (in any of the forms it reports) —
+          anything else is a 400, and the container image is resolved from the version rather than
+          sent. Choosing a version that is not the channel’s latest also sets
+          `releaseChannelVersionHold` unless you send it explicitly, so auto-upgrade does not undo
+          the pin.
   /api/v1/deployments/{deploymentId}/build-status:
     get:
       operationId: buildStatus
@@ -259,7 +271,369 @@ paths:
       summary: Reset a deployment to the first onboarding step (project)
       tags:
         - Deployments
+  /api/v1/deployments/{deploymentId}/dashboard-exports:
+    post:
+      operationId: startExport
+      parameters:
+        - in: path
+          name: deploymentId
+          required: true
+          schema:
+            type: integer
+          description: Numeric id of the deployment that owns the dashboard.
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/StartDashboardExportInput'
+        description: StartDashboardExportInput
+        required: true
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DashboardExportJobResponse'
+          description: ''
+      summary: Export a dashboard as PNG or PDF
+      tags:
+        - Dashboard Exports
+      x-mint:
+        content: >-
+          Submit a render of a published dashboard. Identify it with either `dashboardId` (numeric)
+          or `dashboardPublicId` (string) — supply exactly one; it must belong to this deployment,
+          otherwise `404` is returned.
+
+
+          Returns as soon as the job is accepted, because a render waits for every widget to finish
+          querying. Poll `GET /dashboard-exports/{jobId}` until `status` is `completed`, then fetch
+          the file from `GET /dashboard-exports/{jobId}/download`. The job and its file are dropped
+          at `expiresAt` (5 minutes) — download before then or submit again.
+
+
+          Pass `filters`, `timeGrains` and `memberSwitchers` to render the board with specific
+          control values, exactly as a scheduled notification does; omit them to render its saved
+          defaults.
+
+
+          By default the dashboard renders under the calling user's own security context, so the
+          file shows what that user would see. Requires **manage** access to the dashboard's
+          workbook — the same permission the console's own "Download as PNG / PDF" actions require,
+          because a whole-dashboard render is a bulk data export.
+
+
+          To export on someone else's behalf, pass `renderAs`: the queries behind the image then run
+          under that user's security context instead of yours. **Requires the caller to be a tenant
+          administrator.** Name a console user by `userId` or `email` (`type: USER`), or an embed
+          user by `embedTenantName` + `externalId` (`type: EMBED_USER`). A deactivated console user
+          is not a valid subject and returns `404`; an email is matched case-insensitively.
+
+
+          An embed subject is provisioned if it does not exist yet, and `groups`, `userAttributes`
+          and `securityContext` apply to **this render only** — they are carried on the render's own
+          session and are NOT written to the user's stored context, so exporting for someone never
+          changes what their live embedded sessions see. (Use the embed-tenant users API to change a
+          user's stored context.) An embed subject additionally requires the dashboard's workbook to
+          be shared with that embed tenant, otherwise `403` is returned.
+
+
+          Returns `403` when the workspace has data downloads restricted — including for an
+          on-behalf-of export, which deliberately does **not** bypass that setting the way a
+          built-in scheduled notification does — and `429` when there are already too many exports
+          in flight for the identity being rendered as.
+  /api/v1/deployments/{deploymentId}/dashboard-exports/{jobId}:
+    get:
+      operationId: getExportStatus
+      parameters:
+        - in: path
+          name: deploymentId
+          required: true
+          schema:
+            type: integer
+          description: Numeric id of the deployment that owns the dashboard.
+        - in: path
+          name: jobId
+          required: true
+          schema:
+            type: string
+          description: Job id returned when the export was submitted.
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DashboardExportStatusResponse'
+          description: ''
+      summary: Get the status of a dashboard export
+      tags:
+        - Dashboard Exports
+      x-mint:
+        content: >-
+          Progress of a submitted render. Poll until `status` is `completed` (then download it) or
+          `failed` (then read `error`); `pending` and `processing` both mean keep waiting.
+
+
+          Returns `404` once the job has expired, and for a job submitted by a different user — a
+          job is only ever visible to whoever started it.
+  /api/v1/deployments/{deploymentId}/dashboard-exports/{jobId}/download:
+    get:
+      operationId: downloadExport
+      parameters:
+        - in: path
+          name: deploymentId
+          required: true
+          description: Numeric id of the deployment that owns the dashboard.
+          schema:
+            type: integer
+        - in: path
+          name: jobId
+          required: true
+          description: Job id returned when the export was submitted.
+          schema:
+            type: string
+        - in: query
+          name: filename
+          required: false
+          description: Filename stem for the attachment, without extension. Defaults to `dashboard`.
+          schema:
+            type: string
+      responses:
+        '200':
+          content:
+            application/pdf:
+              schema:
+                format: binary
+                type: string
+            image/png:
+              schema:
+                format: binary
+                type: string
+          description: The rendered dashboard.
+      summary: Download a completed dashboard export
+      tags:
+        - Dashboard Exports
+      x-mint:
+        content: >-
+          Stream the rendered file as an attachment, named `dashboard.png` / `dashboard.pdf` unless
+          `?filename=` supplies a different stem (the extension always follows the rendered format).
+
+
+          Returns `409` while the job is still rendering — poll `GET /dashboard-exports/{jobId}`
+          first — `422` if the render failed (terminal: submit a new export rather than retrying
+          this one), and `404` once the job has expired or if it belongs to a different user.
+  /api/v1/deployments/{deploymentId}/databricks-metric-view-integrations/{dataSourceName}:
+    get:
+      operationId: getIntegration
+      parameters:
+        - in: path
+          name: deploymentId
+          required: true
+          schema:
+            type: integer
+        - in: path
+          name: dataSourceName
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DatabricksMetricViewIntegrationResponse'
+          description: ''
+      summary: Get Databricks Metric View publication settings
+      tags:
+        - Databricks Metric View Integration
+      x-mint:
+        content: >-
+          Requires a Databricks datasource. This is currently in preview — reach out to the Cube
+          support team to activate it for your account.
+    put:
+      operationId: saveIntegration
+      parameters:
+        - in: path
+          name: deploymentId
+          required: true
+          schema:
+            type: integer
+        - in: path
+          name: dataSourceName
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SaveDatabricksMetricViewIntegrationInput'
+        description: SaveDatabricksMetricViewIntegrationInput
+        required: false
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DatabricksMetricViewIntegrationResponse'
+          description: ''
+      summary: Create or update Databricks Metric View publication settings
+      tags:
+        - Databricks Metric View Integration
+      x-mint:
+        content: >-
+          Uses optimistic configuration versioning. Pass `expectedConfigurationVersion` 0 to create.
+          Requires a Databricks datasource. This is currently in preview — reach out to the Cube
+          support team to activate it for your account.
+  /api/v1/deployments/{deploymentId}/databricks-metric-view-previews:
+    post:
+      operationId: startPreview
+      parameters:
+        - in: path
+          name: deploymentId
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DatabricksMetricViewPublicationPreviewInput'
+        description: DatabricksMetricViewPublicationPreviewInput
+        required: true
+      responses:
+        '202':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DatabricksMetricViewPublicationPreviewStartResponse'
+          description: ''
+      summary: Start a Databricks Metric View publication preview
+      tags:
+        - Databricks Metric View Publication
+      x-mint:
+        content: >-
+          Queues an offline conversion of static YAML from the deployment's latest successful build
+          and returns polling URLs immediately. Exact retries while the same content-addressed
+          preview is running reuse that work; a later submission starts a fresh execution. Preview
+          payloads and results are retained for at most seven days. The conversion supports scalar
+          dimensions, common and calculated measures, and acyclic many-to-one equi-joins from one
+          Databricks datasource. Access policies, templating, extends, unsafe fanout, unsupported
+          expressions, multiple datasources, and converter loss are blocked per view. Two-part
+          schema.table sources are qualified with `CUBEJS_DB_DATABRICKS_CATALOG` for the selected
+          datasource; without that setting they fail closed with an actionable issue. Requires
+          `SchemaRead` or `SchemaUpdate` access. This is currently in preview — reach out to the
+          Cube support team to activate it for your account.
+  /api/v1/deployments/{deploymentId}/databricks-metric-view-previews/{previewId}:
+    delete:
+      operationId: cancelPreview
+      parameters:
+        - in: path
+          name: deploymentId
+          required: true
+          schema:
+            type: integer
+        - in: path
+          name: previewId
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          content:
+            application/json: {}
+          description: Successful response
+      summary: Cancel a Databricks Metric View preview
+      tags:
+        - Databricks Metric View Publication
+    get:
+      operationId: previewStatus
+      parameters:
+        - in: path
+          name: deploymentId
+          required: true
+          schema:
+            type: integer
+        - in: path
+          name: previewId
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DatabricksMetricViewPublicationPreviewStatusResponse'
+          description: ''
+      summary: Get Databricks Metric View preview status
+      tags:
+        - Databricks Metric View Publication
+  /api/v1/deployments/{deploymentId}/databricks-metric-view-previews/{previewId}/result:
+    get:
+      operationId: previewResult
+      parameters:
+        - in: path
+          name: deploymentId
+          required: true
+          schema:
+            type: integer
+        - in: path
+          name: previewId
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DatabricksMetricViewPublicationPreviewResultResponse'
+          description: ''
+      summary: Get a completed Databricks Metric View preview result
+      tags:
+        - Databricks Metric View Publication
+      x-mint:
+        content: Returns 409 while the preview is still running or if it ended without a conversion result.
   /api/v1/deployments/{deploymentId}/dbt-sync:
+    get:
+      operationId: listDbtSyncs
+      parameters:
+        - in: path
+          name: deploymentId
+          required: true
+          schema:
+            type: integer
+        - in: query
+          name: status
+          schema:
+            oneOf:
+              - $ref: '#/components/schemas/DbtSyncRunsQueryStatus'
+              - type: 'null'
+        - in: query
+          name: trigger
+          schema:
+            oneOf:
+              - $ref: '#/components/schemas/DbtSyncRunsQueryTrigger'
+              - type: 'null'
+        - in: query
+          name: after
+          schema:
+            type: string
+        - in: query
+          name: first
+          schema:
+            minimum: 1
+            type: integer
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DbtSyncRunListResponse'
+          description: ''
+      summary: List dbt syncs for a deployment
+      tags:
+        - dbt Sync
     post:
       operationId: startDbtSync
       parameters:
@@ -285,6 +659,206 @@ paths:
       summary: Start a dbt sync for a deployment
       tags:
         - dbt Sync
+  /api/v1/deployments/{deploymentId}/dbt-sync/{syncJobId}:
+    delete:
+      operationId: cancelDbtSync
+      parameters:
+        - in: path
+          name: deploymentId
+          required: true
+          schema:
+            type: integer
+        - in: path
+          name: syncJobId
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DbtSyncCancelResponse'
+          description: ''
+      summary: Cancel a running dbt sync
+      tags:
+        - dbt Sync
+    get:
+      operationId: getDbtSyncStatus
+      parameters:
+        - in: path
+          name: deploymentId
+          required: true
+          schema:
+            type: integer
+        - in: path
+          name: syncJobId
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DbtSyncStatusResponse'
+          description: ''
+      summary: Get the status of a dbt sync
+      tags:
+        - dbt Sync
+  /api/v1/deployments/{deploymentId}/dbt-sync/{syncJobId}/generated-files:
+    get:
+      operationId: getDbtSyncGeneratedFiles
+      parameters:
+        - in: path
+          name: deploymentId
+          required: true
+          schema:
+            type: integer
+        - in: path
+          name: syncJobId
+          required: true
+          schema:
+            type: string
+        - in: query
+          name: after
+          schema:
+            oneOf:
+              - type: string
+              - type: 'null'
+        - in: query
+          name: first
+          schema:
+            oneOf:
+              - minimum: 1
+                type: integer
+              - type: 'null'
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DbtSyncGeneratedFilesListResponse'
+          description: ''
+      summary: Get the files generated by a dbt sync that did not commit them
+      tags:
+        - dbt Sync
+  /api/v1/deployments/{deploymentId}/dbt-sync/{syncJobId}/logs:
+    get:
+      operationId: getDbtSyncLogs
+      parameters:
+        - in: path
+          name: deploymentId
+          required: true
+          schema:
+            type: integer
+        - in: path
+          name: syncJobId
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DbtSyncLogEntriesListResponse'
+          description: ''
+      summary: Get the log of a dbt sync
+      tags:
+        - dbt Sync
+  /api/v1/deployments/{deploymentId}/dbt-sync/{syncJobId}/result:
+    get:
+      operationId: getDbtSyncResult
+      parameters:
+        - in: path
+          name: deploymentId
+          required: true
+          schema:
+            type: integer
+        - in: path
+          name: syncJobId
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DbtSyncResultResponse'
+          description: ''
+      summary: Get the result of a completed dbt sync
+      tags:
+        - dbt Sync
+  /api/v1/deployments/{deploymentId}/embed-tenants/{embedTenantName}/workbooks:
+    get:
+      operationId: listEmbedTenantWorkbooks
+      parameters:
+        - in: path
+          name: deploymentId
+          required: true
+          schema:
+            type: number
+        - in: path
+          name: embedTenantName
+          required: true
+          schema:
+            type: string
+        - in: query
+          name: accessSource
+          schema:
+            oneOf:
+              - $ref: '#/components/schemas/EmbedTenantWorkbooksListQueryAccessSource'
+              - type: 'null'
+        - in: query
+          name: after
+          schema:
+            type: string
+        - in: query
+          name: first
+          schema:
+            minimum: 1
+            type: integer
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EmbedTenantWorkbooksListResponse'
+          description: ''
+      summary: List workbooks accessible to an embed tenant
+      tags:
+        - Dashboard Embed Access
+      x-mint:
+        content: >-
+          **🔒 Admin only.** Requires administrator privileges — the authenticated principal (API
+          key, embed JWT, or any bearer token) must belong to a user with the admin role.
+
+
+          Return every workbook the named embed tenant can access in this deployment. Effective
+          access includes workbooks shared directly with the tenant, workbooks shared with all embed
+          users, and workbooks inherited from shared folders. Supports `first`/`after` cursor
+          pagination.
+
+
+          Filter workbooks by how access is granted:
+
+
+          - `tenant`: the workbook itself is explicitly shared with the named embed tenant. Excludes
+          workbooks available only through the all-embed-users group or a shared folder.
+
+          - `allEmbedUsers`: the workbook itself is explicitly shared with the built-in
+          all-embed-users group, making it available to every embed tenant. Excludes tenant-specific
+          direct shares and folder-inherited access.
+
+          - `folder`: access is inherited because the workbook is inside a shared folder or any of
+          its descendant folders. The folder may be shared specifically with the named tenant or
+          with all embed users.
+
+
+          Omit this parameter to return the union of all three access sources. A workbook can match
+          more than one source.
   /api/v1/deployments/{deploymentId}/env-vars:
     get:
       operationId: getEnvVariables
@@ -294,6 +868,19 @@ paths:
           required: true
           schema:
             type: integer
+        - in: query
+          name: after
+          schema:
+            oneOf:
+              - type: string
+              - type: 'null'
+        - in: query
+          name: first
+          schema:
+            oneOf:
+              - minimum: 1
+                type: integer
+              - type: 'null'
       responses:
         '200':
           content:
@@ -306,8 +893,9 @@ paths:
         - Env Variables
       x-mint:
         content: >-
-          Lists the deployment environment variables. Values of secret-named variables (containing
-          PASS, SECRET, TOKEN, KEY, or CREDENTIAL) are returned as `[ENCRYPTED]`.
+          Lists the deployment environment variables, cursor-paginated via `first`/`after`. Values
+          of secret-named variables (containing PASS, SECRET, TOKEN, KEY, or CREDENTIAL) are
+          returned as `[ENCRYPTED]`.
     put:
       operationId: setEnvVariables
       parameters:
@@ -337,7 +925,9 @@ paths:
         content: >-
           Upserts deployment environment variables by name; variables not included keep their
           existing values. Passing the `[ENCRYPTED]` placeholder (the masked read value) is rejected
-          — omit variables you do not intend to change.
+          — omit variables you do not intend to change. New variable names must be POSIX identifiers
+          (`^[A-Za-z_][A-Za-z0-9_]*$`); names already stored on the deployment may be resent
+          unchanged so a legacy name can still be updated or removed.
   /api/v1/deployments/{deploymentId}/environments:
     get:
       operationId: getDeploymentEnvironments
@@ -379,6 +969,15 @@ paths:
               - type: 'null'
             type: integer
             minimum: 0
+        - in: query
+          name: after
+          schema:
+            type: string
+        - in: query
+          name: first
+          schema:
+            minimum: 1
+            type: integer
       responses:
         '200':
           content:
@@ -423,6 +1022,15 @@ paths:
               - type: 'null'
             type: integer
             minimum: 0
+        - in: query
+          name: after
+          schema:
+            type: string
+        - in: query
+          name: first
+          schema:
+            minimum: 1
+            type: integer
       responses:
         '200':
           content:
@@ -737,6 +1345,15 @@ paths:
             oneOf:
               - $ref: '#/components/schemas/DeploymentLogsQueryContainer'
               - type: 'null'
+        - in: query
+          name: after
+          schema:
+            type: string
+        - in: query
+          name: first
+          schema:
+            minimum: 1
+            type: integer
       responses:
         '200':
           content:
@@ -762,107 +1379,69 @@ paths:
           description: Numeric id of the deployment that owns the notification.
         - in: query
           name: dashboardId
-          required: false
           schema:
             oneOf:
               - minimum: 1
                 type: integer
-                description: >-
-                  Optional filter: only return notifications for this numeric dashboard id. Provide
-                  this OR dashboardPublicId, not both.
               - type: 'null'
-            type: integer
-            minimum: 1
-          description: >-
-            Optional filter: only return notifications for this numeric dashboard id. Provide this
-            OR `dashboardPublicId`, not both.
+            description: >-
+              Optional filter: only return notifications for this numeric dashboard id. Provide this
+              OR dashboardPublicId, not both.
         - in: query
           name: dashboardPublicId
-          required: false
           schema:
             oneOf:
               - type: string
-                description: >-
-                  Optional filter: only return notifications for this dashboard public id. Provide
-                  this OR dashboardId, not both.
               - type: 'null'
-            type: string
-          description: >-
-            Optional filter: only return notifications for this dashboard public id. Provide this OR
-            `dashboardId`, not both.
+            description: >-
+              Optional filter: only return notifications for this dashboard public id. Provide this
+              OR dashboardId, not both.
         - in: query
           name: recipientUserId
-          required: false
           schema:
             oneOf:
               - minimum: 1
                 type: integer
-                description: >-
-                  Optional filter: only return notifications received by this user, by user id.
-                  Mutually exclusive with recipientEmail and the embed-user filter.
               - type: 'null'
-            type: integer
-            minimum: 1
-          description: >-
-            Optional filter: only return notifications received by this user, by user id. Mutually
-            exclusive with `recipientEmail` and the embed-user filter.
+            description: >-
+              Optional filter: only return notifications received by this user, by user id. Mutually
+              exclusive with recipientEmail and the embed-user filter.
         - in: query
           name: recipientEmail
-          required: false
           schema:
             oneOf:
               - type: string
-                description: >-
-                  Optional filter: only return notifications received by this user, by email.
-                  Mutually exclusive with recipientUserId and the embed-user filter.
               - type: 'null'
-            type: string
-          description: >-
-            Optional filter: only return notifications received by this user, by email. Mutually
-            exclusive with `recipientUserId` and the embed-user filter.
+            description: >-
+              Optional filter: only return notifications received by this user, by email. Mutually
+              exclusive with recipientUserId and the embed-user filter.
         - in: query
           name: recipientEmbedTenantName
-          required: false
           schema:
             oneOf:
               - type: string
-                description: >-
-                  Optional filter: only return notifications received by this embed user. Required
-                  together with recipientExternalId; mutually exclusive with the user filters.
               - type: 'null'
-            type: string
-          description: >-
-            Optional filter: only return notifications received by this embed user. Required
-            together with `recipientExternalId`; mutually exclusive with the user filters.
+            description: >-
+              Optional filter: only return notifications received by this embed user. Required
+              together with recipientExternalId; mutually exclusive with the user filters.
         - in: query
           name: recipientExternalId
-          required: false
           schema:
             oneOf:
               - type: string
-                description: >-
-                  Optional filter: only return notifications received by this embed user. Required
-                  together with recipientEmbedTenantName; mutually exclusive with the user filters.
               - type: 'null'
-            type: string
-          description: >-
-            Optional filter: only return notifications received by this embed user. Required
-            together with `recipientEmbedTenantName`; mutually exclusive with the user filters.
-        - in: query
-          name: first
-          required: false
-          schema:
-            type: integer
-            minimum: 1
-            maximum: 200
-          description: Page size for cursor pagination (default 100, max 200).
+            description: >-
+              Optional filter: only return notifications received by this embed user. Required
+              together with recipientEmbedTenantName; mutually exclusive with the user filters.
         - in: query
           name: after
-          required: false
+          schema:
+            type: string
+        - in: query
+          name: first
           schema:
             minimum: 1
-            type: string
-          description: Opaque cursor for the next page; pass the previous response's `pageInfo.endCursor`.
+            type: integer
       responses:
         '200':
           content:
@@ -1099,26 +1678,18 @@ paths:
             type: integer
           description: Numeric id of the notification (scheduled run).
         - in: query
-          name: first
-          required: false
+          name: after
           schema:
             oneOf:
               - type: string
               - type: 'null'
-            type: integer
-            minimum: 1
-            maximum: 200
-          description: Page size for cursor pagination (default 100, max 200).
         - in: query
-          name: after
-          required: false
+          name: first
           schema:
             oneOf:
               - minimum: 1
                 type: integer
               - type: 'null'
-            type: string
-          description: Opaque cursor for the next page; pass the previous response's `pageInfo.endCursor`.
       responses:
         '200':
           content:
@@ -1198,6 +1769,19 @@ paths:
           required: true
           schema:
             type: integer
+        - in: query
+          name: after
+          schema:
+            oneOf:
+              - type: string
+              - type: 'null'
+        - in: query
+          name: first
+          schema:
+            oneOf:
+              - minimum: 1
+                type: integer
+              - type: 'null'
       responses:
         '200':
           content:
@@ -1512,6 +2096,64 @@ paths:
 
           Requires **edit** access to the report.
   /api/v1/deployments/{deploymentId}/reports/{reportId}/connect-workbook:
+    delete:
+      operationId: disconnectReportFromWorkbook
+      parameters:
+        - in: path
+          name: deploymentId
+          required: true
+          schema:
+            type: number
+        - in: path
+          name: reportId
+          required: true
+          schema:
+            type: number
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DisconnectReportFromWorkbookInput'
+        description: DisconnectReportFromWorkbookInput
+        required: false
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Report'
+          description: ''
+      summary: Disconnect a report from one spot in a spreadsheet
+      tags:
+        - Reports
+      x-mint:
+        content: |-
+          Remove a single placement of a report — one sheet + anchor in one
+          spreadsheet — leaving every other placement, in this workbook and in others, alone.
+
+          Address the placement by `placementId`, or (for placements recorded before ids
+          existed) by `externalWorkbookId` plus `sheetName` and `anchorCell` — or a
+          `resultLocation` naming both. Neither the sheet name nor the anchor is optional in
+          that form: matching is by sheet + anchor, and a target missing either addresses
+          nothing.
+
+          `sheetId` is an optional extra, not a substitute for `sheetName`: a placement
+          written before that field existed has only a name, and no id the server could
+          resolve to it, so an id-only address would match nothing while looking correct.
+
+          Send a `sheetId` only when you know it is the one the placement was stored with.
+          It NARROWS the target — a placement recorded under a different id is not matched,
+          even when the sheet name and anchor agree, because the stored name may belong to a
+          tab that has since been renamed and the id is the only stable identity. If your id
+          may have moved on (a tab deleted and recreated under the same name reports a new
+          one), address the placement by `placementId`, or by sheet name with no
+          `sheetId` at all.
+
+          A target that matches no placement succeeds and changes nothing, so retrying is
+          safe.
+
+          Like connecting, this records nothing about the report's definition and so requires
+          only read access: unplacing a report from your own sheet is not an edit to the report.
     put:
       operationId: connectReportToWorkbook
       parameters:
@@ -1565,6 +2207,13 @@ paths:
           required: true
           schema:
             type: number
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RefreshReportInput'
+        description: RefreshReportInput
+        required: false
       responses:
         '200':
           content:
@@ -1575,6 +2224,32 @@ paths:
       summary: Refresh report
       tags:
         - Reports
+  /api/v1/deployments/{deploymentId}/settings:
+    get:
+      operationId: getDeploymentSettings
+      parameters:
+        - in: path
+          name: deploymentId
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DeploymentSettings'
+          description: ''
+      summary: Get deployment settings
+      tags:
+        - Deployments
+      x-mint:
+        content: >-
+          Every setting of a deployment in one payload — the full contents of the console Settings
+          pages (general, configuration flags, deploy, launchpad, Cube Store private storage), plus
+          the read-only values displayed alongside them. Secrets are excluded; read environment
+          variables through `/env-vars` instead. Writes go to `PUT /:deploymentId`, which accepts
+          the same fields and returns this payload.
   /api/v1/deployments/{deploymentId}/shared-workspace:
     get:
       operationId: sharedWorkspaceObjects
@@ -1663,6 +2338,13 @@ paths:
           required: true
           schema:
             type: integer
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateDeploymentTokenInput'
+        description: CreateDeploymentTokenInput
+        required: false
       responses:
         '200':
           content:
@@ -1673,6 +2355,45 @@ paths:
       summary: Deployment token
       tags:
         - Deployments
+  /api/v1/deployments/{deploymentId}/versions:
+    get:
+      operationId: listDeploymentVersions
+      parameters:
+        - in: path
+          name: deploymentId
+          required: true
+          schema:
+            type: integer
+        - in: query
+          name: after
+          schema:
+            oneOf:
+              - type: string
+              - type: 'null'
+        - in: query
+          name: first
+          schema:
+            oneOf:
+              - minimum: 1
+                type: integer
+              - type: 'null'
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DeploymentVersionsResponse'
+          description: ''
+      summary: List available Cube versions
+      tags:
+        - Deployments
+      x-mint:
+        content: >-
+          Every Cube version this deployment can be switched to — the same set the console’s version
+          picker offers: the head of each release channel, plus the older versions the tenant has
+          run before (its release history). Pass a listed `releaseChannelVersion` to `PUT
+          /:deploymentId`; anything else is rejected. The container image is resolved server-side
+          and is not part of the write surface.
   /api/v1/deployments/{deploymentId}/workbooks:
     get:
       operationId: getWorkbooks
@@ -2794,6 +3515,56 @@ paths:
           groups — including the account-wide `groups` that drive data-model access — are left
           untouched. Idempotent: the response buckets every requested member into `addedMembers` or
           `unchangedMembers`.
+  /api/v1/embed-tenants/{embedTenantName}/user:
+    post:
+      operationId: provisionEmbedUser
+      parameters:
+        - in: path
+          name: embedTenantName
+          required: true
+          schema:
+            type: string
+          description: Name of the embed tenant (the `embedTenantName` used to generate embed sessions).
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProvisionEmbedUserInput'
+        description: ProvisionEmbedUserInput
+        required: false
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EmbedUser'
+          description: ''
+      summary: Provision an embed user
+      tags:
+        - Embed Tenants
+      x-mint:
+        content: >-
+          **🔒 Admin only.** Requires administrator privileges — the authenticated principal (API
+          key, embed JWT, or any bearer token) must belong to a user with the admin role.
+
+
+          Creates or updates one embed user from the identity your own system knows. An embed user
+          is otherwise created the first time they generate a session, so this is how an integration
+          puts its own directory into Cube up front: a user provisioned here is immediately
+          addressable — listable, searchable, assignable to groups, and selectable wherever the
+          product offers a choice of users — before they have ever opened the embed.
+
+
+          Idempotent, and the body is the desired state: provisioning an `externalId` that already
+          exists updates it rather than failing. `email`, `userProfile.displayName` and
+          `userProfile.picture` are overwritten when supplied and preserved when omitted; each group
+          lane is REPLACED when supplied, preserved when omitted, and cleared by `[]`. The embed
+          tenant itself is created on demand, so it need not exist yet.
+
+
+          Everything set here is exactly what `generate-session` would have set, and a later session
+          for the same `externalId` re-applies whatever it carries — so provisioning changes when a
+          user exists, never what their session grants them.
   /api/v1/embed-tenants/{embedTenantName}/users:
     get:
       operationId: listEmbedUsers
@@ -2809,8 +3580,8 @@ paths:
           schema:
             oneOf:
               - type: string
-                description: Case-insensitive substring match against the embed user’s email or external id.
               - type: 'null'
+            description: Case-insensitive substring match against the embed user’s email or external id.
         - in: query
           name: after
           schema:
@@ -2843,6 +3614,57 @@ paths:
           though they stay addressable by it everywhere it is accepted as input. Use `search` to
           match a substring of the email or external id, or a complete external id, which resolves a
           user even when the response cannot echo it back.
+    post:
+      operationId: provisionEmbedUsers
+      parameters:
+        - in: path
+          name: embedTenantName
+          required: true
+          schema:
+            type: string
+          description: Name of the embed tenant (the `embedTenantName` used to generate embed sessions).
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProvisionEmbedUsersInput'
+        description: ProvisionEmbedUsersInput
+        required: false
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProvisionEmbedUsersResponse'
+          description: ''
+      summary: Provision embed users in bulk
+      tags:
+        - Embed Tenants
+      x-mint:
+        content: >-
+          **🔒 Admin only.** Requires administrator privileges — the authenticated principal (API
+          key, embed JWT, or any bearer token) must belong to a user with the admin role.
+
+
+          Provisions up to 100 embed users in one request, each exactly as `POST
+          /embed-tenants/{embedTenantName}/user` would. Use it to load a user directory into an
+          embed tenant, and send further requests to cover a directory larger than one batch.
+
+
+          **This endpoint is partially successful.** It returns `200` whenever the request itself is
+          well formed, and reports each user separately:
+
+          - `succeeded` — the users that were provisioned, in the order requested.
+
+          - `failed` — the entries that were not, each with the `externalId` and an `error` carrying
+          the `status` and `message` the single-user endpoint would have returned (`400` for a group
+          name that does not exist, `429` once the tenant is at its embed-user limit).
+
+
+          Users are applied one at a time in the order given, and earlier ones are not rolled back
+          when a later one fails. Since provisioning is idempotent, resending the whole batch after
+          fixing the failures is safe. A repeated `externalId` within one batch is applied once per
+          entry, so the last one wins.
   /api/v1/embed/dashboard/{publicId}:
     get:
       operationId: getDashboard
@@ -2918,6 +3740,256 @@ paths:
 
           Note that the flag alone does not make a dashboard embeddable — it must also be published
           and shared with the embed tenant. Returns `404` if the dashboard does not exist.
+  /api/v1/embed/dashboard/{publicId}/comments:
+    get:
+      operationId: listDashboardComments
+      parameters:
+        - in: path
+          name: publicId
+          required: true
+          schema:
+            type: string
+        - in: query
+          name: includeResolved
+          schema:
+            oneOf:
+              - type: boolean
+              - type: 'null'
+        - in: query
+          name: resolvedOnly
+          schema:
+            oneOf:
+              - type: boolean
+              - type: 'null'
+        - in: query
+          name: after
+          schema:
+            type: string
+        - in: query
+          name: first
+          schema:
+            minimum: 1
+            type: integer
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EmbedDashboardCommentThreadsListResponse'
+          description: ''
+      summary: List comment threads on an embeddable dashboard
+      tags:
+        - Embed
+      x-mint:
+        content: >-
+          Returns one page of comment threads — each a root comment plus its replies, oldest first —
+          for the dashboard identified by its `publicId`, scoped to the caller's embed tenant.
+
+
+          Threads are ordered newest-first by when they started, so a thread holds its place while
+          it is being replied to. Open threads are returned by default; pass `includeResolved` to
+          widen the page to resolved ones too, or `resolvedOnly` to replace the set with just those.
+
+
+          A comment whose author deleted it is returned with an empty `body` and `removedAt` set, so
+          a thread keeps its shape and the surviving replies stay readable.
+
+
+          Requires a signed embed session scoped to an embed tenant. Every comment endpoint does: a
+          conversation lives inside one embed tenant's partition, so a credential that names no
+          tenant — an API key, a console session — has no conversation to be served and receives
+          `403`.
+    post:
+      operationId: createDashboardComment
+      parameters:
+        - in: path
+          name: publicId
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateEmbedDashboardCommentBody'
+        description: CreateEmbedDashboardCommentBody
+        required: false
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EmbedDashboardCommentDto'
+          description: ''
+      summary: Post a comment on an embeddable dashboard
+      tags:
+        - Embed
+      x-mint:
+        content: >-
+          Starts a thread, or replies to one when `parentId` names a thread root.
+
+
+          The comment is attributed to the calling embed user — the author is taken from the signed
+          session, never from the request body. Nesting is one level deep: replying to a reply
+          returns `400`, and `404` covers a `parentId` that names a comment on another dashboard, a
+          deleted thread, or nothing at all.
+  /api/v1/embed/dashboard/{publicId}/comments/mentionable-users:
+    get:
+      operationId: listMentionableEmbedUsers
+      parameters:
+        - in: path
+          name: publicId
+          required: true
+          schema:
+            type: string
+        - in: query
+          name: search
+          schema:
+            oneOf:
+              - maxLength: 255
+                type: string
+              - type: 'null'
+        - in: query
+          name: after
+          schema:
+            type: string
+        - in: query
+          name: first
+          schema:
+            minimum: 1
+            type: integer
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EmbedMentionableUsersListResponse'
+          description: ''
+      summary: List embed users mentionable in a dashboard comment
+      tags:
+        - Embed
+      x-mint:
+        content: >-
+          Returns one page of the caller's fellow embed users, for a mention autocomplete, ordered
+          by username.
+
+
+          Scoped to the caller's own embed tenant and to embed users only — console users of the
+          host tenant are never returned. Pass `search` to filter by username or email. `email` may
+          be `null`: `username` is the only identity field an embed user is guaranteed to have.
+  /api/v1/embed/dashboard/{publicId}/comments/{commentId}:
+    delete:
+      operationId: removeDashboardComment
+      parameters:
+        - in: path
+          name: publicId
+          required: true
+          schema:
+            type: string
+        - in: path
+          name: commentId
+          required: true
+          schema:
+            type: number
+      responses:
+        '200':
+          content:
+            application/json: {}
+          description: Successful response
+      summary: Delete a comment on an embeddable dashboard
+      tags:
+        - Embed
+      x-mint:
+        content: >-
+          Soft-deletes a comment. Author only.
+
+
+          Deleting a thread root takes its replies with it, so a deleted thread leaves nothing
+          behind. Deleting a reply re-derives its thread's last-activity marker, so the thread does
+          not keep its position on the strength of a message that is gone.
+    patch:
+      operationId: updateDashboardComment
+      parameters:
+        - in: path
+          name: publicId
+          required: true
+          schema:
+            type: string
+        - in: path
+          name: commentId
+          required: true
+          schema:
+            type: number
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateEmbedDashboardCommentBody'
+        description: UpdateEmbedDashboardCommentBody
+        required: false
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EmbedDashboardCommentDto'
+          description: ''
+      summary: Edit a comment on an embeddable dashboard
+      tags:
+        - Embed
+      x-mint:
+        content: >-
+          Replaces a comment's body and stamps `editedAt`.
+
+
+          Author only: another embed user's comment returns `403`, and a comment that is not on this
+          dashboard returns `404` rather than revealing that it exists elsewhere.
+  /api/v1/embed/dashboard/{publicId}/comments/{commentId}/resolve:
+    post:
+      operationId: setDashboardCommentResolved
+      parameters:
+        - in: path
+          name: publicId
+          required: true
+          schema:
+            type: string
+        - in: path
+          name: commentId
+          required: true
+          schema:
+            type: number
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SetEmbedDashboardCommentResolvedBody'
+        description: SetEmbedDashboardCommentResolvedBody
+        required: false
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EmbedDashboardCommentThreadDto'
+          description: ''
+      summary: Resolve or re-open a comment thread
+      tags:
+        - Embed
+      x-mint:
+        content: >-
+          Marks a thread resolved, or re-opens it. Author only — the embed user who started the
+          thread.
+
+
+          The console surface is wider: there, a workbook editor may also resolve someone else's
+          thread. That branch has no analogue here, because an embed viewer holds no workbook rights
+          at all, so authorship is the whole rule.
+
+
+          Threads only — a reply has no resolve state of its own, and one carrying it would put two
+          answers on the same thread, so `400` is returned for a reply's id. A thread whose root was
+          deleted while replies survive is still resolvable, or it would sit in the unresolved list
+          forever.
   /api/v1/embed/dashboard/{publicId}/python-run:
     post:
       operationId: postDashboardPythonRun
@@ -3019,6 +4091,52 @@ paths:
 
           `deploymentId` is required and the caller must have read access to it. Embedding must be
           enabled for the tenant, otherwise `403` is returned.
+  /api/v1/embed/session/revoke:
+    post:
+      operationId: revokeSession
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RevokeEmbedSessionInput'
+        description: RevokeEmbedSessionInput
+        required: false
+      responses:
+        '200':
+          content:
+            application/json: {}
+          description: Successful response
+        '204':
+          description: Session revoked, or did not exist.
+      summary: Revoke an embed session
+      tags:
+        - Embed
+      x-mint:
+        content: >-
+          **🔒 Admin only.** Requires administrator privileges — the authenticated principal (API
+          key, embed JWT, or any bearer token) must belong to a user with the admin role.
+
+
+          Ends an embed session from the server side — call it from your application's logout
+          handler. Pass the `sessionId` that `POST /api/v1/embed/generate-session` returned.
+
+
+          Works in either state the session can be in: an id that has not been exchanged yet can no
+          longer be redeemed via `POST /api/v1/embed/session/token`, and the token an
+          already-exchanged id produced is rejected with `401` from this moment on. The embedded
+          iframe does not tear itself down — remove it on logout as before.
+
+
+          Idempotent: revoking an unknown, expired or already-revoked id also responds `204` — so
+          the response alone never tells you whether a token was still revocable. That depends on
+          Cube, not on the client library you call from: only tokens Cube issued after this endpoint
+          shipped carry the claim revocation is checked against, and an older token keeps working
+          until it expires on its own, within 24 hours. A Cube API token the embed obtained from
+          `POST /api/v1/deployments/{deploymentId}/token` is a separate credential and is not
+          affected.
+
+
+          Embedding must be enabled for the account, otherwise `403` is returned.
   /api/v1/embed/session/token:
     post:
       operationId: postTokenBySessionId
@@ -3057,6 +4175,20 @@ paths:
   /api/v1/github/installations:
     get:
       operationId: installations
+      parameters:
+        - in: query
+          name: after
+          schema:
+            oneOf:
+              - type: string
+              - type: 'null'
+        - in: query
+          name: first
+          schema:
+            oneOf:
+              - minimum: 1
+                type: integer
+              - type: 'null'
       responses:
         '200':
           content:
@@ -3075,7 +4207,20 @@ paths:
           name: installationId
           required: true
           schema:
-            type: number
+            type: integer
+        - in: query
+          name: after
+          schema:
+            oneOf:
+              - type: string
+              - type: 'null'
+        - in: query
+          name: first
+          schema:
+            oneOf:
+              - minimum: 1
+                type: integer
+              - type: 'null'
       responses:
         '200':
           content:
@@ -3090,11 +4235,11 @@ paths:
     get:
       operationId: branches
       parameters:
-        - in: query
-          name: installationId
+        - in: path
+          name: owner
           required: true
           schema:
-            type: integer
+            type: string
         - in: path
           name: repo
           required: true
@@ -3102,9 +4247,22 @@ paths:
             type: string
         - in: query
           name: installationId
-          required: false
+          required: true
           schema:
-            type: number
+            type: integer
+        - in: query
+          name: after
+          schema:
+            oneOf:
+              - type: string
+              - type: 'null'
+        - in: query
+          name: first
+          schema:
+            oneOf:
+              - minimum: 1
+                type: integer
+              - type: 'null'
       responses:
         '200':
           content:
@@ -3319,6 +4477,20 @@ paths:
   /api/v1/regions:
     get:
       operationId: listRegions
+      parameters:
+        - in: query
+          name: after
+          schema:
+            oneOf:
+              - type: string
+              - type: 'null'
+        - in: query
+          name: first
+          schema:
+            oneOf:
+              - minimum: 1
+                type: integer
+              - type: 'null'
       responses:
         '200':
           content:
@@ -3329,6 +4501,30 @@ paths:
       summary: List regions
       tags:
         - Regions
+      x-mint:
+        content: >-
+          Lists the regions available to the account, cursor-paginated via `first`/`after`. The
+          legacy `data` field returns the full, unpaginated list and is deprecated — use `items` +
+          `pageInfo` instead.
+  /api/v1/spec:
+    get:
+      operationId: getSpec
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                additionalProperties: true
+                type: object
+          description: The OpenAPI 3.1 document
+      summary: Get the OpenAPI specification
+      tags:
+        - OpenAPI Spec
+      x-mint:
+        content: >-
+          The full OpenAPI 3.1 document for this API, as served by the build handling the request —
+          every path, parameter, request body and schema. Intended for runtime discovery by clients
+          and agents; `cube spec` wraps it with filtering.
   /api/v1/tenant/settings:
     get:
       operationId: getTenantSettings
@@ -3361,6 +4557,42 @@ paths:
       summary: Update tenant settings
       tags:
         - Tenant Settings
+  /api/v1/usage-analytics/token:
+    post:
+      operationId: createToken
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UsageAnalyticsTokenResponse'
+          description: ''
+      summary: Issue a Cube API token for Usage Analytics
+      tags:
+        - Usage Analytics
+      x-mint:
+        content: >-
+          **🔒 Admin only.** Requires administrator privileges — the authenticated principal (API
+          key, embed JWT, or any bearer token) must belong to a user with the admin role.
+
+
+          Issues a short-lived Cube API token for Cube's internal **Usage Analytics** deployment —
+          the data shown on **Admin → Usage Analytics** — so you can query your own usage and
+          billing data programmatically (REST API, BI tools, scripts) instead of only through the
+          embedded page.
+
+
+          The token is scoped to your account: it carries the same server-resolved security context
+          as the embedded Usage Analytics page, so queries only ever see your own data. Send it as
+          `Authorization: Bearer <token>` on requests to the returned `apiUrl` (the deployment's
+          [Cube REST API](/reference/core-data-apis/rest-api)).
+
+
+          Tokens expire after 1 hour (see `expiresAt`). Issue a fresh one per session or scheduled
+          refresh — issuing is idempotent and cheap.
+
+
+          Requires Usage Analytics to be enabled for the account, otherwise `404` is returned.
   /api/v1/user-attribute-values:
     post:
       operationId: upsertUserAttributeValue
@@ -3430,6 +4662,15 @@ paths:
             oneOf:
               - $ref: '#/components/schemas/GetUserAttributesQueryType'
               - type: 'null'
+        - in: query
+          name: after
+          schema:
+            type: string
+        - in: query
+          name: first
+          schema:
+            minimum: 1
+            type: integer
       responses:
         '200':
           content:
@@ -3440,6 +4681,11 @@ paths:
       summary: Get user attributes
       tags:
         - User Attributes
+      x-mint:
+        content: >-
+          List user attributes, newest first, cursor-paginated via `first`/`after`. The legacy
+          `offset`/`limit` query params and the `data`/`count` response fields are deprecated — use
+          `items` + `pageInfo` instead.
     post:
       operationId: createUserAttribute
       requestBody:
@@ -3636,6 +4882,30 @@ paths:
 
           Reapplying an action a user is already in (deactivating a deactivated user) succeeds as a
           no-op.
+  /api/v1/users/me/settings:
+    patch:
+      operationId: updateMySettings
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserSettingsInput'
+        description: UserSettings
+        required: false
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+          description: ''
+      summary: Update my settings
+      tags:
+        - Users
+      x-mint:
+        content: >-
+          Merge a partial patch into the authenticated user's own settings. Omitted fields are left
+          as they are; `sheets` merges field-by-field, and an explicit `null` clears it.
   /api/v1/users/{id}:
     delete:
       operationId: deleteUser
@@ -3704,6 +4974,53 @@ paths:
           `github`, no starter project is scaffolded — connect a repository afterwards via POST
           /build/api/v1/deployments/:deploymentId/github/connect.
   /build/api/v1/deployments/{deploymentId}/branches:
+    delete:
+      operationId: removeBranch
+      parameters:
+        - in: path
+          name: deploymentId
+          required: true
+          schema:
+            type: integer
+        - in: query
+          name: branchName
+          required: true
+          schema:
+            type: string
+        - in: query
+          name: removeOnUpstream
+          required: false
+          schema:
+            type: boolean
+            default: false
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DataModelWriteResponse'
+          description: ''
+      summary: Delete a branch
+      tags:
+        - Data Model
+      x-mint:
+        content: >-
+          Deletes the branch and its git ref — the API-side counterpart of pruning a branch in Cube
+          Cloud, for callers that create branches per run (a CI job syncing dbt on every pull
+          request, say) and would otherwise accumulate them forever. Child branches are re-parented
+          onto the deleted branch’s own parent, and anyone viewing the branch in dev mode is moved
+          back to the default branch, so a branch that is currently open is deleted rather than
+          refused. The deploy branch cannot be deleted (400) and an unknown branch is a 404.
+
+
+          `removeOnUpstream=true` additionally deletes the branch on the connected git provider
+          (GitHub/GitLab). It defaults to `false`, so by default the branch is removed from Cube
+          Cloud only and the ref on your own remote is left alone — a CI job cleaning up branches it
+          created itself should opt in explicitly.
+
+
+          `branchName` is a query parameter rather than a path segment because branch names contain
+          slashes (`dbt-sync/main-20260817120000-a1b2c3d4`).
     get:
       operationId: listBranches
       parameters:
@@ -3712,6 +5029,19 @@ paths:
           required: true
           schema:
             type: integer
+        - in: query
+          name: after
+          schema:
+            oneOf:
+              - type: string
+              - type: 'null'
+        - in: query
+          name: first
+          schema:
+            oneOf:
+              - minimum: 1
+                type: integer
+              - type: 'null'
       responses:
         '200':
           content:
@@ -3747,6 +5077,39 @@ paths:
       summary: Create a branch (optionally entering dev mode on it)
       tags:
         - Data Model
+  /build/api/v1/deployments/{deploymentId}/branches/staging-environment:
+    put:
+      operationId: setBranchStagingEnvironment
+      parameters:
+        - in: path
+          name: deploymentId
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SetBranchStagingEnvironmentRequest'
+        description: SetBranchStagingEnvironmentRequest
+        required: false
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SetBranchStagingEnvironmentResponse'
+          description: ''
+      summary: Enable or disable a branch's staging environment
+      tags:
+        - Data Model
+      x-mint:
+        content: >-
+          Enabling a branch keeps its staging environment always active and accessible at
+          `<deploymentUrl>/dev-mode/{branchName}/cubejs-api/v1`; disabled (the default) it is only
+          active while the branch is viewed in Cube Cloud. Enabled branches are the ones listed by
+          `GET /api/v1/deployments/{deploymentId}/environments?type=staging`. Only shared branches
+          qualify — personal dev branches and the deploy branch are rejected.
   /build/api/v1/deployments/{deploymentId}/commit:
     post:
       operationId: commitChanges
@@ -3861,6 +5224,19 @@ paths:
           required: false
           schema:
             type: boolean
+        - in: query
+          name: after
+          schema:
+            oneOf:
+              - type: string
+              - type: 'null'
+        - in: query
+          name: first
+          schema:
+            oneOf:
+              - minimum: 1
+                type: integer
+              - type: 'null'
       responses:
         '200':
           content:
@@ -3871,6 +5247,12 @@ paths:
       summary: List the data-model source files for a deployment
       tags:
         - Data Model
+      x-mint:
+        content: >-
+          Returns the data-model file tree. `first`/`after` (from the shared cursor params) paginate
+          the **top-level** tree nodes only — a single node can carry a large subtree, so this
+          bounds the number of roots returned, not the total file count. Omit `first` to get the
+          whole tree.
     put:
       operationId: updateFiles
       parameters:
@@ -4049,6 +5431,43 @@ paths:
       summary: Start a data-model upload transaction
       tags:
         - Data Model Uploads
+  /build/api/v1/deployments/{deploymentId}/data-model/validate:
+    get:
+      operationId: validateDataModel
+      parameters:
+        - in: path
+          name: deploymentId
+          required: true
+          schema:
+            type: integer
+        - in: query
+          name: branchName
+          required: false
+          schema:
+            type: string
+        - in: query
+          name: devMode
+          required: false
+          schema:
+            type: boolean
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DataModelValidationResponse'
+          description: ''
+      summary: Compile a deployment's data model and report compilation errors
+      tags:
+        - Data Model
+      x-mint:
+        content: >-
+          Asks the branch's own Cube runtime for `GET /cubejs-api/v1/meta` — the same call the
+          console makes in dev mode — so the verdict is the one that branch's API would give. With
+          neither parameter it validates the deploy branch (production). `branchName` validates a
+          named branch, and `devMode=true` validates the caller's active dev-mode branch; the two
+          are mutually exclusive. Answers 200 with `valid: false` and the compiler's errors when the
+          model doesn't compile — a broken model is a result, not a request error.
   /build/api/v1/deployments/{deploymentId}/dev-mode:
     delete:
       operationId: stopDevMode
@@ -4239,26 +5658,52 @@ components:
           oneOf:
             - $ref: '#/components/schemas/EmbedSettings'
             - type: 'null'
+        sheetsAgentChatEnabled:
+          type: boolean
         sheetsUi:
           oneOf:
             - $ref: '#/components/schemas/SheetsUiSettings'
             - type: 'null'
+        timezoneSettings:
+          oneOf:
+            - $ref: '#/components/schemas/TimezoneSettings'
+            - type: 'null'
       required:
         - applyThemeGlobally
+        - sheetsAgentChatEnabled
       type: object
     AppTheme:
       properties:
         dark:
           $ref: '#/components/schemas/AppThemeScheme'
+          deprecated: true
+          description: 'Deprecated: use palette and logoUrl instead.'
         light:
           $ref: '#/components/schemas/AppThemeScheme'
+          deprecated: true
+          description: 'Deprecated: use palette and logoUrl instead.'
+        logoUrl:
+          type: string
+        palette:
+          $ref: '#/components/schemas/AppThemePalette'
         typography:
           oneOf:
             - $ref: '#/components/schemas/AppThemeTypography'
             - type: 'null'
       required:
+        - palette
+        - logoUrl
         - light
         - dark
+      type: object
+    AppThemeCodePalette:
+      properties:
+        saturation:
+          oneOf:
+            - maximum: 100
+              type: number
+              minimum: 0
+            - type: 'null'
       type: object
     AppThemeFontRef:
       properties:
@@ -4269,6 +5714,77 @@ components:
       required:
         - fontRef
         - fontWeight
+      type: object
+    AppThemePalette:
+      properties:
+        accent:
+          oneOf:
+            - $ref: '#/components/schemas/AppThemePaletteSeed'
+            - type: 'null'
+        base:
+          oneOf:
+            - $ref: '#/components/schemas/AppThemePaletteSeed'
+            - type: 'null'
+        contrastLevel:
+          oneOf:
+            - maximum: 100
+              type: number
+              minimum: 0
+            - type: 'null'
+        pastel:
+          oneOf:
+            - type: boolean
+            - type: 'null'
+        surfaceMode:
+          oneOf:
+            - $ref: '#/components/schemas/AppThemeSurfaceMode'
+            - type: 'null'
+        themes:
+          oneOf:
+            - $ref: '#/components/schemas/AppThemePaletteThemes'
+            - type: 'null'
+      type: object
+    AppThemePaletteSeed:
+      properties:
+        color:
+          oneOf:
+            - type: string
+            - type: 'null'
+        hue:
+          oneOf:
+            - maximum: 360
+              type: number
+              minimum: 0
+            - type: 'null'
+        saturation:
+          oneOf:
+            - maximum: 100
+              type: number
+              minimum: 0
+            - type: 'null'
+      type: object
+    AppThemePaletteThemes:
+      properties:
+        code:
+          oneOf:
+            - $ref: '#/components/schemas/AppThemeCodePalette'
+            - type: 'null'
+        danger:
+          oneOf:
+            - $ref: '#/components/schemas/AppThemePaletteSeed'
+            - type: 'null'
+        note:
+          oneOf:
+            - $ref: '#/components/schemas/AppThemePaletteSeed'
+            - type: 'null'
+        success:
+          oneOf:
+            - $ref: '#/components/schemas/AppThemePaletteSeed'
+            - type: 'null'
+        warning:
+          oneOf:
+            - $ref: '#/components/schemas/AppThemePaletteSeed'
+            - type: 'null'
       type: object
     AppThemeScheme:
       properties:
@@ -4289,6 +5805,11 @@ components:
         - contrast
         - logoUrl
       type: object
+    AppThemeSurfaceMode:
+      enum:
+        - neutral
+        - tinted
+      type: string
     AppThemeTypography:
       properties:
         body:
@@ -4308,6 +5829,10 @@ components:
       properties:
         id:
           type: integer
+        isStagingEnvironmentEnabled:
+          oneOf:
+            - type: boolean
+            - type: 'null'
         lastHash:
           oneOf:
             - type: string
@@ -4325,10 +5850,21 @@ components:
     BranchesListResponse:
       properties:
         data:
+          deprecated: true
+          description: 'Deprecated: use `items` instead. Kept for backward compatibility.'
           items:
             $ref: '#/components/schemas/BranchResponse'
           type: array
+        items:
+          items:
+            $ref: '#/components/schemas/BranchResponse'
+          type: array
+        pageInfo:
+          oneOf:
+            - $ref: '#/components/schemas/PageInfo'
+            - type: 'null'
       required:
+        - items
         - data
       type: object
     BuildStatusResponse:
@@ -4549,18 +6085,55 @@ components:
       type: object
     ConnectReportToWorkbookInput:
       properties:
+        addressOnly:
+          oneOf:
+            - type: boolean
+            - type: 'null'
+        anchorCell:
+          oneOf:
+            - type: string
+            - type: 'null'
         endResultCell:
           oneOf:
             - type: string
             - type: 'null'
         externalWorkbookId:
           type: string
+        host:
+          oneOf:
+            - $ref: '#/components/schemas/ConnectReportToWorkbookInputHost'
+            - type: 'null'
+        placementId:
+          oneOf:
+            - type: string
+            - type: 'null'
+        resultChecksum:
+          oneOf:
+            - $ref: '#/components/schemas/ReportPlacementResultChecksumInput'
+            - type: 'null'
         resultLocation:
           type: string
+        sheetId:
+          oneOf:
+            - type: string
+            - type: 'null'
+        sheetName:
+          oneOf:
+            - type: string
+            - type: 'null'
+        workbookName:
+          oneOf:
+            - type: string
+            - type: 'null'
       required:
         - externalWorkbookId
         - resultLocation
       type: object
+    ConnectReportToWorkbookInputHost:
+      enum:
+        - GOOGLE_SHEETS
+        - EXCEL
+      type: string
     ControlThemeBorderSectionInput:
       properties:
         color:
@@ -4703,14 +6276,40 @@ components:
         - git
         - cli
       type: string
+    CreateDeploymentTokenInput:
+      properties:
+        expiresIn:
+          oneOf:
+            - maximum: 86400
+              type: integer
+              minimum: 60
+            - type: 'null'
+          description: >-
+            Token lifetime in seconds, between 60 and 86400. Omit to keep the historical default of
+            24 hours (86400). Callers that hold the token outside a browser session — scripts, BI
+            tools, scheduled jobs — should request a short lifetime and re-issue tokens instead.
+      type: object
+    CreateEmbedDashboardCommentBody:
+      properties:
+        body:
+          maxLength: 10000
+          minLength: 1
+          type: string
+        parentId:
+          oneOf:
+            - type: integer
+            - type: 'null'
+      required:
+        - body
+      type: object
     CreateEmbedGroupInput:
       properties:
         description:
           oneOf:
             - maxLength: 500
               type: string
-              description: Optional human-readable description.
             - type: 'null'
+          description: Optional human-readable description.
         name:
           description: >-
             Group name, unique within the embed tenant. The `system:` prefix is reserved and
@@ -4742,51 +6341,63 @@ components:
         customCron:
           oneOf:
             - type: string
-              description: Custom cron expression (required if scheduleType is CUSTOM)
             - type: 'null'
+          description: Custom cron expression (required if scheduleType is CUSTOM)
         dashboardId:
           oneOf:
             - type: integer
-              description: >-
-                Numeric id of the dashboard to run on the schedule. Provide this OR
-                dashboardPublicId (exactly one).
             - type: 'null'
+          description: >-
+            Numeric id of the dashboard to run on the schedule. Provide this OR dashboardPublicId
+            (exactly one).
         dashboardPublicId:
           oneOf:
             - type: string
-              description: >-
-                Public id of the dashboard to run on the schedule. Provide this OR dashboardId
-                (exactly one).
             - type: 'null'
+          description: >-
+            Public id of the dashboard to run on the schedule. Provide this OR dashboardId (exactly
+            one).
         dayOfMonth:
           oneOf:
             - type: integer
-              description: Day of month (1-31)
             - type: 'null'
+          description: Day of month (1-31)
         dayOfWeek:
           oneOf:
             - type: integer
-              description: Day of week (0-6, Sunday=0)
             - type: 'null'
+          description: Day of week (0-6, Sunday=0)
         filters:
           oneOf:
             - items:
                 $ref: '#/components/schemas/DashboardFilterInput'
               type: array
-              description: >-
-                Dimension filters applied to the dashboard when the notification is rendered
-                (substituted into the screenshot/PDF for every recipient).
             - type: 'null'
+          description: >-
+            Dimension filters applied to the dashboard when the notification is rendered
+            (substituted into the screenshot/PDF for every recipient).
         hour:
           oneOf:
             - type: integer
-              description: Hour of the day (0-23)
             - type: 'null'
+          description: Hour of the day (0-23)
+        memberSwitchers:
+          oneOf:
+            - items:
+                $ref: '#/components/schemas/DashboardMemberSwitcherInput'
+              type: array
+            - type: 'null'
+          description: Field-switcher selections applied to the dashboard when the notification is rendered.
         minute:
           oneOf:
             - type: integer
-              description: Minute of the hour (0-59)
             - type: 'null'
+          description: Minute of the hour (0-59)
+        notificationAiSummary:
+          oneOf:
+            - type: boolean
+            - type: 'null'
+          description: Include an AI-generated "what changed" summary in the notification body. Off by default.
         notificationEnabled:
           oneOf:
             - type: boolean
@@ -4802,13 +6413,13 @@ components:
             - items:
                 $ref: '#/components/schemas/DashboardTimeGrainInput'
               type: array
-              description: Time-grain overrides applied to the dashboard when the notification is rendered.
             - type: 'null'
+          description: Time-grain overrides applied to the dashboard when the notification is rendered.
         timezone:
           oneOf:
             - type: string
-              description: Timezone for the schedule (e.g. "America/New_York")
             - type: 'null'
+          description: Timezone for the schedule (e.g. "America/New_York")
       required:
         - scheduleType
       type: object
@@ -4910,6 +6521,10 @@ components:
           oneOf:
             - type: integer
             - type: 'null'
+        host:
+          oneOf:
+            - $ref: '#/components/schemas/CreateReportInputHost'
+            - type: 'null'
         jsonQuery:
           oneOf:
             - type: string
@@ -4921,7 +6536,8 @@ components:
             - type: 'null'
         name:
           oneOf:
-            - type: string
+            - maxLength: 255
+              type: string
             - type: 'null'
         pivotItems:
           oneOf:
@@ -4934,7 +6550,15 @@ components:
               minLength: 12
               maxLength: 12
             - type: 'null'
+        resultChecksum:
+          oneOf:
+            - $ref: '#/components/schemas/ReportPlacementResultChecksumInput'
+            - type: 'null'
         resultLocation:
+          oneOf:
+            - type: string
+            - type: 'null'
+        sheetId:
           oneOf:
             - type: string
             - type: 'null'
@@ -4948,13 +6572,23 @@ components:
             - type: 'null'
         title:
           oneOf:
-            - type: string
+            - maxLength: 255
+              type: string
             - type: 'null'
         workbookId:
           oneOf:
             - type: integer
             - type: 'null'
+        workbookName:
+          oneOf:
+            - type: string
+            - type: 'null'
       type: object
+    CreateReportInputHost:
+      enum:
+        - GOOGLE_SHEETS
+        - EXCEL
+      type: string
     CreateReportInputSource:
       enum:
         - GOOGLE_SHEETS
@@ -5014,6 +6648,60 @@ components:
           oneOf:
             - type: string
             - type: 'null'
+      type: object
+    CspsConfig:
+      properties:
+        awsRoleArn:
+          oneOf:
+            - type: string
+            - type: 'null'
+        azureClientId:
+          oneOf:
+            - type: string
+            - type: 'null'
+        azureContainer:
+          oneOf:
+            - type: string
+            - type: 'null'
+        azureStorageAccount:
+          oneOf:
+            - type: string
+            - type: 'null'
+        azureTenantId:
+          oneOf:
+            - type: string
+            - type: 'null'
+        enabled:
+          type: boolean
+        gcpServiceAccountEmail:
+          oneOf:
+            - type: string
+            - type: 'null'
+        gcpWorkloadIdentityProvider:
+          oneOf:
+            - type: string
+            - type: 'null'
+        gcsBucket:
+          oneOf:
+            - type: string
+            - type: 'null'
+        s3Bucket:
+          oneOf:
+            - type: string
+            - type: 'null'
+        s3Region:
+          oneOf:
+            - type: string
+            - type: 'null'
+        s3Sse:
+          oneOf:
+            - type: string
+            - type: 'null'
+        storageProvider:
+          type: string
+      required:
+        - enabled
+        - storageProvider
       type: object
     CspsConfigInput:
       properties:
@@ -5334,6 +7022,49 @@ components:
               type: array
             - type: 'null'
       type: object
+    DashboardConfigDraftInput:
+      properties:
+        app:
+          oneOf:
+            - $ref: '#/components/schemas/DashboardAppSourceInput'
+            - type: 'null'
+        description:
+          oneOf:
+            - type: string
+            - type: 'null'
+        kind:
+          oneOf:
+            - $ref: '#/components/schemas/DashboardConfigDraftInputKind'
+            - type: 'null'
+        layout:
+          oneOf:
+            - $ref: '#/components/schemas/DashboardLayoutInput'
+            - type: 'null'
+        settings:
+          oneOf:
+            - type: object
+              additionalProperties: true
+            - type: 'null'
+        theme:
+          oneOf:
+            - $ref: '#/components/schemas/DashboardThemeInput'
+            - type: 'null'
+        title:
+          oneOf:
+            - type: string
+            - type: 'null'
+        widgets:
+          oneOf:
+            - items:
+                $ref: '#/components/schemas/DashboardWidgetDraftInput'
+              type: array
+            - type: 'null'
+      type: object
+    DashboardConfigDraftInputKind:
+      enum:
+        - CLASSIC
+        - APP
+      type: string
     DashboardConfigInput:
       properties:
         app:
@@ -5398,6 +7129,50 @@ components:
         - publicId
         - allowEmbed
       type: object
+    DashboardExportJobResponse:
+      properties:
+        expiresAt:
+          description: >-
+            When the job (and its rendered file) is evicted from the renderer cache. Download before
+            this, or submit a new export.
+          format: date-time
+          type: string
+        jobId:
+          description: Job id to poll for status and to download the finished file with.
+          type: string
+      required:
+        - jobId
+        - expiresAt
+      type: object
+    DashboardExportStatusResponse:
+      properties:
+        contentType:
+          oneOf:
+            - type: string
+            - type: 'null'
+          description: MIME type of the rendered file. Present once `status` is `completed`.
+        error:
+          oneOf:
+            - type: string
+            - type: 'null'
+          description: Why the render failed. Present only when `status` is `failed`.
+        progress:
+          oneOf:
+            - type: number
+            - type: 'null'
+          description: Rendering progress, 0-100, when the renderer reports one.
+        status:
+          $ref: '#/components/schemas/DashboardExportStatusResponseStatus'
+      required:
+        - status
+      type: object
+    DashboardExportStatusResponseStatus:
+      enum:
+        - pending
+        - processing
+        - completed
+        - failed
+      type: string
     DashboardFilter:
       properties:
         caseSensitive:
@@ -5434,12 +7209,14 @@ components:
       properties:
         caseSensitive:
           oneOf:
-            - description: 'For string filters: whether matching is case-sensitive'
+            - {}
             - type: 'null'
+          description: 'For string filters: whether matching is case-sensitive'
         endInclusive:
           oneOf:
-            - description: 'For between filters: whether the end bound is inclusive'
+            - {}
             - type: 'null'
+          description: 'For between filters: whether the end bound is inclusive'
         member:
           description: Dimension path, e.g. "Orders.status"
           pattern: .+\..+
@@ -5450,20 +7227,21 @@ components:
             - type: 'null'
         startInclusive:
           oneOf:
-            - description: 'For between filters: whether the start bound is inclusive'
+            - {}
             - type: 'null'
+          description: 'For between filters: whether the start bound is inclusive'
         value:
           oneOf:
-            - description: >-
-                Filter value. Omit for is_null / is_not_null / is_empty / is_not_empty; provide a
-                2-element [start, end] array for between.
-              oneOf:
+            - oneOf:
                 - type: string
                 - type: number
                 - type: boolean
                 - type: array
                   items: {}
             - type: 'null'
+          description: >-
+            Filter value. Omit for is_null / is_not_null / is_empty / is_not_empty; provide a
+            2-element [start, end] array for between.
       required:
         - member
       type: object
@@ -5562,6 +7340,29 @@ components:
           oneOf:
             - type: integer
             - type: 'null'
+      type: object
+    DashboardMemberSwitcher:
+      properties:
+        member:
+          type: string
+        selected:
+          type: string
+      required:
+        - member
+        - selected
+      type: object
+    DashboardMemberSwitcherInput:
+      properties:
+        member:
+          description: Path of the member the control replaces, e.g. "Orders.status"
+          pattern: .+\..+
+          type: string
+        selected:
+          description: Name of the member to show in its place, e.g. "city" (no view prefix)
+          type: string
+      required:
+        - member
+        - selected
       type: object
     DashboardResponsiveLayouts:
       properties:
@@ -5701,14 +7502,60 @@ components:
         - type
         - position
       type: object
+    DashboardWidgetDraftInput:
+      properties:
+        config:
+          oneOf:
+            - type: object
+              additionalProperties: true
+            - type: 'null'
+        id:
+          oneOf:
+            - maxLength: 128
+              type: string
+            - type: 'null'
+        position:
+          $ref: '#/components/schemas/DashboardWidgetPositionInput'
+        responsiveLayouts:
+          oneOf:
+            - $ref: '#/components/schemas/DashboardResponsiveLayoutsInput'
+            - type: 'null'
+        style:
+          oneOf:
+            - type: object
+              additionalProperties: true
+            - type: 'null'
+        type:
+          $ref: '#/components/schemas/DashboardWidgetDraftInputType'
+      required:
+        - type
+        - position
+      type: object
+    DashboardWidgetDraftInputType:
+      enum:
+        - CHART
+        - TEXT
+        - FILTER
+        - AI
+        - TIME_GRAIN
+        - FIELD
+        - PARENT
+        - SPACER
+        - DIVIDER
+        - CONTAINER
+      type: string
     DashboardWidgetDtoType:
       enum:
         - CHART
         - TEXT
         - FILTER
         - AI
-        - TABS_CONTAINER
         - TIME_GRAIN
+        - FIELD
+        - PARENT
+        - SPACER
+        - DIVIDER
+        - CONTAINER
       type: string
     DashboardWidgetInput:
       properties:
@@ -5718,6 +7565,7 @@ components:
               additionalProperties: true
             - type: 'null'
         id:
+          maxLength: 128
           type: string
         position:
           $ref: '#/components/schemas/DashboardWidgetPositionInput'
@@ -5743,8 +7591,12 @@ components:
         - TEXT
         - FILTER
         - AI
-        - TABS_CONTAINER
         - TIME_GRAIN
+        - FIELD
+        - PARENT
+        - SPACER
+        - DIVIDER
+        - CONTAINER
       type: string
     DashboardWidgetPosition:
       properties:
@@ -5805,12 +7657,613 @@ components:
         - path
         - newPath
       type: object
+    DataModelValidationError:
+      properties:
+        fileName:
+          oneOf:
+            - type: string
+            - type: 'null'
+        message:
+          type: string
+      required:
+        - message
+      type: object
+    DataModelValidationResponse:
+      properties:
+        branchName:
+          type: string
+        cubesCount:
+          oneOf:
+            - type: integer
+            - type: 'null'
+        deploymentId:
+          type: integer
+        errors:
+          items:
+            $ref: '#/components/schemas/DataModelValidationError'
+          type: array
+        mode:
+          $ref: '#/components/schemas/DataModelValidationResponseMode'
+        valid:
+          type: boolean
+      required:
+        - deploymentId
+        - branchName
+        - mode
+        - valid
+        - errors
+      type: object
+    DataModelValidationResponseMode:
+      enum:
+        - production
+        - dev_mode
+      type: string
     DataModelWriteResponse:
       properties:
         success:
           type: boolean
       required:
         - success
+      type: object
+    DatabricksMetricViewIntegrationConfigurationResponse:
+      properties:
+        deletionPolicy:
+          $ref: '#/components/schemas/DatabricksMetricViewIntegrationConfigurationResponseDeletionPolicy'
+        enabled:
+          type: boolean
+        selectionMode:
+          $ref: '#/components/schemas/DatabricksMetricViewIntegrationConfigurationResponseSelectionMode'
+        sourceOverrides:
+          oneOf:
+            - type: object
+              additionalProperties:
+                type: string
+            - type: 'null'
+        targetCatalog:
+          type: string
+        targetNamePrefix:
+          oneOf:
+            - type: string
+            - type: 'null'
+        targetNames:
+          oneOf:
+            - type: object
+              additionalProperties:
+                type: string
+            - type: 'null'
+        targetSchema:
+          type: string
+        version:
+          $ref: '#/components/schemas/DatabricksMetricViewIntegrationConfigurationResponseVersion'
+        viewNameRegex:
+          oneOf:
+            - type: string
+            - type: 'null'
+        viewNames:
+          oneOf:
+            - items:
+                type: string
+              type: array
+            - type: 'null'
+      required:
+        - version
+        - enabled
+        - targetCatalog
+        - targetSchema
+        - selectionMode
+        - deletionPolicy
+      type: object
+    DatabricksMetricViewIntegrationConfigurationResponseDeletionPolicy:
+      enum:
+        - retain
+        - delete-managed
+      type: string
+    DatabricksMetricViewIntegrationConfigurationResponseSelectionMode:
+      enum:
+        - all
+        - selected
+        - pattern
+      type: string
+    DatabricksMetricViewIntegrationConfigurationResponseVersion:
+      enum:
+        - 1
+      type: number
+    DatabricksMetricViewIntegrationResponse:
+      properties:
+        accessTest:
+          oneOf:
+            - type: object
+            - type: 'null'
+        configuration:
+          $ref: '#/components/schemas/DatabricksMetricViewIntegrationConfigurationResponse'
+        configurationVersion:
+          type: integer
+        createdAt:
+          oneOf:
+            - format: date
+              type: string
+            - format: date-time
+              type: string
+        dataSourceName:
+          type: string
+        deploymentId:
+          type: integer
+        publicId:
+          type: string
+        updatedAt:
+          oneOf:
+            - format: date
+              type: string
+            - format: date-time
+              type: string
+      required:
+        - publicId
+        - deploymentId
+        - dataSourceName
+        - configurationVersion
+        - configuration
+        - createdAt
+        - updatedAt
+      type: object
+    DatabricksMetricViewPublicationCounts:
+      properties:
+        dimensions:
+          type: integer
+        errors:
+          type: integer
+        joins:
+          type: integer
+        measures:
+          type: integer
+        warnings:
+          type: integer
+      required:
+        - dimensions
+        - measures
+        - joins
+        - warnings
+        - errors
+      type: object
+    DatabricksMetricViewPublicationDatasetSource:
+      properties:
+        dataSource:
+          type: string
+        dataset:
+          type: string
+        originalSource:
+          type: string
+        resolvedSource:
+          type: string
+      required:
+        - dataset
+        - dataSource
+        - originalSource
+        - resolvedSource
+      type: object
+    DatabricksMetricViewPublicationIssue:
+      properties:
+        code:
+          type: string
+        element:
+          oneOf:
+            - type: string
+            - type: 'null'
+        message:
+          type: string
+        severity:
+          $ref: '#/components/schemas/DatabricksMetricViewPublicationIssueSeverity'
+        stage:
+          $ref: '#/components/schemas/DatabricksMetricViewPublicationIssueStage'
+      required:
+        - code
+        - severity
+        - stage
+        - message
+      type: object
+    DatabricksMetricViewPublicationIssueSeverity:
+      enum:
+        - ERROR
+        - WARNING
+      type: string
+    DatabricksMetricViewPublicationIssueStage:
+      enum:
+        - INPUT
+        - VIEW_PROJECTION
+        - OSSIE_VALIDATION
+        - OSSIE_TO_DATABRICKS
+        - OUTPUT_VALIDATION
+        - EXECUTION
+      type: string
+    DatabricksMetricViewPublicationPreviewInput:
+      properties:
+        dataSourceName:
+          type: string
+        selectionMode:
+          $ref: '#/components/schemas/DatabricksMetricViewPublicationPreviewInputSelectionMode'
+        sourceOverrides:
+          oneOf:
+            - type: object
+              additionalProperties:
+                type: string
+            - type: 'null'
+          description: >-
+            Optional map of Cube view name to the root source dataset the view projects from, for
+            view projections where that root would otherwise be ambiguous.
+        targetNames:
+          oneOf:
+            - type: object
+              additionalProperties:
+                type: string
+            - type: 'null'
+          description: Optional Cube view name to Databricks Metric View name overrides.
+        viewNameRegex:
+          oneOf:
+            - type: string
+            - type: 'null'
+          description: >-
+            A safe, bounded regex subset for view names. Supports literals, ^, $, dot, and one .*
+            wildcard; grouping, alternation, lookaround, and backreferences are rejected.
+        viewNames:
+          oneOf:
+            - items:
+                type: string
+              type: array
+            - type: 'null'
+          description: Required only when selectionMode is 'selected'.
+      required:
+        - dataSourceName
+        - selectionMode
+      type: object
+    DatabricksMetricViewPublicationPreviewInputSelectionMode:
+      enum:
+        - all
+        - selected
+        - pattern
+      type: string
+    DatabricksMetricViewPublicationPreviewResultResponse:
+      properties:
+        buildJobId:
+          type: integer
+        commit:
+          oneOf:
+            - type: string
+            - type: 'null'
+        completedAt:
+          pattern: \d{4}-[01]\d-[0-3]\dT[0-2]\d:[0-5]\d:[0-5]\d.\d+Z?
+          type: string
+        dataSourceName:
+          type: string
+        deploymentId:
+          type: integer
+        durationMs:
+          type: integer
+        outcome:
+          $ref: '#/components/schemas/DatabricksMetricViewPublicationPreviewResultResponseOutcome'
+        previewId:
+          type: string
+        runtime:
+          $ref: '#/components/schemas/DatabricksMetricViewPublicationRuntime'
+        sourceSha256:
+          type: string
+        version:
+          $ref: '#/components/schemas/DatabricksMetricViewPublicationPreviewResultResponseVersion'
+        views:
+          items:
+            $ref: '#/components/schemas/DatabricksMetricViewPublicationViewResult'
+          type: array
+      required:
+        - previewId
+        - deploymentId
+        - dataSourceName
+        - buildJobId
+        - completedAt
+        - durationMs
+        - version
+        - outcome
+        - sourceSha256
+        - views
+        - runtime
+      type: object
+    DatabricksMetricViewPublicationPreviewResultResponseOutcome:
+      enum:
+        - success
+        - partial
+        - failed
+      type: string
+    DatabricksMetricViewPublicationPreviewResultResponseVersion:
+      enum:
+        - 2
+      type: integer
+    DatabricksMetricViewPublicationPreviewStartResponse:
+      properties:
+        buildJobId:
+          type: integer
+        commit:
+          oneOf:
+            - type: string
+            - type: 'null'
+        dataSourceName:
+          type: string
+        deploymentId:
+          type: integer
+        previewId:
+          type: string
+        resultUrl:
+          type: string
+        reused:
+          type: boolean
+        status:
+          $ref: '#/components/schemas/DatabricksMetricViewPublicationPreviewStartResponseStatus'
+        statusUrl:
+          type: string
+      required:
+        - previewId
+        - deploymentId
+        - dataSourceName
+        - buildJobId
+        - reused
+        - status
+        - statusUrl
+        - resultUrl
+      type: object
+    DatabricksMetricViewPublicationPreviewStartResponseStatus:
+      enum:
+        - QUEUED
+      type: string
+    DatabricksMetricViewPublicationPreviewStatusResponse:
+      properties:
+        dataSourceName:
+          type: string
+        deploymentId:
+          type: integer
+        error:
+          oneOf:
+            - type: string
+            - type: 'null'
+        previewId:
+          type: string
+        progress:
+          $ref: '#/components/schemas/DatabricksMetricViewPublicationProgress'
+        resultAvailable:
+          type: boolean
+        startedAt:
+          pattern: \d{4}-[01]\d-[0-3]\dT[0-2]\d:[0-5]\d:[0-5]\d.\d+Z?
+          type: string
+        status:
+          $ref: '#/components/schemas/DatabricksMetricViewPublicationPreviewStatusResponseStatus'
+        updatedAt:
+          pattern: \d{4}-[01]\d-[0-3]\dT[0-2]\d:[0-5]\d:[0-5]\d.\d+Z?
+          type: string
+      required:
+        - previewId
+        - deploymentId
+        - dataSourceName
+        - status
+        - progress
+        - resultAvailable
+        - startedAt
+        - updatedAt
+      type: object
+    DatabricksMetricViewPublicationPreviewStatusResponseStatus:
+      enum:
+        - QUEUED
+        - RUNNING
+        - COMPLETED
+        - FAILED
+        - CANCELLED
+      type: string
+    DatabricksMetricViewPublicationProgress:
+      properties:
+        message:
+          type: string
+        percentComplete:
+          type: integer
+        stage:
+          $ref: '#/components/schemas/DatabricksMetricViewPublicationProgressStage'
+      required:
+        - stage
+        - percentComplete
+        - message
+      type: object
+    DatabricksMetricViewPublicationProgressStage:
+      enum:
+        - QUEUED
+        - RUNNING
+        - COMPLETED
+        - FAILED
+        - CANCELLED
+      type: string
+    DatabricksMetricViewPublicationRuntime:
+      properties:
+        bridgeCommit:
+          type: string
+        bridgeVersion:
+          type: string
+        cubeConverterVersion:
+          type: string
+        databricksConverterVersion:
+          type: string
+        ossieCommit:
+          type: string
+        ossieCoreVersion:
+          type: string
+        policyVersion:
+          type: integer
+        runnerVersion:
+          type: string
+        templateName:
+          type: string
+      required:
+        - bridgeCommit
+        - bridgeVersion
+        - ossieCommit
+        - ossieCoreVersion
+        - databricksConverterVersion
+        - cubeConverterVersion
+        - templateName
+        - runnerVersion
+        - policyVersion
+      type: object
+    DatabricksMetricViewPublicationViewResult:
+      properties:
+        counts:
+          $ref: '#/components/schemas/DatabricksMetricViewPublicationCounts'
+        cubeViewName:
+          type: string
+        datasetSources:
+          items:
+            $ref: '#/components/schemas/DatabricksMetricViewPublicationDatasetSource'
+          type: array
+        eligibleForPublication:
+          type: boolean
+        issues:
+          items:
+            $ref: '#/components/schemas/DatabricksMetricViewPublicationIssue'
+          type: array
+        metricViewName:
+          type: string
+        metricViewSha256:
+          oneOf:
+            - type: string
+            - type: 'null'
+        metricViewYaml:
+          oneOf:
+            - type: string
+            - type: 'null'
+        outcome:
+          $ref: '#/components/schemas/DatabricksMetricViewPublicationViewResultOutcome'
+        source:
+          oneOf:
+            - type: string
+            - type: 'null'
+      required:
+        - cubeViewName
+        - metricViewName
+        - outcome
+        - eligibleForPublication
+        - issues
+        - datasetSources
+        - counts
+      type: object
+    DatabricksMetricViewPublicationViewResultOutcome:
+      enum:
+        - success
+        - failed
+      type: string
+    DbtGeneratedFileContent:
+      properties:
+        content:
+          description: The generated YAML.
+          type: string
+        path:
+          description: Path of the generated file within the data model project.
+          type: string
+      required:
+        - path
+        - content
+      type: object
+    DbtSyncCancelResponse:
+      properties:
+        message:
+          type: string
+      required:
+        - message
+      type: object
+    DbtSyncGeneratedFile:
+      properties:
+        path:
+          description: Path of the generated file within the data model project.
+          type: string
+      required:
+        - path
+      type: object
+    DbtSyncGeneratedFilesListResponse:
+      properties:
+        items:
+          description: The generated cube files, ready to write into your repository.
+          items:
+            $ref: '#/components/schemas/DbtGeneratedFileContent'
+          type: array
+        pageInfo:
+          $ref: '#/components/schemas/PageInfo'
+      required:
+        - items
+        - pageInfo
+      type: object
+    DbtSyncLogEntriesListResponse:
+      properties:
+        items:
+          items:
+            $ref: '#/components/schemas/DbtSyncLogEntry'
+          type: array
+        pageInfo:
+          $ref: '#/components/schemas/PageInfo'
+      required:
+        - items
+        - pageInfo
+      type: object
+    DbtSyncLogEntry:
+      properties:
+        durationMs:
+          oneOf:
+            - type: integer
+            - type: 'null'
+          description: For a phase line, how long the phase took, in milliseconds.
+        level:
+          description: info or error.
+          type: string
+        message:
+          type: string
+        phase:
+          oneOf:
+            - type: string
+            - type: 'null'
+          description: The phase this line belongs to, e.g. dbt-compile.
+        stream:
+          description: >-
+            Always "system" in this version. "stdout" and "stderr" join it once dbt’s own output is
+            captured, so treat this as an open set.
+          type: string
+        timestamp:
+          description: When the line was produced, as an ISO 8601 timestamp.
+          type: string
+      required:
+        - timestamp
+        - level
+        - stream
+        - message
+      type: object
+    DbtSyncManifestStats:
+      properties:
+        macros:
+          type: integer
+        models:
+          type: integer
+        sources:
+          type: integer
+      required:
+        - models
+        - sources
+        - macros
+      type: object
+    DbtSyncProgress:
+      properties:
+        message:
+          oneOf:
+            - type: string
+            - type: 'null'
+          description: Human-readable description of what the sync is doing right now.
+        percentComplete:
+          description: >-
+            Rough completion percentage derived from the stage. Progress reporting only — do not
+            gate on it; gate on the status reaching COMPLETED or FAILED.
+          type: integer
+        stage:
+          description: The stage the sync is currently in, from the same set of values as the sync status.
+          type: string
+      required:
+        - stage
+        - percentComplete
       type: object
     DbtSyncResponse:
       properties:
@@ -5824,6 +8277,266 @@ components:
         - syncJobId
         - workflowId
         - branchName
+      type: object
+    DbtSyncResultResponse:
+      properties:
+        completedAt:
+          description: When the sync finished, as an ISO 8601 timestamp.
+          type: string
+        cubeCount:
+          description: How many cubes the sync generated from the dbt manifest.
+          type: integer
+        durationMs:
+          description: End-to-end sync duration in milliseconds.
+          type: integer
+        generatedFiles:
+          description: The cube files this sync generated and committed to the branch it created.
+          items:
+            $ref: '#/components/schemas/DbtSyncGeneratedFile'
+          type: array
+        manifestStats:
+          $ref: '#/components/schemas/DbtSyncManifestStats'
+        syncJobId:
+          type: string
+      required:
+        - syncJobId
+        - generatedFiles
+        - manifestStats
+        - cubeCount
+        - completedAt
+        - durationMs
+      type: object
+    DbtSyncRun:
+      properties:
+        branchName:
+          description: The Cube branch this sync wrote its generated cubes to.
+          type: string
+        completedAt:
+          oneOf:
+            - type: string
+            - type: 'null'
+          description: >-
+            When the sync finished, as an ISO 8601 timestamp, or null while it is still running.
+            This is stamped by the process that ran the sync whereas startedAt is stamped by the
+            process that launched it — two different clocks — so for a run that failed moments after
+            starting, completedAt can even precede startedAt. Use durationMs to show how long a run
+            took rather than subtracting these.
+        deploymentId:
+          type: integer
+        durationMs:
+          oneOf:
+            - type: integer
+            - type: 'null'
+          description: >-
+            How long the sync took, in milliseconds, and the value to use when showing a duration.
+            Measured from a single clock, so it is never negative — prefer it over subtracting
+            startedAt from completedAt, which can disagree with it by a small skew.
+        errorMessage:
+          oneOf:
+            - type: string
+            - type: 'null'
+          description: Why the sync stopped. Present only for a failed run.
+        failedPhase:
+          oneOf:
+            - type: string
+            - type: 'null'
+          description: The phase that failed, e.g. dbt-compile.
+        gitRef:
+          oneOf:
+            - type: string
+            - type: 'null'
+          description: The dbt-repository ref this sync was run against, when pinned.
+        lastStage:
+          oneOf:
+            - type: string
+            - type: 'null'
+          description: The pipeline stage the run reached, e.g. COMPILING_DBT.
+        phases:
+          oneOf:
+            - items:
+                $ref: '#/components/schemas/DbtSyncRunPhase'
+              type: array
+            - type: 'null'
+          description: Per-phase timings, in the order they ran. Absent while the sync is running.
+        source:
+          description: >-
+            Where this sync got its dbt metadata: `git` (Cube cloned the dbt repository and ran dbt)
+            or `manifest` (the caller uploaded a `manifest.json` and no repository was accessed).
+            Runs predating the manifest source report `git`.
+          type: string
+        startedAt:
+          description: >-
+            When the sync started, as an ISO 8601 timestamp. See completedAt before comparing the
+            two.
+          type: string
+        stats:
+          oneOf:
+            - $ref: '#/components/schemas/DbtSyncRunStats'
+            - type: 'null'
+        status:
+          description: >-
+            RUNNING, COMPLETED, FAILED, CANCELLED or UNKNOWN. UNKNOWN means the outcome could not be
+            established (the run’s record was lost and the workflow engine no longer knows the
+            workflow) and is deliberately distinct from FAILED. Treat an unrecognized value as
+            non-terminal.
+          type: string
+        syncJobId:
+          type: string
+        trigger:
+          description: >-
+            What started the sync: manual (the Cube Cloud UI), api (this REST API), webhook (a push
+            to the dbt repository), agent (Cube AI), or unknown.
+          type: string
+        triggerContext:
+          oneOf:
+            - $ref: '#/components/schemas/DbtSyncRunTriggerContext'
+            - type: 'null'
+        userId:
+          oneOf:
+            - type: integer
+            - type: 'null'
+          description: The Cube user who started the sync, when a user started it.
+      required:
+        - syncJobId
+        - deploymentId
+        - status
+        - trigger
+        - source
+        - branchName
+        - startedAt
+      type: object
+    DbtSyncRunListResponse:
+      properties:
+        items:
+          items:
+            $ref: '#/components/schemas/DbtSyncRun'
+          type: array
+        pageInfo:
+          $ref: '#/components/schemas/PageInfo'
+      required:
+        - items
+        - pageInfo
+      type: object
+    DbtSyncRunPhase:
+      properties:
+        durationMs:
+          description: How long the phase took, in milliseconds.
+          type: integer
+        outcome:
+          description: ok or failed.
+          type: string
+        phase:
+          description: Phase token, e.g. repo-clone, dbt-deps, dbt-compile.
+          type: string
+        startedOffsetMs:
+          description: When the phase began, in milliseconds after the sync started.
+          type: integer
+      required:
+        - phase
+        - startedOffsetMs
+        - durationMs
+        - outcome
+      type: object
+    DbtSyncRunStats:
+      properties:
+        cubeCount:
+          oneOf:
+            - type: integer
+            - type: 'null'
+          description: How many cubes the sync generated.
+        dbtVersion:
+          oneOf:
+            - type: string
+            - type: 'null'
+          description: >-
+            The dbt version that produced the converted manifest, from its `metadata` block.
+            Advisory — absent when the producer omitted it.
+        generatedFileCount:
+          oneOf:
+            - type: integer
+            - type: 'null'
+          description: How many files the sync wrote to the branch it created.
+        macros:
+          oneOf:
+            - type: integer
+            - type: 'null'
+          description: dbt macros found in the manifest.
+        manifestGeneratedAt:
+          oneOf:
+            - type: string
+            - type: 'null'
+          description: >-
+            When dbt generated the converted manifest, as an ISO 8601 timestamp. For an uploaded
+            manifest this is how you tell a stale upload from a fresh one; it is NOT when the sync
+            ran.
+        models:
+          oneOf:
+            - type: integer
+            - type: 'null'
+          description: dbt models found in the manifest.
+        sources:
+          oneOf:
+            - type: integer
+            - type: 'null'
+          description: dbt sources found in the manifest.
+      type: object
+    DbtSyncRunTriggerContext:
+      properties:
+        headSha:
+          oneOf:
+            - type: string
+            - type: 'null'
+        pushedBranch:
+          oneOf:
+            - type: string
+            - type: 'null'
+        targetBranch:
+          oneOf:
+            - type: string
+            - type: 'null'
+      type: object
+    DbtSyncRunsQueryStatus:
+      enum:
+        - RUNNING
+        - COMPLETED
+        - FAILED
+        - CANCELLED
+        - UNKNOWN
+      type: string
+    DbtSyncRunsQueryTrigger:
+      enum:
+        - manual
+        - api
+        - webhook
+        - agent
+        - unknown
+      type: string
+    DbtSyncStatusResponse:
+      properties:
+        error:
+          oneOf:
+            - type: string
+            - type: 'null'
+          description: Why the sync stopped. Present only when the status is FAILED.
+        progress:
+          $ref: '#/components/schemas/DbtSyncProgress'
+        status:
+          description: >-
+            One of INITIALIZING, CREATING_SANDBOX, UPLOADING_PROJECT, INSTALLING_DEPENDENCIES,
+            RUNNING_DBT_DEPS, COMPILING_DBT, PROCESSING_MANIFEST, WRITING_CUBE_FILES, FINALIZING,
+            COMPLETED, FAILED. COMPLETED and FAILED are the only terminal values: poll until one of
+            them, then read the result. Treat any unrecognized value as still running.
+          type: string
+        syncJobId:
+          type: string
+        updatedAt:
+          description: When this status was last updated, as an ISO 8601 timestamp.
+          type: string
+      required:
+        - syncJobId
+        - status
+        - progress
+        - updatedAt
       type: object
     Deployment:
       properties:
@@ -5931,14 +8644,28 @@ components:
     DeploymentEnvironmentTokensListResponse:
       properties:
         data:
+          deprecated: true
+          description: 'Deprecated: use `items` instead. Kept for backward compatibility.'
           items:
             $ref: '#/components/schemas/DeploymentEnvironmentToken'
           type: array
+        items:
+          items:
+            $ref: '#/components/schemas/DeploymentEnvironmentToken'
+          type: array
+        pageInfo:
+          oneOf:
+            - $ref: '#/components/schemas/PageInfo'
+            - type: 'null'
         pagination:
-          $ref: '#/components/schemas/DeploymentsPagination'
+          oneOf:
+            - $ref: '#/components/schemas/DeploymentsPagination'
+            - type: 'null'
+          description: 'Deprecated: use `pageInfo` instead. Kept for backward compatibility.'
+          deprecated: true
       required:
+        - items
         - data
-        - pagination
       type: object
     DeploymentEnvironmentType:
       enum:
@@ -5949,14 +8676,28 @@ components:
     DeploymentEnvironmentsListResponse:
       properties:
         data:
+          deprecated: true
+          description: 'Deprecated: use `items` instead. Kept for backward compatibility.'
           items:
             $ref: '#/components/schemas/DeploymentEnvironment'
           type: array
+        items:
+          items:
+            $ref: '#/components/schemas/DeploymentEnvironment'
+          type: array
+        pageInfo:
+          oneOf:
+            - $ref: '#/components/schemas/PageInfo'
+            - type: 'null'
         pagination:
-          $ref: '#/components/schemas/DeploymentsPagination'
+          oneOf:
+            - $ref: '#/components/schemas/DeploymentsPagination'
+            - type: 'null'
+          description: 'Deprecated: use `pageInfo` instead. Kept for backward compatibility.'
+          deprecated: true
       required:
+        - items
         - data
-        - pagination
       type: object
     DeploymentLogLine:
       properties:
@@ -5990,6 +8731,10 @@ components:
           items:
             $ref: '#/components/schemas/DeploymentLogLine'
           type: array
+        pageInfo:
+          oneOf:
+            - $ref: '#/components/schemas/PageInfo'
+            - type: 'null'
       required:
         - items
       type: object
@@ -6028,15 +8773,204 @@ components:
           items:
             $ref: '#/components/schemas/DeploymentPod'
           type: array
+        pageInfo:
+          oneOf:
+            - $ref: '#/components/schemas/PageInfo'
+            - type: 'null'
       required:
         - items
       type: object
+    DeploymentSettings:
+      properties:
+        autoDomain:
+          oneOf:
+            - type: string
+            - type: 'null'
+        cloudProvider:
+          $ref: '#/components/schemas/DeploymentSettingsCloudProvider'
+        creationMethod:
+          oneOf:
+            - $ref: '#/components/schemas/DeploymentSettingsCreationMethod'
+            - type: 'null'
+        creationStep:
+          $ref: '#/components/schemas/CreationStep'
+        cspsConfig:
+          oneOf:
+            - $ref: '#/components/schemas/CspsConfig'
+            - type: 'null'
+        cubeImageCloud:
+          oneOf:
+            - type: string
+            - type: 'null'
+        cubeImageVersion:
+          oneOf:
+            - type: string
+            - type: 'null'
+        customDomain:
+          oneOf:
+            - type: string
+            - type: 'null'
+        defaultLaunchpadViewGroup:
+          oneOf:
+            - type: string
+            - type: 'null'
+        deployBranchMergeAllowed:
+          type: boolean
+        deployBranchName:
+          type: string
+        deployBranchReadOnly:
+          type: boolean
+        deployMode:
+          oneOf:
+            - $ref: '#/components/schemas/DeploymentSettingsDeployMode'
+            - type: 'null'
+        deployProjectRoot:
+          type: string
+        deploymentUrl:
+          type: string
+        id:
+          type: integer
+        isCold:
+          oneOf:
+            - type: boolean
+            - type: 'null'
+        isCubeSqlEnabled:
+          type: boolean
+        isManaged:
+          oneOf:
+            - type: boolean
+            - type: 'null'
+        isSupportPreAggregations:
+          type: boolean
+        launchpadTabs:
+          oneOf:
+            - items:
+                type: string
+              type: array
+            - type: 'null'
+        name:
+          type: string
+        region:
+          oneOf:
+            - type: string
+            - type: 'null'
+        releaseChannel:
+          $ref: '#/components/schemas/DeploymentSettingsReleaseChannel'
+        releaseChannelVersion:
+          oneOf:
+            - type: string
+            - type: 'null'
+        releaseChannelVersionHold:
+          oneOf:
+            - type: boolean
+            - type: 'null'
+        repoType:
+          oneOf:
+            - $ref: '#/components/schemas/DeploymentSettingsRepoType'
+            - type: 'null'
+        targetPlatform:
+          oneOf:
+            - type: string
+            - type: 'null'
+        template:
+          $ref: '#/components/schemas/DeploymentSettingsTemplate'
+        templateVariables:
+          oneOf:
+            - type: object
+              additionalProperties: true
+            - type: 'null'
+      required:
+        - id
+        - name
+        - template
+        - cloudProvider
+        - creationStep
+        - deploymentUrl
+        - releaseChannel
+        - deployBranchName
+        - deployBranchReadOnly
+        - deployBranchMergeAllowed
+        - deployProjectRoot
+        - isCubeSqlEnabled
+        - isSupportPreAggregations
+      type: object
+    DeploymentSettingsCloudProvider:
+      enum:
+        - cubecloud
+        - aws
+        - gcp
+      type: string
+    DeploymentSettingsCreationMethod:
+      enum:
+        - upload
+        - cubecloud
+        - github
+        - ssh
+      type: string
+    DeploymentSettingsDeployMode:
+      enum:
+        - git
+        - cli
+      type: string
+    DeploymentSettingsReleaseChannel:
+      enum:
+        - latest
+        - release
+      type: string
+    DeploymentSettingsRepoType:
+      enum:
+        - git
+        - deployRepo
+      type: string
+    DeploymentSettingsTemplate:
+      enum:
+        - single
+        - simpleCluster
+        - multiCluster
+      type: string
     DeploymentTokenResponse:
       properties:
         cubeApiToken:
           type: string
       required:
         - cubeApiToken
+      type: object
+    DeploymentVersion:
+      properties:
+        isCurrent:
+          type: boolean
+        isLatestInChannel:
+          type: boolean
+        releaseChannel:
+          $ref: '#/components/schemas/DeploymentVersionReleaseChannel'
+        releaseChannelVersion:
+          type: string
+        version:
+          type: string
+      required:
+        - releaseChannelVersion
+        - version
+        - releaseChannel
+        - isLatestInChannel
+        - isCurrent
+      type: object
+    DeploymentVersionReleaseChannel:
+      enum:
+        - latest
+        - release
+      type: string
+    DeploymentVersionsResponse:
+      properties:
+        items:
+          items:
+            $ref: '#/components/schemas/DeploymentVersion'
+          type: array
+        pageInfo:
+          oneOf:
+            - $ref: '#/components/schemas/PageInfo'
+            - type: 'null'
+      required:
+        - items
       type: object
     DeploymentsListResponse:
       properties:
@@ -6045,7 +8979,13 @@ components:
             - minimum: 0
               type: integer
             - type: 'null'
+          description: >-
+            Deprecated: total number of accessible deployments, ignoring pagination. Kept for
+            backward compatibility.
+          deprecated: true
         data:
+          deprecated: true
+          description: 'Deprecated: use `items` instead. Kept for backward compatibility.'
           items:
             $ref: '#/components/schemas/Deployment'
           type: array
@@ -6059,14 +8999,18 @@ components:
             - type: 'null'
         pagination:
           $ref: '#/components/schemas/DeploymentsPagination'
+          deprecated: true
+          description: 'Deprecated: use `pageInfo` instead. Kept for backward compatibility.'
         totalCount:
           oneOf:
             - minimum: 0
               type: integer
             - type: 'null'
+          description: 'Deprecated: use `count`. Kept for backward compatibility.'
+          deprecated: true
       required:
-        - data
         - items
+        - data
         - pagination
       type: object
     DeploymentsPagination:
@@ -6099,6 +9043,33 @@ components:
             - type: 'null'
       required:
         - active
+      type: object
+    DisconnectReportFromWorkbookInput:
+      properties:
+        anchorCell:
+          oneOf:
+            - type: string
+            - type: 'null'
+        externalWorkbookId:
+          oneOf:
+            - type: string
+            - type: 'null'
+        placementId:
+          oneOf:
+            - type: string
+            - type: 'null'
+        resultLocation:
+          oneOf:
+            - type: string
+            - type: 'null'
+        sheetId:
+          oneOf:
+            - type: string
+            - type: 'null'
+        sheetName:
+          oneOf:
+            - type: string
+            - type: 'null'
       type: object
     DuplicateWorkbookInput:
       properties:
@@ -6159,22 +9130,101 @@ components:
         - read
         - none
       type: string
+    EmbedDashboardCommentDto:
+      properties:
+        body:
+          type: string
+        createdAt:
+          oneOf:
+            - format: date
+              type: string
+            - format: date-time
+              type: string
+        dashboardId:
+          type: string
+        editedAt:
+          oneOf:
+            - oneOf:
+                - format: date
+                  type: string
+                - format: date-time
+                  type: string
+            - type: 'null'
+        id:
+          type: integer
+        isOwn:
+          type: boolean
+        removedAt:
+          oneOf:
+            - oneOf:
+                - format: date
+                  type: string
+                - format: date-time
+                  type: string
+            - type: 'null'
+        userId:
+          oneOf:
+            - type: integer
+            - type: 'null'
+      required:
+        - id
+        - dashboardId
+        - body
+        - createdAt
+        - isOwn
+      type: object
+    EmbedDashboardCommentThreadDto:
+      properties:
+        replies:
+          items:
+            $ref: '#/components/schemas/EmbedDashboardCommentDto'
+          type: array
+        resolvedAt:
+          oneOf:
+            - oneOf:
+                - format: date
+                  type: string
+                - format: date-time
+                  type: string
+            - type: 'null'
+        resolvedBy:
+          oneOf:
+            - type: integer
+            - type: 'null'
+        root:
+          $ref: '#/components/schemas/EmbedDashboardCommentDto'
+      required:
+        - root
+        - replies
+      type: object
+    EmbedDashboardCommentThreadsListResponse:
+      properties:
+        items:
+          items:
+            $ref: '#/components/schemas/EmbedDashboardCommentThreadDto'
+          type: array
+        pageInfo:
+          $ref: '#/components/schemas/PageInfo'
+      required:
+        - items
+        - pageInfo
+      type: object
     EmbedGroupMemberInput:
       properties:
         embedUserId:
           oneOf:
             - minimum: 1
               type: integer
-              description: Numeric id of an existing embed user. Provide this OR `externalId`.
             - type: 'null'
+          description: Numeric id of an existing embed user. Provide this OR `externalId`.
         externalId:
           oneOf:
             - minLength: 1
               type: string
-              description: >-
-                External id of the embed user (the `externalId` passed to `generate-session`).
-                Provide this OR `embedUserId`.
             - type: 'null'
+          description: >-
+            External id of the embed user (the `externalId` passed to `generate-session`). Provide
+            this OR `embedUserId`.
       type: object
     EmbedGroupMembersInput:
       properties:
@@ -6202,6 +9252,36 @@ components:
         - addedMembers
         - unchangedMembers
       type: object
+    EmbedMentionableUserDto:
+      properties:
+        email:
+          oneOf:
+            - type: string
+            - type: 'null'
+        firstName:
+          oneOf:
+            - type: string
+            - type: 'null'
+        id:
+          type: integer
+        username:
+          type: string
+      required:
+        - id
+        - username
+      type: object
+    EmbedMentionableUsersListResponse:
+      properties:
+        items:
+          items:
+            $ref: '#/components/schemas/EmbedMentionableUserDto'
+          type: array
+        pageInfo:
+          $ref: '#/components/schemas/PageInfo'
+      required:
+        - items
+        - pageInfo
+      type: object
     EmbedPythonFilteredRunInput:
       properties:
         reportId:
@@ -6217,26 +9297,161 @@ components:
       type: object
     EmbedSessionSettings:
       properties:
-        showDashboardChat:
+        allowAi:
           oneOf:
             - type: boolean
-              description: >-
-                Whether embedded published dashboards viewed with this session show the AI chat
-                (agent panel and launcher bubble). Omit to inherit the account-wide embed setting
-                (shown by default); `false` hides the chat even if it is enabled account-wide,
-                `true` shows it even if it is disabled account-wide. Only affects the dashboard
-                surface.
             - type: 'null'
-      type: object
-    EmbedSettings:
-      properties:
+          description: >-
+            Whether this session may use AI at all. This is the master switch over every AI surface
+            in the embed: the dashboard agent, the workbook chat, the AI summary widgets and the
+            standalone embedded chat. Omit to inherit the account-wide embed setting (allowed by
+            default); `false` disables AI even if it is enabled account-wide. Unlike the `show*`
+            keys below it is enforced server-side — the session cannot obtain AI Chat credentials at
+            all, so no request made with it can consume AI tokens — and it outranks them: a `false`
+            here disables a surface whose own `show*` key is `true`. It does not change user roles
+            or permissions for non-AI API calls. `null` is accepted and means the same as omitting
+            it.
+        allowChatWorkspaceAuthoring:
+          oneOf:
+            - type: boolean
+            - type: 'null'
+          description: >-
+            Whether AI Chat authenticated with this session may create or modify persistent Cube
+            Workspace content. Set to `false` for headless chat integrations that render answers in
+            their own UI: ad-hoc data analysis and inline tables/charts remain available, but the
+            agent cannot save or update standalone explorations/reports, create or modify workbooks,
+            create or publish dashboards, or direct users to those Cube UI surfaces. Omit or set to
+            `true` to preserve the session user's role-derived authoring capabilities; `true` never
+            grants access the user does not already have. This setting changes only AI Chat tools
+            and instructions. It does not change user roles or permissions for direct API calls.
         locale:
           oneOf:
             - type: string
             - type: 'null'
+          description: >-
+            UI language for every embed viewed with this session, as a BCP-47 code — a full code
+            (`es-ES`), a short code (`es`) or a regional variant all resolve to a shipped locale.
+            Sits between the per-iframe `?locale=` parameter, which still wins because it is the
+            more specific answer, and the account-wide default under Embed → Settings. A language
+            Cube does not ship falls through to that default rather than failing the session.
+        showAiWidgets:
+          oneOf:
+            - type: boolean
+            - type: 'null'
+          description: >-
+            Whether AI summary widgets are authorable and refreshable with this session: the "AI
+            widget" entry in the dashboard editor's Add widgets menu, and the prompt input plus
+            Generate/Regenerate controls on an existing widget. An already-generated summary still
+            renders, so a published dashboard keeps its content — it simply cannot be regenerated.
+            Omit to inherit the account-wide embed setting (enabled by default); `false` disables
+            them even if they are enabled account-wide, `true` enables them even if they are
+            disabled account-wide.
         showDashboardChat:
           oneOf:
             - type: boolean
+            - type: 'null'
+          description: >-
+            Whether embedded published dashboards viewed with this session show the AI chat (agent
+            panel and launcher bubble). Omit to inherit the account-wide embed setting (shown by
+            default); `false` hides the chat even if it is enabled account-wide, `true` shows it
+            even if it is disabled account-wide. Only affects the dashboard surface, and only hides
+            the entry point — use `allowAi` to withhold AI from the session.
+        showDashboardSettings:
+          oneOf:
+            - type: boolean
+            - type: 'null'
+          description: >-
+            Whether the dashboard editor viewed with this session offers its settings panel — the
+            gear button and the sidebar behind it. That panel is the ONLY place an embed user can
+            reach the dashboard slug, the per-dashboard time zone, the per-dashboard agent, the grid
+            behaviour switches and the dashboard theme, so `false` withdraws all of them together.
+            Omit or set to `true` to keep the panel (the default).
+        showGroupByCube:
+          oneOf:
+            - type: boolean
+            - type: 'null'
+          description: >-
+            Whether the workbook data pane viewed with this session offers the "Group by Cube" /
+            "Group by Folder" item in its more-actions menu. `false` hides the item AND pins the
+            pane to the grouping it would have defaulted to — by folder when the view defines
+            folders, by cube otherwise. The choice is remembered per browser, so pinning is what
+            makes the pane look the same for every user of the session rather than freezing whatever
+            each of them last picked. No content is withdrawn either way. Omit or set to `true` to
+            leave the choice with the user (the default).
+        showMemberNames:
+          oneOf:
+            - type: boolean
+            - type: 'null'
+          description: >-
+            Whether the workbook data pane viewed with this session may display raw member NAMES
+            instead of their titles (the "Show Member Names" item in the pane's more-actions menu).
+            Member names are the data model's own identifiers, so this is a schema-protection
+            setting in the same family as the account-wide Show Generated SQL switch. `false` hides
+            the menu item AND pins the pane to titles, so a user who already switched to names is
+            returned to titles — hiding the control alone would leave them stuck on names with no
+            way back. Omit or set to `true` to leave the choice with the user (the default).
+        showWorkbookChat:
+          oneOf:
+            - type: boolean
+            - type: 'null'
+          description: >-
+            Whether the Creator Mode workbook viewed with this session shows its AI entry points:
+            the chat side panel and its toggle, the launchpad's "Ask Cube Agent" button and the "Fix
+            in chat" action on a failed report. Omit to inherit the account-wide embed setting
+            (shown by default); `false` hides them even if they are enabled account-wide, `true`
+            shows them even if they are disabled account-wide. Hides entry points only — use
+            `allowAi` to withhold AI from the session.
+        showWorkbookShare:
+          oneOf:
+            - type: boolean
+            - type: 'null'
+          description: >-
+            Whether the Creator Mode workspace viewed with this session offers sharing: the workbook
+            header's Share button and the Share action on a workbook, dashboard, exploration or
+            folder row in the workspace list. Set to `false` for a deployment where each embed user
+            should only ever see their own content. Omit or set to `true` to keep sharing available
+            (the default). Hides the entry points only — it does not revoke access already granted,
+            and it never widens what the session's own permissions allow.
+        timezone:
+          oneOf:
+            - type: string
+            - type: 'null'
+          description: >-
+            IANA time zone the agent runs its queries in for every embed viewed with this session
+            (e.g. `America/New_York`). Sits between the per-iframe `?timezone=` parameter and the
+            account-wide default, and remains subject to the tenant time-zone policy — it is not a
+            way around it. A bare UTC offset or an unknown name falls through to the account default
+            rather than failing the session, because Cube would compute in UTC and report nothing.
+      type: object
+    EmbedSettings:
+      properties:
+        allowAi:
+          oneOf:
+            - type: boolean
+            - type: 'null'
+        enableDashboardComments:
+          oneOf:
+            - type: boolean
+            - type: 'null'
+        locale:
+          oneOf:
+            - type: string
+            - type: 'null'
+        showAiWidgets:
+          oneOf:
+            - type: boolean
+            - type: 'null'
+        showDashboardChat:
+          oneOf:
+            - type: boolean
+            - type: 'null'
+        showWorkbookChat:
+          oneOf:
+            - type: boolean
+            - type: 'null'
+        timezone:
+          oneOf:
+            - type: string
             - type: 'null'
       type: object
     EmbedTenant:
@@ -6270,6 +9485,24 @@ components:
           oneOf:
             - type: string
             - type: 'null'
+      type: object
+    EmbedTenantWorkbooksListQueryAccessSource:
+      enum:
+        - tenant
+        - allEmbedUsers
+        - folder
+      type: string
+    EmbedTenantWorkbooksListResponse:
+      properties:
+        items:
+          items:
+            $ref: '#/components/schemas/Workbook'
+          type: array
+        pageInfo:
+          $ref: '#/components/schemas/PageInfo'
+      required:
+        - items
+        - pageInfo
       type: object
     EmbedTenantsPublicResponse:
       properties:
@@ -6409,12 +9642,87 @@ components:
     EnvVariablesListResponse:
       properties:
         data:
+          deprecated: true
+          description: 'Deprecated: use `items` instead. Kept for backward compatibility.'
           items:
             $ref: '#/components/schemas/EnvVariableItem'
           type: array
+        items:
+          items:
+            $ref: '#/components/schemas/EnvVariableItem'
+          type: array
+        pageInfo:
+          oneOf:
+            - $ref: '#/components/schemas/PageInfo'
+            - type: 'null'
       required:
+        - items
         - data
       type: object
+    ExportSubjectInput:
+      properties:
+        email:
+          oneOf:
+            - type: string
+            - type: 'null'
+          description: >-
+            Main user email (for type=USER; provide this OR userId). For type=EMBED_USER it is the
+            email recorded on the provisioned embed user, and the externalId is used when it is
+            omitted.
+        embedTenantName:
+          oneOf:
+            - type: string
+            - type: 'null'
+          description: Embed tenant name (for type=EMBED_USER)
+        externalId:
+          oneOf:
+            - type: string
+            - type: 'null'
+          description: >-
+            Embed user external id (for type=EMBED_USER). The user is provisioned if it does not
+            exist yet.
+        groups:
+          oneOf:
+            - items:
+                type: string
+              type: array
+            - type: 'null'
+          description: >-
+            Embed user groups (type=EMBED_USER). Must reference groups that already exist; drives
+            what the rendered dashboard is allowed to show.
+        securityContext:
+          oneOf:
+            - type: object
+              additionalProperties: true
+            - type: 'null'
+          description: >-
+            Security context applied to the embed user before rendering (type=EMBED_USER) — the same
+            object a generate-session call takes. Row-level rules in the data model see exactly
+            this.
+        type:
+          $ref: '#/components/schemas/ExportSubjectInputType'
+        userAttributes:
+          oneOf:
+            - items:
+                $ref: '#/components/schemas/UserAttributeInput'
+              type: array
+            - type: 'null'
+          description: >-
+            Embed user attribute values (type=EMBED_USER). Names must reference attribute
+            definitions that already exist.
+        userId:
+          oneOf:
+            - type: integer
+            - type: 'null'
+          description: Main user id (for type=USER; provide this OR email)
+      required:
+        - type
+      type: object
+    ExportSubjectInputType:
+      enum:
+        - USER
+        - EMBED_USER
+      type: string
     FileHash:
       properties:
         hash:
@@ -6504,6 +9812,10 @@ components:
           oneOf:
             - type: integer
             - type: 'null'
+        user:
+          oneOf:
+            - $ref: '#/components/schemas/ResourceOwner'
+            - type: 'null'
       required:
         - name
         - position
@@ -6525,11 +9837,11 @@ components:
           oneOf:
             - minimum: 0
               type: integer
-              deprecated: true
-              description: >-
-                Deprecated: total number of accessible folders, ignoring pagination. Kept for
-                backward compatibility.
             - type: 'null'
+          description: >-
+            Deprecated: total number of accessible folders, ignoring pagination. Kept for backward
+            compatibility.
+          deprecated: true
         data:
           deprecated: true
           description: 'Deprecated: use `items` instead. Kept for backward compatibility.'
@@ -6557,6 +9869,21 @@ components:
       type: object
     GenerateSession:
       properties:
+        branchName:
+          oneOf:
+            - type: string
+            - type: 'null'
+          description: >-
+            Branch of `deploymentId` whose data model this session queries. Omit it — or pass the
+            deployment’s production branch — to query the production environment, which is the
+            default. Any other branch of the deployment is accepted: a branch with a staging
+            environment enabled, a shared branch, or a personal dev branch. The branch must be
+            served when the session is generated, otherwise the request is rejected: a branch
+            without a staging environment runs only while someone has it open in Cube (dev mode or
+            the branch switcher), so enable its staging environment for a branch an embedded app
+            should be able to reach at any time. A name that is not a branch of the deployment
+            returns `404`. Content (dashboards, workbooks, reports) is not branch-scoped — the same
+            saved content is rendered against the branch’s data model.
         creatorMode:
           oneOf:
             - type: boolean
@@ -6591,30 +9918,29 @@ components:
             - items:
                 $ref: '#/components/schemas/GroupDefinition'
               type: array
-              deprecated: true
-              description: >-
-                Deprecated and ignored. Global groups can no longer be created through this endpoint
-                — define them beforehand via the Cube UI or admin API. Still accepted for backward
-                compatibility (no error), but it has no effect. To create per-embed-tenant groups,
-                use `tenantGroupDefinitions`.
             - type: 'null'
+          description: >-
+            Deprecated and ignored. Global groups can no longer be created through this endpoint —
+            define them beforehand via the Cube UI or admin API. Still accepted for backward
+            compatibility (no error), but it has no effect. To create per-embed-tenant groups, use
+            `tenantGroupDefinitions`.
+          deprecated: true
         groups:
           oneOf:
             - items:
                 type: string
               type: array
-              description: >-
-                Global user groups — defined once at the tenant level and shared across every embed
-                tenant — to assign this embed user to. Use `groups` for **data-model access
-                control**: each name is placed verbatim into the Cube security context as
-                `cubeCloud.groups`, where your data model's `access_policy` rules reference it to
-                gate cubes, views, members, and row-/column-level filters. The groups must already
-                exist in the tenant (create them via the Cube UI or admin API beforehand) — this
-                endpoint never creates global groups, and names that do not resolve to an existing
-                group are rejected. Global groups are NOT shown in an embed tenant’s Creator Mode
-                UI. To share or organize content inside a single embed tenant, use `tenantGroups`
-                instead.
             - type: 'null'
+          description: >-
+            Global user groups — defined once at the tenant level and shared across every embed
+            tenant — to assign this embed user to. Use `groups` for **data-model access control**:
+            each name is placed verbatim into the Cube security context as `cubeCloud.groups`, where
+            your data model's `access_policy` rules reference it to gate cubes, views, members, and
+            row-/column-level filters. The groups must already exist in the tenant (create them via
+            the Cube UI or admin API beforehand) — this endpoint never creates global groups, and
+            names that do not resolve to an existing group are rejected. Global groups are NOT shown
+            in an embed tenant’s Creator Mode UI. To share or organize content inside a single embed
+            tenant, use `tenantGroups` instead.
         internalId:
           oneOf:
             - type: string
@@ -6642,40 +9968,40 @@ components:
           oneOf:
             - $ref: '#/components/schemas/EmbedSessionSettings'
               type: object
-              description: >-
-                Per-session overrides for embed behavior. Each key is tri-state: omit it to inherit
-                the account-wide setting, or set `true`/`false` to force the behavior for every
-                embed viewed with this session, taking precedence over the account-wide setting.
             - type: 'null'
+          description: >-
+            Per-session overrides for embed behavior, stored in the signed embed token. Each
+            documented key applies only to this session; omitted keys preserve their existing
+            default behavior.
         tenantGroupDefinitions:
           oneOf:
             - items:
                 $ref: '#/components/schemas/GroupDefinition'
               type: array
-              description: >-
-                Idempotently create or update the per-embed-tenant groups referenced by
-                `tenantGroups`, before they are assigned. Requires `creatorMode: true` and
-                `embedTenantName`. Use this to declare a tenant’s groups in the same call that
-                assigns them, so you do not need a separate admin request. Applies only to
-                per-embed-tenant groups; global groups must be defined beforehand.
             - type: 'null'
+          description: >-
+            Idempotently create or update the per-embed-tenant groups referenced by `tenantGroups`,
+            before they are assigned. Requires `creatorMode: true` and `embedTenantName`. Use this
+            to declare a tenant’s groups in the same call that assigns them, so you do not need a
+            separate admin request. Applies only to per-embed-tenant groups; global groups must be
+            defined beforehand.
         tenantGroups:
           oneOf:
             - items:
                 type: string
               type: array
-              description: >-
-                Per-embed-tenant user groups — scoped to the single embed tenant named by
-                `embedTenantName` — to assign this embed user to. Use `tenantGroups` for **content
-                sharing and organization within one embed tenant**: for example, so a creator can
-                share a workbook, dashboard, or folder with a group of that tenant’s users. These
-                are the only groups shown in the embed tenant’s Creator Mode UI. Requires
-                `creatorMode: true` and `embedTenantName`. Define the groups beforehand — or in the
-                same request — via `tenantGroupDefinitions`. In the Cube security context they
-                appear namespaced as `system:tenant:{embedTenantName}:group:{groupName}`, so a
-                tenant group can never collide with — or be mistaken for — a global `groups` entry
-                of the same name. For organization-wide data-model access policies, use `groups`.
             - type: 'null'
+          description: >-
+            Per-embed-tenant user groups — scoped to the single embed tenant named by
+            `embedTenantName` — to assign this embed user to. Use `tenantGroups` for **content
+            sharing and organization within one embed tenant**: for example, so a creator can share
+            a workbook, dashboard, or folder with a group of that tenant’s users. These are the only
+            groups shown in the embed tenant’s Creator Mode UI. Requires `creatorMode: true` and
+            `embedTenantName`. Define the groups beforehand — or in the same request — via
+            `tenantGroupDefinitions`. In the Cube security context they appear namespaced as
+            `system:tenant:{embedTenantName}:group:{groupName}`, so a tenant group can never collide
+            with — or be mistaken for — a global `groups` entry of the same name. For
+            organization-wide data-model access policies, use `groups`.
         userAttributeDefinitions:
           oneOf:
             - items:
@@ -6754,10 +10080,21 @@ components:
     GitHubBranchesListResponse:
       properties:
         data:
+          deprecated: true
+          description: 'Deprecated: use `items` instead. Kept for backward compatibility.'
           items:
             $ref: '#/components/schemas/GitHubBranchResponse'
           type: array
+        items:
+          items:
+            $ref: '#/components/schemas/GitHubBranchResponse'
+          type: array
+        pageInfo:
+          oneOf:
+            - $ref: '#/components/schemas/PageInfo'
+            - type: 'null'
       required:
+        - items
         - data
       type: object
     GitHubConnectStatusResponse:
@@ -6792,10 +10129,21 @@ components:
     GitHubInstallationsListResponse:
       properties:
         data:
+          deprecated: true
+          description: 'Deprecated: use `items` instead. Kept for backward compatibility.'
           items:
             $ref: '#/components/schemas/GitHubInstallationResponse'
           type: array
+        items:
+          items:
+            $ref: '#/components/schemas/GitHubInstallationResponse'
+          type: array
+        pageInfo:
+          oneOf:
+            - $ref: '#/components/schemas/PageInfo'
+            - type: 'null'
       required:
+        - items
         - data
       type: object
     GitHubRepoResponse:
@@ -6814,10 +10162,21 @@ components:
     GitHubReposListResponse:
       properties:
         data:
+          deprecated: true
+          description: 'Deprecated: use `items` instead. Kept for backward compatibility.'
           items:
             $ref: '#/components/schemas/GitHubRepoResponse'
           type: array
+        items:
+          items:
+            $ref: '#/components/schemas/GitHubRepoResponse'
+          type: array
+        pageInfo:
+          oneOf:
+            - $ref: '#/components/schemas/PageInfo'
+            - type: 'null'
       required:
+        - items
         - data
       type: object
     GroupDefinition:
@@ -6924,14 +10283,24 @@ components:
             - items:
                 $ref: '#/components/schemas/DashboardFilter'
               type: array
-              description: Dimension filters applied when the notification is rendered.
             - type: 'null'
+          description: Dimension filters applied when the notification is rendered.
         humanReadableSchedule:
           description: Human-readable description of the cron schedule
           type: string
         id:
           type: integer
         isEnabled:
+          type: boolean
+        memberSwitchers:
+          oneOf:
+            - items:
+                $ref: '#/components/schemas/DashboardMemberSwitcher'
+              type: array
+            - type: 'null'
+          description: Field-switcher selections applied when the notification is rendered.
+        notificationAiSummary:
+          description: Whether this notification carries an AI-generated "what changed" summary in its body.
           type: boolean
         notificationEnabled:
           type: boolean
@@ -6942,8 +10311,8 @@ components:
             - items:
                 $ref: '#/components/schemas/DashboardTimeGrain'
               type: array
-              description: Time-grain overrides applied when the notification is rendered.
             - type: 'null'
+          description: Time-grain overrides applied when the notification is rendered.
         timezone:
           type: string
       required:
@@ -6956,6 +10325,7 @@ components:
         - humanReadableSchedule
         - notificationEnabled
         - notificationFormat
+        - notificationAiSummary
       type: object
     NotificationRecipient:
       properties:
@@ -7001,45 +10371,45 @@ components:
         channelId:
           oneOf:
             - type: string
-              description: Slack channel id (for type=SLACK)
             - type: 'null'
+          description: Slack channel id (for type=SLACK)
         channelName:
           oneOf:
             - type: string
-              description: Slack channel display name (optional, for type=SLACK)
             - type: 'null'
+          description: Slack channel display name (optional, for type=SLACK)
         email:
           oneOf:
             - type: string
-              description: Main user email (for type=USER; provide this OR userId)
             - type: 'null'
+          description: Main user email (for type=USER; provide this OR userId)
         embedTenantName:
           oneOf:
             - type: string
-              description: Embed tenant name (for type=EMBED_USER)
             - type: 'null'
+          description: Embed tenant name (for type=EMBED_USER)
         externalId:
           oneOf:
             - type: string
-              description: Embed user external id (for type=EMBED_USER)
             - type: 'null'
+          description: Embed user external id (for type=EMBED_USER)
         groups:
           oneOf:
             - items:
                 type: string
               type: array
-              description: >-
-                Embed user groups (type=EMBED_USER). Must reference groups that already exist;
-                drives per-recipient access when the report is rendered.
             - type: 'null'
+          description: >-
+            Embed user groups (type=EMBED_USER). Must reference groups that already exist; drives
+            per-recipient access when the report is rendered.
         securityContext:
           oneOf:
             - type: object
               additionalProperties: true
-              description: >-
-                Embed user security context (type=EMBED_USER). Applied for per-recipient row-level
-                security when the report is rendered.
             - type: 'null'
+          description: >-
+            Embed user security context (type=EMBED_USER). Applied for per-recipient row-level
+            security when the report is rendered.
         type:
           $ref: '#/components/schemas/NotificationRecipientInputType'
         userAttributes:
@@ -7047,15 +10417,15 @@ components:
             - items:
                 $ref: '#/components/schemas/UserAttributeInput'
               type: array
-              description: >-
-                Embed user attribute values (type=EMBED_USER). Names must reference attribute
-                definitions that already exist.
             - type: 'null'
+          description: >-
+            Embed user attribute values (type=EMBED_USER). Names must reference attribute
+            definitions that already exist.
         userId:
           oneOf:
             - type: integer
-              description: Main user id (for type=USER; provide this OR email)
             - type: 'null'
+          description: Main user id (for type=USER; provide this OR email)
       required:
         - type
       type: object
@@ -7271,6 +10641,10 @@ components:
           items:
             type: string
           type: array
+        displayScale:
+          oneOf:
+            - $ref: '#/components/schemas/PivotItemsDisplayScale'
+            - type: 'null'
         filters:
           items:
             type: string
@@ -7279,22 +10653,50 @@ components:
           items:
             type: string
           type: array
+        measuresAxis:
+          oneOf:
+            - $ref: '#/components/schemas/PivotItemsMeasuresAxis'
+            - type: 'null'
+        measuresPosition:
+          oneOf:
+            - $ref: '#/components/schemas/PivotItemsMeasuresPosition'
+            - type: 'null'
         rows:
           items:
             type: string
           type: array
+        showAppliedFilters:
+          oneOf:
+            - type: boolean
+            - type: 'null'
+        showColumnTotals:
+          oneOf:
+            - type: boolean
+            - type: 'null'
       required:
         - columns
         - measures
         - rows
         - filters
       type: object
+    PivotItemsDisplayScale:
+      enum:
+        - model
+        - absolute
+        - thousands
+        - millions
+        - billions
+      type: string
     PivotItemsInput:
       properties:
         columns:
           items:
             type: string
           type: array
+        displayScale:
+          oneOf:
+            - $ref: '#/components/schemas/PivotItemsInputDisplayScale'
+            - type: 'null'
         filters:
           items:
             type: string
@@ -7303,22 +10705,241 @@ components:
           items:
             type: string
           type: array
+        measuresAxis:
+          oneOf:
+            - $ref: '#/components/schemas/PivotItemsInputMeasuresAxis'
+            - type: 'null'
+        measuresPosition:
+          oneOf:
+            - $ref: '#/components/schemas/PivotItemsInputMeasuresPosition'
+            - type: 'null'
         rows:
           items:
             type: string
           type: array
+        showAppliedFilters:
+          oneOf:
+            - type: boolean
+            - type: 'null'
+        showColumnTotals:
+          oneOf:
+            - type: boolean
+            - type: 'null'
       required:
         - columns
         - measures
         - rows
         - filters
       type: object
+    PivotItemsInputDisplayScale:
+      enum:
+        - model
+        - absolute
+        - thousands
+        - millions
+        - billions
+      type: string
+    PivotItemsInputMeasuresAxis:
+      enum:
+        - columns
+        - rows
+      type: string
+    PivotItemsInputMeasuresPosition:
+      enum:
+        - before
+        - after
+      type: string
+    PivotItemsMeasuresAxis:
+      enum:
+        - columns
+        - rows
+      type: string
+    PivotItemsMeasuresPosition:
+      enum:
+        - before
+        - after
+      type: string
+    Policy:
+      properties:
+        actions:
+          items:
+            enum:
+              - All
+              - DeploymentsManage
+              - DeploymentCreate
+              - DeploymentRead
+              - DeploymentUpdate
+              - DeploymentDelete
+              - SecretsManage
+              - DownloadData
+              - PlaygroundRead
+              - SchemaRead
+              - SchemaUpdate
+              - SchemaUpdateDevBranches
+              - APMRead
+              - ChatHistoryRead
+              - PreAggregationBuild
+              - AlertsCreate
+              - AlertsRead
+              - AlertsUpdate
+              - AlertsDelete
+              - AuditLogManage
+              - BillingRead
+              - SqlRunnerRead
+              - DataAssetsRead
+              - DataAssetsManage
+              - CubeNetworkConnect
+              - ReportRead
+              - ReportEdit
+              - ReportManage
+              - WorkbookManage
+              - WorkbookRead
+              - WorkbookEdit
+              - ChatThreadRead
+              - AgentManage
+              - AgentRead
+              - AgentSpaceManage
+              - AgentAdmin
+              - DeploymentAgentRead
+              - OAuthIntegrationsManage
+              - OAuthIntegrationsIssueTokens
+              - McpToolsManage
+              - AIBIDevelop
+              - AIBIExplore
+              - AIBIView
+              - ChartPalettesManage
+              - DashboardThemesManage
+              - AIBIDeveloper
+              - AIBIUser
+              - AIBIViewer
+              - EmbedDeploymentRead
+              - EmbedDashboardRead
+              - FolderRead
+              - FolderEdit
+              - FolderManage
+            type: string
+          type: array
+        resourceType:
+          $ref: '#/components/schemas/PolicyResourceType'
+        resources:
+          items:
+            type: string
+          type: array
+      required:
+        - resourceType
+        - actions
+        - resources
+      type: object
+    PolicyResourceType:
+      enum:
+        - Global
+        - Deployment
+        - Report
+        - ReportFolder
+        - Agent
+        - AgentSpace
+        - Workbook
+        - Dashboard
+        - Folder
+        - ChatThread
+      type: string
     PostTokenBySessionIdInput:
       properties:
         sessionId:
           type: string
       required:
         - sessionId
+      type: object
+    ProvisionEmbedUserFailure:
+      properties:
+        error:
+          $ref: '#/components/schemas/BulkActionError'
+        externalId:
+          description: The `externalId` of the entry that failed, normalized the same way a successful one is.
+          type: string
+      required:
+        - externalId
+        - error
+      type: object
+    ProvisionEmbedUserInput:
+      properties:
+        email:
+          oneOf:
+            - format: email
+              type: string
+            - type: 'null'
+          description: >-
+            Email address, shown wherever the user is listed and searchable through `GET
+            /embed-tenants/{embedTenantName}/users`. Must be a valid address, and is stored
+            lowercased. Omit it and Cube derives a synthetic `{externalId}@cubecloud.dev`
+            placeholder instead, which is what makes a user hard to recognise in a list. Supplying
+            it again later updates the stored address.
+        externalId:
+          description: >-
+            The id your own system knows this user by — the same `externalId` you will pass to
+            `generate-session`. Trimmed and lowercased before it is stored, so casing never produces
+            a second user.
+          minLength: 1
+          type: string
+        groups:
+          oneOf:
+            - items:
+                type: string
+              type: array
+            - type: 'null'
+          description: >-
+            Global, account-wide groups (the `groups` field of `generate-session`) that gate
+            data-model access. They must already exist. Supplying the field REPLACES the user’s
+            global groups; omit it to leave them untouched, pass `[]` to clear them.
+        tenantGroups:
+          oneOf:
+            - items:
+                type: string
+              type: array
+            - type: 'null'
+          description: >-
+            Groups belonging to this embed tenant (the `tenantGroups` field of `generate-session`),
+            which scope content sharing and organization within the tenant. Create them first via
+            `POST /embed-tenants/{embedTenantName}/groups`. Supplying the field REPLACES the user’s
+            tenant groups; omit it to leave them untouched, pass `[]` to clear them.
+        userProfile:
+          oneOf:
+            - $ref: '#/components/schemas/EmbedUserProfile'
+              type: object
+            - type: 'null'
+          description: >-
+            Display name and avatar. `displayName` is the name shown wherever the user appears,
+            including on content they author. Omitted fields keep their current value.
+      required:
+        - externalId
+      type: object
+    ProvisionEmbedUsersInput:
+      properties:
+        users:
+          description: Embed users to provision (1–100 per request).
+          items:
+            $ref: '#/components/schemas/ProvisionEmbedUserInput'
+          maxItems: 100
+          minItems: 1
+          type: array
+      required:
+        - users
+      type: object
+    ProvisionEmbedUsersResponse:
+      properties:
+        failed:
+          description: The entries that were not applied, each with the reason.
+          items:
+            $ref: '#/components/schemas/ProvisionEmbedUserFailure'
+          type: array
+        succeeded:
+          description: The users that were provisioned, in the order they were requested.
+          items:
+            $ref: '#/components/schemas/EmbedUser'
+          type: array
+      required:
+        - succeeded
+        - failed
       type: object
     PublishDashboardInput:
       properties:
@@ -7385,6 +11006,37 @@ components:
         - stderr
         - inputRowCount
       type: object
+    RefreshReportInput:
+      properties:
+        anchorCell:
+          oneOf:
+            - type: string
+            - type: 'null'
+        externalWorkbookId:
+          oneOf:
+            - type: string
+            - type: 'null'
+        placementId:
+          oneOf:
+            - type: string
+            - type: 'null'
+        resultChecksum:
+          oneOf:
+            - $ref: '#/components/schemas/ReportPlacementResultChecksumInput'
+            - type: 'null'
+        resultLocation:
+          oneOf:
+            - type: string
+            - type: 'null'
+        sheetId:
+          oneOf:
+            - type: string
+            - type: 'null'
+        sheetName:
+          oneOf:
+            - type: string
+            - type: 'null'
+      type: object
     RegionResponse:
       properties:
         id:
@@ -7422,10 +11074,21 @@ components:
     RegionsListResponse:
       properties:
         data:
+          deprecated: true
+          description: 'Deprecated: use `items` instead. Kept for backward compatibility.'
           items:
             $ref: '#/components/schemas/RegionResponse'
           type: array
+        items:
+          items:
+            $ref: '#/components/schemas/RegionResponse'
+          type: array
+        pageInfo:
+          oneOf:
+            - $ref: '#/components/schemas/PageInfo'
+            - type: 'null'
       required:
+        - items
         - data
       type: object
     RemoveDataModelFilesInput:
@@ -7446,8 +11109,8 @@ components:
         embedTenantName:
           oneOf:
             - type: string
-              description: Embed tenant name (required for type=EMBED_USER; resolves the storage partition)
             - type: 'null'
+          description: Embed tenant name (required for type=EMBED_USER; resolves the storage partition)
         id:
           description: >-
             Recipient id: userId (type=USER), embedUserId (type=EMBED_USER), or channelId
@@ -7512,6 +11175,10 @@ components:
               type: string
         createdBy:
           type: integer
+        currentQueryChecksum:
+          oneOf:
+            - type: string
+            - type: 'null'
         deploymentId:
           type: integer
         description:
@@ -7552,6 +11219,7 @@ components:
               additionalProperties: true
             - type: 'null'
         name:
+          maxLength: 255
           type: string
         pivotItems:
           oneOf:
@@ -7637,18 +11305,147 @@ components:
       type: string
     ReportPlacement:
       properties:
+        anchorCell:
+          oneOf:
+            - type: string
+            - type: 'null'
         endResultCell:
           oneOf:
             - type: string
             - type: 'null'
+        host:
+          oneOf:
+            - $ref: '#/components/schemas/ReportPlacementHost'
+            - type: 'null'
+        id:
+          oneOf:
+            - type: string
+            - type: 'null'
+        placedAt:
+          oneOf:
+            - type: string
+            - type: 'null'
+        placedByUserId:
+          oneOf:
+            - type: integer
+            - type: 'null'
+        queryChecksum:
+          oneOf:
+            - type: string
+            - type: 'null'
+        refreshedAt:
+          oneOf:
+            - type: string
+            - type: 'null'
+        refreshedByUserId:
+          oneOf:
+            - type: integer
+            - type: 'null'
+        resultChecksum:
+          oneOf:
+            - $ref: '#/components/schemas/ReportPlacementResultChecksum'
+            - type: 'null'
         resultLocation:
           type: string
+        sheetId:
+          oneOf:
+            - type: string
+            - type: 'null'
+        sheetName:
+          oneOf:
+            - type: string
+            - type: 'null'
+        syncStatus:
+          oneOf:
+            - $ref: '#/components/schemas/ReportPlacementSyncStatus'
+            - type: 'null'
         workbookId:
           type: string
+        workbookName:
+          oneOf:
+            - type: string
+            - type: 'null'
       required:
         - workbookId
         - resultLocation
       type: object
+    ReportPlacementHost:
+      enum:
+        - GOOGLE_SHEETS
+        - EXCEL
+      type: string
+    ReportPlacementResultChecksum:
+      properties:
+        chunks:
+          items:
+            $ref: '#/components/schemas/ReportPlacementResultChunk'
+          maxItems: 2000
+          type: array
+        v:
+          minimum: 1
+          type: integer
+      required:
+        - v
+        - chunks
+      type: object
+    ReportPlacementResultChecksumInput:
+      properties:
+        chunks:
+          items:
+            $ref: '#/components/schemas/ReportPlacementResultChunkInput'
+          maxItems: 2000
+          type: array
+        v:
+          minimum: 1
+          type: integer
+      required:
+        - v
+        - chunks
+      type: object
+    ReportPlacementResultChunk:
+      properties:
+        from:
+          minimum: 0
+          type: integer
+        hash:
+          maxLength: 64
+          minLength: 1
+          type: string
+        to:
+          oneOf:
+            - minimum: 0
+              type: integer
+            - type: 'null'
+          deprecated: true
+      required:
+        - from
+        - hash
+      type: object
+    ReportPlacementResultChunkInput:
+      properties:
+        from:
+          minimum: 0
+          type: integer
+        hash:
+          maxLength: 64
+          minLength: 1
+          type: string
+        to:
+          oneOf:
+            - minimum: 0
+              type: integer
+            - type: 'null'
+          deprecated: true
+      required:
+        - from
+        - hash
+      type: object
+    ReportPlacementSyncStatus:
+      enum:
+        - UP_TO_DATE
+        - CHANGED
+        - UNKNOWN
+      type: string
     ReportSnapshot:
       properties:
         description:
@@ -7661,6 +11458,10 @@ components:
             - type: 'null'
         id:
           type: integer
+        isSourceReport:
+          oneOf:
+            - type: boolean
+            - type: 'null'
         kind:
           oneOf:
             - $ref: '#/components/schemas/ReportSnapshotDtoKind'
@@ -7683,6 +11484,10 @@ components:
         preferences:
           oneOf:
             - $ref: '#/components/schemas/ReportSnapshotPreferences'
+            - type: 'null'
+        pythonCode:
+          oneOf:
+            - type: string
             - type: 'null'
         reportId:
           type: integer
@@ -7714,6 +11519,7 @@ components:
         - kpi
         - html
         - map
+        - sankey
       type: string
     ReportSnapshotPreferences:
       properties:
@@ -7730,11 +11536,11 @@ components:
           oneOf:
             - minimum: 0
               type: integer
-              deprecated: true
-              description: >-
-                Deprecated: total number of accessible reports, ignoring pagination. Kept for
-                backward compatibility.
             - type: 'null'
+          description: >-
+            Deprecated: total number of accessible reports, ignoring pagination. Kept for backward
+            compatibility.
+          deprecated: true
         data:
           deprecated: true
           description: 'Deprecated: use `items` instead. Kept for backward compatibility.'
@@ -7771,6 +11577,17 @@ components:
         - id
         - email
       type: object
+    RevokeEmbedSessionInput:
+      properties:
+        sessionId:
+          description: >-
+            The session id returned by `POST /api/v1/embed/generate-session`. Works whether or not
+            the session has already been exchanged for a token.
+          pattern: ^[0-9a-f]{32}$
+          type: string
+      required:
+        - sessionId
+      type: object
     RoleWithAccess:
       properties:
         actions:
@@ -7789,6 +11606,7 @@ components:
               - SchemaUpdate
               - SchemaUpdateDevBranches
               - APMRead
+              - ChatHistoryRead
               - PreAggregationBuild
               - AlertsCreate
               - AlertsRead
@@ -7839,6 +11657,90 @@ components:
         - name
         - actions
       type: object
+    SaveDatabricksMetricViewIntegrationInput:
+      properties:
+        deletionPolicy:
+          $ref: '#/components/schemas/SaveDatabricksMetricViewIntegrationInputDeletionPolicy'
+        enabled:
+          type: boolean
+        expectedConfigurationVersion:
+          description: Use 0 to create; otherwise pass the configurationVersion returned by GET.
+          minimum: 0
+          type: integer
+        selectionMode:
+          $ref: '#/components/schemas/SaveDatabricksMetricViewIntegrationInputSelectionMode'
+        sourceOverrides:
+          additionalProperties:
+            type: string
+          type: object
+        targetCatalog:
+          maxLength: 255
+          type: string
+        targetNamePrefix:
+          maxLength: 255
+          type: string
+        targetNames:
+          additionalProperties:
+            type: string
+          type: object
+        targetSchema:
+          maxLength: 255
+          type: string
+        viewNameRegex:
+          maxLength: 128
+          type: string
+        viewNames:
+          items:
+            type: string
+          maxItems: 128
+          type: array
+      required:
+        - expectedConfigurationVersion
+        - enabled
+        - targetCatalog
+        - targetSchema
+        - selectionMode
+      type: object
+    SaveDatabricksMetricViewIntegrationInputDeletionPolicy:
+      enum:
+        - retain
+        - delete-managed
+      type: string
+    SaveDatabricksMetricViewIntegrationInputSelectionMode:
+      enum:
+        - all
+        - selected
+        - pattern
+      type: string
+    SetBranchStagingEnvironmentRequest:
+      properties:
+        branchId:
+          oneOf:
+            - type: integer
+            - type: 'null'
+        branchName:
+          oneOf:
+            - type: string
+            - type: 'null'
+        enabled:
+          type: boolean
+      required:
+        - enabled
+      type: object
+    SetBranchStagingEnvironmentResponse:
+      properties:
+        data:
+          $ref: '#/components/schemas/BranchResponse'
+      required:
+        - data
+      type: object
+    SetEmbedDashboardCommentResolvedBody:
+      properties:
+        resolved:
+          type: boolean
+      required:
+        - resolved
+      type: object
     SetEnvVariablesInput:
       properties:
         env_variables:
@@ -7855,23 +11757,150 @@ components:
             - type: boolean
             - type: 'null'
       type: object
+    SheetsUserSettingsInput:
+      properties:
+        autoRunQueryOnChange:
+          oneOf:
+            - type: boolean
+            - type: 'null'
+        openExplorationFromSheet:
+          oneOf:
+            - type: boolean
+            - type: 'null'
+        revealSheetOnOpen:
+          oneOf:
+            - type: boolean
+            - type: 'null'
+        showAppliedFilters:
+          oneOf:
+            - type: boolean
+            - type: 'null'
+        suppressDuplicateValues:
+          oneOf:
+            - type: boolean
+            - type: 'null'
+      type: object
     SourceTreeResponse:
       properties:
         data:
+          deprecated: true
+          description: 'Deprecated: use `items` instead. Kept for backward compatibility.'
           items:
             additionalProperties: true
             type: object
           type: array
+        items:
+          items:
+            additionalProperties: true
+            type: object
+          type: array
+        pageInfo:
+          oneOf:
+            - $ref: '#/components/schemas/PageInfo'
+            - type: 'null'
       required:
+        - items
         - data
       type: object
+    StartDashboardExportInput:
+      properties:
+        dashboardId:
+          oneOf:
+            - type: integer
+            - type: 'null'
+          description: >-
+            Numeric id of the dashboard to export. Provide either this or `dashboardPublicId`, not
+            both.
+        dashboardPublicId:
+          oneOf:
+            - type: string
+            - type: 'null'
+          description: Public id of the dashboard to export. Provide either this or `dashboardId`, not both.
+        filters:
+          oneOf:
+            - items:
+                $ref: '#/components/schemas/DashboardFilterInput'
+              type: array
+            - type: 'null'
+          description: >-
+            Dimension filters applied to the dashboard while it renders. Same shape the
+            scheduled-notification API uses.
+        format:
+          $ref: '#/components/schemas/StartDashboardExportInputFormat'
+        memberSwitchers:
+          oneOf:
+            - items:
+                $ref: '#/components/schemas/DashboardMemberSwitcherInput'
+              type: array
+            - type: 'null'
+          description: Field-switcher selections applied to the dashboard while it renders.
+        renderAs:
+          oneOf:
+            - $ref: '#/components/schemas/ExportSubjectInput'
+            - type: 'null'
+          description: >-
+            Render the dashboard as this user instead of the caller — the queries behind the image
+            run under THEIR security context. Requires the caller to be a tenant admin. Omit to
+            render as the API key's own user.
+        timeGrains:
+          oneOf:
+            - items:
+                $ref: '#/components/schemas/DashboardTimeGrainInput'
+              type: array
+            - type: 'null'
+          description: Time-grain overrides applied to the dashboard while it renders.
+      required:
+        - format
+      type: object
+    StartDashboardExportInputFormat:
+      enum:
+        - png
+        - pdf
+      type: string
     StartDbtSyncInput:
       properties:
         branchName:
           oneOf:
             - type: string
             - type: 'null'
+        manifest:
+          oneOf:
+            - type: object
+              additionalProperties: true
+            - type: 'null'
+          description: >-
+            The contents of your dbt `target/manifest.json`, as JSON. Required when `source` is
+            `manifest` and ignored otherwise. Produced by `dbt parse`, `dbt compile` or `dbt build`,
+            so a CI job can POST the manifest it just validated and be sure Cube converts exactly
+            that — no re-parse of a branch tip that may already have moved.
+        output:
+          oneOf:
+            - $ref: '#/components/schemas/StartDbtSyncInputOutput'
+            - type: 'null'
+        ref:
+          oneOf:
+            - type: string
+            - type: 'null'
+          description: >-
+            Git ref in the dbt repository to sync from — a branch or a tag, NOT a commit SHA.
+            Overrides the branch saved on the deployment’s dbt git integration for this sync only,
+            so CI can sync the ref under review (e.g. a pull request’s head branch) instead of the
+            tracked branch. The generated Cube branch is named after it.
+        source:
+          oneOf:
+            - $ref: '#/components/schemas/StartDbtSyncInputSource'
+            - type: 'null'
       type: object
+    StartDbtSyncInputOutput:
+      enum:
+        - branch
+        - files
+      type: string
+    StartDbtSyncInputSource:
+      enum:
+        - git
+        - manifest
+      type: string
     StartDevModeRequest:
       properties:
         branchName:
@@ -7972,6 +12001,21 @@ components:
         - url
         - format
       type: object
+    TimezoneSettings:
+      properties:
+        allowUserOverride:
+          oneOf:
+            - type: boolean
+            - type: 'null'
+        enabled:
+          oneOf:
+            - type: boolean
+            - type: 'null'
+        timezone:
+          oneOf:
+            - type: string
+            - type: 'null'
+      type: object
     UpdateDashboardEmbeddingInput:
       properties:
         allowEmbed:
@@ -7999,6 +12043,10 @@ components:
       type: object
     UpdateDeploymentInput:
       properties:
+        cloudProvider:
+          oneOf:
+            - $ref: '#/components/schemas/UpdateDeploymentInputCloudProvider'
+            - type: 'null'
         creationMethod:
           oneOf:
             - $ref: '#/components/schemas/UpdateDeploymentInputCreationMethod'
@@ -8008,6 +12056,10 @@ components:
             - $ref: '#/components/schemas/CspsConfigInput'
             - type: 'null'
         customDomain:
+          oneOf:
+            - type: string
+            - type: 'null'
+        defaultLaunchpadViewGroup:
           oneOf:
             - type: string
             - type: 'null'
@@ -8031,11 +12083,48 @@ components:
           oneOf:
             - type: string
             - type: 'null'
+        launchpadTabs:
+          oneOf:
+            - items:
+                type: string
+              type: array
+            - type: 'null'
         name:
           oneOf:
             - type: string
             - type: 'null'
+        region:
+          oneOf:
+            - type: string
+            - type: 'null'
+        releaseChannel:
+          oneOf:
+            - $ref: '#/components/schemas/UpdateDeploymentInputReleaseChannel'
+            - type: 'null'
+        releaseChannelVersion:
+          oneOf:
+            - type: string
+            - type: 'null'
+        releaseChannelVersionHold:
+          oneOf:
+            - type: boolean
+            - type: 'null'
+        template:
+          oneOf:
+            - $ref: '#/components/schemas/UpdateDeploymentInputTemplate'
+            - type: 'null'
+        templateVariables:
+          oneOf:
+            - type: object
+              additionalProperties: true
+            - type: 'null'
       type: object
+    UpdateDeploymentInputCloudProvider:
+      enum:
+        - cubecloud
+        - aws
+        - gcp
+      type: string
     UpdateDeploymentInputCreationMethod:
       enum:
         - upload
@@ -8047,6 +12136,17 @@ components:
       enum:
         - git
         - cli
+      type: string
+    UpdateDeploymentInputReleaseChannel:
+      enum:
+        - latest
+        - release
+      type: string
+    UpdateDeploymentInputTemplate:
+      enum:
+        - single
+        - simpleCluster
+        - multiCluster
       type: string
     UpdateEmbedAccessInput:
       properties:
@@ -8072,14 +12172,23 @@ components:
         - read
         - none
       type: string
+    UpdateEmbedDashboardCommentBody:
+      properties:
+        body:
+          maxLength: 10000
+          minLength: 1
+          type: string
+      required:
+        - body
+      type: object
     UpdateEmbedGroupInput:
       properties:
         description:
           oneOf:
             - maxLength: 500
               type: string
-              description: New description. Pass an empty string to clear it. Omit to leave it unchanged.
             - type: 'null'
+          description: New description. Pass an empty string to clear it. Omit to leave it unchanged.
       type: object
     UpdateFolderInput:
       properties:
@@ -8112,10 +12221,10 @@ components:
             - items:
                 $ref: '#/components/schemas/DashboardFilterInput'
               type: array
-              description: >-
-                Dimension filters applied to the dashboard when the notification is rendered.
-                Replaces the existing set when provided.
             - type: 'null'
+          description: >-
+            Dimension filters applied to the dashboard when the notification is rendered. Replaces
+            the existing set when provided.
         hour:
           oneOf:
             - type: integer
@@ -8123,12 +12232,26 @@ components:
         isEnabled:
           oneOf:
             - type: boolean
-              description: Enable or disable the schedule
             - type: 'null'
+          description: Enable or disable the schedule
+        memberSwitchers:
+          oneOf:
+            - items:
+                $ref: '#/components/schemas/DashboardMemberSwitcherInput'
+              type: array
+            - type: 'null'
+          description: >-
+            Field-switcher selections applied to the dashboard when the notification is rendered.
+            Replaces the existing set when provided.
         minute:
           oneOf:
             - type: integer
             - type: 'null'
+        notificationAiSummary:
+          oneOf:
+            - type: boolean
+            - type: 'null'
+          description: Include an AI-generated "what changed" summary in the notification body. Off by default.
         notificationEnabled:
           oneOf:
             - type: boolean
@@ -8146,10 +12269,10 @@ components:
             - items:
                 $ref: '#/components/schemas/DashboardTimeGrainInput'
               type: array
-              description: >-
-                Time-grain overrides applied to the dashboard when the notification is rendered.
-                Replaces the existing set when provided.
             - type: 'null'
+          description: >-
+            Time-grain overrides applied to the dashboard when the notification is rendered.
+            Replaces the existing set when provided.
         timezone:
           oneOf:
             - type: string
@@ -8264,6 +12387,10 @@ components:
           oneOf:
             - type: integer
             - type: 'null'
+        host:
+          oneOf:
+            - $ref: '#/components/schemas/UpdateReportInputHost'
+            - type: 'null'
         jsonQuery:
           oneOf:
             - type: string
@@ -8275,11 +12402,16 @@ components:
             - type: 'null'
         name:
           oneOf:
-            - type: string
+            - maxLength: 255
+              type: string
             - type: 'null'
         pivotItems:
           oneOf:
             - $ref: '#/components/schemas/PivotItems'
+            - type: 'null'
+        placementId:
+          oneOf:
+            - type: string
             - type: 'null'
         publicId:
           oneOf:
@@ -8288,7 +12420,15 @@ components:
               minLength: 12
               maxLength: 12
             - type: 'null'
+        resultChecksum:
+          oneOf:
+            - $ref: '#/components/schemas/ReportPlacementResultChecksumInput'
+            - type: 'null'
         resultLocation:
+          oneOf:
+            - type: string
+            - type: 'null'
+        sheetId:
           oneOf:
             - type: string
             - type: 'null'
@@ -8298,13 +12438,23 @@ components:
             - type: 'null'
         title:
           oneOf:
-            - type: string
+            - maxLength: 255
+              type: string
             - type: 'null'
         workbookId:
           oneOf:
             - type: integer
             - type: 'null'
+        workbookName:
+          oneOf:
+            - type: string
+            - type: 'null'
       type: object
+    UpdateReportInputHost:
+      enum:
+        - GOOGLE_SHEETS
+        - EXCEL
+      type: string
     UpdateWorkbookInput:
       properties:
         folderId:
@@ -8345,6 +12495,33 @@ components:
           type: string
       required:
         - id
+      type: object
+    UsageAnalyticsTokenResponse:
+      properties:
+        apiUrl:
+          description: >-
+            Base URL of the Usage Analytics deployment’s Cube REST API (e.g.
+            `https://<host>/cubejs-api/v1`). Query it with the returned token.
+          type: string
+        deploymentId:
+          description: Id of the Usage Analytics deployment the token was issued for.
+          type: integer
+        expiresAt:
+          oneOf:
+            - type: string
+            - type: 'null'
+          description: >-
+            When the token expires, as an ISO-8601 timestamp. Request a new token before this moment
+            — issuing one is idempotent and cheap.
+        token:
+          description: >-
+            A short-lived JWT for the Usage Analytics deployment, carrying this tenant’s security
+            context. Send it as `Authorization: Bearer <token>` on requests to `apiUrl`.
+          type: string
+      required:
+        - token
+        - apiUrl
+        - deploymentId
       type: object
     User:
       properties:
@@ -8437,6 +12614,15 @@ components:
                 - format: date-time
                   type: string
             - type: 'null'
+        userPolicies:
+          oneOf:
+            - items:
+                $ref: '#/components/schemas/Policy'
+              type: array
+            - type: 'null'
+          description: >-
+            The caller's effective resource policies: direct grants, organization-wide grants, and
+            grants inherited from their groups. Only populated by `GET /api/v1/users/me`.
         username:
           type: string
       required:
@@ -8665,12 +12851,28 @@ components:
     UserAttributesListResponse:
       properties:
         count:
+          deprecated: true
+          description: >-
+            Deprecated: total number of user attributes, ignoring pagination. Kept for backward
+            compatibility.
+          minimum: 0
           type: integer
         data:
+          deprecated: true
+          description: 'Deprecated: use `items` instead. Kept for backward compatibility.'
           items:
             $ref: '#/components/schemas/UserAttribute'
           type: array
+        items:
+          items:
+            $ref: '#/components/schemas/UserAttribute'
+          type: array
+        pageInfo:
+          oneOf:
+            - $ref: '#/components/schemas/PageInfo'
+            - type: 'null'
       required:
+        - items
         - data
         - count
       type: object
@@ -8707,6 +12909,11 @@ components:
         picture:
           oneOf:
             - {}
+            - type: 'null'
+        settings:
+          oneOf:
+            - type: object
+              additionalProperties: true
             - type: 'null'
         username:
           type: string
@@ -8823,13 +13030,26 @@ components:
           oneOf:
             - type: boolean
             - type: 'null'
+        defaultDeploymentId:
+          oneOf:
+            - type: integer
+            - type: 'null'
         lastSeenChangelogId:
           oneOf:
             - type: integer
             - type: 'null'
+          description: >-
+            Deprecated and ignored. The changelog now arrives in the notification inbox, which
+            carries its own read state. Accepted for backward compatibility but never read or
+            written.
+          deprecated: true
         locale:
           oneOf:
             - type: string
+            - type: 'null'
+        sheets:
+          oneOf:
+            - $ref: '#/components/schemas/SheetsUserSettingsInput'
             - type: 'null'
         theme:
           oneOf:
@@ -9069,7 +13289,7 @@ components:
       properties:
         dashboardDraft:
           oneOf:
-            - $ref: '#/components/schemas/DashboardConfigInput'
+            - $ref: '#/components/schemas/DashboardConfigDraftInput'
             - type: 'null'
       type: object
     WorkbookDtoType:
@@ -9085,7 +13305,13 @@ components:
             - minimum: 0
               type: integer
             - type: 'null'
+          description: >-
+            Deprecated: total number of accessible workbooks, ignoring pagination. Kept for backward
+            compatibility.
+          deprecated: true
         data:
+          deprecated: true
+          description: 'Deprecated: use `items` instead. Kept for backward compatibility.'
           items:
             $ref: '#/components/schemas/Workbook'
           type: array

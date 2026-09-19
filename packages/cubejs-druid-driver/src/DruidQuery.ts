@@ -33,7 +33,7 @@ export class DruidQuery extends BaseQuery {
   }
 
   public subtractInterval(date: string, interval: string) {
-    return `(${date} + INTERVAL ${interval})`;
+    return `(${date} - INTERVAL ${interval})`;
   }
 
   public addInterval(date: string, interval: string) {
@@ -68,6 +68,11 @@ export class DruidQuery extends BaseQuery {
     // Druid evaluates CURRENT_TIMESTAMP in the sqlTimeZone query context, which
     // defaults to UTC — assumes the connection does not override sqlTimeZone
     templates.functions.UTCTIMESTAMP = 'CURRENT_TIMESTAMP';
+    delete templates.functions.WIDTH_BUCKET;
+
+    // Druid only accepts set operations in narrow forms and has no UNION of distinct rows,
+    // so the SQL API leaves them to post processing here.
+    delete templates.statements.union;
 
     return templates;
   }

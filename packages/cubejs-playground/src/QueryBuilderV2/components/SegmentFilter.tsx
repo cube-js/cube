@@ -39,7 +39,6 @@ const SegmentFilterWrapper = tasty(Space, {
 
 export function SegmentFilter(props: MemberFilterProps) {
   const {
-    member,
     cubeName,
     cubeTitle,
     memberName,

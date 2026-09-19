@@ -52,7 +52,7 @@ const cubeApi = cube(
 
 Name | Type | Description |
 ------ | ------ | ------ |
-apiToken | string &#124;  () => *Promise‹string›* | [API token][ref-security] is used to authorize requests and determine SQL database you're accessing. In the development mode, Cube will print the API token to the console on startup. In case of async function `authorization` is updated for `options.transport` on each request. |
+apiToken | string &#124;  () => *Promise‹string›* | [API token][ref-security] is used to authorize requests and determine SQL database you're accessing. In [development mode](/reference/configuration/environment-variables#cubejs_dev_mode) (local use only — it bypasses authentication), Cube will print the API token to the console on startup. In case of async function `authorization` is updated for `options.transport` on each request. |
 options | [CubeApiOptions](#cubeapioptions) | - |
 
 >  **cube**(**options**: [CubeApiOptions](#cubeapioptions)): *[CubeApi](#cubeapi)*
@@ -113,6 +113,56 @@ Formats a date value for a given time dimension `granularity` (e.g. `'day'`, `'m
 ## `CubeApi`
 
 Main class for accessing Cube API
+
+### `cubeSql`
+
+>  **cubeSql**(**sqlQuery**: string, **options?**: [CubeSqlOptions](#cubesqloptions)): *Promise‹[CubeSqlResult](#cubesqlresult)›*
+
+>  **cubeSql**(**sqlQuery**: string, **options?**: [CubeSqlOptions](#cubesqloptions), **callback?**: [LoadMethodCallback](#loadmethodcallback)‹[CubeSqlResult](#cubesqlresult)›): *void*
+
+Run a SQL query via the [`/v1/cubesql`][ref-cubesql-endpoint] endpoint of the
+[SQL API][ref-sql-api] and get the results.
+
+```js
+const result = await cubeApi.cubeSql(
+  'SELECT status, MEASURE(count) FROM orders GROUP BY 1',
+  { timezone: 'America/Los_Angeles' }
+);
+```
+
+**Parameters:**
+
+Name | Type | Description |
+------ | ------ | ------ |
+sqlQuery | string | The SQL query to run |
+options? | [CubeSqlOptions](#cubesqloptions) | - |
+callback? | [LoadMethodCallback](#loadmethodcallback)‹[CubeSqlResult](#cubesqlresult)› | - |
+
+### `cubeSqlStream`
+
+>  **cubeSqlStream**(**sqlQuery**: string, **options?**: [CubeSqlOptions](#cubesqloptions)): *AsyncGenerator‹CubeSqlStreamChunk›*
+
+Same as [`cubeSql`](#cubesql), but yields the results as they stream in. Each
+chunk is either `{ type: 'schema', schema, lastRefreshTime?, external?, usedPreAggregations? }`,
+`{ type: 'data', data }` (one row), or `{ type: 'error', error }`.
+
+```js
+for await (const chunk of cubeApi.cubeSqlStream(
+  'SELECT status, MEASURE(count) FROM orders GROUP BY 1',
+  { timezone: 'America/Los_Angeles' }
+)) {
+  if (chunk.type === 'data') {
+    console.log(chunk.data);
+  }
+}
+```
+
+**Parameters:**
+
+Name | Type | Description |
+------ | ------ | ------ |
+sqlQuery | string | The SQL query to run |
+options? | [CubeSqlOptions](#cubesqloptions) | - |
 
 ### `dryRun`
 
@@ -857,6 +907,26 @@ pollInterval? | number | - |
 transport? | [ITransport](#itransport) | Transport implementation to use. [HttpTransport](#httptransport) will be used by default. |
 signal? | AbortSignal | AbortSignal to cancel requests |
 
+### `CubeSqlOptions`
+
+Extends [`LoadMethodOptions`](#loadmethodoptions) with the options accepted by
+[`cubeSql`](#cubesql) and [`cubeSqlStream`](#cubesqlstream).
+
+Name | Type | Optional? | Description |
+------ | ------ | ------ | --- |
+`timeout` | `number` | ✅ Yes | Query timeout in milliseconds. |
+`timezone` | `string` | ✅ Yes | The [time zone][ref-time-zone] for this query in the [TZ Database Name][link-tzdb] format, e.g., `America/Los_Angeles` — same as `query.timezone` in the REST (JSON) API's [`/v1/load`][ref-query-format]. When omitted, the query runs in the deployment's default time zone. |
+
+### `CubeSqlResult`
+
+Name | Type | Description |
+------ | ------ | ------ |
+schema | `{ name: string, column_type: string, format?: string }[]` | - |
+data | `(string \| number \| boolean \| null)[][]` | - |
+lastRefreshTime? | string | - |
+external? | boolean | Whether the result was served from the external (pre-aggregation) store. Only reported when true. |
+usedPreAggregations? | `Record<string, { preAggregationId?: string, lastUpdatedAt?: number, type: string }>` | Pre-aggregations this result was served from, keyed by pre-aggregation table name. Absent when the query hit none, and on deployments older than the field. Entries also carry `targetTableName` in dev mode and for the Playground. |
+
 ### `DateRange`
 
 > **DateRange**: *string | [string, string]*
@@ -887,7 +957,7 @@ Name | Type | Optional? | Description |
 `progressCallback` |  | ✅ Yes |  |
 `subscribe` | `boolean` | ✅ Yes | Pass `true` to use continuous fetch behavior. |
 `signal` | `AbortSignal` | ✅ Yes | AbortSignal to cancel the request. This allows you to manually abort requests using AbortController. |
-`baseRequestId` | `string` | ✅ Yes | Base request ID ([`spanId`](https://cube.dev/docs/product/apis-integrations/core-data-apis/rest-api#request-span-annotation)) to be used for the request. If not provided a random request ID will be generated. |
+`baseRequestId` | `string` | ✅ Yes | Base request ID ([`spanId`](/reference/core-data-apis/rest-api#request-span-annotation)) to be used for the request. If not provided a random request ID will be generated. |
 
 ### `MetaMethodOptions`
 
@@ -1197,3 +1267,7 @@ values? | never |
 [ref-query-format]: /reference/core-data-apis/rest-api/query-format
 [ref-security]: /docs/data-modeling/access-control
 [ref-cache-control]: /reference/core-data-apis/rest-api#cache-control
+[ref-sql-api]: /reference/core-data-apis/sql-api
+[ref-cubesql-endpoint]: /reference/core-data-apis/rest-api/reference#base_path/v1/cubesql
+[ref-time-zone]: /reference/core-data-apis/queries#time-zone
+[link-tzdb]: https://en.wikipedia.org/wiki/Tz_database

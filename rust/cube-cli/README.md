@@ -28,8 +28,17 @@ pins a specific release tag).
 
 Every run checks GitHub for a newer release in the background and prints a
 notice when one is available (set `CUBE_NO_UPDATE_CHECK=1` to disable, e.g.
-in CI; the notice only goes to interactive terminals, on stderr). Update
-in place any time with:
+in CI; the notice only goes to interactive terminals, on stderr).
+
+The same check feeds a hint under API errors: when a request fails on the API
+side *and* this binary is behind, the error is followed by a line suggesting
+`cube update`, since a CLI that lags the API is a common cause of otherwise
+puzzling failures. A CLI already on the latest release is never told to
+update, and `CUBE_NO_UPDATE_CHECK=1` silences the hint along with the notice.
+Unlike the notice, the hint is not limited to interactive terminals — it is
+attached to a failure, and a stale pinned CLI in CI is where it pays off.
+
+Update in place any time with:
 
 ```bash
 cube update          # download the latest release and replace this binary
@@ -128,11 +137,12 @@ Every endpoint of the Console Server public API is covered:
 
 | Group | Endpoints |
 |---|---|
-| `deployments` | list, get, create (`--bootstrap` scaffolds + builds a serving deployment), update, delete, token, advance-step, reset-step |
+| `deployments` | list, get, create (`--bootstrap` scaffolds + builds a serving deployment), update (`--release-channel`, `--release-channel-version`), settings, versions, delete, token, advance-step, reset-step |
 | `regions` | list available deployment regions |
+| `validate` | compile a deployment's data model and report the compiler's errors; exits non-zero so it gates CI. `--branch` picks a branch, `--dev-mode` your active dev-mode working copy; neither validates the deploy branch |
 | `logs` | tail deployment pod logs (`--pod`, `-c/--container`; defaults to the Cube API container) |
 | `github` (`gh`) | status, installations, repos, branches, connect (import a repo into a deployment + first build) |
-| `data-model` (`dm`) | list, get, put, delete, rename files; branches, create-branch, dev-mode, exit-dev-mode, commit, pull. File writes only land on a **dev-mode branch**: `dev-mode <branch>` forks a personal `dev-…` branch and prints its name — pass that via `--branch` (or omit `--branch` to use your active dev-mode branch); puts to any other branch are rejected by the API |
+| `data-model` (`dm`) | list, get, put, delete, rename files; branches, create-branch, enable-branch, disable-branch, dev-mode, exit-dev-mode, commit, pull. File writes only land on a **dev-mode branch**: `dev-mode <branch>` forks a personal `dev-…` branch and prints its name — pass that via `--branch` (or omit `--branch` to use your active dev-mode branch); puts to any other branch are rejected by the API. `enable-branch` / `disable-branch` toggle whether a shared branch's staging environment stays always active (vs. only while viewed in the UI); `branches` reports it as `ENABLED` and `environments list --type staging` lists the enabled ones |
 | `environments` | list, tokens, create-token (incl. `--meta-sync`) |
 | `variables` | list, set (`KEY=VALUE` upserts) |
 | `folders` | list, create, update, delete, ancestors |
@@ -152,6 +162,7 @@ Every endpoint of the Console Server public API is covered:
 | `app` | config, theme |
 | `meta` | POST /api/v1/meta/ |
 | `scim` | Users/Groups CRUD + patch, resource-types, schemas, service-provider-config |
+| `spec` | the API's own OpenAPI document from `/api/v1/spec`: bare lists every operation, `<pattern>` filters on method/path/summary/operationId, `--json` prints OpenAPI (filtered = matching operations + the transitive schema closure) |
 | `api` | raw escape hatch: `cube api GET /api/v1/... -q key=value -d '{...}'` |
 
 Conventions:

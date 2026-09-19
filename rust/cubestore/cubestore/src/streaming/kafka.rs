@@ -8,11 +8,10 @@ use crate::streaming::traffic_sender::TrafficSender;
 use crate::streaming::{parse_json_payload_and_key, StreamingSource};
 use crate::table::{Row, TableValue};
 use crate::CubeError;
-use async_std::stream;
 use async_trait::async_trait;
 use datafusion::arrow::array::ArrayRef;
 use datafusion::cube_ext;
-use futures::Stream;
+use futures::{stream, Stream};
 use json::object::Object;
 use json::JsonValue;
 use rdkafka::consumer::{Consumer, StreamConsumer};
@@ -227,7 +226,7 @@ impl KafkaClientService for KafkaClientServiceImpl {
         let config_obj = self.config_obj.clone();
         let mut consumer = self.consumer.write().await;
         *consumer = Some(stream_consumer.clone());
-        Ok(Box::pin(stream::from_fn(move || {
+        Ok(Box::pin(stream::unfold((), move |()| {
             let stream_consumer = stream_consumer.clone();
             let to_row = to_row.clone();
             let config_obj = config_obj.clone();
@@ -253,8 +252,8 @@ impl KafkaClientService for KafkaClientServiceImpl {
                         });
                     match row {
                         Ok(None) => continue,
-                        Ok(Some(row)) => break Some(Ok(row)),
-                        Err(e) => break Some(Err(e)),
+                        Ok(Some(row)) => break Some((Ok(row), ())),
+                        Err(e) => break Some((Err(e), ())),
                     }
                 }
             }

@@ -1,7 +1,6 @@
-import fs from 'fs';
-import path from 'path';
 import { BigqueryQuery } from '../../src/adapter/BigqueryQuery';
 import { PostgresQuery } from '../../src/adapter/PostgresQuery';
+import { allDialects } from './allDialects';
 import { prepareJsCompiler } from './PrepareCompiler';
 
 // `?` placeholders are positional: a value referenced from two places in the
@@ -63,23 +62,6 @@ function placeholdersCount(sql: string) {
   return (sql.match(/\?/g) || []).length;
 }
 
-// Read off the directory rather than listed by hand, so a dialect added later
-// cannot quietly escape the invariant below.
-const ADAPTER_DIR = path.join(__dirname, '..', '..', 'src', 'adapter');
-
-function allDialects() {
-  const classes = fs.readdirSync(ADAPTER_DIR)
-    // Tests run from `dist`, so the adapter dir holds `.js`; `.ts` keeps this
-    // working if they are ever run from source.
-    .map(file => file.match(/^(\w+Query)\.(?:ts|js)$/)?.[1])
-    .filter((name): name is string => !!name && name !== 'BaseQuery')
-    // eslint-disable-next-line global-require, import/no-dynamic-require
-    .map(name => require(path.join(ADAPTER_DIR, name))[name]);
-
-  expect(classes.length).toBeGreaterThan(10);
-  return classes;
-}
-
 describe('positional params', () => {
   // Dialects whose placeholder carries the param index are free to share a param
   // between placeholders; those rendering a bare placeholder are not, since the
@@ -88,7 +70,7 @@ describe('positional params', () => {
     const { compiler, joinGraph, cubeEvaluator } = prepareJsCompiler(model);
     await compiler.compile();
 
-    const reusingPositionalDialects = allDialects().filter(QueryClass => {
+    const reusingPositionalDialects = allDialects().filter(([, QueryClass]) => {
       const query = new QueryClass({ joinGraph, cubeEvaluator, compiler }, {
         measures: ['orders.count'],
         timezone: 'UTC',
@@ -96,7 +78,7 @@ describe('positional params', () => {
       const indexedPlaceholder = query.sqlTemplates().params.param.includes('param_index');
 
       return !indexedPlaceholder && query.shouldReuseParams;
-    }).map(QueryClass => QueryClass.name);
+    }).map(([name]) => name);
 
     expect(reusingPositionalDialects).toEqual([]);
   });

@@ -294,7 +294,7 @@ describe('Member expressions on views', () => {
     baseQuery: {
       measures: Array<string>,
       dimensions: Array<string>,
-      order: Array<{id: string, desc: boolean}>,
+      order: Array<{ id: string, desc: boolean }>,
     },
     baseExpectedResults: Array<Record<string, string | null>>,
     testMeasures: Array<{

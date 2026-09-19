@@ -1,0 +1,30 @@
+// The rule set lives in the @cubejs-backend/linter package so it stays a publishable,
+// reviewable unit; this file adds the repo-wide ignores.
+//
+// Backend packages do not fall through to this config: each of them has its own
+// .oxlintrc.json extending packages/cubejs-linter/node.json, and a nested config replaces
+// this one outright for its subtree (it does not merge), so those packages restate the
+// ignores they need. This file governs the frontend packages and everything outside
+// packages/.
+//
+// `yarn lint` runs bare `oxlint`: passing -c/--config would disable nested config
+// discovery, and packages/cubejs-client-{dx,react} rely on it.
+{
+  "$schema": "./node_modules/oxlint/configuration_schema.json",
+  "extends": ["./packages/cubejs-linter/.oxlintrc.json"],
+  "env": {
+    "node": true,
+    "es6": true
+  },
+  "ignorePatterns": [
+    "dist/",
+    "lib/",
+    "build/",
+    "coverage/",
+    "gen/",
+    "**/*.d.ts",
+    "docs-mintlify/",
+    "examples/",
+    "rust/cubesql/"
+  ]
+}

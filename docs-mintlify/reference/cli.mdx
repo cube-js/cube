@@ -139,6 +139,30 @@ cube github connect DEPLOYMENT_ID REPO --installation INSTALLATION_ID --branch m
 Connecting clones the repository into the deployment and triggers the first
 build.
 
+## Validate the data model
+
+`cube validate` compiles a deployment's data model and reports the compiler's
+errors, exiting non-zero when there are any — so it works as a CI gate:
+
+```bash
+cube validate DEPLOYMENT_ID                      # the deploy branch (production)
+cube validate DEPLOYMENT_ID --branch my-branch   # a specific branch
+cube validate DEPLOYMENT_ID --dev-mode           # your active dev-mode branch
+```
+
+The compile runs where the model runs: the command asks the branch's own Cube
+API for its metadata, the same call the Cube UI makes. So the model is
+checked against that environment's real variables and drivers, and a branch is
+validated by the environment serving it — with `--dev-mode`, against your
+uncommitted working copy, before you commit it.
+
+```
+✓ Data model on master is valid (12 cubes)
+```
+
+Pass `--json` for a machine-readable report (`valid`, `errors[]` with the file
+each was reported against, `cubesCount`); the exit code is the same either way.
+
 ## Command reference
 
 Run `cube <command> --help` for the full options of any command.
@@ -146,12 +170,14 @@ Run `cube <command> --help` for the full options of any command.
 | Command | Description |
 | --- | --- |
 | `login`, `logout`, `whoami`, `context` | Authentication and saved contexts |
-| `deployments` | List, get, create, update, delete deployments; `token`, `build-status`, `advance-step`, `reset-step` |
+| `deployments` | List, get, create, update, delete deployments; `settings`, `versions`, `token`, `build-status`, `advance-step`, `reset-step` |
 | `deploy` | Upload a local project directory and build it |
+| `validate` | Compile a deployment's data model and report compilation errors (`--branch`, `--dev-mode`) |
 | `logs` | Tail deployment pod logs (`--pod`, `-c/--container`, `--source production\|dev`) |
 | `regions` | List available deployment regions |
 | `github` (`gh`) | GitHub integration: `status`, `installations`, `repos`, `branches`, `connect` |
-| `data-model` | Data model files and Git workflow: `list`, `get`, `put`, `delete`, `rename`, `file-hashes`, `branches`, `create-branch`, `dev-mode`, `commit`, `pull`, `merge`, `merge-to-default` |
+| `data-model` | Data model files and Git workflow: `list`, `get`, `put`, `delete`, `rename`, `file-hashes`, `branches`, `create-branch`, `delete-branch`, `enable-branch`/`disable-branch`, `dev-mode`, `commit`, `pull`, `merge`, `merge-to-default` |
+| `dbt` | dbt sync: `sync` (`--ref` or `--manifest`, `--wait`), `generate` (`--manifest`, `--out`, `--check`), `status`, `result`, `logs`, `history` (`--status`, `--trigger`), `cancel` |
 | `environments` | Deployment environments and environment tokens |
 | `variables` | Deployment environment variables |
 | `folders`, `workbooks`, `reports`, `workspace` | Workspace content management |
@@ -159,6 +185,7 @@ Run `cube <command> --help` for the full options of any command.
 | `tenant`, `notifications`, `integrations`, `oidc`, `api-keys` | Account administration |
 | `embed` | Embed sessions, tokens, embed tenants; `enable-dashboard`/`disable-dashboard` toggle signed embedding for a dashboard |
 | `agents`, `app`, `meta`, `scim` | Agents, app config, model metadata, SCIM v2 |
+| `spec` | Show the API's OpenAPI specification — see [Discovering the API](#discovering-the-api) |
 | `api` | Raw authenticated API request (escape hatch): `cube api GET /api/v1/... -q key=value -d '{...}'` |
 | `update` | Update the CLI to the latest release |
 | `completion` | Generate shell completions |
@@ -166,25 +193,405 @@ Run `cube <command> --help` for the full options of any command.
 List commands print tables by default; pass `--json` anywhere for raw JSON
 output, suitable for piping to `jq`.
 
+## Changing the Cube version
+
+`cube deployments versions` lists the Cube versions a deployment can switch to
+— the head of each [update channel][ref-update-channels], plus the older
+versions your account has run before:
+
+```bash
+cube deployments versions DEPLOYMENT_ID
+```
+
+```
+VERSION  CHANNEL  LATEST  CURRENT  PASS AS
+1.7.20   latest   true    true     cubejs/cube:v1.7.20
+1.6.69   latest   false   false    cubejs/cube:v1.6.69
+```
+
+Apply one with `update`. Any of `1.7.20`, `v1.7.20` or `cubejs/cube:v1.7.20` is
+accepted; a version that is not on the list is rejected. The container image is
+resolved from the version, so there is nothing else to set:
+
+```bash
+cube deployments update DEPLOYMENT_ID --release-channel-version 1.7.20
+cube deployments update DEPLOYMENT_ID --release-channel release  # move to a channel's latest
+```
+
+`cube deployments settings DEPLOYMENT_ID` reads back every setting, including
+the version and channel currently in effect.
+
+## Discovering the API
+
+`cube spec` prints the OpenAPI specification of the API you are logged into, so
+neither you nor an AI agent has to guess an endpoint's parameters. It reads
+`/api/v1/spec` from the deployment itself, which means the contract you get is
+the one that build actually serves.
+
+With no arguments it lists every operation:
+
+```bash
+cube spec
+```
+
+```
+METHOD  PATH                                            SUMMARY
+GET     /api/v1/deployments                             Get deployments
+PUT     /api/v1/deployments/{deploymentId}              Update a deployment
+...
+```
+
+Pass a pattern to narrow it down. The match is case-insensitive and covers the
+method, path, summary, and operation id:
+
+```bash
+cube spec settings
+```
+
+Add `--json` to get OpenAPI instead of a table. Unfiltered, that is the entire
+document — pipe it into a code generator or a validator. Filtered, it is a
+smaller but still valid document containing just the matching operations plus
+every schema they reference, transitively:
+
+```bash
+cube spec updateDeployment --json
+```
+
+That last form is the one to reach for when you want an endpoint's full
+parameter list: the request body's schema is included rather than left as a
+`$ref` pointing into a document you would then have to fetch in full.
+
+<Tip>
+
+Point an agent at `cube spec <topic> --json` and it can construct a correct
+request without any hardcoded knowledge of the API.
+
+</Tip>
+
 ## Data model Git workflow
 
 Edit the data model through branches without touching production:
 
 ```bash
-cube data-model create-branch DEPLOYMENT_ID my-branch --dev-mode
-cube data-model put DEPLOYMENT_ID model/cubes/orders.yml --file orders.yml --branch my-branch
+cube data-model create-branch DEPLOYMENT_ID my-branch
+DEV=$(cube data-model dev-mode DEPLOYMENT_ID my-branch --json | jq -r .branchName)
+cube data-model put DEPLOYMENT_ID model/cubes/orders.yml --file orders.yml --branch "$DEV"
+cube data-model commit DEPLOYMENT_ID --branch "$DEV" -m "add orders cube"
+cube data-model exit-dev-mode DEPLOYMENT_ID
+cube data-model delete-branch DEPLOYMENT_ID "$DEV"
 cube data-model merge-to-default DEPLOYMENT_ID --branch my-branch -m "add orders cube"
 ```
 
-`merge-to-default` merges into the deploy branch and rebuilds production.
+`commit` pushes the dev branch's edits to the shared branch it was forked from, and
+`merge-to-default` merges that branch into the deploy branch, rebuilds production, and
+**deletes the branch it merged** — pass `--keep-branch` to keep it.
+
+<Warning>
+
+Check that `$DEV` is set before `put` and `commit` use it. An interactive shell has no
+`pipefail`, so a failed `dev-mode` leaves it empty and `jq` still exits 0 — and `put` and
+`commit` accept an empty `--branch`, sending an empty field rather than stopping. They
+would then act on whatever your dev-mode session currently points at. `delete-branch`,
+the third line taking `$DEV`, does refuse it, so the sequence fails eventually — but only
+after `commit` has already pushed. In a script, `set -o pipefail` and a `[ -n "$DEV" ]`
+guard cover it.
+
+</Warning>
+
+That accounts for `my-branch`; `exit-dev-mode` and `delete-branch` account for what
+you'd otherwise leave behind. Dev mode is per-credential state, so while a session stays open every
+command that omits `--branch` targets that dev branch instead of the deploy branch, and
+each pass through this workflow forks another `dev-…` branch. Releasing and pruning
+before the merge also keeps the fork's parent around until the fork is gone.
 
 <Info>
 
-File writes (`put`, `delete`, `rename`) only land on a **dev-mode branch**. With
-`--dev-mode`, `create-branch` (and `dev-mode`) forks a personal `dev-…` branch and
-prints it — pass that printed name via `--branch`, not the name you gave
-`create-branch`, or omit `--branch` to use your active dev-mode branch. Writes
-targeting any other branch are rejected by the API.
+File writes (`put`, `delete`, `rename`) only land on a personal **`dev-…` branch**,
+which is what `dev-mode` forks and prints. Pass that name via `--branch`, or omit
+`--branch` to use your active dev-mode branch. Writes to any other branch are
+rejected by the API.
+
+`create-branch --dev-mode` is not a shortcut for this: it points your session at the
+new branch without forking, so writes to the name you gave it are rejected with
+*"Branch … is not a dev-mode branch"* even though `build-status` reports that branch
+as `dev_mode`. Run `dev-mode` on it to get a name you can write to.
+
+</Info>
+
+`enable-branch` keeps a shared branch's [staging environment][ref-staging-env]
+always active, so it stays queryable without anyone viewing the branch in the
+UI — useful for running tests against a branch from CI. `disable-branch` reverts
+to the default, where the environment is only active while viewed.
+`cube data-model branches DEPLOYMENT_ID` shows the current state per branch, and
+`cube environments list DEPLOYMENT_ID --type staging` lists the enabled ones with
+their API credentials.
+
+```bash
+cube data-model enable-branch DEPLOYMENT_ID my-branch
+cube data-model disable-branch DEPLOYMENT_ID my-branch
+```
+
+## dbt sync
+
+Pull a dbt project's models in as cubes. By default, Cube clones the repository
+configured on the deployment's dbt integration and runs dbt to produce a
+manifest, so a Git-based sync needs only the deployment:
+
+```bash
+cube dbt sync DEPLOYMENT_ID --wait
+```
+
+In CI, upload the manifest the dbt job already produced instead:
+
+```bash
+dbt parse
+cube dbt sync DEPLOYMENT_ID --manifest target/manifest.json --wait
+```
+
+`--manifest` parses the file as JSON and uploads it with the sync request. Cube
+converts that exact artifact without cloning the dbt repository, using a repository
+credential, provisioning a sandbox, or running dbt. This makes the sync faster and
+also works when the deployment has no dbt Git integration. Any dbt command that
+parses the project can produce `target/manifest.json`, including `dbt parse`, `dbt
+compile`, `dbt run`, and `dbt build`. Use `--manifest -` to read it from standard
+input. Manifest upload requests must be no larger than 50 MiB; use the Git-based sync
+path for larger projects.
+After starting the sync, the CLI reads its history row to confirm the tenant honored
+the `manifest` source instead of silently falling back to Git, so `--manifest` requires
+both `SchemaUpdate` and `SchemaRead` access.
+
+The server validates that the upload is a supported dbt manifest, rather than another
+dbt artifact such as `catalog.json` or `run_results.json`. Saved conversion settings
+are still applied when the deployment has them; otherwise their defaults are used.
+Settings that require Cube to execute dbt, such as the model selector and catalog type
+inference, apply only to Git-based syncs.
+
+Each sync creates a **new branch** for the generated cubes and prints its name.
+`--wait` polls until the sync finishes, reporting each stage, then prints the
+generated files; it exits non-zero if the sync fails. Without `--wait` it returns
+a `syncJobId` you can follow yourself:
+
+```bash
+cube dbt status DEPLOYMENT_ID SYNC_JOB_ID --wait
+cube dbt result DEPLOYMENT_ID SYNC_JOB_ID
+cube dbt cancel DEPLOYMENT_ID SYNC_JOB_ID
+```
+
+For a Git-based sync, `--ref` syncs a specific branch or tag of the dbt repository
+instead of the one saved on the integration:
+
+```bash
+cube dbt sync DEPLOYMENT_ID --ref feature/orders-model --wait
+```
+
+<Note>
+
+`--ref` takes a branch or tag, not a commit SHA, and can't be combined with
+`--manifest`: the uploaded manifest already identifies the exact dbt state to convert.
+Git-based syncs provision a sandbox and parse the project, so prefer one per push over
+one per commit. Manifest syncs skip those phases.
+
+</Note>
+
+### Generate cubes without committing them
+
+`sync` commits the generated cubes to a Cube branch for review. `generate` does
+the opposite: it converts your manifest and writes the files to your working
+copy, committing nothing and creating no branch, so your own pipeline commits
+them through its normal review.
+
+```bash
+dbt parse
+cube dbt generate DEPLOYMENT_ID --manifest target/manifest.json --out .
+```
+
+`--out` is the **root of your data model project**, not the cube folder: the
+generated paths are project-relative (`model/cubes/dbt/…`) and are written
+beneath it as they come, so the output path configured on your dbt integration
+keeps deciding where the cubes live. `--out` defaults to the current directory.
+
+Cube never touches git on this path — no branch is created, nothing is written to
+the Cube data model, and the "dbt sync is ready for review" notification does not
+fire. That last one matters when the command runs on every pull request.
+
+`--check` compares the generated cubes against what is already on disk and exits
+non-zero if any of them is missing or differs, without writing. It walks the files
+the run generated, so it detects a cube that is out of date or absent — but not a
+cube left behind by a dbt model that was deleted, which neither `--check` nor the
+write path removes. Use it to fail a PR whose committed cubes no longer match the
+models its dbt project still has:
+
+```bash
+cube dbt generate DEPLOYMENT_ID --manifest target/manifest.json --out . --check
+```
+
+<Note>
+
+`generate` needs a deployment and an API key, because the conversion runs in Cube
+using that deployment's saved pull options — which is what keeps its output
+identical to the managed pull's. It does **not** need access to your dbt
+repository.
+
+</Note>
+
+### Sync history and logs
+
+`history` lists a deployment's recent syncs — how each one was triggered, whether its
+source was `git` or `manifest`, how it ended, and how long it took — and `logs` prints
+one sync's phase timeline, including the text a failed phase produced:
+
+```bash
+cube dbt history DEPLOYMENT_ID
+cube dbt logs DEPLOYMENT_ID SYNC_JOB_ID
+```
+
+`history` narrows with `--status` (`RUNNING`, `COMPLETED`, `FAILED`, `CANCELLED`,
+`UNKNOWN`) and `--trigger` (`manual`, `api`, `webhook`, `agent`, `unknown`) — both
+case-sensitive as spelled here — and pages with `--first`/`--after`, taking the cursor
+from `pageInfo.endCursor` in `--json` output. A page holds at most 100 runs, so a
+larger `--first` returns 100 with `pageInfo.hasNextPage` set. `logs` takes no paging
+flags — one sync's timeline is one page, and each line carries the phase it belongs
+to and how long that phase took.
+
+Both need only `SchemaRead`. Durations are the server's own single-clock figure, so
+they never disagree with the run they describe. `--json` carries the rest of each
+record — the dbt ref that was synced, the phase that failed, per-phase timings and
+manifest counts. When the manifest provides them, `stats.dbtVersion` and
+`stats.manifestGeneratedAt` identify the dbt version and when the artifact itself was
+generated.
+
+`logs` is what turns a red CI step into something self-explaining: a failed
+`--wait` reports the reason, and the timeline says which phase produced it.
+
+```bash
+cube dbt sync "$DEPLOYMENT_ID" --ref "$GITHUB_HEAD_REF" --wait --json > sync.json || {
+  SYNC_JOB_ID=$(jq -r '.syncJobId // empty' sync.json)
+  [ -n "$SYNC_JOB_ID" ] && cube dbt logs "$DEPLOYMENT_ID" "$SYNC_JOB_ID"
+  exit 1
+}
+```
+
+A failed `--wait --json` still writes its document before exiting non-zero, which
+is what leaves the `syncJobId` there to follow up on.
+
+<Note>
+
+A cancelled sync is listed as `CANCELLED` by `history`, but reported as a failure by
+`status` and by `sync --wait` — a gate polling for a terminal answer needs one, and the
+reason it prints says the sync was cancelled.
+
+</Note>
+
+### dbt sync as a CI test gate
+
+Parse the dbt project under review, upload that exact manifest, compile the generated
+Cube model, query it, and fail the job if any step breaks — without touching
+production or granting Cube access to the dbt repository:
+
+```yaml
+# Dev mode is per credential, so two runs of this gate on one deployment would
+# re-point each other's session. Serialise them, and don't cancel a run in flight:
+# a cancelled run skips its prune step and leaves a branch and a live session behind.
+concurrency:
+  group: cube-dbt-gate-${{ vars.CUBE_DEPLOYMENT_ID }}
+  cancel-in-progress: false
+
+env:
+  CUBE_API_URL: ${{ secrets.CUBE_API_URL }}
+  CUBE_API_KEY: ${{ secrets.CUBE_API_KEY }}
+  DEPLOYMENT_ID: ${{ vars.CUBE_DEPLOYMENT_ID }}
+
+steps:
+  # If an earlier step already ran dbt compile, run, or build, reuse the
+  # target/manifest.json it produced and omit this step.
+  - name: Parse the dbt project under review
+    run: dbt parse
+
+  - name: Upload the dbt manifest
+    shell: bash
+    run: |
+      cube dbt sync "$DEPLOYMENT_ID" --manifest target/manifest.json --wait --json > sync.json
+      BRANCH=$(jq -er '.branchName | select(length > 0)' sync.json)
+      echo "BRANCH=$BRANCH" >> "$GITHUB_ENV"
+
+  - name: Compile and query the generated model
+    shell: bash   # for -o pipefail: a failed `cube … | jq` must not yield an empty variable
+    run: |
+      DEV_BRANCH=$(cube data-model dev-mode "$DEPLOYMENT_ID" "$BRANCH" --json | jq -r .branchName)
+      echo "DEV_BRANCH=$DEV_BRANCH" >> "$GITHUB_ENV"
+      cube deployments build-status "$DEPLOYMENT_ID" --branch "$DEV_BRANCH" --wait
+      API=$(cube deployments get "$DEPLOYMENT_ID" --json | jq -r .deploymentUrl)
+      TOKEN=$(cube deployments token "$DEPLOYMENT_ID")
+      OK=
+      for _ in $(seq 20); do
+        rm -f res.json
+        CODE=$(curl -sSG -o res.json -w '%{http_code}' --max-time 95 \
+          "$API/dev-mode/$DEV_BRANCH/cubejs-api/v1/load" \
+          -H "Authorization: $TOKEN" \
+          --data-urlencode 'query={"measures":["dbt_fct_orders.count"]}') || CODE=curl-$?
+        if [ "$CODE" = 200 ] && jq -e '.data' res.json; then OK=1; break; fi
+        if jq -e '.error == "Continue wait"' res.json >/dev/null 2>&1; then sleep 5; continue; fi
+        if jq -e '.error' res.json >/dev/null 2>&1; then cat res.json; exit 1; fi
+        echo "no answer from the API ($CODE), retrying"; sleep 5
+      done
+      [ -n "$OK" ] || { echo "query never returned data (last status $CODE):"
+                        cat res.json 2>/dev/null; exit 1; }
+
+  - name: Release the dev-mode session
+    if: always()
+    continue-on-error: true
+    run: cube data-model exit-dev-mode "$DEPLOYMENT_ID"
+
+  - name: Prune the branches the gate created
+    run: |
+      rc=0
+      cube data-model delete-branch "$DEPLOYMENT_ID" "$DEV_BRANCH" || rc=$?
+      cube data-model delete-branch "$DEPLOYMENT_ID" "$BRANCH" || rc=$?
+      exit $rc
+```
+
+With `--wait --json`, the sync returns the generated branch and terminal result in one
+document. Uploading the artifact produced in the preceding dbt step ensures Cube
+converts the same project state the job validated, even if the remote branch moves
+while the job is running. The query must use the deployment's `deploymentUrl`, and the
+loop must retry [`Continue wait`][ref-rest-api-continue-wait] responses until data
+arrives. Replace `dbt_fct_orders.count` with a measure generated by the sync.
+
+<Warning>
+
+Give the gate its own API key. Dev mode is per credential, so concurrent runs sharing a
+key can re-point each other's session. The concurrency group serializes them, and the
+release step runs even after a failure.
+
+</Warning>
+
+<Warning>
+
+Compile the personal `dev-…` branch returned by `data-model dev-mode`, not the shared
+branch created by the sync. The shared branch has no active runtime by default.
+
+</Warning>
+
+Keep `shell: bash` on the piped step so a failed `cube` command cannot be hidden by a
+successful `jq` process.
+
+New dbt inputs such as `dbt sync --ref` reject an empty value, as do required branch
+arguments such as `data-model dev-mode` and `delete-branch`. Existing optional flags keep
+their previous behavior: `deployments build-status --branch ''` is still accepted for a
+one-shot status request, but is rejected with the new `--wait` gate.
+
+Other existing optional `--branch` flags may accept an empty value for compatibility;
+omit them when you want the documented default.
+
+The API key needs `SchemaUpdate`, `SchemaRead`, `SchemaUpdateDevBranches`, and
+`DeploymentRead` for this deployment. See [API keys][ref-api-keys] and [custom
+roles][ref-custom-roles].
+
+<Info>
+
+A successful gate prunes both branches it creates: the sync branch and its personal
+`dev-…` fork. Failed runs keep them for inspection. Add `--remove-on-upstream` to the
+cleanup commands if the connected Git provider branch should also be deleted.
 
 </Info>
 
@@ -209,4 +616,8 @@ is a hash of the OS machine id. Telemetry is disabled automatically in CI,
 or explicitly with `CUBE_NO_TELEMETRY=1` (or the legacy `CUBEJS_TELEMETRY=false`).
 
 [ref-api-keys]: /admin/account-billing/api-keys
-[ref-rest-api]: /reference/core-data-apis/rest-api/index
+[ref-custom-roles]: /admin/users-and-permissions/custom-roles
+[ref-rest-api]: /reference/core-data-apis/rest-api
+[ref-rest-api-continue-wait]: /reference/core-data-apis/rest-api#continue-wait
+[ref-staging-env]: /admin/deployment/environments#staging-environments
+[ref-update-channels]: /admin/deployment#update-channels

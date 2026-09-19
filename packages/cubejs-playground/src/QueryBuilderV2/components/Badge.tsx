@@ -46,16 +46,15 @@ export const MemberBadge = memo(
     isSpecial?: boolean;
     isMissing?: boolean;
     children: ReactNode | number;
-  }) => {
-    return (
-      <MemberBadgeElement
-        data-member={type}
-        mods={{ special: isSpecial || !Number.isNaN(Number(children)), missing: isMissing }}
-        radius="1r"
-      >
-        {!type && <QuestionCircleOutlined style={{ fontSize: '13px' }} />}
-        {children}
-      </MemberBadgeElement>
-    );
-  }
+  }) => (
+    <MemberBadgeElement
+      data-member={type}
+      mods={{ special: isSpecial || !Number.isNaN(Number(children)), missing: isMissing }}
+      radius="1r"
+    >
+      {!type && <QuestionCircleOutlined style={{ fontSize: '13px' }} />}
+      {children}
+    </MemberBadgeElement>
+  )
+  
 );

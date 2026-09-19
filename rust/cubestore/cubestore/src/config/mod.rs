@@ -55,6 +55,7 @@ use futures::future::join_all;
 use log::Level;
 use log::{debug, error};
 use mockall::automock;
+use serde::{Deserialize, Serialize};
 use simple_logger::SimpleLogger;
 use std::fmt::Display;
 use std::future::Future;
@@ -425,6 +426,14 @@ pub trait ConfigObj: DIService {
     /// leaving the row-count split as the only trigger.
     fn wal_split_size_threshold_bytes(&self) -> Option<u64>;
 
+    /// Maximum number of logical plans built at the same time: `auto` by default, which is
+    /// `max(4, 2 x cores)`. `0` disables the limit.
+    fn max_concurrent_query_plans(&self) -> usize;
+
+    /// Maximum number of queries waiting for a planning slot. Over that, a query is rejected
+    /// instead of queued. `0` disables the limit.
+    fn max_queued_query_plans(&self) -> usize;
+
     fn select_worker_pool_size(&self) -> usize;
 
     fn select_worker_idle_timeout(&self) -> u64;
@@ -533,9 +542,9 @@ pub trait ConfigObj: DIService {
 
     fn enable_topk(&self) -> bool;
 
-    /// When enabled, a TableImportCSV job is placed on the worker with the fewest in-flight
-    /// CSV imports (load-aware), instead of by stateless hash of (table_id, location). Off by
-    /// default (hash placement); kept as a flag for rollout/rollback.
+    /// When enabled (default), a TableImportCSV job is placed on the worker with the fewest
+    /// in-flight CSV imports (load-aware). When disabled, placement is the stateless hash of
+    /// (table_id, location), which ignores in-flight load.
     fn load_aware_import_placement_enabled(&self) -> bool;
 
     /// Time budget for a single batch repartition job. The job yields its runner
@@ -560,14 +569,14 @@ pub trait ConfigObj: DIService {
     /// Off by default; when disabled, chunks are sent whole and filtered only in the subprocess.
     fn prefilter_in_memory_chunks_enabled(&self) -> bool;
 
-    /// When enabled, a merge group's chunk parquets (PerPartition / Range strategies) are
-    /// downloaded concurrently before building the merge inputs, instead of one at a time.
+    /// When enabled (default), a merge group's chunk parquets (PerPartition / Range strategies)
+    /// are downloaded concurrently before building the merge inputs, instead of one at a time.
     /// The group is already bounded by repartition_merge_max_input_files and the download
-    /// pool by download_concurrency, so no extra budget is needed. Off by default.
+    /// pool by download_concurrency, so no extra budget is needed.
     fn repartition_concurrent_download(&self) -> bool;
 
     /// Which repartition strategy to use for an inactive parent's persisted chunks.
-    /// Defaults to PerChunk.
+    /// Defaults to Range.
     fn repartition_strategy(&self) -> RepartitionStrategy;
 
     /// Cap on the number of chunks merged together in one Merge group / RepartitionRange.
@@ -585,20 +594,32 @@ pub trait ConfigObj: DIService {
     fn repartition_check_overlapping_children(&self) -> bool;
     /// Factor `f` controlling when the worker-side partial hash aggregate trims its output to the
     /// top-k groups. Trimming happens only when the number of local groups exceeds `f * k`, where
-    /// `k = limit + offset`. `0` disables the optimization.
+    /// `k = limit + offset`. `0` disables the optimization; the default is `2`. Whether the trim
+    /// runs decides the shape of both halves of a split plan, so it rides in [`PlanningFlags`]; a
+    /// worker uses its own value only when the sender sent no flags.
     fn group_by_limit_factor(&self) -> usize;
 
     /// When the worker group-by-limit hash trim is active, controls where the worker's hash table
-    /// lives: `false` (default) coalesces the partial aggregate's input to one partition (one hash
-    /// table per worker, "over merge"); `true` keeps the raw multi-partition input so it runs per
-    /// partition ("under merge").
+    /// lives: `true` (default) keeps the raw multi-partition input so the aggregate runs per
+    /// partition ("under merge"); `false` coalesces the partial aggregate's input to one partition
+    /// (one hash table per worker, "over merge").
+    ///
+    /// Unlike [`ConfigObj::group_by_limit_factor`], this one stays node-local and is not part of
+    /// [`PlanningFlags`]: it only moves a partition coalesce below the partial aggregate, leaving
+    /// the subtree's schema and the partition count the router sees the same either way.
     fn group_by_limit_per_partition(&self) -> bool;
+
+    /// Push the query's `LIMIT` into the workers for `GROUP BY ... ORDER BY ... LIMIT`. Off makes
+    /// every worker emit all of its groups and leaves the cut to the router. Node-local and not in
+    /// [`PlanningFlags`]: the worker receives the router's plan, descriptor included.
+    fn limit_pushdown(&self) -> bool;
 
     /// Replace the sort-preserving merge feeding a grouped Linear (hash) aggregate with a plain
     /// partition coalesce (the hash aggregate ignores input order, so the per-row merge is wasted).
     fn coalesce_under_hash_aggregate(&self) -> bool;
 
-    /// Router-side merge strategy for distributed value-ordered top-k.
+    /// Router-side merge strategy for distributed value-ordered top-k. Defaults to FullMerge; the
+    /// router's value governs the whole query, see [`TopKAggregateStrategy`].
     fn topk_aggregate_strategy(&self) -> TopKAggregateStrategy;
 
     fn allow_decimal128(&self) -> bool;
@@ -624,6 +645,10 @@ pub trait ConfigObj: DIService {
     fn stream_replay_check_interval_secs(&self) -> u64;
 
     fn check_ws_orphaned_messages_interval_secs(&self) -> u64;
+
+    /// Concurrent websocket connections allowed per authenticated user.
+    /// 0 disables the limit.
+    fn max_ws_connections_per_user(&self) -> usize;
 
     fn drop_ws_processing_messages_after_secs(&self) -> u64;
 
@@ -697,6 +722,8 @@ pub struct ConfigObjImpl {
     pub data_dir: PathBuf,
     pub dump_dir: Option<PathBuf>,
     pub store_provider: FileStoreProvider,
+    pub max_concurrent_query_plans: usize,
+    pub max_queued_query_plans: usize,
     pub select_worker_pool_size: usize,
     pub select_worker_idle_timeout: u64,
     pub job_runners_count: usize,
@@ -763,6 +790,7 @@ pub struct ConfigObjImpl {
     pub repartition_check_overlapping_children: bool,
     pub group_by_limit_factor: usize,
     pub group_by_limit_per_partition: bool,
+    pub limit_pushdown: bool,
     pub coalesce_under_hash_aggregate: bool,
     pub topk_aggregate_strategy: TopKAggregateStrategy,
     pub allow_decimal128: bool,
@@ -777,6 +805,7 @@ pub struct ConfigObjImpl {
     pub metadata_cache_time_to_idle_secs: u64,
     pub stream_replay_check_interval_secs: u64,
     pub check_ws_orphaned_messages_interval_secs: u64,
+    pub max_ws_connections_per_user: usize,
     pub drop_ws_processing_messages_after_secs: u64,
     pub drop_ws_complete_messages_after_secs: u64,
     pub skip_kafka_parsing_errors: bool,
@@ -874,6 +903,14 @@ impl ConfigObj for ConfigObjImpl {
 
     fn wal_split_size_threshold_bytes(&self) -> Option<u64> {
         self.wal_split_size_threshold_bytes
+    }
+
+    fn max_concurrent_query_plans(&self) -> usize {
+        self.max_concurrent_query_plans
+    }
+
+    fn max_queued_query_plans(&self) -> usize {
+        self.max_queued_query_plans
     }
 
     fn select_worker_pool_size(&self) -> usize {
@@ -1119,6 +1156,10 @@ impl ConfigObj for ConfigObjImpl {
         self.group_by_limit_per_partition
     }
 
+    fn limit_pushdown(&self) -> bool {
+        self.limit_pushdown
+    }
+
     fn coalesce_under_hash_aggregate(&self) -> bool {
         self.coalesce_under_hash_aggregate
     }
@@ -1168,6 +1209,10 @@ impl ConfigObj for ConfigObjImpl {
 
     fn check_ws_orphaned_messages_interval_secs(&self) -> u64 {
         self.check_ws_orphaned_messages_interval_secs
+    }
+
+    fn max_ws_connections_per_user(&self) -> usize {
+        self.max_ws_connections_per_user
     }
 
     fn drop_ws_processing_messages_after_secs(&self) -> u64 {
@@ -1304,39 +1349,84 @@ pub async fn init_test_logger() {
 
 /// Router-side merge strategy for distributed value-ordered top-k (`SELECT ... GROUP BY x ORDER BY
 /// agg(...) LIMIT k`). Selected by `CUBESTORE_TOPK_STRATEGY`.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+///
+/// Both halves of a split plan must be planned from the same value, or the router combines a worker
+/// stream whose ordering it does not have and returns wrong rows instead of failing. So it rides in
+/// [`PlanningFlags`], and a worker uses its own value only when the sender sent no flags.
+///
+/// The wire names are the env names and must survive a variant rename. No catch-all variant: an
+/// unknown strategy fails the message deserialize, which the receiver logs and the sender sees as a
+/// dropped connection.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum TopKAggregateStrategy {
-    /// Original streaming NRA merge with per-row state (default).
+    /// Original streaming NRA merge with per-row state.
+    #[serde(rename = "streaming")]
     Streaming,
     /// Same streaming NRA merge (keeps early termination, bounded router memory), but vectorized.
+    #[serde(rename = "vectorized_streaming")]
     VectorizedStreaming,
-    /// ClickHouse-style full re-aggregation on the router + fetch-limited sort. Drops early
-    /// termination, so the router materializes every distinct group.
+    /// ClickHouse-style full re-aggregation on the router + fetch-limited sort (default). Drops
+    /// early termination, so the router materializes every distinct group.
+    #[serde(rename = "full_merge")]
     FullMerge,
 }
 
 /// Parses [`TopKAggregateStrategy`] from an env var. Lenient: an unset or unrecognized value falls
-/// back to the default (`Streaming`) with a warning rather than panicking -- a malformed perf toggle
+/// back to the default (`FullMerge`) with a warning rather than panicking -- a malformed perf toggle
 /// must never take a node down.
 fn env_topk_strategy(name: &str) -> TopKAggregateStrategy {
     match env::var(name) {
-        Err(_) => TopKAggregateStrategy::Streaming,
+        Err(_) => TopKAggregateStrategy::FullMerge,
         Ok(v) => match v.trim().to_ascii_lowercase().as_str() {
-            "" | "streaming" | "default" | "v1" => TopKAggregateStrategy::Streaming,
+            "streaming" | "v1" => TopKAggregateStrategy::Streaming,
             "vectorized" | "vectorized_streaming" | "v2" => {
                 TopKAggregateStrategy::VectorizedStreaming
             }
-            "full_merge" | "full-merge" | "fullmerge" => TopKAggregateStrategy::FullMerge,
+            "" | "default" | "full_merge" | "full-merge" | "fullmerge" => {
+                TopKAggregateStrategy::FullMerge
+            }
             other => {
                 log::warn!(
-                    "unknown {} value '{}', using default (streaming)",
+                    "unknown {} value '{}', using default (full_merge)",
                     name,
                     other
                 );
-                TopKAggregateStrategy::Streaming
+                TopKAggregateStrategy::FullMerge
             }
         },
     }
+}
+
+/// The oversubscription is deliberate: planning also waits on the metastore, and undershooting
+/// costs throughput several times over while overshooting only costs memory.
+fn auto_max_concurrent_query_plans() -> usize {
+    let cores = std::thread::available_parallelism()
+        .map(|c| c.get())
+        .unwrap_or(4);
+    std::cmp::max(4, 2 * cores)
+}
+
+/// `auto` (the default) sizes the limit by the cores available to the process, an explicit number
+/// overrides it and `0` turns the throttling off.
+fn max_concurrent_query_plans_from_env() -> usize {
+    const NAME: &str = "CUBESTORE_MAX_CONCURRENT_QUERY_PLANS";
+    let value = match env::var(NAME) {
+        Ok(value) => value,
+        Err(_) => return auto_max_concurrent_query_plans(),
+    };
+    let value = value.trim();
+    if value.eq_ignore_ascii_case("auto") {
+        return auto_max_concurrent_query_plans();
+    }
+    value.parse().unwrap_or_else(|e: std::num::ParseIntError| {
+        log::warn!(
+            "Ignoring environment variable '{}' with '{}' value: {}; using auto",
+            NAME,
+            value,
+            e
+        );
+        auto_max_concurrent_query_plans()
+    })
 }
 
 fn env_bool(name: &str, default: bool) -> bool {
@@ -1350,11 +1440,33 @@ fn env_bool(name: &str, default: bool) -> bool {
         .unwrap_or(default)
 }
 
-/// Lenient boolean env read for opt-in toggles: only `1`/`true` enable it, anything else (including a
-/// typo) is treated as off. Unlike [`env_bool`] it never panics -- a malformed value on a
-/// performance flag must not take a node down on startup.
-fn env_flag(name: &str) -> bool {
-    env::var(name).map_or(false, |v| v == "true" || v == "1")
+/// Recognizes the usual boolean spellings in either case; `None` for anything else, including an
+/// empty value.
+fn parse_flag(value: &str) -> Option<bool> {
+    match value.trim().to_ascii_lowercase().as_str() {
+        "1" | "true" | "yes" | "on" => Some(true),
+        "0" | "false" | "no" | "off" => Some(false),
+        _ => None,
+    }
+}
+
+/// Lenient boolean env read for toggles: falls back to `default` with a warning on a value
+/// [`parse_flag`] does not recognize. Unlike [`env_bool`] it never panics -- a malformed value on a
+/// performance flag must not take a node down on startup, and for a flag that is on by default the
+/// value an operator writes to turn it off is the one path that must work.
+fn env_flag(name: &str, default: bool) -> bool {
+    match env::var(name) {
+        Err(_) => default,
+        Ok(v) => parse_flag(&v).unwrap_or_else(|| {
+            log::warn!(
+                "Ignoring {} value '{}', using default ({})",
+                name,
+                v,
+                default
+            );
+            default
+        }),
+    }
 }
 
 pub fn env_parse<T>(name: &str, default: T) -> T
@@ -1367,13 +1479,14 @@ where
 
 /// Lenient numeric env read for opt-in performance toggles: an unparseable value logs a warning and
 /// falls back to the default instead of panicking, so a typo can't take a node down on startup.
+/// Surrounding whitespace is ignored, which a value coming from YAML easily carries.
 pub fn env_parse_lenient<T>(name: &str, default: T) -> T
 where
     T: FromStr,
     T::Err: Display,
 {
     match env::var(name) {
-        Ok(v) => match v.parse::<T>() {
+        Ok(v) => match v.trim().parse::<T>() {
             Ok(n) => n,
             Err(e) => {
                 log::warn!(
@@ -1535,20 +1648,20 @@ where
 }
 
 // Unlike env_optparse, an unparseable value is not fatal: it logs a warning and falls
-// back to per_chunk, so a typo in the strategy env never takes the process down.
+// back to range, so a typo in the strategy env never takes the process down.
 fn env_repartition_strategy() -> RepartitionStrategy {
     match env::var("CUBESTORE_REPARTITION_STRATEGY") {
         Ok(v) => match v.parse::<RepartitionStrategy>() {
             Ok(s) => s,
             Err(e) => {
                 log::warn!(
-                    "Ignoring CUBESTORE_REPARTITION_STRATEGY: {}; using per_chunk",
+                    "Ignoring CUBESTORE_REPARTITION_STRATEGY: {}; using range",
                     e
                 );
-                RepartitionStrategy::PerChunk
+                RepartitionStrategy::Range
             }
         },
-        Err(_) => RepartitionStrategy::PerChunk,
+        Err(_) => RepartitionStrategy::Range,
     }
 }
 
@@ -1705,6 +1818,8 @@ impl Config {
                         FileStoreProvider::Filesystem { remote_dir: None }
                     }
                 },
+                max_concurrent_query_plans: max_concurrent_query_plans_from_env(),
+                max_queued_query_plans: env_parse_lenient("CUBESTORE_MAX_QUEUED_QUERY_PLANS", 5000),
                 select_worker_pool_size: env_parse("CUBESTORE_SELECT_WORKERS", 4),
                 select_worker_idle_timeout: env_parse_duration(
                     "CUBESTORE_SELECT_WORKERS_IDLE_TIMEOUT",
@@ -1848,16 +1963,16 @@ impl Config {
                 .map(|v| v as u64),
                 job_runners_count: env_parse("CUBESTORE_JOB_RUNNERS", 4),
                 long_term_job_runners_count: env_parse("CUBESTORE_LONG_TERM_JOB_RUNNERS", 32),
-                csv_import_job_runners_count: env_parse("CUBESTORE_CSV_IMPORT_JOB_RUNNERS", 0),
+                csv_import_job_runners_count: env_parse("CUBESTORE_CSV_IMPORT_JOB_RUNNERS", 1),
                 connection_timeout: 60,
                 server_name: env::var("CUBESTORE_SERVER_NAME")
                     .ok()
                     .unwrap_or("localhost".to_string()),
                 upload_to_remote: !env::var("CUBESTORE_NO_UPLOAD").ok().is_some(),
                 enable_topk: env_bool("CUBESTORE_ENABLE_TOPK", true),
-                load_aware_import_placement_enabled: env_bool(
+                load_aware_import_placement_enabled: env_flag(
                     "CUBESTORE_LOAD_AWARE_IMPORT_PLACEMENT",
-                    false,
+                    true,
                 ),
                 repartition_chunks_time_budget_secs: env_parse(
                     "CUBESTORE_REPARTITION_TIME_BUDGET_SECS",
@@ -1875,9 +1990,9 @@ impl Config {
                     "CUBESTORE_PREFILTER_IN_MEMORY_CHUNKS",
                     false,
                 ),
-                repartition_concurrent_download: env_bool(
+                repartition_concurrent_download: env_flag(
                     "CUBESTORE_REPARTITION_CONCURRENT_DOWNLOAD",
-                    false,
+                    true,
                 ),
                 repartition_strategy: env_repartition_strategy(),
                 repartition_merge_max_input_files: env_parse(
@@ -1886,15 +2001,16 @@ impl Config {
                 ),
                 repartition_merge_max_rows: env_parse(
                     "CUBESTORE_REPARTITION_MERGE_MAX_ROWS",
-                    4_000_000,
+                    400_000,
                 ),
                 repartition_check_overlapping_children: env_bool(
                     "CUBESTORE_REPARTITION_CHECK_OVERLAPPING_CHILDREN",
                     false,
                 ),
-                group_by_limit_factor: env_parse_lenient("CUBESTORE_GROUP_BY_LIMIT_FACTOR", 0),
-                group_by_limit_per_partition: env_flag("CUBESTORE_GROUP_BY_LIMIT_PER_PARTITION"),
-                coalesce_under_hash_aggregate: env_flag("CUBESTORE_COALESCE_UNDER_HASH_AGGREGATE"),
+                group_by_limit_factor: env_parse_lenient("CUBESTORE_GROUP_BY_LIMIT_FACTOR", 2),
+                group_by_limit_per_partition: env_flag("CUBESTORE_GROUP_BY_LIMIT_PER_PARTITION", true),
+                limit_pushdown: env_flag("CUBESTORE_LIMIT_PUSHDOWN", true),
+                coalesce_under_hash_aggregate: env_flag("CUBESTORE_COALESCE_UNDER_HASH_AGGREGATE", false),
                 topk_aggregate_strategy: env_topk_strategy("CUBESTORE_TOPK_STRATEGY"),
                 allow_decimal128: env_bool("CUBESTORE_ALLOW_DECIMAL128", false),
                 enable_remove_orphaned_remote_files: env_bool(
@@ -1941,6 +2057,10 @@ impl Config {
                     "CUBESTORE_CHECK_WS_ORPHANED_MESSAGES_INTERVAL",
                     30,
                 ),
+                max_ws_connections_per_user: env_parse(
+                    "CUBESTORE_MAX_WS_CONNECTIONS_PER_USER",
+                    0,
+                ),
                 drop_ws_processing_messages_after_secs: env_parse(
                     "CUBESTORE_DROP_WS_PROCESSING_MESSAGES_AFTER",
                     60 * 60,
@@ -1983,7 +2103,7 @@ impl Config {
                     Some(60_000),
                     None,
                 ),
-                metastore_batch_rpc: env_parse("CUBESTORE_METASTORE_BATCH_RPC", false),
+                metastore_batch_rpc: env_flag("CUBESTORE_METASTORE_BATCH_RPC", true),
                 transport_max_message_size,
                 transport_max_frame_size: env_parse_size(
                     "CUBESTORE_TRANSPORT_MAX_FRAME_SIZE",
@@ -2090,6 +2210,8 @@ impl Config {
                 store_provider: FileStoreProvider::Filesystem {
                     remote_dir: Some(Self::test_remote_dir_path(directory, name)),
                 },
+                max_concurrent_query_plans: 8,
+                max_queued_query_plans: 5000,
                 select_worker_pool_size: 0,
                 select_worker_idle_timeout: 600,
                 job_runners_count: 4,
@@ -2141,22 +2263,23 @@ impl Config {
                 server_name: "localhost".to_string(),
                 upload_to_remote: true,
                 enable_topk: true,
-                load_aware_import_placement_enabled: false,
+                load_aware_import_placement_enabled: true,
                 repartition_chunks_time_budget_secs: 60,
                 push_partial_aggregate_below_merge_enabled: true,
                 compaction_split_by_total_file_size_enabled: false,
                 // Production default is off; kept on in tests so prefilter_chunks_shared_scan
                 // and the rest of the suite keep exercising the worker-side trim path.
                 prefilter_in_memory_chunks_enabled: true,
-                repartition_concurrent_download: false,
-                repartition_strategy: RepartitionStrategy::PerChunk,
+                repartition_concurrent_download: true,
+                repartition_strategy: RepartitionStrategy::Range,
                 repartition_merge_max_input_files: 50,
-                repartition_merge_max_rows: 4_000_000,
+                repartition_merge_max_rows: 400_000,
                 repartition_check_overlapping_children: false,
                 group_by_limit_factor: 2,
-                group_by_limit_per_partition: false,
+                group_by_limit_per_partition: true,
+                limit_pushdown: true,
                 coalesce_under_hash_aggregate: false,
-                topk_aggregate_strategy: TopKAggregateStrategy::Streaming,
+                topk_aggregate_strategy: TopKAggregateStrategy::FullMerge,
                 allow_decimal128: false,
                 enable_remove_orphaned_remote_files: false,
                 enable_startup_warmup: true,
@@ -2173,6 +2296,7 @@ impl Config {
                 gc_loop_interval: 60,
                 stream_replay_check_interval_secs: 60,
                 check_ws_orphaned_messages_interval_secs: 1,
+                max_ws_connections_per_user: 0,
                 drop_ws_processing_messages_after_secs: 60,
                 drop_ws_complete_messages_after_secs: 10,
                 skip_kafka_parsing_errors: false,
@@ -2185,7 +2309,7 @@ impl Config {
                 max_disk_space_per_worker: 0,
                 disk_space_cache_duration_secs: 0,
                 disk_space_compute_lock_timeout_ms: 1000,
-                metastore_batch_rpc: false,
+                metastore_batch_rpc: true,
                 transport_max_message_size: 64 << 20,
                 transport_max_frame_size: 16 << 20,
                 local_files_cleanup_interval_secs: 600,
@@ -2955,6 +3079,7 @@ impl Config {
                         Duration::from_secs(config.drop_ws_complete_messages_after_secs()),
                         config.transport_max_message_size(),
                         config.transport_max_frame_size(),
+                        config.max_ws_connections_per_user(),
                     )
                 })
                 .await;
@@ -3041,5 +3166,20 @@ mod tests {
             RepartitionStrategy::Range
         );
         assert!("nonsense".parse::<RepartitionStrategy>().is_err());
+    }
+
+    #[test]
+    fn parse_flag_spellings() {
+        for on in ["1", "true", "TRUE", "True", "yes", "on", " on "] {
+            assert_eq!(parse_flag(on), Some(true), "{}", on);
+        }
+        for off in ["0", "false", "FALSE", "no", "off", " off "] {
+            assert_eq!(parse_flag(off), Some(false), "{}", off);
+        }
+        // Unrecognized values leave the caller on its default rather than silently reading as off,
+        // which for an on-by-default toggle would turn it off behind the operator's back.
+        for unknown in ["", "  ", "enabled", "2", "-1", "nonsense"] {
+            assert_eq!(parse_flag(unknown), None, "{}", unknown);
+        }
     }
 }

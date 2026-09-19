@@ -30,6 +30,7 @@ import { QueryResultFormat } from '../codegen';
 const CubeStoreCapabilityMinVersion = {
   queueExclusive: '1.6.22',
   queueExternalId: '1.6.26',
+  queueAddAndRetrieve: '1.7.25',
   sendableParameters: '1.6.38',
   arrowFormat: '1.6.66',
 } satisfies Record<string, string>;
@@ -295,8 +296,10 @@ export class CubeStoreDriver extends BaseDriver implements DriverInterface {
     }
 
     await this.createTableWithOptions(table, columns, { indexes: indexesSql, aggregations, buildRangeEnd: queryTracingObj?.buildRangeEnd }, queryTracingObj);
+
     try {
       const batchSize = 2000; // TODO make dynamic?
+
       for (let j = 0; j < Math.ceil(tableData.rows.length / batchSize); j++) {
         const currentBatchSize = Math.min(tableData.rows.length - j * batchSize, batchSize);
         const indexArray = Array.from({ length: currentBatchSize }, (v, i) => i);
@@ -351,6 +354,7 @@ export class CubeStoreDriver extends BaseDriver implements DriverInterface {
     }
 
     const tempFiles: string[] = [];
+
     try {
       const pipelinePromises: Promise<any>[] = [];
       const filePromises: Promise<string>[] = [];
@@ -470,6 +474,7 @@ export class CubeStoreDriver extends BaseDriver implements DriverInterface {
 
     if (tableData.partitions) {
       locations = [];
+
       for (let i = 0; i < tableData.partitions; i++) {
         locations.push(`stream://${tableData.streamingSource.name}/${tableData.streamingTable}/${i}`);
       }

@@ -115,8 +115,9 @@ impl FilterItem {
     /// Partial matching is only supported for AND groups. OR groups are
     /// preserved only when all of their children match the target members.
     ///
-    /// `Segment` nodes are skipped during extraction — they do not prevent
-    /// sibling member filters from being collected in AND groups.
+    /// A `Segment` node matches when `target_members` names it, and is
+    /// otherwise skipped — skipping does not prevent sibling member filters
+    /// from being collected in AND groups.
     pub fn find_subtree_for_members(&self, target_members: &[&String]) -> Option<FilterItem> {
         self.find_subtree_for_members_inner(target_members)
             .map(|(filter_item, _)| filter_item)
@@ -198,7 +199,16 @@ impl FilterItem {
                     None
                 }
             }
-            FilterItem::Segment(_) => None,
+            FilterItem::Segment(segment) => {
+                if target_members
+                    .iter()
+                    .any(|target| segment.matches_member_name(target))
+                {
+                    Some((self.clone(), true))
+                } else {
+                    None
+                }
+            }
         }
     }
 

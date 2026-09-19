@@ -179,6 +179,15 @@ export async function runEnvironment(
   if (type === 'questdb') {
     compose.withWaitStrategy('data', Wait.forHealthCheck());
   }
+  // Trino binds its HTTP port only once the coordinator has finished starting,
+  // so wait on the container HEALTHCHECK (shipped with the trinodb/trino image).
+  // That regularly takes longer than the global startup timeout, and the compose
+  // environment overwrites every strategy's own timeout with the global one, so
+  // the global value has to be raised rather than the strategy's.
+  if (type === 'trino') {
+    compose.withStartupTimeout(180 * 1000);
+    compose.withWaitStrategy('data', Wait.forHealthCheck());
+  }
   // CrateDB opens its Postgres-wire port before the cluster is ready to serve
   // queries, so wait on the "started" startup log line (matching CrateDBRunner in
   // testing-shared) before connecting.

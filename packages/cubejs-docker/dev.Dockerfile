@@ -1,4 +1,4 @@
-FROM node:24.18.0-trixie-slim AS base
+FROM node:24.21.0-trixie-slim AS base
 
 ARG IMAGE_VERSION=dev
 

@@ -155,6 +155,10 @@
     "---------------------------------------",
     "Requires Tesseract.                    ",
     "---------------------------------------",
+    "    A custom granularity origin on a single-unit interval only reaches the grouping under Tesseract.",
+    "querying custom granularities ECommerce: count by fiscal_year_by_1st_april + no dimension",
+    "querying custom granularities ECommerce: count by fiscal_year_by_15th_april + no dimension",
+    "querying custom granularities ECommerce: count by monthly_from_15th + no dimension",
     "querying BigECommerce: rolling window by 2 day without date range",
     "querying BigECommerce: rolling window by 2 month without date range",
     "querying BigECommerce: rolling window YTD without date range",
@@ -247,6 +251,14 @@
     "---- Different results comparing to baseQuery version. Need to investigate ----",
     "querying BigECommerce: rolling window YTD (month + week)",
     "querying BigECommerce: rolling window YTD (month + week + no gran)",
-    "querying BigECommerce: rolling window YTD without granularity"
+    "querying BigECommerce: rolling window YTD without granularity",
+
+    "---- The oracledb thin client pinned here (6.2.0) mis-reads a response packet for the",
+    "---- plan these produce and raises NJS-111, breaking the connection. The same statement",
+    "---- succeeds through sqlplus and through oracledb 6.3.0 and later, so this waits on a",
+    "---- driver upgrade. Both shapes reach the same plan; skipping only one moves the",
+    "---- failure onto the other. ----",
+    "SQL API: Rolling Window YTD (year + month + day + date_trunc equal)",
+    "SQL API: Rolling Window YTD (year + month + day + date_trunc IN)"
   ]
 }

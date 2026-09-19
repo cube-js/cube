@@ -3,12 +3,25 @@ use crate::planner::{MemberSymbol, SqlCall};
 use std::fmt::Debug;
 use std::rc::Rc;
 
+/// One side of a join key, paired with the column the rollup on that
+/// side stores it in. A key kept as the rollup's time dimension lives
+/// in a granularity-suffixed column, so the ON clause cannot be
+/// rendered from the symbol alone.
+#[derive(Clone, Debug)]
+pub struct PreAggregationJoinMember {
+    pub symbol: Rc<MemberSymbol>,
+    pub column: String,
+    /// Granularity the column is truncated to, `None` for a key stored
+    /// as a plain dimension.
+    pub granularity: Option<String>,
+}
+
 #[derive(Clone, Debug)]
 pub struct PreAggregationJoinItem {
     pub from: Rc<PreAggregationSource>,
     pub to: Rc<PreAggregationSource>,
-    pub from_members: Vec<Rc<MemberSymbol>>,
-    pub to_members: Vec<Rc<MemberSymbol>>,
+    pub from_members: Vec<PreAggregationJoinMember>,
+    pub to_members: Vec<PreAggregationJoinMember>,
     pub on_sql: Rc<SqlCall>,
 }
 

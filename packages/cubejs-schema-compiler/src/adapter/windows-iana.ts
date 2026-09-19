@@ -451,7 +451,7 @@ const ianaToWindows: Record<string, string> = {
   'Pacific/Truk': 'West Pacific Standard Time',
   'Pacific/Wake': 'UTC+12',
   'Pacific/Wallis': 'UTC+12',
-  'UTC': 'UTC',
+  UTC: 'UTC',
 };
 
 export function resolveWindowsTimezone(iana: string): string {

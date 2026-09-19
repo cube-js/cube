@@ -343,6 +343,61 @@ describe('GraphQL Schema', () => {
       expect(res.body).toMatchSnapshot();
     });
 
+    // `graphql.ts` copies the same pre-aggregation identity into `extensions`
+    // as the REST response carries. Its own app so the snapshot above keeps
+    // describing a query that hit no pre-aggregation.
+    test('should return usedPreAggregations in extensions', async () => {
+      const usedPreAggregations = {
+        'schema.orders_main20240101': {
+          preAggregationId: 'Orders.main',
+          lastUpdatedAt: 1712000000000,
+          type: 'rollup',
+        },
+      };
+
+      const preAggApp = express();
+
+      preAggApp.use('/graphql', jsonParser, (req: any, res: any) => {
+        const schema = makeSchema(metaConfig);
+
+        return graphqlHTTP({
+          schema,
+          context: {
+            req,
+            res,
+            apiGateway: {
+              async load({ query, res: response }) {
+                response({
+                  query,
+                  annotation: mockAnnotation,
+                  lastRefreshTime: mockLastRefreshTime,
+                  usedPreAggregations,
+                  data: [
+                    { 'Orders.count': 10, 'Orders.totalAmount': 500, 'Orders.status': 'completed' },
+                  ],
+                });
+              },
+            },
+          },
+          extensions: () => res.extensions || {},
+        })(req, res);
+      });
+
+      const query = `query CubeQuery {
+        cube {
+          orders { count totalAmount status }
+        }
+      }`;
+
+      const res = await request(preAggApp)
+        .post('/graphql')
+        .set('Content-Type', 'application/json')
+        .send(gqlQuery(query));
+
+      expect(res.body.errors).toBeUndefined();
+      expect(res.body.extensions.usedPreAggregations).toEqual(usedPreAggregations);
+    });
+
     it('should accumulate all measures and dimensions', async () => {
       const query = `query CubeQuery {
         cube {

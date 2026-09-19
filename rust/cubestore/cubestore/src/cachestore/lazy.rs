@@ -1,7 +1,7 @@
 use crate::cachestore::cache_eviction_manager::EvictionResult;
 use crate::cachestore::cache_rocksstore::{
-    CachestoreInfo, QueueAddPayload, QueueAddResponse, QueueAllItem, QueueGetResponse,
-    QueueListItem,
+    CachestoreInfo, QueueAddAndRetrievePayload, QueueAddAndRetrieveResponse, QueueAddPayload,
+    QueueAddResponse, QueueAllItem, QueueGetResponse, QueueListItem,
 };
 use crate::cachestore::queue_item::QueueRetrieveResponse;
 use crate::cachestore::{
@@ -292,6 +292,13 @@ impl CacheStore for LazyRocksCacheStore {
 
     async fn queue_add(&self, payload: QueueAddPayload) -> Result<QueueAddResponse, CubeError> {
         self.init().await?.queue_add(payload).await
+    }
+
+    async fn queue_add_and_retrieve(
+        &self,
+        payload: QueueAddAndRetrievePayload,
+    ) -> Result<QueueAddAndRetrieveResponse, CubeError> {
+        self.init().await?.queue_add_and_retrieve(payload).await
     }
 
     async fn queue_clear(&self) -> Result<(), CubeError> {

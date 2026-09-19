@@ -1,0 +1,7 @@
+---
+source: cubesqlplanner/src/tests/integration/member_expressions.rs
+expression: result
+---
+customer_overview__orders_count | customer_overview__returns_count | total_count
+--------------------------------+----------------------------------+------------
+8                               | 5                                | 13

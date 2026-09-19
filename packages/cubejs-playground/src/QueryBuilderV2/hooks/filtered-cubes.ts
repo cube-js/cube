@@ -1,8 +1,7 @@
 import { TCubeDimension, TCubeMeasure, TCubeSegment } from '@cubejs-client/core';
 
-import { MemberViewType, TCubeFolder, TCubeHierarchy } from '../types';
+import { MemberViewType, TCubeFolder, TCubeHierarchy, Cube } from '../types';
 import { getMemberSearchName } from '../utils';
-import { Cube } from '../types';
 
 import { useRawFilter } from './raw-filter';
 
@@ -26,20 +25,17 @@ export function useFilteredCubes(
     T extends TCubeMeasure | TCubeDimension | TCubeSegment | TCubeFolder | TCubeHierarchy,
   >(
     items: T[]
-  ): T[] => {
-    return items.filter((item: T) => {
-      const cubeName = item.name.split('.')[0];
-      const cube = cubesMap[cubeName];
-      const cubeId = cube ? getMemberSearchName(cube, memberViewType) : cubeName;
-      const itemId = getMemberSearchName(item, memberViewType);
+  ): T[] => items.filter((item: T) => {
+    const cubeName = item.name.split('.')[0];
+    const cube = cubesMap[cubeName];
+    const cubeId = cube ? getMemberSearchName(cube, memberViewType) : cubeName;
+    const itemId = getMemberSearchName(item, memberViewType);
 
-      return (
-        rawFilterFn(cubeId ?? item.name, filterString) ||
-        (itemId && rawFilterFn(itemId, filterString))
-      );
-    });
-  };
-
+    return (
+      rawFilterFn(cubeId ?? item.name, filterString)
+        || (itemId && rawFilterFn(itemId, filterString))
+    );
+  });
   const members: string[] = [];
 
   const membersByCube = cubes.reduce(
@@ -77,16 +73,14 @@ export function useFilteredCubes(
 
   return {
     isFiltered: !!filterString,
-    cubes: cubes.filter((item) => {
-      return (
-        rawFilterFn(getMemberSearchName(item, memberViewType), filterString) ||
-        membersByCube[item.name].dimensions.length ||
-        membersByCube[item.name].measures.length ||
-        membersByCube[item.name].segments.length ||
-        membersByCube[item.name].folders.length ||
-        membersByCube[item.name].hierarchies.length
-      );
-    }),
+    cubes: cubes.filter((item) => (
+      rawFilterFn(getMemberSearchName(item, memberViewType), filterString)
+        || membersByCube[item.name].dimensions.length
+        || membersByCube[item.name].measures.length
+        || membersByCube[item.name].segments.length
+        || membersByCube[item.name].folders.length
+        || membersByCube[item.name].hierarchies.length
+    )),
     membersByCube,
     members,
   };

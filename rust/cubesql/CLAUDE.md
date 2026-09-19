@@ -4,18 +4,18 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Repository Overview
 
-CubeSQL is a SQL proxy server that enables SQL-based access to Cube.js semantic layer. It emulates the PostgreSQL wire protocol, allowing standard SQL clients and BI tools to query Cube.js deployments as if they were traditional databases. Note: MySQL protocol support has been deprecated and is no longer available.
+CubeSQL is a SQL proxy server that enables SQL-based access to Cube semantic layer. It emulates the PostgreSQL wire protocol, allowing standard SQL clients and BI tools to query Cube deployments as if they were traditional databases. Note: MySQL protocol support has been deprecated and is no longer available.
 
 This is a Rust workspace containing three crates:
 - **cubesql**: Main SQL proxy server with query compilation and protocol emulation
-- **cubeclient**: Rust client library for Cube.js API communication
+- **cubeclient**: Rust client library for Cube API communication
 - **pg-srv**: PostgreSQL wire protocol server implementation
 
 ## Development Commands
 
 ### Prerequisites
 ```bash
-# Install required Rust toolchain (1.90.0)
+# Install required Rust toolchain (1.98.1)
 rustup update
 
 # Install snapshot testing tool
@@ -59,7 +59,7 @@ cargo test
 cargo test test_introspection
 cargo test test_udfs
 
-# Run integration tests (requires Cube.js instance)
+# Run integration tests (requires Cube instance)
 cargo test --test e2e
 
 # Review snapshot test changes
@@ -74,9 +74,9 @@ cargo bench
 ### Query Processing Pipeline
 1. **Protocol Layer**: Accepts PostgreSQL wire protocol connections
 2. **SQL Parser**: Modified sqlparser-rs parses incoming SQL queries
-3. **Query Rewriter**: egg-based rewrite engine transforms SQL to Cube.js queries
-4. **Compilation**: Generates Cube.js REST API calls or DataFusion execution plans
-5. **Execution**: DataFusion executes queries or proxies to Cube.js
+3. **Query Rewriter**: egg-based rewrite engine transforms SQL to Cube queries
+4. **Compilation**: Generates Cube REST API calls or DataFusion execution plans
+5. **Execution**: DataFusion executes queries or proxies to Cube
 6. **Result Formatting**: Converts results back to wire protocol format
 
 ### Key Components
@@ -113,6 +113,56 @@ cargo bench
 3. Add tests with snapshot expectations
 4. Update protocol-specific handling if needed
 
+### Rewrite rules: never traverse a list recursively
+
+Every matcher must match exactly **one** level. A list is consumed by dedicated rules
+that match the list node itself — never by a transform that walks it.
+
+- **Lists are flat, not head/tail.** A list node holds all of its elements as children
+  (`UnionInputs(a, b, c)`), not nested cons cells (`UnionInputs(a, UnionInputs(b, ...))`).
+  Cons lists are legacy — do not add new ones, and prefer converting one you touch.
+  Build them with the flat branch of `add_expr_flat_list_node!` (or an equivalent that
+  adds a single node with every element), register the node in `ListType`, and traverse
+  with `flat_list_pushdown_pullup_rules` / `replacer_flat_push_down_node` /
+  `replacer_flat_pull_up_node`, or `transforming_list_rewrite_with_lists_and_vars` when the
+  output needs a node no pattern can spell out (a cleared replacer context, an alias
+  converted to another node type). The flat pull-up matches the whole list in one rule and
+  takes `top_level_elem_vars`, which is how a fact that must hold across every element —
+  all queries reaching the same data source — is enforced: name the variable there and
+  unification does the rest, with no comparison of your own.
+- When the elements of a list each have many alternatives (the pulled up forms of a
+  query) and the rewrite builds one list node from them, the combinations of the
+  alternatives are the product of their counts, and so is the number of list nodes; every
+  rule above the list multiplies it again. Use
+  `transforming_list_rewrite_per_elem_with_lists_and_vars` there, with the searcher's own
+  element pattern as the applier's element pattern: each element then resolves to the class
+  it was matched in, whichever alternative matched, so the list is one node and extraction
+  picks between the alternatives. Where that class also holds forms the parent cannot use,
+  the cost model has to rule them out in the parent's state (`plan_nodes_inside_wrapper`).
+- Generate the traversal with the existing helpers rather than by hand:
+  `WrapperRules::list_pushdown_pullup_rules` / `flat_list_pushdown_pullup_rules`
+  (or `replacer_push_down_node` / `replacer_pull_up_node` underneath them). They emit
+  the `-push-down`, `-pull-up` and `-tail` rules that distribute a replacer over the
+  list's elements and collect it back once they are all done.
+- Push-down and pull-up are **separate rules**. Do not fold both directions, or the
+  list walk, into one rewrite with a big transform.
+- Do not write an imperative reader over `egraph[id].nodes` to collect a list's
+  elements inside a transform. An e-class holds many representations, so picking one is
+  arbitrary; the cons shape is also an implementation detail of how the list was built
+  (`add_plan_list_node!`), which a hand-rolled reader silently couples itself to.
+- A transform should only decide scalar facts (a flag, an alias, whether a template
+  exists) about nodes the **pattern** already bound. Relationships between several
+  matched nodes — "both sides reach the same data source" — belong in the pattern, by
+  reusing one pattern variable in both places, so unification enforces them.
+- A push-down replacer must never end up on top of an already pulled-up subtree. Inputs
+  that arrive as a finished `cube_scan_wrapper(wrapper_pullup_replacer(..))` — the queries
+  of a set operation, the sides of a join — have nothing left to push into, so their list
+  carries a **pull-up** replacer and is consumed by pull-up rules. Putting a push-down
+  replacer there instead makes `wrapper-subqueries-wrapped-scan-to-pull`
+  (`rules/wrapper/subquery.rs`) match, which re-contexts the element without comparing
+  input data sources — see the `TODO` on it. That rule is for the subquery path only;
+  reaching it from anywhere else means the rules above it are shaped wrong.
+
 ### Debugging Query Compilation
 ```bash
 # Enable detailed logging
@@ -141,6 +191,6 @@ cargo insta review  # Review and accept/reject changes
 
 - This codebase uses heavily modified forks of DataFusion and sqlparser-rs
 - Many clippy lints are disabled due to code generation and complex patterns
-- Integration tests require a running Cube.js instance
+- Integration tests require a running Cube instance
 - The rewrite engine is performance-critical and uses advanced optimization techniques
 - Protocol compatibility is paramount for BI tool support

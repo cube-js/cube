@@ -118,3 +118,4 @@ class SqliteDriver extends BaseDriver {
 }
 
 module.exports = SqliteDriver;
+module.exports.SqliteDriver = SqliteDriver;

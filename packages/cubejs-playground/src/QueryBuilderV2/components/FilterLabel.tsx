@@ -48,7 +48,6 @@ export function FilterLabel(props: FilterLabelProps) {
     type,
     isMissing,
     member,
-    name,
     cubeName = props.name.split('.')[0],
     cubeTitle,
     memberName = props.name.split('.')[1],

@@ -78,7 +78,7 @@ const granularities: GranularityOption[] = [
 ];
 
 /**
- * `<QueryBuilder />` is used to build interactive analytics query builders. It abstracts state management and API calls to Cube.js Backend. It uses render prop technique and doesn’t render anything itself, but calls the render function instead.
+ * `<QueryBuilder />` is used to build interactive analytics query builders. It abstracts state management and API calls to Cube Backend. It uses render prop technique and doesn’t render anything itself, but calls the render function instead.
  *
  * **Example**
  *
@@ -143,6 +143,8 @@ const granularities: GranularityOption[] = [
  */
 export default class QueryBuilder extends React.Component<QueryBuilderProps, QueryBuilderInternalState> {
   static contextType = CubeContext;
+
+  context!: React.ContextType<typeof CubeContext>;
 
   static defaultProps = {
     cubeApi: null,
@@ -278,10 +280,6 @@ export default class QueryBuilder extends React.Component<QueryBuilderProps, Que
   // TypeScript field declarations into `everything-else`, which the configured
   // order puts after `lifecycle`. Runtime is unaffected: field initializers run
   // right after `super()`, so the constructor's assignments still win.
-  //
-  // `this.context` is not re-declared: React types it as `any`, and a field
-  // declaration would be emitted at runtime and shadow the context React
-  // assigns.
   private mutexObj: MutexObj;
 
   private orderMembersOrderKeys: string[];

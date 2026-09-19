@@ -86,6 +86,20 @@ impl<'a> LogicalNodeProcessor<'a, KeysSubQuery> for KeysSubQueryProcessor<'a> {
 
         if !context.dimensions_query {
             for member in keys_subquery.primary_keys_dimensions().iter() {
+                // A primary key that is also a query dimension is already
+                // projected above. Projecting it again would put two columns
+                // under one alias, making every reference to it from the
+                // enclosing re-join ambiguous. Symbols are matched the way
+                // `Schema::find_column_for_member` matches them, so that the
+                // re-join resolves to the surviving column.
+                let resolved = member.clone().resolve_reference_chain();
+                if keys_subquery
+                    .schema()
+                    .all_dimensions()
+                    .any(|dim| dim.clone().resolve_reference_chain() == resolved)
+                {
+                    continue;
+                }
                 let alias = member.alias();
                 references_builder.resolve_references_for_member(
                     member.clone(),

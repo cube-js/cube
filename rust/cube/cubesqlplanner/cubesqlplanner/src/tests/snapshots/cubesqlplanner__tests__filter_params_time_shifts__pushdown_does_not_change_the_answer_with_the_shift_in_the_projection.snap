@@ -1,0 +1,13 @@
+---
+source: cubesqlplanner/cubesqlplanner/src/tests/filter_params_time_shifts.rs
+expression: pushed_down
+---
+cst_calendar__calendar_d_day | cst_fact__amount | cst_fact__amount_ly | cst_fact__amount_ly2
+-----------------------------+------------------+---------------------+---------------------
+2024-12-29 00:00:00          | 729              | 365                 | 1                   
+2024-12-30 00:00:00          | 730              | 366                 | 2                   
+2024-12-31 00:00:00          | 731              | 367                 | 3                   
+2025-01-01 00:00:00          | 732              | 368                 | 4                   
+2025-01-02 00:00:00          | 733              | 369                 | 5                   
+2025-01-03 00:00:00          | 734              | 370                 | 6                   
+2025-01-04 00:00:00          | 735              | 371                 | 7

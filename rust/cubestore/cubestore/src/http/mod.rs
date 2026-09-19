@@ -4,6 +4,7 @@ use std::sync::Arc;
 
 use warp::{Filter, Rejection, Reply};
 
+use crate::cachestore::QUEUE_ITEM_PROCESS_ID_MAX_LEN;
 use crate::metastore::{Column, ColumnType, ImportFormat};
 use crate::mysql::SqlAuthService;
 use crate::sql::{
@@ -13,7 +14,6 @@ use crate::store::DataFrame;
 use crate::table::{Row, TableValue};
 use crate::util::WorkerLoop;
 use crate::{app_metrics, CubeError};
-use async_std::fs::File;
 use cubeshared::codegen::{
     root_as_http_message, HttpColumnValue, HttpColumnValueArgs, HttpError, HttpErrorArgs,
     HttpMessageArgs, HttpParameterValue, HttpQuery, HttpQueryArgs, HttpQueryResult,
@@ -23,26 +23,177 @@ use cubeshared::codegen::{
 };
 use cubeshared::flatbuffers::{FlatBufferBuilder, ForwardsUOffset, Vector, WIPOffset};
 use datafusion::cube_ext;
-use futures::{AsyncWriteExt, SinkExt, Stream, StreamExt};
+use futures::{SinkExt, Stream, StreamExt};
 use futures_timer::Delay;
 use hex::ToHex;
 use http_auth_basic::Credentials;
 use log::error;
 use log::info;
 use log::trace;
+use log::Level;
 use serde::Deserialize;
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
 use std::convert::TryFrom;
+use std::error::Error as StdError;
+use std::io;
 use std::net::SocketAddr;
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::{Duration, SystemTime};
 use tempfile::NamedTempFile;
-use tokio::io::BufReader;
+use tokio::fs::File;
+use tokio::io::{AsyncWriteExt, BufReader};
 use tokio::sync::mpsc::Sender;
 use tokio::sync::{mpsc, Mutex};
+use tokio_tungstenite::tungstenite;
+use tokio_tungstenite::tungstenite::error::ProtocolError;
 use tokio_util::sync::CancellationToken;
 use warp::filters::ws::{Message, Ws};
 use warp::http::StatusCode;
 use warp::reject::Reject;
+
+/// Close code the WebSocket protocol reserves for a message a peer refuses to
+/// process because it is too large (RFC 6455 section 7.4.1, "Message Too Big").
+const MESSAGE_TOO_BIG_CLOSE_CODE: u16 = 1009;
+
+/// Close code the WebSocket protocol reserves for a peer that should come back
+/// later (RFC 6455 section 7.4.1, "Try Again Later"). An evicted connection was
+/// recycled to make room for a newer one, not broken, and a client that still
+/// needs it should reconnect rather than report a transport failure.
+const CONNECTION_EVICTED_CLOSE_CODE: u16 = 1013;
+
+/// How long the server waits for an evicted connection's close frame to go out.
+///
+/// The connection's entry leaves the counter when it is evicted, not when its
+/// task ends, so this is also how long its descriptor can outlive the slot it
+/// accounted for: the steady-state overshoot is the eviction rate times this
+/// bound. Sending is what can block — a peer whose receive window is closed
+/// keeps the frame in our buffer indefinitely — and a close frame is a handful
+/// of bytes, so a peer that cannot take them within this long is not going to.
+const EVICTED_CLOSE_TIMEOUT: Duration = Duration::from_secs(2);
+
+/// How long a caller waits for the connection counter's lock before giving up.
+///
+/// Nothing awaits inside the critical section — it is a map lookup and an
+/// insert — so waiting at all is barely reachable by the code as written; the
+/// bound is here so that knowing this cannot stall a connection needs no
+/// reasoning about the callers. It is deliberately generous rather than tight:
+/// a thread holding the lock can be descheduled for a long time under CPU
+/// pressure, and giving up then would quietly stop counting connections
+/// exactly when the cap matters most. Both callers log when they give up, so a
+/// bound that is ever reached is visible rather than silent.
+const COUNTER_LOCK_TIMEOUT: Duration = Duration::from_secs(1);
+
+/// How much room the transport is given above the configured sizes.
+///
+/// The size limit is enforced here rather than by the transport, so that an
+/// over-limit request can be answered with an error naming the message it
+/// belongs to, on a connection that stays up for everything else multiplexed
+/// over it. That needs the message to arrive whole: `tungstenite` raises its
+/// capacity error as soon as the frame header is parsed, before the payload is
+/// read, which leaves the frame stream desynchronized and the message id
+/// unread. So the transport is configured a factor above the limit, and only
+/// enforces it as a backstop against a peer that would otherwise make the
+/// server buffer without bound. A message in between is what gets the readable
+/// error; past the backstop there is nothing to answer with but a close frame.
+///
+/// The frame limit is given the same headroom, and has to be: a client sends a
+/// query as a single frame, so an exact frame limit would refuse an over-limit
+/// message at the transport before the handler ever saw it, and at the default
+/// configuration — where `CUBESTORE_TRANSPORT_MAX_FRAME_SIZE` and
+/// `CUBESTORE_TRANSPORT_MAX_MESSAGE_SIZE` are both `64 << 20` — that is every
+/// over-limit message, leaving the readable error unreachable.
+///
+/// Frame size is not re-checked in the handler, because reassembly happens
+/// below `warp` and individual frames are never visible up here. So with the
+/// two knobs configured apart, `CUBESTORE_TRANSPORT_MAX_FRAME_SIZE` bounds a
+/// single allocation at the headroom multiple of its configured value, and the
+/// message limit is what actually enforces the policy.
+const TRANSPORT_SIZE_HEADROOM: usize = 2;
+
+/// Recognizes the error raised when an incoming message exceeds
+/// `CUBESTORE_TRANSPORT_MAX_MESSAGE_SIZE` or `CUBESTORE_TRANSPORT_MAX_FRAME_SIZE`,
+/// and renders it as a close reason. `warp` boxes the underlying `tungstenite`
+/// error, so it has to be recovered through `source()`.
+fn message_too_large_reason(
+    e: &warp::Error,
+    max_message_size: usize,
+    max_frame_size: usize,
+) -> Option<String> {
+    match e.source()?.downcast_ref::<tungstenite::Error>()? {
+        tungstenite::Error::Capacity(tungstenite::error::CapacityError::MessageTooLong {
+            size,
+            max_size,
+        }) => {
+            // `max_size` is the backstop the transport was configured with,
+            // which is the configured limit times the headroom. Report what
+            // the operator actually set, since that is the number they can
+            // change.
+            let configured = max_size / TRANSPORT_SIZE_HEADROOM;
+            // The same error covers both caps and doesn't say which one
+            // fired, so the value has to name the knob: a frame limit
+            // configured below the message limit would otherwise be reported
+            // as a message limit that never refused anything, sending an
+            // operator to the wrong environment variable. When the two are
+            // equal, as they are by default, the number is the same either
+            // way and the message limit is the one to name.
+            let limit = if configured == max_message_size {
+                "message"
+            } else if configured == max_frame_size {
+                "frame"
+            } else {
+                "transport"
+            };
+            Some(format!(
+                "Message of {} bytes exceeds the maximum {} size of {} bytes",
+                size, limit, configured
+            ))
+        }
+        _ => None,
+    }
+}
+
+/// Level at which a websocket transport error is reported, in either
+/// direction. A peer that vanished is not actionable, and a fleet of them going
+/// away at once would otherwise bury the transport failures that are. `warp`
+/// boxes the `tungstenite` error, so it comes back through `source()`; anything
+/// else is not known to be benign and stays at `Error`.
+fn websocket_error_level(e: &warp::Error) -> Level {
+    match e
+        .source()
+        .and_then(|s| s.downcast_ref::<tungstenite::Error>())
+    {
+        Some(e) => tungstenite_error_level(e),
+        None => Level::Error,
+    }
+}
+
+fn tungstenite_error_level(e: &tungstenite::Error) -> Level {
+    match e {
+        // How a client normally goes away: `terminate()`, a killed process, a
+        // closed browser tab. Nothing else about it is ever known.
+        tungstenite::Error::Protocol(ProtocolError::ResetWithoutClosingHandshake) => Level::Debug,
+        // Reading from, or writing to, a peer that has already closed.
+        tungstenite::Error::ConnectionClosed | tungstenite::Error::AlreadyClosed => Level::Debug,
+        tungstenite::Error::Io(io) if is_peer_gone(io.kind()) => Level::Debug,
+        // A frame that raced the peer's own close frame: harmless once, a
+        // client that closes incorrectly if it keeps happening.
+        tungstenite::Error::Protocol(ProtocolError::ReceivedAfterClosing) => Level::Warn,
+        _ => Level::Error,
+    }
+}
+
+/// Whether an IO error means the peer is simply gone, as opposed to the
+/// connection failing while the peer is still there.
+fn is_peer_gone(kind: io::ErrorKind) -> bool {
+    matches!(
+        kind,
+        io::ErrorKind::ConnectionReset
+            | io::ErrorKind::ConnectionAborted
+            | io::ErrorKind::BrokenPipe
+            | io::ErrorKind::NotConnected
+            | io::ErrorKind::UnexpectedEof
+    )
+}
 
 pub struct HttpServer {
     bind_address: String,
@@ -56,13 +207,170 @@ pub struct HttpServer {
     cancel_token: CancellationToken,
     max_message_size: usize,
     max_frame_size: usize,
+    ws_connections: Arc<WsConnectionCounter>,
 }
 
 crate::di_service!(HttpServer, []);
 
+/// Caps how many concurrent websocket connections one authenticated user may
+/// hold. A client that leaks connections otherwise exhausts the process file
+/// descriptor table for every other user sharing the node.
+///
+/// At the limit the user's oldest connection is closed to admit the new one,
+/// rather than the new one being refused: a client that still needs the closed
+/// connection reconnects, while one that had forgotten about it simply loses it.
+/// A limit of 0 disables the cap.
+pub struct WsConnectionCounter {
+    limit: usize,
+    /// Live connections per user, keyed by a monotonic id so the first entry is the
+    /// oldest, holding the token that asks the connection task to close.
+    ///
+    /// Synchronous on purpose, not a `tokio` lock behind `util::lock::acquire_lock`:
+    /// entries are removed from `WsConnectionGuard::drop`, and a destructor cannot
+    /// `.await`. Releasing anywhere else would leak the slot on a panic, a cancelled
+    /// task, or a connection that dies before the upgrade completes. Nothing awaits
+    /// inside the critical section either — `acquire` is not an `async fn`, so one
+    /// cannot be added — which is the shape the `tokio::sync::Mutex` docs point at a
+    /// standard-library lock for. Every caller still takes it with a bound, so the
+    /// property does not rest on that reasoning holding: see COUNTER_LOCK_TIMEOUT.
+    users: parking_lot::Mutex<HashMap<String, BTreeMap<u64, CancellationToken>>>,
+    next_id: AtomicU64,
+}
+
+/// `None` when the lock could not be taken within [`COUNTER_LOCK_TIMEOUT`].
+/// Callers fail open: the cap is a safety net, so a counter that is briefly
+/// unavailable must not be what refuses or stalls a connection.
+fn try_lock_users(
+    users: &parking_lot::Mutex<HashMap<String, BTreeMap<u64, CancellationToken>>>,
+) -> Option<parking_lot::MutexGuard<'_, HashMap<String, BTreeMap<u64, CancellationToken>>>> {
+    users.try_lock_for(COUNTER_LOCK_TIMEOUT)
+}
+
+/// Frees the slot taken by [`WsConnectionCounter::acquire`] when the connection
+/// task ends, however it ends, and carries the token that task waits on.
+pub struct WsConnectionGuard {
+    counter: Arc<WsConnectionCounter>,
+    user: Option<String>,
+    id: u64,
+    cancel: CancellationToken,
+}
+
+impl WsConnectionCounter {
+    pub fn new(limit: usize) -> Arc<Self> {
+        Arc::new(Self {
+            limit,
+            users: parking_lot::Mutex::new(HashMap::new()),
+            next_id: AtomicU64::new(0),
+        })
+    }
+
+    /// Unauthenticated connections and a disabled cap stay untracked.
+    pub fn acquire(self: &Arc<Self>, user: Option<&str>) -> WsConnectionGuard {
+        let cancel = CancellationToken::new();
+        let user = match user {
+            Some(user) if self.limit > 0 => user,
+            _ => {
+                return WsConnectionGuard {
+                    counter: self.clone(),
+                    user: None,
+                    id: 0,
+                    cancel,
+                }
+            }
+        };
+
+        let id = self.next_id.fetch_add(1, Ordering::Relaxed);
+        let evicted = {
+            let mut users = match try_lock_users(&self.users) {
+                Some(users) => users,
+                None => {
+                    log::error!(
+                        "Timed out locking the websocket connection counter; admitting an untracked connection (user: {})",
+                        user,
+                    );
+                    return WsConnectionGuard {
+                        counter: self.clone(),
+                        user: None,
+                        id: 0,
+                        cancel,
+                    };
+                }
+            };
+            let entries = users.entry(user.to_string()).or_default();
+            let evicted = if entries.len() >= self.limit {
+                let oldest = *entries.keys().next().expect("a full map has an entry");
+                // Removed here rather than left to the victim's own `drop`, which
+                // runs later: otherwise this admission would overshoot the limit.
+                entries.remove(&oldest)
+            } else {
+                None
+            };
+            entries.insert(id, cancel.clone());
+            evicted
+        };
+
+        // Outside the lock. Cancelling only wakes the victim's task, so this cannot
+        // deadlock, but there is no reason to hold the lock across it.
+        if let Some(evicted) = evicted {
+            evicted.cancel();
+        }
+
+        WsConnectionGuard {
+            counter: self.clone(),
+            user: Some(user.to_string()),
+            id,
+            cancel,
+        }
+    }
+
+    pub fn count(&self, user: &str) -> usize {
+        try_lock_users(&self.users)
+            .and_then(|users| users.get(user).map(BTreeMap::len))
+            .unwrap_or(0)
+    }
+}
+
+impl WsConnectionGuard {
+    /// Resolves when this connection has been chosen to make room for a newer one.
+    pub async fn evicted(&self) {
+        self.cancel.cancelled().await
+    }
+}
+
+impl Drop for WsConnectionGuard {
+    fn drop(&mut self) {
+        let user = match &self.user {
+            Some(user) => user,
+            None => return,
+        };
+        let mut users = match try_lock_users(&self.counter.users) {
+            Some(users) => users,
+            None => {
+                // The entry stays behind, but it is the oldest one of that user by
+                // construction, so the next admission evicts it: cancelling an
+                // already finished connection's token is a no-op.
+                log::error!(
+                    "Timed out locking the websocket connection counter; leaving a finished connection's slot to be evicted (user: {})",
+                    user,
+                );
+                return;
+            }
+        };
+        if let Some(entries) = users.get_mut(user) {
+            // Idempotent: an evicting `acquire` may have removed this entry already.
+            entries.remove(&self.id);
+            // Dropped when empty so a churn of one-off users can't grow the map.
+            if entries.is_empty() {
+                users.remove(user);
+            }
+        }
+    }
+}
+
 #[derive(Debug)]
 pub enum CubeRejection {
     NotAuthorized,
+    BadRequest(String),
     Internal(String),
 }
 
@@ -76,6 +384,21 @@ impl From<CubeError> for warp::reject::Rejection {
 /// so they shouldn't pollute the error log.
 fn is_rate_limit_error(e: &CubeError) -> bool {
     e.message.to_ascii_lowercase().contains("rate limit")
+}
+
+/// `process_id` is connection scoped and reaches the cachestore as `QueueItem.process_id`,
+/// so it's bounded here, on its only ingress.
+fn check_process_id_header(process_id: &Option<String>) -> Result<(), CubeRejection> {
+    if let Some(id) = process_id {
+        if id.len() > QUEUE_ITEM_PROCESS_ID_MAX_LEN {
+            return Err(CubeRejection::BadRequest(format!(
+                "x-process-id header exceeds maximum allowed length of {} characters",
+                QUEUE_ITEM_PROCESS_ID_MAX_LEN
+            )));
+        }
+    }
+
+    Ok(())
 }
 
 #[derive(Deserialize)]
@@ -95,6 +418,7 @@ impl HttpServer {
         drop_complete_messages_after: Duration,
         max_message_size: usize,
         max_frame_size: usize,
+        max_ws_connections_per_user: usize,
     ) -> Arc<Self> {
         Arc::new(Self {
             bind_address,
@@ -105,6 +429,7 @@ impl HttpServer {
             drop_complete_messages_after,
             max_message_size,
             max_frame_size,
+            ws_connections: WsConnectionCounter::new(max_ws_connections_per_user),
             worker_loop: WorkerLoop::new("HttpServer message processing"),
             drop_orphaned_messages_loop: WorkerLoop::new("HttpServer drop orphaned messages"),
             cancel_token: CancellationToken::new(),
@@ -124,13 +449,8 @@ impl HttpServer {
                 move |auth_header: Option<String>, process_id: Option<String>| {
                     let auth_service = auth_service.clone();
                     async move {
-                        if let Some(ref id) = process_id {
-                            if id.len() > 64 {
-                                return Err(warp::reject::custom(CubeRejection::Internal(
-                                    "x-process-id header exceeds 64 characters".to_string(),
-                                )));
-                            }
-                        }
+                        check_process_id_header(&process_id).map_err(warp::reject::custom)?;
+
                         let res = HttpServer::authorize(auth_service, auth_header).await;
                         match res {
                             Ok(user) => Ok(SqlQueryContext {
@@ -151,24 +471,52 @@ impl HttpServer {
         let context_filter_to_move = context_filter.clone();
         let max_frame_size = self.max_frame_size.clone();
         let max_message_size = self.max_message_size.clone();
+        let ws_connections = self.ws_connections.clone();
+        let ws_connections_filter = warp::any().map(move || ws_connections.clone());
 
         let query_route = warp::path!("ws")
             .and(context_filter_to_move)
+            .and(ws_connections_filter)
             .and(warp::ws::ws())
-            .and_then(move |tx: mpsc::Sender<(mpsc::Sender<Arc<HttpMessage>>, SqlQueryContext, HttpMessage)>, sql_query_context: SqlQueryContext, ws: Ws| async move {
+            .and_then(move |tx: mpsc::Sender<(mpsc::Sender<Arc<HttpMessage>>, SqlQueryContext, HttpMessage)>, sql_query_context: SqlQueryContext, ws_connections: Arc<WsConnectionCounter>, ws: Ws| async move {
                 let tx_to_move = tx.clone();
                 let sql_query_context = sql_query_context.clone();
-                let reply = ws.max_frame_size(max_frame_size).max_message_size(max_message_size).on_upgrade(async move |mut web_socket| {
+                let connection_guard = ws_connections.acquire(sql_query_context.user.as_deref());
+                let reply = ws.max_frame_size(max_frame_size.saturating_mul(TRANSPORT_SIZE_HEADROOM)).max_message_size(max_message_size.saturating_mul(TRANSPORT_SIZE_HEADROOM)).on_upgrade(async move |mut web_socket| {
+                    // Lives as long as the connection task; dropping it frees the slot.
+                    let connection_guard = connection_guard;
                     let process_id = sql_query_context.process_id.as_deref().unwrap_or("None");
                     trace!("WebSocket connection established (process_id: {})", process_id);
                     let (response_tx, mut response_rx) = mpsc::channel::<Arc<HttpMessage>>(10000);
                     loop {
                         tokio::select! {
+                            _ = connection_guard.evicted() => {
+                                log::warn!(
+                                    "Closing websocket connection to admit a newer one for the same user (process_id: {})",
+                                    process_id,
+                                );
+                                // A close frame naming the reason rather than a bare drop,
+                                // so the client can tell being recycled from a network
+                                // blip. Bounded, because the descriptor is already
+                                // unaccounted for: see EVICTED_CLOSE_TIMEOUT.
+                                let close = web_socket.send(Message::close_with(
+                                    CONNECTION_EVICTED_CLOSE_CODE,
+                                    "connection evicted to admit a newer one for the same user",
+                                ));
+                                match tokio::time::timeout(EVICTED_CLOSE_TIMEOUT, close).await {
+                                    Ok(Ok(())) => {}
+                                    Ok(Err(e)) => log::log!(websocket_error_level(&e), "Websocket close send error: {:?}", e),
+                                    Err(_) => log::warn!(
+                                        "Timed out sending the close frame of an evicted websocket connection"
+                                    ),
+                                }
+                                break;
+                            }
                             Some(res) = response_rx.recv() => {
                                 trace!("Sending web socket response (process_id: {})", process_id);
                                 let send_res = web_socket.send(Message::binary(res.bytes())).await;
                                 if let Err(e) = send_res {
-                                    error!("Websocket message send error: {:?}", e)
+                                    log::log!(websocket_error_level(&e), "Websocket message send error: {:?}", e)
                                 }
                                 if res.should_close_connection() {
                                    log::warn!("Websocket connection closed");
@@ -178,7 +526,30 @@ impl HttpServer {
                             Some(msg) = web_socket.next() => {
                                 match msg {
                                     Err(e) => {
-                                        error!("Websocket error: {:?}", e);
+                                        // Past the transport backstop the payload is refused
+                                        // before it is read, so the frame stream is left
+                                        // desynchronized and the message id is never seen: the
+                                        // connection can't be reused and the error can't be
+                                        // attributed to a query the way an over-limit request
+                                        // under the backstop is. Answer with the close code
+                                        // reserved for this instead of dropping the connection
+                                        // silently, so the client can report the size rather than
+                                        // a bare disconnect it would otherwise retry.
+                                        match message_too_large_reason(&e, max_message_size, max_frame_size) {
+                                            Some(reason) => {
+                                                error!("Websocket message too large: {}", reason);
+                                                let send_res = web_socket.send(
+                                                    Message::close_with(MESSAGE_TOO_BIG_CLOSE_CODE, reason)
+                                                ).await;
+                                                if let Err(e) = send_res {
+                                                    log::log!(websocket_error_level(&e), "Websocket close send error: {:?}", e)
+                                                }
+                                            }
+                                            None => log::log!(
+                                                websocket_error_level(&e),
+                                                "Websocket error: {:?}", e
+                                            ),
+                                        }
                                         break;
                                     }
                                     Ok(msg) => {
@@ -195,6 +566,25 @@ impl HttpServer {
                                             let message_id = http_message.message_id();
                                             let connection_id = http_message.connection_id().map(|s| s.to_string());
 
+                                            // Refused here rather than by the transport so the
+                                            // answer can name the message it belongs to and the
+                                            // connection survives for everything else in flight
+                                            // on it. See TRANSPORT_SIZE_HEADROOM.
+                                            if message_buffer.len() > max_message_size {
+                                                let error = format!(
+                                                    "Request of {} bytes exceeds the maximum message size of {} bytes. Reduce the size of the query, e.g. by sending fewer or smaller inline tables, or raise CUBESTORE_TRANSPORT_MAX_MESSAGE_SIZE.",
+                                                    message_buffer.len(), max_message_size
+                                                );
+                                                error!("Websocket message too large: {}", error);
+                                                let send_res = web_socket.send(
+                                                    Message::binary(HttpMessage { message_id, connection_id, command: HttpCommand::Error { error } }.bytes())
+                                                ).await;
+                                                if let Err(e) = send_res {
+                                                    log::log!(websocket_error_level(&e), "Websocket message send error: {:?}", e)
+                                                }
+                                                continue;
+                                            }
+
                                             match HttpMessage::read(http_message).await {
                                                 Err(e) => {
                                                     error!("Websocket message read error: {:?}", e);
@@ -203,7 +593,7 @@ impl HttpServer {
                                                         Message::binary(HttpMessage { message_id, connection_id, command: HttpCommand::Error { error: e.to_string() } }.bytes())
                                                     ).await;
                                                     if let Err(e) = send_res {
-                                                        error!("Websocket message send error: {:?}", e)
+                                                        log::log!(websocket_error_level(&e), "Websocket message send error: {:?}", e)
                                                     }
                                                     break;
                                                 },
@@ -216,7 +606,7 @@ impl HttpServer {
                                                             Message::binary(HttpMessage { message_id, connection_id, command: HttpCommand::Error { error: e.to_string() } }.bytes())
                                                         ).await;
                                                         if let Err(e) = send_res {
-                                                            error!("Websocket message send error: {:?}", e)
+                                                            log::log!(websocket_error_level(&e), "Websocket message send error: {:?}", e)
                                                         }
                                                         break;
                                                     }
@@ -225,7 +615,7 @@ impl HttpServer {
                                         } else if msg.is_ping() {
                                             let send_res = web_socket.send(Message::pong(Vec::new())).await;
                                             if let Err(e) = send_res {
-                                                error!("Websocket ping send error: {:?}", e)
+                                                log::log!(websocket_error_level(&e), "Websocket ping send error: {:?}", e)
                                             }
                                         } else if msg.is_close() {
                                             break;
@@ -535,6 +925,13 @@ impl HttpServer {
                                 StatusCode::FORBIDDEN,
                             ))
                         }
+                        CubeRejection::BadRequest(e) => {
+                            obj.insert("error".to_string(), e.to_string());
+                            Ok(warp::reply::with_status(
+                                warp::reply::json(&obj),
+                                StatusCode::BAD_REQUEST,
+                            ))
+                        }
                         CubeRejection::Internal(e) => {
                             obj.insert("error".to_string(), e.to_string());
                             Ok(warp::reply::with_status(
@@ -578,9 +975,6 @@ impl HttpServer {
                     .map_err(|e| CubeRejection::Internal(e.to_string()))?;
             }
             file.flush()
-                .await
-                .map_err(|e| CubeRejection::Internal(e.to_string()))?;
-            file.close()
                 .await
                 .map_err(|e| CubeRejection::Internal(e.to_string()))?;
         }
@@ -1104,7 +1498,10 @@ mod tests {
     use std::sync::Arc;
     use std::time::Duration;
     use tokio::net::TcpStream;
-    use tokio_tungstenite::tungstenite::Message;
+    use tokio_tungstenite::tungstenite::client::IntoClientRequest;
+    use tokio_tungstenite::tungstenite::handshake::client::Request;
+    use tokio_tungstenite::tungstenite::http::HeaderValue;
+    use tokio_tungstenite::tungstenite::{Error as WsError, Message};
     use tokio_tungstenite::{connect_async, MaybeTlsStream, WebSocketStream};
     use url::Url;
 
@@ -1145,6 +1542,215 @@ mod tests {
         async fn temp_uploads_dir(&self, _ctx: SqlQueryContext) -> Result<String, CubeError> {
             unimplemented!("Mock")
         }
+    }
+
+    /// Records what `upload_temp_file` found on disk, so a test can assert the
+    /// body had fully landed before the path was handed off.
+    struct UploadStubService {
+        dir: std::path::PathBuf,
+        seen: std::sync::Mutex<Option<Vec<u8>>>,
+    }
+    crate::di_service!(UploadStubService, [SqlService]);
+    #[async_trait]
+    impl SqlService for UploadStubService {
+        async fn exec_query(&self, _q: &str) -> Result<QueryResult, CubeError> {
+            unimplemented!("Mock")
+        }
+        async fn exec_query_with_context(
+            &self,
+            _ctx: SqlQueryContext,
+            _q: &str,
+        ) -> Result<QueryResult, CubeError> {
+            unimplemented!("Mock")
+        }
+        async fn plan_query(&self, _q: &str) -> Result<QueryPlans, CubeError> {
+            unimplemented!("Mock")
+        }
+        async fn plan_query_with_context(
+            &self,
+            _ctx: SqlQueryContext,
+            _q: &str,
+        ) -> Result<QueryPlans, CubeError> {
+            unimplemented!("Mock")
+        }
+        async fn upload_temp_file(
+            &self,
+            _ctx: SqlQueryContext,
+            _name: String,
+            path: &Path,
+        ) -> Result<(), CubeError> {
+            *self.seen.lock().unwrap() = Some(std::fs::read(path)?);
+            Ok(())
+        }
+        async fn temp_uploads_dir(&self, _ctx: SqlQueryContext) -> Result<String, CubeError> {
+            Ok(self.dir.to_string_lossy().to_string())
+        }
+    }
+
+    #[test]
+    fn acquire_evicts_the_oldest_connection_to_admit_a_new_one() {
+        let counter = WsConnectionCounter::new(2);
+        let oldest = counter.acquire(Some("tenant-a"));
+        let newer = counter.acquire(Some("tenant-a"));
+        assert_eq!(counter.count("tenant-a"), 2);
+
+        let newcomer = counter.acquire(Some("tenant-a"));
+
+        assert!(
+            oldest.cancel.is_cancelled(),
+            "the oldest connection is the one asked to close"
+        );
+        assert!(!newer.cancel.is_cancelled());
+        assert!(!newcomer.cancel.is_cancelled());
+        assert_eq!(
+            counter.count("tenant-a"),
+            2,
+            "the victim leaves before the newcomer is inserted, so the limit never overshoots"
+        );
+
+        // The victim's own drop runs later and must not take another entry with it,
+        // which is why entries are keyed by a monotonic id.
+        drop(oldest);
+        assert_eq!(counter.count("tenant-a"), 2);
+
+        // Eviction keeps following insertion order.
+        let latest = counter.acquire(Some("tenant-a"));
+        assert!(
+            newer.cancel.is_cancelled(),
+            "now the second connection is oldest"
+        );
+        assert!(!newcomer.cancel.is_cancelled());
+        assert!(!latest.cancel.is_cancelled());
+    }
+
+    #[test]
+    fn ws_connection_counter_caps_each_user_independently() {
+        let counter = WsConnectionCounter::new(1);
+        let a = counter.acquire(Some("tenant-a"));
+        let b = counter.acquire(Some("tenant-b"));
+
+        assert!(
+            !a.cancel.is_cancelled() && !b.cancel.is_cancelled(),
+            "one connection each is within the cap"
+        );
+
+        let a_again = counter.acquire(Some("tenant-a"));
+        assert!(a.cancel.is_cancelled(), "tenant-a is at its cap");
+        assert!(
+            !b.cancel.is_cancelled(),
+            "one user at its cap must not affect another"
+        );
+        assert!(!a_again.cancel.is_cancelled());
+        assert_eq!(counter.count("tenant-a"), 1);
+        assert_eq!(counter.count("tenant-b"), 1);
+    }
+
+    #[test]
+    fn ws_connection_counter_forgets_users_that_dropped_to_zero() {
+        let counter = WsConnectionCounter::new(1);
+
+        drop(counter.acquire(Some("tenant-a")));
+        assert_eq!(counter.count("tenant-a"), 0);
+        assert!(
+            try_lock_users(&counter.users)
+                .expect("uncontended")
+                .is_empty(),
+            "a churn of one-off users must not grow the map"
+        );
+
+        // Both guards are bound to names: one left as a temporary dies at the end of
+        // its own statement and would free the slot it is meant to hold.
+        let _b = counter.acquire(Some("tenant-b"));
+        let _c = counter.acquire(Some("tenant-c"));
+        assert_eq!(
+            try_lock_users(&counter.users).expect("uncontended").len(),
+            2
+        );
+    }
+
+    #[test]
+    fn acquire_gives_up_on_a_stuck_lock_instead_of_waiting_on_it() {
+        let counter = WsConnectionCounter::new(1);
+        let blocker = counter.users.lock();
+
+        // From another thread: the lock is not reentrant, and the point is that a
+        // caller returns on its own schedule rather than the lock holder's.
+        let probe = Arc::clone(&counter);
+        let guard = std::thread::spawn(move || probe.acquire(Some("tenant-a")))
+            .join()
+            .expect("acquire must return rather than wait for the lock");
+
+        assert!(
+            guard.user.is_none(),
+            "the cap is a safety net, so an unavailable counter admits the              connection untracked rather than refusing or stalling it"
+        );
+        assert!(!guard.cancel.is_cancelled());
+
+        drop(blocker);
+        assert_eq!(counter.count("tenant-a"), 0);
+    }
+
+    #[test]
+    fn ws_connection_counter_leaves_untracked_what_it_cannot_attribute() {
+        let disabled = WsConnectionCounter::new(0);
+        let mut held = Vec::new();
+        for _ in 0..1000 {
+            held.push(disabled.acquire(Some("tenant-a")));
+        }
+        assert!(
+            held.iter().all(|guard| !guard.cancel.is_cancelled()),
+            "limit 0 disables the cap"
+        );
+        assert_eq!(disabled.count("tenant-a"), 0);
+
+        let counter = WsConnectionCounter::new(1);
+        let first = counter.acquire(None);
+        let second = counter.acquire(None);
+        assert!(
+            !first.cancel.is_cancelled() && !second.cancel.is_cancelled(),
+            "unauthenticated connections are not attributable and stay untracked"
+        );
+    }
+
+    #[tokio::test]
+    async fn upload_writes_the_whole_body_before_handing_off_the_path() -> Result<(), CubeError> {
+        let dir = tempfile::tempdir()?;
+        let service = Arc::new(UploadStubService {
+            dir: dir.path().to_path_buf(),
+            seen: std::sync::Mutex::new(None),
+        });
+
+        // Many chunks well past the file's internal buffer: an unflushed tail
+        // would show up here as a short read.
+        let chunks: Vec<Vec<u8>> = (0..8u8).map(|i| vec![b'a' + i; 64 * 1024]).collect();
+        let expected: Vec<u8> = chunks.iter().flatten().copied().collect();
+        let body = futures::stream::iter(
+            chunks
+                .into_iter()
+                .map(|c| Ok::<bytes::Bytes, warp::Error>(bytes::Bytes::from(c))),
+        );
+
+        HttpServer::handle_upload(
+            service.clone(),
+            SqlQueryContext::default(),
+            UploadQuery {
+                name: "upload.csv".to_string(),
+            },
+            body,
+        )
+        .await
+        .map_err(|e| CubeError::internal(format!("{:?}", e)))?;
+
+        let seen = service
+            .seen
+            .lock()
+            .unwrap()
+            .clone()
+            .expect("upload_temp_file was never reached");
+        // Compared without pretty_assertions to keep a failure from dumping 512KB.
+        assert_eq!(seen.len(), expected.len());
+        assert!(seen == expected, "uploaded bytes differ from the body");
+        Ok(())
     }
 
     fn build_types<'a: 'ma, 'ma>(
@@ -1519,6 +2125,7 @@ mod tests {
             Duration::from_millis(1000),
             config.transport_max_message_size(),
             config.transport_max_frame_size(),
+            config.max_ws_connections_per_user(),
         ));
         {
             let http_server = http_server.clone();
@@ -1677,6 +2284,429 @@ mod tests {
 
         let mut socket2 = connect_and_send(3, Some("foo2".to_string())).await;
         assert_message(&mut socket2, "10").await;
+
+        http_server.stop_processing().await;
+        Ok(())
+    }
+
+    #[test]
+    fn check_process_id_header_bounds() {
+        assert!(check_process_id_header(&None).is_ok());
+        assert!(check_process_id_header(&Some("".to_string())).is_ok());
+        assert!(
+            check_process_id_header(&Some("x".repeat(QUEUE_ITEM_PROCESS_ID_MAX_LEN))).is_ok(),
+            "the limit is inclusive"
+        );
+
+        let res = check_process_id_header(&Some("x".repeat(QUEUE_ITEM_PROCESS_ID_MAX_LEN + 1)));
+        match res {
+            Err(CubeRejection::BadRequest(msg)) => assert!(
+                msg.contains("x-process-id header exceeds maximum allowed length"),
+                "unexpected message: {}",
+                msg
+            ),
+            other => panic!("Expected CubeRejection::BadRequest, actual: {:?}", other),
+        }
+    }
+
+    #[tokio::test]
+    async fn ws_process_id_header_test() -> Result<(), CubeError> {
+        init_test_logger().await;
+
+        let mut auth = MockSqlAuthService::new();
+        auth.expect_authenticate().return_const(Ok(None));
+
+        let config = Config::test("ws_process_id_header_test").config_obj();
+
+        let http_server = Arc::new(HttpServer::new(
+            "127.0.0.1:53032".to_string(),
+            Arc::new(auth),
+            Arc::new(SqlServiceMock {
+                message_counter: AtomicU64::new(0),
+            }),
+            Duration::from_millis(100),
+            Duration::from_millis(10000),
+            Duration::from_millis(1000),
+            config.transport_max_message_size(),
+            config.transport_max_frame_size(),
+            config.max_ws_connections_per_user(),
+        ));
+        {
+            let http_server = http_server.clone();
+            cube_ext::spawn(async move { http_server.run_server().await });
+        }
+
+        tokio::time::sleep(Duration::from_secs(1)).await;
+
+        fn connect_request(process_id: &str) -> Request {
+            let mut request = "ws://127.0.0.1:53032/ws".into_client_request().unwrap();
+            request
+                .headers_mut()
+                .insert("x-process-id", HeaderValue::from_str(process_id).unwrap());
+            request
+        }
+
+        let err = connect_async(connect_request(
+            &"x".repeat(QUEUE_ITEM_PROCESS_ID_MAX_LEN + 1),
+        ))
+        .await
+        .err()
+        .expect("expected the handshake to be rejected");
+        match err {
+            WsError::Http(response) => assert_eq!(response.status().as_u16(), 400),
+            other => panic!("Expected an http error, actual: {:?}", other),
+        }
+
+        let (socket, _) =
+            connect_async(connect_request(&"x".repeat(QUEUE_ITEM_PROCESS_ID_MAX_LEN)))
+                .await
+                .expect("a header at the limit should be accepted");
+        drop(socket);
+
+        http_server.stop_processing().await;
+        Ok(())
+    }
+
+    /// An evicted connection is told why it is going away, so a client can tell
+    /// being recycled from a network blip, and the cap actually reaches the
+    /// connection rather than only the counter.
+    #[tokio::test]
+    async fn ws_connection_evicted_test() -> Result<(), CubeError> {
+        init_test_logger().await;
+
+        let mut auth = MockSqlAuthService::new();
+        auth.expect_authenticate().return_const(Ok(None));
+
+        let http_server = Arc::new(HttpServer::new(
+            "127.0.0.1:53036".to_string(),
+            Arc::new(auth),
+            Arc::new(SqlServiceMock {
+                message_counter: AtomicU64::new(0),
+            }),
+            Duration::from_millis(100),
+            Duration::from_millis(10000),
+            Duration::from_millis(1000),
+            64 * 1024,
+            64 * 1024,
+            // One connection per user, so the second one has to evict the first.
+            1,
+        ));
+        {
+            let http_server = http_server.clone();
+            cube_ext::spawn(async move { http_server.run_server().await });
+        }
+
+        tokio::time::sleep(Duration::from_secs(1)).await;
+
+        fn connect_request(user: &str) -> Request {
+            let mut request = "ws://127.0.0.1:53036/ws".into_client_request().unwrap();
+            request.headers_mut().insert(
+                "authorization",
+                HeaderValue::from_str(&Credentials::new(user, "").as_http_header()).unwrap(),
+            );
+            request
+        }
+
+        let (mut first, _) = connect_async(connect_request("tenant-a"))
+            .await
+            .expect("the first connection is within the cap");
+        let (second, _) = connect_async(connect_request("tenant-a"))
+            .await
+            .expect("the second connection is admitted by evicting the first");
+
+        // Bounded, so a regression in the eviction path fails this test instead of
+        // hanging it: nothing else would ever wake this read.
+        let msg = tokio::time::timeout(Duration::from_secs(10), first.next())
+            .await
+            .expect("the evicted connection must be closed promptly")
+            .expect("the evicted connection is closed, not left open")
+            .unwrap();
+        match msg {
+            Message::Close(Some(frame)) => {
+                assert_eq!(u16::from(frame.code), CONNECTION_EVICTED_CLOSE_CODE);
+                assert!(
+                    frame.reason.contains("evicted"),
+                    "unexpected close reason: {}",
+                    frame.reason
+                );
+            }
+            msg => panic!("Close frame expected, got: {:?}", msg),
+        }
+
+        // Another user is unaffected by tenant-a having been at its cap.
+        let (other, _) = connect_async(connect_request("tenant-b"))
+            .await
+            .expect("a different user has its own slot");
+
+        drop(other);
+        drop(second);
+
+        http_server.stop_processing().await;
+        Ok(())
+    }
+
+    /// An incoming message past the transport backstop is answered with the
+    /// WebSocket "message too big" close code instead of the connection being
+    /// dropped without a word, which the client can only read as a bare
+    /// disconnect and retry.
+    #[tokio::test]
+    async fn ws_message_too_large_test() -> Result<(), CubeError> {
+        init_test_logger().await;
+
+        let max_message_size = 4 * 1024;
+        let mut auth = MockSqlAuthService::new();
+        auth.expect_authenticate().return_const(Ok(None));
+
+        let http_server = Arc::new(HttpServer::new(
+            "127.0.0.1:53033".to_string(),
+            Arc::new(auth),
+            Arc::new(SqlServiceMock {
+                message_counter: AtomicU64::new(0),
+            }),
+            Duration::from_millis(100),
+            Duration::from_millis(10000),
+            Duration::from_millis(1000),
+            max_message_size,
+            max_message_size,
+            0, // no websocket connection cap
+        ));
+        {
+            let http_server = http_server.clone();
+            cube_ext::spawn(async move { http_server.run_server().await });
+        }
+
+        tokio::time::sleep(Duration::from_secs(1)).await;
+
+        let (mut socket, _) = connect_async(Url::parse("ws://127.0.0.1:53033/ws").unwrap())
+            .await
+            .unwrap();
+
+        // Clear of the headroom the graceful path is given, so that the server
+        // refuses the frame before it can read the message id back out of it.
+        socket
+            .send(Message::binary(
+                HttpMessage {
+                    message_id: 1,
+                    command: HttpCommand::Query {
+                        query: "s".repeat(max_message_size * TRANSPORT_SIZE_HEADROOM * 2),
+                        inline_tables: vec![],
+                        trace_obj: None,
+                        parameters: None,
+                        response_format: QueryResultFormat::Legacy,
+                    },
+                    connection_id: Some("foo".to_string()),
+                }
+                .bytes(),
+            ))
+            .await
+            .unwrap();
+
+        let msg = socket.next().await.unwrap().unwrap();
+        match msg {
+            Message::Close(Some(frame)) => {
+                assert_eq!(u16::from(frame.code), MESSAGE_TOO_BIG_CLOSE_CODE);
+                // The configured limit, not the backstop the transport is
+                // given: that is the number an operator set and can change.
+                assert!(
+                    frame.reason.contains(&format!(
+                        "exceeds the maximum message size of {} bytes",
+                        max_message_size
+                    )),
+                    "unexpected close reason: {}",
+                    frame.reason
+                );
+            }
+            msg => panic!("Close frame expected, got: {:?}", msg),
+        }
+
+        http_server.stop_processing().await;
+        Ok(())
+    }
+
+    /// The close reason names whichever limit refused the message. The same
+    /// capacity error covers both, so a frame limit configured below the
+    /// message limit would otherwise be reported as a message limit that never
+    /// refused anything.
+    #[tokio::test]
+    async fn ws_message_too_large_names_the_frame_limit_test() -> Result<(), CubeError> {
+        init_test_logger().await;
+
+        let max_frame_size = 4 * 1024;
+        let max_message_size = max_frame_size * 4;
+        let mut auth = MockSqlAuthService::new();
+        auth.expect_authenticate().return_const(Ok(None));
+
+        let http_server = Arc::new(HttpServer::new(
+            "127.0.0.1:53035".to_string(),
+            Arc::new(auth),
+            Arc::new(SqlServiceMock {
+                message_counter: AtomicU64::new(0),
+            }),
+            Duration::from_millis(100),
+            Duration::from_millis(10000),
+            Duration::from_millis(1000),
+            max_message_size,
+            max_frame_size,
+            0, // no websocket connection cap
+        ));
+        {
+            let http_server = http_server.clone();
+            cube_ext::spawn(async move { http_server.run_server().await });
+        }
+
+        tokio::time::sleep(Duration::from_secs(1)).await;
+
+        let (mut socket, _) = connect_async(Url::parse("ws://127.0.0.1:53035/ws").unwrap())
+            .await
+            .unwrap();
+
+        // Past the frame backstop but inside the message one, so the frame
+        // limit is what refuses it.
+        socket
+            .send(Message::binary(
+                HttpMessage {
+                    message_id: 1,
+                    command: HttpCommand::Query {
+                        query: "s".repeat(max_frame_size * TRANSPORT_SIZE_HEADROOM * 2),
+                        inline_tables: vec![],
+                        trace_obj: None,
+                        parameters: None,
+                        response_format: QueryResultFormat::Legacy,
+                    },
+                    connection_id: Some("foo".to_string()),
+                }
+                .bytes(),
+            ))
+            .await
+            .unwrap();
+
+        let msg = socket.next().await.unwrap().unwrap();
+        match msg {
+            Message::Close(Some(frame)) => {
+                assert_eq!(u16::from(frame.code), MESSAGE_TOO_BIG_CLOSE_CODE);
+                assert!(
+                    frame.reason.contains(&format!(
+                        "exceeds the maximum frame size of {} bytes",
+                        max_frame_size
+                    )),
+                    "unexpected close reason: {}",
+                    frame.reason
+                );
+            }
+            msg => panic!("Close frame expected, got: {:?}", msg),
+        }
+
+        http_server.stop_processing().await;
+        Ok(())
+    }
+
+    /// An over-limit request that still fits within the transport headroom is
+    /// answered with an error naming the message it belongs to, and the
+    /// connection carries on serving the queries multiplexed over it.
+    #[tokio::test]
+    async fn ws_message_too_large_reports_the_message_test() -> Result<(), CubeError> {
+        init_test_logger().await;
+
+        let max_message_size = 4 * 1024;
+        let mut auth = MockSqlAuthService::new();
+        auth.expect_authenticate().return_const(Ok(None));
+
+        let http_server = Arc::new(HttpServer::new(
+            "127.0.0.1:53034".to_string(),
+            Arc::new(auth),
+            Arc::new(SqlServiceMock {
+                message_counter: AtomicU64::new(0),
+            }),
+            Duration::from_millis(100),
+            Duration::from_millis(10000),
+            Duration::from_millis(1000),
+            max_message_size,
+            max_message_size,
+            0, // no websocket connection cap
+        ));
+        {
+            let http_server = http_server.clone();
+            cube_ext::spawn(async move { http_server.run_server().await });
+        }
+
+        tokio::time::sleep(Duration::from_secs(1)).await;
+
+        let (mut socket, _) = connect_async(Url::parse("ws://127.0.0.1:53034/ws").unwrap())
+            .await
+            .unwrap();
+
+        // Over the limit, but inside the headroom the transport is given, so it
+        // arrives whole and can be attributed to message 7.
+        socket
+            .send(Message::binary(
+                HttpMessage {
+                    message_id: 7,
+                    command: HttpCommand::Query {
+                        query: "s".repeat(max_message_size + max_message_size / 2),
+                        inline_tables: vec![],
+                        trace_obj: None,
+                        parameters: None,
+                        response_format: QueryResultFormat::Legacy,
+                    },
+                    connection_id: Some("foo".to_string()),
+                }
+                .bytes(),
+            ))
+            .await
+            .unwrap();
+
+        // Read off the flatbuffer directly: `HttpMessage::read` only decodes the
+        // commands a client sends, and an error is not one of them.
+        let msg = socket.next().await.unwrap().unwrap();
+        let data = msg.into_data();
+        let message = root_as_http_message(&data).unwrap();
+        assert_eq!(message.message_id(), 7);
+        let error = message
+            .command_as_http_error()
+            .expect("an error was expected")
+            .error()
+            .unwrap_or_default();
+        assert!(
+            error.contains(&format!(
+                "exceeds the maximum message size of {} bytes",
+                max_message_size
+            )),
+            "unexpected error: {}",
+            error
+        );
+
+        // The point of answering instead of closing: the connection is still
+        // usable for everything that wasn't oversized.
+        socket
+            .send(Message::binary(
+                HttpMessage {
+                    message_id: 8,
+                    command: HttpCommand::Query {
+                        query: "foo".to_string(),
+                        inline_tables: vec![],
+                        trace_obj: None,
+                        parameters: None,
+                        response_format: QueryResultFormat::Legacy,
+                    },
+                    connection_id: Some("foo".to_string()),
+                }
+                .bytes(),
+            ))
+            .await
+            .unwrap();
+
+        let msg = socket.next().await.unwrap().unwrap();
+        let message = HttpMessage::read(root_as_http_message(&msg.into_data()).unwrap())
+            .await
+            .unwrap();
+        assert_eq!(message.message_id, 8);
+        match message.command {
+            HttpCommand::ResultSet { data_frame } => assert_eq!(
+                data_frame.get_rows()[0].values()[0],
+                TableValue::String("0".to_string())
+            ),
+            command => panic!("Result set expected, got: {:?}", command),
+        }
 
         http_server.stop_processing().await;
         Ok(())

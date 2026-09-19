@@ -3,10 +3,9 @@ import { Badge, TooltipProvider } from '@cube-dev/ui-kit';
 import { useQueryBuilderContext } from '../context';
 
 export function OutdatedLabel() {
-  let { isApiTokenChanged, isDataModelChanged, isQueryTouched, isResultOutdated } =
-    useQueryBuilderContext();
+  const { isApiTokenChanged, isDataModelChanged, isQueryTouched } = useQueryBuilderContext();
 
-  let title = (
+  const title = (
     <>
       {isApiTokenChanged && <div>Security context has changed</div>}
       {isDataModelChanged && <div>Data model has been updated</div>}

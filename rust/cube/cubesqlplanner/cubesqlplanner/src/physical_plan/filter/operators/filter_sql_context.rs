@@ -1,7 +1,9 @@
 use crate::cube_bridge::base_query_options::FilterValue;
 use crate::planner::query_tools::QueryTools;
 use crate::planner::sql_templates::{PlanSqlTemplates, TemplateProjectionColumn};
+use crate::planner::time_dimension::{SeriesSpan, UNBOUNDED_INTERVAL};
 use crate::planner::QueryDateTimeHelper;
+use crate::utils::sql_expression_scanner::{ends_in_line_comment, is_top_level_compound};
 use cubenativeutils::CubeError;
 use std::rc::Rc;
 
@@ -15,7 +17,7 @@ enum DateBound {
 }
 
 pub struct FilterSqlContext<'a> {
-    pub member_sql: &'a str,
+    member_sql: String,
     pub query_tools: &'a Rc<QueryTools>,
     pub plan_templates: &'a PlanSqlTemplates,
     pub use_db_time_zone: bool,
@@ -23,6 +25,47 @@ pub struct FilterSqlContext<'a> {
 }
 
 impl<'a> FilterSqlContext<'a> {
+    pub fn new(
+        member_sql: &str,
+        query_tools: &'a Rc<QueryTools>,
+        plan_templates: &'a PlanSqlTemplates,
+        use_db_time_zone: bool,
+        use_raw_values: bool,
+    ) -> Self {
+        Self {
+            member_sql: Self::as_operand(member_sql),
+            query_tools,
+            plan_templates,
+            use_db_time_zone,
+            use_raw_values,
+        }
+    }
+
+    /// The member's SQL as a single operand: safe to place next to an operator
+    /// of any precedence.
+    pub fn member_sql(&self) -> &str {
+        &self.member_sql
+    }
+
+    // A member's SQL is an expression of unknown shape. When its own top-level
+    // operator binds weaker than the operator a filter template puts beside it,
+    // the bare splice re-associates and that operator captures only the tail of
+    // the member expression — a syntax error on some dialects, a silently
+    // different predicate on the rest. Parentheses pin the whole expression as
+    // one operand; an atomic expression needs none and keeps its shape.
+    fn as_operand(member_sql: &str) -> String {
+        // An expression ending in a line comment swallows whatever the template
+        // appends on that line, so it needs the wrapping — and a line of its own
+        // for the closing parenthesis — however atomic it otherwise is.
+        if ends_in_line_comment(member_sql) {
+            return format!("({}\n)", member_sql);
+        }
+        if !is_top_level_compound(member_sql) {
+            return member_sql.to_string();
+        }
+        format!("({})", member_sql)
+    }
+
     pub fn allocate_param(&self, value: &str) -> String {
         self.query_tools.allocate_param(value)
     }
@@ -101,6 +144,19 @@ impl<'a> FilterSqlContext<'a> {
         bound: DateBound,
         cast: bool,
     ) -> Result<String, CubeError> {
+        self.format_and_allocate_date_impl(value, bound, cast, true)
+    }
+
+    /// `in_db_time_zone` false leaves the date in the query's own timezone, for
+    /// a caller comparing it against a member that is converted into that
+    /// timezone rather than read raw.
+    fn format_and_allocate_date_impl(
+        &self,
+        value: &str,
+        bound: DateBound,
+        cast: bool,
+        in_db_time_zone: bool,
+    ) -> Result<String, CubeError> {
         let allocate = |value: &str| {
             if cast {
                 self.allocate_timestamp_param(value)
@@ -119,8 +175,12 @@ impl<'a> FilterSqlContext<'a> {
             DateBound::From => QueryDateTimeHelper::format_from_date(value, precision)?,
             DateBound::To => QueryDateTimeHelper::format_to_date(value, precision)?,
         };
-        let with_tz = self.apply_db_time_zone(formatted)?;
-        allocate(&with_tz)
+        let formatted = if in_db_time_zone {
+            self.apply_db_time_zone(formatted)?
+        } else {
+            formatted
+        };
+        allocate(&formatted)
     }
 
     fn is_partition_range(&self, value: &str) -> bool {
@@ -139,32 +199,72 @@ impl<'a> FilterSqlContext<'a> {
         self.plan_templates.convert_tz(field.to_string())
     }
 
+    /// The rolling window's series bounds as literal parameters, or `None`
+    /// when they can only be read back off the series itself.
+    ///
+    /// Left in the query's own timezone: a rolling filter compares them against
+    /// the member converted into that timezone, and the series places its
+    /// points there too.
+    ///
+    /// Raw values are spliced into pre-aggregation SQL verbatim rather than
+    /// allocated as parameters, which a bound cannot be rendered as.
+    pub fn date_range_literals(
+        &self,
+        span: &Option<SeriesSpan>,
+    ) -> Result<Option<(String, String)>, CubeError> {
+        let Some(span) = span else {
+            return Ok(None);
+        };
+        if self.use_raw_values {
+            return Ok(None);
+        }
+        Ok(Some((
+            self.format_and_allocate_date_impl(&span.from, DateBound::From, true, false)?,
+            self.format_and_allocate_date_impl(
+                self.series_span_end(span)?,
+                DateBound::To,
+                true,
+                false,
+            )?,
+        )))
+    }
+
+    /// Upper bound of `span` for the series shape this dialect renders.
+    pub fn series_span_end<'s>(&self, span: &'s SeriesSpan) -> Result<&'s String, CubeError> {
+        let generated = self
+            .plan_templates
+            .supports_generated_time_series(span.predefined_granularity)?;
+        Ok(span.to(generated))
+    }
+
     pub fn date_range_from_time_series(&self) -> Result<(String, String), CubeError> {
-        let from_expr = format!(
-            "min({})",
-            self.plan_templates.quote_identifier("date_from")?
+        Ok((
+            self.time_series_bound("min", "date_from")?,
+            self.time_series_bound("max", "date_to")?,
+        ))
+    }
+
+    /// Scalar sub-select of `aggregate(column)` over the time series driving
+    /// this rolling window.
+    pub fn time_series_bound(&self, aggregate: &str, column: &str) -> Result<String, CubeError> {
+        let expr = format!(
+            "{}({})",
+            aggregate,
+            self.plan_templates.quote_identifier(column)?
         );
-        let to_expr = format!("max({})", self.plan_templates.quote_identifier("date_to")?);
-        let from_expr = self.plan_templates.series_bounds_cast(&from_expr)?;
-        let to_expr = self.plan_templates.series_bounds_cast(&to_expr)?;
+        let expr = self.plan_templates.series_bounds_cast(&expr)?;
         let alias = "value".to_string();
-        let time_series_cte_name = "time_series".to_string();
 
-        let from_column = TemplateProjectionColumn {
-            expr: from_expr.clone(),
+        let projection = TemplateProjectionColumn {
+            expr: expr.clone(),
             alias: alias.clone(),
-            aliased: self.plan_templates.column_aliased(&from_expr, &alias)?,
-        };
-        let to_column = TemplateProjectionColumn {
-            expr: to_expr.clone(),
-            alias: alias.clone(),
-            aliased: self.plan_templates.column_aliased(&to_expr, &alias)?,
+            aliased: self.plan_templates.column_aliased(&expr, &alias)?,
         };
 
-        let from = self.plan_templates.select(
+        let select = self.plan_templates.select(
             vec![],
-            &time_series_cte_name,
-            vec![from_column],
+            "time_series",
+            vec![projection],
             None,
             vec![],
             None,
@@ -174,20 +274,27 @@ impl<'a> FilterSqlContext<'a> {
             false,
             false,
         )?;
-        let to = self.plan_templates.select(
-            vec![],
-            &time_series_cte_name,
-            vec![to_column],
-            None,
-            vec![],
-            None,
-            vec![],
-            None,
-            None,
-            false,
-            false,
-        )?;
-        Ok((format!("({})", from), format!("({})", to)))
+        Ok(format!("({})", select))
+    }
+
+    /// A date normalised to the dialect's precision, without allocating it —
+    /// for a caller that still has arithmetic to do on it.
+    pub fn format_from_date(&self, value: &str) -> Result<String, CubeError> {
+        let precision = self.plan_templates.timestamp_precision()?;
+        QueryDateTimeHelper::format_from_date(value, precision)
+    }
+
+    pub fn format_to_date(&self, value: &str) -> Result<String, CubeError> {
+        let precision = self.plan_templates.timestamp_precision()?;
+        QueryDateTimeHelper::format_to_date(value, precision)
+    }
+
+    /// The bound, unless its side reaches without limit — which no date states.
+    pub fn keep_bounded(bound: String, interval: &Option<String>) -> Option<String> {
+        match interval.as_deref() {
+            Some(UNBOUNDED_INTERVAL) => None,
+            _ => Some(bound),
+        }
     }
 
     pub fn extend_date_range_bound(
@@ -197,7 +304,7 @@ impl<'a> FilterSqlContext<'a> {
         is_sub: bool,
     ) -> Result<Option<String>, CubeError> {
         match interval {
-            Some(interval) if interval != "unbounded" => {
+            Some(interval) if interval != UNBOUNDED_INTERVAL => {
                 if is_sub {
                     Ok(Some(
                         self.plan_templates
@@ -217,4 +324,41 @@ impl<'a> FilterSqlContext<'a> {
 
 pub trait FilterOperationSql {
     fn to_sql(&self, ctx: &FilterSqlContext) -> Result<String, CubeError>;
+}
+
+#[cfg(test)]
+mod tests {
+    use super::FilterSqlContext;
+
+    fn as_operand(member_sql: &str) -> String {
+        FilterSqlContext::as_operand(member_sql)
+    }
+
+    #[test]
+    fn atomic_expression_stays_bare() {
+        assert_eq!(as_operand("amount"), "amount");
+        assert_eq!(as_operand("sum(amount)"), "sum(amount)");
+        assert_eq!(as_operand(""), "");
+    }
+
+    #[test]
+    fn compound_expression_is_wrapped() {
+        assert_eq!(as_operand("amount > 50"), "(amount > 50)");
+        assert_eq!(
+            as_operand("sum(amount) IS NOT NULL"),
+            "(sum(amount) IS NOT NULL)"
+        );
+    }
+
+    // The closing parenthesis, not precedence, is what a trailing line comment
+    // threatens, so the comment decides before atomicity does.
+    #[test]
+    fn trailing_line_comment_wraps_on_its_own_line() {
+        assert_eq!(as_operand("amount -- as is"), "(amount -- as is\n)");
+        assert_eq!(
+            as_operand("amount + 1 -- one more"),
+            "(amount + 1 -- one more\n)"
+        );
+        assert_eq!(as_operand("amount -- note\n + 1"), "(amount -- note\n + 1)");
+    }
 }

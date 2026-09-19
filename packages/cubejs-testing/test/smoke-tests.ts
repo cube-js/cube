@@ -28,3 +28,22 @@ export async function testQueryMeasure(client: CubeApi) {
   });
   expect(response.rawData()).toMatchSnapshot('query');
 }
+
+interface Stoppable {
+  stop(): Promise<unknown>;
+}
+
+type Teardown = Stoppable | (() => Promise<unknown>);
+
+export async function stopIfStarted(name: string, resource: Teardown | undefined) {
+  if (!resource) {
+    console.warn(`[smoke] ${name} was never started, nothing to stop`);
+    return;
+  }
+
+  try {
+    await (typeof resource === 'function' ? resource() : resource.stop());
+  } catch (e) {
+    console.warn(`[smoke] failed to stop ${name}:`, e);
+  }
+}

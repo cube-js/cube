@@ -6,9 +6,9 @@ export function useHasOverflow(ref?: RefObject<HTMLDivElement>) {
   useEffect(() => {
     const element = ref?.current;
     const handler = () => {
-      const hasOverflow = (element?.scrollWidth ?? 0) > (element?.clientWidth ?? 0);
+      const nextHasOverflow = (element?.scrollWidth ?? 0) > (element?.clientWidth ?? 0);
 
-      setHasOverflow(hasOverflow);
+      setHasOverflow(nextHasOverflow);
     };
 
     if (!ref) {

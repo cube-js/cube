@@ -12,11 +12,12 @@ import {
   TooltipProvider,
 } from '@cube-dev/ui-kit';
 import { Key } from '@react-types/shared';
-import React, { KeyboardEvent, useCallback, useEffect, useRef, useState } from 'react';
+import React, { KeyboardEvent, ReactElement, useCallback, useEffect, useRef, useState } from 'react';
 import { PlusOutlined } from '@ant-design/icons';
 
 import { useQueryBuilderContext } from '../context';
 import { useEvent, useOutsideFocus, useDimensionValues } from '../hooks';
+import { uniqArray } from '../utils';
 
 const ButtonWrapper = tasty({
   styles: {
@@ -108,6 +109,25 @@ export function ValuesInput(props: ValuesInputProps) {
       !isOpen || !allowSuggestions || !showSuggestions || !memberName || memberType !== 'dimension',
   });
 
+  // Add current value to the value list and clear the input value
+  const addValue = useEvent(() => {
+    const value = textValue.trim();
+
+    if (!value) {
+      return;
+    }
+
+    onChange([...values.filter((val) => val !== value), value]);
+    setTextValue('');
+    setIsOpen(false);
+  });
+
+  const addValueLazy = () => {
+    setTimeout(() => {
+      addValue();
+    });
+  };
+
   // If focus goes outside the widget, update the state
   useOutsideFocus(
     ref,
@@ -149,25 +169,6 @@ export function ValuesInput(props: ValuesInputProps) {
     }
   }, [isSuggestionLoading]);
 
-  // Add current value to the value list and clear the input value
-  const addValue = useEvent(() => {
-    const value = textValue.trim();
-
-    if (!value) {
-      return;
-    }
-
-    onChange([...values.filter((val) => val !== value), value]);
-    setTextValue('');
-    setIsOpen(false);
-  });
-
-  const addValueLazy = () => {
-    setTimeout(() => {
-      addValue();
-    });
-  };
-
   const onKeyDown = (e: KeyboardEvent) => {
     if (e.key === 'Enter') {
       e.preventDefault();
@@ -194,7 +195,13 @@ export function ValuesInput(props: ValuesInputProps) {
   );
 
   const onTextChange = useEvent((value: string | number) => {
-    setTextValue(typeof value === 'number' ? (!Number.isNaN(value) ? String(value) : '') : value);
+    if (typeof value !== 'number') {
+      setTextValue(value);
+
+      return;
+    }
+
+    setTextValue(Number.isNaN(value) ? '' : String(value));
   });
 
   function onInput() {
@@ -219,92 +226,35 @@ export function ValuesInput(props: ValuesInputProps) {
     />
   );
 
-  const input =
-    type === 'string' ? (
-      memberType === 'dimension' && allowSuggestions && showSuggestions ? (
-        <ComboBox
-          allowsCustomValue
-          aria-label="Text value input"
-          inputRef={inputRef}
+  let textInputSuffix: ReactElement | null = null;
+
+  if (allowSuggestions && !suggestionError && !isSuggestionLoading) {
+    textInputSuffix = (
+      <TooltipProvider title="Load values...">
+        <Button
+          icon={<CaretDownIcon />}
+          type="neutral"
           size="small"
-          inputValue={textValue}
-          placeholder={
-            isSuggestionLoading
-              ? 'Loading values...'
-              : (placeholder ?? `Type ${suggestions.length ? 'or select ' : ''}value to add...`)
-          }
-          validationState={hasError ? 'invalid' : undefined}
-          suffix={
-            suggestionError ? (
-              <TooltipProvider activeWrap title={`Unable to load values.\n${suggestionError}`}>
-                <InfoCircleIcon color="#danger" styles={{ cursor: 'default' }} />
-              </TooltipProvider>
-            ) : null
-          }
-          suffixPosition="after"
-          width="30x"
-          menuTrigger="focus"
-          isLoading={isSuggestionLoading && !suggestions.length}
-          disabledKeys={suggestions.length ? undefined : ['no-suggestions']}
-          onSelectionChange={(key: Key | null) => {
-            key && onTextChange(key as string);
-            addValueLazy();
-          }}
-          onInputChange={(key: Key | null) => {
-            onTextChange(key as string);
-          }}
-          onKeyDown={onKeyDown}
-          onFocus={onFocus}
-        >
-          {suggestions.length ? (
-            suggestions.map((suggestion) => (
-              <ComboBox.Item key={suggestion} textValue={suggestion}>
-                {suggestion}
-              </ComboBox.Item>
-            ))
-          ) : (
-            <ComboBox.Item key="no-suggestions">No values loaded</ComboBox.Item>
-          )}
-        </ComboBox>
-      ) : (
-        <TextInput
-          aria-label="Text value input"
-          inputRef={inputRef}
-          size="small"
-          value={textValue}
-          placeholder={placeholder || `Type ${allowSuggestions ? 'or select ' : ''}value to add...`}
-          validationState={hasError ? 'invalid' : undefined}
-          isLoading={isSuggestionLoading}
-          suffix={
-            allowSuggestions && !suggestionError ? (
-              !isSuggestionLoading ? (
-                <TooltipProvider title="Load values...">
-                  <Button
-                    icon={<CaretDownIcon />}
-                    type="neutral"
-                    size="small"
-                    height="(4x - 2bw)"
-                    radius="right"
-                    onPress={() => setShowSuggestions(true)}
-                  />
-                </TooltipProvider>
-              ) : null
-            ) : suggestionError && !hasError ? (
-              <Grid width="4x" placeContent="center">
-                <TooltipProvider activeWrap title={`Unable to load values.\n${suggestionError}`}>
-                  <InfoCircleIcon color="#danger" styles={{ cursor: 'default' }} />
-                </TooltipProvider>
-              </Grid>
-            ) : null
-          }
-          suffixPosition="after"
-          wrapperStyles={{ width: '30x' }}
-          onChange={onTextChange}
-          onKeyDown={onKeyDown}
-          onFocus={onFocus}
+          height="(4x - 2bw)"
+          radius="right"
+          onPress={() => setShowSuggestions(true)}
         />
-      )
-    ) : (
+      </TooltipProvider>
+    );
+  } else if (suggestionError && !hasError) {
+    textInputSuffix = (
+      <Grid width="4x" placeContent="center">
+        <TooltipProvider activeWrap title={`Unable to load values.\n${suggestionError}`}>
+          <InfoCircleIcon color="#danger" styles={{ cursor: 'default' }} />
+        </TooltipProvider>
+      </Grid>
+    );
+  }
+
+  let input: ReactElement;
+
+  if (type !== 'string') {
+    input = (
       <NumberInput
         aria-label="Number value input"
         inputRef={inputRef}
@@ -321,6 +271,74 @@ export function ValuesInput(props: ValuesInputProps) {
         onFocus={onFocus}
       />
     );
+  } else if (memberType === 'dimension' && allowSuggestions && showSuggestions) {
+    input = (
+      <ComboBox
+        allowsCustomValue
+        aria-label="Text value input"
+        inputRef={inputRef}
+        size="small"
+        inputValue={textValue}
+        placeholder={
+          isSuggestionLoading
+            ? 'Loading values...'
+            : (placeholder ?? `Type ${suggestions.length ? 'or select ' : ''}value to add...`)
+        }
+        validationState={hasError ? 'invalid' : undefined}
+        suffix={
+          suggestionError ? (
+            <TooltipProvider activeWrap title={`Unable to load values.\n${suggestionError}`}>
+              <InfoCircleIcon color="#danger" styles={{ cursor: 'default' }} />
+            </TooltipProvider>
+          ) : null
+        }
+        suffixPosition="after"
+        width="30x"
+        menuTrigger="focus"
+        isLoading={isSuggestionLoading && !suggestions.length}
+        disabledKeys={suggestions.length ? undefined : ['no-suggestions']}
+        onSelectionChange={(key: Key | null) => {
+          if (key) {
+            onTextChange(key as string);
+          }
+          addValueLazy();
+        }}
+        onInputChange={(key: Key | null) => {
+          onTextChange(key as string);
+        }}
+        onKeyDown={onKeyDown}
+        onFocus={onFocus}
+      >
+        {suggestions.length ? (
+          suggestions.map((suggestion) => (
+            <ComboBox.Item key={suggestion} textValue={suggestion}>
+              {suggestion}
+            </ComboBox.Item>
+          ))
+        ) : (
+          <ComboBox.Item key="no-suggestions">No values loaded</ComboBox.Item>
+        )}
+      </ComboBox>
+    );
+  } else {
+    input = (
+      <TextInput
+        aria-label="Text value input"
+        inputRef={inputRef}
+        size="small"
+        value={textValue}
+        placeholder={placeholder || `Type ${allowSuggestions ? 'or select ' : ''}value to add...`}
+        validationState={hasError ? 'invalid' : undefined}
+        isLoading={isSuggestionLoading}
+        suffix={textInputSuffix}
+        suffixPosition="after"
+        wrapperStyles={{ width: '30x' }}
+        onChange={onTextChange}
+        onKeyDown={onKeyDown}
+        onFocus={onFocus}
+      />
+    );
+  }
 
   const Element = useCallback(
     ({ children }: React.PropsWithChildren<{}>) => {
@@ -339,13 +357,11 @@ export function ValuesInput(props: ValuesInputProps) {
 
   return (
     <Element>
-      {values.map((value, i) => {
-        return (
-          <TooltipProvider key={i} activeWrap title={value}>
-            <StyledTag onClose={() => onRemove(value)}>{value}</StyledTag>
-          </TooltipProvider>
-        );
-      })}
+      {uniqArray(values).map((value) => (
+        <TooltipProvider key={value} activeWrap title={value}>
+          <StyledTag onClose={() => onRemove(value)}>{value}</StyledTag>
+        </TooltipProvider>
+      ))}
       <Space gap={0} placeContent="baseline">
         {isOpen ? input : <ButtonWrapper>{addButton}</ButtonWrapper>}
       </Space>

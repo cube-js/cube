@@ -53,7 +53,7 @@ export function AddFilterInput(props: AddFilterInputProps) {
     dateRanges: queryDateRanges,
   } = useQueryBuilderContext();
 
-  const [members, dimensions, measures, dateRanges, segments, nameToMemberType] = useMemo(() => {
+  const [members, dimensions, measures, dateRanges, segments] = useMemo(() => {
     // Sort members by cube name and used status
     const sort = (
       a: TCubeDimension | TCubeMeasure | TCubeSegment,
@@ -73,13 +73,13 @@ export function AddFilterInput(props: AddFilterInputProps) {
       return a.name.localeCompare(b.name);
     };
 
-    const members = [
+    const memberList = [
       ...Object.values(joinableMembers.dimensions).sort(sort),
       ...Object.values(joinableMembers.measures).sort(sort),
       ...Object.values(joinableMembers.segments).sort(sort),
     ];
 
-    const nameToMemberType = members.reduce(
+    const nameToMemberType = memberList.reduce(
       (acc, member) => {
         acc[member.name] = ['dimension', 'measure', 'segment'][
           [
@@ -94,38 +94,27 @@ export function AddFilterInput(props: AddFilterInputProps) {
       {} as Record<string, MemberType>
     );
 
-    const dimensions = members.filter((member) => {
-      return nameToMemberType[member.name] === 'dimension';
-    });
+    const dimensionMembers = memberList.filter((member) => nameToMemberType[member.name] === 'dimension');
 
-    const measures = members.filter((member) => {
-      return nameToMemberType[member.name] === 'measure';
-    });
+    const measureMembers = memberList.filter((member) => nameToMemberType[member.name] === 'measure');
 
-    const segments = members
-      .filter((member) => {
-        return nameToMemberType[member.name] === 'segment';
-      })
-      .filter((member) => {
-        return !query.segments?.includes(member.name);
-      });
+    const segmentMembers = memberList
+      .filter((member) => nameToMemberType[member.name] === 'segment')
+      .filter((member) => !query.segments?.includes(member.name));
 
-    const dateRanges = members
+    const dateRangeMembers = memberList
       .filter(
-        (member) =>
-          nameToMemberType[member.name] === 'dimension' &&
-          (member as TCubeDimension).type === 'time'
+        (member) => nameToMemberType[member.name] === 'dimension'
+          && (member as TCubeDimension).type === 'time'
       )
-      .filter((member) => {
-        return !queryDateRanges.list.includes(member.name);
-      }) as TCubeDimension[];
+      .filter((member) => !queryDateRanges.list.includes(member.name)) as TCubeDimension[];
 
     return [
-      members,
-      dimensions as TCubeDimension[],
-      measures as TCubeMeasure[],
-      dateRanges as TCubeDimension[],
-      segments as TCubeSegment[],
+      memberList,
+      dimensionMembers as TCubeDimension[],
+      measureMembers as TCubeMeasure[],
+      dateRangeMembers as TCubeDimension[],
+      segmentMembers as TCubeSegment[],
       nameToMemberType,
     ];
   }, [
@@ -136,26 +125,26 @@ export function AddFilterInput(props: AddFilterInputProps) {
   ]);
 
   const shownMembers = useMemo(() => {
-    let shownMembers: (TCubeSegment | TCubeDimension | TCubeMeasure)[];
+    let visibleMembers: (TCubeSegment | TCubeDimension | TCubeMeasure)[];
 
     switch (mode) {
       case 'measure':
-        shownMembers = measures;
+        visibleMembers = measures;
         break;
       case 'dimension':
-        shownMembers = dimensions;
+        visibleMembers = dimensions;
         break;
       case 'segment':
-        shownMembers = segments;
+        visibleMembers = segments;
         break;
       case 'dateRange':
-        shownMembers = dateRanges;
+        visibleMembers = dateRanges;
         break;
       default:
-        shownMembers = [];
+        visibleMembers = [];
     }
 
-    return shownMembers;
+    return visibleMembers;
   }, [members, mode]);
 
   const onAction = useEvent((key: Key) => {
@@ -189,44 +178,44 @@ export function AddFilterInput(props: AddFilterInputProps) {
   });
 
   const items = useMemo(() => {
-    const items = [
+    const menuItems = [
       { value: 'dimension', label: 'Filter by Dimension' },
       { value: 'measure', label: 'Filter by Measure' },
     ];
 
     if (onSegmentAdd) {
-      items.push({ value: 'segment', label: 'Filter by Segment' });
+      menuItems.push({ value: 'segment', label: 'Filter by Segment' });
     }
 
     if (onDateRangeAdd) {
-      items.push({ value: 'dateRange', label: 'Filter by Date Range' });
+      menuItems.push({ value: 'dateRange', label: 'Filter by Date Range' });
     }
 
-    items.push({ value: 'and', label: 'AND Branch' }, { value: 'or', label: 'OR Branch' });
+    menuItems.push({ value: 'and', label: 'AND Branch' }, { value: 'or', label: 'OR Branch' });
 
-    return items;
+    return menuItems;
   }, [onDateRangeAdd, onSegmentAdd]);
 
   const disabledKeys = useMemo(() => {
-    const disabledKeys: string[] = [];
+    const disabledMenuKeys: string[] = [];
 
     if (!dateRanges.length) {
-      disabledKeys.push('dateRange');
+      disabledMenuKeys.push('dateRange');
     }
 
     if (!dimensions.length) {
-      disabledKeys.push('dimension');
+      disabledMenuKeys.push('dimension');
     }
 
     if (!measures.length) {
-      disabledKeys.push('measure');
+      disabledMenuKeys.push('measure');
     }
 
     if (!segments.length) {
-      disabledKeys.push('segment');
+      disabledMenuKeys.push('segment');
     }
 
-    return disabledKeys;
+    return disabledMenuKeys;
   }, [dateRanges.length, dimensions.length, measures.length, segments.length]);
 
   useEffect(() => {
@@ -291,7 +280,7 @@ export function AddFilterInput(props: AddFilterInputProps) {
           {shownMembers.map((member) => {
             const memberName = member.name.split('.')[1];
             const cubeName = member.name.split('.')[0];
-            const cube = cubes.find((cube) => cube.name === cubeName);
+            const cube = cubes.find((candidateCube) => candidateCube.name === cubeName);
 
             return (
               <Select.Item key={member.name} textValue={member.name}>

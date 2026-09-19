@@ -18,6 +18,7 @@ import {
   FROM_PARTITION_RANGE,
   MAX_SOURCE_ROW_LIMIT,
   QueryAlias,
+  canonicalTimezone,
   getEnv,
   localTimestampToUtc,
   timeSeries as timeSeriesBase,
@@ -255,6 +256,7 @@ export class BaseQuery {
     };
     this.maskedMembers = new Set();
     this.memberMaskFilters = {};
+
     for (const item of this.options.maskedMembers || []) {
       this.maskedMembers.add(item.member);
       if (item.filter) {
@@ -286,6 +288,7 @@ export class BaseQuery {
       memberToAlias: this.options.memberToAlias,
       expressionParams: this.options.expressionParams,
       convertTzForRawTimeDimension: this.options.convertTzForRawTimeDimension,
+      localRefreshKey: this.options.localRefreshKey,
       from: this.options.from,
       multiStageQuery: this.options.multiStageQuery,
       multiStageDimensions: this.options.multiStageDimensions,
@@ -297,6 +300,18 @@ export class BaseQuery {
     this.from = this.options.from;
     this.multiStageQuery = this.options.multiStageQuery;
     this.timezone = this.options.timezone;
+
+    // Backstop for every dialect convertTz() sink: callers that bypass the API gateway
+    // (queryRewrite, refresh scheduler, SQL API sessions) reach the dialects through here.
+    if (this.timezone) {
+      const timezone = canonicalTimezone(this.timezone);
+      if (!timezone) {
+        throw new UserError(`Incorrect timezone ${this.timezone}`);
+      }
+
+      this.timezone = timezone;
+    }
+
     this.rowLimit = this.options.rowLimit;
     this.offset = this.options.offset;
     /** @type {import('./PreAggregations').PreAggregations} */
@@ -349,6 +364,9 @@ export class BaseQuery {
     // toggled independently. The neverUseSqlPlannerPreaggregation() guard still opts
     // specific query types (e.g. CubeStoreQuery) out for correctness.
     this.canUseNativeSqlPlannerPreAggregation = this.useNativeSqlPlanner && !this.neverUseSqlPlannerPreaggregation();
+    // Gated at emit time so that with the flag off the refresh key tuples stay
+    // byte-identical and nothing downstream re-hashes to a new cache key.
+    this.localRefreshKey = this.options.localRefreshKey ?? getEnv('refreshKeyLocalTime');
     this.queryLevelJoinHints = this.options.joinHints ?? [];
     this.prebuildJoin();
 
@@ -376,6 +394,7 @@ export class BaseQuery {
        * @type {Record<string, string[]>}
        */
       const queryJoinGraph = {};
+
       for (const { originalFrom, originalTo } of (this.join?.joins || [])) {
         if (!queryJoinGraph[originalFrom]) {
           queryJoinGraph[originalFrom] = [];
@@ -448,6 +467,7 @@ export class BaseQuery {
     const currentContext = this.safeEvaluateSymbolContext();
     if (contextPropNames) {
       const contextKey = {};
+
       for (const element of contextPropNames) {
         contextKey[element] = currentContext[element];
       }
@@ -939,14 +959,16 @@ export class BaseQuery {
       dimensions: this.options.dimensions,
       segments: this.options.segments,
       timeDimensions: this.options.timeDimensions,
-      timezone: this.options.timezone,
+      timezone: this.timezone,
       joinGraph: this.joinGraph,
       cubeEvaluator: this.cubeEvaluator,
       securityContext: this.contextSymbols.securityContext,
       order,
       filters: this.options.filters,
-      limit: this.options.limit ? this.options.limit.toString() : null,
-      rowLimit: this.options.rowLimit ? this.options.rowLimit.toString() : null,
+      limit: this.options.limit != null ? this.options.limit.toString() : null,
+      // `rowLimit: 0` is a valid limit (BI tools use `LIMIT 0` as a schema probe),
+      // so it must not be collapsed into `null` (no limit) here
+      rowLimit: this.options.rowLimit != null ? this.options.rowLimit.toString() : null,
       offset: this.options.offset ? this.options.offset.toString() : null,
       baseTools: this,
       ungrouped: this.options.ungrouped,
@@ -997,13 +1019,15 @@ export class BaseQuery {
       dimensions: this.options.dimensions,
       segments: this.options.segments,
       timeDimensions: this.options.timeDimensions,
-      timezone: this.options.timezone,
+      timezone: this.timezone,
       joinGraph: this.joinGraph,
       cubeEvaluator: this.cubeEvaluator,
       order,
       filters: this.options.filters,
-      limit: this.options.limit ? this.options.limit.toString() : null,
-      rowLimit: this.options.rowLimit ? this.options.rowLimit.toString() : null,
+      limit: this.options.limit != null ? this.options.limit.toString() : null,
+      // `rowLimit: 0` is a valid limit (BI tools use `LIMIT 0` as a schema probe),
+      // so it must not be collapsed into `null` (no limit) here
+      rowLimit: this.options.rowLimit != null ? this.options.rowLimit.toString() : null,
       offset: this.options.offset ? this.options.offset.toString() : null,
       baseTools: this,
       ungrouped: this.options.ungrouped,
@@ -1900,11 +1924,21 @@ export class BaseQuery {
             // If we have custom granularities in time dimension
             if (td.granularities) {
               for (const granularityName of Object.keys(td.granularities)) {
-                const grObj = new Granularity(this, { dimension: dimensionKey, granularity: granularityName });
-                hierarchies[`${dimensionKey}.${granularityName}`] = [
-                  granularityName,
-                  ...standardGranularitiesParents[grObj.minGranularity()],
-                ];
+                const granularity = this.cubeEvaluator.resolveGranularity([cube, tdName, 'granularities', granularityName]);
+
+                // A granularity that only overrides the SQL of its time dimension has no
+                // interval to derive a hierarchy from. Such a granularity can only be
+                // matched by a rollup declaring it by name, which is what a missing
+                // hierarchy entry already means.
+                // An unresolvable granularity is a different matter and keeps
+                // reporting itself from the constructor below.
+                if (!granularity || granularity.interval) {
+                  const grObj = new Granularity(this, { dimension: dimensionKey, granularity: granularityName });
+                  hierarchies[`${dimensionKey}.${granularityName}`] = [
+                    granularityName,
+                    ...standardGranularitiesParents[grObj.minGranularity()],
+                  ];
+                }
               }
             }
           }
@@ -3199,6 +3233,33 @@ export class BaseQuery {
     return '';
   }
 
+  /**
+   * Row limit as a number, or `null` when it is not set at all. Unlike a truthy check
+   * this keeps `0` (a valid limit that returns no rows) distinct from "no limit", and
+   * unlike a bare `parseInt` it keeps a non-numeric `rowLimit` out of the rendered SQL.
+   * @protected
+   * @returns {number|null}
+   */
+  parsedRowLimit() {
+    if (this.rowLimit == null) {
+      return null;
+    }
+    const parsed = parseInt(this.rowLimit, 10);
+    return Number.isNaN(parsed) ? null : parsed;
+  }
+
+  /**
+   * Leading row-limit clause for statements that do not render `topLimit()` -- the legacy
+   * rollup query in `PreAggregations` is the one such statement. Only dialects that cannot
+   * express a zero row limit as a trailing clause (T-SQL, where FETCH NEXT must be >= 1)
+   * return anything here; every other dialect renders `LIMIT 0` and gets `''`.
+   * @public
+   * @returns {string}
+   */
+  zeroRowLimitTopClause() {
+    return '';
+  }
+
   baseSelect() {
     return R.flatten(this.forSelect().map(s => s.selectColumns())).filter(s => !!s).join(', ');
   }
@@ -3322,6 +3383,7 @@ export class BaseQuery {
     }
 
     this.safeEvaluateSymbolContext().currentMember = memberPath;
+
     try {
       if (this.maskedMembers && this.maskedMembers.has(memberPath) && !memberExpressionType &&
           !this.safeEvaluateSymbolContext().skipMasking) {
@@ -3767,6 +3829,9 @@ export class BaseQuery {
     };
   }
 
+  /**
+   * @returns {string[]}
+   */
   collectLeafMeasures(fn) {
     const context = { leafMeasures: {} };
     this.evaluateSymbolSqlWithContext(
@@ -3789,6 +3854,7 @@ export class BaseQuery {
   evaluateSymbolSqlWithContext(fn, context) {
     const oldContext = this.evaluateSymbolContext;
     this.evaluateSymbolContext = oldContext ? Object.assign({}, oldContext, context) : context;
+
     try {
       const result = fn();
       this.evaluateSymbolContext = oldContext;
@@ -4214,6 +4280,7 @@ export class BaseQuery {
       externalQueryClass: this.options.externalQueryClass,
       queryFactory: this.options.queryFactory,
       useNativeSqlPlanner: this.options.useNativeSqlPlanner,
+      localRefreshKey: this.options.localRefreshKey,
       ...options,
     };
   }
@@ -4252,19 +4319,22 @@ export class BaseQuery {
             this.refreshKeySelect(sql),
             {
               external,
-              renewalThreshold: this.refreshKeyRenewalThresholdForInterval(cubeFromPath.refreshKey)
+              renewalThreshold: this.refreshKeyRenewalThresholdForInterval(cubeFromPath.refreshKey),
+              ...this.localRefreshKeyOptions(cubeFromPath.refreshKey, query)
             },
             query
           ];
         }
       }
 
-      const [sql, external, query] = this.everyRefreshKeySql(this.defaultEveryRefreshKey());
+      const defaultEveryRefreshKey = this.defaultEveryRefreshKey();
+      const [sql, external, query] = this.everyRefreshKeySql(defaultEveryRefreshKey);
       return [
         this.refreshKeySelect(sql),
         {
           external,
-          renewalThreshold: this.defaultRefreshKeyRenewalThreshold()
+          renewalThreshold: this.defaultRefreshKeyRenewalThreshold(),
+          ...this.localRefreshKeyOptions(defaultEveryRefreshKey, query)
         },
         query
       ];
@@ -4508,8 +4578,27 @@ export class BaseQuery {
         FLOOR: 'FLOOR({{ args_concat }})',
         CEIL: 'CEIL({{ args_concat }})',
         TRUNC: 'TRUNC({{ args_concat }})',
+        // Window functions. The SQL API resolves a window function to `functions/<NAME>`
+        // just like any other function, so a built-in without an entry here is never
+        // pushed down: the window, and everything computed on top of it, is left to
+        // post processing over a row-capped result. These are the SQL:2003 window
+        // functions, supported by every dialect that supports windowing at all, so they
+        // live in the base and a dialect missing one deletes it.
         LAG: 'LAG({{ args_concat }})',
         LEAD: 'LEAD({{ args_concat }})',
+        ROW_NUMBER: 'ROW_NUMBER({{ args_concat }})',
+        RANK: 'RANK({{ args_concat }})',
+        DENSE_RANK: 'DENSE_RANK({{ args_concat }})',
+        PERCENT_RANK: 'PERCENT_RANK({{ args_concat }})',
+        CUME_DIST: 'CUME_DIST({{ args_concat }})',
+        // Unreachable from the SQL API until CORE-831: DataFusion types NTILE's argument
+        // `Exact([UInt64])` and will not coerce an integer literal to it, so the query
+        // fails to plan. Kept because the template itself is right - once the fork's
+        // signature is relaxed, NTILE pushes down with no change here.
+        NTILE: 'NTILE({{ args_concat }})',
+        FIRST_VALUE: 'FIRST_VALUE({{ args_concat }})',
+        LAST_VALUE: 'LAST_VALUE({{ args_concat }})',
+        NTH_VALUE: 'NTH_VALUE({{ args_concat }})',
 
         // There is a difference in behaviour of these function processing in different DBs and DWHs.
         // The SQL standard requires greatest and least to return null in case one argument is null.
@@ -4565,6 +4654,7 @@ export class BaseQuery {
         DATE: 'DATE({{ args_concat }})',
 
         PERCENTILECONT: 'PERCENTILE_CONT({{ args_concat }})',
+        WIDTH_BUCKET: 'WIDTH_BUCKET({{ args_concat }})',
       },
       statements: {
         select: '{% if ctes %} WITH {% if recursive %}RECURSIVE {% endif %}\n' +
@@ -4586,6 +4676,12 @@ export class BaseQuery {
           '{% if offset is not none %}\nOFFSET {{ offset }}{% endif %}',
         group_by_exprs: '{{ group_by | map(attribute=\'index\') | join(\', \') }}',
         join: '{{ join_type }} JOIN {{ source }} ON {{ condition }}',
+        union: '{% for query in queries %}(\n' +
+          '{{ query | indent(2, true) }}\n' +
+          ')' +
+          '{% if not loop.last %}\nUNION {% if not distinct %}ALL {% endif %}{% endif %}' +
+          '{% endfor %}' +
+          '{% if limit is not none %}\nLIMIT {{ limit }}{% endif %}',
         cte: '{{ alias }} AS ({{ query | indent(2, true) }})',
         time_series_select: 'SELECT date_from::timestamp AS "date_from",\n' +
           'date_to::timestamp AS "date_to" \n' +
@@ -4677,6 +4773,21 @@ export class BaseQuery {
         lt: '{{ column }} < {{ param }}',
         lte: '{{ column }} <= {{ param }}',
         like_pattern: '{% if start_wild %}\'%\' || {% endif %}{{ value }}{% if end_wild %}|| \'%\'{% endif %}',
+        // Character the native planner uses to escape `%`, `_` and itself inside
+        // a user-supplied LIKE value, mirroring what BaseFilter.escapeWildcardChars
+        // does on the legacy path. Without it the planner skips escaping entirely
+        // and a user searching for a literal `%` gets a wildcard instead, matching
+        // every row. Backslash is the default LIKE escape character in Postgres,
+        // MySQL, BigQuery, ClickHouse and Cube Store, so no ESCAPE clause is
+        // needed here - and Cube Store's parser rejects one outright, which is
+        // why this must stay a bare escape character. Dialects whose LIKE has no
+        // default escape character add the explicit clause themselves: Presto and
+        // Trino in `like_pattern`, MSSQL, Oracle and Snowflake in
+        // `tesseract.ilike` (their pattern is wrapped, so the clause cannot go
+        // inside it), and DuckDB and Pinot likewise in `tesseract.ilike` - those
+        // two live in their driver packages rather than in this directory, so a
+        // sweep of only this directory will miss them.
+        like_escape_char: '\\',
         always_true: '1 = 1'
 
       },
@@ -4797,20 +4908,48 @@ export class BaseQuery {
     };
   }
 
+  /**
+   * Both the rendered SQL and the descriptor handed to the orchestrator for local
+   * evaluation derive from this, so they cannot disagree on the formula.
+   *
+   * @return {{ utcOffset: number, interval: number, dayOffset: number, cron: boolean }}
+   */
+  everyRefreshKeyParts(refreshKey) {
+    const every = refreshKey.every || '1 hour';
+
+    if (/^(\d+) (second|minute|hour|day|week)s?$/.test(every)) {
+      return {
+        utcOffset: this.timezone ? moment.tz(this.timezone).utcOffset() * 60 : 0,
+        interval: this.parseSecondDuration(every),
+        dayOffset: 0,
+        cron: false,
+      };
+    }
+
+    return { ...this.calcIntervalForCronString(refreshKey), cron: true };
+  }
+
+  /**
+   * @protected
+   * @param {BaseQuery} [query] the instance that rendered the SQL, when it differs from `this`
+   */
+  localRefreshKeyOptions(refreshKey, query) {
+    return this.localRefreshKey
+      ? { localRefreshKey: (query || this).everyRefreshKeyParts(refreshKey) }
+      : {};
+  }
+
   everyRefreshKeySql(refreshKey, external = false) {
     if (this.externalQueryClass) {
       return this.externalQuery().everyRefreshKeySql(refreshKey, true);
     }
 
-    const every = refreshKey.every || '1 hour';
+    const { utcOffset, interval, dayOffset, cron } = this.everyRefreshKeyParts(refreshKey);
 
-    if (/^(\d+) (second|minute|hour|day|week)s?$/.test(every)) {
-      const utcOffset = this.timezone ? moment.tz(this.timezone).utcOffset() * 60 : 0;
+    if (!cron) {
       const utcOffsetPrefix = utcOffset ? `${utcOffset} + ` : '';
-      return [this.floorSql(`(${utcOffsetPrefix}${this.unixTimestampSql()}) / ${this.parseSecondDuration(every)}`), external, this];
+      return [this.floorSql(`(${utcOffsetPrefix}${this.unixTimestampSql()}) / ${interval}`), external, this];
     }
-
-    const { dayOffset, utcOffset, interval } = this.calcIntervalForCronString(refreshKey);
 
     /**
      * Small explanation how it works for every `0 8 * * *`
@@ -5003,6 +5142,13 @@ export class BaseQuery {
           }
 
           if (preAggregation.refreshKey.every || preAggregation.refreshKey.incremental) {
+            // An incremental key is wrapped into `CASE WHEN NOW() < <dateTo + updateWindow>`
+            // against an allocated partition range param, so it is not reproducible from
+            // a time interval alone.
+            const localRefreshKeyOptions = preAggregation.refreshKey.incremental
+              ? {}
+              : this.localRefreshKeyOptions(preAggregation.refreshKey, refreshKeyQuery);
+
             return [
               refreshKeyQuery.paramAllocator.buildSqlAndParams(this.refreshKeySelect(refreshKey)).concat({
                 external: refreshKeyExternal,
@@ -5011,7 +5157,8 @@ export class BaseQuery {
                 updateWindowSeconds: preAggregation.refreshKey.updateWindow &&
                   this.parseSecondDuration(preAggregation.refreshKey.updateWindow),
                 renewalThresholdOutsideUpdateWindow: preAggregation.refreshKey.incremental &&
-                  24 * 60 * 60
+                  24 * 60 * 60,
+                ...localRefreshKeyOptions
               })
             ];
           }
@@ -5035,15 +5182,15 @@ export class BaseQuery {
             () => preAggregationQueryForSql.cacheKeyQueries(
               (refreshKeyCube, [refreshKeySQL, refreshKeyQueryOptions, refreshKeyQuery]) => {
                 if (!cubeFromPath.refreshKey) {
-                  const [sql, external, query] = this.everyRefreshKeySql({
-                    every: '1 hour'
-                  });
+                  const hourlyRefreshKey = { every: '1 hour' };
+                  const [sql, external, query] = this.everyRefreshKeySql(hourlyRefreshKey);
 
                   return [
                     this.refreshKeySelect(sql),
                     {
                       external,
                       renewalThreshold: this.defaultRefreshKeyRenewalThreshold(),
+                      ...this.localRefreshKeyOptions(hourlyRefreshKey, query)
                     },
                     query
                   ];
@@ -5239,7 +5386,7 @@ export class BaseQuery {
     }
 
     const filterParams = filter.filterParams();
-    const filterParamArg = filterParamArgs.filter(p => {
+    const matching = filterParamArgs.filter(p => {
       const member = p.__member();
       return member === filter.measure ||
         member === filter.dimension ||
@@ -5247,10 +5394,18 @@ export class BaseQuery {
           aliases[member] === filter.measure ||
           aliases[member] === filter.dimension
         ));
-    })[0];
+    });
+
+    if (!matching.length) {
+      throw new Error(`FILTER_PARAMS arg not found for ${filter.measure || filter.dimension}`);
+    }
+
+    // Several args can name the same member, one per time shift it addresses.
+    // Only the one addressing no shift describes the rows this query reads.
+    const filterParamArg = matching.find(p => !(p.__timeShift && p.__timeShift()));
 
     if (!filterParamArg) {
-      throw new Error(`FILTER_PARAMS arg not found for ${filter.measure || filter.dimension}`);
+      return BaseFilter.ALWAYS_TRUE;
     }
 
     if (typeof filterParamArg.__column() !== 'function') {
@@ -5314,51 +5469,98 @@ export class BaseQuery {
         // and do not check cube validity as it's part of compilation step.
         const cubeName = allFilters && cubeEvaluator.cubeNameFromPath(name);
         return new Proxy({ cube: cubeName }, {
-          get: (cubeNameObj, propertyName) => ({
-            filter: (column) => ({
-              __column() {
-                return column;
-              },
-              __member() {
-                return cubeEvaluator.pathFromArray([cubeNameObj.cube, propertyName]);
-              },
-              toString() {
-                // Segments should be excluded because they are evaluated separately in cubeReferenceProxy
-                // In other case this falls into the recursive loop/stack exceeded caused by:
-                // collectFrom() -> traverseSymbol() -> evaluateSymbolSql() ->
-                // evaluateSql() -> resolveSymbolsCall() -> cubeReferenceProxy->toString() ->
-                // evaluateSymbolSql() -> evaluateSql()... -> and got here again
-                //
-                // When FILTER_PARAMS is used in dimension/measure SQL - we also hit recursive loop:
-                // allBackAliasMembersExceptSegments() -> collectFrom() -> traverseSymbol() -> evaluateSymbolSql() ->
-                // autoPrefixAndEvaluateSql() -> evaluateSql() -> filterProxyFromAllFilters->Proxy->toString()
-                // and so on...
-                // For this case aliasGathering flag is added to the context in first iteration and
-                // is checked below to prevent looping.
-                const aliases = allFilters ?
-                  allFilters
-                    .map(v => (v.query && !v.query.safeEvaluateSymbolContext().aliasGathering ? v.query.allBackAliasMembersExceptSegments() : {}))
-                    .reduce((a, b) => ({ ...a, ...b }), {})
-                  : {};
-                // Filtering aliases that somehow relate to this group member
-                const groupMember = cubeEvaluator.pathFromArray([cubeNameObj.cube, propertyName]);
-                const aliasesForGroupMembers = Object.entries(aliases)
-                  .filter(([key, _value]) => key === groupMember)
-                  .map(([_key, value]) => value);
-                const filter = BaseQuery.findAndSubTreeForFilterGroup(
-                  newGroupFilter({ operator: 'and', values: allFilters }),
-                  [groupMember],
-                  newGroupFilter,
-                  aliasesForGroupMembers
+          get: (cubeNameObj, propertyName) => new Proxy({}, {
+            get: (memberTarget, prop) => {
+              if (prop === 'filter') {
+                return (column) => BaseQuery.filterProxyBinding(
+                  cubeNameObj.cube, propertyName, false, column, allFilters, cubeEvaluator, allocateParam, newGroupFilter
                 );
-
-                return `(${BaseQuery.renderFilterParams(filter, [this], allocateParam, newGroupFilter, aliases)})`;
               }
-            })
+              // A time shift is addressed only by the native planner. Here the
+              // binding still has to exist, so that a model written for it
+              // compiles and FILTER_GROUP can recover its member, but it
+              // restates nothing.
+              if (prop === 'time_shifts' || prop === 'timeShifts') {
+                return new Proxy({}, {
+                  get: (_shiftTarget, timeShiftName) => {
+                    // Under `time_shifts` every string reads as the name of a
+                    // shift, so string coercion and `filter` — the plain form
+                    // with `time_shifts.` inserted by mistake — are reserved.
+                    if (typeof timeShiftName !== 'string' || BaseQuery.NOT_SHIFT_NAMES.has(timeShiftName)) {
+                      return () => {
+                        throw new UserError(
+                          `FILTER_PARAMS.${cubeNameObj.cube}.${propertyName}.time_shifts needs the name of a time shift: ` +
+                          'FILTER_PARAMS.<cube>.<member>.time_shifts.<name>.filter(...)'
+                        );
+                      };
+                    }
+                    return {
+                      filter: (column) => BaseQuery.filterProxyBinding(
+                        cubeNameObj.cube, propertyName, true, column, allFilters, cubeEvaluator, allocateParam, newGroupFilter
+                      )
+                    };
+                  }
+                });
+              }
+              return Reflect.get(memberTarget, prop);
+            }
           })
         });
       }
     });
+  }
+
+  static get NOT_SHIFT_NAMES() {
+    return new Set(['toString', 'valueOf', 'filter']);
+  }
+
+  static filterProxyBinding(cubeName, propertyName, isTimeShift, column, allFilters, cubeEvaluator, allocateParam, newGroupFilter) {
+    return {
+      __column() {
+        return column;
+      },
+      __member() {
+        return cubeEvaluator.pathFromArray([cubeName, propertyName]);
+      },
+      __timeShift() {
+        return isTimeShift;
+      },
+      toString() {
+        if (isTimeShift) {
+          return `(${BaseFilter.ALWAYS_TRUE})`;
+        }
+        // Segments should be excluded because they are evaluated separately in cubeReferenceProxy
+        // In other case this falls into the recursive loop/stack exceeded caused by:
+        // collectFrom() -> traverseSymbol() -> evaluateSymbolSql() ->
+        // evaluateSql() -> resolveSymbolsCall() -> cubeReferenceProxy->toString() ->
+        // evaluateSymbolSql() -> evaluateSql()... -> and got here again
+        //
+        // When FILTER_PARAMS is used in dimension/measure SQL - we also hit recursive loop:
+        // allBackAliasMembersExceptSegments() -> collectFrom() -> traverseSymbol() -> evaluateSymbolSql() ->
+        // autoPrefixAndEvaluateSql() -> evaluateSql() -> filterProxyFromAllFilters->Proxy->toString()
+        // and so on...
+        // For this case aliasGathering flag is added to the context in first iteration and
+        // is checked below to prevent looping.
+        const aliases = allFilters ?
+          allFilters
+            .map(v => (v.query && !v.query.safeEvaluateSymbolContext().aliasGathering ? v.query.allBackAliasMembersExceptSegments() : {}))
+            .reduce((a, b) => ({ ...a, ...b }), {})
+          : {};
+        // Filtering aliases that somehow relate to this group member
+        const groupMember = cubeEvaluator.pathFromArray([cubeName, propertyName]);
+        const aliasesForGroupMembers = Object.entries(aliases)
+          .filter(([key, _value]) => key === groupMember)
+          .map(([_key, value]) => value);
+        const filter = BaseQuery.findAndSubTreeForFilterGroup(
+          newGroupFilter({ operator: 'and', values: allFilters }),
+          [groupMember],
+          newGroupFilter,
+          aliasesForGroupMembers
+        );
+
+        return `(${BaseQuery.renderFilterParams(filter, [this], allocateParam, newGroupFilter, aliases)})`;
+      }
+    };
   }
 
   /**
@@ -5458,6 +5660,7 @@ export class BaseQuery {
      * @type {Record<string, string>}
      */
     const res = {};
+
     for (const [original, alias] of Object.entries(aliases)) {
       const [cube, field] = original.split('.');
       const path = buildJoinPath(cube);
@@ -5501,6 +5704,7 @@ export class BaseQuery {
         visited.add(node);
 
         const neighbors = query.joinGraphPaths[node] || [];
+
         for (const neighbor of neighbors) {
           if (dfs(neighbor)) {
             path.unshift(node);
@@ -5518,7 +5722,7 @@ export class BaseQuery {
   /**
    * Returns a function that constructs the full member path
    * based on the query's join structure.
-   * @returns {(function(member: string): (string))}
+   * @returns {(member: string) => string}
    */
   resolveFullMemberPathFn() {
     const { root: queryJoinRoot } = this.join || {};

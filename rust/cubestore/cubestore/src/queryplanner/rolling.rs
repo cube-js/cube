@@ -709,6 +709,9 @@ impl ExecutionPlan for RollingWindowAggExec {
     ) -> Result<Arc<dyn ExecutionPlan>, DataFusionError> {
         assert_eq!(children.len(), 1);
         Ok(Arc::new(RollingWindowAggExec {
+            // Safe to carry over: these are built from this node's own output schema plus
+            // constants, nothing in them is derived from the input. A node whose properties do
+            // follow the input -- output partitioning above all -- must recompute them here.
             properties: self.properties.clone(),
             sorted_input: children.remove(0),
             group_key: self.group_key.clone(),

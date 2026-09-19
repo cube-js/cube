@@ -741,7 +741,7 @@ impl LogicalPlanAnalysis {
             LogicalPlanLanguage::CubeScanFilters(params) => {
                 let mut map = Vec::new();
                 for id in params.iter() {
-                    map.extend(filter_operators(*id)?.into_iter());
+                    map.extend(filter_operators(*id)?);
                 }
                 Some(map)
             }
@@ -749,7 +749,7 @@ impl LogicalPlanAnalysis {
             LogicalPlanLanguage::FilterOpFilters(params) => {
                 let mut map = Vec::new();
                 for id in params.iter() {
-                    map.extend(filter_operators(*id)?.into_iter());
+                    map.extend(filter_operators(*id)?);
                 }
                 Some(map)
             }
@@ -824,7 +824,7 @@ impl LogicalPlanAnalysis {
                             }
                         };
                     }
-                    map.extend(column_name_to_alias(*id)?.into_iter());
+                    map.extend(column_name_to_alias(*id)?);
                 }
                 Some(map)
             }
@@ -960,7 +960,7 @@ impl LogicalPlanAnalysis {
             | LogicalPlanLanguage::ScalarFunctionExprArgs(params)
             | LogicalPlanLanguage::ScalarUDFExprArgs(params) => {
                 for p in params.iter() {
-                    vec.extend(referenced_columns(*p)?.into_iter());
+                    vec.extend(referenced_columns(*p)?);
                 }
 
                 Some(vec)
@@ -968,7 +968,7 @@ impl LogicalPlanAnalysis {
 
             LogicalPlanLanguage::GroupingSetExprMembers(params) => {
                 for p in params.iter() {
-                    vec.extend(referenced_columns(*p)?.into_iter());
+                    vec.extend(referenced_columns(*p)?);
                 }
 
                 Some(vec)

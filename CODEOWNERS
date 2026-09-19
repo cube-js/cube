@@ -25,7 +25,6 @@
 /packages/*-schema-extension/          @cube-js/schema-compiler
 
 # Doc reviewers
-/docs/           @cube-js/doc-reviewers
 /docs-mintlify/  @keydunov
 
 # Developer Relations and Community
