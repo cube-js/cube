@@ -59,7 +59,7 @@ While you are editing, the tab strip is where you work with the tabs themselves:
 
 Click the empty part of the strip to select the container, then drag its resize grip to change its size; drag that same empty part to move it on the board. Its gear menu carries **Resize** and **Delete**.
 
-A new tabs container is added at 6×9 cells — narrowing to the dashboard's own column count when that is fewer than 6, though never below 4 — and can't be resized below 4×6. If a tab holds a grid, the container also can't shrink past what that grid's own contents need.
+A new tabs container is added at 6×9 cells, narrowed to fit the board or grid it's placed in when that is smaller — though never below its 4×6 minimum, so a grid with no free 4×6 block refuses the drop rather than taking a smaller container. It can't be resized below 4×6 either, inside a grid as much as on the canvas; and if a tab holds a grid, it also can't shrink past what that grid's own contents need.
 
 A tabs container can sit on the canvas, inside a grid, or inside a tab ([nesting rules](#nesting-containers)), but **not inside a stack**: that drop is refused and Cube tells you tabs can't be placed inside a stack. A container nested inside a tab is sized by the tab body rather than by hand: a nested grid keeps **Edit title** and **Delete** but drops **Resize**, and a nested stack or tabs container carries a delete button in its top-right corner instead of a menu.
 
