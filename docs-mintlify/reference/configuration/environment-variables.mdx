@@ -2225,6 +2225,29 @@ The timeout for SQL queries in seconds.
 | ------------------- | ---------------------- | --------------------- |
 | A number in seconds | `120`                  | `120`                 |
 
+## `CUBESTORE_MAX_CONCURRENT_QUERY_PLANS`
+
+The maximum number of query logical plans Cube Store builds at the same time.
+Planning runs before the result cache and is CPU-intensive, so a burst of
+queries can oversubscribe the available cores; this limit gates how many
+plans are built concurrently. `auto` (the default) sizes the limit to
+`max(4, 2 x cores)` available to the process. `0` disables the limit.
+
+| Possible Values          | Default in Development | Default in Production |
+| ------------------------- | ---------------------- | --------------------- |
+| `auto`, `0`, or a number | `auto`                 | `auto`                |
+
+## `CUBESTORE_MAX_QUEUED_QUERY_PLANS`
+
+The maximum number of queries that may wait for a planning slot once
+[`CUBESTORE_MAX_CONCURRENT_QUERY_PLANS`](#cubestore_max_concurrent_query_plans)
+is reached. Once the queue is full, a new query is rejected rather than
+queued. `0` disables the limit.
+
+| Possible Values | Default in Development | Default in Production |
+| --------------- | ---------------------- | --------------------- |
+| A valid number  | `5000`                 | `5000`                |
+
 ## `CUBESTORE_QUERY_CACHE_STALE_WHILE_REVALIDATE`
 
 Enables stale-while-revalidate behavior for Cube Store's SQL result cache. When set
