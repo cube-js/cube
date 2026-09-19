@@ -61,8 +61,7 @@ describe('MSSQL SQL API boolean contexts', () => {
       comparison: 'CAST(b AS INT) > 0',
       compound: 'b = CAST(1 AS BIT) OR c = CAST(1 AS BIT)'
     };
-    const dimensions: Record<string, string> = {};
-    let segmentSql: string;
+    const models = new Map<string, { dimensionSql: string; segmentSql: string }>();
 
     beforeAll(async () => {
       for (const [model, sql] of Object.entries(modelSql)) {
@@ -76,26 +75,38 @@ describe('MSSQL SQL API boolean contexts', () => {
         `);
         await compilers.compiler.compile();
         const modelQuery = new MssqlQuery(compilers, { measures: ['KibanaSampleDataEcommerce.count'] });
-        dimensions[model] = modelQuery.newDimension('KibanaSampleDataEcommerce.has_subscription').dimensionSql();
-        segmentSql = modelQuery.newSegment('KibanaSampleDataEcommerce.is_male').segmentSql();
+        models.set(model, {
+          dimensionSql: modelQuery.newDimension('KibanaSampleDataEcommerce.has_subscription').dimensionSql(),
+          segmentSql: modelQuery.newSegment('KibanaSampleDataEcommerce.is_male').segmentSql()
+        });
       }
     });
 
     it.each(booleanFixture.dimensionCases)('$model: $query', async test => {
+      const model = models.get(test.model);
+      if (!model) {
+        throw new Error(`Unknown boolean fixture model: ${test.model}`);
+      }
       // Rust asserts these exact member expressions after planning. The provider
       // executes their model expansion across true, false, and NULL inputs.
-      const sql = test.sql.split(`\${KibanaSampleDataEcommerce.has_subscription}`).join(dimensions[test.model])
-        .split(`\${KibanaSampleDataEcommerce.is_male}`).join(segmentSql);
-      const result = query(test.predicate
+      const sql = test.sql.split(`\${KibanaSampleDataEcommerce.has_subscription}`).join(model.dimensionSql)
+        .split(`\${KibanaSampleDataEcommerce.is_male}`).join(model.segmentSql);
+      const querySql = test.predicate
         ? `SELECT COUNT(*) AS n FROM ${fixture} WHERE ${sql}`
-        : `SELECT ${sql} AS n FROM ${fixture}`);
+        : `SELECT ${sql} AS n FROM ${fixture}`;
 
       // Excluding raw references deliberately cannot make a BIT into a bare
       // condition, or an opaque predicate into a scalar value.
       if (test.expected === null) {
-        await expect(result).rejects.toThrow(/non-boolean|syntax/i);
+        if (!test.expectedError) {
+          throw new Error('Missing expected error for unsupported boolean fixture');
+        }
+        await expect(query(querySql)).rejects.toMatchObject({
+          number: test.expectedError.number,
+          message: expect.stringContaining(test.expectedError.token)
+        });
       } else {
-        expect(Number((await result)[0].n)).toBe(test.expected);
+        expect(Number((await query(querySql))[0].n)).toBe(test.expected);
       }
     });
   });
