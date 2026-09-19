@@ -39,7 +39,12 @@ A boolean filter is fixed on `is` — there's no operator picker — and takes a
 
 ### Single vs. multiple selection
 
-Filters can allow either a single value or multiple values. Configure this when adding or editing the filter — multi-select is the default for string dimensions, while time and number dimensions default to a single value. A boolean filter is always single-value.
+How many values a filter takes follows from the dimension type and the operator, and only one combination of the two is configurable:
+
+- **String**, `is` and `is not` — multiple values. The **Selection Mode** switch (**Enable multiple values**) in the filter's edit sidebar is the only control over this, and it appears only while the operator is `is`. Turning it off makes the filter single-select, and that setting stays with the filter if you switch the operator to `is not` afterwards. The substring operators (`contains` and its relatives) take one text value.
+- **Number**, `is` and `is not` — multiple values, typed into the value picker. The comparison operators take one number each.
+- **Time** — one value per operator: a date for `is`, `is not`, `after`, `after or on`, `before` and `before or on`, a range for `between`, a whole period for the `in the …` operators.
+- **Boolean** — the single `true` / `false` described above.
 
 ### Default values
 
