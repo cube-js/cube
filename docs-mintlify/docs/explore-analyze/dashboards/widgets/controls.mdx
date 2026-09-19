@@ -27,7 +27,7 @@ The available operators depend on the type of the underlying dimension:
 | **Time** | `is`, `is not`, `after`, `after or on`, `before`, `before or on`, `between`, `in the month`, `not in the month`, `in the quarter`, `not in the quarter`, `in the year`, `not in the year`, `is null`, `is not null` |
 | **Boolean** | `is` |
 
-A time filter's value is either a fixed date or a relative one — **Today**, **Yesterday**, **This month**, `3 months ago` and the like — chosen in the filter's own value picker. The operator is the same either way.
+A time filter's value is either a fixed date or a relative one, chosen in the filter's own value picker. The **Relative** tab lists presets — **Today**, **Yesterday**, **This month**, **3 months ago** and the like — and **Custom** builds any other relative value from a number, a unit and **ago** / **from now**. The operator is the same either way.
 
 A boolean filter takes a `true` / `false` value and shows no operator picker, since `is` is the only condition to choose from.
 
@@ -83,7 +83,7 @@ If a [parent control](#parent) drives this filter, the option the viewer is on d
 
 A filter whose dimension shares a semantic view with other filters can be marked **faceted**, which scopes the values it suggests to the ones those other filters leave available — so viewers only see combinations that exist in the data.
 
-For example, on a sales dashboard with a **Country** filter and a **City** filter, marking the City filter as faceted means selecting `United States` in the Country filter limits the City filter to U.S. cities only. The mark is per filter and narrows in one direction: Country scopes City without carrying the mark itself, and marking Country faceted as well is what makes the two scope each other.
+For example, on a sales dashboard with a **Country** filter and a **City** filter, marking the City filter as faceted means selecting `United States` in the Country filter limits the City filter to U.S. cities only. The mark is per filter and narrows in one direction: Country is a *source* for City without carrying the mark itself, and marking Country faceted as well is what makes the two scope each other.
 
 Turn it on with the **Enable facet** switch, in the **Facet** section of the filter's settings. Faceting changes only the values this filter *suggests*; which rows the charts show is decided by the filters themselves, exactly as it is without it.
 
@@ -93,14 +93,14 @@ Every condition a filter can be set to narrows a faceted filter — all of the [
 
 Two cases contribute nothing:
 
-- **A filter with no value yet.** An empty filter narrows nothing, just as it leaves the charts unfiltered — and so does one a viewer has cleared.
+- **A filter still waiting on its value.** A condition that takes a value narrows nothing until it has one, just as it leaves the charts unfiltered — and so does one a viewer has cleared. The four that take no value — `is null`, `is not null`, `is empty`, `is not empty` — narrow as soon as they are set.
 - **A filter on another semantic view.** Narrowing a value list means querying this filter's own view, so only filters on that view qualify. The rest are greyed out in the source picker below.
 
-A source on a time dimension narrows by whole days, so a condition carrying a time of day scopes the list to the days it covers. A suggestion list is never narrowed past what the charts show: it can offer a value the charts have no rows for, but it never hides one they do.
+A source on a time dimension narrows by whole days, rounded outward, so a condition carrying a time of day scopes the list to every day it touches. A suggestion list is never narrowed past what the charts show: it can offer a value the charts have no rows for, but it never hides one they do.
 
 #### Choosing which filters narrow this one
 
-By default a faceted filter is narrowed by every other filter on its semantic view. To follow only some of them, open the gear beside **Facet** and pick those filters in the picker it reveals — it reads **All** for as long as nothing is picked. Closing the gear again drops the picks and puts the filter back on **All**. A filter never narrows its own list, so it isn't offered as a source for itself.
+By default a faceted filter is narrowed by every other filter on its semantic view. To follow only some of them, open the gear beside **Facet** and pick those filters in the picker it reveals — it reads **All** for as long as nothing is picked. Closing the gear discards the list — including one saved earlier, which the gear opens on — so saving after that puts the filter back on **All**. A filter never narrows its own list, so it isn't offered as a source for itself.
 
 A source you picked that later stops qualifying — its dimension re-pointed at another semantic view, say — is flagged in that picker.
 
