@@ -42,7 +42,7 @@ A grid can be nested inside the root board, inside another grid, or inside a tab
 
 A **tabs container** shows one widget at a time behind a row of tabs across the top of its card. Use it where a dashboard would otherwise run long: put each view of the data on its own tab and let viewers switch between them, instead of stacking every chart down the page.
 
-Each tab holds **one** widget, which fills the tab body — resize the container and the widget resizes with it, and there are no separate resize handles inside a tab. Drag a widget in from the canvas, the **Add Widgets** menu, or another container; an empty tab shows a **Drag a widget here** placeholder. A tab that already holds a widget refuses a second drop and the dragged widget returns to where it came from. To empty a tab, remove the widget through its own menu or delete button, or drag it back out onto the canvas, where it lands at the size of the tab body it was filling rather than at the size a newly added widget of its type would get.
+Each tab holds **one** widget, which fills the tab body — resize the container and the widget resizes with it, and there are no separate resize handles inside a tab. Drag a widget in from the canvas, the **Add Widgets** menu, or another container; an empty tab shows a **Drag a widget here** placeholder. A tab that already holds a widget refuses a second drop and the dragged widget returns to where it came from. To empty a tab, remove the widget through its own menu or delete button, or drag it back out onto the canvas, where it lands at the size of the tab body it was filling.
 
 While you are editing, the tab strip is where you work with the tabs themselves:
 
@@ -75,7 +75,9 @@ One pairing is never allowed at any depth: a **grid** or a **tabs container** in
 ## Deleting a container
 
 <Warning>
+
 Cube asks you to confirm before deleting a container that still holds widgets, and **Cancel** leaves everything in place. Confirming deletes every widget inside it, at every nesting depth — the children are not moved back onto the canvas. An empty container is deleted straight away, with no prompt.
+
 </Warning>
 
 This holds for every container — stack, grid, and tabs — and for every way of deleting one: the container's own menu or delete button, and **Delete** / **Backspace** on a board selection. Deleting a single **tab** works the same way: its widget goes with it, and a tab that holds one asks first.
