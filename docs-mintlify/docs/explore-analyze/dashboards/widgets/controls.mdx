@@ -83,21 +83,25 @@ When multiple filters target dimensions from the same semantic view, you can mar
 
 For example, on a sales dashboard with a **Country** filter and a **City** filter, marking both as faceted means selecting `United States` in the Country filter limits the City filter to U.S. cities only.
 
-A faceted filter is narrowed by the siblings whose condition can be turned into a scope:
+A faceted filter can take as a source any sibling the picker offers, which is a sibling whose condition Cube can turn into a scope:
 
-- A dimension of any type set to `is` or `is not`.
-- A time dimension set to any of its date conditions except `is null` and `is not null`.
+- A dimension of any type set to `is` or `is not`. A **Boolean** dimension has no operator menu, and the `is true` / `is false` its value picker offers counts as `is` here.
+- A time dimension set to any of its date conditions except `is null` and `is not null`. One of those is offered and still scopes nothing: `is not` on a value that is not a whole period, since a point in time has no period to exclude.
 
-Every other condition narrows nothing and cannot be picked as a source — `contains`, `starts with` and `ends with` and their negations, the numeric comparisons (`greater than`, `less than` and their *or equal* forms), and `is null`, `is not null`, `is empty` and `is not empty`.
+Every other condition cannot be picked as a source and scopes nothing — `contains`, `starts with` and `ends with` and their negations, the comparisons on a **Number** dimension (`greater than`, `less than` and their *or equal* forms), and `is null`, `is not null`, `is empty` and `is not empty`.
 
 To pick which siblings a filter listens to, turn the **Facet** switch on in its edit sidebar and press the gear beside the switch. A sibling whose condition cannot narrow is greyed out in that list, with a tooltip saying it is not available for this semantic view or filter type.
 
-A date source scopes the value list to the rows the charts are showing, never to a wider window. A positive date condition scopes it to the window it names:
+A date source scopes the value list to the window the charts are showing. Where a Cube condition can express the charts' own bound exactly it does, and where it cannot the scope errs wider rather than tighter, so the list never drops a value the charts still have rows for. A positive date condition scopes it to the window it names:
 
 - A value that names a whole period — a **Today**, **Yesterday**, **This week**, **This month**, **This quarter** or **This year** preset on the **Relative** tab, or an `in the month`, `in the quarter` or `in the year` condition — scopes the list to that period.
 - A fixed date, or a relative value that names a single moment such as **3 months ago**, scopes it to that moment, which is what the charts match.
-- `after`, `after or on`, `before` and `before or on` scope the list to everything on one side of the date, on the same bound the charts use — the list stays open-ended exactly where they are.
-- A `between` range, including the **Past week** to **Past 2 years** presets, scopes the list to the range's own bounds. A range the charts return no rows for therefore leaves the value list empty too, instead of offering values the charts exclude.
+- `after`, `after or on`, `before` and `before or on` scope the list to everything on one side of the date, on the same bound the charts use whenever that bound is a whole day — the list stays open-ended exactly where they are.
+- A `between` range, including the **Past week** to **Past 2 years** presets, scopes the list to the range's own whole-day bounds. A range the charts return no rows for therefore leaves the value list empty too, instead of offering values the charts exclude.
+
+<Warning>
+Cube reads a `before` or `after` bound as the *start* of the day it names, so an upper bound that carries a time of day is rounded up to the end of that day before it becomes a scope — never down, which would hide values the charts still show. The value list can then keep a value whose only rows fall later that day while the charts exclude it. Only a hand-written [`f_` URL parameter](#sharing-the-current-selection) produces such a bound; the value editor picks whole days, which match the charts exactly.
+</Warning>
 
 A negated date condition scopes the list the other way, to everything *outside* the period it names — `not in the month`, `not in the quarter` and `not in the year`, and `is not` on one of the whole-period values above.
 
