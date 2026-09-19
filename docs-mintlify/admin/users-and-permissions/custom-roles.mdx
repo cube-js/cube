@@ -72,7 +72,7 @@ The Base Role is required. Save is disabled until one is selected.
 
 #### Auto-bump to Developer
 
-Four deployment-scoped actions sit at every tier: **Access deployment** (`DeploymentRead`), **Access AI agents** (`DeploymentAgentRead`), **Download data** (`DownloadData`) and **Access chat history** (`ChatHistoryRead`). Check any other one — for example **Edit deployment** or **Edit data model** — and the Base Role is automatically forced to **Developer**, with the Viewer and Explorer options disabled behind a tooltip:
+Four deployment-scoped actions sit at every tier, because a Viewer-tier role has to be able to hold them: **Access deployment** (`DeploymentRead`), **Access AI agents** (`DeploymentAgentRead`), **Download data** (`DownloadData`) and **Access chat history** (`ChatHistoryRead`). Opening a deployment, using Analytics Chat and downloading results are viewer-level work; chat history is exempt for the same reason, though it shows other users' conversations, so grant it deliberately. Check any other action — for example **Edit deployment** or **Edit data model** — and the Base Role is automatically forced to **Developer**, with the Viewer and Explorer options disabled behind a tooltip:
 
 > Selected actions require Developer role
 
@@ -126,18 +126,12 @@ Either grant **Full access** (a shortcut that enables every current and future d
 | AI          | Access AI agents                    | Use the AI agent in Analytics Chat, workbooks, the IDE, and dashboards.                                                                                                   |
 | Pre-aggregations | Build pre-aggregations         | Trigger pre-aggregation builds (**Build All** and bulk build actions). Withholding it prevents accidental large builds that put Cube Store under pressure.                |
 | Monitoring  | Access query history                | View deployment query history, performance, and traces.                                                                                                                   |
-| Monitoring  | Access chat history                 | View other users' chat conversations for the deployment, including Analytics Chat and the Excel/Google Sheets add-in panes (**Admin → Chats History**). It is [exempt from the auto-bump](#auto-bump-to-developer), so a Viewer-tier role can hold it — grant it only to roles that should see other people's conversations. |
+| Monitoring  | Access chat history                 | View other users' chat conversations for the deployment, including Analytics Chat and the Excel/Google Sheets add-in panes (**Admin → Chats History**). It does not [force the Base Role to Developer](#auto-bump-to-developer), so grant it only to roles that should see other people's conversations. |
 | Data Export | Download data                       | Download query results as CSV from workbooks, Analytics Chat, and published dashboards. The built-in Viewer, Explorer and Developer roles grant it themselves, through their own deployment policies; a custom role does not inherit that from its Base Role, so check it here if the role needs it. See [Data download controls][ref-data-download-controls]. |
 
 When **Full access** is checked, the granular checkboxes appear checked and disabled — granting Full access today also covers any deployment-scoped permissions added in the future.
 
 {/* TODO: Upload screenshot of a deployment policy card with "Full access" checked, granular checkboxes shown checked + disabled */}
-
-<Tip>
-
-**Access deployment** (`DeploymentRead`) and **Download data** (`DownloadData`) are exempt from the [auto-bump](#auto-bump-to-developer) because a Viewer-tier role has to be able to hold them — opening a deployment and downloading from it are viewer-level work. That section lists the full set of exempt actions.
-
-</Tip>
 
 [ref-data-download-controls]: /admin/users-and-permissions/roles-and-permissions#restricting-data-downloads
 
@@ -158,7 +152,7 @@ A common pattern: someone who consumes dashboards and chats but never edits anyt
     Select **Viewer**.
   </Step>
   <Step title="Add a deployment policy">
-    Click **Add deployment policy**, leave **Scope** on **All deployments**, and check **Access deployment** and **Access AI agents**. The Base Role carries neither; **Access AI agents** is what Analytics Chat needs, and both are [exempt from the auto-bump](#auto-bump-to-developer), so the role stays a Viewer.
+    Click **Add deployment policy**, leave **Scope** on **All deployments**, and check **Access deployment** and **Access AI agents**. The Base Role carries neither; **Access AI agents** is what Analytics Chat needs, and neither [forces the Base Role to Developer](#auto-bump-to-developer), so the role stays a Viewer.
   </Step>
   <Step title="Save">
     Click **Create**.
@@ -177,7 +171,7 @@ For an analyst who works in one deployment.
     Add a deployment policy, switch **Scope** to **Specific deployments**, and pick the relevant deployment(s) from the picker.
   </Step>
   <Step title="Pick actions">
-    Check **Access deployment** so the user can open the deployment, **Access AI agents** for Analytics Chat, and **Download data** if they should be able to export query results — all three are [exempt from the auto-bump](#auto-bump-to-developer), so the role stays an Explorer. **Access chat history** is the fourth exemption and would keep the tier too, but it shows other users' conversations, so leave it off unless the role should see them. Leave the remaining actions alone — **Access query history**, for instance, forces the Base Role to Developer, so adding one costs you the Explorer this walkthrough is for.
+    Check **Access deployment** so the user can open the deployment, **Access AI agents** for Analytics Chat, and **Download data** if they should be able to export query results — none of them [forces the Base Role to Developer](#auto-bump-to-developer). **Access chat history** does not either, but it shows other users' conversations, so leave it off unless the role should see them. Leave the rest alone — **Access query history**, for instance, does force the bump, and that costs you the Explorer this walkthrough is for.
   </Step>
   <Step title="Save">
     Click **Create**.
