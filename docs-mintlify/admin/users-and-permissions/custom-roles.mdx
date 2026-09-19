@@ -177,7 +177,7 @@ For an analyst who works in one deployment.
     Add a deployment policy, switch **Scope** to **Specific deployments**, and pick the relevant deployment(s) from the picker.
   </Step>
   <Step title="Pick actions">
-    Check **Access deployment** so the user can open the deployment, **Access AI agents** for Analytics Chat, and **Download data** if they should be able to export query results — all three are [exempt from the auto-bump](#auto-bump-to-developer), so the role stays an Explorer. Leave every other action alone — **Access query history**, for instance, forces the Base Role to Developer, so adding one here costs you the Explorer this walkthrough is for.
+    Check **Access deployment** so the user can open the deployment, **Access AI agents** for Analytics Chat, and **Download data** if they should be able to export query results — all three are [exempt from the auto-bump](#auto-bump-to-developer), so the role stays an Explorer. **Access chat history** is the fourth exemption and would keep the tier too, but it shows other users' conversations, so leave it off unless the role should see them. Leave the remaining actions alone — **Access query history**, for instance, forces the Base Role to Developer, so adding one costs you the Explorer this walkthrough is for.
   </Step>
   <Step title="Save">
     Click **Create**.
