@@ -5,7 +5,9 @@ use crate::planner::{Case, CubeRef, SqlCall};
 
 use super::common::CompiledMemberPath;
 use super::deps::{self, DepVisitor, DepVisitorMut, SymbolDeps};
-use super::{DimensionSymbol, MeasureSymbol, MemberExpressionSymbol, TimeDimensionSymbol};
+use super::{
+    ColumnRefSymbol, DimensionSymbol, MeasureSymbol, MemberExpressionSymbol, TimeDimensionSymbol,
+};
 use std::fmt::Debug;
 use std::ops::ControlFlow;
 use std::rc::Rc;
@@ -25,12 +27,18 @@ use std::rc::Rc;
 /// Indivisible: renders as a single SQL expression. A symbol may depend
 /// on other symbols (`get_dependencies`); whether those deps are
 /// inlined or pushed into a CTE / subquery is a physical-plan decision.
+///
+/// `ColumnRef` is the one variant that describes no calculation at all:
+/// the member is read from a source of the select it appears in. It
+/// keeps the identity of the member it stands for, so it can hold any
+/// position the original held.
 #[derive(Clone)]
 pub enum MemberSymbol {
     Dimension(Rc<DimensionSymbol>),
     TimeDimension(Rc<TimeDimensionSymbol>),
     Measure(Rc<MeasureSymbol>),
     MemberExpression(Rc<MemberExpressionSymbol>),
+    ColumnRef(Rc<ColumnRefSymbol>),
 }
 
 impl Debug for MemberSymbol {
@@ -46,6 +54,7 @@ impl Debug for MemberSymbol {
                 .debug_tuple("MemberExpression")
                 .field(&self.full_name())
                 .finish(),
+            Self::ColumnRef(_) => f.debug_tuple("ColumnRef").field(&self.full_name()).finish(),
         }
     }
 }
@@ -80,12 +89,17 @@ impl MemberSymbol {
         Rc::new(Self::TimeDimension(symbol))
     }
 
+    pub fn new_column_ref(symbol: Rc<ColumnRefSymbol>) -> Rc<Self> {
+        Rc::new(Self::ColumnRef(symbol))
+    }
+
     pub fn compiled_path(&self) -> &CompiledMemberPath {
         match self {
             Self::Dimension(d) => d.compiled_path(),
             Self::TimeDimension(d) => d.compiled_path(),
             Self::Measure(m) => m.compiled_path(),
             Self::MemberExpression(e) => e.compiled_path(),
+            Self::ColumnRef(r) => r.compiled_path(),
         }
     }
 
@@ -182,6 +196,7 @@ impl MemberSymbol {
             Self::TimeDimension(d) => d.is_reference(),
             Self::Measure(m) => m.is_reference(),
             Self::MemberExpression(e) => e.is_reference(),
+            Self::ColumnRef(_) => true,
         }
     }
 
@@ -192,6 +207,10 @@ impl MemberSymbol {
             Self::TimeDimension(d) => d.reference_member(),
             Self::Measure(m) => m.reference_member(),
             Self::MemberExpression(e) => e.reference_member(),
+            // The origin is an identity annotation rather than a
+            // dependency, so it is named here explicitly instead of
+            // being picked up as the first dependency.
+            Self::ColumnRef(r) => Some(r.origin().clone()),
         }
     }
 
@@ -239,14 +258,30 @@ impl MemberSymbol {
         false
     }
 
-    /// `MemberExpression` symbols are never owned by a cube; for the other
-    /// variants, the answer comes from the underlying member definition.
+    /// `MemberExpression` and `ColumnRef` symbols are never owned by a cube —
+    /// the first has no member definition behind it, the second is read from a
+    /// source the select already has. For the other variants the answer comes
+    /// from the underlying member definition.
     pub fn owned_by_cube(&self) -> bool {
         match self {
             Self::Dimension(d) => d.owned_by_cube(),
             Self::TimeDimension(d) => d.owned_by_cube(),
             Self::Measure(m) => m.owned_by_cube(),
             Self::MemberExpression(_) => false,
+            Self::ColumnRef(_) => false,
+        }
+    }
+
+    /// The time dimension this symbol stands for: itself, or the one
+    /// behind a reference that reads it from a source. Answers a
+    /// question about member identity, so it looks through references;
+    /// `as_time_dimension` answers what the symbol renders as and does
+    /// not.
+    pub fn time_dimension_behind_references(&self) -> Option<Rc<TimeDimensionSymbol>> {
+        match self {
+            Self::TimeDimension(d) => Some(d.clone()),
+            Self::ColumnRef(r) => r.origin().time_dimension_behind_references(),
+            _ => None,
         }
     }
 
@@ -370,6 +405,7 @@ impl SymbolDeps for MemberSymbol {
             Self::TimeDimension(d) => d.as_ref().visit_deps(visitor),
             Self::Measure(m) => m.as_ref().visit_deps(visitor),
             Self::MemberExpression(e) => e.as_ref().visit_deps(visitor),
+            Self::ColumnRef(r) => r.as_ref().visit_deps(visitor),
         }
     }
 
@@ -395,6 +431,11 @@ impl SymbolDeps for MemberSymbol {
                 body.visit_deps_mut(visitor)?;
                 *e = Rc::new(body);
             }
+            Self::ColumnRef(r) => {
+                let mut body = (**r).clone();
+                body.visit_deps_mut(visitor)?;
+                *r = Rc::new(body);
+            }
         }
         Ok(())
     }
@@ -407,6 +448,7 @@ impl crate::utils::debug::DebugSql for MemberSymbol {
             MemberSymbol::Measure(m) => m.debug_sql(expand_deps),
             MemberSymbol::TimeDimension(t) => t.debug_sql(expand_deps),
             MemberSymbol::MemberExpression(e) => e.debug_sql(expand_deps),
+            MemberSymbol::ColumnRef(r) => r.debug_sql(expand_deps),
         }
     }
 }

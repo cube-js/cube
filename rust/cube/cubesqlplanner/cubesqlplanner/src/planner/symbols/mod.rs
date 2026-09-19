@@ -1,3 +1,4 @@
+mod column_ref_symbol;
 mod common;
 mod cube_symbol;
 pub mod deps;
@@ -11,6 +12,7 @@ mod symbol_factory;
 mod time_dimension_symbol;
 pub mod transforms;
 
+pub use column_ref_symbol::{ColumnRefSymbol, ReferenceValue};
 pub use common::*;
 pub use cube_symbol::{
     CubeNameSymbol, CubeNameSymbolFactory, CubeTableSymbol, CubeTableSymbolFactory,

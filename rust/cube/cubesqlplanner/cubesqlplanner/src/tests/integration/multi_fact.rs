@@ -312,6 +312,47 @@ async fn test_multi_fact_measure_filter_on_second_fact() {
     }
 }
 
+/// ORDER BY a measure that the query filters on but does not select. Such an
+/// item is absent from the select's schema, so it carries its own symbol into
+/// the ORDER BY and has to be read from the aggregate the same way the HAVING
+/// reads it — dropping the sort key silently would leave the rows unordered.
+#[tokio::test(flavor = "multi_thread")]
+async fn test_order_by_filtered_measure_outside_selection() {
+    let ctx = create_context();
+
+    let query = indoc! {"
+        measures:
+          - orders.count
+        dimensions:
+          - customers.name
+        filters:
+          - member: returns.count
+            operator: gt
+            values:
+              - \"1\"
+        order:
+          - id: returns.count
+            desc: true
+          - id: customers.name
+    "};
+
+    let sql = ctx.build_sql(query).unwrap();
+
+    let order_by = sql
+        .rsplit_once("ORDER BY")
+        .map(|(_, tail)| tail.to_string())
+        .unwrap_or_default();
+    assert!(
+        order_by.contains("returns__count"),
+        "Expected the filtered measure to survive as a sort key:\n{}",
+        sql
+    );
+
+    if let Some(result) = ctx.try_execute_pg(query, SEED).await {
+        insta::assert_snapshot!(result);
+    }
+}
+
 #[tokio::test(flavor = "multi_thread")]
 async fn test_multiplied_with_time_granularity() {
     let ctx = create_context();

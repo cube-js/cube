@@ -55,7 +55,7 @@ impl LogicalSchema {
         for (i, m) in self.time_dimensions.iter().enumerate() {
             if m.full_name() == name {
                 result.push(i + self.dimensions.len());
-            } else if let Ok(time_dimension) = m.as_time_dimension() {
+            } else if let Some(time_dimension) = m.time_dimension_behind_references() {
                 if time_dimension.base_symbol().full_name() == name {
                     result.push(i + self.dimensions.len());
                 }
@@ -225,6 +225,46 @@ mod tests {
         assert_eq!(
             result2.as_ref().map(|r| r.full_name()),
             Some(measure.full_name())
+        );
+
+        Ok(())
+    }
+
+    /// A time dimension a select reads from a source is held in the schema as a
+    /// reference. ORDER BY names the base dimension, without the granularity
+    /// suffix, so the position lookup has to find it through that reference —
+    /// otherwise the sort key is silently dropped.
+    #[test]
+    fn test_find_member_positions_for_a_referenced_time_dimension() -> Result<(), CubeError> {
+        use crate::physical_plan::symbols::column_ref_symbol::column_reference;
+        use crate::physical_plan::QualifiedColumnName;
+
+        let schema = MockSchema::from_yaml_file("common/visitors.yaml");
+        let ctx = TestContext::new(schema)?;
+
+        let time_dim_base = ctx.create_dimension("visitors.created_at")?;
+        let time_dim = MemberSymbol::new_time_dimension(TimeDimensionSymbol::new(
+            time_dim_base,
+            Some("day".to_string()),
+            None,
+            None,
+        ));
+        let reference = column_reference(
+            &time_dim,
+            QualifiedColumnName::new(Some("src".to_string()), "created_at_day".to_string()),
+        );
+
+        let logical_schema = LogicalSchema::default().set_time_dimensions(vec![reference.clone()]);
+
+        assert_eq!(
+            logical_schema.find_member_positions("visitors.created_at"),
+            vec![0],
+            "the base name must find the referenced time dimension"
+        );
+        assert_eq!(
+            logical_schema.find_member_positions(&time_dim.full_name()),
+            vec![0],
+            "so must the granular name the reference carries"
         );
 
         Ok(())

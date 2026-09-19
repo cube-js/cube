@@ -113,6 +113,8 @@ macro_rules! symbol_deps {
                 &self,
                 visitor: &mut dyn $crate::planner::symbols::deps::DepVisitor,
             ) -> ::std::ops::ControlFlow<()> {
+                // A node whose every slot is `skip` never touches the visitor.
+                let _ = &visitor;
                 let Self { $($field),+ } = self;
                 $($crate::planner::symbols::deps::symbol_deps!(@visit $mode, $field, visitor);)+
                 ::std::ops::ControlFlow::Continue(())
@@ -122,6 +124,7 @@ macro_rules! symbol_deps {
                 &mut self,
                 visitor: &mut dyn $crate::planner::symbols::deps::DepVisitorMut,
             ) -> Result<(), ::cubenativeutils::CubeError> {
+                let _ = &visitor;
                 let Self { $($field),+ } = self;
                 $($crate::planner::symbols::deps::symbol_deps!(@visit_mut $mode, $field, visitor);)+
                 Ok(())

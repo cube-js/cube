@@ -2,11 +2,12 @@ use super::FullKeyAggregateStrategy;
 use crate::logical_plan::{FullKeyAggregate, LogicalJoin};
 use crate::physical_plan::sql_nodes::SqlNodesFactory;
 use crate::physical_plan::{
-    Expr, From, FromSource, JoinBuilder, JoinCondition, QualifiedColumnName, ReferencesBuilder,
-    Select, SelectBuilder, SingleAliasedSource,
+    Expr, From, FromSource, JoinBuilder, JoinCondition, QualifiedColumnName,
+    ReferenceSubstitutions, ReferencesBuilder, Select, SelectBuilder, SingleAliasedSource,
 };
 use crate::physical_plan_builder::PhysicalPlanBuilder;
 use crate::physical_plan_builder::PushDownBuilderContext;
+use crate::planner::symbols::transforms;
 use crate::planner::MemberSymbol;
 use cubenativeutils::CubeError;
 use itertools::Itertools;
@@ -67,25 +68,34 @@ impl<'a> FullJoinFullKeyAggregateStrategy<'a> {
         context: &PushDownBuilderContext,
     ) -> Result<Rc<Select>, CubeError> {
         let query_tools = self.builder.query_tools();
-        let mut context_factory = SqlNodesFactory::new();
+        let context_factory = SqlNodesFactory::new();
         let references_builder = ReferencesBuilder::new(from.clone());
-        let mut select_builder = SelectBuilder::new(from);
+
+        let mut substitutions = ReferenceSubstitutions::new();
         for dimension in dimensions.iter() {
-            self.builder.process_query_dimension(
+            self.builder.collect_query_dimension_substitution(
                 dimension,
                 &references_builder,
-                &mut select_builder,
-                &mut context_factory,
-                &context,
+                &from,
+                &mut substitutions,
+            )?;
+        }
+        for measure in measures {
+            references_builder.collect_substitutions_for_member(
+                measure.clone(),
+                &None,
+                &mut substitutions,
             )?;
         }
 
+        let mut select_builder = SelectBuilder::new(from);
+        for dimension in dimensions.iter() {
+            let dimension = transforms::substitute_by_name(dimension, &substitutions)?;
+            self.builder
+                .project_query_dimension(&dimension, &mut select_builder, &context)?;
+        }
         for measure in measures {
-            references_builder.resolve_references_for_member(
-                measure.clone(),
-                &None,
-                context_factory.render_references_mut(),
-            )?;
+            let measure = transforms::substitute_by_name(measure, &substitutions)?;
             select_builder.add_projection_member(&measure, None);
         }
         let res = Rc::new(select_builder.build(query_tools.clone(), context_factory));

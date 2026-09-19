@@ -1,3 +1,4 @@
+pub mod column_ref_symbol;
 pub mod dimension_kinds;
 pub mod dimension_symbol;
 pub mod measure_kinds;

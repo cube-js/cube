@@ -1,10 +1,14 @@
 use super::super::{LogicalNodeProcessor, ProcessableNode, PushDownBuilderContext};
+use crate::logical_plan::transforms as logical_transforms;
 use crate::logical_plan::{all_symbols, KeysSubQuery};
+use crate::physical_plan::symbols::column_ref_symbol::literal_reference;
 use crate::physical_plan::{
-    CalcGroupItem, CalcGroupsJoin, From, ReferencesBuilder, Select, SelectBuilder,
+    CalcGroupItem, CalcGroupsJoin, From, ReferenceSubstitutions, ReferencesBuilder, Select,
+    SelectBuilder,
 };
 use crate::physical_plan_builder::PhysicalPlanBuilder;
 use crate::planner::collectors::collect_calc_group_dims_from_nodes;
+use crate::planner::symbols::transforms;
 use crate::planner::symbols::transforms::get_filtered_values;
 use cubenativeutils::CubeError;
 use itertools::Itertools as _;
@@ -51,10 +55,20 @@ impl<'a> LogicalNodeProcessor<'a, KeysSubQuery> for KeysSubQueryProcessor<'a> {
                 values,
             }
         });
+        // A value pinned by the query is not read from the source, so it is
+        // recorded before the walk below can map the dimension to a column.
+        let mut substitutions = ReferenceSubstitutions::new();
         for item in calc_groups_items
             .clone()
             .filter(|itm| itm.values.len() == 1)
         {
+            substitutions.insert(
+                item.symbol.full_name(),
+                literal_reference(&item.symbol, item.values[0].clone()),
+            );
+            // A join condition can name a calc-group dimension too, and it is
+            // built before there is a select symbol environment to rewrite, so
+            // it resolves the value while rendering.
             context_factory.add_render_reference(item.symbol.full_name(), item.values[0].clone());
         }
         let calc_groups_to_join = calc_groups_items
@@ -68,46 +82,65 @@ impl<'a> LogicalNodeProcessor<'a, KeysSubQuery> for KeysSubQueryProcessor<'a> {
         };
 
         let references_builder = ReferencesBuilder::new(source.clone());
-        let mut select_builder = SelectBuilder::new(source);
-        self.builder.resolve_subquery_dimensions_references(
+        self.builder.collect_subquery_dimensions_substitutions(
             &keys_subquery.source().dimension_subqueries(),
             &references_builder,
+            &mut substitutions,
             &mut context_factory,
         )?;
         for member in keys_subquery.schema().all_dimensions() {
-            let alias = member.alias();
-            references_builder.resolve_references_for_member(
+            references_builder.collect_substitutions_for_member(
                 member.clone(),
                 &None,
-                context_factory.render_references_mut(),
+                &mut substitutions,
             )?;
-            select_builder.add_projection_member(member, Some(alias));
         }
-
-        if !context.dimensions_query {
-            for member in keys_subquery.primary_keys_dimensions().iter() {
-                // A primary key that is also a query dimension is already
-                // projected above. Projecting it again would put two columns
-                // under one alias, making every reference to it from the
-                // enclosing re-join ambiguous. Symbols are matched the way
-                // `Schema::find_column_for_member` matches them, so that the
-                // re-join resolves to the surviving column.
-                let resolved = member.clone().resolve_reference_chain();
-                if keys_subquery
-                    .schema()
-                    .all_dimensions()
-                    .any(|dim| dim.clone().resolve_reference_chain() == resolved)
-                {
-                    continue;
-                }
-                let alias = member.alias();
-                references_builder.resolve_references_for_member(
+        let primary_keys_dimensions = if context.dimensions_query {
+            vec![]
+        } else {
+            // A primary key that is also a query dimension is already projected
+            // above. Projecting it again would put two columns under one alias,
+            // making every reference to it from the enclosing re-join ambiguous.
+            // Symbols are matched the way `Schema::find_column_for_member`
+            // matches them, so that the re-join resolves to the surviving
+            // column.
+            let members = keys_subquery
+                .primary_keys_dimensions()
+                .iter()
+                .filter(|member| {
+                    let resolved = (*member).clone().resolve_reference_chain();
+                    !keys_subquery
+                        .schema()
+                        .all_dimensions()
+                        .any(|dim| dim.clone().resolve_reference_chain() == resolved)
+                })
+                .cloned()
+                .collect_vec();
+            for member in members.iter() {
+                references_builder.collect_substitutions_for_member(
                     member.clone(),
                     &None,
-                    context_factory.render_references_mut(),
+                    &mut substitutions,
                 )?;
-                select_builder.add_projection_member(member, Some(alias));
             }
+            members
+        };
+
+        let schema = logical_transforms::substitute_symbols_in_schema(
+            &keys_subquery.schema(),
+            &substitutions,
+        )?;
+        let filter = logical_transforms::substitute_symbols_in_filter(filter, &substitutions)?;
+
+        let mut select_builder = SelectBuilder::new(source);
+        for member in schema.all_dimensions() {
+            let alias = member.alias();
+            select_builder.add_projection_member(member, Some(alias));
+        }
+        for member in primary_keys_dimensions.iter() {
+            let member = transforms::substitute_by_name(member, &substitutions)?;
+            let alias = member.alias();
+            select_builder.add_projection_member(&member, Some(alias));
         }
 
         select_builder.set_distinct();

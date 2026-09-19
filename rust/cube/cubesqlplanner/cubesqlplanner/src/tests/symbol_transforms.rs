@@ -4,12 +4,14 @@ use crate::logical_plan::transforms::{
     mark_tz_converted_at_source_in_schema, measures_render_modifier_in_schema,
 };
 use crate::logical_plan::LogicalSchema;
+use crate::physical_plan::symbols::column_ref_symbol::column_reference;
+use crate::physical_plan::QualifiedColumnName;
 use crate::planner::symbols::transforms;
 use crate::planner::{MeasureRenderModifier, MemberSymbol};
 use crate::test_fixtures::cube_bridge::MockSchema;
 use crate::test_fixtures::test_utils::TestContext;
 use std::cell::RefCell;
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::rc::Rc;
 
 fn ctx() -> TestContext {
@@ -140,5 +142,82 @@ fn tz_mark_reaches_time_dimensions_embedded_in_other_members() {
         tz_mark_of(&marked.dimensions[0], "events.created_at_day"),
         Some(true),
         "the embedded occurrence must carry the mark too"
+    );
+}
+
+/// A reference is terminal. It carries the name of the member it stands for, so
+/// a substitute that reads that member *through* a reference — an aggregation
+/// over a column of a source below — would match its own map entry again and be
+/// rebuilt around itself without end.
+#[test]
+fn substitution_does_not_reenter_a_reference() {
+    let ctx = ctx();
+    let measure = ctx.create_measure("events.count").unwrap();
+    let column = QualifiedColumnName::new(Some("src".to_string()), "cnt".to_string());
+    let over_reference = MemberSymbol::new_measure(transforms::measure_over_reference(
+        &measure.as_measure().unwrap(),
+        column_reference(&measure, column),
+    ));
+
+    let replacements = HashMap::from([(measure.full_name(), over_reference)]);
+    let substituted = transforms::substitute_by_name(&measure, &replacements).unwrap();
+
+    assert_eq!(
+        ctx.evaluate_symbol(&substituted).unwrap(),
+        "count(\"src\".\"cnt\")",
+        "the measure must read the column once, wrapped by its own aggregation"
+    );
+}
+
+/// The same holds for a reference embedded in another member's expression: the
+/// walk replaces the measure inside the `CASE` body and stops at the reference
+/// it now reads.
+#[test]
+fn substitution_does_not_reenter_a_nested_reference() {
+    let ctx = ctx();
+    let dimension = ctx.create_dimension("events.count_label").unwrap();
+    let measure = ctx.create_measure("events.count").unwrap();
+    let column = QualifiedColumnName::new(Some("src".to_string()), "cnt".to_string());
+    let over_reference = MemberSymbol::new_measure(transforms::measure_over_reference(
+        &measure.as_measure().unwrap(),
+        column_reference(&measure, column),
+    ));
+
+    let replacements = HashMap::from([(measure.full_name(), over_reference)]);
+    let substituted = transforms::substitute_by_name(&dimension, &replacements).unwrap();
+
+    let sql = ctx.evaluate_symbol(&substituted).unwrap();
+    assert!(
+        sql.contains("count(\"src\".\"cnt\")"),
+        "the nested measure must read the column: {sql}"
+    );
+}
+
+/// Nothing wraps a reference, and that includes the render-reference map a join
+/// condition resolves its members through: a reference carries the name of the
+/// member it stands for, so looking that name up would render it from the map
+/// instead of from itself.
+#[test]
+fn render_references_do_not_intercept_a_reference() {
+    let ctx = ctx();
+    let dimension = ctx.create_dimension("events.id").unwrap();
+    let reference = column_reference(
+        &dimension,
+        QualifiedColumnName::new(Some("src".to_string()), "id".to_string()),
+    );
+
+    let sql = ctx
+        .evaluate_symbol_with_render_references(
+            &reference,
+            vec![(
+                dimension.full_name(),
+                QualifiedColumnName::new(Some("other".to_string()), "other_id".to_string()),
+            )],
+        )
+        .unwrap();
+
+    assert_eq!(
+        sql, "\"src\".\"id\"",
+        "the reference must render the column it names"
     );
 }

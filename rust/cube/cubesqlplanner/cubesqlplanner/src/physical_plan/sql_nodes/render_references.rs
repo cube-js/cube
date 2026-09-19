@@ -9,17 +9,13 @@ use std::any::Any;
 use std::collections::HashMap;
 use std::rc::Rc;
 
-#[derive(Clone)]
-pub struct RawReferenceValue(pub String);
-
 /// Replacement form for a member that is rendered as a reference
-/// instead of being evaluated: a qualified column, a quoted string
-/// literal, or a raw SQL fragment.
+/// instead of being evaluated: a qualified column or a quoted string
+/// literal.
 #[derive(Clone)]
 pub enum RenderReferencesType {
     QualifiedColumnName(QualifiedColumnName),
     LiteralValue(String),
-    RawReferenceValue(String),
 }
 
 impl From<QualifiedColumnName> for RenderReferencesType {
@@ -31,12 +27,6 @@ impl From<QualifiedColumnName> for RenderReferencesType {
 impl From<String> for RenderReferencesType {
     fn from(value: String) -> Self {
         Self::LiteralValue(value)
-    }
-}
-
-impl From<RawReferenceValue> for RenderReferencesType {
-    fn from(value: RawReferenceValue) -> Self {
-        Self::RawReferenceValue(value.0)
     }
 }
 
@@ -91,6 +81,18 @@ impl SqlNode for RenderReferencesSqlNode {
         node_processor: Rc<dyn SqlNode>,
         templates: &PlanSqlTemplates,
     ) -> Result<String, CubeError> {
+        // A reference already names what it reads, and it carries the name of
+        // the member it stands for — looking that name up here would render it
+        // from this map instead of from itself.
+        if matches!(node.as_ref(), MemberSymbol::ColumnRef(_)) {
+            return self.input.to_sql(
+                visitor,
+                node,
+                query_tools.clone(),
+                node_processor.clone(),
+                templates,
+            );
+        }
         let full_name = node.full_name();
         if let Some(reference) = self.references.get(&full_name) {
             match reference {
@@ -107,7 +109,6 @@ impl SqlNode for RenderReferencesSqlNode {
                     ))
                 }
                 RenderReferencesType::LiteralValue(value) => templates.quote_string(value),
-                RenderReferencesType::RawReferenceValue(value) => Ok(value.clone()),
             }
         } else {
             self.input.to_sql(

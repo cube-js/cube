@@ -26,5 +26,12 @@ pub fn strip_join_prefix(symbol: &Rc<MemberSymbol>) -> Rc<MemberSymbol> {
             new.compiled_path = new.compiled_path.strip_join_prefix();
             Rc::new(MemberSymbol::MemberExpression(Rc::new(new)))
         }
+        // A reference has no path of its own — it takes identity from the
+        // member it stands for, so that member is stripped instead.
+        MemberSymbol::ColumnRef(r) => {
+            let mut new = (**r).clone();
+            new.origin = strip_join_prefix(&new.origin);
+            Rc::new(MemberSymbol::ColumnRef(Rc::new(new)))
+        }
     }
 }

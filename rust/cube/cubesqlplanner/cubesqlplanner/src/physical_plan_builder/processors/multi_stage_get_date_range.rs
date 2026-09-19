@@ -1,9 +1,9 @@
 use super::super::context::PushDownBuilderContext;
 use super::super::{LogicalNodeProcessor, ProcessableNode};
 use crate::logical_plan::MultiStageGetDateRange;
-use crate::physical_plan::ReferencesBuilder;
-use crate::physical_plan::{QueryPlan, SelectBuilder};
+use crate::physical_plan::{QueryPlan, ReferenceSubstitutions, ReferencesBuilder, SelectBuilder};
 use crate::physical_plan_builder::PhysicalPlanBuilder;
+use crate::planner::symbols::transforms;
 use cubenativeutils::CubeError;
 use std::rc::Rc;
 
@@ -29,7 +29,18 @@ impl<'a> LogicalNodeProcessor<'a, MultiStageGetDateRange> for MultiStageGetDateR
         let references_builder = ReferencesBuilder::new(from.clone());
         let mut select_builder = SelectBuilder::new(from);
         let mut context_factory = context.make_sql_nodes_factory()?;
-        let args = vec![get_date_range.time_dimension.clone()];
+
+        let mut substitutions = ReferenceSubstitutions::new();
+        self.builder.collect_subquery_dimensions_substitutions(
+            &get_date_range.source.dimension_subqueries(),
+            &references_builder,
+            &mut substitutions,
+            &mut context_factory,
+        )?;
+        let args = vec![transforms::substitute_by_name(
+            &get_date_range.time_dimension,
+            &substitutions,
+        )?];
         select_builder.add_projection_function_expression(
             "MAX",
             args.clone(),
@@ -42,11 +53,6 @@ impl<'a> LogicalNodeProcessor<'a, MultiStageGetDateRange> for MultiStageGetDateR
             "min_date".to_string(),
         );
 
-        self.builder.resolve_subquery_dimensions_references(
-            &get_date_range.source.dimension_subqueries(),
-            &references_builder,
-            &mut context_factory,
-        )?;
         let select = Rc::new(select_builder.build(query_tools.clone(), context_factory));
         Ok(QueryPlan::Select(select))
     }
