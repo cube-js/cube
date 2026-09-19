@@ -41,9 +41,9 @@ A boolean filter has no operator picker at all: one dropdown carries the conditi
 
 How many values a filter takes follows from the dimension type and the operator, and only one combination of the two is configurable:
 
-- **String**, `is` and `is not` — multiple values by default, and configurable: the **Selection Mode** switch (**Enable multiple values**) in the filter's edit sidebar appears only while the operator is `is`; turning it off makes the filter single-select, and that setting stays with the filter if you switch the operator to `is not` afterwards. The substring operators (`contains` and its relatives) take one text value.
+- **String**, `is` and `is not` — multiple values by default. Only `is` is configurable: the **Selection Mode** switch (**Enable multiple values**) in the filter's edit sidebar appears only while that operator is selected, turning it off makes the filter single-select, and that setting stays with the filter if you switch the operator to `is not` afterwards. The substring operators (`contains` and its relatives) take one text value.
 - **Number**, `is` and `is not` — multiple values, typed into the value picker. The comparison operators take one number each.
-- **Time** and **Boolean** — one value, of the shape each operator takes [above](#operators-by-dimension-type).
+- **Time** and **Boolean** — one value, of the shape each operator takes [above](#operators-by-dimension-type), except `is null` and `is not null`, which take none.
 
 ### Default values
 
