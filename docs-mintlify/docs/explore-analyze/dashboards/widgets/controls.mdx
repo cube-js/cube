@@ -80,6 +80,14 @@ When multiple filters target dimensions from the same semantic view, you can mar
 
 For example, on a sales dashboard with a **Country** filter and a **City** filter, marking both as faceted means selecting `United States` in the Country filter limits the City filter to U.S. cities only.
 
+A faceted filter is narrowed by the sibling filters set to `is` or `is not`, and by a filter on a time dimension set to any of its date conditions but `is null` and `is not null`. The rest — a substring condition, a numeric comparison, `is null` — are greyed out in the source picker, which says so in a tooltip. One combination is offered and still narrows nothing: `is not` on a time dimension set to a single moment rather than a whole period, since excluding the whole day around one instant would hide values whose rows the charts still show.
+
+A date source scopes the value list to the rows the charts are showing, never to a wider window:
+
+- A value that names a whole period — a **Today**, **Yesterday**, **This week**, **This month**, **This quarter** or **This year** preset on the **Relative** tab, or a condition that picks a whole month, quarter or year — scopes the list to that period.
+- A fixed date, or a relative value that names a single moment such as **3 months ago**, scopes it to that moment, which is what the charts match.
+- A range, including the **Past week** to **Past 2 years** presets, scopes the list to the range's own bounds. A range the charts return no rows for therefore leaves the value list empty too, instead of offering values the charts exclude.
+
 ## Time granularity switcher
 
 Time granularity switchers let viewers change the granularity of time-based dimensions on the dashboard — for example, switching a revenue chart from daily to weekly or monthly. The widget targets a single time dimension and applies the chosen [granularity][ref-granularities] to every chart that groups by that dimension.
