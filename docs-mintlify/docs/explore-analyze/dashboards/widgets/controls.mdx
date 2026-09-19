@@ -85,7 +85,7 @@ For example, on a sales dashboard with a **Country** filter and a **City** filte
 
 A faceted filter can take as a source any sibling on the same semantic view set to one of these conditions:
 
-- A dimension of any type set to `is` or `is not`, including the `is true` / `is false` a **Boolean** dimension's value picker offers.
+- A **String** or **Number** dimension set to `is` or `is not`, or a **Boolean** one, whose `is true` / `is false` count as `is` here.
 - A time dimension set to any of its date conditions except `is null` and `is not null` — though `is not` does not narrow on every value it accepts.
 
 Every other condition cannot be picked as a source and scopes nothing — `contains`, `starts with` and `ends with` and their negations, the comparisons on a **Number** dimension (`greater than`, `less than` and their *or equal* forms), and `is null`, `is not null`, `is empty` and `is not empty`.
