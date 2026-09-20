@@ -2106,6 +2106,35 @@ The logging level for Cube Store.
 
 See also [`CUBEJS_LOG_LEVEL`](/reference/configuration/environment-variables#cubejs_log_level).
 
+## `CUBESTORE_MAX_CONCURRENT_QUERY_PLANS`
+
+The maximum number of SQL queries that Cube Store may build a logical plan for
+at the same time. Query planning runs before the result cache, so a burst of
+queries can otherwise enter it all at once, oversubscribing the available
+cores and holding every in-flight plan's intermediate state in memory. Extra
+queries beyond the limit wait for a free slot, up to
+[`CUBESTORE_MAX_QUEUED_QUERY_PLANS`](#cubestore_max_queued_query_plans).
+
+Set to `0` to disable the limit. `auto` (the default) sizes the limit to
+twice the CPU cores available to the process, with a floor of `4`.
+
+| Possible Values                     | Default in Development | Default in Production |
+| ------------------------------------ | ---------------------- | --------------------- |
+| `auto`, `0`, or a positive integer   | `auto`                  | `auto`                |
+
+## `CUBESTORE_MAX_QUEUED_QUERY_PLANS`
+
+The maximum number of SQL queries that may wait for a query-planning slot once
+[`CUBESTORE_MAX_CONCURRENT_QUERY_PLANS`](#cubestore_max_concurrent_query_plans)
+is reached. A query that arrives once the queue is full is rejected rather
+than queued, since planning isn't covered by
+[`CUBESTORE_QUERY_TIMEOUT`](#cubestore_query_timeout) and an unbounded queue
+would otherwise grow without limit.
+
+| Possible Values | Default in Development | Default in Production |
+| --------------- | ---------------------- | --------------------- |
+| A valid number  | `5000`                  | `5000`                |
+
 ## `CUBESTORE_MAX_WS_CONNECTIONS_PER_USER`
 
 The maximum number of concurrent WebSocket connections a single authenticated
