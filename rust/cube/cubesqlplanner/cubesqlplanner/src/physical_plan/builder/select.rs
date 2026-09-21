@@ -238,10 +238,11 @@ impl SelectBuilder {
         self.filter = filter;
     }
 
-    /// The filters that `FILTER_PARAMS` and `FILTER_GROUP` bindings in this
-    /// select's sources bind against. Defaults to the WHERE filter; set it
-    /// where a select carries no WHERE of its own but its sources still have
-    /// to see the query's filters.
+    /// Filters an enclosing construct applies on this select's behalf, for
+    /// the `FILTER_PARAMS` and `FILTER_GROUP` bindings of its sources to
+    /// resolve against. Set it where a select carries no WHERE of its own but
+    /// its sources still have to see the query's filters; it is conjoined
+    /// with the WHERE filter, never substituted for it.
     pub fn set_filter_params_filters(&mut self, filters: Option<Filter>) {
         self.filter_params_filters = filters;
     }
@@ -333,11 +334,23 @@ impl SelectBuilder {
         schema
     }
 
+    /// Everything that constrains the rows this select emits, as one
+    /// conjunction: its own WHERE and whatever an enclosing construct applies
+    /// on its behalf. A binding may push any of it into a source's scan.
+    fn binding_filters(filter: Option<Filter>, from_enclosing: Option<Filter>) -> Option<Filter> {
+        match (filter, from_enclosing) {
+            (Some(filter), Some(from_enclosing)) => Some(Filter {
+                items: filter
+                    .items
+                    .into_iter()
+                    .chain(from_enclosing.items)
+                    .collect(),
+            }),
+            (filter, from_enclosing) => filter.or(from_enclosing),
+        }
+    }
+
     pub fn build(self, query_tools: Rc<QueryTools>, mut nodes_factory: SqlNodesFactory) -> Select {
-        debug_assert!(
-            self.filter_params_filters.is_none() || self.filter.is_none(),
-            "filter_params_filters replaces the WHERE filter for binding resolution"
-        );
         let cube_references = Self::make_cube_references(self.from.clone());
         nodes_factory.set_cube_name_references(cube_references);
         let schema = if self.projection_columns.is_empty() {
@@ -355,7 +368,7 @@ impl SelectBuilder {
             context: Rc::new(VisitorContext::new(
                 query_tools,
                 &nodes_factory,
-                self.filter_params_filters.or(self.filter),
+                Self::binding_filters(self.filter, self.filter_params_filters),
             )),
             ctes: self.ctes,
             is_distinct: self.is_distinct,
