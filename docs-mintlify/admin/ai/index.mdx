@@ -124,6 +124,11 @@ The `runtime` property controls how the agent processes requests:
   `reasoning` and `chassis` are **experimental**. They may be unstable and are not yet feature-complete. Stick with `plain` unless you specifically need extended thinking or the leaner semantic-model toolset.
 </Warning>
 
+The `runtime` property applies to chat — [Analytics Chat](/docs/explore-analyze/analytics-chat)
+and the [workbook chat sidebar](/docs/explore-analyze/workbooks). [AI summary
+widgets](/docs/explore-analyze/dashboards/widgets/ai-summary) always use their own runtime,
+regardless of this setting.
+
 ## Memory
 
 The `memory_mode` property controls how the agent persists context across conversations:
