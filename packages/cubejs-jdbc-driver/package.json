@@ -2,7 +2,7 @@
   "name": "@cubejs-backend/jdbc-driver",
   "description": "Cube JDBC database driver",
   "author": "Cube Dev, Inc.",
-  "version": "1.7.42",
+  "version": "1.7.43",
   "repository": {
     "type": "git",
     "url": "https://github.com/cube-js/cube.git",
@@ -33,9 +33,9 @@
     "index.js"
   ],
   "dependencies": {
-    "@cubejs-backend/base-driver": "1.7.42",
+    "@cubejs-backend/base-driver": "1.7.43",
     "@cubejs-backend/node-java-maven": "^0.1.3",
-    "@cubejs-backend/shared": "1.7.42"
+    "@cubejs-backend/shared": "1.7.43"
   },
   "optionalDependencies": {
     "@cubejs-backend/jdbc": "^0.9.0",
@@ -46,7 +46,7 @@
     "testEnvironment": "node"
   },
   "devDependencies": {
-    "@cubejs-backend/linter": "1.7.42",
+    "@cubejs-backend/linter": "1.7.43",
     "@types/jest": "^29",
     "@types/node": "^22",
     "typescript": "~6.0.3"

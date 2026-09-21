@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.7.43](https://github.com/cube-js/cube/compare/v1.7.42...v1.7.43) (2026-09-21)
+
+### Features
+
+- **cubesql:** Upgrade lru from 0.13.0 to 0.18.4 ([#11950](https://github.com/cube-js/cube/issues/11950)) ([82f4a70](https://github.com/cube-js/cube/commit/82f4a7056351ea83e4da6d22b6c0a80673b7b0ce))
+
 ## [1.7.42](https://github.com/cube-js/cube/compare/v1.7.41...v1.7.42) (2026-09-18)
 
 **Note:** Version bump only for package @cubejs-backend/native

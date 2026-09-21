@@ -3,6 +3,19 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.7.43](https://github.com/cube-js/cube/compare/v1.7.42...v1.7.43) (2026-09-21)
+
+### Bug Fixes
+
+- **cubestore:** Point a shed query at multi-cluster instead of env knobs ([#11931](https://github.com/cube-js/cube/issues/11931)) ([2d9c13a](https://github.com/cube-js/cube/commit/2d9c13a44e01466ffdccfdc065e5ecddc8189930))
+- **query-orchestrator:** don't report failed pre-agg build jobs as done ([#11629](https://github.com/cube-js/cube/issues/11629)) ([42bfe75](https://github.com/cube-js/cube/commit/42bfe75a5628b9a9f882362a63771239a0c6d1a9))
+
+### Features
+
+- **cubesql:** Upgrade lru from 0.13.0 to 0.18.4 ([#11950](https://github.com/cube-js/cube/issues/11950)) ([82f4a70](https://github.com/cube-js/cube/commit/82f4a7056351ea83e4da6d22b6c0a80673b7b0ce))
+- **snowflake-driver:** Upgrade snowflake-sdk to 3.3.0 ([#11947](https://github.com/cube-js/cube/issues/11947)) ([152bedc](https://github.com/cube-js/cube/commit/152bedc0be20b09bf7e49730c88e203b475413e0))
+- Update deps to pass open security advisories ([#11948](https://github.com/cube-js/cube/issues/11948)) ([15b2088](https://github.com/cube-js/cube/commit/15b2088a56f9038bfa2eb15dfbeecce5bcef11b7))
+
 ## [1.7.42](https://github.com/cube-js/cube/compare/v1.7.41...v1.7.42) (2026-09-18)
 
 ### Features

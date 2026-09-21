@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.7.43](https://github.com/cube-js/cube/compare/v1.7.42...v1.7.43) (2026-09-21)
+
+### Bug Fixes
+
+- **query-orchestrator:** don't report failed pre-agg build jobs as done ([#11629](https://github.com/cube-js/cube/issues/11629)) ([42bfe75](https://github.com/cube-js/cube/commit/42bfe75a5628b9a9f882362a63771239a0c6d1a9))
+
 ## [1.7.42](https://github.com/cube-js/cube/compare/v1.7.41...v1.7.42) (2026-09-18)
 
 **Note:** Version bump only for package @cubejs-backend/query-orchestrator

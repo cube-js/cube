@@ -2,7 +2,7 @@
   "name": "@cubejs-backend/duckdb-driver",
   "description": "Cube DuckDB database driver",
   "author": "Cube Dev, Inc.",
-  "version": "1.7.42",
+  "version": "1.7.43",
   "repository": {
     "type": "git",
     "url": "https://github.com/cube-js/cube.git",
@@ -33,16 +33,16 @@
     "unit": "NODE_OPTIONS=--experimental-vm-modules jest --verbose dist/test/unit"
   },
   "dependencies": {
-    "@cubejs-backend/base-driver": "1.7.42",
-    "@cubejs-backend/schema-compiler": "1.7.42",
-    "@cubejs-backend/shared": "1.7.42",
+    "@cubejs-backend/base-driver": "1.7.43",
+    "@cubejs-backend/schema-compiler": "1.7.43",
+    "@cubejs-backend/shared": "1.7.43",
     "@duckdb/node-api": "1.5.5-r.5",
     "luxon": "^3.4.4"
   },
   "license": "Apache-2.0",
   "devDependencies": {
-    "@cubejs-backend/linter": "1.7.42",
-    "@cubejs-backend/testing-shared": "1.7.42",
+    "@cubejs-backend/linter": "1.7.43",
+    "@cubejs-backend/testing-shared": "1.7.43",
     "@types/jest": "^29",
     "@types/luxon": "^3.4.2",
     "@types/node": "^22",
