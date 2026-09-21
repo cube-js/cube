@@ -324,7 +324,12 @@ export const localTimestampToUtc = (timezone: string, timestampFormat: string, t
     }
 
     const parsedTime = Date.parse(`${timestamp}Z`);
-    const offset = zone.utcOffset(parsedTime);
+    // `utcOffset()` answers for an instant, but `parsedTime` is the local clock reading
+    // pushed onto the UTC line, not the instant being asked about. Around a DST
+    // transition the two fall on different sides of it and the offsets differ, which
+    // moved the bounds by an hour. `parse()` is what moment.tz() itself uses for a local
+    // reading: it walks the transition table accounting for the offset it is resolving.
+    const offset = zone.parse(parsedTime);
     const inDbTimeZoneDate = new Date(parsedTime + offset * 60 * 1000);
 
     if (timestampFormat === 'YYYY-MM-DD[T]HH:mm:ss.SSS[Z]' || timestampFormat === 'YYYY-MM-DDTHH:mm:ss.SSSZ') {

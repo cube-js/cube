@@ -476,6 +476,49 @@ describe('localTimestampToUtc', () => {
     const result = localTimestampToUtc(timezone, 'YYYY-MM-DDTHH:mm:ss.SSS', timestamp);
     expect(result).toBe('2025-02-28T17:00:00.000'); // America/New_York is UTC-5 during daylight saving time
   });
+
+  // The 01:00 hour exists exactly once on both transition dates, so the offset of the
+  // requested local time is the only correct one — no ambiguity to resolve.
+  it('should use the offset of the local time, not of the same clock reading in UTC, around DST', () => {
+    const timezone = 'Europe/Amsterdam';
+    const format = 'YYYY-MM-DD[T]HH:mm:ss.SSS[Z]';
+
+    // DST ends at 03:00 local (01:00Z), so local 01:00 is still CEST (UTC+2).
+    expect(localTimestampToUtc(timezone, format, '2026-10-25T01:00:00.000'))
+      .toBe('2026-10-24T23:00:00.000Z');
+    expect(localTimestampToUtc(timezone, format, '2026-10-25T01:59:59.999'))
+      .toBe('2026-10-24T23:59:59.999Z');
+
+    // DST starts at 02:00 local (01:00Z), so local 01:00 is still CET (UTC+1).
+    expect(localTimestampToUtc(timezone, format, '2026-03-29T01:00:00.000'))
+      .toBe('2026-03-29T00:00:00.000Z');
+    expect(localTimestampToUtc(timezone, format, '2026-03-29T01:59:59.999'))
+      .toBe('2026-03-29T00:59:59.999Z');
+  });
+
+  it('should match the moment.tz conversion around DST for every supported format', () => {
+    const timezone = 'America/New_York';
+    const timestamps = [
+      // DST ends at 02:00 local: 00:00 is EDT (UTC-4), 03:00 is EST (UTC-5).
+      '2026-11-01T00:30:00.000',
+      '2026-11-01T03:30:00.000',
+      // DST starts at 02:00 local: 01:30 is EST (UTC-5), 03:30 is EDT (UTC-4).
+      '2026-03-08T01:30:00.000',
+      '2026-03-08T03:30:00.000',
+    ];
+
+    for (const timestamp of timestamps) {
+      const expected = moment.tz(timestamp, timezone).utc();
+
+      expect(localTimestampToUtc(timezone, 'YYYY-MM-DD[T]HH:mm:ss.SSS[Z]', timestamp))
+        .toBe(expected.format('YYYY-MM-DD[T]HH:mm:ss.SSS[Z]'));
+      expect(localTimestampToUtc(timezone, 'YYYY-MM-DDTHH:mm:ss.SSS', timestamp))
+        .toBe(expected.format('YYYY-MM-DDTHH:mm:ss.SSS'));
+      // The microsecond formats take the 26 character branch.
+      expect(localTimestampToUtc(timezone, 'YYYY-MM-DD[T]HH:mm:ss.SSSSSS[Z]', `${timestamp}000`))
+        .toBe(`${expected.format('YYYY-MM-DD[T]HH:mm:ss.SSS')}000Z`);
+    }
+  });
 });
 
 describe('utcToLocalTimeZone', () => {
