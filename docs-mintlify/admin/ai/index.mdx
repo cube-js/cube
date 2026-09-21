@@ -118,7 +118,7 @@ The `runtime` property controls how the agent processes requests:
 |--------------|--------------------------------------------------------------------------------------------|
 | `plain`      | Default. Optimized for speed and cost. Recommended for most use cases.                     |
 | `reasoning`  | Enables extended thinking for complex analysis.                                            |
-| `chassis`    | Uses a lean, semantic-model-focused toolset and places query results inline in the response instead of as separate tool calls. |
+| `chassis`    | Optimized for semantic-model exploration. Returns query results inline in the answer instead of as separate result cards. |
 
 <Warning>
   `reasoning` and `chassis` are **experimental**. They may be unstable and are not yet feature-complete. Stick with `plain` unless you have a specific need for extended reasoning or the `chassis` toolset.
