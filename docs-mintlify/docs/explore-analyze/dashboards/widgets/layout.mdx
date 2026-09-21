@@ -64,7 +64,7 @@ A new tabs container is added 6 cells wide and 9 tall. A board narrows the width
 
 So a grid narrower than 4 columns or shorter than 6 rows can never take a tabs container at all, and a larger one takes it only where it has a free block of the narrowed size — 6×9 in a grid at least that big. It can't be resized below 4×6 either, inside a grid as much as on the canvas; and if a tab holds a grid, it also can't shrink past what that grid's own contents need.
 
-A tabs container can sit on the canvas, inside a grid, or inside a tab, but not inside a stack ([nesting rules](#nesting-containers)). A container nested inside a tab is sized by the tab body rather than by hand: a nested grid keeps **Edit title** and **Delete Grid** but drops **Resize**, and a nested stack or tabs container carries a delete button in its top-right corner instead of a menu.
+A tabs container can sit on the canvas, inside a grid, or inside a tab, but not inside a stack ([nesting rules](#nesting-containers)). Inside a tab, a nested grid keeps **Edit title** and **Delete Grid** but drops **Resize**, and a nested stack or tabs container carries a delete button in its top-right corner instead of a menu.
 
 A tab you haven't opened yet isn't rendered at all, so its charts never query. Once you open it, it stays loaded: switching back to it costs no new queries, and it keeps up with a control or a refresh alongside the tabs already open.
 
@@ -78,7 +78,7 @@ Switching a tab writes it into the page URL as `?tab_<widget_id>=<tab_id>`, so a
 
 Containers nest inside one another up to **four levels deep**, counted from a container sitting directly on the canvas. The limit is on the chain as a whole, whatever the mix of kinds — a grid inside a grid inside a grid is as deep as a grid holding a tabs container holding a stack. A grid on the canvas, holding a tabs container, whose tab holds a grid, holding another grid, is at the limit: that innermost grid still takes charts and other widgets, but dropping another container into it is refused.
 
-One pairing is never allowed at any depth: a **grid** or a **tabs container** inside a stack — a stack has no cells of its own to give them. The reverse is fine, which is why a stack is the one container that goes anywhere.
+Two placements are never allowed at any depth: a **grid** or a **tabs container** inside a stack — a stack has no cells of its own to give them. The reverse is fine, which is why a stack is the one container that goes anywhere.
 
 ## Deleting a container
 
