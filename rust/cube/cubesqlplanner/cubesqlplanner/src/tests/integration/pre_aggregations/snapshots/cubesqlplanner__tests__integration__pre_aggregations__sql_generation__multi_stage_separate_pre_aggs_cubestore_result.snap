@@ -1,7 +1,8 @@
 ---
 source: cubesqlplanner/cubesqlplanner/src/tests/integration/pre_aggregations/sql_generation.rs
+assertion_line: 1001
 expression: result
 ---
 orders__count_reduce_status | orders__revenue_reduce_status
 ----------------------------+------------------------------
-7                           | 1750
+7                           | 1750.00000

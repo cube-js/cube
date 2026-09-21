@@ -1,13 +1,14 @@
 ---
 source: cubesqlplanner/cubesqlplanner/src/tests/integration/pre_aggregations/sql_generation.rs
+assertion_line: 334
 expression: result
 ---
 orders__status | orders__city | orders__multi_level_measure
 ---------------+--------------+----------------------------
-cancelled      | Chicago      | 1                          
-completed      | Boston       | 0.625                      
-completed      | Chicago      | 1                          
-completed      | New York     | 0.75                       
-pending        | Boston       | 1                          
-pending        | Chicago      | 1                          
-pending        | New York     | 0.65
+cancelled      | Chicago      | 1.0000000000000            
+completed      | Boston       | 0.6250000000000            
+completed      | Chicago      | 1.0000000000000            
+completed      | New York     | 0.7500000000000            
+pending        | Boston       | 1.0000000000000            
+pending        | Chicago      | 1.0000000000000            
+pending        | New York     | 0.6500000000000

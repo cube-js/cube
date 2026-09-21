@@ -975,8 +975,6 @@ impl TestContext {
     /// be `external: true`.
     #[cfg(feature = "integration-cubestore")]
     pub async fn try_execute_cubestore(&self, query_yaml: &str, seed_file: &str) -> Option<String> {
-        use mysql_async::prelude::Queryable;
-
         let options = self.create_query_options_from_yaml(query_yaml);
         let client = super::pg_service::connect_and_seed(seed_file).await;
 
@@ -1002,9 +1000,9 @@ impl TestContext {
 
         self.create_pre_agg_tables(&client, &pre_aggregations).await;
 
-        let (mut conn, cs_schema) = super::cubestore_service::connect_with_schema().await;
+        let (cs_client, cs_schema) = super::cubestore_service::connect_with_schema().await;
         let table_names = self
-            .upload_pre_agg_tables_to_cubestore(&client, &mut conn, &cs_schema, &pre_aggregations)
+            .upload_pre_agg_tables_to_cubestore(&client, &cs_client, &cs_schema, &pre_aggregations)
             .await;
 
         let templates = ctx
@@ -1039,30 +1037,14 @@ impl TestContext {
                 .into_owned();
         }
 
-        let rows: Vec<mysql_async::Row> = conn.query(&final_sql).await.unwrap_or_else(|e| {
+        let result = cs_client.query(&final_sql).await.unwrap_or_else(|e| {
             panic!(
                 "CubeStore SQL execution failed:\n{}\n\nError: {:?}",
                 final_sql, e
             )
         });
 
-        let columns: Vec<String> = rows
-            .first()
-            .map(|r| {
-                r.columns_ref()
-                    .iter()
-                    .map(|c| c.name_str().to_string())
-                    .collect()
-            })
-            .unwrap_or_default();
-        let formatted_rows: Vec<Vec<String>> = rows
-            .iter()
-            .map(|r| {
-                (0..r.columns_ref().len())
-                    .map(|i| Self::mysql_value_to_string(r.as_ref(i)))
-                    .collect()
-            })
-            .collect();
+        let (columns, formatted_rows) = Self::cubestore_result_rows(&result);
 
         // Rows are NOT re-sorted here: every test must carry a total `order:`
         // so the query itself pins row order (CubeStore aggregates in parallel
@@ -1087,12 +1069,11 @@ impl TestContext {
     async fn upload_pre_agg_tables_to_cubestore(
         &self,
         client: &tokio_postgres::Client,
-        conn: &mut mysql_async::Conn,
+        cs_client: &cubestore_ws_transport::Client,
         cs_schema: &str,
         pre_aggregations: &[PreAggregationUsage],
     ) -> Vec<String> {
         use itertools::Itertools;
-        use mysql_async::prelude::Queryable;
         use std::collections::HashSet;
 
         let mut created: Vec<String> = Vec::new();
@@ -1171,7 +1152,7 @@ impl TestContext {
                     extra_sql,
                     csv_path.to_string_lossy()
                 );
-                conn.query_drop(&create_sql).await.unwrap_or_else(|e| {
+                cs_client.query(&create_sql).await.unwrap_or_else(|e| {
                     panic!(
                         "Failed to create CubeStore table:\n{}\n\nError: {:?}",
                         create_sql, e
@@ -1351,28 +1332,62 @@ impl TestContext {
         }
     }
 
+    /// Stringifies a CubeStore result into `(columns, rows)` for
+    /// `format_rows_table`. The transport always asks for Arrow, but an older
+    /// server can still answer with the legacy row envelope, so both are handled.
     #[cfg(feature = "integration-cubestore")]
-    fn mysql_value_to_string(value: Option<&mysql_async::Value>) -> String {
-        use mysql_async::Value;
-        match value {
-            None | Some(Value::NULL) => "NULL".to_string(),
-            Some(Value::Bytes(bytes)) => String::from_utf8_lossy(bytes).into_owned(),
-            Some(Value::Int(v)) => v.to_string(),
-            Some(Value::UInt(v)) => v.to_string(),
-            Some(Value::Float(v)) => v.to_string(),
-            Some(Value::Double(v)) => v.to_string(),
-            Some(Value::Date(y, m, d, h, min, s, micros)) => {
-                if *micros == 0 {
-                    format!("{:04}-{:02}-{:02} {:02}:{:02}:{:02}", y, m, d, h, min, s)
-                } else {
-                    format!(
-                        "{:04}-{:02}-{:02} {:02}:{:02}:{:02}.{:06}",
-                        y, m, d, h, min, s, micros
-                    )
-                }
-            }
-            Some(other) => format!("{:?}", other),
-        }
+    fn cubestore_result_rows(
+        result: &cubestore_ws_transport::QueryResult,
+    ) -> (Vec<String>, Vec<Vec<String>>) {
+        use cubestore_ws_transport::arrow::util::display::{ArrayFormatter, FormatOptions};
+        use cubestore_ws_transport::ResultData;
+
+        // Arrow's defaults render NULL as an empty string and timestamps as
+        // RFC3339 (`2024-04-01T00:00:00`). Both are overridden to match the
+        // Postgres rendering, because the rolling-window tests assert the
+        // CubeStore and Postgres results are equal. chrono's `%.f` emits
+        // nothing when the fraction is zero.
+        let fmt_options = FormatOptions::default()
+            .with_null("NULL")
+            .with_display_error(true)
+            .with_timestamp_format(Some("%Y-%m-%d %H:%M:%S%.f"));
+
+        // Column names come from the payload, so they survive an empty result.
+        let columns = result.get_columns();
+        let rows = match &result.data {
+            ResultData::Completed => Vec::new(),
+            ResultData::Legacy { rows, .. } => rows
+                .iter()
+                .map(|row| {
+                    row.iter()
+                        .map(|cell| cell.clone().unwrap_or_else(|| "NULL".to_string()))
+                        .collect()
+                })
+                .collect(),
+            ResultData::Arrow { batches, .. } => batches
+                .iter()
+                .flat_map(|batch| {
+                    let formatters: Vec<ArrayFormatter> = batch
+                        .columns()
+                        .iter()
+                        .map(|col| {
+                            ArrayFormatter::try_new(col.as_ref(), &fmt_options)
+                                .expect("Failed to build arrow formatter")
+                        })
+                        .collect();
+                    (0..batch.num_rows())
+                        .map(|row_idx| {
+                            formatters
+                                .iter()
+                                .map(|f| f.value(row_idx).to_string())
+                                .collect()
+                        })
+                        .collect::<Vec<Vec<String>>>()
+                })
+                .collect(),
+        };
+
+        (columns, rows)
     }
 
     /// Inlines params as literals so the SQL can run without a bind protocol.

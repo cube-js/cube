@@ -1,3 +1,4 @@
+use cubestore_ws_transport::{Client, ClientConfig};
 use std::net::TcpListener;
 use std::path::PathBuf;
 use std::process::{Child, Command, Stdio};
@@ -7,7 +8,7 @@ use std::time::{Duration, Instant};
 use tokio::sync::OnceCell;
 
 struct CubeStoreInstance {
-    mysql_port: u16,
+    http_port: u16,
     _child: Child,
 }
 
@@ -111,6 +112,9 @@ fn free_port() -> u16 {
 
 async fn init_cubestore() -> CubeStoreInstance {
     let bin = cubestored_bin();
+    // Nothing connects to the legacy MySQL listener anymore, but it still has
+    // to be pinned to a free loopback port: left unset it binds `0.0.0.0:3306`
+    // and test binaries running in parallel collide on it.
     let mysql_port = free_port();
     let http_port = free_port();
     let status_port = free_port();
@@ -118,7 +122,7 @@ async fn init_cubestore() -> CubeStoreInstance {
     let data_dir = std::env::temp_dir().join(format!(
         "cubestored-test-{}-{}",
         std::process::id(),
-        mysql_port
+        http_port
     ));
 
     let child = Command::new(&bin)
@@ -145,40 +149,42 @@ async fn init_cubestore() -> CubeStoreInstance {
 
     let deadline = Instant::now() + Duration::from_secs(60);
     loop {
-        if std::net::TcpStream::connect(("127.0.0.1", mysql_port)).is_ok() {
+        if std::net::TcpStream::connect(("127.0.0.1", http_port)).is_ok() {
             break;
         }
         if Instant::now() > deadline {
             panic!(
-                "cubestored did not open MySQL port {} within 60s (binary: {:?})",
-                mysql_port, bin
+                "cubestored did not open HTTP port {} within 60s (binary: {:?})",
+                http_port, bin
             );
         }
         tokio::time::sleep(Duration::from_millis(100)).await;
     }
 
     CubeStoreInstance {
-        mysql_port,
+        http_port,
         _child: child,
     }
 }
 
 /// Connects to the shared cubestored instance and creates a fresh
 /// per-test schema; returns the connection and the schema name.
-pub async fn connect_with_schema() -> (mysql_async::Conn, String) {
+pub async fn connect_with_schema() -> (Client, String) {
     let instance = CS_INSTANCE.get_or_init(init_cubestore).await;
 
-    let url = format!("mysql://root:@127.0.0.1:{}/", instance.mysql_port);
-    let opts = mysql_async::Opts::from_url(&url).expect("Invalid cubestore connection URL");
-    let mut conn = mysql_async::Conn::new(opts)
+    // `build_ws_url` appends `/ws` itself, and cubestored's `authorization`
+    // header is optional, so no credentials are needed for a local instance.
+    let url = url::Url::parse(&format!("ws://127.0.0.1:{}", instance.http_port))
+        .expect("Invalid cubestore connection URL");
+    let client = Client::connect(ClientConfig::new(url))
         .await
         .expect("Failed to connect to cubestored");
 
     let schema = format!("test_{}", SCHEMA_COUNTER.fetch_add(1, Ordering::Relaxed));
-    use mysql_async::prelude::Queryable;
-    conn.query_drop(format!("CREATE SCHEMA {}", schema))
+    client
+        .query(format!("CREATE SCHEMA {}", schema))
         .await
         .unwrap_or_else(|e| panic!("Failed to create schema {}: {}", schema, e));
 
-    (conn, schema)
+    (client, schema)
 }
