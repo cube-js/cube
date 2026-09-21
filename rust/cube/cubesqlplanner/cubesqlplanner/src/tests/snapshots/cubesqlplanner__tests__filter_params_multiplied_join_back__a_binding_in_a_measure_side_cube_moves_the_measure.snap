@@ -4,5 +4,5 @@ expression: result
 ---
 fpmjb_order_tags__tag | fpmjb_orders__vip_amount
 ----------------------+-------------------------
-a                     | 300                     
-b                     | 800
+a                     | NULL                    
+b                     | 700

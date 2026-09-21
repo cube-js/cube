@@ -31,11 +31,21 @@ const FILTER_GROUP_SCAN: &str = "SELECT * FROM fpmjb_orders WHERE \
     FILTER_PARAMS_COLUMN:fpmjb_orders.tenant_id:tenant_id|\
     FILTER_PARAMS_COLUMN:fpmjb_orders.created_at:created_at}";
 
+const PLAIN_USERS_SCAN: &str = "SELECT * FROM fpmjb_users";
+
 fn schema(fact_sql: &str) -> MockSchema {
     schema_with_key(fact_sql, "id")
 }
 
 fn schema_with_key(fact_sql: &str, id_sql: &str) -> MockSchema {
+    schema_of(fact_sql, id_sql, PLAIN_USERS_SCAN)
+}
+
+fn schema_with_users(fact_sql: &str, users_sql: &str) -> MockSchema {
+    schema_of(fact_sql, "id", users_sql)
+}
+
+fn schema_of(fact_sql: &str, id_sql: &str, users_sql: &str) -> MockSchema {
     MockSchema::from_yaml(&format!(
         r#"
 cubes:
@@ -75,7 +85,7 @@ cubes:
                 - sql: "{{fpmjb_users.is_vip}} = true"
 
     - name: fpmjb_users
-      sql: "SELECT * FROM fpmjb_users"
+      sql: "{users_sql}"
       dimensions:
           - name: id
             type: number
@@ -413,4 +423,49 @@ fn the_join_key_renders_the_same_expression_on_both_sides() {
         "sql: {}",
         sql
     );
+}
+
+// The two shapes above bind in the cube `sql`'s top-level `WHERE`, where the
+// keys side applies the same predicate to the same rows and the measure side
+// can only shrink its build. The two below bind where that argument does not
+// reach, so the measure genuinely moves - to the value the keys side and a
+// plain, non-multiplied query already produce.
+
+// A binding over a column of a table joined *inside* the cube's `sql`. It gates
+// a projected value rather than a row, so the key set is untouched and the
+// superset argument says nothing: orders of a user who signed up outside the
+// reported period contribute 0.
+const JOINED_VALUE_BINDING_SCAN: &str = "SELECT o.id, o.tenant_id, o.user_id, o.created_at, \
+    CASE WHEN {FILTER_PARAMS_COLUMN:fpmjb_orders.created_at:u.signup_at} \
+    THEN o.amount ELSE 0 END AS amount \
+    FROM fpmjb_orders o LEFT JOIN fpmjb_users u ON o.user_id = u.id";
+
+// A binding in a cube the *measure* join tree reaches and the keys tree does
+// not. Nothing on the keys side offsets it, so its rows drop and the measure's
+// own filter over them turns false.
+const USERS_BINDING_SCAN: &str = "SELECT * FROM fpmjb_users WHERE \
+    {FILTER_PARAMS_COLUMN:fpmjb_orders.created_at:signup_at}";
+
+#[tokio::test(flavor = "multi_thread")]
+async fn a_binding_over_a_joined_column_moves_the_measure() {
+    let Some(result) = TestContext::new(schema(JOINED_VALUE_BINDING_SCAN))
+        .unwrap()
+        .try_execute_pg(&query_for("fpmjb_orders.vip_amount"), SEED)
+        .await
+    else {
+        return;
+    };
+    insta::assert_snapshot!(result);
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn a_binding_in_a_measure_side_cube_moves_the_measure() {
+    let Some(result) = TestContext::new(schema_with_users(PUSHED_DOWN_SCAN, USERS_BINDING_SCAN))
+        .unwrap()
+        .try_execute_pg(&query_for("fpmjb_orders.vip_amount"), SEED)
+        .await
+    else {
+        return;
+    };
+    insta::assert_snapshot!(result);
 }
