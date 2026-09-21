@@ -1,5 +1,5 @@
-// styled-components 6.5 stopped widening an unaugmented DefaultTheme to `any`, so every
-// `props.theme` read has to be declared. CodeSnippet is the only ThemeProvider here.
+// The bare import makes this a module augmentation; without it `declare module`
+// shadows styled-components' own types instead of merging into them.
 import 'styled-components';
 
 declare module 'styled-components' {
