@@ -31,7 +31,7 @@ A time filter's *value* is fixed or relative, picked on the value editor's **Fix
 
 ### Single vs. multiple selection
 
-Filters can allow either a single value or multiple values. The **Selection Mode** switch in the filter's edit sidebar sets this, and it appears on a string filter using `is`, where several values are allowed unless you turn it off. Every other combination is fixed by its own value editor: a number filter using `is` or `is not` takes several values, a time filter one value per field, and the substring conditions a single text box.
+Filters can allow either a single value or multiple values. The filter's edit sidebar sets this under **Selection Mode**, on a switch labelled **Enable multiple values**: it is offered on a string filter using `is`, where several values are allowed unless you turn it off, and what you set there also governs the same filter on `is not`. No other combination has a switch — each takes the shape its own value editor gives it: several values for a number filter using `is` or `is not`, one value per field for a time filter, a single text box for the substring conditions, the one value its `is true` / `is false` picker sets for a boolean filter, and no value at all for `is null`, `is not null`, `is empty` and `is not empty`.
 
 ### Default values
 
