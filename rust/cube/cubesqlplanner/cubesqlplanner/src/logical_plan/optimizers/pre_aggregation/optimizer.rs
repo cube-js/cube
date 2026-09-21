@@ -273,9 +273,8 @@ impl PreAggregationOptimizer {
             MultiStageMatch::ExternalTypesSplit => {}
         }
 
-        // Every stage is covered, just not by one engine. Retrying within a
-        // single external type gives up per-stage precision for a set that one
-        // query can actually read, and the alternative is reading the fact
+        // Retrying within a single external type trades per-stage precision for
+        // a set one query can read, against an alternative of reading the fact
         // table. CubeStore goes first as the default and faster store.
         for external in [true, false] {
             let candidates: Vec<_> = compiled_pre_aggregations
@@ -283,9 +282,14 @@ impl PreAggregationOptimizer {
                 .filter(|pa| pa.external.unwrap_or(false) == external)
                 .cloned()
                 .collect();
-            if let MultiStageMatch::Matched(rewritten) =
-                self.match_multistages(root, &candidates)?
-            {
+            let outcome = self.match_multistages(root, &candidates)?;
+            // These candidates share one external type, and that is the same
+            // value a usage built from them reports, so the pass cannot split.
+            debug_assert!(
+                !matches!(outcome, MultiStageMatch::ExternalTypesSplit),
+                "a pass over one external type reported a split"
+            );
+            if let MultiStageMatch::Matched(rewritten) = outcome {
                 return Ok(Some(rewritten));
             }
         }
