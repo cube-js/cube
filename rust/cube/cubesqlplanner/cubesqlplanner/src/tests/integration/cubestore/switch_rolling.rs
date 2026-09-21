@@ -118,8 +118,22 @@ fn assert_served_by(ctx: &TestContext, query: &str, expected_rollup: &str) {
     );
 }
 
+/// `YYYY-MM-DDTHH:MM:SS`, optionally followed by a fractional part.
+fn is_rfc3339_timestamp(cell: &str) -> bool {
+    let bytes = cell.as_bytes();
+    if bytes.len() < 19 {
+        return false;
+    }
+    let punctuation = [(4, b'-'), (7, b'-'), (10, b'T'), (13, b':'), (16, b':')];
+    if punctuation.iter().any(|&(i, c)| bytes[i] != c) {
+        return false;
+    }
+    let digits = [0, 1, 2, 3, 5, 6, 8, 9, 11, 12, 14, 15, 17, 18];
+    digits.iter().all(|&i| bytes[i].is_ascii_digit())
+}
+
 /// Engine-independent form of a result table. CubeStore renders timestamps as
-/// `...T00:00:00.000Z` where Postgres uses `... 00:00:00` — matched on that
+/// RFC3339 (`...T00:00:00`) where Postgres uses `... 00:00:00` — matched on that
 /// shape, so a string cell like the `YTD` calc-group value is left alone — and
 /// ratios are
 /// computed in f64 against Postgres' NUMERIC, so the two differ in the last
@@ -128,14 +142,20 @@ fn assert_served_by(ctx: &TestContext, query: &str, expected_rollup: &str) {
 fn normalize(table: &str) -> String {
     fn normalize_cell(cell: &str) -> String {
         let cell = cell.trim();
-        // Only rewrite cells shaped like CubeStore's `2024-05-01T00:00:00.000Z`,
-        // so string values carrying a `T` or `Z` — the `YTD` calc group here —
-        // survive untouched.
-        let cell = match cell.strip_suffix('Z') {
-            Some(timestamp) if timestamp.contains('T') => {
-                timestamp.replacen('T', " ", 1).replace(".000", "")
-            }
-            _ => cell.to_string(),
+        // Only rewrite cells shaped like `2024-05-01T00:00:00`, matched
+        // positionally so string values that merely contain a `T` — the `YTD`
+        // calc group here — survive untouched.
+        let cell = if is_rfc3339_timestamp(cell) {
+            // `T` -> space, and drop an all-zero fractional part so a
+            // microsecond-precision `...T00:00:00.000000` still matches
+            // Postgres' `... 00:00:00`.
+            let stamp = match cell.split_once('.') {
+                Some((head, frac)) if frac.chars().all(|c| c == '0') => head,
+                _ => cell,
+            };
+            stamp.replacen('T', " ", 1)
+        } else {
+            cell.to_string()
         };
         match cell.parse::<f64>() {
             Ok(value) => format!("{value:.10}"),

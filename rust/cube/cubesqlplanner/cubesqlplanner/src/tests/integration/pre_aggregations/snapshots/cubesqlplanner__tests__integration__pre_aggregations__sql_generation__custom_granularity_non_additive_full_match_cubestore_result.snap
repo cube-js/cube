@@ -5,6 +5,6 @@ expression: result
 ---
 orders__status | orders__created_at_half_year | orders__avg_amount
 ---------------+------------------------------+-------------------
-cancelled      | 2025-01-01 00:00:00          | 25.00000          
-completed      | 2025-01-01 00:00:00          | 185.00000         
-pending        | 2025-01-01 00:00:00          | 146.25000
+cancelled      | 2025-01-01T00:00:00          | 25.00000          
+completed      | 2025-01-01T00:00:00          | 185.00000         
+pending        | 2025-01-01T00:00:00          | 146.25000

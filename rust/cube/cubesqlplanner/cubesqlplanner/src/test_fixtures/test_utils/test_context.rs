@@ -1342,15 +1342,9 @@ impl TestContext {
         use cubestore_ws_transport::arrow::util::display::{ArrayFormatter, FormatOptions};
         use cubestore_ws_transport::ResultData;
 
-        // Arrow's defaults render NULL as an empty string and timestamps as
-        // RFC3339 (`2024-04-01T00:00:00`). Both are overridden to match the
-        // Postgres rendering, because the rolling-window tests assert the
-        // CubeStore and Postgres results are equal. chrono's `%.f` emits
-        // nothing when the fraction is zero.
-        let fmt_options = FormatOptions::default()
-            .with_null("NULL")
-            .with_display_error(true)
-            .with_timestamp_format(Some("%Y-%m-%d %H:%M:%S%.f"));
+        // Arrow renders a null as an empty string, which is indistinguishable
+        // from an empty string value in the rendered table.
+        let fmt_options = FormatOptions::default().with_null("NULL");
 
         // Column names come from the payload, so they survive an empty result.
         let columns = result.get_columns();
