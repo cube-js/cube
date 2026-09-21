@@ -79,11 +79,11 @@ If a [parent control](#parent) drives this filter, the option the viewer is on d
 
 ### Faceted filters
 
-When multiple filters target dimensions from the same semantic view, you can mark them as **faceted**. Faceted filters scope each other's value lists — selecting a value in one filter narrows the options shown in the others, so viewers only see combinations that exist in the data.
+When multiple filters target dimensions from the same semantic view, you can mark them as **faceted**. A faceted filter scopes its value list to what its siblings are set to — selecting a value in one filter narrows the options shown in the faceted ones, so viewers only see combinations that exist in the data.
 
 For example, on a sales dashboard with a **Country** filter and a **City** filter, marking both as faceted means selecting `United States` in the Country filter limits the City filter to U.S. cities only.
 
-A faceted filter can take as a source any sibling on the same semantic view set to one of these conditions:
+A faceted filter can take as a source any sibling on the same semantic view set to one of these conditions — the sibling does not need **Facet** turned on itself:
 
 - A **String** or **Number** dimension set to `is` or `is not`. A **Boolean** dimension counts here too: its `is true` / `is false` set `is`.
 - A time dimension set to any of its date conditions except `is null` and `is not null` — though `is not` and the `in the …` and `not in the …` conditions narrow on one value only, and `is not` needs that value to name a whole period.
