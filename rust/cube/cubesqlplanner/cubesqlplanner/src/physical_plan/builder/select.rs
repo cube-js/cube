@@ -378,3 +378,50 @@ impl SelectBuilder {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::planner::filter::{FilterGroup, FilterGroupOperator, FilterItem};
+
+    // Two items that compare unequal, so the merged order is observable.
+    fn items() -> (FilterItem, FilterItem) {
+        let inner = FilterItem::Group(Rc::new(FilterGroup::new(FilterGroupOperator::And, vec![])));
+        let outer = FilterItem::Group(Rc::new(FilterGroup::new(
+            FilterGroupOperator::Or,
+            vec![inner.clone()],
+        )));
+        (inner, outer)
+    }
+
+    fn filter(item: &FilterItem) -> Option<Filter> {
+        Some(Filter {
+            items: vec![item.clone()],
+        })
+    }
+
+    #[test]
+    fn binding_filters_conjoins_both_sides_where_first() {
+        let (a, b) = items();
+
+        let merged = SelectBuilder::binding_filters(filter(&a), filter(&b))
+            .expect("a filter when either side is set");
+
+        assert_eq!(merged.items, vec![a, b]);
+    }
+
+    #[test]
+    fn binding_filters_keeps_whichever_side_is_set() {
+        let (a, b) = items();
+
+        assert_eq!(
+            SelectBuilder::binding_filters(filter(&a), None).map(|f| f.items),
+            Some(vec![a])
+        );
+        assert_eq!(
+            SelectBuilder::binding_filters(None, filter(&b)).map(|f| f.items),
+            Some(vec![b])
+        );
+        assert!(SelectBuilder::binding_filters(None, None).is_none());
+    }
+}
