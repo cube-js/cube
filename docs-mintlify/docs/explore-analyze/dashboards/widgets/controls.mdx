@@ -22,13 +22,30 @@ The available operators depend on the type of the underlying dimension:
 
 | Dimension type | Operators |
 |---|---|
-| **String** | `is`, `is not`, `contains`, `not contains`, `starts with`, `not starts with`, `ends with`, `not ends with`, `is null`, `is not null` |
+| **String** | `is`, `is not`, `contains`, `not contains`, `starts with`, `not starts with`, `ends with`, `not ends with`, `is null`, `is not null`, `is empty`, `is not empty` |
 | **Number** | `is`, `is not`, `greater than`, `greater than or equal`, `less than`, `less than or equal`, `is null`, `is not null` |
-| **Time** | `is`, `is not`, `before date`, `before or on date`, `after date`, `after or on date`, `between`, `relative date`, `is null`, `is not null` |
+| **Boolean** | `is` — no operator menu; the value picker's `is true` and `is false` set it |
+| **Time** | `is`, `is not`, `in the month`, `not in the month`, `in the quarter`, `not in the quarter`, `in the year`, `not in the year`, `after`, `after or on`, `before`, `before or on`, `between`, `is null`, `is not null` |
+
+A time filter's *value* is fixed or relative, picked on the value editor's **Fixed** and **Relative** tabs: a calendar date, a whole-period preset — **Today**, **Yesterday**, **This week**, **This month**, **This quarter**, **This year** — or a single-moment relative value, offered as the **1 week ago**, **1 month ago**, **3 months ago** and **1 year ago** presets and typed with any other count in the custom *N periods ago* / *from now* editor.
+
+A `between` filter picks a calendar date for each bound on its **Fixed** tab, and one whole window — **Past week** to **Past 2 years** — on its **Relative** tab.
+
+Neither tab offers a list of values: each field takes one, and a `between` filter's two fields fill its two-entry `value` array with one bound each rather than with alternatives. The [**Selection Mode**](#single-vs-multiple-selection) switch is not offered for a time dimension either, so a time filter carries *several values* for one condition only when a hand-written [URL parameter](#sharing-the-current-selection) passes a list in its `value` — `f_orders.created_at={"type":"equals","value":["2026-01-01","2026-02-01"]}`.
 
 ### Single vs. multiple selection
 
-Filters can allow either a single value or multiple values. Configure this when adding or editing the filter — multi-select is the default for string dimensions, while time and number dimensions default to a single value.
+Filters can allow either a single value or multiple values. The filter's edit sidebar sets this under **Selection Mode**, on a switch labelled **Enable multiple values** — offered on a string filter using `is`, and on no other combination. What each filter holds:
+
+| Filter | Values |
+|---|---|
+| **String** on `is` / `is not` | Several, unless you turn **Enable multiple values** off; what you set on `is` also governs `is not` |
+| **Number** on `is` / `is not` | Several |
+| **Number** comparisons (`greater than`, `less than` and their *or equal* forms) | One |
+| **Time** on any condition except `is null` and `is not null` | One per field in the UI; several only through a hand-written [URL parameter](#sharing-the-current-selection) |
+| **Boolean** | One, set by its `is true` / `is false` picker |
+| Substring conditions (`contains`, `starts with`, `ends with` and their negations) | One |
+| `is null`, `is not null`, `is empty`, `is not empty` | None |
 
 ### Default values
 
@@ -65,7 +82,7 @@ How the attribute value is matched to the filter:
 
 | Attribute type | How it's applied |
 |---|---|
-| **String**, **Number** | Used as a single value. Works with single-value operators like `is` / `is not`, and is also accepted by multi-select filters as a one-item selection. |
+| **String**, **Number** | Used as a single value, including in a filter that accepts several — it seeds a one-item selection there. |
 | **String array**, **Number array** | Used as a list of values, one per array entry. Empty values are dropped. |
 
 Empty, `null`, or unresolvable attribute values are skipped — the filter falls back to whatever static default it has, or no default if none is set.
@@ -76,9 +93,40 @@ If a [parent control](#parent) drives this filter, the option the viewer is on d
 
 ### Faceted filters
 
-When multiple filters target dimensions from the same semantic view, you can mark them as **faceted**. Faceted filters scope each other's value lists — selecting a value in one filter narrows the options shown in the others, so viewers only see combinations that exist in the data.
+When multiple filters target dimensions from the same semantic view, you can mark one as **faceted**. A faceted filter scopes its value list to what its siblings are set to — selecting a value in one filter narrows the options shown in the faceted one, so viewers only see combinations that exist in the data.
 
-For example, on a sales dashboard with a **Country** filter and a **City** filter, marking both as faceted means selecting `United States` in the Country filter limits the City filter to U.S. cities only.
+For example, on a sales dashboard with a **Country** filter and a **City** filter, marking the City filter as faceted means selecting `United States` in the Country filter limits the City filter to U.S. cities only. Mark both and each narrows the other.
+
+A faceted filter can take as a source any sibling on the same semantic view set to one of these conditions — the sibling does not need **Facet** turned on itself:
+
+- A **String** or **Number** dimension set to `is` or `is not`. A **Boolean** dimension counts here too: its `is true` / `is false` set `is`.
+- A time dimension set to any of its date conditions except `is null` and `is not null` — though `is not` and the `in the …` and `not in the …` conditions narrow on one value only, and `is not` needs that value to name a whole period.
+
+Every other condition cannot be picked as a source and scopes nothing — `contains`, `starts with` and `ends with` and their negations, the comparisons on a **Number** dimension (`greater than`, `less than` and their *or equal* forms), and `is null`, `is not null`, `is empty` and `is not empty`.
+
+To pick which siblings a filter listens to, turn the **Facet** switch on in its edit sidebar: the source picker appears with it, reading **All**. The picker lists every other filter on the dashboard and greys out the ones it cannot use — a sibling set to one of those other conditions, or one targeting a different semantic view — with a tooltip saying it is not available for this semantic view or filter type. Left at **All**, the filter listens to every sibling the picker leaves selectable; picking entries narrows it to those.
+
+**Cancel** leaves the filter on the sources it was last saved with — it discards every unsaved edit in the sidebar, not only the source list — while turning **Facet** back off clears the entries you picked, so switching it on again starts from **All**.
+
+A date source never scopes the value list to less than the window the charts are showing, so the list never drops a value the charts still have rows for. Which window it scopes to depends on the condition:
+
+| Condition | Window the value list is scoped to |
+|---|---|
+| `is` | What its value names: the whole period of a whole-period preset, the moment itself of a fixed date or a single-moment relative value, and all of those windows for several values |
+| `in the month`, `in the quarter`, `in the year` | The whole period the value falls in |
+| `after`, `after or on`, `before`, `before or on` | Everything on one side of the date the value resolves to — for a whole-period preset, the day that period starts on |
+| `between` | The range itself, between its own bounds, fixed or relative |
+| `not in the month`, `not in the quarter`, `not in the year` | Everything *outside* the whole period the value falls in |
+| `is not` on a whole-period value | Everything *outside* the period that value names |
+
+On `after`, `after or on`, `before`, `before or on` and `between`, the value editor picks a whole day for every bound, and on a whole day the scope takes the same bound the charts do — so a window they return no rows for leaves the value list empty too.
+
+<Warning>
+A source can end up with nothing to scope by, leaving the value list as wide as it was while the charts narrow:
+
+- `is not` on a fixed date or on a single-moment relative value such as **3 months ago** — a point in time has no period to exclude.
+- `is not` and the `in the …` and `not in the …` conditions on several values — each reads one period from one value.
+</Warning>
 
 ## Time granularity switcher
 
@@ -352,6 +400,22 @@ Each control type has its own parameter:
 The semantic view and member are the **internal names** configured on the control — not the display titles you see in the picker. A view shown as `Orders` is usually `orders` in the parameter. The same goes for the member on the right-hand side of `ms_`: it is the internal name of the member to switch to, and it is a measure rather than a dimension when the switcher's **Field Type** is **Measure**. Granularities are lowercase and must be one of the switcher's [allowed granularities](#allowed-granularities) — `day`, `week`, `month`, `quarter`, `year`, plus `second`, `minute`, and `hour` for time dimensions that expose them.
 
 You can also write these parameters by hand to open a dashboard in a particular state — see [Pre-set dashboard filters and granularities via URL][ref-embed-url-filters] for the embedded case, which uses the same format.
+
+A filter's JSON carries the condition in its `type` key, alongside the `value`. Omitted, it is `equals`, which is why the example above writes only a value. The strings for the conditions in [Operators by dimension type](#operators-by-dimension-type):
+
+| Condition | `type` |
+|---|---|
+| `is`, `is not` | `equals`, `not_equals` |
+| `greater than`, `greater than or equal` — on a time dimension, `after`, `after or on` | `greater_than`, `greater_than_or_equal` |
+| `less than`, `less than or equal` — on a time dimension, `before`, `before or on` | `less_than`, `less_than_or_equal` |
+| `between` | `between` |
+| `in the month`, `in the quarter`, `in the year` and their `not` forms | `in_month`, `in_quarter`, `in_year`, `not_in_month`, `not_in_quarter`, `not_in_year` |
+| `contains`, `starts with`, `ends with` and their `not` forms | `contains`, `starts_with`, `ends_with`, `not_contains`, `not_starts_with`, `not_ends_with` |
+| `is null`, `is not null`, `is empty`, `is not empty` | `is_null`, `is_not_null`, `is_empty`, `is_not_empty` — these take no `value` |
+
+A **Boolean** dimension's `is true` and `is false` sit on the `is` row: both are `equals`, with `value` set to the string `"true"` or `"false"` — `f_orders.is_paid={"value":"true"}`.
+
+A `between` filter's `value` is a two-entry array, and both bounds are inclusive unless you set `startInclusive` or `endInclusive` to `false`. Each is a key of its own, beside `type` and `value` rather than inside them — `f_orders.created_at={"type":"between","value":["2026-01-01","2026-02-01"],"endInclusive":false}`.
 
 What travels in the link, and what wins when a link value arrives:
 
