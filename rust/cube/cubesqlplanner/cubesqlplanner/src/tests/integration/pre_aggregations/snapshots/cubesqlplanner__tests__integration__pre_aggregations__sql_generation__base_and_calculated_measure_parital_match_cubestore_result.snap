@@ -1,9 +1,10 @@
 ---
 source: cubesqlplanner/cubesqlplanner/src/tests/integration/pre_aggregations/sql_generation.rs
+assertion_line: 541
 expression: result
 ---
 orders__status | orders__amount_per_count
 ---------------+-------------------------
-cancelled      | 25                      
-completed      | 185                     
-pending        | 146.25
+cancelled      | 25.000000000            
+completed      | 185.000000000           
+pending        | 146.250000000

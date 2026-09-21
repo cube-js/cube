@@ -1,11 +1,12 @@
 ---
 source: cubesqlplanner/cubesqlplanner/src/tests/integration/pre_aggregations/sql_generation.rs
+assertion_line: 625
 expression: result
 ---
-orders__status | orders__created_at_day   | orders__count
----------------+--------------------------+--------------
-cancelled      | 2025-02-15T00:00:00.000Z | 1            
-completed      | 2025-01-10T00:00:00.000Z | 1            
-completed      | 2025-01-31T00:00:00.000Z | 1            
-pending        | 2025-01-10T00:00:00.000Z | 1            
-pending        | 2025-03-01T00:00:00.000Z | 1
+orders__status | orders__created_at_day | orders__count
+---------------+------------------------+--------------
+cancelled      | 2025-02-15 00:00:00    | 1            
+completed      | 2025-01-10 00:00:00    | 1            
+completed      | 2025-01-31 00:00:00    | 1            
+pending        | 2025-01-10 00:00:00    | 1            
+pending        | 2025-03-01 00:00:00    | 1

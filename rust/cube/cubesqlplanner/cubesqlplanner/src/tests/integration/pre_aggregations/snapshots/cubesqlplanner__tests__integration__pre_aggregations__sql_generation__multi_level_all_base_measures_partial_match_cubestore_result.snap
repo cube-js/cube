@@ -1,9 +1,10 @@
 ---
 source: cubesqlplanner/cubesqlplanner/src/tests/integration/pre_aggregations/sql_generation.rs
+assertion_line: 367
 expression: result
 ---
 orders__status | orders__multi_level_measure
 ---------------+----------------------------
-cancelled      | 1                          
-completed      | 0.4625                     
-pending        | 0.73125
+cancelled      | 1.0000000000000            
+completed      | 0.4625000000000            
+pending        | 0.7312500000000

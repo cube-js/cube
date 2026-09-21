@@ -1,7 +1,8 @@
 ---
 source: cubesqlplanner/cubesqlplanner/src/tests/integration/pre_aggregations/sql_generation.rs
+assertion_line: 887
 expression: result
 ---
 orders__created_at_half_year | orders__count
 -----------------------------+--------------
-2025-01-01T00:00:00.000Z     | 10
+2025-01-01 00:00:00          | 10

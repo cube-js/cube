@@ -1,13 +1,14 @@
 ---
 source: cubesqlplanner/cubesqlplanner/src/tests/integration/pre_aggregations/sql_generation.rs
+assertion_line: 276
 expression: result
 ---
-orders__country | orders__created_at_day   | orders__avg_amount
-----------------+--------------------------+-------------------
-Boston          | 2025-01-31T00:00:00.000Z | 300               
-Boston          | 2025-02-01T00:00:00.000Z | 112.5             
-Chicago         | 2025-02-15T00:00:00.000Z | 25                
-Chicago         | 2025-03-01T00:00:00.000Z | 287.5             
-New York        | 2025-01-10T00:00:00.000Z | 150               
-New York        | 2025-01-11T00:00:00.000Z | 50                
-New York        | 2025-03-02T00:00:00.000Z | 60
+orders__country | orders__created_at_day | orders__avg_amount
+----------------+------------------------+-------------------
+Boston          | 2025-01-31 00:00:00    | 300.00000         
+Boston          | 2025-02-01 00:00:00    | 112.50000         
+Chicago         | 2025-02-15 00:00:00    | 25.00000          
+Chicago         | 2025-03-01 00:00:00    | 287.50000         
+New York        | 2025-01-10 00:00:00    | 150.00000         
+New York        | 2025-01-11 00:00:00    | 50.00000          
+New York        | 2025-03-02 00:00:00    | 60.00000

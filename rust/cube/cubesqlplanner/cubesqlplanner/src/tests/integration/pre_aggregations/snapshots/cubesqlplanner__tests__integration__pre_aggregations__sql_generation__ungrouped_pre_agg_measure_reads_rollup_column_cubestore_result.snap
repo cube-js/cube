@@ -1,16 +1,17 @@
 ---
 source: cubesqlplanner/cubesqlplanner/src/tests/integration/pre_aggregations/sql_generation.rs
+assertion_line: 1473
 expression: result
 ---
 orders__id | orders__status | orders__city | orders__total_amount
 -----------+----------------+--------------+---------------------
-1          | completed      | New York     | 100                 
-2          | pending        | New York     | 200                 
-3          | completed      | New York     | 50                  
-4          | completed      | Boston       | 300                 
-5          | pending        | Boston       | 150                 
-6          | completed      | Boston       | 75                  
-7          | cancelled      | Chicago      | 25                  
-8          | completed      | Chicago      | 400                 
-9          | pending        | Chicago      | 175                 
-10         | pending        | New York     | 60
+1          | completed      | New York     | 100.00000           
+2          | pending        | New York     | 200.00000           
+3          | completed      | New York     | 50.00000            
+4          | completed      | Boston       | 300.00000           
+5          | pending        | Boston       | 150.00000           
+6          | completed      | Boston       | 75.00000            
+7          | cancelled      | Chicago      | 25.00000            
+8          | completed      | Chicago      | 400.00000           
+9          | pending        | Chicago      | 175.00000           
+10         | pending        | New York     | 60.00000
