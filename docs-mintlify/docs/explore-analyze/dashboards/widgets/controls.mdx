@@ -86,23 +86,23 @@ For example, on a sales dashboard with a **Country** filter and a **City** filte
 A faceted filter can take as a source any sibling on the same semantic view set to one of these conditions:
 
 - A **String** or **Number** dimension set to `is` or `is not`. A **Boolean** dimension counts here too: its `is true` / `is false` set `is`.
-- A time dimension set to any of its date conditions except `is null` and `is not null` — though `is not` and the `in the …` and `not in the …` conditions each have a value shape they cannot narrow on.
+- A time dimension set to any of its date conditions except `is null` and `is not null` — though `is not` and the `in the …` and `not in the …` conditions narrow only when their value is a single whole period.
 
 Every other condition cannot be picked as a source and scopes nothing — `contains`, `starts with` and `ends with` and their negations, the comparisons on a **Number** dimension (`greater than`, `less than` and their *or equal* forms), and `is null`, `is not null`, `is empty` and `is not empty`.
 
-To pick which siblings a filter listens to, turn the **Facet** switch on in its edit sidebar: the source picker appears with it, reading **All**. Left at **All**, the filter listens to every sibling on the same semantic view; picking entries narrows it to those. A sibling whose condition cannot narrow is greyed out in that list, with a tooltip saying it is not available for this semantic view or filter type.
+To pick which siblings a filter listens to, turn the **Facet** switch on in its edit sidebar: the source picker appears with it, reading **All**. Left at **All**, the filter listens to every sibling on the same semantic view; picking entries narrows it to those. A sibling whose condition cannot narrow is greyed out in that list, with a tooltip saying it is not available for this semantic view or filter type. **Cancel** leaves the filter on the sources it was last saved with — it discards every unsaved edit in the sidebar, not only the source list — while turning **Facet** back off clears the entries you picked, so switching it on again starts from **All**.
 
-<Warning>
-Press **Cancel** in the sidebar to restore the sources the filter was last saved with: turning **Facet** back off clears the list you picked, and switching it on again starts from **All**.
-</Warning>
+A date source never scopes the value list to less than the window the charts are showing, so the list never drops a value the charts still have rows for. Which window it scopes to depends on the condition:
 
-A date source never scopes the value list to less than the window the charts are showing, so the list never drops a value the charts still have rows for. Which window a source scopes to depends on the condition:
+| Condition | Window the value list is scoped to |
+|---|---|
+| `is` | What its value names: the whole period of a whole-period preset, the moment itself of a fixed date or a single-moment relative value, and all of those windows for several values |
+| `in the month`, `in the quarter`, `in the year` | The whole period the value falls in |
+| `after`, `after or on`, `before`, `before or on` | Everything on one side of the single whole day the value resolves to — for a whole-period preset, the day that period starts on |
+| `between` | The range's own whole-day bounds, fixed or relative |
+| `not in the month`, `not in the quarter`, `not in the year`, `is not` on a whole-period value | Everything *outside* that period |
 
-- `is` scopes the list to what its value names: the whole period for a whole-period preset, and the moment itself — what the charts match — for a fixed date or a single-moment relative value. Several values scope the list to all of their windows.
-- `in the month`, `in the quarter` and `in the year` scope the list to the whole period their value falls in.
-- `after`, `after or on`, `before` and `before or on` scope the list to everything on one side of the single whole day their value resolves to — for a whole-period preset, the day that period starts on, which is the day the charts compare against too.
-- `between` scopes the list to the range's own whole-day bounds, whether those bounds are fixed or relative. A range the charts return no rows for therefore leaves the value list empty too, instead of offering values the charts exclude.
-- The negated conditions — `not in the month`, `not in the quarter`, `not in the year`, and `is not` on a whole-period value — scope the list the other way, to everything *outside* that period.
+A `between` range the charts return no rows for therefore leaves the value list empty too, instead of offering values the charts exclude.
 
 <Warning>
 A source can end up with nothing to scope by, leaving the value list as wide as it was while the charts narrow:
