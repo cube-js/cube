@@ -92,15 +92,17 @@ Every other condition cannot be picked as a source and scopes nothing — `conta
 
 To pick which siblings a filter listens to, turn the **Facet** switch on in its edit sidebar: the source picker appears with it, reading **All**. Left at **All**, the filter listens to every sibling on the same semantic view; picking entries narrows it to those. A sibling whose condition cannot narrow is greyed out in that list, with a tooltip saying it is not available for this semantic view or filter type. **Cancel** leaves the filter on the sources it was last saved with — it discards every unsaved edit in the sidebar, not only the source list — while turning **Facet** back off clears the entries you picked, so switching it on again starts from **All**.
 
-A date source never scopes the value list to less than the window the charts are showing, so the list never drops a value the charts still have rows for. Every bound the value editor picks is a whole day, and on a whole day the scope takes the same bound the charts do — so a `between` range they return no rows for leaves the value list empty too. Which window it scopes to depends on the condition:
+A date source never scopes the value list to less than the window the charts are showing, so the list never drops a value the charts still have rows for. Which window it scopes to depends on the condition:
 
 | Condition | Window the value list is scoped to |
 |---|---|
 | `is` | What its value names: the whole period of a whole-period preset, the moment itself of a fixed date or a single-moment relative value, and all of those windows for several values |
 | `in the month`, `in the quarter`, `in the year` | The whole period the value falls in |
-| `after`, `after or on`, `before`, `before or on` | Everything on one side of the single whole day the value resolves to — for a whole-period preset, the day that period starts on |
-| `between` | The range itself, between its own bounds — whole days, fixed or relative, as the value editor picks them |
+| `after`, `after or on`, `before`, `before or on` | Everything on one side of the date the value resolves to — for a whole-period preset, the day that period starts on |
+| `between` | The range itself, between its own bounds, fixed or relative |
 | `not in the month`, `not in the quarter`, `not in the year`, `is not` on a whole-period value | Everything *outside* that period |
+
+`after`, `after or on`, `before`, `before or on` and `between` scope on their bounds rather than on a period. The value editor picks a whole day for each, and on a whole day the scope takes the same bound the charts do — so a window the charts return no rows for leaves the value list empty too.
 
 <Warning>
 A source can end up with nothing to scope by, leaving the value list as wide as it was while the charts narrow:
