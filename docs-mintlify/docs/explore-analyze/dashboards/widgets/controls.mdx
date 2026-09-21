@@ -79,7 +79,7 @@ If a [parent control](#parent) drives this filter, the option the viewer is on d
 
 ### Faceted filters
 
-When multiple filters target dimensions from the same semantic view, you can mark one as **faceted**. A faceted filter scopes its value list to what its siblings are set to — selecting a value in one filter narrows the options shown in the faceted ones, so viewers only see combinations that exist in the data.
+When multiple filters target dimensions from the same semantic view, you can mark one as **faceted**. A faceted filter scopes its value list to what its siblings are set to — selecting a value in one filter narrows the options shown in the faceted one, so viewers only see combinations that exist in the data.
 
 For example, on a sales dashboard with a **Country** filter and a **City** filter, marking the City filter as faceted means selecting `United States` in the Country filter limits the City filter to U.S. cities only.
 
@@ -90,7 +90,7 @@ A faceted filter can take as a source any sibling on the same semantic view set 
 
 Every other condition cannot be picked as a source and scopes nothing — `contains`, `starts with` and `ends with` and their negations, the comparisons on a **Number** dimension (`greater than`, `less than` and their *or equal* forms), and `is null`, `is not null`, `is empty` and `is not empty`.
 
-To pick which siblings a filter listens to, turn the **Facet** switch on in its edit sidebar: the source picker appears with it, reading **All**. Left at **All**, the filter listens to every sibling; picking entries narrows it to those. A sibling whose condition cannot narrow is greyed out in that list, with a tooltip saying it is not available for this semantic view or filter type. **Cancel** leaves the filter on the sources it was last saved with — it discards every unsaved edit in the sidebar, not only the source list — while turning **Facet** back off clears the entries you picked, so switching it on again starts from **All**.
+To pick which siblings a filter listens to, turn the **Facet** switch on in its edit sidebar: the source picker appears with it, reading **All**. Left at **All**, the filter listens to every sibling; picking entries narrows it to those. A sibling set to one of those other conditions is greyed out in that list, with a tooltip saying it is not available for this semantic view or filter type. **Cancel** leaves the filter on the sources it was last saved with — it discards every unsaved edit in the sidebar, not only the source list — while turning **Facet** back off clears the entries you picked, so switching it on again starts from **All**.
 
 A date source never scopes the value list to less than the window the charts are showing, so the list never drops a value the charts still have rows for. Which window it scopes to depends on the condition:
 
