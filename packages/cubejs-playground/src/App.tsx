@@ -1,5 +1,4 @@
 /* eslint-disable no-undef,react/jsx-no-target-blank */
-import '@ant-design/compatible/assets/index.css';
 import { Alert, Layout } from 'antd';
 import { Component, PropsWithChildren, useEffect } from 'react';
 import { RouteComponentProps, withRouter } from 'react-router-dom';
