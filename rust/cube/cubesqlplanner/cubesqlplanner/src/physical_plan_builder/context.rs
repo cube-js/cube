@@ -2,7 +2,6 @@ use cubenativeutils::CubeError;
 
 use crate::physical_plan::sql_nodes::SqlNodesFactory;
 use crate::physical_plan::Schema;
-use crate::planner::filter::Filter;
 use crate::planner::planners::multi_stage::{EvaluationContext, TimeShiftState};
 use crate::planner::MemberSymbol;
 use std::collections::HashMap;
@@ -24,10 +23,6 @@ pub(super) struct PushDownBuilderContext {
     pub required_measures: Option<Vec<Rc<MemberSymbol>>>,
     pub dimensions_query: bool,
     pub measure_subquery: bool,
-    // What `SelectBuilder::set_filter_params_filters` describes, on its way to
-    // the node it was set for. Taken there rather than read, so it is never
-    // visible further down.
-    pub filter_params_filters: Option<Filter>,
     pub multi_stage_schemas: HashMap<String, Rc<Schema>>,
     pub multi_stage_dimension_schemas: HashMap<Vec<String>, Rc<MultiStageDimensionContext>>,
     pub multi_stage_dimensions: Vec<String>,
