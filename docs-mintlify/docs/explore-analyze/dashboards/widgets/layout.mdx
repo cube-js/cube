@@ -36,7 +36,7 @@ A new grid is added as a square matching the column count of the board or grid i
 
 Click the grid's header to select it, then drag its resize grip to change its size, or open its gear menu for **Edit title**, **Resize**, and **Delete Grid** ([what that removes](#deleting-a-container)). Resizing only crops or restores empty rows and columns: a grid can't shrink below 2×2 or cut into an occupied cell. To name a grid, click into its header once it's selected and type a title.
 
-A grid can be nested inside the root board, inside another grid, or inside a tab, but not inside a stack ([nesting rules](#nesting-containers)).
+A grid can sit on the canvas, inside another grid, or inside a tab, but not inside a stack ([nesting rules](#nesting-containers)).
 
 ## Tabs
 
@@ -60,9 +60,7 @@ While you are editing, the tab strip is where you work with the tabs themselves:
 
 Click the empty part of the strip to select the container, then drag its resize grip to change its size; drag that same empty part to move it on the board. Its gear menu carries **Resize** and **Delete Tabs** ([what that removes](#deleting-a-container)).
 
-A new tabs container is added 6 cells wide and 9 tall. A board narrows the width alone, to its own column count when that is under 6, so the height is always 9; a grid narrows both, to its own column and row counts. Neither narrowing goes below the 4×6 minimum.
-
-So a grid narrower than 4 columns or shorter than 6 rows can never take a tabs container at all, and a larger one takes it only where it has a free block of the narrowed size — 6×9 in a grid at least that big. It can't be resized below 4×6 either, inside a grid as much as on the canvas; and if a tab holds a grid, it also can't shrink past what that grid's own contents need.
+A new tabs container is added 6 cells wide and 9 tall, narrowed to where it's placed: a board narrows the width to its own column count, a grid narrows both to its own column and row counts, and neither goes below 4×6. A grid takes one only where it has a free block of that narrowed size, so a grid under 4 columns or 6 rows never takes one at all. You can't resize one below 4×6 anywhere, and a tab holding a grid can't shrink past what that grid's contents need.
 
 A tabs container can sit on the canvas, inside a grid, or inside a tab, but not inside a stack ([nesting rules](#nesting-containers)). Inside a tab, a nested grid keeps **Edit title** and **Delete Grid** but drops **Resize**, and a nested stack or tabs container carries a delete button in its top-right corner instead of a menu.
 
