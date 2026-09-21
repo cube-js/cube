@@ -52,7 +52,7 @@ tracing = { version = "0.1.40", features = ["async-await"] }
 async-stream = "0.3.3"
 sha1_smol = "1.0.0"
 minijinja = { version = "1", features = ["json", "loader"] }
-lru = "0.13.0"
+lru = "0.18.4"
 moka = { version = "0.12", features = ["future"] }
 sha2 = "0.10.8"
 bigdecimal = "0.4.2"
