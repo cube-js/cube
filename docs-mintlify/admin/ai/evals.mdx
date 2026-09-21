@@ -100,6 +100,28 @@ background. The run list shows live progress and then the outcome:
 | **Created by** | Who triggered the run. |
 | **Last updated** | When it finished. |
 
+### Run evals from CI
+
+The Cube CLI can run the same eval suite as a pull-request check. Authenticate
+with `CUBE_API_URL` and `CUBE_API_KEY`, then pass the branch under review:
+
+```yaml
+- name: Run Cube agent evals
+  env:
+    CUBE_API_URL: ${{ vars.CUBE_API_URL }}
+    CUBE_API_KEY: ${{ secrets.CUBE_API_KEY }}
+    DEPLOYMENT_ID: ${{ vars.CUBE_DEPLOYMENT_ID }}
+  run: cube evals run "$DEPLOYMENT_ID" --branch "$GITHUB_HEAD_REF" --wait
+```
+
+The command waits for completion and exits non-zero when the eval run fails,
+when it produces no graded questions, or when any question has a verdict other than
+`pass`. It also fails closed if the API does not return a complete result set. Add
+`--agent NAME` to test a configured agent or
+`--file eval_questions/revenue.yml` to limit the run to one question file. Pass
+`--json` for a machine-readable document containing both the terminal run and
+its per-question results when the result set is complete.
+
 ## Reading the results
 
 Open a run to see per-question results: the question list on the left, with a
