@@ -2587,6 +2587,29 @@
     mkdirp "^3.0.1"
     xml2js "^0.6.2"
 
+"@cubejs-backend/shared@1.7.42":
+  version "1.7.42"
+  resolved "https://registry.yarnpkg.com/@cubejs-backend/shared/-/shared-1.7.42.tgz#1b3bc38ca87ad1108e783ec089728ff5816d4618"
+  integrity sha512-X1a/2q/GL9Z3HFxcuefQz3/cTN3PqWB6KOor14NXxx+0rf20q8Z+YWFj3R52Z+zRK4EbYcLthcmIy9ThaH0gfg==
+  dependencies:
+    "@oclif/color" "^1.0.0"
+    bytes "^3.1.2"
+    cli-progress "^3.10.0"
+    cross-spawn "^7.0.3"
+    env-var "^6.3.0"
+    fs-extra "^11.1.1"
+    generic-pool "^3.9.0"
+    lru-cache "^11.1.0"
+    moment-range "^4.0.2"
+    moment-timezone "^0.5.48"
+    node-fetch "^2.7.0"
+    node-stream-zip "^1.16.0"
+    proxy-agent "^6.5.0"
+    shelljs "^0.8.5"
+    tar "^7.5.22"
+    throttle-debounce "^3.0.1"
+    uuid "^11.1.1"
+
 "@cubejs-infra/post-installer@^0.2.0":
   version "0.2.0"
   resolved "https://registry.yarnpkg.com/@cubejs-infra/post-installer/-/post-installer-0.2.0.tgz#f8aed8b67a4a05e27d0c2a28258ba1aad4ec3ca5"
