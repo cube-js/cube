@@ -42,7 +42,7 @@ Filters can allow either a single value or multiple values. The filter's edit si
 | **String** on `is` / `is not` | Several, unless you turn **Enable multiple values** off; what you set on `is` also governs `is not` |
 | **Number** on `is` / `is not` | Several |
 | **Number** comparisons (`greater than`, `less than` and their *or equal* forms) | One |
-| **Time** on any condition except `is null` and `is not null` | One per field |
+| **Time** on any condition except `is null` and `is not null` | One per field in the UI; several only through a hand-written [URL parameter](#sharing-the-current-selection) |
 | **Boolean** | One, set by its `is true` / `is false` picker |
 | Substring conditions (`contains`, `starts with`, `ends with` and their negations) | One |
 | `is null`, `is not null`, `is empty`, `is not empty` | None |
@@ -411,7 +411,9 @@ A filter's JSON carries the condition in its `type` key, alongside the `value`. 
 | `contains`, `starts with`, `ends with` and their `not` forms | `contains`, `starts_with`, `ends_with`, `not_contains`, `not_starts_with`, `not_ends_with` |
 | `is null`, `is not null`, `is empty`, `is not empty` | `is_null`, `is_not_null`, `is_empty`, `is_not_empty` — these take no `value` |
 
-A `between` filter's `value` is a two-entry array, and both bounds are inclusive unless you set `startInclusive` or `endInclusive` to `false`.
+A **Boolean** dimension's `is true` and `is false` sit on the `is` row: both are `equals`, with `value` set to the string `"true"` or `"false"` — `f_orders.is_paid={"value":"true"}`.
+
+A `between` filter's `value` is a two-entry array, and both bounds are inclusive unless you set `startInclusive` or `endInclusive` to `false`. Each is a key of its own, beside `type` and `value` rather than inside them — `f_orders.created_at={"type":"between","value":["2026-01-01","2026-02-01"],"endInclusive":false}`.
 
 What travels in the link, and what wins when a link value arrives:
 
