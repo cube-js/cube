@@ -4,9 +4,7 @@
 //! One SQL query cannot read from CubeStore and from the source database at
 //! once, so a set of per-stage matches that spans both external types is
 //! unusable as a whole. These tests pin what the matcher does with such a set,
-//! and guard the neighbouring cases it must not disturb: a single wider
-//! pre-aggregation is able to cover every stage on its own, and a query matched
-//! as a whole keeps the pre-aggregation it already matched.
+//! and guard the neighbouring cases it must not disturb.
 
 use crate::test_fixtures::cube_bridge::MockSchema;
 use crate::test_fixtures::test_utils::TestContext;
@@ -130,9 +128,8 @@ async fn test_narrow_pre_aggregation_alone_cannot_serve_the_query() -> Result<()
 }
 
 // A query that matches as a whole never reaches the multi-stage path, so the
-// retry cannot drag it onto the wider pre-aggregation. Candidates are tried in
-// declaration order with no ranking between them, so what this pins is that
-// `by_day` — declared first, and the narrower of the two — keeps winning.
+// retry cannot drag it onto the wider pre-aggregation. Candidates carry no
+// ranking, so what this pins is `by_day` — declared first — still winning.
 #[tokio::test(flavor = "multi_thread")]
 async fn test_whole_query_match_is_left_alone_by_the_retry() -> Result<(), CubeError> {
     let ctx = TestContext::new(MockSchema::from_yaml_file(YAML))?;
@@ -167,15 +164,10 @@ async fn test_whole_query_match_is_left_alone_by_the_retry() -> Result<(), CubeE
     Ok(())
 }
 
-// Finding the fallback set is only half of it: the denominator now reads
-// `by_brand_day` and re-aggregates across the brands it stores, instead of
-// reading a pre-summed `by_day`. The rows must still be the ones the fact
-// table produces — a brand predicate leaking into that read would leave every
-// share at 1.0 while all the assertions above still passed.
-//
-// `try_execute_pg` rather than `try_execute`: the served plan is external, so
-// `try_execute` would route it to CubeStore and skip. The arithmetic under
-// test does not depend on which engine stores the rollup.
+// The denominator re-aggregates `by_brand_day` across brands instead of reading
+// a pre-summed `by_day`; a brand predicate leaking into that read would leave
+// every share at 1.0 with the assertions above still passing. `try_execute_pg`,
+// not `try_execute`: the served plan is external and would otherwise skip.
 #[tokio::test(flavor = "multi_thread")]
 async fn test_fallback_rows_agree_with_the_fact_table() -> Result<(), CubeError> {
     let served = TestContext::new(MockSchema::from_yaml_file(YAML))?;
@@ -220,11 +212,9 @@ async fn test_fallback_rows_agree_with_the_fact_table() -> Result<(), CubeError>
     Ok(())
 }
 
-// With the brand-grained rollup available in both external types, either group
-// can cover the query, so the retry order is what decides between them rather
-// than availability. Trying the source first would serve this from
-// `by_brand_day_source` instead, which is what pins CubeStore-first as a
-// deliberate choice.
+// Here the brand-grained rollup exists in both external types, so either group
+// can cover the query and the retry order decides rather than availability:
+// trying the source first would serve this from `by_brand_day_source`.
 #[tokio::test(flavor = "multi_thread")]
 async fn test_retry_prefers_cubestore_when_both_engines_can_cover() -> Result<(), CubeError> {
     let ctx = TestContext::new(MockSchema::from_yaml_file(YAML_BOTH_ENGINES))?;
@@ -265,10 +255,9 @@ async fn test_retry_prefers_cubestore_when_both_engines_can_cover() -> Result<()
     Ok(())
 }
 
-// Both retries come up empty: the numerator needs brand, the regrouped
-// denominator needs region, and each external type has only one of them. This
-// is the exhausted-retry path — distinct from a stage that matched nothing on
-// the first pass and returned before any retry ran.
+// The numerator needs brand, the regrouped denominator needs region, and each
+// external type carries only one — so both retries are exhausted. Distinct from
+// a stage that matched nothing and returned before any retry ran.
 #[tokio::test(flavor = "multi_thread")]
 async fn test_falls_back_to_source_when_neither_engine_can_cover() -> Result<(), CubeError> {
     let ctx = TestContext::new(MockSchema::from_yaml_file(YAML_NEITHER_ENGINE))?;

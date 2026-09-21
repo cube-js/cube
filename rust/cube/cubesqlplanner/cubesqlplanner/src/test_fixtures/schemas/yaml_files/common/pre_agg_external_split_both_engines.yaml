@@ -1,7 +1,6 @@
-# Same share measure as `pre_agg_external_split.yaml`, but the brand-grained
-# rollup exists in both external types. Either one alone can cover both stages,
-# so which one a retry settles on is a policy choice rather than the only
-# option left. Reads the same `pa_sales` table.
+# Same share measure and `pa_sales` table as `pre_agg_external_split.yaml`, but
+# the brand-grained rollup exists in both external types: either one alone
+# covers both stages, so a retry picks between them by policy.
 cubes:
     - name: sales
       sql: "SELECT * FROM pa_sales"
