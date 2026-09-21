@@ -31,7 +31,7 @@ A time filter's *value* is fixed or relative, picked on the value editor's **Fix
 
 A `between` filter picks a calendar date for each bound on its **Fixed** tab, and one whole window — **Past week** to **Past 2 years** — on its **Relative** tab.
 
-Neither tab sets more than one value, and the [**Selection Mode**](#single-vs-multiple-selection) switch is not offered for a time dimension, so a time filter holds *several values* only when a hand-written [URL parameter](#sharing-the-current-selection) passes a list in its `value` — `f_orders.created_at={"type":"equals","value":["2026-01-01","2026-02-01"]}`.
+Neither tab offers a list of values: each field takes one, and a `between` filter's two fields fill its two-entry `value` array with one bound each rather than with alternatives. The [**Selection Mode**](#single-vs-multiple-selection) switch is not offered for a time dimension either, so a time filter carries *several values* for one condition only when a hand-written [URL parameter](#sharing-the-current-selection) passes a list in its `value` — `f_orders.created_at={"type":"equals","value":["2026-01-01","2026-02-01"]}`.
 
 ### Single vs. multiple selection
 
@@ -104,7 +104,9 @@ A faceted filter can take as a source any sibling on the same semantic view set 
 
 Every other condition cannot be picked as a source and scopes nothing — `contains`, `starts with` and `ends with` and their negations, the comparisons on a **Number** dimension (`greater than`, `less than` and their *or equal* forms), and `is null`, `is not null`, `is empty` and `is not empty`.
 
-To pick which siblings a filter listens to, turn the **Facet** switch on in its edit sidebar: the source picker appears with it, reading **All**. The picker lists every other filter on the dashboard and greys out the ones it cannot use — a sibling set to one of those other conditions, or one targeting a different semantic view — with a tooltip saying it is not available for this semantic view or filter type. Left at **All**, the filter listens to every sibling the picker leaves selectable; picking entries narrows it to those. **Cancel** leaves the filter on the sources it was last saved with — it discards every unsaved edit in the sidebar, not only the source list — while turning **Facet** back off clears the entries you picked, so switching it on again starts from **All**.
+To pick which siblings a filter listens to, turn the **Facet** switch on in its edit sidebar: the source picker appears with it, reading **All**. The picker lists every other filter on the dashboard and greys out the ones it cannot use — a sibling set to one of those other conditions, or one targeting a different semantic view — with a tooltip saying it is not available for this semantic view or filter type. Left at **All**, the filter listens to every sibling the picker leaves selectable; picking entries narrows it to those.
+
+**Cancel** leaves the filter on the sources it was last saved with — it discards every unsaved edit in the sidebar, not only the source list — while turning **Facet** back off clears the entries you picked, so switching it on again starts from **All**.
 
 A date source never scopes the value list to less than the window the charts are showing, so the list never drops a value the charts still have rows for. Which window it scopes to depends on the condition:
 
