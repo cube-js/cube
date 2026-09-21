@@ -15,6 +15,11 @@ use indoc::indoc;
 
 const YAML: &str = "common/pre_agg_external_split.yaml";
 const SEED: &str = "pre_agg_external_split_tables.sql";
+// Same measure and table as YAML, with the brand-grained rollup present in
+// both external types.
+const YAML_BOTH_ENGINES: &str = "common/pre_agg_external_split_both_engines.yaml";
+// Same again, with the two rollups each carrying what the other stage needs.
+const YAML_NEITHER_ENGINE: &str = "common/pre_agg_external_split_neither_engine.yaml";
 
 // Numerator reads revenue for one brand; the denominator lifts the brand
 // filter and totals every brand. Only `by_brand_day` carries brand, so only it
@@ -211,6 +216,108 @@ async fn test_fallback_rows_agree_with_the_fact_table() -> Result<(), CubeError>
     if let Some(rows) = served_rows {
         insta::assert_snapshot!(rows);
     }
+
+    Ok(())
+}
+
+// With the brand-grained rollup available in both external types, either group
+// can cover the query, so the retry order is what decides between them rather
+// than availability. Trying the source first would serve this from
+// `by_brand_day_source` instead, which is what pins CubeStore-first as a
+// deliberate choice.
+#[tokio::test(flavor = "multi_thread")]
+async fn test_retry_prefers_cubestore_when_both_engines_can_cover() -> Result<(), CubeError> {
+    let ctx = TestContext::new(MockSchema::from_yaml_file(YAML_BOTH_ENGINES))?;
+
+    let (sql, pre_aggrs) = ctx.build_sql_with_used_pre_aggregations(BRAND_SHARE_QUERY)?;
+
+    assert_eq!(
+        pre_aggrs.len(),
+        2,
+        "both stages must be served; got [{}]. Generated SQL:\n{sql}",
+        used(&pre_aggrs)
+    );
+    assert!(
+        pre_aggrs
+            .iter()
+            .all(|p| p.name() == "by_brand_day_external"),
+        "the external group is tried first, so both usages must be \
+         `by_brand_day_external`; got [{}]",
+        used(&pre_aggrs)
+    );
+
+    // Restricted to the source-side candidates the query is served too, so the
+    // preference above is a choice between two workable groups rather than the
+    // only one available.
+    let source_side = TestContext::new(
+        MockSchema::from_yaml_file(YAML_BOTH_ENGINES)
+            .only_pre_aggregations(&["by_day", "by_brand_day_source"]),
+    )?;
+    let (_sql, source_pre_aggrs) =
+        source_side.build_sql_with_used_pre_aggregations(BRAND_SHARE_QUERY)?;
+    assert!(
+        !source_pre_aggrs.is_empty() && source_pre_aggrs.iter().all(|p| !p.external()),
+        "the source group must be able to serve the query for the preference \
+         above to mean anything; got [{}]",
+        used(&source_pre_aggrs)
+    );
+
+    Ok(())
+}
+
+// Both retries come up empty: the numerator needs brand, the regrouped
+// denominator needs region, and each external type has only one of them. This
+// is the exhausted-retry path — distinct from a stage that matched nothing on
+// the first pass and returned before any retry ran.
+#[tokio::test(flavor = "multi_thread")]
+async fn test_falls_back_to_source_when_neither_engine_can_cover() -> Result<(), CubeError> {
+    let ctx = TestContext::new(MockSchema::from_yaml_file(YAML_NEITHER_ENGINE))?;
+
+    let (sql, pre_aggrs) = ctx.build_sql_with_used_pre_aggregations(BRAND_SHARE_QUERY)?;
+
+    assert!(
+        pre_aggrs.is_empty(),
+        "neither external type covers both stages, so the query must read the \
+         fact table; got [{}]. Generated SQL:\n{sql}",
+        used(&pre_aggrs)
+    );
+
+    // Each rollup on its own still serves nothing, which is what makes the
+    // groups above individually insufficient rather than merely unlucky.
+    for name in ["by_brand_day", "by_region_day"] {
+        let single = TestContext::new(
+            MockSchema::from_yaml_file(YAML_NEITHER_ENGINE).only_pre_aggregations(&[name]),
+        )?;
+        let (_sql, single_pre_aggrs) =
+            single.build_sql_with_used_pre_aggregations(BRAND_SHARE_QUERY)?;
+        assert!(
+            single_pre_aggrs.is_empty(),
+            "`{name}` alone must not serve the query; got [{}]",
+            used(&single_pre_aggrs)
+        );
+    }
+
+    Ok(())
+}
+
+// Externals are dropped before matching, so a pass can never come out split
+// and the retry never runs. The outcome has to stay what it was before the
+// retry existed: `by_day` cannot apply the brand filter, so nothing is served.
+#[tokio::test(flavor = "multi_thread")]
+async fn test_disabled_external_pre_aggregations_are_unaffected() -> Result<(), CubeError> {
+    let ctx = TestContext::new(MockSchema::from_yaml_file(YAML))?;
+
+    // Note the snake_case key: these options ignore unknown fields, so a
+    // camelCase spelling would silently leave the flag unset.
+    let query = format!("{BRAND_SHARE_QUERY}disable_external_pre_aggregations: true\n");
+    let (sql, pre_aggrs) = ctx.build_sql_with_used_pre_aggregations(&query)?;
+
+    assert!(
+        pre_aggrs.is_empty(),
+        "with externals disabled only `by_day` remains, which cannot filter by \
+         brand; got [{}]. Generated SQL:\n{sql}",
+        used(&pre_aggrs)
+    );
 
     Ok(())
 }

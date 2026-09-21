@@ -1,0 +1,70 @@
+# Same share measure as `pre_agg_external_split.yaml`, but the brand-grained
+# rollup exists in both external types. Either one alone can cover both stages,
+# so which one a retry settles on is a policy choice rather than the only
+# option left. Reads the same `pa_sales` table.
+cubes:
+    - name: sales
+      sql: "SELECT * FROM pa_sales"
+      dimensions:
+          - name: id
+            type: number
+            sql: id
+            primary_key: true
+          - name: brand
+            type: string
+            sql: brand
+          - name: created_at
+            type: time
+            sql: created_at
+      measures:
+          - name: revenue
+            type: sum
+            sql: amount
+
+          - name: revenue_all_brands
+            type: number
+            sql: "{CUBE.revenue}"
+            multi_stage: true
+            reduce_by:
+                - brand
+            filter:
+                exclude:
+                    - brand
+
+          - name: brand_share
+            type: number
+            sql: "{CUBE.revenue} / NULLIF({CUBE.revenue_all_brands}, 0)"
+            multi_stage: true
+
+      pre_aggregations:
+          # Declared first, so the brand-free denominator reaches it before
+          # either brand-grained rollup and the first pass comes out split.
+          - name: by_day
+            type: rollup
+            external: false
+            measures:
+                - revenue
+            time_dimension: created_at
+            granularity: day
+
+          - name: by_brand_day_external
+            type: rollup
+            external: true
+            measures:
+                - revenue
+            dimensions:
+                - brand
+            time_dimension: created_at
+            granularity: day
+
+          # Declared last and in the other external type: reordering the retry
+          # to try the source first would make this one win instead.
+          - name: by_brand_day_source
+            type: rollup
+            external: false
+            measures:
+                - revenue
+            dimensions:
+                - brand
+            time_dimension: created_at
+            granularity: day
