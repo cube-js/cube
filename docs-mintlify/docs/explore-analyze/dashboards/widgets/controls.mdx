@@ -86,7 +86,7 @@ For example, on a sales dashboard with a **Country** filter and a **City** filte
 A faceted filter can take as a source any sibling on the same semantic view set to one of these conditions:
 
 - A **String** or **Number** dimension set to `is` or `is not`. A **Boolean** dimension counts here too: its `is true` / `is false` set `is`.
-- A time dimension set to any of its date conditions except `is null` and `is not null` — though `is not` and the `in the …` and `not in the …` conditions each have values they cannot narrow on, which the warning below lists.
+- A time dimension set to any of its date conditions except `is null` and `is not null` — though `is not` and the `in the …` and `not in the …` conditions narrow on one value only, and `is not` needs that value to name a whole period.
 
 Every other condition cannot be picked as a source and scopes nothing — `contains`, `starts with` and `ends with` and their negations, the comparisons on a **Number** dimension (`greater than`, `less than` and their *or equal* forms), and `is null`, `is not null`, `is empty` and `is not empty`.
 
@@ -99,7 +99,7 @@ A date source never scopes the value list to less than the window the charts are
 | `is` | What its value names: the whole period of a whole-period preset, the moment itself of a fixed date or a single-moment relative value, and all of those windows for several values |
 | `in the month`, `in the quarter`, `in the year` | The whole period the value falls in |
 | `after`, `after or on`, `before`, `before or on` | Everything on one side of the single whole day the value resolves to — for a whole-period preset, the day that period starts on |
-| `between` | The range's own bounds, fixed or relative. The value editor picks whole days, and on a whole day the scope takes the same bound the charts do — so a range the charts return no rows for leaves the value list empty too |
+| `between` | The range's own whole-day bounds, fixed or relative — the same bounds the charts use, so a range they return no rows for leaves the value list empty too |
 | `not in the month`, `not in the quarter`, `not in the year`, `is not` on a whole-period value | Everything *outside* that period |
 
 <Warning>
