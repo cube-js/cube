@@ -102,7 +102,7 @@ A date source never scopes the value list to less than the window the charts are
 | `between` | The range itself, between its own bounds, fixed or relative |
 | `not in the month`, `not in the quarter`, `not in the year`, `is not` on a whole-period value | Everything *outside* that period |
 
-`after`, `after or on`, `before`, `before or on` and `between` scope on their bounds rather than on a period. The value editor picks a whole day for each, and on a whole day the scope takes the same bound the charts do — so a window the charts return no rows for leaves the value list empty too.
+On `after`, `after or on`, `before`, `before or on` and `between`, the value editor picks a whole day for every bound, and on a whole day the scope takes the same bound the charts do — so a window they return no rows for leaves the value list empty too.
 
 <Warning>
 A source can end up with nothing to scope by, leaving the value list as wide as it was while the charts narrow:
