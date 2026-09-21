@@ -31,7 +31,7 @@ A time filter's *value* is fixed or relative, picked on the value editor's **Fix
 
 ### Single vs. multiple selection
 
-Filters can allow either a single value or multiple values. The filter's edit sidebar sets this under **Selection Mode**, on a switch labelled **Enable multiple values**: it is offered on a string filter using `is`, where several values are allowed unless you turn it off, and what you set there also governs the same filter on `is not`. No other combination has a switch — each takes the shape its own value editor gives it: several values for a number filter using `is` or `is not`, one value per field for a time filter, a single text box for the substring conditions, the one value its `is true` / `is false` picker sets for a boolean filter, and no value at all for `is null`, `is not null`, `is empty` and `is not empty`.
+Filters can allow either a single value or multiple values. The filter's edit sidebar sets this under **Selection Mode**, on a switch labelled **Enable multiple values**: it is offered on a string filter using `is`, where several values are allowed unless you turn it off, and what you set there also governs the same filter on `is not`. No other combination has a switch — each takes the shape its own value editor gives it: several values for a number filter using `is` or `is not`, one value for the comparisons on a **Number** dimension (`greater than`, `less than` and their *or equal* forms), one value per field for a time filter, a single text box for the substring conditions, the one value its `is true` / `is false` picker sets for a boolean filter, and no value at all for `is null`, `is not null`, `is empty` and `is not empty`.
 
 ### Default values
 
@@ -384,6 +384,20 @@ Each control type has its own parameter:
 The semantic view and member are the **internal names** configured on the control — not the display titles you see in the picker. A view shown as `Orders` is usually `orders` in the parameter. The same goes for the member on the right-hand side of `ms_`: it is the internal name of the member to switch to, and it is a measure rather than a dimension when the switcher's **Field Type** is **Measure**. Granularities are lowercase and must be one of the switcher's [allowed granularities](#allowed-granularities) — `day`, `week`, `month`, `quarter`, `year`, plus `second`, `minute`, and `hour` for time dimensions that expose them.
 
 You can also write these parameters by hand to open a dashboard in a particular state — see [Pre-set dashboard filters and granularities via URL][ref-embed-url-filters] for the embedded case, which uses the same format.
+
+A filter's JSON carries the condition in its `type` key, alongside the `value`. Omitted, it is `equals`, which is why the example above writes only a value. The strings for the conditions in [Operators by dimension type](#operators-by-dimension-type):
+
+| Condition | `type` |
+|---|---|
+| `is`, `is not` | `equals`, `not_equals` |
+| `greater than`, `greater than or equal` — on a time dimension, `after`, `after or on` | `greater_than`, `greater_than_or_equal` |
+| `less than`, `less than or equal` — on a time dimension, `before`, `before or on` | `less_than`, `less_than_or_equal` |
+| `between` | `between` |
+| `in the month`, `in the quarter`, `in the year` and their `not` forms | `in_month`, `in_quarter`, `in_year`, `not_in_month`, `not_in_quarter`, `not_in_year` |
+| `contains`, `starts with`, `ends with` and their `not` forms | `contains`, `starts_with`, `ends_with`, `not_contains`, `not_starts_with`, `not_ends_with` |
+| `is null`, `is not null`, `is empty`, `is not empty` | `is_null`, `is_not_null`, `is_empty`, `is_not_empty` — these take no `value` |
+
+A `between` filter's `value` is a two-entry array, and both bounds are inclusive unless you set `startInclusive` or `endInclusive` to `false`.
 
 What travels in the link, and what wins when a link value arrives:
 
