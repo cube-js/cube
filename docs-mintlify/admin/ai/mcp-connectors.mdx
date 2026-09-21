@@ -33,7 +33,9 @@ outbound, the other inbound — you can use either or both.
   (for example, "search pages" or "create issue"). A single connector typically exposes
   many tools.
 - Connectors are managed in the admin panel under **MCP Connectors** and apply across the
-  organization, so every agent can use the tools you enable.
+  organization, so every agent can use the tools you enable — except agents using the
+  [`chassis` runtime](/admin/ai#runtime), which runs a reduced toolset that does not
+  include MCP connector tools.
 
 ## Adding a connector
 
