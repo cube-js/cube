@@ -118,11 +118,15 @@ The `runtime` property controls how the agent processes requests:
 |--------------|--------------------------------------------------------------------------------------------|
 | `plain`      | Default. Optimized for speed and cost. Recommended for most use cases.                     |
 | `reasoning`  | Enables extended thinking for complex analysis.                                            |
-| `chassis`    | Optimized for semantic-model exploration. Runs a reduced toolset — [MCP connector tools](/admin/ai/mcp-connectors) and some [workbook authoring](/docs/explore-analyze/workbooks/workbook-agent) capabilities are among the features unavailable — and query results appear inline in the answer rather than as separate tool-call results. |
+| `chassis`    | Optimized for semantic-model exploration. Runs a reduced toolset, and query results appear inline in the answer rather than as separate tool-call results. |
 
 <Warning>
   `reasoning` and `chassis` are **experimental**. They may be unstable and are not yet feature-complete. Stick with `plain` unless you specifically need extended thinking or the leaner semantic-model toolset.
 </Warning>
+
+Under `chassis`, some agent features are unavailable, including [MCP connector
+tools](/admin/ai/mcp-connectors) and parts of [workbook
+authoring](/docs/explore-analyze/workbooks/workbook-agent).
 
 The `runtime` property applies to chat surfaces such as [Analytics
 Chat](/docs/explore-analyze/analytics-chat), the [Workbook
