@@ -1,13 +1,19 @@
 //! A measure that needs the full-key plan is aggregated over a keys subquery
-//! joined back to a second copy of the fact source by primary key. Both copies
-//! read the same fact rows over the same columns, so both must render the
-//! cube's `FILTER_PARAMS` bindings as the query's real predicates - otherwise
-//! the database builds the join against the whole unfiltered fact table.
+//! joined back to a second copy of the fact source by primary key. The keys
+//! side renders the cube's `FILTER_PARAMS` bindings as the query's real
+//! predicates; the measure side rendered them as always-true, so the database
+//! built the join against the whole unfiltered fact table.
 //!
-//! The join back is by primary key and the keys side already applies the same
-//! predicates, so filtering the measure side can only shrink the build, never
-//! change the result. The Postgres tests state that in numbers: the same model
-//! with and without the bindings answers the same.
+//! Both sides now resolve their bindings against the same filters. That brings
+//! the measure side into agreement with the keys side - and with what a plain
+//! non-multiplied query over the same model already renders - rather than
+//! leaving the result untouched by construction. For a binding in the cube
+//! `sql`'s top-level `WHERE` it does leave the result untouched: the join back
+//! is by primary key and the keys side applies the same predicates, so every
+//! joinable row already satisfies them and only the hash build shrinks. That is
+//! what the Postgres tests below measure. A binding placed elsewhere in the
+//! `sql` - a join condition, a projected expression - restricts values rather
+//! than rows, and a measure over those values can move.
 
 use crate::cube_bridge::base_query_options::FilterValue;
 use crate::test_fixtures::cube_bridge::MockSchema;
@@ -122,6 +128,22 @@ fn query_for(measure: &str) -> String {
 }
 
 const CUBE_SQL_HEAD: &str = "SELECT * FROM fpmjb_orders WHERE ";
+
+// Parameter placeholders carry their position in the statement, so two
+// renderings of one expression differ by their numbers alone.
+fn blank_params(sql: &str) -> String {
+    let mut out = String::new();
+    let mut chars = sql.chars().peekable();
+    while let Some(ch) = chars.next() {
+        out.push(ch);
+        if ch == '$' {
+            while chars.peek().is_some_and(|c| c.is_ascii_digit()) {
+                chars.next();
+            }
+        }
+    }
+    out
+}
 
 // One rendered copy of the fact cube's `sql`.
 struct FactCopy {
@@ -323,10 +345,40 @@ async fn a_measure_subquery_source_answers_the_same_as_a_full_scan() {
     insta::assert_snapshot!(result);
 }
 
+// The join back is written by the alias of the measure-side fact copy followed
+// by its ON clause; the keys-side copy carries the same alias but no ON.
+const JOIN_BACK: &str = "AS \"fpmjb_orders_key_fpmjb_orders\" ON ";
+
+// The ON clause of the join back, parameters blanked.
+fn join_back_on_clause(sql: &str) -> String {
+    assert_eq!(
+        sql.matches(JOIN_BACK).count(),
+        1,
+        "the join back must be locatable\nsql: {}",
+        sql
+    );
+    let (_, after) = sql.split_once(JOIN_BACK).unwrap();
+    blank_params(after.lines().next().unwrap())
+}
+
+// Every rendering of the key's own expression, parameters blanked.
+fn key_expressions(sql: &str) -> Vec<String> {
+    sql.match_indices("CASE WHEN ")
+        .map(|(start, _)| {
+            let tail = &sql[start..];
+            let end = tail
+                .find(" END")
+                .map(|i| i + " END".len())
+                .unwrap_or(tail.len());
+            blank_params(&tail[..end])
+        })
+        .collect()
+}
+
 // The join back compares the key the keys side projected against the key the
 // measure side renders. A binding anywhere in the primary key's own `sql` has
-// to resolve on both sides, or the two stop being the same expression and the
-// join matches nothing.
+// to resolve the same way in both, or the two stop being one expression and
+// the join matches nothing.
 #[test]
 fn the_join_key_renders_the_same_expression_on_both_sides() {
     let ctx = TestContext::new(schema_with_key(
@@ -339,18 +391,26 @@ fn the_join_key_renders_the_same_expression_on_both_sides() {
         .build_sql_and_params(&query_for("fpmjb_orders.orders_per_buyer"))
         .unwrap();
 
-    let (_, join_back) = sql.rsplit_once(" ON ").expect("a join back\nsql: {sql}");
-    let on_clause = join_back.lines().next().unwrap();
+    // The keys side projects the key under the alias the join back reads, and
+    // the measure side renders it again in the ON clause.
+    let renderings = key_expressions(&sql);
     assert!(
-        !on_clause.contains("1 = 1"),
-        "the measure side of the join key must resolve its binding\non: {}\nsql: {}",
-        on_clause,
+        renderings.len() >= 2,
+        "expected the key on both sides\nsql: {}",
         sql
     );
-    assert!(
-        on_clause.contains("CASE WHEN (tenant_id = $"),
-        "the measure side of the join key must render the predicate\non: {}\nsql: {}",
-        on_clause,
+    assert_eq!(
+        renderings,
+        vec!["CASE WHEN (tenant_id = $) THEN id END".to_string(); renderings.len()],
+        "every rendering of the key must resolve the binding the same way\nsql: {}",
+        sql
+    );
+
+    // ... and the join back really compares the keys side's alias against it.
+    assert_eq!(
+        join_back_on_clause(&sql),
+        format!("((\"keys\".\"fpmjb_orders__id\" = {}))", renderings[0]),
+        "sql: {}",
         sql
     );
 }
