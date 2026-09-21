@@ -203,7 +203,6 @@ impl MultipliedMeasuresQueryPlanner {
                 key_join.clone(),
                 &measures,
                 &primary_keys_dimensions,
-                keys_subquery.filter().clone(),
                 scope,
             )?;
             measure_subquery.into()
@@ -274,7 +273,6 @@ impl MultipliedMeasuresQueryPlanner {
         key_join: Rc<JoinTree>,
         measures: &Vec<Rc<MemberSymbol>>,
         primary_keys_dimensions: &Vec<Rc<MemberSymbol>>,
-        filter: Rc<LogicalFilter>,
         scope: &mut PlanningScope,
     ) -> Result<Rc<MeasureSubquery>, CubeError> {
         let subquery_dimensions = collect_sub_query_dimensions_from_members(&measures, &key_join)?;
@@ -296,11 +294,7 @@ impl MultipliedMeasuresQueryPlanner {
             .set_measures(measures.clone())
             .into_rc();
 
-        let result = MeasureSubquery {
-            schema,
-            filter,
-            source,
-        };
+        let result = MeasureSubquery { schema, source };
         Ok(Rc::new(result))
     }
 

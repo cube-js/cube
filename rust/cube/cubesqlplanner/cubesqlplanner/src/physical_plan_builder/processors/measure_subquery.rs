@@ -24,6 +24,11 @@ impl<'a> LogicalNodeProcessor<'a, MeasureSubquery> for MeasureSubqueryProcessor<
         context: &PushDownBuilderContext,
     ) -> Result<Self::PhysycalNode, CubeError> {
         let query_tools = self.builder.query_tools();
+        // Taken rather than read: the filters are this select's to resolve
+        // bindings against, not its sources' to inherit.
+        let mut context = context.clone();
+        let filter_params_filters = context.filter_params_filters.take();
+        let context = &context;
         let from = self
             .builder
             .process_node(measure_subquery.source.as_ref(), context)?;
@@ -48,8 +53,8 @@ impl<'a> LogicalNodeProcessor<'a, MeasureSubquery> for MeasureSubqueryProcessor<
             select_builder.add_projection_member(&meas, None);
         }
 
-        // Not a WHERE of its own - see `MeasureSubquery::filter`.
-        select_builder.set_filter_params_filters(measure_subquery.filter.all_filters());
+        // Not a WHERE of its own - the enclosing keys subquery restricts the rows.
+        select_builder.set_filter_params_filters(filter_params_filters);
 
         let select = Rc::new(select_builder.build(query_tools.clone(), context_factory));
         Ok(select)

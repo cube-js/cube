@@ -154,9 +154,13 @@ impl<'a> LogicalNodeProcessor<'a, AggregateMultipliedSubquery>
             }
             AggregateMultipliedSubquerySource::MeasureSubquery(measure_subquery) => {
                 check_measures_survive_measure_subquery(&measure_subquery.schema.measures)?;
+                // The subquery carries no WHERE of its own either, so its
+                // sources need the same filters to resolve their bindings.
+                let mut measure_context = context.clone();
+                measure_context.filter_params_filters = filter_params_filters.clone();
                 let subquery = self
                     .builder
-                    .process_node(measure_subquery.as_ref(), context)?;
+                    .process_node(measure_subquery.as_ref(), &measure_context)?;
                 let conditions = primary_keys_dimensions
                     .iter()
                     .map(|dim| -> Result<_, CubeError> {

@@ -2,6 +2,7 @@ use cubenativeutils::CubeError;
 
 use crate::physical_plan::sql_nodes::SqlNodesFactory;
 use crate::physical_plan::Schema;
+use crate::planner::filter::Filter;
 use crate::planner::planners::multi_stage::{EvaluationContext, TimeShiftState};
 use crate::planner::MemberSymbol;
 use std::collections::HashMap;
@@ -14,7 +15,7 @@ pub struct MultiStageDimensionContext {
     pub join_dimensions: Vec<Rc<MemberSymbol>>,
 }
 
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Default)]
 pub(super) struct PushDownBuilderContext {
     pub alias_prefix: Option<String>,
     pub render_measure_for_ungrouped: bool,
@@ -23,6 +24,11 @@ pub(super) struct PushDownBuilderContext {
     pub required_measures: Option<Vec<Rc<MemberSymbol>>>,
     pub dimensions_query: bool,
     pub measure_subquery: bool,
+    // Filters an enclosing node applies on behalf of the select being built,
+    // for the `FILTER_PARAMS` and `FILTER_GROUP` bindings of its sources to
+    // resolve against. Taken by the node it was set for, so it is never
+    // visible further down.
+    pub filter_params_filters: Option<Filter>,
     pub multi_stage_schemas: HashMap<String, Rc<Schema>>,
     pub multi_stage_dimension_schemas: HashMap<Vec<String>, Rc<MultiStageDimensionContext>>,
     pub multi_stage_dimensions: Vec<String>,
