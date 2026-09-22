@@ -36,7 +36,7 @@ export class ServerContainer {
   protected isCubeConfigEmpty: boolean = true;
 
   public constructor(
-    protected readonly configuration: { debug: boolean }
+    protected readonly configuration: { debug: boolean, devMode?: boolean }
   ) {
   }
 
@@ -247,6 +247,13 @@ export class ServerContainer {
       override,
       multiline: 'line-breaks'
     });
+
+    // `cubejs dev-server` asks for dev mode, but an explicit CUBEJS_DEV_MODE wins over
+    // it: silently flipping a `false` to `true` would drop the SQL API password check
+    // for someone who asked to keep it. This runs after dotenv so a .env value counts
+    if (this.configuration.devMode && process.env.CUBEJS_DEV_MODE === undefined) {
+      process.env.CUBEJS_DEV_MODE = 'true';
+    }
 
     // Dev mode is decided by CUBEJS_DEV_MODE alone. NODE_ENV is only kept in sync
     // for user configuration code and third-party libraries that still read it

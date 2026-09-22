@@ -319,6 +319,14 @@ describe('getEnv(compilerCacheSize)', () => {
   });
 });
 
+const restoreNodeEnv = (value: string | undefined) => {
+  if (value === undefined) {
+    delete process.env.NODE_ENV;
+  } else {
+    process.env.NODE_ENV = value;
+  }
+};
+
 describe('getEnv(devMode)', () => {
   const nodeEnv = process.env.NODE_ENV;
 
@@ -329,7 +337,7 @@ describe('getEnv(devMode)', () => {
 
   afterAll(() => {
     delete process.env.CUBEJS_DEV_MODE;
-    process.env.NODE_ENV = nodeEnv;
+    restoreNodeEnv(nodeEnv);
   });
 
   test('is off when neither CUBEJS_DEV_MODE nor NODE_ENV is set', () => {
@@ -359,5 +367,76 @@ describe('getEnv(devMode)', () => {
 
     process.env.NODE_ENV = 'development';
     expect(getEnv('devMode')).toBe(false);
+  });
+});
+
+describe('the NODE_ENV deprecation warning', () => {
+  const nodeEnv = process.env.NODE_ENV;
+  let logSpy: jest.SpyInstance;
+
+  // The warning is printed at most once per process, so each case needs a fresh
+  // module registry to reset displayCLIWarningOnce's bookkeeping
+  beforeEach(() => {
+    jest.resetModules();
+    delete process.env.CUBEJS_DEV_MODE;
+    delete process.env.NODE_ENV;
+    logSpy = jest.spyOn(console, 'log').mockImplementation(() => {
+      // swallow
+    });
+  });
+
+  afterEach(() => {
+    logSpy.mockRestore();
+    delete process.env.CUBEJS_DEV_MODE;
+    restoreNodeEnv(nodeEnv);
+  });
+
+  const nodeEnvWarnings = () => logSpy.mock.calls
+    .map(([message]) => String(message))
+    .filter((message) => message.includes('NODE_ENV'));
+
+  // eslint-disable-next-line global-require
+  const freshGetEnv = () => require('../src/env').getEnv;
+
+  test('is printed once when NODE_ENV is non-production and CUBEJS_DEV_MODE is unset', () => {
+    process.env.NODE_ENV = 'development';
+
+    const getEnvFresh = freshGetEnv();
+    expect(getEnvFresh('devMode')).toBe(false);
+    expect(getEnvFresh('devMode')).toBe(false);
+
+    expect(nodeEnvWarnings()).toHaveLength(1);
+    expect(nodeEnvWarnings()[0]).toContain('no longer taken into account');
+  });
+
+  test('does not tell an instance that wants development mode off to switch it on', () => {
+    process.env.NODE_ENV = 'staging';
+
+    expect(freshGetEnv()('devMode')).toBe(false);
+
+    expect(nodeEnvWarnings()[0]).toContain('otherwise no action is needed');
+  });
+
+  test('is suppressed once CUBEJS_DEV_MODE is set, whatever its value', () => {
+    process.env.NODE_ENV = 'development';
+    process.env.CUBEJS_DEV_MODE = 'false';
+
+    expect(freshGetEnv()('devMode')).toBe(false);
+
+    expect(nodeEnvWarnings()).toHaveLength(0);
+  });
+
+  test('is not printed for NODE_ENV=production', () => {
+    process.env.NODE_ENV = 'production';
+
+    expect(freshGetEnv()('devMode')).toBe(false);
+
+    expect(nodeEnvWarnings()).toHaveLength(0);
+  });
+
+  test('is not printed when NODE_ENV is unset', () => {
+    expect(freshGetEnv()('devMode')).toBe(false);
+
+    expect(nodeEnvWarnings()).toHaveLength(0);
   });
 });

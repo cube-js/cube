@@ -224,9 +224,10 @@ const devMode = () => {
   ) {
     displayCLIWarningOnce(
       'NODE_ENV_DEV_MODE',
-      `NODE_ENV is deprecated as a way to enable development mode and is ignored: NODE_ENV=${
+      `NODE_ENV is no longer taken into account when deciding development mode: NODE_ENV=${
         process.env.NODE_ENV
-      } no longer puts Cube in development mode. Please use CUBEJS_DEV_MODE=true instead.`
+      } does not enable it, and development mode is off. If this instance was meant to ` +
+      'run in development mode, set CUBEJS_DEV_MODE=true; otherwise no action is needed.'
     );
   }
 
@@ -291,6 +292,8 @@ const variables: Record<string, (...args: any) => any> = {
       return asBoolOrTime(process.env.CUBEJS_SCHEDULED_REFRESH_TIMER, 'CUBEJS_SCHEDULED_REFRESH_TIMER');
     }
 
+    // Deliberately NOT the dev mode decision: background refresh ran in dev mode too,
+    // so aligning this on getEnv('devMode') would silently stop it for bare instances
     // It's true by default for development
     return process.env.NODE_ENV !== 'production';
   },
