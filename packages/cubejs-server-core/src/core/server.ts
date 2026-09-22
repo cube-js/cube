@@ -371,11 +371,8 @@ export class CubejsServerCore {
       this.event('Server Start');
     }
 
-    // Last in the constructor, so anything that throws above takes no pin. Only an
-    // instance that finished construction is ever shut down, and shutdown is what
-    // releases this. The merged option, not the default OptsHandler resolved for it:
-    // `...opts` overrides that, and a driver resolving a different schema from
-    // CUBEJS_DEV_MODE is what the pin prevents
+    // Last in the constructor, so anything that throws above takes no pin; shutdown
+    // releases it
     if (typeof this.options.preAggregationsSchema === 'string') {
       pinPreAggregationsSchema(this.options.preAggregationsSchema);
       this.heldPreAggregationsSchemaPin = this.options.preAggregationsSchema;
@@ -1020,11 +1017,9 @@ export class CubejsServerCore {
   public async shutdown() {
     this.compilerCache.clear();
 
-    // Paired with the pin the constructor took: an instance that is gone must not
-    // leave the next one's drivers on its schema. The flag makes a second shutdown a
-    // no-op, because the pin counts how many instances hold it, not which - and this
-    // method is public and unguarded, so a double call would otherwise release the
-    // share of a co-resident instance that is still serving on the same schema
+    // This method is public and unguarded, and the pin counts how many instances hold
+    // it rather than which, so without the latch a second call here would release a
+    // co-resident instance's share of a schema it is still serving on
     if (this.heldPreAggregationsSchemaPin !== undefined) {
       const schema = this.heldPreAggregationsSchemaPin;
 

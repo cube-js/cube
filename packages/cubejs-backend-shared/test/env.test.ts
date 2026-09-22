@@ -440,7 +440,7 @@ describe('pinPreAggregationsSchema', () => {
     const env = freshEnv();
 
     env.pinPreAggregationsSchema('dev_pre_aggregations');
-    env.releasePreAggregationsSchemaPin();
+    env.dropPreAggregationsSchemaPin();
 
     // Without the release the second pin is refused and the drivers stay on `dev_`,
     // while the reloaded instance names `analytics_preaggs` in the statement
@@ -477,7 +477,7 @@ describe('pinPreAggregationsSchema', () => {
 
     // No schema: the whole process is re-reading its configuration, so nothing it
     // pinned earlier survives to be shared
-    env.releasePreAggregationsSchemaPin();
+    env.dropPreAggregationsSchemaPin();
 
     expect(process.env.CUBEJS_PRE_AGGREGATIONS_SCHEMA).toBeUndefined();
   });
@@ -501,7 +501,7 @@ describe('pinPreAggregationsSchema', () => {
 
     const env = freshEnv();
 
-    env.releasePreAggregationsSchemaPin();
+    env.dropPreAggregationsSchemaPin();
 
     // A reload re-reads `.env`, but the user's own choice outlives it
     expect(process.env.CUBEJS_PRE_AGGREGATIONS_SCHEMA).toEqual('my_schema');

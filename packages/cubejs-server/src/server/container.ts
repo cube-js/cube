@@ -10,7 +10,7 @@ import {
   getEnv,
   isDockerImage, isNativeSupported,
   markDevModeResolvedByCaller,
-  releasePreAggregationsSchemaPin,
+  dropPreAggregationsSchemaPin,
   PackageManifest,
   resolveBuiltInPackageVersion,
 } from '@cubejs-backend/shared';
@@ -252,7 +252,7 @@ export class ServerContainer {
     // the drivers; the pin from the previous one would otherwise refuse to move. Before
     // dotenv, so a CUBEJS_PRE_AGGREGATIONS_SCHEMA added to `.env` is the user's and stays
     if (override) {
-      releasePreAggregationsSchemaPin();
+      dropPreAggregationsSchemaPin();
     }
 
     dotenv.config({

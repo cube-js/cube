@@ -223,23 +223,10 @@ let pinnedPreAggregationsSchema: string | undefined;
 let pinnedPreAggregationsSchemaHolders = 0;
 
 /**
- * Without this the next instance's drivers stay on the schema the previous one
- * resolved. A `schema` releases one holder of it; no argument drops the pin
- * outright, which is what a reload of the whole process wants.
+ * Drops the pin outright, whatever is still holding it, which is what a reload of the
+ * whole process wants. To give up one instance's share, release it by schema instead.
  */
-export const releasePreAggregationsSchemaPin = (schema?: string) => {
-  if (schema !== undefined) {
-    if (schema !== pinnedPreAggregationsSchema) {
-      return;
-    }
-
-    if (pinnedPreAggregationsSchemaHolders > 1) {
-      pinnedPreAggregationsSchemaHolders -= 1;
-
-      return;
-    }
-  }
-
+export const dropPreAggregationsSchemaPin = () => {
   // Only what this process pinned. A value the user set outlives any reload
   if (
     pinnedPreAggregationsSchema !== undefined &&
@@ -250,6 +237,24 @@ export const releasePreAggregationsSchemaPin = (schema?: string) => {
 
   pinnedPreAggregationsSchema = undefined;
   pinnedPreAggregationsSchemaHolders = 0;
+};
+
+/**
+ * Gives up one holder's share of the pin. Without it the next instance's drivers stay
+ * on the schema the previous one resolved.
+ */
+export const releasePreAggregationsSchemaPin = (schema: string) => {
+  if (schema !== pinnedPreAggregationsSchema) {
+    return;
+  }
+
+  if (pinnedPreAggregationsSchemaHolders > 1) {
+    pinnedPreAggregationsSchemaHolders -= 1;
+
+    return;
+  }
+
+  dropPreAggregationsSchemaPin();
 };
 
 /**

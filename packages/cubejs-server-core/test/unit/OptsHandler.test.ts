@@ -11,7 +11,7 @@ import type {
   ServerCoreInitializedOptions,
 } from '../../src/core/types';
 import type { OptsHandler } from '../../src/core/OptsHandler';
-import { releasePreAggregationsSchemaPin } from '@cubejs-backend/shared';
+import { dropPreAggregationsSchemaPin } from '@cubejs-backend/shared';
 import { lookupDriverClass } from '../../src/core/DriverResolvers';
 import { CubejsServerCore } from '../../src/core/server';
 import { CreateOptions, SystemOptions } from '../../src/core/types';
@@ -62,7 +62,7 @@ describe('OptsHandler class', () => {
     // The variable and the module-level latch behind it. Clearing only the variable
     // leaves userPreAggregationsSchema() comparing against the previous case's pin,
     // so a case using a schema an earlier one pinned would silently stop testing itself
-    releasePreAggregationsSchemaPin();
+    dropPreAggregationsSchemaPin();
     delete process.env.CUBEJS_PRE_AGGREGATIONS_SCHEMA;
   });
 
