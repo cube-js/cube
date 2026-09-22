@@ -29,7 +29,6 @@ describe('MSSQL SQL API boolean contexts', () => {
     const dimensionSql = modelQuery.newDimension('KibanaSampleDataEcommerce.has_subscription').dimensionSql();
 
     for (const test of booleanFixture.segmentCases) {
-      // Rust verifies each fixture expression against the real wrapper plan.
       const sql = test.sql.split(`\${KibanaSampleDataEcommerce.is_male}`).join(segmentSql)
         .split(`\${KibanaSampleDataEcommerce.has_subscription}`).join(dimensionSql);
       const result = await query(test.predicate
@@ -87,8 +86,6 @@ describe('MSSQL SQL API boolean contexts', () => {
       if (!model) {
         throw new Error(`Unknown boolean fixture model: ${test.model}`);
       }
-      // Rust asserts these exact member expressions after planning. The provider
-      // executes their model expansion across true, false, and NULL inputs.
       const sql = test.sql.split(`\${KibanaSampleDataEcommerce.has_subscription}`).join(model.dimensionSql)
         .split(`\${KibanaSampleDataEcommerce.is_male}`).join(model.segmentSql);
       const querySql = test.predicate
