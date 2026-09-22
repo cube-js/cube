@@ -126,6 +126,13 @@ function kebab(s) {
 }
 // Longest shared path prefix (by segment) across a tag's paths — the "Resource"
 // column value. Falls back to the single path when a tag has just one.
+//
+// When every path in the tag extends past the shared prefix, the prefix is not
+// itself a callable resource of this tag — e.g. every "Workbook Promotions" path
+// lives one segment past `.../workbooks/{workbookId}`, which is the single-
+// workbook resource under the *Workbooks* tag, not this one. Appending `/*`
+// marks the row as a sub-resource group instead of implying the bare prefix is
+// an endpoint here too.
 function commonPathPrefix(pathList) {
   const split = pathList.map((p) => p.split('/'));
   const first = split[0];
@@ -133,7 +140,11 @@ function commonPathPrefix(pathList) {
   for (; i < first.length; i++) {
     if (!split.every((s) => s[i] === first[i])) break;
   }
-  return split.length === 1 ? first.join('/') : first.slice(0, i).join('/') || '/';
+  const prefix = split.length === 1 ? first.join('/') : first.slice(0, i).join('/') || '/';
+  if (split.length > 1 && !pathList.includes(prefix)) {
+    return `${prefix}/*`;
+  }
+  return prefix;
 }
 
 // The v1 REST API, on both path families it is served under: /api/v1/… on the
