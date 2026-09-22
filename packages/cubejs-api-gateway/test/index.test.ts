@@ -132,11 +132,17 @@ describe('enforceSecurityChecks resolution', () => {
     expect(build({}).securityChecksEnforced).toBe(false);
   });
 
-  test('honours an explicit enforceSecurityChecks either way', () => {
+  test('lets an explicit `true` enable checks in dev mode', () => {
     delete process.env.CUBEJS_DEV_MODE;
 
     expect(build({ devServer: true, enforceSecurityChecks: true }).securityChecksEnforced).toBe(true);
-    expect(build({ devServer: false, enforceSecurityChecks: false }).securityChecksEnforced).toBe(false);
+  });
+
+  test('does not let an explicit `false` disable checks outside dev mode', () => {
+    // `||`, as on master: opting out of auth on a non-dev instance is not offered
+    delete process.env.CUBEJS_DEV_MODE;
+
+    expect(build({ devServer: false, enforceSecurityChecks: false }).securityChecksEnforced).toBe(true);
   });
 });
 

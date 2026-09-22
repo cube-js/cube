@@ -290,8 +290,10 @@ class ApiGateway {
     // server-core resolves dev mode and passes it down; CUBEJS_DEV_MODE is the fallback
     // for anyone constructing the gateway directly
     this.devServer = options.devServer ?? getEnv('devMode');
-    // `??`, not `||`: an explicit `false` is a request, not an absent value
-    this.enforceSecurityChecks = options.enforceSecurityChecks ?? !this.devServer;
+    // `||`, not `??`: master's semantics, where an explicit `false` cannot disable auth
+    // outside dev mode. server-core never passes this key, so the `!devServer` default
+    // is reached either way - `??` would only loosen it for direct gateway embedders
+    this.enforceSecurityChecks = options.enforceSecurityChecks || !this.devServer;
     this.extendContext = options.extendContext;
 
     this.checkAuthFn = this.createCheckAuthFn(options);
