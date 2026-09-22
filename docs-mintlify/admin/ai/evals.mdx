@@ -188,7 +188,7 @@ steps:
       reads=(
         curl --fail-with-body --silent --show-error
         --connect-timeout 10 --max-time 30
-        --retry 4 --retry-delay 2 --retry-all-errors
+        --retry 4 --retry-delay 2
         "${auth[@]}"
       )
 
