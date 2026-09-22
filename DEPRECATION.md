@@ -482,12 +482,12 @@ or by the `devServer` option when embedding `@cubejs-backend/server-core` direct
 
 Cube prints a warning when it sees a non-production `NODE_ENV` with `CUBEJS_DEV_MODE`
 unset. If you relied on `NODE_ENV` to get development mode, set `CUBEJS_DEV_MODE=true`
-instead. The `cubejs dev-server` command is unaffected unless you set the variable
-yourself: it asks for development mode directly, without `CUBEJS_DEV_MODE`, so the SQL
-API keeps the generated password it has always had there. An explicit
-`CUBEJS_DEV_MODE=false` now wins over the command, so `cubejs dev-server` starts a
-non-development server and requires `CUBEJS_DB_TYPE` or a `driverFactory` like
-`cubejs server` does.
+instead. The dev server commands — `cubejs dev-server` and the `cubejs-dev-server` bin —
+are unaffected unless you set the variable yourself: they ask for development mode
+directly, without `CUBEJS_DEV_MODE`, so the SQL API keeps the generated password it has
+always had there. An explicit `CUBEJS_DEV_MODE=false` now wins over them, so either
+command starts a non-development server and requires `CUBEJS_DB_TYPE` or a
+`driverFactory` like `cubejs server` does.
 
 An instance that was implicitly in development mode also changes the pre-aggregation
 schema it writes to, from `dev_pre_aggregations` to `prod_pre_aggregations`, unless
