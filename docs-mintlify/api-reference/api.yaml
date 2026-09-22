@@ -4400,9 +4400,12 @@ paths:
           (`resultLocation`/`sheetId`/`sheetName`/`anchorCell`/`endResultCell`/`host`), its opaque
           `reportId`/`placementId`, the owning `deploymentId`, the placement's
           `placedAt`/`refreshedAt` timestamps, and the exploration's `owner` — including their email
-          address, so the recipient can ask for access. `reportName` is `null` on a denied entry —
-          the name is withheld along with the exploration — and reading the report itself still
-          answers `403`.
+          address, so the recipient can ask for access. `owner` is `null` for an embed-partition
+          exploration whose owning user record no longer exists — embed report ownership carries no
+          foreign key, so the row can outlive its owner; a main-workspace exploration's owner always
+          exists, since deleting the owner cascades to delete the report. `reportName` is `null` on
+          a denied entry — the name is withheld along with the exploration — and reading the report
+          itself still answers `403`.
 
 
           Results are returned in pages using cursor-based pagination: pass `first` to set the page
