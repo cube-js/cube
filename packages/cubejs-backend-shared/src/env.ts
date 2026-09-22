@@ -250,18 +250,16 @@ export const pinPreAggregationsSchema = (schema: string) => {
     return;
   }
 
-  // One variable cannot answer for two instances, and a driver reads it directly, so
-  // the second one's driver is on the first one's schema. Say so here rather than let
-  // it surface as a table the query cannot find
-  if (
-    pinnedPreAggregationsSchema !== undefined &&
-    pinnedPreAggregationsSchema !== schema
-  ) {
+  // Whoever set it — this process for another instance, or the user against a
+  // CreateOptions.preAggregationsSchema that overrules it. A driver reads the variable
+  // directly, so say it here rather than let it surface as a table the query cannot find
+  if (process.env.CUBEJS_PRE_AGGREGATIONS_SCHEMA !== schema) {
     displayCLIWarningOnce(
       'pre-aggregations-schema-pinned',
-      `Pre-aggregation schema '${pinnedPreAggregationsSchema}' is already pinned for ` +
-      `this process, so drivers will use it rather than '${schema}'. Set ` +
-      'CUBEJS_PRE_AGGREGATIONS_SCHEMA, or run one Cube instance per process.'
+      `Pre-aggregation schema '${process.env.CUBEJS_PRE_AGGREGATIONS_SCHEMA}' is already ` +
+      `set for this process, so drivers will use it rather than '${schema}'. Align ` +
+      'CUBEJS_PRE_AGGREGATIONS_SCHEMA with the schema this instance uses, or run one ' +
+      'Cube instance per process.'
     );
   }
 };

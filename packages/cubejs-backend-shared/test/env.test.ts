@@ -396,7 +396,7 @@ describe('pinPreAggregationsSchema', () => {
 
   const pinWarnings = () => logSpy.mock.calls
     .map(([message]) => String(message))
-    .filter((message) => message.includes('already pinned'));
+    .filter((message) => message.includes('drivers will use it'));
 
   // eslint-disable-next-line global-require
   const freshEnv = () => require('../src/env');
@@ -464,17 +464,32 @@ describe('pinPreAggregationsSchema', () => {
     expect(env.userPreAggregationsSchema()).toEqual('my_schema');
   });
 
-  test('stays quiet when the user set the variable, and does not overwrite it', () => {
+  test('stays quiet when the user set the variable and the instance agrees', () => {
     process.env.CUBEJS_PRE_AGGREGATIONS_SCHEMA = 'my_schema';
 
     const env = freshEnv();
 
-    env.pinPreAggregationsSchema('prod_pre_aggregations');
+    // What OptsHandler resolves from a user-set variable, absent a CreateOptions override
+    env.pinPreAggregationsSchema('my_schema');
 
-    // The user chose one schema for the whole process, which is not a conflict
     expect(process.env.CUBEJS_PRE_AGGREGATIONS_SCHEMA).toEqual('my_schema');
     expect(pinWarnings()).toHaveLength(0);
     expect(env.userPreAggregationsSchema()).toEqual('my_schema');
+  });
+
+  test('warns when a user-set variable disagrees with the resolved schema', () => {
+    process.env.CUBEJS_PRE_AGGREGATIONS_SCHEMA = 'my_schema';
+
+    const env = freshEnv();
+
+    // CreateOptions.preAggregationsSchema overrules the variable through `...opts`, so
+    // server-core names one schema and a driver reading the variable names the other
+    env.pinPreAggregationsSchema('analytics_preaggs');
+
+    expect(process.env.CUBEJS_PRE_AGGREGATIONS_SCHEMA).toEqual('my_schema');
+    expect(pinWarnings()).toHaveLength(1);
+    expect(pinWarnings()[0]).toContain('my_schema');
+    expect(pinWarnings()[0]).toContain('analytics_preaggs');
   });
 });
 
