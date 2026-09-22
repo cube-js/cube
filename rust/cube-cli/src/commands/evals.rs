@@ -46,7 +46,7 @@ enum Cmd {
         /// Agent to evaluate (defaults to the auto agent)
         #[arg(long, value_parser = util::nonempty_filter)]
         agent: Option<String>,
-        /// Run one eval-question YAML file within the agents directory
+        /// Run one file under agents/, e.g. eval_questions/revenue.yml
         #[arg(long, value_name = "PATH", value_parser = util::nonempty_repo_path)]
         file: Option<String>,
         /// Wait for the run and exit non-zero unless every question passes

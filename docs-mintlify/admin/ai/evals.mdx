@@ -134,8 +134,11 @@ steps:
       curl -fsSL https://raw.githubusercontent.com/cube-js/cube/master/install-cli.sh | sh
 
   - name: Run Cube agent evals
+    shell: bash
     timeout-minutes: 35
     run: |
+      set -euo pipefail
+      trap 'if [[ -f eval.json && ! -s eval.json ]]; then rm -f eval.json; fi' EXIT
       cube evals run "$DEPLOYMENT_ID" \
         --branch "$CUBE_BRANCH" \
         --wait \
@@ -155,8 +158,9 @@ The command waits for completion and exits non-zero when the eval run fails,
 when it produces no graded questions, or when any question has a verdict other
 than `pass`. It also fails closed if the API does not confirm a complete result
 set. When a complete result set is returned, the command writes `eval.json`
-before exiting, including on a failed verdict. Add `--agent NAME` to test a
-configured agent or
+before exiting, including on a failed verdict. If results cannot be verified,
+the step log explains why and the empty output file is removed, so no empty
+artifact is uploaded. Add `--agent NAME` to test a configured agent or
 `--file eval_questions/revenue.yml` to limit the run to one question file. Pass
 `--json` for a machine-readable document containing both the terminal run and
 its per-question results when the result set is complete.
@@ -167,7 +171,10 @@ If you do not want to install the CLI, call the same public endpoints directly.
 This example does not retry the `POST`, because repeating a non-idempotent start
 request after an ambiguous network failure could create another run. It bounds
 every `GET`, retries transient read failures, and applies the same fail-closed
-checks as the CLI:
+checks as the CLI. Because reads are idempotent, it retries connection resets
+too; a permanent read error such as `401` will also be retried four times before
+the job fails. Each read writes to a file so curl can discard a partial response
+before retrying.
 
 ```yaml
 env:
@@ -186,9 +193,9 @@ steps:
       api="${CUBE_API_URL%/}/api/v1/deployments/$DEPLOYMENT_ID/evaluations"
       auth=(-H "Authorization: Api-Key $CUBE_API_KEY")
       reads=(
-        curl --fail-with-body --silent --show-error
+        curl --fail --silent --show-error
         --connect-timeout 10 --max-time 30
-        --retry 4 --retry-delay 2
+        --retry 4 --retry-delay 2 --retry-all-errors
         "${auth[@]}"
       )
 
@@ -209,8 +216,8 @@ steps:
           exit 1
         fi
 
-        run=$("${reads[@]}" "$api/$evaluation_id")
-        status=$(jq -r '.status | if type == "string" then ascii_downcase else "" end' <<<"$run")
+        "${reads[@]}" --output run.json "$api/$evaluation_id"
+        status=$(jq -r '.status | if type == "string" then ascii_downcase else "" end' run.json)
         if [[ "$status" != "$last_status" ]]; then
           echo "Eval run $evaluation_id: $status"
           last_status=$status
@@ -222,9 +229,9 @@ steps:
         esac
       done
 
-      results=$("${reads[@]}" "$api/$evaluation_id/results")
-      jq -n --argjson evalRun "$run" --argjson results "$results" \
-        '{evalRun: $evalRun, results: $results}' > eval.json
+      "${reads[@]}" --output results.json "$api/$evaluation_id/results"
+      jq -n --slurpfile evalRun run.json --slurpfile results results.json \
+        '{evalRun: $evalRun[0], results: $results[0]}' > eval.json
       jq . eval.json
 
       if ! jq -e '
