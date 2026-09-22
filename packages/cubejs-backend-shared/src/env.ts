@@ -221,19 +221,37 @@ export const markDevModeResolvedByCaller = () => {
 let pinnedPreAggregationsSchema: string | undefined;
 
 /**
- * A driver cannot see CreateOptions.devServer, so it falls back to CUBEJS_DEV_MODE,
- * which the option can contradict either way; pinning makes both sides read one value.
+ * A driver cannot see CreateOptions, so it falls back to CUBEJS_DEV_MODE, which both
+ * `devServer` and `preAggregationsSchema` contradict; pinning makes both sides agree.
  */
 export const pinPreAggregationsSchema = (schema: string) => {
   if (process.env.CUBEJS_PRE_AGGREGATIONS_SCHEMA === undefined) {
     process.env.CUBEJS_PRE_AGGREGATIONS_SCHEMA = schema;
     pinnedPreAggregationsSchema = schema;
+
+    return;
+  }
+
+  // One variable cannot answer for two instances, and a driver reads it directly, so
+  // the second one's driver is on the first one's schema. Say so here rather than let
+  // it surface as a table the query cannot find
+  if (
+    pinnedPreAggregationsSchema !== undefined &&
+    pinnedPreAggregationsSchema !== schema
+  ) {
+    displayCLIWarningOnce(
+      'pre-aggregations-schema-pinned',
+      `Pre-aggregation schema '${pinnedPreAggregationsSchema}' is already pinned for ` +
+      `this process, so drivers will use it rather than '${schema}'. Set ` +
+      'CUBEJS_PRE_AGGREGATIONS_SCHEMA, or run one Cube instance per process.'
+    );
   }
 };
 
 /**
  * The variable as the user set it: a value this process pinned reads as unset, so a
- * second instance resolves its own default instead of inheriting the first's.
+ * second instance resolves its own default instead of inheriting the first's. Only
+ * server-core reads this — a driver reads the variable, and cannot tell them apart.
  */
 export const userPreAggregationsSchema = (): string | undefined => {
   const schema = process.env.CUBEJS_PRE_AGGREGATIONS_SCHEMA;

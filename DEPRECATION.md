@@ -537,7 +537,9 @@ whichever way `devServer` points — on Databricks with a `catalog` configured, 
 disagreement would leave the catalog prefix off the statement and queries failing with
 `TABLE_OR_VIEW_NOT_FOUND`, while `dropTable` qualifies unconditionally and drops from
 the other catalog. An explicit `CUBEJS_PRE_AGGREGATIONS_SCHEMA` is never overwritten,
-and the value Cube writes is the one it would have used anyway.
+and the value Cube writes is the one that instance uses, `preAggregationsSchema` from
+`CreateOptions` included. A per-tenant `preAggregationsSchema` function has no single
+schema to write, so it is left alone and such a driver still resolves its own.
 
 Authentication can also flip without the `devServer` option. An embedder that set
 `CUBEJS_DEV_MODE=true` alongside an explicit

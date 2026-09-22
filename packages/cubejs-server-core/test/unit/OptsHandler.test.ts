@@ -398,6 +398,36 @@ describe('OptsHandler class', () => {
     expect(process.env.CUBEJS_PRE_AGGREGATIONS_SCHEMA).toEqual('my_schema');
   });
 
+  test('must pin CreateOptions.preAggregationsSchema, not the default it overrides', async () => {
+    process.env.CUBEJS_DB_TYPE = 'postgres';
+
+    const core = new CubejsServerCoreExposed({
+      ...conf,
+      preAggregationsSchema: 'analytics_preaggs',
+      driverFactory: () => ({ type: <DatabaseType>'postgres' }),
+    });
+
+    // `...opts` wins over the dev/prod default, so pinning before the merge would put a
+    // driver on `prod_pre_aggregations` while this instance names `analytics_preaggs`
+    expect(core.options.preAggregationsSchema).toEqual('analytics_preaggs');
+    expect(process.env.CUBEJS_PRE_AGGREGATIONS_SCHEMA).toEqual('analytics_preaggs');
+  });
+
+  test('must not pin a per-tenant preAggregationsSchema function', async () => {
+    process.env.CUBEJS_DB_TYPE = 'postgres';
+
+    const core = new CubejsServerCoreExposed({
+      ...conf,
+      preAggregationsSchema: (ctx) => `preaggs_${ctx.securityContext?.tenantId}`,
+      driverFactory: () => ({ type: <DatabaseType>'postgres' }),
+    });
+
+    // No single schema to pin, so the variable is left unset and a driver falls back to
+    // its own CUBEJS_DEV_MODE reading. Pinning any one tenant's schema would be worse
+    expect(typeof core.options.preAggregationsSchema).toEqual('function');
+    expect(process.env.CUBEJS_PRE_AGGREGATIONS_SCHEMA).toBeUndefined();
+  });
+
   test('must not let one instance pin the schema for the next', async () => {
     process.env.CUBEJS_DB_TYPE = 'postgres';
 

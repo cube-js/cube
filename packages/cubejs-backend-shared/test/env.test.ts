@@ -370,6 +370,73 @@ describe('getEnv(devMode)', () => {
   });
 });
 
+describe('pinPreAggregationsSchema', () => {
+  const saved = process.env.CUBEJS_PRE_AGGREGATIONS_SCHEMA;
+  let logSpy: jest.SpyInstance;
+
+  // Both the pin and displayCLIWarningOnce latch for the life of the module registry,
+  // so each case needs a fresh one
+  beforeEach(() => {
+    jest.resetModules();
+    delete process.env.CUBEJS_PRE_AGGREGATIONS_SCHEMA;
+    logSpy = jest.spyOn(console, 'log').mockImplementation(() => {
+      // swallow
+    });
+  });
+
+  afterEach(() => {
+    logSpy.mockRestore();
+
+    if (saved === undefined) {
+      delete process.env.CUBEJS_PRE_AGGREGATIONS_SCHEMA;
+    } else {
+      process.env.CUBEJS_PRE_AGGREGATIONS_SCHEMA = saved;
+    }
+  });
+
+  const pinWarnings = () => logSpy.mock.calls
+    .map(([message]) => String(message))
+    .filter((message) => message.includes('already pinned'));
+
+  // eslint-disable-next-line global-require
+  const freshEnv = () => require('../src/env');
+
+  test('warns when a second instance needs a different schema', () => {
+    const env = freshEnv();
+
+    env.pinPreAggregationsSchema('dev_pre_aggregations');
+    env.pinPreAggregationsSchema('prod_pre_aggregations');
+
+    // One variable cannot answer for two instances and a driver reads it directly, so
+    // the second instance's driver is on the first's schema whatever is done here
+    expect(process.env.CUBEJS_PRE_AGGREGATIONS_SCHEMA).toEqual('dev_pre_aggregations');
+    expect(pinWarnings()).toHaveLength(1);
+    expect(pinWarnings()[0]).toContain('prod_pre_aggregations');
+  });
+
+  test('stays quiet when the second instance needs the same schema', () => {
+    const env = freshEnv();
+
+    env.pinPreAggregationsSchema('prod_pre_aggregations');
+    env.pinPreAggregationsSchema('prod_pre_aggregations');
+
+    expect(pinWarnings()).toHaveLength(0);
+  });
+
+  test('stays quiet when the user set the variable, and does not overwrite it', () => {
+    process.env.CUBEJS_PRE_AGGREGATIONS_SCHEMA = 'my_schema';
+
+    const env = freshEnv();
+
+    env.pinPreAggregationsSchema('prod_pre_aggregations');
+
+    // The user chose one schema for the whole process, which is not a conflict
+    expect(process.env.CUBEJS_PRE_AGGREGATIONS_SCHEMA).toEqual('my_schema');
+    expect(pinWarnings()).toHaveLength(0);
+    expect(env.userPreAggregationsSchema()).toEqual('my_schema');
+  });
+});
+
 describe('the NODE_ENV deprecation warning', () => {
   const nodeEnv = process.env.NODE_ENV;
   let logSpy: jest.SpyInstance;

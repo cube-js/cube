@@ -296,13 +296,6 @@ export class OptsHandler {
         ? 'dev_pre_aggregations'
         : 'prod_pre_aggregations');
 
-    // A driver resolves this schema from CUBEJS_DEV_MODE, which CreateOptions.devServer
-    // can contradict in either direction. Both readings have to name the same schema:
-    // DatabricksDriver builds the catalog-qualifying regex in query() from its own
-    // answer while dropTable() qualifies unconditionally, so a disagreement makes the
-    // query fail to find the table and the drop remove one from the other catalog
-    pinPreAggregationsSchema(preAggregationsSchema);
-
     const skipOnEnv = [
       // Default EXT_DB variables
       'CUBEJS_EXT_DB_URL',
@@ -443,6 +436,18 @@ export class OptsHandler {
       },
       fastReload: getEnv('fastReload'),
     };
+
+    // Pinned from the merged options rather than from the default above, because
+    // `...opts` overrides it: a driver resolves this schema from CUBEJS_DEV_MODE, which
+    // both CreateOptions.devServer and CreateOptions.preAggregationsSchema contradict,
+    // and it has to name the schema this instance actually uses. DatabricksDriver builds
+    // the catalog-qualifying regex in query() from its own answer while dropTable()
+    // qualifies unconditionally, so a disagreement makes the query fail to find the
+    // table and the drop remove one from the other catalog.
+    // A per-tenant function has no single schema to pin, so it is left to that fallback
+    if (typeof options.preAggregationsSchema === 'string') {
+      pinPreAggregationsSchema(options.preAggregationsSchema);
+    }
 
     if (opts.contextToAppId && !opts.scheduledRefreshContexts) {
       this.core.logger('Multitenancy Without ScheduledRefreshContexts', {
