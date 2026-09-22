@@ -39,6 +39,8 @@ Bare `WHERE completed`, `NOT completed`, and `CASE WHEN completed THEN ...` are
 unsupported for these dimensions. Both comparisons preserve unknown for `NULL`.
 Existing conditions on predicate-backed dimensions, such as `amount > 50`, remain
 supported.
+A predicate-backed boolean dimension such as `big` cannot be used as a scalar
+value: `SELECT big` and `COUNT(DISTINCT big)` are unsupported.
 
 </Warning>
 
