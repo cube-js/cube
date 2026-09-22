@@ -165,8 +165,11 @@ fn ensure_complete_results(evaluation: i64, results: &Value) -> Result<()> {
         Some(Value::Bool(true)) => {
             bail!("eval run {evaluation} returned an incomplete results page; refusing to grade it")
         }
-        _ => {
-            bail!("eval run {evaluation} did not confirm a complete results page; refusing to grade it")
+        None => {
+            bail!("eval run {evaluation} returned results without pageInfo.hasNextPage; refusing to grade because completeness is unknown")
+        }
+        Some(_) => {
+            bail!("eval run {evaluation} returned a non-boolean pageInfo.hasNextPage; refusing to grade it")
         }
     }
 }
@@ -383,18 +386,23 @@ mod tests {
         .to_string()
         .contains("incomplete results page"));
 
-        for malformed in [
-            json!({ "items": [{ "verdict": "pass" }] }),
-            json!({
-                "items": [{ "verdict": "pass" }],
-                "pageInfo": { "hasNextPage": "false" }
-            }),
-        ] {
-            assert!(ensure_complete_results(42, &malformed)
+        assert!(
+            ensure_complete_results(42, &json!({ "items": [{ "verdict": "pass" }] }))
                 .unwrap_err()
                 .to_string()
-                .contains("did not confirm a complete results page"));
-        }
+                .contains("without pageInfo.hasNextPage")
+        );
+
+        assert!(ensure_complete_results(
+            42,
+            &json!({
+                "items": [{ "verdict": "pass" }],
+                "pageInfo": { "hasNextPage": "false" }
+            })
+        )
+        .unwrap_err()
+        .to_string()
+        .contains("non-boolean pageInfo.hasNextPage"));
 
         assert!(ensure_complete_results(
             42,
@@ -407,6 +415,12 @@ mod tests {
         ensure_complete_results(
             42,
             &json!({ "items": [{ "verdict": "pass" }], "pageInfo": { "hasNextPage": false } }),
+        )
+        .unwrap();
+        ensure_passed(
+            42,
+            &run,
+            &json!({ "items": [{ "verdict": "pass" }, { "verdict": "PASS" }] }),
         )
         .unwrap();
 

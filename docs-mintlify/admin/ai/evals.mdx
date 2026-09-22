@@ -210,7 +210,7 @@ steps:
         fi
 
         run=$("${reads[@]}" "$api/$evaluation_id")
-        status=$(jq -er '.status | strings | ascii_downcase' <<<"$run")
+        status=$(jq -r '.status | if type == "string" then ascii_downcase else "" end' <<<"$run")
         if [[ "$status" != "$last_status" ]]; then
           echo "Eval run $evaluation_id: $status"
           last_status=$status
