@@ -34,7 +34,10 @@ function safetyParseSemver(version: string | null) {
 }
 
 export class ServerContainer {
-  protected isCubeConfigEmpty: boolean = true;
+  // Left undefined until `lookupConfiguration` measures it, so an override that does not
+  // call super falls back to measuring what it returned rather than inheriting a stale
+  // `true` — which would tell server-core a fully configured project is unconfigured
+  protected isCubeConfigEmpty: boolean | undefined;
 
   public constructor(
     protected readonly configuration: { debug: boolean, devMode?: boolean }
@@ -273,10 +276,10 @@ export class ServerContainer {
       process.env.NODE_ENV = 'development';
     }
 
-    const withDevServerDefault = (userConfig: CreateOptions): CreateOptions => {
-      // Measured on the user's own config, before the default is folded in: server-core
-      // reads emptiness as "nothing is configured yet" and opens Playground's connection
-      // wizard on it, and `{ devServer: true }` is not empty
+    // Measures the user's own config and then folds in the devServer default. The order
+    // matters: server-core reads emptiness as "nothing is configured yet" and opens
+    // Playground's connection wizard on it, and `{ devServer: true }` is not empty
+    const measureAndApplyDevServer = (userConfig: CreateOptions): CreateOptions => {
       this.isCubeConfigEmpty = Object.keys(userConfig).length === 0;
 
       return devServer ? { devServer, ...userConfig } : userConfig;
@@ -298,11 +301,11 @@ export class ServerContainer {
         );
       }
 
-      return withDevServerDefault(await this.loadConfigurationFromPythonFile());
+      return measureAndApplyDevServer(await this.loadConfigurationFromPythonFile());
     }
 
     if (fs.existsSync(path.join(process.cwd(), 'cube.js'))) {
-      return withDevServerDefault(await this.loadConfigurationFromFile());
+      return measureAndApplyDevServer(await this.loadConfigurationFromFile());
     }
 
     if (fs.existsSync(path.join(process.cwd(), 'cube.ts'))) {
@@ -315,7 +318,7 @@ export class ServerContainer {
       'There is no cube.js file. Continue with environment variables'
     );
 
-    return withDevServerDefault({});
+    return measureAndApplyDevServer({});
   }
 
   protected async loadConfigurationFromPythonFile(): Promise<CreateOptions> {
@@ -374,7 +377,9 @@ export class ServerContainer {
       const server = await this.runServerInstance(
         configuration,
         embedded,
-        this.isCubeConfigEmpty
+        // `??` so an overridden `lookupConfiguration` that never measured still gets the
+        // computation this had before the devServer default existed
+        this.isCubeConfigEmpty ?? Object.keys(userConfig).length === 0
       );
 
       return {

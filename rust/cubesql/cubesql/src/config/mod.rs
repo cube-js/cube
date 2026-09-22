@@ -474,20 +474,29 @@ where
 /// A boolean variable read the way the JavaScript side reads one: `true` or
 /// `false` in any casing. Any other value is reported and the default used;
 /// a variable that only picks a default must not fail startup.
+/// The single definition of what counts as a boolean here. `None` means the variable is
+/// absent or holds something this does not accept, so every caller falls back the same
+/// way — including the Node bridge, which would otherwise have to restate the rule.
+pub fn env_optparse_bool(name: &str) -> Option<bool> {
+    match env::var(name).ok()?.trim().to_lowercase().as_str() {
+        "true" => Some(true),
+        "false" => Some(false),
+        _ => None,
+    }
+}
+
 fn env_parse_bool(name: &str, default: bool) -> bool {
     match env::var(name) {
         Err(_) => default,
-        Ok(value) => match value.trim().to_lowercase().as_str() {
-            "true" => true,
-            "false" => false,
-            other => {
-                warn!(
-                    "Environment variable '{}' has value '{}', expected true or false; using {}",
-                    name, other, default
-                );
+        Ok(_) => env_optparse_bool(name).unwrap_or_else(|| {
+            warn!(
+                "Environment variable '{}' has value '{}', expected true or false; using {}",
+                name,
+                env::var(name).unwrap_or_default(),
                 default
-            }
-        },
+            );
+            default
+        }),
     }
 }
 

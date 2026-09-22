@@ -4,6 +4,7 @@ use crate::gateway::{
 };
 use crate::{auth::NodeBridgeAuthService, transport::NodeBridgeTransport};
 use async_trait::async_trait;
+use cubesql::config::env_optparse_bool;
 use cubesql::config::injection::Injector;
 use cubesql::config::processing_loop::ShutdownMode;
 use cubesql::{
@@ -12,7 +13,6 @@ use cubesql::{
     transport::TransportService,
     CubeError,
 };
-use std::env;
 use std::sync::Arc;
 use tokio::task::JoinHandle;
 
@@ -139,17 +139,9 @@ impl NodeConfiguration for NodeConfigurationImpl {
             };
 
             // Config::default() can only see CUBEJS_DEV_MODE, so without this the SQL
-            // API would redact in a process the Node side treats as a dev server. The
-            // guard mirrors env_parse_bool, not presence, so the two accept the same
-            // set of values
+            // API would redact in a process the Node side treats as a dev server
             if let Some(dev_mode) = options.dev_mode {
-                let redaction_was_parsed = env::var("CUBEJS_LOG_REDACTION")
-                    .map(|value| matches!(value.trim().to_lowercase().as_str(), "true" | "false"))
-                    .unwrap_or(false);
-
-                if !redaction_was_parsed {
-                    c.log_redaction = !dev_mode;
-                }
+                c.log_redaction = env_optparse_bool("CUBEJS_LOG_REDACTION").unwrap_or(!dev_mode);
             };
 
             c

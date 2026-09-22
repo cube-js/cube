@@ -14,7 +14,8 @@ class TestServerContainer extends ServerContainer {
   }
 
   // Poisoned before the call so that "never assigned" fails too, not just
-  // "assigned from the wrong config"
+  // "assigned from the wrong config" — the field now starts undefined, and undefined
+  // would read as a pass against `toBe(true)` never being reached
   poisonCubeConfigEmpty() {
     this.isCubeConfigEmpty = false;
   }
