@@ -2518,7 +2518,7 @@ class ApiGateway {
    * the body carried no statement (validation failed on it).
    */
   private redactedSqlForLog(query: unknown): { sql: string } | undefined {
-    if (!getEnv('logRedaction', { devMode: this.devServer }) || typeof query !== 'string') {
+    if (!getEnv('logRedaction', this.devServer) || typeof query !== 'string') {
       return undefined;
     }
 

@@ -346,7 +346,7 @@ export class SQLServer {
 
     // Deliberately the env var, not the gateway's resolved devServer: switching this
     // would drop the SQL password check for a `devServer: true` embedder who never
-    // asked for it. The mismatch it leaves is pre-existing - see PR #11959
+    // asked for it
     if (!getEnv('devMode')) {
       if (!allowedUser) {
         allowedUser = 'cube';

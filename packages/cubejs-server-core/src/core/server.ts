@@ -203,7 +203,7 @@ export class CubejsServerCore {
     );
     // Wraps the log sink only: the agent and telemetry wrappers installed below
     // sit outside it and forward the original params
-    this.logger = getEnv('logRedaction', { devMode }) ? withLogRedaction(logger) : logger;
+    this.logger = getEnv('logRedaction', devMode) ? withLogRedaction(logger) : logger;
 
     this.optsHandler = new OptsHandler(this, opts, systemOptions);
     this.options = this.optsHandler.getCoreInitializedOptions();
