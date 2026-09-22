@@ -19,6 +19,7 @@ import {
   getRealType,
   hasPreAggregationsEnvVars,
   internalExceptions,
+  releasePreAggregationsSchemaPin,
   track,
   FileRepository,
   SchemaFileRepository,
@@ -999,6 +1000,13 @@ export class CubejsServerCore {
 
   public async shutdown() {
     this.compilerCache.clear();
+
+    // Paired with the pin OptsHandler took: an instance that is gone must not leave
+    // the next one's drivers on its schema. Keyed on the value, so a concurrent
+    // instance's pin is left alone; a per-tenant function pinned nothing
+    if (typeof this.options.preAggregationsSchema === 'string') {
+      releasePreAggregationsSchemaPin(this.options.preAggregationsSchema);
+    }
 
     if (this.devServer) {
       if (!process.env.CI) {

@@ -428,6 +428,33 @@ describe('OptsHandler class', () => {
     expect(process.env.CUBEJS_PRE_AGGREGATIONS_SCHEMA).toBeUndefined();
   });
 
+  test('must let an instance that shut down hand the pin to the next', async () => {
+    process.env.CUBEJS_DB_TYPE = 'postgres';
+
+    const { externalDbType, externalDriverFactory, ...confWithoutExternal } = conf;
+
+    const dev = new CubejsServerCoreExposed({
+      ...confWithoutExternal,
+      devServer: true,
+      driverFactory: () => ({ type: <DatabaseType>'postgres' }),
+    });
+
+    expect(process.env.CUBEJS_PRE_AGGREGATIONS_SCHEMA).toEqual('dev_pre_aggregations');
+
+    await dev.shutdown();
+
+    // Without the release the next instance's drivers stay on `dev_pre_aggregations`
+    // while it names `prod_pre_aggregations` in the statement
+    const prod = new CubejsServerCoreExposed({
+      ...conf,
+      devServer: false,
+      driverFactory: () => ({ type: <DatabaseType>'postgres' }),
+    });
+
+    expect(prod.options.preAggregationsSchema).toEqual('prod_pre_aggregations');
+    expect(process.env.CUBEJS_PRE_AGGREGATIONS_SCHEMA).toEqual('prod_pre_aggregations');
+  });
+
   test('must not let one instance pin the schema for the next', async () => {
     process.env.CUBEJS_DB_TYPE = 'postgres';
 

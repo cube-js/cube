@@ -452,6 +452,20 @@ describe('pinPreAggregationsSchema', () => {
     expect(pinWarnings()).toHaveLength(0);
   });
 
+  test('releasing a schema other than the pinned one leaves the pin alone', () => {
+    const env = freshEnv();
+
+    env.pinPreAggregationsSchema('dev_pre_aggregations');
+    // An instance that never held the pin shutting down, so it is not its to drop
+    env.releasePreAggregationsSchemaPin('prod_pre_aggregations');
+
+    expect(process.env.CUBEJS_PRE_AGGREGATIONS_SCHEMA).toEqual('dev_pre_aggregations');
+
+    env.releasePreAggregationsSchemaPin('dev_pre_aggregations');
+
+    expect(process.env.CUBEJS_PRE_AGGREGATIONS_SCHEMA).toBeUndefined();
+  });
+
   test('releasing leaves a value the user set in place', () => {
     process.env.CUBEJS_PRE_AGGREGATIONS_SCHEMA = 'my_schema';
 

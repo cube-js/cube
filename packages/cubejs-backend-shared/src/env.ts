@@ -221,10 +221,16 @@ export const markDevModeResolvedByCaller = () => {
 let pinnedPreAggregationsSchema: string | undefined;
 
 /**
- * Releases the pin so the next one can take, which a reload needs: without it the
- * drivers stay on the schema the previous configuration resolved.
+ * Releases the pin so the next one can take, which a reload and an instance shutting
+ * down both need: without it the next instance's drivers stay on the schema the
+ * previous one resolved. `schema` releases only a pin of that value, so one instance
+ * leaving does not drop a pin another is still relying on.
  */
-export const releasePreAggregationsSchemaPin = () => {
+export const releasePreAggregationsSchemaPin = (schema?: string) => {
+  if (schema !== undefined && schema !== pinnedPreAggregationsSchema) {
+    return;
+  }
+
   // Only what this process pinned. A value the user set outlives any reload
   if (
     pinnedPreAggregationsSchema !== undefined &&
