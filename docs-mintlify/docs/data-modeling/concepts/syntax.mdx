@@ -884,6 +884,19 @@ cube(`orders`, {
 })
 ```
 
+<Warning>
+
+`{reference}` is resolved once, when the data model is compiled, not per
+request — the same compiled model can then be reused across different
+users' requests, e.g., on [dedicated infrastructure][ref-dedicated-infra].
+Don't use this syntax with [`SECURITY_CONTEXT`][ref-context-security],
+since it needs to be re-evaluated for every request: write
+`{{ SECURITY_CONTEXT.field }}` (Jinja double braces) instead of
+`{SECURITY_CONTEXT.field}`. The Semantic Model IDE warns when it detects
+the single-brace form.
+
+</Warning>
+
 If you need to use literal, non-referential curly braces in YAML, e.g.,
 to define a JSON object, you can escape them with a backslash:
 
@@ -998,6 +1011,8 @@ string values in time dimensions.
 [ref-dynamic-data-models-jinja]: /docs/data-modeling/dynamic/jinja
 [ref-dynamic-data-models-js]: /docs/data-modeling/dynamic/javascript
 [ref-context-variables]: /reference/data-modeling/context-variables
+[ref-context-security]: /reference/data-modeling/context-variables#security_context
+[ref-dedicated-infra]: /admin/deployment/infrastructure#dedicated-infrastructure
 [ref-config-model-path]: /reference/configuration/config#schemapath
 [ref-config-repository-factory]: /reference/configuration/config#repositoryfactory
 [ref-subquery]: /docs/data-modeling/dimensions#subquery-dimensions
