@@ -12,6 +12,7 @@ use cubesql::{
     transport::TransportService,
     CubeError,
 };
+use std::env;
 use std::sync::Arc;
 use tokio::task::JoinHandle;
 
@@ -111,6 +112,10 @@ pub struct NodeConfigurationImpl {
 pub struct NodeConfigurationFactoryOptions {
     pub gateway_port: Option<u16>,
     pub pg_port: Option<u16>,
+    /// Development mode as server-core resolved it, which CUBEJS_DEV_MODE alone cannot
+    /// express: CreateOptions.devServer wins over the variable and never reaches an
+    /// environment read. Absent when the embedder did not supply one.
+    pub dev_mode: Option<bool>,
 }
 
 #[async_trait]
@@ -131,6 +136,16 @@ impl NodeConfiguration for NodeConfigurationImpl {
         let config = config.update_config(|mut c| {
             if let Some(p) = options.pg_port {
                 c.postgres_bind_address = Some(format!("0.0.0.0:{}", p));
+            };
+
+            // Without this the SQL API would redact query logs in a process the Node
+            // side is treating as a dev server, since Config::default() can only see
+            // CUBEJS_DEV_MODE. An explicit CUBEJS_LOG_REDACTION still wins, as it does
+            // in Config::default() itself
+            if let Some(dev_mode) = options.dev_mode {
+                if env::var("CUBEJS_LOG_REDACTION").is_err() {
+                    c.log_redaction = !dev_mode;
+                }
             };
 
             c

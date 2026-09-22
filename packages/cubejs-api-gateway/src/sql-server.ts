@@ -45,14 +45,21 @@ export class SQLServer {
 
   protected readonly gatewayPort: number | undefined;
 
+  // The native side can only read CUBEJS_DEV_MODE, and CreateOptions.devServer beats it,
+  // so the resolved value is kept here and handed to registerInterface below. Without it
+  // the SQL API would redact query logs in a process the Node side logs in full
+  protected readonly devServer: boolean;
+
   public constructor(
     protected readonly apiGateway: ApiGateway,
     options: SQLServerConstructorOptions,
   ) {
+    this.devServer = options.devServer ?? getEnv('devMode');
+
     setupLogger(
       ({ event }) => apiGateway.log(event),
       process.env.CUBEJS_LOG_LEVEL === 'trace' ? 'trace' : 'warn',
-      !(options.devServer ?? getEnv('devMode'))
+      !this.devServer
     );
 
     // Actually, proxy is enabled in gateway
@@ -133,6 +140,7 @@ export class SQLServer {
     this.sqlInterfaceInstance = await registerInterface({
       gatewayPort: this.gatewayPort,
       pgPort: options.pgSqlPort,
+      devServer: this.devServer,
       contextToApiScopes: async ({ securityContext }) => this.apiGateway.contextToApiScopesFn(
         securityContext,
         getEnv('defaultApiScope') || await this.apiGateway.contextToApiScopesDefFn()

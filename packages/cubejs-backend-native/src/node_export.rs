@@ -114,6 +114,15 @@ fn register_interface<C: NodeConfiguration>(mut cx: FunctionContext) -> JsResult
         None
     };
 
+    let dev_mode_handle = options.get_value(&mut cx, "devServer")?;
+    let dev_mode = if dev_mode_handle.is_a::<JsBoolean, _>(&mut cx) {
+        let value = dev_mode_handle.downcast_or_throw::<JsBoolean, _>(&mut cx)?;
+
+        Some(value.value(&mut cx))
+    } else {
+        None
+    };
+
     let (deferred, promise) = cx.promise();
     let channel = cx.channel();
 
@@ -140,6 +149,7 @@ fn register_interface<C: NodeConfiguration>(mut cx: FunctionContext) -> JsResult
         let config = C::new(NodeConfigurationFactoryOptions {
             gateway_port,
             pg_port,
+            dev_mode,
         });
 
         runtime.block_on(async move {

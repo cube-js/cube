@@ -249,30 +249,23 @@ export class ServerContainer {
       multiline: 'line-breaks'
     });
 
-    // `cubejs dev-server` asks for dev mode through CreateOptions.devServer rather than
-    // by writing CUBEJS_DEV_MODE. That variable also gates the SQL API's default port
-    // and its password check, neither of which this command turned on before, so setting
-    // it would serve an unauthenticated SQL API wherever a port is configured. An
-    // explicit CUBEJS_DEV_MODE still wins - read after dotenv, so a .env value counts
+    // CUBEJS_DEV_MODE also gates the SQL API's default port and its password check,
+    // neither of which `cubejs dev-server` turned on before, so it asks for dev mode
+    // through CreateOptions.devServer instead. Read after dotenv, so a .env value wins
     const devServer = this.configuration.devMode && process.env.CUBEJS_DEV_MODE === undefined
       ? true
       : undefined;
 
     if (devServer) {
-      // The deprecation warning has nothing to say to a process that just resolved dev
-      // mode for itself, and NODE_ENV below would otherwise trip it
       markDevModeResolvedByCaller();
     }
 
-    // NODE_ENV is kept in sync only for user configuration code and third-party
-    // libraries that still read it; it has no say in the dev mode decision
+    // Kept in sync for user config code and third-party libraries that still read it
     if (devServer ?? getEnv('devMode')) {
       process.env.NODE_ENV = 'development';
     }
 
-    // `cubejs dev-server` supplies the default; a `devServer` in cube.js still wins,
-    // as does the `...userConfig` spread at every return below
-    const withDevServer = (userConfig: CreateOptions): CreateOptions => (
+    const withDevServerDefault = (userConfig: CreateOptions): CreateOptions => (
       devServer ? { devServer, ...userConfig } : userConfig
     );
 
@@ -292,11 +285,11 @@ export class ServerContainer {
         );
       }
 
-      return withDevServer(await this.loadConfigurationFromPythonFile());
+      return withDevServerDefault(await this.loadConfigurationFromPythonFile());
     }
 
     if (fs.existsSync(path.join(process.cwd(), 'cube.js'))) {
-      return withDevServer(await this.loadConfigurationFromFile());
+      return withDevServerDefault(await this.loadConfigurationFromFile());
     }
 
     if (fs.existsSync(path.join(process.cwd(), 'cube.ts'))) {
@@ -309,7 +302,7 @@ export class ServerContainer {
       'There is no cube.js file. Continue with environment variables'
     );
 
-    return withDevServer({});
+    return withDevServerDefault({});
   }
 
   protected async loadConfigurationFromPythonFile(): Promise<CreateOptions> {
