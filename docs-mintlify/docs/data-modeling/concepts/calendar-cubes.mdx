@@ -503,6 +503,11 @@ cubes:
             granularity: day
           - dimension: retail_date
             granularity: day
+        indexes:
+          - name: date_key_idx
+            columns: [date_key]
+          - name: prev_year_date_idx
+            columns: [prev_year_date]
 
   - name: sales
     measures:
@@ -523,6 +528,9 @@ cubes:
         measures: [revenue]
         time_dimension: date
         granularity: day
+        indexes:
+          - name: date_idx
+            columns: [date]
       - name: sales_by_calendar
         type: rollup_join
         measures: [revenue]
@@ -536,12 +544,14 @@ cubes:
           - custom_calendar.calendar_rollup
 ```
 
-Four things are required, and missing any of them returns you to the fallback:
+Five things are required, and missing any of them returns you to the fallback:
 
 - the shift's `sql` is a **member reference**, so a stored column can stand for it;
 - the calendar's rollup **stores the column the shift maps through**;
 - the join condition names **members on both sides**;
-- every calendar dimension the query groups by is **declared in both rollups**.
+- every calendar dimension the query groups by is **declared in both rollups**;
+- each rollup has an [index][ref-rollup-join] covering its side of the join key —
+  Cube Store joins rollups only on an indexed column.
 
 ### Naming a granularity defined with `sql`
 
