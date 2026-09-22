@@ -43,7 +43,7 @@ impl<'a> LogicalNodeProcessor<'a, KeysSubQuery> for KeysSubQueryProcessor<'a> {
         let all_symbols = all_symbols(&keys_subquery.schema(), &keys_subquery.filter());
         let calc_group_dims = collect_calc_group_dims_from_nodes(all_symbols.iter())?;
 
-        let filter = keys_subquery.filter().all_filters();
+        let filter = keys_subquery.where_filter();
         let calc_groups_items = calc_group_dims.into_iter().map(|dim| {
             let values = get_filtered_values(&dim, &filter);
             CalcGroupItem {

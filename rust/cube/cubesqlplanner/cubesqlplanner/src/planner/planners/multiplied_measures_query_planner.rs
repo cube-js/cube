@@ -219,6 +219,17 @@ impl MultipliedMeasuresQueryPlanner {
         }))
     }
 
+    // The query's WHERE-side filters, as every subquery of this flow sees
+    // them. HAVING-style measure filters are applied by the enclosing query.
+    fn query_filter(&self) -> Rc<LogicalFilter> {
+        Rc::new(LogicalFilter {
+            dimensions_filters: self.query_properties.dimensions_filters().clone(),
+            time_dimensions_filters: self.query_properties.time_dimensions_filters().clone(),
+            measures_filter: vec![],
+            segments: self.query_properties.segments().clone(),
+        })
+    }
+
     fn check_should_build_join_for_measure_select(
         &self,
         measures: &Vec<Rc<MemberSymbol>>,
@@ -317,12 +328,7 @@ impl MultipliedMeasuresQueryPlanner {
             .set_measures(measures.clone())
             .into_rc();
 
-        let logical_filter = Rc::new(LogicalFilter {
-            dimensions_filters: self.query_properties.dimensions_filters().clone(),
-            time_dimensions_filters: self.query_properties.time_dimensions_filters().clone(),
-            measures_filter: vec![],
-            segments: self.query_properties.segments().clone(),
-        });
+        let logical_filter = self.query_filter();
 
         let query = Query::builder()
             .schema(schema)
@@ -364,12 +370,7 @@ impl MultipliedMeasuresQueryPlanner {
             .join_planner
             .make_join_logical_plan(&key_join, subquery_dimension_queries);
 
-        let logical_filter = Rc::new(LogicalFilter {
-            dimensions_filters: self.query_properties.dimensions_filters().clone(),
-            time_dimensions_filters: self.query_properties.time_dimensions_filters().clone(),
-            measures_filter: vec![],
-            segments: self.query_properties.segments().clone(),
-        });
+        let logical_filter = self.query_filter();
 
         let schema = LogicalSchema::default()
             .set_dimensions(self.query_properties.dimensions().clone())

@@ -1,4 +1,5 @@
 use super::super::{LogicalNodeProcessor, ProcessableNode, PushDownBuilderContext};
+use super::measure_subquery::MeasureSubqueryProcessor;
 use crate::logical_plan::transforms as logical_transforms;
 use crate::logical_plan::{AggregateMultipliedSubquery, AggregateMultipliedSubquerySource};
 use crate::physical_plan::ReferencesBuilder;
@@ -84,6 +85,10 @@ impl<'a> LogicalNodeProcessor<'a, AggregateMultipliedSubquery>
             JoinBuilder::new_from_subselect(keys_query.clone(), keys_query_alias.clone());
 
         let mut context_factory = context.make_sql_nodes_factory()?;
+        // Everything rendered against the fact source below has to resolve its
+        // `FILTER_PARAMS` bindings against the same filters the keys side did,
+        // or the two copies of the source stop agreeing.
+        let filter_params_filters = aggregate_multiplied_subquery.keys_subquery.where_filter();
         let primary_keys_dimensions = &aggregate_multiplied_subquery
             .keys_subquery
             .primary_keys_dimensions();
@@ -112,7 +117,7 @@ impl<'a> LogicalNodeProcessor<'a, AggregateMultipliedSubquery>
                 let join_visitor_context = Rc::new(VisitorContext::new(
                     query_tools.clone(),
                     &join_context_factory,
-                    None,
+                    filter_params_filters.clone(),
                 ));
 
                 let conditions = primary_keys_dimensions
@@ -147,9 +152,11 @@ impl<'a> LogicalNodeProcessor<'a, AggregateMultipliedSubquery>
             }
             AggregateMultipliedSubquerySource::MeasureSubquery(measure_subquery) => {
                 check_measures_survive_measure_subquery(&measure_subquery.schema.measures)?;
-                let subquery = self
-                    .builder
-                    .process_node(measure_subquery.as_ref(), context)?;
+                let subquery = MeasureSubqueryProcessor::new(self.builder).process(
+                    measure_subquery,
+                    context,
+                    filter_params_filters.clone(),
+                )?;
                 let conditions = primary_keys_dimensions
                     .iter()
                     .map(|dim| -> Result<_, CubeError> {
@@ -187,6 +194,8 @@ impl<'a> LogicalNodeProcessor<'a, AggregateMultipliedSubquery>
         let from = From::new_from_join(join_builder.build());
         let references_builder = ReferencesBuilder::new(from.clone());
         let mut select_builder = SelectBuilder::new(from.clone());
+        // Not a WHERE of its own - the keys side already restricts the rows.
+        select_builder.set_filter_params_filters(filter_params_filters);
         let mut group_by = Vec::new();
 
         self.builder.resolve_subquery_dimensions_references(
