@@ -70,7 +70,7 @@ The Base Role is required. Save is disabled until one is selected.
 
 #### Auto-bump to Developer
 
-Four deployment-scoped actions can be checked at every tier, because checking one does not force the Base Role upward: **Access deployment** (`DeploymentRead`), **Access AI agents** (`DeploymentAgentRead`), **Download data** (`DownloadData`) and **Access chat history** (`ChatHistoryRead`). They still have to be granted by a deployment policy — the tier confers none of them. Check any other action — for example **Edit deployment** or **Edit data model** — and the Base Role is automatically forced to **Developer**, with the Viewer and Explorer options disabled behind a tooltip:
+Four deployment-scoped actions can be checked at every tier: **Access deployment** (`DeploymentRead`), **Access AI agents** (`DeploymentAgentRead`), **Download data** (`DownloadData`) and **Access chat history** (`ChatHistoryRead`). Check any other action — for example **Edit deployment** or **Edit data model** — and the Base Role is automatically forced to **Developer**, with the Viewer and Explorer options disabled behind a tooltip:
 
 > Selected actions require Developer role
 
@@ -150,12 +150,14 @@ A common pattern: someone who consumes dashboards and chats but never edits anyt
     Select **Viewer**.
   </Step>
   <Step title="Add a deployment policy">
-    Click **Add deployment policy**, leave **Scope** on **All deployments**, and check **Access deployment**, **Access AI agents** for Analytics Chat, and **Download data** if they should be able to export query results. The Base Role carries none of them, and none [forces the Base Role to Developer](#auto-bump-to-developer), so the role stays a Viewer.
+    Click **Add deployment policy**, leave **Scope** on **All deployments**, and check **Access deployment**, **Access AI agents** for Analytics Chat, and **Download data** if they should be able to export query results. None of them [forces the Base Role to Developer](#auto-bump-to-developer), so the role stays a Viewer.
   </Step>
   <Step title="Save">
     Click **Create**.
   </Step>
 </Steps>
+
+As written, `Org Viewer` reproduces the built-in Viewer account-wide — assigning that role does the same thing. What makes it worth writing as a custom role is what you change from here: narrow **Scope** to specific deployments, drop an action the built-in grants, or add a [Global permission](#global-permissions) the built-in does not carry.
 
 ### Create an Explorer for a single deployment
 
