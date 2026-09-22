@@ -352,10 +352,8 @@ export class SQLServer {
     let allowedUser: string | null = options.sqlUser || getEnv('sqlUser');
     let allowedPassword: string | null = options.sqlPassword || getEnv('sqlPassword');
 
-    // Deliberately the env var, not the gateway's resolved devServer. `pgSqlPort` keys
-    // the SQL API's default port off the same variable, so the two agree about whether
-    // this process has a SQL API at all; reading devServer here would generate no
-    // password for a `devServer: true` embedder who turned the port on by hand
+    // Deliberately the env var, not the gateway's resolved devServer: `pgSqlPort` keys
+    // the SQL API's default port off the same variable, so the two stay in step
     if (!getEnv('devMode')) {
       if (!allowedUser) {
         allowedUser = 'cube';

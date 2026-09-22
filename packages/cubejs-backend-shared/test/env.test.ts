@@ -442,4 +442,28 @@ describe('the NODE_ENV deprecation warning', () => {
     expect(nodeEnvWarnings()).toHaveLength(1);
     expect(nodeEnvWarnings()[0]).toContain('including when NODE_ENV was unset');
   });
+
+  // Both dev server paths leave CUBEJS_DEV_MODE unset and set NODE_ENV=development,
+  // which is exactly the shape the warning fires on — so without this it would greet
+  // every `cubejs dev-server` run telling a dev server to enable development mode
+  test('is silenced by markDevModeResolvedByCaller', () => {
+    process.env.NODE_ENV = 'development';
+
+    // eslint-disable-next-line global-require
+    const env = require('../src/env');
+    env.markDevModeResolvedByCaller();
+
+    expect(env.getEnv('devMode')).toBe(false);
+
+    expect(nodeEnvWarnings()).toHaveLength(0);
+  });
+
+  test('is not silenced for a process that never called it', () => {
+    process.env.NODE_ENV = 'development';
+
+    // A fresh registry, so the latch the case above set cannot leak into this one
+    expect(freshGetEnv()('devMode')).toBe(false);
+
+    expect(nodeEnvWarnings()).toHaveLength(1);
+  });
 });

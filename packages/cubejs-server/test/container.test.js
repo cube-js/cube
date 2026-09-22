@@ -23,6 +23,9 @@ describe('ServerContainer dev mode resolution', () => {
     delete process.env.CUBEJS_DEV_MODE;
     delete process.env.CUBEJS_PG_SQL_PORT;
     delete process.env.CUBEJS_SQL_PORT;
+    // lookupConfiguration writes NODE_ENV=development, which would otherwise carry
+    // into every case after the first
+    delete process.env.NODE_ENV;
   });
 
   afterAll(() => {

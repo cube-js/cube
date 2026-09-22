@@ -468,10 +468,8 @@ export class DatabricksDriver extends JDBCDriver {
     if (schema) {
       return schema;
     } else {
-      // CUBEJS_DEV_MODE alone, while server-core resolves the same default through
-      // CreateOptions.devServer first - a driver has no way to see that option. The two
-      // only diverge for an embedder whose devServer contradicts the variable, and only
-      // when the schema is not pinned; CUBEJS_PRE_AGGREGATIONS_SCHEMA above settles it
+      // The env var, not the resolved dev mode: a driver cannot see
+      // CreateOptions.devServer. CUBEJS_PRE_AGGREGATIONS_SCHEMA above settles the two
       return getEnv('devMode')
         ? 'dev_pre_aggregations'
         : 'prod_pre_aggregations';

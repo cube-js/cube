@@ -138,12 +138,16 @@ impl NodeConfiguration for NodeConfigurationImpl {
                 c.postgres_bind_address = Some(format!("0.0.0.0:{}", p));
             };
 
-            // Without this the SQL API would redact query logs in a process the Node
-            // side is treating as a dev server, since Config::default() can only see
-            // CUBEJS_DEV_MODE. An explicit CUBEJS_LOG_REDACTION still wins, as it does
-            // in Config::default() itself
+            // Config::default() can only see CUBEJS_DEV_MODE, so without this the SQL
+            // API would redact in a process the Node side treats as a dev server. The
+            // guard mirrors env_parse_bool, not presence, so the two accept the same
+            // set of values
             if let Some(dev_mode) = options.dev_mode {
-                if env::var("CUBEJS_LOG_REDACTION").is_err() {
+                let redaction_was_parsed = env::var("CUBEJS_LOG_REDACTION")
+                    .map(|value| matches!(value.trim().to_lowercase().as_str(), "true" | "false"))
+                    .unwrap_or(false);
+
+                if !redaction_was_parsed {
                     c.log_redaction = !dev_mode;
                 }
             };
