@@ -267,8 +267,9 @@ export class ServerContainer {
     // Written before `cube.js` is loaded so that file sees it, which is what master did;
     // the config it exports can still overrule the command, and the sync follows below
     const nodeEnv = process.env.NODE_ENV;
+    const wroteNodeEnv = !!(devServer ?? getEnv('devMode'));
 
-    if (devServer ?? getEnv('devMode')) {
+    if (wroteNodeEnv) {
       process.env.NODE_ENV = 'development';
     }
 
@@ -283,8 +284,14 @@ export class ServerContainer {
       // A `cube.js` exporting `devServer: false` overrules the command, and the sync has
       // to follow it rather than the request: `gracefulShutdown` below, `refreshWorkerMode`
       // and `detectQueueAndCacheDriver` all still read NODE_ENV, and leaving `development`
-      // on an instance in production mode is what would reach them
-      if (!(config.devServer ?? getEnv('devMode'))) {
+      // on an instance in production mode is what would reach them. Only what was written
+      // here is taken back, and only while it is still there — `cube.js` assigning
+      // NODE_ENV itself is that file's decision either way
+      if (
+        wroteNodeEnv &&
+        !(config.devServer ?? getEnv('devMode')) &&
+        process.env.NODE_ENV === 'development'
+      ) {
         if (nodeEnv === undefined) {
           delete process.env.NODE_ENV;
         } else {

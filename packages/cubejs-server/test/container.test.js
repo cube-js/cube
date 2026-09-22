@@ -211,6 +211,73 @@ describe('ServerContainer dev mode resolution', () => {
     }
   });
 
+  // The restore exists to undo this method's own write. Running it unconditionally on
+  // the non-dev path reverted a NODE_ENV nothing here had touched, which for a project
+  // that sets it in cube.js meant deleting it — gracefulShutdown then reads 2 seconds
+  // instead of 30 and detectQueueAndCacheDriver picks the memory queue over cubestore
+  test('leaves a NODE_ENV this run never wrote alone', async () => {
+    const container = makeContainer(true);
+    container.stubConfigurationFile({});
+
+    const projectDir = fs.mkdtempSync(path.join(os.tmpdir(), 'cube-container-'));
+    const cwd = process.cwd();
+
+    fs.writeFileSync(path.join(projectDir, 'cube.js'), 'module.exports = {};\n');
+
+    try {
+      process.chdir(projectDir);
+
+      // `cubejs dev-server` with dev mode explicitly off: nothing writes NODE_ENV here,
+      // so the cube.js assignment below is the only one, and it is not this run's to undo
+      process.env.CUBEJS_DEV_MODE = 'false';
+      container.stubConfigurationFile({});
+      const loader = container.loadConfigurationFromFile.bind(container);
+      container.loadConfigurationFromFile = async () => {
+        process.env.NODE_ENV = 'production';
+
+        return loader();
+      };
+
+      await container.lookupConfiguration();
+
+      expect(process.env.NODE_ENV).toEqual('production');
+    } finally {
+      process.chdir(cwd);
+      fs.rmSync(projectDir, { recursive: true, force: true });
+    }
+  });
+
+  test('leaves a NODE_ENV cube.js chose over the one this run wrote', async () => {
+    const container = makeContainer(true);
+
+    const projectDir = fs.mkdtempSync(path.join(os.tmpdir(), 'cube-container-'));
+    const cwd = process.cwd();
+
+    fs.writeFileSync(
+      path.join(projectDir, 'cube.js'),
+      'module.exports = { devServer: false };\n'
+    );
+
+    try {
+      process.chdir(projectDir);
+
+      // The run writes `development`, cube.js replaces it and turns the dev server off.
+      // The restore is scoped to the value it wrote, so the file's choice survives
+      container.loadConfigurationFromFile = async () => {
+        process.env.NODE_ENV = 'staging';
+
+        return { devServer: false };
+      };
+
+      await container.lookupConfiguration();
+
+      expect(process.env.NODE_ENV).toEqual('staging');
+    } finally {
+      process.chdir(cwd);
+      fs.rmSync(projectDir, { recursive: true, force: true });
+    }
+  });
+
   test('`cubejs server` asks for nothing', async () => {
     const config = await lookupConfiguration();
 
