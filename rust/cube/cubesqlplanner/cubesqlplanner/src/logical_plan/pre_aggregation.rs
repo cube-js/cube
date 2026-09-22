@@ -31,6 +31,25 @@ pub struct PreAggregation {
 }
 
 impl PreAggregation {
+    /// The member a stored time-dimension column stands for, and the column's
+    /// name. The one place this naming is decided.
+    pub fn stored_time_dimension_column(dimension: &Rc<MemberSymbol>) -> (String, String) {
+        let (base_symbol, granularity) = if let Ok(td) = dimension.as_time_dimension() {
+            (td.base_symbol().clone(), td.granularity().clone())
+        } else {
+            (dimension.clone(), None)
+        };
+        let suffix = if let Some(granularity) = &granularity {
+            format!("_{}", granularity.clone())
+        } else {
+            "".to_string()
+        };
+        (
+            base_symbol.full_name(),
+            format!("{}{}", base_symbol.alias(), suffix),
+        )
+    }
+
     pub fn name(&self) -> &String {
         &self.name
     }
@@ -111,21 +130,8 @@ impl PreAggregation {
             res.insert(dim.full_name(), QualifiedColumnName::new(None, alias));
         }
         for dim in self.time_dimensions().iter() {
-            let (base_symbol, granularity) = if let Ok(td) = dim.as_time_dimension() {
-                (td.base_symbol().clone(), td.granularity().clone())
-            } else {
-                (dim.clone(), None)
-            };
-            let suffix = if let Some(granularity) = &granularity {
-                format!("_{}", granularity.clone())
-            } else {
-                "".to_string()
-            };
-            let alias = format!("{}{}", base_symbol.alias(), suffix);
-            res.insert(
-                base_symbol.full_name(),
-                QualifiedColumnName::new(None, alias),
-            );
+            let (full_name, alias) = Self::stored_time_dimension_column(dim);
+            res.insert(full_name, QualifiedColumnName::new(None, alias));
         }
 
         for segment in self.segments().iter() {

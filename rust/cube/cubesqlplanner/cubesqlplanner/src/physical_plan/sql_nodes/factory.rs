@@ -287,10 +287,15 @@ impl SqlNodesFactory {
 
         let input: Rc<dyn SqlNode> = ParenthesizeSqlNode::new(input);
 
-        let input: Rc<dyn SqlNode> = TimeDimensionNode::new(input);
+        let input: Rc<dyn SqlNode> =
+            TimeDimensionNode::new(self.pre_aggregation_dimensions_references.clone(), input);
 
         let input = if !self.calendar_time_shifts.is_empty() {
-            CalendarTimeShiftSqlNode::new(self.calendar_time_shifts.clone(), input)
+            CalendarTimeShiftSqlNode::new(
+                self.calendar_time_shifts.clone(),
+                self.pre_aggregation_dimensions_references.clone(),
+                input,
+            )
         } else {
             input
         };
@@ -309,7 +314,8 @@ impl SqlNodesFactory {
     }
 
     fn time_dimension_processor(&self, input: Rc<dyn SqlNode>) -> Rc<dyn SqlNode> {
-        let input: Rc<dyn SqlNode> = TimeDimensionNode::new(input);
+        let input: Rc<dyn SqlNode> =
+            TimeDimensionNode::new(self.pre_aggregation_dimensions_references.clone(), input);
 
         input
     }

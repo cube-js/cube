@@ -1,0 +1,141 @@
+cubes:
+  - name: retail_calendar
+    calendar: true
+    sql: "SELECT * FROM cal_pa_dates"
+
+    dimensions:
+      - name: date_val
+        sql: "{CUBE}.date_val"
+        type: time
+        primary_key: true
+
+        time_shift:
+          # Declared through the dimension, so a stored column can stand for it.
+          - interval: 1 year
+            type: prior
+            sql: "{CUBE.prev_year_date}"
+
+      - name: retail_date
+        sql: "{CUBE}.date_val"
+        type: time
+
+        time_shift:
+          - interval: 1 year
+            type: prior
+            sql: "{CUBE.prev_year_date}"
+
+      - name: prev_year_date
+        sql: "{CUBE}.prev_year_date"
+        type: time
+
+    measures:
+      - name: count
+        type: count
+
+    pre_aggregations:
+      # Materializes what the shift reads: the primary key, the column the
+      # shift maps it to, and the dimension queries group by.
+      - name: calendar_rollup
+        type: rollup
+        measures:
+          - count
+        dimensions:
+          - prev_year_date
+        time_dimensions:
+          - dimension: date_val
+            granularity: day
+          - dimension: retail_date
+            granularity: day
+
+      # Same without the column the shift maps through.
+      - name: calendar_rollup_no_shift_column
+        type: rollup
+        measures:
+          - count
+        time_dimensions:
+          - dimension: date_val
+            granularity: day
+          - dimension: retail_date
+            granularity: day
+
+  - name: demand
+    sql: "SELECT * FROM cal_pa_demand"
+
+    joins:
+      - name: retail_calendar
+        sql: "{CUBE.demand_date} = {retail_calendar.date_val}"
+        relationship: many_to_one
+
+    dimensions:
+      - name: id
+        sql: id
+        type: number
+        primary_key: true
+      - name: demand_date
+        sql: demand_date
+        type: time
+      - name: item_dept
+        sql: item_dept
+        type: string
+
+    measures:
+      - name: gross_demand
+        type: sum
+        sql: gross_demand
+      - name: cancellations
+        type: sum
+        sql: cancellations
+      - name: net_demand_a
+        type: number
+        sql: "{gross_demand} - {cancellations}"
+      - name: net_demand_a_ly
+        type: number
+        multi_stage: true
+        sql: "{net_demand_a}"
+        time_shift:
+          - interval: 1 year
+            type: prior
+
+    pre_aggregations:
+      - name: demand_rollup
+        type: rollup
+        measures:
+          - gross_demand
+          - cancellations
+        dimensions:
+          - item_dept
+        time_dimension: demand_date
+        granularity: day
+
+      - name: demand_with_calendar
+        type: rollupJoin
+        measures:
+          - gross_demand
+          - cancellations
+        dimensions:
+          - item_dept
+          - retail_calendar.prev_year_date
+        time_dimensions:
+          - dimension: retail_calendar.date_val
+            granularity: day
+          - dimension: retail_calendar.retail_date
+            granularity: day
+        rollups:
+          - demand.demand_rollup
+          - retail_calendar.calendar_rollup
+
+      - name: demand_with_calendar_no_shift_column
+        type: rollupJoin
+        measures:
+          - gross_demand
+          - cancellations
+        dimensions:
+          - item_dept
+        time_dimensions:
+          - dimension: retail_calendar.date_val
+            granularity: day
+          - dimension: retail_calendar.retail_date
+            granularity: day
+        rollups:
+          - demand.demand_rollup
+          - retail_calendar.calendar_rollup_no_shift_column

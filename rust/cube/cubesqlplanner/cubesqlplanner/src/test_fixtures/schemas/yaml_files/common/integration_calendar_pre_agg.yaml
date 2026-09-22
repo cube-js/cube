@@ -1,0 +1,234 @@
+cubes:
+  - name: retail_calendar
+    calendar: true
+    sql: "SELECT * FROM cal_pa_dates"
+
+    dimensions:
+      - name: date_val
+        sql: "{CUBE}.date_val"
+        type: time
+        primary_key: true
+
+        granularities:
+          - name: week
+            sql: "{CUBE.retail_week_begin}"
+
+        time_shift:
+          - interval: 1 year
+            type: prior
+            sql: "{CUBE}.prev_year_date"
+
+          - name: one_year
+            sql: "{CUBE}.prev_year_date"
+
+      - name: retail_date
+        sql: "{CUBE}.date_val"
+        type: time
+
+        granularities:
+          - name: week
+            sql: "{CUBE.retail_week_begin}"
+
+        time_shift:
+          - interval: 1 year
+            type: prior
+            sql: "{CUBE}.prev_year_date"
+
+          - name: one_year
+            sql: "{CUBE}.prev_year_date"
+
+      - name: retail_week_begin
+        sql: "{CUBE}.retail_week_begin"
+        type: time
+
+      - name: retail_year_week
+        sql: "{CUBE}.retail_year_week"
+        type: string
+
+      - name: retail_year
+        sql: "{CUBE}.retail_year"
+        type: string
+
+
+  - name: plain_dates
+    sql: "SELECT * FROM cal_pa_dates"
+
+    dimensions:
+      - name: date_val
+        sql: "{CUBE}.date_val"
+        type: time
+        primary_key: true
+
+      - name: plain_date
+        sql: "{CUBE}.date_val"
+        type: time
+
+        granularities:
+          - name: week
+            sql: "{CUBE.retail_week_begin}"
+
+        time_shift:
+          - interval: 1 year
+            type: prior
+            sql: "{CUBE}.prev_year_date"
+
+      - name: retail_week_begin
+        sql: "{CUBE}.retail_week_begin"
+        type: time
+
+  - name: demand
+    sql: "SELECT * FROM cal_pa_demand"
+
+    joins:
+      - name: retail_calendar
+        sql: "{CUBE}.demand_date = {retail_calendar.date_val}"
+        relationship: many_to_one
+
+      - name: plain_dates
+        sql: "{CUBE}.demand_date = {plain_dates.date_val}"
+        relationship: many_to_one
+
+    dimensions:
+      - name: id
+        sql: id
+        type: number
+        primary_key: true
+
+      - name: demand_date
+        sql: demand_date
+        type: time
+
+        granularities:
+          - name: week
+            sql: "date_trunc('week', {CUBE}.demand_date)"
+
+      - name: item_dept
+        sql: item_dept
+        type: string
+
+    measures:
+      - name: gross_demand
+        type: sum
+        sql: gross_demand
+
+      - name: cancellations
+        type: sum
+        sql: cancellations
+
+      - name: net_demand_a
+        type: number
+        sql: "{gross_demand} - {cancellations}"
+
+      - name: net_demand_a_ly
+        type: number
+        multi_stage: true
+        sql: "{net_demand_a}"
+        time_shift:
+          - interval: 1 year
+            type: prior
+
+      - name: net_demand_a_ly_named
+        type: number
+        multi_stage: true
+        sql: "{net_demand_a}"
+        time_shift:
+          - name: one_year
+
+      # An interval the calendar declares no mapping for: plain arithmetic on
+      # its primary key, bypassing the calendar table.
+      - name: net_demand_a_prev_week
+        type: number
+        multi_stage: true
+        sql: "{net_demand_a}"
+        time_shift:
+          - interval: 1 week
+            type: prior
+
+      - name: unique_items_approx
+        type: count_distinct_approx
+        sql: item_dept
+
+      - name: unique_items_approx_ly
+        type: number
+        multi_stage: true
+        sql: "{unique_items_approx}"
+        time_shift:
+          - interval: 1 year
+            type: prior
+
+    pre_aggregations:
+      # Rolled up by the calendar's own (non primary key) time dimension.
+      - name: demand_by_item_hierarchies1
+        type: rollup
+        measures:
+          - gross_demand
+          - cancellations
+          - unique_items_approx
+        dimensions:
+          - item_dept
+        time_dimension: retail_calendar.retail_date
+        granularity: day
+
+      # Same content rolled up by the fact table's own date.
+      - name: demand_by_item_hierarchies_fact_date
+        type: rollup
+        measures:
+          - gross_demand
+          - cancellations
+          - unique_items_approx
+        dimensions:
+          - item_dept
+        time_dimension: demand_date
+        granularity: day
+
+      # Same content rolled up by a non-calendar joined cube's date.
+      - name: demand_by_plain_date
+        type: rollup
+        measures:
+          - gross_demand
+          - cancellations
+        dimensions:
+          - item_dept
+        time_dimension: plain_dates.plain_date
+        granularity: day
+
+      # Declares the `sql`-overridden week itself, so it stores the overriding
+      # column's value rather than a bucket derived from it.
+      - name: demand_by_plain_week
+        type: rollup
+        measures:
+          - gross_demand
+          - cancellations
+        dimensions:
+          - item_dept
+        time_dimension: plain_dates.plain_date
+        granularity: week
+
+      # Same, with the model opting into ranges that need not fall on the
+      # stored buckets' boundaries.
+      - name: demand_by_plain_week_non_strict
+        type: rollup
+        allow_non_strict_date_range_match: true
+        measures:
+          - gross_demand
+          - cancellations
+        dimensions:
+          - item_dept
+        time_dimension: plain_dates.plain_date
+        granularity: week
+
+      # Same base time dimension stored at two granularities, one of them the
+      # `sql`-overridden week.
+      - name: demand_by_plain_day_and_week
+        type: rollup
+        allow_non_strict_date_range_match: true
+        measures:
+          - gross_demand
+          - cancellations
+        dimensions:
+          - item_dept
+        time_dimensions:
+          - dimension: plain_dates.plain_date
+            granularity: week
+          - dimension: plain_dates.plain_date
+            granularity: day

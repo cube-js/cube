@@ -45,12 +45,18 @@ impl TimeShiftState {
     /// member has no meaning under an interval. Both the gate that admits a
     /// pre-aggregation and the node that renders from one ask this, so the two
     /// cannot come to different conclusions.
+    ///
+    /// A calendar shift is the exception no offset reaches: it moves the key
+    /// the fact table joins to, and a stored column carries the unshifted one.
     pub fn shift_for_substituted_column(
         &self,
         symbol: &Rc<MemberSymbol>,
     ) -> Option<&DimensionTimeShift> {
         let dimension = resolve_base_symbol(symbol).as_dimension().ok()?;
         if dimension.is_reference() || !dimension.is_time() {
+            return None;
+        }
+        if dimension.time_shift_pk_full_name().is_some() {
             return None;
         }
         self.get_for_symbol(symbol)

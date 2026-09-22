@@ -1,4 +1,5 @@
 use super::SqlNode;
+use crate::physical_plan::sql_nodes::render_references::RenderReferences;
 use crate::physical_plan::SqlEvaluatorVisitor;
 use crate::planner::query_tools::QueryTools;
 use crate::planner::sql_templates::PlanSqlTemplates;
@@ -10,13 +11,17 @@ use std::rc::Rc;
 /// Renders a time dimension: applies the granularity (predefined
 /// or calendar SQL) and timezone conversion, unless the symbol is
 /// marked as already timezone-converted.
+///
+/// `substituted` names the members rendered as a stored column. For a `sql`
+/// granularity that column already holds the value, and is its only form.
 pub struct TimeDimensionNode {
+    substituted: RenderReferences,
     input: Rc<dyn SqlNode>,
 }
 
 impl TimeDimensionNode {
-    pub fn new(input: Rc<dyn SqlNode>) -> Rc<Self> {
-        Rc::new(Self { input })
+    pub fn new(substituted: RenderReferences, input: Rc<dyn SqlNode>) -> Rc<Self> {
+        Rc::new(Self { substituted, input })
     }
 }
 
@@ -36,6 +41,15 @@ impl SqlNode for TimeDimensionNode {
                     // Propagate the outer visitor: the calendar SQL is the
                     // expression itself, not wrapped further here.
                     if let Some(calendar_sql) = granularity_obj.calendar_sql() {
+                        if self.substituted.contains_key(&ev.base_symbol().full_name()) {
+                            return self.input.to_sql(
+                                visitor,
+                                node,
+                                query_tools.clone(),
+                                node_processor.clone(),
+                                templates,
+                            );
+                        }
                         return calendar_sql.eval(
                             visitor,
                             node_processor.clone(),

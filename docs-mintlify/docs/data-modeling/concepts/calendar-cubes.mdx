@@ -452,16 +452,96 @@ expression in the generated SQL.
 <Warning>
 
 **A [pre-aggregation][ref-pre-aggregations] must declare the overridden granularity
-itself.** A rollup that names it is built from the overriding column and serves those
-queries correctly.
+itself**, keep it at that one granularity, and set
+[`allow_non_strict_date_range_match`][ref-non-strict] to answer queries carrying a date
+range. A rollup at a finer granularity is refused: custom periods cannot be assembled
+from predefined ones.
 
-A rollup at a finer granularity is not a correct source. Cube can still match one through
-the granularity hierarchy — a `day` rollup for a `month` query — but the rollup holds
-`DATE_TRUNC` buckets that the overriding column cannot be recovered from, so the query
-either fails or returns Gregorian periods. Custom periods cannot be assembled from
-predefined ones.
+Cube cannot check that a range aligns with the calendar's periods, so with that setting
+on, make sure the ranges you query do.
 
 </Warning>
+
+### Pre-aggregations and time shifts
+
+A query using a [time shift][ref-time-shift] declared on a calendar dimension is served
+from pre-aggregations only when everything the shift reads is materialized. Otherwise it
+falls back to the source database — results stay correct, acceleration is lost.
+
+Give the calendar its own rollup and tie it to the fact rollup with a
+[`rollup_join`][ref-rollup-join]:
+
+```yaml
+cubes:
+  - name: custom_calendar
+    calendar: true
+    dimensions:
+      - name: date_key
+        sql: "{CUBE}.date_val"
+        type: time
+        primary_key: true
+        time_shift:
+          # A member reference, not `{CUBE}.prev_year_date`.
+          - interval: 1 year
+            type: prior
+            sql: "{CUBE.prev_year_date}"
+      - name: prev_year_date
+        sql: "{CUBE}.prev_year_date"
+        type: time
+      - name: retail_date
+        sql: "{CUBE}.date_val"
+        type: time
+    measures:
+      - name: count
+        type: count
+    pre_aggregations:
+      - name: calendar_rollup
+        measures: [count]
+        dimensions: [prev_year_date]        # the column the shift maps through
+        time_dimensions:
+          - dimension: date_key
+            granularity: day
+          - dimension: retail_date
+            granularity: day
+
+  - name: sales
+    measures:
+      - name: revenue
+        sql: amount
+        type: sum
+    dimensions:
+      - name: date
+        sql: "{CUBE}.date"
+        type: time
+    joins:
+      - name: custom_calendar
+        # Members on both sides, not `{CUBE}.date`.
+        sql: "{CUBE.date} = {custom_calendar.date_key}"
+        relationship: many_to_one
+    pre_aggregations:
+      - name: sales_rollup
+        measures: [revenue]
+        time_dimension: date
+        granularity: day
+      - name: sales_by_calendar
+        type: rollup_join
+        measures: [revenue]
+        time_dimensions:
+          - dimension: custom_calendar.date_key
+            granularity: day
+          - dimension: custom_calendar.retail_date
+            granularity: day
+        rollups:
+          - sales.sales_rollup
+          - custom_calendar.calendar_rollup
+```
+
+Four things are required, and missing any of them returns you to the fallback:
+
+- the shift's `sql` is a **member reference**, so a stored column can stand for it;
+- the calendar's rollup **stores the column the shift maps through**;
+- the join condition names **members on both sides**;
+- every calendar dimension the query groups by is **declared in both rollups**.
 
 ### Naming a granularity defined with `sql`
 
@@ -508,4 +588,6 @@ calendar in full.
 [ref-recipe-custom-granularity]: /recipes/data-modeling/custom-granularity
 [ref-recipe-custom-calendar]: /recipes/data-modeling/custom-calendar
 [ref-pre-aggregations]: /docs/pre-aggregations/matching-pre-aggregations
+[ref-non-strict]: /reference/data-modeling/pre-aggregations#allow_non_strict_date_range_match
+[ref-rollup-join]: /reference/data-modeling/pre-aggregations#rollup_join
 [ref-primary-key]: /reference/data-modeling/dimensions#primary_key
