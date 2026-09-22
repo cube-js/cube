@@ -128,6 +128,8 @@ A source can end up with nothing to scope by, leaving the value list as wide as 
 - `is not` and the `in the …` and `not in the …` conditions on several values — each reads one period from one value.
 </Warning>
 
+A list that *is* being scoped does not necessarily look shorter — a long one fills the dropdown either way, and the values the window drops need not be the ones on screen. To check that a source is narrowing it, look for a value you know the window has no rows for and confirm it is gone from the list. Searching for that value is not a check: a filter's value box takes values that are not in its list, so it offers back whatever you type.
+
 ## Time granularity switcher
 
 Time granularity switchers let viewers change the granularity of time-based dimensions on the dashboard — for example, switching a revenue chart from daily to weekly or monthly. The widget targets a single time dimension and applies the chosen [granularity][ref-granularities] to every chart that groups by that dimension.
