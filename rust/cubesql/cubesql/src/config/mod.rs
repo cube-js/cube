@@ -471,16 +471,6 @@ where
     })
 }
 
-/// The single definition of what counts as a boolean here: `true` or `false` in any
-/// casing. `None` means absent or unrecognised, which is what the default below is for.
-fn env_optparse_bool(name: &str) -> Option<bool> {
-    match env::var(name).ok()?.trim().to_lowercase().as_str() {
-        "true" => Some(true),
-        "false" => Some(false),
-        _ => None,
-    }
-}
-
 /// An unrecognised value is reported and the default used; a variable that only
 /// picks a default must not fail startup. Shared with the Node bridge, so the same
 /// value is read the same way and reported the same way on either path.
@@ -489,13 +479,17 @@ pub fn env_parse_bool(name: &str, default: bool) -> bool {
         return default;
     };
 
-    env_optparse_bool(name).unwrap_or_else(|| {
-        warn!(
-            "Environment variable '{}' has value '{}', expected true or false; using {}",
-            name, value, default
-        );
-        default
-    })
+    match value.trim().to_lowercase().as_str() {
+        "true" => true,
+        "false" => false,
+        _ => {
+            warn!(
+                "Environment variable '{}' has value '{}', expected true or false; using {}",
+                name, value, default
+            );
+            default
+        }
+    }
 }
 
 pub fn env_parse_duration<T>(name: &str, default: T, max: Option<T>, min: Option<T>) -> T
