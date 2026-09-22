@@ -4396,9 +4396,12 @@ paths:
           them, and who to ask.
 
 
-          A `DENIED` entry carries only the placement's address, its opaque `reportId`/`placementId`
-          and the exploration's `owner`. `reportName` is `null` on a denied entry — the name is
-          withheld along with the exploration — and reading the report itself still answers `403`.
+          A `DENIED` entry carries only the placement's address
+          (`sheetId`/`sheetName`/`anchorCell`/`endResultCell`/`host`), its opaque
+          `reportId`/`placementId`, the owning `deploymentId`, the placement's
+          `placedAt`/`refreshedAt` timestamps, and the exploration's `owner`. `reportName` is `null`
+          on a denied entry — the name is withheld along with the exploration — and reading the
+          report itself still answers `403`.
 
 
           Results are returned in pages using cursor-based pagination: pass `first` to set the page
