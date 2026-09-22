@@ -42,7 +42,7 @@ The role builder uses a two-column layout. The left column (sticky as you scroll
 
 ### Base Role
 
-Every custom role has exactly one **Base Role**. It determines:
+In the role builder, every custom role has exactly one **Base Role**. It determines:
 
 - The user's **license tier** — Cube infers the tier from the highest Base Role across all of the user's roles.
 - What that tier **licenses** — the kind of work its holder may do.
@@ -275,7 +275,7 @@ Assignment is the exception — `PUT /api/v1/roles/{roleId}/users/{userId}` reso
 
 ## Reference: action catalog
 
-This section lists every action the role builder exposes. The internal action names match the names shown in the [audit log][ref-audit-log]. `POST /api/v1/roles` accepts a wider set than the builder renders — see the `actions` enum on [`POST /api/v1/roles`][ref-api-create-role] for the full list.
+This section lists every action the role builder exposes. The internal action names match the names shown in the [audit log][ref-audit-log]. The API is wider in both directions: it accepts actions the builder does not render, and policies over resource types it has no card for — reports, workbooks, agents, folders. See the `actions` and `resourceType` enums on [`POST /api/v1/roles`][ref-api-create-role] for both full lists.
 
 [ref-audit-log]: /admin/monitoring/audit-log
 
