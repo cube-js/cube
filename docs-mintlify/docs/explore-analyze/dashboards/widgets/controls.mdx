@@ -124,7 +124,7 @@ On `after`, `after or on`, `before`, `before or on` and `between`, the value edi
 A source can end up with nothing to scope by, leaving the value list as wide as it was while the charts narrow. These are the cases where the charts match on something the value list has no way to ask for:
 
 - `is not` on a fixed date or on a single-moment relative value such as **3 months ago** — a point in time has no period to exclude.
-- `is not` on several dates — the scope can exclude the period one value names, not one period apiece. (The `in the …` and `not in the …` conditions read one value only: a list in theirs stops the charts building a query at all, so nothing narrows either way.)
+- `is not` on several dates — the scope can exclude the period one value names, not one period apiece.
 - Several values on a substring condition, which only a [URL parameter](#sharing-the-current-selection) can give one — the charts match the values joined into a single term, not any of them, and the value list has no way to ask for that.
 - `not contains`, `not starts with` or `not ends with` carrying `"caseSensitive": true`, which that parameter is the only way to set — the value list can be narrowed case-insensitively alone, which would drop values the charts still show.
 </Warning>
