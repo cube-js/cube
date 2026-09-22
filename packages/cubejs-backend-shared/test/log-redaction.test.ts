@@ -257,14 +257,10 @@ describe('CUBEJS_LOG_REDACTION', () => {
   });
 
   it('is off by default in development mode, as the dev server decides it', () => {
+    // NODE_ENV stays at 'production' throughout: it used to force the default back on,
+    // and the point of this case is that it no longer has a say
     process.env.NODE_ENV = 'production';
     process.env.CUBEJS_DEV_MODE = 'true';
-    expect(getEnv('logRedaction')).toBe(false);
-
-    process.env.NODE_ENV = 'development';
-    expect(getEnv('logRedaction')).toBe(false);
-
-    delete process.env.NODE_ENV;
     expect(getEnv('logRedaction')).toBe(false);
   });
 
@@ -287,12 +283,19 @@ describe('CUBEJS_LOG_REDACTION', () => {
   });
 
   it('follows an explicit value in either mode', () => {
-    process.env.NODE_ENV = 'production';
+    // The two halves have to differ by dev mode, not by NODE_ENV, or both run
+    // outside development mode and the interesting half is never reached
+    process.env.CUBEJS_DEV_MODE = 'false';
     process.env.CUBEJS_LOG_REDACTION = 'false';
     expect(getEnv('logRedaction')).toBe(false);
 
-    process.env.NODE_ENV = 'development';
+    process.env.CUBEJS_DEV_MODE = 'true';
+    expect(getEnv('logRedaction')).toBe(false);
+
     process.env.CUBEJS_LOG_REDACTION = 'true';
+    expect(getEnv('logRedaction')).toBe(true);
+
+    process.env.CUBEJS_DEV_MODE = 'false';
     expect(getEnv('logRedaction')).toBe(true);
   });
 });

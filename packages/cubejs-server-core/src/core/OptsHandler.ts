@@ -482,7 +482,10 @@ export class OptsHandler {
    * Determines whether current instance should be bootstraped in the
    * dev mode or not. Dev mode is opt-in: CreateOptions.devServer if the embedder
    * set it, otherwise CUBEJS_DEV_MODE. It is off by default and NODE_ENV has no
-   * say in it. The gateway resolves the same way, so the two cannot disagree.
+   * say in it. The gateway and the server-core logger resolve it the same way.
+   * Two reads deliberately stay on CUBEJS_DEV_MODE alone and so can disagree with
+   * this one for a `devServer` embedder: the SQL API password check in
+   * api-gateway's sql-server.ts, and DatabricksDriver.getPreAggrSchemaName().
    */
   private isDevMode(): boolean {
     return this.createOptions.devServer ?? getEnv('devMode');

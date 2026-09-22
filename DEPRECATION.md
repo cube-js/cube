@@ -522,6 +522,14 @@ otherwise production instance, stop passing it — or accept that the instance i
 [authentication bypass](https://docs.cube.dev/reference/configuration/environment-variables#cubejs_dev_mode)
 and keep it off the network.
 
+On Databricks with a `catalog` configured, such an embedder should also pin
+[`CUBEJS_PRE_AGGREGATIONS_SCHEMA`](https://docs.cube.dev/reference/configuration/environment-variables#cubejs_pre_aggregations_schema).
+The driver qualifies pre-aggregation tables with the catalog by matching the schema name
+in the statement, and it resolves that name from `CUBEJS_DEV_MODE` because a driver
+cannot see `CreateOptions.devServer`. With the variable unset and `devServer` set either
+way, the two names disagree, the catalog prefix is never applied, and queries fail with
+`TABLE_OR_VIEW_NOT_FOUND`. Pinning the variable makes both sides read it instead.
+
 The mirror case loses Cube Store instead. An embedder that passed `devServer: false`
 with `CUBEJS_DEV_MODE=true` used to be in development mode anyway, so it got
 `externalDbType: 'cubestore'` and the bundled Cube Store. It is now out of development
