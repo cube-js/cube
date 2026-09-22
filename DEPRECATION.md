@@ -504,7 +504,7 @@ be configured explicitly. An instance that was implicitly in development mode an
 no `CUBEJS_CUBESTORE_*` or `CUBEJS_EXT_DB_*` variables set therefore has no external
 database after the upgrade, and building a pre-aggregation fails with
 `externalDriverFactory is not provided`. Configure a
-[Cube Store connection](https://docs.cube.dev/cube-core/deployment#cube-store) for such
+[Cube Store connection](https://docs.cube.dev/cube-core/deployment#set-up-cube-store) for such
 an instance, or set `CUBEJS_DEV_MODE=true` if it was meant to be a dev server.
 
 `CreateOptions.devServer` is now what decides development mode for code that embeds
@@ -528,5 +528,5 @@ with `CUBEJS_DEV_MODE=true` used to be in development mode anyway, so it got
 mode, gets neither, and the first pre-aggregation build fails with
 `externalDriverFactory is not provided`; its pre-aggregations also move from
 `dev_pre_aggregations` to `prod_pre_aggregations`. Drop the `devServer: false`, or
-configure a [Cube Store connection](https://docs.cube.dev/cube-core/deployment#cube-store)
+configure a [Cube Store connection](https://docs.cube.dev/cube-core/deployment#set-up-cube-store)
 as the paragraphs above describe.

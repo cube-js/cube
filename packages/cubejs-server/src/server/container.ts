@@ -253,6 +253,15 @@ export class ServerContainer {
     // for someone who asked to keep it. This runs after dotenv so a .env value counts
     if (this.configuration.devMode && process.env.CUBEJS_DEV_MODE === undefined) {
       process.env.CUBEJS_DEV_MODE = 'true';
+
+      // Dev mode is what makes `pgSqlPort` default to 15432, and the SQL API skips the
+      // password check there — so defaulting the flag above would open an unauthenticated
+      // Postgres listener that `cubejs dev-server` never opened before. Default the port
+      // off with it. Only the pair we defaulted ourselves is closed: an explicit
+      // CUBEJS_DEV_MODE=true, or an explicit CUBEJS_PG_SQL_PORT, still gets the SQL API
+      if (process.env.CUBEJS_PG_SQL_PORT === undefined) {
+        process.env.CUBEJS_PG_SQL_PORT = 'false';
+      }
     }
 
     // Dev mode is decided by CUBEJS_DEV_MODE alone. NODE_ENV is only kept in sync
