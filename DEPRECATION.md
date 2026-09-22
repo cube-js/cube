@@ -481,8 +481,11 @@ into account: development mode is off by default and is enabled only by
 
 Cube prints a warning when it sees a non-production `NODE_ENV` with `CUBEJS_DEV_MODE`
 unset. If you relied on `NODE_ENV` to get development mode, set `CUBEJS_DEV_MODE=true`
-instead. The `cubejs dev-server` command is unaffected: it sets `CUBEJS_DEV_MODE=true`
-for you.
+instead. The `cubejs dev-server` command is unaffected unless you set the variable
+yourself: it defaults `CUBEJS_DEV_MODE=true` when neither the environment nor `.env`
+sets it. An explicit `CUBEJS_DEV_MODE=false` now wins over the command, so
+`cubejs dev-server` starts a non-development server and requires `CUBEJS_DB_TYPE` or a
+`driverFactory` like `cubejs server` does.
 
 An instance that was implicitly in development mode also changes the pre-aggregation
 schema it writes to, from `dev_pre_aggregations` to `prod_pre_aggregations`, unless

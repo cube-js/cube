@@ -343,14 +343,20 @@ describe('OptsHandler class', () => {
     delete process.env.CUBEJS_DEV_MODE;
     process.env.CUBEJS_DB_TYPE = 'postgres';
 
+    // `conf` pins externalDbType, which would mask the default this asserts
+    const { externalDbType, externalDriverFactory, ...confWithoutExternal } = conf;
+
     const core = new CubejsServerCoreExposed({
-      ...conf,
+      ...confWithoutExternal,
       devServer: true,
       driverFactory: () => ({ type: <DatabaseType>'postgres' }),
     });
 
     expect(core.options.devServer).toBe(true);
     expect(core.options.preAggregationsSchema).toEqual('dev_pre_aggregations');
+    // Without this the instance gets no external DB at all, so the first
+    // pre-aggregation build fails with `externalDriverFactory is not provided`
+    expect(core.options.externalDbType).toEqual('cubestore');
   });
 
   test('must not treat an explicit devServer: false as dev mode', async () => {

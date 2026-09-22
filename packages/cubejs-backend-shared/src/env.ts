@@ -226,8 +226,9 @@ const devMode = () => {
     displayCLIWarningOnce(
       'NODE_ENV_DEV_MODE',
       'Development mode used to be on whenever NODE_ENV was not \'production\', including ' +
-      'when NODE_ENV was unset. NODE_ENV is no longer taken into account and development ' +
-      'mode is off. If this instance was meant to run in development mode, set ' +
+      'when NODE_ENV was unset. NODE_ENV is no longer taken into account: development ' +
+      'mode is enabled by CUBEJS_DEV_MODE, or by CreateOptions.devServer when embedding ' +
+      'server-core. If this instance was meant to run in development mode, set ' +
       'CUBEJS_DEV_MODE=true; otherwise no action is needed.'
     );
   }

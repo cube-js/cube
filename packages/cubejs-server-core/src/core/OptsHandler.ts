@@ -307,7 +307,7 @@ export class OptsHandler {
     const externalDbType =
       opts.externalDbType ||
       <DatabaseType | undefined>process.env.CUBEJS_EXT_DB_TYPE ||
-      (getEnv('devMode') || definedExtDBVariables.length > 0) && 'cubestore' ||
+      (this.isDevMode() || definedExtDBVariables.length > 0) && 'cubestore' ||
       undefined;
 
     let externalDriverFactory =
