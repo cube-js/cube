@@ -233,7 +233,13 @@ describe('CUBEJS_LOG_REDACTION', () => {
   afterEach(() => {
     delete process.env.CUBEJS_LOG_REDACTION;
     delete process.env.CUBEJS_DEV_MODE;
-    process.env.NODE_ENV = nodeEnv;
+    // Assigning an undefined `nodeEnv` back would store the string "undefined", which is
+    // a non-production value and would make the next read emit the deprecation warning
+    if (nodeEnv === undefined) {
+      delete process.env.NODE_ENV;
+    } else {
+      process.env.NODE_ENV = nodeEnv;
+    }
   });
 
   it('is on by default outside of development mode', () => {

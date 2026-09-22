@@ -434,9 +434,12 @@ describe('the NODE_ENV deprecation warning', () => {
     expect(nodeEnvWarnings()).toHaveLength(0);
   });
 
-  test('is not printed when NODE_ENV is unset', () => {
+  // An unset NODE_ENV used to mean development mode, so this instance is one the
+  // change affects and must not be left without a signal
+  test('is printed when NODE_ENV is unset, the case this change flips', () => {
     expect(freshGetEnv()('devMode')).toBe(false);
 
-    expect(nodeEnvWarnings()).toHaveLength(0);
+    expect(nodeEnvWarnings()).toHaveLength(1);
+    expect(nodeEnvWarnings()[0]).toContain('including when NODE_ENV was unset');
   });
 });

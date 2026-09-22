@@ -217,17 +217,18 @@ const devMode = () => {
     .default('false')
     .asBoolStrict();
 
+  // No NODE_ENV guard: development mode used to be on when NODE_ENV was unset too,
+  // so that instance is part of the population this warning exists for
   if (
     process.env.CUBEJS_DEV_MODE === undefined &&
-    process.env.NODE_ENV !== undefined &&
     process.env.NODE_ENV !== 'production'
   ) {
     displayCLIWarningOnce(
       'NODE_ENV_DEV_MODE',
-      `NODE_ENV is no longer taken into account when deciding development mode: NODE_ENV=${
-        process.env.NODE_ENV
-      } does not enable it, and development mode is off. If this instance was meant to ` +
-      'run in development mode, set CUBEJS_DEV_MODE=true; otherwise no action is needed.'
+      'Development mode used to be on whenever NODE_ENV was not \'production\', including ' +
+      'when NODE_ENV was unset. NODE_ENV is no longer taken into account and development ' +
+      'mode is off. If this instance was meant to run in development mode, set ' +
+      'CUBEJS_DEV_MODE=true; otherwise no action is needed.'
     );
   }
 
@@ -294,7 +295,6 @@ const variables: Record<string, (...args: any) => any> = {
 
     // Deliberately NOT the dev mode decision: background refresh ran in dev mode too,
     // so aligning this on getEnv('devMode') would silently stop it for bare instances
-    // It's true by default for development
     return process.env.NODE_ENV !== 'production';
   },
   scheduledRefreshQueriesPerAppId: () => get('CUBEJS_SCHEDULED_REFRESH_QUERIES_PER_APP_ID').asIntPositive(),
