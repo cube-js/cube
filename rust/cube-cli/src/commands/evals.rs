@@ -16,10 +16,15 @@ const FAILED: &str = "failed";
 // wait. Give transient proxy/network errors a small, bounded recovery window so
 // a completed run does not hang the CLI or fail on a single blip.
 const RESULTS_FETCH_TIMEOUT: Duration = Duration::from_secs(30);
+// A run that becomes terminal at the status deadline still needs one bounded
+// chance to fetch its verdict. This may extend --timeout by at most five seconds.
+const RESULTS_FETCH_FLOOR: Duration = Duration::from_secs(5);
 const RESULTS_FETCH_POLL_MAX: Duration = Duration::from_secs(5);
 
 fn results_fetch_timeout(timeout: Duration, elapsed: Duration) -> Duration {
-    timeout.saturating_sub(elapsed).min(RESULTS_FETCH_TIMEOUT)
+    timeout
+        .saturating_sub(elapsed)
+        .clamp(RESULTS_FETCH_FLOOR, RESULTS_FETCH_TIMEOUT)
 }
 
 /// Run and inspect AI agent evals.
@@ -47,7 +52,7 @@ enum Cmd {
         /// Wait for the run and exit non-zero unless every question passes
         #[arg(long)]
         wait: bool,
-        /// Give up waiting after this long (30s, 15m, 1h)
+        /// Wait up to this long for the run; terminal results may take 5s more
         #[arg(long, default_value = "30m", value_parser = util::parse_duration, requires = "wait")]
         timeout: Duration,
         /// How often to poll while waiting
@@ -63,7 +68,7 @@ enum Cmd {
         /// Wait for the run and exit non-zero unless every question passes
         #[arg(long)]
         wait: bool,
-        /// Give up waiting after this long (30s, 15m, 1h)
+        /// Wait up to this long for the run; terminal results may take 5s more
         #[arg(long, default_value = "30m", value_parser = util::parse_duration, requires = "wait")]
         timeout: Duration,
         /// How often to poll while waiting
@@ -519,7 +524,11 @@ mod tests {
         );
         assert_eq!(
             results_fetch_timeout(Duration::from_secs(60), Duration::from_secs(60)),
-            Duration::ZERO
+            RESULTS_FETCH_FLOOR
+        );
+        assert_eq!(
+            results_fetch_timeout(Duration::from_secs(60), Duration::from_secs(59)),
+            RESULTS_FETCH_FLOOR
         );
     }
 }

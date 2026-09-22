@@ -357,6 +357,9 @@ makes the eval suite usable as a CI gate. With `--json`, the waiting commands
 print the terminal eval run and its per-question results as one JSON document
 when the result set is complete, before returning the same exit code.
 
+`--timeout` bounds the run-status wait. If the run finishes at that deadline,
+the CLI allows up to five additional seconds to fetch its terminal results.
+
 See [Run evals from CI](/admin/ai/evals#run-evals-from-ci) for complete GitHub
 Actions recipes using either the CLI or the public Platform API.
 
