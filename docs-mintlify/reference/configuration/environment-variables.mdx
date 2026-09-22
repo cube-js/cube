@@ -1219,10 +1219,12 @@ option](/reference/configuration/config#context_to_api_scopes).
 
 ## `CUBEJS_DEV_MODE`
 
-If `true`, enables [development mode](/docs/data-modeling/dev-mode). Development mode
-is off unless this variable is set to `true`, and `NODE_ENV` is ignored. Code that
-embeds `@cubejs-backend/server-core` directly can also turn it on with the `devServer`
-option it passes to `CubejsServerCore`, which takes precedence over this variable.
+If `true`, enables [development mode](/docs/data-modeling/dev-mode). Otherwise
+development mode is off, and `NODE_ENV` is ignored — except that the `cubejs dev-server`
+command and the `cubejs-dev-server` bin turn it on for themselves when this variable is
+unset, and code that embeds `@cubejs-backend/server-core` directly can do the same with
+the `devServer` option it passes to `CubejsServerCore`. Setting this variable to `false`
+overrides both commands; the `devServer` option takes precedence over it.
 
 | Possible Values | Default   |
 | --------------- | --------- |

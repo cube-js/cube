@@ -25,9 +25,11 @@ never expose it to the internet, and never use it in production. Using developme
 mode in the Cube cloud platform is highly discouraged — it bypasses the platform's
 security model.
 
-To keep it off, leave `CUBEJS_DEV_MODE` unset — that is its default, and `NODE_ENV` has
-no effect on it. Code that embeds `@cubejs-backend/server-core` directly can still turn
-it on with the `devServer` option it passes to `CubejsServerCore`, which takes
-precedence over the variable, so leave that unset too.
+To keep it off, set `CUBEJS_DEV_MODE=false`. Leaving it unset is not enough on its own:
+`cubejs dev-server` and the `cubejs-dev-server` bin turn development mode on for
+themselves exactly when the variable is unset, and code that embeds
+`@cubejs-backend/server-core` directly can do the same with the `devServer` option it
+passes to `CubejsServerCore`. An explicit `false` overrides the two commands; for an
+embedder, leave `devServer` unset as well. `NODE_ENV` has no effect either way.
 
 </Warning>
