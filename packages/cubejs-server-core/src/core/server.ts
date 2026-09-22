@@ -192,8 +192,10 @@ export class CubejsServerCore {
   ) {
     this.coreServerVersion = version;
 
+    // Same resolution the gateway does, so a `devServer: true` embedder gets the dev
+    // logger and a `devServer: false` one does not get it from the env var alone
     const logger = opts.logger || createLogger(
-      !getEnv('devMode'),
+      !(opts.devServer ?? getEnv('devMode')),
       getEnv('logLevel'),
     );
     // Wraps the log sink only: the agent and telemetry wrappers installed below

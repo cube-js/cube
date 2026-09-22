@@ -31,6 +31,8 @@ export type SQLServerOptions = {
 
 export type SQLServerConstructorOptions = {
   gatewayPort?: number,
+  /** Resolved by the gateway, so the native logger matches the Node one */
+  devServer?: boolean,
 };
 
 export type SqlAuthServiceAuthenticateRequest = {
@@ -50,7 +52,7 @@ export class SQLServer {
     setupLogger(
       ({ event }) => apiGateway.log(event),
       process.env.CUBEJS_LOG_LEVEL === 'trace' ? 'trace' : 'warn',
-      !getEnv('devMode')
+      !(options.devServer ?? getEnv('devMode'))
     );
 
     // Actually, proxy is enabled in gateway
@@ -342,6 +344,9 @@ export class SQLServer {
     let allowedUser: string | null = options.sqlUser || getEnv('sqlUser');
     let allowedPassword: string | null = options.sqlPassword || getEnv('sqlPassword');
 
+    // Deliberately the env var, not the gateway's resolved devServer: switching this
+    // would drop the SQL password check for a `devServer: true` embedder who never
+    // asked for it. The mismatch it leaves is pre-existing - see PR #11959
     if (!getEnv('devMode')) {
       if (!allowedUser) {
         allowedUser = 'cube';
