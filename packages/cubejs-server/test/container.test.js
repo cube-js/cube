@@ -6,10 +6,26 @@ import { ServerContainer } from '../src/server/container';
 
 // `lookupConfiguration` is what resolves dev mode; with no cube.js in cwd it warns and
 // returns the config it built, so it is safe to call directly
-const lookupConfiguration = (devMode) => new ServerContainer({
+// `isCubeConfigEmpty` is protected; widen it rather than reaching in, so a change to
+// the field is a compile error here instead of a silently passing test
+class TestServerContainer extends ServerContainer {
+  get cubeConfigEmpty() {
+    return this.isCubeConfigEmpty;
+  }
+
+  // Poisoned before the call so that "never assigned" fails too, not just
+  // "assigned from the wrong config"
+  poisonCubeConfigEmpty() {
+    this.isCubeConfigEmpty = false;
+  }
+}
+
+const makeContainer = (devMode) => new TestServerContainer({
   debug: false,
   ...(devMode !== undefined && { devMode }),
-}).lookupConfiguration();
+});
+
+const lookupConfiguration = (devMode) => makeContainer(devMode).lookupConfiguration();
 
 describe('ServerContainer dev mode resolution', () => {
   const saved = {
@@ -94,6 +110,21 @@ describe('ServerContainer dev mode resolution', () => {
 
     expect(config.devServer).toBeUndefined();
     expect(getEnv('devMode')).toBe(false);
+  });
+
+  // server-core reads this as "nothing is configured yet" and opens Playground's
+  // connection wizard on it, so folding the devServer default in before measuring
+  // would silently send a fresh project to the query builder instead
+  test('the devServer default does not make an empty config look configured', async () => {
+    const container = makeContainer(true);
+    container.poisonCubeConfigEmpty();
+
+    const config = await container.lookupConfiguration();
+
+    // The resolved config is not empty, yet the project still counts as unconfigured
+    expect(config.devServer).toBe(true);
+    expect(Object.keys(config).length).toBeGreaterThan(0);
+    expect(container.cubeConfigEmpty).toBe(true);
   });
 
   test('`cubejs server` asks for nothing', async () => {

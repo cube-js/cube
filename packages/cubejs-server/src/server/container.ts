@@ -265,9 +265,14 @@ export class ServerContainer {
       process.env.NODE_ENV = 'development';
     }
 
-    const withDevServerDefault = (userConfig: CreateOptions): CreateOptions => (
-      devServer ? { devServer, ...userConfig } : userConfig
-    );
+    const withDevServerDefault = (userConfig: CreateOptions): CreateOptions => {
+      // Measured on the user's own config, before the default is folded in: server-core
+      // reads emptiness as "nothing is configured yet" and opens Playground's connection
+      // wizard on it, and `{ devServer: true }` is not empty
+      this.isCubeConfigEmpty = Object.keys(userConfig).length === 0;
+
+      return devServer ? { devServer, ...userConfig } : userConfig;
+    };
 
     if (fs.existsSync(path.join(process.cwd(), 'cube.py'))) {
       const supported = isNativeSupported();
@@ -361,7 +366,7 @@ export class ServerContainer {
       const server = await this.runServerInstance(
         configuration,
         embedded,
-        Object.keys(userConfig).length === 0
+        this.isCubeConfigEmpty
       );
 
       return {
