@@ -141,7 +141,7 @@ function commonPathPrefix(pathList) {
     if (!split.every((s) => s[i] === first[i])) break;
   }
   const prefix = split.length === 1 ? first.join('/') : first.slice(0, i).join('/') || '/';
-  if (split.length > 1 && !pathList.includes(prefix)) {
+  if (split.length > 1 && prefix !== '/' && !pathList.includes(prefix)) {
     return `${prefix}/*`;
   }
   return prefix;
