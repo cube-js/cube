@@ -21,6 +21,7 @@ fn ctx_rollup_join(pre_aggs: &[&str]) -> TestContext {
         "demand_rollup",
         "calendar_rollup",
         "calendar_rollup_no_shift_column",
+        "calendar_rollup_coarse_shift_column",
     ];
     let names = pre_aggs
         .iter()
@@ -456,4 +457,22 @@ async fn calendar_shift_runs_on_cubestore() {
             insta::assert_snapshot!(name, result);
         }
     }
+}
+
+/// A stored time dimension holds a period, not a value. The shift joins on an
+/// exact key, so a mapped column kept at a coarser grain cannot serve it.
+#[tokio::test(flavor = "multi_thread")]
+async fn calendar_shift_coarse_mapped_column_falls_back() {
+    let query = query(
+        "demand.net_demand_a_ly",
+        "retail_calendar.retail_date",
+        "day",
+    );
+    let ctx = ctx_rollup_join(&["demand_with_calendar_coarse_shift_column"]);
+    let (sql, usages) = ctx.build_sql_with_used_pre_aggregations(&query).unwrap();
+    assert!(
+        usages.is_empty(),
+        "expected the query to fall back to the source; SQL:\n{}",
+        sql
+    );
 }

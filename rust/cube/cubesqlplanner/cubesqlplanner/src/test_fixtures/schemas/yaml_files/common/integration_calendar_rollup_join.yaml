@@ -54,6 +54,24 @@ cubes:
             columns:
               - prev_year_date
 
+      # Keeps the mapped column, but truncated to a month — a period, not the
+      # value the shift joins on.
+      - name: calendar_rollup_coarse_shift_column
+        type: rollup
+        measures:
+          - count
+        time_dimensions:
+          - dimension: prev_year_date
+            granularity: month
+          - dimension: date_val
+            granularity: day
+          - dimension: retail_date
+            granularity: day
+        indexes:
+          - name: coarse_date_val_idx
+            columns:
+              - date_val
+
       # Same without the column the shift maps through.
       - name: calendar_rollup_no_shift_column
         type: rollup
@@ -148,3 +166,16 @@ cubes:
         rollups:
           - demand.demand_rollup
           - retail_calendar.calendar_rollup_no_shift_column
+
+      - name: demand_with_calendar_coarse_shift_column
+        type: rollupJoin
+        measures:
+          - gross_demand
+          - cancellations
+        dimensions:
+          - item_dept
+        time_dimension: retail_calendar.retail_date
+        granularity: day
+        rollups:
+          - demand.demand_rollup
+          - retail_calendar.calendar_rollup_coarse_shift_column
