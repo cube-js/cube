@@ -121,7 +121,7 @@ A date source never scopes the value list to less than the window the charts are
 On `after`, `after or on`, `before`, `before or on` and `between`, the value editor picks a whole day for every bound, and on a whole day the scope takes the same bound the charts do — so a window they return no rows for leaves the value list empty too.
 
 <Warning>
-A source can end up with nothing to scope by, leaving the value list as wide as it was while the charts narrow:
+A source can end up with nothing to scope by, leaving the value list as wide as it was while the charts narrow. These are the cases where the charts match on something the value list has no way to ask for:
 
 - `is not` on a fixed date or on a single-moment relative value such as **3 months ago** — a point in time has no period to exclude.
 - `is not` and the `in the …` and `not in the …` conditions on several values — each reads one period from one value.
@@ -423,7 +423,7 @@ A `between` filter's `value` is a two-entry array, and both bounds are inclusive
 
 A substring condition takes `caseSensitive` the same way: with `true` the match is made with `LIKE` rather than `ILIKE`, so it respects case wherever the column's collation is case-sensitive, and without the key case is ignored — `f_orders.status={"type":"not_contains","value":"ship","caseSensitive":true}`. The value editor has no switch for it, so a filter matches case only where a link sets the key.
 
-Outside `between`, a `value` may still be a list: `is` and `is not` read its entries as alternatives — `f_orders.status={"value":["shipped","processing"]}` — while a substring condition matches them joined into a single term.
+Outside `between`, a `value` may still be a list, and what a condition makes of one differs. `is` and `is not` read its entries as alternatives — `f_orders.status={"value":["shipped","processing"]}` — on a time dimension as much as a string or number one. A substring condition matches the entries joined with commas into one term, so `{"type":"contains","value":["ship","proc"]}` matches `%ship,proc%` and neither entry on its own. Every other condition reads exactly one value — the comparisons, and the `in the …` and `not in the …` family — and a list in their `value` leaves the widget unable to build its query at all.
 
 What travels in the link, and what wins when a link value arrives:
 
