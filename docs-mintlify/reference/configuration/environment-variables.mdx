@@ -1424,9 +1424,10 @@ original spacing are not kept. Every string argument is redacted, a granularity 
 as it was received. A statement Cube could not redact at all, such as a malformed request
 body or a SQL API error raised before the statement was read, is logged as `redacted`.
 
-It is off by default in development mode, that is when
-[`CUBEJS_DEV_MODE`](#cubejs_dev_mode) is `true`, so runnable SQL statements can be read
-from the console.
+It is off by default in development mode — whether that comes from
+[`CUBEJS_DEV_MODE`](#cubejs_dev_mode), from a dev server command, or from the
+`devServer` option an embedder passes to `CubejsServerCore` — so runnable SQL
+statements can be read from the console.
 
 | Possible Values | Default in Development | Default in Production |
 | --------------- | ---------------------- | --------------------- |
