@@ -32,6 +32,7 @@ describe('ServerContainer dev mode resolution', () => {
     CUBEJS_DEV_MODE: process.env.CUBEJS_DEV_MODE,
     CUBEJS_PG_SQL_PORT: process.env.CUBEJS_PG_SQL_PORT,
     CUBEJS_SQL_PORT: process.env.CUBEJS_SQL_PORT,
+    CUBEJS_PRE_AGGREGATIONS_SCHEMA: process.env.CUBEJS_PRE_AGGREGATIONS_SCHEMA,
     NODE_ENV: process.env.NODE_ENV,
   };
 
@@ -39,6 +40,7 @@ describe('ServerContainer dev mode resolution', () => {
     delete process.env.CUBEJS_DEV_MODE;
     delete process.env.CUBEJS_PG_SQL_PORT;
     delete process.env.CUBEJS_SQL_PORT;
+    delete process.env.CUBEJS_PRE_AGGREGATIONS_SCHEMA;
     // lookupConfiguration writes NODE_ENV=development, which would otherwise carry
     // into every case after the first
     delete process.env.NODE_ENV;
@@ -127,11 +129,39 @@ describe('ServerContainer dev mode resolution', () => {
     expect(container.cubeConfigEmpty).toBe(true);
   });
 
+  // DatabricksDriver resolves the pre-aggregation schema from CUBEJS_DEV_MODE, which
+  // this path leaves unset, so without the pin it answers `prod_` while server-core
+  // emits `dev_` and the catalog-qualifying regex in query() never matches
+  test('`cubejs dev-server` pins the pre-aggregation schema for drivers', async () => {
+    await lookupConfiguration(true);
+
+    expect(getEnv('preAggregationsSchema')).toEqual('dev_pre_aggregations');
+  });
+
+  test('an explicit pre-aggregation schema is left alone', async () => {
+    process.env.CUBEJS_PRE_AGGREGATIONS_SCHEMA = 'my_schema';
+
+    await lookupConfiguration(true);
+
+    expect(getEnv('preAggregationsSchema')).toEqual('my_schema');
+  });
+
+  test('a non-dev-mode dev-server run does not pin the schema', async () => {
+    process.env.CUBEJS_DEV_MODE = 'false';
+
+    await lookupConfiguration(true);
+
+    // Pinning `dev_pre_aggregations` here would put a production instance on the dev
+    // schema, which is the opposite of what the pin is for
+    expect(process.env.CUBEJS_PRE_AGGREGATIONS_SCHEMA).toBeUndefined();
+  });
+
   test('`cubejs server` asks for nothing', async () => {
     const config = await lookupConfiguration();
 
     expect(config.devServer).toBeUndefined();
     expect(process.env.CUBEJS_DEV_MODE).toBeUndefined();
+    expect(process.env.CUBEJS_PRE_AGGREGATIONS_SCHEMA).toBeUndefined();
     expect(getEnv('pgSqlPort')).toBeUndefined();
   });
 });

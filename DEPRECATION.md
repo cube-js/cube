@@ -483,9 +483,11 @@ or by the `devServer` option when embedding `@cubejs-backend/server-core` direct
 Cube prints a warning when it sees a non-production `NODE_ENV` with `CUBEJS_DEV_MODE`
 unset. If you relied on `NODE_ENV` to get development mode, set `CUBEJS_DEV_MODE=true`
 instead. The dev server commands — `cubejs dev-server` and the `cubejs-dev-server` bin —
-are unaffected unless you set the variable yourself: they ask for development mode
-directly, without `CUBEJS_DEV_MODE`, so the SQL API keeps the generated password it has
-always had there. An explicit `CUBEJS_DEV_MODE=false` now wins over them, so either
+keep the behaviour they had: they ask for development mode directly, without
+`CUBEJS_DEV_MODE`, so the SQL API keeps the generated password it has always had there,
+and they pin `CUBEJS_PRE_AGGREGATIONS_SCHEMA` to `dev_pre_aggregations` when you have not
+set it, so drivers that resolve the schema from the variable stay in step with the rest
+of the instance. An explicit `CUBEJS_DEV_MODE=false` now wins over them, so either
 command starts a non-development server and requires `CUBEJS_DB_TYPE` or a
 `driverFactory` like `cubejs server` does.
 
@@ -536,7 +538,10 @@ The driver qualifies pre-aggregation tables with the catalog by matching the sch
 in the statement, and it resolves that name from `CUBEJS_DEV_MODE` because a driver
 cannot see `CreateOptions.devServer`. With the variable unset and `devServer` set either
 way, the two names disagree, the catalog prefix is never applied, and queries fail with
-`TABLE_OR_VIEW_NOT_FOUND`. Pinning the variable makes both sides read it instead.
+`TABLE_OR_VIEW_NOT_FOUND` — while `dropTable` qualifies unconditionally, so tables are
+created in one catalog and dropped from another. Pinning the variable makes both sides
+read it instead. The dev server commands pin it for you; only an embedder passing
+`devServer` has to.
 
 The same applies without the option. An embedder that set `CUBEJS_DEV_MODE=true`
 alongside an explicit `NODE_ENV=production` used to get Playground with JWT verification

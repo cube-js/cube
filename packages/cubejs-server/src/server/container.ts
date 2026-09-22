@@ -258,6 +258,14 @@ export class ServerContainer {
 
     if (devServer) {
       markDevModeResolvedByCaller();
+
+      // A driver cannot see CreateOptions.devServer, so DatabricksDriver resolves the
+      // pre-aggregation schema from CUBEJS_DEV_MODE and would answer `prod_` while
+      // server-core emits `dev_`. Pinning the schema makes both sides read the same
+      // value, which is what master's NODE_ENV sync achieved here
+      if (process.env.CUBEJS_PRE_AGGREGATIONS_SCHEMA === undefined) {
+        process.env.CUBEJS_PRE_AGGREGATIONS_SCHEMA = 'dev_pre_aggregations';
+      }
     }
 
     // Kept in sync for user config code and third-party libraries that still read it
