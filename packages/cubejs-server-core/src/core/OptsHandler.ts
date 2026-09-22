@@ -437,10 +437,8 @@ export class OptsHandler {
       fastReload: getEnv('fastReload'),
     };
 
-    // From the merged options, not the default above, since `...opts` overrides it: a
-    // driver resolves this from CUBEJS_DEV_MODE, and the two naming different schemas
-    // makes DatabricksDriver query a table it cannot find and drop one from the wrong
-    // catalog. A per-tenant function has no single schema, so it keeps that fallback
+    // The merged value, not the default above: `...opts` overrides it, and a driver
+    // resolving a different schema from CUBEJS_DEV_MODE is what the pin prevents
     if (typeof options.preAggregationsSchema === 'string') {
       pinPreAggregationsSchema(options.preAggregationsSchema);
     }

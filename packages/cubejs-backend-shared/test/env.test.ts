@@ -414,6 +414,19 @@ describe('pinPreAggregationsSchema', () => {
     expect(pinWarnings()[0]).toContain('prod_pre_aggregations');
   });
 
+  test('pins over an empty value, which every consumer reads as absent', () => {
+    // `CUBEJS_PRE_AGGREGATIONS_SCHEMA=` in a .env produces this. Skipping the pin here
+    // would leave server-core and a driver each falling back to their own answer
+    process.env.CUBEJS_PRE_AGGREGATIONS_SCHEMA = '';
+
+    const env = freshEnv();
+
+    env.pinPreAggregationsSchema('dev_pre_aggregations');
+
+    expect(process.env.CUBEJS_PRE_AGGREGATIONS_SCHEMA).toEqual('dev_pre_aggregations');
+    expect(env.userPreAggregationsSchema()).toBeUndefined();
+  });
+
   test('stays quiet when the second instance needs the same schema', () => {
     const env = freshEnv();
 

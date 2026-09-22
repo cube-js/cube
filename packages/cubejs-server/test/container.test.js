@@ -141,11 +141,7 @@ describe('ServerContainer dev mode resolution', () => {
     expect(container.cubeConfigEmpty).toBe(true);
   });
 
-  // The pre-aggregation schema a driver reads is pinned by OptsHandler, which resolves
-  // CreateOptions.devServer the same way server-core does. Writing it here too would
-  // key it on the command's request rather than on the config that wins, and
-  // `cubejs dev-server` with CUBEJS_DEV_MODE=true and a cube.js exporting
-  // `devServer: false` would be pinned to the dev schema of an instance in production
+  // OptsHandler pins it, from the config that wins rather than the command's request
   test('`cubejs dev-server` does not pin the pre-aggregation schema itself', async () => {
     await lookupConfiguration(true);
 

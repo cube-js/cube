@@ -225,7 +225,9 @@ let pinnedPreAggregationsSchema: string | undefined;
  * `devServer` and `preAggregationsSchema` contradict; pinning makes both sides agree.
  */
 export const pinPreAggregationsSchema = (schema: string) => {
-  if (process.env.CUBEJS_PRE_AGGREGATIONS_SCHEMA === undefined) {
+  // Falsy, not undefined: every consumer treats an empty value as absent and falls back,
+  // so leaving one in place would be the mismatch this exists to prevent
+  if (!process.env.CUBEJS_PRE_AGGREGATIONS_SCHEMA) {
     process.env.CUBEJS_PRE_AGGREGATIONS_SCHEMA = schema;
     pinnedPreAggregationsSchema = schema;
 

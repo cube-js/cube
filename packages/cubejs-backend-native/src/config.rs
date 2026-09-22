@@ -4,7 +4,7 @@ use crate::gateway::{
 };
 use crate::{auth::NodeBridgeAuthService, transport::NodeBridgeTransport};
 use async_trait::async_trait;
-use cubesql::config::env_optparse_bool;
+use cubesql::config::env_parse_bool;
 use cubesql::config::injection::Injector;
 use cubesql::config::processing_loop::ShutdownMode;
 use cubesql::{
@@ -141,7 +141,7 @@ impl NodeConfiguration for NodeConfigurationImpl {
             // Config::default() can only see CUBEJS_DEV_MODE, so without this the SQL
             // API would redact in a process the Node side treats as a dev server
             if let Some(dev_mode) = options.dev_mode {
-                c.log_redaction = env_optparse_bool("CUBEJS_LOG_REDACTION").unwrap_or(!dev_mode);
+                c.log_redaction = env_parse_bool("CUBEJS_LOG_REDACTION", !dev_mode);
             };
 
             c

@@ -547,9 +547,10 @@ Authentication can also flip without the `devServer` option. An embedder that se
 still enforced on the REST (JSON) and GraphQL APIs, because enforcement keyed on
 `NODE_ENV` rather than on development mode. It now follows development mode, so those
 APIs accept requests with no token. Drop `CUBEJS_DEV_MODE=true` if the instance was not
-meant to be a dev server. The CLI and the official Docker images are unaffected: they
-sync `NODE_ENV` to `development` whenever development mode resolves true, so that
-contradictory pair never reached them.
+meant to be a dev server. `cubejs server`, `cubejs dev-server` and the official Docker
+images are unaffected: they sync `NODE_ENV` to `development` whenever development mode
+resolves true, so that contradictory pair never reached them. The `cubejs-dev-server`
+bin does not sync it, so that pair does reach an instance started that way.
 
 The mirror case loses Cube Store instead. An embedder that passed `devServer: false`
 with `CUBEJS_DEV_MODE=true` used to be in development mode anyway, so it got

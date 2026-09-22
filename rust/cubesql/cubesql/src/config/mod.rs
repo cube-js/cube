@@ -472,9 +472,8 @@ where
 }
 
 /// The single definition of what counts as a boolean here: `true` or `false` in any
-/// casing. `None` means absent or unrecognised, so every caller — including the Node
-/// bridge — falls back the same way.
-pub fn env_optparse_bool(name: &str) -> Option<bool> {
+/// casing. `None` means absent or unrecognised, which is what the default below is for.
+fn env_optparse_bool(name: &str) -> Option<bool> {
     match env::var(name).ok()?.trim().to_lowercase().as_str() {
         "true" => Some(true),
         "false" => Some(false),
@@ -483,8 +482,9 @@ pub fn env_optparse_bool(name: &str) -> Option<bool> {
 }
 
 /// An unrecognised value is reported and the default used; a variable that only
-/// picks a default must not fail startup.
-fn env_parse_bool(name: &str, default: bool) -> bool {
+/// picks a default must not fail startup. Shared with the Node bridge, so the same
+/// value is read the same way and reported the same way on either path.
+pub fn env_parse_bool(name: &str, default: bool) -> bool {
     let Ok(value) = env::var(name) else {
         return default;
     };

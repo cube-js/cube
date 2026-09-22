@@ -281,10 +281,7 @@ export class ServerContainer {
 
       const config = devServer ? { devServer, ...userConfig } : userConfig;
 
-      // A `cube.js` exporting `devServer: false` overrules the command, and the sync has
-      // to follow it rather than the request: `gracefulShutdown` below, `refreshWorkerMode`
-      // and `detectQueueAndCacheDriver` all still read NODE_ENV, and leaving `development`
-      // on an instance in production mode is what would reach them. Only what was written
+      // The sync follows the resolved config, not the request. Only what was written
       // here is taken back, and only while it is still there — `cube.js` assigning
       // NODE_ENV itself is that file's decision either way
       if (
