@@ -252,6 +252,11 @@ pagination parameters on the results request returns the complete result set;
 if `pageInfo.hasNextPage` is anything other than `false`, do not use that page
 as a CI verdict.
 
+Both recipes require every selected question to return `pass`. A `review`
+verdict, including one caused by missing ground truth, fails the CI gate. Keep
+questions intended for manual review in a separate file, then use CLI `--file`
+or API `questionFile` to run an automatically gradable file in CI.
+
 ## Reading the results
 
 Open a run to see per-question results: the question list on the left, with a

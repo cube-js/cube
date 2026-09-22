@@ -1,3 +1,4 @@
+use std::io::{self, Write as _};
 use std::time::Duration;
 
 use anyhow::{bail, Context as _, Result};
@@ -155,6 +156,31 @@ fn print_results(json_output: bool, results: &Value) {
     output::table(&["VERDICT", "QUESTION", "SCORE"], rows);
 }
 
+fn next_page_hint(
+    deployment: i64,
+    evaluation: i64,
+    first: Option<u64>,
+    results: &Value,
+) -> Option<String> {
+    if results.pointer("/pageInfo/hasNextPage") != Some(&Value::Bool(true)) {
+        return None;
+    }
+
+    let Some(cursor) = results
+        .pointer("/pageInfo/endCursor")
+        .and_then(Value::as_str)
+        .filter(|cursor| !cursor.is_empty())
+    else {
+        return Some("More results are available; use --json to read pageInfo.endCursor".into());
+    };
+
+    let first = first.map_or_else(String::new, |count| format!(" --first {count}"));
+    Some(format!(
+        "More results: `cube evals results {deployment} {evaluation}{first} --after {}`",
+        util::shell_quote(cursor)
+    ))
+}
+
 fn ensure_complete_results(evaluation: i64, results: &Value) -> Result<()> {
     if results.get("items").and_then(Value::as_array).is_none() {
         bail!("eval run {evaluation} returned a malformed results page; refusing to grade it");
@@ -234,7 +260,14 @@ async fn finish_wait(
     json_output: bool,
 ) -> Result<()> {
     let run = wait_for_run(api, deployment, evaluation, timeout, poll).await?;
-    let results = fetch_complete_results(api, deployment, evaluation, poll).await?;
+    let results = fetch_complete_results(api, deployment, evaluation, poll)
+        .await
+        .with_context(|| {
+            format!(
+                "could not verify eval run {evaluation}; inspect available results with \
+                 `cube evals results {deployment} {evaluation}`"
+            )
+        })?;
     print_completed(json_output, evaluation, &run, &results);
     ensure_passed(evaluation, &run, &results)
 }
@@ -314,6 +347,12 @@ pub async fn command(args: Args, ctx: &Ctx) -> Result<()> {
                 .get(&results_path(deployment, evaluation), &query)
                 .await?;
             print_results(ctx.json, &results);
+            if !ctx.json {
+                if let Some(hint) = next_page_hint(deployment, evaluation, first, &results) {
+                    io::stdout().flush()?;
+                    eprintln!("{hint}");
+                }
+            }
             Ok(())
         }
     }
@@ -430,5 +469,26 @@ mod tests {
             .to_string();
         assert!(error.contains("eval run 42 failed"), "got: {error}");
         assert!(error.contains("1/1"), "got: {error}");
+    }
+
+    #[test]
+    fn paginated_results_show_a_runnable_next_page_command() {
+        let results = json!({
+            "items": [{ "verdict": "pass" }],
+            "pageInfo": { "hasNextPage": true, "endCursor": "a;b" }
+        });
+        assert_eq!(
+            next_page_hint(1, 42, Some(5), &results),
+            Some("More results: `cube evals results 1 42 --first 5 --after 'a;b'`".into())
+        );
+        assert_eq!(
+            next_page_hint(
+                1,
+                42,
+                None,
+                &json!({ "pageInfo": { "hasNextPage": false } })
+            ),
+            None
+        );
     }
 }
