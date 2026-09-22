@@ -16,10 +16,7 @@ rss: true
 
   ### Changed
 
-  - `AppConfigResponse` gained `dashboardAppsEnabled` — whether this tenant has Dashboard Apps, for a client with no other read path to tenant flags (the creator-mode embed, the Sheets add-in) to tell whether to render an `APP`-kind workbook as the app rather than the classic builder — and `restrictDataDownload` — the tenant-wide data-download lock, exposed here for the same reason: an embed has no other read path to it, and previously only the published-dashboard embed carried a copy on its own payload.
-  - `ReportSnapshot` gained `publicId` — the snapshotted report's public id, which is what a published Dashboard App resolves a report by (`useReportData('<publicId>')`); `null` on versions written before it was recorded.
-  - `TenantSettings` / `TenantSettingsInput` gained `aiTokensAutoPurchaseEnabled`, `aiTokensAutoPurchaseThreshold` and `aiTokensAutoPurchaseAmount` (CUB-4690) — automatic AI-token top-up. `Threshold`/`Amount` are dollar amounts and are only meaningful while `Enabled`; they are retained when it is switched off so re-enabling restores what the customer had.
-  - `PivotItems` / `PivotItemsInput` gained `showRowTotals` (CUB-4542) — whether a trailing "Total" column is appended, totaling each row across the pivot columns; the row-axis counterpart of the existing `showColumnTotals`. Ignored without a Columns zone, same as its sibling.
+  - `DatabricksMetricViewPublicationViewResult.outcome` gained `partial`, and the result gained a required `withheldMembers` — measures a view could not publish, each named with its cube. A `partial` view is queryable but incomplete; a consumer matching exhaustively on `outcome` must handle the new value.
 
   ### Removed
 
@@ -27,10 +24,17 @@ rss: true
   - `AgentsWithIntegrations` keeps its name despite no longer selecting any integrations. Renaming a published operation would break every caller on top of the field removal, for cosmetic gain; it is a plain agents query now.
 </Update>
 
-<Update label="2026-09-20" description="v0.12.0" tags={["Deprecated"]}>
+<Update label="2026-09-20" description="v0.12.0" tags={["Added","Deprecated"]}>
+  ### Added
+
+  - `AppConfigResponse` gained `dashboardAppsEnabled` — whether this tenant has Dashboard Apps, for a client with no other read path to tenant flags (the creator-mode embed, the Sheets add-in) to tell whether to render an `APP`-kind workbook as the app rather than the classic builder — and `restrictDataDownload` — the tenant-wide data-download lock, exposed here for the same reason: an embed has no other read path to it, and previously only the published-dashboard embed carried a copy on its own payload.
+  - `ReportSnapshot` gained `publicId` — the snapshotted report's public id, which is what a published Dashboard App resolves a report by (`useReportData('<publicId>')`); `null` on versions written before it was recorded.
+  - `TenantSettings` / `TenantSettingsInput` gained `aiTokensAutoPurchaseEnabled`, `aiTokensAutoPurchaseThreshold` and `aiTokensAutoPurchaseAmount` (CUB-4690) — automatic AI-token top-up. `Threshold`/`Amount` are dollar amounts and are only meaningful while `Enabled`; they are retained when it is switched off so re-enabling restores what the customer had.
+  - `PivotItems` / `PivotItemsInput` gained `showRowTotals` (CUB-4542) — whether a trailing "Total" column is appended, totaling each row across the pivot columns; the row-axis counterpart of the existing `showColumnTotals`. Ignored without a Columns zone, same as its sibling.
+
   ### Deprecated
 
-  - The agent Jira/Atlassian integration is gone (CUB-4773). `Agent.integrations` (`AgentIntegrationsDto`, `AgentIntegrationsJiraDto`), `UpdateAgentInput.integrations`, the `atlassianConfig` / `jiraProjects` / `jiraIssueTypes` queries and `useD3AiJiraIntegration` are **deprecated, not removed** — they remain in the schema returning null/false so existing clients keep working, and are deleted in a later release (CUB-4781). Nothing reads or writes them: the OAuth callback, credential storage and token refresh behind them are gone.
+  - The agent Jira/Atlassian integration no longer does anything (CUB-4773). `Agent.integrations` (`AgentIntegrationsDto`, `AgentIntegrationsJiraDto`), `UpdateAgentInput.integrations`, the `atlassianConfig` / `jiraProjects` / `jiraIssueTypes` queries and `useD3AiJiraIntegration` are **deprecated, not removed** — they remain in the schema returning null/false so existing clients keep working, and are deleted in a later release (CUB-4781). Nothing reads or writes them: the OAuth callback, credential storage and token refresh behind them are gone.
 </Update>
 
 <Update label="2026-09-15" description="v0.11.0" tags={["Added"]}>
