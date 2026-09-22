@@ -415,13 +415,13 @@ A filter's JSON carries the condition in its `type` key, alongside the `value`. 
 | `in the month`, `in the quarter`, `in the year` and their `not` forms | `in_month`, `in_quarter`, `in_year`, `not_in_month`, `not_in_quarter`, `not_in_year` |
 | `contains`, `starts with`, `ends with` and their `not` forms | `contains`, `starts_with`, `ends_with`, `not_contains`, `not_starts_with`, `not_ends_with` |
 | `is null`, `is not null`, `is empty`, `is not empty` | `is_null`, `is_not_null`, `is_empty`, `is_not_empty` — these take no `value` |
-| Custom SQL, which no operator menu offers | `custom` — its `value` is a SQL condition, used in the query as written |
+| Custom SQL, which no operator menu offers | `custom` — a facet source set to it scopes nothing |
 
 A **Boolean** dimension's `is true` and `is false` sit on the `is` row: both are `equals`, with `value` set to the string `"true"` or `"false"` — `f_orders.is_paid={"value":"true"}`.
 
 A `between` filter's `value` is a two-entry array, and both bounds are inclusive unless you set `startInclusive` or `endInclusive` to `false`. Each is a key of its own, beside `type` and `value` rather than inside them — `f_orders.created_at={"type":"between","value":["2026-01-01","2026-02-01"],"endInclusive":false}`.
 
-A substring condition takes `caseSensitive` the same way: with `true` it matches the case of the value exactly, and without the key it ignores case — `f_orders.status={"type":"not_contains","value":"ship","caseSensitive":true}`. The value editor has no switch for it, so a filter matches case only where a link sets the key.
+A substring condition takes `caseSensitive` the same way: with `true` the match is made with `LIKE` rather than `ILIKE`, so it respects case wherever the column's collation is case-sensitive, and without the key case is ignored — `f_orders.status={"type":"not_contains","value":"ship","caseSensitive":true}`. The value editor has no switch for it, so a filter matches case only where a link sets the key.
 
 Outside `between`, a `value` may still be a list: `is` and `is not` read its entries as alternatives — `f_orders.status={"value":["shipped","processing"]}` — while a substring condition matches them joined into a single term.
 
