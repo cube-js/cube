@@ -239,6 +239,10 @@ overwrite them — its **Locate** button jumps straight to them.
 
 {/* TODO: screenshot — the hand-edit overwrite banner with its Locate button */}
 
+If someone shares a workbook with you that has a placement you don't have
+access to, placing your cursor in it shows a note that names the owner so you
+can request access; it never reveals the exploration's title or data.
+
 A placement survives renaming the sheet it's on or the workbook it's in —
 it's tracked by the sheet's and workbook's own stable ids, not by name. A
 placement's anchor is a fixed cell reference, though, so it does **not**
@@ -298,7 +302,9 @@ pane — every conversation you've had in the add-in on this deployment, not
 just the current workbook's — and sync with your Cube account, so they're
 available from any device. Like other conversations, they're readable by
 admins and anyone with the **Access chat history** permission under
-[Chats History](/admin/monitoring/chats-history).
+[Chats History](/admin/monitoring/chats-history). These conversations stay
+in the add-in — they don't appear in **History** in the
+[Cube workspace](/docs/explore-analyze/analytics-chat#history).
 
 {/* TODO: screenshot — the chat pane open in the add-in sidebar */}
 
