@@ -71,7 +71,7 @@ features:
 | Removed    | [`context_to_roles`](#context-to-roles)                                                                                           | v1.6.4     | v1.7.0    |
 | Deprecated | [Node.js 22](#nodejs-22)                                                                                                          | v1.7.0     |           |
 | Deprecated | [Hive driver](#hive-driver)                                                                                                       | v1.7.25    |           |
-| Removed    | [`NODE_ENV` as a development mode switch](#node_env-as-a-development-mode-switch)                                                  | v1.7.41    | v1.7.41   |
+| Removed    | [`NODE_ENV` as a development mode switch](#node_env-as-a-development-mode-switch)                                                  | v1.7.44    | v1.7.44   |
 
 ### Node.js 8
 
@@ -469,9 +469,9 @@ ships Hive/SparkSQL connection settings that can be used through a custom
 
 ### `NODE_ENV` as a development mode switch
 
-**Deprecated in Release: v1.7.41**
+**Deprecated in Release: v1.7.44**
 
-**Removed in Release: v1.7.41**
+**Removed in Release: v1.7.44**
 
 Development mode used to be on whenever `NODE_ENV` was anything but `production`,
 which put an instance with no `NODE_ENV` set at all into development mode — an
@@ -483,3 +483,13 @@ Cube prints a warning when it sees a non-production `NODE_ENV` with `CUBEJS_DEV_
 unset. If you relied on `NODE_ENV` to get development mode, set `CUBEJS_DEV_MODE=true`
 instead. The `cubejs dev-server` command is unaffected: it sets `CUBEJS_DEV_MODE=true`
 for you.
+
+An instance that was implicitly in development mode also changes the pre-aggregation
+schema it writes to, from `dev_pre_aggregations` to `prod_pre_aggregations`, unless
+[`CUBEJS_PRE_AGGREGATIONS_SCHEMA`](https://docs.cube.dev/reference/configuration/environment-variables#cubejs_pre_aggregations_schema)
+pins it. Every pre-aggregation is rebuilt in the new schema on first use, and the
+tables left behind in `dev_pre_aggregations` are no longer tracked by the refresh
+worker, so nothing drops them for you — remove them by hand once the rebuild has
+finished. To keep the old schema instead, either set `CUBEJS_DEV_MODE=true` (if the
+instance really was meant to be a dev server) or set
+`CUBEJS_PRE_AGGREGATIONS_SCHEMA=dev_pre_aggregations` explicitly.

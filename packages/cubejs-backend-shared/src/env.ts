@@ -209,12 +209,8 @@ function asBoolOrTime(input: string, envName: string): number | boolean {
 }
 
 /**
- * Development mode is opt-in and driven solely by CUBEJS_DEV_MODE. It is off by
- * default, including when neither CUBEJS_DEV_MODE nor NODE_ENV is set.
- *
- * NODE_ENV is deprecated for this decision and no longer enables development
- * mode: it used to be on whenever NODE_ENV was anything but `production`, which
- * silently turned an unconfigured instance into an authentication bypass.
+ * Development mode is opt-in through CUBEJS_DEV_MODE and off by default.
+ * NODE_ENV is deprecated for this decision and ignored — see DEPRECATION.md.
  */
 const devMode = () => {
   const enabled = get('CUBEJS_DEV_MODE')
@@ -240,15 +236,10 @@ const devMode = () => {
 const variables: Record<string, (...args: any) => any> = {
   devMode,
   logLevel: () => get('CUBEJS_LOG_LEVEL').asString(),
-  logRedaction: () => {
-    // Off in development mode as OptsHandler.isDevMode decides it: there the console is
-    // the log sink and runnable SQL is wanted
-    const isDevMode = devMode();
-
-    return get('CUBEJS_LOG_REDACTION')
-      .default(isDevMode ? 'false' : 'true')
-      .asBoolStrict();
-  },
+  // Off in development mode: there the console is the log sink and runnable SQL is wanted
+  logRedaction: () => get('CUBEJS_LOG_REDACTION')
+    .default(devMode() ? 'false' : 'true')
+    .asBoolStrict(),
   port: () => asPortOrSocket(process.env.PORT || '4000', 'PORT'),
   tls: () => get('CUBEJS_ENABLE_TLS')
     .default('false')
