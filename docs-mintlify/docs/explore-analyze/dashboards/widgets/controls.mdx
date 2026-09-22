@@ -101,7 +101,7 @@ A faceted filter can take as a source any sibling on the same semantic view, wha
 
 - `is null`, `is not null`, `is empty` and `is not empty` carry no value and narrow as soon as they are set. Every other condition waits for a value, and until it has one it leaves the value list alone, just as it leaves the charts unfiltered.
 - A condition and value that together leave nothing to scope by narrow nothing either, as the warning below sets out.
-- Custom SQL is the one condition no source can be set to: no operator menu offers it, and a filter a hand-written [URL parameter](#sharing-the-current-selection) gives it scopes nothing.
+- Custom SQL scopes nothing. No operator menu offers it, so only a hand-written [URL parameter](#sharing-the-current-selection) can set a filter to it, and a source set that way leaves the value list alone.
 
 To pick which siblings a filter listens to, turn the **Facet** switch on in its edit sidebar: the source picker appears with it, reading **All**. The picker lists every other filter on the dashboard and greys out the ones it cannot use — the ones targeting a different semantic view — with a tooltip saying it is not available for this semantic view or filter type. Left at **All**, the filter listens to every sibling the picker leaves selectable; picking entries narrows it to those. A filter you picked that later stops qualifying, because its dimension was re-pointed at another semantic view say, stays in the list with a warning icon rather than disappearing from it.
 
