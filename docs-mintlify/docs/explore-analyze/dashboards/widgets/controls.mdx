@@ -97,14 +97,9 @@ When multiple filters target dimensions from the same semantic view, you can mar
 
 For example, on a sales dashboard with a **Country** filter and a **City** filter, marking the City filter as faceted means selecting `United States` in the Country filter limits the City filter to U.S. cities only. Mark both and each narrows the other.
 
-A faceted filter can take as a source any sibling on the same semantic view set to one of these conditions — the sibling does not need **Facet** turned on itself:
+A faceted filter can take as a source any sibling on the same semantic view, whatever condition that sibling is set to and whether or not it carries **Facet** itself: `is` and `is not`, the substring conditions, the comparisons on a **Number** dimension and every date condition all narrow the value list, and a **Boolean** dimension counts here too, its `is true` / `is false` setting `is`. The four conditions that carry no value — `is null`, `is not null`, `is empty` and `is not empty` — narrow as soon as they are set; every other condition waits for a value, and until it has one it leaves the value list alone, just as it leaves the charts unfiltered. Custom SQL is the exception no source can be set to: no operator menu offers it, and a filter a hand-written [URL parameter](#sharing-the-current-selection) gives it scopes nothing.
 
-- A **String** or **Number** dimension set to `is` or `is not`. A **Boolean** dimension counts here too: its `is true` / `is false` set `is`.
-- A time dimension set to any of its date conditions except `is null` and `is not null` — though `is not` and the `in the …` and `not in the …` conditions narrow on one value only, and `is not` needs that value to name a whole period.
-
-Every other condition cannot be picked as a source and scopes nothing — `contains`, `starts with` and `ends with` and their negations, the comparisons on a **Number** dimension (`greater than`, `less than` and their *or equal* forms), and `is null`, `is not null`, `is empty` and `is not empty`.
-
-To pick which siblings a filter listens to, turn the **Facet** switch on in its edit sidebar: the source picker appears with it, reading **All**. The picker lists every other filter on the dashboard and greys out the ones it cannot use — a sibling set to one of those other conditions, or one targeting a different semantic view — with a tooltip saying it is not available for this semantic view or filter type. Left at **All**, the filter listens to every sibling the picker leaves selectable; picking entries narrows it to those.
+To pick which siblings a filter listens to, turn the **Facet** switch on in its edit sidebar: the source picker appears with it, reading **All**. The picker lists every other filter on the dashboard and greys out the ones it cannot use — the ones targeting a different semantic view — with a tooltip saying it is not available for this semantic view or filter type. Left at **All**, the filter listens to every sibling the picker leaves selectable; picking entries narrows it to those. A filter you picked that later stops qualifying, because its dimension was re-pointed at another semantic view say, stays in the list with a warning icon rather than disappearing from it.
 
 **Cancel** leaves the filter on the sources it was last saved with — it discards every unsaved edit in the sidebar, not only the source list — while turning **Facet** back off clears the entries you picked, so switching it on again starts from **All**.
 
@@ -126,6 +121,8 @@ A source can end up with nothing to scope by, leaving the value list as wide as 
 
 - `is not` on a fixed date or on a single-moment relative value such as **3 months ago** — a point in time has no period to exclude.
 - `is not` and the `in the …` and `not in the …` conditions on several values — each reads one period from one value.
+- Several values on a substring condition, which only a [URL parameter](#sharing-the-current-selection) can give one — the charts match the values joined into a single term, not any of them, and the value list has no way to ask for that.
+- `not contains`, `not starts with` or `not ends with` marked case-sensitive, again only reachable through that parameter — the value list can be narrowed case-insensitively alone, which would drop values the charts still show.
 </Warning>
 
 A list that *is* being scoped does not necessarily look shorter — a long one fills the dropdown either way, and the values the window drops need not be the ones on screen. To check that a source is narrowing it, look for a value you know the window has no rows for and confirm it is gone from the list. Searching for that value is not a check: a filter's value box takes values that are not in its list, so it offers back whatever you type.
