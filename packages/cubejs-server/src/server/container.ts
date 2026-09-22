@@ -10,6 +10,7 @@ import {
   getEnv,
   isDockerImage, isNativeSupported,
   markDevModeResolvedByCaller,
+  releasePreAggregationsSchemaPin,
   PackageManifest,
   resolveBuiltInPackageVersion,
 } from '@cubejs-backend/shared';
@@ -247,6 +248,13 @@ export class ServerContainer {
   }
 
   public async lookupConfiguration(override: boolean = false): Promise<CreateOptions> {
+    // A reload builds a second CubejsServerCore, and the schema it resolves has to reach
+    // the drivers; the pin from the previous one would otherwise refuse to move. Before
+    // dotenv, so a CUBEJS_PRE_AGGREGATIONS_SCHEMA added to `.env` is the user's and stays
+    if (override) {
+      releasePreAggregationsSchemaPin();
+    }
+
     dotenv.config({
       override,
       multiline: 'line-breaks'

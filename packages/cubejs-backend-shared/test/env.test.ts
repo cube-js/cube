@@ -436,6 +436,34 @@ describe('pinPreAggregationsSchema', () => {
     expect(pinWarnings()).toHaveLength(0);
   });
 
+  test('releasing lets a reload pin the schema its new config resolved', () => {
+    const env = freshEnv();
+
+    env.pinPreAggregationsSchema('dev_pre_aggregations');
+    env.releasePreAggregationsSchemaPin();
+
+    // Without the release the second pin is refused and the drivers stay on `dev_`,
+    // while the reloaded instance names `analytics_preaggs` in the statement
+    expect(process.env.CUBEJS_PRE_AGGREGATIONS_SCHEMA).toBeUndefined();
+
+    env.pinPreAggregationsSchema('analytics_preaggs');
+
+    expect(process.env.CUBEJS_PRE_AGGREGATIONS_SCHEMA).toEqual('analytics_preaggs');
+    expect(pinWarnings()).toHaveLength(0);
+  });
+
+  test('releasing leaves a value the user set in place', () => {
+    process.env.CUBEJS_PRE_AGGREGATIONS_SCHEMA = 'my_schema';
+
+    const env = freshEnv();
+
+    env.releasePreAggregationsSchemaPin();
+
+    // A reload re-reads `.env`, but the user's own choice outlives it
+    expect(process.env.CUBEJS_PRE_AGGREGATIONS_SCHEMA).toEqual('my_schema');
+    expect(env.userPreAggregationsSchema()).toEqual('my_schema');
+  });
+
   test('stays quiet when the user set the variable, and does not overwrite it', () => {
     process.env.CUBEJS_PRE_AGGREGATIONS_SCHEMA = 'my_schema';
 

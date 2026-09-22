@@ -221,6 +221,22 @@ export const markDevModeResolvedByCaller = () => {
 let pinnedPreAggregationsSchema: string | undefined;
 
 /**
+ * Releases the pin so the next one can take, which a reload needs: without it the
+ * drivers stay on the schema the previous configuration resolved.
+ */
+export const releasePreAggregationsSchemaPin = () => {
+  // Only what this process pinned. A value the user set outlives any reload
+  if (
+    pinnedPreAggregationsSchema !== undefined &&
+    process.env.CUBEJS_PRE_AGGREGATIONS_SCHEMA === pinnedPreAggregationsSchema
+  ) {
+    delete process.env.CUBEJS_PRE_AGGREGATIONS_SCHEMA;
+  }
+
+  pinnedPreAggregationsSchema = undefined;
+};
+
+/**
  * A driver cannot see CreateOptions, so it falls back to CUBEJS_DEV_MODE, which both
  * `devServer` and `preAggregationsSchema` contradict; pinning makes both sides agree.
  */

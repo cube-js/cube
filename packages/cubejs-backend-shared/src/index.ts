@@ -2,6 +2,7 @@ export {
   getEnv,
   markDevModeResolvedByCaller,
   pinPreAggregationsSchema,
+  releasePreAggregationsSchemaPin,
   userPreAggregationsSchema,
   assertDataSource,
   keyByDataSource,
