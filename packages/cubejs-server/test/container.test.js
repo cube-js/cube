@@ -173,6 +173,38 @@ describe('ServerContainer dev mode resolution', () => {
       const config = await container.lookupConfiguration();
 
       expect(config.devServer).toBe(false);
+      // The sync is written before `cube.js` is loaded, so it is keyed on the command's
+      // request; leaving `development` here would hand `gracefulShutdown`,
+      // `refreshWorkerMode` and `detectQueueAndCacheDriver` a dev server that is not one
+      expect(process.env.NODE_ENV).toBeUndefined();
+    } finally {
+      process.chdir(cwd);
+      fs.rmSync(projectDir, { recursive: true, force: true });
+    }
+  });
+
+  test('a cube.js devServer: false restores the NODE_ENV it found', async () => {
+    process.env.NODE_ENV = 'production';
+
+    const container = makeContainer(true);
+    container.stubConfigurationFile({ devServer: false });
+
+    const projectDir = fs.mkdtempSync(path.join(os.tmpdir(), 'cube-container-'));
+    const cwd = process.cwd();
+
+    fs.writeFileSync(
+      path.join(projectDir, 'cube.js'),
+      'module.exports = { devServer: false };\n'
+    );
+
+    try {
+      process.chdir(projectDir);
+
+      await container.lookupConfiguration();
+
+      // Restored rather than deleted: the command overwrote a value the user set, and
+      // `gracefulShutdown` reads exactly this one — 30 seconds in production, 2 outside
+      expect(process.env.NODE_ENV).toEqual('production');
     } finally {
       process.chdir(cwd);
       fs.rmSync(projectDir, { recursive: true, force: true });

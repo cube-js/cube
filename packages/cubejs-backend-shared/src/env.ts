@@ -211,10 +211,8 @@ function asBoolOrTime(input: string, envName: string): number | boolean {
 let devModeResolvedByCaller = false;
 
 /**
- * Declares that development mode was decided through CreateOptions.devServer, so the
- * deprecation warning below has nothing to tell this process. `cubejs dev-server` calls
- * it: without this the warning would fire on every run, telling a user who is already
- * in development mode to turn development mode on.
+ * Without this the deprecation warning below fires on every dev server run, telling a
+ * user already in development mode to turn development mode on.
  */
 export const markDevModeResolvedByCaller = () => {
   devModeResolvedByCaller = true;
@@ -223,10 +221,8 @@ export const markDevModeResolvedByCaller = () => {
 let pinnedPreAggregationsSchema: string | undefined;
 
 /**
- * A driver cannot see CreateOptions.devServer, so it resolves the pre-aggregation
- * schema from this variable and falls back to CUBEJS_DEV_MODE, which the option can
- * contradict in either direction. Pinning the schema server-core resolved makes both
- * sides read one value. Called by server-core, which is where that answer is known.
+ * A driver cannot see CreateOptions.devServer, so it falls back to CUBEJS_DEV_MODE,
+ * which the option can contradict either way; pinning makes both sides read one value.
  */
 export const pinPreAggregationsSchema = (schema: string) => {
   if (process.env.CUBEJS_PRE_AGGREGATIONS_SCHEMA === undefined) {
@@ -237,8 +233,7 @@ export const pinPreAggregationsSchema = (schema: string) => {
 
 /**
  * The variable as the user set it: a value this process pinned reads as unset, so a
- * second instance still resolves its own default instead of inheriting the first's.
- * The pin is for drivers, which have no default of their own to fall back to.
+ * second instance resolves its own default instead of inheriting the first's.
  */
 export const userPreAggregationsSchema = (): string | undefined => {
   const schema = process.env.CUBEJS_PRE_AGGREGATIONS_SCHEMA;

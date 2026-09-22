@@ -263,7 +263,11 @@ export class ServerContainer {
       markDevModeResolvedByCaller();
     }
 
-    // Kept in sync for user config code and third-party libraries that still read it
+    // Kept in sync for user config code and third-party libraries that still read it.
+    // Written before `cube.js` is loaded so that file sees it, which is what master did;
+    // the config it exports can still overrule the command, and the sync follows below
+    const nodeEnv = process.env.NODE_ENV;
+
     if (devServer ?? getEnv('devMode')) {
       process.env.NODE_ENV = 'development';
     }
@@ -274,7 +278,21 @@ export class ServerContainer {
     const measureAndApplyDevServer = (userConfig: CreateOptions): CreateOptions => {
       this.isCubeConfigEmpty = Object.keys(userConfig).length === 0;
 
-      return devServer ? { devServer, ...userConfig } : userConfig;
+      const config = devServer ? { devServer, ...userConfig } : userConfig;
+
+      // A `cube.js` exporting `devServer: false` overrules the command, and the sync has
+      // to follow it rather than the request: `gracefulShutdown` below, `refreshWorkerMode`
+      // and `detectQueueAndCacheDriver` all still read NODE_ENV, and leaving `development`
+      // on an instance in production mode is what would reach them
+      if (!(config.devServer ?? getEnv('devMode'))) {
+        if (nodeEnv === undefined) {
+          delete process.env.NODE_ENV;
+        } else {
+          process.env.NODE_ENV = nodeEnv;
+        }
+      }
+
+      return config;
     };
 
     if (fs.existsSync(path.join(process.cwd(), 'cube.py'))) {
