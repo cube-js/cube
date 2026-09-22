@@ -619,17 +619,12 @@ impl PreAggregationOptimizer {
             .iter()
             .chain(pre_aggregation.segments.iter())
             .map(|member| member.full_name())
-            .chain(pre_aggregation.time_dimensions.iter().filter_map(|member| {
-                // A stored time dimension is truncated to its granularity, and
-                // a mapping is a value rather than a period: only the
-                // calendar's own row grain still holds it.
-                member
-                    .as_time_dimension()
-                    .ok()
-                    .and_then(|time_dimension| time_dimension.granularity().clone())
-                    .filter(|granularity| granularity == "day")
-                    .map(|_| PreAggregation::stored_time_dimension_column(member).0)
-            }))
+            .chain(
+                pre_aggregation
+                    .time_dimensions
+                    .iter()
+                    .map(|member| PreAggregation::stored_time_dimension_column(member).0),
+            )
             .collect::<HashSet<_>>();
         Ok(extracted.calendar_shifts.values().all(|shift| {
             shift.sql.as_ref().is_some_and(|sql| {
