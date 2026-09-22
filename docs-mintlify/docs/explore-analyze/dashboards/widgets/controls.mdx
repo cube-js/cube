@@ -401,7 +401,7 @@ Each control type has its own parameter:
 
 The semantic view and member are the **internal names** configured on the control — not the display titles you see in the picker. A view shown as `Orders` is usually `orders` in the parameter. The same goes for the member on the right-hand side of `ms_`: it is the internal name of the member to switch to, and it is a measure rather than a dimension when the switcher's **Field Type** is **Measure**. Granularities are lowercase and must be one of the switcher's [allowed granularities](#allowed-granularities) — `day`, `week`, `month`, `quarter`, `year`, plus `second`, `minute`, and `hour` for time dimensions that expose them.
 
-You can also write these parameters by hand to open a dashboard in a particular state — see [Pre-set dashboard filters and granularities via URL][ref-embed-url-filters] for the embedded case, which uses the same format.
+You can also write these parameters by hand to open a dashboard in a particular state — see [Pre-set dashboard filters, granularities, and tabs via URL][ref-embed-url-filters] for the embedded case, which uses the same format.
 
 A filter's JSON carries the condition in its `type` key, alongside the `value`. Omitted, it is `equals`, which is why the example above writes only a value. The strings for the conditions in [Operators by dimension type](#operators-by-dimension-type):
 
