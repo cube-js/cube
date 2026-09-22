@@ -221,6 +221,17 @@ export const markDevModeResolvedByCaller = () => {
 };
 
 /**
+ * A driver cannot see CreateOptions.devServer, so it resolves the pre-aggregation
+ * schema from the variable; pinning makes both sides read the same value. The dev
+ * server paths call it once they know development mode is on.
+ */
+export const pinDevPreAggregationsSchema = () => {
+  if (process.env.CUBEJS_PRE_AGGREGATIONS_SCHEMA === undefined) {
+    process.env.CUBEJS_PRE_AGGREGATIONS_SCHEMA = 'dev_pre_aggregations';
+  }
+};
+
+/**
  * Development mode is opt-in through CUBEJS_DEV_MODE and off by default.
  * NODE_ENV is deprecated for this decision and ignored — see DEPRECATION.md.
  */

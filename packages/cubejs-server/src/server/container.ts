@@ -10,6 +10,7 @@ import {
   getEnv,
   isDockerImage, isNativeSupported,
   markDevModeResolvedByCaller,
+  pinDevPreAggregationsSchema,
   PackageManifest,
   resolveBuiltInPackageVersion,
 } from '@cubejs-backend/shared';
@@ -276,16 +277,10 @@ export class ServerContainer {
 
       const config = devServer ? { devServer, ...userConfig } : userConfig;
 
-      // A driver cannot see CreateOptions.devServer, so DatabricksDriver resolves the
-      // pre-aggregation schema from CUBEJS_DEV_MODE and would answer `prod_` while
-      // server-core emits `dev_`. Pinning makes both sides read the same value.
       // Keyed on the resolved config, not the command's request: a cube.js exporting
       // `devServer: false` wins over `cubejs dev-server`, and the schema has to follow
-      if (
-        (config.devServer ?? getEnv('devMode')) &&
-        process.env.CUBEJS_PRE_AGGREGATIONS_SCHEMA === undefined
-      ) {
-        process.env.CUBEJS_PRE_AGGREGATIONS_SCHEMA = 'dev_pre_aggregations';
+      if (config.devServer ?? getEnv('devMode')) {
+        pinDevPreAggregationsSchema();
       }
 
       return config;

@@ -471,12 +471,9 @@ where
     })
 }
 
-/// A boolean variable read the way the JavaScript side reads one: `true` or
-/// `false` in any casing. Any other value is reported and the default used;
-/// a variable that only picks a default must not fail startup.
-/// The single definition of what counts as a boolean here. `None` means the variable is
-/// absent or holds something this does not accept, so every caller falls back the same
-/// way — including the Node bridge, which would otherwise have to restate the rule.
+/// The single definition of what counts as a boolean here: `true` or `false` in any
+/// casing. `None` means absent or unrecognised, so every caller — including the Node
+/// bridge — falls back the same way.
 pub fn env_optparse_bool(name: &str) -> Option<bool> {
     match env::var(name).ok()?.trim().to_lowercase().as_str() {
         "true" => Some(true),
@@ -485,19 +482,20 @@ pub fn env_optparse_bool(name: &str) -> Option<bool> {
     }
 }
 
+/// An unrecognised value is reported and the default used; a variable that only
+/// picks a default must not fail startup.
 fn env_parse_bool(name: &str, default: bool) -> bool {
-    match env::var(name) {
-        Err(_) => default,
-        Ok(_) => env_optparse_bool(name).unwrap_or_else(|| {
-            warn!(
-                "Environment variable '{}' has value '{}', expected true or false; using {}",
-                name,
-                env::var(name).unwrap_or_default(),
-                default
-            );
-            default
-        }),
-    }
+    let Ok(value) = env::var(name) else {
+        return default;
+    };
+
+    env_optparse_bool(name).unwrap_or_else(|| {
+        warn!(
+            "Environment variable '{}' has value '{}', expected true or false; using {}",
+            name, value, default
+        );
+        default
+    })
 }
 
 pub fn env_parse_duration<T>(name: &str, default: T, max: Option<T>, min: Option<T>) -> T

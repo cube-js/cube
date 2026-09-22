@@ -1,6 +1,6 @@
 import 'source-map-support/register';
 
-import { getEnv, markDevModeResolvedByCaller } from '@cubejs-backend/shared';
+import { getEnv, markDevModeResolvedByCaller, pinDevPreAggregationsSchema } from '@cubejs-backend/shared';
 
 import { CubejsServer } from '../server';
 
@@ -11,13 +11,7 @@ const devServer = process.env.CUBEJS_DEV_MODE === undefined || getEnv('devMode')
 
 if (devServer) {
   markDevModeResolvedByCaller();
-
-  // A driver cannot see CreateOptions.devServer, so DatabricksDriver resolves the
-  // pre-aggregation schema from CUBEJS_DEV_MODE and would answer `prod_` while
-  // server-core emits `dev_`. Pinning the schema makes both sides read the same value
-  if (process.env.CUBEJS_PRE_AGGREGATIONS_SCHEMA === undefined) {
-    process.env.CUBEJS_PRE_AGGREGATIONS_SCHEMA = 'dev_pre_aggregations';
-  }
+  pinDevPreAggregationsSchema();
 }
 
 const server = new CubejsServer({ devServer });

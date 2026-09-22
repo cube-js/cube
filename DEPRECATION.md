@@ -543,8 +543,9 @@ created in one catalog and dropped from another. Pinning the variable makes both
 read it instead. The dev server commands pin it for you; only an embedder passing
 `devServer` has to.
 
-The same applies without the option. An embedder that set `CUBEJS_DEV_MODE=true`
-alongside an explicit `NODE_ENV=production` used to get Playground with JWT verification
+Authentication can also flip without the `devServer` option. An embedder that set
+`CUBEJS_DEV_MODE=true` alongside an explicit
+`NODE_ENV=production` used to get Playground with JWT verification
 still enforced on the REST (JSON) and GraphQL APIs, because enforcement keyed on
 `NODE_ENV` rather than on development mode. It now follows development mode, so those
 APIs accept requests with no token. Drop `CUBEJS_DEV_MODE=true` if the instance was not
