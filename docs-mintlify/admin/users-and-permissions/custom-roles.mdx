@@ -70,7 +70,7 @@ The Base Role is required. Save is disabled until one is selected.
 
 #### Auto-bump to Developer
 
-Six deployment-scoped actions can be checked at every tier, because checking one does not force the Base Role upward: **Access deployment** (`DeploymentRead`), **Access AI agents** (`DeploymentAgentRead`), **Create scheduled tasks** (`ScheduledTasksCreate`), **Download data** (`DownloadData`), **Access chat history** (`ChatHistoryRead`) and **View pre-aggregations** (`PreAggregationRead`). They still have to be granted by a deployment policy — the tier confers none of them. Chat history shows other users' conversations, so grant it deliberately. Check any other action — for example **Edit deployment** or **Edit data model** — and the Base Role is automatically forced to **Developer**, with the Viewer and Explorer options disabled behind a tooltip:
+Six deployment-scoped actions can be checked at every tier: **Access deployment** (`DeploymentRead`), **Access AI agents** (`DeploymentAgentRead`), **Create scheduled tasks** (`ScheduledTasksCreate`), **Download data** (`DownloadData`), **Access chat history** (`ChatHistoryRead`) and **View pre-aggregations** (`PreAggregationRead`). Check any other action — for example **Edit deployment** or **Edit data model** — and the Base Role is automatically forced to **Developer**, with the Viewer and Explorer options disabled behind a tooltip:
 
 > Selected actions require Developer role
 
@@ -169,6 +169,8 @@ A common pattern: someone who consumes dashboards and chats but never edits anyt
     Click **Create**.
   </Step>
 </Steps>
+
+As written, `Org Viewer` reproduces the built-in Viewer account-wide — assigning that role does the same thing. What makes it worth writing as a custom role is what you change from here: narrow **Scope** to specific deployments, drop an action the built-in grants, or add a [Global permission](#global-permissions) the built-in does not carry.
 
 ### Create an Explorer for a single deployment
 
