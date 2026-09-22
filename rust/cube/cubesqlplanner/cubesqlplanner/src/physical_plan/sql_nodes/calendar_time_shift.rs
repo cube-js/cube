@@ -41,17 +41,8 @@ impl CalendarTimeShiftSqlNode {
         &self.input
     }
 
-    /// The same question the matcher asks before admitting the shift, so the
-    /// two cannot disagree.
     fn renders_from_stored_columns(&self, shift: &CalendarDimensionTimeShift) -> bool {
-        shift.sql.as_ref().is_some_and(|sql| {
-            let dependencies = sql.get_dependencies();
-            // Empty for a raw-column declaration: nothing to substitute.
-            !dependencies.is_empty()
-                && dependencies
-                    .iter()
-                    .all(|dependency| self.substituted.contains_key(&dependency.full_name()))
-        })
+        shift.renders_from_stored(|name| self.substituted.contains_key(name))
     }
 }
 

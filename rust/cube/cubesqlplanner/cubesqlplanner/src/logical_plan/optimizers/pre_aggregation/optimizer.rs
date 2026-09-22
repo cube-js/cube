@@ -586,11 +586,8 @@ impl PreAggregationOptimizer {
             .collect()
     }
 
-    /// Every member the stage's calendar shifts read, as the pre-aggregation
-    /// would have to store it. A calendar shift is a mapping held in the
-    /// calendar's table; when that table's columns are themselves materialized,
-    /// the shift renders from stored columns and the stage needs nothing
-    /// outside the pre-aggregation.
+    /// Whether the stage's calendar shifts read only columns this
+    /// pre-aggregation stores, i.e. whether it can answer them by itself.
     fn calendar_shifts_are_stored(
         pre_aggregation: &CompiledPreAggregation,
         time_shifts: &TimeShiftState,
@@ -626,17 +623,10 @@ impl PreAggregationOptimizer {
                     .map(|member| PreAggregation::stored_time_dimension_column(member).0),
             )
             .collect::<HashSet<_>>();
-        Ok(extracted.calendar_shifts.values().all(|shift| {
-            shift.sql.as_ref().is_some_and(|sql| {
-                let dependencies = sql.get_dependencies();
-                // Empty for a raw-column declaration: nothing to store, nothing
-                // to substitute.
-                !dependencies.is_empty()
-                    && dependencies
-                        .iter()
-                        .all(|dependency| stored.contains(&dependency.full_name()))
-            })
-        }))
+        Ok(extracted
+            .calendar_shifts
+            .values()
+            .all(|shift| shift.renders_from_stored(|name| stored.contains(name))))
     }
 
     fn can_carry_time_shifts(
@@ -694,11 +684,6 @@ impl PreAggregationOptimizer {
                     if let Ok((from, to)) = date_range_op.formatted_date_range(precision) {
                         // Apply time shift for this dimension if present.
                         // SQL renders `column + interval`, so actual data range is `date - interval`.
-                        //
-                        // A calendar maps the period through a column of its own
-                        // table, and the declared interval only names that
-                        // mapping — offsetting the range by it would describe a
-                        // band of rows the rendered filter never asks for.
                         let shift =
                             time_shifts.get_for_symbol(base_filter.raw_member_evaluator_ref());
                         let is_calendar_shift = shift.is_some_and(|shift| {
@@ -710,10 +695,13 @@ impl PreAggregationOptimizer {
                                     dimension.time_shift_pk_full_name().is_some()
                                 })
                         });
-                        if let Some(interval) = shift
-                            .filter(|_| !is_calendar_shift)
-                            .and_then(|s| s.interval.as_ref())
-                        {
+                        // The range prunes partitions, and no band derived from
+                        // the reporting one describes the rows a calendar
+                        // mapping asks for. Decline to prune.
+                        if is_calendar_shift {
+                            return None;
+                        }
+                        if let Some(interval) = shift.and_then(|s| s.interval.as_ref()) {
                             let tz = query_tools.timezone();
                             let neg = -interval.clone();
                             let shifted_from = QueryDateTime::from_date_str(tz, &from)

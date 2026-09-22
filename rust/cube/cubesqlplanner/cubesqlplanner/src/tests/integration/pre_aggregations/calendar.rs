@@ -356,12 +356,12 @@ async fn calendar_shift_rollup_join_without_shift_column_falls_back() {
     assert_eq!(rollup, source);
 }
 
-/// The partition range handed to the storage layer and the filter rendered
-/// into the same scan have to describe one band of rows. A calendar shift maps
-/// the period through a table, so the range must not be offset by the
-/// interval the declaration names.
+/// The range a usage carries prunes partitions, so it has to describe the rows
+/// the rendered filter asks for. A calendar maps the period through its own
+/// table, which no band derived from the reporting one reproduces, so the
+/// shifted stage must carry no range at all rather than the range the user typed.
 #[tokio::test(flavor = "multi_thread")]
-async fn calendar_shift_partition_range_agrees_with_rendered_filter() {
+async fn calendar_shift_stage_prunes_no_partitions() {
     let query = query(
         "demand.net_demand_a_ly",
         "retail_calendar.retail_date",
@@ -370,17 +370,21 @@ async fn calendar_shift_partition_range_agrees_with_rendered_filter() {
     let ctx = ctx_rollup_join(&["demand_with_calendar"]);
     let (sql, usages) = ctx.build_sql_with_used_pre_aggregations(&query).unwrap();
     assert!(!usages.is_empty(), "expected the rollup to be read");
+
     let reporting_range = Some((
         "2025-02-09T00:00:00.000".to_string(),
         "2025-02-11T23:59:59.999".to_string(),
     ));
-    let offset = usages
-        .iter()
-        .find(|usage| usage.date_range.is_some() && usage.date_range != reporting_range)
-        .map(|usage| usage.date_range.clone());
-    assert_eq!(
-        offset, None,
-        "pre-aggregation is read for a range the query never filters on; SQL:\n{}",
+    assert!(
+        usages.iter().any(|usage| usage.date_range.is_none()),
+        "the shifted stage must prune no partitions; SQL:\n{}",
+        sql
+    );
+    assert!(
+        usages
+            .iter()
+            .all(|usage| usage.date_range.is_none() || usage.date_range == reporting_range),
+        "an unshifted stage may only be pruned to the reporting range; SQL:\n{}",
         sql
     );
 }
