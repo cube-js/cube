@@ -104,7 +104,10 @@ async fn test_float_literal_member_pushdown_fallback() {
     if !Rewriter::sql_push_down_enabled() {
         return;
     }
-    for (sql_type, type_template) in [("REAL", "types/float"), ("DOUBLE", "types/double")] {
+    for (sql_type, type_template, rendered) in [
+        ("REAL", "types/float", "CAST(100 AS FLOAT)"),
+        ("DOUBLE", "types/double", "CAST(100 AS DOUBLE)"),
+    ] {
         for missing in [false, true] {
             let plan = convert_select_to_query_plan_customized(
                 format!(
@@ -122,7 +125,12 @@ async fn test_float_literal_member_pushdown_fallback() {
             // LIMIT 0 preserves a literal scan member, bypassing expression gates.
             // A missing type must still leave an executable local plan.
             if !missing {
-                plan.as_logical_plan().find_cube_scan_wrapped_sql();
+                assert!(plan
+                    .as_logical_plan()
+                    .find_cube_scan_wrapped_sql()
+                    .wrapped_sql
+                    .sql
+                    .contains(rendered));
             }
             plan.as_physical_plan().await.unwrap();
         }
