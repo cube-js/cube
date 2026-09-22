@@ -1,6 +1,6 @@
 import 'source-map-support/register';
 
-import { getEnv, markDevModeResolvedByCaller, pinDevPreAggregationsSchema } from '@cubejs-backend/shared';
+import { getEnv, markDevModeResolvedByCaller } from '@cubejs-backend/shared';
 
 import { CubejsServer } from '../server';
 
@@ -11,7 +11,6 @@ const devServer = process.env.CUBEJS_DEV_MODE === undefined || getEnv('devMode')
 
 if (devServer) {
   markDevModeResolvedByCaller();
-  pinDevPreAggregationsSchema();
 }
 
 const server = new CubejsServer({ devServer });

@@ -6,6 +6,8 @@ import {
   assertDataSource,
   isDockerImage,
   displayCLIWarning,
+  pinPreAggregationsSchema,
+  userPreAggregationsSchema,
 } from '@cubejs-backend/shared';
 import {
   isCubeStoreSupported,
@@ -286,6 +288,21 @@ export class OptsHandler {
   private initializeCoreOptions(
     opts: DriverDecoratedOptions
   ): ServerCoreInitializedOptions {
+    // Not getEnv: a schema this process pinned is not a user's choice, so a second
+    // instance resolves its own default rather than inheriting the first's
+    const preAggregationsSchema =
+      userPreAggregationsSchema() ||
+      (this.isDevMode()
+        ? 'dev_pre_aggregations'
+        : 'prod_pre_aggregations');
+
+    // A driver resolves this schema from CUBEJS_DEV_MODE, which CreateOptions.devServer
+    // can contradict in either direction. Both readings have to name the same schema:
+    // DatabricksDriver builds the catalog-qualifying regex in query() from its own
+    // answer while dropTable() qualifies unconditionally, so a disagreement makes the
+    // query fail to find the table and the drop remove one from the other catalog
+    pinPreAggregationsSchema(preAggregationsSchema);
+
     const skipOnEnv = [
       // Default EXT_DB variables
       'CUBEJS_EXT_DB_URL',
@@ -408,11 +425,7 @@ export class OptsHandler {
       scheduledRefreshConcurrency: getEnv('scheduledRefreshQueriesPerAppId'),
       scheduledRefreshBatchSize: getEnv('scheduledRefreshBatchSize'),
       compilerCacheSize: getEnv('compilerCacheSize'),
-      preAggregationsSchema:
-        getEnv('preAggregationsSchema') ||
-        (this.isDevMode()
-          ? 'dev_pre_aggregations'
-          : 'prod_pre_aggregations'),
+      preAggregationsSchema,
       schemaPath: getEnv('schemaPath'),
       scheduledRefreshTimer: getEnv('refreshWorkerMode'),
       sqlCache: true,

@@ -220,15 +220,30 @@ export const markDevModeResolvedByCaller = () => {
   devModeResolvedByCaller = true;
 };
 
+let pinnedPreAggregationsSchema: string | undefined;
+
 /**
  * A driver cannot see CreateOptions.devServer, so it resolves the pre-aggregation
- * schema from the variable; pinning makes both sides read the same value. The dev
- * server paths call it once they know development mode is on.
+ * schema from this variable and falls back to CUBEJS_DEV_MODE, which the option can
+ * contradict in either direction. Pinning the schema server-core resolved makes both
+ * sides read one value. Called by server-core, which is where that answer is known.
  */
-export const pinDevPreAggregationsSchema = () => {
+export const pinPreAggregationsSchema = (schema: string) => {
   if (process.env.CUBEJS_PRE_AGGREGATIONS_SCHEMA === undefined) {
-    process.env.CUBEJS_PRE_AGGREGATIONS_SCHEMA = 'dev_pre_aggregations';
+    process.env.CUBEJS_PRE_AGGREGATIONS_SCHEMA = schema;
+    pinnedPreAggregationsSchema = schema;
   }
+};
+
+/**
+ * The variable as the user set it: a value this process pinned reads as unset, so a
+ * second instance still resolves its own default instead of inheriting the first's.
+ * The pin is for drivers, which have no default of their own to fall back to.
+ */
+export const userPreAggregationsSchema = (): string | undefined => {
+  const schema = process.env.CUBEJS_PRE_AGGREGATIONS_SCHEMA;
+
+  return schema === pinnedPreAggregationsSchema ? undefined : schema;
 };
 
 /**

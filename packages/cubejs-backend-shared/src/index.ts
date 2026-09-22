@@ -1,7 +1,8 @@
 export {
   getEnv,
   markDevModeResolvedByCaller,
-  pinDevPreAggregationsSchema,
+  pinPreAggregationsSchema,
+  userPreAggregationsSchema,
   assertDataSource,
   keyByDataSource,
   hasPreAggregationsEnvVars,

@@ -58,6 +58,9 @@ describe('OptsHandler class', () => {
   afterEach(() => {
     delete process.env.CUBEJS_DEV_MODE;
     delete process.env.CUBEJS_DB_TYPE;
+    // Written by the pin below, which would otherwise be the schema every later
+    // case resolves rather than its own
+    delete process.env.CUBEJS_PRE_AGGREGATIONS_SCHEMA;
   });
 
   test('must throw if CreateOptions.dbType is specified', () => {
@@ -354,6 +357,9 @@ describe('OptsHandler class', () => {
 
     expect(core.options.devServer).toBe(true);
     expect(core.options.preAggregationsSchema).toEqual('dev_pre_aggregations');
+    // A driver reads the variable and falls back to CUBEJS_DEV_MODE, which is unset
+    // here, so without the pin DatabricksDriver would answer `prod_pre_aggregations`
+    expect(process.env.CUBEJS_PRE_AGGREGATIONS_SCHEMA).toEqual('dev_pre_aggregations');
     // Without this the instance gets no external DB at all, so the first
     // pre-aggregation build fails with `externalDriverFactory is not provided`
     expect(core.options.externalDbType).toEqual('cubestore');
@@ -371,6 +377,49 @@ describe('OptsHandler class', () => {
 
     expect(core.options.devServer).toBe(false);
     expect(core.options.preAggregationsSchema).toEqual('prod_pre_aggregations');
+    // The mirror of the case above, and the one master kept in step: the variable says
+    // dev mode, the option overrules it, and a driver left on the variable would build
+    // its catalog-qualifying regex from `dev_pre_aggregations` while this instance
+    // names `prod_pre_aggregations` in the statement
+    expect(process.env.CUBEJS_PRE_AGGREGATIONS_SCHEMA).toEqual('prod_pre_aggregations');
+  });
+
+  test('must leave an explicit CUBEJS_PRE_AGGREGATIONS_SCHEMA alone', async () => {
+    process.env.CUBEJS_PRE_AGGREGATIONS_SCHEMA = 'my_schema';
+    process.env.CUBEJS_DB_TYPE = 'postgres';
+
+    const core = new CubejsServerCoreExposed({
+      ...conf,
+      devServer: true,
+      driverFactory: () => ({ type: <DatabaseType>'postgres' }),
+    });
+
+    expect(core.options.preAggregationsSchema).toEqual('my_schema');
+    expect(process.env.CUBEJS_PRE_AGGREGATIONS_SCHEMA).toEqual('my_schema');
+  });
+
+  test('must not let one instance pin the schema for the next', async () => {
+    process.env.CUBEJS_DB_TYPE = 'postgres';
+
+    const { externalDbType, externalDriverFactory, ...confWithoutExternal } = conf;
+
+    const dev = new CubejsServerCoreExposed({
+      ...confWithoutExternal,
+      devServer: true,
+      driverFactory: () => ({ type: <DatabaseType>'postgres' }),
+    });
+
+    const prod = new CubejsServerCoreExposed({
+      ...conf,
+      devServer: false,
+      driverFactory: () => ({ type: <DatabaseType>'postgres' }),
+    });
+
+    // The pin is a process-wide variable written for drivers, which have no default of
+    // their own. Reading it back as if the user had set it would hand the second
+    // instance the first's schema, silently overruling its own dev mode
+    expect(dev.options.preAggregationsSchema).toEqual('dev_pre_aggregations');
+    expect(prod.options.preAggregationsSchema).toEqual('prod_pre_aggregations');
   });
 
   test('must determine custom drivers from the cube.js file', async () => {

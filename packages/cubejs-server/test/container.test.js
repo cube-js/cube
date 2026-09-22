@@ -141,37 +141,21 @@ describe('ServerContainer dev mode resolution', () => {
     expect(container.cubeConfigEmpty).toBe(true);
   });
 
-  // DatabricksDriver resolves the pre-aggregation schema from CUBEJS_DEV_MODE, which
-  // this path leaves unset, so without the pin it answers `prod_` while server-core
-  // emits `dev_` and the catalog-qualifying regex in query() never matches
-  test('`cubejs dev-server` pins the pre-aggregation schema for drivers', async () => {
+  // The pre-aggregation schema a driver reads is pinned by OptsHandler, which resolves
+  // CreateOptions.devServer the same way server-core does. Writing it here too would
+  // key it on the command's request rather than on the config that wins, and
+  // `cubejs dev-server` with CUBEJS_DEV_MODE=true and a cube.js exporting
+  // `devServer: false` would be pinned to the dev schema of an instance in production
+  test('`cubejs dev-server` does not pin the pre-aggregation schema itself', async () => {
     await lookupConfiguration(true);
 
-    expect(getEnv('preAggregationsSchema')).toEqual('dev_pre_aggregations');
-  });
-
-  test('an explicit pre-aggregation schema is left alone', async () => {
-    process.env.CUBEJS_PRE_AGGREGATIONS_SCHEMA = 'my_schema';
-
-    await lookupConfiguration(true);
-
-    expect(getEnv('preAggregationsSchema')).toEqual('my_schema');
-  });
-
-  test('a non-dev-mode dev-server run does not pin the schema', async () => {
-    process.env.CUBEJS_DEV_MODE = 'false';
-
-    await lookupConfiguration(true);
-
-    // Pinning `dev_pre_aggregations` here would put a production instance on the dev
-    // schema, which is the opposite of what the pin is for
     expect(process.env.CUBEJS_PRE_AGGREGATIONS_SCHEMA).toBeUndefined();
   });
 
   // `cube.js` is loaded after the command's request is resolved, and `...userConfig`
   // wins, so anything keyed on the request rather than on the resolved config would
-  // leave this instance on the dev schema while server-core puts it in production mode
-  test('a cube.js devServer: false wins over the command, schema included', async () => {
+  // leave this instance in dev mode while server-core puts it in production mode
+  test('a cube.js devServer: false wins over the command', async () => {
     const projectDir = fs.mkdtempSync(path.join(os.tmpdir(), 'cube-container-'));
     const cwd = process.cwd();
 
@@ -189,7 +173,6 @@ describe('ServerContainer dev mode resolution', () => {
       const config = await container.lookupConfiguration();
 
       expect(config.devServer).toBe(false);
-      expect(process.env.CUBEJS_PRE_AGGREGATIONS_SCHEMA).toBeUndefined();
     } finally {
       process.chdir(cwd);
       fs.rmSync(projectDir, { recursive: true, force: true });

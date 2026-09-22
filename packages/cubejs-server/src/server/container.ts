@@ -10,7 +10,6 @@ import {
   getEnv,
   isDockerImage, isNativeSupported,
   markDevModeResolvedByCaller,
-  pinDevPreAggregationsSchema,
   PackageManifest,
   resolveBuiltInPackageVersion,
 } from '@cubejs-backend/shared';
@@ -275,15 +274,7 @@ export class ServerContainer {
     const measureAndApplyDevServer = (userConfig: CreateOptions): CreateOptions => {
       this.isCubeConfigEmpty = Object.keys(userConfig).length === 0;
 
-      const config = devServer ? { devServer, ...userConfig } : userConfig;
-
-      // Keyed on the resolved config, not the command's request: a cube.js exporting
-      // `devServer: false` wins over `cubejs dev-server`, and the schema has to follow
-      if (config.devServer ?? getEnv('devMode')) {
-        pinDevPreAggregationsSchema();
-      }
-
-      return config;
+      return devServer ? { devServer, ...userConfig } : userConfig;
     };
 
     if (fs.existsSync(path.join(process.cwd(), 'cube.py'))) {
