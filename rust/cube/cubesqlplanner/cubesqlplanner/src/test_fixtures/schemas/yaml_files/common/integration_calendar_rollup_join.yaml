@@ -127,11 +127,8 @@ cubes:
         dimensions:
           - item_dept
           - retail_calendar.prev_year_date
-        time_dimensions:
-          - dimension: retail_calendar.date_val
-            granularity: day
-          - dimension: retail_calendar.retail_date
-            granularity: day
+        time_dimension: retail_calendar.retail_date
+        granularity: day
         rollups:
           - demand.demand_rollup
           - retail_calendar.calendar_rollup

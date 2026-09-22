@@ -491,6 +491,10 @@ cubes:
       - name: retail_date
         sql: "{CUBE}.date_val"
         type: time
+        time_shift:
+          - interval: 1 year
+            type: prior
+            sql: "{CUBE.prev_year_date}"
     measures:
       - name: count
         type: count
@@ -544,8 +548,10 @@ cubes:
           - custom_calendar.calendar_rollup
 ```
 
-Five things are required, and missing any of them returns you to the fallback:
+Six things are required, and missing any of them returns you to the fallback:
 
+- the shift is **declared on the dimension the query groups by**, not only on the primary
+  key — otherwise the interval is applied to the key and the mapping is skipped;
 - the shift's `sql` is a **member reference**, so a stored column can stand for it;
 - the calendar's rollup **stores the column the shift maps through**;
 - the join condition names **members on both sides**;
