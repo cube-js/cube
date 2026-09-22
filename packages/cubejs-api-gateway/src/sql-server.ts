@@ -353,11 +353,7 @@ export class SQLServer {
     let allowedPassword: string | null = options.sqlPassword || getEnv('sqlPassword');
 
     // Deliberately the env var, not the gateway's resolved devServer: `pgSqlPort` keys
-    // the SQL API's default port off the same variable, so the two stay in step.
-    // The cost is that `devServer: false` with CUBEJS_DEV_MODE=true enforces JWT on the
-    // HTTP APIs while this listener takes any password — as it did on master, where
-    // enforcement keyed on NODE_ENV. Aligning this on devServer would close that, and
-    // would also leave `cubejs dev-server` serving 15432 without one
+    // the SQL API's default port off the same variable, so the two stay in step
     if (!getEnv('devMode')) {
       if (!allowedUser) {
         allowedUser = 'cube';

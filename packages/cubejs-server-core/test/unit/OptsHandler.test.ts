@@ -431,6 +431,19 @@ describe('OptsHandler class', () => {
     expect(process.env.CUBEJS_PRE_AGGREGATIONS_SCHEMA).toBeUndefined();
   });
 
+  test('must not pin for a construction that throws', async () => {
+    process.env.CUBEJS_DB_TYPE = 'postgres';
+
+    // Reaches initializeCoreOptions and then fails its required-option check. A pin
+    // taken before that has no owner: shutdown never runs, so nothing releases it, and
+    // the next instance is told to align with a schema a dead attempt chose
+    expect(() => new CubejsServerCoreExposed({
+      driverFactory: () => ({ type: <DatabaseType>'postgres' }),
+    })).toThrow('required option(s)');
+
+    expect(process.env.CUBEJS_PRE_AGGREGATIONS_SCHEMA).toBeUndefined();
+  });
+
   test('must keep the pin while a second instance on the same schema is up', async () => {
     process.env.CUBEJS_DB_TYPE = 'postgres';
 

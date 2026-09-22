@@ -437,12 +437,6 @@ export class OptsHandler {
       fastReload: getEnv('fastReload'),
     };
 
-    // The merged value, not the default above: `...opts` overrides it, and a driver
-    // resolving a different schema from CUBEJS_DEV_MODE is what the pin prevents
-    if (typeof options.preAggregationsSchema === 'string') {
-      pinPreAggregationsSchema(options.preAggregationsSchema);
-    }
-
     if (opts.contextToAppId && !opts.scheduledRefreshContexts) {
       this.core.logger('Multitenancy Without ScheduledRefreshContexts', {
         warning: (
@@ -485,6 +479,14 @@ export class OptsHandler {
           } required option(s)`
         );
       }
+    }
+
+    // The merged value, not the default above: `...opts` overrides it, and a driver
+    // resolving a different schema from CUBEJS_DEV_MODE is what the pin prevents.
+    // After the validation above, so a construction that throws takes no pin: only
+    // an instance that exists will call shutdown to release it
+    if (typeof options.preAggregationsSchema === 'string') {
+      pinPreAggregationsSchema(options.preAggregationsSchema);
     }
 
     return options;
