@@ -914,6 +914,13 @@
                 ]
               },
               {
+                "group": "External Documents",
+                "openapi": "/api-reference/api.yaml",
+                "pages": [
+                  "GET /api/v1/external-documents/{externalWorkbookId}/placements"
+                ]
+              },
+              {
                 "group": "Workbooks",
                 "openapi": "/api-reference/api.yaml",
                 "pages": [
@@ -927,6 +934,17 @@
                   "POST /api/v1/deployments/{deploymentId}/workbooks/{workbookId}/dashboard/ai-widget-thread",
                   "POST /api/v1/deployments/{deploymentId}/workbooks/{workbookId}/duplicate",
                   "POST /api/v1/deployments/{deploymentId}/workbooks/{workbookId}/publish"
+                ]
+              },
+              {
+                "group": "Workbook Promotions",
+                "openapi": "/api-reference/api.yaml",
+                "pages": [
+                  "GET /api/v1/deployments/{deploymentId}/workbooks/{workbookId}/promotion",
+                  "GET /api/v1/deployments/{deploymentId}/workbooks/{workbookId}/promotion-links",
+                  "POST /api/v1/deployments/{deploymentId}/workbooks/{workbookId}/promotion-previews",
+                  "GET /api/v1/deployments/{deploymentId}/workbooks/{workbookId}/promotions",
+                  "POST /api/v1/deployments/{deploymentId}/workbooks/{workbookId}/promotions"
                 ]
               },
               {

@@ -32,7 +32,9 @@ tags:
   - name: Databricks Metric View Integration
   - name: Folders
   - name: Reports
+  - name: External Documents
   - name: Workbooks
+  - name: Workbook Promotions
   - name: Dashboard Exports
   - name: Notifications
   - name: Workspace
@@ -2823,6 +2825,177 @@ paths:
           Requires **manage** access to the workbook. Returns `404` if the workbook or the named
           embed tenant does not exist, and `400` if the request specifies no change or sets
           `allowEmbed` on a workbook that has no published dashboard.
+  /api/v1/deployments/{deploymentId}/workbooks/{workbookId}/promotion:
+    get:
+      operationId: getWorkbookPromotion
+      parameters:
+        - in: path
+          name: deploymentId
+          required: true
+          schema:
+            type: number
+        - in: path
+          name: workbookId
+          required: true
+          schema:
+            type: number
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WorkbookPromotionSummaryResponse'
+          description: ''
+      summary: Get workbook promotion provenance
+      tags:
+        - Workbook Promotions
+  /api/v1/deployments/{deploymentId}/workbooks/{workbookId}/promotion-links:
+    get:
+      operationId: getWorkbookPromotionLinks
+      parameters:
+        - in: path
+          name: deploymentId
+          required: true
+          schema:
+            type: number
+        - in: path
+          name: workbookId
+          required: true
+          schema:
+            type: number
+        - in: query
+          name: after
+          schema:
+            oneOf:
+              - type: string
+              - type: 'null'
+        - in: query
+          name: first
+          schema:
+            oneOf:
+              - minimum: 1
+                type: integer
+              - type: 'null'
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WorkbookPromotionLinksListResponse'
+          description: ''
+      summary: List workbook promotion destinations
+      tags:
+        - Workbook Promotions
+  /api/v1/deployments/{deploymentId}/workbooks/{workbookId}/promotion-previews:
+    post:
+      operationId: previewWorkbookPromotion
+      parameters:
+        - in: path
+          name: deploymentId
+          required: true
+          schema:
+            type: number
+        - in: path
+          name: workbookId
+          required: true
+          schema:
+            type: number
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PreviewWorkbookPromotionInput'
+        description: PreviewWorkbookPromotionInput
+        required: false
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WorkbookPromotionPreviewDto'
+          description: ''
+      summary: Preview a workbook promotion
+      tags:
+        - Workbook Promotions
+      x-mint:
+        content: >-
+          Validate promotion of the complete workbook and published dashboard to another deployment.
+          The source slug is preserved so deployment-scoped dashboard links remain stable. Returns
+          content hashes for optimistic concurrency; no preview is stored. Requires access to both
+          deployments.
+  /api/v1/deployments/{deploymentId}/workbooks/{workbookId}/promotions:
+    get:
+      operationId: getWorkbookPromotions
+      parameters:
+        - in: path
+          name: deploymentId
+          required: true
+          schema:
+            type: number
+        - in: path
+          name: workbookId
+          required: true
+          schema:
+            type: number
+        - in: query
+          name: after
+          schema:
+            oneOf:
+              - type: string
+              - type: 'null'
+        - in: query
+          name: first
+          schema:
+            oneOf:
+              - minimum: 1
+                type: integer
+              - type: 'null'
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WorkbookPromotionsListResponse'
+          description: ''
+      summary: List workbook promotion history
+      tags:
+        - Workbook Promotions
+    post:
+      operationId: promoteWorkbook
+      parameters:
+        - in: path
+          name: deploymentId
+          required: true
+          schema:
+            type: number
+        - in: path
+          name: workbookId
+          required: true
+          schema:
+            type: number
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApplyWorkbookPromotionInput'
+        description: ApplyWorkbookPromotionInput
+        required: false
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WorkbookPromotionDto'
+          description: ''
+      summary: Promote and publish a workbook
+      tags:
+        - Workbook Promotions
+      x-mint:
+        content: >-
+          Promote the current workbook atomically if its source hash still matches the preview.
+          Repeated promotions update the linked copy, including its deployment-scoped slug. Override
+          replaces destination edits, never source validation or permissions. An idempotency key
+          makes retries safe.
   /api/v1/deployments/{deploymentId}/workbooks/{workbookId}/publish:
     post:
       operationId: publishDashboard
@@ -4172,6 +4345,77 @@ paths:
           This endpoint is unauthenticated — it is called from the embedding client and the session
           id itself is the credential. Returns `401` if the session id is unknown or has already
           been redeemed.
+  /api/v1/external-documents/{externalWorkbookId}/placements:
+    get:
+      operationId: listExternalDocumentPlacements
+      parameters:
+        - in: path
+          name: externalWorkbookId
+          required: true
+          schema:
+            type: string
+        - in: query
+          name: after
+          schema:
+            oneOf:
+              - type: string
+              - type: 'null'
+        - in: query
+          name: first
+          schema:
+            oneOf:
+              - minimum: 1
+                type: integer
+              - type: 'null'
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExternalDocumentPlacementsListResponse'
+          description: ''
+        '422':
+          description: >-
+            The document holds more placements than this endpoint will report on. A state, not a
+            malformed request: the answer is deliberately an error rather than a page that silently
+            omits placements no cursor can reach.
+      summary: List the Cube placements in an external spreadsheet
+      tags:
+        - External Documents
+      x-mint:
+        content: >-
+          Every block of Cube-written cells in the external document `externalWorkbookId` — a Google
+          Drive file id, or the custom property the Excel add-in writes — across the whole tenant.
+
+
+          Unlike `GET /api/v1/deployments/{deploymentId}/reports?externalWorkbookId=`, which lists
+          only the reports the caller can read, this endpoint also reports the placements they
+          **cannot**: each entry carries `access`, which is `GRANTED` when the caller may open the
+          exploration and `DENIED` when they may not. It is how a recipient of a shared workbook
+          learns that a block they are looking at is backed by an exploration nobody has shared with
+          them, and who to ask.
+
+
+          A `DENIED` entry carries only the placement's address
+          (`resultLocation`/`sheetId`/`sheetName`/`anchorCell`/`endResultCell`/`host`), its opaque
+          `reportId`/`placementId`, the owning `deploymentId`, the placement's
+          `placedAt`/`refreshedAt` timestamps, and the exploration's `owner` — including their email
+          address, so the recipient can ask for access. `owner` is `null` for an embed-partition
+          exploration whose owning user record no longer exists — embed report ownership carries no
+          foreign key, so the row can outlive its owner; a main-workspace exploration's owner always
+          exists, since deleting the owner cascades to delete the report. `reportName` is `null` on
+          a denied entry — the name is withheld along with the exploration — and reading the report
+          itself still answers `403`.
+
+
+          Results are returned in pages using cursor-based pagination: pass `first` to set the page
+          size and `after` (the previous response's `pageInfo.endCursor`) to fetch the next page.
+          Omitting `first` returns every placement in the document.
+
+
+          A document holding more than 500 placed explorations, or more than 2000 placements in
+          total, is answered with `422` rather than a truncated page — an inventory that looks
+          complete but is not would hide the very placement a recipient needs to see.
   /api/v1/github/installations:
     get:
       operationId: installations
@@ -5654,10 +5898,14 @@ components:
           oneOf:
             - $ref: '#/components/schemas/CreatorMode'
             - type: 'null'
+        dashboardAppsEnabled:
+          type: boolean
         embedding:
           oneOf:
             - $ref: '#/components/schemas/EmbedSettings'
             - type: 'null'
+        restrictDataDownload:
+          type: boolean
         sheetsAgentChatEnabled:
           type: boolean
         sheetsUi:
@@ -5670,7 +5918,9 @@ components:
             - type: 'null'
       required:
         - applyThemeGlobally
+        - restrictDataDownload
         - sheetsAgentChatEnabled
+        - dashboardAppsEnabled
       type: object
     AppTheme:
       properties:
@@ -5824,6 +6074,36 @@ components:
         - fonts
         - body
         - heading
+      type: object
+    ApplyWorkbookPromotionInput:
+      properties:
+        expectedDestinationHash:
+          oneOf:
+            - pattern: ^[a-f0-9]{64}$
+              type: string
+            - type: 'null'
+        expectedSourceHash:
+          pattern: ^[a-f0-9]{64}$
+          type: string
+        idempotencyKey:
+          format: uuid
+          type: string
+        override:
+          oneOf:
+            - type: boolean
+            - type: 'null'
+        targetDeploymentId:
+          minimum: 1
+          type: integer
+        targetFolderId:
+          oneOf:
+            - minimum: 1
+              type: integer
+            - type: 'null'
+      required:
+        - targetDeploymentId
+        - expectedSourceHash
+        - idempotencyKey
       type: object
     BranchResponse:
       properties:
@@ -8136,20 +8416,43 @@ components:
           oneOf:
             - type: string
             - type: 'null'
+        withheldMembers:
+          description: >-
+            Measures this view could not publish, each named with the cube it comes from. A view
+            with entries here is queryable but incomplete.
+          items:
+            $ref: '#/components/schemas/DatabricksMetricViewPublicationWithheldMember'
+          type: array
       required:
         - cubeViewName
         - metricViewName
         - outcome
         - eligibleForPublication
         - issues
+        - withheldMembers
         - datasetSources
         - counts
       type: object
     DatabricksMetricViewPublicationViewResultOutcome:
       enum:
         - success
+        - partial
         - failed
       type: string
+    DatabricksMetricViewPublicationWithheldMember:
+      properties:
+        code:
+          description: Why it could not be published, as a stable code.
+          type: string
+        cube:
+          type: string
+        member:
+          type: string
+      required:
+        - cube
+        - member
+        - code
+      type: object
     DbtGeneratedFileContent:
       properties:
         content:
@@ -9723,6 +10026,85 @@ components:
         - USER
         - EMBED_USER
       type: string
+    ExternalDocumentPlacementResponse:
+      properties:
+        access:
+          $ref: '#/components/schemas/ExternalDocumentPlacementResponseAccess'
+        anchorCell:
+          oneOf:
+            - type: string
+            - type: 'null'
+        deploymentId:
+          type: integer
+        endResultCell:
+          oneOf:
+            - type: string
+            - type: 'null'
+        host:
+          oneOf:
+            - $ref: '#/components/schemas/ExternalDocumentPlacementResponseHost'
+            - type: 'null'
+        owner:
+          oneOf:
+            - $ref: '#/components/schemas/ResourceOwner'
+            - type: 'null'
+        placedAt:
+          oneOf:
+            - type: string
+            - type: 'null'
+        placementId:
+          oneOf:
+            - type: string
+            - type: 'null'
+        refreshedAt:
+          oneOf:
+            - type: string
+            - type: 'null'
+        reportId:
+          type: integer
+        reportName:
+          oneOf:
+            - type: string
+            - type: 'null'
+        resultLocation:
+          type: string
+        sheetId:
+          oneOf:
+            - type: string
+            - type: 'null'
+        sheetName:
+          oneOf:
+            - type: string
+            - type: 'null'
+      required:
+        - access
+        - reportId
+        - deploymentId
+        - resultLocation
+      type: object
+    ExternalDocumentPlacementResponseAccess:
+      enum:
+        - GRANTED
+        - DENIED
+      type: string
+    ExternalDocumentPlacementResponseHost:
+      enum:
+        - GOOGLE_SHEETS
+        - EXCEL
+      type: string
+    ExternalDocumentPlacementsListResponse:
+      properties:
+        items:
+          items:
+            $ref: '#/components/schemas/ExternalDocumentPlacementResponse'
+          type: array
+        pageInfo:
+          oneOf:
+            - $ref: '#/components/schemas/PageInfo'
+            - type: 'null'
+      required:
+        - items
+      type: object
     FileHash:
       properties:
         hash:
@@ -10673,6 +11055,10 @@ components:
           oneOf:
             - type: boolean
             - type: 'null'
+        showRowTotals:
+          oneOf:
+            - type: boolean
+            - type: 'null'
       required:
         - columns
         - measures
@@ -10722,6 +11108,10 @@ components:
             - type: boolean
             - type: 'null'
         showColumnTotals:
+          oneOf:
+            - type: boolean
+            - type: 'null'
+        showRowTotals:
           oneOf:
             - type: boolean
             - type: 'null'
@@ -10850,6 +11240,65 @@ components:
       required:
         - sessionId
       type: object
+    PreviewWorkbookPromotionInput:
+      properties:
+        targetDeploymentId:
+          minimum: 1
+          type: integer
+        targetFolderId:
+          oneOf:
+            - minimum: 1
+              type: integer
+            - type: 'null'
+      required:
+        - targetDeploymentId
+      type: object
+    PromotionActorDto:
+      properties:
+        apiKeyId:
+          oneOf:
+            - type: integer
+            - type: 'null'
+        authenticationMethod:
+          $ref: '#/components/schemas/PromotionActorDtoAuthenticationMethod'
+        displayName:
+          type: string
+        userId:
+          type: integer
+      required:
+        - userId
+        - displayName
+        - authenticationMethod
+      type: object
+    PromotionActorDtoAuthenticationMethod:
+      enum:
+        - session
+        - apiKey
+      type: string
+    PromotionReferenceDto:
+      properties:
+        availability:
+          $ref: '#/components/schemas/PromotionReferenceDtoAvailability'
+        deploymentId:
+          oneOf:
+            - type: integer
+            - type: 'null'
+        name:
+          oneOf:
+            - type: string
+            - type: 'null'
+        workbookId:
+          oneOf:
+            - type: integer
+            - type: 'null'
+      required:
+        - availability
+      type: object
+    PromotionReferenceDtoAvailability:
+      enum:
+        - available
+        - unavailable
+      type: string
     ProvisionEmbedUserFailure:
       properties:
         error:
@@ -11485,6 +11934,10 @@ components:
           oneOf:
             - $ref: '#/components/schemas/ReportSnapshotPreferences'
             - type: 'null'
+        publicId:
+          oneOf:
+            - type: string
+            - type: 'null'
         pythonCode:
           oneOf:
             - type: string
@@ -11920,6 +12373,12 @@ components:
       type: object
     TenantSettings:
       properties:
+        aiTokensAutoPurchaseAmount:
+          type: integer
+        aiTokensAutoPurchaseEnabled:
+          type: boolean
+        aiTokensAutoPurchaseThreshold:
+          type: integer
         auditLogEnabled:
           type: boolean
         auditLogEnabledCurrent:
@@ -11948,9 +12407,20 @@ components:
         - maintenanceWindowDay
         - maintenanceWindowTime
         - oidcEnabled
+        - aiTokensAutoPurchaseEnabled
+        - aiTokensAutoPurchaseThreshold
+        - aiTokensAutoPurchaseAmount
       type: object
     TenantSettingsInput:
       properties:
+        aiTokensAutoPurchaseAmount:
+          oneOf:
+            - type: integer
+            - type: 'null'
+        aiTokensAutoPurchaseEnabled:
+          oneOf:
+            - type: boolean
+            - type: 'null'
         auditLogEnabled:
           oneOf:
             - type: boolean
@@ -13240,6 +13710,10 @@ components:
           type: object
         name:
           type: string
+        promotion:
+          oneOf:
+            - $ref: '#/components/schemas/WorkbookPromotionSummaryDto'
+            - type: 'null'
         publishedDashboard:
           oneOf:
             - $ref: '#/components/schemas/Dashboard'
@@ -13298,6 +13772,141 @@ components:
         - WORKBOOK
         - REPORT
       type: string
+    WorkbookPromotionDto:
+      properties:
+        completedAt:
+          oneOf:
+            - format: date
+              type: string
+            - format: date-time
+              type: string
+        destinationChangedSincePreview:
+          type: boolean
+        destinationWasDiverged:
+          type: boolean
+        id:
+          type: integer
+        linkId:
+          type: integer
+        outcome:
+          $ref: '#/components/schemas/WorkbookPromotionDtoOutcome'
+        overrideRequested:
+          type: boolean
+        performedBy:
+          $ref: '#/components/schemas/PromotionActorDto'
+        source:
+          oneOf:
+            - $ref: '#/components/schemas/PromotionReferenceDto'
+            - type: 'null'
+        target:
+          oneOf:
+            - $ref: '#/components/schemas/PromotionReferenceDto'
+            - type: 'null'
+        targetDashboardVersionId:
+          type: integer
+      required:
+        - id
+        - linkId
+        - completedAt
+        - outcome
+        - performedBy
+        - overrideRequested
+        - destinationWasDiverged
+        - destinationChangedSincePreview
+        - targetDashboardVersionId
+      type: object
+    WorkbookPromotionDtoOutcome:
+      enum:
+        - created
+        - updated
+        - unchanged
+      type: string
+    WorkbookPromotionLinkDto:
+      properties:
+        id:
+          type: integer
+        target:
+          $ref: '#/components/schemas/PromotionReferenceDto'
+      required:
+        - id
+        - target
+      type: object
+    WorkbookPromotionLinksListResponse:
+      properties:
+        items:
+          items:
+            $ref: '#/components/schemas/WorkbookPromotionLinkDto'
+          type: array
+        pageInfo:
+          $ref: '#/components/schemas/PageInfo'
+      required:
+        - items
+        - pageInfo
+      type: object
+    WorkbookPromotionPreviewDto:
+      properties:
+        destinationHash:
+          oneOf:
+            - type: string
+            - type: 'null'
+        destinationWasDiverged:
+          type: boolean
+        reportCount:
+          type: integer
+        sourceHash:
+          type: string
+        targetDeploymentId:
+          type: integer
+        targetWorkbookId:
+          oneOf:
+            - type: integer
+            - type: 'null'
+      required:
+        - targetDeploymentId
+        - destinationWasDiverged
+        - reportCount
+        - sourceHash
+      type: object
+    WorkbookPromotionSummaryDto:
+      properties:
+        firstPromotion:
+          oneOf:
+            - $ref: '#/components/schemas/WorkbookPromotionDto'
+            - type: 'null'
+        lastPromotion:
+          oneOf:
+            - $ref: '#/components/schemas/WorkbookPromotionDto'
+            - type: 'null'
+        linkId:
+          type: integer
+        origin:
+          $ref: '#/components/schemas/PromotionReferenceDto'
+        parent:
+          $ref: '#/components/schemas/PromotionReferenceDto'
+      required:
+        - linkId
+        - parent
+        - origin
+      type: object
+    WorkbookPromotionSummaryResponse:
+      properties:
+        promotion:
+          oneOf:
+            - $ref: '#/components/schemas/WorkbookPromotionSummaryDto'
+            - type: 'null'
+      type: object
+    WorkbookPromotionsListResponse:
+      properties:
+        items:
+          items:
+            $ref: '#/components/schemas/WorkbookPromotionDto'
+          type: array
+        pageInfo:
+          $ref: '#/components/schemas/PageInfo'
+      required:
+        - items
+        - pageInfo
+      type: object
     WorkbooksListResponse:
       properties:
         count:
