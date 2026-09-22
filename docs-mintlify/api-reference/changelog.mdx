@@ -7,6 +7,25 @@ rss: true
 {/* GENERATED FILE — do not edit by hand. */}
 {/* Run scripts/extract-changelog.mjs against the platform client CHANGELOG.md. */}
 
+<Update label="2026-09-22" description="v0.13.0" tags={["Added","Removed"]}>
+  ### Added
+
+  - New public REST endpoints for promoting a workbook across deployments (CUB-2563): `POST /api/v1/deployments/{deploymentId}/workbooks/{workbookId}/promotion-previews` (`WorkbookPromotionsPublicController.previewWorkbookPromotion`) validates the promotion and returns content hashes for optimistic concurrency, without storing anything; `POST .../promotions` (`.promoteWorkbook`) applies it atomically if the source hash still matches the preview, preserving the workbook's deployment-scoped slug across repeat promotions, and takes an idempotency key to make retries safe; `GET .../promotion` (`.getWorkbookPromotion`) returns the workbook's promotion provenance; `GET .../promotions` (`.getWorkbookPromotions`) lists its promotion history with cursor pagination; `GET .../promotion-links` (`.getWorkbookPromotionLinks`) lists its promotion destinations. Requires access to both deployments, and a workspace session or API key — not an embed session. New schemas: `WorkbookPromotionDto`, `WorkbookPromotionPreviewDto`, `WorkbookPromotionSummaryResponse`, `WorkbookPromotionSummaryDto`, `WorkbookPromotionsListResponse`, `WorkbookPromotionLinkDto`, `WorkbookPromotionLinksListResponse`, `PromotionActorDto`, `PromotionReferenceDto`, `PreviewWorkbookPromotionInput`, `ApplyWorkbookPromotionInput`.
+  - `WorkbookDto` gained `promotion` (CUB-2563) — the workbook's promotion summary (`WorkbookPromotionSummaryDto`), `null` on a workbook that has never been promoted or received a promotion.
+  - New public REST endpoint `GET /api/v1/external-documents/{externalWorkbookId}/placements` (`ExternalDocumentsPublicController.listExternalDocumentPlacements`) (CUB-4418) lists every block of Cube-written cells in an external spreadsheet — a Google Drive file id, or the custom property the Excel add-in writes — across the whole tenant, including placements the caller cannot read: each entry carries `access: GRANTED | DENIED`, with `reportName` withheld (`null`) on a denied entry. Tenant-scoped, unlike `GET /api/v1/deployments/{deploymentId}/reports?externalWorkbookId=`, which lists only readable reports for one deployment. Supports cursor pagination (`first`/`after`); omitting `first` returns every placement in the document. Answers `422` rather than a truncated page if the document holds more than 500 placed explorations or 2000 total placements. New schema: `ExternalDocumentPlacementsListResponse` (`ExternalDocumentPlacementResponse`, `ExternalDocumentPlacementResponseAccess`, `ExternalDocumentPlacementResponseHost`).
+
+  ### Removed
+
+  - The deprecated agent Jira/Atlassian schema surface is deleted (CUB-4781), one release after `0.12.0` shipped it deprecated-but-present. Gone: `Agent.integrations` and `UpdateAgentInput.integrations` (with `AgentIntegrationsDto`, `AgentIntegrationsJiraDto`, `JiraSite`, `JiraProject`, `JiraIssueType` and their `*Input` counterparts), the `atlassianConfig` / `jiraProjects` / `jiraIssueTypes` queries, and the `useD3AiJiraIntegration` tenant flag. All of them answered null, empty or false for their whole deprecated life — nothing read or wrote them, because the OAuth callback, credential storage and token refresh behind them were removed in CUB-4773. A client that still **selects** one of these fields will now fail the whole GraphQL query rather than receive null, so remove them from your operations if you have not already.
+  - `AgentsWithIntegrations` keeps its name despite no longer selecting any integrations. Renaming a published operation would break every caller on top of the field removal, for cosmetic gain; it is a plain agents query now.
+</Update>
+
+<Update label="2026-09-20" description="v0.12.0" tags={["Deprecated"]}>
+  ### Deprecated
+
+  - The agent Jira/Atlassian integration is gone (CUB-4773). `Agent.integrations` (`AgentIntegrationsDto`, `AgentIntegrationsJiraDto`), `UpdateAgentInput.integrations`, the `atlassianConfig` / `jiraProjects` / `jiraIssueTypes` queries and `useD3AiJiraIntegration` are **deprecated, not removed** — they remain in the schema returning null/false so existing clients keep working, and are deleted in a later release (CUB-4781). Nothing reads or writes them: the OAuth callback, credential storage and token refresh behind them are gone.
+</Update>
+
 <Update label="2026-09-15" description="v0.11.0" tags={["Added"]}>
   ### Added
 

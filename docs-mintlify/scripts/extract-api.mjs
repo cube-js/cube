@@ -174,6 +174,13 @@ const EXCLUDE_OPERATIONS = new Set([
   // Gated behind the useDatabricksMetricViewsPush flag, not GA (CUB-4443).
   // Remove once the feature ships.
   'POST /api/v1/deployments/{deploymentId}/databricks-metric-view-integrations/{dataSourceName}/access-test',
+  // Same flag, same not-GA state — the sync-run sub-resource added after the
+  // integration CRUD endpoints were first documented (CUB-4443). Remove once
+  // the feature ships.
+  'GET /api/v1/deployments/{deploymentId}/databricks-metric-view-integrations/{dataSourceName}/syncs',
+  'POST /api/v1/deployments/{deploymentId}/databricks-metric-view-integrations/{dataSourceName}/syncs',
+  'GET /api/v1/deployments/{deploymentId}/databricks-metric-view-integrations/{dataSourceName}/syncs/{runId}',
+  'DELETE /api/v1/deployments/{deploymentId}/databricks-metric-view-integrations/{dataSourceName}/syncs/{runId}',
 ]);
 
 // Cube-staff-only operations (provisioning real cloud infrastructure — Regions,

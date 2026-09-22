@@ -1105,6 +1105,24 @@
                 ]
               },
               {
+                "group": "External Documents",
+                "openapi": "/api-reference/api.yaml",
+                "pages": [
+                  "GET /api/v1/external-documents/{externalWorkbookId}/placements"
+                ]
+              },
+              {
+                "group": "Workbook Promotions",
+                "openapi": "/api-reference/api.yaml",
+                "pages": [
+                  "GET /api/v1/deployments/{deploymentId}/workbooks/{workbookId}/promotion",
+                  "GET /api/v1/deployments/{deploymentId}/workbooks/{workbookId}/promotion-links",
+                  "POST /api/v1/deployments/{deploymentId}/workbooks/{workbookId}/promotion-previews",
+                  "GET /api/v1/deployments/{deploymentId}/workbooks/{workbookId}/promotions",
+                  "POST /api/v1/deployments/{deploymentId}/workbooks/{workbookId}/promotions"
+                ]
+              },
+              {
                 "group": "Users (SCIM)",
                 "openapi": "/api-reference/scim.yaml",
                 "pages": [
