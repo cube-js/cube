@@ -538,11 +538,12 @@ cubes:
       - name: sales_by_calendar
         type: rollup_join
         measures: [revenue]
-        time_dimensions:
-          - dimension: custom_calendar.date_key
-            granularity: day
-          - dimension: custom_calendar.retail_date
-            granularity: day
+        # The mapped column has to be declared here, not only on the rollup
+        # below: this is the member list that decides whether the shift can be
+        # served. `rollup_join` takes a single `time_dimension`.
+        dimensions: [custom_calendar.prev_year_date]
+        time_dimension: custom_calendar.retail_date
+        granularity: day
         rollups:
           - sales.sales_rollup
           - custom_calendar.calendar_rollup
@@ -553,7 +554,8 @@ Six things are required, and missing any of them returns you to the fallback:
 - the shift is **declared on the dimension the query groups by**, not only on the primary
   key — otherwise the interval is applied to the key and the mapping is skipped;
 - the shift's `sql` is a **member reference**, so a stored column can stand for it;
-- the calendar's rollup **stores the column the shift maps through**;
+- the column the shift maps through is **declared on the `rollup_join`** and stored by the
+  calendar's rollup — the first is what decides whether the shift can be served;
 - the join condition names **members on both sides**;
 - every calendar dimension the query groups by is **declared in both rollups**;
 - each rollup has an [index][ref-rollup-join] covering its side of the join key —

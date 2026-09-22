@@ -46,8 +46,12 @@ impl TimeShiftState {
     /// pre-aggregation and the node that renders from one ask this, so the two
     /// cannot come to different conclusions.
     ///
-    /// A calendar shift is the exception no offset reaches: it moves the key
-    /// the fact table joins to, and a stored column carries the unshifted one.
+    /// A calendar cube is the exception no offset reaches: a mapping moves the
+    /// key the fact table joins to, and a stored column carries the unshifted
+    /// one. This refuses every dimension of such a cube, including a shift that
+    /// resolved to plain arithmetic on its key: that one is recorded against
+    /// the key rather than the queried dimension, so nothing offsets the stored
+    /// column and the rows come back unshifted.
     pub fn shift_for_substituted_column(
         &self,
         symbol: &Rc<MemberSymbol>,
