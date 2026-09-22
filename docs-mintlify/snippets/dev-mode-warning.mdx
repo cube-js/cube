@@ -1,7 +1,7 @@
 <Warning>
 
 **Development mode is an authentication bypass.** Cube is in development mode when
-`CUBEJS_DEV_MODE=true`, and only then. It switches off JWT verification on the
+`CUBEJS_DEV_MODE=true`. It switches off JWT verification on the
 [REST (JSON)](/reference/core-data-apis/rest-api) and
 [GraphQL](/reference/core-data-apis/graphql-api) APIs: they then accept requests with
 no token at all.
@@ -25,8 +25,9 @@ never expose it to the internet, and never use it in production. Using developme
 mode in the Cube cloud platform is highly discouraged — it bypasses the platform's
 security model.
 
-To keep it off, leave `CUBEJS_DEV_MODE` unset — that is its default everywhere,
-including when you embed `@cubejs-backend/server-core` directly. `NODE_ENV` has no
-effect on it.
+To keep it off, leave `CUBEJS_DEV_MODE` unset — that is its default, and `NODE_ENV` has
+no effect on it. Code that embeds `@cubejs-backend/server-core` directly can still turn
+it on with the `devServer` option it passes to `CubejsServerCore`, which takes
+precedence over the variable, so leave that unset too.
 
 </Warning>

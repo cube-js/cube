@@ -242,9 +242,6 @@ const variables: Record<string, (...args: any) => any> = {
   // Off in development mode: there the console is the log sink and runnable SQL is wanted.
   // Callers that resolved dev mode themselves (CreateOptions.devServer beats the env var)
   // pass it in, so the default cannot disagree with the instance it is describing
-  // A positional boolean rather than an options bag: getEnv's `opts` is typed `any`
-  // (see the `variables` annotation), so a misspelled key would compile and silently
-  // fall back to the env var - the exact bug this parameter exists to prevent
   logRedaction: (resolvedDevMode?: boolean) => get('CUBEJS_LOG_REDACTION')
     .default((resolvedDevMode ?? devMode()) ? 'false' : 'true')
     .asBoolStrict(),

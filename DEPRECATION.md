@@ -476,8 +476,9 @@ ships Hive/SparkSQL connection settings that can be used through a custom
 Development mode used to be on whenever `NODE_ENV` was anything but `production`,
 which put an instance with no `NODE_ENV` set at all into development mode — an
 authentication bypass — without anyone asking for it. `NODE_ENV` is no longer taken
-into account: development mode is off by default and is enabled only by
-[`CUBEJS_DEV_MODE=true`](https://docs.cube.dev/reference/configuration/environment-variables#cubejs_dev_mode).
+into account: development mode is off by default and is enabled by
+[`CUBEJS_DEV_MODE=true`](https://docs.cube.dev/reference/configuration/environment-variables#cubejs_dev_mode),
+or by the `devServer` option when embedding `@cubejs-backend/server-core` directly.
 
 Cube prints a warning when it sees a non-production `NODE_ENV` with `CUBEJS_DEV_MODE`
 unset. If you relied on `NODE_ENV` to get development mode, set `CUBEJS_DEV_MODE=true`

@@ -55,6 +55,11 @@ const conf = {
 };
 
 describe('OptsHandler class', () => {
+  afterEach(() => {
+    delete process.env.CUBEJS_DEV_MODE;
+    delete process.env.CUBEJS_DB_TYPE;
+  });
+
   test('must throw if CreateOptions.dbType is specified', () => {
     expect(() => new CubejsServerCoreExposed(<any>{
       ...conf,
@@ -287,7 +292,6 @@ describe('OptsHandler class', () => {
     // Case 3
     expect(() => {
       process.env.CUBEJS_DB_TYPE = undefined;
-      process.env.NODE_ENV = 'production';
       // eslint-disable-next-line @typescript-eslint/no-unused-vars
       core = new CubejsServerCoreExposed({
         ...conf,
@@ -301,7 +305,6 @@ describe('OptsHandler class', () => {
     // Case 4
     expect(() => {
       delete process.env.CUBEJS_DB_TYPE;
-      process.env.NODE_ENV = 'production';
       // eslint-disable-next-line @typescript-eslint/no-unused-vars
       core = new CubejsServerCoreExposed({
         ...conf,
@@ -311,8 +314,6 @@ describe('OptsHandler class', () => {
     }).toThrow(
       'Either CUBEJS_DB_TYPE or CreateOptions.driverFactory must be specified'
     );
-
-    delete process.env.NODE_ENV;
   });
 
   test('must configure/reconfigure contextToDbType', async () => {
@@ -340,7 +341,6 @@ describe('OptsHandler class', () => {
   test('must treat CreateOptions.devServer as dev mode without CUBEJS_DEV_MODE', async () => {
     // The gateway resolves devServer the same way, so server-core must not answer
     // "production" for an instance whose playground it just mounted
-    delete process.env.CUBEJS_DEV_MODE;
     process.env.CUBEJS_DB_TYPE = 'postgres';
 
     // `conf` pins externalDbType, which would mask the default this asserts
@@ -371,8 +371,6 @@ describe('OptsHandler class', () => {
 
     expect(core.options.devServer).toBe(false);
     expect(core.options.preAggregationsSchema).toEqual('prod_pre_aggregations');
-
-    delete process.env.CUBEJS_DEV_MODE;
   });
 
   test('must determine custom drivers from the cube.js file', async () => {
