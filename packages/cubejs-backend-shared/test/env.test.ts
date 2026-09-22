@@ -396,7 +396,7 @@ describe('pinPreAggregationsSchema', () => {
 
   const pinWarnings = () => logSpy.mock.calls
     .map(([message]) => String(message))
-    .filter((message) => message.includes('drivers will use it'));
+    .filter((message) => message.includes('is already set for this process'));
 
   // eslint-disable-next-line global-require
   const freshEnv = () => require('../src/env');
@@ -534,6 +534,34 @@ describe('pinPreAggregationsSchema', () => {
     expect(pinWarnings()).toHaveLength(1);
     expect(pinWarnings()[0]).toContain('my_schema');
     expect(pinWarnings()[0]).toContain('analytics_preaggs');
+  });
+
+  test('names each instance whose schema loses, not only the first', () => {
+    const env = freshEnv();
+
+    env.pinPreAggregationsSchema('dev_pre_aggregations');
+    env.pinPreAggregationsSchema('prod_pre_aggregations');
+    env.pinPreAggregationsSchema('analytics_preaggs');
+
+    // displayCLIWarningOnce is keyed per message, so a constant key would let the
+    // second instance silence the third - which is the one left guessing why its
+    // Databricks driver is qualifying queries with a schema it never named
+    expect(pinWarnings()).toHaveLength(2);
+    expect(pinWarnings()[0]).toContain('prod_pre_aggregations');
+    expect(pinWarnings()[1]).toContain('analytics_preaggs');
+  });
+
+  test('names the one driver that actually follows the variable', () => {
+    const env = freshEnv();
+
+    env.pinPreAggregationsSchema('dev_pre_aggregations');
+    env.pinPreAggregationsSchema('prod_pre_aggregations');
+
+    // Every other driver takes the schema off the descriptor server-core resolved, so
+    // a warning saying "drivers will use it" sends those deployments hunting a
+    // table-location bug they do not have
+    expect(pinWarnings()[0]).toContain('Databricks');
+    expect(pinWarnings()[0]).toContain('catalog');
   });
 });
 

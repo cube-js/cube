@@ -279,13 +279,19 @@ export const pinPreAggregationsSchema = (schema: string) => {
   }
 
   // Whoever set it — this process for another instance, or the user against a
-  // CreateOptions.preAggregationsSchema that overrules it. A driver reads the variable
-  // directly, so say it here rather than let it surface as a table the query cannot find
-  if (process.env.CUBEJS_PRE_AGGREGATIONS_SCHEMA !== schema) {
+  // CreateOptions.preAggregationsSchema that overrules it. Scoped to the one reader the
+  // variable actually has, rather than claiming every driver follows it: the rest take
+  // the schema off the pre-aggregation descriptor server-core resolved and are unaffected.
+  // Keyed on the pair, so a third instance naming a third schema is reported too
+  const setSchema = process.env.CUBEJS_PRE_AGGREGATIONS_SCHEMA;
+
+  if (setSchema !== schema) {
     displayCLIWarningOnce(
-      'pre-aggregations-schema-pinned',
-      `Pre-aggregation schema '${process.env.CUBEJS_PRE_AGGREGATIONS_SCHEMA}' is already ` +
-      `set for this process, so drivers will use it rather than '${schema}'. Align ` +
+      `pre-aggregations-schema-pinned:${setSchema}:${schema}`,
+      `Pre-aggregation schema '${setSchema}' is already set for this process, but this ` +
+      `instance resolved '${schema}'. A Databricks driver with a 'catalog' configured ` +
+      `reads CUBEJS_PRE_AGGREGATIONS_SCHEMA directly and so will qualify its queries ` +
+      `with '${setSchema}'; every other driver follows '${schema}'. Align ` +
       'CUBEJS_PRE_AGGREGATIONS_SCHEMA with the schema this instance uses, or run one ' +
       'Cube instance per process.'
     );
