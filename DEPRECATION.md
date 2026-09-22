@@ -506,3 +506,27 @@ database after the upgrade, and building a pre-aggregation fails with
 `externalDriverFactory is not provided`. Configure a
 [Cube Store connection](https://docs.cube.dev/cube-core/deployment#cube-store) for such
 an instance, or set `CUBEJS_DEV_MODE=true` if it was meant to be a dev server.
+
+`CreateOptions.devServer` is now what decides development mode for code that embeds
+`@cubejs-backend/server-core` directly, and **this can switch authentication off where
+it used to be on**. An embedder that passed `devServer: true` under `NODE_ENV=production`
+with `CUBEJS_DEV_MODE` unset used to mount the Playground routes while the data APIs
+stayed in production mode: JWT verification was enforced on the REST (JSON) and GraphQL
+APIs, the SQL API generated a password, log redaction was on, and pre-aggregations went
+to `prod_pre_aggregations`. Development mode now follows the option, so the same code
+serves those APIs with no token required, returns GraphiQL, stack traces and the
+transformed query to unauthenticated callers, stops redacting logs, and writes to
+`dev_pre_aggregations`. Nothing in the environment has to change for this to happen, and
+no warning is printed. If you passed `devServer: true` only to get the Playground on an
+otherwise production instance, stop passing it — or accept that the instance is now an
+[authentication bypass](https://docs.cube.dev/reference/configuration/environment-variables#cubejs_dev_mode)
+and keep it off the network.
+
+The mirror case loses Cube Store instead. An embedder that passed `devServer: false`
+with `CUBEJS_DEV_MODE=true` used to be in development mode anyway, so it got
+`externalDbType: 'cubestore'` and the bundled Cube Store. It is now out of development
+mode, gets neither, and the first pre-aggregation build fails with
+`externalDriverFactory is not provided`; its pre-aggregations also move from
+`dev_pre_aggregations` to `prod_pre_aggregations`. Drop the `devServer: false`, or
+configure a [Cube Store connection](https://docs.cube.dev/cube-core/deployment#cube-store)
+as the paragraphs above describe.

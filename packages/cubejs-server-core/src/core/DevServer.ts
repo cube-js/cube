@@ -53,7 +53,7 @@ export class DevServer {
 
     // `false`, not unset: under `cubejs dev-server` ServerContainer defaults
     // CUBEJS_DEV_MODE to `true` exactly when it is unset, so unsetting is a no-op here
-    console.log('🔓 Authentication checks are disabled in developer mode. Set CUBEJS_DEV_MODE=false (or run `cubejs server`) to enable them.');
+    console.log('🔓 Authentication checks are disabled in developer mode. Set CUBEJS_DEV_MODE=false to enable them.');
     console.log(`🦅 Dev environment available at ${apiUrl}`);
 
     if (
