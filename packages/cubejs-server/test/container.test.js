@@ -207,10 +207,9 @@ describe('ServerContainer dev mode resolution', () => {
     }
   });
 
-  // The restore exists to undo this method's own write. Running it unconditionally on
-  // the non-dev path reverted a NODE_ENV nothing here had touched, which for a project
-  // that sets it in cube.js meant deleting it — gracefulShutdown then reads 2 seconds
-  // instead of 30 and detectQueueAndCacheDriver picks the memory queue over cubestore
+  // The restore is scoped to this method's own write: deleting a NODE_ENV that cube.js
+  // set would drop gracefulShutdown from 30 seconds to 2 and swap
+  // detectQueueAndCacheDriver from cubestore to the memory queue
   test('leaves a NODE_ENV this run never wrote alone', async () => {
     const container = makeContainer(true);
     container.stubConfigurationFile({});
