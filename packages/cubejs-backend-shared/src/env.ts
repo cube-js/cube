@@ -238,9 +238,11 @@ const devMode = () => {
 const variables: Record<string, (...args: any) => any> = {
   devMode,
   logLevel: () => get('CUBEJS_LOG_LEVEL').asString(),
-  // Off in development mode: there the console is the log sink and runnable SQL is wanted
-  logRedaction: () => get('CUBEJS_LOG_REDACTION')
-    .default(devMode() ? 'false' : 'true')
+  // Off in development mode: there the console is the log sink and runnable SQL is wanted.
+  // Callers that resolved dev mode themselves (CreateOptions.devServer beats the env var)
+  // pass it in, so the default cannot disagree with the instance it is describing
+  logRedaction: ({ devMode: resolvedDevMode }: { devMode?: boolean } = {}) => get('CUBEJS_LOG_REDACTION')
+    .default((resolvedDevMode ?? devMode()) ? 'false' : 'true')
     .asBoolStrict(),
   port: () => asPortOrSocket(process.env.PORT || '4000', 'PORT'),
   tls: () => get('CUBEJS_ENABLE_TLS')

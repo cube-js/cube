@@ -268,6 +268,21 @@ describe('CUBEJS_LOG_REDACTION', () => {
     expect(getEnv('logRedaction')).toBe(false);
   });
 
+  it('follows a resolved dev mode passed in by the caller', () => {
+    // CreateOptions.devServer beats CUBEJS_DEV_MODE, so a caller that already
+    // resolved dev mode must not get a default computed from the env var
+    delete process.env.CUBEJS_DEV_MODE;
+    expect(getEnv('logRedaction', { devMode: true })).toBe(false);
+    expect(getEnv('logRedaction', { devMode: false })).toBe(true);
+
+    process.env.CUBEJS_DEV_MODE = 'true';
+    expect(getEnv('logRedaction', { devMode: false })).toBe(true);
+
+    // an explicit CUBEJS_LOG_REDACTION still wins over both
+    process.env.CUBEJS_LOG_REDACTION = 'true';
+    expect(getEnv('logRedaction', { devMode: true })).toBe(true);
+  });
+
   it('follows an explicit value in either mode', () => {
     process.env.NODE_ENV = 'production';
     process.env.CUBEJS_LOG_REDACTION = 'false';

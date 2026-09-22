@@ -337,6 +337,38 @@ describe('OptsHandler class', () => {
     expect(await core.contextToDbType({} as DriverContext)).toEqual('postgres');
   });
 
+  test('must treat CreateOptions.devServer as dev mode without CUBEJS_DEV_MODE', async () => {
+    // The gateway resolves devServer the same way, so server-core must not answer
+    // "production" for an instance whose playground it just mounted
+    delete process.env.CUBEJS_DEV_MODE;
+    process.env.CUBEJS_DB_TYPE = 'postgres';
+
+    const core = new CubejsServerCoreExposed({
+      ...conf,
+      devServer: true,
+      driverFactory: () => ({ type: <DatabaseType>'postgres' }),
+    });
+
+    expect(core.options.devServer).toBe(true);
+    expect(core.options.preAggregationsSchema).toEqual('dev_pre_aggregations');
+  });
+
+  test('must not treat an explicit devServer: false as dev mode', async () => {
+    process.env.CUBEJS_DEV_MODE = 'true';
+    process.env.CUBEJS_DB_TYPE = 'postgres';
+
+    const core = new CubejsServerCoreExposed({
+      ...conf,
+      devServer: false,
+      driverFactory: () => ({ type: <DatabaseType>'postgres' }),
+    });
+
+    expect(core.options.devServer).toBe(false);
+    expect(core.options.preAggregationsSchema).toEqual('prod_pre_aggregations');
+
+    delete process.env.CUBEJS_DEV_MODE;
+  });
+
   test('must determine custom drivers from the cube.js file', async () => {
     class BaseDriver {
       public async testConnection() {

@@ -480,11 +480,12 @@ export class OptsHandler {
 
   /**
    * Determines whether current instance should be bootstraped in the
-   * dev mode or not. Dev mode is opt-in through CUBEJS_DEV_MODE only, it is off
-   * by default and NODE_ENV has no say in it.
+   * dev mode or not. Dev mode is opt-in: CreateOptions.devServer if the embedder
+   * set it, otherwise CUBEJS_DEV_MODE. It is off by default and NODE_ENV has no
+   * say in it. The gateway resolves the same way, so the two cannot disagree.
    */
   private isDevMode(): boolean {
-    return getEnv('devMode');
+    return this.createOptions.devServer ?? getEnv('devMode');
   }
 
   /**

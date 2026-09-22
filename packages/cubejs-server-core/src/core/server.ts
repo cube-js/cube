@@ -192,15 +192,18 @@ export class CubejsServerCore {
   ) {
     this.coreServerVersion = version;
 
-    // Same resolution the gateway does, so a `devServer: true` embedder gets the dev
-    // logger and a `devServer: false` one does not get it from the env var alone
+    // Same resolution the gateway and OptsHandler do, so a `devServer: true` embedder
+    // gets the dev logger and unredacted SQL, and a `devServer: false` one gets neither
+    // from the env var alone
+    const devMode = opts.devServer ?? getEnv('devMode');
+
     const logger = opts.logger || createLogger(
-      !(opts.devServer ?? getEnv('devMode')),
+      !devMode,
       getEnv('logLevel'),
     );
     // Wraps the log sink only: the agent and telemetry wrappers installed below
     // sit outside it and forward the original params
-    this.logger = getEnv('logRedaction') ? withLogRedaction(logger) : logger;
+    this.logger = getEnv('logRedaction', { devMode }) ? withLogRedaction(logger) : logger;
 
     this.optsHandler = new OptsHandler(this, opts, systemOptions);
     this.options = this.optsHandler.getCoreInitializedOptions();

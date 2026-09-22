@@ -85,7 +85,6 @@ async function createApiGateway(
 }
 
 describe('enforceSecurityChecks resolution', () => {
-  // Widened rather than cast: a cast would hide a signature change from the compiler
   class ApiGatewayExposed extends ApiGateway {
     public get securityChecksEnforced(): boolean {
       return this.enforceSecurityChecks;
