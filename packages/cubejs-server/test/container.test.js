@@ -293,6 +293,38 @@ describe('ServerContainer dev mode resolution', () => {
     expect(process.env.CUBEJS_PRE_AGGREGATIONS_SCHEMA).toEqual('my_schema');
   });
 
+  // Same string as the write, so nothing short of intercepting the assignment could
+  // tell them apart — and a production-mode instance wants it gone either way, since
+  // refreshWorkerMode and detectQueueAndCacheDriver still read it
+  test('takes back a development NODE_ENV cube.js set to match the write', async () => {
+    const container = makeContainer(true);
+
+    const projectDir = fs.mkdtempSync(path.join(os.tmpdir(), 'cube-container-'));
+    const cwd = process.cwd();
+
+    fs.writeFileSync(
+      path.join(projectDir, 'cube.js'),
+      'module.exports = { devServer: false };\n'
+    );
+
+    try {
+      process.chdir(projectDir);
+
+      container.loadConfigurationFromFile = async () => {
+        process.env.NODE_ENV = 'development';
+
+        return { devServer: false };
+      };
+
+      await container.lookupConfiguration();
+
+      expect(process.env.NODE_ENV).toBeUndefined();
+    } finally {
+      process.chdir(cwd);
+      fs.rmSync(projectDir, { recursive: true, force: true });
+    }
+  });
+
   test('`cubejs server` asks for nothing', async () => {
     const config = await lookupConfiguration();
 

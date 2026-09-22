@@ -289,9 +289,10 @@ export class ServerContainer {
 
       const config = devServer ? { devServer, ...userConfig } : userConfig;
 
-      // The sync follows the resolved config, not the request. Only what was written
-      // here is taken back, and only while it is still there — `cube.js` assigning
-      // NODE_ENV itself is that file's decision either way
+      // The sync follows the resolved config, not the request. Taken back only while
+      // the written value is still there, so a `cube.js` that chose another one keeps
+      // it; one that assigned `development` too is indistinguishable from this write
+      // and is taken back with it, which is also what a non-development instance needs
       if (
         wroteNodeEnv &&
         !(config.devServer ?? getEnv('devMode')) &&
