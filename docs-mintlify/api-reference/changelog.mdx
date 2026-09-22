@@ -7,16 +7,12 @@ rss: true
 {/* GENERATED FILE — do not edit by hand. */}
 {/* Run scripts/extract-changelog.mjs against the platform client CHANGELOG.md. */}
 
-<Update label="2026-09-22" description="v0.13.0" tags={["Added","Changed","Removed"]}>
+<Update label="2026-09-22" description="v0.13.0" tags={["Added","Removed"]}>
   ### Added
 
   - New public REST endpoints for promoting a workbook across deployments (CUB-2563): `POST /api/v1/deployments/{deploymentId}/workbooks/{workbookId}/promotion-previews` (`WorkbookPromotionsPublicController.previewWorkbookPromotion`) validates the promotion and returns content hashes for optimistic concurrency, without storing anything; `POST .../promotions` (`.promoteWorkbook`) applies it atomically if the source hash still matches the preview, preserving the workbook's deployment-scoped slug across repeat promotions, and takes an idempotency key to make retries safe; `GET .../promotion` (`.getWorkbookPromotion`) returns the workbook's promotion provenance; `GET .../promotions` (`.getWorkbookPromotions`) lists its promotion history with cursor pagination; `GET .../promotion-links` (`.getWorkbookPromotionLinks`) lists its promotion destinations. Requires access to both deployments, and a workspace session or API key — not an embed session. New schemas: `WorkbookPromotionDto`, `WorkbookPromotionDtoOutcome`, `WorkbookPromotionPreviewDto`, `WorkbookPromotionSummaryResponse`, `WorkbookPromotionSummaryDto`, `WorkbookPromotionsListResponse`, `WorkbookPromotionLinkDto`, `WorkbookPromotionLinksListResponse`, `PromotionActorDto`, `PromotionActorDtoAuthenticationMethod`, `PromotionReferenceDto`, `PromotionReferenceDtoAvailability`, `PreviewWorkbookPromotionInput`, `ApplyWorkbookPromotionInput`.
   - `Workbook` gained `promotion` (CUB-2563) — the workbook's promotion summary (`WorkbookPromotionSummaryDto`), `null` on a workbook that has never been promoted or received a promotion.
   - New public REST endpoint `GET /api/v1/external-documents/{externalWorkbookId}/placements` (`ExternalDocumentsPublicController.listExternalDocumentPlacements`) (CUB-4418) lists every block of Cube-written cells in an external spreadsheet — a Google Drive file id, or the custom property the Excel add-in writes — across the whole tenant, including placements the caller cannot read: each entry carries `access: GRANTED | DENIED`, with `reportName` withheld (`null`) on a denied entry. Tenant-scoped, unlike `GET /api/v1/deployments/{deploymentId}/reports?externalWorkbookId=`, which lists only readable reports for one deployment. Supports cursor pagination (`first`/`after`); omitting `first` returns every placement in the document. Answers `422` rather than a truncated page if the document holds more than 500 placed explorations or 2000 total placements. New schema: `ExternalDocumentPlacementsListResponse` (`ExternalDocumentPlacementResponse`, `ExternalDocumentPlacementResponseAccess`, `ExternalDocumentPlacementResponseHost`).
-
-  ### Changed
-
-  - `DatabricksMetricViewPublicationViewResult.outcome` gained `partial`, and the result gained a required `withheldMembers` — measures a view could not publish, each named with its cube. A `partial` view is queryable but incomplete; a consumer matching exhaustively on `outcome` must handle the new value.
 
   ### Removed
 
@@ -24,13 +20,17 @@ rss: true
   - `AgentsWithIntegrations` keeps its name despite no longer selecting any integrations. Renaming a published operation would break every caller on top of the field removal, for cosmetic gain; it is a plain agents query now.
 </Update>
 
-<Update label="2026-09-20" description="v0.12.0" tags={["Added","Deprecated"]}>
+<Update label="2026-09-20" description="v0.12.0" tags={["Added","Changed","Deprecated"]}>
   ### Added
 
   - `AppConfigResponse` gained `dashboardAppsEnabled` — whether this tenant has Dashboard Apps, for a client with no other read path to tenant flags (the creator-mode embed, the Sheets add-in) to tell whether to render an `APP`-kind workbook as the app rather than the classic builder — and `restrictDataDownload` — the tenant-wide data-download lock, exposed here for the same reason: an embed has no other read path to it, and previously only the published-dashboard embed carried a copy on its own payload.
   - `ReportSnapshot` gained `publicId` — the snapshotted report's public id, which is what a published Dashboard App resolves a report by (`useReportData('<publicId>')`); `null` on versions written before it was recorded.
   - `TenantSettings` / `TenantSettingsInput` gained `aiTokensAutoPurchaseEnabled`, `aiTokensAutoPurchaseThreshold` and `aiTokensAutoPurchaseAmount` (CUB-4690) — automatic AI-token top-up. `Threshold`/`Amount` are dollar amounts and are only meaningful while `Enabled`; they are retained when it is switched off so re-enabling restores what the customer had.
   - `PivotItems` / `PivotItemsInput` gained `showRowTotals` (CUB-4542) — whether a trailing "Total" column is appended, totaling each row across the pivot columns; the row-axis counterpart of the existing `showColumnTotals`. Ignored without a Columns zone, same as its sibling.
+
+  ### Changed
+
+  - `DatabricksMetricViewPublicationViewResult.outcome` gained `partial`, and the result gained a required `withheldMembers` — measures a view could not publish, each named with its cube. A `partial` view is queryable but incomplete; a consumer matching exhaustively on `outcome` must handle the new value.
 
   ### Deprecated
 
