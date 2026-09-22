@@ -437,14 +437,10 @@ export class OptsHandler {
       fastReload: getEnv('fastReload'),
     };
 
-    // Pinned from the merged options rather than from the default above, because
-    // `...opts` overrides it: a driver resolves this schema from CUBEJS_DEV_MODE, which
-    // both CreateOptions.devServer and CreateOptions.preAggregationsSchema contradict,
-    // and it has to name the schema this instance actually uses. DatabricksDriver builds
-    // the catalog-qualifying regex in query() from its own answer while dropTable()
-    // qualifies unconditionally, so a disagreement makes the query fail to find the
-    // table and the drop remove one from the other catalog.
-    // A per-tenant function has no single schema to pin, so it is left to that fallback
+    // From the merged options, not the default above, since `...opts` overrides it: a
+    // driver resolves this from CUBEJS_DEV_MODE, and the two naming different schemas
+    // makes DatabricksDriver query a table it cannot find and drop one from the wrong
+    // catalog. A per-tenant function has no single schema, so it keeps that fallback
     if (typeof options.preAggregationsSchema === 'string') {
       pinPreAggregationsSchema(options.preAggregationsSchema);
     }
