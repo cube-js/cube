@@ -219,16 +219,27 @@ export const markDevModeResolvedByCaller = () => {
 };
 
 let pinnedPreAggregationsSchema: string | undefined;
+// How many live instances resolved it, so the last one out clears the variable
+let pinnedPreAggregationsSchemaHolders = 0;
 
 /**
  * Releases the pin so the next one can take, which a reload and an instance shutting
  * down both need: without it the next instance's drivers stay on the schema the
- * previous one resolved. `schema` releases only a pin of that value, so one instance
- * leaving does not drop a pin another is still relying on.
+ * previous one resolved. `schema` releases one holder of a pin of that value, so the
+ * variable outlives any instance still relying on it; without it the pin goes
+ * regardless, which is what a reload of the whole process wants.
  */
 export const releasePreAggregationsSchemaPin = (schema?: string) => {
-  if (schema !== undefined && schema !== pinnedPreAggregationsSchema) {
-    return;
+  if (schema !== undefined) {
+    if (schema !== pinnedPreAggregationsSchema) {
+      return;
+    }
+
+    if (pinnedPreAggregationsSchemaHolders > 1) {
+      pinnedPreAggregationsSchemaHolders -= 1;
+
+      return;
+    }
   }
 
   // Only what this process pinned. A value the user set outlives any reload
@@ -240,6 +251,7 @@ export const releasePreAggregationsSchemaPin = (schema?: string) => {
   }
 
   pinnedPreAggregationsSchema = undefined;
+  pinnedPreAggregationsSchemaHolders = 0;
 };
 
 /**
@@ -252,6 +264,18 @@ export const pinPreAggregationsSchema = (schema: string) => {
   if (!process.env.CUBEJS_PRE_AGGREGATIONS_SCHEMA) {
     process.env.CUBEJS_PRE_AGGREGATIONS_SCHEMA = schema;
     pinnedPreAggregationsSchema = schema;
+    pinnedPreAggregationsSchemaHolders = 1;
+
+    return;
+  }
+
+  // Another instance pinned this same schema, and nothing else records that this one
+  // is relying on it, so the first to shut down would take it from the rest
+  if (
+    process.env.CUBEJS_PRE_AGGREGATIONS_SCHEMA === schema &&
+    pinnedPreAggregationsSchema === schema
+  ) {
+    pinnedPreAggregationsSchemaHolders += 1;
 
     return;
   }

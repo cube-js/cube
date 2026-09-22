@@ -431,6 +431,35 @@ describe('OptsHandler class', () => {
     expect(process.env.CUBEJS_PRE_AGGREGATIONS_SCHEMA).toBeUndefined();
   });
 
+  test('must keep the pin while a second instance on the same schema is up', async () => {
+    process.env.CUBEJS_DB_TYPE = 'postgres';
+
+    const { externalDbType, externalDriverFactory, ...confWithoutExternal } = conf;
+
+    const first = new CubejsServerCoreExposed({
+      ...confWithoutExternal,
+      devServer: true,
+      driverFactory: () => ({ type: <DatabaseType>'postgres' }),
+    });
+
+    const second = new CubejsServerCoreExposed({
+      ...confWithoutExternal,
+      devServer: true,
+      driverFactory: () => ({ type: <DatabaseType>'postgres' }),
+    });
+
+    await first.shutdown();
+
+    // `second` is still serving, and its driver reads the variable directly: losing it
+    // here sends the driver to `prod_pre_aggregations` while the plan names `dev_`
+    expect(second.options.preAggregationsSchema).toEqual('dev_pre_aggregations');
+    expect(process.env.CUBEJS_PRE_AGGREGATIONS_SCHEMA).toEqual('dev_pre_aggregations');
+
+    await second.shutdown();
+
+    expect(process.env.CUBEJS_PRE_AGGREGATIONS_SCHEMA).toBeUndefined();
+  });
+
   test('must let an instance that shut down hand the pin to the next', async () => {
     process.env.CUBEJS_DB_TYPE = 'postgres';
 

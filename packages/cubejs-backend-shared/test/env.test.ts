@@ -452,6 +452,36 @@ describe('pinPreAggregationsSchema', () => {
     expect(pinWarnings()).toHaveLength(0);
   });
 
+  test('keeps the pin while another instance that resolved it is still up', () => {
+    const env = freshEnv();
+
+    env.pinPreAggregationsSchema('dev_pre_aggregations');
+    env.pinPreAggregationsSchema('dev_pre_aggregations');
+
+    // The second pin is a no-op on the variable, so without counting holders nothing
+    // records that a second instance is relying on it
+    env.releasePreAggregationsSchemaPin('dev_pre_aggregations');
+
+    expect(process.env.CUBEJS_PRE_AGGREGATIONS_SCHEMA).toEqual('dev_pre_aggregations');
+
+    env.releasePreAggregationsSchemaPin('dev_pre_aggregations');
+
+    expect(process.env.CUBEJS_PRE_AGGREGATIONS_SCHEMA).toBeUndefined();
+  });
+
+  test('a reload drops the pin whatever the count', () => {
+    const env = freshEnv();
+
+    env.pinPreAggregationsSchema('dev_pre_aggregations');
+    env.pinPreAggregationsSchema('dev_pre_aggregations');
+
+    // No schema: the whole process is re-reading its configuration, so nothing it
+    // pinned earlier survives to be shared
+    env.releasePreAggregationsSchemaPin();
+
+    expect(process.env.CUBEJS_PRE_AGGREGATIONS_SCHEMA).toBeUndefined();
+  });
+
   test('releasing a schema other than the pinned one leaves the pin alone', () => {
     const env = freshEnv();
 
