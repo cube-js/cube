@@ -499,6 +499,13 @@ finished. To keep the old schema instead, either set `CUBEJS_DEV_MODE=true` (if 
 instance really was meant to be a dev server) or set
 `CUBEJS_PRE_AGGREGATIONS_SCHEMA=dev_pre_aggregations` explicitly.
 
+Log output changes format with it. Development mode selects the human-readable logger;
+outside it Cube emits one structured JSON object per line, on both the Node and the SQL
+API side. An instance that was implicitly in development mode therefore switches to JSON
+on upgrade, so anything that greps or line-parses Cube's stdout stops matching. Set
+`CUBEJS_DEV_MODE=true` if the instance was meant to be a dev server, or update whatever
+parses the text format.
+
 The bundled Cube Store goes with it. Development mode is what defaults the external
 database to Cube Store and starts the bundled instance; outside it, Cube Store has to
 be configured explicitly. An instance that was implicitly in development mode and has
