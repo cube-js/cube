@@ -444,6 +444,54 @@ describe('OptsHandler class', () => {
     expect(process.env.CUBEJS_PRE_AGGREGATIONS_SCHEMA).toBeUndefined();
   });
 
+  test('must not pin for a throw after the options are resolved', async () => {
+    process.env.CUBEJS_DB_TYPE = 'postgres';
+
+    const { externalDbType, externalDriverFactory, ...confWithoutExternal } = conf;
+
+    // Options resolve, and the constructor throws further down. Validating inside
+    // OptsHandler is not enough for that reason: the pin has to be the last thing the
+    // constructor does, or an attempt that never became an instance holds it forever
+    expect(() => new CubejsServerCoreExposed(<CreateOptions>{
+      ...confWithoutExternal,
+      devServer: true,
+      driverFactory: () => ({ type: <DatabaseType>'postgres' }),
+      contextToDataSourceId: () => 'tenant',
+    })).toThrow('contextToDataSourceId has been deprecated');
+
+    expect(process.env.CUBEJS_PRE_AGGREGATIONS_SCHEMA).toBeUndefined();
+  });
+
+  test('must not let a repeated shutdown release another instance\'s share', async () => {
+    process.env.CUBEJS_DB_TYPE = 'postgres';
+
+    const { externalDbType, externalDriverFactory, ...confWithoutExternal } = conf;
+
+    const first = new CubejsServerCoreExposed({
+      ...confWithoutExternal,
+      devServer: true,
+      driverFactory: () => ({ type: <DatabaseType>'postgres' }),
+    });
+
+    const second = new CubejsServerCoreExposed({
+      ...confWithoutExternal,
+      devServer: true,
+      driverFactory: () => ({ type: <DatabaseType>'postgres' }),
+    });
+
+    await first.shutdown();
+    // shutdown() is public and unguarded, so a host that calls it on a signal and again
+    // on exit gets here. The pin counts holders rather than naming them, so the second
+    // call would spend `second`'s share and delete the variable it is still serving on
+    await first.shutdown();
+
+    expect(process.env.CUBEJS_PRE_AGGREGATIONS_SCHEMA).toEqual('dev_pre_aggregations');
+
+    await second.shutdown();
+
+    expect(process.env.CUBEJS_PRE_AGGREGATIONS_SCHEMA).toBeUndefined();
+  });
+
   test('must keep the pin while a second instance on the same schema is up', async () => {
     process.env.CUBEJS_DB_TYPE = 'postgres';
 

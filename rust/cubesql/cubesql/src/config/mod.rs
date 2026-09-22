@@ -474,9 +474,8 @@ where
 }
 
 /// An unrecognised value is reported and the default used; a variable that only
-/// picks a default must not fail startup. Shared with the Node bridge, so the same
-/// value is read the same way and reported the same way on either path.
-pub fn env_parse_bool(name: &str, default: bool) -> bool {
+/// picks a default must not fail startup.
+fn env_parse_bool(name: &str, default: bool) -> bool {
     let Ok(value) = env::var(name) else {
         return default;
     };

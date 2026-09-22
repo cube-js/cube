@@ -19,6 +19,7 @@ import {
   getRealType,
   hasPreAggregationsEnvVars,
   internalExceptions,
+  pinPreAggregationsSchema,
   releasePreAggregationsSchemaPin,
   track,
   FileRepository,
@@ -153,6 +154,14 @@ export class CubejsServerCore {
   protected readonly contextToCubeStoreRouterId: ContextToCubeStoreRouterIdFn | null;
 
   protected readonly preAggregationsSchema: PreAggregationsSchemaFn;
+
+  /**
+   * The share of the process-wide pre-aggregation schema pin this instance holds,
+   * if it took one. Records that this instance holds it, which the pin's own count
+   * cannot: the count knows how many instances hold it, not which, so without this
+   * a repeated shutdown of one instance would release another's share.
+   */
+  private heldPreAggregationsSchemaPin: string | undefined;
 
   protected readonly scheduledRefreshTimeZones: ScheduledRefreshTimeZonesFn;
 
@@ -360,6 +369,16 @@ export class CubejsServerCore {
       }
 
       this.event('Server Start');
+    }
+
+    // Last in the constructor, so anything that throws above takes no pin. Only an
+    // instance that finished construction is ever shut down, and shutdown is what
+    // releases this. The merged option, not the default OptsHandler resolved for it:
+    // `...opts` overrides that, and a driver resolving a different schema from
+    // CUBEJS_DEV_MODE is what the pin prevents
+    if (typeof this.options.preAggregationsSchema === 'string') {
+      pinPreAggregationsSchema(this.options.preAggregationsSchema);
+      this.heldPreAggregationsSchemaPin = this.options.preAggregationsSchema;
     }
   }
 
@@ -1001,11 +1020,16 @@ export class CubejsServerCore {
   public async shutdown() {
     this.compilerCache.clear();
 
-    // Paired with the pin OptsHandler took: an instance that is gone must not leave
-    // the next one's drivers on its schema. Keyed on the value, so a concurrent
-    // instance's pin is left alone; a per-tenant function pinned nothing
-    if (typeof this.options.preAggregationsSchema === 'string') {
-      releasePreAggregationsSchemaPin(this.options.preAggregationsSchema);
+    // Paired with the pin the constructor took: an instance that is gone must not
+    // leave the next one's drivers on its schema. The flag makes a second shutdown a
+    // no-op, because the pin counts how many instances hold it, not which - and this
+    // method is public and unguarded, so a double call would otherwise release the
+    // share of a co-resident instance that is still serving on the same schema
+    if (this.heldPreAggregationsSchemaPin !== undefined) {
+      const schema = this.heldPreAggregationsSchemaPin;
+
+      this.heldPreAggregationsSchemaPin = undefined;
+      releasePreAggregationsSchemaPin(schema);
     }
 
     if (this.devServer) {

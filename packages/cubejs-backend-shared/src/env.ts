@@ -223,11 +223,9 @@ let pinnedPreAggregationsSchema: string | undefined;
 let pinnedPreAggregationsSchemaHolders = 0;
 
 /**
- * Releases the pin so the next one can take, which a reload and an instance shutting
- * down both need: without it the next instance's drivers stay on the schema the
- * previous one resolved. `schema` releases one holder of a pin of that value, so the
- * variable outlives any instance still relying on it; without it the pin goes
- * regardless, which is what a reload of the whole process wants.
+ * Without this the next instance's drivers stay on the schema the previous one
+ * resolved. A `schema` releases one holder of it; no argument drops the pin
+ * outright, which is what a reload of the whole process wants.
  */
 export const releasePreAggregationsSchemaPin = (schema?: string) => {
   if (schema !== undefined) {
