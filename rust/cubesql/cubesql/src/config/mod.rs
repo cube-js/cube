@@ -162,9 +162,9 @@ impl ConfigObjImpl {
 
         let db_query_limit: i32 = env_parse("CUBEJS_DB_QUERY_LIMIT", 50000);
         // Development mode as server-core decides it (OptsHandler::isDevMode): there the
-        // console is the log sink and runnable SQL is wanted
-        let dev_mode = env::var("NODE_ENV").map_or(true, |node_env| node_env != "production")
-            || env_parse_bool("CUBEJS_DEV_MODE", false);
+        // console is the log sink and runnable SQL is wanted. CUBEJS_DEV_MODE alone
+        // decides it and it is off by default; NODE_ENV is deprecated and ignored
+        let dev_mode = env_parse_bool("CUBEJS_DEV_MODE", false);
         let non_streaming_query_max_row_limit =
             match env_optparse("CUBESQL_NON_STREAMING_QUERY_MAX_ROW_LIMIT") {
                 Some(limit) if limit > db_query_limit => {
