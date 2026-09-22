@@ -484,6 +484,7 @@ export class CubejsServerCore {
       this.logger,
       {
         standalone: this.standalone,
+        devServer: this.options.devServer,
         dataSourceStorage: this.orchestratorStorage,
         basePath: this.options.basePath,
         contextRejectionMiddleware: this.contextRejectionMiddleware.bind(this),

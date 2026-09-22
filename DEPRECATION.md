@@ -493,3 +493,12 @@ worker, so nothing drops them for you — remove them by hand once the rebuild h
 finished. To keep the old schema instead, either set `CUBEJS_DEV_MODE=true` (if the
 instance really was meant to be a dev server) or set
 `CUBEJS_PRE_AGGREGATIONS_SCHEMA=dev_pre_aggregations` explicitly.
+
+The bundled Cube Store goes with it. Development mode is what defaults the external
+database to Cube Store and starts the bundled instance; outside it, Cube Store has to
+be configured explicitly. An instance that was implicitly in development mode and has
+no `CUBEJS_CUBESTORE_*` or `CUBEJS_EXT_DB_*` variables set therefore has no external
+database after the upgrade, and building a pre-aggregation fails with
+`externalDriverFactory is not provided`. Configure a
+[Cube Store connection](https://docs.cube.dev/cube-core/deployment#cube-store) for such
+an instance, or set `CUBEJS_DEV_MODE=true` if it was meant to be a dev server.

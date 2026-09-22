@@ -223,6 +223,8 @@ class ApiGateway {
 
   protected readonly subscriptionStore: any;
 
+  protected readonly devServer: boolean;
+
   protected readonly enforceSecurityChecks: boolean;
 
   protected readonly standalone: boolean;
@@ -285,7 +287,11 @@ class ApiGateway {
 
     this.queryRewrite = options.queryRewrite || (async (query) => query);
     this.subscriptionStore = options.subscriptionStore || new LocalSubscriptionStore();
-    this.enforceSecurityChecks = options.enforceSecurityChecks || !getEnv('devMode');
+    // server-core resolves dev mode and passes it down; CUBEJS_DEV_MODE is the fallback
+    // for anyone constructing the gateway directly
+    this.devServer = options.devServer ?? getEnv('devMode');
+    // `??`, not `||`: an explicit `false` is a request, not an absent value
+    this.enforceSecurityChecks = options.enforceSecurityChecks ?? !this.devServer;
     this.extendContext = options.extendContext;
 
     this.checkAuthFn = this.createCheckAuthFn(options);
@@ -365,7 +371,7 @@ class ApiGateway {
             res,
             apiGateway: this
           },
-          graphiql: getEnv('devMode')
+          graphiql: this.devServer
             ? { headerEditorEnabled: true }
             : false,
           extensions: () => (res as any).extensions || {},
