@@ -42,10 +42,7 @@ The role builder uses a two-column layout. The left column (sticky as you scroll
 
 ### Base Role
 
-In the role builder, every custom role has exactly one **Base Role**. It determines:
-
-- The user's **license tier** — Cube infers the tier from the highest Base Role across all of the user's roles.
-- What that tier **licenses** — the kind of work its holder may do.
+In the role builder, every custom role has exactly one **Base Role**. It determines the user's **license tier**, which Cube infers from the highest Base Role across all of the user's roles.
 
 | Base Role  | What the tier licenses                                       |
 | ---------- | ------------------------------------------------------------ |
@@ -157,7 +154,7 @@ A common pattern: someone who consumes dashboards and chats but never edits anyt
   </Step>
 </Steps>
 
-With all three actions checked, `Org Viewer` gives the same tier and the same deployment access as the built-in Viewer. What makes it worth writing as a custom role is what you change from here: leave **Download data** off, narrow **Scope** to specific deployments, or add a [Global permission](#global-permissions) the built-in does not carry.
+With all three actions checked, `Org Viewer` gives the same tier and the same deployment access as the built-in Viewer. What makes it worth writing as a custom role is what you change from here: narrow **Scope** to specific deployments, or add a [Global permission](#global-permissions) the built-in does not carry.
 
 ### Create an Explorer for a single deployment
 
@@ -275,7 +272,7 @@ Assignment is the exception — `PUT /api/v1/roles/{roleId}/users/{userId}` reso
 
 ## Reference: action catalog
 
-This section lists every action the role builder exposes. The internal action names match the names shown in the [audit log][ref-audit-log]. The API is wider in both directions: it accepts actions the builder does not render, and policies over resource types it has no card for — reports, workbooks, agents, folders. See the `actions` and `resourceType` enums on [`POST /api/v1/roles`][ref-api-create-role] for both full lists.
+This section lists every action the role builder exposes. The internal action names match the names shown in the [audit log][ref-audit-log]. The API is wider in two ways: it accepts actions the builder does not render, and policies over resource types it has no card for — `Report`, `Workbook`, `Agent` and `ChatThread` among them. See the `actions` and `resourceType` enums on [`POST /api/v1/roles`][ref-api-create-role] for both full lists.
 
 [ref-audit-log]: /admin/monitoring/audit-log
 
