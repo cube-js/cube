@@ -538,6 +538,15 @@ cannot see `CreateOptions.devServer`. With the variable unset and `devServer` se
 way, the two names disagree, the catalog prefix is never applied, and queries fail with
 `TABLE_OR_VIEW_NOT_FOUND`. Pinning the variable makes both sides read it instead.
 
+The same applies without the option. An embedder that set `CUBEJS_DEV_MODE=true`
+alongside an explicit `NODE_ENV=production` used to get Playground with JWT verification
+still enforced on the REST (JSON) and GraphQL APIs, because enforcement keyed on
+`NODE_ENV` rather than on development mode. It now follows development mode, so those
+APIs accept requests with no token. Drop `CUBEJS_DEV_MODE=true` if the instance was not
+meant to be a dev server. The CLI and the official Docker images are unaffected: they
+sync `NODE_ENV` to `development` whenever development mode resolves true, so that
+contradictory pair never reached them.
+
 The mirror case loses Cube Store instead. An embedder that passed `devServer: false`
 with `CUBEJS_DEV_MODE=true` used to be in development mode anyway, so it got
 `externalDbType: 'cubestore'` and the bundled Cube Store. It is now out of development
