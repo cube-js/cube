@@ -93,8 +93,8 @@ fn query(measure: &str, time_dimension: &str, granularity: &str) -> String {
               - dimension: {}
                 granularity: {}
                 dateRange:
-                  - "2025-02-02"
-                  - "2025-02-04"
+                  - "2025-02-09"
+                  - "2025-02-11"
             order:
               - id: {}
         "#},
@@ -188,8 +188,8 @@ async fn unshifted_measure_from_calendar_rollup_matches_source() {
           - dimension: retail_calendar.retail_date
             granularity: day
             dateRange:
-              - "2025-02-02"
-              - "2025-02-04"
+              - "2025-02-09"
+              - "2025-02-11"
         order:
           - id: retail_calendar.retail_date
     "#};
@@ -285,6 +285,29 @@ async fn calendar_undeclared_interval_shift_falls_back() {
     }
 }
 
+/// The third retail year maps back 364 days where the second maps back 371, so
+/// one rollup answering both is only possible by reading the calendar.
+#[tokio::test(flavor = "multi_thread")]
+async fn calendar_shift_served_from_rollups_in_a_second_retail_year() {
+    let query = indoc! {r#"
+        measures:
+          - demand.net_demand_a
+          - demand.net_demand_a_ly
+        time_dimensions:
+          - dimension: retail_calendar.retail_date
+            granularity: day
+            dateRange:
+              - "2026-02-08"
+              - "2026-02-10"
+        order:
+          - id: retail_calendar.retail_date
+    "#};
+    if let Some((rollup, source, _)) = rollup_join_vs_source(query, &["demand_with_calendar"]).await
+    {
+        assert_eq!(rollup, source);
+    }
+}
+
 /// Rule 2: everything the shift reads is materialized, so the whole query is
 /// answered from rollup tables. Grouped by a non-primary-key calendar
 /// dimension on purpose — with the primary key the shift rewrites the
@@ -348,8 +371,8 @@ async fn calendar_shift_partition_range_agrees_with_rendered_filter() {
     let (sql, usages) = ctx.build_sql_with_used_pre_aggregations(&query).unwrap();
     assert!(!usages.is_empty(), "expected the rollup to be read");
     let reporting_range = Some((
-        "2025-02-02T00:00:00.000".to_string(),
-        "2025-02-04T23:59:59.999".to_string(),
+        "2025-02-09T00:00:00.000".to_string(),
+        "2025-02-11T23:59:59.999".to_string(),
     ));
     let offset = usages
         .iter()
@@ -391,7 +414,9 @@ async fn sql_granularity_rollup_with_several_grains_falls_back() {
 
 /// The same shift, executed against a live CubeStore. Nothing but rollup
 /// tables exists there, so this is what proves the query needs no source
-/// table rather than merely omitting one from the SQL.
+/// table rather than merely omitting one from the SQL. Both retail years are
+/// snapshotted: the second maps back 371 days and the third 364, so the
+/// numbers show the calendar being read rather than an interval applied.
 #[tokio::test(flavor = "multi_thread")]
 async fn calendar_shift_runs_on_cubestore() {
     let schema = MockSchema::from_yaml_file(YAML_ROLLUP_JOIN).only_pre_aggregations(&[
@@ -400,12 +425,35 @@ async fn calendar_shift_runs_on_cubestore() {
         "calendar_rollup",
     ]);
     let ctx = TestContext::new_with_external_cubestore(schema).unwrap();
-    let query = query(
-        "demand.net_demand_a_ly",
-        "retail_calendar.retail_date",
-        "day",
-    );
-    if let Some(result) = ctx.try_execute_cubestore(&query, SEED).await {
-        insta::assert_snapshot!("calendar_shift_runs_on_cubestore", result);
+
+    for (name, range) in [
+        (
+            "calendar_shift_runs_on_cubestore",
+            ("2025-02-09", "2025-02-11"),
+        ),
+        (
+            "calendar_shift_runs_on_cubestore_second_year",
+            ("2026-02-08", "2026-02-10"),
+        ),
+    ] {
+        let query = format!(
+            indoc! {r#"
+                measures:
+                  - demand.net_demand_a
+                  - demand.net_demand_a_ly
+                time_dimensions:
+                  - dimension: retail_calendar.retail_date
+                    granularity: day
+                    dateRange:
+                      - "{}"
+                      - "{}"
+                order:
+                  - id: retail_calendar.retail_date
+            "#},
+            range.0, range.1
+        );
+        if let Some(result) = ctx.try_execute_cubestore(&query, SEED).await {
+            insta::assert_snapshot!(name, result);
+        }
     }
 }
