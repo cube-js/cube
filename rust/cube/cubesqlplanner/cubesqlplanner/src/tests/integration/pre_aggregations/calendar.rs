@@ -388,3 +388,24 @@ async fn sql_granularity_rollup_with_several_grains_falls_back() {
         assert_eq!(rollup, source);
     }
 }
+
+/// The same shift, executed against a live CubeStore. Nothing but rollup
+/// tables exists there, so this is what proves the query needs no source
+/// table rather than merely omitting one from the SQL.
+#[tokio::test(flavor = "multi_thread")]
+async fn calendar_shift_runs_on_cubestore() {
+    let schema = MockSchema::from_yaml_file(YAML_ROLLUP_JOIN).only_pre_aggregations(&[
+        "demand_with_calendar",
+        "demand_rollup",
+        "calendar_rollup",
+    ]);
+    let ctx = TestContext::new_with_external_cubestore(schema).unwrap();
+    let query = query(
+        "demand.net_demand_a_ly",
+        "retail_calendar.retail_date",
+        "day",
+    );
+    if let Some(result) = ctx.try_execute_cubestore(&query, SEED).await {
+        insta::assert_snapshot!("calendar_shift_runs_on_cubestore", result);
+    }
+}

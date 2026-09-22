@@ -46,6 +46,13 @@ cubes:
             granularity: day
           - dimension: retail_date
             granularity: day
+        indexes:
+          - name: date_val_idx
+            columns:
+              - date_val
+          - name: prev_year_date_idx
+            columns:
+              - prev_year_date
 
       # Same without the column the shift maps through.
       - name: calendar_rollup_no_shift_column
@@ -97,6 +104,7 @@ cubes:
             type: prior
 
     pre_aggregations:
+      # CubeStore joins rollups only on an indexed column.
       - name: demand_rollup
         type: rollup
         measures:
@@ -106,6 +114,10 @@ cubes:
           - item_dept
         time_dimension: demand_date
         granularity: day
+        indexes:
+          - name: demand_date_idx
+            columns:
+              - demand_date
 
       - name: demand_with_calendar
         type: rollupJoin
