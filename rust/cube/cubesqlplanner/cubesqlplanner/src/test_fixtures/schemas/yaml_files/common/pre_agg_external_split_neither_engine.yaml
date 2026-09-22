@@ -1,0 +1,68 @@
+# A split where neither external type can cover the query on its own: the
+# numerator needs brand, the denominator is regrouped by region, and no rollup
+# carries both. Reads the same `pa_sales` table.
+cubes:
+    - name: sales
+      sql: "SELECT * FROM pa_sales"
+      dimensions:
+          - name: id
+            type: number
+            sql: id
+            primary_key: true
+          - name: brand
+            type: string
+            sql: brand
+          - name: region
+            type: string
+            sql: region
+          - name: created_at
+            type: time
+            sql: created_at
+      measures:
+          - name: revenue
+            type: sum
+            sql: amount
+
+          # Drops the brand filter and regroups by region, so this stage needs
+          # a rollup carrying region — which the brand-grained one is not.
+          - name: revenue_by_region
+            type: number
+            sql: "{CUBE.revenue}"
+            multi_stage: true
+            reduce_by:
+                - brand
+            add_group_by:
+                - region
+            filter:
+                exclude:
+                    - brand
+
+          - name: brand_share
+            type: number
+            sql: "{CUBE.revenue} / NULLIF({CUBE.revenue_by_region}, 0)"
+            multi_stage: true
+
+      pre_aggregations:
+          # Carries brand but not region: serves the numerator, never the
+          # regrouped denominator.
+          - name: by_brand_day
+            type: rollup
+            external: true
+            measures:
+                - revenue
+            dimensions:
+                - brand
+            time_dimension: created_at
+            granularity: day
+
+          # Carries region but not brand: the mirror image, in the other
+          # external type.
+          - name: by_region_day
+            type: rollup
+            external: false
+            measures:
+                - revenue
+            dimensions:
+                - region
+            time_dimension: created_at
+            granularity: day
