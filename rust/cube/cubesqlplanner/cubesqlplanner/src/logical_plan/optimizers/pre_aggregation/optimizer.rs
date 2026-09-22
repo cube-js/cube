@@ -623,10 +623,25 @@ impl PreAggregationOptimizer {
                     .map(|member| PreAggregation::stored_time_dimension_column(member).0),
             )
             .collect::<HashSet<_>>();
+        // The mapping is applied where the calendar's primary key is rendered,
+        // which for a pre-aggregation is the condition joining two rollups.
+        // Without that join nothing rewrites and the stage reads unshifted.
+        let joins_on = |primary_key: &String| match pre_aggregation.source.as_ref() {
+            PreAggregationSource::Join(join) => join.items.iter().any(|item| {
+                item.from_members
+                    .iter()
+                    .chain(item.to_members.iter())
+                    .any(|member| member.symbol.full_name() == *primary_key)
+            }),
+            _ => false,
+        };
+
         Ok(extracted
             .calendar_shifts
-            .values()
-            .all(|shift| shift.renders_from_stored(|name| stored.contains(name))))
+            .iter()
+            .all(|(primary_key, shift)| {
+                joins_on(primary_key) && shift.renders_from_stored(|name| stored.contains(name))
+            }))
     }
 
     fn can_carry_time_shifts(
@@ -678,30 +693,42 @@ impl PreAggregationOptimizer {
             .ok()
             .and_then(|dt| dt.timestamp_precision().ok())
             .unwrap_or(3);
+
+        // The range prunes partitions, and no band derived from the reporting
+        // one describes the rows a calendar mapping asks for. Asked of every
+        // filter, not just the first: any calendar shift declines pruning.
+        let is_calendar_shifted = |item: &FilterItem| {
+            let FilterItem::Item(base_filter) = item else {
+                return false;
+            };
+            time_shifts
+                .get_for_symbol(base_filter.raw_member_evaluator_ref())
+                .is_some_and(|shift| {
+                    shift
+                        .dimension
+                        .as_dimension()
+                        .ok()
+                        .is_some_and(|dimension| dimension.time_shift_pk_full_name().is_some())
+                })
+        };
+        if filter
+            .time_dimensions_filters
+            .iter()
+            .any(is_calendar_shifted)
+        {
+            return None;
+        }
+
         for item in &filter.time_dimensions_filters {
             if let FilterItem::Item(base_filter) = item {
                 if let FilterOp::DateRange(date_range_op) = base_filter.operation() {
                     if let Ok((from, to)) = date_range_op.formatted_date_range(precision) {
                         // Apply time shift for this dimension if present.
                         // SQL renders `column + interval`, so actual data range is `date - interval`.
-                        let shift =
-                            time_shifts.get_for_symbol(base_filter.raw_member_evaluator_ref());
-                        let is_calendar_shift = shift.is_some_and(|shift| {
-                            shift
-                                .dimension
-                                .as_dimension()
-                                .ok()
-                                .is_some_and(|dimension| {
-                                    dimension.time_shift_pk_full_name().is_some()
-                                })
-                        });
-                        // The range prunes partitions, and no band derived from
-                        // the reporting one describes the rows a calendar
-                        // mapping asks for. Decline to prune.
-                        if is_calendar_shift {
-                            return None;
-                        }
-                        if let Some(interval) = shift.and_then(|s| s.interval.as_ref()) {
+                        if let Some(interval) = time_shifts
+                            .get_for_symbol(base_filter.raw_member_evaluator_ref())
+                            .and_then(|shift| shift.interval.as_ref())
+                        {
                             let tz = query_tools.timezone();
                             let neg = -interval.clone();
                             let shifted_from = QueryDateTime::from_date_str(tz, &from)

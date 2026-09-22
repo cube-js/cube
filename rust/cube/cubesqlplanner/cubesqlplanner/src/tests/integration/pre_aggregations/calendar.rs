@@ -21,6 +21,7 @@ fn ctx_rollup_join(pre_aggs: &[&str]) -> TestContext {
         "demand_rollup",
         "calendar_rollup",
         "calendar_rollup_no_shift_column",
+        "demand_by_calendar_plain",
     ];
     let names = pre_aggs
         .iter()
@@ -460,4 +461,26 @@ async fn calendar_shift_runs_on_cubestore() {
             insta::assert_snapshot!(name, result);
         }
     }
+}
+
+/// Storing the mapped column is not enough: the mapping is applied where the
+/// calendar's primary key is rendered, which is the condition joining two
+/// rollups. A plain rollup has no such condition, so it would read unshifted.
+#[tokio::test(flavor = "multi_thread")]
+async fn calendar_shift_plain_rollup_with_mapped_column_falls_back() {
+    let query = query(
+        "demand.net_demand_a_ly",
+        "retail_calendar.retail_date",
+        "day",
+    );
+    let ctx = ctx_rollup_join(&["demand_by_calendar_plain"]);
+    let (sql, usages) = ctx.build_sql_with_used_pre_aggregations(&query).unwrap();
+    assert!(
+        usages.is_empty(),
+        "expected the query to fall back to the source; SQL:\n{}",
+        sql
+    );
+    let rollup = ctx.try_execute_pg(&query, SEED).await;
+    let source = ctx_rollup_join(&[]).try_execute_pg(&query, SEED).await;
+    assert_eq!(rollup, source);
 }

@@ -148,3 +148,15 @@ cubes:
         rollups:
           - demand.demand_rollup
           - retail_calendar.calendar_rollup_no_shift_column
+
+      # A plain rollup that happens to store the mapped column, with no join
+      # for the shift to rewrite.
+      - name: demand_by_calendar_plain
+        type: rollup
+        measures:
+          - gross_demand
+          - cancellations
+        dimensions:
+          - retail_calendar.prev_year_date
+        time_dimension: retail_calendar.retail_date
+        granularity: day

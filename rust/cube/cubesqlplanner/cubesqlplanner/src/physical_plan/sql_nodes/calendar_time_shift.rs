@@ -59,8 +59,7 @@ impl SqlNode for CalendarTimeShiftSqlNode {
             MemberSymbol::Dimension(ev) => {
                 if !ev.is_reference() {
                     if let Some(shift) = self.shifts.get(&ev.full_name()) {
-                        if self.substituted.contains_key(&ev.full_name())
-                            && !self.renders_from_stored_columns(shift)
+                        if !self.substituted.is_empty() && !self.renders_from_stored_columns(shift)
                         {
                             return Err(CubeError::internal(format!(
                                 "Calendar time shift for {} cannot be rendered: the shift reads columns of the calendar cube, which this query neither stores nor selects from",
