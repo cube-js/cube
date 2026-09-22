@@ -227,8 +227,8 @@ impl TableCreator {
                 .await
                 .map_err(|_| {
                     CubeError::internal(format!(
-                        "Timeout during create table finalization: {:?}",
-                        table
+                        "Timeout during create table finalization: {}",
+                        table.get_row().get_table_name()
                     ))
                 })
                 .and_then(|r| r);
@@ -240,7 +240,10 @@ impl TableCreator {
                                 table.get_id(),
                                 inner
                             );
-                            return Err(CubeError::internal(format!("Error during create table finalization {:?}: some jobs are orphaned", table)));
+                            return Err(CubeError::internal(format!(
+                                "Error during create table finalization {}: some jobs are orphaned",
+                                table.get_row().get_table_name()
+                            )));
                         }
                         log::warn!(
                             "Some import jobs for table {} are orphaned, table creation restarted",
@@ -248,7 +251,10 @@ impl TableCreator {
                         );
                         retries += 1;
                         if retries > max_retries {
-                            return Err(CubeError::internal(format!("Error during create table finalization {:?}: some jobs are orphaned", table)));
+                            return Err(CubeError::internal(format!(
+                                "Error during create table finalization {}: some jobs are orphaned",
+                                table.get_row().get_table_name()
+                            )));
                         } else {
                             continue;
                         }

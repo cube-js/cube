@@ -195,7 +195,7 @@ export class CubeStoreDriver extends BaseDriver implements DriverInterface {
     }
 
     return this.query(sql, params, queryTracingObj).catch(e => {
-      e.message = `Error during create table: ${sql}: ${e.message}`;
+      e.message = `Error during create table ${tableName}: ${e.message}`;
       throw e;
     });
   }
