@@ -125,14 +125,9 @@ function kebab(s) {
   return mintSlugify(normalizeTypography(String(s).trim()));
 }
 // Longest shared path prefix (by segment) across a tag's paths — the "Resource"
-// column value. Falls back to the single path when a tag has just one.
-//
-// When every path in the tag extends past the shared prefix, the prefix is not
-// itself a callable resource of this tag — e.g. every "Workbook Promotions" path
-// lives one segment past `.../workbooks/{workbookId}`, which is the single-
-// workbook resource under the *Workbooks* tag, not this one. Appending `/*`
-// marks the row as a sub-resource group instead of implying the bare prefix is
-// an endpoint here too.
+// column value. Falls back to the single path when a tag has just one. A `/*`
+// suffix marks a prefix that is not itself one of the tag's paths, so the row
+// reads as a sub-resource group rather than implying a callable endpoint.
 function commonPathPrefix(pathList) {
   const split = pathList.map((p) => p.split('/'));
   const first = split[0];
