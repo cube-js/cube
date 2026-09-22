@@ -16,9 +16,9 @@ export class DevServer extends Command {
   public async run() {
     const options = this.parse(DevServer);
 
-    // Dev mode is driven by CUBEJS_DEV_MODE only. It is defaulted in ServerContainer,
-    // after dotenv, so that an explicit value — from the environment or .env — still
-    // wins, and NODE_ENV is synced from it there
+    // ServerContainer turns this into CreateOptions.devServer, after dotenv, so that an
+    // explicit CUBEJS_DEV_MODE — from the environment or .env — still wins. It stays out
+    // of process.env: that variable also gates the SQL API's port and password check
     const container = new ServerContainer({
       debug: options.flags.debug,
       devMode: true,

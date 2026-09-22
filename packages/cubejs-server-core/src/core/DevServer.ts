@@ -51,8 +51,8 @@ export class DevServer {
     // todo: empty/default `apiSecret` in dev mode to allow the DB connection wizard
     const cubejsToken = jwt.sign({}, options.apiSecret || 'secret', { expiresIn: '1d' });
 
-    // `false`, not unset: under `cubejs dev-server` ServerContainer defaults
-    // CUBEJS_DEV_MODE to `true` exactly when it is unset, so unsetting is a no-op here
+    // `false`, not unset: `cubejs dev-server` asks for dev mode whenever the variable is
+    // unset, so unsetting is a no-op there — only an explicit `false` overrides it
     console.log('🔓 Authentication checks are disabled in developer mode. Set CUBEJS_DEV_MODE=false to enable them.');
     console.log(`🦅 Dev environment available at ${apiUrl}`);
 

@@ -9,6 +9,7 @@ import {
   displayCLIWarning,
   getEnv,
   isDockerImage, isNativeSupported,
+  markDevModeResolvedByCaller,
   PackageManifest,
   resolveBuiltInPackageVersion,
 } from '@cubejs-backend/shared';
@@ -248,28 +249,32 @@ export class ServerContainer {
       multiline: 'line-breaks'
     });
 
-    // `cubejs dev-server` asks for dev mode, but an explicit CUBEJS_DEV_MODE wins over
-    // it: silently flipping a `false` to `true` would drop the SQL API password check
-    // for someone who asked to keep it. This runs after dotenv so a .env value counts
-    if (this.configuration.devMode && process.env.CUBEJS_DEV_MODE === undefined) {
-      process.env.CUBEJS_DEV_MODE = 'true';
+    // `cubejs dev-server` asks for dev mode through CreateOptions.devServer rather than
+    // by writing CUBEJS_DEV_MODE. That variable also gates the SQL API's default port
+    // and its password check, neither of which this command turned on before, so setting
+    // it would serve an unauthenticated SQL API wherever a port is configured. An
+    // explicit CUBEJS_DEV_MODE still wins - read after dotenv, so a .env value counts
+    const devServer = this.configuration.devMode && process.env.CUBEJS_DEV_MODE === undefined
+      ? true
+      : undefined;
 
-      // Dev mode is what makes `pgSqlPort` default to 15432, and the SQL API skips the
-      // password check there — so defaulting the flag above would open an unauthenticated
-      // Postgres listener that `cubejs dev-server` never opened before. Default the port
-      // off with it. Only the pair we defaulted ourselves is closed: an explicit
-      // CUBEJS_DEV_MODE=true, or an explicit CUBEJS_PG_SQL_PORT, still gets the SQL API
-      if (process.env.CUBEJS_PG_SQL_PORT === undefined) {
-        process.env.CUBEJS_PG_SQL_PORT = 'false';
-      }
+    if (devServer) {
+      // The deprecation warning has nothing to say to a process that just resolved dev
+      // mode for itself, and NODE_ENV below would otherwise trip it
+      markDevModeResolvedByCaller();
     }
 
-    // Dev mode is decided by CUBEJS_DEV_MODE alone. NODE_ENV is only kept in sync
-    // for user configuration code and third-party libraries that still read it
-    const devMode = getEnv('devMode');
-    if (devMode) {
+    // NODE_ENV is kept in sync only for user configuration code and third-party
+    // libraries that still read it; it has no say in the dev mode decision
+    if (devServer ?? getEnv('devMode')) {
       process.env.NODE_ENV = 'development';
     }
+
+    // `cubejs dev-server` supplies the default; a `devServer` in cube.js still wins,
+    // as does the `...userConfig` spread at every return below
+    const withDevServer = (userConfig: CreateOptions): CreateOptions => (
+      devServer ? { devServer, ...userConfig } : userConfig
+    );
 
     if (fs.existsSync(path.join(process.cwd(), 'cube.py'))) {
       const supported = isNativeSupported();
@@ -287,11 +292,11 @@ export class ServerContainer {
         );
       }
 
-      return this.loadConfigurationFromPythonFile();
+      return withDevServer(await this.loadConfigurationFromPythonFile());
     }
 
     if (fs.existsSync(path.join(process.cwd(), 'cube.js'))) {
-      return this.loadConfigurationFromFile();
+      return withDevServer(await this.loadConfigurationFromFile());
     }
 
     if (fs.existsSync(path.join(process.cwd(), 'cube.ts'))) {
@@ -304,7 +309,7 @@ export class ServerContainer {
       'There is no cube.js file. Continue with environment variables'
     );
 
-    return {};
+    return withDevServer({});
   }
 
   protected async loadConfigurationFromPythonFile(): Promise<CreateOptions> {

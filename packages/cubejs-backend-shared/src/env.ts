@@ -208,6 +208,18 @@ function asBoolOrTime(input: string, envName: string): number | boolean {
   );
 }
 
+let devModeResolvedByCaller = false;
+
+/**
+ * Declares that development mode was decided through CreateOptions.devServer, so the
+ * deprecation warning below has nothing to tell this process. `cubejs dev-server` calls
+ * it: without this the warning would fire on every run, telling a user who is already
+ * in development mode to turn development mode on.
+ */
+export const markDevModeResolvedByCaller = () => {
+  devModeResolvedByCaller = true;
+};
+
 /**
  * Development mode is opt-in through CUBEJS_DEV_MODE and off by default.
  * NODE_ENV is deprecated for this decision and ignored — see DEPRECATION.md.
@@ -220,6 +232,7 @@ const devMode = () => {
   // No NODE_ENV guard: development mode used to be on when NODE_ENV was unset too,
   // so that instance is part of the population this warning exists for
   if (
+    !devModeResolvedByCaller &&
     process.env.CUBEJS_DEV_MODE === undefined &&
     process.env.NODE_ENV !== 'production'
   ) {

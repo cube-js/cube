@@ -1,5 +1,6 @@
 export {
   getEnv,
+  markDevModeResolvedByCaller,
   assertDataSource,
   keyByDataSource,
   hasPreAggregationsEnvVars,
