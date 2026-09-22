@@ -11,6 +11,7 @@ import type {
   ServerCoreInitializedOptions,
 } from '../../src/core/types';
 import type { OptsHandler } from '../../src/core/OptsHandler';
+import { releasePreAggregationsSchemaPin } from '@cubejs-backend/shared';
 import { lookupDriverClass } from '../../src/core/DriverResolvers';
 import { CubejsServerCore } from '../../src/core/server';
 import { CreateOptions, SystemOptions } from '../../src/core/types';
@@ -58,8 +59,10 @@ describe('OptsHandler class', () => {
   afterEach(() => {
     delete process.env.CUBEJS_DEV_MODE;
     delete process.env.CUBEJS_DB_TYPE;
-    // Written by the pin below, which would otherwise be the schema every later
-    // case resolves rather than its own
+    // The variable and the module-level latch behind it. Clearing only the variable
+    // leaves userPreAggregationsSchema() comparing against the previous case's pin,
+    // so a case using a schema an earlier one pinned would silently stop testing itself
+    releasePreAggregationsSchemaPin();
     delete process.env.CUBEJS_PRE_AGGREGATIONS_SCHEMA;
   });
 

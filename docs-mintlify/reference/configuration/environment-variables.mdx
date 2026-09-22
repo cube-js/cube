@@ -1475,6 +1475,10 @@ to use for storing pre-aggregations.
 | --------------- | ---------------------- | ----------------------- |
 | A valid string  | `dev_pre_aggregations` | `prod_pre_aggregations` |
 
+When this variable is unset, Cube writes the schema it resolved into it at startup, so
+that drivers reading the variable directly use the same schema as the rest of the
+instance. A value you set yourself is never overwritten.
+
 It can be also set using the [`pre_aggregations_schema` configuration
 option](/reference/configuration/config#pre_aggregations_schema).
 
