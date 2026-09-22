@@ -32,7 +32,9 @@ tags:
   - name: Databricks Metric View Integration
   - name: Folders
   - name: Reports
+  - name: External Documents
   - name: Workbooks
+  - name: Workbook Promotions
   - name: Dashboard Exports
   - name: Notifications
   - name: Workspace
@@ -50,8 +52,6 @@ tags:
   - name: Dashboard Embed Access
   - name: Usage Analytics
   - name: OpenAPI Spec
-  - name: External Documents
-  - name: Workbook Promotions
 paths:
   /api/v1/app-config:
     get:
