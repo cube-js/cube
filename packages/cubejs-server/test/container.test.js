@@ -1,5 +1,9 @@
 /* globals describe,test,expect,beforeEach,afterAll */
 
+import fs from 'fs';
+import os from 'os';
+import path from 'path';
+
 import { getEnv } from '@cubejs-backend/shared';
 
 import { ServerContainer } from '../src/server/container';
@@ -18,6 +22,13 @@ class TestServerContainer extends ServerContainer {
   // would read as a pass against `toBe(true)` never being reached
   poisonCubeConfigEmpty() {
     this.isCubeConfigEmpty = false;
+  }
+
+  // The real loader uses a dynamic import, which this package's jest does not run with
+  // --experimental-vm-modules. What matters here is what lookupConfiguration does with
+  // the file's contents, not how they are read
+  stubConfigurationFile(config) {
+    this.loadConfigurationFromFile = async () => config;
   }
 }
 
@@ -155,6 +166,34 @@ describe('ServerContainer dev mode resolution', () => {
     // Pinning `dev_pre_aggregations` here would put a production instance on the dev
     // schema, which is the opposite of what the pin is for
     expect(process.env.CUBEJS_PRE_AGGREGATIONS_SCHEMA).toBeUndefined();
+  });
+
+  // `cube.js` is loaded after the command's request is resolved, and `...userConfig`
+  // wins, so anything keyed on the request rather than on the resolved config would
+  // leave this instance on the dev schema while server-core puts it in production mode
+  test('a cube.js devServer: false wins over the command, schema included', async () => {
+    const projectDir = fs.mkdtempSync(path.join(os.tmpdir(), 'cube-container-'));
+    const cwd = process.cwd();
+
+    fs.writeFileSync(
+      path.join(projectDir, 'cube.js'),
+      'module.exports = { devServer: false };\n'
+    );
+
+    try {
+      process.chdir(projectDir);
+
+      const container = makeContainer(true);
+      container.stubConfigurationFile({ devServer: false });
+
+      const config = await container.lookupConfiguration();
+
+      expect(config.devServer).toBe(false);
+      expect(process.env.CUBEJS_PRE_AGGREGATIONS_SCHEMA).toBeUndefined();
+    } finally {
+      process.chdir(cwd);
+      fs.rmSync(projectDir, { recursive: true, force: true });
+    }
   });
 
   test('`cubejs server` asks for nothing', async () => {

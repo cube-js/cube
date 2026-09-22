@@ -261,14 +261,6 @@ export class ServerContainer {
 
     if (devServer) {
       markDevModeResolvedByCaller();
-
-      // A driver cannot see CreateOptions.devServer, so DatabricksDriver resolves the
-      // pre-aggregation schema from CUBEJS_DEV_MODE and would answer `prod_` while
-      // server-core emits `dev_`. Pinning the schema makes both sides read the same
-      // value, which is what master's NODE_ENV sync achieved here
-      if (process.env.CUBEJS_PRE_AGGREGATIONS_SCHEMA === undefined) {
-        process.env.CUBEJS_PRE_AGGREGATIONS_SCHEMA = 'dev_pre_aggregations';
-      }
     }
 
     // Kept in sync for user config code and third-party libraries that still read it
@@ -282,7 +274,21 @@ export class ServerContainer {
     const measureAndApplyDevServer = (userConfig: CreateOptions): CreateOptions => {
       this.isCubeConfigEmpty = Object.keys(userConfig).length === 0;
 
-      return devServer ? { devServer, ...userConfig } : userConfig;
+      const config = devServer ? { devServer, ...userConfig } : userConfig;
+
+      // A driver cannot see CreateOptions.devServer, so DatabricksDriver resolves the
+      // pre-aggregation schema from CUBEJS_DEV_MODE and would answer `prod_` while
+      // server-core emits `dev_`. Pinning makes both sides read the same value.
+      // Keyed on the resolved config, not the command's request: a cube.js exporting
+      // `devServer: false` wins over `cubejs dev-server`, and the schema has to follow
+      if (
+        (config.devServer ?? getEnv('devMode')) &&
+        process.env.CUBEJS_PRE_AGGREGATIONS_SCHEMA === undefined
+      ) {
+        process.env.CUBEJS_PRE_AGGREGATIONS_SCHEMA = 'dev_pre_aggregations';
+      }
+
+      return config;
     };
 
     if (fs.existsSync(path.join(process.cwd(), 'cube.py'))) {
