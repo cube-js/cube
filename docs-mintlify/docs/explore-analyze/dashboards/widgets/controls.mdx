@@ -97,13 +97,17 @@ When multiple filters target dimensions from the same semantic view, you can mar
 
 For example, on a sales dashboard with a **Country** filter and a **City** filter, marking the City filter as faceted means selecting `United States` in the Country filter limits the City filter to U.S. cities only. Mark both and each narrows the other.
 
-A faceted filter can take as a source any sibling on the same semantic view, whatever condition that sibling is set to and whether or not it carries **Facet** itself: `is` and `is not`, the substring conditions, the comparisons on a **Number** dimension and every date condition are all read — each narrows the value list unless its condition and value together leave nothing to scope by, as the warning below sets out — and a **Boolean** dimension counts here too, its `is true` / `is false` setting `is`. The four conditions that carry no value — `is null`, `is not null`, `is empty` and `is not empty` — narrow as soon as they are set; every other condition waits for a value, and until it has one it leaves the value list alone, just as it leaves the charts unfiltered. Custom SQL is the exception no source can be set to: no operator menu offers it, and a filter a hand-written [URL parameter](#sharing-the-current-selection) gives it scopes nothing.
+A faceted filter can take as a source any sibling on the same semantic view, whatever condition that sibling is set to and whether or not it carries **Facet** itself — `is` and `is not`, the substring conditions, the comparisons on a **Number** dimension and every date condition are all read, and a **Boolean** dimension counts here too, its `is true` / `is false` setting `is`. That comes with qualifications:
+
+- `is null`, `is not null`, `is empty` and `is not empty` carry no value and narrow as soon as they are set. Every other condition waits for a value, and until it has one it leaves the value list alone, just as it leaves the charts unfiltered.
+- A condition and value that together leave nothing to scope by narrow nothing either, as the warning below sets out.
+- Custom SQL is the one condition no source can be set to: no operator menu offers it, and a filter a hand-written [URL parameter](#sharing-the-current-selection) gives it scopes nothing.
 
 To pick which siblings a filter listens to, turn the **Facet** switch on in its edit sidebar: the source picker appears with it, reading **All**. The picker lists every other filter on the dashboard and greys out the ones it cannot use — the ones targeting a different semantic view — with a tooltip saying it is not available for this semantic view or filter type. Left at **All**, the filter listens to every sibling the picker leaves selectable; picking entries narrows it to those. A filter you picked that later stops qualifying, because its dimension was re-pointed at another semantic view say, stays in the list with a warning icon rather than disappearing from it.
 
 **Cancel** leaves the filter on the sources it was last saved with — it discards every unsaved edit in the sidebar, not only the source list — while turning **Facet** back off clears the entries you picked, so switching it on again starts from **All**.
 
-A date source never scopes the value list to less than the window the charts are showing, so the list never drops a value the charts still have rows for. Which window it scopes to depends on the condition:
+A date source never scopes the value list to less than the window the charts are showing, so the list never drops a value the charts still have rows for. Which window it scopes to depends on the condition; `is null` and `is not null` name no window and scope by presence instead, to the rows with no date and to the rows with one:
 
 | Condition | Window the value list is scoped to |
 |---|---|
