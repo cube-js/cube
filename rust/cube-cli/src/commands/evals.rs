@@ -1,6 +1,6 @@
 use std::time::Duration;
 
-use anyhow::{bail, Result};
+use anyhow::{bail, Context as _, Result};
 use clap::Subcommand;
 use serde_json::{json, Value};
 
@@ -11,6 +11,11 @@ use crate::{output, util, Ctx};
 // The eval runner persists exactly these two terminal statuses.
 const COMPLETED: &str = "completed";
 const FAILED: &str = "failed";
+// Fetching the terminal result page is a separate request after the user-facing
+// wait. Give transient proxy/network errors a small, bounded recovery window so
+// a completed run does not hang the CLI or fail on a single blip.
+const RESULTS_FETCH_TIMEOUT: Duration = Duration::from_secs(30);
+const RESULTS_FETCH_POLL_MAX: Duration = Duration::from_secs(5);
 
 /// Run and inspect AI agent evals.
 #[derive(clap::Args)]
@@ -151,11 +156,42 @@ fn print_results(json_output: bool, results: &Value) {
 }
 
 fn ensure_complete_results(evaluation: i64, results: &Value) -> Result<()> {
-    if results.pointer("/pageInfo/hasNextPage") == Some(&Value::Bool(true)) {
-        bail!("eval run {evaluation} returned an incomplete results page; refusing to grade it");
+    if results.get("items").and_then(Value::as_array).is_none() {
+        bail!("eval run {evaluation} returned a malformed results page; refusing to grade it");
     }
 
-    Ok(())
+    match results.pointer("/pageInfo/hasNextPage") {
+        Some(Value::Bool(false)) => Ok(()),
+        Some(Value::Bool(true)) => {
+            bail!("eval run {evaluation} returned an incomplete results page; refusing to grade it")
+        }
+        _ => {
+            bail!("eval run {evaluation} did not confirm a complete results page; refusing to grade it")
+        }
+    }
+}
+
+async fn fetch_complete_results(
+    api: &Client,
+    deployment: i64,
+    evaluation: i64,
+    poll: Duration,
+) -> Result<Value> {
+    let path = results_path(deployment, evaluation);
+    let results = wait::poll(
+        Wait::new(
+            "eval results",
+            RESULTS_FETCH_TIMEOUT,
+            poll.min(RESULTS_FETCH_POLL_MAX),
+        )
+        .advising_nothing(),
+        || async { api.get(&path, &Query::new()).await.map(Progress::Done) },
+    )
+    .await
+    .with_context(|| format!("failed to fetch results for eval run {evaluation}"))?;
+
+    ensure_complete_results(evaluation, &results)?;
+    Ok(results)
 }
 
 fn ensure_passed(evaluation: i64, run: &Value, results: &Value) -> Result<()> {
@@ -195,10 +231,7 @@ async fn finish_wait(
     json_output: bool,
 ) -> Result<()> {
     let run = wait_for_run(api, deployment, evaluation, timeout, poll).await?;
-    let results = api
-        .get(&results_path(deployment, evaluation), &Query::new())
-        .await?;
-    ensure_complete_results(evaluation, &results)?;
+    let results = fetch_complete_results(api, deployment, evaluation, poll).await?;
     print_completed(json_output, evaluation, &run, &results);
     ensure_passed(evaluation, &run, &results)
 }
@@ -349,6 +382,33 @@ mod tests {
         .unwrap_err()
         .to_string()
         .contains("incomplete results page"));
+
+        for malformed in [
+            json!({ "items": [{ "verdict": "pass" }] }),
+            json!({
+                "items": [{ "verdict": "pass" }],
+                "pageInfo": { "hasNextPage": "false" }
+            }),
+        ] {
+            assert!(ensure_complete_results(42, &malformed)
+                .unwrap_err()
+                .to_string()
+                .contains("did not confirm a complete results page"));
+        }
+
+        assert!(ensure_complete_results(
+            42,
+            &json!({ "items": null, "pageInfo": { "hasNextPage": false } })
+        )
+        .unwrap_err()
+        .to_string()
+        .contains("malformed results page"));
+
+        ensure_complete_results(
+            42,
+            &json!({ "items": [{ "verdict": "pass" }], "pageInfo": { "hasNextPage": false } }),
+        )
+        .unwrap();
 
         let failed = json!({ "id": 42, "status": "FAILED" });
         let error = ensure_passed(42, &failed, &json!({ "items": [{ "verdict": "pass" }] }))

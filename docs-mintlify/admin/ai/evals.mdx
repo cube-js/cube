@@ -102,25 +102,155 @@ background. The run list shows live progress and then the outcome:
 
 ### Run evals from CI
 
-The Cube CLI can run the same eval suite as a pull-request check. Authenticate
-with `CUBE_API_URL` and `CUBE_API_KEY`, then pass the branch under review:
+You can gate a pull request with either the Cube CLI or the public Platform
+API. In both cases, store the tenant URL and deployment ID as repository
+variables, store the API key as a secret, and pass the branch under review.
+The API key needs `SchemaUpdate` access to start a run and either `SchemaRead`
+or `SchemaUpdate` access to poll it and read its results.
+
+This capability is currently in preview. Contact Cube support to activate it
+for your account.
+
+#### With the Cube CLI
+
+Set `CUBE_CLI_VERSION` to the Cube CLI release you have tested, then install
+that exact version in the job:
 
 ```yaml
-- name: Run Cube agent evals
-  env:
-    CUBE_API_URL: ${{ vars.CUBE_API_URL }}
-    CUBE_API_KEY: ${{ secrets.CUBE_API_KEY }}
-    DEPLOYMENT_ID: ${{ vars.CUBE_DEPLOYMENT_ID }}
-  run: cube evals run "$DEPLOYMENT_ID" --branch "$GITHUB_HEAD_REF" --wait
+env:
+  CUBE_API_URL: ${{ vars.CUBE_API_URL }}
+  CUBE_API_KEY: ${{ secrets.CUBE_API_KEY }}
+  DEPLOYMENT_ID: ${{ vars.CUBE_DEPLOYMENT_ID }}
+  CUBE_BRANCH: ${{ github.head_ref || github.ref_name }}
+
+steps:
+  - name: Install Cube CLI
+    env:
+      CUBE_VERSION: ${{ vars.CUBE_CLI_VERSION }}
+    shell: bash
+    run: |
+      set -euo pipefail
+      test -n "$CUBE_VERSION"
+      curl -fsSL https://raw.githubusercontent.com/cube-js/cube/master/install-cli.sh | sh
+
+  - name: Run Cube agent evals
+    timeout-minutes: 35
+    run: |
+      cube evals run "$DEPLOYMENT_ID" \
+        --branch "$CUBE_BRANCH" \
+        --wait \
+        --timeout 30m \
+        --json > eval.json
+
+  - name: Upload eval result
+    if: always()
+    uses: actions/upload-artifact@v4
+    with:
+      name: cube-eval
+      path: eval.json
+      if-no-files-found: ignore
 ```
 
 The command waits for completion and exits non-zero when the eval run fails,
-when it produces no graded questions, or when any question has a verdict other than
-`pass`. It also fails closed if the API does not return a complete result set. Add
-`--agent NAME` to test a configured agent or
+when it produces no graded questions, or when any question has a verdict other
+than `pass`. It also fails closed if the API does not confirm a complete result
+set. When a complete result set is returned, the command writes `eval.json`
+before exiting, including on a failed verdict. Add `--agent NAME` to test a
+configured agent or
 `--file eval_questions/revenue.yml` to limit the run to one question file. Pass
 `--json` for a machine-readable document containing both the terminal run and
 its per-question results when the result set is complete.
+
+#### With the Platform API
+
+If you do not want to install the CLI, call the same public endpoints directly.
+This example does not retry the `POST`, because repeating a non-idempotent start
+request after an ambiguous network failure could create another run. It bounds
+every `GET`, retries transient read failures, and applies the same fail-closed
+checks as the CLI:
+
+```yaml
+env:
+  CUBE_API_URL: ${{ vars.CUBE_API_URL }}
+  CUBE_API_KEY: ${{ secrets.CUBE_API_KEY }}
+  DEPLOYMENT_ID: ${{ vars.CUBE_DEPLOYMENT_ID }}
+  CUBE_BRANCH: ${{ github.head_ref || github.ref_name }}
+
+steps:
+  - name: Run Cube agent evals through the Platform API
+    shell: bash
+    timeout-minutes: 35
+    run: |
+      set -euo pipefail
+
+      api="${CUBE_API_URL%/}/api/v1/deployments/$DEPLOYMENT_ID/evaluations"
+      auth=(-H "Authorization: Api-Key $CUBE_API_KEY")
+      reads=(
+        curl --fail-with-body --silent --show-error
+        --connect-timeout 10 --max-time 30
+        --retry 4 --retry-delay 2 --retry-all-errors
+        "${auth[@]}"
+      )
+
+      started=$(
+        jq -cn --arg branch "$CUBE_BRANCH" '{branchName: $branch}' |
+          curl --fail-with-body --silent --show-error \
+            --connect-timeout 10 --max-time 30 \
+            "${auth[@]}" -H 'Content-Type: application/json' \
+            --data-binary @- "$api"
+      )
+      evaluation_id=$(jq -er '.id | select(type == "number")' <<<"$started")
+
+      deadline=$((SECONDS + 1800))
+      last_status=
+      while :; do
+        if (( SECONDS >= deadline )); then
+          echo "Timed out waiting for eval run $evaluation_id" >&2
+          exit 1
+        fi
+
+        run=$("${reads[@]}" "$api/$evaluation_id")
+        status=$(jq -er '.status | strings | ascii_downcase' <<<"$run")
+        if [[ "$status" != "$last_status" ]]; then
+          echo "Eval run $evaluation_id: $status"
+          last_status=$status
+        fi
+
+        case "$status" in
+          completed|failed) break ;;
+          *) sleep 5 ;;
+        esac
+      done
+
+      results=$("${reads[@]}" "$api/$evaluation_id/results")
+      jq -n --argjson evalRun "$run" --argjson results "$results" \
+        '{evalRun: $evalRun, results: $results}' > eval.json
+      jq . eval.json
+
+      if ! jq -e '
+        .evalRun.status == "completed" and
+        (.results.items | type) == "array" and
+        (.results.items | length) > 0 and
+        .results.pageInfo.hasNextPage == false and
+        all(.results.items[]; .verdict == "pass")
+      ' eval.json > /dev/null; then
+        echo "The eval run failed, was incomplete, or did not pass every question" >&2
+        exit 1
+      fi
+
+  - name: Upload eval result
+    if: always()
+    uses: actions/upload-artifact@v4
+    with:
+      name: cube-eval
+      path: eval.json
+      if-no-files-found: ignore
+```
+
+The `POST` body also accepts `agentName` and `questionFile`. Omitting the
+pagination parameters on the results request returns the complete result set;
+if `pageInfo.hasNextPage` is anything other than `false`, do not use that page
+as a CI verdict.
 
 ## Reading the results
 
