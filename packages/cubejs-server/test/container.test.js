@@ -4,7 +4,7 @@ import fs from 'fs';
 import os from 'os';
 import path from 'path';
 
-import { getEnv } from '@cubejs-backend/shared';
+import { getEnv, pinPreAggregationsSchema } from '@cubejs-backend/shared';
 
 import { ServerContainer } from '../src/server/container';
 
@@ -277,8 +277,6 @@ describe('ServerContainer dev mode resolution', () => {
   // overwrite a non-empty value, so without the release the drivers keep the schema the
   // previous config resolved while the new instance names a different one
   test('a reload releases the pin so the next config can take it', async () => {
-    const { pinPreAggregationsSchema } = require('@cubejs-backend/shared');
-
     pinPreAggregationsSchema('dev_pre_aggregations');
     expect(process.env.CUBEJS_PRE_AGGREGATIONS_SCHEMA).toEqual('dev_pre_aggregations');
 
