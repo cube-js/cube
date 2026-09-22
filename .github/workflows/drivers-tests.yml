@@ -235,7 +235,6 @@ jobs:
         redshift
         redshift-export-bucket-s3
         snowflake
-        snowflake-encrypted-pk
         snowflake-export-bucket-s3
         snowflake-export-bucket-s3-via-storage-integration-iam-roles
         snowflake-export-bucket-s3-prefix
@@ -282,7 +281,6 @@ jobs:
           - redshift
           - redshift-export-bucket-s3
           - snowflake
-          - snowflake-encrypted-pk
           - snowflake-export-bucket-s3
           - snowflake-export-bucket-s3-via-storage-integration-iam-roles
           - snowflake-export-bucket-s3-prefix
@@ -427,7 +425,6 @@ jobs:
 
           # Snowflake
           DRIVERS_TESTS_CUBEJS_DB_SNOWFLAKE_USER: ${{ secrets.DRIVERS_TESTS_CUBEJS_DB_SNOWFLAKE_USER }}
-          DRIVERS_TESTS_CUBEJS_DB_SNOWFLAKE_PASS: ${{ secrets.DRIVERS_TESTS_CUBEJS_DB_SNOWFLAKE_PASS }}
           DRIVERS_TESTS_CUBEJS_DB_SNOWFLAKE_PRIVATE_KEY: ${{ secrets.DRIVERS_TESTS_CUBEJS_DB_SNOWFLAKE_PRIVATE_KEY }}
           DRIVERS_TESTS_CUBEJS_DB_SNOWFLAKE_PRIVATE_KEY_PASS: ${{ secrets.DRIVERS_TESTS_CUBEJS_DB_SNOWFLAKE_PRIVATE_KEY_PASS }}
         with:
