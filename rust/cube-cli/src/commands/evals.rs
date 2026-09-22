@@ -1,5 +1,5 @@
 use std::io::{self, Write as _};
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use anyhow::{bail, Context as _, Result};
 use clap::Subcommand;
@@ -17,6 +17,10 @@ const FAILED: &str = "failed";
 // a completed run does not hang the CLI or fail on a single blip.
 const RESULTS_FETCH_TIMEOUT: Duration = Duration::from_secs(30);
 const RESULTS_FETCH_POLL_MAX: Duration = Duration::from_secs(5);
+
+fn results_fetch_timeout(timeout: Duration, elapsed: Duration) -> Duration {
+    timeout.saturating_sub(elapsed).min(RESULTS_FETCH_TIMEOUT)
+}
 
 /// Run and inspect AI agent evals.
 #[derive(clap::Args)]
@@ -204,16 +208,12 @@ async fn fetch_complete_results(
     api: &Client,
     deployment: i64,
     evaluation: i64,
+    timeout: Duration,
     poll: Duration,
 ) -> Result<Value> {
     let path = results_path(deployment, evaluation);
     let results = wait::poll(
-        Wait::new(
-            "eval results",
-            RESULTS_FETCH_TIMEOUT,
-            poll.min(RESULTS_FETCH_POLL_MAX),
-        )
-        .advising_nothing(),
+        Wait::new("eval results", timeout, poll.min(RESULTS_FETCH_POLL_MAX)).advising_nothing(),
         || async { api.get(&path, &Query::new()).await.map(Progress::Done) },
     )
     .await
@@ -259,8 +259,10 @@ async fn finish_wait(
     poll: Duration,
     json_output: bool,
 ) -> Result<()> {
+    let started = Instant::now();
     let run = wait_for_run(api, deployment, evaluation, timeout, poll).await?;
-    let results = fetch_complete_results(api, deployment, evaluation, poll)
+    let results_timeout = results_fetch_timeout(timeout, started.elapsed());
+    let results = fetch_complete_results(api, deployment, evaluation, results_timeout, poll)
         .await
         .with_context(|| {
             format!(
@@ -486,9 +488,38 @@ mod tests {
                 1,
                 42,
                 None,
+                &json!({ "pageInfo": { "hasNextPage": true, "endCursor": "" } })
+            ),
+            Some("More results are available; use --json to read pageInfo.endCursor".into())
+        );
+        assert_eq!(
+            next_page_hint(1, 42, None, &json!({ "pageInfo": { "hasNextPage": true } })),
+            Some("More results are available; use --json to read pageInfo.endCursor".into())
+        );
+        assert_eq!(
+            next_page_hint(
+                1,
+                42,
+                None,
                 &json!({ "pageInfo": { "hasNextPage": false } })
             ),
             None
+        );
+    }
+
+    #[test]
+    fn results_fetch_stays_within_the_user_timeout() {
+        assert_eq!(
+            results_fetch_timeout(Duration::from_secs(60), Duration::from_secs(50)),
+            Duration::from_secs(10)
+        );
+        assert_eq!(
+            results_fetch_timeout(Duration::from_secs(600), Duration::from_secs(50)),
+            RESULTS_FETCH_TIMEOUT
+        );
+        assert_eq!(
+            results_fetch_timeout(Duration::from_secs(60), Duration::from_secs(60)),
+            Duration::ZERO
         );
     }
 }

@@ -228,11 +228,11 @@ steps:
       jq . eval.json
 
       if ! jq -e '
-        .evalRun.status == "completed" and
+        (.evalRun.status | ascii_downcase) == "completed" and
         (.results.items | type) == "array" and
         (.results.items | length) > 0 and
         .results.pageInfo.hasNextPage == false and
-        all(.results.items[]; .verdict == "pass")
+        all(.results.items[]; (.verdict // "" | ascii_downcase) == "pass")
       ' eval.json > /dev/null; then
         echo "The eval run failed, was incomplete, or did not pass every question" >&2
         exit 1
