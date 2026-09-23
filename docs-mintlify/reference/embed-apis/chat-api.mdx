@@ -350,7 +350,7 @@ The API returns streaming JSON responses. Each line contains a separate JSON obj
 - **`type`** (string): Present only on the `__usage__` frame, where it is always `"usage"`
 - **`usage`** (object): Present only on the `__usage__` frame — `models` (string[]), `llmCalls`, `inputTokens`, `outputTokens`, `cacheWriteTokens`, `cacheReadTokens`, `totalTokens` (numbers)
 
-The stream always ends with one additional frame, `id: "__usage__"`, reporting the run's models and token usage (see the Usage Message example below). Treat it like the `__cutoff__` and `__state__` frames: filter it out of anything rendered as a chat message.
+The stream always ends with one additional frame, `id: "__usage__"` (see the Usage Message example below). Treat it like the `__cutoff__` and `__state__` frames: filter it out of anything rendered as a chat message.
 
 ### Response Examples
 
@@ -546,7 +546,7 @@ The API returns a series of JSON objects, each on a separate line. Here's what a
 }
 ```
 
-This is always the last frame on the stream, sent whether the run completed, was aborted, or errored. `usage.models` lists the distinct models used, and for a [BYOM](/admin/ai/bring-your-own-model) model is normalized to strip infrastructure detail (e.g. a Bedrock inference-profile ARN is reduced to its model name) rather than the raw configured identifier. There is no cost field — Cube's rate card isn't necessarily the caller's bill, and it's always zero for BYOM.
+This is always the last frame on the stream, sent whether the run completed, was aborted, or errored. `usage.models` lists the distinct models used, and for a [BYOM](/admin/ai/bring-your-own-model) model is normalized to strip infrastructure detail (e.g. a Bedrock inference-profile ARN is reduced to its model name) rather than the raw configured identifier. The frame reports tokens only — there is no cost field.
 
 ### Getting the Final Assistant Message
 

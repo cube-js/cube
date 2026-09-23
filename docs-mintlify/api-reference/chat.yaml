@@ -279,6 +279,9 @@ paths:
                       outputTokens:
                         type: number
                       totalTokens:
+                        description: >-
+                          Sum of `inputTokens`, `outputTokens`, `cacheWriteTokens`, and
+                          `cacheReadTokens`.
                         type: number
                     type: object
                 type: object
