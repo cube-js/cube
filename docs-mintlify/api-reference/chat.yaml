@@ -57,9 +57,11 @@ paths:
 
         terminated by `\n`) and served with `Content-Type: application/json`. Each line represents a
 
-        chat message, a state update, a usage frame, or an error object. Assistant content arrives incrementally —
+        chat message, a state update, a usage frame, or an error object. Assistant content arrives
 
-        updates to a previously emitted message carry the same `id` with `isDelta: true`.
+        incrementally — updates to a previously emitted message carry the same `id` with
+
+        `isDelta: true`.
 
 
         Provide `input` to send a new message. Omit `input` (with a `chatId`) to retrieve the
