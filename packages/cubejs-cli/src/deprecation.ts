@@ -36,10 +36,9 @@ const HELP_FLAGS = new Set(['--help', '-h']);
 
 const commandFrom = (argv: string[]) => (argv[0] && !argv[0].startsWith('-') ? argv[0] : undefined);
 
-// `server` is the Docker image entrypoint, so warning on commands without a
-// `cube` counterpart would put the banner in every container's logs. Other
-// flag-only runs (e.g. `--version`) stay silent too, since version probes
-// often capture stderr.
+// `server` is the Docker image entrypoint (`CMD ["cubejs", "server"]`) and
+// `--version` output gets parsed by scripts, so both stay silent, like every
+// run that has no `cube` counterpart.
 export const shouldDisplayDeprecationWarning = (argv: string[]) => !argv.length ||
   HELP_FLAGS.has(argv[0]) ||
   COMMAND_REPLACEMENTS.has(commandFrom(argv) ?? '');
