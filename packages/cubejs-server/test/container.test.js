@@ -141,7 +141,7 @@ describe('ServerContainer dev mode resolution', () => {
     expect(container.cubeConfigEmpty).toBe(true);
   });
 
-  // OptsHandler pins it, from the config that wins rather than the command's request
+  // CubejsServerCore pins it, from the config that wins rather than the command's request
   test('`cubejs dev-server` does not pin the pre-aggregation schema itself', async () => {
     await lookupConfiguration(true);
 

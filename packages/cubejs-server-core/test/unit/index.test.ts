@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-empty-function */
 
-import { SchemaFileRepository, withTimeout } from '@cubejs-backend/shared';
+import { dropPreAggregationsSchemaPin, SchemaFileRepository, withTimeout } from '@cubejs-backend/shared';
 
 import {
   CreateOptions,
@@ -97,6 +97,12 @@ describe('index.test', () => {
     delete process.env.CUBEJS_SCHEDULED_REFRESH;
     delete process.env.CUBEJS_SCHEDULED_REFRESH_TIMER;
     delete process.env.CUBEJS_LOG_REDACTION;
+
+    // The cores built here take the pin and are never shut down, so without this the
+    // first dev-mode one leaves `dev_pre_aggregations` set and every later case that
+    // resolves its own schema prints the conflict warning at it
+    dropPreAggregationsSchemaPin();
+    delete process.env.CUBEJS_PRE_AGGREGATIONS_SCHEMA;
 
     process.env.NODE_ENV = 'development';
     process.env.CUBEJS_API_SECRET = 'api-secret';
