@@ -193,7 +193,7 @@ def context_to_cube_store_router_id(ctx: dict) -> str:
 ```
 
 ```js title="JavaScript"
-const crypto = require('crypto')
+const zlib = require('zlib')
 
 const NUMBER_OF_CLUSTERS = 3
 
@@ -202,8 +202,8 @@ module.exports = {
     return `CUBE_APP_${securityContext.tenant_id}`
   },
   contextToCubeStoreRouterId: ({ securityContext }) => {
-    const hash = crypto.createHash('md5').update(`${securityContext.tenant_id}`).digest()
-    return `CUBE_ROUTER_${hash.readUInt32BE(0) % NUMBER_OF_CLUSTERS}`
+    const tenantId = `${securityContext.tenant_id}`
+    return `CUBE_ROUTER_${zlib.crc32(tenantId) % NUMBER_OF_CLUSTERS}`
   }
 }
 ```
