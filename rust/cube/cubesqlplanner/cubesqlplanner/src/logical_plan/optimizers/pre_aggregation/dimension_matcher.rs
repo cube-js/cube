@@ -239,17 +239,41 @@ impl<'a> DimensionMatcher<'a> {
         time_dimension: &TimeDimensionSymbol,
         add_to_matched_dimension: bool,
     ) -> Result<MatchState, CubeError> {
+        // Read from a stored column rather than computed, so nothing derives
+        // it from another bucket.
+        let is_sql_granularity = |td: &TimeDimensionSymbol| {
+            td.granularity_obj()
+                .as_ref()
+                .is_some_and(|granularity_obj| granularity_obj.calendar_sql().is_some())
+        };
+        let is_sql_defined_granularity = is_sql_granularity(time_dimension);
+
         let granularity = if self.pre_aggregation.allow_non_strict_date_range_match {
             time_dimension.granularity().clone()
         } else {
             time_dimension.rollup_granularity(self.query_tools.clone())?
         };
+
+        // Demoted, i.e. the range needs a finer grain than this one.
+        if is_sql_defined_granularity && granularity != *time_dimension.granularity() {
+            return Ok(MatchState::NotMatched);
+        }
+
         let base_symbol_name = time_dimension.base_symbol().full_name();
 
         if let Some(entries) = self
             .pre_aggregation_time_dimensions
             .get_mut(&base_symbol_name)
         {
+            // Stored columns are addressed by the member alone, so several
+            // granularities of one dimension are indistinguishable here, and
+            // whichever is left standing may be a `sql` one read as is.
+            if entries.len() > 1
+                && (is_sql_defined_granularity
+                    || entries.iter().any(|(td, _)| is_sql_granularity(td)))
+            {
+                return Ok(MatchState::NotMatched);
+            }
             // First, look for exact granularity match
             let exact_match = entries
                 .iter_mut()
@@ -259,6 +283,10 @@ impl<'a> DimensionMatcher<'a> {
                     *matched = true;
                 }
                 return Ok(MatchState::Full);
+            }
+
+            if is_sql_defined_granularity {
+                return Ok(MatchState::NotMatched);
             }
 
             // No exact match — find the finest pre-agg granularity that covers the query
