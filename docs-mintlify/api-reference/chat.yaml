@@ -134,14 +134,6 @@ paths:
                   summary: Error line
                   value:
                     error: 'BadRequestError: Bad branch'
-                finalState:
-                  summary: Thread state snapshot (__state__)
-                  value:
-                    id: __state__
-                    isDelta: false
-                    role: assistant
-                    state:
-                      messages: []
                 initialState:
                   summary: Initial state (__cutoff__)
                   value:
@@ -151,6 +143,14 @@ paths:
                     state:
                       chatId: a1b2c3d4-08d7-40b9-8b1c-e7e3a698647e
                       isStreaming: false
+                threadState:
+                  summary: Thread state snapshot (__state__)
+                  value:
+                    id: __state__
+                    isDelta: false
+                    role: assistant
+                    state:
+                      messages: []
                 toolCall:
                   summary: Tool call (cubeMeta)
                   value:
