@@ -404,9 +404,6 @@ example, when [tenants][ref-multitenancy] are partitioned across routers to
 isolate their pre-aggregation storage and query load). By default this function
 is not set, and all requests use the same Cube Store router.
 
-In Cube, multiple Cube Store routers are available on Multi-cluster deployments
-with [Multi-router Cube Store][ref-multi-router-cube-store] enabled.
-
 <Warning>
 
 `context_to_cube_store_router_id` requires
@@ -420,25 +417,35 @@ Called on each request.
 
 ```python title="Python"
 from cube import config
+import zlib
+
+NUMBER_OF_ROUTERS = 3
 
 @config('context_to_cube_store_router_id')
 def context_to_cube_store_router_id(ctx: dict) -> str:
-  return f"CUBE_ROUTER_{ctx['securityContext']['tenant_id']}"
+  tenant_id = str(ctx['securityContext']['tenant_id'])
+  return f"CUBE_ROUTER_{zlib.crc32(tenant_id.encode()) % NUMBER_OF_ROUTERS}"
 ```
 
 ```javascript title="JavaScript"
+const zlib = require('zlib')
+
+const NUMBER_OF_ROUTERS = 3
+
 module.exports = {
   contextToCubeStoreRouterId: ({ securityContext }) => {
-    return `CUBE_ROUTER_${securityContext.tenant_id}`
+    const tenantId = `${securityContext.tenant_id}`
+    return `CUBE_ROUTER_${zlib.crc32(tenantId) % NUMBER_OF_ROUTERS}`
   }
 }
 ```
 
 </CodeGroup>
 
-On Multi-cluster deployments, keep the number of distinct ids at or below
-**Number of clusters**. See [Multi-router Cube Store][ref-multi-router-cube-store]
-for an example that maps many tenants onto a fixed set of ids.
+The example maps tenants onto a fixed set of router ids. In Cube, multiple Cube
+Store routers are available on Multi-cluster deployments with
+[Multi-router Cube Store][ref-multi-router-cube-store] enabled, and the number
+of distinct ids should stay at or below **Number of clusters**.
 
 ### `driver_factory`
 
