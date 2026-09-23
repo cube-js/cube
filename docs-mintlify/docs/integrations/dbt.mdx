@@ -323,6 +323,8 @@ models:
       meta:
         cube:
           public: false
+
+  - name: dim_customers
     columns:
       - name: customer_email
         config:
@@ -334,7 +336,8 @@ models:
 - On a **model**, this sets the generated cube's `public`.
 - On a **column**, it hides that column's dimension and any `sum` measure built from it.
   The cube's `count` measure stays visible.
-- The top-level `meta:` key works too. If a model carries both, `config.meta` wins.
+- The top-level `meta:` key works too, on models and columns. If one carries both,
+  `config.meta` wins.
 - A column's `config:` block needs dbt Core 1.10 or later. On older versions, declare
   a column's `meta:` at the top level of the column instead.
 - Use a boolean. In dbt YAML the pull also accepts the strings `"true"` / `"false"` in
