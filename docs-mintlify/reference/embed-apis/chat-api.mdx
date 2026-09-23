@@ -347,6 +347,8 @@ The API returns streaming JSON responses. Each line contains a separate JSON obj
 - **`isInProcess`** (boolean): Whether the message is still being generated
 - **`sort`** (number): Message ordering sequence number
 - **`state`** (object): Current streaming state information
+- **`type`** (string): Present only on the `__usage__` frame, where it is always `"usage"`
+- **`usage`** (object): Present only on the `__usage__` frame — `models` (string[]), `llmCalls`, `inputTokens`, `outputTokens`, `cacheWriteTokens`, `cacheReadTokens`, `totalTokens` (numbers)
 
 The stream always ends with one additional frame, `id: "__usage__"`, reporting the run's models and token usage (see the Usage Message example below). Treat it like the `__cutoff__` and `__state__` frames: filter it out of anything rendered as a chat message.
 

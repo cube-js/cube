@@ -135,7 +135,7 @@ paths:
                   value:
                     error: 'BadRequestError: Bad branch'
                 finalState:
-                  summary: Final state (__state__)
+                  summary: Thread state snapshot (__state__)
                   value:
                     id: __state__
                     isDelta: false
@@ -151,20 +151,6 @@ paths:
                     state:
                       chatId: a1b2c3d4-08d7-40b9-8b1c-e7e3a698647e
                       isStreaming: false
-                usage:
-                  summary: Usage (__usage__, always the last frame)
-                  value:
-                    id: __usage__
-                    type: usage
-                    usage:
-                      models:
-                        - claude-sonnet-5
-                      llmCalls: 7
-                      inputTokens: 18412
-                      outputTokens: 2280
-                      cacheWriteTokens: 31006
-                      cacheReadTokens: 264118
-                      totalTokens: 315816
                 toolCall:
                   summary: Tool call (cubeMeta)
                   value:
@@ -177,6 +163,20 @@ paths:
                     toolCall:
                       input: '{"searchQuery":"revenue trends"}'
                       name: cubeMeta
+                usage:
+                  summary: Usage (__usage__, always the last frame)
+                  value:
+                    id: __usage__
+                    type: usage
+                    usage:
+                      cacheReadTokens: 264118
+                      cacheWriteTokens: 31006
+                      inputTokens: 18412
+                      llmCalls: 7
+                      models:
+                        - claude-sonnet-5
+                      outputTokens: 2280
+                      totalTokens: 315816
                 userEcho:
                   summary: User message echo
                   value:
@@ -233,6 +233,21 @@ paths:
                   thinking:
                     description: Agent's internal reasoning. Only present in development mode.
                     type: string
+                  toolCall:
+                    description: Present when the message represents a tool invocation or its result.
+                    properties:
+                      input:
+                        description: JSON-encoded tool input.
+                        type: string
+                      name:
+                        description: Tool name, e.g. `cubeMeta` or `cubeSqlApi`.
+                        type: string
+                      result:
+                        description: >-
+                          JSON-encoded tool result. Absent until the tool finishes; on failure
+                          contains a JSON object with an `error` field.
+                        type: string
+                    type: object
                   type:
                     description: >-
                       Present only on the `__usage__` frame, where it is always `usage`. Absent on
@@ -265,21 +280,6 @@ paths:
                         type: number
                       totalTokens:
                         type: number
-                    type: object
-                  toolCall:
-                    description: Present when the message represents a tool invocation or its result.
-                    properties:
-                      input:
-                        description: JSON-encoded tool input.
-                        type: string
-                      name:
-                        description: Tool name, e.g. `cubeMeta` or `cubeSqlApi`.
-                        type: string
-                      result:
-                        description: >-
-                          JSON-encoded tool result. Absent until the tool finishes; on failure
-                          contains a JSON object with an `error` field.
-                        type: string
                     type: object
                 type: object
             text/html; charset=utf-8: {}
