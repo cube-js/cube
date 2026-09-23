@@ -1,0 +1,16 @@
+{
+  "dimensions": [
+    "Orders.status",
+    "Orders.createdAt",
+    "Orders.createdAtConverted"
+  ],
+  "timeDimensions": [ {
+    "dimension": "Orders.createdAt",
+    "granularity": "day"
+  } ],
+  "order": {
+    "Orders.createdAt": "desc"
+  },
+  "limit": 3,
+  "timezone": "America/New_York"
+}
