@@ -90,7 +90,8 @@ regenerate the token if it needs to be rotated.
 `cubejs-cli` is deprecated. Use the new [Cube CLI][ref-cli] instead. In CI,
 authenticate with an API key rather than the deploy token — set `CUBE_API_URL`
 and `CUBE_API_KEY` (or run `cube login --api-key <KEY> --url <URL>`), then run
-`cube deploy <deployment-id> --directory .`.
+`cube deploy <deployment-id> --directory .` (find the id with
+`cube deployments list`).
 
 </Warning>
 

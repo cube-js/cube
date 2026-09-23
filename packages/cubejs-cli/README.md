@@ -15,6 +15,7 @@
 > ```
 >
 > See the [Cube CLI reference](https://docs.cube.dev/reference/cli) for details.
+> Set `CUBEJS_CLI_NO_DEPRECATION_WARNING=true` to suppress the warning.
 
 Install:
 
