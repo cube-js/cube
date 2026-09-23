@@ -85,6 +85,13 @@ example CI/CD pipeline config (such as a GitHub Actions workflow), on the
 **Build & Deploy** tab of the **Settings** screen. The same screen lets you
 regenerate the token if it needs to be rotated.
 
+<Warning>
+
+`cubejs-cli` is deprecated. Use the new [Cube CLI][ref-cli] instead: run
+`cube login`, then `cube deploy <deployment-id>` to push your project.
+
+</Warning>
+
 <Frame>
   <img src="https://static.cube.dev/docs/admin/deployment/continuous-deployment/cli-deploy-token.png" alt="Build & Deploy settings tab with Deploy with CLI selected, showing the Deploy Token and a sample GitHub Actions workflow" />
 </Frame>
@@ -148,3 +155,4 @@ automatically, switch the deployment to [Deploy with Git](#deploy-with-git).
 [ref-environments-dev]: /admin/deployment/environments#development-environments
 [ref-environments-prod]: /admin/deployment/environments#production-environment
 [ref-environments-staging]: /admin/deployment/environments#staging-environments
+[ref-cli]: /reference/cli

@@ -7,6 +7,15 @@
 
 # Cube CLI
 
+> [!WARNING]
+> `cubejs-cli` is deprecated. Please use the new native Cube CLI (`cube`) instead:
+>
+> ```bash
+> curl -fsSL https://raw.githubusercontent.com/cube-js/cube/master/install-cli.sh | sh
+> ```
+>
+> See the [Cube CLI reference](https://docs.cube.dev/reference/cli) for details.
+
 Install:
 
 ```
