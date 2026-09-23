@@ -556,10 +556,31 @@ Six things are required, and missing any of them returns you to the fallback:
 - the shift's `sql` is a **member reference**, so a stored column can stand for it;
 - the column the shift maps through is **declared on the `rollup_join`** and stored by the
   calendar's rollup — the first is what decides whether the shift can be served;
-- the join condition names **members on both sides**;
+- the join condition names **members on both sides**, and on the calendar's side the
+  **primary key** — that is the member a shift replaces;
 - every calendar dimension the query groups by is **declared in both rollups**;
 - each rollup has an [index][ref-rollup-join] covering its side of the join key —
   Cube Store joins rollups only on an indexed column.
+
+Reporting by a fiscal week or period works the same way: the join key and the reporting
+label are different columns and need not share a grain. Keep the primary key at `day`, so
+the shifted join still matches an exact value, and store the period alongside it:
+
+```yaml
+      - name: calendar_rollup
+        measures: [count]
+        dimensions: [prev_year_date]
+        time_dimensions:
+          - dimension: date_key        # the join key, an exact value
+            granularity: day
+          - dimension: retail_date     # the reporting label
+            granularity: week
+```
+
+The `rollup_join` then declares `time_dimension: custom_calendar.retail_date` with
+`granularity: week`, and — as with any `sql` granularity — needs
+[`allow_non_strict_date_range_match`][ref-non-strict], since Cube cannot check that a
+range falls on those periods.
 
 ### Naming a granularity defined with `sql`
 

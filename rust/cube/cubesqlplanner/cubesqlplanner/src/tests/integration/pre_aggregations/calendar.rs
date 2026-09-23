@@ -22,6 +22,8 @@ fn ctx_rollup_join(pre_aggs: &[&str]) -> TestContext {
         "calendar_rollup",
         "calendar_rollup_no_shift_column",
         "demand_by_calendar_plain",
+        "demand_with_calendar_week",
+        "calendar_rollup_week",
     ];
     let names = pre_aggs
         .iter()
@@ -483,4 +485,71 @@ async fn calendar_shift_plain_rollup_with_mapped_column_falls_back() {
     let rollup = ctx.try_execute_pg(&query, SEED).await;
     let source = ctx_rollup_join(&[]).try_execute_pg(&query, SEED).await;
     assert_eq!(rollup, source);
+}
+
+/// Reporting by a `sql`-overridden fiscal week. The calendar's rollup keeps the
+/// primary key at `day`, so the shifted join still matches an exact value,
+/// while the week column it also stores carries the reporting label. Cube
+/// cannot check that a range falls on those weeks, hence
+/// `allow_non_strict_date_range_match`.
+#[tokio::test(flavor = "multi_thread")]
+async fn calendar_shift_served_from_rollups_by_fiscal_week() {
+    let query = indoc! {r#"
+        measures:
+          - demand.net_demand_a
+          - demand.net_demand_a_ly
+        time_dimensions:
+          - dimension: retail_calendar.retail_date
+            granularity: week
+            dateRange:
+              - "2025-02-09"
+              - "2025-02-22"
+        order:
+          - id: retail_calendar.retail_date
+    "#};
+    if let Some((rollup, source, sql)) =
+        rollup_join_vs_source(query, &["demand_with_calendar_week"]).await
+    {
+        assert_eq!(rollup, source);
+        for source_table in ["cal_pa_dates", "cal_pa_demand"] {
+            assert!(
+                !sql.contains(source_table),
+                "query must read rollups only, but names {}; SQL:\n{}",
+                source_table,
+                sql
+            );
+        }
+    }
+}
+
+/// Grouping by a calendar dimension that is not a time dimension at all. Only
+/// the primary key and the mapped column have roles the shift depends on;
+/// anything else the calendar exposes is an ordinary stored dimension.
+#[tokio::test(flavor = "multi_thread")]
+async fn calendar_shift_groups_by_a_plain_calendar_dimension() {
+    let query = indoc! {r#"
+        measures:
+          - demand.net_demand_a
+          - demand.net_demand_a_ly
+        dimensions:
+          - retail_calendar.retail_year_week
+        time_dimensions:
+          - dimension: retail_calendar.retail_date
+            granularity: day
+            dateRange:
+              - "2025-02-09"
+              - "2025-02-11"
+        order:
+          - id: retail_calendar.retail_year_week
+    "#};
+    if let Some((rollup, source, sql)) =
+        rollup_join_vs_source(query, &["demand_with_calendar"]).await
+    {
+        assert_eq!(rollup, source);
+        assert!(
+            !sql.contains("cal_pa_dates") && !sql.contains("cal_pa_demand"),
+            "query must read rollups only; SQL:\n{}",
+            sql
+        );
+    }
 }

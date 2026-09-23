@@ -15,9 +15,17 @@ cubes:
             type: prior
             sql: "{CUBE.prev_year_date}"
 
+      - name: retail_week_begin
+        sql: "{CUBE}.retail_week_begin"
+        type: time
+
       - name: retail_date
         sql: "{CUBE}.date_val"
         type: time
+
+        granularities:
+          - name: week
+            sql: "{CUBE.retail_week_begin}"
 
         time_shift:
           - interval: 1 year
@@ -27,6 +35,10 @@ cubes:
       - name: prev_year_date
         sql: "{CUBE}.prev_year_date"
         type: time
+
+      - name: retail_year_week
+        sql: "{CUBE}.retail_year_week"
+        type: string
 
     measures:
       - name: count
@@ -41,6 +53,7 @@ cubes:
           - count
         dimensions:
           - prev_year_date
+          - retail_year_week
         time_dimensions:
           - dimension: date_val
             granularity: day
@@ -51,6 +64,26 @@ cubes:
             columns:
               - date_val
           - name: prev_year_date_idx
+            columns:
+              - prev_year_date
+
+      # Reporting by the overridden week, with the join key still at day.
+      - name: calendar_rollup_week
+        type: rollup
+        measures:
+          - count
+        dimensions:
+          - prev_year_date
+        time_dimensions:
+          - dimension: date_val
+            granularity: day
+          - dimension: retail_date
+            granularity: week
+        indexes:
+          - name: week_date_val_idx
+            columns:
+              - date_val
+          - name: week_prev_year_date_idx
             columns:
               - prev_year_date
 
@@ -127,6 +160,7 @@ cubes:
         dimensions:
           - item_dept
           - retail_calendar.prev_year_date
+          - retail_calendar.retail_year_week
         time_dimension: retail_calendar.retail_date
         granularity: day
         rollups:
@@ -160,3 +194,17 @@ cubes:
           - retail_calendar.prev_year_date
         time_dimension: retail_calendar.retail_date
         granularity: day
+
+      - name: demand_with_calendar_week
+        type: rollupJoin
+        allow_non_strict_date_range_match: true
+        measures:
+          - gross_demand
+          - cancellations
+        dimensions:
+          - retail_calendar.prev_year_date
+        time_dimension: retail_calendar.retail_date
+        granularity: week
+        rollups:
+          - demand.demand_rollup
+          - retail_calendar.calendar_rollup_week
