@@ -43,7 +43,10 @@ use chrono::{
 use cubeclient::models::V1CubeMeta;
 use datafusion::{
     arrow::{
-        array::{Date32Array, Date64Array, TimestampNanosecondArray},
+        array::{
+            Date32Array, Date64Array, TimestampMicrosecondArray, TimestampMillisecondArray,
+            TimestampNanosecondArray, TimestampSecondArray,
+        },
         datatypes::DataType,
     },
     logical_plan::{Column, Expr, Operator},
@@ -3793,6 +3796,9 @@ impl FilterRules {
                                             vec![Decimal::new(*value).to_string(*scale)]
                                         }
                                         ScalarValue::TimestampNanosecond(_, _)
+                                        | ScalarValue::TimestampMicrosecond(_, _)
+                                        | ScalarValue::TimestampMillisecond(_, _)
+                                        | ScalarValue::TimestampSecond(_, _)
                                         | ScalarValue::Date32(_)
                                         | ScalarValue::Date64(_) => {
                                             if let Ok(Some(timestamp)) =
@@ -4696,6 +4702,9 @@ impl FilterRules {
                 Decimal::new(*value).to_string(*scale)
             }
             ScalarValue::TimestampNanosecond(_, _)
+            | ScalarValue::TimestampMicrosecond(_, _)
+            | ScalarValue::TimestampMillisecond(_, _)
+            | ScalarValue::TimestampSecond(_, _)
             | ScalarValue::Date32(_)
             | ScalarValue::Date64(_) => {
                 if let Some(timestamp) = Self::scalar_to_native_datetime(literal)? {
@@ -4716,13 +4725,32 @@ impl FilterRules {
         literal: &ScalarValue,
     ) -> Result<Option<NaiveDateTime>, &'static str> {
         Ok(match literal {
+            // Plan normalization folds a date too far out for nanoseconds (`9999-12-31`) to a
+            // millisecond timestamp, so the coarser units are accepted here as well.
             ScalarValue::TimestampNanosecond(_, _)
+            | ScalarValue::TimestampMicrosecond(_, _)
+            | ScalarValue::TimestampMillisecond(_, _)
+            | ScalarValue::TimestampSecond(_, _)
             | ScalarValue::Date32(_)
             | ScalarValue::Date64(_) => {
+                // `value_as_datetime` ignores validity, so a NULL would read as the epoch.
+                if literal.is_null() {
+                    return Ok(None);
+                }
                 let array = literal.to_array();
                 let timestamp = if let Some(array) =
                     array.as_any().downcast_ref::<TimestampNanosecondArray>()
                 {
+                    array.value_as_datetime(0)
+                } else if let Some(array) =
+                    array.as_any().downcast_ref::<TimestampMicrosecondArray>()
+                {
+                    array.value_as_datetime(0)
+                } else if let Some(array) =
+                    array.as_any().downcast_ref::<TimestampMillisecondArray>()
+                {
+                    array.value_as_datetime(0)
+                } else if let Some(array) = array.as_any().downcast_ref::<TimestampSecondArray>() {
                     array.value_as_datetime(0)
                 } else if let Some(array) = array.as_any().downcast_ref::<Date32Array>() {
                     array.value_as_datetime(0)
@@ -5287,23 +5315,16 @@ impl FilterRules {
                 return false;
             };
 
-            let (Some(start_date), Some(end_date)) = (
-                start_date.and_utc().timestamp_nanos_opt(),
-                end_date.and_utc().timestamp_nanos_opt(),
-            ) else {
-                return false;
-            };
-
             subst.insert(
                 start_date_var,
                 egraph.add(LogicalPlanLanguage::LiteralExprValue(LiteralExprValue(
-                    ScalarValue::TimestampNanosecond(Some(start_date), None),
+                    Self::naive_datetime_to_timestamp_literal(start_date),
                 ))),
             );
             subst.insert(
                 end_date_var,
                 egraph.add(LogicalPlanLanguage::LiteralExprValue(LiteralExprValue(
-                    ScalarValue::TimestampNanosecond(Some(end_date), None),
+                    Self::naive_datetime_to_timestamp_literal(end_date),
                 ))),
             );
             true
@@ -5830,6 +5851,10 @@ impl FilterRules {
                 let Some(timestamp) = Self::filter_scalar_to_timestamp_nanos(literal) else {
                     continue;
                 };
+                // The last representable day (2262-04-11) has no next day in nanoseconds.
+                let Some(next_day_start) = timestamp.checked_add(ONE_DAY_NANOS) else {
+                    continue;
+                };
 
                 subst.insert(
                     day_start_var,
@@ -5840,7 +5865,7 @@ impl FilterRules {
                 subst.insert(
                     next_day_start_var,
                     egraph.add(LogicalPlanLanguage::LiteralExprValue(LiteralExprValue(
-                        ScalarValue::TimestampNanosecond(Some(timestamp + ONE_DAY_NANOS), None),
+                        ScalarValue::TimestampNanosecond(Some(next_day_start), None),
                     ))),
                 );
                 return true;
@@ -6059,6 +6084,16 @@ impl FilterRules {
         }
     }
 
+    /// A timestamp literal for a date range bound: nanoseconds where they reach, milliseconds
+    /// beyond 2262-04-11, which filter rules accept as well.
+    fn naive_datetime_to_timestamp_literal(dt: NaiveDateTime) -> ScalarValue {
+        let dt = dt.and_utc();
+        match dt.timestamp_nanos_opt() {
+            Some(nanos) => ScalarValue::TimestampNanosecond(Some(nanos), None),
+            None => ScalarValue::TimestampMillisecond(Some(dt.timestamp_millis()), None),
+        }
+    }
+
     // The outer Option's purpose is to signal when the type is incorrect
     // or parsing couldn't interpret the value as a NativeDateTime.
     // The inner Option is None when the ScalarValue is None.
@@ -6072,6 +6107,14 @@ impl FilterRules {
             let dt = DateTime::from_timestamp(ts_seconds, ts_nanos).map(|dt| Some(dt.naive_utc()));
             return dt;
         };
+        // Coarser units, as `scalar_to_native_datetime` accepts: plan normalization folds a date
+        // too far out for nanoseconds to a millisecond timestamp.
+        if let ScalarValue::TimestampMicrosecond(_, None)
+        | ScalarValue::TimestampMillisecond(_, None)
+        | ScalarValue::TimestampSecond(_, None) = literal
+        {
+            return Self::scalar_to_native_datetime(literal).ok();
+        }
 
         let ScalarValue::Utf8(str) = literal else {
             return None;
@@ -6376,5 +6419,43 @@ impl Decimal {
 
     pub fn format_string(raw_value: i128, scale: usize) -> String {
         Decimal::new(raw_value).to_string(scale)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use datafusion::scalar::ScalarValue;
+
+    use super::FilterRules;
+
+    /// A NULL temporal literal has no datetime. `value_as_datetime` ignores validity, so without
+    /// a guard it would read as 1970-01-01 and push down as a real bound.
+    #[test]
+    fn test_scalar_to_native_datetime_null() {
+        let timestamps = [
+            ScalarValue::TimestampNanosecond(None, None),
+            ScalarValue::TimestampMicrosecond(None, None),
+            ScalarValue::TimestampMillisecond(None, None),
+            ScalarValue::TimestampSecond(None, None),
+        ];
+        for literal in timestamps
+            .iter()
+            .chain(&[ScalarValue::Date32(None), ScalarValue::Date64(None)])
+        {
+            assert_eq!(
+                FilterRules::scalar_to_native_datetime(literal),
+                Ok(None),
+                "{:?}",
+                literal
+            );
+        }
+        for literal in &timestamps {
+            assert_eq!(
+                FilterRules::scalar_dt_to_naive_datetime(literal),
+                Some(None),
+                "{:?}",
+                literal
+            );
+        }
     }
 }

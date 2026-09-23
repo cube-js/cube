@@ -36,6 +36,25 @@ macro_rules! plan_to_language {
     };
 }
 
+/// Whether two scalars agree on timezone when both are timestamps of the same unit.
+///
+/// TODO DataFusion compares timestamp scalars without their timezone, so literal nodes would
+/// otherwise merge across timezones. Every unit needs this: plan normalization produces
+/// millisecond timestamps for dates past the nanosecond range.
+pub fn timestamp_timezones_match(
+    left: &datafusion::scalar::ScalarValue,
+    right: &datafusion::scalar::ScalarValue,
+) -> bool {
+    use datafusion::scalar::ScalarValue::*;
+    match (left, right) {
+        (TimestampNanosecond(_, left), TimestampNanosecond(_, right))
+        | (TimestampMicrosecond(_, left), TimestampMicrosecond(_, right))
+        | (TimestampMillisecond(_, left), TimestampMillisecond(_, right))
+        | (TimestampSecond(_, left), TimestampSecond(_, right)) => left == right,
+        _ => true,
+    }
+}
+
 #[macro_export]
 macro_rules! variant_field_struct {
     ($variant:ident, $var_field:ident, String) => {
@@ -674,18 +693,8 @@ macro_rules! variant_field_struct {
 
             impl core::cmp::PartialEq for [<$variant $var_field:camel>] {
                 fn eq(&self, other: &[<$variant $var_field:camel>]) -> bool {
-                    // TODO Datafusion has incorrect Timestamp comparison without timezone involved
-                    match &self.0 {
-                        ScalarValue::TimestampNanosecond(_, self_tz) => {
-                            match &other.0 {
-                                ScalarValue::TimestampNanosecond(_, other_tz) => {
-                                    self_tz == other_tz && self.0 == other.0
-                                }
-                                _ => self.0 == other.0
-                            }
-                        }
-                        _ => self.0 == other.0
-                    }
+                    $crate::compile::rewrite::language::timestamp_timezones_match(&self.0, &other.0)
+                        && self.0 == other.0
                 }
             }
 
@@ -1201,4 +1210,43 @@ macro_rules! __plan_to_language {
             { $($decl)* }
         );
     };
+}
+
+#[cfg(test)]
+mod tests {
+    use datafusion::scalar::ScalarValue;
+
+    use super::timestamp_timezones_match;
+
+    #[test]
+    fn test_timestamp_timezones_match_every_unit() {
+        let utc = Some("UTC".to_string());
+        for (with_tz, without_tz) in [
+            (
+                ScalarValue::TimestampNanosecond(Some(0), utc.clone()),
+                ScalarValue::TimestampNanosecond(Some(0), None),
+            ),
+            (
+                ScalarValue::TimestampMicrosecond(Some(0), utc.clone()),
+                ScalarValue::TimestampMicrosecond(Some(0), None),
+            ),
+            (
+                ScalarValue::TimestampMillisecond(Some(0), utc.clone()),
+                ScalarValue::TimestampMillisecond(Some(0), None),
+            ),
+            (
+                ScalarValue::TimestampSecond(Some(0), utc.clone()),
+                ScalarValue::TimestampSecond(Some(0), None),
+            ),
+        ] {
+            // DataFusion itself treats these as equal, which is what the check guards against.
+            assert_eq!(with_tz, without_tz);
+            assert!(!timestamp_timezones_match(&with_tz, &without_tz));
+            assert!(timestamp_timezones_match(&with_tz, &with_tz));
+        }
+        assert!(timestamp_timezones_match(
+            &ScalarValue::Int64(Some(1)),
+            &ScalarValue::Int64(Some(1))
+        ));
+    }
 }
