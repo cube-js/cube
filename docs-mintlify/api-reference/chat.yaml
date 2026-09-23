@@ -250,6 +250,8 @@ paths:
                     description: >-
                       Present only on the `__usage__` frame, where it is always `usage`. Absent on
                       every other message.
+                    enum:
+                      - usage
                     type: string
                   usage:
                     description: >-
