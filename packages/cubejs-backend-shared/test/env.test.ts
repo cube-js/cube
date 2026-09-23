@@ -412,6 +412,9 @@ describe('pinPreAggregationsSchema', () => {
     expect(process.env.CUBEJS_PRE_AGGREGATIONS_SCHEMA).toEqual('dev_pre_aggregations');
     expect(pinWarnings()).toHaveLength(1);
     expect(pinWarnings()[0]).toContain('prod_pre_aggregations');
+    // Two instances, so dropping a setting is not it - neither of them set the variable
+    expect(pinWarnings()[0]).toContain('one Cube instance per process');
+    expect(pinWarnings()[0]).not.toContain('Drop either');
   });
 
   test('pins over an empty value, which every consumer reads as absent', () => {
@@ -576,6 +579,9 @@ describe('pinPreAggregationsSchema', () => {
     expect(pinWarnings()).toHaveLength(1);
     expect(pinWarnings()[0]).toContain('my_schema');
     expect(pinWarnings()[0]).toContain('analytics_preaggs');
+    // One instance, so telling them to run one per process is advice they cannot take
+    expect(pinWarnings()[0]).toContain('Drop either CUBEJS_PRE_AGGREGATIONS_SCHEMA');
+    expect(pinWarnings()[0]).not.toContain('one Cube instance per process');
   });
 
   test('names each instance whose schema loses, not only the first', () => {
