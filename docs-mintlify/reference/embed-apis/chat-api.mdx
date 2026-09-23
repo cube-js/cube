@@ -334,7 +334,7 @@ The API returns streaming JSON responses. Each line contains a separate JSON obj
 
 ### Response Fields
 
-- **`id`** (string): Unique message identifier
+- **`id`** (string): Unique message identifier. Sentinel values: `__cutoff__`, `__state__`, and `__usage__`
 - **`role`** (string): Message sender: `"user"` or `"assistant"`. Absent on error lines and on the `__usage__` frame
 - **`content`** (string): Message content (streamed incrementally for assistant messages)
 - **`thinking`** (string): Agent's internal reasoning process (visible in development mode)
