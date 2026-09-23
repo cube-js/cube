@@ -24,7 +24,8 @@ it does not import Databricks definitions into Cube or sync automatically after 
 - If a Cube source uses a two-part `schema.table` name, set
   [`CUBEJS_DB_DATABRICKS_CATALOG`](/reference/configuration/environment-variables#cubejs_db_databricks_catalog)
   for that data source so Preview can resolve its catalog. Without it, those views are blocked.
-- Ask your Databricks administrator for a **dedicated target catalog and schema** for the preview.
+- Ask your Databricks administrator for a **dedicated target catalog and schema** for the
+  published Metric Views.
   The identity configured on the Cube data source needs `CAN USE` on its SQL warehouse,
   `USE CATALOG` and `USE SCHEMA` on the target and source namespaces, `SELECT` on source
   relations, and `CREATE TABLE` on the target schema. The same identity must own any existing
@@ -36,7 +37,8 @@ it does not import Databricks definitions into Cube or sync automatically after 
   grant them `SELECT` on it or access to its catalog and schema.
 - Databricks evaluates access to the published object under Unity Catalog permissions, not
   Cube's query-time authorization. Cube access policies that cannot be represented there block
-  publication. Review the preview and Databricks grants before exposing a target to consumers.
+  publication. Review the **Preview** result and Databricks grants before exposing a target to
+  consumers.
 - Cube uses the data source credential server-side; you do not enter a second token in the
   browser. Preview returns generated YAML for review, but credentials and complete generated
   DDL are not written to logs.
@@ -95,8 +97,8 @@ delete obsolete Metric Views; it currently behaves like `retain`. Choose `retain
 
 ## What can be published
 
-The preview is the authority for your deployed model. This preview release supports static YAML,
-one Databricks data source per published view, scalar dimensions, common aggregates and
+The **Preview** result is the authority for your deployed model. This preview release supports
+static YAML, one Databricks data source per published view, scalar dimensions, common aggregates and
 supported calculated measures, and conservative many-to-one equality joins. The target uses
 Databricks Metric View YAML 1.1.
 
