@@ -469,8 +469,9 @@ export class DatabricksDriver extends JDBCDriver {
       return schema;
     } else {
       // A driver cannot see CreateOptions.devServer, so this can disagree with the
-      // schema server-core resolved. It pins CUBEJS_PRE_AGGREGATIONS_SCHEMA above
-      // whenever it has one string to pin — a per-tenant function is the gap
+      // schema server-core resolved. server-core writes that schema into
+      // CUBEJS_PRE_AGGREGATIONS_SCHEMA whenever it has one string to write, which the
+      // branch above then reads — a per-tenant preAggregationsSchema function is the gap
       return getEnv('devMode')
         ? 'dev_pre_aggregations'
         : 'prod_pre_aggregations';

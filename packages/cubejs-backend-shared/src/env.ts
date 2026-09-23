@@ -286,19 +286,16 @@ export const pinPreAggregationsSchema = (schema: string): symbol | undefined => 
     return takeShare();
   }
 
-  // Whoever set it — this process for another instance, or a user value that
-  // CreateOptions.preAggregationsSchema overrules. Keyed on the pair, so a third
-  // instance naming a third schema is reported rather than silenced by the second
   const setSchema = process.env.CUBEJS_PRE_AGGREGATIONS_SCHEMA;
 
   if (setSchema !== schema) {
-    // Only one of these is actionable, and which depends on who set the variable: this
-    // process for an earlier instance, or the user against an option that overrules it
     const remedy = pinnedPreAggregationsSchema !== undefined
       ? 'Run one Cube instance per process, or give both instances the same schema.'
       : 'Drop either CUBEJS_PRE_AGGREGATIONS_SCHEMA or the preAggregationsSchema option, '
         + 'so one of them names the schema.';
 
+    // Keyed on the pair, so a third instance naming a third schema is reported
+    // rather than silenced by the second
     displayCLIWarningOnce(
       `pre-aggregations-schema-pinned:${setSchema}:${schema}`,
       `Pre-aggregation schema '${setSchema}' is already set for this process, but this ` +

@@ -8,8 +8,6 @@ import { getEnv, pinPreAggregationsSchema } from '@cubejs-backend/shared';
 
 import { ServerContainer } from '../src/server/container';
 
-// `lookupConfiguration` is what resolves dev mode; with no cube.js in cwd it warns and
-// returns the config it built, so it is safe to call directly
 // `isCubeConfigEmpty` is protected; widen it rather than reaching in, so a change to
 // the field is a compile error here instead of a silently passing test
 class TestServerContainer extends ServerContainer {
@@ -37,6 +35,8 @@ const makeContainer = (devMode) => new TestServerContainer({
   ...(devMode !== undefined && { devMode }),
 });
 
+// `lookupConfiguration` is what resolves dev mode; with no cube.js in cwd it warns and
+// returns the config it built, so it is safe to call directly
 const lookupConfiguration = (devMode) => makeContainer(devMode).lookupConfiguration();
 
 describe('ServerContainer dev mode resolution', () => {
@@ -212,7 +212,6 @@ describe('ServerContainer dev mode resolution', () => {
   // detectQueueAndCacheDriver from cubestore to the memory queue
   test('leaves a NODE_ENV this run never wrote alone', async () => {
     const container = makeContainer(true);
-    container.stubConfigurationFile({});
 
     const projectDir = fs.mkdtempSync(path.join(os.tmpdir(), 'cube-container-'));
     const cwd = process.cwd();
