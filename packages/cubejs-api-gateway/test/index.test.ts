@@ -867,6 +867,35 @@ describe('API Gateway', () => {
     });
   });
 
+  describe('total query', () => {
+    test('returns total 0 when the count query returns no rows', async () => {
+      // MongoDB BI Connector returns no rows for `SELECT COUNT(*)` over an empty set
+      class AdapterApiEmptyMock extends AdapterApiMock {
+        public async executeQuery(_query) {
+          return { data: [] };
+        }
+      }
+
+      const { app } = await createApiGateway(new AdapterApiEmptyMock());
+
+      const query = JSON.stringify({
+        measures: ['Foo.bar'],
+        total: true,
+      });
+
+      const res = await request(app)
+        .get(`/cubejs-api/v1/load?query=${query}`)
+        .set('Content-type', 'application/json')
+        .set('Authorization', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.e30.t-IDcSemACt8x4iTMCda8Yhe3iZaWbvV5XKSTbuAn0M')
+        .expect(200);
+
+      expect(res.body).toMatchObject({
+        data: [],
+        total: 0,
+      });
+    });
+  });
+
   describe('sql api member expressions evaluations', () => {
     const query = {
       measures: [
