@@ -3,7 +3,7 @@ name: Bridge tests
 on:
   pull_request:
     paths:
-      - '.github/actions/setup-yarn/**'
+      - '.github/actions/setup-yarn-1/**'
       - '.github/workflows/bridge-tests.yml'
       - 'rust/cube/cubesqlplanner/**'
       - 'rust/cube/cubenativeutils/**'
@@ -39,7 +39,7 @@ jobs:
         with:
           node-version: 24.x
       - name: Set Yarn version
-        uses: ./.github/actions/setup-yarn
+        uses: ./.github/actions/setup-yarn-1
       - name: Get yarn cache directory path
         id: yarn-cache-dir-path
         run: echo "dir=$(yarn cache dir)" >> "$GITHUB_OUTPUT"

@@ -12,7 +12,7 @@ on:
       - completed
   push:
     paths:
-      - '.github/actions/setup-yarn/**'
+      - '.github/actions/setup-yarn-1/**'
       - '.github/workflows/post-release.yml'
     branches:
       - 'master'
@@ -59,7 +59,7 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-workspace-main-20.x-
       - name: Set Yarn version
-        uses: ./.github/actions/setup-yarn
+        uses: ./.github/actions/setup-yarn-1
       - name: Yarn install
         uses: nick-fields/retry@v4
         env:
@@ -124,7 +124,7 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-workspace-main-20.x-
       - name: Set Yarn version
-        uses: ./.github/actions/setup-yarn
+        uses: ./.github/actions/setup-yarn-1
       - name: Yarn install
         uses: nick-fields/retry@v4
         env:
@@ -188,7 +188,7 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-workspace-main-20.x-
       - name: Set Yarn version
-        uses: ./.github/actions/setup-yarn
+        uses: ./.github/actions/setup-yarn-1
       - name: Yarn install
         uses: nick-fields/retry@v4
         env:

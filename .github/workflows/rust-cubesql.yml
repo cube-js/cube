@@ -3,7 +3,7 @@ name: Build native
 on:
   push:
     paths:
-      - '.github/actions/setup-yarn/**'
+      - '.github/actions/setup-yarn-1/**'
       - '.github/workflows/rust-cubesql.yml'
       - 'packages/cubejs-backend-native/**'
       - 'rust/cube/**'
@@ -12,7 +12,7 @@ on:
       - 'master'
   pull_request:
     paths:
-      - '.github/actions/setup-yarn/**'
+      - '.github/actions/setup-yarn-1/**'
       - '.github/workflows/rust-cubesql.yml'
       - 'packages/cubejs-backend-native/**'
       - 'rust/cube/**'
@@ -165,7 +165,7 @@ jobs:
       - name: Install Yarn
         run: npm install -g yarn
       - name: Set Yarn version
-        uses: ./.github/actions/setup-yarn
+        uses: ./.github/actions/setup-yarn-1
       - name: Get yarn cache directory path
         id: yarn-cache-dir-path
         run: echo "dir=$(yarn cache dir)" >> "$GITHUB_OUTPUT"
@@ -274,7 +274,7 @@ jobs:
         with:
           node-version: ${{ matrix.node-version }}
       - name: Set Yarn version
-        uses: ./.github/actions/setup-yarn
+        uses: ./.github/actions/setup-yarn-1
       - name: Get yarn cache directory path
         id: yarn-cache-dir-path
         run: echo "dir=$(yarn cache dir)" >> "$GITHUB_OUTPUT"
@@ -356,7 +356,7 @@ jobs:
         with:
           node-version: ${{ matrix.node-version }}
       - name: Set Yarn version
-        uses: ./.github/actions/setup-yarn
+        uses: ./.github/actions/setup-yarn-1
       - name: Get yarn cache directory path
         id: yarn-cache-dir-path
         run: echo "dir=$(yarn cache dir)" >> "$GITHUB_OUTPUT"
