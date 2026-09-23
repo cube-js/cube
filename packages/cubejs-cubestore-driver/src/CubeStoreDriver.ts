@@ -195,7 +195,7 @@ export class CubeStoreDriver extends BaseDriver implements DriverInterface {
     }
 
     return this.query(sql, params, queryTracingObj).catch(e => {
-      e.message = `Error during create table: ${sql}: ${e.message}`;
+      e.message = `Error during create table ${tableName}: ${e.message}`;
       throw e;
     });
   }
@@ -369,10 +369,6 @@ export class CubeStoreDriver extends BaseDriver implements DriverInterface {
       const { baseUrl } = this;
       let fileCounter = 0;
 
-      this.createTableSql(table, columns);
-      // eslint-disable-next-line no-unused-vars
-      const createTableSqlWithoutLocation = this.createTableSqlWithOptions(table, columns, options);
-
       const getFileStream = () => {
         if (!currentFileStream) {
           const writer = csvWriter({ headers: columns.map(c => c.name) });
@@ -392,7 +388,7 @@ export class CubeStoreDriver extends BaseDriver implements DriverInterface {
               }).then(async res => {
                 if (res.status !== 200) {
                   const error = await res.json();
-                  throw new Error(`Error during upload of ${fileName} create table: ${createTableSqlWithoutLocation}: ${error.error}`);
+                  throw new Error(`Error during upload of ${fileName}: ${error.error}`);
                 }
                 return fileName;
               }));
