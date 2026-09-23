@@ -75,8 +75,14 @@ paths:
         - `__cutoff__` — initial marker emitted before new content; also carries the thread `chatId`
         and `isStreaming` under `state`.
 
-        - `__state__` — final thread snapshot emitted at the end, carrying the full `{ messages:
-        [...] }` state.
+        - `__state__` — thread snapshot emitted near the end, carrying the full `{ messages: [...] }`
+        state.
+
+        - `__usage__` — always the last frame on the stream, whether the run completed, was aborted,
+        or errored. Carries `{ models, llmCalls, inputTokens, outputTokens, cacheWriteTokens,
+        cacheReadTokens, totalTokens }` under `usage`. `models` is normalized for a BYOM model to omit
+        infrastructure detail (e.g. a Bedrock inference-profile ARN is reduced to its model name).
+        There is no cost field.
 
 
         Errors mid-stream are emitted as a standalone line `{ "error": "<message>" }` rather than a
@@ -145,6 +151,20 @@ paths:
                     state:
                       chatId: a1b2c3d4-08d7-40b9-8b1c-e7e3a698647e
                       isStreaming: false
+                usage:
+                  summary: Usage (__usage__, always the last frame)
+                  value:
+                    id: __usage__
+                    type: usage
+                    usage:
+                      models:
+                        - claude-sonnet-5
+                      llmCalls: 7
+                      inputTokens: 18412
+                      outputTokens: 2280
+                      cacheWriteTokens: 31006
+                      cacheReadTokens: 264118
+                      totalTokens: 315816
                 toolCall:
                   summary: Tool call (cubeMeta)
                   value:
@@ -185,8 +205,9 @@ paths:
                   id:
                     description: >-
                       Unique message identifier. Sentinel values: `__cutoff__` (initial marker,
-                      carries the chatId under `state`) and `__state__` (final thread state
-                      snapshot). Absent on error lines.
+                      carries the chatId under `state`), `__state__` (thread state snapshot), and
+                      `__usage__` (always the last frame, carries model/token counts under `usage`).
+                      Absent on error lines.
                     type: string
                   isDelta:
                     description: >-
@@ -212,6 +233,39 @@ paths:
                   thinking:
                     description: Agent's internal reasoning. Only present in development mode.
                     type: string
+                  type:
+                    description: >-
+                      Present only on the `__usage__` frame, where it is always `usage`. Absent on
+                      every other message.
+                    type: string
+                  usage:
+                    description: >-
+                      Present only on the `__usage__` frame — always the last one on the stream,
+                      whether the run completed, was aborted, or errored.
+                    properties:
+                      cacheReadTokens:
+                        type: number
+                      cacheWriteTokens:
+                        type: number
+                      inputTokens:
+                        type: number
+                      llmCalls:
+                        description: Number of LLM calls made during the run.
+                        type: number
+                      models:
+                        description: >-
+                          Distinct models used across the run's LLM calls, deduplicated. For a BYOM
+                          model, normalized to omit infrastructure detail (e.g. a Bedrock
+                          inference-profile ARN is reduced to its model name) rather than the raw
+                          configured identifier.
+                        items:
+                          type: string
+                        type: array
+                      outputTokens:
+                        type: number
+                      totalTokens:
+                        type: number
+                    type: object
                   toolCall:
                     description: Present when the message represents a tool invocation or its result.
                     properties:

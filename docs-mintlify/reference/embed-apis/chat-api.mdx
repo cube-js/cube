@@ -348,7 +348,7 @@ The API returns streaming JSON responses. Each line contains a separate JSON obj
 - **`sort`** (number): Message ordering sequence number
 - **`state`** (object): Current streaming state information
 
-The stream always ends with one additional frame, `id: "__usage__"`, reporting the run's model and token usage (see the Usage Message example below). Treat it like the `__cutoff__` and `__state__` frames: filter it out of anything rendered as a chat message.
+The stream always ends with one additional frame, `id: "__usage__"`, reporting the run's models and token usage (see the Usage Message example below). Treat it like the `__cutoff__` and `__state__` frames: filter it out of anything rendered as a chat message.
 
 ### Response Examples
 

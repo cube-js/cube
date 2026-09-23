@@ -85,11 +85,10 @@ directly by your model provider based on their pricing.
 
 This means:
 
-- No Cube token quota is deducted for BYOM chat requests, and BYOM calls are
-  never charged against your Cube AI token balance
-- Per-call token counts for BYOM requests do appear in usage views (for
-  visibility into what you're sending your own provider), but always with no
-  cost attached, since Cube doesn't bill for them
+- No Cube token quota is deducted for BYOM chat requests
+- BYOM requests do appear in the **AI Tokens Usage** tab and in [Usage
+  Analytics][ref-usage-analytics], with their token counts, but always at no
+  cost
 - Per-seat token grants and token packages do not apply
 
 See [AI Tokens][ref-ai-tokens] for details on how token billing works with
@@ -166,3 +165,4 @@ Ensure the model ID configured in Cube matches a valid model offered by your
 provider. Model availability may vary by region.
 
 [ref-ai-tokens]: /admin/account-billing/ai-tokens
+[ref-usage-analytics]: /admin/monitoring/usage-analytics
