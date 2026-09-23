@@ -93,19 +93,19 @@ If a [parent control](#parent) drives this filter, the option the viewer is on d
 
 ### Faceted filters
 
-When multiple filters target dimensions from the same semantic view, you can mark one as **faceted**. A faceted filter scopes its value list to what its siblings are set to — selecting a value in one filter narrows the options shown in the faceted one, so viewers only see combinations that exist in the data.
+When a dashboard carries more than one filter, you can mark one as **faceted**. A faceted filter scopes its value list to what its siblings are set to — selecting a value in one filter narrows the options shown in the faceted one, so viewers only see combinations that exist in the data. A sibling on the same semantic view narrows it directly; one on another semantic view narrows it once you [match it to a dimension of this one](#sources-on-another-semantic-view).
 
 For example, on a sales dashboard with a **Country** filter and a **City** filter, marking the City filter as faceted means selecting `United States` in the Country filter limits the City filter to U.S. cities only. Mark both and each narrows the other.
 
-A faceted filter can take as a source any sibling on the same semantic view, whatever condition that sibling is set to and whether or not it carries **Facet** itself — `is` and `is not`, the substring conditions, the comparisons on a **Number** dimension and every date condition are all read, and a **Boolean** dimension counts here too, its `is true` / `is false` setting `is`. That comes with qualifications:
+A faceted filter can take as a source any sibling, on its own semantic view or another, whatever condition that sibling is set to and whether or not it carries **Facet** itself — `is` and `is not`, the substring conditions, the comparisons on a **Number** dimension and every date condition are all read, and a **Boolean** dimension counts here too, its `is true` / `is false` setting `is`. That comes with qualifications:
 
 - `is null`, `is not null`, `is empty` and `is not empty` carry no value and narrow as soon as they are set. Every other condition waits for a value, and until it has one it leaves the value list alone, just as it leaves the charts unfiltered.
 - A condition and value that together leave nothing to scope by narrow nothing either, as the warning below sets out.
 - Custom SQL scopes nothing. No operator menu offers it, so only a hand-written [URL parameter](#sharing-the-current-selection) can set a filter to it, and a source set that way leaves the value list alone.
 
-To pick which siblings a filter listens to, turn the **Facet** switch on in its edit sidebar: the source picker appears with it, reading **All**. The picker lists every other filter on the dashboard and greys out the ones it cannot use — the ones targeting a different semantic view — with a tooltip saying it is not available for this semantic view or filter type. Left at **All**, the filter listens to every sibling the picker leaves selectable; picking entries narrows it to those. A filter you picked that later stops qualifying, because its dimension was re-pointed at another semantic view say, stays in the list with a warning icon rather than disappearing from it.
+To pick which siblings a filter listens to, turn the **Facet** switch on in its edit sidebar: the source picker appears with it, reading **All**. The picker lists every other filter on the dashboard and greys out the ones it cannot use — a sibling whose condition cannot narrow a value list — with a tooltip saying so. A filter on another semantic view is selectable, and picking one adds a row under the picker for [matching it to a dimension of this filter's view](#sources-on-another-semantic-view). Left at **All**, the filter listens to every sibling on its own semantic view that the picker leaves selectable; picking entries narrows it to those. A filter you picked that later stops qualifying stays in the list with a warning icon rather than disappearing from it.
 
-**Cancel** leaves the filter on the sources it was last saved with — it discards every unsaved edit in the sidebar, not only the source list — while turning **Facet** back off clears the entries you picked, so switching it on again starts from **All**.
+**Cancel** leaves the filter on the sources it was last saved with — it discards every unsaved edit in the sidebar, not only the source list — while turning **Facet** back off clears the entries you picked, and the dimensions you matched them to, so switching it on again starts from **All**.
 
 A date source never scopes the value list to less than the window the charts are showing, so the list never drops a value the charts still have rows for. Which window it scopes to depends on the condition; `is null` and `is not null` name no window and scope by presence instead, to the rows with no date and to the rows with one:
 
@@ -130,6 +130,18 @@ A source can end up with nothing to scope by, leaving the value list as wide as 
 </Warning>
 
 A list that *is* being scoped does not necessarily look shorter — a long one fills the dropdown either way, and the values the window drops need not be the ones on screen. To check that a source is narrowing it, look for a value you know the window has no rows for and confirm it is gone from the list. Searching for that value is not a check: a filter's value box takes values that are not in its list, so it offers back whatever you type.
+
+#### Sources on another semantic view
+
+A filter on one semantic view can narrow a faceted filter on another, once you say which dimension of the faceted filter's own view the source stands for. Pick it in the source picker like any other sibling and a row appears under the picker: **Based on** names the source's own view and dimension, and the picker beneath it — **Matching dimension for "*the source's title*"** — takes a dimension of *this* filter's view. The value list is scoped through that dimension, so the query behind it never names the source's view. The match is part of the dashboard, so it applies on a published dashboard and in an embed too, including when the source's value arrives in a [URL parameter](#sharing-the-current-selection).
+
+The match is pre-selected for you when the answer is unambiguous: a dimension of this view the model declares as the same underlying column, then one the dashboard already maps that control to for a chart, then one matching by name and type. Several equally good candidates count as no answer, as does one of a different data type, and the row then opens unmatched. Only the dimensions the scope can use are selectable: one of the same data type as the source's dimension, whose type can express the source's condition.
+
+Nothing is stored until you **Save**, and clearing a match or unchecking the source drops it from the dashboard: picking that source again suggests a match afresh rather than restoring the one you cleared.
+
+<Warning>
+A source you picked but have not matched narrows nothing, leaving the value list as wide as it was — match it, or uncheck it. Its row says so while it is unmatched: *Until you pick a matching dimension, this source does not narrow the list.*
+</Warning>
 
 ## Time granularity switcher
 
