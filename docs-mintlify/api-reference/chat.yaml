@@ -147,6 +147,7 @@ paths:
                     id: __state__
                     isDelta: false
                     role: assistant
+                    sort: 10
                     state:
                       messages: []
                 toolCall:
