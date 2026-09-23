@@ -5,15 +5,30 @@ description: Configure multiple agents within a single deployment, each with its
 
 Every Cube deployment ships with a single agent by default — see the [Overview](/admin/ai) for the standard configuration. For more advanced setups, you can configure **multiple agents** within the same deployment, each with its own model, accessible views, rules, and certified queries.
 
-Multi-agent is useful when:
-
-- Different teams need agents tuned to their own domain (e.g., a Sales Assistant and a Marketing Analyst).
-- You want specialized agents with distinct instructions or tool access in the same deployment.
-- You need to isolate context (rules, certified queries, memories) between user groups.
+Start with one agent, and read [When to use multiple agents](#when-to-use-multiple-agents) before adding more.
 
 <Info>
   `agents/config.yml` is the source of truth for spaces and agents: declaring them there and [reconciling](#reconciliation) is the only supported way to create either. Agents can't be created in the UI, and their settings are read-only there. Cube links every record it creates to the entry it came from, and matches them by that entry's `name`.
 </Info>
+
+## When to use multiple agents
+
+Add an agent only when users need it to behave differently in a way one agent can't vary per user.
+
+**Split by audience, not by subject area.** Multiple agents fit when they answer questions about the same data for audiences that need a different voice or model — for example, an agent for editorial staff on a larger model that avoids technical terms, and an agent for product teams that names measures and shows SQL. [Rules](/admin/ai/rules) apply to everyone using a space and can't branch on who is asking, so one agent can't speak two ways. Give each of these agents its own space for its tone rules, and attach the rules and certified queries they both need to each space.
+
+**Don't split one data model into subject-area agents** — a finance agent and a marketing agent for the same users. Someone who asks about both has to pick the right agent for every question, and so does any client calling Cube for them: an [MCP client](/docs/integrations/mcp-server) chooses the agent per request from its name, and uses the default agent when it names none. Use one agent instead:
+
+- Scope data with [access policies](/docs/data-modeling/data-access-policies). The agent runs with the permissions of the user it operates under, so access policies decide what it can see and return.
+- Add subject-area knowledge as [`agent_requested` rules](/admin/ai/rules#rule-types), which the agent pulls in only when a question needs them.
+
+Subject-area agents in separate spaces make sense only when their audiences don't overlap and their rules, certified queries, and memories must stay apart.
+
+<Warning>
+  Don't rely on an agent for security. `accessible_views`, rules, and the choice of agent guide what the agent does; they don't restrict data. A rule such as "always filter this view by region" is an instruction the agent can miss — enforce it with an [access policy](/docs/data-modeling/data-access-policies).
+</Warning>
+
+To benchmark each agent, [run an eval](/admin/ai/evals#running-an-eval) once per agent, choosing it under **Agent**.
 
 ## Architecture
 
@@ -23,7 +38,7 @@ A multi-agent setup introduces one new concept on top of the single-agent model:
 - A **space** is an isolated context. It owns its **rules**, **certified queries**, and **memories** — they are not shared across spaces.
 - Each **agent** belongs to exactly one space and inherits everything that space owns. Multiple agents can live in the same space and share the same rules, certified queries, and memories.
 
-This means you choose a space's boundary based on what context should be shared. Two agents serving the same team usually live in one space; agents serving different domains (Sales vs. Marketing) live in different spaces so their context stays separate.
+This means you choose a space's boundary based on what context should be shared. Two agents serving the same team usually live in one space; agents that need different rules — a different tone for a different audience, or context that must stay apart — live in different spaces.
 
 ```mermaid
 flowchart LR
