@@ -77,15 +77,18 @@ Preview and sync each resolve the latest successful deployed build when started.
 lands between them, preview again before syncing. Each Databricks data source currently has one
 saved target; there is no named staging-to-production promotion or pinned-build publication.
 
-The name pattern supports literals, `^`, `$`, dot, and at most one `.*` wildcard; it is not a
-general regular expression and is limited to 128 characters. Each preview or sync can resolve at
-most 128 views for a data source, whether the scope is **all**, **selected**, or **pattern**. If
-**all** or **pattern** resolves more than 128 deployed views, preview and sync reject the request;
-narrow the scope and try again.
-A newly deployed view enters an **all** or matching **pattern** scope on the next manual sync.
-A **selected** scope changes only when you edit it. Renaming a view or target creates a new target
-and leaves the old one retained. Per-view target-name and root-source overrides are available
-through the configuration API, but are not editable in the card.
+Scope rules:
+
+- The name pattern supports literals, `^`, `$`, dot, and at most one `.*` wildcard. It is not a
+  general regular expression and is limited to 128 characters.
+- Each preview or sync resolves at most 128 views per data source, whether the scope is **all**,
+  **selected**, or **pattern**. If **all** or **pattern** resolves more, preview and sync reject
+  the request; narrow the scope and try again.
+- A newly deployed view enters an **all** or matching **pattern** scope on the next manual sync.
+  A **selected** scope changes only when you edit it.
+- Renaming a view or target creates a new target and leaves the old one retained.
+- Per-view target-name and root-source overrides are available through the configuration API,
+  but are not editable in the card.
 
 The public REST API documents [reading settings](/api-reference/databricks-metric-view-integration/get-databricks-metric-view-publication-settings),
 [saving settings](/api-reference/databricks-metric-view-integration/create-or-update-databricks-metric-view-publication-settings),
@@ -97,8 +100,7 @@ for API guidance if you need to automate them.
 
 When saving settings through the API, set `deletionPolicy` to `retain`; omitting it also defaults
 to `retain`. The older `delete-managed` value is deprecated but remains accepted for existing API
-clients. It does not delete obsolete Metric Views; it currently behaves like `retain`. Choose
-`retain` for new settings.
+clients. It does not delete obsolete Metric Views; it currently behaves like `retain`.
 
 ## What can be published
 
