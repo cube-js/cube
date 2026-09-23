@@ -8,9 +8,9 @@ packages that teach coding agents how to work with Cube. They can explore and ch
 semantic model, run queries, build dashboards, manage access, configure embedded
 analytics, and operate deployments.
 
-In Claude Code, the skills ship as the **Cube plugin**, together with the hosted
+In Claude Code, the skills ship as the **Cube plugin**, bundled with the hosted
 [Cube MCP server](/docs/integrations/mcp-server). In other coding agents, you install the
-skills on their own and they drive the [Cube CLI](/reference/cli).
+skills on their own and connect the MCP server or the [Cube CLI](/reference/cli) yourself.
 
 > Cube agent skills run in your coding agent. They are not Agent Skills in Cube, which your data team authors in the semantic model and runs from Analytics Chat.
 
@@ -33,9 +33,8 @@ Run these commands inside Claude Code:
 /plugin install cube@cube
 ```
 
-Then run `/mcp`, select `plugin:cube:cube`, and sign in to Cube. For `cube-admin`,
-`cube-embed`, most of `cube-deploy`, and finding saved content, also
-[install the Cube CLI](#install-the-cube-cli).
+Then run `/mcp`, select `plugin:cube:cube`, and sign in to Cube. Some skills also need the
+[Cube CLI](#install-the-cube-cli).
 
 The plugin uses the same endpoint as the Cube connector, so you don't need both. For how
 Claude Code handles a server that is configured twice, see
