@@ -5,6 +5,7 @@ on:
     paths:
       - '.github/actions/smoke.sh'
       - '.github/actions/integration/**'
+      - '.github/actions/setup-yarn-1/**'
       - '.github/workflows/push.yml'
       - '.github/workflows/master.yml'
       - 'packages/**'
@@ -24,6 +25,7 @@ on:
     paths:
       - '.github/actions/smoke.sh'
       - '.github/actions/integration/**'
+      - '.github/actions/setup-yarn-1/**'
       - '.github/workflows/push.yml'
       - '.github/workflows/master.yml'
       - 'packages/**'
@@ -115,7 +117,7 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-yarn-
       - name: Set Yarn version
-        run: yarn policies set-version v1.22.22
+        uses: ./.github/actions/setup-yarn-1
       - name: Yarn install
         uses: nick-fields/retry@v4
         env:
@@ -180,7 +182,7 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-yarn-
       - name: Set Yarn version
-        run: yarn policies set-version v1.22.22
+        uses: ./.github/actions/setup-yarn-1
       - name: Yarn install
         uses: nick-fields/retry@v4
         env:
@@ -306,7 +308,7 @@ jobs:
       - name: Install Yarn
         run: npm install -g yarn
       - name: Set Yarn version
-        run: yarn policies set-version v1.22.22
+        uses: ./.github/actions/setup-yarn-1
         # We don't need to install all yarn deps to build native
       - name: Install cargo-cp-artifact
         run: npm install -g cargo-cp-artifact@0.1
@@ -359,7 +361,7 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-yarn-
       - name: Set Yarn version
-        run: yarn policies set-version v1.22.22
+        uses: ./.github/actions/setup-yarn-1
       - name: Yarn install
         uses: nick-fields/retry@v4
         env:
@@ -473,7 +475,7 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-yarn-
       - name: Set Yarn version
-        run: yarn policies set-version v1.22.22
+        uses: ./.github/actions/setup-yarn-1
       - name: Yarn install
         uses: nick-fields/retry@v4
         env:
@@ -584,7 +586,7 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-yarn-
       - name: Set Yarn version
-        run: yarn policies set-version v1.22.22
+        uses: ./.github/actions/setup-yarn-1
       - name: Yarn install
         uses: nick-fields/retry@v4
         env:
@@ -669,7 +671,7 @@ jobs:
       - name: Install Yarn
         run: npm install -g yarn
       - name: Set Yarn version
-        run: yarn policies set-version v1.22.22
+        uses: ./.github/actions/setup-yarn-1
       - name: Get yarn cache directory path
         id: yarn-cache-dir-path
         run: echo "dir=$(yarn cache dir)" >> "$GITHUB_OUTPUT"
