@@ -32,18 +32,29 @@ export const deprecationMessage = (command?: string): string[] => {
   return lines;
 };
 
+const HELP_FLAGS = new Set(['--help', '-h']);
+
 // `server` is the Docker image entrypoint, so warning on commands without a
-// `cube` counterpart would put the banner in every container's logs.
-export const shouldDisplayDeprecationWarning = (command?: string) => !command || COMMAND_REPLACEMENTS.has(command);
+// `cube` counterpart would put the banner in every container's logs. Other
+// flag-only runs (e.g. `--version`) stay silent too, since version probes
+// often capture stderr.
+export const shouldDisplayDeprecationWarning = (argv: string[]) => {
+  const [first] = argv;
+  if (first === undefined || HELP_FLAGS.has(first)) {
+    return true;
+  }
+
+  return !first.startsWith('-') && COMMAND_REPLACEMENTS.has(first);
+};
 
 // Printed to stderr so the command's own stdout (e.g. `cubejs deploy`)
-// stays intact for scripts that consume it. Left uncolored: chalk detects
-// color support on stdout, not stderr.
+// stays intact for scripts that consume it.
 export const displayDeprecationWarning = (argv: string[] = process.argv.slice(2)) => {
-  const command = argv[0] && !argv[0].startsWith('-') ? argv[0] : undefined;
-  if (isDeprecationWarningDisabled() || !shouldDisplayDeprecationWarning(command)) {
+  if (isDeprecationWarningDisabled() || !shouldDisplayDeprecationWarning(argv)) {
     return;
   }
+
+  const command = argv[0] && !argv[0].startsWith('-') ? argv[0] : undefined;
 
   console.error('');
   deprecationMessage(command).forEach((line) => console.error(line));

@@ -23,14 +23,18 @@ describe('deprecation', () => {
   });
 
   test('only warns for commands replaced by the new CLI', () => {
-    expect(shouldDisplayDeprecationWarning(undefined)).toBe(true);
-    expect(shouldDisplayDeprecationWarning('deploy')).toBe(true);
-    expect(shouldDisplayDeprecationWarning('auth')).toBe(true);
-    expect(shouldDisplayDeprecationWarning('server')).toBe(false);
-    expect(shouldDisplayDeprecationWarning('create')).toBe(false);
-    expect(shouldDisplayDeprecationWarning('token')).toBe(false);
-    expect(shouldDisplayDeprecationWarning('toString')).toBe(false);
-    expect(shouldDisplayDeprecationWarning('constructor')).toBe(false);
+    expect(shouldDisplayDeprecationWarning([])).toBe(true);
+    expect(shouldDisplayDeprecationWarning(['--help'])).toBe(true);
+    expect(shouldDisplayDeprecationWarning(['-h'])).toBe(true);
+    expect(shouldDisplayDeprecationWarning(['deploy'])).toBe(true);
+    expect(shouldDisplayDeprecationWarning(['auth', 'token'])).toBe(true);
+    expect(shouldDisplayDeprecationWarning(['--version'])).toBe(false);
+    expect(shouldDisplayDeprecationWarning(['-V'])).toBe(false);
+    expect(shouldDisplayDeprecationWarning(['server'])).toBe(false);
+    expect(shouldDisplayDeprecationWarning(['create'])).toBe(false);
+    expect(shouldDisplayDeprecationWarning(['token'])).toBe(false);
+    expect(shouldDisplayDeprecationWarning(['toString'])).toBe(false);
+    expect(shouldDisplayDeprecationWarning(['constructor'])).toBe(false);
   });
 
   test('can be disabled via env', () => {
@@ -83,6 +87,7 @@ describe('deprecation', () => {
     test('stays silent for commands without a replacement', () => {
       displayDeprecationWarning(['server']);
       displayDeprecationWarning(['token', '-p', 'deploy=1']);
+      displayDeprecationWarning(['--version']);
 
       expect(errorSpy).not.toHaveBeenCalled();
       expect(logSpy).not.toHaveBeenCalled();
