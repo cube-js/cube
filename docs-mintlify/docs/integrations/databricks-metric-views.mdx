@@ -1,0 +1,92 @@
+---
+title: Databricks Metric Views
+description: Preview and publish Cube views as native Databricks Metric Views.
+---
+
+<Warning>
+
+Databricks Metric View publication is currently in preview. The user experience and supported
+model features may change. Reach out to the [Cube support team](/admin/account-billing/support)
+to activate it for your account.
+
+</Warning>
+
+Cube publishes selected, deployed Cube views as native Metric Views in your Databricks Unity
+Catalog. Databricks applications query those objects directly; they do not query Cube at runtime.
+Your Cube model remains the source of truth. This is a **one-way, manual** publication workflow:
+it does not import Databricks definitions into Cube or sync automatically after deployments.
+
+## Before you start
+
+- Configure a [Databricks data source](/admin/connect-to-data/data-sources/databricks-jdbc)
+  and deploy static Cube YAML with public views. This workflow reads the latest successful
+  deployed build, not unsaved IDE changes.
+- Ask your Databricks administrator for a **dedicated target catalog and schema** for the pilot.
+  The identity configured on the Cube data source needs `CAN USE` on its SQL warehouse,
+  `USE CATALOG` and `USE SCHEMA` on the target and source namespaces, `SELECT` on source
+  relations, and `CREATE TABLE` on the target schema. It must be able to replace and drop
+  the temporary views it creates. For existing Cube-managed targets, it also needs the
+  permissions required to replace those views. See [Databricks's Metric View prerequisites](https://docs.databricks.com/aws/en/uc-semantics/metric-views/create).
+- Arrange target access for Databricks consumers separately. Publishing an object does not
+  grant them `SELECT` on it or access to its catalog and schema.
+
+## Publish a view
+
+1. Open your deployment's **Settings → Data Sources** and edit the Databricks data source.
+   Expand **Databricks Metric Views**.
+2. Enter the target catalog and schema. Choose all public views, selected views, or a name
+   pattern. You can add a target-name prefix. Select **Keep its Metric View in Databricks**
+   when a view leaves the scope. Turn publication on and save the configuration. This alone
+   does not start a write.
+3. Run **Preview**. Inspect every view's generated YAML, source relation, warnings, and blocking
+   issues. Preview reads the deployed model and **does not write to Databricks**.
+4. Run **Test access**. With a completed preview selected, it checks source reads as well as
+   warehouse, target-schema, and temporary create/replace/drop access. The test creates and
+   cleans up a uniquely named temporary view; it does not change a final target.
+5. Select **Sync now**. Review the result for **each view** in run history. `created`, `updated`,
+   and `unchanged` are successful outcomes; `blocked`, `validation_failed`, and
+   `publish_failed` need investigation. A run can be `PARTIAL` if some views succeeded and
+   others did not.
+
+Preview and sync each resolve the latest successful deployed build when started. If a new build
+lands between them, preview again before syncing. A deployment currently has one saved target;
+there is no named staging-to-production promotion or pinned-build publication.
+
+## What can be published
+
+The preview is the authority for your deployed model. This preview release supports static YAML,
+one Databricks data source per published view, scalar dimensions, common aggregates and
+supported calculated measures, and conservative many-to-one equality joins. The target uses
+Databricks Metric View YAML 1.1.
+
+| Preview result | Examples | What to do |
+| --- | --- | --- |
+| Supported | Static view with a clear root source and representable dimensions, measures, and joins | Review generated YAML, then test access and sync. |
+| Warning | Behavior-neutral metadata Databricks cannot represent; a fan-out-unsafe measure withheld as `CUBE_MEMBER_WITHHELD` | Review the exact difference before accepting publication. For a withheld measure, publish it from a view rooted at its own cube. |
+| Blocking | Dynamic JavaScript/TypeScript/Jinja models, unflattened `extends`, access policies that cannot be preserved, mixed data sources, ambiguous roots, non-equality/cyclic/one-to-many joins, unsupported expressions or types, and multi-stage/window/ranking calculations | Simplify the model or keep that view in Cube. For `CUBE_VIEW_JOIN_NOT_REPRESENTABLE`, root the view at the many-side cube. |
+
+An unsafe joined measure can be **withheld while the rest of its view is published**. That view
+may show `created` or `updated`, and the run may show `COMPLETED`, even though some measures are
+missing in Databricks. Check the preview's `CUBE_MEMBER_WITHHELD` warnings and the run's
+`withheldMembers` / `incompleteViewCount` before treating a run as complete. There is no
+opt-in gate for incomplete publication yet.
+
+## Ownership, failures, and rollback
+
+Cube records ownership after a confirmed write. It will not adopt or overwrite an existing
+unmanaged Metric View, and it refuses a managed target whose remote definition has drifted.
+Resolve the collision or drift with your Cube operator; do not delete a customer-owned object
+to make a run pass. A failed conversion, validation, or write leaves that view's previous
+Databricks definition in place. Other views in the same run may still publish.
+
+Removing a view from scope, disabling publication, or turning off the pilot **does not delete**
+its Databricks Metric View. The run reports an obsolete target as `retained_obsolete`. If you
+need to remove one, have the target owner review and drop it manually in Databricks. There is
+no automatic managed-delete action in this pilot.
+
+You can request cancellation of an active run. It prevents further writes but does not undo
+views already published. To roll back a bad definition, restore the desired Cube model,
+deploy it, preview, and sync again. Inspect run history and the Databricks target afterward.
+If publication is unavailable, contact [Cube support](/admin/account-billing/support) with
+the deployment, data source, run ID, and per-view issue codes. Do not send credentials or
+sensitive source data.
