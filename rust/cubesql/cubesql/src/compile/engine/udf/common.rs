@@ -1104,11 +1104,12 @@ macro_rules! date_math_udf {
             } else {
                 let timestamp = timestamps.value_as_datetime(i).unwrap();
                 let interval = intervals.value(i).into();
+                let result = $FUN(timestamp, interval, $IS_ADD)?;
                 builder.append_value(
-                    $FUN(timestamp, interval, $IS_ADD)?
+                    result
                         .and_utc()
                         .timestamp_nanos_opt()
-                        .unwrap(),
+                        .ok_or_else(|| date_out_of_timestamp_range(result))?,
                 )?;
             }
         }
@@ -1454,7 +1455,11 @@ pub fn create_str_to_date_udf() -> ScalarUDF {
             let res = res?;
 
             Ok(ColumnarValue::Scalar(ScalarValue::TimestampNanosecond(
-                Some(res.and_utc().timestamp_nanos_opt().unwrap()),
+                Some(
+                    res.and_utc()
+                        .timestamp_nanos_opt()
+                        .ok_or_else(|| date_out_of_timestamp_range(res))?,
+                ),
                 None,
             )))
         });
@@ -2495,7 +2500,11 @@ macro_rules! generate_series_helper_timestamp {
             ))
         })?;
         let res = date_addsub_month_day_nano(current_dt, $STEP, true)?;
-        $CURRENT = res.and_utc().timestamp_nanos_opt().unwrap() as $PRIMITIVE_TYPE;
+        // A step past 2262-04-11 has no nanosecond timestamp, so it is also past `end`: stop.
+        let Some(next) = res.and_utc().timestamp_nanos_opt() else {
+            break;
+        };
+        $CURRENT = next as $PRIMITIVE_TYPE;
     };
 }
 
@@ -3552,6 +3561,12 @@ pub fn create_position_udf() -> ScalarUDF {
     )
 }
 
+/// Error for a date or datetime no nanosecond timestamp can hold, i.e. one outside
+/// 1677-09-21..2262-04-11.
+fn date_out_of_timestamp_range(date: impl std::fmt::Display) -> DataFusionError {
+    DataFusionError::Execution(format!("Date {} is out of range for a timestamp", date))
+}
+
 pub fn create_date_to_timestamp_udf() -> ScalarUDF {
     let fun = make_scalar_function(move |args: &[ArrayRef]| {
         assert!(args.len() == 1);
@@ -3564,12 +3579,23 @@ pub fn create_date_to_timestamp_udf() -> ScalarUDF {
                     .iter()
                     .map(|date| {
                         date.map(|date| {
-                            let nanoseconds_in_day = 86_400_000_000_000_i64;
-                            let timestamp = date as i64 * nanoseconds_in_day;
-                            timestamp
+                            const NANOSECONDS_IN_DAY: i64 = 86_400_000_000_000;
+                            (date as i64)
+                                .checked_mul(NANOSECONDS_IN_DAY)
+                                .ok_or_else(|| {
+                                    let epoch = NaiveDate::from_ymd_opt(1970, 1, 1).unwrap();
+                                    match epoch.checked_add_signed(Duration::days(date as i64)) {
+                                        Some(date) => date_out_of_timestamp_range(date),
+                                        None => date_out_of_timestamp_range(format!(
+                                            "{} days from 1970-01-01",
+                                            date
+                                        )),
+                                    }
+                                })
                         })
+                        .transpose()
                     })
-                    .collect::<PrimitiveArray<TimestampNanosecondType>>();
+                    .collect::<Result<PrimitiveArray<TimestampNanosecondType>>>()?;
 
                 Ok(Arc::new(result) as ArrayRef)
             }
@@ -3587,12 +3613,11 @@ pub fn create_date_to_timestamp_udf() -> ScalarUDF {
                                     "Cannot initalize default zero NaiveTime".to_string(),
                                 ),
                             )?;
-                            Ok(Some(
-                                NaiveDateTime::new(date, time)
-                                    .and_utc()
-                                    .timestamp_nanos_opt()
-                                    .unwrap(),
-                            ))
+                            NaiveDateTime::new(date, time)
+                                .and_utc()
+                                .timestamp_nanos_opt()
+                                .ok_or_else(|| date_out_of_timestamp_range(date))
+                                .map(Some)
                         }
                         None => Ok(None),
                     })

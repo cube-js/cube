@@ -63,6 +63,7 @@ mod role_column_grants;
 mod role_table_grants;
 mod testing_blocking;
 mod testing_dataset;
+mod testing_panic;
 
 use super::utils;
 pub use pg_am::*;
@@ -117,3 +118,4 @@ pub use sql_implementation_info::*;
 pub use sql_sizing::*;
 pub use testing_blocking::*;
 pub use testing_dataset::*;
+pub use testing_panic::*;
