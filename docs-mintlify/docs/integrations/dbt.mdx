@@ -344,8 +344,9 @@ models:
 generated cube private unless its dbt model declares `meta.cube.public`. This also
 covers models added to dbt later, so a raw layer stays private without a `meta` block
 on each model. A model's own declaration always takes precedence, so you can still
-expose selected models with `public: true`. The option applies to cubes only: a
-private cube's dimensions and measures can't be queried anyway.
+expose selected models with `public: true`. The option sets the cube's `public` only
+and leaves its dimensions and measures as they are: a private cube can't be queried
+directly, and a view that includes its members exposes them either way.
 
 A common pattern is to keep the pulled layer private and expose it through
 [views](/reference/data-modeling/view), which can include members of private cubes.
