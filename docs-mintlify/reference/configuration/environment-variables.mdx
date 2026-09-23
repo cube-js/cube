@@ -2148,6 +2148,28 @@ The Access Key ID for MinIO. Required when using MinIO.
 | --------------------------- | ---------------------- | --------------------- |
 | A valid MinIO Access Key ID | N/A                    | N/A                   |
 
+## `CUBESTORE_MAX_CONCURRENT_QUERY_PLANS`
+
+The maximum number of SQL query plans Cube Store builds at the same time.
+Planning runs before results are served from cache, so a burst of concurrent
+queries can oversubscribe the available cores; this limits how many plans are
+built in parallel, queuing the rest. `auto` sizes the limit from the number of
+cores available to the process. Set to `0` to disable the limit.
+
+| Possible Values          | Default in Development | Default in Production |
+| ------------------------ | ----------------------- | --------------------- |
+| `auto`, `0`, or a number | `auto`                  | `auto`                 |
+
+## `CUBESTORE_MAX_QUEUED_QUERY_PLANS`
+
+The maximum number of queries that may wait for a query planning slot once
+[`CUBESTORE_MAX_CONCURRENT_QUERY_PLANS`](#cubestore_max_concurrent_query_plans)
+is reached. Queries beyond this limit are rejected rather than queued.
+
+| Possible Values | Default in Development | Default in Production |
+| --------------- | ----------------------- | --------------------- |
+| A valid number  | `5000`                  | `5000`                 |
+
 ## `CUBESTORE_MINIO_BUCKET`
 
 The name of the bucket that you want to use MinIO. Required when using MinIO.
