@@ -156,12 +156,11 @@ export class CubejsServerCore {
   protected readonly preAggregationsSchema: PreAggregationsSchemaFn;
 
   /**
-   * The share of the process-wide pre-aggregation schema pin this instance holds,
-   * if it took one. Records that this instance holds it, which the pin's own count
-   * cannot: the count knows how many instances hold it, not which, so without this
-   * a repeated shutdown of one instance would release another's share.
+   * This instance's share of the process-wide pre-aggregation schema pin, when it took
+   * one. Releasing by identity is what stops a repeated shutdown, or one following a
+   * reload's drop, from spending a share that is not this instance's.
    */
-  private heldPreAggregationsSchemaPin: string | undefined;
+  private heldPreAggregationsSchemaPin: symbol | undefined;
 
   protected readonly scheduledRefreshTimeZones: ScheduledRefreshTimeZonesFn;
 
@@ -374,8 +373,8 @@ export class CubejsServerCore {
     // Last in the constructor, so anything that throws above takes no pin; shutdown
     // releases it
     if (typeof this.options.preAggregationsSchema === 'string') {
-      pinPreAggregationsSchema(this.options.preAggregationsSchema);
-      this.heldPreAggregationsSchemaPin = this.options.preAggregationsSchema;
+      this.heldPreAggregationsSchemaPin =
+        pinPreAggregationsSchema(this.options.preAggregationsSchema);
     }
   }
 
@@ -1017,14 +1016,13 @@ export class CubejsServerCore {
   public async shutdown() {
     this.compilerCache.clear();
 
-    // This method is public and unguarded, and the pin counts how many instances hold
-    // it rather than which, so without the latch a second call here would release a
-    // co-resident instance's share of a schema it is still serving on
+    // Undefined when this instance never took a share, and cleared here because this
+    // method is public and unguarded: a second call must not release the share again
     if (this.heldPreAggregationsSchemaPin !== undefined) {
-      const schema = this.heldPreAggregationsSchemaPin;
+      const holder = this.heldPreAggregationsSchemaPin;
 
       this.heldPreAggregationsSchemaPin = undefined;
-      releasePreAggregationsSchemaPin(schema);
+      releasePreAggregationsSchemaPin(holder);
     }
 
     if (this.devServer) {

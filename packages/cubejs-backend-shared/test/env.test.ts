@@ -455,16 +455,58 @@ describe('pinPreAggregationsSchema', () => {
   test('keeps the pin while another instance that resolved it is still up', () => {
     const env = freshEnv();
 
-    env.pinPreAggregationsSchema('dev_pre_aggregations');
-    env.pinPreAggregationsSchema('dev_pre_aggregations');
+    const first = env.pinPreAggregationsSchema('dev_pre_aggregations');
+    const second = env.pinPreAggregationsSchema('dev_pre_aggregations');
 
-    // The second pin is a no-op on the variable, so without counting holders nothing
+    // The second pin is a no-op on the variable, so without tracking holders nothing
     // records that a second instance is relying on it
-    env.releasePreAggregationsSchemaPin('dev_pre_aggregations');
+    env.releasePreAggregationsSchemaPin(first);
 
     expect(process.env.CUBEJS_PRE_AGGREGATIONS_SCHEMA).toEqual('dev_pre_aggregations');
 
-    env.releasePreAggregationsSchemaPin('dev_pre_aggregations');
+    env.releasePreAggregationsSchemaPin(second);
+
+    expect(process.env.CUBEJS_PRE_AGGREGATIONS_SCHEMA).toBeUndefined();
+  });
+
+  test('a share a reload dropped cannot be spent against the next pin', () => {
+    const env = freshEnv();
+
+    const a = env.pinPreAggregationsSchema('dev_pre_aggregations');
+    const b = env.pinPreAggregationsSchema('dev_pre_aggregations');
+
+    env.releasePreAggregationsSchemaPin(a);
+    // A reload while B is still up: it drops the pin from under B, whose share is now
+    // stale. B's shutdown must not spend it against the pin the reload's own instance
+    // takes next, or C's drivers fall back while C's plans still name the schema
+    env.dropPreAggregationsSchemaPin();
+
+    const c = env.pinPreAggregationsSchema('dev_pre_aggregations');
+
+    env.releasePreAggregationsSchemaPin(b);
+
+    expect(process.env.CUBEJS_PRE_AGGREGATIONS_SCHEMA).toEqual('dev_pre_aggregations');
+
+    env.releasePreAggregationsSchemaPin(c);
+
+    expect(process.env.CUBEJS_PRE_AGGREGATIONS_SCHEMA).toBeUndefined();
+  });
+
+  test('takes no share for an instance whose schema lost', () => {
+    const env = freshEnv();
+
+    const held = env.pinPreAggregationsSchema('dev_pre_aggregations');
+    // Refused, so there is no share to give up later - and releasing nothing must not
+    // drop the pin the instance that did take one is still serving on
+    const refused = env.pinPreAggregationsSchema('prod_pre_aggregations');
+
+    expect(refused).toBeUndefined();
+
+    env.releasePreAggregationsSchemaPin(<symbol>refused);
+
+    expect(process.env.CUBEJS_PRE_AGGREGATIONS_SCHEMA).toEqual('dev_pre_aggregations');
+
+    env.releasePreAggregationsSchemaPin(held);
 
     expect(process.env.CUBEJS_PRE_AGGREGATIONS_SCHEMA).toBeUndefined();
   });
@@ -475,23 +517,23 @@ describe('pinPreAggregationsSchema', () => {
     env.pinPreAggregationsSchema('dev_pre_aggregations');
     env.pinPreAggregationsSchema('dev_pre_aggregations');
 
-    // No schema: the whole process is re-reading its configuration, so nothing it
-    // pinned earlier survives to be shared
+    // The whole process is re-reading its configuration, so nothing it pinned earlier
+    // survives to be shared, however many instances were holding it
     env.dropPreAggregationsSchemaPin();
 
     expect(process.env.CUBEJS_PRE_AGGREGATIONS_SCHEMA).toBeUndefined();
   });
 
-  test('releasing a schema other than the pinned one leaves the pin alone', () => {
+  test('releasing a share the pin never issued leaves it alone', () => {
     const env = freshEnv();
 
-    env.pinPreAggregationsSchema('dev_pre_aggregations');
+    const held = env.pinPreAggregationsSchema('dev_pre_aggregations');
     // An instance that never held the pin shutting down, so it is not its to drop
-    env.releasePreAggregationsSchemaPin('prod_pre_aggregations');
+    env.releasePreAggregationsSchemaPin(Symbol('someone else'));
 
     expect(process.env.CUBEJS_PRE_AGGREGATIONS_SCHEMA).toEqual('dev_pre_aggregations');
 
-    env.releasePreAggregationsSchemaPin('dev_pre_aggregations');
+    env.releasePreAggregationsSchemaPin(held);
 
     expect(process.env.CUBEJS_PRE_AGGREGATIONS_SCHEMA).toBeUndefined();
   });

@@ -219,12 +219,13 @@ export const markDevModeResolvedByCaller = () => {
 };
 
 let pinnedPreAggregationsSchema: string | undefined;
-// How many live instances resolved it, so the last one out clears the variable
-let pinnedPreAggregationsSchemaHolders = 0;
+// Which instances hold it, not how many: a drop has to be able to invalidate the shares
+// it drops, or one taken before it is later spent against the pin taken after
+const pinnedPreAggregationsSchemaHolders = new Set<symbol>();
 
 /**
  * Drops the pin outright, whatever is still holding it, which is what a reload of the
- * whole process wants. To give up one instance's share, release it by schema instead.
+ * whole process wants. To give up one instance's share, release that share instead.
  */
 export const dropPreAggregationsSchemaPin = () => {
   // Only what this process pinned. A value the user set outlives any reload
@@ -236,40 +237,44 @@ export const dropPreAggregationsSchemaPin = () => {
   }
 
   pinnedPreAggregationsSchema = undefined;
-  pinnedPreAggregationsSchemaHolders = 0;
+  pinnedPreAggregationsSchemaHolders.clear();
 };
 
 /**
- * Gives up one holder's share of the pin. Without it the next instance's drivers stay
- * on the schema the previous one resolved.
+ * Gives up the share `pinPreAggregationsSchema` returned. Without it the next instance's
+ * drivers stay on the schema the previous one resolved. A share a drop already
+ * invalidated is unknown here and releases nothing, so it cannot spend a later pin's.
  */
-export const releasePreAggregationsSchemaPin = (schema: string) => {
-  if (schema !== pinnedPreAggregationsSchema) {
+export const releasePreAggregationsSchemaPin = (holder: symbol) => {
+  if (!pinnedPreAggregationsSchemaHolders.delete(holder)) {
     return;
   }
 
-  if (pinnedPreAggregationsSchemaHolders > 1) {
-    pinnedPreAggregationsSchemaHolders -= 1;
-
-    return;
+  if (pinnedPreAggregationsSchemaHolders.size === 0) {
+    dropPreAggregationsSchemaPin();
   }
-
-  dropPreAggregationsSchemaPin();
 };
 
 /**
  * A driver cannot see CreateOptions, so it falls back to CUBEJS_DEV_MODE, which both
  * `devServer` and `preAggregationsSchema` contradict; pinning makes both sides agree.
  */
-export const pinPreAggregationsSchema = (schema: string) => {
+export const pinPreAggregationsSchema = (schema: string): symbol | undefined => {
+  const takeShare = () => {
+    const holder = Symbol('preAggregationsSchemaPin');
+
+    pinnedPreAggregationsSchemaHolders.add(holder);
+
+    return holder;
+  };
+
   // Falsy, not undefined: every consumer treats an empty value as absent and falls back,
   // so leaving one in place would be the mismatch this exists to prevent
   if (!process.env.CUBEJS_PRE_AGGREGATIONS_SCHEMA) {
     process.env.CUBEJS_PRE_AGGREGATIONS_SCHEMA = schema;
     pinnedPreAggregationsSchema = schema;
-    pinnedPreAggregationsSchemaHolders = 1;
 
-    return;
+    return takeShare();
   }
 
   // Another instance pinned this same schema, and nothing else records that this one
@@ -278,9 +283,7 @@ export const pinPreAggregationsSchema = (schema: string) => {
     process.env.CUBEJS_PRE_AGGREGATIONS_SCHEMA === schema &&
     pinnedPreAggregationsSchema === schema
   ) {
-    pinnedPreAggregationsSchemaHolders += 1;
-
-    return;
+    return takeShare();
   }
 
   // Whoever set it — this process for another instance, or a user value that

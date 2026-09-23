@@ -138,12 +138,9 @@ impl NodeConfiguration for NodeConfigurationImpl {
                 c.postgres_bind_address = Some(format!("0.0.0.0:{}", p));
             };
 
-            // Config::default() can only see CUBEJS_DEV_MODE, so without this the SQL
-            // API would redact in a process the Node side treats as a dev server. Only
-            // the default moves: a usable CUBEJS_LOG_REDACTION was already parsed there,
-            // and parsing it again would warn twice for one bad value. Empty counts as
-            // unset, which is what Config::default() falls back on and what the Node
-            // side rejects outright, so neither reads it as a choice
+            // Only the default moves: a usable CUBEJS_LOG_REDACTION was already parsed
+            // by Config::default(), and parsing it again would warn twice for one bad
+            // value. Empty is not usable on either side, so it is not a choice either
             if let Some(dev_mode) = options.dev_mode {
                 let redaction_chosen =
                     env::var("CUBEJS_LOG_REDACTION").is_ok_and(|v| !v.trim().is_empty());
