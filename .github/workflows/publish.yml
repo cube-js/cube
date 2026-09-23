@@ -52,16 +52,7 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-yarn-
       - name: Set Yarn version
-        run: |
-          # set-version downloads from GitHub Releases, which intermittently returns 5xx
-          if [ "$(yarn --version)" != "1.22.22" ]; then
-            for i in 1 2 3; do
-              yarn policies set-version v1.22.22 && break
-              [ "$i" = 3 ] && exit 1
-              sleep $((i * 15))
-            done
-          fi
-        shell: bash
+        uses: ./.github/actions/setup-yarn
       - name: Yarn install
         uses: nick-fields/retry@v4
         env:
@@ -131,16 +122,7 @@ jobs:
       - name: Install Yarn
         run: npm install -g yarn
       - name: Set Yarn version
-        run: |
-          # set-version downloads from GitHub Releases, which intermittently returns 5xx
-          if [ "$(yarn --version)" != "1.22.22" ]; then
-            for i in 1 2 3; do
-              yarn policies set-version v1.22.22 && break
-              [ "$i" = 3 ] && exit 1
-              sleep $((i * 15))
-            done
-          fi
-        shell: bash
+        uses: ./.github/actions/setup-yarn
         # We don't need to install all yarn deps to build native
       - name: Install cargo-cp-artifact
         run: npm install -g cargo-cp-artifact@0.1
@@ -232,16 +214,7 @@ jobs:
         with:
           node-version: ${{ matrix.node-version }}
       - name: Set Yarn version
-        run: |
-          # set-version downloads from GitHub Releases, which intermittently returns 5xx
-          if [ "$(yarn --version)" != "1.22.22" ]; then
-            for i in 1 2 3; do
-              yarn policies set-version v1.22.22 && break
-              [ "$i" = 3 ] && exit 1
-              sleep $((i * 15))
-            done
-          fi
-        shell: bash
+        uses: ./.github/actions/setup-yarn
         # We don't need to install all yarn deps to build native
       - name: Install cargo-cp-artifact
         run: npm install -g cargo-cp-artifact@0.1
@@ -315,16 +288,7 @@ jobs:
         with:
           node-version: ${{ matrix.node-version }}
       - name: Set Yarn version
-        run: |
-          # set-version downloads from GitHub Releases, which intermittently returns 5xx
-          if [ "$(yarn --version)" != "1.22.22" ]; then
-            for i in 1 2 3; do
-              yarn policies set-version v1.22.22 && break
-              [ "$i" = 3 ] && exit 1
-              sleep $((i * 15))
-            done
-          fi
-        shell: bash
+        uses: ./.github/actions/setup-yarn
         # We don't need to install all yarn deps to build native
       - name: Install cargo-cp-artifact
         run: npm install -g cargo-cp-artifact@0.1

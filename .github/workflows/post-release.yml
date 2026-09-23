@@ -12,6 +12,7 @@ on:
       - completed
   push:
     paths:
+      - '.github/actions/setup-yarn/**'
       - '.github/workflows/post-release.yml'
     branches:
       - 'master'
@@ -58,16 +59,7 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-workspace-main-20.x-
       - name: Set Yarn version
-        run: |
-          # set-version downloads from GitHub Releases, which intermittently returns 5xx
-          if [ "$(yarn --version)" != "1.22.22" ]; then
-            for i in 1 2 3; do
-              yarn policies set-version v1.22.22 && break
-              [ "$i" = 3 ] && exit 1
-              sleep $((i * 15))
-            done
-          fi
-        shell: bash
+        uses: ./.github/actions/setup-yarn
       - name: Yarn install
         uses: nick-fields/retry@v4
         env:
@@ -132,16 +124,7 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-workspace-main-20.x-
       - name: Set Yarn version
-        run: |
-          # set-version downloads from GitHub Releases, which intermittently returns 5xx
-          if [ "$(yarn --version)" != "1.22.22" ]; then
-            for i in 1 2 3; do
-              yarn policies set-version v1.22.22 && break
-              [ "$i" = 3 ] && exit 1
-              sleep $((i * 15))
-            done
-          fi
-        shell: bash
+        uses: ./.github/actions/setup-yarn
       - name: Yarn install
         uses: nick-fields/retry@v4
         env:
@@ -205,16 +188,7 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-workspace-main-20.x-
       - name: Set Yarn version
-        run: |
-          # set-version downloads from GitHub Releases, which intermittently returns 5xx
-          if [ "$(yarn --version)" != "1.22.22" ]; then
-            for i in 1 2 3; do
-              yarn policies set-version v1.22.22 && break
-              [ "$i" = 3 ] && exit 1
-              sleep $((i * 15))
-            done
-          fi
-        shell: bash
+        uses: ./.github/actions/setup-yarn
       - name: Yarn install
         uses: nick-fields/retry@v4
         env:
