@@ -35,8 +35,9 @@ Run these commands inside Claude Code:
 
 Then run `/mcp`, select `plugin:cube:cube`, and sign in to Cube.
 
-The plugin connects to the same endpoint as the Cube connector. If you already connected
-the connector, Claude Code uses one server, not two.
+You don't need the Cube connector as well. If you already connected it, Claude Code
+connects once, through the plugin, and `/mcp` lists the connector as hidden. A Cube server
+you added yourself with `claude mcp add` takes precedence over the plugin's instead.
 
 ### Codex, GitHub Copilot, Gemini CLI, and other compatible agents
 
@@ -55,8 +56,8 @@ The source is public under Apache 2.0 at
 ## Install the Cube CLI
 
 The skills use the Cube MCP server when it is connected, and the Cube CLI otherwise. The
-CLI is required for `cube-admin`, `cube-embed`, and most of `cube-deploy`, which the MCP
-server does not cover.
+CLI is required for `cube-admin`, `cube-embed`, and `cube-deploy`, and for finding saved
+content with `cube-explore-content` — work the MCP server does not cover.
 
 On Linux or macOS, run:
 
@@ -82,12 +83,12 @@ For a headless environment, set `CUBE_API_URL` and `CUBE_API_KEY` instead. See
 | `cube-explore-model` | Searches and inspects cubes, views, measures, dimensions, joins, and model files. | MCP or CLI |
 | `cube-build-model` | Edits cubes and views on a dev-mode branch, validates them, and commits them for review. | MCP or CLI |
 | `cube-run-query` | Runs semantic-layer queries and interprets the results. | MCP or CLI |
-| `cube-explore-content` | Browses workbooks, workbook reports, explorations, dashboards, folders, and scheduled notifications. | CLI |
+| `cube-explore-content` | Browses workbooks, workbook reports, explorations, dashboards, folders, and scheduled notifications. | CLI; MCP reads a known workbook or report |
 | `cube-build-content` | Creates and updates workbooks, workbook reports, explorations, dashboards, folders, and scheduled notifications. | MCP or CLI |
 | `cube-configure-agent` | Inspects and tunes the agent, including rules, certified queries, and Agent Skills in Cube. | MCP or CLI |
 | `cube-admin` | Manages users, groups, attributes, access policies, tenant settings, SCIM, and OIDC. | CLI |
 | `cube-embed` | Configures embed sessions, tokens, embeddable dashboards, and embed tenants. | CLI |
-| `cube-deploy` | Manages deployments, environments, environment variables, builds, and logs. | CLI |
+| `cube-deploy` | Manages deployments, environments, environment variables, builds, and logs. | CLI; MCP for read-only checks |
 
 ## Use the skills
 

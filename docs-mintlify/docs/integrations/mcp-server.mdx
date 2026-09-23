@@ -6,8 +6,8 @@ description: Connect MCP-aware assistants to Cube through a hosted HTTPS endpoin
 Cube MCP (Model Context Protocol) lets MCP-compatible AI clients connect to Cube over HTTPS using OAuth.
 
 This page covers the **Cube connector**, which gives an AI assistant direct access to Cube
-through MCP. It is not [Cube agent skills](/docs/integrations/agent-skills), which run in a
-coding agent and operate Cube through the CLI, or
+through MCP. It is not [Cube agent skills](/docs/integrations/agent-skills), workflows
+for coding agents that ship with this server as the Cube plugin for Claude Code, or
 [Agent Skills in Cube](/docs/explore-analyze/skills), which are saved workflows your data
 team authors for Analytics Chat.
 
@@ -95,6 +95,9 @@ Cube is available in the
 [Claude Connectors Directory](https://claude.ai/customize/connectors). Connect it once
 and use it in Claude on the web, desktop, or Claude Code—there is no endpoint to paste or
 local server to configure.
+
+In Claude Code, you can instead install the [Cube plugin](/docs/integrations/agent-skills#claude-code),
+which bundles this server with Cube agent skills.
 
 1. In Claude on the web or desktop, open **Customize → Connectors**.
 2. Click **+**, choose **Browse connectors**, and search for **Cube**.
