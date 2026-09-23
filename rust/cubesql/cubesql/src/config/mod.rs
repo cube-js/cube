@@ -471,6 +471,27 @@ where
     })
 }
 
+/// The spellings a boolean variable is honoured in. One definition, so a caller asking
+/// whether one was set cannot drift from what setting it actually does.
+fn parse_bool(value: &str) -> Option<bool> {
+    match value.trim().to_lowercase().as_str() {
+        "true" => Some(true),
+        "false" => Some(false),
+        _ => None,
+    }
+}
+
+/// Whether `name` holds a value that would be honoured, as opposed to absent or
+/// unrecognised. The Node bridge asks this before moving a default of its own, so that
+/// a value this crate honours is never taken for a choice the user did not make.
+pub fn env_bool_is_set(name: &str) -> bool {
+    env::var(name)
+        .ok()
+        .as_deref()
+        .and_then(parse_bool)
+        .is_some()
+}
+
 /// An unrecognised value is reported and the default used; a variable that only
 /// picks a default must not fail startup.
 fn env_parse_bool(name: &str, default: bool) -> bool {
@@ -478,17 +499,13 @@ fn env_parse_bool(name: &str, default: bool) -> bool {
         return default;
     };
 
-    match value.trim().to_lowercase().as_str() {
-        "true" => true,
-        "false" => false,
-        _ => {
-            warn!(
-                "Environment variable '{}' has value '{}', expected true or false; using {}",
-                name, value, default
-            );
-            default
-        }
-    }
+    parse_bool(&value).unwrap_or_else(|| {
+        warn!(
+            "Environment variable '{}' has value '{}', expected true or false; using {}",
+            name, value, default
+        );
+        default
+    })
 }
 
 pub fn env_parse_duration<T>(name: &str, default: T, max: Option<T>, min: Option<T>) -> T

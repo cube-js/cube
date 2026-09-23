@@ -560,3 +560,12 @@ mode, gets neither, and the first pre-aggregation build fails with
 `dev_pre_aggregations` to `prod_pre_aggregations`. Drop the `devServer: false`, or
 configure a [Cube Store connection](https://docs.cube.dev/cube-core/deployment#set-up-cube-store)
 as the paragraphs above describe.
+
+**The SQL API does not follow `devServer: false`.** It keys off `CUBEJS_DEV_MODE`
+alone, so with that pair the Postgres-wire endpoint still comes up on port `15432` and
+still accepts any credentials, while the REST (JSON) and GraphQL APIs now enforce JWT.
+Before this change the whole instance was in development mode and the open SQL API
+matched an equally open HTTP API; now the instance presents as authenticated while that
+port is not. Set
+[`CUBEJS_SQL_PASSWORD`](https://cube.dev/docs/reference/configuration/environment-variables#cubejs_sql_password),
+or `CUBEJS_PG_SQL_PORT=false` to not serve it at all.

@@ -4,6 +4,7 @@ use crate::gateway::{
 };
 use crate::{auth::NodeBridgeAuthService, transport::NodeBridgeTransport};
 use async_trait::async_trait;
+use cubesql::config::env_bool_is_set;
 use cubesql::config::injection::Injector;
 use cubesql::config::processing_loop::ShutdownMode;
 use cubesql::{
@@ -12,7 +13,6 @@ use cubesql::{
     transport::TransportService,
     CubeError,
 };
-use std::env;
 use std::sync::Arc;
 use tokio::task::JoinHandle;
 
@@ -142,12 +142,7 @@ impl NodeConfiguration for NodeConfigurationImpl {
             // would redact in a process the Node side treats as a dev server. Only the
             // default moves: re-parsing a value it honoured would warn twice for one bad one
             if let Some(dev_mode) = options.dev_mode {
-                // The spellings cubesql's env_parse_bool honours. Anything else - empty,
-                // `1`, a typo - it warned about and fell back on, so it chose nothing
-                let redaction_chosen = env::var("CUBEJS_LOG_REDACTION")
-                    .is_ok_and(|v| matches!(v.trim().to_lowercase().as_str(), "true" | "false"));
-
-                if !redaction_chosen {
+                if !env_bool_is_set("CUBEJS_LOG_REDACTION") {
                     c.log_redaction = !dev_mode;
                 }
             };
