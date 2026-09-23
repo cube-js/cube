@@ -79,8 +79,9 @@ saved target; there is no named staging-to-production promotion or pinned-build 
 
 Scope rules:
 
-- The name pattern supports literals, `^`, `$`, dot, and at most one `.*` wildcard. It is not a
-  general regular expression and is limited to 128 characters.
+- The name pattern supports literals, `^`, `$`, a bare `.` that matches any single character, and
+  at most one `.*` wildcard. It is not a general regular expression and is limited to 128
+  characters. Review the matched views in Preview before syncing.
 - Each preview or sync resolves at most 128 views per data source, whether the scope is **all**,
   **selected**, or **pattern**. If **all** or **pattern** resolves more, preview and sync reject
   the request; narrow the scope and try again.
@@ -93,6 +94,8 @@ Scope rules:
 The public REST API documents [reading settings](/api-reference/databricks-metric-view-integration/get-databricks-metric-view-publication-settings),
 [saving settings](/api-reference/databricks-metric-view-integration/create-or-update-databricks-metric-view-publication-settings),
 [starting a preview](/api-reference/databricks-metric-view-publication/start-a-databricks-metric-view-publication-preview),
+[checking preview status](/api-reference/databricks-metric-view-publication/get-databricks-metric-view-preview-status),
+[getting the completed preview result](/api-reference/databricks-metric-view-publication/get-a-completed-databricks-metric-view-preview-result),
 and [cancelling a preview](/api-reference/databricks-metric-view-publication/cancel-a-databricks-metric-view-preview).
 Publication runs and publication-run cancellation also have REST endpoints, but those are not yet
 in the public API reference during preview. Contact [Cube support](/admin/account-billing/support)
@@ -116,7 +119,7 @@ run a new **Preview** after a Cube upgrade.
 | --- | --- | --- |
 | Supported | Static view with a clear root source and representable dimensions, measures, and joins | Review generated YAML, then test access and sync. |
 | Warning | Behavior-neutral metadata Databricks cannot represent; a fan-out-unsafe measure withheld as `CUBE_MEMBER_WITHHELD` | Review the exact difference before accepting publication. For a withheld measure, publish it from a view rooted at its own cube. |
-| Blocking | Dynamic JavaScript/TypeScript/Jinja models, unflattened `extends`, any Cube access policy on the view or a referenced cube, mixed data sources, ambiguous roots, non-equality/cyclic/one-to-many joins, unsupported expressions or types, and multi-stage/window/ranking calculations | Simplify the model or keep that view in Cube. For `CUBE_VIEW_JOIN_NOT_REPRESENTABLE`, root the view at the many-side cube. |
+| Blocking | Dynamic JavaScript/TypeScript/Jinja models, unflattened `extends`, any Cube access policy on the view or a referenced cube, mixed data sources, a two-part `schema.table` source without `CUBEJS_DB_DATABRICKS_CATALOG`, ambiguous roots, non-equality/cyclic/one-to-many joins, unsupported expressions or types, and multi-stage/window/ranking calculations | Set `CUBEJS_DB_DATABRICKS_CATALOG` for a two-part source; otherwise simplify the model or keep that view in Cube. For `CUBE_VIEW_JOIN_NOT_REPRESENTABLE`, root the view at the many-side cube. |
 
 An unsafe joined measure can be **withheld while the rest of its view is published**. That view
 may show **Created** or **Updated**, and the run may show **Completed**, even though some measures
@@ -128,8 +131,9 @@ yet.
 
 Cube records ownership after a confirmed write. It will not adopt or overwrite an existing
 unmanaged Metric View, and it refuses a managed target whose remote definition has drifted.
-Resolve the collision or drift with your Cube operator; do not delete a customer-owned object
-to make a run pass. A failed conversion, validation, or write leaves that view's previous
+Resolve the collision or drift with the owner of the Databricks object, or contact
+[Cube support](/admin/account-billing/support). Cube never deletes or overwrites an object it does
+not manage. A failed conversion, validation, or write leaves that view's previous
 Databricks definition in place. Other views in the same run may still publish.
 
 Removing a view from scope, disabling publication, or Cube support deactivating the preview for
