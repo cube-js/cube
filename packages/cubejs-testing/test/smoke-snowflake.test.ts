@@ -23,6 +23,7 @@ describe('snowflake', () => {
       'snowflake',
       {
         CUBEJS_DB_TYPE: 'snowflake',
+        CUBEJS_DB_SNOWFLAKE_AUTHENTICATOR: 'SNOWFLAKE_JWT',
 
         ...DEFAULT_CONFIG,
       },

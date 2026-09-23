@@ -26,6 +26,20 @@ Each item — a toolbar button, or an option inside the **Add Controls**, **Add 
 
 Starting a drag from a menu option closes the menu, so it doesn't cover the canvas while you place the widget.
 
+## Widget size
+
+Widgets are sized in the dashboard's grid cells. Each type is added at its own size on a 12-column dashboard, and has a minimum it can't be dragged below:
+
+| Widget | Added at | Minimum |
+| --- | --- | --- |
+| Chart | 6×8 | 2×3 |
+| Text | 6×6 | 2×3 |
+| AI summary | 6×10 | 2×4 |
+
+A [KPI chart](/docs/explore-analyze/charts/chart-types/kpi) is added smaller, at 3×3, and carries the same minimum as any other chart. A control resizes by width only — its height is fixed by the input it renders — and never narrows below 2 columns. The [layout widgets](/docs/explore-analyze/dashboards/widgets/layout) carry their own sizes, listed on their page.
+
+A minimum only constrains a resize you make in the builder. A dashboard that already stores a widget smaller than its minimum keeps that size — in the builder and on the published dashboard alike — until you resize that widget yourself. The board's edge outranks a minimum too, so a widget with less room than its minimum between it and the right edge is held to the room it has rather than pushed off the board.
+
 ## Arranging widgets
 
 Drag any widget to move it, and use the handle in its bottom-right corner to resize it — the surrounding widgets shift to make room.

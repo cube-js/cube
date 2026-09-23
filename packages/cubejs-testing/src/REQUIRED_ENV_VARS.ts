@@ -17,7 +17,7 @@ export const REQUIRED_ENV_VARS: { [key: string]: string[] } = {
   ],
   snowflake: [
     'CUBEJS_DB_USER',
-    'CUBEJS_DB_PASS',
+    'CUBEJS_DB_SNOWFLAKE_PRIVATE_KEY',
     'CUBEJS_DB_NAME',
     'CUBEJS_DB_SNOWFLAKE_ACCOUNT',
     'CUBEJS_DB_SNOWFLAKE_REGION',

@@ -19,10 +19,12 @@ A divider is a horizontal separator line that breaks up the layout flow — a li
 
 A **horizontal stack** or **vertical stack** is a container that groups several widgets and lays them out evenly — side by side in a horizontal stack, or top to bottom in a vertical stack. Use a stack to keep a set of related widgets aligned and sized together, instead of positioning each one on the grid by hand.
 
-Place a stack on the canvas and resize it to any width and height; its children always share that space evenly:
+Place a stack on the canvas and resize it; its children always share that space evenly:
 
 - In a **horizontal stack**, each child takes the full height and an equal share of the width.
 - In a **vertical stack**, each child takes the full width and an equal share of the height.
+
+A horizontal stack is added 12×6 and can't shrink below 4×3; a vertical one is added 6×12 and can't shrink below 2×6.
 
 Add a widget to a stack by dragging it in — from the canvas, the toolbar, or another stack — and remove one by dragging it back out; the remaining children redistribute to fill the space. Stacks can be nested inside one another, inside a grid, or inside a tab ([nesting rules](#nesting-containers)).
 
@@ -32,9 +34,9 @@ Because a stack owns its children's layout, you work with the **container as a u
 
 A **grid** is a container whose children each hold a fixed cell position and size, unlike a stack's evenly shared space. A grid is a window into the same uniform cell grid as the board that holds it, so a child keeps the exact footprint you give it — nothing is auto-compacted, swapped, resized, or moved to make room. Dragging, resizing, or dropping a widget onto a cell that's already occupied is rejected and the widget stays where it was.
 
-A new grid is added as a square matching the column count of the board or grid it's placed in — for example, 12×12 on a 12-column dashboard. Add a widget to it by dragging one in from the canvas, the toolbar, or another container; the widget keeps its size and lands on the cell you drop it on, as long as that cell is free.
+A new grid is added as a square matching the column count of the board or grid it's placed in, plus one row for its header — for example, 12×13 on a 12-column dashboard. Inside another grid it is narrowed to that grid's own width and height, and the drop is refused where no free block of that size is left. Add a widget to it by dragging one in from the canvas, the toolbar, or another container; the widget keeps its size and lands on the cell you drop it on, as long as that cell is free.
 
-Click the grid's header to select it, then drag its resize grip to change its size, or open its gear menu for **Edit title**, **Resize**, and **Delete Grid** ([what that removes](#deleting-a-container)). Resizing only crops or restores empty rows and columns: a grid can't shrink below 2×2 or cut into an occupied cell. To name a grid, click into its header once it's selected and type a title.
+Click the grid's header to select it, then drag its resize grip to change its size, or open its gear menu for **Edit title**, **Resize**, and **Delete Grid** ([what that removes](#deleting-a-container)). Resizing only crops or restores empty rows and columns: a grid can't shrink below 2×4 or cut into an occupied cell. To name a grid, click into its header once it's selected and type a title.
 
 A grid can sit on the canvas, inside another grid, or inside a tab, but not inside a stack ([nesting rules](#nesting-containers)).
 
