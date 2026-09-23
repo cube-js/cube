@@ -21,6 +21,9 @@ it does not import Databricks definitions into Cube or sync automatically after 
 - Configure a [Databricks data source](/admin/connect-to-data/data-sources/databricks-jdbc)
   and deploy static Cube YAML with public views. This workflow reads the latest successful
   deployed build, not unsaved IDE changes.
+- If a Cube source uses a two-part `schema.table` name, set
+  [`CUBEJS_DB_DATABRICKS_CATALOG`](/reference/configuration/environment-variables#cubejs_db_databricks_catalog)
+  for that data source so Preview can resolve its catalog. Without it, those views are blocked.
 - Ask your Databricks administrator for a **dedicated target catalog and schema** for the preview.
   The identity configured on the Cube data source needs `CAN USE` on its SQL warehouse,
   `USE CATALOG` and `USE SCHEMA` on the target and source namespaces, `SELECT` on source
@@ -50,7 +53,9 @@ it does not import Databricks definitions into Cube or sync automatically after 
   </Step>
   <Step title="Preview the deployed model">
     Run **Preview**. Inspect every view's generated YAML, source relation, warnings, and blocking
-    issues. Preview reads the deployed model and **does not write to Databricks**.
+    issues. Preview requires deployment `SchemaRead` or `SchemaUpdate` access, reads the
+    deployed model, and **does not write to Databricks**. Preview payloads and results are retained
+    for at most seven days; run it again if an older result is gone.
   </Step>
   <Step title="Test access">
     With a completed preview selected, run **Test access**. It checks source reads as well as
@@ -80,6 +85,9 @@ and [publication preview API](/api-reference/databricks-metric-view-publication/
 support scripting configuration and read-only previews. Publication runs and cancellation also
 have REST endpoints, but they are not yet in the public API reference during preview. Contact
 [Cube support](/admin/account-billing/support) for API guidance if you need to automate them.
+When saving settings through the API, use `deletionPolicy: retain`. The older
+`delete-managed` value may still appear when reading a historical configuration, but new writes
+reject it. If the API reference lists that value, treat it as legacy-only.
 
 ## What can be published
 
