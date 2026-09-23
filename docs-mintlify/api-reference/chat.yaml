@@ -57,7 +57,7 @@ paths:
 
         terminated by `\n`) and served with `Content-Type: application/json`. Each line represents a
 
-        chat message, a state update, or an error object. Assistant content arrives incrementally —
+        chat message, a state update, a usage frame, or an error object. Assistant content arrives incrementally —
 
         updates to a previously emitted message carry the same `id` with `isDelta: true`.
 
@@ -290,7 +290,7 @@ paths:
                 type: object
             text/html; charset=utf-8: {}
           description: >-
-            Newline-delimited stream of chat message / state / error objects (served as
+            Newline-delimited stream of chat message / state / usage / error objects (served as
             `Content-Type: application/json`). Each line is a JSON object of the schema below.
       security:
         - apiKey: []
