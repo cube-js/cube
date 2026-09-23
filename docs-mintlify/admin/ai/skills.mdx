@@ -103,6 +103,16 @@ its complete instructions on demand.
 For how skills appear and run in chat — buttons, the `/` menu, and automatic matching —
 see [Agent skills](/docs/explore-analyze/skills).
 
+## Built-in skills
+
+Cube ships a small number of built-in skills alongside any you define. They appear in the
+same catalog — the agent's skill list, the `loadSkill` tool, and the `/` menu — with no
+configuration required. To customize a built-in skill, define a skill with the same `name`
+under `agents/skills/`; your version replaces the built-in one for your deployment.
+
+Built-in skills don't appear as buttons in the chat empty state — those buttons are your
+own deployment's pitch — but they're reachable from the `/` menu like any other skill.
+
 ## Deploying and testing
 
 Skills ship through the normal Cube development flow: author the skill on a development
