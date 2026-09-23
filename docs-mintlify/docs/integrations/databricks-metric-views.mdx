@@ -41,8 +41,7 @@ it does not import Databricks definitions into Cube or sync automatically after 
   to Databricks. Review the **Preview** result and configure Databricks grants before exposing a
   target to consumers.
 - Cube uses the data source credential server-side; you do not enter a second token in the
-  browser. Preview returns generated YAML for review, but Cube does not log the generated DDL or
-  data source credentials.
+  browser. Preview returns generated YAML to authorized users for review.
 
 ## Publish a view
 
@@ -114,13 +113,14 @@ static YAML, one Databricks data source per published view, scalar dimensions, c
 supported calculated measures, and conservative many-to-one equality joins. The target uses
 Databricks Metric View YAML 1.1.
 
-The matrix reflects the current preview release. Capabilities may change between releases, so
+These categories reflect the current preview release. Capabilities may change between releases, so
 run a new **Preview** after a Cube upgrade.
 
-| Preview result | Examples | What to do |
-| --- | --- | --- |
-| Supported | Static view with a clear root source and representable dimensions, measures, and joins | Review generated YAML, then test access and sync. |
-| Warning | Behavior-neutral metadata Databricks cannot represent; a fan-out-unsafe measure withheld as `CUBE_MEMBER_WITHHELD` | Review the exact difference before accepting publication. For a withheld measure, publish it from a view rooted at its own cube. |
+- **Supported** — a static view with a clear root source and representable dimensions, measures,
+  and joins. Review the generated YAML, then test access and sync.
+- **Warning** — behavior-neutral metadata Databricks cannot represent, or a fan-out-unsafe measure
+  withheld as `CUBE_MEMBER_WITHHELD`. Review the exact difference before accepting publication;
+  for a withheld measure, publish it from a view rooted at its own cube.
 
 Preview **blocks** a view when it finds any of these conditions:
 
