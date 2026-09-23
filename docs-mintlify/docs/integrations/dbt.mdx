@@ -337,8 +337,10 @@ models:
 - The top-level `meta:` key works too. If a model carries both, `config.meta` wins.
 - A column's `config:` block needs dbt Core 1.10 or later. On older versions, declare
   a column's `meta:` at the top level of the column instead.
-- Use a boolean, or the strings `"true"` / `"false"` in any casing. Any other value is
-  ignored.
+- Use a boolean. In dbt YAML the pull also accepts the strings `"true"` / `"false"` in
+  any casing and writes a real boolean to the generated cube. Any other value is
+  treated as not declared: a column stays public, and a model falls back to
+  **Mark pulled cubes as public**.
 
 **For the whole pull.** Turn off **Mark pulled cubes as public** to make every
 generated cube private unless its dbt model declares `meta.cube.public`. This also
