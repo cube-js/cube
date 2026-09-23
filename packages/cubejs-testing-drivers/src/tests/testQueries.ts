@@ -247,6 +247,19 @@ export function testQueries(type: string, { includeIncrementalSchemaSuite, exten
         await delay(OP_DELAY);
       }
 
+      // Stores calendar-shifted measures, whose build runs the shifted joins.
+      // Only the native planner serves a multi-stage measure from a rollup, and
+      // only the fixtures that declare this rollup build it.
+      if (isTesseractEnv && fixtures.preAggregations?.BigECommerce?.some((pa) => pa.name === 'RetailPriorPeriodsByWeek')) {
+        await buildPreaggs(env.cube.port, apiToken, {
+          timezones: ['UTC'],
+          preAggregations: ['BigECommerce.RetailPriorPeriodsByWeekExternal'],
+          contexts: [{ securityContext: { tenant: 't1' } }],
+        });
+
+        await delay(OP_DELAY);
+      }
+
       // Exercise pre-aggregation build with a custom granularity. The
       // granularity name `build_only_half_year` is unique to this rollup — no
       // query test references it, so the rollup cannot match any test query and
@@ -2233,6 +2246,62 @@ export function testQueries(type: string, { includeIncrementalSchemaSuite, exten
         }
       });
       expect(response.rawData()).toMatchSnapshot();
+    });
+
+    // A calendar shift is a mapping held in the calendar's table, applied by
+    // joining the facts on the mapped column. A rollup storing the shifted
+    // measures themselves runs that join at build time, so the rollup store
+    // answers with no join left to apply. Grouped by a retail week on purpose:
+    // the week is a calendar column, not arithmetic on the date. The prior
+    // month carries the comparison: retail months are 4 or 5 weeks long, and
+    // unlike the sparse prior year it has rows in almost every week.
+    const priorPeriodsByWeek = (variant: '' | 'NoPreAgg') => ({
+      measures: [
+        'BigECommerce.count',
+        `BigECommerce.totalCountRetailYearAgo${variant}`,
+        `BigECommerce.totalCountRetailMonthAgo${variant}`,
+      ],
+      timeDimensions: [{
+        dimension: 'RetailCalendar.retail_date',
+        granularity: 'week',
+        dateRange: ['2020-02-02', '2021-01-30'],
+      }],
+      order: {
+        'RetailCalendar.retail_date': 'asc',
+      },
+    } as const);
+
+    execute('querying BigECommerce with Retail Calendar: prior year and month by week (no pre-aggregation)', async () => {
+      const response = await client.load(priorPeriodsByWeek('NoPreAgg'));
+      expect(servedByRollupStore(response)).toBe(false);
+      expect(response.rawData()).toMatchSnapshot();
+    });
+
+    execute('querying BigECommerce with Retail Calendar: prior year and month by week (pre-aggregation in CubeStore)', async () => {
+      const [rollup, source] = await Promise.all([
+        client.load(priorPeriodsByWeek('')),
+        client.load(priorPeriodsByWeek('NoPreAgg')),
+      ]);
+      expect(servedByRollupStore(rollup)).toBe(true);
+      expect(servedByRollupStore(source)).toBe(false);
+
+      const sourceRows = source.rawData().map(({
+        'BigECommerce.totalCountRetailYearAgoNoPreAgg': yearAgo,
+        'BigECommerce.totalCountRetailMonthAgoNoPreAgg': monthAgo,
+        ...row
+      }: any) => ({
+        ...row,
+        'BigECommerce.totalCountRetailYearAgo': yearAgo,
+        'BigECommerce.totalCountRetailMonthAgo': monthAgo,
+      }));
+      // Agreeing proves little unless the prior month is mostly populated and
+      // is not simply the current period again, which is what a rollup that
+      // dropped the shift would return.
+      const monthAgo = sourceRows.filter((row: any) => row['BigECommerce.totalCountRetailMonthAgo'] !== null);
+      expect(monthAgo.length).toBeGreaterThan(sourceRows.length / 2);
+      expect(monthAgo.some((row: any) => row['BigECommerce.totalCountRetailMonthAgo'] !== row['BigECommerce.count'])).toBe(true);
+      expect(rollup.rawData()).toEqual(sourceRows);
+      expect(rollup.rawData()).toMatchSnapshot();
     });
 
     execute('querying BigECommerce with Retail Calendar: totalCountRetailMonthAgo', async () => {
