@@ -335,7 +335,7 @@ The API returns streaming JSON responses. Each line contains a separate JSON obj
 ### Response Fields
 
 - **`id`** (string): Unique message identifier
-- **`role`** (string): Message sender: `"user"` or `"assistant"`
+- **`role`** (string): Message sender: `"user"` or `"assistant"`. Absent on error lines and on the `__usage__` frame
 - **`content`** (string): Message content (streamed incrementally for assistant messages)
 - **`thinking`** (string): Agent's internal reasoning process (visible in development mode)
 - **`toolCall`** (object): Information about tool calls made by the agent during processing
@@ -345,7 +345,7 @@ The API returns streaming JSON responses. Each line contains a separate JSON obj
 - **`graphPath`** (string[]): Identifies which node of the agent graph produced this message. For example, `["cube_data_analyst_agent"]` for the main agent node or `["cube_data_analyst_agent", "tools"]` for tool calls. Messages with `graphPath[0] === "final"` represent the final consolidated answer.
 - **`isDelta`** (boolean): Whether this is an incremental content update
 - **`isInProcess`** (boolean): Whether the message is still being generated
-- **`sort`** (number): Message ordering sequence number
+- **`sort`** (number): Message ordering sequence number. Absent on the `__usage__` frame
 - **`state`** (object): Current streaming state information
 - **`type`** (string): Present only on the `__usage__` frame, where it is always `"usage"`
 - **`usage`** (object): Present only on the `__usage__` frame — `models` (string[]), `llmCalls`, `inputTokens`, `outputTokens`, `cacheWriteTokens`, `cacheReadTokens`, `totalTokens` (numbers)

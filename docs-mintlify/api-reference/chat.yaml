@@ -216,12 +216,14 @@ paths:
                     description: Whether the message is still being generated.
                     type: boolean
                   role:
+                    description: Absent on error lines and on the `__usage__` frame.
                     enum:
                       - user
                       - assistant
                     type: string
                   sort:
-                    description: Message ordering sequence.
+                    description: >-
+                      Message ordering sequence. Absent on the `__usage__` frame.
                     type: number
                   state:
                     description: >-
