@@ -421,6 +421,10 @@ import zlib
 
 NUMBER_OF_CLUSTERS = 3
 
+@config('context_to_app_id')
+def context_to_app_id(ctx: dict) -> str:
+  return f"CUBE_APP_{ctx['securityContext']['tenant_id']}"
+
 @config('context_to_orchestrator_id')
 def context_to_orchestrator_id(ctx: dict) -> str:
   return f"CUBE_APP_{ctx['securityContext']['tenant_id']}"
@@ -441,6 +445,9 @@ const zlib = require('zlib')
 const NUMBER_OF_CLUSTERS = 3
 
 module.exports = {
+  contextToAppId: ({ securityContext }) => {
+    return `CUBE_APP_${securityContext.tenant_id}`
+  },
   contextToOrchestratorId: ({ securityContext }) => {
     return `CUBE_APP_${securityContext.tenant_id}`
   },
