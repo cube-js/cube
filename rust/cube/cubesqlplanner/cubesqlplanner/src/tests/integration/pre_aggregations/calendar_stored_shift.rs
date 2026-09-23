@@ -77,12 +77,7 @@ fn cell(result: &str, key: &[(&str, &str)], column: &str) -> String {
         .unwrap_or_else(|| panic!("no row {:?} in:\n{}", key, result))
 }
 
-/// Week 53 of the long retail year compares to the prior year's week 52, the
-/// same prior rows week 52 reads: the build's join puts them in both weeks, as
-/// the source does.
-#[tokio::test(flavor = "multi_thread")]
-async fn prior_year_stored_by_retail_week_is_served_from_the_rollup() {
-    let query = indoc! {r#"
+const BY_WEEK: &str = indoc! {r#"
         measures:
           - sales.amount
           - sales.amount_ly
@@ -94,8 +89,65 @@ async fn prior_year_stored_by_retail_week_is_served_from_the_rollup() {
         order:
           - id: retail_calendar.retail_date
           - id: sales.store
-    "#};
-    if let Some((rollup, source)) = served_vs_source(query, "sales_ly_by_week").await {
+"#};
+
+const BY_YEAR: &str = indoc! {r#"
+        measures:
+          - sales.amount
+          - sales.amount_ly
+        dimensions:
+          - sales.store
+        time_dimensions:
+          - dimension: retail_calendar.retail_date
+            granularity: year
+        order:
+          - id: retail_calendar.retail_date
+          - id: sales.store
+"#};
+
+const FILTERED_BY_YEAR: &str = indoc! {r#"
+        measures:
+          - sales.amount
+          - sales.amount_ly
+        dimensions:
+          - sales.store
+          - retail_calendar.retail_year
+        time_dimensions:
+          - dimension: retail_calendar.retail_date
+            granularity: week
+        filters:
+          - member: retail_calendar.retail_year
+            operator: equals
+            values:
+              - "2007"
+        order:
+          - id: retail_calendar.retail_date
+          - id: sales.store
+"#};
+
+const OVER_A_RANGE: &str = indoc! {r#"
+        measures:
+          - sales.amount
+          - sales.amount_ly
+        dimensions:
+          - sales.store
+        time_dimensions:
+          - dimension: retail_calendar.retail_date
+            granularity: week
+            dateRange:
+              - "2007-01-07"
+              - "2007-02-17"
+        order:
+          - id: retail_calendar.retail_date
+          - id: sales.store
+"#};
+
+/// Week 53 of the long retail year compares to the prior year's week 52, the
+/// same prior rows week 52 reads: the build's join puts them in both weeks, as
+/// the source does.
+#[tokio::test(flavor = "multi_thread")]
+async fn prior_year_stored_by_retail_week_is_served_from_the_rollup() {
+    if let Some((rollup, source)) = served_vs_source(BY_WEEK, "sales_ly_by_week").await {
         assert_eq!(rollup, source);
         let ly_of_week = |week: &str| {
             cell(
@@ -119,20 +171,7 @@ async fn prior_year_stored_by_retail_week_is_served_from_the_rollup() {
 /// the calendar's mapping rather than reading the previous year's row.
 #[tokio::test(flavor = "multi_thread")]
 async fn prior_year_stored_by_retail_year_is_served_from_the_rollup() {
-    let query = indoc! {r#"
-        measures:
-          - sales.amount
-          - sales.amount_ly
-        dimensions:
-          - sales.store
-        time_dimensions:
-          - dimension: retail_calendar.retail_date
-            granularity: year
-        order:
-          - id: retail_calendar.retail_date
-          - id: sales.store
-    "#};
-    if let Some((rollup, source)) = served_vs_source(query, "sales_ly_by_year").await {
+    if let Some((rollup, source)) = served_vs_source(BY_YEAR, "sales_ly_by_year").await {
         assert_eq!(rollup, source);
         let north = |year: &str, column: &str| {
             cell(
@@ -158,26 +197,9 @@ async fn prior_year_stored_by_retail_year_is_served_from_the_rollup() {
 /// year, so its prior year lies 371 days back rather than 364.
 #[tokio::test(flavor = "multi_thread")]
 async fn prior_year_filtered_by_a_stored_calendar_attribute_matches_source() {
-    let query = indoc! {r#"
-        measures:
-          - sales.amount
-          - sales.amount_ly
-        dimensions:
-          - sales.store
-          - retail_calendar.retail_year
-        time_dimensions:
-          - dimension: retail_calendar.retail_date
-            granularity: week
-        filters:
-          - member: retail_calendar.retail_year
-            operator: equals
-            values:
-              - "2007"
-        order:
-          - id: retail_calendar.retail_date
-          - id: sales.store
-    "#};
-    if let Some((rollup, source)) = served_vs_source(query, "sales_ly_by_week_and_year").await {
+    if let Some((rollup, source)) =
+        served_vs_source(FILTERED_BY_YEAR, "sales_ly_by_week_and_year").await
+    {
         assert_eq!(rollup, source);
     }
 }
@@ -186,23 +208,9 @@ async fn prior_year_filtered_by_a_stored_calendar_attribute_matches_source() {
 /// boundary where the offset changes from 364 to 371 days.
 #[tokio::test(flavor = "multi_thread")]
 async fn prior_year_over_a_date_range_matches_source() {
-    let query = indoc! {r#"
-        measures:
-          - sales.amount
-          - sales.amount_ly
-        dimensions:
-          - sales.store
-        time_dimensions:
-          - dimension: retail_calendar.retail_date
-            granularity: week
-            dateRange:
-              - "2007-01-07"
-              - "2007-02-17"
-        order:
-          - id: retail_calendar.retail_date
-          - id: sales.store
-    "#};
-    if let Some((rollup, source)) = served_vs_source(query, "sales_ly_by_week_non_strict").await {
+    if let Some((rollup, source)) =
+        served_vs_source(OVER_A_RANGE, "sales_ly_by_week_non_strict").await
+    {
         assert_eq!(rollup, source);
     }
 }
@@ -267,4 +275,42 @@ async fn prior_year_over_an_unshifted_rollup_falls_back() {
     if let Some((rollup, source)) = fallback_vs_source(query, "sales_by_week").await {
         assert_eq!(rollup, source);
     }
+}
+
+/// The same stored rollups executed on a live CubeStore. The harness builds
+/// each rollup in Postgres and uploads it, so this exercises only the query
+/// side; the build is the one the Postgres tests cover.
+#[tokio::test(flavor = "multi_thread")]
+async fn stored_prior_year_runs_on_cubestore() {
+    for (query, pre_agg) in [
+        (BY_WEEK, "sales_ly_by_week"),
+        (BY_YEAR, "sales_ly_by_year"),
+        (FILTERED_BY_YEAR, "sales_ly_by_week_and_year"),
+        (OVER_A_RANGE, "sales_ly_by_week_non_strict"),
+    ] {
+        let schema = MockSchema::from_yaml_file(YAML).only_pre_aggregations(&[pre_agg]);
+        let ctx = TestContext::new_with_external_cubestore(schema).unwrap();
+        let Some(cubestore) = ctx.try_execute_cubestore(query, SEED).await else {
+            return;
+        };
+        let source = ctx_with(&[]).try_execute_pg(query, SEED).await.unwrap();
+        assert!(!rows(&source).is_empty(), "{}", pre_agg);
+        assert_eq!(rows(&cubestore), rows(&source), "{}", pre_agg);
+    }
+}
+
+/// Cells of a result table, with CubeStore's ISO timestamps in the form
+/// Postgres prints them.
+fn rows(result: &str) -> Vec<Vec<String>> {
+    let iso = regex::Regex::new(r"^(\d{4}-\d{2}-\d{2})T(\d{2}:\d{2}:\d{2})\.000Z$").unwrap();
+    result
+        .lines()
+        .filter(|line| !line.trim().is_empty())
+        .skip(2)
+        .map(|line| {
+            line.split('|')
+                .map(|value| iso.replace(value.trim(), "$1 $2").into_owned())
+                .collect()
+        })
+        .collect()
 }
