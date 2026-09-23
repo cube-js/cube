@@ -350,6 +350,16 @@ A common pattern is to keep the pulled layer private and expose it through
 A cube that [`extends`](/reference/data-modeling/cube#extends) a private generated
 cube inherits `public: false`, so set `public: true` on it to expose it.
 
+<Warning>
+
+A view doesn't inherit member-level visibility. A column hidden with
+`meta.cube.public: false` becomes queryable again through a view that includes it,
+for example with `includes: "*"`. Use
+[`excludes`](/reference/data-modeling/view#includes-and-excludes) to keep such members
+out of the view.
+
+</Warning>
+
 ## Pass environment variables to dbt
 
 This section applies only to Git-based pulls. A manifest pull runs no dbt process in
