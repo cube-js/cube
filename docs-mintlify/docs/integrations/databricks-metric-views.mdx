@@ -47,15 +47,15 @@ it does not import Databricks definitions into Cube or sync automatically after 
   <Step title="Configure publication">
     Open your deployment's **Settings → Data Sources** and edit the Databricks data source.
     Expand **Databricks Metric Views**. Enter the target catalog and schema. Choose all public
-    views, selected views, or a name pattern; optionally add a target-name prefix. A view that
-    later leaves the scope keeps its Metric View in Databricks—there is no managed-delete option.
-    Turn publication on and save. This alone does not start a write.
+    views, selected views, or a name pattern; optionally add a target-name prefix. Turn publication
+    on and save. This alone does not start a write.
   </Step>
   <Step title="Preview the deployed model">
     Run **Preview**. Inspect every view's generated YAML, source relation, warnings, and blocking
-    issues. Preview requires deployment `SchemaRead` or `SchemaUpdate` access, reads the
-    deployed model, and **does not write to Databricks**. Preview payloads and results are retained
-    for at most seven days; run it again if an older result is gone.
+    issues. Preview requires `SchemaRead` or `SchemaUpdate`
+    [deployment access](/admin/users-and-permissions/custom-roles). It reads the deployed model and
+    **does not write to Databricks**. Preview payloads and results are retained for at most seven
+    days; run it again if an older result is gone.
   </Step>
   <Step title="Test access">
     With a completed preview selected, run **Test access**. It checks source reads as well as
@@ -75,16 +75,18 @@ lands between them, preview again before syncing. A deployment currently has one
 there is no named staging-to-production promotion or pinned-build publication.
 
 The name pattern supports literals, `^`, `$`, dot, and at most one `.*` wildcard; it is not a
-general regular expression. A newly deployed view enters an **all** or matching **pattern** scope
-on the next manual sync. A **selected** scope changes only when you edit it. Renaming a view or
-target creates a new target and leaves the old one retained. Per-view target-name and root-source
-overrides are available through the configuration API, but are not editable in the card.
+general regular expression and is limited to 128 characters. You can select up to 128 views.
+A newly deployed view enters an **all** or matching **pattern** scope on the next manual sync.
+A **selected** scope changes only when you edit it. Renaming a view or target creates a new target
+and leaves the old one retained. Per-view target-name and root-source overrides are available
+through the configuration API, but are not editable in the card.
 
 The [publication settings API](/api-reference/databricks-metric-view-integration/get-databricks-metric-view-publication-settings)
 and [publication preview API](/api-reference/databricks-metric-view-publication/start-a-databricks-metric-view-publication-preview)
-support scripting configuration and read-only previews. Publication runs and cancellation also
-have REST endpoints, but they are not yet in the public API reference during preview. Contact
-[Cube support](/admin/account-billing/support) for API guidance if you need to automate them.
+support scripting configuration and read-only previews, including preview cancellation.
+Publication runs and publication-run cancellation also have REST endpoints, but those are not yet
+in the public API reference during preview. Contact [Cube support](/admin/account-billing/support)
+for API guidance if you need to automate them.
 When saving settings through the API, use `deletionPolicy: retain`. The older
 `delete-managed` value may still appear when reading a historical configuration, but new writes
 reject it. If the API reference lists that value, treat it as legacy-only.
@@ -122,7 +124,7 @@ Databricks definition in place. Other views in the same run may still publish.
 Removing a view from scope, disabling publication, or Cube support deactivating the preview for
 your account **does not delete** its Databricks Metric View. Run history labels an obsolete target
 **Obsolete, kept**. If you need to remove one, have the target owner review and drop it manually
-in Databricks. There is no automatic managed-delete action in this preview.
+in Databricks.
 
 You can request cancellation of an active run. It prevents further writes but does not undo
 views already published. To roll back a bad definition, restore the desired Cube model,
