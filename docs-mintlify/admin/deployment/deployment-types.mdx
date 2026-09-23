@@ -155,8 +155,9 @@ same request.
 ### Multi-router Cube Store {#multi-router-cube-store}
 
 By default, all Dedicated deployments within a Multi-cluster deployment share
-one Cube Store router. With **Multi-router Cube Store** enabled, each Cube Store
-router id gets its own router, spreading pre-aggregation storage and query load
+one Cube Store router. With **Multi-router Cube Store** enabled, distinct Cube
+Store router ids are spread across separate routers, up to the deployment's
+**Number of clusters**. This spreads pre-aggregation storage and query load
 across Cube Store in your region.
 
 To enable it, navigate to **Settings → Configuration**, turn on
@@ -168,11 +169,8 @@ Each request's router id comes from
 [`context_to_orchestrator_id`][ref-ctx-to-orchestrator-id] if it's not defined.
 Without either, all requests resolve to the same id and share one router.
 
-A deployment uses at most as many routers as its **Number of clusters**. Once a
-Cube API instance has seen more distinct router ids than that, requests with
-additional ids are served by the shared Cube Store router. To keep every tenant
-on a dedicated router, map tenants onto a fixed set of router ids no larger
-than **Number of clusters**:
+Keep the number of distinct router ids at or below **Number of clusters**. To
+serve many tenants, map them onto a fixed set of router ids:
 
 <CodeGroup>
 
@@ -212,9 +210,14 @@ module.exports = {
 
 <Warning>
 
-Router ids should be stable for each tenant. Pre-aggregations are stored per
-router, so a tenant whose router id changes has its pre-aggregations built
-again on the new router.
+Pre-aggregations are stored per router, so a tenant whose router changes has
+its pre-aggregations built again on the new router. Keep router ids stable for
+each tenant.
+
+Once a Cube API instance has seen more distinct router ids than **Number of
+clusters**, it connects to the shared Cube Store router until it restarts,
+including for ids that had their own router before. Instances fall back
+independently, so the same tenant can be served by different routers.
 
 </Warning>
 
