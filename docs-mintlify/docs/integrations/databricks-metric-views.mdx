@@ -81,13 +81,15 @@ A **selected** scope changes only when you edit it. Renaming a view or target cr
 and leaves the old one retained. Per-view target-name and root-source overrides are available
 through the configuration API, but are not editable in the card.
 
-The [publication settings API](/api-reference/databricks-metric-view-integration/get-databricks-metric-view-publication-settings)
-and [publication preview API](/api-reference/databricks-metric-view-publication/start-a-databricks-metric-view-publication-preview)
-support scripting configuration and read-only previews, including preview cancellation.
+The public REST API documents [reading settings](/api-reference/databricks-metric-view-integration/get-databricks-metric-view-publication-settings),
+[saving settings](/api-reference/databricks-metric-view-integration/create-or-update-databricks-metric-view-publication-settings),
+[starting a preview](/api-reference/databricks-metric-view-publication/start-a-databricks-metric-view-publication-preview),
+and [cancelling a preview](/api-reference/databricks-metric-view-publication/cancel-a-databricks-metric-view-preview).
 Publication runs and publication-run cancellation also have REST endpoints, but those are not yet
 in the public API reference during preview. Contact [Cube support](/admin/account-billing/support)
 for API guidance if you need to automate them.
-When saving settings through the API, use `deletionPolicy: retain`. The older
+
+When saving settings through the API, set `deletionPolicy` to `retain`. The older
 `delete-managed` value may still appear when reading a historical configuration, but new writes
 reject it. If the API reference lists that value, treat it as legacy-only.
 
