@@ -140,10 +140,15 @@ impl NodeConfiguration for NodeConfigurationImpl {
 
             // Config::default() can only see CUBEJS_DEV_MODE, so without this the SQL
             // API would redact in a process the Node side treats as a dev server. Only
-            // the default moves: an explicit CUBEJS_LOG_REDACTION was already parsed
-            // there, and parsing it again would warn twice for one bad value
+            // the default moves: a usable CUBEJS_LOG_REDACTION was already parsed there,
+            // and parsing it again would warn twice for one bad value. Empty counts as
+            // unset, which is what Config::default() falls back on and what the Node
+            // side rejects outright, so neither reads it as a choice
             if let Some(dev_mode) = options.dev_mode {
-                if env::var("CUBEJS_LOG_REDACTION").is_err() {
+                let redaction_chosen =
+                    env::var("CUBEJS_LOG_REDACTION").is_ok_and(|v| !v.trim().is_empty());
+
+                if !redaction_chosen {
                     c.log_redaction = !dev_mode;
                 }
             };
