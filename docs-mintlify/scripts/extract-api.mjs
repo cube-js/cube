@@ -187,6 +187,12 @@ const EXCLUDE_OPERATIONS = new Set([
   'POST /api/v1/deployments/{deploymentId}/databricks-metric-view-integrations/{dataSourceName}/syncs',
   'GET /api/v1/deployments/{deploymentId}/databricks-metric-view-integrations/{dataSourceName}/syncs/{runId}',
   'DELETE /api/v1/deployments/{deploymentId}/databricks-metric-view-integrations/{dataSourceName}/syncs/{runId}',
+  // Evaluations (CUB-3667): every operation's own description says "This
+  // capability is currently in preview — reach out to the Cube support team to
+  // activate it for your account", not GA. Remove once the feature ships.
+  'POST /api/v1/deployments/{deploymentId}/evaluations',
+  'GET /api/v1/deployments/{deploymentId}/evaluations/{evaluationId}',
+  'GET /api/v1/deployments/{deploymentId}/evaluations/{evaluationId}/results',
 ]);
 
 // Cube-staff-only operations (provisioning real cloud infrastructure — Regions,
@@ -226,7 +232,7 @@ const TAG_ORDER = [
   'Data Model', 'Data Model Uploads', 'GitHub', 'GitHub Connection', 'dbt Sync',
   'Databricks Metric View Publication', 'Databricks Metric View Integration',
   'Folders', 'Reports', 'External Documents', 'Workbooks', 'Workbook Promotions', 'Dashboard Exports', 'Notifications', 'Scheduled Tasks', 'Workspace', 'Agents', 'Metadata',
-  'Users', 'Users Admin', 'Groups', 'User Groups',
+  'Users', 'Users Admin', 'Groups', 'User Groups', 'API Keys',
   'User Attributes', 'User Attribute Values', 'Resource Policies', 'Tenant Settings',
   'OAuth Integrations', 'User OAuth Tokens', 'OIDC Token Configs',
   'App Theme', 'AI Engineer', 'Embed', 'Embed Tenants', 'Dashboard Embed Access',
@@ -280,6 +286,7 @@ const ACRONYMS = [
   [/\boidc\b/gi, 'OIDC'],
   [/\bscim\b/gi, 'SCIM'],
   [/\bai\b/gi, 'AI'],
+  [/\bapi\b/gi, 'API'],
   // Product spelling: lowercase, even at the start of a tag or summary.
   [/\bdbt\b/gi, 'dbt'],
 ];

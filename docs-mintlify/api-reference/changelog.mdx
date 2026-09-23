@@ -7,6 +7,20 @@ rss: true
 {/* GENERATED FILE — do not edit by hand. */}
 {/* Run scripts/extract-changelog.mjs against the platform client CHANGELOG.md. */}
 
+<Update label="2026-09-23" description="v0.14.0" tags={["Added","Changed"]}>
+  ### Added
+
+  - Public REST parity for API key management (CORE-730): `GET` / `POST /api/v1/api-keys` and `GET` / `DELETE /api/v1/api-keys/{id}` (`ApiKeysPublicController.listApiKeys` / `createApiKey` / `getApiKey` / `deleteApiKey`), matching the `cube api-keys list/create/get/delete` CLI commands, which previously had no REST route to target. Admin-only. List and get responses omit the real secret — only a SHA-256 hash is persisted — so only the create response carries the one-time-revealed `token`. New schemas: `ApiKeyResponse`, `ApiKeyCreatedResponse`, `ApiKeysListResponse`, `CreateApiKeyInput`.
+
+  ### Changed
+
+  - `POST /api/v1/deployments/{deploymentId}/environments/{environmentId}/tokens` now signs only an allowlisted `scopes` entry, and authorizes each one separately (CUB-4801). The allowlist is `meta` and `sql-runner`; anything else, including `ai-engineer` and `agents-config` (gated elsewhere on schema access and privileged settings), is dropped rather than signed. `sql-runner` additionally requires SQL Runner read access on that deployment, and a caller-supplied `sql-runner-permissions:*` entry is never honoured — the server appends the non-DDL qualifier itself when DDL is disabled, matching the GraphQL mint. Before, deployment edit access granted every requested scope.
+  - `GET /api/v1/deployments/{deploymentId}/environments/{environmentId}/tokens` now lists only the tokens the calling user minted (CUB-4801). Before, any caller with read access to the deployment received every live token in the environment, credential included. The response shape is unchanged. Ownership is derived from a claim the mint stamps into each token, so a token minted before this release belongs to nobody and stops appearing; tokens expire within the hour regardless. One listing covers the most recent 1000 live tokens of the environment, which is far above what an hour of minting produces.
+  - The token routes (`GET`/`POST …/tokens`, `POST …/tokens-for-meta-sync`) no longer accept an embed session. Minting a Cube API credential is not an embed capability. `GET …/environments` is unchanged.
+  - `POST …/tokens` applies the same security-context gate as the console's token mutations: a caller without deployment edit access (admin or developer role) has every key of `security_context` dropped before signing, and a caller-supplied `scope` claim is never signed on any tier. The response's `security_context` now echoes what was actually signed.
+  - `scopes` on `POST …/tokens` also requires deployment edit access — it is a runtime grant (`sql-runner`, `agents-config`), gated the same way the console's equivalent mint is. It is ignored for a caller without that access, and a `dev-token` entry is never honoured from any caller. `tokens-for-meta-sync` still forces `meta` regardless.
+</Update>
+
 <Update label="2026-09-22" description="v0.13.0" tags={["Added","Removed"]}>
   ### Added
 

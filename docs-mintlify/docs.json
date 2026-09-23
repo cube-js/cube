@@ -999,6 +999,16 @@
                 ]
               },
               {
+                "group": "API Keys",
+                "openapi": "/api-reference/api.yaml",
+                "pages": [
+                  "GET /api/v1/api-keys",
+                  "POST /api/v1/api-keys",
+                  "GET /api/v1/api-keys/{id}",
+                  "DELETE /api/v1/api-keys/{id}"
+                ]
+              },
+              {
                 "group": "User Attributes",
                 "openapi": "/api-reference/api.yaml",
                 "pages": [
