@@ -30,6 +30,10 @@ it does not import Databricks definitions into Cube or sync automatically after 
 - Arrange target access for Databricks consumers separately. Publishing an object does not
   grant them `SELECT` on it or access to its catalog and schema.
 
+Databricks evaluates access to the published object under Unity Catalog permissions, not under
+Cube's query-time authorization. Cube access policies that cannot be represented there block
+publication; review the preview and Databricks grants before exposing a target to consumers.
+
 ## Publish a view
 
 1. Open your deployment's **Settings → Data Sources** and edit the Databricks data source.
