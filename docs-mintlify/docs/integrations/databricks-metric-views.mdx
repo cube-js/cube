@@ -119,7 +119,20 @@ run a new **Preview** after a Cube upgrade.
 | --- | --- | --- |
 | Supported | Static view with a clear root source and representable dimensions, measures, and joins | Review generated YAML, then test access and sync. |
 | Warning | Behavior-neutral metadata Databricks cannot represent; a fan-out-unsafe measure withheld as `CUBE_MEMBER_WITHHELD` | Review the exact difference before accepting publication. For a withheld measure, publish it from a view rooted at its own cube. |
-| Blocking | Dynamic JavaScript/TypeScript/Jinja models, unflattened `extends`, any Cube access policy on the view or a referenced cube, mixed data sources, a two-part `schema.table` source without `CUBEJS_DB_DATABRICKS_CATALOG`, ambiguous roots, non-equality/cyclic/one-to-many joins, unsupported expressions or types, and multi-stage/window/ranking calculations | Set `CUBEJS_DB_DATABRICKS_CATALOG` for a two-part source; otherwise simplify the model or keep that view in Cube. For `CUBE_VIEW_JOIN_NOT_REPRESENTABLE`, root the view at the many-side cube. |
+
+Preview **blocks** a view when it finds any of these conditions:
+
+- Dynamic JavaScript, TypeScript, or Jinja models, or unflattened `extends`: use static YAML and
+  flatten inherited definitions before publishing.
+- A Cube access policy on the view or a referenced cube: keep that governed view in Cube; the
+  policy cannot be transferred to a Databricks Metric View.
+- Mixed data sources or an ambiguous root dataset: use one data source and a clear root.
+- A two-part `schema.table` source without `CUBEJS_DB_DATABRICKS_CATALOG`: set that variable for
+  the selected Databricks data source and preview again.
+- Non-equality, cyclic, or one-to-many joins: simplify the join. For
+  `CUBE_VIEW_JOIN_NOT_REPRESENTABLE`, root the view at the many-side cube.
+- Unsupported expressions or types, or multi-stage, window, or ranking calculations: simplify
+  the model or keep that view in Cube.
 
 An unsafe joined measure can be **withheld while the rest of its view is published**. That view
 may show **Created** or **Updated**, and the run may show **Completed**, even though some measures
@@ -137,9 +150,9 @@ not manage. A failed conversion, validation, or write leaves that view's previou
 Databricks definition in place. Other views in the same run may still publish.
 
 Removing a view from scope, disabling publication, or Cube support deactivating the preview for
-your account **does not delete** its Databricks Metric View. Run history labels an obsolete target
-**Obsolete, kept**. If you need to remove one, have the target owner review and drop it manually
-in Databricks.
+your account **does not delete** its Databricks Metric View. If you remove a view from scope and
+sync again, run history labels the obsolete target **Obsolete, kept**. If you need to remove one,
+have the target owner review and drop it manually in Databricks.
 
 You can request cancellation of an active run. It prevents further writes but does not undo
 views already published. To roll back a bad definition, restore the desired Cube model,
