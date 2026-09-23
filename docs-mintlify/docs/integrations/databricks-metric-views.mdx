@@ -90,8 +90,8 @@ in the public API reference during preview. Contact [Cube support](/admin/accoun
 for API guidance if you need to automate them.
 
 When saving settings through the API, set `deletionPolicy` to `retain`. The older
-`delete-managed` value may still appear when reading a historical configuration, but new writes
-reject it. If the API reference lists that value, treat it as legacy-only.
+`delete-managed` value is deprecated but remains accepted for existing API clients. It does not
+delete obsolete Metric Views; it currently behaves like `retain`. Choose `retain` for new settings.
 
 ## What can be published
 
