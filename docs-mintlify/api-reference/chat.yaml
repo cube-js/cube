@@ -80,9 +80,7 @@ paths:
 
         - `__usage__` — always the last frame on the stream, whether the run completed, was aborted,
         or errored. Carries `{ models, llmCalls, inputTokens, outputTokens, cacheWriteTokens,
-        cacheReadTokens, totalTokens }` under `usage`. `models` is normalized for a BYOM model to omit
-        infrastructure detail (e.g. a Bedrock inference-profile ARN is reduced to its model name).
-        There is no cost field.
+        cacheReadTokens, totalTokens }` under `usage`. There is no cost field.
 
 
         Errors mid-stream are emitted as a standalone line `{ "error": "<message>" }` rather than a
