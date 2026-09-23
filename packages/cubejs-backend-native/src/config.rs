@@ -138,12 +138,14 @@ impl NodeConfiguration for NodeConfigurationImpl {
                 c.postgres_bind_address = Some(format!("0.0.0.0:{}", p));
             };
 
-            // Only the default moves: a usable CUBEJS_LOG_REDACTION was already parsed
-            // by Config::default(), and parsing it again would warn twice for one bad
-            // value. Empty is not usable on either side, so it is not a choice either
+            // Config::default() can only see CUBEJS_DEV_MODE, so without this the SQL API
+            // would redact in a process the Node side treats as a dev server. Only the
+            // default moves: re-parsing a value it honoured would warn twice for one bad one
             if let Some(dev_mode) = options.dev_mode {
-                let redaction_chosen =
-                    env::var("CUBEJS_LOG_REDACTION").is_ok_and(|v| !v.trim().is_empty());
+                // The spellings cubesql's env_parse_bool honours. Anything else - empty,
+                // `1`, a typo - it warned about and fell back on, so it chose nothing
+                let redaction_chosen = env::var("CUBEJS_LOG_REDACTION")
+                    .is_ok_and(|v| matches!(v.trim().to_lowercase().as_str(), "true" | "false"));
 
                 if !redaction_chosen {
                     c.log_redaction = !dev_mode;
