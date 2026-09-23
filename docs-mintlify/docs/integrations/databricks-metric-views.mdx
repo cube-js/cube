@@ -41,10 +41,14 @@ it does not import Databricks definitions into Cube or sync automatically after 
   to Databricks. Review the **Preview** result and configure Databricks grants before exposing a
   target to consumers.
 - Cube uses the data source credential server-side; you do not enter a second token in the
-  browser. Preview returns generated YAML for review, but credentials and complete generated
-  DDL are not written to logs.
+  browser. Preview returns generated YAML for review, but Cube does not log the generated DDL or
+  data source credentials.
 
 ## Publish a view
+
+The full publication flow requires `SchemaUpdate`
+[deployment access](/admin/users-and-permissions/custom-roles). `SchemaRead` is enough to run and
+inspect Preview, but not to save settings, test access, or sync.
 
 <Steps>
   <Step title="Configure publication">
@@ -55,10 +59,8 @@ it does not import Databricks definitions into Cube or sync automatically after 
   </Step>
   <Step title="Preview the deployed model">
     Run **Preview**. Inspect every view's generated YAML, source relation, warnings, and blocking
-    issues. Preview requires `SchemaRead` or `SchemaUpdate`
-    [deployment access](/admin/users-and-permissions/custom-roles). It reads the deployed model and
-    **does not write to Databricks**. Preview payloads and results are retained for at most seven
-    days; run it again if an older result is gone.
+    issues. It reads the deployed model and **does not write to Databricks**. Preview payloads and
+    results are retained for at most seven days; run it again if an older result is gone.
   </Step>
   <Step title="Test access">
     With a completed preview selected, run **Test access**. It checks source reads as well as
