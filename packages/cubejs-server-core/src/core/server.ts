@@ -157,8 +157,7 @@ export class CubejsServerCore {
 
   /**
    * This instance's share of the process-wide pre-aggregation schema pin, when it took
-   * one. Releasing by identity is what stops a repeated shutdown, or one following a
-   * reload's drop, from spending a share that is not this instance's.
+   * one. Undefined when it did not, or once shutdown has released it.
    */
   private heldPreAggregationsSchemaPin: symbol | undefined;
 

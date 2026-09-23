@@ -271,7 +271,6 @@ export class ServerContainer {
       markDevModeResolvedByCaller();
     }
 
-    // Kept in sync for user config code and third-party libraries that still read it.
     // Written before `cube.js` is loaded so that file sees it, which is what master did;
     // the config it exports can still overrule the command, and the sync follows below
     const nodeEnv = process.env.NODE_ENV;
@@ -281,16 +280,14 @@ export class ServerContainer {
       process.env.NODE_ENV = 'development';
     }
 
-    // Measures the user's own config and then folds in the devServer default. The order
-    // matters: server-core reads emptiness as "nothing is configured yet" and opens
-    // Playground's connection wizard on it, and `{ devServer: true }` is not empty
+    // `{ devServer: true }` is not empty, and server-core reads emptiness as "nothing is
+    // configured yet" - measure the user's own config before folding the default in
     const measureAndApplyDevServer = (userConfig: CreateOptions): CreateOptions => {
       this.isCubeConfigEmpty = Object.keys(userConfig).length === 0;
 
       const config = devServer ? { devServer, ...userConfig } : userConfig;
 
-      // Scoped to the value written above, so a `cube.js` that chose its own NODE_ENV
-      // keeps it; one that assigned `development` too is indistinguishable and goes with it
+      // Scoped to the value written above, so a `cube.js` that chose its own NODE_ENV keeps it
       if (
         wroteNodeEnv &&
         !(config.devServer ?? getEnv('devMode')) &&
