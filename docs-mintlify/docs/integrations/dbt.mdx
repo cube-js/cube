@@ -335,8 +335,10 @@ models:
 - On a **column**, it hides that column's dimension and any `sum` measure built from it.
   The cube's `count` measure stays visible.
 - The top-level `meta:` key works too. If a model carries both, `config.meta` wins.
+- A column's `config:` block needs dbt Core 1.10 or later. On older versions, declare
+  a column's `meta:` at the top level of the column instead.
 - Use a boolean, or the strings `"true"` / `"false"` in any casing. Any other value is
-  ignored with a warning.
+  ignored.
 
 **For the whole pull.** Turn off **Mark pulled cubes as public** to make every
 generated cube private unless its dbt model declares `meta.cube.public`. This also
