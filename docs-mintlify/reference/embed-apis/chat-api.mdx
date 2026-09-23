@@ -546,7 +546,7 @@ The API returns a series of JSON objects, each on a separate line. Here's what a
 }
 ```
 
-This is always the last frame on the stream, sent whether the run completed, was aborted, or errored. `usage.models` lists the distinct models used, and for a [BYOM](/admin/ai/bring-your-own-model) model is normalized to strip infrastructure detail (e.g. a Bedrock inference-profile ARN is reduced to its model name) rather than the raw configured identifier. The frame reports tokens only — there is no cost field.
+This is always the last frame on the stream, sent whether the run completed, was aborted, or errored — when the request is rejected before any LLM call, the counts are all `0` and `models` is empty. `usage.models` lists the distinct models used, and for a [BYOM](/admin/ai/bring-your-own-model) model is normalized to strip infrastructure detail (e.g. a Bedrock inference-profile ARN is reduced to its model name) rather than the raw configured identifier. The frame reports tokens only — there is no cost field.
 
 ### Getting the Final Assistant Message
 
