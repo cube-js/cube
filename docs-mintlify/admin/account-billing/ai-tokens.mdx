@@ -111,8 +111,10 @@ exceeded.
 ### Can I bring my own AI model?
 
 Yes. When using a [Bring Your Own Model (BYOM)][ref-byom] configuration, AI
-requests bypass the token quota system entirely — no tokens are consumed or
-tracked for those requests. You are billed directly by your model provider.
+requests bypass the token quota system entirely — no tokens are consumed
+against your Cube AI token balance. You are billed directly by your model
+provider. Administrators can still see BYOM token counts in [Usage
+Analytics][ref-usage-analytics], at no cost.
 
 ### Why does a single prompt sometimes use more tokens than expected?
 
@@ -128,3 +130,4 @@ different reasoning path.
 
 [ref-ai-overview]: /admin/ai
 [ref-byom]: /admin/ai/bring-your-own-model
+[ref-usage-analytics]: /admin/monitoring/usage-analytics
