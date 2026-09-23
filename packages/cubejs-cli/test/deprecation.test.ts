@@ -19,6 +19,7 @@ describe('deprecation', () => {
     expect(deprecationMessage('deploy').join('\n')).toContain('cube deploy <deployment-id>');
     expect(deprecationMessage('auth').join('\n')).toContain('cube login');
     expect(deprecationMessage('create').join('\n')).not.toContain('Instead of');
+    expect(deprecationMessage('toString').join('\n')).not.toContain('Instead of');
   });
 
   test('only warns for commands replaced by the new CLI', () => {
@@ -28,6 +29,8 @@ describe('deprecation', () => {
     expect(shouldDisplayDeprecationWarning('server')).toBe(false);
     expect(shouldDisplayDeprecationWarning('create')).toBe(false);
     expect(shouldDisplayDeprecationWarning('token')).toBe(false);
+    expect(shouldDisplayDeprecationWarning('toString')).toBe(false);
+    expect(shouldDisplayDeprecationWarning('constructor')).toBe(false);
   });
 
   test('can be disabled via env', () => {

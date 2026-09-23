@@ -5,10 +5,10 @@ export const NEW_CLI_INSTALL_SH = 'curl -fsSL https://raw.githubusercontent.com/
 export const NEW_CLI_INSTALL_PS = 'irm https://raw.githubusercontent.com/cube-js/cube/master/install-cli.ps1 | iex';
 
 // Legacy commands that have a direct counterpart in the new `cube` CLI.
-export const COMMAND_REPLACEMENTS: Record<string, string> = {
-  auth: 'cube login',
-  deploy: 'cube deploy <deployment-id>',
-};
+export const COMMAND_REPLACEMENTS: ReadonlyMap<string, string> = new Map([
+  ['auth', 'cube login'],
+  ['deploy', 'cube deploy <deployment-id>'],
+]);
 
 export const isDeprecationWarningDisabled = (env: NodeJS.ProcessEnv = process.env) => {
   const value = (env.CUBEJS_CLI_NO_DEPRECATION_WARNING || '').trim().toLowerCase();
@@ -23,7 +23,7 @@ export const deprecationMessage = (command?: string): string[] => {
     `  Windows (PowerShell): ${NEW_CLI_INSTALL_PS}`,
   ];
 
-  const replacement = command && COMMAND_REPLACEMENTS[command];
+  const replacement = command && COMMAND_REPLACEMENTS.get(command);
   if (replacement) {
     lines.push(`Instead of \`cubejs ${command}\`, use \`${replacement}\`.`);
   }
@@ -36,7 +36,7 @@ export const deprecationMessage = (command?: string): string[] => {
 
 // `server` is the Docker image entrypoint, so warning on commands without a
 // `cube` counterpart would put the banner in every container's logs.
-export const shouldDisplayDeprecationWarning = (command?: string) => !command || !!COMMAND_REPLACEMENTS[command];
+export const shouldDisplayDeprecationWarning = (command?: string) => !command || COMMAND_REPLACEMENTS.has(command);
 
 // Printed to stderr so commands whose stdout is consumed by scripts
 // (e.g. `cubejs token`) keep their output intact.
