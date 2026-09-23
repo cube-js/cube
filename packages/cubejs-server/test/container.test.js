@@ -296,6 +296,9 @@ describe('ServerContainer dev mode resolution', () => {
   // Same string as the write, so nothing short of intercepting the assignment could
   // tell them apart — and a production-mode instance wants it gone either way, since
   // refreshWorkerMode and detectQueueAndCacheDriver still read it
+  // `cube.js` assigning `development` itself is indistinguishable from this run's own
+  // write - nothing short of intercepting the assignment separates them - so the
+  // take-back claims it. Right either way here: the config says this is not a dev server
   test('takes back a development NODE_ENV cube.js set to match the write', async () => {
     const container = makeContainer(true);
 
