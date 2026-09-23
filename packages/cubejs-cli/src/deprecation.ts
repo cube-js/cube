@@ -34,10 +34,8 @@ export const deprecationMessage = (command?: string): string[] => {
   return lines;
 };
 
-// Only warn where the new CLI actually replaces the legacy one: commands with
-// a Cloud counterpart, plus bare `cubejs` / `--help`. Local commands such as
-// `server` (the Docker image entrypoint), `create` or `token` have no
-// equivalent in `cube`, so warning there would just spam logs.
+// `server` is the Docker image entrypoint, so warning on commands without a
+// `cube` counterpart would put the banner in every container's logs.
 export const shouldDisplayDeprecationWarning = (command?: string) => !command || !!COMMAND_REPLACEMENTS[command];
 
 // Printed to stderr so commands whose stdout is consumed by scripts
