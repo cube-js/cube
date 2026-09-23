@@ -421,6 +421,10 @@ import zlib
 
 NUMBER_OF_ROUTERS = 3
 
+@config('context_to_orchestrator_id')
+def context_to_orchestrator_id(ctx: dict) -> str:
+  return f"CUBE_APP_{ctx['securityContext']['tenant_id']}"
+
 @config('context_to_cube_store_router_id')
 def context_to_cube_store_router_id(ctx: dict) -> str:
   tenant_id = str(ctx['securityContext']['tenant_id'])
@@ -433,6 +437,9 @@ const zlib = require('zlib')
 const NUMBER_OF_ROUTERS = 3
 
 module.exports = {
+  contextToOrchestratorId: ({ securityContext }) => {
+    return `CUBE_APP_${securityContext.tenant_id}`
+  },
   contextToCubeStoreRouterId: ({ securityContext }) => {
     const tenantId = `${securityContext.tenant_id}`
     return `CUBE_ROUTER_${zlib.crc32(tenantId) % NUMBER_OF_ROUTERS}`
