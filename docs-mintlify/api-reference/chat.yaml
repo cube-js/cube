@@ -79,8 +79,8 @@ paths:
         state.
 
         - `__usage__` — always the last frame on the stream, whether the run completed, was aborted,
-        or errored. Carries `{ models, llmCalls, inputTokens, outputTokens, cacheWriteTokens,
-        cacheReadTokens, totalTokens }` under `usage`. There is no cost field.
+        or errored. Carries `type: "usage"` and `{ models, llmCalls, inputTokens, outputTokens,
+        cacheWriteTokens, cacheReadTokens, totalTokens }` under `usage`. There is no cost field.
 
 
         Errors mid-stream are emitted as a standalone line `{ "error": "<message>" }` rather than a
