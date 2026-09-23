@@ -1,4 +1,4 @@
-use cubeclient::models::{V1LoadRequestQuery, V1LoadRequestQueryTimeDimension};
+use cubeclient::models::{V1CubeMetaType, V1LoadRequestQuery, V1LoadRequestQueryTimeDimension};
 use datafusion::{
     logical_plan::{plan::Extension, JoinType, LogicalPlan, PlanVisitor},
     physical_plan::displayable,
@@ -15,7 +15,8 @@ use crate::{
         rewrite::rewriter::Rewriter,
         test::{
             convert_select_to_query_plan, convert_select_to_query_plan_customized,
-            convert_select_to_query_plan_with_config, convert_sql_to_cube_query, get_test_session,
+            convert_select_to_query_plan_with_config, convert_select_to_query_plan_with_meta,
+            convert_sql_to_cube_query, get_test_meta, get_test_session,
             get_test_session_with_config, get_test_tenant_ctx,
             get_test_tenant_ctx_with_cube_data_sources,
             get_test_tenant_ctx_with_multi_data_source_view,
@@ -25,7 +26,7 @@ use crate::{
         DatabaseProtocol,
     },
     config::ConfigObjImpl,
-    transport::TransportLoadRequestQuery,
+    transport::{CubeMeta, CubeMetaDimension, CubeMetaMeasure, TransportLoadRequestQuery},
     CubeError,
 };
 
@@ -4909,4 +4910,690 @@ async fn test_wrapper_cast_without_template_folds_to_cube_scan_filter() {
         Some("KibanaSampleDataEcommerce.order_date")
     );
     assert_eq!(filters[0].operator.as_deref(), Some("afterOrOnDate"));
+}
+
+/// A filter that can't be turned into Cube filters keeps the ungrouped scan in its own
+/// select, and `DISTINCT` wraps it into another one. The inner select must project only the
+/// columns the outer one reads, not every member of the cube
+#[tokio::test]
+async fn test_wrapper_distinct_over_filter_prunes_inner_members() {
+    if !Rewriter::sql_push_down_enabled() {
+        return;
+    }
+    init_testing_logger();
+
+    let query_plan = convert_select_to_query_plan(
+        // language=PostgreSQL
+        r#"
+        SELECT DISTINCT
+            KibanaSampleDataEcommerce.customer_gender,
+            KibanaSampleDataEcommerce.notes
+        FROM KibanaSampleDataEcommerce
+        WHERE (
+            KibanaSampleDataEcommerce.customer_gender ILIKE '%fe%ma%'
+            OR KibanaSampleDataEcommerce.notes ILIKE '%foo%'
+        )
+        AND KibanaSampleDataEcommerce.customer_gender IS NOT NULL
+        ORDER BY 1
+        LIMIT 100
+        ;"#
+        .to_string(),
+        DatabaseProtocol::PostgreSQL,
+    )
+    .await;
+
+    let physical_plan = query_plan.as_physical_plan().await.unwrap();
+    println!(
+        "Physical plan: {}",
+        displayable(physical_plan.as_ref()).indent()
+    );
+
+    let sql = query_plan.as_logical_plan().find_cube_scan_wrapped_sql();
+    assert!(sql.wrapped_sql.sql.contains("SELECT DISTINCT"));
+
+    let request = sql.request;
+    assert_eq!(request.measures, Some(vec![]));
+    let dimensions = request
+        .dimensions
+        .unwrap()
+        .iter()
+        .map(|d| serde_json::from_str::<serde_json::Value>(d).unwrap()["expr"]["sql"].clone())
+        .collect::<Vec<_>>();
+    assert_eq!(
+        dimensions,
+        vec![
+            json!("${KibanaSampleDataEcommerce.customer_gender}"),
+            json!("${KibanaSampleDataEcommerce.notes}"),
+        ]
+    );
+}
+
+/// Columns the inner select sorts by must stay in its projection even when the outer
+/// select does not read them: a push-to-Cube select finds its sort keys there
+#[tokio::test]
+async fn test_wrapper_distinct_over_filter_keeps_inner_sort_key() {
+    if !Rewriter::sql_push_down_enabled() {
+        return;
+    }
+    init_testing_logger();
+
+    let query_plan = convert_select_to_query_plan(
+        // language=PostgreSQL
+        r#"
+        SELECT DISTINCT t.customer_gender
+        FROM (
+            SELECT customer_gender, notes
+            FROM KibanaSampleDataEcommerce
+            WHERE customer_gender ILIKE '%fe%ma%'
+            ORDER BY notes
+            LIMIT 7
+        ) t
+        ;"#
+        .to_string(),
+        DatabaseProtocol::PostgreSQL,
+    )
+    .await;
+
+    let physical_plan = query_plan.as_physical_plan().await.unwrap();
+    println!(
+        "Physical plan: {}",
+        displayable(physical_plan.as_ref()).indent()
+    );
+
+    let request = query_plan
+        .as_logical_plan()
+        .find_cube_scan_wrapped_sql()
+        .request;
+    assert_eq!(request.measures, Some(vec![]));
+    let dimensions = request
+        .dimensions
+        .unwrap()
+        .iter()
+        .map(|d| serde_json::from_str::<serde_json::Value>(d).unwrap()["alias"].clone())
+        .collect::<Vec<_>>();
+    assert_eq!(dimensions, vec![json!("customer_gender"), json!("notes")]);
+    assert_eq!(
+        request.order,
+        Some(vec![vec!["notes".to_string(), "asc".to_string()]])
+    );
+    assert_eq!(request.limit, Some(7));
+}
+
+/// Pruning stops at a `DISTINCT` select: dropping its columns would change which rows it
+/// considers duplicates. The select below it still gets pruned to what `DISTINCT` reads
+#[tokio::test]
+async fn test_wrapper_count_over_distinct_keeps_distinct_columns() {
+    if !Rewriter::sql_push_down_enabled() {
+        return;
+    }
+    init_testing_logger();
+
+    let query_plan = convert_select_to_query_plan(
+        // language=PostgreSQL
+        r#"
+        SELECT COUNT(*)
+        FROM (
+            SELECT DISTINCT customer_gender
+            FROM KibanaSampleDataEcommerce
+            WHERE customer_gender ILIKE '%fe%ma%'
+        ) t
+        ;"#
+        .to_string(),
+        DatabaseProtocol::PostgreSQL,
+    )
+    .await;
+
+    let physical_plan = query_plan.as_physical_plan().await.unwrap();
+    println!(
+        "Physical plan: {}",
+        displayable(physical_plan.as_ref()).indent()
+    );
+
+    let sql = query_plan.as_logical_plan().find_cube_scan_wrapped_sql();
+    assert!(sql.wrapped_sql.sql.contains(
+        r#"SELECT DISTINCT 
+      "KibanaSampleDataEcommerce"."customer_gender" "customer_gender""#
+    ));
+
+    let request = sql.request;
+    assert_eq!(request.measures, Some(vec![]));
+    let dimensions = request
+        .dimensions
+        .unwrap()
+        .iter()
+        .map(|d| serde_json::from_str::<serde_json::Value>(d).unwrap()["alias"].clone())
+        .collect::<Vec<_>>();
+    assert_eq!(dimensions, vec![json!("customer_gender")]);
+}
+
+/// When the outer select reads no columns at all, the inner select still has to project
+/// something. It keeps a single dimension: a measure could pull in joins of its own
+#[tokio::test]
+async fn test_wrapper_constant_over_filter_keeps_single_dimension() {
+    if !Rewriter::sql_push_down_enabled() {
+        return;
+    }
+    init_testing_logger();
+
+    let query_plan = convert_select_to_query_plan(
+        // language=PostgreSQL
+        r#"
+        SELECT DISTINCT 1 AS one
+        FROM (
+            SELECT *
+            FROM KibanaSampleDataEcommerce
+            WHERE customer_gender ILIKE '%fe%ma%'
+            LIMIT 10
+        ) t
+        ;"#
+        .to_string(),
+        DatabaseProtocol::PostgreSQL,
+    )
+    .await;
+
+    let physical_plan = query_plan.as_physical_plan().await.unwrap();
+    println!(
+        "Physical plan: {}",
+        displayable(physical_plan.as_ref()).indent()
+    );
+
+    let request = query_plan
+        .as_logical_plan()
+        .find_cube_scan_wrapped_sql()
+        .request;
+    assert_eq!(request.measures, Some(vec![]));
+    let dimensions = request
+        .dimensions
+        .unwrap()
+        .iter()
+        .map(|d| serde_json::from_str::<serde_json::Value>(d).unwrap()["alias"].clone())
+        .collect::<Vec<_>>();
+    assert_eq!(dimensions, vec![json!("id")]);
+    assert_eq!(request.segments.map(|s| s.len()), Some(1));
+    assert_eq!(request.limit, Some(10));
+}
+
+/// Test meta with a view over two cubes: `KibanaSampleDataEcommerce` and `Logs`
+fn orders_logs_view_meta() -> Vec<CubeMeta> {
+    let dimension = |name: &str, alias_member: &str| CubeMetaDimension {
+        name: format!("OrdersLogsView.{name}"),
+        r#type: "string".to_string(),
+        alias_member: Some(alias_member.to_string()),
+        ..CubeMetaDimension::default()
+    };
+    let measure = |name: &str, alias_member: &str, agg_type: &str| CubeMetaMeasure {
+        name: format!("OrdersLogsView.{name}"),
+        r#type: "number".to_string(),
+        agg_type: Some(agg_type.to_string()),
+        alias_member: Some(alias_member.to_string()),
+        ..CubeMetaMeasure::default()
+    };
+    let mut meta = get_test_meta();
+    meta.push(CubeMeta {
+        name: "OrdersLogsView".to_string(),
+        description: None,
+        title: None,
+        r#type: V1CubeMetaType::View,
+        dimensions: vec![
+            dimension(
+                "customer_gender",
+                "KibanaSampleDataEcommerce.customer_gender",
+            ),
+            dimension("notes", "KibanaSampleDataEcommerce.notes"),
+            dimension("content", "Logs.content"),
+        ],
+        measures: vec![
+            measure("sumPrice", "KibanaSampleDataEcommerce.sumPrice", "sum"),
+            measure("agentCount", "Logs.agentCount", "countDistinct"),
+        ],
+        segments: vec![],
+        joins: None,
+        folders: None,
+        nested_folders: None,
+        hierarchies: None,
+        meta: None,
+    });
+    meta
+}
+
+/// Members of a view that the query does not read are dropped from the inner select even
+/// when they come from another cube, so that cube is not joined into the inner query
+#[tokio::test]
+async fn test_wrapper_distinct_over_filter_drops_unused_view_cube() {
+    if !Rewriter::sql_push_down_enabled() {
+        return;
+    }
+    init_testing_logger();
+
+    let query_plan = convert_select_to_query_plan_with_meta(
+        // language=PostgreSQL
+        r#"
+        SELECT DISTINCT customer_gender
+        FROM OrdersLogsView
+        WHERE customer_gender ILIKE '%fe%ma%'
+        ORDER BY 1
+        LIMIT 100
+        ;"#
+        .to_string(),
+        orders_logs_view_meta(),
+    )
+    .await;
+
+    let physical_plan = query_plan.as_physical_plan().await.unwrap();
+    println!(
+        "Physical plan: {}",
+        displayable(physical_plan.as_ref()).indent()
+    );
+
+    let request = query_plan
+        .as_logical_plan()
+        .find_cube_scan_wrapped_sql()
+        .request;
+    assert_eq!(request.measures, Some(vec![]));
+    let dimensions = request
+        .dimensions
+        .unwrap()
+        .iter()
+        .map(|d| serde_json::from_str::<serde_json::Value>(d).unwrap()["expr"]["sql"].clone())
+        .collect::<Vec<_>>();
+    assert_eq!(dimensions, vec![json!("${OrdersLogsView.customer_gender}")]);
+    // No hints either: `Logs` would be joined by a hint naming it even without members
+    assert_eq!(request.join_hints, None);
+}
+
+/// An inner `LIMIT` slices the rows of the members the query reads, whether the filter
+/// under it is pushed into the Cube query or kept in a wrapped select
+#[tokio::test]
+async fn test_wrapper_limit_over_filter_reads_same_members_as_without_filter() {
+    if !Rewriter::sql_push_down_enabled() {
+        return;
+    }
+    init_testing_logger();
+
+    let dimensions = |request: &TransportLoadRequestQuery| {
+        request
+            .dimensions
+            .clone()
+            .unwrap_or_default()
+            .iter()
+            .map(|d| {
+                serde_json::from_str::<serde_json::Value>(d)
+                    .map(|d| d["expr"]["sql"].as_str().unwrap().to_string())
+                    .unwrap_or_else(|_| d.clone())
+            })
+            .collect::<Vec<_>>()
+    };
+
+    // Without a filter the subquery is a plain CubeScan over the members it reads
+    let query_plan = convert_select_to_query_plan_with_meta(
+        // language=PostgreSQL
+        r#"
+        SELECT DISTINCT customer_gender
+        FROM (SELECT * FROM OrdersLogsView LIMIT 10) t
+        ;"#
+        .to_string(),
+        orders_logs_view_meta(),
+    )
+    .await;
+    let request = query_plan.as_logical_plan().find_cube_scan().request;
+    assert_eq!(dimensions(&request), vec!["OrdersLogsView.customer_gender"]);
+    assert_eq!(request.measures, Some(vec![]));
+    assert_eq!(request.limit, Some(10));
+
+    // A filter Cube can't take keeps the scan in a wrapped select, which must not bring
+    // back the members above
+    let query_plan = convert_select_to_query_plan_with_meta(
+        // language=PostgreSQL
+        r#"
+        SELECT DISTINCT customer_gender
+        FROM (
+            SELECT *
+            FROM OrdersLogsView
+            WHERE customer_gender ILIKE '%fe%ma%'
+            LIMIT 10
+        ) t
+        ;"#
+        .to_string(),
+        orders_logs_view_meta(),
+    )
+    .await;
+
+    let physical_plan = query_plan.as_physical_plan().await.unwrap();
+    println!(
+        "Physical plan: {}",
+        displayable(physical_plan.as_ref()).indent()
+    );
+
+    let request = query_plan
+        .as_logical_plan()
+        .find_cube_scan_wrapped_sql()
+        .request;
+    assert_eq!(
+        dimensions(&request),
+        vec!["${OrdersLogsView.customer_gender}"]
+    );
+    assert_eq!(request.measures, Some(vec![]));
+    assert_eq!(request.limit, Some(10));
+}
+
+/// Window columns of the inner select are kept while its unread projection columns are
+/// dropped: the window is computed by the inner query whether or not it is read
+#[tokio::test]
+async fn test_wrapper_distinct_over_filter_keeps_inner_window() {
+    if !Rewriter::sql_push_down_enabled() {
+        return;
+    }
+    init_testing_logger();
+
+    let query_plan = convert_select_to_query_plan(
+        // language=PostgreSQL
+        r#"
+        SELECT DISTINCT g
+        FROM (
+            SELECT customer_gender g, ROW_NUMBER() OVER (ORDER BY notes) rn
+            FROM KibanaSampleDataEcommerce
+            WHERE customer_gender ILIKE '%fe%ma%'
+        ) t
+        ;"#
+        .to_string(),
+        DatabaseProtocol::PostgreSQL,
+    )
+    .await;
+
+    let physical_plan = query_plan.as_physical_plan().await.unwrap();
+    println!(
+        "Physical plan: {}",
+        displayable(physical_plan.as_ref()).indent()
+    );
+
+    let request = query_plan
+        .as_logical_plan()
+        .find_cube_scan_wrapped_sql()
+        .request;
+    let sqls = |members: Option<Vec<String>>| {
+        members
+            .unwrap()
+            .iter()
+            .map(|m| {
+                serde_json::from_str::<serde_json::Value>(m).unwrap()["expr"]["sql"]
+                    .as_str()
+                    .unwrap()
+                    .to_string()
+            })
+            .collect::<Vec<_>>()
+    };
+    assert_eq!(
+        sqls(request.dimensions),
+        vec!["${KibanaSampleDataEcommerce.customer_gender}"]
+    );
+    assert_eq!(
+        sqls(request.measures),
+        vec!["ROW_NUMBER() OVER (ORDER BY ${KibanaSampleDataEcommerce.notes} ASC)"]
+    );
+}
+
+/// A sort key the inner select orders by through an alias is still found by name and kept
+#[tokio::test]
+async fn test_wrapper_distinct_over_filter_keeps_aliased_sort_key() {
+    if !Rewriter::sql_push_down_enabled() {
+        return;
+    }
+    init_testing_logger();
+
+    let query_plan = convert_select_to_query_plan(
+        // language=PostgreSQL
+        r#"
+        SELECT DISTINCT t.g
+        FROM (
+            SELECT customer_gender AS g, notes AS n
+            FROM KibanaSampleDataEcommerce
+            WHERE customer_gender ILIKE '%fe%ma%'
+            ORDER BY n
+            LIMIT 10
+        ) t
+        ;"#
+        .to_string(),
+        DatabaseProtocol::PostgreSQL,
+    )
+    .await;
+
+    let physical_plan = query_plan.as_physical_plan().await.unwrap();
+    println!(
+        "Physical plan: {}",
+        displayable(physical_plan.as_ref()).indent()
+    );
+
+    let request = query_plan
+        .as_logical_plan()
+        .find_cube_scan_wrapped_sql()
+        .request;
+    assert_eq!(request.measures, Some(vec![]));
+    let dimensions = request
+        .dimensions
+        .unwrap()
+        .iter()
+        .map(|d| serde_json::from_str::<serde_json::Value>(d).unwrap()["alias"].clone())
+        .collect::<Vec<_>>();
+    assert_eq!(dimensions, vec![json!("customer_gender"), json!("notes")]);
+    assert_eq!(
+        request.order,
+        Some(vec![vec!["notes".to_string(), "asc".to_string()]])
+    );
+    assert_eq!(request.limit, Some(10));
+}
+
+/// Pruning drops members, not join hints: a join the query writes still decides which rows
+/// an inner `LIMIT` slices, whether the filter under it is pushed into the Cube query or not
+#[tokio::test]
+async fn test_wrapper_limit_over_filter_keeps_join_hints() {
+    if !Rewriter::sql_push_down_enabled() {
+        return;
+    }
+    init_testing_logger();
+
+    let hints = Some(vec![vec![
+        "KibanaSampleDataEcommerce".to_string(),
+        "Logs".to_string(),
+    ]]);
+
+    // Without a filter the subquery is a plain CubeScan over the members it reads
+    let query_plan = convert_select_to_query_plan(
+        // language=PostgreSQL
+        r#"
+        SELECT DISTINCT customer_gender
+        FROM (
+            SELECT k.customer_gender, l.content
+            FROM KibanaSampleDataEcommerce k
+            JOIN Logs l ON k.__cubeJoinField = l.__cubeJoinField
+            LIMIT 10
+        ) t
+        ;"#
+        .to_string(),
+        DatabaseProtocol::PostgreSQL,
+    )
+    .await;
+    let request = query_plan.as_logical_plan().find_cube_scan().request;
+    assert_eq!(
+        request.dimensions,
+        Some(vec!["KibanaSampleDataEcommerce.customer_gender".to_string()])
+    );
+    assert_eq!(request.join_hints, hints);
+
+    let query_plan = convert_select_to_query_plan(
+        // language=PostgreSQL
+        r#"
+        SELECT DISTINCT customer_gender
+        FROM (
+            SELECT k.customer_gender, l.content
+            FROM KibanaSampleDataEcommerce k
+            JOIN Logs l ON k.__cubeJoinField = l.__cubeJoinField
+            WHERE k.customer_gender ILIKE '%fe%ma%'
+            LIMIT 10
+        ) t
+        ;"#
+        .to_string(),
+        DatabaseProtocol::PostgreSQL,
+    )
+    .await;
+
+    let physical_plan = query_plan.as_physical_plan().await.unwrap();
+    println!(
+        "Physical plan: {}",
+        displayable(physical_plan.as_ref()).indent()
+    );
+
+    let request = query_plan
+        .as_logical_plan()
+        .find_cube_scan_wrapped_sql()
+        .request;
+    let dimensions = request
+        .dimensions
+        .unwrap()
+        .iter()
+        .map(|d| serde_json::from_str::<serde_json::Value>(d).unwrap()["expr"]["sql"].clone())
+        .collect::<Vec<_>>();
+    assert_eq!(
+        dimensions,
+        vec![json!("${KibanaSampleDataEcommerce.customer_gender}")]
+    );
+    assert_eq!(request.measures, Some(vec![]));
+    assert_eq!(request.join_hints, hints);
+    assert_eq!(request.limit, Some(10));
+}
+
+/// COUNT(*) counts the rows of every member, so the inner select keeps all of them, the
+/// same members it has when the filter is pushed into the Cube query
+#[tokio::test]
+async fn test_wrapper_count_over_filter_reads_same_members_as_without_filter() {
+    if !Rewriter::sql_push_down_enabled() {
+        return;
+    }
+    init_testing_logger();
+
+    let member_names = |members: Option<Vec<String>>| {
+        let mut names = members
+            .unwrap_or_default()
+            .iter()
+            .map(|m| {
+                serde_json::from_str::<serde_json::Value>(m)
+                    .map(|m| m["expr"]["sql"].as_str().unwrap().to_string())
+                    .unwrap_or_else(|_| m.clone())
+                    .trim_start_matches("${")
+                    .trim_end_matches('}')
+                    .to_string()
+            })
+            // `__user` and `__cubeJoinField` are not members
+            .filter(|name| !name.starts_with("CAST(NULL"))
+            .collect::<Vec<_>>();
+        names.sort();
+        names
+    };
+
+    let query_plan = convert_select_to_query_plan_with_meta(
+        // language=PostgreSQL
+        r#"
+        SELECT COUNT(*)
+        FROM (SELECT * FROM OrdersLogsView LIMIT 10) t
+        ;"#
+        .to_string(),
+        orders_logs_view_meta(),
+    )
+    .await;
+    let request = query_plan
+        .as_logical_plan()
+        .find_cube_scan_wrapped_sql()
+        .request;
+    let dimensions = member_names(request.dimensions);
+    let measures = member_names(request.measures);
+    assert_eq!(
+        dimensions,
+        vec![
+            "OrdersLogsView.content",
+            "OrdersLogsView.customer_gender",
+            "OrdersLogsView.notes"
+        ]
+    );
+    assert_eq!(
+        measures,
+        vec!["OrdersLogsView.agentCount", "OrdersLogsView.sumPrice"]
+    );
+
+    let query_plan = convert_select_to_query_plan_with_meta(
+        // language=PostgreSQL
+        r#"
+        SELECT COUNT(*)
+        FROM (
+            SELECT *
+            FROM OrdersLogsView
+            WHERE customer_gender ILIKE '%fe%ma%'
+            LIMIT 10
+        ) t
+        ;"#
+        .to_string(),
+        orders_logs_view_meta(),
+    )
+    .await;
+
+    let physical_plan = query_plan.as_physical_plan().await.unwrap();
+    println!(
+        "Physical plan: {}",
+        displayable(physical_plan.as_ref()).indent()
+    );
+
+    let request = query_plan
+        .as_logical_plan()
+        .find_cube_scan_wrapped_sql()
+        .request;
+    assert_eq!(member_names(request.dimensions), dimensions);
+    assert_eq!(member_names(request.measures), measures);
+    assert_eq!(request.limit, Some(10));
+}
+
+/// A window column the outer select reads is a column of the inner query already, so no
+/// unread member is brought back to keep the inner query valid
+#[tokio::test]
+async fn test_wrapper_distinct_over_filter_keeps_only_read_window() {
+    if !Rewriter::sql_push_down_enabled() {
+        return;
+    }
+    init_testing_logger();
+
+    let query_plan = convert_select_to_query_plan_with_meta(
+        // language=PostgreSQL
+        r#"
+        SELECT DISTINCT rn
+        FROM (
+            SELECT content, notes, ROW_NUMBER() OVER (ORDER BY customer_gender) rn
+            FROM OrdersLogsView
+            WHERE customer_gender ILIKE '%fe%ma%'
+        ) t
+        ;"#
+        .to_string(),
+        orders_logs_view_meta(),
+    )
+    .await;
+
+    let physical_plan = query_plan.as_physical_plan().await.unwrap();
+    println!(
+        "Physical plan: {}",
+        displayable(physical_plan.as_ref()).indent()
+    );
+
+    let request = query_plan
+        .as_logical_plan()
+        .find_cube_scan_wrapped_sql()
+        .request;
+    assert_eq!(request.dimensions, Some(vec![]));
+    let measures = request
+        .measures
+        .unwrap()
+        .iter()
+        .map(|m| serde_json::from_str::<serde_json::Value>(m).unwrap()["expr"]["sql"].clone())
+        .collect::<Vec<_>>();
+    assert_eq!(
+        measures,
+        vec![json!(
+            "ROW_NUMBER() OVER (ORDER BY ${OrdersLogsView.customer_gender} ASC)"
+        )]
+    );
 }
