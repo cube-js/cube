@@ -33,11 +33,13 @@ Run these commands inside Claude Code:
 /plugin install cube@cube
 ```
 
-Then run `/mcp`, select `plugin:cube:cube`, and sign in to Cube.
+Then run `/mcp`, select `plugin:cube:cube`, and sign in to Cube. For `cube-admin`,
+`cube-embed`, most of `cube-deploy`, and finding saved content, also
+[install the Cube CLI](#install-the-cube-cli).
 
-You don't need the Cube connector as well. If you already connected it, Claude Code
-connects once, through the plugin, and `/mcp` lists the connector as hidden. A Cube server
-you added yourself with `claude mcp add` takes precedence over the plugin's instead.
+The plugin uses the same endpoint as the Cube connector, so you don't need both. For how
+Claude Code handles a server that is configured twice, see
+[MCP scope precedence](https://code.claude.com/docs/en/mcp#scope-hierarchy-and-precedence).
 
 ### Codex, GitHub Copilot, Gemini CLI, and other compatible agents
 
@@ -56,8 +58,8 @@ The source is public under Apache 2.0 at
 ## Install the Cube CLI
 
 The skills use the Cube MCP server when it is connected, and the Cube CLI otherwise. The
-CLI is required for `cube-admin`, `cube-embed`, and `cube-deploy`, and for finding saved
-content with `cube-explore-content` — work the MCP server does not cover.
+CLI is required for `cube-admin`, `cube-embed`, and most of `cube-deploy`, and for finding
+saved content with `cube-explore-content` — work the MCP server does not cover.
 
 On Linux or macOS, run:
 
