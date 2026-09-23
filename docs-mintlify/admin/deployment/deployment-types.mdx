@@ -92,7 +92,7 @@ It provides you with two options:
 workload, allowing to route requests over up to 10 Dedicated deployments and
 up to 100 API instances.
 * Optionally, scale the number of Cube Store routers, allowing for increased
-Cube Store querying performance.
+Cube Store querying performance. See [Multi-router Cube Store](#multi-router-cube-store).
 
 
 Each Dedicated deployment is billed separately, and all Dedicated deployments
@@ -152,12 +152,80 @@ same request.
 
 </Warning>
 
+### Multi-router Cube Store {#multi-router-cube-store}
+
+By default, all Dedicated deployments within a Multi-cluster deployment share
+one Cube Store router. With **Multi-router Cube Store** enabled, each Cube Store
+router id gets its own router, spreading pre-aggregation storage and query load
+across Cube Store in your region.
+
+To enable it, navigate to **Settings → Configuration**, turn on
+**Multi-router Cube Store** in the **Configuration flags** section, and click
+**Apply**. The option is only available on Multi-cluster deployments.
+
+Each request's router id comes from
+[`context_to_cube_store_router_id`][ref-ctx-to-cube-store-router-id], or from
+[`context_to_orchestrator_id`][ref-ctx-to-orchestrator-id] if it's not defined.
+Without either, all requests resolve to the same id and share one router.
+
+A deployment uses at most as many routers as its **Number of clusters**. Once a
+Cube API instance has seen more distinct router ids than that, requests with
+additional ids are served by the shared Cube Store router. To keep every tenant
+on a dedicated router, map tenants onto a fixed set of router ids no larger
+than **Number of clusters**:
+
+<CodeGroup>
+
+```python title="Python"
+from cube import config
+import zlib
+
+NUMBER_OF_CLUSTERS = 3
+
+@config('context_to_orchestrator_id')
+def context_to_orchestrator_id(ctx: dict) -> str:
+  return f"CUBE_APP_{ctx['securityContext']['tenant_id']}"
+
+@config('context_to_cube_store_router_id')
+def context_to_cube_store_router_id(ctx: dict) -> str:
+  tenant_id = str(ctx['securityContext']['tenant_id'])
+  return f"CUBE_ROUTER_{zlib.crc32(tenant_id.encode()) % NUMBER_OF_CLUSTERS}"
+```
+
+```js title="JavaScript"
+const crypto = require('crypto')
+
+const NUMBER_OF_CLUSTERS = 3
+
+module.exports = {
+  contextToOrchestratorId: ({ securityContext }) => {
+    return `CUBE_APP_${securityContext.tenant_id}`
+  },
+  contextToCubeStoreRouterId: ({ securityContext }) => {
+    const hash = crypto.createHash('md5').update(`${securityContext.tenant_id}`).digest()
+    return `CUBE_ROUTER_${hash.readUInt32BE(0) % NUMBER_OF_CLUSTERS}`
+  }
+}
+```
+
+</CodeGroup>
+
+<Warning>
+
+Router ids should be stable for each tenant. Pre-aggregations are stored per
+router, so a tenant whose router id changes has its pre-aggregations built
+again on the new router.
+
+</Warning>
+
 ## Switching between deployment types
 
 To switch a deployment's type, go to the deployment's **Settings** screen
 and select from the available options.
 
 [ref-ctx-to-app-id]: /reference/configuration/config#context_to_app_id
+[ref-ctx-to-orchestrator-id]: /reference/configuration/config#context_to_orchestrator_id
+[ref-ctx-to-cube-store-router-id]: /reference/configuration/config#context_to_cube_store_router_id
 [ref-limits]: /admin/deployment/limits#resources
 [ref-scalability]: /admin/deployment/scalability
 [ref-multitenancy]: /embedding/multitenancy

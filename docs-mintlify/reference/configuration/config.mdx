@@ -404,6 +404,9 @@ example, when [tenants][ref-multitenancy] are partitioned across routers to
 isolate their pre-aggregation storage and query load). By default this function
 is not set, and all requests use the same Cube Store router.
 
+In Cube, multiple Cube Store routers are available on Multi-cluster deployments
+with [Multi-router Cube Store][ref-multi-router-cube-store] enabled.
+
 <Warning>
 
 `context_to_cube_store_router_id` requires
@@ -1581,6 +1584,7 @@ module.exports = {
 [ref-rest-scopes]: /reference/core-data-apis/rest-api#api-scopes
 [ref-config-options]: /admin/connect-to-data#configuration-options
 [self-orchestrator-id]: #context_to_orchestrator_id
+[ref-multi-router-cube-store]: /admin/deployment/deployment-types#multi-router-cube-store
 [ref-compile-context]: /reference/data-modeling/context-variables#compile_context
 [ref-multiple-data-sources]: /admin/connect-to-data/multiple-data-sources
 [ref-websockets]: /recipes/core-data-api/real-time-data-fetch
