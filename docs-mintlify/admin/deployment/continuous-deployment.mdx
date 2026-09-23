@@ -72,6 +72,16 @@ What happens after connecting depends on the deploy mode:
 
 ## Deploy with CLI
 
+<Warning>
+
+`cubejs-cli` is deprecated. Use the new [Cube CLI][ref-cli] instead. In CI,
+authenticate with an API key rather than the deploy token — set `CUBE_API_URL`
+and `CUBE_API_KEY` (or run `cube login --api-key <KEY> --url <URL>`), then run
+`cube deploy <deployment-id> --directory .` (find the id with
+`cube deployments list`).
+
+</Warning>
+
 When a deployment is configured to deploy with CLI, production builds are
 **only** triggered when you (or your CI/CD pipeline) push the project to
 Cube Cloud by running:
@@ -84,16 +94,6 @@ You can find your Deploy Token, along with copy-paste instructions and an
 example CI/CD pipeline config (such as a GitHub Actions workflow), on the
 **Build & Deploy** tab of the **Settings** screen. The same screen lets you
 regenerate the token if it needs to be rotated.
-
-<Warning>
-
-`cubejs-cli` is deprecated. Use the new [Cube CLI][ref-cli] instead. In CI,
-authenticate with an API key rather than the deploy token — set `CUBE_API_URL`
-and `CUBE_API_KEY` (or run `cube login --api-key <KEY> --url <URL>`), then run
-`cube deploy <deployment-id> --directory .` (find the id with
-`cube deployments list`).
-
-</Warning>
 
 <Frame>
   <img src="https://static.cube.dev/docs/admin/deployment/continuous-deployment/cli-deploy-token.png" alt="Build & Deploy settings tab with Deploy with CLI selected, showing the Deploy Token and a sample GitHub Actions workflow" />
