@@ -283,11 +283,9 @@ export const pinPreAggregationsSchema = (schema: string) => {
     return;
   }
 
-  // Whoever set it — this process for another instance, or the user against a
-  // CreateOptions.preAggregationsSchema that overrules it. Scoped to the one reader the
-  // variable actually has, rather than claiming every driver follows it: the rest take
-  // the schema off the pre-aggregation descriptor server-core resolved and are unaffected.
-  // Keyed on the pair, so a third instance naming a third schema is reported too
+  // Whoever set it — this process for another instance, or a user value that
+  // CreateOptions.preAggregationsSchema overrules. Keyed on the pair, so a third
+  // instance naming a third schema is reported rather than silenced by the second
   const setSchema = process.env.CUBEJS_PRE_AGGREGATIONS_SCHEMA;
 
   if (setSchema !== schema) {
