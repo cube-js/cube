@@ -329,13 +329,14 @@ already streaming returns a `Streaming for thread is in progress` error.
 ## Response Format
 
 <Info>
-The API returns streaming JSON responses. Each line contains a separate JSON object representing a chat message or state update.
+The API returns streaming JSON responses. Each line contains a separate JSON object representing a chat message, a state update, or a usage frame.
 </Info>
 
 ### Response Fields
 
-- **`id`** (string): Unique message identifier
-- **`role`** (string): Message sender: `"user"` or `"assistant"`
+- **`id`** (string): Unique message identifier. Sentinel values: `__cutoff__`, `__state__`, and `__usage__`
+- **`role`** (string): Message sender: `"user"` or `"assistant"`. Absent on error lines and on the `__usage__` frame
+- **`error`** (string): Present only on error lines — mid-stream failures arrive as a standalone `{ "error": "<message>" }` line rather than a non-200 status, and such a line carries no message fields
 - **`content`** (string): Message content (streamed incrementally for assistant messages)
 - **`thinking`** (string): Agent's internal reasoning process (visible in development mode)
 - **`toolCall`** (object): Information about tool calls made by the agent during processing
@@ -345,10 +346,12 @@ The API returns streaming JSON responses. Each line contains a separate JSON obj
 - **`graphPath`** (string[]): Identifies which node of the agent graph produced this message. For example, `["cube_data_analyst_agent"]` for the main agent node or `["cube_data_analyst_agent", "tools"]` for tool calls. Messages with `graphPath[0] === "final"` represent the final consolidated answer.
 - **`isDelta`** (boolean): Whether this is an incremental content update
 - **`isInProcess`** (boolean): Whether the message is still being generated
-- **`sort`** (number): Message ordering sequence number
+- **`sort`** (number): Message ordering sequence number. Absent on the `__usage__` frame
 - **`state`** (object): Current streaming state information
+- **`type`** (string): Present only on the `__usage__` frame, where it is always `"usage"`
+- **`usage`** (object): Present only on the `__usage__` frame — `models` (string[]), `llmCalls`, `inputTokens`, `outputTokens`, `cacheWriteTokens`, `cacheReadTokens`, `totalTokens` (numbers)
 
-
+The stream always ends with one additional frame, `id: "__usage__"` (see the Usage Message example below). Treat it like the `__cutoff__` and `__state__` frames: filter it out of anything rendered as a chat message.
 
 ### Response Examples
 
@@ -507,7 +510,7 @@ The API returns a series of JSON objects, each on a separate line. Here's what a
 }
 ```
 
-**Final State Update:**
+**Thread State Snapshot:**
 ```json
 {
   "id": "__state__",
@@ -526,6 +529,25 @@ The API returns a series of JSON objects, each on a separate line. Here's what a
   "sort": 10
 }
 ```
+
+**Usage Message:**
+```json
+{
+  "id": "__usage__",
+  "type": "usage",
+  "usage": {
+    "models": ["claude-sonnet-5"],
+    "llmCalls": 7,
+    "inputTokens": 18412,
+    "outputTokens": 2280,
+    "cacheWriteTokens": 31006,
+    "cacheReadTokens": 264118,
+    "totalTokens": 315816
+  }
+}
+```
+
+This is always the last frame on the stream, sent whether the run completed, was aborted, or errored — when the request is rejected before any LLM call, the counts are all `0` and `models` is empty. `usage.models` lists the distinct models used, and for a [BYOM](/admin/ai/bring-your-own-model) model is normalized to strip infrastructure detail (e.g. a Bedrock inference-profile ARN is reduced to its model name) rather than the raw configured identifier. The frame reports tokens only — there is no cost field.
 
 ### Getting the Final Assistant Message
 

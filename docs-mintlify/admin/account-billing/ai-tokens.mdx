@@ -82,6 +82,9 @@ tab in the billing settings page. The dashboard shows:
 - Remaining allocation from per-seat grants and token packages
 - Breakdown by usage dimension
 
+Token counts include [BYOM][ref-byom] calls, which are recorded at zero cost
+and do not count against your allocation.
+
 On paying accounts, **Billing → Cost and Usage** — a separate tab from **AI
 Tokens Usage** above — also shows a balance chip for each credit package the
 account holds: the base AI token allowance, then any compute (CCU), additional
@@ -111,8 +114,12 @@ exceeded.
 ### Can I bring my own AI model?
 
 Yes. When using a [Bring Your Own Model (BYOM)][ref-byom] configuration, AI
-requests bypass the token quota system entirely — no tokens are consumed or
-tracked for those requests. You are billed directly by your model provider.
+requests bypass the token quota system entirely — no tokens are consumed
+against your Cube AI token balance, and you're billed directly by your
+model provider. Token counts for BYOM calls still appear in the **AI Tokens
+Usage** tab above. They're also recorded in the **AI Calls & Cost** view in
+[Usage Analytics][ref-usage-analytics]; no pre-built dashboard uses that
+view, so administrators need to build one on it.
 
 ### Why does a single prompt sometimes use more tokens than expected?
 
@@ -128,3 +135,4 @@ different reasoning path.
 
 [ref-ai-overview]: /admin/ai
 [ref-byom]: /admin/ai/bring-your-own-model
+[ref-usage-analytics]: /admin/monitoring/usage-analytics
