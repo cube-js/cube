@@ -42,7 +42,7 @@ Filters can allow either a single value or multiple values. The filter's edit si
 | **String** on `is` / `is not` | Several, unless you turn **Enable multiple values** off; what you set on `is` also governs `is not` |
 | **Number** on `is` / `is not` | Several |
 | **Number** comparisons (`greater than`, `less than` and their *or equal* forms) | One |
-| **Time** on any condition except `is null` and `is not null` | One per field in the UI; several only through a hand-written [URL parameter](#sharing-the-current-selection) |
+| **Time** on any condition except `is null` and `is not null` | One per field in the UI; several only on `is` / `is not`, and only through a hand-written [URL parameter](#sharing-the-current-selection) |
 | **Boolean** | One, set by its `is true` / `is false` picker |
 | Substring conditions (`contains`, `starts with`, `ends with` and their negations) | One |
 | `is null`, `is not null`, `is empty`, `is not empty` | None |
@@ -97,18 +97,17 @@ When multiple filters target dimensions from the same semantic view, you can mar
 
 For example, on a sales dashboard with a **Country** filter and a **City** filter, marking the City filter as faceted means selecting `United States` in the Country filter limits the City filter to U.S. cities only. Mark both and each narrows the other.
 
-A faceted filter can take as a source any sibling on the same semantic view set to one of these conditions — the sibling does not need **Facet** turned on itself:
+A faceted filter can take as a source any sibling on the same semantic view, whatever condition that sibling is set to and whether or not it carries **Facet** itself — `is` and `is not`, the substring conditions, the comparisons on a **Number** dimension and every date condition are all read, and a **Boolean** dimension counts here too, its `is true` / `is false` setting `is`. That comes with qualifications:
 
-- A **String** or **Number** dimension set to `is` or `is not`. A **Boolean** dimension counts here too: its `is true` / `is false` set `is`.
-- A time dimension set to any of its date conditions except `is null` and `is not null` — though `is not` and the `in the …` and `not in the …` conditions narrow on one value only, and `is not` needs that value to name a whole period.
+- `is null`, `is not null`, `is empty` and `is not empty` carry no value and narrow as soon as they are set. Every other condition waits for a value, and until it has one it leaves the value list alone, just as it leaves the charts unfiltered.
+- A condition and value that together leave nothing to scope by narrow nothing either, as the warning below sets out.
+- Custom SQL scopes nothing. No operator menu offers it, so only a hand-written [URL parameter](#sharing-the-current-selection) can set a filter to it, and a source set that way leaves the value list alone.
 
-Every other condition cannot be picked as a source and scopes nothing — `contains`, `starts with` and `ends with` and their negations, the comparisons on a **Number** dimension (`greater than`, `less than` and their *or equal* forms), and `is null`, `is not null`, `is empty` and `is not empty`.
-
-To pick which siblings a filter listens to, turn the **Facet** switch on in its edit sidebar: the source picker appears with it, reading **All**. The picker lists every other filter on the dashboard and greys out the ones it cannot use — a sibling set to one of those other conditions, or one targeting a different semantic view — with a tooltip saying it is not available for this semantic view or filter type. Left at **All**, the filter listens to every sibling the picker leaves selectable; picking entries narrows it to those.
+To pick which siblings a filter listens to, turn the **Facet** switch on in its edit sidebar: the source picker appears with it, reading **All**. The picker lists every other filter on the dashboard and greys out the ones it cannot use — the ones targeting a different semantic view — with a tooltip saying it is not available for this semantic view or filter type. Left at **All**, the filter listens to every sibling the picker leaves selectable; picking entries narrows it to those. A filter you picked that later stops qualifying, because its dimension was re-pointed at another semantic view say, stays in the list with a warning icon rather than disappearing from it.
 
 **Cancel** leaves the filter on the sources it was last saved with — it discards every unsaved edit in the sidebar, not only the source list — while turning **Facet** back off clears the entries you picked, so switching it on again starts from **All**.
 
-A date source never scopes the value list to less than the window the charts are showing, so the list never drops a value the charts still have rows for. Which window it scopes to depends on the condition:
+A date source never scopes the value list to less than the window the charts are showing, so the list never drops a value the charts still have rows for. Which window it scopes to depends on the condition; `is null` and `is not null` name no window and scope by presence instead, to the rows with no date and to the rows with one:
 
 | Condition | Window the value list is scoped to |
 |---|---|
@@ -122,10 +121,12 @@ A date source never scopes the value list to less than the window the charts are
 On `after`, `after or on`, `before`, `before or on` and `between`, the value editor picks a whole day for every bound, and on a whole day the scope takes the same bound the charts do — so a window they return no rows for leaves the value list empty too.
 
 <Warning>
-A source can end up with nothing to scope by, leaving the value list as wide as it was while the charts narrow:
+A source can end up with nothing to scope by, leaving the value list as wide as it was while the charts narrow. These are the cases where the charts match on something the value list has no way to ask for:
 
 - `is not` on a fixed date or on a single-moment relative value such as **3 months ago** — a point in time has no period to exclude.
-- `is not` and the `in the …` and `not in the …` conditions on several values — each reads one period from one value.
+- `is not` on several dates — the scope can exclude the period one value names, not one period apiece.
+- Several values on a substring condition, which only a [URL parameter](#sharing-the-current-selection) can give one — the charts match the values joined into a single term, not any of them, and the value list has no way to ask for that.
+- `not contains`, `not starts with` or `not ends with` carrying `"caseSensitive": true`, which that parameter is the only way to set — the value list can be narrowed case-insensitively alone, which would drop values the charts still show.
 </Warning>
 
 A list that *is* being scoped does not necessarily look shorter — a long one fills the dropdown either way, and the values the window drops need not be the ones on screen. To check that a source is narrowing it, look for a value you know the window has no rows for and confirm it is gone from the list. Searching for that value is not a check: a filter's value box takes values that are not in its list, so it offers back whatever you type.
@@ -414,10 +415,15 @@ A filter's JSON carries the condition in its `type` key, alongside the `value`. 
 | `in the month`, `in the quarter`, `in the year` and their `not` forms | `in_month`, `in_quarter`, `in_year`, `not_in_month`, `not_in_quarter`, `not_in_year` |
 | `contains`, `starts with`, `ends with` and their `not` forms | `contains`, `starts_with`, `ends_with`, `not_contains`, `not_starts_with`, `not_ends_with` |
 | `is null`, `is not null`, `is empty`, `is not empty` | `is_null`, `is_not_null`, `is_empty`, `is_not_empty` — these take no `value` |
+| Custom SQL, which no operator menu offers | `custom` — a facet source set to it scopes nothing |
 
 A **Boolean** dimension's `is true` and `is false` sit on the `is` row: both are `equals`, with `value` set to the string `"true"` or `"false"` — `f_orders.is_paid={"value":"true"}`.
 
 A `between` filter's `value` is a two-entry array, and both bounds are inclusive unless you set `startInclusive` or `endInclusive` to `false`. Each is a key of its own, beside `type` and `value` rather than inside them — `f_orders.created_at={"type":"between","value":["2026-01-01","2026-02-01"],"endInclusive":false}`.
+
+A substring condition takes `caseSensitive` the same way: with `true` the match is made with `LIKE` rather than `ILIKE`, so it respects case wherever the column's collation is case-sensitive, and without the key case is ignored — `f_orders.status={"type":"not_contains","value":"ship","caseSensitive":true}`. The value editor has no switch for it, so a filter matches case only where a link sets the key.
+
+Outside `between`, a `value` may still be a list, and what a condition makes of one differs. `is` and `is not` read its entries as alternatives — `f_orders.status={"value":["shipped","processing"]}` — on a time dimension as much as a string or number one. A substring condition matches the entries joined with commas into one term, so `{"type":"contains","value":["ship","proc"]}` matches `%ship,proc%` and neither entry on its own. Every other condition reads exactly one value — the comparisons, and the `in the …` and `not in the …` family — and a list in their `value` leaves the widget unable to build its query at all.
 
 What travels in the link, and what wins when a link value arrives:
 
