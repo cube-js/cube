@@ -44,6 +44,14 @@ project directory.
 npx cubejs-cli deploy --token <TOKEN>
 ```
 
+<Warning>
+
+`cubejs-cli` is deprecated. You can upload the project with the new
+[Cube CLI][ref-cli] instead: run `cube login`, then
+`cube deploy <deployment-id> --directory .` from your project directory.
+
+</Warning>
+
 <div style={{ textAlign: "center" }}>
   <img
     alt="Cube Cloud Upload Project Screen"
@@ -100,3 +108,4 @@ queries or connect your application to Cube Cloud API.
 
 [ref-cloud-connecting-to-databases]: /admin/connect-to-data/data-sources
 [ref-cloud-playground]: /docs/explore-analyze/playground
+[ref-cli]: /reference/cli

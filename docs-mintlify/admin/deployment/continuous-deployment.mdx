@@ -87,8 +87,10 @@ regenerate the token if it needs to be rotated.
 
 <Warning>
 
-`cubejs-cli` is deprecated. Use the new [Cube CLI][ref-cli] instead: run
-`cube login`, then `cube deploy <deployment-id>` to push your project.
+`cubejs-cli` is deprecated. Use the new [Cube CLI][ref-cli] instead. In CI,
+authenticate with an API key rather than the deploy token — set `CUBE_API_URL`
+and `CUBE_API_KEY` (or run `cube login --api-key <KEY> --url <URL>`), then run
+`cube deploy <deployment-id> --directory .`.
 
 </Warning>
 

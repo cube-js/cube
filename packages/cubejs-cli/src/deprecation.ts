@@ -11,8 +11,8 @@ export const COMMAND_REPLACEMENTS: Record<string, string> = {
 };
 
 export const isDeprecationWarningDisabled = (env: NodeJS.ProcessEnv = process.env) => {
-  const value = env.CUBEJS_CLI_NO_DEPRECATION_WARNING;
-  return !!value && value !== 'false' && value !== '0';
+  const value = (env.CUBEJS_CLI_NO_DEPRECATION_WARNING || '').trim().toLowerCase();
+  return value !== '' && value !== 'false' && value !== '0';
 };
 
 export const deprecationMessage = (command?: string): string[] => {
@@ -34,14 +34,19 @@ export const deprecationMessage = (command?: string): string[] => {
   return lines;
 };
 
+// Only warn where the new CLI actually replaces the legacy one: commands with
+// a Cloud counterpart, plus bare `cubejs` / `--help`. Local commands such as
+// `server` (the Docker image entrypoint), `create` or `token` have no
+// equivalent in `cube`, so warning there would just spam logs.
+export const shouldDisplayDeprecationWarning = (command?: string) => !command || !!COMMAND_REPLACEMENTS[command];
+
 // Printed to stderr so commands whose stdout is consumed by scripts
 // (e.g. `cubejs token`) keep their output intact.
 export const displayDeprecationWarning = (argv: string[] = process.argv.slice(2)) => {
-  if (isDeprecationWarningDisabled()) {
+  const command = argv[0] && !argv[0].startsWith('-') ? argv[0] : undefined;
+  if (isDeprecationWarningDisabled() || !shouldDisplayDeprecationWarning(command)) {
     return;
   }
-
-  const command = argv.find((arg) => !arg.startsWith('-'));
 
   console.error('');
   deprecationMessage(command).forEach((line) => console.error(line));
