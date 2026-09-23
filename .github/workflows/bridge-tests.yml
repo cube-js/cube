@@ -38,7 +38,16 @@ jobs:
         with:
           node-version: 24.x
       - name: Set Yarn version
-        run: yarn policies set-version v1.22.22
+        run: |
+          # set-version downloads from GitHub Releases, which intermittently returns 5xx
+          if [ "$(yarn --version)" != "1.22.22" ]; then
+            for i in 1 2 3; do
+              yarn policies set-version v1.22.22 && break
+              [ "$i" = 3 ] && exit 1
+              sleep $((i * 15))
+            done
+          fi
+        shell: bash
       - name: Get yarn cache directory path
         id: yarn-cache-dir-path
         run: echo "dir=$(yarn cache dir)" >> "$GITHUB_OUTPUT"
