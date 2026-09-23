@@ -566,34 +566,6 @@ fn failure(deployment: i64, sync_job_id: &str, status: &Value) -> anyhow::Error 
     )
 }
 
-/// Server text as a terminal may safely show it: every control character except the
-/// line breaks and tabs the timeline keeps on purpose is dropped.
-///
-/// This is text the CLI did not write — dbt compile output, warehouse messages, model
-/// names — and an ESC sequence in it can retitle a window, move the cursor, or overwrite
-/// the lines above it in a CI log. `one_line` is not the guard it looks like: it drops
-/// control characters that are WHITESPACE as a side effect of splitting on it, and ESC
-/// is not whitespace. Printing raw would be safe only under `--json`, where `serde_json`
-/// escapes them.
-fn printable(text: &str) -> String {
-    text.chars()
-        .filter(|c| !c.is_control() || *c == '\n' || *c == '\t')
-        .collect()
-}
-
-/// How much of one server-supplied value a table cell or a line prefix keeps. Long
-/// enough for a branch name, a timestamp or a trigger with room to spare, short enough
-/// that one row stays one row: a table is laid out to its widest cell, so an unbounded
-/// one would push every other column off the screen.
-const CELL_LIMIT: usize = 120;
-
-/// One bounded, printable line of server text — what a table cell and a timeline
-/// prefix both need, and where trimming comes from: `one_line` splits on whitespace, so
-/// padding and interior newlines go the same way.
-fn one_cell(text: &str) -> String {
-    util::one_line(&printable(text), CELL_LIMIT)
-}
-
 /// A `durationMs` rendered as time, because a sync runs for minutes and `912345` is
 /// not a thing anyone reads off a table.
 ///
@@ -656,7 +628,7 @@ fn history_row(run: &Value) -> Vec<String> {
     // table, where an interior newline breaks the row and an unbounded value pushes the
     // other columns off the screen. Padding goes with them, so a `COMPLETED ` cannot sit
     // beside a `COMPLETED` and read as two outcomes.
-    let cell = |field: &str| one_cell(&output::field(run, field));
+    let cell = |field: &str| util::one_cell(&output::field(run, field));
 
     vec![
         cell("syncJobId"),
@@ -700,15 +672,15 @@ struct LogEntry {
 
 fn log_entry(value: &Value) -> LogEntry {
     LogEntry {
-        time: one_cell(&output::field(value, "timestamp")),
-        phase: one_cell(&output::field(value, "phase")),
-        duration: human_duration_ms(&one_cell(&output::field(value, "durationMs"))),
+        time: util::one_cell(&output::field(value, "timestamp")),
+        phase: util::one_cell(&output::field(value, "phase")),
+        duration: human_duration_ms(&util::one_cell(&output::field(value, "durationMs"))),
         // Kept whole, unlike the prefix beside it and the poll label's `one_line`: this
         // is the failure text itself, printed once, and a dbt compile error means its
         // line breaks. Collapsing them would apply the label's rule where it does harm —
         // so the control characters `one_line` would have taken with the newlines are
         // dropped deliberately instead.
-        message: printable(output::field(value, "message").trim_end()),
+        message: util::printable(output::field(value, "message").trim_end()),
         // `error` is the level the endpoint documents beside `info`. The other two cost
         // nothing and lean the safe way: colour is not a decision anything acts on, so a
         // level this build has not met yet is better red than silently ordinary.
@@ -1741,7 +1713,7 @@ mod tests {
         assert_eq!(cell(&row, "BRANCH"), "dbt-sync/a[2J b");
         let trigger = cell(&row, "TRIGGER");
         assert!(trigger.ends_with('…'), "bounded: {trigger}");
-        assert_eq!(trigger.chars().count(), CELL_LIMIT + 1);
+        assert_eq!(trigger.chars().count(), util::CELL_LIMIT + 1);
     }
 
     #[test]
