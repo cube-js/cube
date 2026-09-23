@@ -8,6 +8,8 @@ const native = require('../dist/js');
 // jest workers and failed with EPERM/ENOENT on Windows.
 module.exports = () => {
   if (native.isFallbackBuild()) {
-    fs.rmSync(path.join(__dirname, '__snapshots__'), { recursive: true, force: true });
+    fs.rmSync(path.join(__dirname, '__snapshots__'), {
+      recursive: true, force: true, maxRetries: 5, retryDelay: 100
+    });
   }
 };

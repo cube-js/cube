@@ -6,7 +6,8 @@
     "benchmarks"
   ],
   "exclude": [
-    "test/snapshotResolver.js"
+    "test/snapshotResolver.js",
+    "test/globalSetup.js"
   ],
   "compilerOptions": {
     "types": ["node", "jest"],
