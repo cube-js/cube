@@ -36,9 +36,10 @@ it does not import Databricks definitions into Cube or sync automatically after 
 - Arrange target access for Databricks consumers separately. Publishing an object does not
   grant them `SELECT` on it or access to its catalog and schema.
 - Databricks evaluates access to the published object under Unity Catalog permissions, not
-  Cube's query-time authorization. Cube access policies that cannot be represented there block
-  publication. Review the **Preview** result and Databricks grants before exposing a target to
-  consumers.
+  Cube's query-time authorization. A view with a Cube access policy, or one that references a cube
+  with an access policy, is blocked from publication; Cube access policies are never transferred
+  to Databricks. Review the **Preview** result and configure Databricks grants before exposing a
+  target to consumers.
 - Cube uses the data source credential server-side; you do not enter a second token in the
   browser. Preview returns generated YAML for review, but credentials and complete generated
   DDL are not written to logs.
@@ -78,7 +79,9 @@ saved target; there is no named staging-to-production promotion or pinned-build 
 
 The name pattern supports literals, `^`, `$`, dot, and at most one `.*` wildcard; it is not a
 general regular expression and is limited to 128 characters. Each preview or sync can resolve at
-most 128 views for a data source, whether the scope is **all**, **selected**, or **pattern**.
+most 128 views for a data source, whether the scope is **all**, **selected**, or **pattern**. If
+**all** or **pattern** resolves more than 128 deployed views, preview and sync reject the request;
+narrow the scope and try again.
 A newly deployed view enters an **all** or matching **pattern** scope on the next manual sync.
 A **selected** scope changes only when you edit it. Renaming a view or target creates a new target
 and leaves the old one retained. Per-view target-name and root-source overrides are available
@@ -92,9 +95,10 @@ Publication runs and publication-run cancellation also have REST endpoints, but 
 in the public API reference during preview. Contact [Cube support](/admin/account-billing/support)
 for API guidance if you need to automate them.
 
-When saving settings through the API, set `deletionPolicy` to `retain`. The older
-`delete-managed` value is deprecated but remains accepted for existing API clients. It does not
-delete obsolete Metric Views; it currently behaves like `retain`. Choose `retain` for new settings.
+When saving settings through the API, set `deletionPolicy` to `retain`; omitting it also defaults
+to `retain`. The older `delete-managed` value is deprecated but remains accepted for existing API
+clients. It does not delete obsolete Metric Views; it currently behaves like `retain`. Choose
+`retain` for new settings.
 
 ## What can be published
 
@@ -110,7 +114,7 @@ run a new **Preview** after a Cube upgrade.
 | --- | --- | --- |
 | Supported | Static view with a clear root source and representable dimensions, measures, and joins | Review generated YAML, then test access and sync. |
 | Warning | Behavior-neutral metadata Databricks cannot represent; a fan-out-unsafe measure withheld as `CUBE_MEMBER_WITHHELD` | Review the exact difference before accepting publication. For a withheld measure, publish it from a view rooted at its own cube. |
-| Blocking | Dynamic JavaScript/TypeScript/Jinja models, unflattened `extends`, access policies that cannot be preserved, mixed data sources, ambiguous roots, non-equality/cyclic/one-to-many joins, unsupported expressions or types, and multi-stage/window/ranking calculations | Simplify the model or keep that view in Cube. For `CUBE_VIEW_JOIN_NOT_REPRESENTABLE`, root the view at the many-side cube. |
+| Blocking | Dynamic JavaScript/TypeScript/Jinja models, unflattened `extends`, any Cube access policy on the view or a referenced cube, mixed data sources, ambiguous roots, non-equality/cyclic/one-to-many joins, unsupported expressions or types, and multi-stage/window/ranking calculations | Simplify the model or keep that view in Cube. For `CUBE_VIEW_JOIN_NOT_REPRESENTABLE`, root the view at the many-side cube. |
 
 An unsafe joined measure can be **withheld while the rest of its view is published**. That view
 may show **Created** or **Updated**, and the run may show **Completed**, even though some measures
