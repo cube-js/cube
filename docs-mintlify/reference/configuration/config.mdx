@@ -419,7 +419,7 @@ Called on each request.
 from cube import config
 import zlib
 
-NUMBER_OF_ROUTERS = 3
+NUMBER_OF_CLUSTERS = 3
 
 @config('context_to_orchestrator_id')
 def context_to_orchestrator_id(ctx: dict) -> str:
@@ -432,13 +432,13 @@ def pre_aggregations_schema(ctx: dict) -> str:
 @config('context_to_cube_store_router_id')
 def context_to_cube_store_router_id(ctx: dict) -> str:
   tenant_id = str(ctx['securityContext']['tenant_id'])
-  return f"CUBE_ROUTER_{zlib.crc32(tenant_id.encode()) % NUMBER_OF_ROUTERS}"
+  return f"CUBE_ROUTER_{zlib.crc32(tenant_id.encode()) % NUMBER_OF_CLUSTERS}"
 ```
 
 ```javascript title="JavaScript"
 const zlib = require('zlib')
 
-const NUMBER_OF_ROUTERS = 3
+const NUMBER_OF_CLUSTERS = 3
 
 module.exports = {
   contextToOrchestratorId: ({ securityContext }) => {
@@ -449,7 +449,7 @@ module.exports = {
   },
   contextToCubeStoreRouterId: ({ securityContext }) => {
     const tenantId = `${securityContext.tenant_id}`
-    return `CUBE_ROUTER_${zlib.crc32(tenantId) % NUMBER_OF_ROUTERS}`
+    return `CUBE_ROUTER_${zlib.crc32(tenantId) % NUMBER_OF_CLUSTERS}`
   }
 }
 ```
