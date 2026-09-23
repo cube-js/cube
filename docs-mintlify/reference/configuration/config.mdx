@@ -425,6 +425,10 @@ NUMBER_OF_ROUTERS = 3
 def context_to_orchestrator_id(ctx: dict) -> str:
   return f"CUBE_APP_{ctx['securityContext']['tenant_id']}"
 
+@config('pre_aggregations_schema')
+def pre_aggregations_schema(ctx: dict) -> str:
+  return f"pre_aggregations_{ctx['securityContext']['tenant_id']}"
+
 @config('context_to_cube_store_router_id')
 def context_to_cube_store_router_id(ctx: dict) -> str:
   tenant_id = str(ctx['securityContext']['tenant_id'])
@@ -439,6 +443,9 @@ const NUMBER_OF_ROUTERS = 3
 module.exports = {
   contextToOrchestratorId: ({ securityContext }) => {
     return `CUBE_APP_${securityContext.tenant_id}`
+  },
+  preAggregationsSchema: ({ securityContext }) => {
+    return `pre_aggregations_${securityContext.tenant_id}`
   },
   contextToCubeStoreRouterId: ({ securityContext }) => {
     const tenantId = `${securityContext.tenant_id}`
