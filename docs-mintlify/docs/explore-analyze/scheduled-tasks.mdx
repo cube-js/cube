@@ -73,6 +73,13 @@ run, or delete it, because every run executes as the creator (see
 [Reading the output](#reading-the-output)). On an account that doesn't
 enforce roles, every user has admin access, including to other users' tasks.
 
+That exemption carries the creator's data access with it. An admin who edits
+another user's task changes what runs under that user's access, and can open
+the resulting thread. A run's chat thread belongs to the task's creator, and
+only the creator, admins, users with the **Access chat history**
+[permission](/admin/users-and-permissions/custom-roles), and people it's shared
+with can open it. Without role enforcement, that means any user can do both.
+
 From the list, you can:
 
 - **Create** a new task. The **New task** button is a dropdown with two
@@ -216,4 +223,6 @@ The API applies the same [limits](#limits) and permissions as the
   you have the **Admin** role.
 - Every endpoint returns `403` while Scheduled Tasks aren't enabled for your
   account.
+- An API key [scoped to other deployments](/admin/account-billing/api-keys#deployment-scope)
+  returns `403` for this one.
 
