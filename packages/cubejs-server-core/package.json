@@ -24,8 +24,7 @@
     "tsc": "tsc",
     "watch": "tsc -w",
     "test": "npm run unit",
-    "unit": "jest --runInBand --forceExit --coverage dist/test",
-    "bench:compile": "node dist/test/benchmarks/compile-scale/run.js"
+    "unit": "jest --runInBand --forceExit --coverage dist/test"
   },
   "dependencies": {
     "@cubejs-backend/api-gateway": "1.7.44",
