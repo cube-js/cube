@@ -213,6 +213,10 @@ pub fn sql_tests(prefix: &str) -> Vec<(&'static str, TestFn)> {
             rolling_window_one_quarter_interval,
         ),
         t("rolling_window_offsets", rolling_window_offsets),
+        t(
+            "rolling_window_offset_start_exclusive_upper_bound",
+            rolling_window_offset_start_exclusive_upper_bound,
+        ),
         t("rolling_window_filtered", rolling_window_filtered),
         t("rolling_window_no_aggregates", rolling_window_no_aggregates),
         t(
@@ -7009,6 +7013,70 @@ LIMIT
             (6, None),
             (8, Some(9)),
             (10, None)
+        ])
+    );
+    Ok(())
+}
+
+// https://github.com/cube-js/cube/issues/8580
+// `rolling_window: { trailing: ..., offset: start }` is planned as
+// `base >= date_from - trailing AND base < date_from`. The upper bound is strict:
+// a row dated exactly `date_from` must not be counted in its own window.
+async fn rolling_window_offset_start_exclusive_upper_bound(
+    service: Box<dyn SqlClient>,
+) -> Result<(), CubeError> {
+    service.exec_query("CREATE SCHEMA s").await?;
+    service
+        .exec_query("CREATE TABLE s.data(day int, n int)")
+        .await?;
+
+    service
+        .exec_query("INSERT INTO s.data(day, n) VALUES (1, 1), (2, 2), (3, 3), (5, 5), (9, 9)")
+        .await?;
+    let r = service
+        .exec_query(
+            "SELECT
+  q_0.`orders__created_at_day`,
+  `orders__rolling_number` `orders__rolling_number`
+FROM
+  (
+    SELECT
+      `orders.created_at_series`.`date_from` `orders__created_at_day`,
+      sum(`orders__rolling_number`) `orders__rolling_number`
+    FROM
+      (
+        SELECT
+          date_from as `date_from`,
+          date_from + 1 AS `date_to`
+        FROM (
+            select unnest(generate_series(0, 10, 2))
+        ) AS series(date_from)
+      ) AS `orders.created_at_series`
+      LEFT JOIN (
+        SELECT
+          day `orders__created_at_day`,
+          n `orders__rolling_number`
+        FROM s.data
+      ) AS `orders_rolling_number_cumulative__base` ON `orders_rolling_number_cumulative__base`.`orders__created_at_day` >= `orders.created_at_series`.`date_from` - 3
+      AND `orders_rolling_number_cumulative__base`.`orders__created_at_day` < `orders.created_at_series`.`date_from`
+    GROUP BY
+      1
+  ) as q_0
+ORDER BY
+  1 ASC
+LIMIT
+  5000",
+        )
+        .await?;
+    assert_eq!(
+        to_rows(&r),
+        rows(&[
+            (0, None),
+            (2, Some(1)),
+            (4, Some(6)),
+            (6, Some(8)),
+            (8, Some(5)),
+            (10, Some(9))
         ])
     );
     Ok(())
