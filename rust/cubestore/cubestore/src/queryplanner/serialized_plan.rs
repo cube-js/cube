@@ -70,10 +70,35 @@ fn expression_depths(
                     }
                 }
             }
-            let _ = expr.apply_children(|child| {
-                pending.push((child, depth + 1));
-                Ok(TreeNodeRecursion::Continue)
-            });
+            match expr {
+                // A run of one operator is linearized into a single node carrying every
+                // operand, so `a OR b OR c ...` costs one level however long it runs. Counting
+                // each `BinaryExpr` would refuse shapes that encode perfectly flat, a filter
+                // over many values being the common one.
+                Expr::BinaryExpr(BinaryExpr { left, op, right }) => {
+                    pending.push((right.as_ref(), depth + 1));
+                    let mut operand = left.as_ref();
+                    while let Expr::BinaryExpr(BinaryExpr {
+                        left,
+                        op: operand_op,
+                        right,
+                    }) = operand
+                    {
+                        if operand_op != op {
+                            break;
+                        }
+                        pending.push((right.as_ref(), depth + 1));
+                        operand = left.as_ref();
+                    }
+                    pending.push((operand, depth + 1));
+                }
+                _ => {
+                    let _ = expr.apply_children(|child| {
+                        pending.push((child, depth + 1));
+                        Ok(TreeNodeRecursion::Continue)
+                    });
+                }
+            }
         }
         Ok(TreeNodeRecursion::Continue)
     });
