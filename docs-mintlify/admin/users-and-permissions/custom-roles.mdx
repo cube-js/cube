@@ -50,7 +50,7 @@ In the role builder, every custom role has exactly one **Base Role**. It sets th
 | Explorer   | Viewer's work, plus creating and editing workbooks and running queries. |
 | Developer  | Explorer's work, plus editing the data model.                |
 
-The built-in roles of the same names carry deployment policies of their own. Viewer and Explorer get `DeploymentRead`, `DeploymentAgentRead` and `DownloadData` over every deployment; Developer gets every deployment action, data-model ones included, except **Access chat history**, plus account-wide deployment management as a [Global permission](#global-permissions). A custom role starts with none of it. Base Role **Viewer** and no deployment policy is licensed for viewer-level work and reaches no deployment; a role meant to work like Developer has to grant the deployment actions itself. **Full access** (`All`) is the bulk shortcut, and unlike the built-in Developer it takes chat history as well.
+The built-in roles of the same names carry deployment policies of their own. Viewer and Explorer get `DeploymentRead`, `DeploymentAgentRead` and `DownloadData` over every deployment; Developer gets every deployment action, data-model ones included, except **Access chat history**, plus account-wide deployment management as a [Global permission](#global-permissions). A custom role starts with none of it. A role with Base Role **Viewer** and no deployment policy is licensed for viewer-level work and reaches no deployment; a role meant to work like Developer has to grant the deployment actions itself. **Full access** (`All`) is the bulk shortcut, and unlike the built-in Developer it takes chat history as well.
 
 The tier is hierarchical, so a higher one satisfies a requirement for a lower:
 
