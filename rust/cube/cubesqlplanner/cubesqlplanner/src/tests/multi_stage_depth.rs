@@ -2,9 +2,7 @@ use crate::test_fixtures::cube_bridge::MockSchema;
 use crate::test_fixtures::test_utils::TestContext;
 use indoc::indoc;
 
-/// The documented default of `CUBEJS_MAX_MULTI_STAGE_DEPTH`, spelled out so that changing the
-/// default has to come with a decision about these cases.
-const DEFAULT_LIMIT: usize = 32;
+use crate::planner::planners::multi_stage::DEFAULT_MAX_MULTI_STAGE_DEPTH as DEFAULT_LIMIT;
 
 const CUBE_HEADER: &str = indoc! {r#"
     cubes:
@@ -73,6 +71,10 @@ fn chained_stages_view_schema(stages: usize) -> String {
         stages - 1
     ));
     yaml
+}
+
+fn query_with_limit(measure: &str, limit: usize) -> String {
+    format!("{}max_multi_stage_depth: {}\n", query_for(measure), limit)
 }
 
 fn query_for(measure: &str) -> String {
@@ -166,4 +168,27 @@ fn a_view_proxy_is_not_an_extra_stage() {
         &format!("stage_{}", stages - 1),
     )
     .unwrap();
+}
+
+/// The limit travels with the query, so a deployment can set it without the planner reading the
+/// environment behind the caller's back.
+#[test]
+fn the_query_carries_the_limit() {
+    let yaml = chained_stages_schema(5);
+    let schema = MockSchema::from_yaml(&yaml).unwrap();
+    let ctx = TestContext::new(schema).unwrap();
+
+    ctx.build_sql(&query_with_limit("stage_4", 5))
+        .expect("a chain of 5 must plan under a limit of 5");
+
+    let err = ctx
+        .build_sql(&query_with_limit("stage_4", 4))
+        .map(|_| ())
+        .expect_err("the same chain must be refused under a limit of 4");
+    assert!(
+        err.to_string()
+            .contains("chains 5 multi-stage members deep, against a limit of 4"),
+        "message must name the limit the query carried, got: {}",
+        err
+    );
 }

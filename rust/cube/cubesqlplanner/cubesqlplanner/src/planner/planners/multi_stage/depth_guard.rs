@@ -12,28 +12,13 @@ use crate::planner::symbols::MemberSymbol;
 use cubenativeutils::CubeError;
 use std::collections::{HashMap, HashSet};
 use std::rc::Rc;
-use std::sync::OnceLock;
 
-/// Multi-stage members a single dependency path may carry. Far above any hand-written model and
-/// below the depth at which planning runs out of stack, which depends on both what each stage
-/// plans and the stack the caller happens to have.
-const DEFAULT_MAX_MULTI_STAGE_DEPTH: usize = 32;
+/// Used when the query carries no limit of its own. Far above any hand-written model and below
+/// the depth at which planning runs out of stack, which depends on both what each stage plans
+/// and the stack the caller happens to have.
+pub const DEFAULT_MAX_MULTI_STAGE_DEPTH: usize = 32;
 
-fn max_multi_stage_depth() -> usize {
-    static MAX_DEPTH: OnceLock<usize> = OnceLock::new();
-    *MAX_DEPTH.get_or_init(|| match std::env::var("CUBEJS_MAX_MULTI_STAGE_DEPTH") {
-        // A malformed value falls back to the default rather than refusing to plan: this is a
-        // safety valve, and a typo in it must not take queries down.
-        Ok(value) => match value.parse::<usize>() {
-            Ok(0) | Err(_) => DEFAULT_MAX_MULTI_STAGE_DEPTH,
-            Ok(depth) => depth,
-        },
-        Err(_) => DEFAULT_MAX_MULTI_STAGE_DEPTH,
-    })
-}
-
-pub fn check_multi_stage_depth(roots: &[Rc<MemberSymbol>]) -> Result<(), CubeError> {
-    let limit = max_multi_stage_depth();
+pub fn check_multi_stage_depth(roots: &[Rc<MemberSymbol>], limit: usize) -> Result<(), CubeError> {
     // Roots share a member graph, so they share the memo: measuring each one against its own
     // would re-expand that graph per root.
     let mut measured = Measured::default();

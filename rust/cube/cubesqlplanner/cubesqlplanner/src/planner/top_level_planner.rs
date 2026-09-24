@@ -32,7 +32,10 @@ impl TopLevelPlanner {
     }
 
     pub fn plan(&self) -> Result<(String, Vec<PreAggregationUsage>), CubeError> {
-        check_multi_stage_depth(&self.request.all_used_symbols()?)?;
+        check_multi_stage_depth(
+            &self.request.all_used_symbols()?,
+            self.request.max_multi_stage_depth(),
+        )?;
 
         let query_planner = QueryPlanner::new(self.request.clone(), self.query_tools.clone());
         let mut scope = PlanningScope::new();
