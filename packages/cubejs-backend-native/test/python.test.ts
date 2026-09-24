@@ -91,6 +91,30 @@ suite('Python Config', () => {
     });
   });
 
+  // https://github.com/cube-js/cube/issues/11987
+  test('checkAuth receives request body and query (POST /v1/load)', async () => {
+    const pyConfig = await loadConfigurationFile('check_auth_request.py');
+    if (!pyConfig.checkAuth) {
+      throw new Error('checkAuth was not defined in check_auth_request.py');
+    }
+
+    const loadQuery = { dimensions: ['probe.id'], limit: 1 };
+    const result: any = await pyConfig.checkAuth(
+      {
+        url: '/cubejs-api/v1/load',
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        ip: '127.0.0.1',
+        query: {},
+        body: { query: loadQuery },
+      } as any,
+      'MY_SECRET_TOKEN'
+    );
+
+    expect(result.security_context.body).toEqual({ query: loadQuery });
+    expect(result.security_context.query).toEqual({});
+  });
+
   test('context_to_groups', async () => {
     if (!config.contextToGroups) {
       throw new Error('contextToGroups was not defined in config.py');
