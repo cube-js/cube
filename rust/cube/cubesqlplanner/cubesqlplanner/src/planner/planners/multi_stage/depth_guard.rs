@@ -1,14 +1,12 @@
 //! Depth guard for chained multi-stage members.
 //!
-//! Every multi-stage member on a dependency path becomes its own CTE, and `MultiStageQueryPlanner`
-//! plans them by descending from a member into its children. Planning runs synchronously on the
-//! caller's thread, so a long enough chain exhausts that thread's stack and the process aborts —
-//! a crash no error handler sees, on either side of the native boundary.
+//! Each multi-stage member is planned as its own stage, by descending from a member into its
+//! children on the caller's thread, so a long enough chain exhausts that thread's stack and the
+//! process aborts -- a crash no error handler sees, on either side of the native boundary. This
+//! turns it into a reportable error.
 //!
-//! The guard turns that into a reportable error. It measures only multi-stage members that are
-//! planned as a stage: calculation chains recurse as well, but cost a fraction of a stage per
-//! level, and a reference -- a view member proxying one, say -- inherits `multi_stage` from what
-//! it resolves to while planning collapses it into that member and opens no stage of its own.
+//! Only members planned as a stage are counted: a reference inherits `multi_stage` from what it
+//! resolves to but planning collapses it, and a calculation level costs a fraction of a stage.
 
 use crate::planner::symbols::MemberSymbol;
 use cubenativeutils::CubeError;
@@ -16,11 +14,9 @@ use std::collections::{HashMap, HashSet};
 use std::rc::Rc;
 use std::sync::OnceLock;
 
-/// Multi-stage members a single dependency path may carry.
-///
-/// Far above any hand-written model — real ones chain a handful of stages — and below the depth
-/// at which planning runs out of stack, which a release build reaches around a few hundred
-/// minimal stages, sooner for heavy ones and sooner still on a smaller caller stack.
+/// Multi-stage members a single dependency path may carry. Far above any hand-written model and
+/// below the depth at which planning runs out of stack, which depends on both what each stage
+/// plans and the stack the caller happens to have.
 const DEFAULT_MAX_MULTI_STAGE_DEPTH: usize = 32;
 
 fn max_multi_stage_depth() -> usize {
@@ -38,8 +34,11 @@ fn max_multi_stage_depth() -> usize {
 
 pub fn check_multi_stage_depth(roots: &[Rc<MemberSymbol>]) -> Result<(), CubeError> {
     let limit = max_multi_stage_depth();
+    // Roots share a member graph, so they share the memo: measuring each one against its own
+    // would re-expand that graph per root.
+    let mut measured = Measured::default();
     for root in roots {
-        let depth = multi_stage_depth(root);
+        let depth = multi_stage_depth(root, &mut measured);
         if depth > limit {
             return Err(CubeError::user(format!(
                 "Member '{}' chains {} multi-stage members deep, against a limit of {}. Each \
@@ -55,17 +54,21 @@ pub fn check_multi_stage_depth(roots: &[Rc<MemberSymbol>]) -> Result<(), CubeErr
     Ok(())
 }
 
+/// Stages measured so far, keyed by symbol address.
+#[derive(Default)]
+struct Measured {
+    depth_below: HashMap<*const MemberSymbol, usize>,
+    /// The symbols those addresses stand for, kept alive so a freed symbol's address cannot come
+    /// back as a different one.
+    symbols: Vec<Rc<MemberSymbol>>,
+}
+
 /// Multi-stage members on the longest dependency path starting at `root`, `root` included.
 ///
-/// Walks an explicit stack and memoizes per symbol identity: the graphs this guards against are
-/// exactly the ones a recursive walk could not survive, and a member reachable by many paths
-/// must not be re-expanded per path.
-fn multi_stage_depth(root: &Rc<MemberSymbol>) -> usize {
-    let mut depth_below: HashMap<*const MemberSymbol, usize> = HashMap::new();
+/// Walks an explicit stack: the graphs this guards against are exactly the ones a recursive walk
+/// could not survive.
+fn multi_stage_depth(root: &Rc<MemberSymbol>, measured: &mut Measured) -> usize {
     let mut on_path: HashSet<*const MemberSymbol> = HashSet::new();
-    // Addresses are the memo keys, so every symbol one stands for has to outlive the walk;
-    // otherwise a freed symbol's address could come back as a different one.
-    let mut measured: Vec<Rc<MemberSymbol>> = Vec::new();
     let mut pending = vec![(root.clone(), false)];
 
     while let Some((symbol, dependencies_visited)) = pending.pop() {
@@ -74,17 +77,19 @@ fn multi_stage_depth(root: &Rc<MemberSymbol>) -> usize {
             let below = symbol
                 .get_dependencies()
                 .iter()
-                .filter_map(|dependency| depth_below.get(&Rc::as_ptr(dependency)))
+                .filter_map(|dependency| measured.depth_below.get(&Rc::as_ptr(dependency)))
                 .copied()
                 .max()
                 .unwrap_or(0);
             let opens_a_stage = symbol.is_multi_stage() && !symbol.is_reference();
-            depth_below.insert(key, below + usize::from(opens_a_stage));
+            measured
+                .depth_below
+                .insert(key, below + usize::from(opens_a_stage));
             on_path.remove(&key);
-            measured.push(symbol);
+            measured.symbols.push(symbol);
             continue;
         }
-        if depth_below.contains_key(&key) || !on_path.insert(key) {
+        if measured.depth_below.contains_key(&key) || !on_path.insert(key) {
             // Already measured, or a cycle: a cyclic model does not terminate in planning
             // either, and this walk must not be the thing that hangs on it.
             continue;
@@ -94,7 +99,8 @@ fn multi_stage_depth(root: &Rc<MemberSymbol>) -> usize {
         pending.extend(dependencies.into_iter().map(|d| (d, false)));
     }
 
-    depth_below
+    measured
+        .depth_below
         .get(&Rc::as_ptr(root))
         .copied()
         .unwrap_or_default()
