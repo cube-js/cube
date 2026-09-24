@@ -3,6 +3,8 @@ import { GenericContainer, Wait } from 'testcontainers';
 import { DbRunnerAbstract, DBRunnerContainerOptions } from './db-runner.abstract';
 import { startContainerWithRetry } from './start-with-retry';
 
+export const MSSQL_READY_COMMAND = 'PATH=/opt/mssql-tools18/bin:/opt/mssql-tools/bin:$PATH sqlcmd -C -S localhost -U sa -P "$MSSQL_SA_PASSWORD" -Q "SELECT 1" -b -o /dev/null';
+
 export class MssqlDbRunner extends DbRunnerAbstract {
   public static startContainer(options: DBRunnerContainerOptions) {
     const version = process.env.TEST_MSSQL_VERSION || options.version || '2019-latest';
@@ -13,9 +15,7 @@ export class MssqlDbRunner extends DbRunnerAbstract {
         MSSQL_SA_PASSWORD: process.env.TEST_DB_PASSWORD || 'Test1test',
       })
       .withExposedPorts(1433)
-      .withWaitStrategy(Wait.forSuccessfulCommand(
-        'PATH=/opt/mssql-tools18/bin:/opt/mssql-tools/bin:$PATH sqlcmd -C -S localhost -U sa -P "$MSSQL_SA_PASSWORD" -Q "SELECT 1" -b -o /dev/null'
-      ))
+      .withWaitStrategy(Wait.forSuccessfulCommand(MSSQL_READY_COMMAND))
       .withStartupTimeout(120 * 1000);
 
     if (options.volumes) {

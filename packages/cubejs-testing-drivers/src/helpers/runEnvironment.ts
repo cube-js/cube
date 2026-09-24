@@ -5,6 +5,7 @@ import { config } from 'dotenv';
 import yargs from 'yargs/yargs';
 import { DockerComposeEnvironment, Wait } from 'testcontainers';
 import { isCI, pausePromise } from '@cubejs-backend/shared';
+import { MSSQL_READY_COMMAND } from '@cubejs-backend/testing-shared';
 import { getFixtures } from './getFixtures';
 import { getTempPath } from './getTempPath';
 import { getComposePath } from './getComposePath';
@@ -155,9 +156,7 @@ export async function runEnvironment(
 
   // TODO extract as a config
   if (type === 'mssql') {
-    compose.withWaitStrategy('data', Wait.forSuccessfulCommand(
-      'PATH=/opt/mssql-tools18/bin:/opt/mssql-tools/bin:$PATH sqlcmd -C -S localhost -U sa -P "$MSSQL_SA_PASSWORD" -Q "SELECT 1" -b -o /dev/null'
-    ));
+    compose.withWaitStrategy('data', Wait.forSuccessfulCommand(MSSQL_READY_COMMAND));
   }
   // TODO: Add health checks for all drivers
   if (type === 'clickhouse') {
