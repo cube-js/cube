@@ -98,13 +98,95 @@ The public REST API documents [reading settings](/api-reference/databricks-metri
 [checking preview status](/api-reference/databricks-metric-view-publication/get-databricks-metric-view-preview-status),
 [getting the completed preview result](/api-reference/databricks-metric-view-publication/get-a-completed-databricks-metric-view-preview-result),
 and [cancelling a preview](/api-reference/databricks-metric-view-publication/cancel-a-databricks-metric-view-preview).
-Publication runs and publication-run cancellation also have REST endpoints, but those are not yet
-in the public API reference during preview. Contact [Cube support](/admin/account-billing/support)
-for API guidance if you need to automate them.
+Publication-run endpoints are also available in the public REST API during preview; their
+reference pages are not yet published. The CI recipe below documents the calls needed to start
+and inspect a run. Contact [Cube support](/admin/account-billing/support) for help with access.
 
 When saving settings through the API, set `deletionPolicy` to `retain`; omitting it also defaults
 to `retain`. The older `delete-managed` value is deprecated but remains accepted for existing API
 clients. It does not delete obsolete Metric Views; it currently behaves like `retain`.
+
+## Trigger publication from CI
+
+Yes: a CI job can publish all deployed public Cube views after a successful Cube deployment. In
+**Settings → Data Sources**, configure the Databricks Metric Views card once with **All views**, a
+dedicated target catalog and schema, `retain`, and publication enabled. Run **Preview** and
+**Test access** before the first write. An API call does not override the saved view scope or
+destination. **All views** is limited to 128 views per data source; incompatible views are reported
+but are not published.
+
+Use a [Platform API key](/api-reference/authentication) with `SchemaUpdate` access to the
+deployment, stored as a CI secret. After the deployment succeeds, the job should:
+
+1. `GET /api/v1/deployments/{deploymentId}/databricks-metric-view-integrations/{dataSourceName}`
+   to read `configurationVersion` and confirm `configuration.enabled` and
+   `configuration.selectionMode: "all"`.
+2. `POST /api/v1/deployments/{deploymentId}/databricks-metric-view-integrations/{dataSourceName}/syncs`
+   with `{"configurationVersion": <version>}`. It returns `202` with `runId`, `buildJobId`,
+   optional `commit`, and a relative `statusUrl`. An optional UUID `idempotencyKey` lets a retry
+   reuse the same run; another start while a run is active returns `409`.
+3. Poll `GET {statusUrl}` until the run is terminal. Treat publication as complete only when
+   `status` is `COMPLETED`, `incompleteViewCount` is `0`, and each view outcome is `created`,
+   `updated`, `unchanged`, or `retained_obsolete` (a view previously published but now out of
+   scope). `PARTIAL` and `FAILED` need investigation. A `COMPLETED` run with
+   `incompleteViewCount > 0` published one or more views **without** the measures listed in
+   `views[].withheldMembers`.
+
+To reject incompatible changes **before** writing, CI can also [start a preview](/api-reference/databricks-metric-view-publication/start-a-databricks-metric-view-publication-preview)
+with `{"dataSourceName": "default", "selectionMode": "all"}`, poll its `statusUrl`, and
+[inspect its result](/api-reference/databricks-metric-view-publication/get-a-completed-databricks-metric-view-preview-result).
+Require every view to be eligible with no `withheldMembers` before starting the sync. The sync
+does not pin itself to that preview's build, so avoid overlapping deployments.
+
+For example, this Bash step uses `curl` and `jq`. Set `CUBE_API_URL` to your tenant host without
+a trailing slash, `DEPLOYMENT_ID` to the deployment that just succeeded, and `CUBE_API_TOKEN` to a
+CI secret. If your deployment step returns a build job ID, set `EXPECTED_BUILD_JOB_ID` too. The
+example assumes the data source is named `default`; URL-encode a different name in the path.
+
+```bash
+set -euo pipefail
+
+integration="$CUBE_API_URL/api/v1/deployments/$DEPLOYMENT_ID/databricks-metric-view-integrations/default"
+auth_header="Authorization: Bearer $CUBE_API_TOKEN"
+settings=$(curl --fail-with-body --silent --show-error -H "$auth_header" "$integration")
+jq -e '.configuration.enabled == true and .configuration.selectionMode == "all" and .configuration.deletionPolicy == "retain"' <<<"$settings" >/dev/null
+version=$(jq -r '.configurationVersion' <<<"$settings")
+
+start=$(jq -n --argjson version "$version" '{configurationVersion: $version}' |
+  curl --fail-with-body --silent --show-error -X POST -H "$auth_header" \
+    -H 'Content-Type: application/json' --data-binary @- "$integration/syncs")
+status_url=$(jq -r '.statusUrl' <<<"$start")
+if [[ -n "${EXPECTED_BUILD_JOB_ID:-}" ]]; then
+  jq -e --argjson expected "$EXPECTED_BUILD_JOB_ID" '.buildJobId == $expected' <<<"$start" >/dev/null
+fi
+
+for attempt in {1..60}; do
+  run=$(curl --fail-with-body --silent --show-error -H "$auth_header" "$CUBE_API_URL$status_url")
+  case "$(jq -r '.status' <<<"$run")" in
+    QUEUED|RUNNING|CANCELLING) sleep 10 ;;
+    *) break ;;
+  esac
+done
+
+jq -e '.status == "COMPLETED" and .incompleteViewCount == 0 and
+  (.viewNames | length > 0) and
+  all(.views[]; .outcome == "created" or .outcome == "updated" or
+    .outcome == "unchanged" or .outcome == "retained_obsolete")' \
+  <<<"$run" >/dev/null
+```
+
+The sync reads the **latest successful deployed build when it starts**, not a build ID supplied by
+CI. Wait for your deployment to finish, avoid overlapping deployments, and compare the returned
+`buildJobId` or `commit` with the build you expected. This check detects a mismatch but cannot
+undo a write that has already begun. Preview and sync can also pick different builds if another
+deployment completes between them; preview again in that case. There is currently no pinned-build
+publication or automatic post-deployment trigger.
+
+A failed CI check does not roll back views already published in that run. Read `views[]` from the
+run status to see what changed. You can inspect older runs with
+`GET /api/v1/deployments/{deploymentId}/databricks-metric-view-integrations/{dataSourceName}/syncs`
+and request cancellation of an active run with `DELETE {statusUrl}`; cancellation stops further
+writes but does not undo completed ones.
 
 ## What can be published
 
