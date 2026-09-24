@@ -58,13 +58,20 @@ five-field expression whose minute field is a single number: `0 * * * *`
 
 ## Limits
 
-Each user can have up to **20 active tasks**, where active means scheduled
-and enabled. Manual and paused tasks don't count, so you can keep as many of
-them as you like. At the limit, creating a scheduled task or resuming a
-paused one fails until you pause or delete another task, or save the new one
-as **Manual**.
+Each user can have up to **20 active tasks** across all of the account's
+deployments, where active means scheduled and enabled. Manual and paused
+tasks don't count toward this limit. At the limit, creating a scheduled task
+or resuming a paused one fails until you pause or delete another task, or
+save the new one as **Manual**.
 
 ## Managing tasks
+
+Anyone who can use the deployment can see its tasks and create new ones.
+Only a task's creator, or a user with the **Admin**
+[role](/admin/users-and-permissions/roles-and-permissions), can edit, pause,
+run, or delete it, because every run executes as the creator (see
+[Reading the output](#reading-the-output)). On an account that doesn't
+enforce roles, every user has admin access, including to other users' tasks.
 
 From the list, you can:
 
@@ -84,10 +91,6 @@ From the list, you can:
   link straight to the run's chat thread, and the thread appears in the
   Recent Chats sidebar immediately.
 - **Delete** a task. Deleting removes its schedule and stops all future runs.
-
-Everyone who can use the deployment can see its tasks. Only a task's
-creator, or an admin, can edit, pause, run, or delete it, because every run
-executes as the creator (see [Reading the output](#reading-the-output)).
 
 {/* TODO: screenshot — New task dropdown with Create with agent and Set up manually options */}
 
@@ -193,11 +196,20 @@ curl --request POST \
   }'
 ```
 
+In the API, `prompt` is the task's **Instructions**, and `cronExpression`
+and `timezone` make up its **Schedule**.
+
 The API applies the same [limits](#limits) and permissions as the
-**Scheduled** page. A cron that fires more than once an hour, an unknown time
-zone, or a 21st active task returns `400`. Changing, running, or deleting
-another user's task returns `403` unless you are an admin, and every endpoint
-returns `403` while Scheduled Tasks aren't enabled for your account.
+**Scheduled** page:
+
+- A cron that fires more than once an hour, or an unknown time zone, returns
+  `400`.
+- Creating or resuming a task past the 20-active-task limit returns `409`.
+  Pause or delete a task before retrying.
+- Changing, running, or deleting another user's task returns `403` unless
+  you have the **Admin** role.
+- Every endpoint returns `403` while Scheduled Tasks aren't enabled for your
+  account.
 
 Each run starts a new chat thread with no memory of earlier runs, so write the
 prompt as a complete request.
