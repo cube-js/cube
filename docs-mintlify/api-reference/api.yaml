@@ -40,6 +40,7 @@ tags:
   - name: Workspace
   - name: Users
   - name: Users Admin
+  - name: API Keys
   - name: User Attributes
   - name: User Attribute Values
   - name: Tenant Settings
@@ -53,6 +54,87 @@ tags:
   - name: Usage Analytics
   - name: OpenAPI Spec
 paths:
+  /api/v1/api-keys:
+    get:
+      operationId: listApiKeys
+      parameters:
+        - in: query
+          name: after
+          schema:
+            oneOf:
+              - type: string
+              - type: 'null'
+        - in: query
+          name: first
+          schema:
+            oneOf:
+              - minimum: 1
+                type: integer
+              - type: 'null'
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiKeysListResponse'
+          description: ''
+      summary: List API keys
+      tags:
+        - API Keys
+    post:
+      operationId: createApiKey
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateApiKeyInput'
+        description: CreateApiKeyInput
+        required: false
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiKeyCreatedResponse'
+          description: ''
+      summary: Create API key
+      tags:
+        - API Keys
+  /api/v1/api-keys/{id}:
+    delete:
+      operationId: deleteApiKey
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: number
+      responses:
+        '200':
+          content:
+            application/json: {}
+          description: Successful response
+      summary: Delete API key
+      tags:
+        - API Keys
+    get:
+      operationId: getApiKey
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: number
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiKeyResponse'
+          description: ''
+      summary: Get API key
+      tags:
+        - API Keys
   /api/v1/app-config:
     get:
       operationId: getAppConfig
@@ -5886,6 +5968,139 @@ components:
       required:
         - creationStep
       type: object
+    ApiKeyCreatedResponse:
+      properties:
+        allowedEndpoints:
+          oneOf:
+            - items:
+                type: string
+              type: array
+            - type: 'null'
+        createdAt:
+          oneOf:
+            - format: date
+              type: string
+            - format: date-time
+              type: string
+        deploymentIds:
+          oneOf:
+            - items:
+                type: integer
+              type: array
+            - type: 'null'
+        expiresAt:
+          oneOf:
+            - oneOf:
+                - format: date
+                  type: string
+                - format: date-time
+                  type: string
+            - type: 'null'
+        id:
+          type: integer
+        lastUsedAt:
+          oneOf:
+            - oneOf:
+                - format: date
+                  type: string
+                - format: date-time
+                  type: string
+            - type: 'null'
+        name:
+          type: string
+        suffix:
+          oneOf:
+            - type: string
+            - type: 'null'
+        token:
+          type: string
+        updatedAt:
+          oneOf:
+            - format: date
+              type: string
+            - format: date-time
+              type: string
+        userId:
+          type: integer
+      required:
+        - id
+        - userId
+        - name
+        - createdAt
+        - updatedAt
+        - token
+      type: object
+    ApiKeyResponse:
+      properties:
+        allowedEndpoints:
+          oneOf:
+            - items:
+                type: string
+              type: array
+            - type: 'null'
+        createdAt:
+          oneOf:
+            - format: date
+              type: string
+            - format: date-time
+              type: string
+        deploymentIds:
+          oneOf:
+            - items:
+                type: integer
+              type: array
+            - type: 'null'
+        expiresAt:
+          oneOf:
+            - oneOf:
+                - format: date
+                  type: string
+                - format: date-time
+                  type: string
+            - type: 'null'
+        id:
+          type: integer
+        lastUsedAt:
+          oneOf:
+            - oneOf:
+                - format: date
+                  type: string
+                - format: date-time
+                  type: string
+            - type: 'null'
+        name:
+          type: string
+        suffix:
+          oneOf:
+            - type: string
+            - type: 'null'
+        updatedAt:
+          oneOf:
+            - format: date
+              type: string
+            - format: date-time
+              type: string
+        userId:
+          type: integer
+      required:
+        - id
+        - userId
+        - name
+        - createdAt
+        - updatedAt
+      type: object
+    ApiKeysListResponse:
+      properties:
+        items:
+          items:
+            $ref: '#/components/schemas/ApiKeyResponse'
+          type: array
+        pageInfo:
+          $ref: '#/components/schemas/PageInfo'
+      required:
+        - items
+        - pageInfo
+      type: object
     AppConfigResponse:
       properties:
         appTheme:
@@ -6470,6 +6685,30 @@ components:
           oneOf:
             - type: string
             - type: 'null'
+      type: object
+    CreateApiKeyInput:
+      properties:
+        allowedEndpoints:
+          oneOf:
+            - items:
+                type: string
+              type: array
+            - type: 'null'
+        deploymentIds:
+          oneOf:
+            - items:
+                type: integer
+              type: array
+            - type: 'null'
+        name:
+          type: string
+        ttlHours:
+          oneOf:
+            - minimum: 1
+              type: integer
+            - type: 'null'
+      required:
+        - name
       type: object
     CreateBranchRequest:
       properties:
