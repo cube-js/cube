@@ -417,21 +417,56 @@ Called on each request.
 
 ```python title="Python"
 from cube import config
+import zlib
+
+NUMBER_OF_CLUSTERS = 3
+
+@config('context_to_app_id')
+def context_to_app_id(ctx: dict) -> str:
+  return f"CUBE_APP_{ctx['securityContext']['tenant_id']}"
+
+@config('context_to_orchestrator_id')
+def context_to_orchestrator_id(ctx: dict) -> str:
+  return f"CUBE_APP_{ctx['securityContext']['tenant_id']}"
+
+@config('pre_aggregations_schema')
+def pre_aggregations_schema(ctx: dict) -> str:
+  return f"pre_aggregations_{ctx['securityContext']['tenant_id']}"
 
 @config('context_to_cube_store_router_id')
 def context_to_cube_store_router_id(ctx: dict) -> str:
-  return f"CUBE_ROUTER_{ctx['securityContext']['tenant_id']}"
+  tenant_id = str(ctx['securityContext']['tenant_id'])
+  return f"CUBE_ROUTER_{zlib.crc32(tenant_id.encode()) % NUMBER_OF_CLUSTERS}"
 ```
 
 ```javascript title="JavaScript"
+const zlib = require('zlib')
+
+const NUMBER_OF_CLUSTERS = 3
+
 module.exports = {
+  contextToAppId: ({ securityContext }) => {
+    return `CUBE_APP_${securityContext.tenant_id}`
+  },
+  contextToOrchestratorId: ({ securityContext }) => {
+    return `CUBE_APP_${securityContext.tenant_id}`
+  },
+  preAggregationsSchema: ({ securityContext }) => {
+    return `pre_aggregations_${securityContext.tenant_id}`
+  },
   contextToCubeStoreRouterId: ({ securityContext }) => {
-    return `CUBE_ROUTER_${securityContext.tenant_id}`
+    const tenantId = `${securityContext.tenant_id}`
+    return `CUBE_ROUTER_${zlib.crc32(tenantId) % NUMBER_OF_CLUSTERS}`
   }
 }
 ```
 
 </CodeGroup>
+
+The example maps tenants onto a fixed set of router ids. In Cube, multiple Cube
+Store routers are available on Multi-cluster deployments with
+[Multi-router Cube Store][ref-multi-router-cube-store] enabled, and the number
+of distinct ids should stay at or below **Number of clusters**.
 
 ### `driver_factory`
 
@@ -1581,6 +1616,7 @@ module.exports = {
 [ref-rest-scopes]: /reference/core-data-apis/rest-api#api-scopes
 [ref-config-options]: /admin/connect-to-data#configuration-options
 [self-orchestrator-id]: #context_to_orchestrator_id
+[ref-multi-router-cube-store]: /admin/deployment/deployment-types#multi-router-cube-store
 [ref-compile-context]: /reference/data-modeling/context-variables#compile_context
 [ref-multiple-data-sources]: /admin/connect-to-data/multiple-data-sources
 [ref-websockets]: /recipes/core-data-api/real-time-data-fetch
