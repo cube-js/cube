@@ -87,11 +87,17 @@ type BulkTransferContent = Omit<TransferContent, 'fileName' | 'content'> & {
 };
 
 // One message for many files, so the symbols, which grow with the whole model, are cloned once
-// per chunk instead of once per file. A file that throws gets null: the caller retries it alone
-// to report the error exactly as the per-file call does.
+// per chunk instead of once per file. The reporter accumulates across calls, so each file gets
+// only the errors and warnings it added. A file that throws gets null: the caller retries it
+// alone to report the error exactly as the per-file call does.
 const transpileJsBulk = ({ files, ...shared }: BulkTransferContent) => files.map(({ fileName, content }) => {
+  const errorsBefore = errorsReport.getErrors().length;
+  const warningsBefore = errorsReport.getWarnings().length;
+
   try {
-    return transpileJs({ ...shared, fileName, content });
+    const res = transpileJs({ ...shared, fileName, content });
+
+    return { ...res, errors: res.errors.slice(errorsBefore), warnings: res.warnings.slice(warningsBefore) };
   } catch {
     return null;
   }

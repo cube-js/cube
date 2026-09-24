@@ -718,12 +718,18 @@ export class DataSchemaCompiler {
     }
 
     const results = await Promise.all(chunks.map(async (chunk) => {
-      const res: ({ content: string; errors: any[]; warnings: any[] } | null)[] = await this.workerPool!.exec('transpileJsBulk', [{
-        files: chunk.map(({ fileName, content }) => ({ fileName, content })),
-        transpilers: transpilerNames,
-        cubeNames,
-        cubeSymbols,
-      }]);
+      let res: ({ content: string; errors: any[]; warnings: any[] } | null)[];
+      try {
+        res = await this.workerPool!.exec('transpileJsBulk', [{
+          files: chunk.map(({ fileName, content }) => ({ fileName, content })),
+          transpilers: transpilerNames,
+          cubeNames,
+          cubeSymbols,
+        }]);
+      } catch {
+        // The whole chunk failed (the worker died, say): the per-file path reports it file by file
+        res = chunk.map(() => null);
+      }
 
       return Promise.all(chunk.map(async (file, i) => {
         const fileRes = res[i];

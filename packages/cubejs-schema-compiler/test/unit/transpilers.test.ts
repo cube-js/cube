@@ -1,6 +1,8 @@
 import { parse } from '@babel/parser';
 import babelGenerator from '@babel/generator';
 import babelTraverse from '@babel/traverse';
+import path from 'path';
+import workerpool from 'workerpool';
 
 import { prepareJsCompiler } from './PrepareCompiler';
 import { ImportExportTranspiler } from '../../src/compiler/transpilers';
@@ -35,6 +37,32 @@ describe('Transpilers', () => {
       throw new Error('Compile should thrown an error');
     } catch (e: any) {
       expect(e.message).toMatch(/Duplicate property parsing test1/);
+    }
+  });
+
+  it('transpileJsBulk returns each file only the errors it caused', async () => {
+    const pool = workerpool.pool(path.join(__dirname, '../../src/compiler/transpilers/transpiler_worker'), { maxWorkers: 1 });
+    const file = (name: string, dimensions: string) => ({
+      fileName: `${name}.js`,
+      content: `cube(\`${name}\`, { sql: 'select 1', dimensions: { ${dimensions} } })`,
+    });
+
+    try {
+      const res = await pool.exec('transpileJsBulk', [{
+        files: [
+          file('first', "id: { sql: 'id', type: 'number' }"),
+          file('second', "id: { sql: 'id', type: 'number' }, 'id': { sql: 'id', type: 'number' }"),
+          file('third', "id: { sql: 'id', type: 'number' }"),
+        ],
+        transpilers: ['CubeCheckDuplicatePropTranspiler'],
+        cubeNames: [],
+        cubeSymbols: {},
+      }]);
+
+      expect(res.map((r) => r.errors.length)).toEqual([0, 1, 0]);
+      expect(res[1].errors[0].message).toMatch(/Duplicate property parsing id/);
+    } finally {
+      await pool.terminate();
     }
   });
 
