@@ -131,17 +131,18 @@ and sync can resolve different builds.
 This Bash step requires `curl` and `jq`. Set `CUBE_API_URL` to your tenant host without a trailing
 slash, `DEPLOYMENT_ID` to the deployment that just succeeded, and `CUBE_API_TOKEN` to the CI secret.
 Set `EXPECTED_BUILD_JOB_ID` if the deployment step returns one. The example uses the `default`
-data source; URL-encode a different name in the path. Generate `SYNC_IDEMPOTENCY_KEY` once as a
-UUID for this deployment and keep it unchanged across CI retries. Set `MAX_POLLS` to scale the wait
-for your view count and warehouse start-up time (default: 180 attempts, 10 seconds apart, plus
-request time).
+data source; URL-encode a different name in the path. Set `SYNC_IDEMPOTENCY_KEY` to a UUID unique
+to this CI publication attempt and keep it unchanged across retries of that attempt. Do not reuse
+it for a later pipeline run: the API would return the earlier run without publishing again. Set
+`MAX_POLLS` to scale the wait for your view count and warehouse start-up time (default: 180
+attempts, 10 seconds apart, plus request time).
 
 ```bash
 set -euo pipefail
 
 integration="$CUBE_API_URL/api/v1/deployments/$DEPLOYMENT_ID/databricks-metric-view-integrations/default"
 auth_header="Authorization: Bearer $CUBE_API_TOKEN"
-: "${SYNC_IDEMPOTENCY_KEY:?Set a stable UUID for this deployment}"
+: "${SYNC_IDEMPOTENCY_KEY:?Set a unique UUID for this publication attempt}"
 settings=$(curl --fail --silent --show-error --connect-timeout 10 --max-time 30 \
   -H "$auth_header" "$integration")
 if ! jq -e '.configuration.enabled == true and .configuration.selectionMode == "all" and .configuration.deletionPolicy == "retain"' <<<"$settings" >/dev/null; then
