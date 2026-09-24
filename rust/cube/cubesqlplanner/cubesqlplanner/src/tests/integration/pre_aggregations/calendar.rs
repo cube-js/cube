@@ -192,12 +192,9 @@ async fn own_cube_sql_granularity_falls_back_to_source() {
     }
 }
 
-/// A rollup that declares the `sql`-overridden granularity itself stores the
-/// overriding column's value, so it is a correct source for it. Cube cannot
-/// verify that a range falls on the overriding column's boundaries — it knows
-/// only the interval and a default origin — so serving a range at all takes
-/// `allow_non_strict_date_range_match`. The range used here does align: the
-/// overridden week starts Sunday 2025-02-02.
+/// Cube cannot verify a range falls on a `sql` granularity's boundaries, so
+/// serving one takes `allow_non_strict_date_range_match`. This range aligns:
+/// the overridden week starts Sunday 2025-02-02.
 #[tokio::test(flavor = "multi_thread")]
 async fn sql_granularity_rollup_declaring_it_matches_source() {
     let query = indoc! {r#"
@@ -245,12 +242,10 @@ async fn calendar_undeclared_interval_shift_falls_back() {
         assert_eq!(rollup, source);
     }
 }
-/// A rollup keeping one dimension at several granularities has a column per
-/// granularity but is addressed by the member alone, so one of them stands for
-/// all. A `sql` granularity is read straight from the column, so the wrong one
-/// would silently return the wrong period — the rollup is refused instead.
-/// The fixture declares `week` before `day` on purpose: that is the order in
-/// which the surviving column is the wrong one.
+
+/// Stored columns are addressed by member alone, so with several grains one
+/// column stands for all; a `sql` week read from the wrong one silently returns
+/// the wrong period, so the rollup is refused.
 #[tokio::test(flavor = "multi_thread")]
 async fn sql_granularity_rollup_with_several_grains_falls_back() {
     let query = indoc! {r#"
@@ -333,6 +328,25 @@ async fn sql_granularity_rollup_serves_a_time_dimension_without_granularity() {
     if let Some((rollup, source)) =
         rollup_vs_source(query, &["demand_by_plain_week_non_strict"]).await
     {
+        assert_eq!(rollup, source);
+    }
+}
+
+/// A range with no granularity lends the query a default `week` when it runs
+/// Monday to Sunday. That shares only its name with the stored `sql` week, so
+/// filtering the stored Sunday starts by it would read the wrong days.
+#[tokio::test(flavor = "multi_thread")]
+async fn default_week_from_a_range_is_not_served_by_a_sql_week() {
+    let query = indoc! {r#"
+        measures:
+          - demand.net_demand_a
+        time_dimensions:
+          - dimension: plain_dates.plain_date
+            dateRange:
+              - "2025-02-03"
+              - "2025-02-09"
+    "#};
+    if let Some((rollup, source)) = fallback_vs_source(query, &["demand_by_plain_week"]).await {
         assert_eq!(rollup, source);
     }
 }

@@ -274,10 +274,13 @@ impl<'a> DimensionMatcher<'a> {
             {
                 return Ok(MatchState::NotMatched);
             }
-            // First, look for exact granularity match
-            let exact_match = entries
-                .iter_mut()
-                .find(|(td, _)| granularity.is_none() || td.granularity() == &granularity);
+            // First, look for exact granularity match. A stored `sql` grain is
+            // only ever itself: a default grain sharing its name is not it.
+            let exact_match = entries.iter_mut().find(|(td, _)| {
+                granularity.is_none()
+                    || (td.granularity() == &granularity
+                        && is_sql_granularity(td) == is_sql_defined_granularity)
+            });
             if let Some((_, matched)) = exact_match {
                 if add_to_matched_dimension {
                     *matched = true;
@@ -293,7 +296,7 @@ impl<'a> DimensionMatcher<'a> {
             let mut best_match = MatchState::NotMatched;
             for (pre_agg_td, matched) in entries.iter_mut() {
                 let pre_aggr_granularity = pre_agg_td.granularity();
-                if pre_aggr_granularity.is_none() {
+                if pre_aggr_granularity.is_none() || is_sql_granularity(pre_agg_td) {
                     continue;
                 }
                 let min_granularity = GranularityHelper::min_granularity_for_time_dimensions(
