@@ -111,7 +111,7 @@ export class MSSqlDbRunner extends BaseDbRunner {
       .withHealthCheck({
         test: [
           'CMD-SHELL',
-          `/opt/mssql-tools18/bin/sqlcmd -C -l 1 -S localhost -U sa -P ${this.password()} -Q "SELECT 1" || exit 1`
+          '/opt/mssql-tools18/bin/sqlcmd -C -l 1 -S localhost -U sa -P "$MSSQL_SA_PASSWORD" -Q "SELECT 1" || exit 1'
         ],
         interval: 1000,
         timeout: 1100,
