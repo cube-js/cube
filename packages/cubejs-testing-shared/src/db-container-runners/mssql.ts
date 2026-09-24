@@ -3,7 +3,7 @@ import { GenericContainer, Wait } from 'testcontainers';
 import { DbRunnerAbstract, DBRunnerContainerOptions } from './db-runner.abstract';
 import { startContainerWithRetry } from './start-with-retry';
 
-export const MSSQL_READY_COMMAND = 'PATH=/opt/mssql-tools18/bin:/opt/mssql-tools/bin:$PATH sqlcmd -C -S localhost -U sa -P "$MSSQL_SA_PASSWORD" -Q "SELECT 1" -b -o /dev/null';
+export const MSSQL_READY_COMMAND = '/opt/mssql-tools18/bin/sqlcmd -C -S localhost -U sa -P "$MSSQL_SA_PASSWORD" -Q "SELECT 1" -b -o /dev/null';
 
 export class MssqlDbRunner extends DbRunnerAbstract {
   public static startContainer(options: DBRunnerContainerOptions) {
