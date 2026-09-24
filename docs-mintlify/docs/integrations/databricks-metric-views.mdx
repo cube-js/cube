@@ -129,7 +129,8 @@ and sync can resolve different builds.
 This Bash step requires `curl` and `jq`. Set `CUBE_API_URL` to your tenant host without a trailing
 slash, `DEPLOYMENT_ID` to the deployment that just succeeded, and `CUBE_API_TOKEN` to the CI secret.
 Set `EXPECTED_BUILD_JOB_ID` if the deployment step returns one. The example uses the `default`
-data source; URL-encode a different name in the path.
+data source; URL-encode a different name in the path. Set `MAX_POLLS` to scale the wait for your
+view count and warehouse start-up time (default: 180 polls, 10 seconds apart).
 
 ```bash
 set -euo pipefail
@@ -155,8 +156,10 @@ if [[ -n "${EXPECTED_BUILD_JOB_ID:-}" ]]; then
   fi
 fi
 
+max_polls=${MAX_POLLS:-180}
+[[ "$max_polls" =~ ^[1-9][0-9]*$ ]] || { echo 'MAX_POLLS must be a positive integer.' >&2; exit 1; }
 run=''
-for _ in {1..60}; do
+for ((attempt=0; attempt<max_polls; attempt++)); do
   response=$(curl --silent --show-error --write-out '\n%{http_code}' \
     -H "$auth_header" "$CUBE_API_URL$status_url") || response=$'\n000'
   http_code=${response##*$'\n'}
@@ -175,12 +178,12 @@ for _ in {1..60}; do
 done
 
 if [[ -z "$run" ]]; then
-  echo "No run status received after 10 minutes: $CUBE_API_URL$status_url" >&2
+  echo "No run status received after $((max_polls * 10)) seconds: $CUBE_API_URL$status_url" >&2
   exit 1
 fi
 case "$(jq -r '.status' <<<"$run")" in
   QUEUED|RUNNING|CANCELLING)
-    echo "No terminal run status observed after 10 minutes: $CUBE_API_URL$status_url" >&2
+    echo "No terminal run status observed after $((max_polls * 10)) seconds: $CUBE_API_URL$status_url" >&2
     exit 1 ;;
 esac
 
