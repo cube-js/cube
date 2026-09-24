@@ -154,7 +154,7 @@ fn plans_a_chain_at_the_default_limit() {
     assert_eq!(sql.matches(" AS (").count(), stages + 1);
 }
 
-/// Past the budget the guard refuses before planning, so this costs no stack at all.
+/// Past the budget the guard refuses before planning starts, naming the depth, member and knob.
 #[test]
 fn chain_past_the_default_limit_names_depth() {
     let stages = DEFAULT_LIMIT + 1;

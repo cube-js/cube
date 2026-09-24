@@ -85,10 +85,17 @@ fn main() {
     // The parser and plan-depth budgets are stack budgets, so this stack has to hold them;
     // tokio's 2 MiB default does not. A value too small to do that would overflow on the first
     // query of any depth, which is the unreportable abort the budgets exist to avoid.
-    tokio_builder.thread_stack_size(
-        env_parse_positive_lenient("CUBESTORE_MAIN_STACK_SIZE", 8 * 1024 * 1024)
-            .max(2 * 1024 * 1024),
-    );
+    const MIN_MAIN_STACK_SIZE: usize = 2 * 1024 * 1024;
+    let main_stack_size = env_parse_positive_lenient("CUBESTORE_MAIN_STACK_SIZE", 8 * 1024 * 1024);
+    if main_stack_size < MIN_MAIN_STACK_SIZE {
+        log::warn!(
+            "Raising CUBESTORE_MAIN_STACK_SIZE from {} to {}: anything smaller cannot hold the \
+             parser and plan depth budgets",
+            main_stack_size,
+            MIN_MAIN_STACK_SIZE
+        );
+    }
+    tokio_builder.thread_stack_size(main_stack_size.max(MIN_MAIN_STACK_SIZE));
     let runtime = tokio_builder.build().unwrap();
     runtime.block_on(async move {
         init_agent_sender().await;
