@@ -2248,13 +2248,9 @@ export function testQueries(type: string, { includeIncrementalSchemaSuite, exten
       expect(response.rawData()).toMatchSnapshot();
     });
 
-    // A calendar shift is a mapping held in the calendar's table, applied by
-    // joining the facts on the mapped column. A rollup storing the shifted
-    // measures themselves runs that join at build time, so the rollup store
-    // answers with no join left to apply. Grouped by a retail week on purpose:
-    // the week is a calendar column, not arithmetic on the date. The prior
-    // month carries the comparison: retail months are 4 or 5 weeks long, and
-    // unlike the sparse prior year it has rows in almost every week.
+    // Grouped by a retail week: a calendar column, not arithmetic on the date.
+    // The prior month carries the comparison: retail months are 4 or 5 weeks
+    // long, and unlike the sparse prior year it has rows in almost every week.
     const priorPeriodsByWeek = (variant: '' | 'NoPreAgg') => ({
       measures: [
         'BigECommerce.count',
