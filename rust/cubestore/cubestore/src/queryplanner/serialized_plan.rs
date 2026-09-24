@@ -1627,9 +1627,8 @@ mod tests {
         );
     }
 
-    /// Decoding is only the first thing a worker does with a plan: physical planning and
-    /// execution recurse per node on the same stack, and before this branch nothing ever handed
-    /// them a plan this deep. A plan at the budget has to survive all of it.
+    /// Physical planning and execution recurse per node on the same stack as decoding, so a plan
+    /// at the budget has to survive all of it, not just the decode.
     #[test]
     fn a_plan_at_the_depth_limit_executes_on_a_worker_stack() {
         let plan = chained_stage_plan(74);
