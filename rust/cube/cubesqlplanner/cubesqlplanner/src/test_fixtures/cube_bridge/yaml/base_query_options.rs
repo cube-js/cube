@@ -35,6 +35,7 @@ pub struct YamlBaseQueryOptions {
     pub total_query: Option<bool>,
     #[serde(default)]
     pub cubestore_support_multistage: Option<bool>,
+    pub max_multi_stage_depth: Option<usize>,
     #[serde(default)]
     pub disable_external_pre_aggregations: Option<bool>,
     #[serde(default)]

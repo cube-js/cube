@@ -1952,6 +1952,13 @@ const variables: Record<string, (...args: any) => any> = {
   cubeStoreRollingWindowJoin: () => get('CUBEJS_CUBESTORE_ROLLING_WINDOW_JOIN')
     .default('true')
     .asBoolStrict(),
+  /**
+   * Multi-stage members a single dependency path may carry. Each one is planned as its own
+   * stage, by a descent that costs stack, so a long enough chain overflows it and takes the
+   * process down with no error to report. Unset leaves the planner's own default.
+   */
+  maxMultiStageDepth: () => get('CUBEJS_MAX_MULTI_STAGE_DEPTH')
+    .asIntPositive(),
   allowUngroupedWithoutPrimaryKey: () => get('CUBEJS_ALLOW_UNGROUPED_WITHOUT_PRIMARY_KEY')
     .default(get('CUBESQL_SQL_PUSH_DOWN').default('true').asString())
     .asBoolStrict(),
