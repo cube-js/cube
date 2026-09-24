@@ -233,18 +233,19 @@ different anchors in the same spreadsheet, and in more than one document at
 once (a Google Sheets spreadsheet and an Excel workbook simultaneously).
 Hovering a row in this list shows every placement it has in the **current**
 document under **Location** / **Locations**. Click **Refresh** to update all
-of that exploration's placements in the current document at once; click its
-title to open it and change the query, which applies to every placement.
+of that exploration's placements in the current document at once — a
+placement whose result is identical to what's already there is left
+untouched instead of being rewritten; click its title to open it and change
+the query, which applies to every placement.
 
 **Refresh all**, at the top of the spreadsheet home, refreshes every
 placement in the document as a tracked run: a footer at the bottom of the
 pane tracks overall progress (**N of M refreshed**) with a **Stop** button,
-while each row shows **Queued**, **Refreshing…**, **No changes** if the
-result is identical to what's already there (the cells are left untouched),
-or **Not refreshed** with a reason if it failed. The run keeps going if you
-navigate away and back; refreshes are written one sheet at a time, so a
-spreadsheet with many sheets refreshes noticeably slower than a single
-placement.
+while each row shows **Queued**, **Refreshing…**, **No changes** for a
+placement left untouched as above, or **Not refreshed** with a reason if it
+failed. The run keeps going if you navigate away and back; refreshes are
+written one sheet at a time, so a spreadsheet with many sheets refreshes
+noticeably slower than a single placement.
 
 If you've edited a placement's cells by hand since it last refreshed, a
 banner names the affected rows and warns that the next **Refresh** will
