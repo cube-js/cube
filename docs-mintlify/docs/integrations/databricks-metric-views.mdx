@@ -155,17 +155,32 @@ if [[ -n "${EXPECTED_BUILD_JOB_ID:-}" ]]; then
   fi
 fi
 
+run=''
 for _ in {1..60}; do
-  run=$(curl --fail --silent --show-error -H "$auth_header" "$CUBE_API_URL$status_url")
+  response=$(curl --silent --show-error --write-out '\n%{http_code}' \
+    -H "$auth_header" "$CUBE_API_URL$status_url") || response=$'\n000'
+  http_code=${response##*$'\n'}
+  case "$http_code" in
+    200) run=${response%$'\n'*} ;;
+    000|429|5??)
+      echo "Status poll returned HTTP $http_code; retrying $CUBE_API_URL$status_url" >&2
+      sleep 10
+      continue ;;
+    *) echo "Status poll returned HTTP $http_code: $CUBE_API_URL$status_url" >&2; exit 1 ;;
+  esac
   case "$(jq -r '.status' <<<"$run")" in
     QUEUED|RUNNING|CANCELLING) sleep 10 ;;
     *) break ;;
   esac
 done
 
+if [[ -z "$run" ]]; then
+  echo "No run status received after 10 minutes: $CUBE_API_URL$status_url" >&2
+  exit 1
+fi
 case "$(jq -r '.status' <<<"$run")" in
   QUEUED|RUNNING|CANCELLING)
-    echo "Run is still active after 10 minutes: $CUBE_API_URL$status_url" >&2
+    echo "No terminal run status observed after 10 minutes: $CUBE_API_URL$status_url" >&2
     exit 1 ;;
 esac
 
