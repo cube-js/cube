@@ -1422,12 +1422,12 @@ fn binary_expr_normalize(
             return Ok(Box::new(Expr::BinaryExpr {
                 left,
                 op,
-                right: evaluate_expr(optimizer, right.cast_to(&left_type, schema)?)?,
+                right: cast_date_to_timestamp(optimizer, right, &left_type, schema),
             }));
         }
         (DataType::Date32, DataType::Timestamp(_, _)) => {
             return Ok(Box::new(Expr::BinaryExpr {
-                left: evaluate_expr(optimizer, left.cast_to(&right_type, schema)?)?,
+                left: cast_date_to_timestamp(optimizer, left, &right_type, schema),
                 op,
                 right,
             }));
@@ -1477,9 +1477,76 @@ fn normalize_temporal_operand(
         }));
     }
     if matches!(expr_type, DataType::Date32) {
-        return evaluate_expr(optimizer, expr.cast_to(target_type, schema)?);
+        return Ok(
+            fold_date_to_timestamp(optimizer, &expr, target_type, schema)
+                .or_else(|| fold_date_to_millis(optimizer, &expr, target_type, schema))
+                .map_or(expr, Box::new),
+        );
     }
     Ok(expr)
+}
+
+/// Casts a `DATE` operand of `TIMESTAMP` arithmetic and folds it to a constant. When it can't
+/// be folded the explicit cast is kept, since mixed `TIMESTAMP`/`DATE` arithmetic has no type;
+/// it then renders as a cast in the pushed down SQL.
+fn cast_date_to_timestamp(
+    optimizer: &PlanNormalize,
+    expr: Box<Expr>,
+    target_type: &DataType,
+    schema: &DFSchema,
+) -> Box<Expr> {
+    Box::new(
+        fold_date_to_timestamp(optimizer, &expr, target_type, schema).unwrap_or_else(|| {
+            Expr::Cast {
+                expr,
+                data_type: target_type.clone(),
+            }
+        }),
+    )
+}
+
+/// Casts a `DATE` operand to the given `TIMESTAMP` type and folds it to a constant, or returns
+/// `None` when it can't be folded. Never errors, since `PlanNormalize` runs as
+/// `optimize(..).unwrap_or(plan)` and an error would drop every other normalization.
+fn fold_date_to_timestamp(
+    optimizer: &PlanNormalize,
+    expr: &Expr,
+    target_type: &DataType,
+    schema: &DFSchema,
+) -> Option<Expr> {
+    let casted = expr.clone().cast_to(target_type, schema).ok()?;
+    match evaluate_expr_stacked(optimizer, casted) {
+        Ok(folded) => Some(folded),
+        Err(err) => {
+            log::trace!(
+                "Can't fold DATE operand {} to {}: {}",
+                expr,
+                target_type,
+                err
+            );
+            None
+        }
+    }
+}
+
+/// Folds a `DATE` operand to a millisecond timestamp when the target is a nanosecond one, which
+/// can't hold dates past 2262-04-11 such as `9999-12-31`. Staying a `TIMESTAMP` keeps the bound a
+/// member filter and renders it as a timestamp literal, which strict dialects require.
+fn fold_date_to_millis(
+    optimizer: &PlanNormalize,
+    expr: &Expr,
+    target_type: &DataType,
+    schema: &DFSchema,
+) -> Option<Expr> {
+    let DataType::Timestamp(TimeUnit::Nanosecond, tz) = target_type else {
+        return None;
+    };
+    fold_date_to_timestamp(
+        optimizer,
+        expr,
+        &DataType::Timestamp(TimeUnit::Millisecond, tz.clone()),
+        schema,
+    )
 }
 
 /// Checks if the expression is `DATE +/- INTERVAL` arithmetic, possibly offset by more
@@ -1513,6 +1580,8 @@ fn is_date_interval_arithmetic(expr: &Expr, schema: &DFSchema) -> Result<bool> {
 /// Casts a string literal expression to the given type, evaluating it to a constant.
 /// Timestamp targets are parsed with Cube's date parser, which accepts date-only
 /// strings (e.g. `'2026-06-01'`) that the Arrow cast kernel rejects.
+/// A string beyond the nanosecond timestamp range (`'9999-12-31'`) becomes a millisecond
+/// timestamp, as a `DATE` bound does, see `fold_date_to_millis`.
 /// Returns `None` when the literal can't be casted.
 fn cast_string_literal_expr(
     optimizer: &PlanNormalize,
@@ -1532,9 +1601,12 @@ fn cast_string_literal_expr(
             TimeUnit::Microsecond => {
                 ScalarValue::TimestampMicrosecond(Some(parsed.timestamp_micros()), tz.clone())
             }
-            TimeUnit::Nanosecond => {
-                ScalarValue::TimestampNanosecond(Some(parsed.timestamp_nanos_opt()?), tz.clone())
-            }
+            TimeUnit::Nanosecond => match parsed.timestamp_nanos_opt() {
+                Some(nanos) => ScalarValue::TimestampNanosecond(Some(nanos), tz.clone()),
+                None => {
+                    ScalarValue::TimestampMillisecond(Some(parsed.timestamp_millis()), tz.clone())
+                }
+            },
         };
         return Some(Box::new(Expr::Literal(scalar)));
     }
@@ -1626,7 +1698,13 @@ fn in_list_expr_normalize(
                 return Ok(list_expr_normalized);
             }
 
-            evaluate_expr_stacked(optimizer, list_expr_normalized.cast_to(&expr_type, schema)?)
+            Ok(
+                fold_date_to_timestamp(optimizer, &list_expr_normalized, &expr_type, schema)
+                    .or_else(|| {
+                        fold_date_to_millis(optimizer, &list_expr_normalized, &expr_type, schema)
+                    })
+                    .unwrap_or(list_expr_normalized),
+            )
         })
         .collect::<Result<Vec<_>>>()?;
 
@@ -1687,7 +1765,24 @@ fn between_expr_normalize(
             expr: Box::new(bound),
             data_type: expr_type.clone(),
         };
-        Ok(Box::new(evaluate_expr_stacked(optimizer, casted)?))
+        Ok(Box::new(
+            match evaluate_expr_stacked(optimizer, casted.clone()) {
+                Ok(folded) => folded,
+                // A computed bound keeps its explicit cast for strict dialects; a plain bound
+                // falls back to a millisecond timestamp, see `fold_date_to_millis`.
+                Err(err) if bound_is_computed => {
+                    log::trace!("Keeping BETWEEN bound {} unfolded: {}", casted, err);
+                    casted
+                }
+                Err(err) => {
+                    let Expr::Cast { expr: bound, .. } = casted else {
+                        unreachable!("BETWEEN bound cast is always Expr::Cast");
+                    };
+                    log::trace!("Can't fold BETWEEN bound {}: {}", bound, err);
+                    fold_date_to_millis(optimizer, &bound, &expr_type, schema).unwrap_or(*bound)
+                }
+            },
+        ))
     };
 
     let low = normalize_bound(low)?;

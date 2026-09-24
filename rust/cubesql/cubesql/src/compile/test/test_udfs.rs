@@ -1458,3 +1458,93 @@ async fn test_string_agg_group_by() -> Result<(), CubeError> {
 
     Ok(())
 }
+
+/// `date_to_timestamp` has a `DATE` and a string overload. A date outside
+/// 1677-09-21..2262-04-11 has no nanosecond timestamp, and both must report that as an error
+/// naming the date instead of panicking or wrapping into a garbage instant.
+#[tokio::test]
+async fn test_date_to_timestamp_out_of_range() -> Result<(), CubeError> {
+    init_testing_logger();
+
+    assert_eq!(
+        execute_query(
+            "SELECT date_to_timestamp(DATE '2262-04-11') AS d, \
+                date_to_timestamp('2262-04-11') AS s"
+                .to_string(),
+            DatabaseProtocol::PostgreSQL
+        )
+        .await?,
+        "+-------------------------+-------------------------+\n\
+        | d                       | s                       |\n\
+        +-------------------------+-------------------------+\n\
+        | 2262-04-11T00:00:00.000 | 2262-04-11T00:00:00.000 |\n\
+        +-------------------------+-------------------------+"
+    );
+
+    for date in ["9999-12-31", "1600-01-01"] {
+        for arg in [format!("DATE '{}'", date), format!("'{}'", date)] {
+            let err = execute_query(
+                format!("SELECT date_to_timestamp({}) AS t", arg),
+                DatabaseProtocol::PostgreSQL,
+            )
+            .await
+            .expect_err("an out-of-range date must fail");
+            assert!(
+                err.to_string()
+                    .contains(&format!("Date {} is out of range for a timestamp", date)),
+                "date_to_timestamp({}) failed with an unexpected error: {}",
+                arg,
+                err
+            );
+        }
+    }
+
+    Ok(())
+}
+
+/// Date arithmetic and parsing whose result has no nanosecond timestamp report an error, and a
+/// timestamp series stops at the end of the range instead of stepping past it.
+#[tokio::test]
+async fn test_timestamp_udfs_beyond_nanosecond_range() -> Result<(), CubeError> {
+    init_testing_logger();
+
+    for (sql, expected) in [
+        (
+            "SELECT DATE_ADD(CAST('2262-04-01 00:00:00' AS TIMESTAMP), INTERVAL '1 month') AS d",
+            "Date 2262-05-01 00:00:00 is out of range for a timestamp",
+        ),
+        (
+            "SELECT str_to_date('9999-12-31', '%Y-%m-%d') AS d",
+            "Date 9999-12-31 00:00:00 is out of range for a timestamp",
+        ),
+    ] {
+        let err = execute_query(sql.to_string(), DatabaseProtocol::PostgreSQL)
+            .await
+            .expect_err("an out-of-range result must fail");
+        assert!(
+            err.to_string().contains(expected),
+            "{} failed with an unexpected error: {}",
+            sql,
+            err
+        );
+    }
+
+    assert_eq!(
+        execute_query(
+            "SELECT generate_series('2262-04-09 00:00:00'::timestamp, \
+                '2262-04-11 23:00:00'::timestamp, '1 day'::interval) AS t"
+                .to_string(),
+            DatabaseProtocol::PostgreSQL
+        )
+        .await?,
+        "+-------------------------+\n\
+        | t                       |\n\
+        +-------------------------+\n\
+        | 2262-04-09T00:00:00.000 |\n\
+        | 2262-04-10T00:00:00.000 |\n\
+        | 2262-04-11T00:00:00.000 |\n\
+        +-------------------------+"
+    );
+
+    Ok(())
+}
