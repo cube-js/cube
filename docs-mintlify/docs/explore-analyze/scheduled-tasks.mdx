@@ -60,9 +60,10 @@ five-field expression whose minute field is a single number: `0 * * * *`
 
 Each user can have up to **20 active tasks** across all of the account's
 deployments, where active means scheduled and enabled. Manual and paused
-tasks don't count toward this limit. At the limit, creating a scheduled task
-or resuming a paused one fails until you pause or delete another task, or
-save the new one as **Manual**.
+tasks don't count toward this limit. At the limit, anything that would make
+a task active fails: creating a scheduled task, resuming a paused one, or
+adding a schedule to a **Manual** task. Pause or delete another task first,
+or keep the new one **Manual**.
 
 ## Managing tasks
 
@@ -78,7 +79,7 @@ another user's task changes what runs under that user's access, and can open
 the resulting thread. A run's chat thread belongs to the task's creator, and
 only the creator, admins, users with the **Access chat history**
 [permission](/admin/users-and-permissions/custom-roles), and people it's shared
-with can open it. Without role enforcement, that means any user can do both.
+with can open it.
 
 From the list, you can:
 
@@ -217,8 +218,10 @@ The API applies the same [limits](#limits) and permissions as the
 
 - A cron expression that isn't a valid five-field cron, one that fires more
   than once an hour, or an unknown time zone returns `400`.
-- Creating or resuming a task past the 20-active-task limit returns `409`.
-  Pause or delete a task before retrying.
+- A request that would make a task active past the 20-active-task limit
+  returns `409`: a create with a `cronExpression`, a `PUT` that resumes a
+  paused task, or a `PUT` that adds a `cronExpression` to a Manual one. Pause
+  or delete a task before retrying.
 - Changing, running, or deleting another user's task returns `403` unless
   you have the **Admin** role.
 - Every endpoint returns `403` while Scheduled Tasks aren't enabled for your
