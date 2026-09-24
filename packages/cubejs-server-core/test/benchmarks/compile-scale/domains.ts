@@ -169,6 +169,7 @@ export const DOMAINS: DomainSpec[] = [
 // Every join the generator writes needs a target inside the same domain
 for (const domain of DOMAINS) {
   const names = new Set(domain.entities.map((e) => e.name));
+
   for (const entity of domain.entities) {
     const dangling = entity.refs.filter((r) => !names.has(r));
     if (dangling.length) {

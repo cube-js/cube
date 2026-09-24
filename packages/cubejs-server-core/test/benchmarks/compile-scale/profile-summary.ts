@@ -1,6 +1,6 @@
 /**
- * Ranks functions by self time across the .cpuprofile files of one run (the main thread and,
- * with the Babel transpiler, its worker threads).
+ * Ranks functions by self time across the .cpuprofile files of one run (the main thread and any
+ * worker threads).
  *
  *   node dist/test/benchmarks/compile-scale/profile-summary.js <dir-or-file> [top]
  */
@@ -44,6 +44,7 @@ export function summarizeProfiles(target: string, top = 30): string {
     : [target];
 
   const lines: string[] = [];
+
   for (const file of files) {
     const profile: Profile = JSON.parse(fs.readFileSync(file, 'utf8'));
     const totalMs = (profile.endTime - profile.startTime) / 1000;
@@ -52,6 +53,7 @@ export function summarizeProfiles(target: string, top = 30): string {
     // Worker threads spend most of a run idle; list only the busy ones
     if (totalMs - idle >= 200) {
       lines.push(`\n${path.basename(file)}: ${(totalMs / 1000).toFixed(1)}s wall, ${((totalMs - idle) / 1000).toFixed(1)}s busy`);
+
       for (const [k, v] of self.filter(([key]) => !key.startsWith('(idle)')).slice(0, top)) {
         lines.push(`  ${(v / 1000).toFixed(2).padStart(7)}s ${((v / totalMs) * 100).toFixed(1).padStart(5)}%  ${k}`);
       }
