@@ -186,12 +186,15 @@ CI policy. `viewNames` lists planned views; `retained_obsolete` means an obsolet
 in place. Publication-run `views[].outcome` values are `unchanged`, `created`, `updated`, `blocked`,
 `validation_failed`, `publish_failed`, `retained_obsolete`, and `deleted_obsolete`; these differ
 from preview outcomes. The recipe accepts only the successful, retain-safe outcomes.
+`incompleteViewCount` counts published views whose `withheldMembers` list is nonempty; requiring
+zero rejects definitions missing measures.
 
 Failed checks do not roll back writes. Inspect `views[]` for errors or `withheldMembers`. List
 older runs with
 `GET /api/v1/deployments/{deploymentId}/databricks-metric-view-integrations/{dataSourceName}/syncs`
 and request cancellation of an active run with `DELETE {statusUrl}`. Cancellation stops further
-writes but does not undo completed ones.
+writes but does not undo completed ones. `curl --fail` exits with code 22 and omits the response
+body on HTTP errors; on `409`, inspect run history before retrying.
 
 ## What can be published
 
