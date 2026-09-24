@@ -99,9 +99,11 @@ The public REST API documents [reading settings](/api-reference/databricks-metri
 [checking preview status](/api-reference/databricks-metric-view-publication/get-databricks-metric-view-preview-status),
 [getting the completed preview result](/api-reference/databricks-metric-view-publication/get-a-completed-databricks-metric-view-preview-result),
 and [cancelling a preview](/api-reference/databricks-metric-view-publication/cancel-a-databricks-metric-view-preview).
-Publication-run endpoints are also available in the public REST API during preview; their
-reference pages are not yet published. The CI recipe below documents the calls needed to start
-and inspect a run. Contact [Cube support](/admin/account-billing/support) for help with access.
+The same API supports [starting a publication run](/api-reference/databricks-metric-view-integration/start-a-databricks-metric-view-publication-run),
+[inspecting a run](/api-reference/databricks-metric-view-integration/get-a-databricks-metric-view-publication-run),
+[listing runs](/api-reference/databricks-metric-view-integration/list-databricks-metric-view-publication-runs),
+and [cancelling a run](/api-reference/databricks-metric-view-integration/cancel-a-databricks-metric-view-publication-run).
+Contact [Cube support](/admin/account-billing/support) for help with access.
 
 When saving settings through the API, set `deletionPolicy` to `retain`; omitting it also defaults
 to `retain`. The older `delete-managed` value is deprecated but remains accepted for existing API
@@ -158,8 +160,8 @@ fi
 
 max_polls=${MAX_POLLS:-180}
 [[ "$max_polls" =~ ^[1-9][0-9]*$ ]] || { echo 'MAX_POLLS must be a positive integer.' >&2; exit 1; }
-run=''
 for ((attempt=0; attempt<max_polls; attempt++)); do
+  run=''
   response=$(curl --silent --show-error --write-out '\n%{http_code}' \
     -H "$auth_header" "$CUBE_API_URL$status_url") || response=$'\n000'
   http_code=${response##*$'\n'}
@@ -178,7 +180,7 @@ for ((attempt=0; attempt<max_polls; attempt++)); do
 done
 
 if [[ -z "$run" ]]; then
-  echo "No run status received after $((max_polls * 10)) seconds: $CUBE_API_URL$status_url" >&2
+  echo "Last status poll returned HTTP $http_code after $((max_polls * 10)) seconds: $CUBE_API_URL$status_url" >&2
   exit 1
 fi
 case "$(jq -r '.status' <<<"$run")" in
