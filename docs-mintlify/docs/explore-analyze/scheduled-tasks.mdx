@@ -177,62 +177,8 @@ The agent follows the same [limits](#limits) and permissions as the
 
 ## Managing tasks with the Platform API
 
-You can manage Scheduled Tasks from scripts and CI with the
-[Cube Platform API](/api-reference/introduction). Authenticate as described in
-[Authentication](/api-reference/authentication); every request acts as the
-user who owns the credential, who needs access to the deployment. Only admins
-hold API keys unless the account allows
-[all users to create them](/admin/account-billing/api-keys#personal-api-keys).
-Embedded analytics sessions can't use these endpoints.
-
-| Method | Path | What it does |
-| --- | --- | --- |
-| `GET` | `/api/v1/deployments/{deploymentId}/scheduled-tasks` | Lists the deployment's tasks, with each task's creator (`userId`) and next run time (`nextRunAt`) |
-| `POST` | `/api/v1/deployments/{deploymentId}/scheduled-tasks` | Creates a task; the caller becomes its creator |
-| `GET` | `/api/v1/deployments/{deploymentId}/scheduled-tasks/{taskId}` | Returns one task |
-| `PUT` | `/api/v1/deployments/{deploymentId}/scheduled-tasks/{taskId}` | Changes only the fields you send; `isEnabled` pauses or resumes, and `cronExpression: null` makes the task Manual |
-| `DELETE` | `/api/v1/deployments/{deploymentId}/scheduled-tasks/{taskId}` | Deletes the task and its schedule |
-| `POST` | `/api/v1/deployments/{deploymentId}/scheduled-tasks/{taskId}/run` | Starts a run now and returns its `chatThreadUuid` |
-| `GET` | `/api/v1/deployments/{deploymentId}/scheduled-tasks/{taskId}/runs` | Lists the task's latest 50 runs, newest first, like the detail page. Anyone who can read the task gets every run's `chatThreadUuid`; opening a thread is a separate check (see [Managing tasks](#managing-tasks)) |
-
-Both list endpoints return every item when you omit `first`. To page, pass
-`first` for the page size and `after` with the previous response's
-`pageInfo.endCursor`; `runs` pages only within the latest 50 runs.
-
-For example, to create a task that runs at 9:00 New York time on weekdays:
-
-```bash
-curl --request POST \
-  --url 'https://<tenant>.cubecloud.dev/api/v1/deployments/<deploymentId>/scheduled-tasks' \
-  --header 'Authorization: Bearer <YOUR_TOKEN>' \
-  --header 'Content-Type: application/json' \
-  --data '{
-    "name": "Weekday signups",
-    "prompt": "Summarize the previous day of signups, flag anything anomalous, and email me the results.",
-    "cronExpression": "0 9 * * 1-5",
-    "timezone": "America/New_York"
-  }'
-```
-
-In the API, `prompt` is the task's **Instructions**, and `cronExpression`
-and `timezone` make up its **Schedule**. A new task is enabled unless you
-send `"isEnabled": false`, so a task created with a `cronExpression` is
-active and counts toward the limit.
-
-The API applies the same [limits](#limits) and permissions as the
-**Scheduled** page:
-
-- A cron expression that isn't a valid five-field cron, one that fires more
-  than once an hour, or an unknown time zone returns `400`.
-- A request that would make a task active past the 20-active-task limit
-  returns `409`: a create with a `cronExpression`, a `PUT` that resumes a
-  paused task, or a `PUT` that adds a `cronExpression` to a Manual one. Pause
-  or delete a task before retrying.
-- Changing, running, or deleting another user's task returns `403` unless
-  you have the **Admin** role, or the account doesn't
-  [enforce roles](#managing-tasks).
-- Every endpoint returns `403` while Scheduled Tasks aren't enabled for your
-  account.
-- An API key [scoped to other deployments](/admin/account-billing/api-keys#deployment-scope)
-  returns `403` for this one.
-
+You can also create, update, pause, run, and delete Scheduled Tasks from
+scripts and CI with the [Platform API](/api-reference/introduction). Its
+Scheduled Tasks endpoints follow the same [limits](#limits) and
+[permissions](#managing-tasks) as the **Scheduled** page. See the API
+reference for the endpoints, fields, and responses.
