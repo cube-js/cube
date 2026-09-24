@@ -141,6 +141,10 @@ Use conventional commits with these prefixes:
 
 Include scope in parentheses when applicable, e.g., `fix(tesseract):` or `feat(databricks-jdbc-driver):`.
 
+PRs are squash-merged. When merging one, use the `merge-pr` skill: always pass `--body` (but not
+`--subject`) to `gh pr merge`, otherwise the raw PR description (template checklist included)
+becomes the squash commit body.
+
 ## Common File Patterns
 
 - `*.test.ts/js`: Jest unit tests
