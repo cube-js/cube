@@ -62,6 +62,20 @@ symbol_deps! {
     }
 }
 
+impl CalendarDimensionTimeShift {
+    /// Whether the mapping renders from stored columns: it has to name members
+    /// rather than raw columns, and every one of them has to be stored.
+    pub fn renders_from_stored(&self, is_stored: impl Fn(&str) -> bool) -> bool {
+        self.sql.as_ref().is_some_and(|sql| {
+            let dependencies = sql.get_dependencies();
+            !dependencies.is_empty()
+                && dependencies
+                    .iter()
+                    .all(|dependency| is_stored(&dependency.full_name()))
+        })
+    }
+}
+
 impl DimensionSymbol {
     pub fn new(
         compiled_path: CompiledMemberPath,

@@ -196,7 +196,7 @@ impl PreAggregationOptimizer {
                 &matched_measures,
                 &Self::read_member_names(&query.schema(), &query.filter()),
                 time_shifts,
-            ) {
+            )? {
                 return Ok(None);
             }
             let source =
@@ -586,15 +586,75 @@ impl PreAggregationOptimizer {
             .collect()
     }
 
+    /// Whether the stage's calendar shifts read only columns this
+    /// pre-aggregation stores, i.e. whether it can answer them by itself.
+    fn calendar_shifts_are_stored(
+        pre_aggregation: &CompiledPreAggregation,
+        time_shifts: &TimeShiftState,
+    ) -> Result<bool, CubeError> {
+        // Cheap answer first: resolving the shifts allocates and sorts, and
+        // this runs per candidate pre-aggregation.
+        let has_calendar_dimension = time_shifts.dimensions_shifts.values().any(|shift| {
+            shift
+                .dimension
+                .as_dimension()
+                .ok()
+                .is_some_and(|dimension| dimension.time_shift_pk_full_name().is_some())
+        });
+        if !has_calendar_dimension {
+            return Ok(false);
+        }
+
+        let extracted = time_shifts.extract_time_shifts()?;
+        // A per-stage answer, so it may only excuse an all-calendar stage:
+        // mixed, it would also wave through members an interval shift carries.
+        if extracted.calendar_shifts.is_empty() || !extracted.interval_shifts.is_empty() {
+            return Ok(false);
+        }
+        let stored = pre_aggregation
+            .dimensions
+            .iter()
+            .chain(pre_aggregation.segments.iter())
+            .map(|member| member.full_name())
+            .chain(
+                pre_aggregation
+                    .time_dimensions
+                    .iter()
+                    .map(|member| PreAggregation::stored_time_dimension_column(member).0),
+            )
+            .collect::<HashSet<_>>();
+        // The mapping is applied where the calendar's primary key is rendered,
+        // which for a pre-aggregation is the condition joining two rollups.
+        // Without that join nothing rewrites and the stage reads unshifted.
+        let joins_on = |primary_key: &String| match pre_aggregation.source.as_ref() {
+            PreAggregationSource::Join(join) => join.items.iter().any(|item| {
+                item.from_members
+                    .iter()
+                    .chain(item.to_members.iter())
+                    .any(|member| member.symbol.full_name() == *primary_key)
+            }),
+            _ => false,
+        };
+
+        Ok(extracted
+            .calendar_shifts
+            .iter()
+            .all(|(primary_key, shift)| {
+                joins_on(primary_key) && shift.renders_from_stored(|name| stored.contains(name))
+            }))
+    }
+
     fn can_carry_time_shifts(
         pre_aggregation: &CompiledPreAggregation,
         matched_measures: &HashSet<String>,
         read_members: &HashSet<String>,
         time_shifts: &TimeShiftState,
-    ) -> bool {
+    ) -> Result<bool, CubeError> {
         if time_shifts.is_empty() {
-            return true;
+            return Ok(true);
         }
+        let calendar_shifts_are_stored =
+            Self::calendar_shifts_are_stored(pre_aggregation, time_shifts)?;
         let is_read = |member: &Rc<MemberSymbol>| {
             read_members.contains(
                 &resolve_base_symbol(member)
@@ -611,13 +671,14 @@ impl PreAggregationOptimizer {
             .all(|member| {
                 !time_shifts.has_shift_under(member)
                     || time_shifts.shift_for_substituted_column(member).is_some()
+                    || calendar_shifts_are_stored
             });
-        grouping_members_carry_shift
+        Ok(grouping_members_carry_shift
             && pre_aggregation
                 .measures
                 .iter()
                 .filter(|measure| matched_measures.contains(&measure.full_name()))
-                .all(|measure| !time_shifts.has_shift_under(measure))
+                .all(|measure| !time_shifts.has_shift_under(measure)))
     }
 
     fn extract_date_range(
@@ -632,6 +693,32 @@ impl PreAggregationOptimizer {
             .ok()
             .and_then(|dt| dt.timestamp_precision().ok())
             .unwrap_or(3);
+
+        // The range prunes partitions, and no band derived from the reporting
+        // one describes the rows a calendar mapping asks for. Asked of every
+        // filter, not just the first: any calendar shift declines pruning.
+        let is_calendar_shifted = |item: &FilterItem| {
+            let FilterItem::Item(base_filter) = item else {
+                return false;
+            };
+            time_shifts
+                .get_for_symbol(base_filter.raw_member_evaluator_ref())
+                .is_some_and(|shift| {
+                    shift
+                        .dimension
+                        .as_dimension()
+                        .ok()
+                        .is_some_and(|dimension| dimension.time_shift_pk_full_name().is_some())
+                })
+        };
+        if filter
+            .time_dimensions_filters
+            .iter()
+            .any(is_calendar_shifted)
+        {
+            return None;
+        }
+
         for item in &filter.time_dimensions_filters {
             if let FilterItem::Item(base_filter) = item {
                 if let FilterOp::DateRange(date_range_op) = base_filter.operation() {
@@ -640,7 +727,7 @@ impl PreAggregationOptimizer {
                         // SQL renders `column + interval`, so actual data range is `date - interval`.
                         if let Some(interval) = time_shifts
                             .get_for_symbol(base_filter.raw_member_evaluator_ref())
-                            .and_then(|s| s.interval.as_ref())
+                            .and_then(|shift| shift.interval.as_ref())
                         {
                             let tz = query_tools.timezone();
                             let neg = -interval.clone();

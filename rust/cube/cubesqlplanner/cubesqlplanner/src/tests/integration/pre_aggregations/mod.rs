@@ -1,3 +1,4 @@
+mod calendar;
 mod external_split;
 mod multi_fact;
 mod multi_stage;

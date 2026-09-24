@@ -1,0 +1,10 @@
+---
+source: cubesqlplanner/cubesqlplanner/src/tests/integration/pre_aggregations/calendar.rs
+assertion_line: 454
+expression: result
+---
+retail_calendar__retail_date_day | demand__net_demand_a | demand__net_demand_a_ly
+---------------------------------+----------------------+------------------------
+2026-02-08T00:00:00.000Z         | 8094                 | 4090                   
+2026-02-09T00:00:00.000Z         | 8105                 | 4101                   
+2026-02-10T00:00:00.000Z         | 8116                 | 4112

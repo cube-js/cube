@@ -1,4 +1,5 @@
 use super::SqlNode;
+use crate::physical_plan::sql_nodes::render_references::RenderReferences;
 use crate::physical_plan::SqlEvaluatorVisitor;
 use crate::planner::query_tools::QueryTools;
 use crate::planner::sql_templates::PlanSqlTemplates;
@@ -13,21 +14,35 @@ use std::rc::Rc;
 /// resolved time-shift primary key matches an entry in `shifts`,
 /// renders the shifted reference (interval / named slot / custom
 /// SQL) declared on the calendar cube.
+///
+/// `substituted` names the members rendered as a stored column. The shift is
+/// declared against the calendar cube's own table, so a substituted member can
+/// only be rendered when the columns it reads are stored too.
 pub struct CalendarTimeShiftSqlNode {
     shifts: HashMap<String, CalendarDimensionTimeShift>, // Key is the full pk name of the calendar cube
+    substituted: RenderReferences,
     input: Rc<dyn SqlNode>,
 }
 
 impl CalendarTimeShiftSqlNode {
     pub fn new(
         shifts: HashMap<String, CalendarDimensionTimeShift>,
+        substituted: RenderReferences,
         input: Rc<dyn SqlNode>,
     ) -> Rc<Self> {
-        Rc::new(Self { shifts, input })
+        Rc::new(Self {
+            shifts,
+            substituted,
+            input,
+        })
     }
 
     pub fn input(&self) -> &Rc<dyn SqlNode> {
         &self.input
+    }
+
+    fn renders_from_stored_columns(&self, shift: &CalendarDimensionTimeShift) -> bool {
+        shift.renders_from_stored(|name| self.substituted.contains_key(name))
     }
 }
 
@@ -44,6 +59,13 @@ impl SqlNode for CalendarTimeShiftSqlNode {
             MemberSymbol::Dimension(ev) => {
                 if !ev.is_reference() {
                     if let Some(shift) = self.shifts.get(&ev.full_name()) {
+                        if !self.substituted.is_empty() && !self.renders_from_stored_columns(shift)
+                        {
+                            return Err(CubeError::internal(format!(
+                                "Calendar time shift for {} cannot be rendered: the shift reads columns of the calendar cube, which this query neither stores nor selects from",
+                                ev.full_name()
+                            )));
+                        }
                         if let Some(sql) = &shift.sql {
                             sql.eval(
                                 visitor,

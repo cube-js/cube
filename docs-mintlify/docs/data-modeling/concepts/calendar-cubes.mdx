@@ -452,16 +452,135 @@ expression in the generated SQL.
 <Warning>
 
 **A [pre-aggregation][ref-pre-aggregations] must declare the overridden granularity
-itself.** A rollup that names it is built from the overriding column and serves those
-queries correctly.
+itself**, keep it at that one granularity, and set
+[`allow_non_strict_date_range_match`][ref-non-strict] to answer queries carrying a date
+range. A rollup at a finer granularity is refused: custom periods cannot be assembled
+from predefined ones.
 
-A rollup at a finer granularity is not a correct source. Cube can still match one through
-the granularity hierarchy — a `day` rollup for a `month` query — but the rollup holds
-`DATE_TRUNC` buckets that the overriding column cannot be recovered from, so the query
-either fails or returns Gregorian periods. Custom periods cannot be assembled from
-predefined ones.
+Cube cannot check that a range aligns with the calendar's periods, so with that setting
+on, make sure the ranges you query do.
 
 </Warning>
+
+### Pre-aggregations and time shifts
+
+A query using a [time shift][ref-time-shift] declared on a calendar dimension is served
+from pre-aggregations only when everything the shift reads is materialized. Otherwise it
+falls back to the source database — results stay correct, acceleration is lost.
+
+Give the calendar its own rollup and tie it to the fact rollup with a
+[`rollup_join`][ref-rollup-join]:
+
+```yaml
+cubes:
+  - name: custom_calendar
+    calendar: true
+    dimensions:
+      - name: date_key
+        sql: "{CUBE}.date_val"
+        type: time
+        primary_key: true
+        time_shift:
+          # A member reference, not `{CUBE}.prev_year_date`.
+          - interval: 1 year
+            type: prior
+            sql: "{CUBE.prev_year_date}"
+      - name: prev_year_date
+        sql: "{CUBE}.prev_year_date"
+        type: time
+      - name: retail_date
+        sql: "{CUBE}.date_val"
+        type: time
+        time_shift:
+          - interval: 1 year
+            type: prior
+            sql: "{CUBE.prev_year_date}"
+    measures:
+      - name: count
+        type: count
+    pre_aggregations:
+      - name: calendar_rollup
+        measures: [count]
+        dimensions: [prev_year_date]        # the column the shift maps through
+        time_dimensions:
+          - dimension: date_key
+            granularity: day
+          - dimension: retail_date
+            granularity: day
+        indexes:
+          - name: date_key_idx
+            columns: [date_key]
+          - name: prev_year_date_idx
+            columns: [prev_year_date]
+
+  - name: sales
+    measures:
+      - name: revenue
+        sql: amount
+        type: sum
+    dimensions:
+      - name: date
+        sql: "{CUBE}.date"
+        type: time
+    joins:
+      - name: custom_calendar
+        # Members on both sides, not `{CUBE}.date`.
+        sql: "{CUBE.date} = {custom_calendar.date_key}"
+        relationship: many_to_one
+    pre_aggregations:
+      - name: sales_rollup
+        measures: [revenue]
+        time_dimension: date
+        granularity: day
+        indexes:
+          - name: date_idx
+            columns: [date]
+      - name: sales_by_calendar
+        type: rollup_join
+        measures: [revenue]
+        # The mapped column has to be declared here, not only on the rollup
+        # below: this is the member list that decides whether the shift can be
+        # served. `rollup_join` takes a single `time_dimension`.
+        dimensions: [custom_calendar.prev_year_date]
+        time_dimension: custom_calendar.retail_date
+        granularity: day
+        rollups:
+          - sales.sales_rollup
+          - custom_calendar.calendar_rollup
+```
+
+Six things are required, and missing any of them returns you to the fallback:
+
+- the shift is **declared on the dimension the query groups by**, not only on the primary
+  key — otherwise the interval is applied to the key and the mapping is skipped;
+- the shift's `sql` is a **member reference**, so a stored column can stand for it;
+- the column the shift maps through is **declared on the `rollup_join`** and stored by the
+  calendar's rollup — the first is what decides whether the shift can be served;
+- the join condition names **members on both sides**, and on the calendar's side the
+  **primary key** — that is the member a shift replaces;
+- every calendar dimension the query groups by is **declared in both rollups**;
+- each rollup has an [index][ref-rollup-join] covering its side of the join key —
+  Cube Store joins rollups only on an indexed column.
+
+Reporting by a fiscal week or period works the same way: the join key and the reporting
+label are different columns and need not share a grain. Keep the primary key at `day`, so
+the shifted join still matches an exact value, and store the period alongside it:
+
+```yaml
+      - name: calendar_rollup
+        measures: [count]
+        dimensions: [prev_year_date]
+        time_dimensions:
+          - dimension: date_key        # the join key, an exact value
+            granularity: day
+          - dimension: retail_date     # the reporting label
+            granularity: week
+```
+
+The `rollup_join` then declares `time_dimension: custom_calendar.retail_date` with
+`granularity: week`, and — as with any `sql` granularity — needs
+[`allow_non_strict_date_range_match`][ref-non-strict], since Cube cannot check that a
+range falls on those periods.
 
 ### Naming a granularity defined with `sql`
 
@@ -508,4 +627,6 @@ calendar in full.
 [ref-recipe-custom-granularity]: /recipes/data-modeling/custom-granularity
 [ref-recipe-custom-calendar]: /recipes/data-modeling/custom-calendar
 [ref-pre-aggregations]: /docs/pre-aggregations/matching-pre-aggregations
+[ref-non-strict]: /reference/data-modeling/pre-aggregations#allow_non_strict_date_range_match
+[ref-rollup-join]: /reference/data-modeling/pre-aggregations#rollup_join
 [ref-primary-key]: /reference/data-modeling/dimensions#primary_key

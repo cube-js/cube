@@ -763,6 +763,25 @@ impl TestContext {
                         Self::create_pg_pre_agg_table(client, &table_name, &inlined_sql).await;
                     }
                 }
+                // A rollupJoin is ephemeral: it is served by the rollups it
+                // names, each refreshed on its own, so every table has to be
+                // built from ITS OWN definition rather than from the join's
+                // member list.
+                PreAggregationSource::Join(_) => {
+                    for table in Self::collect_pre_agg_source_tables(pre_agg.source()) {
+                        let referenced = self.compile_referenced_pre_aggregation(&table);
+                        let yaml = Self::build_pre_agg_query_yaml_from_members(
+                            &referenced.measures,
+                            &referenced.dimensions,
+                            &referenced.time_dimensions,
+                        );
+                        let inlined_sql = self.build_pre_agg_table_sql(&yaml);
+                        let name = table.alias.clone().unwrap_or_else(|| table.name.clone());
+                        let table_name =
+                            PlanSqlTemplates::alias_name(&format!("{}.{}", table.cube_name, name));
+                        Self::create_pg_pre_agg_table(client, &table_name, &inlined_sql).await;
+                    }
+                }
                 _ => {
                     let tables = Self::collect_pre_agg_source_tables(pre_agg.source());
                     // Dedup usages by (cube, name): the optimizer creates a separate
@@ -839,6 +858,29 @@ impl TestContext {
                     table_name, e, inlined_sql
                 )
             });
+    }
+
+    /// Recompiles a rollup a `rollupJoin` refers to. The logical plan keeps
+    /// only the joined tables, not what each of them stores, so the definition
+    /// is looked up again by the cube and name the table carries.
+    #[cfg(feature = "integration-postgres")]
+    fn compile_referenced_pre_aggregation(
+        &self,
+        table: &PreAggregationTable,
+    ) -> Rc<crate::logical_plan::optimizers::CompiledPreAggregation> {
+        use crate::logical_plan::optimizers::{PreAggregationFullName, PreAggregationsCompiler};
+        let cube_names = self
+            .schema
+            .cube_names()
+            .into_iter()
+            .cloned()
+            .collect::<Vec<_>>();
+        let mut compiler =
+            PreAggregationsCompiler::try_new(self.query_tools.clone(), &cube_names).unwrap();
+        let name = PreAggregationFullName::new(table.cube_name.clone(), table.name.clone());
+        compiler
+            .compile_pre_aggregation(&name)
+            .unwrap_or_else(|e| panic!("Failed to compile referenced rollup {:?}: {}", name, e))
     }
 
     #[cfg(feature = "integration-postgres")]
