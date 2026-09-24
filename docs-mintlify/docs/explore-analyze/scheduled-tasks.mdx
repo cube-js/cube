@@ -133,9 +133,9 @@ icon (hover over it to see the "Scheduled task" tooltip).
 A run shows as **Running** while it executes, then completes or fails. A
 failed run's thread shows a failure notice instead of an empty thread.
 
-Each run starts a new chat thread with no memory of earlier runs, so write
-the **Instructions** as a complete request rather than a follow-up to the
-last run.
+A run's thread carries no memory of earlier runs, so write the
+**Instructions** as a complete request rather than a follow-up to the last
+run.
 
 The task runs headlessly under the security context of the user who created
 it, so it sees exactly the data that user can access.
@@ -193,6 +193,10 @@ analytics sessions can't use these endpoints.
 | `POST` | `/api/v1/deployments/{deploymentId}/scheduled-tasks/{taskId}/run` | Starts a run now and returns its `chatThreadUuid` |
 | `GET` | `/api/v1/deployments/{deploymentId}/scheduled-tasks/{taskId}/runs` | Lists the task's latest 50 runs, newest first, like the detail page. Anyone who can read the task gets every run's `chatThreadUuid`; opening a thread is a separate check (see [Managing tasks](#managing-tasks)) |
 
+Both list endpoints return every item when you omit `first`. To page, pass
+`first` for the page size and `after` with the previous response's
+`pageInfo.endCursor`; `runs` pages only within the latest 50 runs.
+
 For example, to create a task that runs at 9:00 New York time on weekdays:
 
 ```bash
@@ -223,7 +227,8 @@ The API applies the same [limits](#limits) and permissions as the
   paused task, or a `PUT` that adds a `cronExpression` to a Manual one. Pause
   or delete a task before retrying.
 - Changing, running, or deleting another user's task returns `403` unless
-  you have the **Admin** role.
+  you have the **Admin** role, or the account doesn't
+  [enforce roles](#managing-tasks).
 - Every endpoint returns `403` while Scheduled Tasks aren't enabled for your
   account.
 - An API key [scoped to other deployments](/admin/account-billing/api-keys#deployment-scope)
