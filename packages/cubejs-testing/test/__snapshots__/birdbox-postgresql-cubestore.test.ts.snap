@@ -92,7 +92,7 @@ Array [
     "unusualDataTypes.bit_column": "11111111",
     "unusualDataTypes.boolean_column": true,
     "unusualDataTypes.cidr_column": "192.168.0.0/24",
-    "unusualDataTypes.id": 1,
+    "unusualDataTypes.id": "1",
     "unusualDataTypes.inet_column": "192.168.0.1",
     "unusualDataTypes.json": Object {
       "key": "value1",
@@ -120,7 +120,7 @@ Array [
     "unusualDataTypes.bit_column": "00000001",
     "unusualDataTypes.boolean_column": false,
     "unusualDataTypes.cidr_column": "192.168.0.0/24",
-    "unusualDataTypes.id": 2,
+    "unusualDataTypes.id": "2",
     "unusualDataTypes.inet_column": "192.168.0.2",
     "unusualDataTypes.json": Object {
       "key": "value2",
@@ -148,7 +148,7 @@ Array [
     "unusualDataTypes.bit_column": "11110000",
     "unusualDataTypes.boolean_column": true,
     "unusualDataTypes.cidr_column": "192.168.0.0/24",
-    "unusualDataTypes.id": 3,
+    "unusualDataTypes.id": "3",
     "unusualDataTypes.inet_column": "192.168.0.3",
     "unusualDataTypes.json": Object {
       "key": "value3",
