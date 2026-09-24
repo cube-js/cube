@@ -188,6 +188,8 @@
     "querying BigECommerce: rolling window YTD without date range",
     "querying custom granularities ECommerce: count by two_mo_by_feb + no dimension + rollingCountByLeading without date range",
     "querying BigECommerce with Retail Calendar: totalCountRetailYearAgo",
+    "querying BigECommerce with Retail Calendar: prior year and month by week (no pre-aggregation)",
+    "querying BigECommerce with Retail Calendar: prior year and month by week (pre-aggregation in CubeStore)",
     "querying BigECommerce with Retail Calendar: totalCountRetailMonthAgo",
     "querying BigECommerce with Retail Calendar: totalCountRetailWeekAgo",
     "Tesseract: querying BigECommerce with Retail Calendar: totalCountRetailMonthAgo",
@@ -255,6 +257,9 @@
     "SQL API: SQL push down push to cube quoted alias",
     "querying BigECommerce: rolling window YTD (month + week)",
     "querying BigECommerce: rolling window YTD (month + week + no gran)",
-    "querying BigECommerce: two multi-stage branches sharing one pre-aggregation"
+    "querying BigECommerce: two multi-stage branches sharing one pre-aggregation",
+    "---- Calendar-shifted measure stored in a rollup: covered on Postgres only for now ----",
+    "querying BigECommerce with Retail Calendar: prior year and month by week (no pre-aggregation)",
+    "querying BigECommerce with Retail Calendar: prior year and month by week (pre-aggregation in CubeStore)"
   ]
 }

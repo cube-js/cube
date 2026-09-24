@@ -1,0 +1,124 @@
+cubes:
+  - name: retail_calendar
+    calendar: true
+    sql_table: cal_ss_dates
+
+    dimensions:
+      - name: date_val
+        sql: "{CUBE}.date_val"
+        type: time
+        primary_key: true
+        granularities:
+          - name: week
+            sql: "{CUBE}.retail_week_begin"
+          - name: year
+            sql: "{CUBE}.retail_year_begin"
+        time_shift:
+          - interval: 1 year
+            type: prior
+            sql: "{CUBE}.prev_year_date"
+
+      - name: retail_date
+        sql: "{CUBE}.date_val"
+        type: time
+        granularities:
+          - name: week
+            sql: "{CUBE}.retail_week_begin"
+          - name: year
+            sql: "{CUBE}.retail_year_begin"
+        time_shift:
+          - interval: 1 year
+            type: prior
+            sql: "{CUBE}.prev_year_date"
+
+      - name: retail_year
+        sql: "{CUBE}.retail_year"
+        type: string
+
+  - name: sales
+    sql_table: cal_ss_sales
+
+    joins:
+      - name: retail_calendar
+        sql: "{CUBE}.sale_date = {retail_calendar.date_val}"
+        relationship: many_to_one
+
+    dimensions:
+      - name: id
+        sql: id
+        type: number
+        primary_key: true
+
+      - name: store
+        sql: store
+        type: string
+
+    measures:
+      - name: amount
+        type: sum
+        sql: amount
+
+      - name: amount_ly
+        type: number
+        multi_stage: true
+        sql: "{amount}"
+        time_shift:
+          - interval: 1 year
+            type: prior
+
+    pre_aggregations:
+      # Stores the shifted measure itself, so its build runs the shifted join.
+      - name: sales_ly_by_week
+        type: rollup
+        measures:
+          - amount
+          - amount_ly
+        dimensions:
+          - store
+        time_dimension: retail_calendar.retail_date
+        granularity: week
+
+      - name: sales_ly_by_year
+        type: rollup
+        measures:
+          - amount
+          - amount_ly
+        dimensions:
+          - store
+        time_dimension: retail_calendar.retail_date
+        granularity: year
+
+      # Also stores a calendar attribute a query can filter by.
+      - name: sales_ly_by_week_and_year
+        type: rollup
+        measures:
+          - amount
+          - amount_ly
+        dimensions:
+          - store
+          - retail_calendar.retail_year
+        time_dimension: retail_calendar.retail_date
+        granularity: week
+
+      # Retail weeks start on Sunday, so a range can only be served from them
+      # with the model opting into non-strict matching.
+      - name: sales_ly_by_week_non_strict
+        type: rollup
+        allow_non_strict_date_range_match: true
+        measures:
+          - amount
+          - amount_ly
+        dimensions:
+          - store
+        time_dimension: retail_calendar.retail_date
+        granularity: week
+
+      # Only the unshifted measure: the shift cannot be applied on top of it.
+      - name: sales_by_week
+        type: rollup
+        measures:
+          - amount
+        dimensions:
+          - store
+        time_dimension: retail_calendar.retail_date
+        granularity: week
