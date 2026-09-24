@@ -95,7 +95,7 @@ impl WrapperRules {
             ScalarValue::Float32(_) | ScalarValue::Float64(_) => return false,
             _ => return true,
         };
-        let supports_templates = |templates: &crate::transport::SqlTemplates| {
+        let supports_templates = |templates: &SqlTemplates| {
             templates.contains_template("expressions/float_literal")
                 || (templates.contains_sql_type(&data_type)
                     && templates.contains_template("expressions/cast"))
