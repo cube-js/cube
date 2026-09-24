@@ -23,7 +23,7 @@ use datafusion::common::TableReference;
 use datafusion::datasource::physical_plan::ParquetFileReaderFactory;
 use datafusion::datasource::DefaultTableSource;
 use datafusion::error::DataFusionError;
-use datafusion::logical_expr::expr::{Exists, InSubquery};
+use datafusion::logical_expr::expr::{BinaryExpr, Exists, InSubquery};
 use datafusion::logical_expr::Expr;
 use datafusion::logical_expr::{
     Aggregate, Distinct, DistinctOn, EmptyRelation, Extension, Filter, Join, Limit, LogicalPlan,
@@ -1149,8 +1149,6 @@ impl SerializedPlan {
             partition_ids_to_execute: self.partition_ids_to_execute.clone(),
             inline_table_ids_to_execute: self.inline_table_ids_to_execute.clone(),
             trace_obj: self.trace_obj.clone(),
-            // A worker decodes the plan it is sent and never encodes one, so this is only a
-            // conservative floor for a plan that somehow makes the return trip.
             max_query_plan_depth: crate::config::DEFAULT_MAX_QUERY_PLAN_DEPTH,
         })
     }
@@ -1628,11 +1626,17 @@ mod tests {
     /// A nested expression nests the encoding the same way a chain of plan nodes does, on a
     /// plan of two nodes that counting nodes alone reads as trivially shallow. Nothing bounds
     /// the decoding of it any more, so the budget has to.
+    ///
+    /// The operator has to alternate: a run of one operator is linearized into a single node.
     #[test]
     fn depth_counts_nested_expressions() {
         let mut deep = col("column1");
-        for _ in 0..DEFAULT_LIMIT {
-            deep = deep + lit(1i64);
+        for level in 0..DEFAULT_LIMIT {
+            deep = if level % 2 == 0 {
+                deep + lit(1i64)
+            } else {
+                deep * lit(2i64)
+            };
         }
         let plan = LogicalPlanBuilder::values(vec![vec![lit(1i64)]])
             .unwrap()
@@ -1650,6 +1654,30 @@ mod tests {
             "message must name depth as the cause, got: {}",
             err
         );
+    }
+
+    /// A filter over many values renders as one long `OR` run, which the encoding linearizes
+    /// into a single node. Counting each of them would refuse a query that encodes flat.
+    #[test]
+    fn a_long_run_of_one_operator_is_one_level() {
+        let mut chain = col("column1").eq(lit(0i64));
+        for value in 1..(DEFAULT_LIMIT * 4) {
+            chain = chain.or(col("column1").eq(lit(value as i64)));
+        }
+        let plan = LogicalPlanBuilder::values(vec![vec![lit(1i64)]])
+            .unwrap()
+            .filter(chain)
+            .unwrap()
+            .build()
+            .unwrap();
+
+        assert!(
+            depth_of(&plan) <= DEFAULT_LIMIT,
+            "a linearized run must not count as one level apiece, got depth {}",
+            depth_of(&plan)
+        );
+        on_a_decoding_stack(move || pre_serialized(plan).to_serialized_plan())
+            .expect("a query that encodes flat must not be refused");
     }
 
     /// The walk that measures depth recurses once per level of subquery nesting, so it has to
