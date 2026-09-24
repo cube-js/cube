@@ -131,23 +131,28 @@ and sync can resolve different builds.
 This Bash step requires `curl` and `jq`. Set `CUBE_API_URL` to your tenant host without a trailing
 slash, `DEPLOYMENT_ID` to the deployment that just succeeded, and `CUBE_API_TOKEN` to the CI secret.
 Set `EXPECTED_BUILD_JOB_ID` if the deployment step returns one. The example uses the `default`
-data source; URL-encode a different name in the path. Set `MAX_POLLS` to scale the wait for your
-view count and warehouse start-up time (default: 180 polls, 10 seconds apart).
+data source; URL-encode a different name in the path. Generate `SYNC_IDEMPOTENCY_KEY` once as a
+UUID for this deployment and keep it unchanged across CI retries. Set `MAX_POLLS` to scale the wait
+for your view count and warehouse start-up time (default: 180 attempts, 10 seconds apart, plus
+request time).
 
 ```bash
 set -euo pipefail
 
 integration="$CUBE_API_URL/api/v1/deployments/$DEPLOYMENT_ID/databricks-metric-view-integrations/default"
 auth_header="Authorization: Bearer $CUBE_API_TOKEN"
-settings=$(curl --fail --silent --show-error -H "$auth_header" "$integration")
+: "${SYNC_IDEMPOTENCY_KEY:?Set a stable UUID for this deployment}"
+settings=$(curl --fail --silent --show-error --connect-timeout 10 --max-time 30 \
+  -H "$auth_header" "$integration")
 if ! jq -e '.configuration.enabled == true and .configuration.selectionMode == "all" and .configuration.deletionPolicy == "retain"' <<<"$settings" >/dev/null; then
   echo 'Enable publication with All views and retain before running CI.' >&2
   exit 1
 fi
 version=$(jq -r '.configurationVersion' <<<"$settings")
 
-start=$(jq -n --argjson version "$version" '{configurationVersion: $version}' |
-  curl --fail --silent --show-error -X POST -H "$auth_header" \
+start=$(jq -n --argjson version "$version" --arg key "$SYNC_IDEMPOTENCY_KEY" \
+    '{configurationVersion: $version, idempotencyKey: $key}' |
+  curl --fail --silent --show-error --connect-timeout 10 --max-time 30 -X POST -H "$auth_header" \
     -H 'Content-Type: application/json' --data-binary @- "$integration/syncs")
 status_url=$(jq -r '.statusUrl' <<<"$start")
 if [[ -n "${EXPECTED_BUILD_JOB_ID:-}" ]]; then
@@ -162,7 +167,8 @@ max_polls=${MAX_POLLS:-180}
 [[ "$max_polls" =~ ^[1-9][0-9]*$ ]] || { echo 'MAX_POLLS must be a positive integer.' >&2; exit 1; }
 for ((attempt=0; attempt<max_polls; attempt++)); do
   run=''
-  response=$(curl --silent --show-error --write-out '\n%{http_code}' \
+  response=$(curl --silent --show-error --connect-timeout 10 --max-time 30 \
+    --write-out '\n%{http_code}' \
     -H "$auth_header" "$CUBE_API_URL$status_url") || response=$'\n000'
   http_code=${response##*$'\n'}
   case "$http_code" in
@@ -180,12 +186,12 @@ for ((attempt=0; attempt<max_polls; attempt++)); do
 done
 
 if [[ -z "$run" ]]; then
-  echo "Last status poll returned HTTP $http_code after $((max_polls * 10)) seconds: $CUBE_API_URL$status_url" >&2
+  echo "Last status poll returned HTTP $http_code after $max_polls attempts: $CUBE_API_URL$status_url" >&2
   exit 1
 fi
 case "$(jq -r '.status' <<<"$run")" in
   QUEUED|RUNNING|CANCELLING)
-    echo "No terminal run status observed after $((max_polls * 10)) seconds: $CUBE_API_URL$status_url" >&2
+    echo "No terminal run status observed after $max_polls attempts: $CUBE_API_URL$status_url" >&2
     exit 1 ;;
 esac
 

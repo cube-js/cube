@@ -177,8 +177,8 @@ const EXCLUDE_OPERATIONS = new Set([
   'GET /api/v1/ai-engineer/settings',
   // Report folders listing — not part of the public docs surface.
   'GET /api/v1/deployments/{deploymentId}/report-folders',
-  // Access-test remains outside the preview API reference; publication-run
-  // operations are documented for CI users and are included by the extractor.
+  // Access-test is not in the preview API reference yet (CUB-4443). Remove once
+  // it is documented.
   'POST /api/v1/deployments/{deploymentId}/databricks-metric-view-integrations/{dataSourceName}/access-test',
   // Evaluations (CUB-3667): every operation's own description says "This
   // capability is currently in preview — reach out to the Cube support team to
