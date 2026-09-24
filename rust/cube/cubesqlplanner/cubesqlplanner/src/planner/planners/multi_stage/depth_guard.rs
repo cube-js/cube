@@ -13,10 +13,14 @@ use cubenativeutils::CubeError;
 use std::collections::{HashMap, HashSet};
 use std::rc::Rc;
 
-/// Used when the query carries no limit of its own. Far above any hand-written model and below
-/// the depth at which planning runs out of stack, which depends on both what each stage plans
-/// and the stack the caller happens to have.
-pub const DEFAULT_MAX_MULTI_STAGE_DEPTH: usize = 32;
+/// Used when the query carries no limit of its own.
+///
+/// A backstop against the crash, not a policy on how deep a model may go: it is set far above
+/// any hand-written model, because where planning actually runs out of stack depends on what
+/// each stage plans and on the stack the caller happens to have. For a query served from a
+/// rollup the binding limit is `CUBESTORE_MAX_QUERY_PLAN_DEPTH` instead, which measures the
+/// plan Cube Store will decode and counts about two of its levels per stage.
+pub const DEFAULT_MAX_MULTI_STAGE_DEPTH: usize = 150;
 
 pub fn check_multi_stage_depth(roots: &[Rc<MemberSymbol>], limit: usize) -> Result<(), CubeError> {
     // Roots share a member graph, so they share the memo: measuring each one against its own
