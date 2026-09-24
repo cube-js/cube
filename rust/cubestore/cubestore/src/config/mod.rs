@@ -1477,6 +1477,24 @@ where
     env_optparse(name).unwrap_or(default)
 }
 
+/// Lenient read for a budget that has to be at least one. `0` reads as "no limit" to most
+/// operators but would be the tightest possible setting, so it is rejected like a malformed
+/// value: warn and keep the default rather than enforce something nobody asked for.
+pub fn env_parse_positive_lenient(name: &str, default: usize) -> usize {
+    match env_parse_lenient(name, default) {
+        0 => {
+            log::warn!(
+                "Ignoring environment variable '{}' with '0' value: it must be at least 1; \
+                 using default {}",
+                name,
+                default
+            );
+            default
+        }
+        value => value,
+    }
+}
+
 /// Lenient numeric env read for opt-in performance toggles: an unparseable value logs a warning and
 /// falls back to the default instead of panicking, so a typo can't take a node down on startup.
 /// Surrounding whitespace is ignored, which a value coming from YAML easily carries.

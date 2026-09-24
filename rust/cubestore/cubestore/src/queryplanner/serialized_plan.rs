@@ -1,4 +1,4 @@
-use crate::config::env_parse_lenient;
+use crate::config::env_parse_positive_lenient;
 use crate::metastore::table::{Table, TablePath};
 use crate::metastore::{Chunk, IdRow, Index, Partition};
 use crate::queryplanner::panic::PanicWorkerNode;
@@ -38,54 +38,57 @@ use std::collections::HashMap;
 use std::fmt::{Debug, Formatter};
 use std::sync::{Arc, OnceLock};
 
-/// Nesting a serialized query plan may reach along its longest path, counting plan nodes,
-/// expression nodes and the plans of subqueries carried in expressions alike -- the protobuf
-/// encoding nests two message levels for each of them.
+/// Nesting a serialized query plan may reach along its longest path. Plan nodes, expression
+/// nodes and the roots of subqueries carried in expressions all count, because the protobuf
+/// encoding nests them the same way.
 ///
-/// Every level of decoding is a recursive call, so the budget is really a stack budget, and the
-/// smallest stack that decodes is the select worker's (`CUBESTORE_SELECT_WORKER_STACK_SIZE`,
-/// 4 MiB), which a release build takes past 600 levels. This default stays well inside that,
-/// and unlike a stack overflow it can be reported.
-///
-/// Cube Store inlines a CTE body at each of its references, so a query built from N chained
-/// stages arrives here as roughly 2N nodes.
+/// Decoding recurses once per level and does not grow its stack, so this is really a budget on
+/// the stack of whichever process decodes -- the smaller of the two is the select worker's
+/// (`CUBESTORE_SELECT_WORKER_STACK_SIZE`). Unlike a stack overflow, it can be reported.
 const DEFAULT_MAX_QUERY_PLAN_DEPTH: usize = 150;
 
 fn max_query_plan_depth() -> usize {
     static MAX_DEPTH: OnceLock<usize> = OnceLock::new();
     *MAX_DEPTH.get_or_init(|| {
-        let depth = env_parse_lenient(
+        env_parse_positive_lenient(
             "CUBESTORE_MAX_QUERY_PLAN_DEPTH",
             DEFAULT_MAX_QUERY_PLAN_DEPTH,
-        );
-        if depth == 0 {
-            DEFAULT_MAX_QUERY_PLAN_DEPTH
-        } else {
-            depth
-        }
+        )
     })
 }
 
-/// Deepest expression tree carried by `node`, and the deepest plan reached through a subquery
-/// one of those expressions carries, both measured from `node`'s expressions.
-fn expression_depths(node: &LogicalPlan) -> (usize, usize) {
+/// The plan nests subqueries as deep as the whole budget allows, so it is over budget whatever
+/// its exact depth is.
+struct OverBudget;
+
+/// Deepest expression tree carried by `node`, and the deepest plan reached through a subquery one
+/// of those expressions carries, both measured from `node`'s expressions.
+fn expression_depths(
+    node: &LogicalPlan,
+    subquery_budget: usize,
+    measured: &mut HashMap<*const LogicalPlan, usize>,
+) -> Result<(usize, usize), OverBudget> {
     let mut deepest_expression = 0;
     let mut deepest_subquery = 0;
+    let mut over_budget = false;
 
     let _ = node.apply_expressions(|root| {
         let mut pending = vec![(root, 1usize)];
         while let Some((expr, depth)) = pending.pop() {
             deepest_expression = deepest_expression.max(depth);
-            // A subquery is a whole plan hanging off the expression that carries it. This is
-            // the one recursive step here, taken once per level of subquery nesting.
-            match expr {
-                Expr::ScalarSubquery(subquery)
-                | Expr::Exists(Exists { subquery, .. })
-                | Expr::InSubquery(InSubquery { subquery, .. }) => {
-                    deepest_subquery = deepest_subquery
-                        .max(depth + logical_plan_depth(subquery.subquery.as_ref()));
+            // A subquery is a whole plan hanging off the expression that carries it, and this is
+            // the only step here that recurses -- once per level of subquery nesting.
+            if let Expr::ScalarSubquery(subquery)
+            | Expr::Exists(Exists { subquery, .. })
+            | Expr::InSubquery(InSubquery { subquery, .. }) = expr
+            {
+                match logical_plan_depth(subquery.subquery.as_ref(), subquery_budget, measured) {
+                    Ok(below) => deepest_subquery = deepest_subquery.max(depth + below),
+                    Err(OverBudget) => {
+                        over_budget = true;
+                        return Ok(TreeNodeRecursion::Stop);
+                    }
                 }
-                _ => {}
             }
             let _ = expr.apply_children(|child| {
                 pending.push((child, depth + 1));
@@ -95,23 +98,34 @@ fn expression_depths(node: &LogicalPlan) -> (usize, usize) {
         Ok(TreeNodeRecursion::Continue)
     });
 
-    (deepest_expression, deepest_subquery)
+    if over_budget {
+        Err(OverBudget)
+    } else {
+        Ok((deepest_expression, deepest_subquery))
+    }
 }
 
 /// Longest root-to-leaf path in `plan`, counting a plan node, an expression node and a
-/// subquery's root alike, because the encoding nests all three the same way.
+/// subquery's root alike. Walks an explicit stack, memoized by node address: the plans this
+/// guards against are exactly the ones a recursive walk could not survive.
 ///
-/// Walks an explicit stack and memoizes per node address: the plans this guards against are
-/// exactly the ones a recursive walk could not survive, and inputs are shared `Arc`s, so a
-/// node reachable by many paths must not be re-expanded per path.
-fn logical_plan_depth(plan: &LogicalPlan) -> usize {
-    let mut depth_below: HashMap<*const LogicalPlan, usize> = HashMap::new();
+/// `subquery_budget` bounds the one step that does recurse, so measuring a plan cannot be what
+/// overflows. A level of subquery nesting costs at least two levels of depth, so exhausting the
+/// budget in nesting alone already puts the plan over it.
+fn logical_plan_depth(
+    plan: &LogicalPlan,
+    subquery_budget: usize,
+    measured: &mut HashMap<*const LogicalPlan, usize>,
+) -> Result<usize, OverBudget> {
+    let Some(nested_budget) = subquery_budget.checked_sub(1) else {
+        return Err(OverBudget);
+    };
     let mut pending: Vec<(&LogicalPlan, bool)> = vec![(plan, false)];
 
     while let Some((node, inputs_visited)) = pending.pop() {
         let key = node as *const LogicalPlan;
         if !inputs_visited {
-            if depth_below.contains_key(&key) {
+            if measured.contains_key(&key) {
                 continue;
             }
             pending.push((node, true));
@@ -122,32 +136,34 @@ fn logical_plan_depth(plan: &LogicalPlan) -> usize {
         let below = node
             .inputs()
             .into_iter()
-            .filter_map(|input| depth_below.get(&(input as *const LogicalPlan)))
+            .filter_map(|input| measured.get(&(input as *const LogicalPlan)))
             .copied()
             .max()
             .unwrap_or(0);
-        let (in_expression, in_subquery) = expression_depths(node);
-        depth_below.insert(key, 1 + below.max(in_expression).max(in_subquery));
+        let (in_expression, in_subquery) = expression_depths(node, nested_budget, measured)?;
+        measured.insert(key, 1 + below.max(in_expression).max(in_subquery));
     }
 
-    depth_below
+    Ok(measured
         .get(&(plan as *const LogicalPlan))
         .copied()
-        .unwrap_or(1)
+        .unwrap_or(1))
 }
 
 fn check_query_plan_depth(plan: &LogicalPlan) -> Result<(), CubeError> {
     let limit = max_query_plan_depth();
-    let depth = logical_plan_depth(plan);
-    if depth > limit {
-        return Err(CubeError::user(format!(
-            "Query plan is nested too deeply to execute: {} levels against a limit of {}. \
-             Reduce the nesting the query asks for -- chained stages, nested subqueries and \
-             expressions all count -- or raise CUBESTORE_MAX_QUERY_PLAN_DEPTH.",
-            depth, limit
-        )));
-    }
-    Ok(())
+    let depth = match logical_plan_depth(plan, limit, &mut HashMap::new()) {
+        Ok(depth) if depth <= limit => return Ok(()),
+        Ok(depth) => depth.to_string(),
+        Err(OverBudget) => format!("more than {}", limit),
+    };
+    Err(CubeError::user(format!(
+        "Query plan is nested too deeply to execute: {} levels against a limit of {}. Reduce the \
+         nesting the query asks for -- chained stages, nested subqueries and expressions all \
+         count -- or raise CUBESTORE_MAX_QUERY_PLAN_DEPTH, together with \
+         CUBESTORE_SELECT_WORKER_STACK_SIZE, which is the stack that has to hold it.",
+        depth, limit
+    )))
 }
 
 #[derive(Clone, Serialize, Deserialize, Debug, Default, Eq, PartialEq)]
@@ -1547,6 +1563,12 @@ mod tests {
     #[cfg(debug_assertions)]
     const DECODING_STACK: usize = 32 * 1024 * 1024;
 
+    /// Depth of a plan that is known to be inside the budget, so the walk cannot bail.
+    fn depth_of(plan: &LogicalPlan) -> usize {
+        logical_plan_depth(plan, DEFAULT_LIMIT, &mut HashMap::new())
+            .unwrap_or_else(|OverBudget| panic!("plan unexpectedly past the budget"))
+    }
+
     fn on_a_decoding_stack<T: Send + 'static>(f: impl FnOnce() -> T + Send + 'static) -> T {
         std::thread::Builder::new()
             .stack_size(DECODING_STACK)
@@ -1574,7 +1596,7 @@ mod tests {
     #[test]
     fn plan_at_the_depth_limit_survives_the_serialization_roundtrip() {
         let plan = chained_stage_plan(74); // the values leaf plus 2 nodes a stage
-        assert_eq!(logical_plan_depth(&plan), DEFAULT_LIMIT);
+        assert_eq!(depth_of(&plan), DEFAULT_LIMIT);
         let decoded = on_a_decoding_stack(move || roundtrip(&plan)).unwrap();
         assert_eq!(
             format!("{}", decoded.display_indent()).lines().count(),
@@ -1588,7 +1610,7 @@ mod tests {
     #[test]
     fn plan_over_the_depth_limit_names_depth() {
         let plan = chained_stage_plan(75);
-        let depth = logical_plan_depth(&plan);
+        let depth = depth_of(&plan);
         assert!(depth > DEFAULT_LIMIT);
         let err = on_a_decoding_stack(move || pre_serialized(plan).to_serialized_plan())
             .map(|_| ())

@@ -1,5 +1,5 @@
 use crate::cachestore::{QueueItemStatus, QueueKey, QUEUE_ITEM_EXTERNAL_ID_MAX_LEN};
-use crate::config::env_parse_lenient;
+use crate::config::env_parse_positive_lenient;
 use crate::sql::{QueryParameter, QueryParameters};
 use sqlparser::ast::{
     ColumnDef, CreateIndex, CreateTable, HiveDistributionStyle, Ident, ObjectName, Query,
@@ -277,25 +277,17 @@ macro_rules! parse_sql_options {
 /// subquery and parenthesised group. `sqlparser`'s own default is 50, low enough that a
 /// generated query with a few dozen nested expressions is rejected outright.
 ///
-/// Every level is a recursive descent on the calling thread's stack and the parser has no
-/// stack-growth protection, so the real ceiling is the stack a statement is parsed on.
-/// Statements are parsed on the `cubestore-main` runtime, whose threads get 8 MiB
-/// (`CUBESTORE_MAIN_STACK_SIZE`). The costliest shape is nested subqueries, at roughly 33 KiB a
-/// level in a release build, which that stack takes past 200; this default stays inside it.
+/// Parsing recurses per level on the `cubestore-main` runtime's threads and has no stack-growth
+/// protection, so this is really a budget on their stack (`CUBESTORE_MAIN_STACK_SIZE`).
 const DEFAULT_SQL_PARSER_RECURSION_LIMIT: usize = 128;
 
 pub(crate) fn sql_parser_recursion_limit() -> usize {
     static LIMIT: OnceLock<usize> = OnceLock::new();
     *LIMIT.get_or_init(|| {
-        let limit = env_parse_lenient(
+        env_parse_positive_lenient(
             "CUBESTORE_SQL_PARSER_RECURSION_LIMIT",
             DEFAULT_SQL_PARSER_RECURSION_LIMIT,
-        );
-        if limit == 0 {
-            DEFAULT_SQL_PARSER_RECURSION_LIMIT
-        } else {
-            limit
-        }
+        )
     })
 }
 
