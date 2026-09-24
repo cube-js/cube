@@ -885,7 +885,11 @@
                 "openapi": "/api-reference/api.yaml",
                 "pages": [
                   "GET /api/v1/deployments/{deploymentId}/databricks-metric-view-integrations/{dataSourceName}",
-                  "PUT /api/v1/deployments/{deploymentId}/databricks-metric-view-integrations/{dataSourceName}"
+                  "PUT /api/v1/deployments/{deploymentId}/databricks-metric-view-integrations/{dataSourceName}",
+                  "GET /api/v1/deployments/{deploymentId}/databricks-metric-view-integrations/{dataSourceName}/syncs",
+                  "POST /api/v1/deployments/{deploymentId}/databricks-metric-view-integrations/{dataSourceName}/syncs",
+                  "GET /api/v1/deployments/{deploymentId}/databricks-metric-view-integrations/{dataSourceName}/syncs/{runId}",
+                  "DELETE /api/v1/deployments/{deploymentId}/databricks-metric-view-integrations/{dataSourceName}/syncs/{runId}"
                 ]
               },
               {

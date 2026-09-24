@@ -13,8 +13,9 @@ to activate this feature for your account.
 
 Cube publishes selected, deployed Cube views as native Metric Views in your Databricks Unity
 Catalog. Databricks applications query those objects directly; they do not query Cube at runtime.
-Your Cube model remains the source of truth. This is a **one-way, manual** publication workflow:
-it does not import Databricks definitions into Cube or sync automatically after deployments.
+Your Cube model remains the source of truth. Publication is **one-way and on demand**, through
+Console or the public REST API; it does not import Databricks definitions into Cube or run
+automatically after deployments.
 
 ## Before you start
 
@@ -98,13 +99,129 @@ The public REST API documents [reading settings](/api-reference/databricks-metri
 [checking preview status](/api-reference/databricks-metric-view-publication/get-databricks-metric-view-preview-status),
 [getting the completed preview result](/api-reference/databricks-metric-view-publication/get-a-completed-databricks-metric-view-preview-result),
 and [cancelling a preview](/api-reference/databricks-metric-view-publication/cancel-a-databricks-metric-view-preview).
-Publication runs and publication-run cancellation also have REST endpoints, but those are not yet
-in the public API reference during preview. Contact [Cube support](/admin/account-billing/support)
-for API guidance if you need to automate them.
+The same API supports [starting a publication run](/api-reference/databricks-metric-view-integration/start-a-databricks-metric-view-publication-run),
+[inspecting a run](/api-reference/databricks-metric-view-integration/get-a-databricks-metric-view-publication-run),
+[listing runs](/api-reference/databricks-metric-view-integration/list-databricks-metric-view-publication-runs),
+and [cancelling a run](/api-reference/databricks-metric-view-integration/cancel-a-databricks-metric-view-publication-run).
+Contact [Cube support](/admin/account-billing/support) for help with access.
 
 When saving settings through the API, set `deletionPolicy` to `retain`; omitting it also defaults
 to `retain`. The older `delete-managed` value is deprecated but remains accepted for existing API
 clients. It does not delete obsolete Metric Views; it currently behaves like `retain`.
+
+## Trigger publication from CI
+
+Run publication from CI after a successful Cube deployment. First, configure **All views**, a
+dedicated target catalog and schema, `retain`, and publication enabled in **Settings → Data
+Sources**. Run **Preview** and **Test access** before the first write. CI uses these saved settings;
+the API call does not override the scope or destination.
+
+Store a [Platform API key](/api-reference/authentication) with deployment `SchemaUpdate` access as
+a CI secret. The recipe reads the saved settings, starts a run with their `configurationVersion`,
+then polls the returned `statusUrl`. The start endpoint returns `202` with a `runId`, `buildJobId`,
+optional `commit`, and root-relative `statusUrl`. It accepts an optional UUID `idempotencyKey` for
+safe retries; another start while a run is active returns `409`.
+Run statuses are `QUEUED`, `RUNNING`, `CANCELLING`, `COMPLETED`, `PARTIAL`, `FAILED`, and `CANCELLED`.
+
+To reject incompatible changes before writing, CI can [preview](/api-reference/databricks-metric-view-publication/start-a-databricks-metric-view-publication-preview)
+with `{"dataSourceName": "default", "selectionMode": "all"}` and [inspect the result](/api-reference/databricks-metric-view-publication/get-a-completed-databricks-metric-view-preview-result).
+Require eligible views with no `withheldMembers`; avoid overlapping deployments because preview
+and sync can resolve different builds.
+
+This Bash step requires `curl` and `jq`. Set `CUBE_API_URL` to your tenant host without a trailing
+slash, `DEPLOYMENT_ID` to the deployment that just succeeded, and `CUBE_API_TOKEN` to the CI secret.
+Set `EXPECTED_BUILD_JOB_ID` if the deployment step returns one. The example uses the `default`
+data source; URL-encode a different name in the path. Set `SYNC_IDEMPOTENCY_KEY` to a UUID unique
+to this CI publication attempt and keep it unchanged across retries of that attempt. Do not reuse
+it for a later pipeline run: the API would return the earlier run without publishing again. Set
+`MAX_POLLS` to scale the wait for your view count and warehouse start-up time (default: 180
+attempts, 10 seconds apart, plus request time).
+
+```bash
+set -euo pipefail
+
+integration="$CUBE_API_URL/api/v1/deployments/$DEPLOYMENT_ID/databricks-metric-view-integrations/default"
+auth_header="Authorization: Bearer $CUBE_API_TOKEN"
+: "${SYNC_IDEMPOTENCY_KEY:?Set a unique UUID for this publication attempt}"
+settings=$(curl --fail --silent --show-error --connect-timeout 10 --max-time 30 \
+  -H "$auth_header" "$integration")
+if ! jq -e '.configuration.enabled == true and .configuration.selectionMode == "all" and .configuration.deletionPolicy == "retain"' <<<"$settings" >/dev/null; then
+  echo 'Enable publication with All views and retain before running CI.' >&2
+  exit 1
+fi
+version=$(jq -r '.configurationVersion' <<<"$settings")
+
+start=$(jq -n --argjson version "$version" --arg key "$SYNC_IDEMPOTENCY_KEY" \
+    '{configurationVersion: $version, idempotencyKey: $key}' |
+  curl --fail --silent --show-error --connect-timeout 10 --max-time 30 -X POST -H "$auth_header" \
+    -H 'Content-Type: application/json' --data-binary @- "$integration/syncs")
+status_url=$(jq -r '.statusUrl' <<<"$start")
+if [[ -n "${EXPECTED_BUILD_JOB_ID:-}" ]]; then
+  if ! jq -e --argjson expected "$EXPECTED_BUILD_JOB_ID" '.buildJobId == $expected' <<<"$start" >/dev/null; then
+    jq '{runId, buildJobId, commit, statusUrl}' <<<"$start" >&2
+    echo 'Run started against a different build; inspect or cancel it before retrying.' >&2
+    exit 1
+  fi
+fi
+
+max_polls=${MAX_POLLS:-180}
+[[ "$max_polls" =~ ^[1-9][0-9]*$ ]] || { echo 'MAX_POLLS must be a positive integer.' >&2; exit 1; }
+for ((attempt=0; attempt<max_polls; attempt++)); do
+  run=''
+  response=$(curl --silent --show-error --connect-timeout 10 --max-time 30 \
+    --write-out '\n%{http_code}' \
+    -H "$auth_header" "$CUBE_API_URL$status_url") || response=$'\n000'
+  http_code=${response##*$'\n'}
+  case "$http_code" in
+    200) run=${response%$'\n'*} ;;
+    000|429|5??)
+      echo "Status poll returned HTTP $http_code; retrying $CUBE_API_URL$status_url" >&2
+      sleep 10
+      continue ;;
+    *) echo "Status poll returned HTTP $http_code: $CUBE_API_URL$status_url" >&2; exit 1 ;;
+  esac
+  case "$(jq -r '.status' <<<"$run")" in
+    QUEUED|RUNNING|CANCELLING) sleep 10 ;;
+    *) break ;;
+  esac
+done
+
+if [[ -z "$run" ]]; then
+  echo "Last status poll returned HTTP $http_code after $max_polls attempts: $CUBE_API_URL$status_url" >&2
+  exit 1
+fi
+case "$(jq -r '.status' <<<"$run")" in
+  QUEUED|RUNNING|CANCELLING)
+    echo "No terminal run status observed after $max_polls attempts: $CUBE_API_URL$status_url" >&2
+    exit 1 ;;
+esac
+
+if ! jq -e '.status == "COMPLETED" and .incompleteViewCount == 0 and
+  (.viewNames | length > 0) and
+  (.views | length > 0) and
+  all(.views[]; .outcome == "created" or .outcome == "updated" or
+    .outcome == "unchanged" or .outcome == "retained_obsolete")' \
+  <<<"$run" >/dev/null; then
+  jq '{status, buildJobId, commit, incompleteViewCount, viewNames, views}' <<<"$run" >&2
+  exit 1
+fi
+```
+
+The expected-build check runs **after** publication starts; a mismatch cannot prevent or undo a
+write. The recipe requires `retain` so future `delete-managed` behavior cannot silently change the
+CI policy. `viewNames` lists planned views; `retained_obsolete` means an obsolete target was left
+in place. Publication-run `views[].outcome` values are `unchanged`, `created`, `updated`, `blocked`,
+`validation_failed`, `publish_failed`, `retained_obsolete`, and `deleted_obsolete`; these differ
+from preview outcomes. The recipe accepts only the successful, retain-safe outcomes.
+`incompleteViewCount` counts published views whose `withheldMembers` list is nonempty; requiring
+zero rejects definitions missing measures.
+
+Failed checks do not roll back writes. Inspect `views[]` for errors or `withheldMembers`. List
+older runs with
+`GET /api/v1/deployments/{deploymentId}/databricks-metric-view-integrations/{dataSourceName}/syncs`
+and request cancellation of an active run with `DELETE {statusUrl}`. Cancellation stops further
+writes but does not undo completed ones. `curl --fail` exits with code 22 and omits the response
+body on HTTP errors; on `409`, inspect run history before retrying.
 
 ## What can be published
 

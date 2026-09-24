@@ -568,6 +568,156 @@ paths:
           Uses optimistic configuration versioning. Pass `expectedConfigurationVersion` 0 to create.
           Requires a Databricks datasource. This is currently in preview — reach out to the Cube
           support team to activate it for your account.
+  /api/v1/deployments/{deploymentId}/databricks-metric-view-integrations/{dataSourceName}/syncs:
+    get:
+      operationId: listSyncs
+      parameters:
+        - in: path
+          name: deploymentId
+          required: true
+          schema:
+            type: integer
+        - in: path
+          name: dataSourceName
+          required: true
+          schema:
+            type: string
+        - in: query
+          name: status
+          schema:
+            oneOf:
+              - $ref: '#/components/schemas/ListDatabricksMetricViewSyncsQueryStatus'
+              - type: 'null'
+        - in: query
+          name: after
+          schema:
+            type: string
+        - in: query
+          name: first
+          schema:
+            minimum: 1
+            type: integer
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DatabricksMetricViewSyncRunListResponse'
+          description: ''
+      summary: List Databricks Metric View publication runs
+      tags:
+        - Databricks Metric View Integration
+      x-mint:
+        content: >-
+          Durable run history for this datasource, newest first. It remains available after a run
+          finishes. Requires a Databricks datasource. This is currently in preview — reach out to
+          the Cube support team to activate it for your account.
+    post:
+      operationId: startSync
+      parameters:
+        - in: path
+          name: deploymentId
+          required: true
+          schema:
+            type: integer
+        - in: path
+          name: dataSourceName
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/StartDatabricksMetricViewSyncInput'
+        description: StartDatabricksMetricViewSyncInput
+        required: true
+      responses:
+        '202':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DatabricksMetricViewSyncStartResponse'
+          description: ''
+      summary: Start a Databricks Metric View publication run
+      tags:
+        - Databricks Metric View Integration
+      x-mint:
+        content: >-
+          Converts the configured Cube views from the deployment's latest successful build and
+          creates or replaces each one's managed Databricks Metric View. Views publish
+          independently: one that is incompatible, fails Databricks validation, or whose destination
+          belongs to another integration keeps its last good definition and does not stop the
+          others, and a view whose definition is unchanged is skipped without a Databricks write.
+          One run per integration at a time; a second start while one is active returns 409.
+          Requires a Databricks datasource, enabled publication settings, and SchemaUpdate access.
+          This is currently in preview — reach out to the Cube support team to activate it for your
+          account.
+  /api/v1/deployments/{deploymentId}/databricks-metric-view-integrations/{dataSourceName}/syncs/{runId}:
+    delete:
+      operationId: cancelSync
+      parameters:
+        - in: path
+          name: deploymentId
+          required: true
+          schema:
+            type: integer
+        - in: path
+          name: dataSourceName
+          required: true
+          schema:
+            type: string
+        - in: path
+          name: runId
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DatabricksMetricViewSyncRunResponse'
+          description: ''
+      summary: Cancel a Databricks Metric View publication run
+      tags:
+        - Databricks Metric View Integration
+      x-mint:
+        content: >-
+          Requests cancellation of an active run and returns its state. Metric Views already written
+          in the run are not rolled back. Requires SchemaUpdate access.
+    get:
+      operationId: syncRun
+      parameters:
+        - in: path
+          name: deploymentId
+          required: true
+          schema:
+            type: integer
+        - in: path
+          name: dataSourceName
+          required: true
+          schema:
+            type: string
+        - in: path
+          name: runId
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DatabricksMetricViewSyncRunResponse'
+          description: ''
+      summary: Get a Databricks Metric View publication run
+      tags:
+        - Databricks Metric View Integration
+      x-mint:
+        content: >-
+          Returns the run with its per-view outcomes, plus live stage and published counts while it
+          is still active.
   /api/v1/deployments/{deploymentId}/databricks-metric-view-previews:
     post:
       operationId: startPreview
@@ -8692,6 +8842,208 @@ components:
         - member
         - code
       type: object
+    DatabricksMetricViewSyncProgressResponse:
+      properties:
+        published:
+          type: integer
+        stage:
+          type: string
+        total:
+          type: integer
+      required:
+        - stage
+        - published
+        - total
+      type: object
+    DatabricksMetricViewSyncRunListResponse:
+      properties:
+        items:
+          items:
+            $ref: '#/components/schemas/DatabricksMetricViewSyncRunResponse'
+          type: array
+        pageInfo:
+          $ref: '#/components/schemas/PageInfo'
+      required:
+        - items
+        - pageInfo
+      type: object
+    DatabricksMetricViewSyncRunResponse:
+      properties:
+        buildJobId:
+          oneOf:
+            - type: integer
+            - type: 'null'
+        cancelRequestedAt:
+          oneOf:
+            - pattern: \d{4}-[01]\d-[0-3]\dT[0-2]\d:[0-5]\d:[0-5]\d.\d+Z?
+              type: string
+            - type: 'null'
+        commit:
+          oneOf:
+            - type: string
+            - type: 'null'
+        completedAt:
+          oneOf:
+            - pattern: \d{4}-[01]\d-[0-3]\dT[0-2]\d:[0-5]\d:[0-5]\d.\d+Z?
+              type: string
+            - type: 'null'
+        configurationVersion:
+          oneOf:
+            - type: integer
+            - type: 'null'
+        createdAt:
+          pattern: \d{4}-[01]\d-[0-3]\dT[0-2]\d:[0-5]\d:[0-5]\d.\d+Z?
+          type: string
+        dataSourceName:
+          type: string
+        deletionPolicy:
+          oneOf:
+            - type: string
+            - type: 'null'
+        deploymentId:
+          type: integer
+        durationMs:
+          oneOf:
+            - type: integer
+            - type: 'null'
+        incompleteViewCount:
+          description: >-
+            How many published views are missing measures the conversion could not represent. A run
+            reports COMPLETED with this above zero, because every view published — so automation
+            that treats COMPLETED as "fully published" should assert this is 0. Read
+            views[].withheldMembers for which measures, and why.
+          minimum: 0
+          type: integer
+        integrationPublicId:
+          type: string
+        progress:
+          oneOf:
+            - $ref: '#/components/schemas/DatabricksMetricViewSyncProgressResponse'
+            - type: 'null'
+          description: Live progress while the run is active; null once it is terminal.
+        runId:
+          type: string
+        stage:
+          oneOf:
+            - type: string
+            - type: 'null'
+        startedAt:
+          oneOf:
+            - pattern: \d{4}-[01]\d-[0-3]\dT[0-2]\d:[0-5]\d:[0-5]\d.\d+Z?
+              type: string
+            - type: 'null'
+        status:
+          $ref: '#/components/schemas/DatabricksMetricViewSyncRunResponseStatus'
+        targetCatalog:
+          oneOf:
+            - type: string
+            - type: 'null'
+        targetSchema:
+          oneOf:
+            - type: string
+            - type: 'null'
+        trigger:
+          $ref: '#/components/schemas/DatabricksMetricViewSyncRunResponseTrigger'
+        viewNames:
+          description: The Cube views this run was planned against.
+          items:
+            type: string
+          type: array
+        views:
+          items:
+            $ref: '#/components/schemas/DatabricksMetricViewSyncViewOutcomeResponse'
+          type: array
+      required:
+        - runId
+        - deploymentId
+        - integrationPublicId
+        - dataSourceName
+        - trigger
+        - status
+        - viewNames
+        - views
+        - incompleteViewCount
+        - createdAt
+      type: object
+    DatabricksMetricViewSyncRunResponseStatus:
+      enum:
+        - QUEUED
+        - RUNNING
+        - CANCELLING
+        - COMPLETED
+        - PARTIAL
+        - FAILED
+        - CANCELLED
+      type: string
+    DatabricksMetricViewSyncRunResponseTrigger:
+      enum:
+        - MANUAL
+      type: string
+    DatabricksMetricViewSyncStartResponse:
+      properties:
+        buildJobId:
+          description: The build whose deployed model this run publishes.
+          type: integer
+        commit:
+          oneOf:
+            - type: string
+            - type: 'null'
+        dataSourceName:
+          type: string
+        deploymentId:
+          type: integer
+        integrationPublicId:
+          type: string
+        reused:
+          description: True when an idempotent retry returned an existing run.
+          type: boolean
+        runId:
+          type: string
+        statusUrl:
+          type: string
+      required:
+        - runId
+        - deploymentId
+        - dataSourceName
+        - integrationPublicId
+        - buildJobId
+        - reused
+        - statusUrl
+      type: object
+    DatabricksMetricViewSyncViewOutcomeResponse:
+      properties:
+        cubeViewName:
+          type: string
+        detail:
+          oneOf:
+            - type: string
+            - type: 'null'
+          description: A stable reason code, never raw Databricks output.
+        outcome:
+          $ref: '#/components/schemas/DatabricksMetricViewSyncViewOutcomeResponseOutcome'
+        withheldMembers:
+          description: >-
+            Measures this view published without, as 'cube.member'. Non-empty means the Metric View
+            is queryable but incomplete.
+          items:
+            type: string
+          type: array
+      required:
+        - cubeViewName
+        - outcome
+        - withheldMembers
+      type: object
+    DatabricksMetricViewSyncViewOutcomeResponseOutcome:
+      enum:
+        - unchanged
+        - created
+        - updated
+        - blocked
+        - validation_failed
+        - publish_failed
+        - retained_obsolete
+        - deleted_obsolete
+      type: string
     DbtGeneratedFileContent:
       properties:
         content:
@@ -10811,6 +11163,16 @@ components:
       required:
         - name
       type: object
+    ListDatabricksMetricViewSyncsQueryStatus:
+      enum:
+        - QUEUED
+        - RUNNING
+        - CANCELLING
+        - COMPLETED
+        - PARTIAL
+        - FAILED
+        - CANCELLED
+      type: string
     LocalizedValue:
       properties:
         locale:
@@ -12394,10 +12756,13 @@ components:
         - selectionMode
       type: object
     SaveDatabricksMetricViewIntegrationInputDeletionPolicy:
-      enum:
-        - retain
-        - delete-managed
-      type: string
+      oneOf:
+        - const: retain
+          type: string
+        - const: delete-managed
+          type: string
+          deprecated: true
+          description: Managed deletion is not implemented. Use retain.
     SaveDatabricksMetricViewIntegrationInputSelectionMode:
       enum:
         - all
@@ -12549,6 +12914,25 @@ components:
         - png
         - pdf
       type: string
+    StartDatabricksMetricViewSyncInput:
+      properties:
+        configurationVersion:
+          description: >-
+            The configurationVersion returned by GET. A run is refused when settings changed after
+            they were loaded, so a publish always uses the configuration the caller saw.
+          minimum: 1
+          type: integer
+        idempotencyKey:
+          oneOf:
+            - format: uuid
+              type: string
+            - type: 'null'
+          description: >-
+            Optional idempotency key. Repeating a start with the same key returns the original run
+            instead of publishing twice; omit it and every call starts a new run.
+      required:
+        - configurationVersion
+      type: object
     StartDbtSyncInput:
       properties:
         branchName:

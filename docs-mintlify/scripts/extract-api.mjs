@@ -177,16 +177,9 @@ const EXCLUDE_OPERATIONS = new Set([
   'GET /api/v1/ai-engineer/settings',
   // Report folders listing — not part of the public docs surface.
   'GET /api/v1/deployments/{deploymentId}/report-folders',
-  // Gated behind the useDatabricksMetricViewsPush flag, not GA (CUB-4443).
-  // Remove once the feature ships.
+  // Access-test is not in the preview API reference yet (CUB-4443). Remove once
+  // it is documented.
   'POST /api/v1/deployments/{deploymentId}/databricks-metric-view-integrations/{dataSourceName}/access-test',
-  // Same flag, same not-GA state — the sync-run sub-resource added after the
-  // integration CRUD endpoints were first documented (CUB-4443). Remove once
-  // the feature ships.
-  'GET /api/v1/deployments/{deploymentId}/databricks-metric-view-integrations/{dataSourceName}/syncs',
-  'POST /api/v1/deployments/{deploymentId}/databricks-metric-view-integrations/{dataSourceName}/syncs',
-  'GET /api/v1/deployments/{deploymentId}/databricks-metric-view-integrations/{dataSourceName}/syncs/{runId}',
-  'DELETE /api/v1/deployments/{deploymentId}/databricks-metric-view-integrations/{dataSourceName}/syncs/{runId}',
   // Evaluations (CUB-3667): every operation's own description says "This
   // capability is currently in preview — reach out to the Cube support team to
   // activate it for your account", not GA. Remove once the feature ships.
