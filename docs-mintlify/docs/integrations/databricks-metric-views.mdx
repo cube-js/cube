@@ -1,0 +1,164 @@
+---
+title: Databricks Metric Views
+description: Preview and publish Cube views as native Databricks Metric Views.
+---
+
+<Warning>
+
+Databricks Metric View publication is currently in preview, and the user experience and supported
+model features may still change. Reach out to the [Cube support team](/admin/account-billing/support)
+to activate this feature for your account.
+
+</Warning>
+
+Cube publishes selected, deployed Cube views as native Metric Views in your Databricks Unity
+Catalog. Databricks applications query those objects directly; they do not query Cube at runtime.
+Your Cube model remains the source of truth. This is a **one-way, manual** publication workflow:
+it does not import Databricks definitions into Cube or sync automatically after deployments.
+
+## Before you start
+
+- Configure a [Databricks data source](/admin/connect-to-data/data-sources/databricks-jdbc)
+  and deploy static Cube YAML with public views. This workflow reads the latest successful
+  deployed build, not unsaved IDE changes.
+- If a Cube source uses a two-part `schema.table` name, set
+  [`CUBEJS_DB_DATABRICKS_CATALOG`](/reference/configuration/environment-variables#cubejs_db_databricks_catalog)
+  for that data source so Preview can resolve its catalog. Without it, those views are blocked.
+- Ask your Databricks administrator for a **dedicated target catalog and schema** for the
+  published Metric Views.
+  The identity configured on the Cube data source needs `CAN USE` on its SQL warehouse,
+  `USE CATALOG` and `USE SCHEMA` on the target and source namespaces, `SELECT` on source
+  relations, and `CREATE TABLE` on the target schema. The same identity must own any existing
+  Cube-managed Metric View it needs to update. It owns the temporary views it creates for the
+  access test. See the [Databricks Metric View prerequisites](https://docs.databricks.com/aws/en/uc-semantics/metric-views/create)
+  and [Metric View ownership guidance](https://docs.databricks.com/aws/en/uc-semantics/metric-views/manage)
+  (AWS documentation; use the equivalent pages for Azure or Google Cloud).
+- Arrange target access for Databricks consumers separately. Publishing an object does not
+  grant them `SELECT` on it or access to its catalog and schema.
+- Databricks evaluates access to the published object under Unity Catalog permissions, not
+  Cube's query-time authorization. A view with a Cube access policy, or one that references a cube
+  with an access policy, is blocked from publication; Cube access policies are never transferred
+  to Databricks. Review the **Preview** result and configure Databricks grants before exposing a
+  target to consumers.
+- Cube uses the data source credential server-side; you do not enter a second token in the
+  browser. Preview returns generated YAML to authorized users for review.
+
+## Publish a view
+
+The full publication flow requires `SchemaUpdate`
+[deployment access](/admin/users-and-permissions/custom-roles). `SchemaRead` is enough to run and
+inspect Preview, but not to save settings, test access, or sync.
+
+<Steps>
+  <Step title="Configure publication">
+    Open your deployment's **Settings → Data Sources** and edit the Databricks data source.
+    Expand **Databricks Metric Views**. Enter the target catalog and schema. Choose all public
+    views, selected views, or a name pattern; optionally add a target-name prefix. Turn publication
+    on and save. This alone does not start a write.
+  </Step>
+  <Step title="Preview the deployed model">
+    Run **Preview**. Inspect every view's generated YAML, source relation, warnings, and blocking
+    issues. It reads the deployed model and **does not write to Databricks**. Preview payloads and
+    results are retained for at most seven days; run it again if an older result is gone.
+  </Step>
+  <Step title="Test access">
+    With a completed preview selected, run **Test access**. It checks source reads as well as
+    warehouse, target-schema, and temporary create/replace/drop access. The test creates and
+    cleans up a uniquely named temporary view; it does not change a final target.
+  </Step>
+  <Step title="Publish and inspect each result">
+    Select **Sync now**. Review the result for **each view** in run history. **Created**,
+    **Updated**, and **Unchanged** are successful outcomes; **Blocked**, **Rejected by Databricks**,
+    and **Write failed** need investigation. A run can be **Partial** if some views succeeded and
+    others did not.
+  </Step>
+</Steps>
+
+Preview and sync each resolve the latest successful deployed build when started. If a new build
+lands between them, preview again before syncing. Each Databricks data source currently has one
+saved target; there is no named staging-to-production promotion or pinned-build publication.
+
+Scope rules:
+
+- The name pattern supports literals, `^`, `$`, a bare `.` that matches any single character, and
+  at most one `.*` wildcard. It is not a general regular expression and is limited to 128
+  characters. Review the matched views in Preview before syncing.
+- Each preview or sync resolves at most 128 views per data source, whether the scope is **all**,
+  **selected**, or **pattern**. If **all** or **pattern** resolves more, preview and sync reject
+  the request; narrow the scope and try again.
+- A newly deployed view enters an **all** or matching **pattern** scope on the next manual sync.
+  A **selected** scope changes only when you edit it.
+- Renaming a view or target creates a new target and leaves the old one retained.
+- Per-view target-name and root-source overrides are available through the configuration API,
+  but are not editable in the card.
+
+The public REST API documents [reading settings](/api-reference/databricks-metric-view-integration/get-databricks-metric-view-publication-settings),
+[saving settings](/api-reference/databricks-metric-view-integration/create-or-update-databricks-metric-view-publication-settings),
+[starting a preview](/api-reference/databricks-metric-view-publication/start-a-databricks-metric-view-publication-preview),
+[checking preview status](/api-reference/databricks-metric-view-publication/get-databricks-metric-view-preview-status),
+[getting the completed preview result](/api-reference/databricks-metric-view-publication/get-a-completed-databricks-metric-view-preview-result),
+and [cancelling a preview](/api-reference/databricks-metric-view-publication/cancel-a-databricks-metric-view-preview).
+Publication runs and publication-run cancellation also have REST endpoints, but those are not yet
+in the public API reference during preview. Contact [Cube support](/admin/account-billing/support)
+for API guidance if you need to automate them.
+
+When saving settings through the API, set `deletionPolicy` to `retain`; omitting it also defaults
+to `retain`. The older `delete-managed` value is deprecated but remains accepted for existing API
+clients. It does not delete obsolete Metric Views; it currently behaves like `retain`.
+
+## What can be published
+
+The **Preview** result is the authority for your deployed model. This preview release supports
+static YAML, one Databricks data source per published view, scalar dimensions, common aggregates and
+supported calculated measures, and conservative many-to-one equality joins. The target uses
+Databricks Metric View YAML 1.1.
+
+These categories reflect the current preview release. Capabilities may change between releases, so
+run a new **Preview** after a Cube upgrade.
+
+- **Supported** — a static view with a clear root source and representable dimensions, measures,
+  and joins. Review the generated YAML, then test access and sync.
+- **Warning** — behavior-neutral metadata Databricks cannot represent, or a fan-out-unsafe measure
+  withheld as `CUBE_MEMBER_WITHHELD`. Review the exact difference before accepting publication;
+  for a withheld measure, publish it from a view rooted at its own cube.
+
+Preview **blocks** a view when it finds any of these conditions:
+
+- Dynamic JavaScript, TypeScript, or Jinja models, or unflattened `extends`: use static YAML and
+  flatten inherited definitions before publishing.
+- A Cube access policy on the view or a referenced cube: keep that governed view in Cube; the
+  policy cannot be transferred to a Databricks Metric View.
+- Mixed data sources or an ambiguous root dataset: use one data source and a clear root.
+- A two-part `schema.table` source without `CUBEJS_DB_DATABRICKS_CATALOG`: set that variable for
+  the selected Databricks data source and preview again.
+- Non-equality, cyclic, or one-to-many joins: simplify the join. For
+  `CUBE_VIEW_JOIN_NOT_REPRESENTABLE`, root the view at the many-side cube.
+- Unsupported expressions or types, or multi-stage, window, or ranking calculations: simplify
+  the model or keep that view in Cube.
+
+An unsafe joined measure can be **withheld while the rest of its view is published**. That view
+may show **Created** or **Updated**, and the run may show **Completed**, even though some measures
+are missing in Databricks. Check **Measures not published** in Preview and beside each view in
+run history before treating a run as complete. There is no opt-in gate for incomplete publication
+yet.
+
+## Ownership, failures, and rollback
+
+Cube records ownership after a confirmed write. It will not adopt or overwrite an existing
+unmanaged Metric View, and it refuses a managed target whose remote definition has drifted.
+Resolve the collision or drift with the owner of the Databricks object, or contact
+[Cube support](/admin/account-billing/support). Cube never deletes or overwrites an object it does
+not manage. A failed conversion, validation, or write leaves that view's previous
+Databricks definition in place. Other views in the same run may still publish.
+
+Removing a view from scope, disabling publication, or Cube support deactivating the preview for
+your account **does not delete** its Databricks Metric View. If you remove a view from scope and
+sync again, run history labels the obsolete target **Obsolete, kept**. If you need to remove one,
+have the target owner review and drop it manually in Databricks.
+
+You can request cancellation of an active run. It prevents further writes but does not undo
+views already published. To roll back a bad definition, restore the desired Cube model,
+deploy it, preview, and sync again. Inspect run history and the Databricks target afterward.
+If publication is unavailable, contact [Cube support](/admin/account-billing/support) with
+the deployment, data source, run ID, and per-view issue codes. Do not send credentials or
+sensitive source data.
