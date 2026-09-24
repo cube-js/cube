@@ -40,7 +40,7 @@ describe('Transpilers', () => {
     }
   });
 
-  it('transpileJsBulk returns each file only the errors it caused', async () => {
+  it('worker transpilation returns each file only the errors it caused', async () => {
     const pool = workerpool.pool(path.join(__dirname, '../../src/compiler/transpilers/transpiler_worker'), { maxWorkers: 1 });
     const file = (name: string, dimensions: string) => ({
       fileName: `${name}.js`,
@@ -61,6 +61,15 @@ describe('Transpilers', () => {
 
       expect(res.map((r) => r.errors.length)).toEqual([0, 1, 0]);
       expect(res[1].errors[0].message).toMatch(/Duplicate property parsing id/);
+
+      // The per-file call on the same worker, whose reporter now holds the error above
+      const single = await pool.exec('transpileJs', [{
+        ...file('fourth', "id: { sql: 'id', type: 'number' }"),
+        transpilers: ['CubeCheckDuplicatePropTranspiler'],
+        cubeNames: [],
+        cubeSymbols: {},
+      }]);
+      expect(single.errors).toEqual([]);
     } finally {
       await pool.terminate();
     }
