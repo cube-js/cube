@@ -318,3 +318,21 @@ async fn sql_granularity_is_not_rolled_up_to_a_coarser_default() {
         assert_eq!(rollup, source);
     }
 }
+
+/// A time dimension with neither a granularity nor a range projects nothing,
+/// so a rollup storing only a `sql` week may serve it: the query asks for the
+/// total, which summing the stored weeks gives.
+#[tokio::test(flavor = "multi_thread")]
+async fn sql_granularity_rollup_serves_a_time_dimension_without_granularity() {
+    let query = indoc! {r#"
+        measures:
+          - demand.net_demand_a
+        time_dimensions:
+          - dimension: plain_dates.plain_date
+    "#};
+    if let Some((rollup, source)) =
+        rollup_vs_source(query, &["demand_by_plain_week_non_strict"]).await
+    {
+        assert_eq!(rollup, source);
+    }
+}
