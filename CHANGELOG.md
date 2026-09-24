@@ -3,6 +3,25 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.7.44](https://github.com/cube-js/cube/compare/v1.7.43...v1.7.44) (2026-09-24)
+
+### Bug Fixes
+
+- **api-gateway:** enforce meta scope on /v1/graphql-to-json ([#11939](https://github.com/cube-js/cube/issues/11939)) ([f566e35](https://github.com/cube-js/cube/commit/f566e35a1aad940ab06dedf380fd2be9f46b5457))
+- **cubestore:** keep create table error messages concise ([#11961](https://github.com/cube-js/cube/issues/11961)) ([f770fda](https://github.com/cube-js/cube/commit/f770fda530bc97cc2593a1978a501868bb372e04))
+- **query-orchestrator:** Bound cached pre-aggregation partition plans ([#11896](https://github.com/cube-js/cube/issues/11896)) ([555e710](https://github.com/cube-js/cube/commit/555e7105d471e67f1c01b8cfc26c25ff9f77937d)), closes [#11860](https://github.com/cube-js/cube/issues/11860)
+- **query-orchestrator:** don't report a cancelled query as a query error ([#11759](https://github.com/cube-js/cube/issues/11759)) ([9070984](https://github.com/cube-js/cube/commit/9070984043e57d79b82e70c0a5dbe7a20b8e0e66))
+- **schema-compiler:** render MSSQL pushdown joins ([#11778](https://github.com/cube-js/cube/issues/11778)) ([218d4a0](https://github.com/cube-js/cube/commit/218d4a0689b5a146d7146ce6794cf5be718fd32e))
+- **tesseract:** never serve a calendar time shift from a plain rollup ([#11979](https://github.com/cube-js/cube/issues/11979)) ([f177d5d](https://github.com/cube-js/cube/commit/f177d5d8713b738154cab5fe7eb63f334c8452c1))
+- **tesseract:** render FILTER_PARAMS on the measure side of a join back ([#11814](https://github.com/cube-js/cube/issues/11814)) ([4cb9452](https://github.com/cube-js/cube/commit/4cb9452355d108187393c43223d30bbfd0cfa8a0))
+- **tesseract:** retry pre-aggregation matching within one external type ([#11812](https://github.com/cube-js/cube/issues/11812)) ([3222ec0](https://github.com/cube-js/cube/commit/3222ec0e1f508566b6e633a69e20f3764f2d4e90))
+- **testing:** gate MSSQL container readiness on the `sa` login ([#11917](https://github.com/cube-js/cube/issues/11917)) ([0564fb5](https://github.com/cube-js/cube/commit/0564fb5b9c2ef7c11618547661a75fa08c438732))
+
+### Features
+
+- **cli:** run agent evals (CUB-3667) ([#11953](https://github.com/cube-js/cube/issues/11953)) ([ecd267c](https://github.com/cube-js/cube/commit/ecd267cd20d165845670f825980e64b98e4eeb88))
+- **hive-driver:** Upgrade thrift 0.20.0 -> 0.23.0 to fix GHSA-r67j-r569-jrwp ([#11969](https://github.com/cube-js/cube/issues/11969)) ([28157ac](https://github.com/cube-js/cube/commit/28157acacca4eacf003986943aca4dd22b563e55))
+
 ## [1.7.43](https://github.com/cube-js/cube/compare/v1.7.42...v1.7.43) (2026-09-21)
 
 ### Bug Fixes

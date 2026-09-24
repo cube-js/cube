@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.7.44](https://github.com/cube-js/cube/compare/v1.7.43...v1.7.44) (2026-09-24)
+
+### Features
+
+- **hive-driver:** Upgrade thrift 0.20.0 -> 0.23.0 to fix GHSA-r67j-r569-jrwp ([#11969](https://github.com/cube-js/cube/issues/11969)) ([28157ac](https://github.com/cube-js/cube/commit/28157acacca4eacf003986943aca4dd22b563e55))
+
 ## [1.7.43](https://github.com/cube-js/cube/compare/v1.7.42...v1.7.43) (2026-09-21)
 
 **Note:** Version bump only for package @cubejs-backend/hive-driver

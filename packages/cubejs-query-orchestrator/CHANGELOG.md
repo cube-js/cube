@@ -3,6 +3,13 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.7.44](https://github.com/cube-js/cube/compare/v1.7.43...v1.7.44) (2026-09-24)
+
+### Bug Fixes
+
+- **query-orchestrator:** Bound cached pre-aggregation partition plans ([#11896](https://github.com/cube-js/cube/issues/11896)) ([555e710](https://github.com/cube-js/cube/commit/555e7105d471e67f1c01b8cfc26c25ff9f77937d)), closes [#11860](https://github.com/cube-js/cube/issues/11860)
+- **query-orchestrator:** don't report a cancelled query as a query error ([#11759](https://github.com/cube-js/cube/issues/11759)) ([9070984](https://github.com/cube-js/cube/commit/9070984043e57d79b82e70c0a5dbe7a20b8e0e66))
+
 ## [1.7.43](https://github.com/cube-js/cube/compare/v1.7.42...v1.7.43) (2026-09-21)
 
 ### Bug Fixes

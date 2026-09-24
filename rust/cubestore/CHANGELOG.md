@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.7.44](https://github.com/cube-js/cube/compare/v1.7.43...v1.7.44) (2026-09-24)
+
+### Bug Fixes
+
+- **cubestore:** keep create table error messages concise ([#11961](https://github.com/cube-js/cube/issues/11961)) ([f770fda](https://github.com/cube-js/cube/commit/f770fda530bc97cc2593a1978a501868bb372e04))
+
 ## [1.7.43](https://github.com/cube-js/cube/compare/v1.7.42...v1.7.43) (2026-09-21)
 
 ### Bug Fixes

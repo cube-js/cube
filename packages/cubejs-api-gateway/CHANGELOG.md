@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.7.44](https://github.com/cube-js/cube/compare/v1.7.43...v1.7.44) (2026-09-24)
+
+### Bug Fixes
+
+- **api-gateway:** enforce meta scope on /v1/graphql-to-json ([#11939](https://github.com/cube-js/cube/issues/11939)) ([f566e35](https://github.com/cube-js/cube/commit/f566e35a1aad940ab06dedf380fd2be9f46b5457))
+
 ## [1.7.43](https://github.com/cube-js/cube/compare/v1.7.42...v1.7.43) (2026-09-21)
 
 **Note:** Version bump only for package @cubejs-backend/api-gateway

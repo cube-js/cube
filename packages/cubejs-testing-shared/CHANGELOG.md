@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.7.44](https://github.com/cube-js/cube/compare/v1.7.43...v1.7.44) (2026-09-24)
+
+### Bug Fixes
+
+- **testing:** gate MSSQL container readiness on the `sa` login ([#11917](https://github.com/cube-js/cube/issues/11917)) ([0564fb5](https://github.com/cube-js/cube/commit/0564fb5b9c2ef7c11618547661a75fa08c438732))
+
 ## [1.7.43](https://github.com/cube-js/cube/compare/v1.7.42...v1.7.43) (2026-09-21)
 
 **Note:** Version bump only for package @cubejs-backend/testing-shared

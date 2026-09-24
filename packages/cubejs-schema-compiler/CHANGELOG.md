@@ -3,6 +3,14 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.7.44](https://github.com/cube-js/cube/compare/v1.7.43...v1.7.44) (2026-09-24)
+
+### Bug Fixes
+
+- **query-orchestrator:** Bound cached pre-aggregation partition plans ([#11896](https://github.com/cube-js/cube/issues/11896)) ([555e710](https://github.com/cube-js/cube/commit/555e7105d471e67f1c01b8cfc26c25ff9f77937d)), closes [#11860](https://github.com/cube-js/cube/issues/11860)
+- **schema-compiler:** render MSSQL pushdown joins ([#11778](https://github.com/cube-js/cube/issues/11778)) ([218d4a0](https://github.com/cube-js/cube/commit/218d4a0689b5a146d7146ce6794cf5be718fd32e))
+- **testing:** gate MSSQL container readiness on the `sa` login ([#11917](https://github.com/cube-js/cube/issues/11917)) ([0564fb5](https://github.com/cube-js/cube/commit/0564fb5b9c2ef7c11618547661a75fa08c438732))
+
 ## [1.7.43](https://github.com/cube-js/cube/compare/v1.7.42...v1.7.43) (2026-09-21)
 
 **Note:** Version bump only for package @cubejs-backend/schema-compiler
