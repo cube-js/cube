@@ -125,6 +125,10 @@ icon (hover over it to see the "Scheduled task" tooltip).
 A run shows as **Running** while it executes, then completes or fails. A
 failed run's thread shows a failure notice instead of an empty thread.
 
+Each run starts a new chat thread with no memory of earlier runs, so write
+the **Instructions** as a complete request rather than a follow-up to the
+last run.
+
 The task runs headlessly under the security context of the user who created
 it, so it sees exactly the data that user can access.
 
@@ -179,7 +183,7 @@ analytics sessions can't use these endpoints.
 | `PUT` | `/api/v1/deployments/{deploymentId}/scheduled-tasks/{taskId}` | Changes only the fields you send; `isEnabled` pauses or resumes, and `cronExpression: null` makes the task Manual |
 | `DELETE` | `/api/v1/deployments/{deploymentId}/scheduled-tasks/{taskId}` | Deletes the task and its schedule |
 | `POST` | `/api/v1/deployments/{deploymentId}/scheduled-tasks/{taskId}/run` | Starts a run now and returns its `chatThreadUuid` |
-| `GET` | `/api/v1/deployments/{deploymentId}/scheduled-tasks/{taskId}/runs` | Lists the chat threads the task's runs produced, newest first |
+| `GET` | `/api/v1/deployments/{deploymentId}/scheduled-tasks/{taskId}/runs` | Lists the chat threads of the task's latest 50 runs, newest first, like the detail page |
 
 For example, to create a task that runs at 9:00 New York time on weekdays:
 
@@ -197,7 +201,9 @@ curl --request POST \
 ```
 
 In the API, `prompt` is the task's **Instructions**, and `cronExpression`
-and `timezone` make up its **Schedule**.
+and `timezone` make up its **Schedule**. A new task is enabled unless you
+send `"isEnabled": false`, so a task created with a `cronExpression` is
+active and counts toward the limit.
 
 The API applies the same [limits](#limits) and permissions as the
 **Scheduled** page:
@@ -211,5 +217,3 @@ The API applies the same [limits](#limits) and permissions as the
 - Every endpoint returns `403` while Scheduled Tasks aren't enabled for your
   account.
 
-Each run starts a new chat thread with no memory of earlier runs, so write the
-prompt as a complete request.
