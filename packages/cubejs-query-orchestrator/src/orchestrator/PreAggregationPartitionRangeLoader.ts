@@ -203,7 +203,7 @@ export class PreAggregationPartitionRangeLoader {
     }];
   }
 
-  private partitionPreAggregationDescription(range: QueryDateRange, buildRange: QueryDateRange): PreAggregationDescription {
+  protected partitionPreAggregationDescription(range: QueryDateRange, buildRange: QueryDateRange): PreAggregationDescription {
     const partitionTableName = PreAggregationPartitionRangeLoader.partitionTableName(
       this.preAggregation.tableName, this.preAggregation.partitionGranularity, range
     );
@@ -442,14 +442,29 @@ export class PreAggregationPartitionRangeLoader {
 
   public async partitionPreAggregations(): Promise<PreAggregationDescription[]> {
     if (this.preAggregation.partitionGranularity && !this.preAggregation.expandedPartition) {
-      const { buildRange, partitionRanges } = await this.partitionRanges();
-      return this.compilerCacheFn(['partitions', JSON.stringify(buildRange)], () => partitionRanges.map(range => this.partitionPreAggregationDescription(range, buildRange)));
+      const buildRange = await this.effectiveDateRange();
+      const { preAggregationId, tableName, dataSource, timezone, partitionGranularity, timestampFormat, timestampPrecision } = this.preAggregation;
+      const identity = { preAggregationId, tableName, dataSource, timezone, partitionGranularity, timestampFormat, timestampPrecision };
+      const cachedPlan = this.compilerCacheFn<{ rangeKey: string | null; descriptions: PreAggregationDescription[] }>(
+        ['partitionPlan', JSON.stringify(identity)], () => ({ rangeKey: null, descriptions: [] })
+      );
+      const rangeKey = JSON.stringify(buildRange);
+      if (cachedPlan.rangeKey === rangeKey) {
+        this.checkMaxPartitions(cachedPlan.descriptions.length);
+        return cachedPlan.descriptions;
+      }
+
+      const descriptions = this.partitionRangesForDateRange(buildRange)
+        .map(range => this.partitionPreAggregationDescription(range, buildRange));
+      // Replace only after successful expansion; in-flight requests may still use the old array.
+      Object.assign(cachedPlan, { rangeKey, descriptions });
+      return descriptions;
     } else {
       return [this.preAggregation];
     }
   }
 
-  private async partitionRanges(ignoreMatchedDateRange?: boolean): Promise<PartitionRanges> {
+  private async effectiveDateRange(ignoreMatchedDateRange?: boolean): Promise<QueryDateRange> {
     const buildRange = await this.loadBuildRange();
 
     // buildRange was localized in loadBuildRange()
@@ -466,22 +481,28 @@ export class PreAggregationPartitionRangeLoader {
       dateRange = [buildRange[1], buildRange[1]];
     }
 
-    const partitionRanges = this.compilerCacheFn(
-      ['timeSeries', this.preAggregation.partitionGranularity, JSON.stringify(dateRange), `${this.preAggregation.timestampPrecision}`],
-      () => PreAggregationPartitionRangeLoader.timeSeries(
-        this.preAggregation.partitionGranularity,
-        dateRange,
-        this.preAggregation.timestampPrecision
-      )
-    );
+    return dateRange;
+  }
 
-    if (partitionRanges.length > this.options.maxPartitions) {
+  private checkMaxPartitions(count: number): void {
+    if (count > this.options.maxPartitions) {
       throw new Error(
-        `Pre-aggregation '${this.preAggregation.tableName}' requested to build ${partitionRanges.length} partitions which exceeds the maximum number of partitions per pre-aggregation of ${this.options.maxPartitions}`
+        `Pre-aggregation '${this.preAggregation.tableName}' requested to build ${count} partitions which exceeds the maximum number of partitions per pre-aggregation of ${this.options.maxPartitions}`
       );
     }
+  }
 
-    return { buildRange: dateRange, partitionRanges };
+  private partitionRangesForDateRange(dateRange: QueryDateRange): QueryDateRange[] {
+    const ranges = PreAggregationPartitionRangeLoader.timeSeries(
+      this.preAggregation.partitionGranularity, dateRange, this.preAggregation.timestampPrecision
+    );
+    this.checkMaxPartitions(ranges.length);
+    return ranges;
+  }
+
+  protected async partitionRanges(ignoreMatchedDateRange?: boolean): Promise<PartitionRanges> {
+    const buildRange = await this.effectiveDateRange(ignoreMatchedDateRange);
+    return { buildRange, partitionRanges: this.partitionRangesForDateRange(buildRange) };
   }
 
   public async loadBuildRange(timestampFormat: string = DEFAULT_TS_FORMAT): Promise<QueryDateRange> {
