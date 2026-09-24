@@ -104,33 +104,51 @@ async fn test_float_literal_member_pushdown_fallback() {
     if !Rewriter::sql_push_down_enabled() {
         return;
     }
-    for (sql_type, type_template, rendered) in [
-        ("REAL", "types/float", "CAST(100 AS FLOAT)"),
-        ("DOUBLE", "types/double", "CAST(100 AS DOUBLE)"),
+    for (sql_type, type_template, rendered, literal) in [
+        (
+            "REAL",
+            "types/float",
+            "CAST(100 AS FLOAT)",
+            ScalarValue::Float32(Some(100.0)),
+        ),
+        (
+            "DOUBLE",
+            "types/double",
+            "CAST(100 AS DOUBLE)",
+            ScalarValue::Float64(Some(100.0)),
+        ),
     ] {
-        for missing in [false, true] {
-            let plan = convert_select_to_query_plan_customized(
-                format!(
+        for missing_source in [None, Some("default"), Some("other")] {
+            let meta = get_test_tenant_ctx_with_multi_data_source_view_and_templates(
+                missing_source
+                    .into_iter()
+                    .map(|source| (source, vec![(type_template.to_string(), String::new())]))
+                    .collect(),
+            );
+            let plan = convert_sql_to_cube_query(
+                &format!(
                     "SELECT SUM(v) FROM (SELECT CAST(100 AS {sql_type}) AS v \
                      FROM KibanaSampleDataEcommerce LIMIT 0) q"
                 ),
-                DatabaseProtocol::PostgreSQL,
-                if missing {
-                    vec![(type_template.to_string(), String::new())]
-                } else {
-                    vec![]
-                },
+                meta.clone(),
+                get_test_session(DatabaseProtocol::PostgreSQL, meta).await,
             )
-            .await;
+            .await
+            .unwrap();
             // LIMIT 0 preserves a literal scan member, bypassing expression gates.
             // A missing type must still leave an executable local plan.
-            if !missing {
-                assert!(plan
-                    .as_logical_plan()
+            if missing_source != Some("default") {
+                let logical_plan = plan.as_logical_plan();
+                assert!(logical_plan
                     .find_cube_scan_wrapped_sql()
                     .wrapped_sql
                     .sql
                     .contains(rendered));
+                // An unrelated source must not force an alternative scan of regular members.
+                assert_eq!(
+                    logical_plan.find_cube_scan().member_fields,
+                    vec![MemberField::Literal(literal.clone())]
+                );
             }
             plan.as_physical_plan().await.unwrap();
         }

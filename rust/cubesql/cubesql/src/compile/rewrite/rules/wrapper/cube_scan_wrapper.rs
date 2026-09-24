@@ -188,9 +188,15 @@ impl WrapperRules {
             let data_sources_out = data_sources_out
                 .into_iter()
                 .filter(|source| {
-                    let data_source = source
-                        .as_deref()
-                        .map_or(DataSource::Unrestricted, DataSource::Specific);
+                    let data_source = match source.as_deref() {
+                        Some(source) => DataSource::Specific(source),
+                        // With no named members, the renderer resolves the scanned cubes.
+                        None => meta
+                            .data_source_for_cube_names(
+                                alias_to_cube.iter().map(|(_, cube)| cube.as_str()),
+                            )
+                            .unwrap_or(DataSource::Unrestricted),
+                    };
                     members.list.iter().all(|(_, member, _)| match member {
                         Member::LiteralMember { value, .. } => {
                             Self::can_push_down_float_literal(value, &data_source, &meta)
