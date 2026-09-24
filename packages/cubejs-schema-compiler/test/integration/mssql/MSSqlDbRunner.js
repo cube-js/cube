@@ -98,17 +98,6 @@ export class MSSqlDbRunner extends BaseDbRunner {
     return process.env.TEST_DB_PASSWORD || 'Test1test';
   }
 
-  sqlcmdPrefix(version) {
-    if (version === '2017-latest') {
-      return '/opt/mssql-tools/bin/';
-    }
-
-    // Thanks, Microsoft the last 2019 Version that has same path is "2019-CU27-ubuntu-20.04"
-    // Starting with "2019-latest" published on 08/01/2024 - new path is "/opt/mssql-tools18/bin/"
-    // @see https://learn.microsoft.com/en-us/troubleshoot/sql/releases/sqlserver-2019/cumulativeupdate28#3217207
-    return '/opt/mssql-tools18/bin/';
-  }
-
   async containerLazyInit() {
     const version = process.env.TEST_MSSQL_VERSION || '2019-latest';
 
@@ -122,7 +111,7 @@ export class MSSqlDbRunner extends BaseDbRunner {
       .withHealthCheck({
         test: [
           'CMD-SHELL',
-          `${this.sqlcmdPrefix(version)}sqlcmd -C -l 1 -S localhost -U sa -P ${this.password()} -Q "SELECT 1" || exit 1`
+          '/opt/mssql-tools18/bin/sqlcmd -C -l 1 -S localhost -U sa -P "$MSSQL_SA_PASSWORD" -Q "SELECT 1" || exit 1'
         ],
         interval: 1000,
         timeout: 1100,
