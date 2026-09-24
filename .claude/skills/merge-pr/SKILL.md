@@ -22,9 +22,7 @@ gh pr view <n> --json number,title,body,state,isDraft,mergeable,commits,headRefN
 ```
 
 Stop and report back if the PR is a draft or has conflicts. Do not use
-`--auto`: repo auto-merge is off, so `gh pr merge --auto` merges immediately
-(exit 0, no output) instead of waiting for CI. Do not use `--admin` unless
-the user explicitly asked for it.
+`--admin` unless the user explicitly asked for it.
 
 ## 2. Write the body
 
