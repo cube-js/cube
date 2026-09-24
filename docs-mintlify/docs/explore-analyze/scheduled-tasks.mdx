@@ -180,8 +180,10 @@ The agent follows the same [limits](#limits) and permissions as the
 You can manage Scheduled Tasks from scripts and CI with the
 [Cube Platform API](/api-reference/introduction). Authenticate as described in
 [Authentication](/api-reference/authentication); every request acts as the
-user who owns the credential, who needs access to the deployment. Embedded
-analytics sessions can't use these endpoints.
+user who owns the credential, who needs access to the deployment. Only admins
+hold API keys unless the account allows
+[all users to create them](/admin/account-billing/api-keys#personal-api-keys).
+Embedded analytics sessions can't use these endpoints.
 
 | Method | Path | What it does |
 | --- | --- | --- |
