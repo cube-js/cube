@@ -6855,6 +6855,31 @@ ORDER BY
         Ok(())
     }
 
+    // https://github.com/cube-js/cube/issues/8156
+    #[tokio::test]
+    async fn test_union_cte_qualified_column() -> Result<(), CubeError> {
+        init_testing_logger();
+
+        let query_plan = convert_select_to_query_plan(
+            "
+            WITH test AS (
+                SELECT customer_gender FROM KibanaSampleDataEcommerce
+                UNION
+                SELECT customer_gender FROM KibanaSampleDataEcommerce
+            )
+            SELECT test.customer_gender FROM test
+            "
+            .to_string(),
+            DatabaseProtocol::PostgreSQL,
+        )
+        .await;
+
+        let logical_plan = query_plan.as_logical_plan();
+        assert_eq!(logical_plan.schema().field(0).name(), "customer_gender");
+
+        Ok(())
+    }
+
     #[tokio::test]
     async fn test_cast_decimal_default_precision() -> Result<(), CubeError> {
         if !Rewriter::sql_push_down_enabled() {
