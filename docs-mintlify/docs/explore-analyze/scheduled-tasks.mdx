@@ -46,7 +46,8 @@ offering these frequencies:
   **Run now**.
 - **Hourly**, **Daily**, **Weekly** (with a day of the week), and **Monthly**
   (with a day of the month) — each with a time picker.
-- **Custom** — a raw cron expression for full control.
+- **Custom** — a raw cron expression, as long as it fires at most once an
+  hour (see below).
 
 A **timezone** selector (defaulting to your browser's timezone) controls when
 the schedule fires; it is stored per task.
