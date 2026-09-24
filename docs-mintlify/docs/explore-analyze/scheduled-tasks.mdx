@@ -46,15 +46,12 @@ offering these frequencies:
   **Run now**.
 - **Hourly**, **Daily**, **Weekly** (with a day of the week), and **Monthly**
   (with a day of the month) — each with a time picker.
-- **Custom** — a raw cron expression, as long as it fires at most once an
-  hour (see below).
+- **Custom** — a raw five-field cron expression. Its minute field must be a
+  single number, so it fires at most once an hour: `30 9 * * 1-5` (9:30 on
+  weekdays) works, while `*/15 * * * *` is rejected.
 
 A **timezone** selector (defaulting to your browser's timezone) controls when
 the schedule fires; it is stored per task.
-
-A custom cron must be a standard five-field expression whose minute field
-is a single number: `0 * * * *` (every hour) and `30 9 * * 1-5` (9:30 on
-weekdays) work, while `*/15 * * * *` is rejected.
 
 ## Limits
 
@@ -64,6 +61,10 @@ tasks don't count toward this limit. At the limit, anything that would make
 a task active fails: creating a scheduled task, resuming a paused one, or
 adding a schedule to a **Manual** task. Pause or delete another task first,
 or keep the new one **Manual**.
+
+The **Scheduled** page lists one deployment's tasks, so active tasks you
+created in other deployments count toward the limit without appearing there.
+Check the **Scheduled** page of each deployment you work in to find them.
 
 ## Managing tasks
 
