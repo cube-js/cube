@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-empty-function */
 
-import { SchemaFileRepository, withTimeout } from '@cubejs-backend/shared';
+import { dropPreAggregationsSchemaPin, SchemaFileRepository, withTimeout } from '@cubejs-backend/shared';
 
 import {
   CreateOptions,
@@ -98,6 +98,12 @@ describe('index.test', () => {
     delete process.env.CUBEJS_SCHEDULED_REFRESH_TIMER;
     delete process.env.CUBEJS_LOG_REDACTION;
 
+    // The cores built here take the pin and are never shut down, so without this the
+    // first dev-mode one leaves `dev_pre_aggregations` set and every later case that
+    // resolves its own schema prints the conflict warning at it
+    dropPreAggregationsSchemaPin();
+    delete process.env.CUBEJS_PRE_AGGREGATIONS_SCHEMA;
+
     process.env.NODE_ENV = 'development';
     process.env.CUBEJS_API_SECRET = 'api-secret';
   });
@@ -179,6 +185,9 @@ describe('index.test', () => {
   });
 
   test('externalDriverFactory should return driver, failure', async () => {
+    // No driverFactory and no CUBEJS_DB_TYPE, which only dev mode allows
+    process.env.CUBEJS_DEV_MODE = 'true';
+
     const options: CreateOptions = { externalDriverFactory: () => <any>null, };
 
     const [_driverFactory, orchestratorOptions] = await getCreateOrchestratorOptionsFromServer(options);
@@ -626,6 +635,8 @@ describe('index.test', () => {
   });
 
   test('Should not throw when the required options are missing in dev mode and no config file exists', () => {
+    process.env.CUBEJS_DEV_MODE = 'true';
+
     expect(() => {
       jest.spyOn(CubejsServerCoreOpen.prototype, 'isReadyForQueryProcessing').mockImplementation(() => false);
       // eslint-disable-next-line

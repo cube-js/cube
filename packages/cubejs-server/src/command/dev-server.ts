@@ -16,10 +16,12 @@ export class DevServer extends Command {
   public async run() {
     const options = this.parse(DevServer);
 
-    process.env.NODE_ENV = 'development';
-
+    // ServerContainer turns this into CreateOptions.devServer, after dotenv, so that an
+    // explicit CUBEJS_DEV_MODE — from the environment or .env — still wins. It stays out
+    // of process.env: that variable also gates the SQL API's port and password check
     const container = new ServerContainer({
       debug: options.flags.debug,
+      devMode: true,
     });
     await container.runProjectDiagnostics();
     await container.start();

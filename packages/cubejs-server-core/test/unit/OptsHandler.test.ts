@@ -11,6 +11,7 @@ import type {
   ServerCoreInitializedOptions,
 } from '../../src/core/types';
 import type { OptsHandler } from '../../src/core/OptsHandler';
+import { dropPreAggregationsSchemaPin } from '@cubejs-backend/shared';
 import { lookupDriverClass } from '../../src/core/DriverResolvers';
 import { CubejsServerCore } from '../../src/core/server';
 import { CreateOptions, SystemOptions } from '../../src/core/types';
@@ -55,6 +56,16 @@ const conf = {
 };
 
 describe('OptsHandler class', () => {
+  afterEach(() => {
+    delete process.env.CUBEJS_DEV_MODE;
+    delete process.env.CUBEJS_DB_TYPE;
+    // The variable and the module-level latch behind it. Clearing only the variable
+    // leaves userPreAggregationsSchema() comparing against the previous case's pin,
+    // so a case using a schema an earlier one pinned would silently stop testing itself
+    dropPreAggregationsSchemaPin();
+    delete process.env.CUBEJS_PRE_AGGREGATIONS_SCHEMA;
+  });
+
   test('must throw if CreateOptions.dbType is specified', () => {
     expect(() => new CubejsServerCoreExposed(<any>{
       ...conf,
@@ -287,7 +298,6 @@ describe('OptsHandler class', () => {
     // Case 3
     expect(() => {
       process.env.CUBEJS_DB_TYPE = undefined;
-      process.env.NODE_ENV = 'production';
       // eslint-disable-next-line @typescript-eslint/no-unused-vars
       core = new CubejsServerCoreExposed({
         ...conf,
@@ -301,7 +311,6 @@ describe('OptsHandler class', () => {
     // Case 4
     expect(() => {
       delete process.env.CUBEJS_DB_TYPE;
-      process.env.NODE_ENV = 'production';
       // eslint-disable-next-line @typescript-eslint/no-unused-vars
       core = new CubejsServerCoreExposed({
         ...conf,
@@ -311,11 +320,13 @@ describe('OptsHandler class', () => {
     }).toThrow(
       'Either CUBEJS_DB_TYPE or CreateOptions.driverFactory must be specified'
     );
-
-    delete process.env.NODE_ENV;
   });
 
   test('must configure/reconfigure contextToDbType', async () => {
+    // Outside of dev mode CUBEJS_DB_TYPE or a driverFactory is required upfront,
+    // and this case is about resolving the type after the instance was created
+    process.env.CUBEJS_DEV_MODE = 'true';
+
     const core = new CubejsServerCoreExposed({
       ...conf,
       driverFactory: undefined,
@@ -331,6 +342,234 @@ describe('OptsHandler class', () => {
     process.env.CUBEJS_DB_TYPE = 'postgres';
     core.reloadEnvVariables();
     expect(await core.contextToDbType({} as DriverContext)).toEqual('postgres');
+  });
+
+  test('must treat CreateOptions.devServer as dev mode without CUBEJS_DEV_MODE', async () => {
+    // The gateway resolves devServer the same way, so server-core must not answer
+    // "production" for an instance whose playground it just mounted
+    process.env.CUBEJS_DB_TYPE = 'postgres';
+
+    // `conf` pins externalDbType, which would mask the default this asserts
+    const { externalDbType, externalDriverFactory, ...confWithoutExternal } = conf;
+
+    const core = new CubejsServerCoreExposed({
+      ...confWithoutExternal,
+      devServer: true,
+      driverFactory: () => ({ type: <DatabaseType>'postgres' }),
+    });
+
+    expect(core.options.devServer).toBe(true);
+    expect(core.options.preAggregationsSchema).toEqual('dev_pre_aggregations');
+    // A driver reads the variable and falls back to CUBEJS_DEV_MODE, which is unset
+    // here, so without the pin DatabricksDriver would answer `prod_pre_aggregations`
+    expect(process.env.CUBEJS_PRE_AGGREGATIONS_SCHEMA).toEqual('dev_pre_aggregations');
+    // Without this the instance gets no external DB at all, so the first
+    // pre-aggregation build fails with `externalDriverFactory is not provided`
+    expect(core.options.externalDbType).toEqual('cubestore');
+  });
+
+  test('must not treat an explicit devServer: false as dev mode', async () => {
+    process.env.CUBEJS_DEV_MODE = 'true';
+    process.env.CUBEJS_DB_TYPE = 'postgres';
+
+    const core = new CubejsServerCoreExposed({
+      ...conf,
+      devServer: false,
+      driverFactory: () => ({ type: <DatabaseType>'postgres' }),
+    });
+
+    expect(core.options.devServer).toBe(false);
+    expect(core.options.preAggregationsSchema).toEqual('prod_pre_aggregations');
+    // The mirror of the case above, and the one master kept in step: the variable says
+    // dev mode, the option overrules it, and a driver left on the variable would build
+    // its catalog-qualifying regex from `dev_pre_aggregations` while this instance
+    // names `prod_pre_aggregations` in the statement
+    expect(process.env.CUBEJS_PRE_AGGREGATIONS_SCHEMA).toEqual('prod_pre_aggregations');
+  });
+
+  test('must leave an explicit CUBEJS_PRE_AGGREGATIONS_SCHEMA alone', async () => {
+    process.env.CUBEJS_PRE_AGGREGATIONS_SCHEMA = 'my_schema';
+    process.env.CUBEJS_DB_TYPE = 'postgres';
+
+    const core = new CubejsServerCoreExposed({
+      ...conf,
+      devServer: true,
+      driverFactory: () => ({ type: <DatabaseType>'postgres' }),
+    });
+
+    expect(core.options.preAggregationsSchema).toEqual('my_schema');
+    expect(process.env.CUBEJS_PRE_AGGREGATIONS_SCHEMA).toEqual('my_schema');
+  });
+
+  test('must pin CreateOptions.preAggregationsSchema, not the default it overrides', async () => {
+    process.env.CUBEJS_DB_TYPE = 'postgres';
+
+    const core = new CubejsServerCoreExposed({
+      ...conf,
+      preAggregationsSchema: 'analytics_preaggs',
+      driverFactory: () => ({ type: <DatabaseType>'postgres' }),
+    });
+
+    // `...opts` wins over the dev/prod default, so pinning before the merge would put a
+    // driver on `prod_pre_aggregations` while this instance names `analytics_preaggs`
+    expect(core.options.preAggregationsSchema).toEqual('analytics_preaggs');
+    expect(process.env.CUBEJS_PRE_AGGREGATIONS_SCHEMA).toEqual('analytics_preaggs');
+  });
+
+  test('must not pin a per-tenant preAggregationsSchema function', async () => {
+    process.env.CUBEJS_DB_TYPE = 'postgres';
+
+    const core = new CubejsServerCoreExposed({
+      ...conf,
+      preAggregationsSchema: (ctx) => `preaggs_${ctx.securityContext?.tenantId}`,
+      driverFactory: () => ({ type: <DatabaseType>'postgres' }),
+    });
+
+    // No single schema to pin, so the variable is left unset and a driver falls back to
+    // its own CUBEJS_DEV_MODE reading. Pinning any one tenant's schema would be worse
+    expect(typeof core.options.preAggregationsSchema).toEqual('function');
+    expect(process.env.CUBEJS_PRE_AGGREGATIONS_SCHEMA).toBeUndefined();
+  });
+
+  test('must not pin for a construction that throws', async () => {
+    process.env.CUBEJS_DB_TYPE = 'postgres';
+
+    // Reaches initializeCoreOptions and then fails its required-option check. A pin
+    // taken before that has no owner: shutdown never runs, so nothing releases it, and
+    // the next instance is told to align with a schema a dead attempt chose
+    expect(() => new CubejsServerCoreExposed({
+      driverFactory: () => ({ type: <DatabaseType>'postgres' }),
+    })).toThrow('required option(s)');
+
+    expect(process.env.CUBEJS_PRE_AGGREGATIONS_SCHEMA).toBeUndefined();
+  });
+
+  test('must not pin for a throw after the options are resolved', async () => {
+    process.env.CUBEJS_DB_TYPE = 'postgres';
+
+    const { externalDbType, externalDriverFactory, ...confWithoutExternal } = conf;
+
+    // Options resolve, and the constructor throws further down. Validating inside
+    // OptsHandler is not enough for that reason: the pin has to be the last thing the
+    // constructor does, or an attempt that never became an instance holds it forever
+    expect(() => new CubejsServerCoreExposed(<CreateOptions>{
+      ...confWithoutExternal,
+      devServer: true,
+      driverFactory: () => ({ type: <DatabaseType>'postgres' }),
+      contextToDataSourceId: () => 'tenant',
+    })).toThrow('contextToDataSourceId has been deprecated');
+
+    expect(process.env.CUBEJS_PRE_AGGREGATIONS_SCHEMA).toBeUndefined();
+  });
+
+  test('must not let a repeated shutdown release another instance\'s share', async () => {
+    process.env.CUBEJS_DB_TYPE = 'postgres';
+
+    const { externalDbType, externalDriverFactory, ...confWithoutExternal } = conf;
+
+    const first = new CubejsServerCoreExposed({
+      ...confWithoutExternal,
+      devServer: true,
+      driverFactory: () => ({ type: <DatabaseType>'postgres' }),
+    });
+
+    const second = new CubejsServerCoreExposed({
+      ...confWithoutExternal,
+      devServer: true,
+      driverFactory: () => ({ type: <DatabaseType>'postgres' }),
+    });
+
+    await first.shutdown();
+    // shutdown() is public and unguarded, so a host that calls it on a signal and again
+    // on exit gets here. The pin counts holders rather than naming them, so the second
+    // call would spend `second`'s share and delete the variable it is still serving on
+    await first.shutdown();
+
+    expect(process.env.CUBEJS_PRE_AGGREGATIONS_SCHEMA).toEqual('dev_pre_aggregations');
+
+    await second.shutdown();
+
+    expect(process.env.CUBEJS_PRE_AGGREGATIONS_SCHEMA).toBeUndefined();
+  });
+
+  test('must keep the pin while a second instance on the same schema is up', async () => {
+    process.env.CUBEJS_DB_TYPE = 'postgres';
+
+    const { externalDbType, externalDriverFactory, ...confWithoutExternal } = conf;
+
+    const first = new CubejsServerCoreExposed({
+      ...confWithoutExternal,
+      devServer: true,
+      driverFactory: () => ({ type: <DatabaseType>'postgres' }),
+    });
+
+    const second = new CubejsServerCoreExposed({
+      ...confWithoutExternal,
+      devServer: true,
+      driverFactory: () => ({ type: <DatabaseType>'postgres' }),
+    });
+
+    await first.shutdown();
+
+    // `second` is still serving, and its driver reads the variable directly: losing it
+    // here sends the driver to `prod_pre_aggregations` while the plan names `dev_`
+    expect(second.options.preAggregationsSchema).toEqual('dev_pre_aggregations');
+    expect(process.env.CUBEJS_PRE_AGGREGATIONS_SCHEMA).toEqual('dev_pre_aggregations');
+
+    await second.shutdown();
+
+    expect(process.env.CUBEJS_PRE_AGGREGATIONS_SCHEMA).toBeUndefined();
+  });
+
+  test('must let an instance that shut down hand the pin to the next', async () => {
+    process.env.CUBEJS_DB_TYPE = 'postgres';
+
+    const { externalDbType, externalDriverFactory, ...confWithoutExternal } = conf;
+
+    const dev = new CubejsServerCoreExposed({
+      ...confWithoutExternal,
+      devServer: true,
+      driverFactory: () => ({ type: <DatabaseType>'postgres' }),
+    });
+
+    expect(process.env.CUBEJS_PRE_AGGREGATIONS_SCHEMA).toEqual('dev_pre_aggregations');
+
+    await dev.shutdown();
+
+    // Without the release the next instance's drivers stay on `dev_pre_aggregations`
+    // while it names `prod_pre_aggregations` in the statement
+    const prod = new CubejsServerCoreExposed({
+      ...conf,
+      devServer: false,
+      driverFactory: () => ({ type: <DatabaseType>'postgres' }),
+    });
+
+    expect(prod.options.preAggregationsSchema).toEqual('prod_pre_aggregations');
+    expect(process.env.CUBEJS_PRE_AGGREGATIONS_SCHEMA).toEqual('prod_pre_aggregations');
+  });
+
+  test('must not let one instance pin the schema for the next', async () => {
+    process.env.CUBEJS_DB_TYPE = 'postgres';
+
+    const { externalDbType, externalDriverFactory, ...confWithoutExternal } = conf;
+
+    const dev = new CubejsServerCoreExposed({
+      ...confWithoutExternal,
+      devServer: true,
+      driverFactory: () => ({ type: <DatabaseType>'postgres' }),
+    });
+
+    const prod = new CubejsServerCoreExposed({
+      ...conf,
+      devServer: false,
+      driverFactory: () => ({ type: <DatabaseType>'postgres' }),
+    });
+
+    // The pin is a process-wide variable written for drivers, which have no default of
+    // their own. Reading it back as if the user had set it would hand the second
+    // instance the first's schema, silently overruling its own dev mode
+    expect(dev.options.preAggregationsSchema).toEqual('dev_pre_aggregations');
+    expect(prod.options.preAggregationsSchema).toEqual('prod_pre_aggregations');
   });
 
   test('must determine custom drivers from the cube.js file', async () => {

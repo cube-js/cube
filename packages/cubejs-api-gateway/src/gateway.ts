@@ -223,6 +223,8 @@ class ApiGateway {
 
   protected readonly subscriptionStore: any;
 
+  protected readonly devServer: boolean;
+
   protected readonly enforceSecurityChecks: boolean;
 
   protected readonly standalone: boolean;
@@ -285,7 +287,13 @@ class ApiGateway {
 
     this.queryRewrite = options.queryRewrite || (async (query) => query);
     this.subscriptionStore = options.subscriptionStore || new LocalSubscriptionStore();
-    this.enforceSecurityChecks = options.enforceSecurityChecks || (process.env.NODE_ENV === 'production');
+    // server-core resolves dev mode and passes it down; CUBEJS_DEV_MODE is the fallback
+    // for anyone constructing the gateway directly
+    this.devServer = options.devServer ?? getEnv('devMode');
+    // `||`, not `??`: master's semantics, where an explicit `false` cannot disable auth
+    // outside dev mode. server-core never passes this key, so the `!devServer` default
+    // is reached either way - `??` would only loosen it for direct gateway embedders
+    this.enforceSecurityChecks = options.enforceSecurityChecks || !this.devServer;
     this.extendContext = options.extendContext;
 
     this.checkAuthFn = this.createCheckAuthFn(options);
@@ -299,6 +307,7 @@ class ApiGateway {
     this.event = options.event || function dummyEvent() {};
     this.sqlServer = this.createSQLServerInstance({
       gatewayPort: options.gatewayPort,
+      devServer: this.devServer,
     });
   }
 
@@ -309,6 +318,7 @@ class ApiGateway {
   protected createSQLServerInstance(options: SQLServerConstructorOptions): SQLServer {
     return new SQLServer(this, {
       gatewayPort: options.gatewayPort,
+      devServer: options.devServer,
     });
   }
 
@@ -365,7 +375,7 @@ class ApiGateway {
             res,
             apiGateway: this
           },
-          graphiql: getEnv('nodeEnv') !== 'production'
+          graphiql: this.devServer
             ? { headerEditorEnabled: true }
             : false,
           extensions: () => (res as any).extensions || {},
@@ -534,7 +544,7 @@ class ApiGateway {
         const jsonQuery = getJsonQueryFromGraphQLQuery(query, metaConfig, variables);
         res.json({ jsonQuery });
       } catch (e: any) {
-        const stack = getEnv('devMode') ? e.stack : undefined;
+        const stack = this.devServer ? e.stack : undefined;
         this.logger('GraphQL to JSON error', {
           error: (stack || e).toString(),
         });
@@ -719,7 +729,7 @@ class ApiGateway {
   }
 
   private filterVisibleItemsInMeta(context: RequestContext, cubes: any[]) {
-    const isDevMode = getEnv('devMode');
+    const isDevMode = this.devServer;
     function visibilityFilter(item) {
       return isDevMode || context.signedWithPlaygroundAuthSecret || item.isVisible;
     }
@@ -1577,7 +1587,7 @@ class ApiGateway {
         normalizedQueries.map(async (normalizedQuery) => (await this.getCompilerApi(context)).getSql(
           this.coerceForSqlQuery({ ...normalizedQuery, memberToAlias, expressionParams, disableExternalPreAggregations }, context),
           {
-            includeDebugInfo: getEnv('devMode') || context.signedWithPlaygroundAuthSecret,
+            includeDebugInfo: this.devServer || context.signedWithPlaygroundAuthSecret,
             exportAnnotatedSql,
           }
         ))
@@ -1828,7 +1838,7 @@ class ApiGateway {
         normalizedQueries.map(async (normalizedQuery) => (await this.getCompilerApi(context)).getSql(
           this.coerceForSqlQuery(normalizedQuery, context),
           {
-            includeDebugInfo: getEnv('devMode') || context.signedWithPlaygroundAuthSecret
+            includeDebugInfo: this.devServer || context.signedWithPlaygroundAuthSecret
           }
         ))
       );
@@ -2024,7 +2034,7 @@ class ApiGateway {
       // replaces it with the unredacted object.
       usedPreAggregations: publicUsedPreAggregations(response.usedPreAggregations),
       ...(
-        getEnv('devMode') ||
+        this.devServer ||
           context.signedWithPlaygroundAuthSecret
           ? {
             refreshKeyValues: response.refreshKeyValues,
@@ -2510,7 +2520,7 @@ class ApiGateway {
    * the body carried no statement (validation failed on it).
    */
   private redactedSqlForLog(query: unknown): { sql: string } | undefined {
-    if (!getEnv('logRedaction') || typeof query !== 'string') {
+    if (!getEnv('logRedaction', this.devServer) || typeof query !== 'string') {
       return undefined;
     }
 
@@ -2525,8 +2535,8 @@ class ApiGateway {
   public handleError({
     e, context, query, redactedQuery, res, requestStarted
   }: HandleErrorOptions) {
-    const requestId = getEnv('devMode') || context?.signedWithPlaygroundAuthSecret ? context?.requestId : undefined;
-    const stack = getEnv('devMode') ? e.stack : undefined;
+    const requestId = this.devServer || context?.signedWithPlaygroundAuthSecret ? context?.requestId : undefined;
+    const stack = this.devServer ? e.stack : undefined;
 
     const plainError = e.plainMessages;
     const loggedQuery = {
@@ -2885,7 +2895,7 @@ class ApiGateway {
     } catch (e: unknown) {
       if (e instanceof CubejsHandlerError) {
         const error = e.originalError || e;
-        const stack = getEnv('devMode') ? error.stack : undefined;
+        const stack = this.devServer ? error.stack : undefined;
         this.log({
           type: error.message,
           url: req.url,
@@ -2895,7 +2905,7 @@ class ApiGateway {
 
         res.status(e.status).json({ error: e.message });
       } else if (e instanceof Error) {
-        const stack = getEnv('devMode') ? e.stack : undefined;
+        const stack = this.devServer ? e.stack : undefined;
         this.log({
           type: 'Auth Error',
           token,
@@ -3034,7 +3044,7 @@ class ApiGateway {
   };
 
   private logProbeError(e: any, type: string): void {
-    const stack = getEnv('devMode') ? (e as Error).stack : undefined;
+    const stack = this.devServer ? (e as Error).stack : undefined;
     this.log({
       type,
       driverType: e.driverType,

@@ -120,6 +120,9 @@ export type SQLInterfaceOptions = {
   canSwitchUserForSession: (payload: CanSwitchUserPayload) => unknown | Promise<unknown>,
   // gateway options
   gatewayPort?: number,
+  /** Development mode as server-core resolved it; the native side can only read
+   * CUBEJS_DEV_MODE, which CreateOptions.devServer overrides */
+  devServer?: boolean,
 };
 
 export interface TransformConfig {

@@ -233,34 +233,69 @@ describe('CUBEJS_LOG_REDACTION', () => {
   afterEach(() => {
     delete process.env.CUBEJS_LOG_REDACTION;
     delete process.env.CUBEJS_DEV_MODE;
-    process.env.NODE_ENV = nodeEnv;
+    // Assigning an undefined `nodeEnv` back would store the string "undefined", which is
+    // a non-production value and would make the next read emit the deprecation warning
+    if (nodeEnv === undefined) {
+      delete process.env.NODE_ENV;
+    } else {
+      process.env.NODE_ENV = nodeEnv;
+    }
   });
 
-  it('is on by default in production', () => {
+  it('is on by default outside of development mode', () => {
     process.env.NODE_ENV = 'production';
+    expect(getEnv('logRedaction')).toBe(true);
+
+    process.env.NODE_ENV = 'development';
+    expect(getEnv('logRedaction')).toBe(true);
+
+    delete process.env.NODE_ENV;
+    expect(getEnv('logRedaction')).toBe(true);
+
+    process.env.CUBEJS_DEV_MODE = 'false';
     expect(getEnv('logRedaction')).toBe(true);
   });
 
   it('is off by default in development mode, as the dev server decides it', () => {
+    // NODE_ENV stays at 'production' throughout: it used to force the default back on,
+    // and the point of this case is that it no longer has a say
     process.env.NODE_ENV = 'production';
     process.env.CUBEJS_DEV_MODE = 'true';
     expect(getEnv('logRedaction')).toBe(false);
+  });
 
+  it('follows a resolved dev mode passed in by the caller', () => {
+    // CreateOptions.devServer beats CUBEJS_DEV_MODE, so a caller that already
+    // resolved dev mode must not get a default computed from the env var
     delete process.env.CUBEJS_DEV_MODE;
-    process.env.NODE_ENV = 'development';
+    expect(getEnv('logRedaction', true)).toBe(false);
+    expect(getEnv('logRedaction', false)).toBe(true);
+
+    process.env.CUBEJS_DEV_MODE = 'true';
+    expect(getEnv('logRedaction', false)).toBe(true);
+
+    // an omitted value still falls back to the env var
     expect(getEnv('logRedaction')).toBe(false);
 
-    delete process.env.NODE_ENV;
-    expect(getEnv('logRedaction')).toBe(false);
+    // an explicit CUBEJS_LOG_REDACTION still wins over both
+    process.env.CUBEJS_LOG_REDACTION = 'true';
+    expect(getEnv('logRedaction', true)).toBe(true);
   });
 
   it('follows an explicit value in either mode', () => {
-    process.env.NODE_ENV = 'production';
+    // The two halves have to differ by dev mode, not by NODE_ENV, or both run
+    // outside development mode and the interesting half is never reached
+    process.env.CUBEJS_DEV_MODE = 'false';
     process.env.CUBEJS_LOG_REDACTION = 'false';
     expect(getEnv('logRedaction')).toBe(false);
 
-    process.env.NODE_ENV = 'development';
+    process.env.CUBEJS_DEV_MODE = 'true';
+    expect(getEnv('logRedaction')).toBe(false);
+
     process.env.CUBEJS_LOG_REDACTION = 'true';
+    expect(getEnv('logRedaction')).toBe(true);
+
+    process.env.CUBEJS_DEV_MODE = 'false';
     expect(getEnv('logRedaction')).toBe(true);
   });
 });

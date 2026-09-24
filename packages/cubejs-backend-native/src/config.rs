@@ -4,6 +4,7 @@ use crate::gateway::{
 };
 use crate::{auth::NodeBridgeAuthService, transport::NodeBridgeTransport};
 use async_trait::async_trait;
+use cubesql::config::env_bool_is_set;
 use cubesql::config::injection::Injector;
 use cubesql::config::processing_loop::ShutdownMode;
 use cubesql::{
@@ -111,6 +112,10 @@ pub struct NodeConfigurationImpl {
 pub struct NodeConfigurationFactoryOptions {
     pub gateway_port: Option<u16>,
     pub pg_port: Option<u16>,
+    /// Development mode as server-core resolved it, which CUBEJS_DEV_MODE alone cannot
+    /// express: CreateOptions.devServer wins over the variable and never reaches an
+    /// environment read. Absent when the embedder did not supply one.
+    pub dev_mode: Option<bool>,
 }
 
 #[async_trait]
@@ -131,6 +136,15 @@ impl NodeConfiguration for NodeConfigurationImpl {
         let config = config.update_config(|mut c| {
             if let Some(p) = options.pg_port {
                 c.postgres_bind_address = Some(format!("0.0.0.0:{}", p));
+            };
+
+            // Config::default() can only see CUBEJS_DEV_MODE, so without this the SQL API
+            // would redact in a process the Node side treats as a dev server. Only the
+            // default moves: re-parsing a value it honoured would warn twice for one bad one
+            if let Some(dev_mode) = options.dev_mode {
+                if !env_bool_is_set("CUBEJS_LOG_REDACTION") {
+                    c.log_redaction = !dev_mode;
+                }
             };
 
             c

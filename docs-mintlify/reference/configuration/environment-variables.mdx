@@ -1219,11 +1219,25 @@ option](/reference/configuration/config#context_to_api_scopes).
 
 ## `CUBEJS_DEV_MODE`
 
-If `true`, enables [development mode](/docs/data-modeling/dev-mode).
+If `true`, enables [development mode](/docs/data-modeling/dev-mode). Otherwise
+development mode is off, and `NODE_ENV` is ignored — except that the `cubejs dev-server`
+command and the `cubejs-dev-server` bin turn it on for themselves when this variable is
+unset, and code that embeds `@cubejs-backend/server-core` directly can do the same with
+the `devServer` option it passes to `CubejsServerCore`. Setting this variable to `false`
+overrides both commands; the `devServer` option takes precedence over it.
 
-| Possible Values | Default in Development | Default in Production |
-| --------------- | ---------------------- | --------------------- |
-| `true`, `false` | `true`                 | `false`               |
+| Possible Values | Default   |
+| --------------- | --------- |
+| `true`, `false` | `false`   |
+
+<Note>
+
+`NODE_ENV` used to enable development mode whenever it was anything but `production`,
+which put an instance with no `NODE_ENV` at all into development mode. That is
+deprecated and no longer happens; Cube prints a warning if it sees a non-production
+`NODE_ENV` with `CUBEJS_DEV_MODE` unset. Set `CUBEJS_DEV_MODE=true` instead.
+
+</Note>
 
 <DevModeWarning />
 
@@ -1410,9 +1424,10 @@ original spacing are not kept. Every string argument is redacted, a granularity 
 as it was received. A statement Cube could not redact at all, such as a malformed request
 body or a SQL API error raised before the statement was read, is logged as `redacted`.
 
-It is off by default in development mode, that is when `NODE_ENV` is not `production` or
-[`CUBEJS_DEV_MODE`](#cubejs_dev_mode) is `true`, so runnable SQL statements can be read
-from the console.
+It is off by default in development mode — whether that comes from
+[`CUBEJS_DEV_MODE`](#cubejs_dev_mode), from a dev server command, or from the
+`devServer` option an embedder passes to `CubejsServerCore` — so runnable SQL
+statements can be read from the console.
 
 | Possible Values | Default in Development | Default in Production |
 | --------------- | ---------------------- | --------------------- |
@@ -1459,6 +1474,10 @@ to use for storing pre-aggregations.
 | Possible Values | Default in Development | Default in Production   |
 | --------------- | ---------------------- | ----------------------- |
 | A valid string  | `dev_pre_aggregations` | `prod_pre_aggregations` |
+
+When this variable is unset, Cube writes the schema it resolved into it at startup, so
+that drivers reading the variable directly use the same schema as the rest of the
+instance. A value you set yourself is never overwritten.
 
 It can be also set using the [`pre_aggregations_schema` configuration
 option](/reference/configuration/config#pre_aggregations_schema).

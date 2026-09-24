@@ -208,22 +208,153 @@ function asBoolOrTime(input: string, envName: string): number | boolean {
   );
 }
 
-const devMode = () => get('CUBEJS_DEV_MODE')
-  .default('false')
-  .asBoolStrict();
+let devModeResolvedByCaller = false;
+
+/**
+ * Without this the deprecation warning below fires on every dev server run, telling a
+ * user already in development mode to turn development mode on.
+ */
+export const markDevModeResolvedByCaller = () => {
+  devModeResolvedByCaller = true;
+};
+
+let pinnedPreAggregationsSchema: string | undefined;
+// Which instances hold it, not how many: a drop has to be able to invalidate the shares
+// it drops, or one taken before it is later spent against the pin taken after
+const pinnedPreAggregationsSchemaHolders = new Set<symbol>();
+
+/**
+ * Drops the pin outright, whatever is still holding it, which is what a reload of the
+ * whole process wants. To give up one instance's share, release that share instead.
+ */
+export const dropPreAggregationsSchemaPin = () => {
+  // Only what this process pinned. A value the user set outlives any reload
+  if (
+    pinnedPreAggregationsSchema !== undefined &&
+    process.env.CUBEJS_PRE_AGGREGATIONS_SCHEMA === pinnedPreAggregationsSchema
+  ) {
+    delete process.env.CUBEJS_PRE_AGGREGATIONS_SCHEMA;
+  }
+
+  pinnedPreAggregationsSchema = undefined;
+  pinnedPreAggregationsSchemaHolders.clear();
+};
+
+/**
+ * Gives up the share `pinPreAggregationsSchema` returned. Without it the next instance's
+ * drivers stay on the schema the previous one resolved. A share a drop already
+ * invalidated is unknown here and releases nothing, so it cannot spend a later pin's.
+ */
+export const releasePreAggregationsSchemaPin = (holder: symbol) => {
+  if (!pinnedPreAggregationsSchemaHolders.delete(holder)) {
+    return;
+  }
+
+  if (pinnedPreAggregationsSchemaHolders.size === 0) {
+    dropPreAggregationsSchemaPin();
+  }
+};
+
+/**
+ * A driver cannot see CreateOptions, so it falls back to CUBEJS_DEV_MODE, which both
+ * `devServer` and `preAggregationsSchema` contradict; pinning makes both sides agree.
+ */
+export const pinPreAggregationsSchema = (schema: string): symbol | undefined => {
+  const takeShare = () => {
+    const holder = Symbol('preAggregationsSchemaPin');
+
+    pinnedPreAggregationsSchemaHolders.add(holder);
+
+    return holder;
+  };
+
+  // Falsy, not undefined: every consumer treats an empty value as absent and falls back,
+  // so leaving one in place would be the mismatch this exists to prevent
+  if (!process.env.CUBEJS_PRE_AGGREGATIONS_SCHEMA) {
+    process.env.CUBEJS_PRE_AGGREGATIONS_SCHEMA = schema;
+    pinnedPreAggregationsSchema = schema;
+
+    return takeShare();
+  }
+
+  // Another instance pinned this same schema, and nothing else records that this one
+  // is relying on it, so the first to shut down would take it from the rest
+  if (
+    process.env.CUBEJS_PRE_AGGREGATIONS_SCHEMA === schema &&
+    pinnedPreAggregationsSchema === schema
+  ) {
+    return takeShare();
+  }
+
+  const setSchema = process.env.CUBEJS_PRE_AGGREGATIONS_SCHEMA;
+
+  if (setSchema !== schema) {
+    const remedy = pinnedPreAggregationsSchema !== undefined
+      ? 'Run one Cube instance per process, or give both instances the same schema.'
+      : 'Drop either CUBEJS_PRE_AGGREGATIONS_SCHEMA or the preAggregationsSchema option, '
+        + 'so one of them names the schema.';
+
+    // Keyed on the pair, so a third instance naming a third schema is reported
+    // rather than silenced by the second
+    displayCLIWarningOnce(
+      `pre-aggregations-schema-pinned:${setSchema}:${schema}`,
+      `Pre-aggregation schema '${setSchema}' is already set for this process, but this ` +
+      `instance resolved '${schema}'. A Databricks driver with a 'catalog' configured ` +
+      `reads CUBEJS_PRE_AGGREGATIONS_SCHEMA directly and so will qualify its queries ` +
+      `with '${setSchema}'; every other driver follows '${schema}'. ${remedy}`
+    );
+  }
+};
+
+/**
+ * The variable as the user set it: a value this process pinned reads as unset, so a
+ * second instance resolves its own default instead of inheriting the first's. Only
+ * server-core reads this — a driver reads the variable, and cannot tell them apart.
+ */
+export const userPreAggregationsSchema = (): string | undefined => {
+  const schema = process.env.CUBEJS_PRE_AGGREGATIONS_SCHEMA;
+
+  return schema === pinnedPreAggregationsSchema ? undefined : schema;
+};
+
+/**
+ * Development mode is opt-in through CUBEJS_DEV_MODE and off by default.
+ * NODE_ENV is deprecated for this decision and ignored — see DEPRECATION.md.
+ */
+const devMode = () => {
+  const enabled = get('CUBEJS_DEV_MODE')
+    .default('false')
+    .asBoolStrict();
+
+  // No NODE_ENV guard: development mode used to be on when NODE_ENV was unset too,
+  // so that instance is part of the population this warning exists for
+  if (
+    !devModeResolvedByCaller &&
+    process.env.CUBEJS_DEV_MODE === undefined &&
+    process.env.NODE_ENV !== 'production'
+  ) {
+    displayCLIWarningOnce(
+      'NODE_ENV_DEV_MODE',
+      'Development mode used to be on whenever NODE_ENV was not \'production\', including ' +
+      'when NODE_ENV was unset. NODE_ENV is no longer taken into account: development ' +
+      'mode is enabled by CUBEJS_DEV_MODE, or by CreateOptions.devServer when embedding ' +
+      'server-core. If this instance was meant to run in development mode, set ' +
+      'CUBEJS_DEV_MODE=true; otherwise no action is needed.'
+    );
+  }
+
+  return enabled;
+};
 
 const variables: Record<string, (...args: any) => any> = {
   devMode,
   logLevel: () => get('CUBEJS_LOG_LEVEL').asString(),
-  logRedaction: () => {
-    // Off in development mode as OptsHandler.isDevMode decides it: there the console is
-    // the log sink and runnable SQL is wanted
-    const isDevMode = process.env.NODE_ENV !== 'production' || devMode();
-
-    return get('CUBEJS_LOG_REDACTION')
-      .default(isDevMode ? 'false' : 'true')
-      .asBoolStrict();
-  },
+  // Off in development mode: there the console is the log sink and runnable SQL is wanted.
+  // Callers that resolved dev mode themselves (CreateOptions.devServer beats the env var)
+  // pass it in, so the default cannot disagree with the instance it is describing
+  logRedaction: (resolvedDevMode?: boolean) => get('CUBEJS_LOG_REDACTION')
+    .default((resolvedDevMode ?? devMode()) ? 'false' : 'true')
+    .asBoolStrict(),
   port: () => asPortOrSocket(process.env.PORT || '4000', 'PORT'),
   tls: () => get('CUBEJS_ENABLE_TLS')
     .default('false')
@@ -275,7 +406,8 @@ const variables: Record<string, (...args: any) => any> = {
       return asBoolOrTime(process.env.CUBEJS_SCHEDULED_REFRESH_TIMER, 'CUBEJS_SCHEDULED_REFRESH_TIMER');
     }
 
-    // It's true by default for development
+    // Deliberately NOT the dev mode decision: background refresh ran in dev mode too,
+    // so aligning this on getEnv('devMode') would silently stop it for bare instances
     return process.env.NODE_ENV !== 'production';
   },
   scheduledRefreshQueriesPerAppId: () => get('CUBEJS_SCHEDULED_REFRESH_QUERIES_PER_APP_ID').asIntPositive(),
@@ -2045,11 +2177,7 @@ const variables: Record<string, (...args: any) => any> = {
       return port;
     }
 
-    const isDevMode = get('CUBEJS_DEV_MODE')
-      .default('false')
-      .asBoolStrict();
-
-    if (isDevMode) {
+    if (devMode()) {
       if (isNativeSupported()) {
         return 15432;
       } else {

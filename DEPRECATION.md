@@ -71,6 +71,7 @@ features:
 | Removed    | [`context_to_roles`](#context-to-roles)                                                                                           | v1.6.4     | v1.7.0    |
 | Deprecated | [Node.js 22](#nodejs-22)                                                                                                          | v1.7.0     |           |
 | Deprecated | [Hive driver](#hive-driver)                                                                                                       | v1.7.25    |           |
+| Removed    | [`NODE_ENV` as a development mode switch](#node_env-as-a-development-mode-switch)                                                  | v1.7.44    | v1.7.44   |
 
 ### Node.js 8
 
@@ -465,3 +466,106 @@ removed in a future release. It is community-supported and is not maintained by 
 the database vendor. There is no drop-in replacement; `@cubejs-backend/jdbc-driver`
 ships Hive/SparkSQL connection settings that can be used through a custom
 [`driverFactory`](https://docs.cube.dev/reference/configuration/config#driver_factory).
+
+### `NODE_ENV` as a development mode switch
+
+**Deprecated in Release: v1.7.44**
+
+**Removed in Release: v1.7.44**
+
+Development mode used to be on whenever `NODE_ENV` was anything but `production`,
+which put an instance with no `NODE_ENV` set at all into development mode — an
+authentication bypass — without anyone asking for it. `NODE_ENV` is no longer taken
+into account: development mode is off by default and is enabled by
+[`CUBEJS_DEV_MODE=true`](https://docs.cube.dev/reference/configuration/environment-variables#cubejs_dev_mode),
+or by the `devServer` option when embedding `@cubejs-backend/server-core` directly.
+
+Cube prints a warning when it sees a non-production `NODE_ENV` with `CUBEJS_DEV_MODE`
+unset. If you relied on `NODE_ENV` to get development mode, set `CUBEJS_DEV_MODE=true`
+instead. The dev server commands — `cubejs dev-server` and the `cubejs-dev-server` bin —
+keep the behaviour they had: they ask for development mode directly, without
+`CUBEJS_DEV_MODE`, so the SQL API keeps the generated password it has always had there.
+An explicit `CUBEJS_DEV_MODE=false` now wins over them, so either command starts a
+non-development server and requires `CUBEJS_DB_TYPE` or a `driverFactory` like
+`cubejs server` does.
+
+An instance that was implicitly in development mode also changes the pre-aggregation
+schema it writes to, from `dev_pre_aggregations` to `prod_pre_aggregations`, unless
+[`CUBEJS_PRE_AGGREGATIONS_SCHEMA`](https://docs.cube.dev/reference/configuration/environment-variables#cubejs_pre_aggregations_schema)
+pins it. Every pre-aggregation is rebuilt in the new schema on first use, and the
+tables left behind in `dev_pre_aggregations` are no longer tracked by the refresh
+worker, so nothing drops them for you — remove them by hand once the rebuild has
+finished. To keep the old schema instead, either set `CUBEJS_DEV_MODE=true` (if the
+instance really was meant to be a dev server) or set
+`CUBEJS_PRE_AGGREGATIONS_SCHEMA=dev_pre_aggregations` explicitly.
+
+Log output changes format with it. Development mode selects the human-readable logger;
+outside it Cube emits one structured JSON object per line, on both the Node and the SQL
+API side. An instance that was implicitly in development mode therefore switches to JSON
+on upgrade, so anything that greps or line-parses Cube's stdout stops matching. Set
+`CUBEJS_DEV_MODE=true` if the instance was meant to be a dev server, or update whatever
+parses the text format.
+
+The bundled Cube Store goes with it. Development mode is what defaults the external
+database to Cube Store and starts the bundled instance; outside it, Cube Store has to
+be configured explicitly. An instance that was implicitly in development mode and has
+no `CUBEJS_CUBESTORE_*` or `CUBEJS_EXT_DB_*` variables set therefore has no external
+database after the upgrade, and building a pre-aggregation fails with
+`externalDriverFactory is not provided`. Configure a
+[Cube Store connection](https://docs.cube.dev/cube-core/deployment#set-up-cube-store) for such
+an instance, or set `CUBEJS_DEV_MODE=true` if it was meant to be a dev server.
+
+`CreateOptions.devServer` is now what decides development mode for code that embeds
+`@cubejs-backend/server-core` directly, and **this can switch authentication off where
+it used to be on**. An embedder that passed `devServer: true` under `NODE_ENV=production`
+with `CUBEJS_DEV_MODE` unset used to mount the Playground routes while the data APIs
+stayed in production mode: JWT verification was enforced on the REST (JSON) and GraphQL
+APIs, the SQL API generated a password, log redaction was on, and pre-aggregations went
+to `prod_pre_aggregations`. Development mode now follows the option, so the same code
+serves those APIs with no token required, returns GraphiQL, stack traces and the
+transformed query to unauthenticated callers, stops redacting logs, and writes to
+`dev_pre_aggregations`. Nothing in the environment has to change for this to happen, and
+no warning is printed. If you passed `devServer: true` only to get the Playground on an
+otherwise production instance, stop passing it — or accept that the instance is now an
+[authentication bypass](https://docs.cube.dev/reference/configuration/environment-variables#cubejs_dev_mode)
+and keep it off the network.
+
+A driver cannot see `CreateOptions.devServer`, so Cube now writes the pre-aggregation
+schema it resolved into `CUBEJS_PRE_AGGREGATIONS_SCHEMA` when you have not set the
+variable yourself. This keeps drivers that read it in step with the rest of the instance
+whichever way `devServer` points — on Databricks with a `catalog` configured, a
+disagreement would leave the catalog prefix off the statement and queries failing with
+`TABLE_OR_VIEW_NOT_FOUND`, while `dropTable` qualifies unconditionally and drops from
+the other catalog. An explicit `CUBEJS_PRE_AGGREGATIONS_SCHEMA` is never overwritten,
+and the value Cube writes is the one that instance uses, `preAggregationsSchema` from
+`CreateOptions` included. A per-tenant `preAggregationsSchema` function has no single
+schema to write, so it is left alone and such a driver still resolves its own.
+
+Authentication can also flip without the `devServer` option. An embedder that set
+`CUBEJS_DEV_MODE=true` alongside an explicit
+`NODE_ENV=production` used to get Playground with JWT verification
+still enforced on the REST (JSON) and GraphQL APIs, because enforcement keyed on
+`NODE_ENV` rather than on development mode. It now follows development mode, so those
+APIs accept requests with no token. Drop `CUBEJS_DEV_MODE=true` if the instance was not
+meant to be a dev server. `cubejs server`, `cubejs dev-server` and the official Docker
+images are unaffected: they sync `NODE_ENV` to `development` whenever development mode
+resolves true, so that contradictory pair never reached them. The `cubejs-dev-server`
+bin does not sync it, so that pair does reach an instance started that way.
+
+The mirror case loses Cube Store instead. An embedder that passed `devServer: false`
+with `CUBEJS_DEV_MODE=true` used to be in development mode anyway, so it got
+`externalDbType: 'cubestore'` and the bundled Cube Store. It is now out of development
+mode, gets neither, and the first pre-aggregation build fails with
+`externalDriverFactory is not provided`; its pre-aggregations also move from
+`dev_pre_aggregations` to `prod_pre_aggregations`. Drop the `devServer: false`, or
+configure a [Cube Store connection](https://docs.cube.dev/cube-core/deployment#set-up-cube-store)
+as the paragraphs above describe.
+
+**The SQL API does not follow `devServer: false`.** It keys off `CUBEJS_DEV_MODE`
+alone, so with that pair the Postgres-wire endpoint still comes up on port `15432` and
+still accepts any credentials, while the REST (JSON) and GraphQL APIs now enforce JWT.
+Before this change the whole instance was in development mode and the open SQL API
+matched an equally open HTTP API; now the instance presents as authenticated while that
+port is not. Set
+[`CUBEJS_SQL_PASSWORD`](https://cube.dev/docs/reference/configuration/environment-variables#cubejs_sql_password),
+or `CUBEJS_PG_SQL_PORT=false` to not serve it at all.
