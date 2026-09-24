@@ -183,7 +183,9 @@ fi
 The expected-build check runs **after** publication starts; a mismatch cannot prevent or undo a
 write. The recipe requires `retain` so future `delete-managed` behavior cannot silently change the
 CI policy. `viewNames` lists planned views; `retained_obsolete` means an obsolete target was left
-in place.
+in place. Publication-run `views[].outcome` values are `unchanged`, `created`, `updated`, `blocked`,
+`validation_failed`, `publish_failed`, `retained_obsolete`, and `deleted_obsolete`; these differ
+from preview outcomes. The recipe accepts only the successful, retain-safe outcomes.
 
 Failed checks do not roll back writes. Inspect `views[]` for errors or `withheldMembers`. List
 older runs with
