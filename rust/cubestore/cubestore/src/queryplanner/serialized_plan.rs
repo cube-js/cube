@@ -1538,11 +1538,18 @@ mod tests {
         .unwrap()
     }
 
-    /// Serializing and deserializing both recurse per plan node and cost far more stack in a
-    /// debug build than in the release build that ships, hence the explicit size.
-    fn on_a_deep_enough_stack<T: Send + 'static>(f: impl FnOnce() -> T + Send + 'static) -> T {
+    /// The stack the budget is sized against: the select worker's default, since that is the
+    /// smaller of the two stacks a plan is decoded on. A debug build spends several times more
+    /// stack per level than the release build the budget was measured on, so only a release run
+    /// holds the budget to its actual claim.
+    #[cfg(not(debug_assertions))]
+    const DECODING_STACK: usize = 4 * 1024 * 1024;
+    #[cfg(debug_assertions)]
+    const DECODING_STACK: usize = 32 * 1024 * 1024;
+
+    fn on_a_decoding_stack<T: Send + 'static>(f: impl FnOnce() -> T + Send + 'static) -> T {
         std::thread::Builder::new()
-            .stack_size(32 * 1024 * 1024)
+            .stack_size(DECODING_STACK)
             .spawn(f)
             .unwrap()
             .join()
@@ -1568,7 +1575,7 @@ mod tests {
     fn plan_at_the_depth_limit_survives_the_serialization_roundtrip() {
         let plan = chained_stage_plan(74); // the values leaf plus 2 nodes a stage
         assert_eq!(logical_plan_depth(&plan), DEFAULT_LIMIT);
-        let decoded = on_a_deep_enough_stack(move || roundtrip(&plan)).unwrap();
+        let decoded = on_a_decoding_stack(move || roundtrip(&plan)).unwrap();
         assert_eq!(
             format!("{}", decoded.display_indent()).lines().count(),
             149,
@@ -1583,7 +1590,7 @@ mod tests {
         let plan = chained_stage_plan(75);
         let depth = logical_plan_depth(&plan);
         assert!(depth > DEFAULT_LIMIT);
-        let err = on_a_deep_enough_stack(move || pre_serialized(plan).to_serialized_plan())
+        let err = on_a_decoding_stack(move || pre_serialized(plan).to_serialized_plan())
             .map(|_| ())
             .expect_err("a plan past the depth limit must not be serialized");
 
@@ -1625,12 +1632,46 @@ mod tests {
             .unwrap();
         assert_eq!(plan.inputs().len(), 1);
 
-        let err = on_a_deep_enough_stack(move || pre_serialized(plan).to_serialized_plan())
+        let err = on_a_decoding_stack(move || pre_serialized(plan).to_serialized_plan())
             .map(|_| ())
             .expect_err("an expression past the depth limit must not be serialized");
         assert!(
             err.to_string().contains("nested too deeply to execute"),
             "message must name depth as the cause, got: {}",
+            err
+        );
+    }
+
+    /// The walk that measures depth recurses once per level of subquery nesting, so it has to
+    /// stay inside the budget it is taken for: measuring a plan must not be what overflows the
+    /// stack. Far past anything the parser would admit, to pin the bound rather than the parser.
+    #[test]
+    fn measuring_a_deeply_nested_subquery_reports_rather_than_overflows() {
+        let mut plan = LogicalPlanBuilder::values(vec![vec![lit(1i64)]])
+            .unwrap()
+            .build()
+            .unwrap();
+        for _ in 0..5_000 {
+            plan = LogicalPlanBuilder::values(vec![vec![lit(1i64)]])
+                .unwrap()
+                .project(vec![Expr::ScalarSubquery(Subquery {
+                    subquery: Arc::new(plan),
+                    outer_ref_columns: vec![],
+                })
+                .alias("nested")])
+                .unwrap()
+                .build()
+                .unwrap();
+        }
+
+        let err = on_a_decoding_stack(move || pre_serialized(plan).to_serialized_plan())
+            .map(|_| ())
+            .expect_err("a plan this deeply nested must not be serialized");
+        assert!(
+            err.to_string()
+                .contains(&format!("more than {} levels", DEFAULT_LIMIT)),
+            "message must say the plan is past the budget without claiming an exact depth, \
+             got: {}",
             err
         );
     }
@@ -1653,7 +1694,7 @@ mod tests {
             .unwrap();
         assert_eq!(plan.inputs().len(), 1);
 
-        let err = on_a_deep_enough_stack(move || pre_serialized(plan).to_serialized_plan())
+        let err = on_a_decoding_stack(move || pre_serialized(plan).to_serialized_plan())
             .map(|_| ())
             .expect_err("a subquery past the depth limit must not be serialized");
         assert!(
