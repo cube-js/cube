@@ -1157,11 +1157,15 @@ impl SerializedPlan {
         })
     }
 
+    /// `max_query_plan_depth` has to come from the caller's configuration: the router decodes a
+    /// plan and encodes it again per worker, so a budget fixed here would cap every plan that
+    /// goes out to a worker regardless of what the node was configured with.
     pub fn to_pre_serialized(
         &self,
         remote_to_local_names: HashMap<String, String>,
         chunk_id_to_record_batches: HashMap<u64, Vec<RecordBatch>>,
         parquet_metadata_cache: Arc<dyn ParquetFileReaderFactory>,
+        max_query_plan_depth: usize,
     ) -> Result<PreSerializedPlan, CubeError> {
         let plan = self.logical_plan(
             remote_to_local_names,
@@ -1174,7 +1178,7 @@ impl SerializedPlan {
             partition_ids_to_execute: self.partition_ids_to_execute.clone(),
             inline_table_ids_to_execute: self.inline_table_ids_to_execute.clone(),
             trace_obj: self.trace_obj.clone(),
-            max_query_plan_depth: crate::config::DEFAULT_MAX_QUERY_PLAN_DEPTH,
+            max_query_plan_depth,
         })
     }
 
@@ -1551,6 +1555,20 @@ mod tests {
         builder.build().unwrap()
     }
 
+    fn pre_serialized_with_limit(plan: LogicalPlan, limit: usize) -> PreSerializedPlan {
+        PreSerializedPlan::try_new(
+            plan,
+            PlanningMeta {
+                indices: Vec::new(),
+                multi_part_subtree: HashMap::new(),
+                pushable_chunk_filters: Vec::new(),
+            },
+            None,
+            limit,
+        )
+        .unwrap()
+    }
+
     fn pre_serialized(plan: LogicalPlan) -> PreSerializedPlan {
         PreSerializedPlan::try_new(
             plan,
@@ -1613,6 +1631,33 @@ mod tests {
             format!("{}", decoded.display_indent()).lines().count(),
             149,
             "the decoded plan must be the one that was encoded"
+        );
+    }
+
+    /// A raised budget has to survive the trip the router takes: it decodes the plan it just
+    /// encoded and encodes it again for each worker, so a budget that did not come along would
+    /// cap every dispatched plan at the default no matter what the node was configured with.
+    #[test]
+    fn a_raised_budget_survives_the_router_round_trip() {
+        let raised = DEFAULT_LIMIT * 2;
+        let plan = chained_stage_plan(100); // 201 levels: past the default, inside the raised one
+        assert!(depth_of(&plan) > DEFAULT_LIMIT);
+
+        let dispatched = on_a_decoding_stack(move || {
+            let serialized = pre_serialized_with_limit(plan, raised).to_serialized_plan()?;
+            serialized
+                .to_pre_serialized(
+                    HashMap::new(),
+                    HashMap::new(),
+                    crate::queryplanner::metadata_cache::NoopParquetMetadataCache::new(),
+                    raised,
+                )?
+                .to_serialized_plan()
+        });
+        assert!(
+            dispatched.is_ok(),
+            "a plan inside the raised budget must still be dispatched, got: {:?}",
+            dispatched.err()
         );
     }
 

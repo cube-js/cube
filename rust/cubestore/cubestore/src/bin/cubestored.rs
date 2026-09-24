@@ -1,4 +1,4 @@
-use cubestore::config::{env_parse_lenient, validate_config, Config, CubeServices};
+use cubestore::config::{env_parse_positive_lenient, validate_config, Config, CubeServices};
 use cubestore::http::status::serve_status_probes;
 use cubestore::telemetry::{init_agent_sender, track_event};
 use cubestore::util::logger::init_cube_logger;
@@ -82,16 +82,13 @@ fn main() {
     if let Ok(var) = std::env::var("CUBESTORE_EVENT_LOOP_MAX_BLOCKING_THREADS") {
         tokio_builder.max_blocking_threads(var.parse().unwrap());
     }
-    // Parsing, planning and plan serialization all recurse once per level of query nesting on
-    // this runtime's threads, so the depth a query may reach is bounded by their stack. Tokio
-    // would otherwise leave it at the 2 MiB platform default, which holds only a few dozen
-    // levels of nested subqueries. Select workers size theirs through
-    // CUBESTORE_SELECT_WORKER_STACK_SIZE, and deserializing a plan has to fit that one too --
-    // see DEFAULT_MAX_QUERY_PLAN_DEPTH.
-    tokio_builder.thread_stack_size(env_parse_lenient(
-        "CUBESTORE_MAIN_STACK_SIZE",
-        8 * 1024 * 1024,
-    ));
+    // The parser and plan-depth budgets are stack budgets, so this stack has to hold them;
+    // tokio's 2 MiB default does not. A value too small to do that would overflow on the first
+    // query of any depth, which is the unreportable abort the budgets exist to avoid.
+    tokio_builder.thread_stack_size(
+        env_parse_positive_lenient("CUBESTORE_MAIN_STACK_SIZE", 8 * 1024 * 1024)
+            .max(2 * 1024 * 1024),
+    );
     let runtime = tokio_builder.build().unwrap();
     runtime.block_on(async move {
         init_agent_sender().await;

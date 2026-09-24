@@ -23,7 +23,7 @@ const CUBE_HEADER: &str = indoc! {r#"
 "#};
 
 /// `stages` measures, each computing over the previous one as its own multi-stage stage, so the
-/// deepest member carries a chain of `stages` + 1 multi-stage members.
+/// deepest member carries a chain of `stages` multi-stage members.
 fn chained_stages_schema(stages: usize) -> String {
     let mut yaml = String::from(CUBE_HEADER);
     yaml.push_str(concat!(
