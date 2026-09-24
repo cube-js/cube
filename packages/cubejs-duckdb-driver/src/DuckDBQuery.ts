@@ -83,6 +83,11 @@ export class DuckDBQuery extends BaseQuery {
     // `//` is integer division truncating toward zero (-7 // 2 = -3), matching
     // PostgreSQL
     templates.expressions.int_division = '({{ left }} // {{ right }})';
+    // Multi-stage queries join their stages on every grouped dimension, NULL
+    // included. Without this operator the planner writes `a = b OR (a IS NULL
+    // AND b IS NULL)`, which DuckDB plans as a nested-loop join; with it DuckDB
+    // plans a hash join
+    templates.operators.is_not_distinct_from = 'IS NOT DISTINCT FROM';
     return templates;
   }
 
