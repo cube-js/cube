@@ -1,19 +1,19 @@
 ---
 name: merge-pr
-description: Squash-merge a cube-js/cube pull request with a clean commit message body. Use whenever you are about to merge a PR — `gh pr merge`, "merge it", "ship it", "land this PR" — so the squash commit body gets a written summary instead of GitHub's default concatenation of every commit message.
+description: Squash-merge a cube-js/cube pull request with a clean commit message body. Use whenever you are about to merge a PR — `gh pr merge`, "merge it", "ship it", "land this PR" — so the squash commit body gets a written summary instead of the raw PR description.
 argument-hint: "[<pr-number>]"
 ---
 
 # Merge a PR
 
-Master only allows squash merges. Without `--body`, GitHub fills the squash
-commit body with every commit message in the PR — `* wip`, `* fix lint`,
-`* address review`, repeated `Co-Authored-By` lines. That text lands in master
-history forever. Always pass `--body`.
+Master only allows squash merges, and the repo default squash message is the
+PR title plus the PR description. Without `--body`, the raw description —
+template checklist, HTML comments, review chatter — lands in master history
+forever. Always pass `--body`.
 
-Do not pass `--subject`: the commit title stays whatever GitHub derives from
-the PR. If the PR title itself is wrong, ask the author to fix it on the PR
-instead of overriding it at merge time.
+Do not pass `--subject`: the commit title is the PR title. If the PR title
+itself is wrong, ask the author to fix it on the PR instead of overriding it
+at merge time.
 
 ## 1. Check the PR is mergeable
 
@@ -44,8 +44,9 @@ Describe the final state of the change, not how the branch got there:
   commits (deduplicated, human authors other than the PR author, plus the AI
   attribution line if any commit carried one).
 
-An empty body is fine for a trivial PR whose title says it all. Never paste
-the per-commit messages.
+An empty body is fine for a trivial PR whose title says it all — pass
+`--body ""` explicitly, never omit the flag. Never paste the per-commit
+messages.
 
 ## 3. Merge
 
@@ -61,5 +62,7 @@ EOF
 )"
 ```
 
-Then confirm with `git log -1 --format=%B origin/master` after `git fetch` and
-report the merged commit to the user.
+Then confirm with `gh pr view <n> --json mergeCommit --jq .mergeCommit.oid`
+and `git fetch && git show -s --format=%B <oid>` (not `git log -1
+origin/master` — another merge may have landed since), and report the merged
+commit to the user.
