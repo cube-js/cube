@@ -2573,6 +2573,7 @@ mod tests {
                 pushable_chunk_filters: Vec::new(),
             },
             None,
+            crate::config::DEFAULT_MAX_QUERY_PLAN_DEPTH,
         )?;
         let exec = ClusterSendExec {
             properties: ClusterSendExec::compute_properties(input.properties(), 2),

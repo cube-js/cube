@@ -249,7 +249,12 @@ impl QueryPlanner for QueryPlannerImpl {
             app_metrics::DATA_QUERY_CHOOSE_INDEX_AND_WORKERS_TIME_US
                 .report(choose_index_ext_start.elapsed()?.as_micros() as i64);
             QueryPlan::Select(
-                PreSerializedPlan::try_new(logical_plan, meta, trace_obj)?,
+                PreSerializedPlan::try_new(
+                    logical_plan,
+                    meta,
+                    trace_obj,
+                    self.config.max_query_plan_depth(),
+                )?,
                 workers,
             )
         } else {

@@ -434,6 +434,11 @@ pub trait ConfigObj: DIService {
     /// instead of queued. `0` disables the limit.
     fn max_queued_query_plans(&self) -> usize;
 
+    /// Nesting a query plan may reach: plan nodes, expression nodes and the roots of subqueries
+    /// carried in expressions all count, because the protobuf encoding nests them the same way.
+    /// Decoding recurses per level, so this bounds the stack a plan costs to move between nodes.
+    fn max_query_plan_depth(&self) -> usize;
+
     fn select_worker_pool_size(&self) -> usize;
 
     fn select_worker_idle_timeout(&self) -> u64;
@@ -724,6 +729,7 @@ pub struct ConfigObjImpl {
     pub store_provider: FileStoreProvider,
     pub max_concurrent_query_plans: usize,
     pub max_queued_query_plans: usize,
+    pub max_query_plan_depth: usize,
     pub select_worker_pool_size: usize,
     pub select_worker_idle_timeout: u64,
     pub job_runners_count: usize,
@@ -911,6 +917,10 @@ impl ConfigObj for ConfigObjImpl {
 
     fn max_queued_query_plans(&self) -> usize {
         self.max_queued_query_plans
+    }
+
+    fn max_query_plan_depth(&self) -> usize {
+        self.max_query_plan_depth
     }
 
     fn select_worker_pool_size(&self) -> usize {
@@ -1429,6 +1439,11 @@ fn max_concurrent_query_plans_from_env() -> usize {
     })
 }
 
+/// Chosen against the smaller of the two stacks a plan is decoded on, the select worker's
+/// (`CUBESTORE_SELECT_WORKER_STACK_SIZE`), with room to spare. Raising one without the other
+/// trades a reportable error for the stack overflow the budget exists to prevent.
+pub const DEFAULT_MAX_QUERY_PLAN_DEPTH: usize = 150;
+
 fn env_bool(name: &str, default: bool) -> bool {
     env::var(name)
         .ok()
@@ -1837,6 +1852,10 @@ impl Config {
                     }
                 },
                 max_concurrent_query_plans: max_concurrent_query_plans_from_env(),
+                max_query_plan_depth: env_parse_positive_lenient(
+                    "CUBESTORE_MAX_QUERY_PLAN_DEPTH",
+                    DEFAULT_MAX_QUERY_PLAN_DEPTH,
+                ),
                 max_queued_query_plans: env_parse_lenient("CUBESTORE_MAX_QUEUED_QUERY_PLANS", 5000),
                 select_worker_pool_size: env_parse("CUBESTORE_SELECT_WORKERS", 4),
                 select_worker_idle_timeout: env_parse_duration(
@@ -2229,6 +2248,7 @@ impl Config {
                     remote_dir: Some(Self::test_remote_dir_path(directory, name)),
                 },
                 max_concurrent_query_plans: 8,
+                max_query_plan_depth: DEFAULT_MAX_QUERY_PLAN_DEPTH,
                 max_queued_query_plans: 5000,
                 select_worker_pool_size: 0,
                 select_worker_idle_timeout: 600,

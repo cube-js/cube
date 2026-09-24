@@ -1,4 +1,3 @@
-use crate::config::env_parse_positive_lenient;
 use crate::metastore::table::{Table, TablePath};
 use crate::metastore::{Chunk, IdRow, Index, Partition};
 use crate::queryplanner::panic::PanicWorkerNode;
@@ -36,26 +35,7 @@ use datafusion_proto::bytes::logical_plan_from_bytes_with_extension_codec;
 use datafusion_proto::logical_plan::LogicalExtensionCodec;
 use std::collections::HashMap;
 use std::fmt::{Debug, Formatter};
-use std::sync::{Arc, OnceLock};
-
-/// Nesting a serialized query plan may reach along its longest path. Plan nodes, expression
-/// nodes and the roots of subqueries carried in expressions all count, because the protobuf
-/// encoding nests them the same way.
-///
-/// Decoding recurses once per level and does not grow its stack, so this is really a budget on
-/// the stack of whichever process decodes -- the smaller of the two is the select worker's
-/// (`CUBESTORE_SELECT_WORKER_STACK_SIZE`). Unlike a stack overflow, it can be reported.
-const DEFAULT_MAX_QUERY_PLAN_DEPTH: usize = 150;
-
-fn max_query_plan_depth() -> usize {
-    static MAX_DEPTH: OnceLock<usize> = OnceLock::new();
-    *MAX_DEPTH.get_or_init(|| {
-        env_parse_positive_lenient(
-            "CUBESTORE_MAX_QUERY_PLAN_DEPTH",
-            DEFAULT_MAX_QUERY_PLAN_DEPTH,
-        )
-    })
-}
+use std::sync::Arc;
 
 /// The plan nests subqueries as deep as the whole budget allows, so it is over budget whatever
 /// its exact depth is.
@@ -150,8 +130,7 @@ fn logical_plan_depth(
         .unwrap_or(1))
 }
 
-fn check_query_plan_depth(plan: &LogicalPlan) -> Result<(), CubeError> {
-    let limit = max_query_plan_depth();
+fn check_query_plan_depth(plan: &LogicalPlan, limit: usize) -> Result<(), CubeError> {
     let depth = match logical_plan_depth(plan, limit, &mut HashMap::new()) {
         Ok(depth) if depth <= limit => return Ok(()),
         Ok(depth) => depth.to_string(),
@@ -211,6 +190,9 @@ pub struct PreSerializedPlan {
     partition_ids_to_execute: Vec<(u64, RowFilter)>,
     inline_table_ids_to_execute: Vec<InlineTableId>,
     trace_obj: Option<String>,
+    /// Carried from the configuration the plan was built under, so the check runs at the point
+    /// the plan is encoded rather than wherever the configuration happens to be in reach.
+    max_query_plan_depth: usize,
 }
 
 #[derive(Clone, Serialize, Deserialize, Debug)]
@@ -988,7 +970,7 @@ pub enum SerializedTableSource {
 
 impl PreSerializedPlan {
     pub fn to_serialized_plan(&self) -> Result<SerializedPlan, CubeError> {
-        check_query_plan_depth(&self.logical_plan)?;
+        check_query_plan_depth(&self.logical_plan, self.max_query_plan_depth)?;
         let serialized_logical_plan =
             datafusion_proto::bytes::logical_plan_to_bytes_with_extension_codec(
                 &self.logical_plan,
@@ -1009,6 +991,7 @@ impl PreSerializedPlan {
         plan: LogicalPlan,
         index_snapshots: PlanningMeta,
         trace_obj: Option<String>,
+        max_query_plan_depth: usize,
     ) -> Result<Self, CubeError> {
         Ok(PreSerializedPlan {
             logical_plan: plan,
@@ -1016,6 +999,7 @@ impl PreSerializedPlan {
             partition_ids_to_execute: Vec::new(),
             inline_table_ids_to_execute: Vec::new(),
             trace_obj,
+            max_query_plan_depth,
         })
     }
 
@@ -1035,6 +1019,7 @@ impl PreSerializedPlan {
             partition_ids_to_execute,
             inline_table_ids_to_execute,
             trace_obj: self.trace_obj.clone(),
+            max_query_plan_depth: self.max_query_plan_depth,
         })
     }
 
@@ -1045,6 +1030,7 @@ impl PreSerializedPlan {
             partition_ids_to_execute: self.partition_ids_to_execute.clone(),
             inline_table_ids_to_execute: self.inline_table_ids_to_execute.clone(),
             trace_obj: self.trace_obj.clone(),
+            max_query_plan_depth: self.max_query_plan_depth,
         })
     }
 
@@ -1163,6 +1149,9 @@ impl SerializedPlan {
             partition_ids_to_execute: self.partition_ids_to_execute.clone(),
             inline_table_ids_to_execute: self.inline_table_ids_to_execute.clone(),
             trace_obj: self.trace_obj.clone(),
+            // A worker decodes the plan it is sent and never encodes one, so this is only a
+            // conservative floor for a plan that somehow makes the return trip.
+            max_query_plan_depth: crate::config::DEFAULT_MAX_QUERY_PLAN_DEPTH,
         })
     }
 
@@ -1523,9 +1512,7 @@ mod tests {
     use super::*;
     use datafusion::logical_expr::{col, lit, LogicalPlanBuilder};
 
-    /// The documented default of `CUBESTORE_MAX_QUERY_PLAN_DEPTH`, spelled out so that changing
-    /// the default has to come with a decision about these cases.
-    const DEFAULT_LIMIT: usize = 150;
+    use crate::config::DEFAULT_MAX_QUERY_PLAN_DEPTH as DEFAULT_LIMIT;
 
     /// The shape Cube Store gets from a chain of multi-stage stages: a CTE body inlined at each
     /// reference, so one stage becomes a projection under a subquery alias.
@@ -1550,6 +1537,7 @@ mod tests {
                 pushable_chunk_filters: Vec::new(),
             },
             None,
+            DEFAULT_LIMIT,
         )
         .unwrap()
     }
