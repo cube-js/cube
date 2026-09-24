@@ -14,7 +14,7 @@ import {
   transpiledFieldsPatterns,
   TranspilerCubeResolver, TranspilerSymbolResolver
 } from './transpilers';
-import { PythonParser } from '../parser/PythonParser';
+import { PythonParser, transpileSimpleFString } from '../parser/PythonParser';
 import { nonStringFields } from './CubeValidator';
 import { ErrorReporter } from './ErrorReporter';
 import { camelizeCube } from './utils';
@@ -218,9 +218,10 @@ export class YamlCompiler {
 
   private transpileYaml(obj, propertyPath, cubeName, errorsReport: ErrorReporter) {
     if (transpiledFields.has(propertyPath[propertyPath.length - 1])) {
+      const fullPath = propertyPath.join('.');
+
       for (const p of transpiledFieldsPatterns) {
-        const fullPath = propertyPath.join('.');
-        if (fullPath.match(p)) {
+        if (p.test(fullPath)) {
           // View default filter `member` / `unless` are member references in
           // the view's own namespace — not Python expressions — so they go
           // through the same f-string path as `values`. The view's
@@ -361,6 +362,11 @@ export class YamlCompiler {
   private parsePythonAndTranspileToJs(codeString: string, errorsReport: ErrorReporter): t.Program | t.NullLiteral {
     if (codeString === '' || codeString === 'f""') {
       return t.nullLiteral();
+    }
+
+    const simple = transpileSimpleFString(codeString);
+    if (simple) {
+      return simple;
     }
 
     try {

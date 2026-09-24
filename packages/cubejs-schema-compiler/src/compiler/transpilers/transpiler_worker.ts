@@ -82,7 +82,23 @@ const transpileYaml = (data: TransferContent) => {
   };
 };
 
+type BulkTransferContent = Omit<TransferContent, 'fileName' | 'content'> & {
+  files: { fileName: string; content: string }[];
+};
+
+// One message for many files, so the symbols, which grow with the whole model, are cloned once
+// per chunk instead of once per file. A file that throws gets null: the caller retries it alone
+// to report the error exactly as the per-file call does.
+const transpileJsBulk = ({ files, ...shared }: BulkTransferContent) => files.map(({ fileName, content }) => {
+  try {
+    return transpileJs({ ...shared, fileName, content });
+  } catch {
+    return null;
+  }
+});
+
 workerpool.worker({
   transpileJs,
+  transpileJsBulk,
   transpileYaml,
 });

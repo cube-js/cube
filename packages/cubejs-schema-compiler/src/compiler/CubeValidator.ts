@@ -1020,7 +1020,12 @@ const SwitchDimension = Joi.object({
 const DimensionsSchema = Joi.object().pattern(identifierRegex, Joi.alternatives().conditional(Joi.ref('.type'), {
   is: 'switch',
   then: SwitchDimension,
+  // Alternatives are tried in order and each miss builds a full error report, so the plain `sql`
+  // dimension, which most dimensions are, goes first. Order does not change what passes.
   otherwise: Joi.alternatives().try(
+    inherit(BaseDimension, {
+      sql: Joi.func().required(),
+    }),
     inherit(BaseDimensionWithoutSubQuery, {
       case: CaseVariants.required(),
       multiStage: Joi.boolean().strict(),
@@ -1032,9 +1037,6 @@ const DimensionsSchema = Joi.object().pattern(identifierRegex, Joi.alternatives(
       longitude: Joi.object().keys({
         sql: Joi.func().required()
       }).required()
-    }),
-    inherit(BaseDimension, {
-      sql: Joi.func().required(),
     }),
     inherit(BaseDimension, {
       multiStage: Joi.boolean().valid(true),

@@ -51,6 +51,61 @@ const nodeVisitor = <R>(visitor: { visitNode: (node: RuleNode, children: R[]) =>
   }
 });
 
+const templateLiteral = (children: any[]): t.TemplateLiteral => {
+  if (children[children.length - 1].type === 'TemplateElement') {
+    children[children.length - 1].tail = true;
+  } else {
+    children.push(t.templateElement({ raw: '', cooked: '' }));
+  }
+  if (children[0].type !== 'TemplateElement') {
+    children.unshift(t.templateElement({ raw: '', cooked: '' }));
+  }
+  return t.templateLiteral(children.filter(c => c.type === 'TemplateElement'), children.filter(c => c.type !== 'TemplateElement'));
+};
+
+const PYTHON_KEYWORDS = new Set([
+  'def', 'return', 'raise', 'from', 'import', 'as', 'global', 'nonlocal', 'assert', 'if', 'elif', 'else',
+  'while', 'for', 'in', 'try', 'finally', 'with', 'except', 'lambda', 'or', 'and', 'not', 'is', 'None',
+  'True', 'False', 'class', 'yield', 'del', 'pass', 'continue', 'break', 'async', 'await',
+]);
+
+// f"..." whose text has no quote, backslash, backtick or brace, and whose {...} hold only dotted names
+const SIMPLE_F_STRING = /^f"((?:[^"\\`{}]|\{[A-Za-z_]\w*(?:\.[A-Za-z_]\w*)*\})*)"$/;
+const SIMPLE_F_STRING_PART = /\{([\w.]+)\}|[^{]+/g;
+
+/**
+ * Builds the same AST the ANTLR parser does for the f-strings that make up most of a YAML
+ * model (`type: count`, `sql: "{CUBE}.id = {orders.id}"`) without running the parser, which
+ * dominates YAML transpilation. Returns null for anything else.
+ */
+export function transpileSimpleFString(codeString: string): t.Program | null {
+  const match = codeString.match(SIMPLE_F_STRING);
+  if (!match || !match[1]) {
+    return null;
+  }
+
+  const children: any[] = [];
+
+  for (const [part, path] of match[1].matchAll(SIMPLE_F_STRING_PART)) {
+    if (path) {
+      const names = path.split('.');
+      // Adjacent expressions are left to the parser, which reports them as an error
+      if (names.some(n => PYTHON_KEYWORDS.has(n)) || (children.length && children[children.length - 1].type !== 'TemplateElement')) {
+        return null;
+      }
+
+      children.push(names.slice(1).reduce<t.Expression>(
+        (expr, n) => t.memberExpression(expr, t.identifier(n)),
+        t.identifier(names[0])
+      ));
+    } else {
+      children.push(t.templateElement({ raw: part, cooked: part }));
+    }
+  }
+
+  return t.program([t.expressionStatement(templateLiteral(children))]);
+}
+
 interface SyntaxError {
   msg: string;
   column: number;
@@ -154,15 +209,7 @@ export class PythonParser {
           }
           return t.templateElement({ raw: node.getText(), cooked: node.getText() });
         } else if (node instanceof String_templateContext) {
-          if (children[children.length - 1].type === 'TemplateElement') {
-            children[children.length - 1].tail = true;
-          } else {
-            children.push(t.templateElement({ raw: '', cooked: '' }));
-          }
-          if (children[0].type !== 'TemplateElement') {
-            children.unshift(t.templateElement({ raw: '', cooked: '' }));
-          }
-          return t.templateLiteral(children.filter(c => c.type === 'TemplateElement'), children.filter(c => c.type !== 'TemplateElement'));
+          return templateLiteral(children);
         } else if (node instanceof Atom_exprContext) {
           if (children.length === 1) {
             return children[0];
