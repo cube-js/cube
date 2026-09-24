@@ -273,12 +273,8 @@ macro_rules! parse_sql_options {
     }};
 }
 
-/// Nesting the parser accepts inside a single statement: one level per nested expression,
-/// subquery and parenthesised group. `sqlparser`'s own default is 50, low enough that a
-/// generated query with a few dozen nested expressions is rejected outright.
-///
-/// Parsing recurses per level on the `cubestore-main` runtime's threads and has no stack-growth
-/// protection, so this is really a budget on their stack (`CUBESTORE_MAIN_STACK_SIZE`).
+/// Nesting the parser accepts inside a single statement. Parsing recurses per level with no
+/// stack growth, so this is a budget on the stack it runs on (`CUBESTORE_MAIN_STACK_SIZE`).
 const DEFAULT_SQL_PARSER_RECURSION_LIMIT: usize = 128;
 
 pub(crate) fn sql_parser_recursion_limit() -> usize {

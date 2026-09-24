@@ -71,10 +71,8 @@ fn expression_depths(
                 }
             }
             match expr {
-                // A run of one operator is linearized into a single node carrying every
-                // operand, so `a OR b OR c ...` costs one level however long it runs. Counting
-                // each `BinaryExpr` would refuse shapes that encode perfectly flat, a filter
-                // over many values being the common one.
+                // Mirrors datafusion-proto, which linearizes a same-operator left spine into
+                // one node.
                 Expr::BinaryExpr(BinaryExpr { left, op, right }) => {
                     pending.push((right.as_ref(), depth + 1));
                     let mut operand = left.as_ref();
@@ -111,12 +109,8 @@ fn expression_depths(
 }
 
 /// Longest root-to-leaf path in `plan`, counting a plan node, an expression node and a
-/// subquery's root alike. Walks an explicit stack, memoized by node address: the plans this
-/// guards against are exactly the ones a recursive walk could not survive.
-///
-/// `subquery_budget` bounds the one step that does recurse, so measuring a plan cannot be what
-/// overflows. A level of subquery nesting costs at least two levels of depth, so exhausting the
-/// budget in nesting alone already puts the plan over it.
+/// subquery's root alike. A level of subquery nesting costs at least two levels of depth, so
+/// exhausting `subquery_budget` in nesting alone already puts the plan over the limit.
 fn logical_plan_depth(
     plan: &LogicalPlan,
     subquery_budget: usize,
@@ -1583,14 +1577,13 @@ mod tests {
         .unwrap()
     }
 
-    /// The stack the budget is sized against: the select worker's default, since that is the
-    /// smaller of the two stacks a plan is decoded on. A debug build spends several times more
-    /// stack per level than the release build the budget was measured on, so only a release run
-    /// holds the budget to its actual claim.
+    /// The stack the budget is sized against: the select worker's default
+    /// (`CUBESTORE_SELECT_WORKER_STACK_SIZE`). A debug build spends several times more stack per
+    /// level, so only a release run holds the budget to its claim.
     #[cfg(not(debug_assertions))]
-    const DECODING_STACK: usize = 4 * 1024 * 1024;
+    const WORKER_STACK: usize = 4 * 1024 * 1024;
     #[cfg(debug_assertions)]
-    const DECODING_STACK: usize = 32 * 1024 * 1024;
+    const WORKER_STACK: usize = 32 * 1024 * 1024;
 
     /// Depth of a plan that is known to be inside the budget, so the walk cannot bail.
     fn depth_of(plan: &LogicalPlan) -> usize {
@@ -1598,9 +1591,9 @@ mod tests {
             .unwrap_or_else(|OverBudget| panic!("plan unexpectedly past the budget"))
     }
 
-    fn on_a_decoding_stack<T: Send + 'static>(f: impl FnOnce() -> T + Send + 'static) -> T {
+    fn on_a_worker_stack<T: Send + 'static>(f: impl FnOnce() -> T + Send + 'static) -> T {
         std::thread::Builder::new()
-            .stack_size(DECODING_STACK)
+            .stack_size(WORKER_STACK)
             .spawn(f)
             .unwrap()
             .join()
@@ -1626,12 +1619,40 @@ mod tests {
     fn plan_at_the_depth_limit_survives_the_serialization_roundtrip() {
         let plan = chained_stage_plan(74); // the values leaf plus 2 nodes a stage
         assert_eq!(depth_of(&plan), DEFAULT_LIMIT);
-        let decoded = on_a_decoding_stack(move || roundtrip(&plan)).unwrap();
+        let decoded = on_a_worker_stack(move || roundtrip(&plan)).unwrap();
         assert_eq!(
             format!("{}", decoded.display_indent()).lines().count(),
             149,
             "the decoded plan must be the one that was encoded"
         );
+    }
+
+    /// Decoding is only the first thing a worker does with a plan: physical planning and
+    /// execution recurse per node on the same stack, and before this branch nothing ever handed
+    /// them a plan this deep. A plan at the budget has to survive all of it.
+    #[test]
+    fn a_plan_at_the_depth_limit_executes_on_a_worker_stack() {
+        let plan = chained_stage_plan(74);
+        assert_eq!(depth_of(&plan), DEFAULT_LIMIT);
+
+        let rows = on_a_worker_stack(move || {
+            let decoded = roundtrip(&plan)?;
+            let context = SessionContext::new_with_state(
+                QueryPlannerImpl::minimal_session_state_from_final_config(SessionConfig::new())
+                    .build(),
+            );
+            let state = context.state();
+            let physical = futures::executor::block_on(
+                state.query_planner().create_physical_plan(&decoded, &state),
+            )?;
+            let batches = futures::executor::block_on(datafusion::physical_plan::collect(
+                physical,
+                state.task_ctx(),
+            ))?;
+            Ok::<_, CubeError>(batches.iter().map(|b| b.num_rows()).sum::<usize>())
+        })
+        .expect("a plan at the budget must plan and execute, not just decode");
+        assert_eq!(rows, 1);
     }
 
     /// A raised budget has to survive the trip the router takes: it decodes the plan it just
@@ -1643,7 +1664,7 @@ mod tests {
         let plan = chained_stage_plan(100); // 201 levels: past the default, inside the raised one
         assert!(depth_of(&plan) > DEFAULT_LIMIT);
 
-        let dispatched = on_a_decoding_stack(move || {
+        let dispatched = on_a_worker_stack(move || {
             let serialized = pre_serialized_with_limit(plan, raised).to_serialized_plan()?;
             serialized
                 .to_pre_serialized(
@@ -1668,7 +1689,7 @@ mod tests {
         let plan = chained_stage_plan(75);
         let depth = depth_of(&plan);
         assert!(depth > DEFAULT_LIMIT);
-        let err = on_a_decoding_stack(move || pre_serialized(plan).to_serialized_plan())
+        let err = on_a_worker_stack(move || pre_serialized(plan).to_serialized_plan())
             .map(|_| ())
             .expect_err("a plan past the depth limit must not be serialized");
 
@@ -1716,7 +1737,7 @@ mod tests {
             .unwrap();
         assert_eq!(plan.inputs().len(), 1);
 
-        let err = on_a_decoding_stack(move || pre_serialized(plan).to_serialized_plan())
+        let err = on_a_worker_stack(move || pre_serialized(plan).to_serialized_plan())
             .map(|_| ())
             .expect_err("an expression past the depth limit must not be serialized");
         assert!(
@@ -1746,7 +1767,7 @@ mod tests {
             "a linearized run must not count as one level apiece, got depth {}",
             depth_of(&plan)
         );
-        on_a_decoding_stack(move || pre_serialized(plan).to_serialized_plan())
+        on_a_worker_stack(move || pre_serialized(plan).to_serialized_plan())
             .expect("a query that encodes flat must not be refused");
     }
 
@@ -1772,7 +1793,7 @@ mod tests {
                 .unwrap();
         }
 
-        let err = on_a_decoding_stack(move || pre_serialized(plan).to_serialized_plan())
+        let err = on_a_worker_stack(move || pre_serialized(plan).to_serialized_plan())
             .map(|_| ())
             .expect_err("a plan this deeply nested must not be serialized");
         assert!(
@@ -1802,7 +1823,7 @@ mod tests {
             .unwrap();
         assert_eq!(plan.inputs().len(), 1);
 
-        let err = on_a_decoding_stack(move || pre_serialized(plan).to_serialized_plan())
+        let err = on_a_worker_stack(move || pre_serialized(plan).to_serialized_plan())
             .map(|_| ())
             .expect_err("a subquery past the depth limit must not be serialized");
         assert!(
