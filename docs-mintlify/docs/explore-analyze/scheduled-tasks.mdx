@@ -52,10 +52,9 @@ offering these frequencies:
 A **timezone** selector (defaulting to your browser's timezone) controls when
 the schedule fires; it is stored per task.
 
-A task runs at most once an hour. A custom cron must be a standard
-five-field expression whose minute field is a single number: `0 * * * *`
-(every hour) and `30 9 * * 1-5` (9:30 on weekdays) work, while
-`*/15 * * * *` is rejected.
+A custom cron must be a standard five-field expression whose minute field
+is a single number: `0 * * * *` (every hour) and `30 9 * * 1-5` (9:30 on
+weekdays) work, while `*/15 * * * *` is rejected.
 
 ## Limits
 
@@ -72,13 +71,12 @@ Anyone who can use the deployment can see its tasks and create new ones.
 Only a task's creator, or a user with the **Admin**
 [role](/admin/users-and-permissions/roles-and-permissions), can edit, pause,
 run, or delete it, because every run executes as the creator (see
-[Reading the output](#reading-the-output)). On an account that doesn't
-enforce roles, every user has admin access, including to other users' tasks.
+[Reading the output](#reading-the-output)).
 
-That exemption carries the creator's data access with it. An admin who edits
-another user's task changes what runs under that user's access, and can open
-the resulting thread. A run's chat thread belongs to the task's creator, and
-only the creator, admins, users with the **Access chat history**
+The admin exception carries the creator's data access with it: an admin who edits
+another user's task changes what runs under that user's access. A run's chat
+thread belongs to the task's creator, and only the creator, admins, users with
+the **Access chat history**
 [permission](/admin/users-and-permissions/custom-roles), and people it's shared
 with can open it.
 
