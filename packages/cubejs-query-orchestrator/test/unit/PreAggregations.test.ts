@@ -95,10 +95,18 @@ const mockPreAggregation = (overrides: Record<string, any> = {}) => ({
   ...overrides,
 });
 
-// Widens the protected entry point that the invalidation key tests drive directly.
+// Widens the protected entry points that the tests drive directly.
 class TestPartitionRangeLoader extends PreAggregationPartitionRangeLoader {
   public getInvalidationKeyValues(range: [string, string]) {
     return super.getInvalidationKeyValues(range);
+  }
+
+  public partitionPreAggregationDescription(range: QueryDateRange, buildRange: QueryDateRange) {
+    return super.partitionPreAggregationDescription(range, buildRange);
+  }
+
+  public partitionRanges(ignoreMatchedDateRange?: boolean) {
+    return super.partitionRanges(ignoreMatchedDateRange);
   }
 }
 
@@ -1585,9 +1593,9 @@ describe('PreAggregations', () => {
       bounds.mockResolvedValue(['2024-01-01T00:00:00.000', '2024-01-03T00:00:00.000']);
       await expect(loader.partitionPreAggregations()).rejects.toThrow('requested to build 3 partitions');
       bounds.mockResolvedValue(rangeB);
-      const describe = jest.spyOn(loader as any, 'partitionPreAggregationDescription').mockImplementationOnce(() => { throw new Error('expansion failed'); });
+      const descriptionSpy = jest.spyOn(loader, 'partitionPreAggregationDescription').mockImplementationOnce(() => { throw new Error('expansion failed'); });
       await expect(loader.partitionPreAggregations()).rejects.toThrow('expansion failed');
-      describe.mockRestore();
+      descriptionSpy.mockRestore();
       bounds.mockResolvedValue(rangeA);
       expect(await loader.partitionPreAggregations()).toBe(first);
     });
@@ -1627,7 +1635,7 @@ describe('PreAggregations', () => {
       const fallback = await loader.partitionPreAggregations();
       expect(fallback.map(p => p.tableName)).toEqual(['test_table20240105']);
       // externalRefresh retries using the full build range, ignoring the unmatched query bounds.
-      const full = await (loader as any).partitionRanges(true);
+      const full = await loader.partitionRanges(true);
       expect(full.partitionRanges).toHaveLength(2);
       expect(full.buildRange).toEqual(['2024-01-04T00:00:00.000', '2024-01-05T12:00:00.000']);
     });
@@ -1644,8 +1652,8 @@ describe('PreAggregations', () => {
     test('ordinary query range generation remains uncached', async () => {
       const compilerCacheFn = jest.fn((_key, fn) => fn());
       const loader = createLoader({}, { compilerCacheFn });
-      const first = await (loader as any).partitionRanges();
-      const second = await (loader as any).partitionRanges();
+      const first = await loader.partitionRanges();
+      const second = await loader.partitionRanges();
       expect(second).toEqual(first);
       expect(second.partitionRanges).not.toBe(first.partitionRanges);
       expect(compilerCacheFn).not.toHaveBeenCalled();

@@ -40,7 +40,6 @@ test('CompilerCache retains only the last partition plan per identity across hun
     entries.set(JSON.stringify(key), entry);
     return entry;
   });
-  // Range loading is mocked; planning uses the real loader and compiler cache.
   const loaders = ['UTC', 'Europe/Paris'].map(timezone => new PreAggregationPartitionRangeLoader(
     async () => null!, jest.fn(), null!, null!, preAggregation(timezone), [], null!,
     { compilerCacheFn, maxPartitions: 10000, maxSourceRowLimit: 10000 },

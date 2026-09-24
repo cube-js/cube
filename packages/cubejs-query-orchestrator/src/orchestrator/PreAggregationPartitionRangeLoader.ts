@@ -203,7 +203,7 @@ export class PreAggregationPartitionRangeLoader {
     }];
   }
 
-  private partitionPreAggregationDescription(range: QueryDateRange, buildRange: QueryDateRange): PreAggregationDescription {
+  protected partitionPreAggregationDescription(range: QueryDateRange, buildRange: QueryDateRange): PreAggregationDescription {
     const partitionTableName = PreAggregationPartitionRangeLoader.partitionTableName(
       this.preAggregation.tableName, this.preAggregation.partitionGranularity, range
     );
@@ -500,7 +500,7 @@ export class PreAggregationPartitionRangeLoader {
     return ranges;
   }
 
-  private async partitionRanges(ignoreMatchedDateRange?: boolean): Promise<PartitionRanges> {
+  protected async partitionRanges(ignoreMatchedDateRange?: boolean): Promise<PartitionRanges> {
     const buildRange = await this.effectiveDateRange(ignoreMatchedDateRange);
     return { buildRange, partitionRanges: this.partitionRangesForDateRange(buildRange) };
   }
