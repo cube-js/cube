@@ -91,8 +91,9 @@ It provides you with two options:
 * Scale the number of [Dedicated](#dedicated) deployments serving your
 workload, allowing to route requests over up to 10 Dedicated deployments and
 up to 100 API instances.
-* Optionally, scale the number of Cube Store routers, allowing for increased
-Cube Store querying performance.
+* Optionally, enable **Multi-router Cube Store** to run a dedicated Cube
+Store router per cluster instead of sharing a single router across all
+clusters, allowing for increased Cube Store querying performance.
 
 
 Each Dedicated deployment is billed separately, and all Dedicated deployments
@@ -107,6 +108,10 @@ with **✓**.
 To set the number of Dedicated deployments within your Multi-cluster
 deployment, navigate to **Settings → Configuration** and edit
 **Number of clusters**.
+
+To give each cluster its own Cube Store router, navigate to
+**Settings → Configuration** and enable **Multi-router Cube Store**. The
+number of routers follows **Number of clusters**.
 
 ### Routing traffic between Dedicated deployments
 
