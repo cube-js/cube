@@ -37,6 +37,10 @@ your permission on the workbook:
   [subscribe or unsubscribe](#subscribing-to-notifications) yourself from each
   schedule's email notifications.
 
+To see the scheduled refreshes of every dashboard in the deployment in one
+place, use the [Scheduled refreshes](#viewing-all-scheduled-refreshes) tab of
+the **Scheduled** page.
+
 <Warning>
 
 The dashboard must be published before schedules can be created.
@@ -100,6 +104,67 @@ The sidebar lists all existing schedules with the following information:
 | Duplicate | Create a new schedule pre-filled from this one (see [Duplicating a schedule](#duplicating-a-schedule)) |
 | Delete | Remove the schedule permanently |
 
+## Viewing all scheduled refreshes
+
+The sidebar shows the schedules of one dashboard. To see every scheduled refresh
+in the deployment, open **Scheduled** in the deployment sidebar and select the
+**Scheduled refreshes** tab of the **Scheduled tasks and refreshes** page. The
+tab has its own URL, so you can bookmark it or reload it and land on the same
+tab. The page's other tab lists [Scheduled Tasks][ref-scheduled-tasks]; if you
+can use only one of the two, the page shows it without tabs.
+
+The tab is available to users with the Explorer, Developer, or Admin
+[role][ref-roles]. Users with the Viewer role don't see it; they reach a
+dashboard's schedules from the calendar icon on the published dashboard.
+
+The list includes a scheduled refresh only if you can open its workbook,
+including workbooks you don't own. A schedule on a workbook you have no access
+to is not listed, even when that workbook sits in a folder you can see. Admins
+see every scheduled refresh in the deployment. Each row shows:
+
+- **Enable/disable toggle** — the untitled first column; turns the schedule on or
+  off.
+- **Dashboard** — the dashboard's title. Click it to open the dashboard in the
+  Dashboard Builder.
+- **Schedule** — the human-readable schedule, like "At 09:00 AM".
+- **Next run** — the next scheduled execution, or "Disabled" if the schedule is
+  off.
+- **Notifications** — the delivery channel, for example "Notification: Email",
+  or "—" when no notification is configured. A Slack notification shows its
+  channel name only on rows you can edit; other rows show "Notification: Slack".
+- **Subscribe** — the [subscribe toggle](#subscribing-to-notifications) for
+  schedules you can only view.
+
+Use the search box above the list to find a schedule by its dashboard title or
+its schedule text.
+
+What a row offers depends on your permission on its workbook:
+
+- **Edit** or **Manage**, whether set on the workbook or inherited from its
+  [folder][ref-sharing] — the enable/disable toggle and a ⋯ menu, always shown,
+  with **Run now**, **Edit schedule**, **Duplicate schedule**, and **Delete**.
+  **Delete** asks for confirmation first. Admins get these controls on every
+  row.
+- **View only** — no toggle and no ⋯ menu. If the schedule sends email
+  notifications, the **Subscribe** column holds a toggle to subscribe or
+  unsubscribe yourself. A schedule that posts to Slack has no toggle.
+
+**Edit schedule** and **Duplicate schedule** open the same dialog as the
+sidebar, pre-filled from the schedule and tied to its dashboard. **Save as
+copy** is available only in the sidebar's edit dialog.
+
+If an enabled schedule could not be registered to run automatically, its
+**Next run** column shows "Couldn't schedule" instead of a time. On a row you
+can edit, click **Retry** next to it to register the schedule again.
+
+### Creating a schedule from the list
+
+Click **New scheduled refresh** above the list. The dialog described in
+[Creating a schedule](#creating-a-schedule) opens with an extra first field,
+**Dashboard**, which lists the published dashboards you can edit. Select one,
+set the schedule, and click **Save**; the new schedule appears in the list
+under that dashboard's title.
+
 ## Duplicating a schedule
 
 To create a new schedule based on an existing one — for example, to send the
@@ -110,10 +175,12 @@ duplicate it. There are two ways:
 - **From the sidebar** — click the duplicate (copy) icon on a schedule card. The
   form dialog opens pre-filled with its **Schedule**, timezone, and
   notification configuration. Adjust anything you need, then click **Save** to
-  create the new schedule.
-- **From the edit dialog** — while editing a schedule, click **Save as copy** in
-  the dialog footer. This creates a new schedule from the current form values,
-  including any unsaved changes, instead of updating the original.
+  create the new schedule. On the
+  [Scheduled refreshes](#viewing-all-scheduled-refreshes) tab, choose
+  **Duplicate schedule** from the row's ⋯ menu instead.
+- **From the sidebar's edit dialog** — while editing a schedule, click **Save as
+  copy** in the dialog footer. This creates a new schedule from the current form
+  values, including any unsaved changes, instead of updating the original.
 
 Duplicates are independent schedules: the original is left unchanged, and the
 copy keeps the source schedule's enabled or disabled state.
@@ -123,7 +190,9 @@ copy keeps the source schedule's enabled or disabled state.
 If a schedule sends [email notifications][ref-notifications], anyone who can view
 the dashboard can subscribe to it themselves — an editor does not have to add
 them as a recipient. Open the scheduled refreshes sidebar from the published
-dashboard and use the toggle on a schedule to subscribe or unsubscribe.
+dashboard and use the toggle on a schedule to subscribe or unsubscribe. The
+same toggle appears in the **Subscribe** column of the
+[Scheduled refreshes](#viewing-all-scheduled-refreshes) tab.
 
 The toggle covers **every** way that schedule could reach you, in one click. If
 you were added individually, unsubscribing removes you from its recipients. If
@@ -172,5 +241,7 @@ The sidebar shows real-time status updates during execution.
 
 [ref-ai-summary]: /docs/explore-analyze/notifications#ai-summary
 [ref-roles]: /admin/users-and-permissions/roles-and-permissions
+[ref-scheduled-tasks]: /docs/explore-analyze/scheduled-tasks
+[ref-sharing]: /docs/organize-content/sharing#permission-inheritance
 [ref-notifications]: /docs/explore-analyze/notifications
 [ref-user-groups]: /admin/users-and-permissions/user-groups
