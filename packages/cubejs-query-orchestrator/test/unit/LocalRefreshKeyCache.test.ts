@@ -1,6 +1,5 @@
 import crypto from 'crypto';
 import { QueryCache, QueryWithParams } from '../../src';
-import { evaluateLocalRefreshKey } from '../../src/orchestrator/utils';
 
 // Keep queue timers real while advancing the clock used by cache entries and refresh keys.
 const realTimers = [
@@ -10,6 +9,7 @@ const realTimers = [
 
 describe('local refresh key SQL cache compatibility', () => {
   const start = 97_800_000;
+  const descriptor = { interval: 600, utcOffset: 0, dayOffset: 0 };
   const caches: QueryCache[] = [];
 
   beforeEach(() => jest.useFakeTimers({ now: start, doNotFake: [...realTimers] }));
@@ -20,9 +20,8 @@ describe('local refresh key SQL cache compatibility', () => {
   });
 
   const setup = (threshold = 86400, interval = 600) => {
-    const descriptor = { interval, utcOffset: 0, dayOffset: 0 };
     const q: QueryWithParams = [`SELECT FLOOR(UNIX_TIMESTAMP() / ${interval}) as refresh_key`, [], {
-      localRefreshKey: descriptor,
+      localRefreshKey: { ...descriptor, interval },
     }];
     const make = (localRefreshKey: boolean, prefix = crypto.randomBytes(16).toString('hex')) => {
       // An independent stand-in for the SQL formula, executed by the real queue handler.
@@ -37,7 +36,7 @@ describe('local refresh key SQL cache compatibility', () => {
       caches.push(cache);
       return { cache, factory, query };
     };
-    return { q, descriptor, make, sql: make(false), local: make(true) };
+    return { q, make };
   };
 
   test.each([
@@ -46,7 +45,9 @@ describe('local refresh key SQL cache compatibility', () => {
     { name: 'threshold is measured from the write time', ttl: 86400, threshold: 120, interval: 60, elapsed: 120001, changes: true },
     { name: 'does not renew early at a wall-clock threshold boundary', ttl: 86400, threshold: 120, interval: 60, elapsed: 83001, changes: false },
   ])('$name', async ({ ttl, threshold, interval, elapsed, changes }) => {
-    const { q, sql, local } = setup(threshold, interval);
+    const { q, make } = setup(threshold, interval);
+    const sql = make(false);
+    const local = make(true);
     const read = (cache: QueryCache) => cache.cacheRefreshKeyResult(q, ttl, { dataSource: 'default', waitForRenew: true });
     // Deliberately off any interval or renewal boundary.
     jest.setSystemTime(start + 37000);
@@ -55,13 +56,18 @@ describe('local refresh key SQL cache compatibility', () => {
     jest.setSystemTime(Date.now() + elapsed);
     const after = await read(sql.cache);
     expect(await read(local.cache)).toEqual(after);
-    expect(JSON.stringify(after) !== JSON.stringify(before)).toBe(changes);
+    if (changes) {
+      expect(after).not.toEqual(before);
+    } else {
+      expect(after).toEqual(before);
+    }
     expect(local.factory).not.toHaveBeenCalled();
   });
 
   test.each([3600, 86400])('readers with different TTLs retain the stored TTL %i', async firstTtl => {
     const { q, make } = setup();
     const secondTtl = firstTtl === 3600 ? 86400 : 3600;
+
     for (const localRefreshKey of [false, true]) {
       const prefix = crypto.randomBytes(16).toString('hex');
       const first = make(localRefreshKey, prefix);
@@ -74,7 +80,11 @@ describe('local refresh key SQL cache compatibility', () => {
       expect(secondSet).not.toHaveBeenCalled();
       jest.setSystemTime(start + 3600001);
       const after = await second.cache.cacheRefreshKeyResult(q, secondTtl, { dataSource: 'default', waitForRenew: true });
-      expect(JSON.stringify(after) !== JSON.stringify(before)).toBe(firstTtl === 3600);
+      if (firstTtl === 3600) {
+        expect(after).not.toEqual(before);
+      } else {
+        expect(after).toEqual(before);
+      }
       if (localRefreshKey) {
         expect(first.factory).not.toHaveBeenCalled();
         expect(second.factory).not.toHaveBeenCalled();
@@ -83,27 +93,41 @@ describe('local refresh key SQL cache compatibility', () => {
   });
 
   test.each([false, true])('background renewal returns the stored value first (local=%s)', async localRefreshKey => {
-    const { q, descriptor, make } = setup(120, 60);
+    const { q, make } = setup(120, 60);
     const { cache } = make(localRefreshKey);
     const before = await cache.cacheRefreshKeyResult(q, 86400, { dataSource: 'default', waitForRenew: true });
     jest.setSystemTime(start + 120001);
     const driver = cache.getCacheDriver();
     const originalSet = driver.set.bind(driver);
-    let renewed: () => void;
-    const done = new Promise<void>(resolve => { renewed = resolve; });
-    jest.spyOn(driver, 'set').mockImplementation(async (...args) => {
-      const result = await originalSet(...args);
-      renewed();
-      return result;
+    let releaseWrite: () => void;
+    const writeAllowed = new Promise<void>(resolve => { releaseWrite = resolve; });
+    let write: ReturnType<typeof driver.set> | undefined;
+    const set = jest.spyOn(driver, 'set').mockImplementation((...args) => {
+      write = writeAllowed.then(() => originalSet(...args));
+      return write;
     });
-    expect(await cache.cacheRefreshKeyResult(q, 86400, { dataSource: 'default', waitForRenew: false })).toEqual(before);
-    await done;
-    expect(await cache.cacheRefreshKeyResult(q, 86400, { dataSource: 'default', waitForRenew: true }))
-      .toEqual(evaluateLocalRefreshKey(descriptor));
+    const key = cache.refreshKeyCacheKey(q, 'default');
+    const returned = jest.fn();
+    const read = cache.cacheRefreshKeyResult(q, 86400, { dataSource: 'default', waitForRenew: false }).then(returned);
+
+    try {
+      // Let the queue and promise callbacks run, keeping the renewal write blocked.
+      await new Promise<void>(resolve => setImmediate(resolve));
+      expect(returned).toHaveBeenCalledWith(before);
+      expect(set).toHaveBeenCalledTimes(1);
+      expect(await driver.get(key)).toMatchObject({ result: before });
+    } finally {
+      releaseWrite();
+      await read;
+      await write;
+    }
+    // Read storage directly so a second cache lookup cannot repair a failed renewal.
+    expect(await driver.get(key)).toMatchObject({ result: [{ refresh_key: '1632' }] });
   });
 
   test.each(['get', 'set'] as const)('propagates cache %s failures without querying the source', async method => {
-    const { q, local } = setup();
+    const { q, make } = setup();
+    const local = make(true);
     jest.spyOn(local.cache.getCacheDriver(), method).mockRejectedValueOnce(new Error('cache unavailable'));
     await expect(local.cache.cacheRefreshKeyResult(q, 3600, { dataSource: 'default', waitForRenew: true }))
       .rejects.toThrow('cache unavailable');
@@ -123,23 +147,36 @@ describe('local refresh key SQL cache compatibility', () => {
     expect(reader.factory).not.toHaveBeenCalled();
   });
 
-  test.each(['disabled', 'sql', 'malformed', 'incremental'])('retains SQL execution for %s keys under a threshold', async kind => {
+  test.each<{
+    name: string;
+    localRefreshKey: boolean;
+    queryOptions: QueryWithParams[2];
+  }>([
+    { name: 'local evaluation is disabled', localRefreshKey: false, queryOptions: { localRefreshKey: descriptor } },
+    { name: 'the descriptor is absent', localRefreshKey: true, queryOptions: {} },
+    { name: 'the interval is invalid', localRefreshKey: true, queryOptions: { localRefreshKey: { ...descriptor, interval: 0 } } },
+    { name: 'the key is incremental', localRefreshKey: true, queryOptions: { localRefreshKey: descriptor, incremental: true } },
+  ])('executes SQL under a threshold when $name', async ({ localRefreshKey, queryOptions }) => {
     const { q, make } = setup();
-    const { cache, query } = make(kind !== 'disabled');
-    if (kind === 'sql') q[2] = {};
-    if (kind === 'malformed') q[2].localRefreshKey.interval = 0;
-    if (kind === 'incremental') q[2].incremental = true;
-    expect(await cache.cacheRefreshKeyResult(q, 3600, { dataSource: 'default', waitForRenew: true })).toEqual([{ refresh_key: '163' }]);
+    const { cache, query } = make(localRefreshKey);
+    const sqlQuery: QueryWithParams = [q[0], q[1], queryOptions];
+    expect(await cache.cacheRefreshKeyResult(sqlQuery, 3600, { dataSource: 'default', waitForRenew: true }))
+      .toEqual([{ refresh_key: '163' }]);
     expect(query).toHaveBeenCalledTimes(1);
   });
 
   test.each([0, undefined])('without a threshold override uses neither the cache nor the queue (%s)', async threshold => {
-    const { q, local } = setup();
+    const { q, make } = setup();
+    const local = make(true);
     local.cache.options.refreshKeyRenewalThreshold = threshold;
     const get = jest.spyOn(local.cache.getCacheDriver(), 'get');
+    const set = jest.spyOn(local.cache.getCacheDriver(), 'set');
     const enqueue = jest.spyOn(local.cache, 'queryWithRetryAndRelease');
     expect(await local.cache.cacheRefreshKeyResult(q, 60, { dataSource: 'default' })).toEqual([{ refresh_key: '163' }]);
+    jest.setSystemTime(start + 600000);
+    expect(await local.cache.cacheRefreshKeyResult(q, 60, { dataSource: 'default' })).toEqual([{ refresh_key: '164' }]);
     expect(get).not.toHaveBeenCalled();
+    expect(set).not.toHaveBeenCalled();
     expect(enqueue).not.toHaveBeenCalled();
     expect(local.factory).not.toHaveBeenCalled();
   });
