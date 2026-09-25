@@ -230,7 +230,11 @@
 
     "Skipped because are too heavy and leads to Connection terminated unexpectedly or ECONNREFUSED or ECONNRESET",
     "SQL API: Rolling Window YTD (year + month + day + date_trunc equal)",
-    "SQL API: Rolling Window YTD (year + month + day + date_trunc IN)"
+    "SQL API: Rolling Window YTD (year + month + day + date_trunc IN)",
+    "---- Time-shifted measure rolled up from a rollup: native planner, Postgres and BigQuery only ----",
+    "querying RetailOrders: named prior month by category for one day (pre-aggregation in CubeStore)",
+    "querying RetailOrders: named prior month by category over two months (pre-aggregation in CubeStore)",
+    "SQL API: named prior month by category for one day"
   ],
   "tesseractSkip": [
     "querying custom granularities ECommerce: count by three_months_by_march + no dimension",
@@ -271,6 +275,10 @@
     "querying BigECommerce: two multi-stage branches sharing one pre-aggregation",
     "---- Calendar-shifted measure stored in a rollup: covered on Postgres only for now ----",
     "querying BigECommerce with Retail Calendar: prior year and month by week (no pre-aggregation)",
-    "querying BigECommerce with Retail Calendar: prior year and month by week (pre-aggregation in CubeStore)"
+    "querying BigECommerce with Retail Calendar: prior year and month by week (pre-aggregation in CubeStore)",
+    "---- Time-shifted measure rolled up from a rollup: native planner, Postgres and BigQuery only ----",
+    "querying RetailOrders: named prior month by category for one day (pre-aggregation in CubeStore)",
+    "querying RetailOrders: named prior month by category over two months (pre-aggregation in CubeStore)",
+    "SQL API: named prior month by category for one day"
   ]
 }

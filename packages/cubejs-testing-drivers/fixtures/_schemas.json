@@ -465,6 +465,28 @@
           }]
         },
         {
+          "name": "retailOrderCount",
+          "type": "count"
+        },
+        {
+          "name": "retailOrderCountPriorMonth",
+          "type": "number",
+          "sql": "{retailOrderCount}",
+          "multi_stage": true,
+          "time_shift": [{
+            "name": "retail_prior_month"
+          }]
+        },
+        {
+          "name": "retailOrderCountPriorMonthNoPreAgg",
+          "type": "number",
+          "sql": "{retailOrderCount}",
+          "multi_stage": true,
+          "time_shift": [{
+            "name": "retail_prior_month"
+          }]
+        },
+        {
           "name": "totalProfitForQuarter",
           "type": "sum",
           "sql": "{totalProfit}",
@@ -608,6 +630,10 @@
               "sql": "{CUBE}.retail_date_prev_month"
             },
             {
+              "name": "retail_prior_month",
+              "sql": "{CUBE}.retail_date_prev_month"
+            },
+            {
               "interval": "1 quarter",
               "type": "prior",
               "sql": "{CUBE}.retail_date_prev_quarter"
@@ -623,6 +649,26 @@
     }
   ],
   "views": [
+    {
+      "name": "RetailOrders",
+      "cubes": [
+        {
+          "join_path": "BigECommerce",
+          "includes": [
+            "category",
+            "subCategory",
+            "productName",
+            "retailOrderCount",
+            "retailOrderCountPriorMonth",
+            "retailOrderCountPriorMonthNoPreAgg"
+          ]
+        },
+        {
+          "join_path": "BigECommerce.RetailCalendar",
+          "includes": ["retail_date"]
+        }
+      ]
+    },
     {
       "name": "SwitchSourceTest",
       "dimensions": [

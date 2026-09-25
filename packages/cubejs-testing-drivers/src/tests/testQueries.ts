@@ -260,6 +260,18 @@ export function testQueries(type: string, { includeIncrementalSchemaSuite, exten
         await delay(OP_DELAY);
       }
 
+      // Stores a named calendar shift by product and day for queries that
+      // roll it up to the category.
+      if (isTesseractEnv && fixtures.preAggregations?.BigECommerce?.some((pa) => pa.name === 'RetailPriorMonthByProductDay')) {
+        await buildPreaggs(env.cube.port, apiToken, {
+          timezones: ['UTC'],
+          preAggregations: ['BigECommerce.RetailPriorMonthByProductDayExternal'],
+          contexts: [{ securityContext: { tenant: 't1' } }],
+        });
+
+        await delay(OP_DELAY);
+      }
+
       // Exercise pre-aggregation build with a custom granularity. The
       // granularity name `build_only_half_year` is unique to this rollup — no
       // query test references it, so the rollup cannot match any test query and
@@ -2300,6 +2312,65 @@ export function testQueries(type: string, { includeIncrementalSchemaSuite, exten
       expect(rollup.rawData()).toMatchSnapshot();
     });
 
+    // A rollup keeps the named prior retail month by product and day; the
+    // queries ask for it by category alone, so the stored value is rolled up.
+    // The prior month is the calendar's mapping, not an interval: 2020-12-14
+    // maps to 2020-11-16, while one month back is the empty 2020-11-14.
+    const priorMonthByCategory = (variant: '' | 'NoPreAgg', dateRange: [string, string]) => ({
+      measures: [
+        'RetailOrders.retailOrderCount',
+        `RetailOrders.retailOrderCountPriorMonth${variant}`,
+      ],
+      dimensions: ['RetailOrders.category'],
+      timeDimensions: [{
+        dimension: 'RetailOrders.retail_date',
+        dateRange,
+      }],
+      order: {
+        'RetailOrders.category': 'asc',
+      },
+    } as const);
+
+    const asRollupRows = (rows: any[]) => rows.map(({
+      'RetailOrders.retailOrderCountPriorMonthNoPreAgg': priorMonth,
+      ...row
+    }: any) => ({
+      ...row,
+      'RetailOrders.retailOrderCountPriorMonth': priorMonth,
+    }));
+
+    // The SQL API renders `retail_date = '<day>'` as a range over one instant.
+    execute('querying RetailOrders: named prior month by category for one day (pre-aggregation in CubeStore)', async () => {
+      const day: [string, string] = ['2020-12-14T00:00:00.000', '2020-12-14T00:00:00.000'];
+      const [rollup, source] = await Promise.all([
+        client.load(priorMonthByCategory('', day)),
+        client.load(priorMonthByCategory('NoPreAgg', day)),
+      ]);
+      expect(servedByRollupStore(rollup)).toBe(true);
+      expect(servedByRollupStore(source)).toBe(false);
+      expect(rollup.rawData()).toEqual(asRollupRows(source.rawData()));
+      const technology = rollup.rawData().find((row: any) => row['RetailOrders.category'] === 'Technology');
+      expect(technology).toMatchObject({
+        'RetailOrders.retailOrderCount': '2',
+        'RetailOrders.retailOrderCountPriorMonth': '1',
+      });
+      expect(rollup.rawData()).toMatchSnapshot();
+    });
+
+    execute('querying RetailOrders: named prior month by category over two months (pre-aggregation in CubeStore)', async () => {
+      const months: [string, string] = ['2020-11-01', '2020-12-31'];
+      const [rollup, source] = await Promise.all([
+        client.load(priorMonthByCategory('', months)),
+        client.load(priorMonthByCategory('NoPreAgg', months)),
+      ]);
+      expect(servedByRollupStore(rollup)).toBe(true);
+      expect(servedByRollupStore(source)).toBe(false);
+      expect(rollup.rawData()).toEqual(asRollupRows(source.rawData()));
+      expect(rollup.rawData().some((row: any) => row['RetailOrders.retailOrderCountPriorMonth'] !== null
+        && row['RetailOrders.retailOrderCountPriorMonth'] !== row['RetailOrders.retailOrderCount'])).toBe(true);
+      expect(rollup.rawData()).toMatchSnapshot();
+    });
+
     execute('querying BigECommerce with Retail Calendar: totalCountRetailMonthAgo', async () => {
       const response = await client.load({
         measures: [
@@ -2723,6 +2794,27 @@ from
   ) "rows"
   `);
       expect(res.rows).toMatchSnapshot('powerbi_min_max_ungrouped_flag');
+    });
+
+    executePg('SQL API: named prior month by category for one day', async (connection) => {
+      const priorMonth = (measure: string) => connection.query(`
+    select
+      category,
+      MEASURE(retailOrderCount) as order_count,
+      MEASURE(${measure}) as prior_month
+    from
+      "public"."RetailOrders"
+    where
+      retail_date = '2020-12-14'
+    group by 1
+    order by 1
+  `);
+      const [rollup, source] = await Promise.all([
+        priorMonth('retailOrderCountPriorMonth'),
+        priorMonth('retailOrderCountPriorMonthNoPreAgg'),
+      ]);
+      expect(rollup.rows).toEqual(source.rows);
+      expect(rollup.rows).toMatchSnapshot();
     });
 
     executePg('SQL API: ungrouped pre-agg', async (connection) => {

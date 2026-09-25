@@ -16,7 +16,8 @@ cubes:
         time_shift:
           - interval: 1 year
             type: prior
-            name: prior_year
+            sql: "{CUBE}.prev_year_date"
+          - name: prior_year
             sql: "{CUBE}.prev_year_date"
 
       - name: retail_date
@@ -30,7 +31,8 @@ cubes:
         time_shift:
           - interval: 1 year
             type: prior
-            name: prior_year
+            sql: "{CUBE}.prev_year_date"
+          - name: prior_year
             sql: "{CUBE}.prev_year_date"
 
       # Declares the same named shift as `retail_date` over another mapping.
