@@ -1148,10 +1148,8 @@ entities before `offset` and `limit` are applied:
 
 Cubes, views, and members that aren't [public][ref-cubes-public] are not
 returned with their definitions. To keep lineage complete, a private cube or
-member that a public member references directly is returned as a _lineage stub_.
-A stub cube has `public` set to `false`, and its members keep their `public`
-value from the data model. A stub member of a public cube has `public` set to
-`false`. A stub has:
+member that a public member references directly is returned as a _lineage stub_,
+with `public` set to `false`. A stub has:
 
 - only the members that public members reference, each with its `name`, `type`,
   and `column_references`
@@ -1183,7 +1181,7 @@ For example, a public view whose `customer_id` dimension is an alias of
   "dimensions": [
     {
       "name": "id",
-      "public": true,
+      "public": false,
       "title": "id",
       "description": "",
       "type": "number",
