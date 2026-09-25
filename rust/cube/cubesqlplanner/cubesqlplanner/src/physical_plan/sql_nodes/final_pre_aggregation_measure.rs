@@ -11,7 +11,8 @@ use std::any::Any;
 use std::rc::Rc;
 
 /// Substitutes a measure with the matching pre-aggregation column
-/// reference (rolled up via the measure's `pre_aggregate_wrap`),
+/// reference (rolled up via the `pre_aggregate_wrap` of the measure's
+/// `rollup_kind`),
 /// or falls through to `input` when the measure has no
 /// pre-aggregation entry.
 pub struct FinalPreAggregationMeasureSqlNode {
@@ -53,7 +54,8 @@ impl SqlNode for FinalPreAggregationMeasureSqlNode {
                                 table_ref,
                                 templates.quote_identifier(&column_name.name())?
                             );
-                            match ev.kind().pre_aggregate_wrap() {
+                            let rollup_kind = ev.rollup_kind();
+                            match rollup_kind.pre_aggregate_wrap() {
                                 // The rollup column holds an HLL state, so it
                                 // must be merged, not recomputed. Keep the
                                 // merged state when this query itself feeds a

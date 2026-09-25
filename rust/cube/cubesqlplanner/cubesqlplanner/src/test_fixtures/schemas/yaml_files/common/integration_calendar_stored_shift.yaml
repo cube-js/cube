@@ -111,6 +111,29 @@ cubes:
             interval: 1 month
             type: prior
 
+      # `type: number` proxies roll up by the kind of the measure they read.
+      - name: max_amount_prev_year
+        type: number
+        multi_stage: true
+        sql: "{max_amount}"
+        time_shift:
+          - time_dimension: sale_date
+            interval: 1 year
+            type: prior
+
+      - name: approx_stores
+        type: count_distinct_approx
+        sql: store
+
+      - name: approx_stores_prev_year
+        type: number
+        multi_stage: true
+        sql: "{approx_stores}"
+        time_shift:
+          - time_dimension: sale_date
+            interval: 1 year
+            type: prior
+
       - name: amount_ly
         type: number
         multi_stage: true
@@ -215,6 +238,9 @@ cubes:
           - max_amount
           - amount_prev_year
           - max_amount_prev_month
+          - max_amount_prev_year
+          - approx_stores
+          - approx_stores_prev_year
         dimensions:
           - store
         time_dimension: sale_date

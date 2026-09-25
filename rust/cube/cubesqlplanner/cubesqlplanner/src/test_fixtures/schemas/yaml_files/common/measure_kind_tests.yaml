@@ -141,3 +141,24 @@ cubes:
             time_shift:
               - interval: 1 year
                 type: prior
+          - name: shifted_distinct_count
+            type: count_distinct
+            sql: "{CUBE.total}"
+            multi_stage: true
+            time_shift:
+              - interval: 1 year
+                type: prior
+          - name: shifted_approx_count
+            type: number
+            sql: "{CUBE.approx_count}"
+            multi_stage: true
+            time_shift:
+              - interval: 1 year
+                type: prior
+          - name: shifted_total_as_average
+            type: avg
+            sql: "{CUBE.total}"
+            multi_stage: true
+            time_shift:
+              - interval: 1 year
+                type: prior

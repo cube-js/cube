@@ -367,6 +367,81 @@ async fn stored_interval_shifts_are_rolled_up_to_a_coarser_grain() {
     }
 }
 
+/// A `type: number` proxy of a maximum rolls up by `max`, the kind of the
+/// measure it reads, not by the `sum` its own type would pick.
+#[tokio::test(flavor = "multi_thread")]
+async fn stored_number_proxy_of_a_maximum_rolls_up_by_max() {
+    let query = indoc! {r#"
+        measures:
+          - sales.max_amount
+          - sales.max_amount_prev_year
+        time_dimensions:
+          - dimension: sales.sale_date
+            granularity: month
+            dateRange:
+              - "2006-01-01"
+              - "2007-12-31"
+        order:
+          - id: sales.sale_date
+    "#};
+    if let Some((rollup, source)) = served_vs_source(query, "sales_prev_year_by_day").await {
+        assert_eq!(rollup, source);
+    }
+}
+
+/// The build stores the HLL state of the measure the proxy reads, so the
+/// stored column is merged, both at the stored grain and rolled up.
+#[tokio::test(flavor = "multi_thread")]
+async fn stored_proxy_of_an_approximate_distinct_count_merges_its_state() {
+    let at_stored_grain = indoc! {r#"
+        measures:
+          - sales.approx_stores
+          - sales.approx_stores_prev_year
+        dimensions:
+          - sales.store
+        time_dimensions:
+          - dimension: sales.sale_date
+            granularity: day
+            dateRange:
+              - "2007-03-01"
+              - "2007-03-07"
+        order:
+          - id: sales.sale_date
+          - id: sales.store
+    "#};
+    let rolled_up = indoc! {r#"
+        measures:
+          - sales.approx_stores
+          - sales.approx_stores_prev_year
+        time_dimensions:
+          - dimension: sales.sale_date
+            granularity: month
+            dateRange:
+              - "2006-01-01"
+              - "2007-12-31"
+        order:
+          - id: sales.sale_date
+    "#};
+    // The HLL merge is CubeStore's, so the rollup is read there.
+    for query in [at_stored_grain, rolled_up] {
+        let schema =
+            MockSchema::from_yaml_file(YAML).only_pre_aggregations(&["sales_prev_year_by_day"]);
+        let ctx = TestContext::new_with_external_cubestore(schema).unwrap();
+        let (sql, usages) = ctx.build_sql_with_used_pre_aggregations(query).unwrap();
+        assert!(
+            usages.len() == 1 && !SOURCE_TABLES.iter().any(|table| sql.contains(table)),
+            "expected the query to be served by the rollup alone; SQL:\n{}",
+            sql
+        );
+        let Some(cubestore) = ctx.try_execute_cubestore(query, SEED).await else {
+            return;
+        };
+        let source = ctx_with(&[]).try_execute_pg(query, SEED).await.unwrap();
+        assert!(!rows(&source).is_empty());
+        assert_eq!(rows(&cubestore), rows(&source));
+    }
+}
+
 /// Control: storing only the unshifted measure leaves the shift to be applied
 /// on top of the rollup, which a calendar mapping cannot be.
 #[tokio::test(flavor = "multi_thread")]

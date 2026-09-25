@@ -1122,8 +1122,22 @@ impl TestContext {
                     .map(|c| (c.name().to_string(), Self::cubestore_type(c.type_())))
                     .collect();
 
+                // CubeStore imports an HLL sketch as base64; Postgres prints hex.
+                let select_list = columns
+                    .iter()
+                    .map(|(n, t)| {
+                        if *t == "HLL_POSTGRES" {
+                            format!(
+                                "translate(encode(decode(substr(\"{}\"::text, 3), 'hex'), 'base64'), E'\\n', '')",
+                                n
+                            )
+                        } else {
+                            format!("\"{}\"", n)
+                        }
+                    })
+                    .join(", ");
                 let messages = client
-                    .simple_query(&format!("SELECT * FROM \"{}\"", table_name))
+                    .simple_query(&format!("SELECT {} FROM \"{}\"", select_list, table_name))
                     .await
                     .unwrap_or_else(|e| {
                         panic!("Failed to read pre-agg table {}: {}", table_name, e)
@@ -1290,6 +1304,7 @@ impl TestContext {
             Type::NUMERIC => "decimal",
             Type::BOOL => "boolean",
             Type::TIMESTAMP | Type::TIMESTAMPTZ | Type::DATE => "timestamp",
+            _ if pg_type.name() == "hll" => "HLL_POSTGRES",
             _ => "varchar",
         }
     }

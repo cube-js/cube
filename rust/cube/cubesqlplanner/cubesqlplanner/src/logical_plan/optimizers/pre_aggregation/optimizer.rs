@@ -648,10 +648,8 @@ impl PreAggregationOptimizer {
                     _ => {}
                 }
                 match measure.time_shift_proxy_target() {
-                    Some(target) if target.as_measure()?.is_multi_stage() => {
-                        measure = target.as_measure()?.clone();
-                    }
-                    _ => break,
+                    Some(target) => measure = target.as_measure()?,
+                    None => break,
                 }
             }
         }
@@ -690,19 +688,16 @@ impl PreAggregationOptimizer {
         for measure in shifts {
             let mut resolved: HashMap<String, Option<CalendarDimensionTimeShift>> = HashMap::new();
             for (pk, dimension) in calendar_dimensions.iter() {
-                let declaration = dimension
-                    .time_shift()
-                    .iter()
-                    .find(|declared| match measure.time_shift() {
-                        Some(MeasureTimeShifts::Named(name)) => {
-                            declared.name.as_ref() == Some(name)
-                        }
-                        Some(MeasureTimeShifts::Common(interval)) => {
-                            declared.interval.as_ref() == Some(interval)
-                        }
-                        _ => false,
-                    })
-                    .cloned();
+                let declaration = match measure.time_shift() {
+                    Some(MeasureTimeShifts::Named(name)) => {
+                        dimension.calendar_time_shift_for_named_interval(name)
+                    }
+                    Some(MeasureTimeShifts::Common(interval)) => {
+                        dimension.calendar_time_shift_for_interval(interval)
+                    }
+                    _ => None,
+                }
+                .map(|(_, declaration)| declaration);
                 match resolved.get(pk) {
                     Some(seen) if !Self::same_calendar_shift(seen, &declaration) => {
                         return Ok(false);
@@ -845,7 +840,7 @@ impl PreAggregationOptimizer {
                 if !matched_measures.contains(symbol.full_name().as_str()) {
                     continue;
                 }
-                if symbol.as_measure()?.kind().is_stored_as_state() {
+                if symbol.as_measure()?.rollup_kind().is_stored_as_state() {
                     return Ok(None);
                 }
             }
