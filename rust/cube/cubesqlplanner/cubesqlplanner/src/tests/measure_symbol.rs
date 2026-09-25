@@ -242,6 +242,7 @@ fn multi_stage_measure_beyond_a_time_shift_proxy_is_not_additive() {
         "multi_stage_calculated",
         "multi_stage_rank",
         "shifted_distinct_count",
+        "shifted_rolling_sum",
         "shifted_total_expression",
         "shifted_average",
         "shifted_total_reduced",

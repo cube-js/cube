@@ -162,3 +162,10 @@ cubes:
             time_shift:
               - interval: 1 year
                 type: prior
+          - name: shifted_rolling_sum
+            type: number
+            sql: "{CUBE.rolling_sum}"
+            multi_stage: true
+            time_shift:
+              - interval: 1 year
+                type: prior

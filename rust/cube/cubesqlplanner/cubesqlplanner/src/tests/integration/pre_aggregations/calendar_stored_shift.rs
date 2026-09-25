@@ -319,8 +319,10 @@ async fn stored_shift_without_its_time_member_is_not_read() {
         let (sql, _) = with_rollup
             .build_sql_with_used_pre_aggregations(&query)
             .unwrap();
+        let reads_stored_column =
+            regex::Regex::new(&format!(r#"\w+\("sales__{}"\)"#, measure)).unwrap();
         assert!(
-            !sql.contains(&format!("sum(\"sales__{}\")", measure)),
+            !reads_stored_column.is_match(&sql),
             "expected the stored shifted column to stay unread; SQL:\n{}",
             sql
         );
@@ -367,6 +369,57 @@ async fn stored_interval_shift_without_its_time_member_over_a_build_range() {
             amount,
             cell(&source, &[("sales__store", store)], "sales__amount")
         );
+    }
+}
+
+/// A proxy of a rolling window stores one window per row, and windows of
+/// neighbouring days overlap, so it is served only at the stored grain.
+#[tokio::test(flavor = "multi_thread")]
+async fn stored_proxy_of_a_rolling_window_is_not_rolled_up() {
+    let at_stored_grain = indoc! {r#"
+        measures:
+          - sales.amount_7d_prev_year
+        dimensions:
+          - sales.store
+        time_dimensions:
+          - dimension: sales.sale_date
+            granularity: day
+            dateRange:
+              - "2007-03-01"
+              - "2007-03-14"
+        order:
+          - id: sales.sale_date
+          - id: sales.store
+    "#};
+    if let Some((rollup, source)) =
+        served_vs_source(at_stored_grain, "sales_rolling_prev_year_by_day").await
+    {
+        assert_eq!(rollup, source);
+    }
+    let by_month = indoc! {r#"
+        measures:
+          - sales.amount_7d_prev_year
+        time_dimensions:
+          - dimension: sales.sale_date
+            granularity: month
+            dateRange:
+              - "2007-01-01"
+              - "2007-06-30"
+        order:
+          - id: sales.sale_date
+    "#};
+    let with_rollup = ctx_with(&["sales_rolling_prev_year_by_day"]);
+    let (sql, _) = with_rollup
+        .build_sql_with_used_pre_aggregations(by_month)
+        .unwrap();
+    assert!(
+        !sql.contains("\"sales__amount_7d_prev_year\")"),
+        "expected the stored windows to stay unread; SQL:\n{}",
+        sql
+    );
+    if let Some(rollup) = with_rollup.try_execute_pg(by_month, SEED).await {
+        let source = ctx_with(&[]).try_execute_pg(by_month, SEED).await.unwrap();
+        assert_eq!(rollup, source);
     }
 }
 

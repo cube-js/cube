@@ -136,6 +136,22 @@ cubes:
             interval: 1 year
             type: prior
 
+      - name: amount_7d
+        type: sum
+        sql: amount
+        rolling_window:
+          trailing: 7 day
+
+      # Stores overlapping windows, so it never rolls up.
+      - name: amount_7d_prev_year
+        type: number
+        multi_stage: true
+        sql: "{amount_7d}"
+        time_shift:
+          - time_dimension: sale_date
+            interval: 1 year
+            type: prior
+
       - name: approx_stores
         type: count_distinct_approx
         sql: store
@@ -295,3 +311,15 @@ cubes:
         granularity: day
         build_range_start: "SELECT TIMESTAMP '2005-01-01'"
         build_range_end: "SELECT TIMESTAMP '2006-12-31 23:59:59.999'"
+
+      - name: sales_rolling_prev_year_by_day
+        type: rollup
+        measures:
+          - amount_7d_prev_year
+        dimensions:
+          - store
+        time_dimension: sale_date
+        granularity: day
+        # A rolling window is built over a time series, which needs a range.
+        build_range_start: "SELECT TIMESTAMP '2007-01-01'"
+        build_range_end: "SELECT TIMESTAMP '2007-12-31 23:59:59.999'"

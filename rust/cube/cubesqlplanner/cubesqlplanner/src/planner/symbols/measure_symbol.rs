@@ -258,12 +258,13 @@ impl MeasureSymbol {
     }
 
     /// True when the measure's aggregation distributes over row union
-    /// (sum-like). A time-shift proxy is additive exactly when the measure
-    /// it reads is: a shift relabels each row and leaves the value it
-    /// contributes untouched. Any other multi-stage measure is not.
+    /// (sum-like). A time-shift proxy is additive when the plain measure it
+    /// reads is; a rolling window stores overlapping windows, which are not.
     pub fn is_additive(&self) -> bool {
         match self.rollup_target() {
-            Some(target) => !target.is_multi_stage() && target.kind.is_additive(),
+            Some(target) => {
+                !target.is_multi_stage() && !target.is_cumulative() && target.kind.is_additive()
+            }
             None => !self.is_multi_stage() && self.kind.is_additive(),
         }
     }
@@ -284,9 +285,8 @@ impl MeasureSymbol {
     }
 
     /// The measure a multi-stage measure reads unchanged under its time
-    /// shift: `sql` is a bare reference to it, the shift is the only
-    /// multi-stage modifier, and the measure's own aggregation returns a
-    /// single value as it is.
+    /// shift: `sql` is a bare reference, the shift is the only modifier, and
+    /// the measure's own aggregation returns a single value as it is.
     pub fn time_shift_proxy_target(&self) -> Option<Rc<MemberSymbol>> {
         let multi_stage = self.multi_stage.as_ref()?;
         multi_stage.time_shift.as_ref()?;
