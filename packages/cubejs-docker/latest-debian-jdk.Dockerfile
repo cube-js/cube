@@ -1,6 +1,9 @@
 # syntax=docker/dockerfile-upstream:master-experimental
 FROM node:24.21.0-trixie-slim AS builder
 
+# Use the image's Node headers to avoid concurrent node-gyp downloads and copies.
+ENV npm_config_nodedir=/usr/local
+
 WORKDIR /cube
 COPY . .
 

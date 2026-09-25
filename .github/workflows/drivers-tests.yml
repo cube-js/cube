@@ -200,6 +200,15 @@ jobs:
           file: ./packages/cubejs-docker/testing-drivers.Dockerfile
           tags: cubejs/cube:testing-drivers
           push: ${{ (env.DOCKERHUB_USERNAME != '') }}
+      - name: Verify JDBC runtime
+        timeout-minutes: 1
+        run: |
+          docker run --rm --network none --workdir /cubejs --entrypoint node cubejs/cube:testing-drivers -e '
+            const java = require("java");
+            console.log("Java version:", java.callStaticMethodSync("java.lang.System", "getProperty", "java.version"));
+            // JVM threads keep Node alive after the check.
+            process.exit(0);
+          '
       - name: Save Docker image as artifact
         run: |
           IMAGE_TAG=cubejs/cube:testing-drivers
