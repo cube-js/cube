@@ -1404,14 +1404,12 @@ export function functionFieldsPatterns(): string[] {
   return Array.from(functionPatterns);
 }
 
-/**
- * A fingerprint of everything the cube schema can see in a definition: own and inherited keys
- * (`extends` works through the prototype), non-enumerable ones (validation runs with
- * `nonEnumerables`), values read through getters, and functions by their source. Keys are
- * sorted: the schema doesn't depend on their order, and Jinja output doesn't keep it stable.
- */
 const isRootPrototype = (o: object) => Object.getPrototypeOf(o) === null && Object.prototype.hasOwnProperty.call(o, 'hasOwnProperty');
 
+/**
+ * Everything the schema can see: inherited and non-enumerable keys, getter values, and function
+ * source. Keys are sorted because Jinja doesn't keep their order stable.
+ */
 function definitionFingerprint(definition: unknown): string {
   const hash = crypto.createHash('sha1');
   const path = new Set<object>();
