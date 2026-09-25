@@ -712,10 +712,9 @@ export const QueryCacheTest = (name: string, options: QueryCacheTestOptions) => 
         };
 
         const queryOptions = (localRefreshKey?: unknown) => <any>{ localRefreshKey };
-        const cacheKey: CacheKey = [REFRESH_KEY_SQL, [], true, 'default'];
 
         it('evaluates a valid descriptor', () => withCache({ localRefreshKey: true }, localCache => {
-          expect(localCache.localRefreshKeyResult(queryOptions(descriptor), cacheKey))
+          expect(localCache.localRefreshKeyResult(queryOptions(descriptor)))
             .toEqual([{ refresh_key: String(Math.floor(Date.now() / 1000 / 600)) }]);
         }));
 
@@ -723,24 +722,23 @@ export const QueryCacheTest = (name: string, options: QueryCacheTestOptions) => 
         // a string too or flipping the flag invalidates every pre-aggregation once.
         it('returns the key as a string', () => withCache({ localRefreshKey: true }, localCache => {
           const [{ refresh_key: value }] = localCache
-            .localRefreshKeyResult(queryOptions(descriptor), cacheKey)!;
+            .localRefreshKeyResult(queryOptions(descriptor))!;
 
           expect(typeof value).toBe('string');
         }));
 
         it('declines when the flag is off', () => withCache({ localRefreshKey: false }, localCache => {
-          expect(localCache.localRefreshKeyResult(queryOptions(descriptor), cacheKey)).toBeNull();
+          expect(localCache.localRefreshKeyResult(queryOptions(descriptor))).toBeNull();
         }));
 
         it('declines without a descriptor', () => withCache({ localRefreshKey: true }, localCache => {
-          expect(localCache.localRefreshKeyResult(undefined, cacheKey)).toBeNull();
-          expect(localCache.localRefreshKeyResult(queryOptions(), cacheKey)).toBeNull();
+          expect(localCache.localRefreshKeyResult()).toBeNull();
+          expect(localCache.localRefreshKeyResult(queryOptions())).toBeNull();
         }));
 
         it('declines a malformed descriptor', () => withCache({ localRefreshKey: true }, localCache => {
           expect(localCache.localRefreshKeyResult(
             queryOptions({ ...descriptor, interval: 0 }),
-            cacheKey,
           )).toBeNull();
         }));
 
@@ -749,7 +747,7 @@ export const QueryCacheTest = (name: string, options: QueryCacheTestOptions) => 
           localCache => {
             const nowSpy = jest.spyOn(Date, 'now').mockReturnValue(97_800_000);
             try {
-              expect(localCache.localRefreshKeyResult(queryOptions(descriptor), cacheKey))
+              expect(localCache.localRefreshKeyResult(queryOptions(descriptor)))
                 .toEqual([{ refresh_key: '163' }]);
             } finally {
               nowSpy.mockRestore();

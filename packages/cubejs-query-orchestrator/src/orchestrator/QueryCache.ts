@@ -245,11 +245,7 @@ export class QueryCache {
     return this.localRefreshKeyEnabled;
   }
 
-  public localRefreshKeyResult(
-    queryOptions: QueryOptions | undefined,
-    // Retained for API compatibility; evaluation no longer depends on the identity.
-    _cacheKey: CacheKey,
-  ): [{ refresh_key: string }] | null {
+  public localRefreshKeyResult(queryOptions?: QueryOptions): [{ refresh_key: string }] | null {
     if (!this.isLocalRefreshKeyActive() || queryOptions?.incremental || !isValidLocalRefreshKey(queryOptions?.localRefreshKey)) {
       return null;
     }
@@ -520,7 +516,7 @@ export class QueryCache {
       && isValidLocalRefreshKey(queryOptions?.localRefreshKey) ? queryOptions.localRefreshKey : undefined;
 
     if (localRefreshKey && !this.options.refreshKeyRenewalThreshold) {
-      return this.localRefreshKeyResult(queryOptions, cacheKey);
+      return this.localRefreshKeyResult(queryOptions);
     }
 
     // An explicit threshold retains the shared entry and the SQL path's TTL and renewal rules.
