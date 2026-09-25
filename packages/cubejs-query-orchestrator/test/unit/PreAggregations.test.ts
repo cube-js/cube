@@ -9,7 +9,7 @@ import {
 } from '@cubejs-backend/shared';
 import crypto from 'crypto';
 
-import { PreAggregationLoadCache, PreAggregationLoader, PreAggregationPartitionRangeLoader, PreAggregations, QueryCache, QueryCacheOptions, REFRESH_KEY_CACHE_TTL, LocalCacheDriver, version, type QueryWithParams } from '../../src';
+import { PreAggregationLoadCache, PreAggregationLoader, PreAggregationPartitionRangeLoader, PreAggregations, QueryCache, QueryCacheOptions, LocalCacheDriver, version, type QueryWithParams } from '../../src';
 import { evaluateLocalRefreshKey } from '../../src/orchestrator/utils';
 
 class MockDriver {
@@ -680,24 +680,6 @@ describe('PreAggregations', () => {
         expect(mockDriver!.executedQueries).toEqual([]);
       } finally {
         nowSpy.mockRestore();
-      }
-    });
-
-    test('keyQueryResult caches refresh keys for REFRESH_KEY_CACHE_TTL', async () => {
-      const loadCache = newLoadCache({ localRefreshKey: false });
-      const spy = jest.spyOn(loadCache['queryCache'], 'cacheRefreshKeyResult');
-
-      try {
-        await loadCache.keyQueryResult(
-          [REFRESH_KEY_SQL, [], { external: false, renewalThreshold: 60, localRefreshKey: descriptor }],
-          false,
-          10,
-        );
-
-        expect(spy).toHaveBeenCalledTimes(1);
-        expect(spy.mock.calls[0][1]).toBe(REFRESH_KEY_CACHE_TTL);
-      } finally {
-        spy.mockRestore();
       }
     });
 

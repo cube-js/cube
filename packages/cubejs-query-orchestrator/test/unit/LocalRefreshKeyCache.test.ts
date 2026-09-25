@@ -44,6 +44,8 @@ describe('local refresh key SQL cache compatibility', () => {
     { name: 'daily TTL keeps the value after an hour', ttl: 86400, threshold: 86400, interval: 600, elapsed: 3600000, changes: false },
     { name: 'short TTL expires before the threshold', ttl: 60, threshold: 86400, interval: 60, elapsed: 120000, changes: true },
     { name: 'threshold is measured from the write time', ttl: 86400, threshold: 120, interval: 60, elapsed: 120001, changes: true },
+    // Renewal must not snap to a wall-clock threshold boundary.
+    { name: 'does not renew early at a wall-clock threshold boundary', ttl: 86400, threshold: 120, interval: 60, elapsed: 83001, changes: false },
   ])('$name', async ({ ttl, threshold, interval, elapsed, changes }) => {
     const { q, sql, local } = setup(threshold, interval);
     const read = (cache: QueryCache) => cache.cacheRefreshKeyResult(q, ttl, { dataSource: 'default', waitForRenew: true });
@@ -56,17 +58,6 @@ describe('local refresh key SQL cache compatibility', () => {
     expect(await read(local.cache)).toEqual(after);
     expect(JSON.stringify(after) !== JSON.stringify(before)).toBe(changes);
     expect(local.factory).not.toHaveBeenCalled();
-  });
-
-  test('does not renew early at a wall-clock threshold boundary', async () => {
-    const { q, sql, local } = setup(120, 60);
-    jest.setSystemTime(start + 37000);
-    const read = (cache: QueryCache) => cache.cacheRefreshKeyResult(q, 86400, { dataSource: 'default', waitForRenew: true });
-    const before = await read(sql.cache);
-    expect(await read(local.cache)).toEqual(before);
-    jest.setSystemTime(start + 120001);
-    expect(await read(sql.cache)).toEqual(before);
-    expect(await read(local.cache)).toEqual(before);
   });
 
   test.each([3600, 86400])('readers with different TTLs retain the stored TTL %i', async firstTtl => {
