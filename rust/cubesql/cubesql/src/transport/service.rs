@@ -929,6 +929,39 @@ impl SqlTemplates {
         )
     }
 
+    pub fn float_literal_expr(
+        &self,
+        value: Option<f64>,
+        data_type: DataType,
+    ) -> Result<String, CubeError> {
+        if self.contains_template("expressions/float_literal") {
+            // MySQL needs exponent literals where FLOAT/DOUBLE casts are unsupported.
+            // It evaluates them as doubles: preserve widened Float32 precision rather
+            // than rounding 0.1f32 to 1e-1.
+            return self.render_template(
+                "expressions/float_literal",
+                context! { value => value.map(|value| format!("{value:e}")) },
+            );
+        }
+
+        // Display keeps casts readable but retains decimal-literal range limits:
+        // a cast cannot recover overflow or underflow while parsing its operand.
+        let expr = value.map_or_else(
+            || "NULL".to_string(),
+            |value| match data_type {
+                DataType::Float32 => (value as f32).to_string(),
+                _ => value.to_string(),
+            },
+        );
+        let sql_type = self.sql_type(data_type)?;
+        let sql_type = if value.is_none() {
+            self.nullable_type(sql_type)?
+        } else {
+            sql_type
+        };
+        self.cast_expr(expr, sql_type)
+    }
+
     pub fn in_list_expr(
         &self,
         expr: String,
@@ -1203,6 +1236,26 @@ mod tests {
             templates.nullable_type("String".to_string()).unwrap(),
             "Nullable(String)"
         );
+    }
+
+    #[test]
+    fn float_literal_override_does_not_require_cast_templates() {
+        let templates = sql_templates_with(vec![(
+            "expressions/float_literal",
+            "{% if value is none %}(NULL + 0e0){% else %}{{ value }}{% endif %}",
+        )]);
+        for data_type in [DataType::Float32, DataType::Float64] {
+            assert_eq!(
+                templates
+                    .float_literal_expr(Some(100.0), data_type.clone())
+                    .unwrap(),
+                "1e2"
+            );
+            assert_eq!(
+                templates.float_literal_expr(None, data_type).unwrap(),
+                "(NULL + 0e0)"
+            );
+        }
     }
 
     #[tokio::test]

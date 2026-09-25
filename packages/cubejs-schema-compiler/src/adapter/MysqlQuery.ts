@@ -226,6 +226,9 @@ export class MysqlQuery extends BaseQuery {
     // MySQL `/` returns DECIMAL even for integer operands; DIV discards the
     // fractional part (truncation toward zero), matching PostgreSQL (-5 DIV 2 = -2)
     templates.expressions.int_division = '({{ left }} DIV {{ right }})';
+    // Exponent literals are floating-point even before MySQL 8.0.17, when CAST
+    // to FLOAT/DOUBLE was introduced. Keep NULL floating-point without that cast too.
+    templates.expressions.float_literal = '{% if value is none %}(NULL + 0e0){% else %}{{ value }}{% endif %}';
     // Timestamp constants arrive as ISO-8601 UTC strings ('2021-01-01T00:00:00.000Z').
     // MySQL parses the 'T'/'Z' markers only with a "Truncated incorrect datetime value"
     // warning and ignores the zone, so both markers are stripped instead. The driver

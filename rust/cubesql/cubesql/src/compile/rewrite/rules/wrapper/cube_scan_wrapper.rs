@@ -1,5 +1,6 @@
 use crate::{
     compile::rewrite::{
+        analysis::Member,
         cube_scan, cube_scan_wrapper, rewrite,
         rewriter::{CubeEGraph, CubeRewrite},
         rules::wrapper::WrapperRules,
@@ -9,7 +10,9 @@ use crate::{
         WrapperReplacerContextInputDataSource, WrapperReplacerContextPushToCube,
         WrapperReplacerContextUngroupedScan,
     },
-    copy_flag, var, var_iter,
+    copy_flag,
+    transport::DataSource,
+    var, var_iter,
 };
 use egg::Subst;
 
@@ -149,11 +152,10 @@ impl WrapperRules {
 
             // This rule would wrap CubeScan, which would try to generate data source SQL for it
             // This means that CubeScan should allow for this
+            let Some(members) = &egraph[subst[members_var]].data.member_name_to_expr else {
+                return vec![];
+            };
             let data_sources = {
-                let Some(members) = &egraph[subst[members_var]].data.member_name_to_expr else {
-                    return vec![];
-                };
-
                 let member_names = members
                     .list
                     .iter()
@@ -180,6 +182,29 @@ impl WrapperRules {
                     .map(|data_source| Some(data_source.to_string()))
                     .collect()
             };
+
+            // Literal members are rendered directly when a scan is wrapped, without
+            // passing through the literal-expression rewrite gate.
+            let data_sources_out = data_sources_out
+                .into_iter()
+                .filter(|source| {
+                    let data_source = match source.as_deref() {
+                        Some(source) => DataSource::Specific(source),
+                        // With no named members, the renderer resolves the scanned cubes.
+                        None => meta
+                            .data_source_for_cube_names(
+                                alias_to_cube.iter().map(|(_, cube)| cube.as_str()),
+                            )
+                            .unwrap_or(DataSource::Unrestricted),
+                    };
+                    members.list.iter().all(|(_, member, _)| match member {
+                        Member::LiteralMember { value, .. } => {
+                            Self::can_push_down_float_literal(value, &data_source, &meta)
+                        }
+                        _ => true,
+                    })
+                })
+                .collect::<Vec<_>>();
 
             subst.insert(
                 push_to_cube_out_var,

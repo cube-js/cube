@@ -12,6 +12,12 @@ const GRANULARITY_TO_INTERVAL = {
 };
 
 export class VerticaQuery extends BaseQuery {
+  public sqlTemplates() {
+    const templates = super.sqlTemplates();
+    templates.types.double = 'DOUBLE PRECISION';
+    return templates;
+  }
+
   public convertTz(field) {
     return `${field} AT TIME ZONE '${this.timezone}'`;
   }

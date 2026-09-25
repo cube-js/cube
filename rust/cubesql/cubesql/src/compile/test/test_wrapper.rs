@@ -54,6 +54,108 @@ async fn test_simple_wrapper() {
 }
 
 #[tokio::test]
+async fn test_float_literal_pushdown_fallback() {
+    if !Rewriter::sql_push_down_enabled() {
+        return;
+    }
+    init_testing_logger();
+
+    for (literal, type_template, rendered) in [
+        ("100.0", "types/double", "CAST(100 AS DOUBLE)"),
+        ("CAST(100 AS REAL)", "types/float", "CAST(100 AS FLOAT)"),
+    ] {
+        for missing_template in [None, Some(type_template), Some("expressions/cast")] {
+            let plan = convert_select_to_query_plan_customized(
+                format!(
+                    "SELECT {literal} * COUNT(*) AS value FROM KibanaSampleDataEcommerce \
+             WHERE LOWER(customer_gender) = 'test'"
+                ),
+                DatabaseProtocol::PostgreSQL,
+                // The mock already supports deleting a template with an empty value.
+                missing_template
+                    .into_iter()
+                    .map(|name| (name.to_string(), String::new()))
+                    .collect(),
+            )
+            .await;
+            let logical_plan = plan.as_logical_plan();
+            if missing_template.is_some() {
+                assert!(
+                    matches!(logical_plan, LogicalPlan::Projection(_)),
+                    "missing {:?}: {:?}",
+                    missing_template,
+                    logical_plan
+                );
+            } else {
+                assert!(logical_plan
+                    .find_cube_scan_wrapped_sql()
+                    .wrapped_sql
+                    .sql
+                    .contains(rendered));
+            }
+            // Fallback must also produce an executable local physical plan.
+            plan.as_physical_plan().await.unwrap();
+        }
+    }
+}
+
+#[tokio::test]
+async fn test_float_literal_member_pushdown_fallback() {
+    if !Rewriter::sql_push_down_enabled() {
+        return;
+    }
+    for (sql_type, type_template, rendered, literal) in [
+        (
+            "REAL",
+            "types/float",
+            "CAST(100 AS FLOAT)",
+            ScalarValue::Float32(Some(100.0)),
+        ),
+        (
+            "DOUBLE",
+            "types/double",
+            "CAST(100 AS DOUBLE)",
+            ScalarValue::Float64(Some(100.0)),
+        ),
+    ] {
+        for missing_source in [None, Some("default"), Some("other")] {
+            let meta = get_test_tenant_ctx_with_multi_data_source_view_and_templates(
+                missing_source
+                    .into_iter()
+                    .map(|source| (source, vec![(type_template.to_string(), String::new())]))
+                    .collect(),
+            );
+            let plan = convert_sql_to_cube_query(
+                &format!(
+                    "SELECT SUM(v) FROM (SELECT CAST(100 AS {sql_type}) AS v \
+                     FROM KibanaSampleDataEcommerce LIMIT 0) q"
+                ),
+                meta.clone(),
+                get_test_session(DatabaseProtocol::PostgreSQL, meta).await,
+            )
+            .await
+            .unwrap();
+            // LIMIT 0 preserves a literal scan member, bypassing expression gates.
+            // A missing type must still leave an executable local plan.
+            if missing_source != Some("default") {
+                let logical_plan = plan.as_logical_plan();
+                assert!(logical_plan
+                    .find_cube_scan_wrapped_sql()
+                    .wrapped_sql
+                    .sql
+                    .contains(rendered));
+                // An unrelated source must not force an alternative scan of regular members.
+                assert_eq!(
+                    logical_plan.find_cube_scan().member_fields,
+                    vec![MemberField::Literal(literal.clone())]
+                );
+            }
+            plan.as_physical_plan().await.unwrap();
+        }
+    }
+}
+
+#[tokio::test]
 async fn test_wrapper_group_by_rollup() {
     if !Rewriter::sql_push_down_enabled() {
         return;
@@ -4141,7 +4243,7 @@ async fn test_wrapper_multi_arg_aggregate_function() {
                     .request
                     .measures
             ),
-            vec!["APPROX_PERCENTILE(${KibanaSampleDataEcommerce.taxful_total_price}, 0.5)"],
+            vec!["APPROX_PERCENTILE(${KibanaSampleDataEcommerce.taxful_total_price}, CAST(0.5 AS DOUBLE))"],
             "{} is not pushed down",
             call
         );
