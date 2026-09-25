@@ -246,11 +246,16 @@ export class QueryCache {
   }
 
   public localRefreshKeyResult(queryOptions?: QueryOptions): [{ refresh_key: string }] | null {
+    const localRefreshKey = this.localRefreshKeyFor(queryOptions);
+    return localRefreshKey ? evaluateLocalRefreshKey(localRefreshKey) : null;
+  }
+
+  private localRefreshKeyFor(queryOptions?: QueryOptions): LocalRefreshKeyDescriptor | null {
     if (!this.isLocalRefreshKeyActive() || queryOptions?.incremental || !isValidLocalRefreshKey(queryOptions?.localRefreshKey)) {
       return null;
     }
 
-    return evaluateLocalRefreshKey(<LocalRefreshKeyDescriptor>queryOptions?.localRefreshKey);
+    return queryOptions?.localRefreshKey ?? null;
   }
 
   public getCacheDriver(): CacheDriverInterface {
@@ -512,11 +517,10 @@ export class QueryCache {
     const [query, values, queryOptions] = sqlQuery;
     const cacheKey = QueryCache.refreshKeyIdentity(sqlQuery, options.dataSource);
 
-    const localRefreshKey = this.isLocalRefreshKeyActive() && !queryOptions?.incremental
-      && isValidLocalRefreshKey(queryOptions?.localRefreshKey) ? queryOptions.localRefreshKey : undefined;
+    const localRefreshKey = this.localRefreshKeyFor(queryOptions);
 
     if (localRefreshKey && !this.options.refreshKeyRenewalThreshold) {
-      return this.localRefreshKeyResult(queryOptions);
+      return evaluateLocalRefreshKey(localRefreshKey);
     }
 
     // An explicit threshold retains the shared entry and the SQL path's TTL and renewal rules.
