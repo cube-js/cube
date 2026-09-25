@@ -375,8 +375,9 @@ curl \
 
 Request a server-rendered snapshot of a whole published dashboard as PNG or
 PDF — the same rendering the [Download as PNG or PDF][ref-dashboard-download]
-action uses — without driving a browser through the console. A draft that has
-never been published can't be exported. Identify the dashboard with either
+action uses — without driving a browser through the console. The endpoint
+renders the on-screen layout only; the [print version][ref-print-version] is
+not available here. A draft that has never been published can't be exported. Identify the dashboard with either
 `dashboardId` (numeric) or `dashboardPublicId` (string) — exactly one, not
 both. Requires **manage** access to the dashboard's workbook, the same
 permission the console's whole-dashboard download requires.
@@ -430,6 +431,7 @@ per-recipient reports with a bounded number of jobs open at a time. See the
 schema.
 
 [ref-dashboard-download]: /docs/explore-analyze/dashboards#download-as-png-or-pdf
+[ref-print-version]: /docs/explore-analyze/dashboards#print-version
 [ref-api-reference]: /api-reference/dashboard-exports/export-a-dashboard-as-png-or-pdf
 
 [ref-core-data-apis]: /reference/core-data-apis
