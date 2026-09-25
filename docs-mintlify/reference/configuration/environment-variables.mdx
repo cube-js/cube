@@ -2106,6 +2106,32 @@ The logging level for Cube Store.
 
 See also [`CUBEJS_LOG_LEVEL`](/reference/configuration/environment-variables#cubejs_log_level).
 
+## `CUBESTORE_MAX_CONCURRENT_QUERY_PLANS`
+
+The maximum number of queries that Cube Store plans at the same time. A burst
+of concurrent queries that arrive together all pay the full planning cost at
+once, oversubscribing the available cores; this setting bounds how many are
+planned in parallel so the rest wait briefly for a slot instead. Set to `0` to
+disable the limit.
+
+| Possible Values                | Default in Development | Default in Production |
+| ------------------------------- | ---------------------- | --------------------- |
+| `auto`, `0`, or a positive integer | `auto`                  | `auto`                 |
+
+`auto` (the default) scales with the number of CPU cores available to the
+Cube Store process.
+
+## `CUBESTORE_MAX_QUEUED_QUERY_PLANS`
+
+The maximum number of queries that may wait for a query planning slot (see
+[`CUBESTORE_MAX_CONCURRENT_QUERY_PLANS`](#cubestore_max_concurrent_query_plans)
+above). Once this many queries are already waiting, further queries are
+rejected immediately instead of being queued indefinitely.
+
+| Possible Values | Default in Development | Default in Production |
+| ---------------- | ---------------------- | --------------------- |
+| A valid number   | `5000`                 | `5000`                |
+
 ## `CUBESTORE_MAX_WS_CONNECTIONS_PER_USER`
 
 The maximum number of concurrent WebSocket connections a single authenticated
