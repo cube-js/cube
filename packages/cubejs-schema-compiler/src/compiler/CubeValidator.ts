@@ -1404,6 +1404,8 @@ export function functionFieldsPatterns(): string[] {
   return Array.from(functionPatterns);
 }
 
+// Model objects come from the VM context, whose Object.prototype isn't this realm's, so the
+// prototype walk stops at whichever realm's Object.prototype it reaches
 const isRootPrototype = (o: object) => Object.getPrototypeOf(o) === null && Object.prototype.hasOwnProperty.call(o, 'hasOwnProperty');
 
 /**
@@ -1435,8 +1437,6 @@ function definitionFingerprint(definition: unknown): string {
         hash.update(']');
       } else {
         hash.update('{');
-        // Model objects come from the VM context, whose Object.prototype isn't this realm's, so
-        // the walk stops at whichever realm's Object.prototype it reaches
         // A key shadowed further down the chain reads the same value, so it is hashed once, at
         // the depth it first appears
         const seen = new Set<string>();
