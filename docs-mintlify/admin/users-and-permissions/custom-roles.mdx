@@ -217,7 +217,7 @@ These are the **role builder's** rules, enforced client-side before it submits; 
 
 ## Managing roles through the API
 
-Custom roles can also be created, updated and assigned over the [REST API][ref-api-roles], so a team that provisions deployments from CI can grant access in the same pipeline instead of finishing in the console. Every call below needs a token that [authenticates][ref-api-auth] as a user with the admin role. The API takes the wire format — a flat list of policies — rather than the builder's cards: the **Base Role** is a `Global` policy naming the tier, and each deployment policy card is one `Deployment` policy.
+Custom roles can also be created, updated and assigned over the [REST API][ref-api-roles], so a team that provisions deployments from CI can grant access in the same pipeline instead of finishing in the console. The `/api/v1/roles` calls need a token that [authenticates][ref-api-auth] as a user with the admin role. The API takes the wire format — a flat list of policies — rather than the builder's cards: the **Base Role** is a `Global` policy naming the tier, and each deployment policy card is one `Deployment` policy.
 
 <Steps>
   <Step title="Create the deployment">
