@@ -976,6 +976,19 @@
                 ]
               },
               {
+                "group": "Scheduled Tasks",
+                "openapi": "/api-reference/api.yaml",
+                "pages": [
+                  "GET /api/v1/deployments/{deploymentId}/scheduled-tasks",
+                  "POST /api/v1/deployments/{deploymentId}/scheduled-tasks",
+                  "GET /api/v1/deployments/{deploymentId}/scheduled-tasks/{taskId}",
+                  "PUT /api/v1/deployments/{deploymentId}/scheduled-tasks/{taskId}",
+                  "DELETE /api/v1/deployments/{deploymentId}/scheduled-tasks/{taskId}",
+                  "POST /api/v1/deployments/{deploymentId}/scheduled-tasks/{taskId}/run",
+                  "GET /api/v1/deployments/{deploymentId}/scheduled-tasks/{taskId}/runs"
+                ]
+              },
+              {
                 "group": "Workspace",
                 "openapi": "/api-reference/api.yaml",
                 "pages": [

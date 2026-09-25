@@ -7,6 +7,14 @@ rss: true
 {/* GENERATED FILE — do not edit by hand. */}
 {/* Run scripts/extract-changelog.mjs against the platform client CHANGELOG.md. */}
 
+<Update label="2026-09-25" description="v0.15.0" tags={["Added"]}>
+  ### Added
+
+  - `GET /api/v1/app-config` returns `aiPaywalled` (CUB-4684): `true` when the tenant uses the new UI without having enabled AI. An embed then offers no AI, whatever the session's `allowAi` says, because the server refuses its AI credentials.
+  - New public REST endpoints for agent scheduled tasks: `GET` / `POST /api/v1/deployments/{deploymentId}/scheduled-tasks`, `GET` / `PUT` / `DELETE …/scheduled-tasks/{taskId}`, `POST …/scheduled-tasks/{taskId}/run` and `GET …/scheduled-tasks/{taskId}/runs` (`ScheduledTasksPublicController.listScheduledTasks` / `createScheduledTask` / `getScheduledTask` / `updateScheduledTask` / `deleteScheduledTask` / `runScheduledTask` / `listScheduledTaskRuns`). A scheduled task is a saved prompt the deployment's agent runs on a cron in an IANA time zone, or only on demand, and each run writes a new chat thread. The endpoints answer `403` unless scheduled tasks are enabled for the account, the caller holds read access to the deployment, and the request is not an embed session. Anyone with that access can list and read the deployment's tasks; only a task's creator, whom every run acts as, or an admin can update, delete or run it. A cron must fire at most once an hour (its minute field is a single number), and a user can have at most 20 active (scheduled and enabled) tasks across the account's deployments. A bad cron or time zone answers `400`, and a create or resume past the limit answers `409`; Manual and paused tasks don't count toward the limit. Each task carries `userId` (the creator) and `nextRunAt`. Both lists support cursor pagination; the tasks list has no cap (omitting `first` returns every task), but the runs list only ever holds the 50 most recent runs, so `first`/`after` page within that window rather than a longer history. New schemas: `ScheduledTaskResponse`, `ScheduledTaskListResponse`, `CreateScheduledTaskInput`, `UpdateScheduledTaskInput`, `RunScheduledTaskResponse`, `ScheduledTaskRunResponse`, `ScheduledTaskRunsListResponse`.
+  - `ReportPlacementResultChecksum` / `ReportPlacementResultChecksumInput` — used by `PUT /api/v1/deployments/{deploymentId}/reports/{reportId}/refresh` and `.../connect-workbook` — gained an optional `payload` field (1–128 chars, CUB-4966): a hash of the grid the add-in just wrote, opaque to the server, so a later refresh can skip rewriting an unchanged block.
+</Update>
+
 <Update label="2026-09-23" description="v0.14.0" tags={["Added","Changed"]}>
   ### Added
 
