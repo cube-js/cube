@@ -79,7 +79,8 @@ const SIMPLE_F_STRING_PART = /\{([\w.]+)\}|[^{]+/g;
  * run of f, F, fr or rf, as the native transpiler does. Returns null for anything else.
  */
 export function transpileSimpleFString(codeString: string): t.Program | null {
-  const match = codeString.match(SIMPLE_F_STRING);
+  // YAML callers pass raw values through, so this can be null or a number
+  const match = typeof codeString === 'string' && codeString.match(SIMPLE_F_STRING);
   if (!match || !match[1]) {
     return null;
   }
