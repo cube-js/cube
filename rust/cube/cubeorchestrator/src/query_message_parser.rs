@@ -3,9 +3,10 @@ use crate::{
     transport::JsRawColumnarData,
 };
 use arrow::array::{
-    Array, BooleanArray, Date32Array, Date64Array, Decimal128Array, Decimal256Array, Float16Array,
-    Float32Array, Float64Array, Int16Array, Int32Array, Int64Array, Int8Array, LargeStringArray,
-    StringArray, StringViewArray, TimestampMicrosecondArray, TimestampMillisecondArray,
+    Array, BinaryArray, BinaryViewArray, BooleanArray, Date32Array, Date64Array, Decimal128Array,
+    Decimal256Array, FixedSizeBinaryArray, Float16Array, Float32Array, Float64Array, Int16Array,
+    Int32Array, Int64Array, Int8Array, LargeBinaryArray, LargeStringArray, StringArray,
+    StringViewArray, TimestampMicrosecondArray, TimestampMillisecondArray,
     TimestampNanosecondArray, TimestampSecondArray, UInt16Array, UInt32Array, UInt64Array,
     UInt8Array,
 };
@@ -421,6 +422,22 @@ fn append_arrow_array(
         }};
     }
 
+    macro_rules! push_binary {
+        ($ty:ty) => {{
+            let a = downcast_array_ref!($ty);
+            for i in 0..len {
+                if a.is_null(i) {
+                    col.push(DBResponsePrimitive::Null);
+                } else {
+                    col.push(DBResponsePrimitive::String(format!(
+                        "0x{}",
+                        hex::encode_upper(a.value(i))
+                    )));
+                }
+            }
+        }};
+    }
+
     // Format decimal arrays from their mantissa and scale. `decimal_to_string` is
     // generic over the mantissa width, so one path handles Decimal128/256.
     macro_rules! push_decimal {
@@ -479,6 +496,10 @@ fn append_arrow_array(
         DataType::Utf8 => push_str!(StringArray),
         DataType::LargeUtf8 => push_str!(LargeStringArray),
         DataType::Utf8View => push_str!(StringViewArray),
+        DataType::Binary => push_binary!(BinaryArray),
+        DataType::LargeBinary => push_binary!(LargeBinaryArray),
+        DataType::BinaryView => push_binary!(BinaryViewArray),
+        DataType::FixedSizeBinary(_) => push_binary!(FixedSizeBinaryArray),
         DataType::Date32 => push_datetime!(Date32Array),
         DataType::Date64 => push_datetime!(Date64Array),
         DataType::Timestamp(TimeUnit::Second, _) => push_datetime!(TimestampSecondArray),
@@ -496,7 +517,7 @@ fn append_arrow_array(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use arrow::array::BinaryArray;
+    use arrow::array::ListArray;
     use arrow::datatypes::{Field, Schema};
     use arrow::ipc::writer::StreamWriter;
     use arrow::record_batch::RecordBatch;
@@ -842,17 +863,67 @@ mod tests {
     }
 
     #[test]
+    fn test_from_arrow_binary_types() -> Result<(), ParseError> {
+        let values: Vec<Option<&[u8]>> = vec![Some(&[0x01, 0xAB, 0x00]), None, Some(&[])];
+        let fixed = FixedSizeBinaryArray::try_from_sparse_iter_with_size(
+            vec![Some([0xDE, 0xAD]), None, Some([0xBE, 0xEF])].into_iter(),
+            2,
+        )
+        .unwrap();
+
+        let schema = Arc::new(Schema::new(vec![
+            Field::new("binary", DataType::Binary, true),
+            Field::new("large_binary", DataType::LargeBinary, true),
+            Field::new("binary_view", DataType::BinaryView, true),
+            Field::new("fixed_binary", DataType::FixedSizeBinary(2), true),
+        ]));
+        let batch = RecordBatch::try_new(
+            schema,
+            vec![
+                Arc::new(BinaryArray::from(values.clone())),
+                Arc::new(LargeBinaryArray::from(values.clone())),
+                Arc::new(BinaryViewArray::from(values)),
+                Arc::new(fixed),
+            ],
+        )
+        .unwrap();
+
+        let result = QueryResult::from_arrow(&arrow_ipc_bytes(&batch))?;
+        let expected = vec![
+            DBResponsePrimitive::String("0x01AB00".to_string()),
+            DBResponsePrimitive::Null,
+            DBResponsePrimitive::String("0x".to_string()),
+        ];
+        for idx in 0..3 {
+            assert_eq!(result.data[idx].as_slice(), expected.as_slice());
+        }
+        assert_eq!(
+            result.data[3].as_slice(),
+            &[
+                DBResponsePrimitive::String("0xDEAD".to_string()),
+                DBResponsePrimitive::Null,
+                DBResponsePrimitive::String("0xBEEF".to_string()),
+            ]
+        );
+
+        Ok(())
+    }
+
+    #[test]
     fn test_from_arrow_unsupported_type() -> Result<(), ParseError> {
+        let list =
+            ListArray::from_iter_primitive::<arrow::datatypes::Int32Type, _, _>(vec![Some(vec![
+                Some(1),
+            ])]);
         let schema = Arc::new(Schema::new(vec![Field::new(
-            "blob",
-            DataType::Binary,
-            false,
+            "list",
+            list.data_type().clone(),
+            true,
         )]));
-        let blobs = BinaryArray::from_vec(vec![b"a".as_ref(), b"b".as_ref()]);
-        let batch = RecordBatch::try_new(schema, vec![Arc::new(blobs)]).unwrap();
+        let batch = RecordBatch::try_new(schema, vec![Arc::new(list)]).unwrap();
 
         let bytes = arrow_ipc_bytes(&batch);
-        let err = QueryResult::from_arrow(&bytes).expect_err("should reject Binary");
+        let err = QueryResult::from_arrow(&bytes).expect_err("should reject List");
         assert!(matches!(err, ParseError::UnsupportedArrowType(_)));
 
         Ok(())
