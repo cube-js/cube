@@ -13083,8 +13083,7 @@ components:
             - type: 'null'
           description: >-
             Standard 5-field cron (minute hour day-of-month month day-of-week), e.g. `0 9 * * 1-5`
-            for 9:00 on weekdays. A task runs at most once an hour, so the minute field is a single
-            number. Null or omitted makes the task Manual: it runs only when started with `POST
+            for 9:00 on weekdays. Null when the task is Manual: it runs only when started with `POST
             /scheduled-tasks/{taskId}/run`.
         deploymentId:
           type: integer
@@ -13941,6 +13940,9 @@ components:
           oneOf:
             - type: integer
             - type: 'null'
+          description: >-
+            The agent that runs the task. Omit to leave unchanged; null resets it to the deployment
+            default.
         cronExpression:
           oneOf:
             - maxLength: 100
@@ -13953,24 +13955,29 @@ components:
           oneOf:
             - type: string
             - type: 'null'
-          description: Send null to clear the description.
+          description: Omit to leave unchanged. Send null to clear the description.
         isEnabled:
           oneOf:
             - type: boolean
             - type: 'null'
-          description: '`false` pauses the schedule, `true` resumes it.'
+          description: >-
+            `false` pauses the schedule, `true` resumes it. Omit to leave unchanged. Explicit null
+            answers `400`.
         name:
           oneOf:
             - maxLength: 255
               type: string
               minLength: 1
             - type: 'null'
+          description: Omit to leave unchanged. Explicit null answers `400`.
         prompt:
           oneOf:
             - minLength: 1
               type: string
             - type: 'null'
-          description: New prompt, shown as the task's Instructions in Cube.
+          description: >-
+            New prompt, shown as the task's Instructions in Cube. Omit to leave unchanged. Explicit
+            null answers `400`.
         timezone:
           oneOf:
             - maxLength: 100
@@ -13978,7 +13985,7 @@ components:
             - type: 'null'
           description: >-
             New IANA time zone for the cron, e.g. `America/New_York`. Omit it to keep the current
-            one.
+            one. Explicit null answers `400`.
       type: object
     UpdateWorkbookInput:
       properties:
