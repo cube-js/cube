@@ -460,6 +460,10 @@ Each control has a **Visibility** setting that determines how it appears on the 
 
 Set the visibility from the **Visibility** dropdown when editing the control. **Hidden** controls remain visible in the dashboard builder so editors can reconfigure them, but disappear from the published view.
 
+<Warning>
+To keep a Hidden control's value out of a downloaded file, use **Download as PDF**, which captures only what the published dashboard shows. The [print version][ref-print-version] states every control holding a value in the summary line under the dashboard title, Hidden ones included, because those values still filter the printed data. A value a Hidden control takes from a [user attribute](#user-attribute-default), such as the viewer's region, therefore appears as text in the file.
+</Warning>
+
 ## Interaction with charts
 
 This section applies to filters, time granularity switchers and field switchers. A [parent control](#parent) has no member of its own and never applies to a chart itself, so it doesn't appear in any chart's [Controls mapping](#controls-mapping) — it acts only through the children it drives, and it's those children that show up here.
@@ -509,6 +513,7 @@ For filter, time granularity, and field switcher controls — the three that map
 
 [ref-embed-url-filters]: /embedding/iframe/dashboards#pre-set-dashboard-filters-via-url
 [ref-workbook-agent]: /docs/explore-analyze/workbooks/workbook-agent
+[ref-print-version]: /docs/explore-analyze/dashboards#print-version
 
 [ref-workbooks]: /docs/explore-analyze/workbooks
 [ref-charts]: /docs/explore-analyze/dashboards/widgets/charts
