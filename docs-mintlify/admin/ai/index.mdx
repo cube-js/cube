@@ -51,7 +51,7 @@ memory_mode: user
 |---------------------|------------------|--------------------------|-------------------------------------------------------------------------------------------------------------------------|
 | `llm`               | string or object | `auto`                   | LLM provider — `auto`, a [predefined model](#llm) name, or a [BYOM](/admin/ai/bring-your-own-model) reference.          |
 | `embedding_llm`     | string or object | `text-embedding-3-large` | Embedding model — a predefined name or a BYOM reference.                                                                |
-| `runtime`           | string           | `plain`                  | [Runtime mode](#runtime) — `plain` or `reasoning`.                                                                      |
+| `runtime`           | string           | `plain`                  | [Runtime mode](#runtime) — `plain`, `reasoning`, or `chassis`.                                                          |
 | `accessible_views`  | array            | _all views_              | List of view names exposed to the agent as context guidance for which views to query. This is not a security control — if omitted or empty, all views are exposed. Use [access policies](/reference/data-modeling/data-access-policies) to enforce actual access restrictions. |
 | `memory_mode`       | string           | `space`                  | [Memory isolation mode](#memory) — `space`, `user`, or `disabled`.                                                      |
 
@@ -118,10 +118,22 @@ The `runtime` property controls how the agent processes requests:
 |--------------|--------------------------------------------------------------------------------------------|
 | `plain`      | Default. Optimized for speed and cost. Recommended for most use cases.                     |
 | `reasoning`  | Enables extended thinking for complex analysis.                                            |
+| `chassis`    | Optimized for semantic-model exploration. Runs a reduced toolset, and query results appear inline in the answer rather than as separate tool-call results. |
 
 <Warning>
-  `reasoning` is **experimental**. It may be unstable and is not yet feature-complete. Stick with `plain` unless you have a specific need for extended reasoning.
+  `reasoning` and `chassis` are **experimental**. They may be unstable and are not yet feature-complete. Stick with `plain` unless you specifically need extended thinking or the leaner semantic-model toolset.
 </Warning>
+
+Under `chassis`, some agent features are unavailable, including [MCP connector
+tools](/admin/ai/mcp-connectors) and parts of [workbook
+authoring](/docs/explore-analyze/workbooks/workbook-agent).
+
+The `runtime` property applies to chat surfaces such as [Analytics
+Chat](/docs/explore-analyze/analytics-chat), the [Workbook
+Agent](/docs/explore-analyze/workbooks/workbook-agent), and the [Dashboard
+Agent](/docs/explore-analyze/dashboards/dashboard-agent). [AI summary
+widgets](/docs/explore-analyze/dashboards/widgets/ai-summary) always use their own runtime,
+regardless of this setting.
 
 ## Memory
 
