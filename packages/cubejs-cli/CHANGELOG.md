@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.7.45](https://github.com/cube-js/cube/compare/v1.7.44...v1.7.45) (2026-09-25)
+
+### Features
+
+- **cubejs-cli:** deprecate cubejs CLI in favor of native Cube CLI ([#11965](https://github.com/cube-js/cube/issues/11965)) ([7c98bd9](https://github.com/cube-js/cube/commit/7c98bd9d3c89cce363af7bb36e876ea0855eb641))
+
 ## [1.7.44](https://github.com/cube-js/cube/compare/v1.7.43...v1.7.44) (2026-09-24)
 
 **Note:** Version bump only for package cubejs-cli
