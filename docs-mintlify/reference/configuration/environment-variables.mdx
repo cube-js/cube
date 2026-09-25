@@ -1979,7 +1979,8 @@ The Secret Access Key for AWS. Required when using AWS S3.
 ## `CUBESTORE_AWS_CREDS_REFRESH_EVERY_MINS`
 
 The number of minutes after which Cube Store should refresh AWS credentials.
-Required when using an AWS instance role.
+Required when using an AWS instance role. In web identity mode, the default is a
+30-second poll and any override is capped at 5 minutes.
 
 | Possible Values           | Default in Development | Default in Production |
 | ------------------------- | ---------------------- | --------------------- |
@@ -1992,7 +1993,7 @@ not set and this variable is present, Cube Store authenticates to S3 using AWS W
 Identity (for example, [IRSA](https://docs.aws.amazon.com/eks/latest/userguide/iam-roles-for-service-accounts.html)
 on Amazon EKS): it exchanges the token for
 temporary credentials via STS `AssumeRoleWithWebIdentity` and re-exchanges them
-when the token file changes.
+before they expire or when the token file changes.
 
 | Possible Values | Default in Development | Default in Production |
 | --------------- | ---------------------- | --------------------- |
