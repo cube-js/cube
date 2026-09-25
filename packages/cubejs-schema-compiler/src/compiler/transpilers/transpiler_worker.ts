@@ -71,7 +71,11 @@ const transpileJs = (data: TransferContent) => {
   };
 };
 
+// Like transpileJs, each file gets only the errors and warnings it added
 const transpileYaml = (data: TransferContent) => {
+  const errorsBefore = errorsReport.getErrors().length;
+  const warningsBefore = errorsReport.getWarnings().length;
+
   cubeDictionary.setCubeNames(data.cubeNames);
   cubeSymbols.setSymbols(data.cubeSymbols);
 
@@ -81,8 +85,8 @@ const transpileYaml = (data: TransferContent) => {
 
   return {
     content: transpiledFile?.content || '',
-    errors: errorsReport.getErrors(),
-    warnings: errorsReport.getWarnings()
+    errors: errorsReport.getErrors().slice(errorsBefore),
+    warnings: errorsReport.getWarnings().slice(warningsBefore)
   };
 };
 

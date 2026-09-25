@@ -1437,11 +1437,17 @@ function definitionFingerprint(definition: unknown): string {
         hash.update('{');
         // Model objects come from the VM context, whose Object.prototype isn't this realm's, so
         // the walk stops at whichever realm's Object.prototype it reaches
+        // A key shadowed further down the chain reads the same value, so it is hashed once, at
+        // the depth it first appears
+        const seen = new Set<string>();
         let depth = 0;
         for (let o: object | null = value; o && !isRootPrototype(o); o = Object.getPrototypeOf(o), depth++) {
           for (const key of Object.getOwnPropertyNames(o).sort()) {
-            hash.update(`${depth}.${key.length}:${key}=`);
-            write((value as Record<string, unknown>)[key]);
+            if (!seen.has(key)) {
+              seen.add(key);
+              hash.update(`${depth}.${key.length}:${key}=`);
+              write((value as Record<string, unknown>)[key]);
+            }
           }
         }
         hash.update('}');

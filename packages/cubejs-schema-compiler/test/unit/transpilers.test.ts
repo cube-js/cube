@@ -70,6 +70,16 @@ describe('Transpilers', () => {
         cubeSymbols: {},
       }]);
       expect(single.errors).toEqual([]);
+
+      // The YAML call on the same worker gets only its own errors too
+      const yaml = await pool.exec('transpileYaml', [{
+        fileName: 'fifth.yml',
+        content: 'cubes:\n  - name: fifth\n    sql: select 1\n',
+        transpilers: [],
+        cubeNames: [],
+        cubeSymbols: {},
+      }]);
+      expect(yaml.errors).toEqual([]);
     } finally {
       await pool.terminate();
     }
