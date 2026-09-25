@@ -151,7 +151,10 @@ Configuration is the same as [Custom OpenAI-compatible](#custom-openai-compatibl
 a free-text model and base URL, an optional API key, and optional custom
 headers with the same placeholders.
 
-The one difference is the base URL: requests go to `<base URL>/v1/messages`,
+As with Custom OpenAI-compatible, the same model serves every request an
+agent makes, including lightweight background calls.
+
+Unlike the OpenAI-compatible provider, requests go to `<base URL>/v1/messages`,
 so leave out the version segment — use `https://gateway.acme.com`, not
 `https://gateway.acme.com/v1`. The API key, when set, is sent in the
 `x-api-key` header. Extended thinking is not available for this provider.
