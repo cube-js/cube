@@ -2807,9 +2807,7 @@ describe('Cube Validation cache', () => {
     const brokenParent = cube('cache_parent', 'not_a_type');
     const brokenChild = Object.setPrototypeOf({ name: 'cache_child', fileName: 'child.js' }, brokenParent);
     const joiResult = new CubeValidator(new CubeSymbols()).validate(brokenChild, new CollectingErrorReporter());
-    const direct = new CubeValidator(new CubeSymbols()).validate(brokenParent, new CollectingErrorReporter());
 
-    // Whatever the schema says about inherited members, the cache must not answer for it
-    expect(Boolean(joiResult.error)).toBe(Boolean(direct.error));
+    expect(joiResult.error).toBeTruthy();
   });
 });
