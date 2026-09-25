@@ -1,7 +1,7 @@
 use crate::{
     compile::{
         engine::{
-            df::scan::{CubeScanNode, DataType, MemberField},
+            df::scan::{CubeScanNode, DataType, MemberField, RegularMember},
             udf::{MEASURE_UDAF_NAME, PATCH_MEASURE_UDAF_NAME},
         },
         rewrite::{
@@ -28,7 +28,7 @@ use datafusion::{
     error::{DataFusionError, Result},
     logical_expr::{ReturnTypeFunction, ScalarFunctionImplementation},
     logical_plan::{
-        plan::Extension, replace_col, Column, DFSchema, DFSchemaRef, Expr, ExprRewritable,
+        plan::Extension, replace_col, Column, DFField, DFSchema, DFSchemaRef, Expr, ExprRewritable,
         ExprRewriter, ExprSchemable, GroupingSet, JoinType, LogicalPlan, Operator,
         UserDefinedLogicalNode,
     },
@@ -377,6 +377,14 @@ impl CubeScanWrapperNode {
             config_obj,
         }
     }
+}
+
+/// `expr` without the aliases wrapped around it
+fn unalias(mut expr: &Expr) -> &Expr {
+    while let Expr::Alias(inner, _) = expr {
+        expr = inner;
+    }
+    expr
 }
 
 fn expr_name(e: &Expr, schema: &DFSchema) -> Result<String> {
@@ -1623,6 +1631,144 @@ impl WrappedSelectNode {
         }
     }
 
+    /// Returns `from` with its projection narrowed down to the columns this select reads.
+    /// Members nobody reads are not rendered in the inner query, and neither are the cubes
+    /// only they would pull in. Join hints are kept: they come from joins the query writes.
+    fn from_with_pruned_projection(&self, meta: &MetaContext) -> Result<Arc<LogicalPlan>> {
+        // Subqueries can reference columns of `from` without them showing up in expressions.
+        // Join plans can't: they are uncorrelated and read `from` only through their condition
+        if !self.subqueries.is_empty() {
+            return Ok(self.from.clone());
+        }
+        let LogicalPlan::Extension(Extension { node }) = self.from.as_ref() else {
+            return Ok(self.from.clone());
+        };
+        let Some(from) = node.as_any().downcast_ref::<WrappedSelectNode>() else {
+            return Ok(self.from.clone());
+        };
+        // Dropping columns would change what rows `DISTINCT` considers duplicates. Other
+        // selects are safe: dropping a cube only stops its `one_to_many` join from
+        // multiplying rows, which leaves the rows a query for just the read members returns
+        if !matches!(from.select_type, WrappedSelectType::Projection) || from.distinct {
+            return Ok(self.from.clone());
+        }
+        let fields = from.schema.fields();
+        if fields.len() != from.projection_expr.len() + from.window_expr.len() {
+            return Ok(self.from.clone());
+        }
+
+        let flat_group_expr = extract_exprlist_from_groupping_set(&self.group_expr);
+        let mut visitor = UsedColumnNamesVisitor::default();
+        for expr in self
+            .projection_expr
+            .iter()
+            .chain(flat_group_expr.iter())
+            .chain(self.aggr_expr.iter())
+            .chain(self.window_expr.iter())
+            .chain(self.filter_expr.iter())
+            .chain(self.having_expr.iter())
+            .chain(self.order_expr.iter())
+            .chain(self.joins.iter().map(|(_, condition, _)| condition))
+        {
+            visitor = expr.accept(visitor)?;
+        }
+        if visitor.reads_every_column {
+            return Ok(self.from.clone());
+        }
+
+        // Match by name only: keeping a column that turns out to be unused is harmless,
+        // dropping one that is referenced under some other qualifier breaks the query
+        let used_names = visitor.names;
+        let is_used = |field: &DFField| used_names.contains(field.name());
+        // A push-to-Cube select finds its sort keys in its projection by name, so match them
+        // the same way. A sort key without a name could be any column, so nothing is pruned
+        let Ok(sort_key_names) = from
+            .order_expr
+            .iter()
+            .map(|sort| expr_name(sort, &from.schema))
+            .collect::<Result<HashSet<_>>>()
+        else {
+            return Ok(self.from.clone());
+        };
+        // Sort pushdown can replace an alias with its expression, so match that one too
+        let maybe_sort_key = |expr: &Expr| {
+            [expr, unalias(expr)].iter().any(|expr| {
+                expr_name(expr, &from.schema).map_or(true, |name| sort_key_names.contains(&name))
+            })
+        };
+
+        // One flag per field: projection columns first, then window columns, which are kept
+        let mut keep = fields
+            .iter()
+            .enumerate()
+            .map(|(i, field)| match from.projection_expr.get(i) {
+                Some(expr) => is_used(field) || maybe_sort_key(expr),
+                None => true,
+            })
+            .collect::<Vec<_>>();
+        if keep.iter().all(|keep| *keep) {
+            return Ok(self.from.clone());
+        }
+        // The inner query still needs at least one column to be valid. Prefer a dimension,
+        // a measure can pull in joins of its own, and a literal like `__user` reads no cube
+        if !keep.iter().any(|keep| *keep) {
+            let keep_index = from
+                .projection_expr
+                .iter()
+                .position(|expr| {
+                    from.scan_member_for_column(expr).is_some_and(|member| {
+                        meta.find_dimension_with_name(&member.member).is_some()
+                    })
+                })
+                .or_else(|| {
+                    from.projection_expr
+                        .iter()
+                        .position(|expr| from.scan_member_for_column(expr).is_some())
+                })
+                .unwrap_or(0);
+            keep[keep_index] = true;
+        }
+
+        let projection_expr = from
+            .projection_expr
+            .iter()
+            .zip(keep.iter())
+            .filter(|(_, keep)| **keep)
+            .map(|(expr, _)| expr.clone())
+            .collect::<Vec<_>>();
+        let schema_fields = fields
+            .iter()
+            .zip(keep.iter())
+            .filter(|(_, keep)| **keep)
+            .map(|(field, _)| field.clone())
+            .collect::<Vec<_>>();
+        let schema = DFSchema::new_with_metadata(schema_fields, from.schema.metadata().clone())?;
+
+        Ok(Arc::new(LogicalPlan::Extension(Extension {
+            node: Arc::new(WrappedSelectNode {
+                schema: Arc::new(schema),
+                projection_expr,
+                ..from.clone()
+            }),
+        })))
+    }
+
+    /// The member `expr` points at when it is a plain column of a CubeScan `from`. Literals,
+    /// and columns the scan does not have, point at no member
+    fn scan_member_for_column(&self, expr: &Expr) -> Option<&RegularMember> {
+        let Expr::Column(column) = unalias(expr) else {
+            return None;
+        };
+        let LogicalPlan::Extension(Extension { node }) = self.from.as_ref() else {
+            return None;
+        };
+        let cube_scan = node.as_any().downcast_ref::<CubeScanNode>()?;
+        match Self::find_member_in_ungrouped_scan(cube_scan, column).ok()? {
+            MemberField::Member(member) => Some(member),
+            MemberField::Literal(_) => None,
+        }
+    }
+
     fn subqueries_names(&self) -> result::Result<HashSet<String>, CubeError> {
         let mut subqueries_names = HashSet::new();
         for subquery in self.subqueries.iter() {
@@ -2042,12 +2188,6 @@ impl WrappedSelectNode {
         // Sort pushdown can replace a select-list alias with the literal expression.
         // Integer literals in ORDER BY are interpreted as select-list positions by some SQL
         // dialects, so restore the generated alias when the literal is selected in this query.
-        fn unalias(mut expr: &Expr) -> &Expr {
-            while let Expr::Alias(inner, _) = expr {
-                expr = inner;
-            }
-            expr
-        }
         // Push-to-Cube discards this `order` and builds its own from `self.order_expr`, so
         // there is nothing to fix there, and a generated alias is not a scan member.
         let literal_aliases = if push_to_cube_context.is_some() {
@@ -4407,7 +4547,7 @@ impl WrappedSelectNode {
             transport.clone(),
             load_request_meta.clone(),
             state.clone(),
-            self.from.clone(),
+            self.from_with_pruned_projection(meta)?,
             true,
             values.clone(),
             parent_data_source,
@@ -4835,6 +4975,39 @@ impl<'ctx, 'mem> ExpressionVisitor for CollectMembersVisitor<'ctx, 'mem> {
     }
 }
 
+/// Collects the names of the columns an expression reads
+#[derive(Default)]
+struct UsedColumnNamesVisitor {
+    names: HashSet<String>,
+    /// Set for expressions that read every column without naming one
+    reads_every_column: bool,
+}
+
+impl ExpressionVisitor for UsedColumnNamesVisitor {
+    fn pre_visit(mut self, expr: &Expr) -> Result<Recursion<Self>> {
+        match expr {
+            Expr::Column(column) | Expr::OuterColumn(_, column) => {
+                self.names.insert(column.name.clone());
+            }
+            Expr::Wildcard | Expr::QualifiedWildcard { .. } => {
+                self.reads_every_column = true;
+            }
+            // Same as `CollectMembersVisitor`: COUNT(*) counts the rows of every member,
+            // so dropping a cube, and its join, would change the count
+            Expr::AggregateFunction {
+                fun: AggregateFunction::Count,
+                args,
+                ..
+            } if args.len() == 1 && matches!(args[0], Expr::Literal(_)) => {
+                self.reads_every_column = true;
+            }
+            _ => {}
+        }
+
+        Ok(Recursion::Continue(self))
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -4843,7 +5016,7 @@ mod tests {
         sql::HttpAuthContext,
         transport::{CubeMeta, CubeMetaDimension, CubeMetaType},
     };
-    use datafusion::logical_plan::DFField;
+    use datafusion::{arrow::datatypes::DataType as ArrowDataType, logical_plan::DFField};
     use std::collections::HashMap;
 
     /// Each entry is a cube with one dimension, on a data source of its own.
@@ -4986,5 +5159,314 @@ mod tests {
             }),
             grouping_set: None,
         });
+    }
+
+    /// An outer select over an inner select that projects `t.a` and `t.b`
+    fn outer_select_over_inner(
+        projection_expr: Vec<Expr>,
+        subqueries: Vec<Arc<LogicalPlan>>,
+        joins: Vec<(Arc<LogicalPlan>, Expr, JoinType)>,
+    ) -> WrappedSelectNode {
+        let schema = Arc::new(
+            DFSchema::new_with_metadata(
+                vec![
+                    DFField::new(Some("t"), "a", ArrowDataType::Utf8, true),
+                    DFField::new(Some("t"), "b", ArrowDataType::Utf8, true),
+                ],
+                HashMap::new(),
+            )
+            .unwrap(),
+        );
+        let inner = WrappedSelectNode::new(
+            schema.clone(),
+            WrappedSelectType::Projection,
+            vec![column_t("a"), column_t("b")],
+            vec![],
+            vec![],
+            vec![],
+            vec![],
+            empty_plan(),
+            vec![],
+            vec![],
+            vec![],
+            None,
+            None,
+            vec![],
+            None,
+            false,
+            false,
+        );
+        WrappedSelectNode::new(
+            schema,
+            WrappedSelectType::Projection,
+            projection_expr,
+            subqueries,
+            vec![],
+            vec![],
+            vec![],
+            Arc::new(LogicalPlan::Extension(Extension {
+                node: Arc::new(inner),
+            })),
+            joins,
+            vec![],
+            vec![],
+            None,
+            None,
+            vec![],
+            None,
+            false,
+            false,
+        )
+    }
+
+    /// Names of the columns the inner select projects after pruning
+    fn pruned_projection(outer: &WrappedSelectNode) -> Vec<String> {
+        pruned_projection_with_meta(outer, &meta_context_with_cubes(&[]))
+    }
+
+    fn pruned_projection_with_meta(outer: &WrappedSelectNode, meta: &MetaContext) -> Vec<String> {
+        let from = outer.from_with_pruned_projection(meta).unwrap();
+        let LogicalPlan::Extension(Extension { node }) = from.as_ref() else {
+            panic!("Expected extension node, got {:?}", from);
+        };
+        let inner = node.as_any().downcast_ref::<WrappedSelectNode>().unwrap();
+        inner
+            .schema
+            .fields()
+            .iter()
+            .map(|f| f.name().clone())
+            .collect()
+    }
+
+    fn empty_plan() -> Arc<LogicalPlan> {
+        Arc::new(LogicalPlan::EmptyRelation(
+            datafusion::logical_plan::plan::EmptyRelation {
+                produce_one_row: false,
+                schema: Arc::new(DFSchema::empty()),
+            },
+        ))
+    }
+
+    fn column_t(name: &str) -> Expr {
+        Expr::Column(Column {
+            relation: Some("t".to_string()),
+            name: name.to_string(),
+        })
+    }
+
+    /// An outer select reading no columns over an inner select that projects every
+    /// column of `scan`, under an alias when `aliased`
+    fn constant_over_scan(scan: CubeScanNode, aliased: bool) -> WrappedSelectNode {
+        let schema = scan.schema.clone();
+        let projection_expr = schema
+            .fields()
+            .iter()
+            .map(|f| {
+                let column = Expr::Column(f.qualified_column());
+                if aliased {
+                    Expr::Alias(Box::new(column), format!("{}_alias", f.name()))
+                } else {
+                    column
+                }
+            })
+            .collect();
+        let inner = WrappedSelectNode::new(
+            schema.clone(),
+            WrappedSelectType::Projection,
+            projection_expr,
+            vec![],
+            vec![],
+            vec![],
+            vec![],
+            Arc::new(LogicalPlan::Extension(Extension {
+                node: Arc::new(scan),
+            })),
+            vec![],
+            vec![],
+            vec![],
+            None,
+            None,
+            vec![],
+            None,
+            false,
+            false,
+        );
+        WrappedSelectNode::new(
+            schema,
+            WrappedSelectType::Projection,
+            vec![Expr::Literal(ScalarValue::Int64(Some(1)))],
+            vec![],
+            vec![],
+            vec![],
+            vec![],
+            Arc::new(LogicalPlan::Extension(Extension {
+                node: Arc::new(inner),
+            })),
+            vec![],
+            vec![],
+            vec![],
+            None,
+            None,
+            vec![],
+            None,
+            false,
+            false,
+        )
+    }
+
+    /// With nothing read, the inner select keeps a dimension over any other column
+    #[test]
+    fn test_prune_inner_select_keeps_dimension_when_nothing_is_read() {
+        let meta = meta_context_with_cubes(&[("Orders", "Orders.status", "default")]);
+        let scan = cube_scan_node(
+            vec![
+                MemberField::Literal(ScalarValue::Utf8(None)),
+                MemberField::regular("Orders.amount".to_string()),
+                MemberField::regular("Orders.status".to_string()),
+            ],
+            vec!["Orders".to_string()],
+        );
+        let outer = constant_over_scan(scan, false);
+        assert_eq!(pruned_projection_with_meta(&outer, &meta), vec!["c2"]);
+    }
+
+    /// Aliased projection columns still point at their members
+    #[test]
+    fn test_prune_inner_select_keeps_aliased_dimension_when_nothing_is_read() {
+        let meta = meta_context_with_cubes(&[("Orders", "Orders.status", "default")]);
+        let scan = cube_scan_node(
+            vec![
+                MemberField::regular("Orders.amount".to_string()),
+                MemberField::regular("Orders.status".to_string()),
+            ],
+            vec!["Orders".to_string()],
+        );
+        let outer = constant_over_scan(scan, true);
+        assert_eq!(pruned_projection_with_meta(&outer, &meta), vec!["c1"]);
+    }
+
+    /// Without a dimension, a member is kept over a literal like `__user`, which reads no cube
+    #[test]
+    fn test_prune_inner_select_keeps_member_over_literal_when_nothing_is_read() {
+        let meta = meta_context_with_cubes(&[("Orders", "Orders.status", "default")]);
+        let scan = cube_scan_node(
+            vec![
+                MemberField::Literal(ScalarValue::Utf8(None)),
+                MemberField::regular("Orders.amount".to_string()),
+            ],
+            vec!["Orders".to_string()],
+        );
+        let outer = constant_over_scan(scan, false);
+        assert_eq!(pruned_projection_with_meta(&outer, &meta), vec!["c1"]);
+    }
+
+    /// Sort pushdown can leave the inner select ordering by a literal it projects under an
+    /// alias. That column is a sort key even though the names differ
+    #[test]
+    fn test_prune_inner_select_keeps_aliased_literal_sort_key() {
+        let five = || Expr::Literal(ScalarValue::Int64(Some(5)));
+        let schema = Arc::new(
+            DFSchema::new_with_metadata(
+                vec![
+                    DFField::new(Some("t"), "a", ArrowDataType::Utf8, true),
+                    DFField::new(Some("t"), "five", ArrowDataType::Int64, true),
+                ],
+                HashMap::new(),
+            )
+            .unwrap(),
+        );
+        let inner = WrappedSelectNode::new(
+            schema.clone(),
+            WrappedSelectType::Projection,
+            vec![
+                column_t("a"),
+                Expr::Alias(Box::new(five()), "five".to_string()),
+            ],
+            vec![],
+            vec![],
+            vec![],
+            vec![],
+            empty_plan(),
+            vec![],
+            vec![],
+            vec![],
+            Some(10),
+            None,
+            vec![Expr::Sort {
+                expr: Box::new(five()),
+                asc: true,
+                nulls_first: false,
+            }],
+            None,
+            false,
+            false,
+        );
+        let outer = WrappedSelectNode::new(
+            schema,
+            WrappedSelectType::Projection,
+            vec![column_t("a")],
+            vec![],
+            vec![],
+            vec![],
+            vec![],
+            Arc::new(LogicalPlan::Extension(Extension {
+                node: Arc::new(inner),
+            })),
+            vec![],
+            vec![],
+            vec![],
+            None,
+            None,
+            vec![],
+            None,
+            true,
+            false,
+        );
+        assert_eq!(pruned_projection(&outer), vec!["a", "five"]);
+    }
+
+    #[test]
+    fn test_prune_inner_select_to_read_columns() {
+        let outer = outer_select_over_inner(vec![column_t("a")], vec![], vec![]);
+        assert_eq!(pruned_projection(&outer), vec!["a"]);
+    }
+
+    #[test]
+    fn test_prune_inner_select_keeps_join_condition_columns() {
+        let condition = Expr::BinaryExpr {
+            left: Box::new(column_t("b")),
+            op: Operator::Eq,
+            right: Box::new(Expr::Column(Column::from_name("x"))),
+        };
+        let outer = outer_select_over_inner(
+            vec![column_t("a")],
+            vec![],
+            vec![(empty_plan(), condition, JoinType::Inner)],
+        );
+        assert_eq!(pruned_projection(&outer), vec!["a", "b"]);
+    }
+
+    #[test]
+    fn test_prune_inner_select_skips_wildcard() {
+        let outer = outer_select_over_inner(vec![column_t("a"), Expr::Wildcard], vec![], vec![]);
+        assert_eq!(pruned_projection(&outer), vec!["a", "b"]);
+    }
+
+    #[test]
+    fn test_prune_inner_select_skips_count_rows() {
+        let count_rows = Expr::AggregateFunction {
+            fun: AggregateFunction::Count,
+            args: vec![Expr::Literal(ScalarValue::UInt8(Some(1)))],
+            distinct: false,
+            within_group: None,
+        };
+        let outer = outer_select_over_inner(vec![count_rows], vec![], vec![]);
+        assert_eq!(pruned_projection(&outer), vec!["a", "b"]);
+    }
+
+    #[test]
+    fn test_prune_inner_select_skips_subqueries() {
+        let outer = outer_select_over_inner(vec![column_t("a")], vec![empty_plan()], vec![]);
+        assert_eq!(pruned_projection(&outer), vec!["a", "b"]);
     }
 }
