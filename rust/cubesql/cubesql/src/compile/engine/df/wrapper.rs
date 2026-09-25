@@ -17,7 +17,7 @@ use crate::{
     sql::{AuthContextRef, SessionState},
     transport::{
         AliasedColumn, DataSource, LoadRequestMeta, MetaContext, SpanId, SqlGenerator,
-        SqlTemplates, TransportLoadRequestQuery, TransportService,
+        SqlTemplates, TransportLoadRequestQuery, TransportService, V1CubeMetaExt,
     },
     CubeError,
 };
@@ -56,6 +56,40 @@ use std::{
     sync::{Arc, LazyLock},
 };
 
+#[cfg(test)]
+#[path = "wrapper/boolean_context_tests.rs"]
+mod boolean_context_tests;
+
+struct RejectRepeatedBoolean<'a> {
+    subqueries: &'a HashMap<String, String>,
+}
+
+impl ExpressionVisitor for RejectRepeatedBoolean<'_> {
+    fn pre_visit(self, expr: &Expr) -> Result<Recursion<Self>> {
+        let subquery = match expr {
+            Expr::InSubquery { .. } => true,
+            Expr::Column(column) => self.subqueries.contains_key(&column.flat_name()),
+            _ => false,
+        };
+        if subquery {
+            return Err(DataFusionError::NotImplemented(
+                "Scalar boolean SQL conversion cannot repeat an opaque subquery".to_string(),
+            ));
+        }
+        let volatile = match expr {
+            Expr::ScalarFunction { fun, .. } => fun.volatility() == Volatility::Volatile,
+            Expr::ScalarUDF { fun, .. } => fun.signature.volatility == Volatility::Volatile,
+            _ => false,
+        };
+        if volatile {
+            return Err(DataFusionError::NotImplemented(
+                "Scalar boolean SQL conversion cannot repeat a volatile expression".to_string(),
+            ));
+        }
+        Ok(Recursion::Continue(self))
+    }
+}
+
 pub struct JoinSubquery {
     alias: String,
     sql: String,
@@ -65,6 +99,7 @@ pub struct JoinSubquery {
 
 pub struct PushToCubeContext<'l> {
     ungrouped_scan_node: &'l CubeScanNode,
+    meta: &'l MetaContext,
     // Known join subquery qualifiers, to generate proper column expressions
     known_join_subqueries: HashSet<String>,
 }
@@ -1756,7 +1791,7 @@ impl WrappedSelectNode {
                             // TODO avoid this alloc
                             &subqueries.keys().cloned().collect(),
                         )?;
-                        let (filter, sql_query) = Self::generate_sql_for_expr(
+                        let (filter, sql_query) = Self::generate_sql_for_predicate(
                             sql_query,
                             sql_generator.clone(),
                             filter.clone(),
@@ -1970,6 +2005,7 @@ impl WrappedSelectNode {
             can_rename_columns,
             push_to_cube_context,
             subqueries_sql,
+            false,
         )
         .await?;
         let flat_group_expr = extract_exprlist_from_groupping_set(&self.group_expr);
@@ -1983,6 +2019,7 @@ impl WrappedSelectNode {
             can_rename_columns,
             push_to_cube_context,
             subqueries_sql,
+            false,
         )
         .await?;
         let group_descs = extract_group_type_from_groupping_set(&self.group_expr)?;
@@ -2010,6 +2047,7 @@ impl WrappedSelectNode {
             can_rename_columns,
             push_to_cube_context,
             subqueries_sql,
+            false,
         )
         .await?;
 
@@ -2023,6 +2061,7 @@ impl WrappedSelectNode {
             can_rename_columns,
             push_to_cube_context,
             subqueries_sql,
+            true,
         )
         .await?;
 
@@ -2036,6 +2075,7 @@ impl WrappedSelectNode {
             can_rename_columns,
             push_to_cube_context,
             subqueries_sql,
+            false,
         )
         .await?;
 
@@ -2126,6 +2166,7 @@ impl WrappedSelectNode {
             can_rename_columns,
             push_to_cube_context,
             subqueries_sql,
+            false,
         )
         .await?;
 
@@ -2255,6 +2296,7 @@ impl WrappedSelectNode {
         can_rename_columns: bool,
         push_to_cube_context: Option<&PushToCubeContext<'_>>,
         subqueries: &HashMap<String, String>,
+        predicate: bool,
     ) -> result::Result<(Vec<(AliasedColumn, HashSet<String>)>, SqlQuery), CubeError> {
         let mut aliased_columns = Vec::new();
         for original_expr in exprs {
@@ -2275,12 +2317,13 @@ impl WrappedSelectNode {
                 )?,
                 None => HashSet::new(),
             };
-            let (expr_sql, new_sql_query) = Self::generate_sql_for_expr(
+            let (expr_sql, new_sql_query) = Self::generate_sql_for_expr_context(
                 sql,
                 generator.clone(),
                 expr.clone(),
                 push_to_cube_context,
                 subqueries,
+                predicate,
             )?;
             let expr_sql =
                 Self::escape_interpolation_quotes(expr_sql, push_to_cube_context.is_some());
@@ -2346,6 +2389,159 @@ impl WrappedSelectNode {
     }
 
     pub fn generate_sql_for_expr<'ctx>(
+        sql_query: SqlQuery,
+        sql_generator: Arc<dyn SqlGenerator>,
+        expr: Expr,
+        push_to_cube_context: Option<&'ctx PushToCubeContext<'ctx>>,
+        subqueries: &HashMap<String, String>,
+    ) -> Result<(String, SqlQuery)> {
+        Self::generate_sql_for_expr_context(
+            sql_query,
+            sql_generator,
+            expr,
+            push_to_cube_context,
+            subqueries,
+            false,
+        )
+    }
+
+    fn generate_sql_for_predicate<'ctx>(
+        sql_query: SqlQuery,
+        sql_generator: Arc<dyn SqlGenerator>,
+        expr: Expr,
+        push_to_cube_context: Option<&'ctx PushToCubeContext<'ctx>>,
+        subqueries: &HashMap<String, String>,
+    ) -> Result<(String, SqlQuery)> {
+        Self::generate_sql_for_expr_context(
+            sql_query,
+            sql_generator,
+            expr,
+            push_to_cube_context,
+            subqueries,
+            true,
+        )
+    }
+
+    // This describes the emitted SQL representation, not the DataFusion type:
+    // a boolean column is a scalar, whereas a comparison is a predicate.
+    fn is_sql_predicate(expr: &Expr) -> bool {
+        match expr {
+            Expr::BinaryExpr { op, .. } => matches!(
+                op,
+                Operator::Eq
+                    | Operator::NotEq
+                    | Operator::Lt
+                    | Operator::LtEq
+                    | Operator::Gt
+                    | Operator::GtEq
+                    | Operator::And
+                    | Operator::Or
+                    | Operator::Like
+                    | Operator::NotLike
+                    | Operator::ILike
+                    | Operator::NotILike
+                    | Operator::IsDistinctFrom
+                    | Operator::IsNotDistinctFrom
+                    | Operator::RegexMatch
+                    | Operator::RegexIMatch
+                    | Operator::RegexNotMatch
+                    | Operator::RegexNotIMatch
+            ),
+            Expr::Not(_)
+            | Expr::IsNull(_)
+            | Expr::IsNotNull(_)
+            | Expr::Like(_)
+            | Expr::ILike(_)
+            | Expr::Between { .. }
+            | Expr::InList { .. }
+            | Expr::InSubquery { .. } => true,
+            _ => false,
+        }
+    }
+
+    fn generate_sql_for_expr_context<'ctx>(
+        sql_query: SqlQuery,
+        sql_generator: Arc<dyn SqlGenerator>,
+        mut expr: Expr,
+        push_to_cube_context: Option<&'ctx PushToCubeContext<'ctx>>,
+        subqueries: &HashMap<String, String>,
+        predicate: bool,
+    ) -> Result<(String, SqlQuery)> {
+        // Aliases do not change representation or consuming context.
+        while let Expr::Alias(inner, _) = expr {
+            expr = *inner;
+        }
+        let mut is_segment = false;
+        let mut leave_raw_dimension = false;
+        let has_boolean_context = sql_generator
+            .get_sql_templates()
+            .contains_template("expressions/scalar_to_predicate");
+        if has_boolean_context {
+            if let (Expr::Column(column), Some(context)) = (&expr, push_to_cube_context) {
+                // A segment is a predicate, but boolean dimension SQL can be either
+                // a predicate or a BIT scalar. Preserve raw dimensions in predicate
+                // context; explicit comparisons/casts still get normal conversion.
+                if !subqueries.contains_key(&column.flat_name())
+                    && !column
+                        .relation
+                        .as_ref()
+                        .is_some_and(|relation| context.known_join_subqueries.contains(relation))
+                {
+                    if let MemberField::Member(member) =
+                        Self::find_member_in_ungrouped_scan(context.ungrouped_scan_node, column)?
+                    {
+                        if let Some((cube_name, member_name)) = member.member.split_once('.') {
+                            if let Some(cube) = context.meta.find_cube_with_name(cube_name) {
+                                is_segment = cube.lookup_segment(member_name).is_some();
+                                leave_raw_dimension = predicate
+                                    && cube
+                                        .lookup_dimension(member_name)
+                                        .is_some_and(|dimension| dimension.r#type == "boolean");
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        let is_predicate = Self::is_sql_predicate(&expr) || is_segment;
+        if is_predicate
+            && !predicate
+            && sql_generator
+                .get_sql_templates()
+                .contains_template("expressions/predicate_to_scalar")
+        {
+            // `predicate_to_scalar` interpolates the predicate twice. Model SQL behind
+            // a member reference is opaque here, so it must be deterministic.
+            expr.accept(RejectRepeatedBoolean { subqueries })?;
+        }
+        let (sql, query) = Self::generate_sql_for_expr_raw(
+            sql_query,
+            sql_generator.clone(),
+            expr,
+            push_to_cube_context,
+            subqueries,
+        )?;
+        // Opaque predicate SQL may contain OR/AND. Preserve its precedence when
+        // embedding it in another predicate or a scalarizing CASE.
+        let sql = if is_segment || leave_raw_dimension {
+            format!("({sql})")
+        } else {
+            sql
+        };
+        let sql = if !leave_raw_dimension && is_predicate != predicate {
+            sql_generator
+                .get_sql_templates()
+                .boolean_context_expr(sql, predicate)
+                .map_err(|e| {
+                    DataFusionError::Internal(format!("Can't convert boolean SQL context: {e}"))
+                })?
+        } else {
+            sql
+        };
+        Ok((sql, query))
+    }
+
+    fn generate_sql_for_expr_raw<'ctx>(
         mut sql_query: SqlQuery,
         sql_generator: Arc<dyn SqlGenerator>,
         expr: Expr,
@@ -2353,16 +2549,6 @@ impl WrappedSelectNode {
         subqueries: &HashMap<String, String>,
     ) -> Result<(String, SqlQuery)> {
         match expr {
-            Expr::Alias(expr, _) => {
-                let (expr, sql_query) = Self::generate_sql_for_expr(
-                    sql_query,
-                    sql_generator.clone(),
-                    *expr,
-                    push_to_cube_context,
-                    subqueries,
-                )?;
-                Ok((expr, sql_query))
-            }
             expr @ Expr::Column(_) => Self::generate_sql_for_column(
                 sql_query,
                 sql_generator,
@@ -2372,19 +2558,21 @@ impl WrappedSelectNode {
             ),
             // Expr::ScalarVariable(_, _) => {}
             Expr::BinaryExpr { left, op, right } => {
-                let (left, sql_query) = Self::generate_sql_for_expr(
+                let (left, sql_query) = Self::generate_sql_for_expr_context(
                     sql_query,
                     sql_generator.clone(),
                     *left,
                     push_to_cube_context,
                     subqueries,
+                    matches!(op, Operator::And | Operator::Or),
                 )?;
-                let (right, sql_query) = Self::generate_sql_for_expr(
+                let (right, sql_query) = Self::generate_sql_for_expr_context(
                     sql_query,
                     sql_generator.clone(),
                     *right,
                     push_to_cube_context,
                     subqueries,
+                    matches!(op, Operator::And | Operator::Or),
                 )?;
                 let resulting_sql = match op {
                     Operator::Like => sql_generator.get_sql_templates().like_expr(
@@ -2505,7 +2693,7 @@ impl WrappedSelectNode {
             }
             // Expr::SimilarTo(_) => {}
             Expr::Not(expr) => {
-                let (expr, sql_query) = Self::generate_sql_for_expr(
+                let (expr, sql_query) = Self::generate_sql_for_predicate(
                     sql_query,
                     sql_generator.clone(),
                     *expr,
@@ -2875,6 +3063,7 @@ impl WrappedSelectNode {
         } else if let Some(PushToCubeContext {
             ungrouped_scan_node,
             known_join_subqueries,
+            ..
         }) = push_to_cube_context
         {
             if let Some(relation) = c.relation.as_ref() {
@@ -2979,12 +3168,13 @@ impl WrappedSelectNode {
         };
         let mut when_then_expr_sql = Vec::new();
         for (when, then) in when_then_expr {
-            let (when, sql_query_next) = Self::generate_sql_for_expr(
+            let (when, sql_query_next) = Self::generate_sql_for_expr_context(
                 sql_query,
                 sql_generator.clone(),
                 *when,
                 push_to_cube_context,
                 subqueries,
+                expr.is_none(),
             )?;
             let (then, sql_query_next) = Self::generate_sql_for_expr(
                 sql_query_next,
@@ -3629,6 +3819,7 @@ impl WrappedSelectNode {
                 Some(PushToCubeContext {
                     ungrouped_scan_node,
                     known_join_subqueries,
+                    ..
                 }),
             ) = (&fun, &args[0], &args[1], push_to_cube_context)
             {
@@ -3955,6 +4146,7 @@ impl WrappedSelectNode {
             PushToCubeContext {
                 ungrouped_scan_node,
                 known_join_subqueries,
+                meta,
             }
         };
 
@@ -4143,7 +4335,7 @@ impl WrappedSelectNode {
 
         let PushToCubeContext {
             ungrouped_scan_node,
-            known_join_subqueries: _,
+            ..
         } = push_to_cube_context;
         let mut prepared_join_subqueries = vec![];
         for JoinSubquery {
@@ -4164,6 +4356,7 @@ impl WrappedSelectNode {
                 true,
                 Some(push_to_cube_context),
                 subqueries_sql,
+                true,
             )
             .await?;
 
@@ -4487,7 +4680,7 @@ impl WrappedSelectNode {
                 join_condition.clone()
             };
 
-            let (join_condition_sql, join_sql) = Self::generate_sql_for_expr(
+            let (join_condition_sql, join_sql) = Self::generate_sql_for_predicate(
                 join_sql,
                 generator.clone(),
                 join_condition,
@@ -4776,6 +4969,7 @@ impl<'ctx, 'mem> CollectMembersVisitor<'ctx, 'mem> {
             let PushToCubeContext {
                 ungrouped_scan_node,
                 known_join_subqueries,
+                ..
             } = self.push_to_cube_context;
 
             if let Some(relation) = c.relation.as_ref() {
@@ -4908,6 +5102,70 @@ mod tests {
             used_cubes,
             None,
         )
+    }
+
+    #[test]
+    fn boolean_context_raw_dimension_boundaries() {
+        use crate::compile::test::{mssql_boolean_templates, sql_generator};
+        use datafusion::logical_plan::col;
+
+        let mut meta = meta_context_with_cubes(&[("Orders", "Orders.completed", "warehouse")]);
+        meta.cubes[0].dimensions[0].r#type = "boolean".to_string();
+        let scan = cube_scan_node(
+            vec![MemberField::regular("Orders.completed".to_string())],
+            vec!["Orders".to_string()],
+        );
+        let context = PushToCubeContext {
+            ungrouped_scan_node: &scan,
+            meta: &meta,
+            known_join_subqueries: HashSet::from(["joined".to_string()]),
+        };
+        let render = |expr, predicate, context, subqueries: &HashMap<String, String>, mssql| {
+            WrappedSelectNode::generate_sql_for_expr_context(
+                SqlQuery::new(String::new(), vec![]),
+                sql_generator(if mssql {
+                    mssql_boolean_templates()
+                } else {
+                    vec![]
+                }),
+                expr,
+                context,
+                subqueries,
+                predicate,
+            )
+            .unwrap()
+            .0
+        };
+        let empty = HashMap::new();
+        assert_eq!(
+            render(col("c0").alias("flag"), true, Some(&context), &empty, true),
+            "(${Orders.completed})"
+        );
+        assert_eq!(
+            render(col("c0"), false, Some(&context), &empty, true),
+            "${Orders.completed}"
+        );
+        assert_eq!(
+            render(col("c0"), true, Some(&context), &empty, false),
+            "${Orders.completed}"
+        );
+        assert_eq!(
+            render(col("c0"), true, None, &empty, true),
+            "(\"c0\" = CAST(1 AS BIT))"
+        );
+        let joined = Expr::Column(Column {
+            relation: Some("joined".to_string()),
+            name: "c0".to_string(),
+        });
+        assert_eq!(
+            render(joined, true, Some(&context), &empty, true),
+            "(\"joined\".\"c0\" = CAST(1 AS BIT))"
+        );
+        let subqueries = HashMap::from([("c0".to_string(), "SELECT CAST(1 AS BIT)".to_string())]);
+        assert_eq!(
+            render(col("c0"), true, Some(&context), &subqueries, true),
+            "((SELECT CAST(1 AS BIT)) = CAST(1 AS BIT))"
+        );
     }
 
     /// A plain wrapped `CubeScan` whose columns are all literals has no member to

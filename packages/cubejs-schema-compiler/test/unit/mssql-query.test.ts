@@ -1,9 +1,19 @@
+import booleanFixture from '../fixtures/mssql-boolean-contexts.json';
 import { QueryAlias } from '@cubejs-backend/shared';
 import { MssqlQuery } from '../../src/adapter/MssqlQuery';
 import { prepareJsCompiler } from './PrepareCompiler';
 import { createJoinedCubesSchema } from './utils';
 
 describe('MssqlQuery', () => {
+  it('provides NULL-preserving SQL API boolean context templates', () => {
+    const templates = MssqlQuery.prototype.sqlTemplates();
+
+    // Rust consumes this same fixture and verifies its SQL with the renderer.
+    for (const [path, expected] of Object.entries(booleanFixture.templates)) {
+      const [section, name] = path.split('/');
+      expect(templates[section][name]).toBe(expected);
+    }
+  });
   const { compiler, joinGraph, cubeEvaluator } = prepareJsCompiler(`
     cube(\`visitors\`, {
       sql: \`

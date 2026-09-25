@@ -6,6 +6,7 @@ on:
       - '.github/actions/setup-yarn-1/**'
       - '.github/workflows/rust-cubesql.yml'
       - 'packages/cubejs-backend-native/**'
+      - 'packages/cubejs-schema-compiler/test/fixtures/mssql-boolean-contexts.json'
       - 'rust/cube/**'
       - 'rust/cubesql/**'
     branches:
@@ -15,6 +16,7 @@ on:
       - '.github/actions/setup-yarn-1/**'
       - '.github/workflows/rust-cubesql.yml'
       - 'packages/cubejs-backend-native/**'
+      - 'packages/cubejs-schema-compiler/test/fixtures/mssql-boolean-contexts.json'
       - 'rust/cube/**'
       - 'rust/cubesql/**'
 
