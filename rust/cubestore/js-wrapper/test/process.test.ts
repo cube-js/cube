@@ -1,9 +1,7 @@
-import fs from 'fs';
 import { ChildProcess, fork } from 'child_process';
 import { pausePromise } from '@cubejs-backend/shared';
 
 import { CubeStoreHandler } from '../src/process';
-import { getBinaryPath } from '../src/download';
 
 class CubeStoreHandlerOpen extends CubeStoreHandler {
   public cubeStore: ChildProcess | null = null;
@@ -11,14 +9,6 @@ class CubeStoreHandlerOpen extends CubeStoreHandler {
 
 describe('CubeStoreHandler', () => {
   jest.setTimeout(60 * 1000);
-
-  beforeAll(() => {
-    try {
-      fs.unlinkSync(getBinaryPath());
-    } catch (e) {
-      console.log(e);
-    }
-  });
 
   it('acquire with release', async () => {
     const handler = new CubeStoreHandlerOpen({
