@@ -372,7 +372,7 @@ export class DataSchemaCompiler {
 
         results = (await Promise.all(jsFilesTasks)).flat();
       } else {
-        results = await Promise.all(toCompile.map(f => this.transpileJsFile(f, errorsReport, { cubeNames, cubeSymbols, transpilerNames })));
+        results = await this.transpileJsFilesWorkerBulk(toCompile, errorsReport, { cubeNames, cubeSymbols, transpilerNames });
       }
 
       return results.filter(f => !!f) as FileContent[];
@@ -692,6 +692,59 @@ export class DataSchemaCompiler {
 
       return { ...file, content: res[index].code };
     });
+  }
+
+  /**
+   * Worker pool counterpart of transpileJsFilesNativeBulk: files go to the workers in chunks
+   * because every message carries all cube symbols, and cloning them for each file costs
+   * files x members.
+   */
+  private async transpileJsFilesWorkerBulk(
+    files: FileContent[],
+    errorsReport: ErrorReporter,
+    options: TranspileOptions
+  ): Promise<(FileContent | undefined)[]> {
+    const { cubeNames, cubeSymbols, transpilerNames } = options;
+    if (!files.length) {
+      return [];
+    }
+
+    // More chunks than workers, so one chunk of large files doesn't hold up the rest
+    const chunkCount = Math.min(files.length, (this.workerPool!.maxWorkers || 1) * 4);
+    const chunkSize = Math.ceil(files.length / chunkCount);
+    const chunks: FileContent[][] = [];
+    for (let i = 0; i < files.length; i += chunkSize) {
+      chunks.push(files.slice(i, i + chunkSize));
+    }
+
+    const results = await Promise.all(chunks.map(async (chunk) => {
+      let res: ({ content: string; errors: any[]; warnings: any[] } | null)[];
+      try {
+        res = await this.workerPool!.exec('transpileJsBulk', [{
+          files: chunk.map(({ fileName, content }) => ({ fileName, content })),
+          transpilers: transpilerNames,
+          cubeNames,
+          cubeSymbols,
+        }]);
+      } catch {
+        // The whole chunk failed (the worker died, say): the per-file path reports it file by file
+        res = chunk.map(() => null);
+      }
+
+      return Promise.all(chunk.map(async (file, i) => {
+        const fileRes = res[i];
+        if (!fileRes) {
+          return this.transpileJsFile(file, errorsReport, options);
+        }
+
+        errorsReport.addErrors(fileRes.errors, file.fileName);
+        errorsReport.addWarnings(fileRes.warnings);
+
+        return { ...file, content: fileRes.content };
+      }));
+    }));
+
+    return results.flat();
   }
 
   private async transpileYamlFilesNativeBulk(

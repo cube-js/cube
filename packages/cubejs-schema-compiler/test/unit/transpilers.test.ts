@@ -1,6 +1,8 @@
 import { parse } from '@babel/parser';
 import babelGenerator from '@babel/generator';
 import babelTraverse from '@babel/traverse';
+import path from 'path';
+import workerpool from 'workerpool';
 
 import { prepareJsCompiler } from './PrepareCompiler';
 import { ImportExportTranspiler } from '../../src/compiler/transpilers';
@@ -36,6 +38,105 @@ describe('Transpilers', () => {
     } catch (e: any) {
       expect(e.message).toMatch(/Duplicate property parsing test1/);
     }
+  });
+
+  it('worker transpilation returns each file only the errors it caused', async () => {
+    const pool = workerpool.pool(path.join(__dirname, '../../src/compiler/transpilers/transpiler_worker'), { maxWorkers: 1 });
+    const file = (name: string, dimensions: string) => ({
+      fileName: `${name}.js`,
+      content: `cube(\`${name}\`, { sql: 'select 1', dimensions: { ${dimensions} } })`,
+    });
+
+    try {
+      const res = await pool.exec('transpileJsBulk', [{
+        files: [
+          file('first', "id: { sql: 'id', type: 'number' }"),
+          file('second', "id: { sql: 'id', type: 'number' }, 'id': { sql: 'id', type: 'number' }"),
+          file('third', "id: { sql: 'id', type: 'number' }"),
+        ],
+        transpilers: ['CubeCheckDuplicatePropTranspiler'],
+        cubeNames: [],
+        cubeSymbols: {},
+      }]);
+
+      expect(res.map((r) => r.errors.length)).toEqual([0, 1, 0]);
+      expect(res[1].errors[0].message).toMatch(/Duplicate property parsing id/);
+
+      // The per-file call on the same worker, whose reporter now holds the error above
+      const single = await pool.exec('transpileJs', [{
+        ...file('fourth', "id: { sql: 'id', type: 'number' }"),
+        transpilers: ['CubeCheckDuplicatePropTranspiler'],
+        cubeNames: [],
+        cubeSymbols: {},
+      }]);
+      expect(single.errors).toEqual([]);
+
+      // The YAML call on the same worker gets only its own errors too
+      const yaml = await pool.exec('transpileYaml', [{
+        fileName: 'fifth.yml',
+        content: 'cubes:\n  - name: fifth\n    sql: select 1\n',
+        transpilers: [],
+        cubeNames: [],
+        cubeSymbols: {},
+      }]);
+      expect(yaml.errors).toEqual([]);
+    } finally {
+      await pool.terminate();
+    }
+  });
+
+  describe('worker bulk fallback', () => {
+    const model = (dimensions: string) => `
+      cube(\`orders\`, {
+        sql: 'select * from orders',
+        measures: { count: { type: 'count' } },
+        dimensions: { ${dimensions} },
+        joins: { customers: { relationship: 'many_to_one', sql: \`\${CUBE}.customer_id = \${customers.id}\` } }
+      })
+      cube(\`customers\`, {
+        sql: 'select * from customers',
+        dimensions: { id: { sql: 'id', type: 'number', primary_key: true } }
+      })
+    `;
+
+    // Pools the compiler creates answer transpileJsBulk with `bulk`; other calls reach the worker
+    const stubBulk = (bulk: (files: unknown[]) => Promise<unknown>) => {
+      const calls: number[] = [];
+      const { pool } = workerpool;
+      jest.spyOn(workerpool, 'pool').mockImplementation((...args: Parameters<typeof pool>) => {
+        const p = pool(...args);
+        const { exec } = p;
+        p.exec = ((method: string, params: any[]) => {
+          if (method !== 'transpileJsBulk') {
+            return exec.call(p, method, params);
+          }
+
+          calls.push(params[0].files.length);
+          return bulk(params[0].files);
+        }) as typeof p.exec;
+        return p;
+      });
+
+      return calls;
+    };
+
+    afterEach(() => jest.restoreAllMocks());
+
+    it.each([
+      ['a rejected chunk', () => Promise.reject(new Error('Worker terminated'))],
+      ['null entries', (files: unknown[]) => Promise.resolve(files.map(() => null))],
+    ])('retries each file alone after %s', async (_, bulk) => {
+      const calls = stubBulk(bulk);
+      const { compiler, cubeEvaluator } = prepareJsCompiler(model(
+        "id: { sql: 'id', type: 'number', primary_key: true }, status: { sql: 'status', type: 'string' }"
+      ));
+
+      await compiler.compile();
+
+      expect(calls.length).toBeGreaterThan(0);
+      expect(Object.keys(cubeEvaluator.cubeFromPath('orders').dimensions)).toEqual(['id', 'status']);
+      expect(cubeEvaluator.cubeFromPath('customers')).toBeDefined();
+    });
   });
 
   it('CubePropContextTranspiler', async () => {
