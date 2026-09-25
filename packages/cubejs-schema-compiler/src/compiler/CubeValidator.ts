@@ -1486,7 +1486,7 @@ export class CubeValidator implements CompilerInterface {
     };
     const fingerprint = definitionFingerprint(cube);
     let result: Joi.ValidationResult;
-    if (validDefinitions.has(fingerprint)) {
+    if (validDefinitions.get(fingerprint)) {
       result = { value: cube, error: undefined };
     } else {
       result = cube.isView ? viewSchema.validate(cube, options) : cubeSchema.validate(cube, options);

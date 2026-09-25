@@ -17,6 +17,7 @@ describe('transpileSimpleFString', () => {
     'f"{a.b.c}"',
     'f"x{a}"',
     'f"{a}x"',
+    'f"{x}.rf"',
     'f"multi\nline {CUBE}.x\n"',
     'f"$ {x}"',
     'f"100%"',
@@ -38,7 +39,6 @@ describe('transpileSimpleFString', () => {
     ['f"rf"', '`rf`;'],
     ['f"FR"', '`FR`;'],
     ['f"{x}f"', `\`\${x}f\`;`],
-    ['f"{x}.rf"', `\`\${x}.rf\`;`],
   ])('keeps the text the parser drops in %s', (code, expected) => {
     expect(babelGenerator(transpileSimpleFString(code)!).code).toEqual(expected);
   });
