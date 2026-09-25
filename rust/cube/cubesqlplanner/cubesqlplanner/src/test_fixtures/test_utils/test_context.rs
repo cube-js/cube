@@ -780,7 +780,14 @@ impl TestContext {
                             }
                         }
                     }
-                    let yaml = Self::build_pre_agg_query_yaml(pre_agg, &union_measures);
+                    let build_range = self
+                        .pre_agg_build_range(client, pre_agg.cube_name(), pre_agg.name())
+                        .await;
+                    let yaml = Self::build_pre_agg_query_yaml(
+                        pre_agg,
+                        &union_measures,
+                        build_range.as_ref(),
+                    );
                     let inlined_sql = self.build_pre_agg_table_sql(&yaml);
 
                     for table in &tables {
@@ -802,23 +809,14 @@ impl TestContext {
         let pa_ctx = Self::new_with_options(self.schema.clone(), Tz::UTC, None, None, false, false)
             .expect("Failed to create pre-agg context");
 
-        let (raw_sql, _) = pa_ctx
-            .build_sql_with_used_pre_aggregations(yaml)
-            .unwrap_or_else(|e| {
-                panic!(
-                    "Failed to build pre-agg SQL.\nQuery YAML:\n{}\nError: {}",
-                    yaml, e
-                )
-            });
-
-        let templates = pa_ctx
-            .query_tools
-            .plan_sql_templates(false)
-            .expect("Failed to get SQL templates");
-        let (sql, params) = pa_ctx
-            .query_tools
-            .build_sql_and_params(&raw_sql, &templates)
-            .expect("Failed to build pre-agg SQL and params");
+        // Planned and resolved in one context, so the params a build range
+        // allocates are the ones its placeholders refer to.
+        let (sql, params) = pa_ctx.build_sql_and_params(yaml).unwrap_or_else(|e| {
+            panic!(
+                "Failed to build pre-agg SQL.\nQuery YAML:\n{}\nError: {}",
+                yaml, e
+            )
+        });
         Self::inline_params(&sql, &params)
     }
 
@@ -861,8 +859,43 @@ impl TestContext {
         }
     }
 
+    /// The pre-aggregation's build range, evaluated the way the refresh does:
+    /// by running its `build_range_start` / `build_range_end` SQL. The table
+    /// is then built as one partition spanning that range.
     #[cfg(feature = "integration-postgres")]
-    fn build_pre_agg_query_yaml(pre_agg: &PreAggregation, measures: &[String]) -> String {
+    async fn pre_agg_build_range(
+        &self,
+        client: &tokio_postgres::Client,
+        cube_name: &str,
+        pre_agg_name: &str,
+    ) -> Option<(String, String)> {
+        let desc = self.schema.get_pre_aggregation(cube_name, pre_agg_name)?;
+        let (start_sql, end_sql) = desc.build_range()?;
+        let evaluate = |sql: &str| {
+            format!(
+                "SELECT to_char(v::timestamp, 'YYYY-MM-DD\"T\"HH24:MI:SS.MS') FROM ({}) AS r(v)",
+                sql
+            )
+        };
+        let mut bounds = Vec::new();
+        for sql in [start_sql, end_sql] {
+            let row = client
+                .query_one(&evaluate(sql), &[])
+                .await
+                .unwrap_or_else(|e| panic!("Failed to evaluate build range {}: {}", sql, e));
+            bounds.push(row.get::<_, String>(0));
+        }
+        let end = bounds.pop()?;
+        let start = bounds.pop()?;
+        Some((start, end))
+    }
+
+    #[cfg(feature = "integration-postgres")]
+    fn build_pre_agg_query_yaml(
+        pre_agg: &PreAggregation,
+        measures: &[String],
+        build_range: Option<&(String, String)>,
+    ) -> String {
         let mut yaml = String::new();
 
         if !measures.is_empty() {
@@ -905,6 +938,12 @@ impl TestContext {
                     }
                 } else {
                     yaml.push_str(&format!("  - dimension: {}\n", td.full_name()));
+                }
+                if let Some((start, end)) = build_range {
+                    yaml.push_str(&format!(
+                        "    dateRange:\n      - \"{}\"\n      - \"{}\"\n",
+                        start, end
+                    ));
                 }
             }
         }

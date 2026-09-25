@@ -281,3 +281,17 @@ cubes:
           - retail_calendar.retail_date_alt2
         time_dimension: retail_calendar.retail_date
         granularity: week
+
+      # Built for 2005-2006 only: a stored row's prior-year value comes from
+      # the year before its label, so the build reaches back to 2004.
+      - name: sales_prev_year_by_day_ranged
+        type: rollup
+        measures:
+          - amount
+          - amount_prev_year
+        dimensions:
+          - store
+        time_dimension: sale_date
+        granularity: day
+        build_range_start: "SELECT TIMESTAMP '2005-01-01'"
+        build_range_end: "SELECT TIMESTAMP '2006-12-31 23:59:59.999'"

@@ -332,6 +332,44 @@ async fn stored_shift_without_its_time_member_is_not_read() {
     }
 }
 
+/// A rollup built for a range holds the prior year of the labels in it,
+/// which is not the range's own amount. A query reading no `sale_date`
+/// applies no shift, so over that rollup the prior year must equal the
+/// amount it reads alongside, both limited to the built range.
+#[tokio::test(flavor = "multi_thread")]
+async fn stored_interval_shift_without_its_time_member_over_a_build_range() {
+    let query = indoc! {r#"
+        measures:
+          - sales.amount
+          - sales.amount_prev_year
+        dimensions:
+          - sales.store
+        order:
+          - id: sales.store
+    "#};
+    let with_rollup = ctx_with(&["sales_prev_year_by_day_ranged"]);
+    let Some(rollup) = with_rollup.try_execute_pg(query, SEED).await else {
+        return;
+    };
+    let source = ctx_with(&[]).try_execute_pg(query, SEED).await.unwrap();
+    for store in ["north", "south"] {
+        let amount = cell(&rollup, &[("sales__store", store)], "sales__amount");
+        assert_eq!(
+            cell(
+                &rollup,
+                &[("sales__store", store)],
+                "sales__amount_prev_year"
+            ),
+            amount
+        );
+        // The range did cut the rollup, or the check above proves nothing.
+        assert_ne!(
+            amount,
+            cell(&source, &[("sales__store", store)], "sales__amount")
+        );
+    }
+}
+
 /// The two proxies land a two-year shift together, which `retail_date_alt2`
 /// declares differently from `retail_date`, although both agree on one year.
 #[tokio::test(flavor = "multi_thread")]
