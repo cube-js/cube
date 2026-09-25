@@ -255,7 +255,7 @@ cube('Sql', {
   sql: 'select * from sql_cube',
 
   refreshKey: {
-    sql: 'SELECT MAX(updated_at) FROM sql_cube_refresh'
+    sql: 'SELECT MAX(updated_at) AS refresh_key FROM sql_cube_refresh'
   },
 
   measures: {
@@ -308,6 +308,10 @@ class MockDriver extends BaseDriver {
 
     let promise: any = Promise.resolve([query]);
     promise = promise.then((res) => new Promise(resolve => setTimeout(() => resolve(res), 150)));
+
+    if (query.includes('sql_cube_refresh')) {
+      promise = promise.then(() => [{ refresh_key: 'sql-key' }]);
+    }
 
     // Simulate query failure for backoff testing
     if (this.shouldFailQuery && this.failQueryPattern && query.match(this.failQueryPattern)) {
@@ -428,7 +432,7 @@ const setupScheduler = ({ repository, useOriginalSqlPreAggregations, skipAssertS
         queueOptions: () => ({
           concurrency: 2,
         }),
-        ...(refreshKeyRenewalThreshold && { refreshKeyRenewalThreshold }),
+        ...(refreshKeyRenewalThreshold !== undefined && { refreshKeyRenewalThreshold }),
       },
       preAggregationsOptions: {
         queueOptions: () => ({
@@ -1288,20 +1292,33 @@ describe('Refresh Scheduler', () => {
     const ctx = { authInfo: { tenantId: 'tenant1' }, securityContext: { tenantId: 'tenant1' }, requestId: 'local refresh key' };
 
     const runRefresh = async (refreshKeyRenewalThreshold?: number) => {
-      const { refreshScheduler, mockDriver } = setupScheduler({
+      const { refreshScheduler, mockDriver, serverCore, compilerApi } = setupScheduler({
         repository: repositoryWithRefreshKeys,
         refreshKeyRenewalThreshold,
       });
 
-      await refreshScheduler.runScheduledRefresh(ctx, {
-        concurrency: 1,
-        workerIndices: [0],
-        throwErrors: true,
-      });
+      const orchestrator = await serverCore.getOrchestratorApi(ctx);
+      const queryCache = orchestrator.getQueryOrchestrator().getQueryCache();
+      const intervalQuery = await compilerApi.getSql({ measures: ['Interval.count'], timezone: 'UTC' });
+      const intervalKeys = new Set<string>(intervalQuery.cacheKeyQueries.map(q => queryCache.refreshKeyCacheKey(q, intervalQuery.dataSource)));
+      const set = jest.spyOn(queryCache.getCacheDriver(), 'set');
+      let localEntries;
+
+      try {
+        await refreshScheduler.runScheduledRefresh(ctx, {
+          concurrency: 1,
+          workerIndices: [0],
+          throwErrors: true,
+          timezones: ['UTC'],
+        });
+        localEntries = set.mock.calls.filter(([key]) => intervalKeys.has(key));
+      } finally {
+        set.mockRestore();
+      }
 
       return {
-        // `every` keys render as `SELECT FLOOR(...) as refresh_key`, a `sql` key renders as itself
-        intervalKeyQueries: mockDriver.executedQueries.filter(q => q.match(/refresh_key/)),
+        localEntries,
+        intervalKeyQueries: mockDriver.executedQueries.filter(q => intervalQuery.cacheKeyQueries.some(([sql]) => sql === q)),
         sqlKeyQueries: mockDriver.executedQueries.filter(q => q.match(/sql_cube_refresh/)),
       };
     };
@@ -1313,21 +1330,23 @@ describe('Refresh Scheduler', () => {
       expect(sqlKeyQueries.length).toBeGreaterThan(0);
     });
 
-    test('skips interval keys that are evaluated locally', async () => {
+    test.each([undefined, 0])('skips uncached local interval keys (threshold=%s)', async threshold => {
       process.env.CUBEJS_REFRESH_KEY_LOCAL_TIME = 'true';
 
-      const { intervalKeyQueries, sqlKeyQueries } = await runRefresh();
+      const { intervalKeyQueries, sqlKeyQueries, localEntries } = await runRefresh(threshold);
 
+      expect(localEntries).toEqual([]);
       expect(intervalKeyQueries).toEqual([]);
       expect(sqlKeyQueries.length).toBeGreaterThan(0);
     });
 
-    test('keeps warming interval keys when refreshKeyRenewalThreshold vetoes local evaluation', async () => {
+    test('warms local refresh key entries without SQL when refreshKeyRenewalThreshold is set', async () => {
       process.env.CUBEJS_REFRESH_KEY_LOCAL_TIME = 'true';
 
-      const { intervalKeyQueries, sqlKeyQueries } = await runRefresh(120);
+      const { intervalKeyQueries, sqlKeyQueries, localEntries } = await runRefresh(120);
 
-      expect(intervalKeyQueries.length).toBeGreaterThan(0);
+      expect(localEntries.length).toBeGreaterThan(0);
+      expect(intervalKeyQueries).toEqual([]);
       expect(sqlKeyQueries.length).toBeGreaterThan(0);
     });
   });
