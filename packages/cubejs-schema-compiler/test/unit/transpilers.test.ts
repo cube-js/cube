@@ -85,6 +85,60 @@ describe('Transpilers', () => {
     }
   });
 
+  describe('worker bulk fallback', () => {
+    const model = (dimensions: string) => `
+      cube(\`orders\`, {
+        sql: 'select * from orders',
+        measures: { count: { type: 'count' } },
+        dimensions: { ${dimensions} },
+        joins: { customers: { relationship: 'many_to_one', sql: \`\${CUBE}.customer_id = \${customers.id}\` } }
+      })
+      cube(\`customers\`, {
+        sql: 'select * from customers',
+        dimensions: { id: { sql: 'id', type: 'number', primary_key: true } }
+      })
+    `;
+
+    // Pools the compiler creates answer transpileJsBulk with `bulk`; other calls reach the worker
+    const stubBulk = (bulk: (files: unknown[]) => Promise<unknown>) => {
+      const calls: number[] = [];
+      const { pool } = workerpool;
+      jest.spyOn(workerpool, 'pool').mockImplementation((...args: Parameters<typeof pool>) => {
+        const p = pool(...args);
+        const { exec } = p;
+        p.exec = ((method: string, params: any[]) => {
+          if (method !== 'transpileJsBulk') {
+            return exec.call(p, method, params);
+          }
+
+          calls.push(params[0].files.length);
+          return bulk(params[0].files);
+        }) as typeof p.exec;
+        return p;
+      });
+
+      return calls;
+    };
+
+    afterEach(() => jest.restoreAllMocks());
+
+    it.each([
+      ['a rejected chunk', () => Promise.reject(new Error('Worker terminated'))],
+      ['null entries', (files: unknown[]) => Promise.resolve(files.map(() => null))],
+    ])('retries each file alone after %s', async (_, bulk) => {
+      const calls = stubBulk(bulk);
+      const { compiler, cubeEvaluator } = prepareJsCompiler(model(
+        "id: { sql: 'id', type: 'number', primary_key: true }, status: { sql: 'status', type: 'string' }"
+      ));
+
+      await compiler.compile();
+
+      expect(calls.length).toBeGreaterThan(0);
+      expect(Object.keys(cubeEvaluator.cubeFromPath('orders').dimensions)).toEqual(['id', 'status']);
+      expect(cubeEvaluator.cubeFromPath('customers')).toBeDefined();
+    });
+  });
+
   it('CubePropContextTranspiler', async () => {
     const { compiler } = prepareJsCompiler(`
         let { securityContext } = COMPILE_CONTEXT;
