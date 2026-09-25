@@ -357,7 +357,7 @@ export class RefreshScheduler {
       }
 
       // Without a threshold, local keys have no entry to warm. With a threshold, warm the
-      // shared entry as for SQL keys; its value is computed locally inside the queue.
+      // shared entry as for SQL keys; its value is computed locally without the queue.
       const sqlRefreshKey = !!cubeFromPath.refreshKey && 'sql' in cubeFromPath.refreshKey;
       if (uncachedLocalRefreshKey && !sqlRefreshKey) {
         return;

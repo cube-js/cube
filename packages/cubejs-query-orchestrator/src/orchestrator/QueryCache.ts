@@ -39,7 +39,7 @@ import { CacheAndQueryDriverType, MetadataOperationType } from './QueryOrchestra
 export const REFRESH_KEY_CACHE_TTL = 60 * 60;
 
 export type CacheQueryResultOptions = {
-  /** Compute this refresh key inside the queue instead of executing its SQL. */
+  /** Compute this refresh key directly instead of executing its SQL. */
   localRefreshKey?: LocalRefreshKeyDescriptor,
   renewalThreshold?: number,
   renewalKey?: any,
@@ -524,7 +524,7 @@ export class QueryCache {
     }
 
     // An explicit threshold retains the shared entry and the SQL path's TTL and renewal rules.
-    // The queue evaluates the local descriptor only when a miss or renewal needs a new value.
+    // Local evaluation bypasses queue slots and deduplication so it cannot wait behind SQL.
     return this.cacheQueryResult(query, values, cacheKey, expiration, {
       ...options,
       localRefreshKey,
@@ -606,9 +606,7 @@ export class QueryCache {
       lambdaTypes,
       persistent,
       aliasNameToMember,
-      localRefreshKey,
     }: {
-      localRefreshKey?: LocalRefreshKeyDescriptor,
       cacheKey: CacheKey,
       dataSource: string,
       external: boolean,
@@ -628,7 +626,6 @@ export class QueryCache {
 
     const _query = {
       queryKey: cacheKey,
-      localRefreshKey,
       query,
       values,
       requestId,
@@ -797,10 +794,6 @@ export class QueryCache {
           }
         },
         query: async (req, setCancelHandle) => {
-          if (isValidLocalRefreshKey(req.localRefreshKey)) {
-            return evaluateLocalRefreshKey(req.localRefreshKey);
-          }
-
           const client = await clientFactory();
 
           const resultPromise = executeFn(client, req);
@@ -1136,18 +1129,21 @@ export class QueryCache {
   ) {
     const { cacheKey, redisKey, renewalKey, expiration, spanId, options } = ctx;
 
-    return this.queryWithRetryAndRelease(query, values, {
-      cacheKey,
-      localRefreshKey: options.localRefreshKey,
-      priority: options.priority,
-      external: options.external,
-      requestId: options.requestId,
-      spanId,
-      persistent: options.persistent,
-      dataSource: options.dataSource,
-      useCsvQuery: options.useCsvQuery,
-      lambdaTypes: options.lambdaTypes,
-    }).then(res => {
+    const result = isValidLocalRefreshKey(options.localRefreshKey)
+      ? Promise.resolve(evaluateLocalRefreshKey(options.localRefreshKey))
+      : this.queryWithRetryAndRelease(query, values, {
+        cacheKey,
+        priority: options.priority,
+        external: options.external,
+        requestId: options.requestId,
+        spanId,
+        persistent: options.persistent,
+        dataSource: options.dataSource,
+        useCsvQuery: options.useCsvQuery,
+        lambdaTypes: options.lambdaTypes,
+      });
+
+    return result.then(res => {
       const entry = {
         time: (new Date()).getTime(),
         result: res,

@@ -45,13 +45,7 @@ export const QueryCacheTest = (name: string, options: QueryCacheTestOptions) => 
       }
     });
 
-    describe('cached local refresh key queue execution', () => {
-      const deferred = () => {
-        let resolve: () => void;
-        const promise = new Promise<void>(done => { resolve = done; });
-        return { promise, resolve: () => resolve() };
-      };
-
+    describe('cached local refresh key evaluation', () => {
       const caches: QueryCache[] = [];
       const descriptor = { interval: 600, utcOffset: 0, dayOffset: 0 };
       const sql = 'SELECT FLOOR(UNIX_TIMESTAMP() / 600) as refresh_key';
@@ -59,7 +53,7 @@ export const QueryCacheTest = (name: string, options: QueryCacheTestOptions) => 
         const factory = jest.fn(async () => {
           throw new Error('local refresh keys must not create a database client');
         });
-        const cache = new QueryCache(prefix, factory, logger, {
+        const localCache = new QueryCache(prefix, factory, logger, {
           ...options,
           localRefreshKey: true,
           refreshKeyRenewalThreshold: 86400,
@@ -67,12 +61,12 @@ export const QueryCacheTest = (name: string, options: QueryCacheTestOptions) => 
           externalQueueOptions: { concurrency: 1 },
           externalDriverFactory: factory,
         });
-        caches.push(cache);
-        return { cache, factory };
+        caches.push(localCache);
+        return { cache: localCache, factory };
       };
       afterEach(async () => {
         jest.restoreAllMocks();
-        await Promise.all(caches.splice(0).map(cache => cache.cleanup()));
+        await Promise.all(caches.splice(0).map(localCache => localCache.cleanup()));
       });
 
       test.each([false, true])('shares a cached local result without a database client (external=%s)', async external => {
@@ -90,49 +84,45 @@ export const QueryCacheTest = (name: string, options: QueryCacheTestOptions) => 
         expect(second.factory).not.toHaveBeenCalled();
       });
 
-      test.each([false, true])('deduplicates concurrent misses across instances and evaluates at execution (external=%s)', async external => {
-        const prefix = crypto.randomBytes(16).toString('hex');
-        const enqueued = deferred();
-        const first = make(prefix);
-        const second = make(prefix, jest.fn((message) => {
-          if (message === 'Waiting for query') enqueued.resolve();
-        }));
-        const firstQueue = external ? first.cache.getExternalQueue() : await first.cache.getQueue('default');
-        const secondQueue = external ? second.cache.getExternalQueue() : await second.cache.getQueue('default');
-        const entered = deferred();
-        const release = deferred();
-        const hold = queue => {
-          const handler = queue['queryHandlers'].query;
-          return jest.spyOn(queue['queryHandlers'], 'query').mockImplementation(async (...args: any[]) => {
-            entered.resolve();
-            await release.promise;
-            return handler(...args);
-          });
-        };
-        const firstHandler = hold(firstQueue);
-        const secondHandler = hold(secondQueue);
+      test.each([
+        { external: false, renew: false },
+        { external: true, renew: false },
+        { external: false, renew: true },
+        { external: true, renew: true },
+      ])('evaluates without a queue on a miss or renewal (external=$external, renew=$renew)', async ({ external, renew }) => {
+        const logger = jest.fn();
+        const { cache: localCache, factory } = make(undefined, logger);
+        const noQueue = () => { throw new Error('local refresh keys must not use a queue'); };
+        const sourceQueue = jest.spyOn(localCache, 'getQueue').mockImplementation(noQueue);
+        const externalQueue = jest.spyOn(localCache, 'getExternalQueue').mockImplementation(noQueue);
+        const execute = jest.spyOn(localCache, 'queryWithRetryAndRelease').mockImplementation(noQueue);
         const q: QueryWithParams = [sql, [], { external, localRefreshKey: descriptor }];
-        const now = Date.now();
-        const nextBoundary = Math.ceil(now / 600000) * 600000;
-        const clock = jest.spyOn(Date, 'now').mockReturnValue(nextBoundary - 1);
-        const firstResult = first.cache.cacheRefreshKeyResult(q, 3600, { dataSource: 'default', waitForRenew: true });
-        let secondResult: ReturnType<QueryCache['cacheRefreshKeyResult']> | undefined;
-        try {
-          await entered.promise;
-          secondResult = second.cache.cacheRefreshKeyResult(q, 86400, { dataSource: 'default', waitForRenew: true });
-          await enqueued.promise;
-          clock.mockReturnValue(nextBoundary);
-          release.resolve();
-          const values = await Promise.all([firstResult, secondResult]);
-          expect(values).toEqual([evaluateLocalRefreshKey(descriptor, nextBoundary), evaluateLocalRefreshKey(descriptor, nextBoundary)]);
-          expect(firstHandler.mock.calls.length + secondHandler.mock.calls.length).toBe(1);
-          expect(first.factory).not.toHaveBeenCalled();
-          expect(second.factory).not.toHaveBeenCalled();
-        } finally {
-          release.resolve();
-          await Promise.allSettled([firstResult, secondResult]);
-          clock.mockRestore();
+        const key = localCache.refreshKeyCacheKey(q, 'default');
+        if (renew) {
+          await localCache.getCacheDriver().set(key, {
+            time: Date.now() - 86400 * 1000 - 1,
+            result: [{ refresh_key: 'stale' }],
+            renewalKey: key,
+          }, 864000);
         }
+        const before = evaluateLocalRefreshKey(descriptor);
+        const value = await localCache.cacheRefreshKeyResult(q, 3600, {
+          dataSource: 'default', waitForRenew: true, requestId: 'local-refresh',
+        });
+        expect([before, evaluateLocalRefreshKey(descriptor)]).toContainEqual(value);
+        expect(await localCache.getCacheDriver().get(key)).toMatchObject({
+          result: value, renewalKey: key, requestId: 'local-refresh',
+        });
+        expect(sourceQueue).not.toHaveBeenCalled();
+        expect(externalQueue).not.toHaveBeenCalled();
+        expect(execute).not.toHaveBeenCalled();
+        expect(factory).not.toHaveBeenCalled();
+        expect(logger).toHaveBeenCalledWith('Renewed', expect.objectContaining({
+          requestId: 'local-refresh', spanId: expect.any(String),
+        }));
+        expect(logger).toHaveBeenCalledWith('Outgoing network usage', expect.objectContaining({
+          service: 'cache', requestId: 'local-refresh', spanId: expect.any(String), bytes: expect.any(Number),
+        }));
       });
     });
 
@@ -668,8 +658,7 @@ export const QueryCacheTest = (name: string, options: QueryCacheTestOptions) => 
       ) => {
         const localCache = newCache(additionalOptions);
         const spy = jest.spyOn(localCache, 'queryWithRetryAndRelease')
-          .mockImplementation(async (_query, _values, opts) => (opts.localRefreshKey
-            ? evaluateLocalRefreshKey(opts.localRefreshKey) : [{ refresh_key: 12345 }]));
+          .mockImplementation(async () => [{ refresh_key: 12345 }]);
 
         try {
           const [result] = await Promise.all(
@@ -682,8 +671,7 @@ export const QueryCacheTest = (name: string, options: QueryCacheTestOptions) => 
 
           return {
             result,
-            executed: spy.mock.calls.filter(([, , opts]) => !opts.localRefreshKey).length,
-            queued: spy.mock.calls.length,
+            executed: spy.mock.calls.length,
             logged: localCache.logger.mock.calls,
           };
         } finally {
@@ -732,14 +720,14 @@ export const QueryCacheTest = (name: string, options: QueryCacheTestOptions) => 
 
       it('caches a locally computed value under a threshold without executing SQL', async () => {
         const nowSpy = jest.spyOn(Date, 'now').mockReturnValue(97_800_000);
+
         try {
-          const { result, executed, queued } = await loadRefreshKey(
+          const { result, executed } = await loadRefreshKey(
             { external: true, renewalThreshold: 60, localRefreshKey: descriptor },
             { localRefreshKey: true, refreshKeyRenewalThreshold: 86400 },
           );
           expect(result).toEqual([{ refresh_key: '163' }]);
           expect(executed).toBe(0);
-          expect(queued).toBe(1);
         } finally {
           nowSpy.mockRestore();
         }
@@ -834,6 +822,7 @@ export const QueryCacheTest = (name: string, options: QueryCacheTestOptions) => 
           { localRefreshKey: true, refreshKeyRenewalThreshold: 86400 },
           localCache => {
             const nowSpy = jest.spyOn(Date, 'now').mockReturnValue(97_800_000);
+
             try {
               expect(localCache.localRefreshKeyResult(queryOptions(descriptor)))
                 .toEqual([{ refresh_key: '163' }]);

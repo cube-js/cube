@@ -1538,7 +1538,9 @@ database, since their values depend on your data and not just on the time.
 
 [`queryCacheOptions.refreshKeyRenewalThreshold`][ref-config-query-cache-options] is still
 honoured: when set, the locally computed value uses the same shared cache, expiration,
-renewal rules, and queue as the SQL result. Scheduled refresh still warms these entries,
+and renewal rules as the SQL result. Local computation bypasses the SQL queue, so cache
+misses and renewals do not wait for running SQL queries. Concurrent local computations
+are not deduplicated across instances. Scheduled refresh still warms these entries,
 without querying the database for the time. Without an override, local keys are computed
 directly from the current time without a cache entry.
 
