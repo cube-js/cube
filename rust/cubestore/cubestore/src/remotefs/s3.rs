@@ -159,13 +159,11 @@ fn new_bucket(
     Ok(bucket)
 }
 
-/// Headroom kept on top of one poll interval, so a refresh never starts with a
-/// nearly-dead session token.
-const WEB_IDENTITY_EXPIRY_MARGIN: Duration = Duration::from_secs(5 * 60);
+const WEB_IDENTITY_EXPIRY_HEADROOM: Duration = Duration::from_secs(5 * 60);
 
 /// The next wake-up is the last chance to react, so one poll plus the headroom.
 fn web_identity_expiry_margin(refresh_every: Duration) -> Duration {
-    refresh_every + WEB_IDENTITY_EXPIRY_MARGIN
+    refresh_every + WEB_IDENTITY_EXPIRY_HEADROOM
 }
 
 fn credentials_expiration(credentials: &Credentials) -> Option<SystemTime> {
@@ -687,7 +685,7 @@ mod tests {
                 &state,
                 state.token_file_modified,
                 now(),
-                WEB_IDENTITY_EXPIRY_MARGIN
+                WEB_IDENTITY_EXPIRY_HEADROOM
             ),
             None
         );
@@ -698,7 +696,7 @@ mod tests {
         let state = fresh_state();
         let touched = Some(SystemTime::UNIX_EPOCH + TOKEN_FILE_MTIME + Duration::from_secs(1));
         assert!(
-            web_identity_refresh_reason(&state, touched, now(), WEB_IDENTITY_EXPIRY_MARGIN)
+            web_identity_refresh_reason(&state, touched, now(), WEB_IDENTITY_EXPIRY_HEADROOM)
                 .is_some()
         );
     }
@@ -713,7 +711,7 @@ mod tests {
             &state,
             state.token_file_modified,
             now(),
-            WEB_IDENTITY_EXPIRY_MARGIN
+            WEB_IDENTITY_EXPIRY_HEADROOM
         )
         .is_some());
     }
@@ -728,7 +726,7 @@ mod tests {
             &state,
             state.token_file_modified,
             now(),
-            WEB_IDENTITY_EXPIRY_MARGIN
+            WEB_IDENTITY_EXPIRY_HEADROOM
         )
         .is_some());
     }
@@ -737,14 +735,14 @@ mod tests {
     fn refresh_needed_when_expiry_is_unknown() {
         let state = WebIdentityCredsState {
             expiration: None,
-            last_attempted: now() - WEB_IDENTITY_EXPIRY_MARGIN,
+            last_attempted: now() - WEB_IDENTITY_EXPIRY_HEADROOM,
             ..fresh_state()
         };
         assert!(web_identity_refresh_reason(
             &state,
             state.token_file_modified,
             now(),
-            WEB_IDENTITY_EXPIRY_MARGIN
+            WEB_IDENTITY_EXPIRY_HEADROOM
         )
         .is_some());
     }
@@ -761,7 +759,7 @@ mod tests {
                 &state,
                 state.token_file_modified,
                 now(),
-                WEB_IDENTITY_EXPIRY_MARGIN
+                WEB_IDENTITY_EXPIRY_HEADROOM
             ),
             None
         );
@@ -825,7 +823,8 @@ mod tests {
         // An unreadable token file reads as "no mtime", not as "unchanged".
         let state = fresh_state();
         assert!(
-            web_identity_refresh_reason(&state, None, now(), WEB_IDENTITY_EXPIRY_MARGIN).is_some()
+            web_identity_refresh_reason(&state, None, now(), WEB_IDENTITY_EXPIRY_HEADROOM)
+                .is_some()
         );
     }
 
@@ -857,10 +856,10 @@ mod tests {
     #[test]
     fn margin_keeps_full_headroom_on_top_of_a_poll_interval() {
         // The margin must not collapse to the poll interval.
-        let poll_every = WEB_IDENTITY_EXPIRY_MARGIN;
+        let poll_every = WEB_IDENTITY_EXPIRY_HEADROOM;
         let margin = web_identity_expiry_margin(poll_every);
         let state = WebIdentityCredsState {
-            expiration: Some(now() + poll_every + WEB_IDENTITY_EXPIRY_MARGIN),
+            expiration: Some(now() + poll_every + WEB_IDENTITY_EXPIRY_HEADROOM),
             ..fresh_state()
         };
         assert!(
