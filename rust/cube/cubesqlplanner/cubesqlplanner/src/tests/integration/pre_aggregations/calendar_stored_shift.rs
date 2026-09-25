@@ -292,6 +292,63 @@ async fn stored_named_shift_resolved_differently_by_a_stored_member_falls_back()
     }
 }
 
+/// Without a time member of the calendar the query applies no shift at all,
+/// while the build mapped every stored row through the calendar, so the
+/// stored shifted column must not be read. The unshifted leaves still are.
+#[tokio::test(flavor = "multi_thread")]
+async fn stored_calendar_shift_without_a_calendar_member_is_not_read() {
+    for (measure, pre_agg) in [
+        ("amount_ly", "sales_ly_by_week"),
+        ("amount_ly_named", "sales_ly_named_by_week"),
+    ] {
+        let query = format!(
+            indoc! {r#"
+                measures:
+                  - sales.amount
+                  - sales.{}
+                dimensions:
+                  - sales.store
+                order:
+                  - id: sales.store
+            "#},
+            measure
+        );
+        let with_rollup = ctx_with(&[pre_agg]);
+        let (sql, _) = with_rollup
+            .build_sql_with_used_pre_aggregations(&query)
+            .unwrap();
+        assert!(
+            !sql.contains(&format!("sum(\"sales__{}\")", measure)),
+            "expected the stored shifted column to stay unread; SQL:\n{}",
+            sql
+        );
+        let Some(rollup) = with_rollup.try_execute_pg(&query, SEED).await else {
+            return;
+        };
+        let source = ctx_with(&[]).try_execute_pg(&query, SEED).await.unwrap();
+        assert_eq!(rollup, source);
+    }
+}
+
+/// The two proxies land a two-year shift together, which `retail_date_alt2`
+/// declares differently from `retail_date`, although both agree on one year.
+#[tokio::test(flavor = "multi_thread")]
+async fn composed_shift_resolved_differently_by_a_stored_member_falls_back() {
+    let query = indoc! {r#"
+        measures:
+          - sales.amount
+          - sales.amount_2ly
+        time_dimensions:
+          - dimension: retail_calendar.retail_date
+            granularity: week
+        order:
+          - id: retail_calendar.retail_date
+    "#};
+    if let Some((rollup, source)) = fallback_vs_source(query, "sales_2ly_by_week_with_alt2").await {
+        assert_eq!(rollup, source);
+    }
+}
+
 /// An expression over the shifted measure is not a proxy of it, so it is
 /// served only at the grain it was stored at.
 #[tokio::test(flavor = "multi_thread")]

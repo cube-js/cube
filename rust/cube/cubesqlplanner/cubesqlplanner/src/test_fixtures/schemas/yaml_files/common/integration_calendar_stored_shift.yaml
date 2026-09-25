@@ -32,6 +32,9 @@ cubes:
           - interval: 1 year
             type: prior
             sql: "{CUBE}.prev_year_date"
+          - interval: 2 year
+            type: prior
+            sql: "{CUBE}.prev_year_date - interval '1 year'"
           - name: prior_year
             sql: "{CUBE}.prev_year_date"
 
@@ -42,6 +45,18 @@ cubes:
         time_shift:
           - name: prior_year
             sql: "{CUBE}.date_val - interval '1 year'"
+
+      # Agrees with `retail_date` on one year back, not on two.
+      - name: retail_date_alt2
+        sql: "{CUBE}.date_val"
+        type: time
+        time_shift:
+          - interval: 1 year
+            type: prior
+            sql: "{CUBE}.prev_year_date"
+          - interval: 2 year
+            type: prior
+            sql: "{CUBE}.date_val - interval '2 year'"
 
       - name: retail_year
         sql: "{CUBE}.retail_year"
@@ -138,6 +153,15 @@ cubes:
         type: number
         multi_stage: true
         sql: "{amount}"
+        time_shift:
+          - interval: 1 year
+            type: prior
+
+      # A proxy of a proxy: the planner composes both shifts into two years.
+      - name: amount_2ly
+        type: number
+        multi_stage: true
+        sql: "{amount_ly}"
         time_shift:
           - interval: 1 year
             type: prior
@@ -245,3 +269,15 @@ cubes:
           - store
         time_dimension: sale_date
         granularity: day
+
+      # The build lands the composed shift on `retail_date_alt2` too.
+      - name: sales_2ly_by_week_with_alt2
+        type: rollup
+        measures:
+          - amount
+          - amount_2ly
+        dimensions:
+          - store
+          - retail_calendar.retail_date_alt2
+        time_dimension: retail_calendar.retail_date
+        granularity: week
