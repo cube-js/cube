@@ -11,9 +11,7 @@ use crate::planner::multi_fact_join_groups::{MeasuresJoinHints, MultiFactJoinGro
 use crate::planner::planners::multi_stage::TimeShiftState;
 use crate::planner::planners::CommonUtils;
 use crate::planner::state::State;
-use crate::planner::symbols::{
-    CalendarDimensionTimeShift, DimensionSymbol, MeasureSymbol, MeasureTimeShifts,
-};
+use crate::planner::symbols::MeasureTimeShifts;
 use crate::planner::time_dimension::QueryDateTime;
 use crate::planner::MemberSymbol;
 use cubenativeutils::CubeError;
@@ -60,12 +58,6 @@ enum MultiStageMatch {
     // Every stage matched, but the matches span both external types, so no one
     // query can read them all.
     ExternalTypesSplit,
-}
-
-enum ComposedShift {
-    None,
-    Shift(MeasureTimeShifts),
-    Unsupported,
 }
 
 pub struct PreAggregationOptimizer {
@@ -629,124 +621,21 @@ impl PreAggregationOptimizer {
                 .all(|measure| !time_shifts.has_shift_under(measure))
     }
 
-    // A stored shift stands for the query's only where both sides land it
-    // alike: the query reads every stored time member the build shifted and
-    // reaches the same calendars, which resolve it to the same declaration.
+    // A shift lands only on the time members a query reads: named and common
+    // shifts on all of them, a dimension shift on those it lists. Dropping a
+    // stored member the build shifted would drop part of the stored shift.
     fn stored_shifts_carry_over(
         pre_aggregation: &CompiledPreAggregation,
         matched_measures: &HashSet<String>,
         schema: &LogicalSchema,
         filter: &LogicalFilter,
     ) -> Result<bool, CubeError> {
-        let read = Self::read_member_names(schema, filter);
-        let mut shifts = Vec::new();
-        for stored in pre_aggregation
-            .measures
-            .iter()
-            .filter(|m| matched_measures.contains(&m.full_name()))
-        {
-            let measure = stored.as_measure()?;
-            if !Self::shifted_members_are_read(pre_aggregation, &measure, &read)? {
-                return Ok(false);
-            }
-            match Self::composed_calendar_shift(&measure)? {
-                ComposedShift::None => {}
-                ComposedShift::Unsupported => return Ok(false),
-                ComposedShift::Shift(shift) => shifts.push(shift),
-            }
-        }
-        if shifts.is_empty() {
-            return Ok(true);
-        }
-
-        let stored_members: Vec<Rc<MemberSymbol>> = pre_aggregation
-            .time_dimensions
-            .iter()
-            .chain(pre_aggregation.dimensions.iter())
-            .cloned()
-            .collect();
-        let mut read_members: Vec<Rc<MemberSymbol>> = schema
-            .dimensions
-            .iter()
-            .chain(schema.time_dimensions.iter())
-            .cloned()
-            .collect();
-        for item in filter
-            .dimensions_filters
-            .iter()
-            .chain(filter.time_dimensions_filters.iter())
-        {
-            item.find_all_member_evaluators(&mut read_members);
-        }
-        let stored = Self::calendar_time_dimensions(&stored_members);
-        let read = Self::calendar_time_dimensions(&read_members);
-        let calendars = |dimensions: &[(String, Rc<DimensionSymbol>)]| {
-            dimensions
-                .iter()
-                .map(|(pk, _)| pk.clone())
-                .collect::<HashSet<_>>()
-        };
-        if calendars(&stored) != calendars(&read) {
-            return Ok(false);
-        }
-
-        for shift in shifts {
-            let mut resolved: HashMap<&String, Option<CalendarDimensionTimeShift>> = HashMap::new();
-            for (pk, dimension) in stored.iter().chain(read.iter()) {
-                let declaration = match &shift {
-                    MeasureTimeShifts::Named(name) => {
-                        dimension.calendar_time_shift_for_named_interval(name)
-                    }
-                    MeasureTimeShifts::Common(interval) => {
-                        dimension.calendar_time_shift_for_interval(interval)
-                    }
-                    MeasureTimeShifts::Dimensions(_) => None,
-                }
-                .map(|(_, declaration)| declaration);
-                match resolved.get(pk) {
-                    Some(seen) if !Self::same_calendar_shift(seen, &declaration) => {
-                        return Ok(false);
-                    }
-                    Some(_) => {}
-                    None => {
-                        resolved.insert(pk, declaration);
-                    }
-                }
-            }
-        }
-        Ok(true)
-    }
-
-    // The build lands a named or common shift on every stored time member and
-    // a dimension shift on the members it lists; a query lands either only on
-    // the members it reads.
-    fn shifted_members_are_read(
-        pre_aggregation: &CompiledPreAggregation,
-        measure: &Rc<MeasureSymbol>,
-        read: &HashSet<String>,
-    ) -> Result<bool, CubeError> {
         let base_name = |member: &Rc<MemberSymbol>| {
             resolve_base_symbol(member)
                 .resolve_reference_chain()
                 .full_name()
         };
-        let mut on_every_member = false;
-        let mut targets = HashSet::new();
-        let mut measure = measure.clone();
-        loop {
-            match measure.time_shift() {
-                Some(MeasureTimeShifts::Dimensions(shifts)) => {
-                    targets.extend(shifts.iter().map(|shift| base_name(&shift.dimension)))
-                }
-                Some(_) => on_every_member = true,
-                None => {}
-            }
-            match measure.time_shift_proxy_target() {
-                Some(target) => measure = target.as_measure()?,
-                None => break,
-            }
-        }
-        Ok(pre_aggregation
+        let stored_time_members: Vec<String> = pre_aggregation
             .time_dimensions
             .iter()
             .chain(pre_aggregation.dimensions.iter())
@@ -757,70 +646,39 @@ impl PreAggregationOptimizer {
                     .is_ok_and(|dimension| dimension.is_time())
             })
             .map(base_name)
-            .filter(|name| on_every_member || targets.contains(name))
-            .all(|name| read.contains(&name)))
-    }
+            .collect();
+        let read = Self::read_member_names(schema, filter);
 
-    // The named or common shift a stored measure's chain of proxies lands on
-    // every time member: common intervals add up, as the planner composes
-    // them; anything else mixed into one chain is left unresolved.
-    fn composed_calendar_shift(measure: &Rc<MeasureSymbol>) -> Result<ComposedShift, CubeError> {
-        let mut composed = ComposedShift::None;
-        let mut measure = measure.clone();
-        loop {
-            composed = match (composed, measure.time_shift()) {
-                (composed, None) => composed,
-                (ComposedShift::None, Some(MeasureTimeShifts::Dimensions(_))) => {
-                    ComposedShift::None
-                }
-                (ComposedShift::None, Some(shift)) => ComposedShift::Shift(shift.clone()),
-                (
-                    ComposedShift::Shift(MeasureTimeShifts::Common(total)),
-                    Some(MeasureTimeShifts::Common(interval)),
-                ) => ComposedShift::Shift(MeasureTimeShifts::Common(total + interval.clone())),
-                _ => return Ok(ComposedShift::Unsupported),
-            };
-            match measure.time_shift_proxy_target() {
-                Some(target) => measure = target.as_measure()?,
-                None => return Ok(composed),
-            }
-        }
-    }
-
-    fn calendar_time_dimensions(
-        members: &[Rc<MemberSymbol>],
-    ) -> Vec<(String, Rc<DimensionSymbol>)> {
-        members
+        for stored in pre_aggregation
+            .measures
             .iter()
-            .filter_map(|member| {
-                let base = match member.as_time_dimension() {
-                    Ok(time_dimension) => time_dimension.base_symbol().clone(),
-                    Err(_) => member.clone(),
-                };
-                let dimension = base.resolve_reference_chain().as_dimension().ok()?;
-                let pk = dimension.time_shift_pk_full_name()?;
-                dimension.is_time().then_some((pk, dimension))
-            })
-            .collect()
-    }
-
-    fn same_calendar_shift(
-        a: &Option<CalendarDimensionTimeShift>,
-        b: &Option<CalendarDimensionTimeShift>,
-    ) -> bool {
-        match (a, b) {
-            (None, None) => true,
-            (Some(a), Some(b)) => {
-                a.interval == b.interval
-                    && a.name == b.name
-                    && match (&a.sql, &b.sql) {
-                        (None, None) => true,
-                        (Some(a), Some(b)) => a.struct_eq(b),
-                        _ => false,
+            .filter(|m| matched_measures.contains(&m.full_name()))
+        {
+            let mut on_every_member = false;
+            let mut targets = HashSet::new();
+            let mut measure = stored.as_measure()?;
+            loop {
+                match measure.time_shift() {
+                    Some(MeasureTimeShifts::Dimensions(shifts)) => {
+                        targets.extend(shifts.iter().map(|shift| base_name(&shift.dimension)))
                     }
+                    Some(_) => on_every_member = true,
+                    None => {}
+                }
+                match measure.time_shift_proxy_target() {
+                    Some(target) => measure = target.as_measure()?,
+                    None => break,
+                }
             }
-            _ => false,
+            if stored_time_members
+                .iter()
+                .filter(|name| on_every_member || targets.contains(*name))
+                .any(|name| !read.contains(name))
+            {
+                return Ok(false);
+            }
         }
+        Ok(true)
     }
 
     fn extract_date_range(
