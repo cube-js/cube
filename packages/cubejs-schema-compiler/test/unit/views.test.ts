@@ -560,6 +560,57 @@ describe('Views YAML', () => {
     ]);
   });
 
+  it('join_path through a join whose name collides with a dimension of the previous cube (issue #10371)', async () => {
+    const { compiler, cubeEvaluator } = prepareYamlCompiler(`
+      cubes:
+        - name: test
+          sql_table: test
+          dimensions:
+            - name: id
+              sql: id
+              type: string
+              primary_key: true
+            - name: test2
+              sql: test2
+              type: string
+          joins:
+            - name: test2
+              relationship: many_to_one
+              sql: "{CUBE.test2} = {test2.id}"
+
+        - name: test2
+          sql_table: test2
+          dimensions:
+            - name: id
+              sql: id
+              type: string
+              primary_key: true
+            - name: name
+              sql: name
+              type: string
+
+      views:
+        - name: v_test
+          cubes:
+            - join_path: test
+              prefix: true
+              includes:
+                - id
+            - join_path: test.test2
+              prefix: true
+              includes:
+                - name
+`);
+
+    await compiler.compile();
+
+    const viewDef = cubeEvaluator.getCubeDefinition('v_test');
+
+    expect(Object.keys(viewDef.dimensions!).sort()).toEqual([
+      'test2_name', 'test_id'
+    ]);
+  });
+
   it('throws error for unresolved members', async () => {
     const { compiler } = prepareYamlCompiler(`
       cubes:
