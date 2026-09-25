@@ -130,6 +130,10 @@ API — for example, an internal LLM gateway.
 
 - **Model** and **base URL** are free text; the base URL must use `http` or
   `https` and may not target a loopback or link-local host
+- The base URL is the API root, including the version segment: requests go
+  to `<base URL>/chat/completions`, so use e.g. `https://gateway.acme.com/v1`
+- The same model serves every request an agent makes, including lightweight
+  background calls that built-in models route to a smaller model
 - **API key** is optional — leave it blank if your endpoint authenticates
   requests some other way, such as a custom header
 - You can add custom HTTP headers sent with every request. Header values may
@@ -146,6 +150,11 @@ Points an agent at any endpoint that implements the Anthropic messages API.
 Configuration is the same as [Custom OpenAI-compatible](#custom-openai-compatible):
 a free-text model and base URL, an optional API key, and optional custom
 headers with the same placeholders.
+
+The one difference is the base URL: requests go to `<base URL>/v1/messages`,
+so leave out the version segment — use `https://gateway.acme.com`, not
+`https://gateway.acme.com/v1`. The API key, when set, is sent in the
+`x-api-key` header. Extended thinking is not available for this provider.
 
 ## Troubleshooting
 
