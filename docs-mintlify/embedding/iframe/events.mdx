@@ -194,7 +194,7 @@ the exported rows themselves.
 
 | Field | Type | Description |
 | --- | --- | --- |
-| `format` | `"csv" \| "xlsx" \| "png" \| "pdf"` | The file format produced. |
+| `format` | `"csv" \| "xlsx" \| "png" \| "pdf"` | The file format produced. The whole-dashboard **Print version** reports `"pdf"`. |
 | `target` | `"widget" \| "dashboard"` | Whether a single widget or the whole dashboard was exported. |
 | `widgetId` | `string` _(optional)_ | Id of the source widget, when `target` is `"widget"`. |
 | `title` | `string` _(optional)_ | Title of the exported widget / dashboard. |
@@ -212,8 +212,8 @@ the exported rows themselves.
 
 <Note>
   A dashboard's download actions — per-widget (CSV, PNG, PDF) and
-  whole-dashboard (PNG, PDF) — only appear when the embed URL includes
-  `allowExport=true` (see [Dashboards → Allow chart and dashboard
+  whole-dashboard (PNG, PDF, print version) — only appear when the embed URL
+  includes `allowExport=true` (see [Dashboards → Allow chart and dashboard
   export](/embedding/iframe/dashboards#allow-csv-export)). The event fires
   when a viewer uses one of them.
 </Note>
