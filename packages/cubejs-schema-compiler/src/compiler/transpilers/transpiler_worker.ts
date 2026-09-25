@@ -71,7 +71,6 @@ const transpileJs = (data: TransferContent) => {
   };
 };
 
-// Like transpileJs, each file gets only the errors and warnings it added
 const transpileYaml = (data: TransferContent) => {
   const errorsBefore = errorsReport.getErrors().length;
   const warningsBefore = errorsReport.getWarnings().length;
