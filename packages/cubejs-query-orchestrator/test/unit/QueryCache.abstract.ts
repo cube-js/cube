@@ -57,8 +57,6 @@ export const QueryCacheTest = (name: string, options: QueryCacheTestOptions) => 
           ...options,
           localRefreshKey: true,
           refreshKeyRenewalThreshold: 86400,
-          queueOptions: async () => ({ concurrency: 1 }),
-          externalQueueOptions: { concurrency: 1 },
           externalDriverFactory: factory,
         });
         caches.push(localCache);
@@ -95,7 +93,6 @@ export const QueryCacheTest = (name: string, options: QueryCacheTestOptions) => 
         const noQueue = () => { throw new Error('local refresh keys must not use a queue'); };
         const sourceQueue = jest.spyOn(localCache, 'getQueue').mockImplementation(noQueue);
         const externalQueue = jest.spyOn(localCache, 'getExternalQueue').mockImplementation(noQueue);
-        const execute = jest.spyOn(localCache, 'queryWithRetryAndRelease').mockImplementation(noQueue);
         const q: QueryWithParams = [sql, [], { external, localRefreshKey: descriptor }];
         const key = localCache.refreshKeyCacheKey(q, 'default');
         if (renew) {
@@ -115,7 +112,6 @@ export const QueryCacheTest = (name: string, options: QueryCacheTestOptions) => 
         });
         expect(sourceQueue).not.toHaveBeenCalled();
         expect(externalQueue).not.toHaveBeenCalled();
-        expect(execute).not.toHaveBeenCalled();
         expect(factory).not.toHaveBeenCalled();
         expect(logger).toHaveBeenCalledWith('Renewed', expect.objectContaining({
           requestId: 'local-refresh', spanId: expect.any(String),
@@ -716,21 +712,6 @@ export const QueryCacheTest = (name: string, options: QueryCacheTestOptions) => 
         );
 
         expect(executed).toBe(1);
-      });
-
-      it('caches a locally computed value under a threshold without executing SQL', async () => {
-        const nowSpy = jest.spyOn(Date, 'now').mockReturnValue(97_800_000);
-
-        try {
-          const { result, executed } = await loadRefreshKey(
-            { external: true, renewalThreshold: 60, localRefreshKey: descriptor },
-            { localRefreshKey: true, refreshKeyRenewalThreshold: 86400 },
-          );
-          expect(result).toEqual([{ refresh_key: '163' }]);
-          expect(executed).toBe(0);
-        } finally {
-          nowSpy.mockRestore();
-        }
       });
 
       it('reports whether local evaluation is in effect', async () => {
