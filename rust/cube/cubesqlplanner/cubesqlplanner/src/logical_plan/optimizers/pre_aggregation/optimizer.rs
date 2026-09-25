@@ -11,6 +11,7 @@ use crate::planner::multi_fact_join_groups::{MeasuresJoinHints, MultiFactJoinGro
 use crate::planner::planners::multi_stage::TimeShiftState;
 use crate::planner::planners::CommonUtils;
 use crate::planner::state::State;
+use crate::planner::symbols::{CalendarDimensionTimeShift, MeasureTimeShifts};
 use crate::planner::time_dimension::QueryDateTime;
 use crate::planner::MemberSymbol;
 use cubenativeutils::CubeError;
@@ -620,6 +621,121 @@ impl PreAggregationOptimizer {
                 .all(|measure| !time_shifts.has_shift_under(measure))
     }
 
+    // A named or common shift takes its calendar mapping from every time
+    // member it lands on, and the build lands it on the stored members while
+    // a rolled-up query lands it only on the ones it reads. Two dimensions of
+    // one calendar may declare the shift differently, so the stored value can
+    // only be rolled up when every member either side reaches resolves the
+    // shift to the same declaration.
+    fn stored_shifts_resolve_alike(
+        pre_aggregation: &CompiledPreAggregation,
+        matched_measures: &HashSet<String>,
+        schema: &LogicalSchema,
+        filter: &LogicalFilter,
+    ) -> Result<bool, CubeError> {
+        let mut shifts = Vec::new();
+        for stored in pre_aggregation
+            .measures
+            .iter()
+            .filter(|m| matched_measures.contains(&m.full_name()))
+        {
+            let mut measure = stored.as_measure()?.clone();
+            loop {
+                match measure.time_shift() {
+                    Some(MeasureTimeShifts::Named(_)) | Some(MeasureTimeShifts::Common(_)) => {
+                        shifts.push(measure.clone())
+                    }
+                    _ => {}
+                }
+                match measure.time_shift_proxy_target() {
+                    Some(target) if target.as_measure()?.is_multi_stage() => {
+                        measure = target.as_measure()?.clone();
+                    }
+                    _ => break,
+                }
+            }
+        }
+        if shifts.is_empty() {
+            return Ok(true);
+        }
+
+        let mut members: Vec<Rc<MemberSymbol>> = pre_aggregation
+            .time_dimensions
+            .iter()
+            .chain(pre_aggregation.dimensions.iter())
+            .chain(schema.dimensions.iter())
+            .chain(schema.time_dimensions.iter())
+            .cloned()
+            .collect();
+        for item in filter
+            .dimensions_filters
+            .iter()
+            .chain(filter.time_dimensions_filters.iter())
+        {
+            item.find_all_member_evaluators(&mut members);
+        }
+        let calendar_dimensions = members
+            .iter()
+            .filter_map(|member| {
+                let base = match member.as_time_dimension() {
+                    Ok(time_dimension) => time_dimension.base_symbol().clone(),
+                    Err(_) => member.clone(),
+                };
+                let dimension = base.resolve_reference_chain().as_dimension().ok()?;
+                let pk = dimension.time_shift_pk_full_name()?;
+                dimension.is_time().then_some((pk, dimension))
+            })
+            .collect::<Vec<_>>();
+
+        for measure in shifts {
+            let mut resolved: HashMap<String, Option<CalendarDimensionTimeShift>> = HashMap::new();
+            for (pk, dimension) in calendar_dimensions.iter() {
+                let declaration = dimension
+                    .time_shift()
+                    .iter()
+                    .find(|declared| match measure.time_shift() {
+                        Some(MeasureTimeShifts::Named(name)) => {
+                            declared.name.as_ref() == Some(name)
+                        }
+                        Some(MeasureTimeShifts::Common(interval)) => {
+                            declared.interval.as_ref() == Some(interval)
+                        }
+                        _ => false,
+                    })
+                    .cloned();
+                match resolved.get(pk) {
+                    Some(seen) if !Self::same_calendar_shift(seen, &declaration) => {
+                        return Ok(false);
+                    }
+                    Some(_) => {}
+                    None => {
+                        resolved.insert(pk.clone(), declaration);
+                    }
+                }
+            }
+        }
+        Ok(true)
+    }
+
+    fn same_calendar_shift(
+        a: &Option<CalendarDimensionTimeShift>,
+        b: &Option<CalendarDimensionTimeShift>,
+    ) -> bool {
+        match (a, b) {
+            (None, None) => true,
+            (Some(a), Some(b)) => {
+                a.interval == b.interval
+                    && a.name == b.name
+                    && match (&a.sql, &b.sql) {
+                        (None, None) => true,
+                        (Some(a), Some(b)) => a.struct_eq(b),
+                        _ => false,
+                    }
+            }
+            _ => false,
+        }
+    }
+
     fn extract_date_range(
         filter: &LogicalFilter,
         query_tools: &Rc<State>,
@@ -709,6 +825,17 @@ impl PreAggregationOptimizer {
         let Some(matched_measures) = matched else {
             return Ok(None);
         };
+
+        if match_state == MatchState::Partial
+            && !Self::stored_shifts_resolve_alike(
+                pre_aggregation,
+                &matched_measures,
+                schema,
+                filters,
+            )?
+        {
+            return Ok(None);
+        }
 
         // An ungrouped read projects stored columns as they are, with no
         // aggregate around them, so a measure kept as a mergeable sketch would

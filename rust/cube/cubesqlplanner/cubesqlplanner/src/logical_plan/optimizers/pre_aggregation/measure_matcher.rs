@@ -31,6 +31,11 @@ impl MeasureMatcher {
     pub fn try_match(&mut self, symbol: &Rc<MemberSymbol>) -> Result<bool, CubeError> {
         match symbol.as_ref() {
             MemberSymbol::Measure(measure) => {
+                // A reference, such as a view member, has no value of its own:
+                // it is the member it names, multi-stage or not.
+                if let Some(target) = measure.reference_member() {
+                    return self.try_match(&target);
+                }
                 // Cumulative measures (rolling windows) require time series joins
                 // that can't be satisfied by a pre-aggregation directly —
                 // only their base (leaf) measures inside the CTE can match

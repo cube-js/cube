@@ -1,6 +1,6 @@
 use super::common::{Case, CompiledMemberPath, MultiStageProperties};
 use super::deps::{self, symbol_deps};
-use super::measure_kinds::MeasureKind;
+use super::measure_kinds::{AggregateWrap, MeasureKind};
 use super::SymbolPath;
 use super::{MemberSymbol, SymbolFactory};
 use crate::cube_bridge::evaluator::CubeEvaluator;
@@ -257,14 +257,55 @@ impl MeasureSymbol {
     }
 
     /// True when the measure's aggregation distributes over row union
-    /// (sum-like). Multi-stage measures are never additive — their
-    /// value depends on the windowed stage, not on a plain sum.
+    /// (sum-like). A multi-stage measure is additive only as a time-shift
+    /// proxy of an additive measure rolled up by the same function: a shift
+    /// relabels each row and leaves the value it contributes untouched.
     pub fn is_additive(&self) -> bool {
         if self.is_multi_stage() {
-            false
+            self.time_shift_proxy_target()
+                .and_then(|target| target.as_measure().ok())
+                .is_some_and(|target| {
+                    target.is_additive()
+                        && match (
+                            self.kind.pre_aggregate_wrap(),
+                            target.kind.pre_aggregate_wrap(),
+                        ) {
+                            (AggregateWrap::Function(own), AggregateWrap::Function(target)) => {
+                                own == target
+                            }
+                            _ => false,
+                        }
+                })
         } else {
             self.kind.is_additive()
         }
+    }
+
+    /// The measure a multi-stage measure reads unchanged under its time
+    /// shift: `sql` is a bare reference to it, and the shift is the only
+    /// multi-stage modifier.
+    pub fn time_shift_proxy_target(&self) -> Option<Rc<MemberSymbol>> {
+        let multi_stage = self.multi_stage.as_ref()?;
+        multi_stage.time_shift.as_ref()?;
+        let grain = &multi_stage.grain;
+        if grain.exclude.is_some()
+            || grain.keep_only.is_some()
+            || grain.include.is_some()
+            || multi_stage.filter.is_some()
+            || self.rolling_window.is_some()
+            || self.case.is_some()
+            || !self.measure_filters.is_empty()
+            || !matches!(
+                self.kind,
+                MeasureKind::Aggregated(_) | MeasureKind::Calculated(_)
+            )
+        {
+            return None;
+        }
+        self.kind
+            .member_sql()?
+            .resolve_direct_reference()
+            .map(|target| target.resolve_reference_chain())
     }
 
     /// SQL calls inside the measure's kind and `case` body.

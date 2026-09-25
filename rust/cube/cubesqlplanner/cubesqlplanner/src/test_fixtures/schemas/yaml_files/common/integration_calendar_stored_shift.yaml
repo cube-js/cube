@@ -16,6 +16,7 @@ cubes:
         time_shift:
           - interval: 1 year
             type: prior
+            name: prior_year
             sql: "{CUBE}.prev_year_date"
 
       - name: retail_date
@@ -29,7 +30,16 @@ cubes:
         time_shift:
           - interval: 1 year
             type: prior
+            name: prior_year
             sql: "{CUBE}.prev_year_date"
+
+      # Declares the same named shift as `retail_date` over another mapping.
+      - name: retail_date_alt
+        sql: "{CUBE}.date_val"
+        type: time
+        time_shift:
+          - name: prior_year
+            sql: "{CUBE}.date_val - interval '1 year'"
 
       - name: retail_year
         sql: "{CUBE}.retail_year"
@@ -53,10 +63,51 @@ cubes:
         sql: store
         type: string
 
+      - name: sale_date
+        sql: sale_date
+        type: time
+
     measures:
       - name: amount
         type: sum
         sql: amount
+
+      - name: max_amount
+        type: max
+        sql: amount
+
+      - name: amount_ly_named
+        type: number
+        multi_stage: true
+        sql: "{amount}"
+        time_shift:
+          - name: prior_year
+
+      - name: amount_ly_doubled
+        type: number
+        multi_stage: true
+        sql: "{amount} * 2"
+        time_shift:
+          - name: prior_year
+
+      # Plain interval shifts over a time dimension of the fact itself.
+      - name: amount_prev_year
+        type: sum
+        multi_stage: true
+        sql: "{amount}"
+        time_shift:
+          - time_dimension: sale_date
+            interval: 1 year
+            type: prior
+
+      - name: max_amount_prev_month
+        type: max
+        multi_stage: true
+        sql: "{max_amount}"
+        time_shift:
+          - time_dimension: sale_date
+            interval: 1 month
+            type: prior
 
       - name: amount_ly
         type: number
@@ -122,3 +173,47 @@ cubes:
           - store
         time_dimension: retail_calendar.retail_date
         granularity: week
+
+      - name: sales_ly_named_by_week
+        type: rollup
+        measures:
+          - amount
+          - amount_ly_named
+        dimensions:
+          - store
+        time_dimension: retail_calendar.retail_date
+        granularity: week
+
+      # The build lands the named shift on `retail_date_alt` too.
+      - name: sales_ly_named_by_week_with_alt
+        type: rollup
+        measures:
+          - amount
+          - amount_ly_named
+        dimensions:
+          - store
+          - retail_calendar.retail_date_alt
+        time_dimension: retail_calendar.retail_date
+        granularity: week
+
+      - name: sales_ly_doubled_by_week
+        type: rollup
+        measures:
+          - amount
+          - amount_ly_doubled
+        dimensions:
+          - store
+        time_dimension: retail_calendar.retail_date
+        granularity: week
+
+      - name: sales_prev_year_by_day
+        type: rollup
+        measures:
+          - amount
+          - max_amount
+          - amount_prev_year
+          - max_amount_prev_month
+        dimensions:
+          - store
+        time_dimension: sale_date
+        granularity: day

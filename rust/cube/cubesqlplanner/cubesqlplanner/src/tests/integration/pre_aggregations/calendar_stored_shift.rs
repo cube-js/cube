@@ -215,26 +215,18 @@ async fn prior_year_over_a_date_range_matches_source() {
     }
 }
 
-/// A multi-stage measure is not additive, so it is served only at the grain
-/// it was stored at: summing it over a stored dimension is refused.
+/// A time-shift proxy of an additive measure is additive: each stored row holds
+/// the prior-year sum of its reporting days, so summing rows over a stored
+/// dimension sums those days.
 #[tokio::test(flavor = "multi_thread")]
-async fn stored_prior_year_is_not_rolled_up_over_a_dimension() {
-    let query = indoc! {r#"
-        measures:
-          - sales.amount
-          - sales.amount_ly
-        time_dimensions:
-          - dimension: retail_calendar.retail_date
-            granularity: week
-        order:
-          - id: retail_calendar.retail_date
-    "#};
-    if let Some((rollup, source)) = fallback_vs_source(query, "sales_ly_by_week").await {
+async fn stored_prior_year_is_rolled_up_over_a_dimension() {
+    if let Some((rollup, source)) = served_vs_source(BY_WEEK_ALL_STORES, "sales_ly_by_week").await {
         assert_eq!(rollup, source);
     }
 }
 
-/// Nor is it rolled up to a coarser granularity.
+/// A retail week does not nest in the `sql`-defined retail year as far as the
+/// granularity hierarchy knows, so the rollup is not rolled up to it.
 #[tokio::test(flavor = "multi_thread")]
 async fn stored_prior_year_is_not_rolled_up_to_a_coarser_grain() {
     let query = indoc! {r#"
@@ -252,6 +244,126 @@ async fn stored_prior_year_is_not_rolled_up_to_a_coarser_grain() {
     "#};
     if let Some((rollup, source)) = fallback_vs_source(query, "sales_ly_by_week").await {
         assert_eq!(rollup, source);
+    }
+}
+
+const BY_WEEK_ALL_STORES: &str = indoc! {r#"
+        measures:
+          - sales.amount
+          - sales.amount_ly
+        time_dimensions:
+          - dimension: retail_calendar.retail_date
+            granularity: week
+        order:
+          - id: retail_calendar.retail_date
+"#};
+
+const NAMED_BY_WEEK_ALL_STORES: &str = indoc! {r#"
+        measures:
+          - sales.amount
+          - sales.amount_ly_named
+        time_dimensions:
+          - dimension: retail_calendar.retail_date
+            granularity: week
+        order:
+          - id: retail_calendar.retail_date
+"#};
+
+/// A named shift resolves to the same calendar declaration as the interval one
+/// and rolls up the same way.
+#[tokio::test(flavor = "multi_thread")]
+async fn stored_named_prior_year_is_rolled_up_over_a_dimension() {
+    if let Some((rollup, source)) =
+        served_vs_source(NAMED_BY_WEEK_ALL_STORES, "sales_ly_named_by_week").await
+    {
+        assert_eq!(rollup, source);
+    }
+}
+
+/// The build also landed the named shift on `retail_date_alt`, whose
+/// declaration maps the calendar differently from `retail_date`'s, so the
+/// stored value is not the one a query reading only `retail_date` computes.
+#[tokio::test(flavor = "multi_thread")]
+async fn stored_named_shift_resolved_differently_by_a_stored_member_falls_back() {
+    if let Some((rollup, source)) =
+        fallback_vs_source(NAMED_BY_WEEK_ALL_STORES, "sales_ly_named_by_week_with_alt").await
+    {
+        assert_eq!(rollup, source);
+    }
+}
+
+/// An expression over the shifted measure is not a proxy of it, so it is
+/// served only at the grain it was stored at.
+#[tokio::test(flavor = "multi_thread")]
+async fn stored_shifted_expression_is_not_rolled_up() {
+    let rolled_up = indoc! {r#"
+        measures:
+          - sales.amount
+          - sales.amount_ly_doubled
+        time_dimensions:
+          - dimension: retail_calendar.retail_date
+            granularity: week
+        order:
+          - id: retail_calendar.retail_date
+    "#};
+    if let Some((rollup, source)) = fallback_vs_source(rolled_up, "sales_ly_doubled_by_week").await
+    {
+        assert_eq!(rollup, source);
+    }
+    let exact = indoc! {r#"
+        measures:
+          - sales.amount
+          - sales.amount_ly_doubled
+        dimensions:
+          - sales.store
+        time_dimensions:
+          - dimension: retail_calendar.retail_date
+            granularity: week
+        order:
+          - id: retail_calendar.retail_date
+          - id: sales.store
+    "#};
+    if let Some((rollup, source)) = served_vs_source(exact, "sales_ly_doubled_by_week").await {
+        assert_eq!(rollup, source);
+    }
+}
+
+/// Interval shifts over the fact's own time dimension, stored by day and read
+/// by month across all stores: the sum rolls up by `sum`, the maximum by `max`.
+#[tokio::test(flavor = "multi_thread")]
+async fn stored_interval_shifts_are_rolled_up_to_a_coarser_grain() {
+    let query = indoc! {r#"
+        measures:
+          - sales.amount
+          - sales.amount_prev_year
+          - sales.max_amount
+          - sales.max_amount_prev_month
+        time_dimensions:
+          - dimension: sales.sale_date
+            granularity: month
+            dateRange:
+              - "2006-01-01"
+              - "2007-12-31"
+        order:
+          - id: sales.sale_date
+    "#};
+    if let Some((rollup, source)) = served_vs_source(query, "sales_prev_year_by_day").await {
+        assert_eq!(rollup, source);
+        let march_2007 = |column: &str| {
+            cell(
+                &rollup,
+                &[("sales__sale_date_month", "2007-03-01 00:00:00")],
+                column,
+            )
+        };
+        assert_ne!(
+            march_2007("sales__amount_prev_year"),
+            march_2007("sales__amount")
+        );
+        assert_ne!(
+            march_2007("sales__max_amount_prev_month"),
+            march_2007("sales__max_amount")
+        );
     }
 }
 
