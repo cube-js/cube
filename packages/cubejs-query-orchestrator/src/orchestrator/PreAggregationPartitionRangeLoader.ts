@@ -15,7 +15,7 @@ import {
 } from '@cubejs-backend/shared';
 import { InlineTable, QueuePriority, TableStructure } from '@cubejs-backend/base-driver';
 import { DriverFactory } from './DriverFactory';
-import { QueryCache, QueryWithParams } from './QueryCache';
+import { QueryCache, QueryWithParams, REFRESH_KEY_CACHE_TTL_SECONDS } from './QueryCache';
 import {
   getLastUpdatedAtTimestamp,
   LAMBDA_TABLE_PREFIX,
@@ -417,7 +417,7 @@ export class PreAggregationPartitionRangeLoader {
       query,
       <string[]>values,
       cacheKeyQueries,
-      60 * 60,
+      REFRESH_KEY_CACHE_TTL_SECONDS,
       [query, <string[]>values],
       undefined,
       {

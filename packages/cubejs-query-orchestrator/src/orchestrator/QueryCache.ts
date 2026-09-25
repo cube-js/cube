@@ -36,8 +36,8 @@ import { CacheAndQueryDriverType, MetadataOperationType } from './QueryOrchestra
 export const REFRESH_KEY_CACHE_TTL_SECONDS = 60 * 60;
 
 export type CacheQueryResultOptions = {
-  /** Compute this refresh key directly instead of executing its SQL. */
-  localRefreshKey?: LocalRefreshKeyDescriptor,
+  /** Produces the result instead of executing the query. */
+  fetchResult?: () => Promise<any>,
   renewalThreshold?: number,
   renewalKey?: any,
   priority?: number,
@@ -507,19 +507,18 @@ export class QueryCache {
     options: RefreshKeyCacheOptions,
   ) {
     const [query, values, queryOptions] = sqlQuery;
-    const cacheKey = QueryCache.refreshKeyIdentity(sqlQuery, options.dataSource);
-
     const localRefreshKey = this.localRefreshKeyFor(queryOptions);
 
     if (localRefreshKey && this.usesUncachedLocalRefreshKey()) {
       return evaluateLocalRefreshKey(localRefreshKey);
     }
 
-    // An explicit threshold retains the shared entry and the SQL path's TTL and renewal rules.
-    // Local evaluation avoids SQL queue waits; concurrent cache writes are last-writer-wins.
+    const cacheKey = QueryCache.refreshKeyIdentity(sqlQuery, options.dataSource);
+
+    // An explicit threshold keeps the shared entry and the SQL path's TTL and renewal rules.
     return this.cacheQueryResult(query, values, cacheKey, expiration, {
       ...options,
-      localRefreshKey,
+      fetchResult: localRefreshKey ? async () => evaluateLocalRefreshKey(localRefreshKey) : undefined,
       renewalThreshold: this.options.refreshKeyRenewalThreshold
         || queryOptions?.renewalThreshold || 2 * 60,
       renewalKey: cacheKey,
@@ -1121,8 +1120,8 @@ export class QueryCache {
   ) {
     const { cacheKey, redisKey, renewalKey, expiration, spanId, options } = ctx;
 
-    const result = isValidLocalRefreshKey(options.localRefreshKey)
-      ? Promise.resolve(evaluateLocalRefreshKey(options.localRefreshKey))
+    const result = options.fetchResult
+      ? options.fetchResult()
       : this.queryWithRetryAndRelease(query, values, {
         cacheKey,
         priority: options.priority,
