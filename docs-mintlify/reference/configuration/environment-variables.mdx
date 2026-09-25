@@ -1537,12 +1537,9 @@ Refresh keys written with `sql` or marked
 database, since their values depend on your data and not just on the time.
 
 [`queryCacheOptions.refreshKeyRenewalThreshold`][ref-config-query-cache-options] is still
-honoured: when set, the locally computed value uses the same shared cache, expiration,
-and renewal rules as the SQL result. Local computation bypasses the SQL queue, so cache
-misses and renewals do not wait for running SQL queries. Concurrent local computations
-are not deduplicated across instances. Scheduled refresh still warms these entries,
-without querying the database for the time. Without an override, local keys are computed
-directly from the current time without a cache entry.
+honoured: when set, the locally computed value is cached and renewed exactly like the SQL
+result, and scheduled refresh warms it without querying the database. Without an
+override, local keys are computed from the current time on every check.
 
 <Warning>
 
