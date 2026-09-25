@@ -78,8 +78,7 @@ const SIMPLE_F_STRING_PART = /\{([\w.]+)\}|[^{]+/g;
  * the parser, which dominates YAML transpilation. Unlike the parser's lexer, it keeps a last text
  * run of f, F, fr or rf, as the native transpiler does. Returns null for anything else.
  */
-export function transpileSimpleFString(codeString: string): t.Program | null {
-  // YAML callers pass raw values through, so this can be null or a number
+export function transpileSimpleFString(codeString: unknown): t.Program | null {
   const match = typeof codeString === 'string' && codeString.match(SIMPLE_F_STRING);
   if (!match || !match[1]) {
     return null;
