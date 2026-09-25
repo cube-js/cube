@@ -788,9 +788,10 @@ Example response:
 
 ### `{base_path}/v1/entities`
 
-Send a `GET` request to list all cubes and views in the data model. Results are
-sorted by type (cubes first), then by name. Each item contains only `type` and
-`name`; use [`/v1/entities/{name}`](#base_path/v1/entities/name) or
+Send a `GET` request to list the cubes and views in the data model, including
+private cubes returned as [lineage stubs](#private-cubes-and-members). Results
+are sorted by type (cubes first), then by name. Each item contains only `type`,
+`name`, and `public`; use [`/v1/entities/{name}`](#base_path/v1/entities/name) or
 [`/v1/entities/all`](#base_path/v1/entities/all) for detailed metadata.
 
 Query parameters:
@@ -816,11 +817,13 @@ total number of entities before `offset` and `limit` are applied:
   "data": [
     {
       "type": "cube",
-      "name": "orders"
+      "name": "orders",
+      "public": true
     },
     {
       "type": "view",
-      "name": "orders_view"
+      "name": "orders_view",
+      "public": true
     }
   ],
   "pagination": {
@@ -845,6 +848,8 @@ Response includes:
 
 - `type` - Either `cube` or `view`
 - `name` - The cube or view name
+- `public` - Whether the cube or view is public; `false` for a
+  [lineage stub](#private-cubes-and-members)
 - `title` - Human-readable title
 - `description` - Description from the data model, or an empty string
 - `table_references` - Data lineage to source tables, each with `data_source`,
@@ -858,11 +863,12 @@ Each member includes:
 | Field | Description |
 | --- | --- |
 | `name` | The member name, without the cube prefix |
+| `public` | Whether the member is public; `false` for a [lineage stub](#private-cubes-and-members) |
 | `title` | Human-readable title |
 | `description` | Description from the data model, or an empty string |
 | `type` | The member type, e.g. `count`, `sum`, or `string` |
-| `sql` | The member's SQL definition (see below). Omitted when it can't be resolved |
-| `is_primary_key` | Whether the dimension is a primary key. Dimensions only |
+| `sql` | The member's SQL definition (see below). Omitted when it can't be resolved, and on lineage stubs |
+| `is_primary_key` | Whether the dimension is a primary key. Dimensions only; omitted on lineage stubs |
 | `member_references` | Upstream members the member is derived from, each with `cube` and `member` |
 | `column_references` | Source columns, each with `data_source`, `table`, `column`, and, if the table is qualified, `schema` |
 
@@ -887,6 +893,7 @@ Example response:
   "data": {
     "type": "cube",
     "name": "orders",
+    "public": true,
     "title": "Orders",
     "description": "Order transactions",
     "table_references": [
@@ -900,6 +907,7 @@ Example response:
     "measures": [
       {
         "name": "total_amount",
+        "public": true,
         "title": "Total Amount",
         "description": "",
         "type": "sum",
@@ -918,6 +926,7 @@ Example response:
     "dimensions": [
       {
         "name": "id",
+        "public": true,
         "title": "Id",
         "description": "",
         "type": "number",
@@ -935,6 +944,7 @@ Example response:
       },
       {
         "name": "status",
+        "public": true,
         "title": "Status",
         "description": "",
         "type": "string",
@@ -996,6 +1006,7 @@ entities before `offset` and `limit` are applied:
     {
       "type": "cube",
       "name": "orders",
+      "public": true,
       "title": "Orders",
       "description": "Order transactions",
       "table_references": [
@@ -1009,6 +1020,7 @@ entities before `offset` and `limit` are applied:
       "measures": [
         {
           "name": "total_amount",
+          "public": true,
           "title": "Total Amount",
           "description": "",
           "type": "sum",
@@ -1027,6 +1039,7 @@ entities before `offset` and `limit` are applied:
       "dimensions": [
         {
           "name": "id",
+          "public": true,
           "title": "Id",
           "description": "",
           "type": "number",
@@ -1044,6 +1057,7 @@ entities before `offset` and `limit` are applied:
         },
         {
           "name": "status",
+          "public": true,
           "title": "Status",
           "description": "",
           "type": "string",
@@ -1064,6 +1078,7 @@ entities before `offset` and `limit` are applied:
     {
       "type": "view",
       "name": "orders_view",
+      "public": true,
       "title": "Orders View",
       "description": "",
       "table_references": [
@@ -1079,6 +1094,7 @@ entities before `offset` and `limit` are applied:
       "measures": [
         {
           "name": "total_amount",
+          "public": true,
           "title": "Total Amount",
           "description": "",
           "type": "sum",
@@ -1099,6 +1115,7 @@ entities before `offset` and `limit` are applied:
       "dimensions": [
         {
           "name": "status",
+          "public": true,
           "title": "Status",
           "description": "",
           "type": "string",
@@ -1126,6 +1143,66 @@ entities before `offset` and `limit` are applied:
   }
 }
 ```
+
+### Private cubes and members
+
+Cubes, views, and members that aren't [public][ref-cubes-public] are not
+returned with their definitions. To keep lineage complete, a private cube or
+member that a public member references directly is returned as a _lineage stub_.
+A stub cube has `public` set to `false`, and its members keep their `public`
+value from the data model. A stub member of a public cube has `public` set to
+`false`. A stub has:
+
+- only the members that public members reference, each with its `name`, `type`,
+  and `column_references`
+- `title` set to its name and an empty `description`
+- empty `member_references` and `cube_references`, and no `sql` or
+  `is_primary_key`
+
+Every entry in `member_references` and `cube_references` resolves to a cube,
+view, or member in the response, and a view's `table_references` include the
+tables it reads through private cubes. For a private cube that no public member
+references, `/v1/entities/{name}` returns `404`. To list only public cubes and
+views, filter on `public`.
+
+For example, a public view whose `customer_id` dimension is an alias of
+`customers.id` in a private `customers` cube returns this stub:
+
+```json
+{
+  "type": "cube",
+  "name": "customers",
+  "public": false,
+  "title": "customers",
+  "description": "",
+  "table_references": [
+    { "data_source": "default", "schema": "public", "table": "customers" }
+  ],
+  "cube_references": [],
+  "measures": [],
+  "dimensions": [
+    {
+      "name": "id",
+      "public": true,
+      "title": "id",
+      "description": "",
+      "type": "number",
+      "member_references": [],
+      "column_references": [
+        {
+          "data_source": "default",
+          "schema": "public",
+          "table": "customers",
+          "column": "id"
+        }
+      ]
+    }
+  ]
+}
+```
+
+Members hidden in a cube that has [data access policies][ref-dap] are never
+returned as stubs or used for lineage. References to them are omitted instead.
 
 ## Health checks
 
@@ -1224,3 +1301,5 @@ Keep-Alive: timeout=5
 [link-tzdb]: https://en.wikipedia.org/wiki/Tz_database
 [ref-control-plane-api]: /reference/control-plane-api
 [self-metadata-api]: #metadata-api
+[ref-cubes-public]: /reference/data-modeling/cube#public
+[ref-dap]: /docs/data-modeling/data-access-policies
