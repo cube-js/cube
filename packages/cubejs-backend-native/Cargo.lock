@@ -1034,6 +1034,7 @@ dependencies = [
  "arrow 58.3.0",
  "chrono",
  "cubeshared",
+ "hex",
  "indexmap 2.14.0",
  "itertools 0.13.0",
  "neon",

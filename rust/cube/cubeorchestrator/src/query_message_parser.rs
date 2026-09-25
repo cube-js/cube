@@ -334,18 +334,6 @@ fn decimal_to_string<T: std::fmt::Display>(mantissa: T, scale: u32) -> String {
     }
 }
 
-/// Render bytes as `0x` followed by uppercase hex, e.g. `[0x01, 0xAB] -> "0x01AB"`.
-fn bytes_to_hex_string(bytes: &[u8]) -> String {
-    const HEX: &[u8; 16] = b"0123456789ABCDEF";
-    let mut out = String::with_capacity(2 + bytes.len() * 2);
-    out.push_str("0x");
-    for &b in bytes {
-        out.push(HEX[(b >> 4) as usize] as char);
-        out.push(HEX[(b & 0x0f) as usize] as char);
-    }
-    out
-}
-
 /// Append every element of an Arrow `array` to a column accumulator, converting
 /// each value to [`DBResponsePrimitive`].
 fn append_arrow_array(
@@ -441,7 +429,10 @@ fn append_arrow_array(
                 if a.is_null(i) {
                     col.push(DBResponsePrimitive::Null);
                 } else {
-                    col.push(DBResponsePrimitive::String(bytes_to_hex_string(a.value(i))));
+                    col.push(DBResponsePrimitive::String(format!(
+                        "0x{}",
+                        hex::encode_upper(a.value(i))
+                    )));
                 }
             }
         }};
