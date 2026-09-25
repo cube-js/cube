@@ -44,7 +44,6 @@ describe('local refresh key SQL cache compatibility', () => {
     { name: 'daily TTL keeps the value after an hour', ttl: 86400, threshold: 86400, interval: 600, elapsed: 3600000, changes: false },
     { name: 'short TTL expires before the threshold', ttl: 60, threshold: 86400, interval: 60, elapsed: 120000, changes: true },
     { name: 'threshold is measured from the write time', ttl: 86400, threshold: 120, interval: 60, elapsed: 120001, changes: true },
-    // Renewal must not snap to a wall-clock threshold boundary.
     { name: 'does not renew early at a wall-clock threshold boundary', ttl: 86400, threshold: 120, interval: 60, elapsed: 83001, changes: false },
   ])('$name', async ({ ttl, threshold, interval, elapsed, changes }) => {
     const { q, sql, local } = setup(threshold, interval);
@@ -134,8 +133,9 @@ describe('local refresh key SQL cache compatibility', () => {
     expect(query).toHaveBeenCalledTimes(1);
   });
 
-  test('without a threshold uses neither the cache nor the queue', async () => {
-    const { q, local } = setup(0);
+  test.each([0, undefined])('without a threshold override uses neither the cache nor the queue (%s)', async threshold => {
+    const { q, local } = setup();
+    local.cache.options.refreshKeyRenewalThreshold = threshold;
     const get = jest.spyOn(local.cache.getCacheDriver(), 'get');
     const enqueue = jest.spyOn(local.cache, 'queryWithRetryAndRelease');
     expect(await local.cache.cacheRefreshKeyResult(q, 60, { dataSource: 'default' })).toEqual([{ refresh_key: '163' }]);

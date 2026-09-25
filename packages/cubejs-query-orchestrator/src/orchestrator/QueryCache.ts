@@ -245,9 +245,9 @@ export class QueryCache {
     return this.localRefreshKeyEnabled;
   }
 
-  public localRefreshKeyResult(queryOptions?: QueryOptions): [{ refresh_key: string }] | null {
-    const localRefreshKey = this.localRefreshKeyFor(queryOptions);
-    return localRefreshKey ? evaluateLocalRefreshKey(localRefreshKey) : null;
+  /** Whether eligible local refresh keys have no shared cache entry to warm. */
+  public usesUncachedLocalRefreshKey(): boolean {
+    return this.isLocalRefreshKeyActive() && !this.options.refreshKeyRenewalThreshold;
   }
 
   private localRefreshKeyFor(queryOptions?: QueryOptions): LocalRefreshKeyDescriptor | null {
@@ -255,7 +255,7 @@ export class QueryCache {
       return null;
     }
 
-    return queryOptions?.localRefreshKey ?? null;
+    return queryOptions.localRefreshKey;
   }
 
   public getCacheDriver(): CacheDriverInterface {
@@ -519,7 +519,7 @@ export class QueryCache {
 
     const localRefreshKey = this.localRefreshKeyFor(queryOptions);
 
-    if (localRefreshKey && !this.options.refreshKeyRenewalThreshold) {
+    if (localRefreshKey && this.usesUncachedLocalRefreshKey()) {
       return evaluateLocalRefreshKey(localRefreshKey);
     }
 

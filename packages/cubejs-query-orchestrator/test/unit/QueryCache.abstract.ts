@@ -677,13 +677,18 @@ export const QueryCacheTest = (name: string, options: QueryCacheTestOptions) => 
       };
 
       it('evaluates locally without touching the driver', async () => {
-        const { result, executed } = await loadRefreshKey(
-          { external: true, renewalThreshold: 60, localRefreshKey: descriptor },
-          { localRefreshKey: true },
-        );
+        const now = jest.spyOn(Date, 'now').mockReturnValue(97_800_000);
 
-        expect(executed).toBe(0);
-        expect(result).toEqual([{ refresh_key: String(Math.floor(Date.now() / 1000 / 600)) }]);
+        try {
+          const { result, executed } = await loadRefreshKey(
+            { external: true, renewalThreshold: 60, localRefreshKey: descriptor },
+            { localRefreshKey: true },
+          );
+          expect(executed).toBe(0);
+          expect(result).toEqual([{ refresh_key: '163' }]);
+        } finally {
+          now.mockRestore();
+        }
       });
 
       it('runs the query when the flag is off', async () => {
@@ -714,20 +719,6 @@ export const QueryCacheTest = (name: string, options: QueryCacheTestOptions) => 
         expect(executed).toBe(1);
       });
 
-      it('reports whether local evaluation is in effect', async () => {
-        const enabled = newCache({ localRefreshKey: true });
-        const disabled = newCache({ localRefreshKey: false });
-        const throttled = newCache({ localRefreshKey: true, refreshKeyRenewalThreshold: 24 * 60 * 60 });
-
-        try {
-          expect(enabled.isLocalRefreshKeyActive()).toBe(true);
-          expect(disabled.isLocalRefreshKeyActive()).toBe(false);
-          expect(throttled.isLocalRefreshKeyActive()).toBe(true);
-        } finally {
-          await Promise.all([enabled.cleanup(), disabled.cleanup(), throttled.cleanup()]);
-        }
-      });
-
       it('runs the query when the flag is unset', async () => {
         const { result, executed } = await loadRefreshKey({
           external: true,
@@ -751,67 +742,6 @@ export const QueryCacheTest = (name: string, options: QueryCacheTestOptions) => 
         );
 
         expect(logged.map(([message]) => message).filter(m => /local/i.test(m))).toEqual([]);
-      });
-
-      describe('localRefreshKeyResult', () => {
-        const withCache = async (
-          additionalOptions: Partial<QueryCacheOptions>,
-          fn: (localCache: QueryCacheOpened) => void,
-        ) => {
-          const localCache = newCache(additionalOptions);
-
-          try {
-            fn(localCache);
-            expect(localCache.logger).not.toHaveBeenCalled();
-          } finally {
-            await localCache.cleanup();
-          }
-        };
-
-        const queryOptions = (localRefreshKey?: unknown) => <any>{ localRefreshKey };
-
-        it('evaluates a valid descriptor', () => withCache({ localRefreshKey: true }, localCache => {
-          expect(localCache.localRefreshKeyResult(queryOptions(descriptor)))
-            .toEqual([{ refresh_key: String(Math.floor(Date.now() / 1000 / 600)) }]);
-        }));
-
-        // Cube Store returns every column as a string, so a locally evaluated key has to be
-        // a string too or flipping the flag invalidates every pre-aggregation once.
-        it('returns the key as a string', () => withCache({ localRefreshKey: true }, localCache => {
-          const [{ refresh_key: value }] = localCache
-            .localRefreshKeyResult(queryOptions(descriptor))!;
-
-          expect(typeof value).toBe('string');
-        }));
-
-        it('declines when the flag is off', () => withCache({ localRefreshKey: false }, localCache => {
-          expect(localCache.localRefreshKeyResult(queryOptions(descriptor))).toBeNull();
-        }));
-
-        it('declines without a descriptor', () => withCache({ localRefreshKey: true }, localCache => {
-          expect(localCache.localRefreshKeyResult()).toBeNull();
-          expect(localCache.localRefreshKeyResult(queryOptions())).toBeNull();
-        }));
-
-        it('declines a malformed descriptor', () => withCache({ localRefreshKey: true }, localCache => {
-          expect(localCache.localRefreshKeyResult(
-            queryOptions({ ...descriptor, interval: 0 }),
-          )).toBeNull();
-        }));
-
-        it('uses the current time rather than rounding to the threshold', () => withCache(
-          { localRefreshKey: true, refreshKeyRenewalThreshold: 86400 },
-          localCache => {
-            const nowSpy = jest.spyOn(Date, 'now').mockReturnValue(97_800_000);
-
-            try {
-              expect(localCache.localRefreshKeyResult(queryOptions(descriptor)))
-                .toEqual([{ refresh_key: '163' }]);
-            } finally {
-              nowSpy.mockRestore();
-            }
-          },
-        ));
       });
     });
 

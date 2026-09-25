@@ -662,7 +662,6 @@ describe('PreAggregations', () => {
       expect(mockDriver!.executedQueries).toEqual([]);
     });
 
-    // A threshold caches the current local value with the loader TTL.
     test('keyQueryResult evaluates locally under a refreshKeyRenewalThreshold', async () => {
       const day = 24 * 60 * 60;
       const loadCache = newLoadCache({ localRefreshKey: true, refreshKeyRenewalThreshold: day });

@@ -345,8 +345,7 @@ export class RefreshScheduler {
 
     const orchestratorApi = await this.serverCore.getOrchestratorApi(context);
     const queryCache = orchestratorApi.getQueryOrchestrator().getQueryCache();
-    const uncachedLocalRefreshKey = queryCache.isLocalRefreshKeyActive()
-      && !queryCache.options.refreshKeyRenewalThreshold;
+    const uncachedLocalRefreshKey = queryCache.usesUncachedLocalRefreshKey();
 
     await Promise.all(queryForEvaluation.cubeEvaluator.cubeNames().map(async cube => {
       const cubeFromPath = queryForEvaluation.cubeEvaluator.cubeFromPath(cube);
