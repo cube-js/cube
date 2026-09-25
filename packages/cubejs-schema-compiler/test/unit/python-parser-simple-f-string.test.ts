@@ -30,6 +30,19 @@ describe('transpileSimpleFString', () => {
     expect(babelGenerator(fast!).code).toEqual(babelGenerator(parsed).code);
   });
 
+  // The parser's lexer reads a last text run of f, F, fr or rf plus the closing quote as the end
+  // token and drops it, or throws when nothing is left. The native transpiler (ruff) keeps the text.
+  it.each([
+    ['f"F"', '`F`;'],
+    ['f"f"', '`f`;'],
+    ['f"rf"', '`rf`;'],
+    ['f"FR"', '`FR`;'],
+    ['f"{x}f"', '`${x}f`;'],
+    ['f"{x}.rf"', '`${x}.rf`;'],
+  ])('keeps the text the parser drops in %s', (code, expected) => {
+    expect(babelGenerator(transpileSimpleFString(code)!).code).toEqual(expected);
+  });
+
   it.each([
     // Not an f-string
     'CUBE.id',
@@ -50,10 +63,11 @@ describe('transpileSimpleFString', () => {
     'f"{None}"',
     'f"{x.True}"',
     'f"{lambda}"',
-    // Adjacent expressions and stray braces are reported by the parser
+    // Adjacent expressions and an unclosed brace are reported by the parser
     'f"{a}{b}"',
-    'f"a}b"',
     'f"a{b"',
+    // The parser reads a lone } as text, but the regex doesn't try to
+    'f"a}b"',
   ])('leaves %s to the parser', (code) => {
     expect(transpileSimpleFString(code)).toBeNull();
   });

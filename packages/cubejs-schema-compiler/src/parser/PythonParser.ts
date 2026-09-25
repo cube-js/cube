@@ -74,9 +74,9 @@ const SIMPLE_F_STRING = /^f"((?:[^"\\`{}]|\{[A-Za-z_]\w*(?:\.[A-Za-z_]\w*)*\})*)
 const SIMPLE_F_STRING_PART = /\{([\w.]+)\}|[^{]+/g;
 
 /**
- * Builds the same AST the ANTLR parser does for the f-strings that make up most of a YAML
- * model (`type: count`, `sql: "{CUBE}.id = {orders.id}"`) without running the parser, which
- * dominates YAML transpilation. Returns null for anything else.
+ * Builds the ANTLR parser's AST for the simple f-strings most of a YAML model is made of, without
+ * the parser, which dominates YAML transpilation. Unlike the parser's lexer, it keeps a last text
+ * run of f, F, fr or rf, as the native transpiler does. Returns null for anything else.
  */
 export function transpileSimpleFString(codeString: string): t.Program | null {
   const match = codeString.match(SIMPLE_F_STRING);
