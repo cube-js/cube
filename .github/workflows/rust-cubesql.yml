@@ -102,6 +102,11 @@ jobs:
           # See https://github.com/taiki-e/cargo-llvm-cov/blob/main/README.md#get-coverage-of-external-tests
           # shellcheck source=/dev/null
           source <(cargo llvm-cov show-env --export-prefix)
+          # Without these the e2e suite skips itself (e2e/tests/postgres.rs), so its snapshots
+          # would be reported as unreferenced; secrets are not available to fork/Dependabot PRs.
+          if [ -z "$CUBESQL_TESTING_CUBE_TOKEN" ] || [ -z "$CUBESQL_TESTING_CUBE_URL" ]; then
+            rm -rf cubesql/e2e/tests/snapshots
+          fi
           cargo insta test --all-features --workspace --unreferenced reject
           cargo llvm-cov report --lcov --output-path lcov.info
       - name: Upload code coverage
