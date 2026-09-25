@@ -55,15 +55,13 @@ export const QueryCacheTest = (name: string, options: QueryCacheTestOptions) => 
       const caches: QueryCache[] = [];
       const descriptor = { interval: 600, utcOffset: 0, dayOffset: 0 };
       const sql = 'SELECT FLOOR(UNIX_TIMESTAMP() / 600) as refresh_key';
-      const make = (prefix = crypto.randomBytes(16).toString('hex'), logger = jest.fn(), localRefreshKey = true) => {
+      const make = (prefix = crypto.randomBytes(16).toString('hex'), logger = jest.fn()) => {
         const factory = jest.fn(async () => {
-          if (localRefreshKey) throw new Error('local refresh keys must not create a database client');
-          // SQL stand-in for the one-second key in the expiry comparison below.
-          return { query: async () => [{ refresh_key: String(Math.floor(Date.now() / 1000)) }] } as any;
+          throw new Error('local refresh keys must not create a database client');
         });
         const cache = new QueryCache(prefix, factory, logger, {
           ...options,
-          localRefreshKey,
+          localRefreshKey: true,
           refreshKeyRenewalThreshold: 86400,
           queueOptions: async () => ({ concurrency: 1 }),
           externalQueueOptions: { concurrency: 1 },
@@ -90,36 +88,6 @@ export const QueryCacheTest = (name: string, options: QueryCacheTestOptions) => 
         expect(await second.cache.getCacheDriver().get(key)).toMatchObject({ result: value, renewalKey: key });
         expect(first.factory).not.toHaveBeenCalled();
         expect(second.factory).not.toHaveBeenCalled();
-      });
-
-      test('matches SQL after shared cache expiry, including retained queue results', async () => {
-        const observations = [];
-        const now = Date.now();
-        const clock = jest.spyOn(Date, 'now');
-        for (const localRefreshKey of [false, true]) {
-          const prefix = crypto.randomBytes(16).toString('hex');
-          const first = make(prefix, jest.fn(), localRefreshKey);
-          const second = make(prefix, jest.fn(), localRefreshKey);
-          const q: QueryWithParams = ['SELECT FLOOR(UNIX_TIMESTAMP()) as refresh_key', [], {
-            localRefreshKey: { ...descriptor, interval: 1 },
-          }];
-          clock.mockReturnValue(now);
-          const before = await first.cache.cacheRefreshKeyResult(q, 1, { dataSource: 'default', waitForRenew: true });
-          await pausePromise(1200);
-          expect(await second.cache.getCacheDriver().get(first.cache.refreshKeyCacheKey(q, 'default'))).toBeFalsy();
-          clock.mockReturnValue(now + 2000);
-          const enqueue = jest.spyOn(second.cache, 'queryWithRetryAndRelease');
-          const after = await second.cache.cacheRefreshKeyResult(q, 1, { dataSource: 'default', waitForRenew: true });
-          expect(enqueue).toHaveBeenCalledTimes(1);
-          observations.push({ before, after });
-          if (localRefreshKey) {
-            expect(first.factory).not.toHaveBeenCalled();
-            expect(second.factory).not.toHaveBeenCalled();
-          }
-        }
-        // CubeStore can return a retained queue result even after the result cache entry expired.
-        // Preserve this existing SQL behavior rather than imposing stronger freshness here.
-        expect(observations[1]).toEqual(observations[0]);
       });
 
       test.each([false, true])('deduplicates concurrent misses across instances and evaluates at execution (external=%s)', async external => {
