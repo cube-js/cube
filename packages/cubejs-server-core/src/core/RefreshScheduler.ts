@@ -344,10 +344,9 @@ export class RefreshScheduler {
     const queryForEvaluation = await compilerApi.createQueryByDataSource(compilers, {});
 
     const orchestratorApi = await this.serverCore.getOrchestratorApi(context);
-    const localRefreshKey = orchestratorApi
-      .getQueryOrchestrator()
-      .getQueryCache()
-      .isLocalRefreshKeyActive();
+    const queryCache = orchestratorApi.getQueryOrchestrator().getQueryCache();
+    const uncachedLocalRefreshKey = queryCache.isLocalRefreshKeyActive()
+      && !queryCache.options.refreshKeyRenewalThreshold;
 
     await Promise.all(queryForEvaluation.cubeEvaluator.cubeNames().map(async cube => {
       const cubeFromPath = queryForEvaluation.cubeEvaluator.cubeFromPath(cube);
@@ -357,12 +356,10 @@ export class RefreshScheduler {
         return;
       }
 
-      // This method exists only to warm the shared refresh key cache, and a locally evaluated
-      // key has no cache entry to warm — the getSql plus executeQuery per timezone below would
-      // be spent on a result that is thrown away. A `sql` key still hits the data source, and
-      // so do interval keys whenever the cache declines to evaluate them locally.
+      // Without a threshold, local keys have no entry to warm. With a threshold, warm the
+      // shared entry as for SQL keys; its value is computed locally inside the queue.
       const sqlRefreshKey = !!cubeFromPath.refreshKey && 'sql' in cubeFromPath.refreshKey;
-      if (localRefreshKey && !sqlRefreshKey) {
+      if (uncachedLocalRefreshKey && !sqlRefreshKey) {
         return;
       }
 

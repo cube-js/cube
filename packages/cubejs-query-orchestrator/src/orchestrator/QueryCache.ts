@@ -33,7 +33,14 @@ import {
 } from './utils';
 import { CacheAndQueryDriverType, MetadataOperationType } from './QueryOrchestrator';
 
+/**
+ * Refresh key cache TTL in seconds for the pre-aggregation loader.
+ */
+export const REFRESH_KEY_CACHE_TTL = 60 * 60;
+
 export type CacheQueryResultOptions = {
+  /** Compute this refresh key inside the queue instead of executing its SQL. */
+  localRefreshKey?: LocalRefreshKeyDescriptor,
   renewalThreshold?: number,
   renewalKey?: any,
   priority?: number,
@@ -233,26 +240,17 @@ export class QueryCache {
     this.localRefreshKeyEnabled = options.localRefreshKey ?? false;
   }
 
-  /**
-   * Whether interval based refresh keys are answered from this instance clock instead of being
-   * run as queries and cached.
-   */
+  /** Whether interval based refresh keys use the instance clock instead of executing SQL. */
   public isLocalRefreshKeyActive(): boolean {
-    return this.localRefreshKeyEnabled && !this.options.refreshKeyRenewalThreshold;
+    return this.localRefreshKeyEnabled;
   }
 
-  public localRefreshKeyResult(queryOptions?: QueryOptions): [{ refresh_key: string }] | null {
-    if (!this.localRefreshKeyEnabled || !isValidLocalRefreshKey(queryOptions?.localRefreshKey)) {
-      return null;
-    }
-
-    // `refreshKeyRenewalThreshold` throttles how often the SQL result is re-read, and that is
-    // also what bounds how often the key advances: a value cached for a day advances daily,
-    // whatever `every` says. A locally evaluated key has no cache entry to age out, so the only
-    // way to keep honouring the override is to leave these keys on the SQL path.
-    // TODO: support the two together by snapping the local value to the threshold instead of
-    // falling back to a query.
-    if (!this.isLocalRefreshKeyActive()) {
+  public localRefreshKeyResult(
+    queryOptions: QueryOptions | undefined,
+    // Retained for API compatibility; evaluation no longer depends on the identity.
+    _cacheKey: CacheKey,
+  ): [{ refresh_key: string }] | null {
+    if (!this.isLocalRefreshKeyActive() || queryOptions?.incremental || !isValidLocalRefreshKey(queryOptions?.localRefreshKey)) {
       return null;
     }
 
@@ -516,16 +514,20 @@ export class QueryCache {
     options: RefreshKeyCacheOptions,
   ) {
     const [query, values, queryOptions] = sqlQuery;
-
-    const local = this.localRefreshKeyResult(queryOptions);
-    if (local) {
-      return local;
-    }
-
     const cacheKey = QueryCache.refreshKeyIdentity(sqlQuery, options.dataSource);
 
+    const localRefreshKey = this.isLocalRefreshKeyActive() && !queryOptions?.incremental
+      && isValidLocalRefreshKey(queryOptions?.localRefreshKey) ? queryOptions.localRefreshKey : undefined;
+
+    if (localRefreshKey && !this.options.refreshKeyRenewalThreshold) {
+      return this.localRefreshKeyResult(queryOptions, cacheKey);
+    }
+
+    // An explicit threshold retains the shared entry and the SQL path's TTL and renewal rules.
+    // The queue evaluates the local descriptor only when a miss or renewal needs a new value.
     return this.cacheQueryResult(query, values, cacheKey, expiration, {
       ...options,
+      localRefreshKey,
       renewalThreshold: this.options.refreshKeyRenewalThreshold
         || queryOptions?.renewalThreshold || 2 * 60,
       renewalKey: cacheKey,
@@ -604,7 +606,9 @@ export class QueryCache {
       lambdaTypes,
       persistent,
       aliasNameToMember,
+      localRefreshKey,
     }: {
+      localRefreshKey?: LocalRefreshKeyDescriptor,
       cacheKey: CacheKey,
       dataSource: string,
       external: boolean,
@@ -624,6 +628,7 @@ export class QueryCache {
 
     const _query = {
       queryKey: cacheKey,
+      localRefreshKey,
       query,
       values,
       requestId,
@@ -792,6 +797,10 @@ export class QueryCache {
           }
         },
         query: async (req, setCancelHandle) => {
+          if (isValidLocalRefreshKey(req.localRefreshKey)) {
+            return evaluateLocalRefreshKey(req.localRefreshKey);
+          }
+
           const client = await clientFactory();
 
           const resultPromise = executeFn(client, req);
@@ -1129,6 +1138,7 @@ export class QueryCache {
 
     return this.queryWithRetryAndRelease(query, values, {
       cacheKey,
+      localRefreshKey: options.localRefreshKey,
       priority: options.priority,
       external: options.external,
       requestId: options.requestId,

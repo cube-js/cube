@@ -1,5 +1,5 @@
 import R from 'ramda';
-import { BaseDriver } from '@cubejs-backend/query-orchestrator';
+import { BaseDriver, CacheEntry } from '@cubejs-backend/query-orchestrator';
 import { pausePromise, SchemaFileRepository, createPromiseLock } from '@cubejs-backend/shared';
 import { CubejsServerCore, CompilerApi, RefreshScheduler } from '../../src';
 
@@ -1288,18 +1288,28 @@ describe('Refresh Scheduler', () => {
     const ctx = { authInfo: { tenantId: 'tenant1' }, securityContext: { tenantId: 'tenant1' }, requestId: 'local refresh key' };
 
     const runRefresh = async (refreshKeyRenewalThreshold?: number) => {
-      const { refreshScheduler, mockDriver } = setupScheduler({
+      const { refreshScheduler, mockDriver, serverCore } = setupScheduler({
         repository: repositoryWithRefreshKeys,
         refreshKeyRenewalThreshold,
       });
 
-      await refreshScheduler.runScheduledRefresh(ctx, {
-        concurrency: 1,
-        workerIndices: [0],
-        throwErrors: true,
-      });
+      const orchestrator = await serverCore.getOrchestratorApi(ctx);
+      const queryCache = orchestrator.getQueryOrchestrator().getQueryCache();
+      const set = jest.spyOn(queryCache.getCacheDriver(), 'set');
+      let localEntries;
+      try {
+        await refreshScheduler.runScheduledRefresh(ctx, {
+          concurrency: 1,
+          workerIndices: [0],
+          throwErrors: true,
+        });
+        localEntries = set.mock.calls.filter(([, entry]) => (entry as CacheEntry)?.result?.[0]?.refresh_key !== undefined);
+      } finally {
+        set.mockRestore();
+      }
 
       return {
+        localEntries,
         // `every` keys render as `SELECT FLOOR(...) as refresh_key`, a `sql` key renders as itself
         intervalKeyQueries: mockDriver.executedQueries.filter(q => q.match(/refresh_key/)),
         sqlKeyQueries: mockDriver.executedQueries.filter(q => q.match(/sql_cube_refresh/)),
@@ -1316,18 +1326,20 @@ describe('Refresh Scheduler', () => {
     test('skips interval keys that are evaluated locally', async () => {
       process.env.CUBEJS_REFRESH_KEY_LOCAL_TIME = 'true';
 
-      const { intervalKeyQueries, sqlKeyQueries } = await runRefresh();
+      const { intervalKeyQueries, sqlKeyQueries, localEntries } = await runRefresh();
 
+      expect(localEntries).toEqual([]);
       expect(intervalKeyQueries).toEqual([]);
       expect(sqlKeyQueries.length).toBeGreaterThan(0);
     });
 
-    test('keeps warming interval keys when refreshKeyRenewalThreshold vetoes local evaluation', async () => {
+    test('warms local refresh key entries without SQL when refreshKeyRenewalThreshold is set', async () => {
       process.env.CUBEJS_REFRESH_KEY_LOCAL_TIME = 'true';
 
-      const { intervalKeyQueries, sqlKeyQueries } = await runRefresh(120);
+      const { intervalKeyQueries, sqlKeyQueries, localEntries } = await runRefresh(120);
 
-      expect(intervalKeyQueries.length).toBeGreaterThan(0);
+      expect(localEntries.length).toBeGreaterThan(0);
+      expect(intervalKeyQueries).toEqual([]);
       expect(sqlKeyQueries.length).toBeGreaterThan(0);
     });
   });

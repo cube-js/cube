@@ -3,6 +3,8 @@ import { CacheMode, createCancelablePromise, pausePromise } from '@cubejs-backen
 import { QueuePriority } from '@cubejs-backend/base-driver';
 
 import { CacheKey, CacheKeyItem, ContinueWaitError, QueryCache, QueryCacheOptions } from '../../src';
+import { evaluateLocalRefreshKey } from '../../src/orchestrator/utils';
+import { localRefreshKeyQueueTests } from './LocalRefreshKeyQueue.abstract';
 
 export type QueryCacheTestOptions = QueryCacheOptions & {
   beforeAll?: () => Promise<void>,
@@ -43,6 +45,8 @@ export const QueryCacheTest = (name: string, options: QueryCacheTestOptions) => 
         await options?.afterAll();
       }
     });
+
+    localRefreshKeyQueueTests(options);
 
     it('withLock', async () => {
       const RANDOM_KEY_CACHE = crypto.randomBytes(16).toString('hex');
@@ -576,7 +580,8 @@ export const QueryCacheTest = (name: string, options: QueryCacheTestOptions) => 
       ) => {
         const localCache = newCache(additionalOptions);
         const spy = jest.spyOn(localCache, 'queryWithRetryAndRelease')
-          .mockImplementation(async () => [{ refresh_key: 12345 }]);
+          .mockImplementation(async (_query, _values, opts) => (opts.localRefreshKey
+            ? evaluateLocalRefreshKey(opts.localRefreshKey) : [{ refresh_key: 12345 }]));
 
         try {
           const [result] = await Promise.all(
@@ -587,7 +592,12 @@ export const QueryCacheTest = (name: string, options: QueryCacheTestOptions) => 
             )
           );
 
-          return { result, executed: spy.mock.calls.length, logged: localCache.logger.mock.calls };
+          return {
+            result,
+            executed: spy.mock.calls.filter(([, , opts]) => !opts.localRefreshKey).length,
+            queued: spy.mock.calls.length,
+            logged: localCache.logger.mock.calls,
+          };
         } finally {
           spy.mockRestore();
           await localCache.cleanup();
@@ -632,20 +642,21 @@ export const QueryCacheTest = (name: string, options: QueryCacheTestOptions) => 
         expect(executed).toBe(1);
       });
 
-      // Local evaluation would advance the key on every interval boundary, ignoring the
-      // throttle a deployment asked for and multiplying pre-aggregation rebuilds.
-      it('runs the query when refreshKeyRenewalThreshold is configured', async () => {
-        const { result, executed } = await loadRefreshKey(
-          { external: true, renewalThreshold: 60, localRefreshKey: descriptor },
-          { localRefreshKey: true, refreshKeyRenewalThreshold: 24 * 60 * 60 },
-        );
-
-        expect(executed).toBe(1);
-        expect(result).toEqual([{ refresh_key: 12345 }]);
+      it('caches a locally computed value under a threshold without executing SQL', async () => {
+        const nowSpy = jest.spyOn(Date, 'now').mockReturnValue(97_800_000);
+        try {
+          const { result, executed, queued } = await loadRefreshKey(
+            { external: true, renewalThreshold: 60, localRefreshKey: descriptor },
+            { localRefreshKey: true, refreshKeyRenewalThreshold: 86400 },
+          );
+          expect(result).toEqual([{ refresh_key: '163' }]);
+          expect(executed).toBe(0);
+          expect(queued).toBe(1);
+        } finally {
+          nowSpy.mockRestore();
+        }
       });
 
-      // The refresh scheduler reads this to decide whether warming a refresh key is pointless,
-      // so it has to agree with the branches above.
       it('reports whether local evaluation is in effect', async () => {
         const enabled = newCache({ localRefreshKey: true });
         const disabled = newCache({ localRefreshKey: false });
@@ -654,7 +665,7 @@ export const QueryCacheTest = (name: string, options: QueryCacheTestOptions) => 
         try {
           expect(enabled.isLocalRefreshKeyActive()).toBe(true);
           expect(disabled.isLocalRefreshKeyActive()).toBe(false);
-          expect(throttled.isLocalRefreshKeyActive()).toBe(false);
+          expect(throttled.isLocalRefreshKeyActive()).toBe(true);
         } finally {
           await Promise.all([enabled.cleanup(), disabled.cleanup(), throttled.cleanup()]);
         }
@@ -676,10 +687,6 @@ export const QueryCacheTest = (name: string, options: QueryCacheTestOptions) => 
       it.each([
         { name: 'the flag is off', additionalOptions: { localRefreshKey: false } },
         { name: 'the flag is unset', additionalOptions: {} },
-        {
-          name: 'refreshKeyRenewalThreshold is configured',
-          additionalOptions: { localRefreshKey: true, refreshKeyRenewalThreshold: 24 * 60 * 60 },
-        },
       ])('does not report the declined local evaluation when $name', async ({ additionalOptions }) => {
         const { logged } = await loadRefreshKey(
           { external: true, renewalThreshold: 60, localRefreshKey: descriptor },
@@ -705,9 +712,10 @@ export const QueryCacheTest = (name: string, options: QueryCacheTestOptions) => 
         };
 
         const queryOptions = (localRefreshKey?: unknown) => <any>{ localRefreshKey };
+        const cacheKey: CacheKey = [REFRESH_KEY_SQL, [], true, 'default'];
 
         it('evaluates a valid descriptor', () => withCache({ localRefreshKey: true }, localCache => {
-          expect(localCache.localRefreshKeyResult(queryOptions(descriptor)))
+          expect(localCache.localRefreshKeyResult(queryOptions(descriptor), cacheKey))
             .toEqual([{ refresh_key: String(Math.floor(Date.now() / 1000 / 600)) }]);
         }));
 
@@ -715,30 +723,37 @@ export const QueryCacheTest = (name: string, options: QueryCacheTestOptions) => 
         // a string too or flipping the flag invalidates every pre-aggregation once.
         it('returns the key as a string', () => withCache({ localRefreshKey: true }, localCache => {
           const [{ refresh_key: value }] = localCache
-            .localRefreshKeyResult(queryOptions(descriptor))!;
+            .localRefreshKeyResult(queryOptions(descriptor), cacheKey)!;
 
           expect(typeof value).toBe('string');
         }));
 
         it('declines when the flag is off', () => withCache({ localRefreshKey: false }, localCache => {
-          expect(localCache.localRefreshKeyResult(queryOptions(descriptor))).toBeNull();
+          expect(localCache.localRefreshKeyResult(queryOptions(descriptor), cacheKey)).toBeNull();
         }));
 
         it('declines without a descriptor', () => withCache({ localRefreshKey: true }, localCache => {
-          expect(localCache.localRefreshKeyResult()).toBeNull();
-          expect(localCache.localRefreshKeyResult(queryOptions())).toBeNull();
+          expect(localCache.localRefreshKeyResult(undefined, cacheKey)).toBeNull();
+          expect(localCache.localRefreshKeyResult(queryOptions(), cacheKey)).toBeNull();
         }));
 
         it('declines a malformed descriptor', () => withCache({ localRefreshKey: true }, localCache => {
           expect(localCache.localRefreshKeyResult(
             queryOptions({ ...descriptor, interval: 0 }),
+            cacheKey,
           )).toBeNull();
         }));
 
-        it('declines when refreshKeyRenewalThreshold is configured', () => withCache(
-          { localRefreshKey: true, refreshKeyRenewalThreshold: 24 * 60 * 60 },
+        it('uses the current time rather than rounding to the threshold', () => withCache(
+          { localRefreshKey: true, refreshKeyRenewalThreshold: 86400 },
           localCache => {
-            expect(localCache.localRefreshKeyResult(queryOptions(descriptor))).toBeNull();
+            const nowSpy = jest.spyOn(Date, 'now').mockReturnValue(97_800_000);
+            try {
+              expect(localCache.localRefreshKeyResult(queryOptions(descriptor), cacheKey))
+                .toEqual([{ refresh_key: '163' }]);
+            } finally {
+              nowSpy.mockRestore();
+            }
           },
         ));
       });

@@ -1522,7 +1522,7 @@ this variable.
 
 To check an `every`-based [`refresh_key`](/reference/data-modeling/cube#refresh_key), Cube
 asks the database what time it is. If `true`, it uses its own clock instead and those
-queries stop entirely, including the ones scheduled refresh issues to warm them.
+SQL queries stop entirely, including the ones issued by scheduled refresh.
 
 | Possible Values | Default in Development | Default in Production |
 | --------------- | ---------------------- | --------------------- |
@@ -1534,10 +1534,13 @@ tenant, and timezone in the deployment.
 
 Refresh keys written with `sql` or marked
 [`incremental`](/reference/data-modeling/pre-aggregations#incremental) keep querying the
-database, since their values depend on your data and not just on the time. So do all
-refresh keys if you have set
-[`queryCacheOptions.refreshKeyRenewalThreshold`][ref-config-query-cache-options], which
-works by caching the query result.
+database, since their values depend on your data and not just on the time.
+
+[`queryCacheOptions.refreshKeyRenewalThreshold`][ref-config-query-cache-options] is still
+honoured: when set, the locally computed value uses the same shared cache, expiration,
+renewal rules, and queue as the SQL result. Scheduled refresh still warms these entries,
+without querying the database for the time. Without an override, local keys are computed
+directly from the current time without a cache entry.
 
 <Warning>
 
