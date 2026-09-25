@@ -37,8 +37,8 @@ describe('transpileSimpleFString', () => {
     ['f"f"', '`f`;'],
     ['f"rf"', '`rf`;'],
     ['f"FR"', '`FR`;'],
-    ['f"{x}f"', '`${x}f`;'],
-    ['f"{x}.rf"', '`${x}.rf`;'],
+    ['f"{x}f"', `\`\${x}f\`;`],
+    ['f"{x}.rf"', `\`\${x}.rf\`;`],
   ])('keeps the text the parser drops in %s', (code, expected) => {
     expect(babelGenerator(transpileSimpleFString(code)!).code).toEqual(expected);
   });
