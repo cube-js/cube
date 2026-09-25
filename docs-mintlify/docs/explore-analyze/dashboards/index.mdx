@@ -106,8 +106,8 @@ options sidebar warns you to update those links.)
 ## Download as PNG, PDF, or CSV {#download-as-png-or-pdf}
 
 Open a published dashboard, click the **More actions** (`⋯`) button in the
-header, and choose **Download as PNG** or **Download as PDF**. The file is
-named after the dashboard's title.
+header, and choose **Download as PNG**, **Download as PDF**, or [**Print
+version**](#print-version). The file is named after the dashboard's title.
 
 To export a **single chart** instead of the whole dashboard, hover the chart
 widget, open its **⋮** menu, and choose **Download as PNG** or **Download as
@@ -133,9 +133,50 @@ mechanism powers PNG/PDF attachments on [notifications][ref-notifications] sent
 after a [scheduled refresh][ref-scheduled-refreshes], and is also available
 programmatically — see the [Control Plane API][ref-control-plane-api].
 
+### Print version {#print-version}
+
+**Print version**, directly under **Download as PDF** in the same menu,
+downloads the dashboard as a paper document rather than a picture of the
+screen. Where **Download as PDF** captures the dashboard's grid as it is laid
+out, the print version rebuilds it for A4 pages:
+
+- Page 1 opens with the dashboard's title and, under it, one read-only line
+  stating the control selections the file was made with, for example
+  `Filters: Status is completed · Created at = Week`. Every filter, time
+  granularity switcher, field switcher and parent control that holds a value
+  contributes to that line, [hidden][ref-control-visibility] ones included. A
+  dashboard with no controls, or none holding a value, prints no such line.
+- The controls themselves are left out: no dropdown, picker or clear button
+  appears on the page.
+- Every other widget — charts, tables, KPIs, text and AI summaries — prints
+  full page width, one below another, in the order you read the dashboard: top
+  to bottom, then left to right. Widgets inside a [layout
+  container][ref-layout] print in the same flow, and a tabs container prints
+  the widgets of **every** tab, in tab order, not only the tab on screen.
+- A table prints every row its query returned, fitted to the page width, and
+  continues onto the following pages with its column headers repeated at the
+  top of each. A table row is never split between two pages.
+- A chart, KPI, text or AI summary block that doesn't fit in the space left on
+  a page starts on the next page instead of being cut in two.
+
+<Info>
+
+A **pivoted** table is the exception to the table rule above: it prints as a
+fixed-height grid, the way it looks on the dashboard, so a long one shows only
+its first rows.
+
+</Info>
+
+Your current control selections are carried into the print version exactly as
+they are into **Download as PDF**, and it requires the same permission.
+[Notification][ref-notifications] attachments and the Control Plane API don't
+offer it: they always render the on-screen layout.
+
 [ref-workbooks]: /docs/explore-analyze/workbooks
 [ref-widgets]: /docs/explore-analyze/dashboards/widgets
 [ref-controls]: /docs/explore-analyze/dashboards/widgets/controls
+[ref-control-visibility]: /docs/explore-analyze/dashboards/widgets/controls#visibility
+[ref-layout]: /docs/explore-analyze/dashboards/widgets/layout
 [ref-dimension-links]: /docs/data-modeling/dimensions#links
 [ref-notifications]: /docs/explore-analyze/notifications
 [ref-scheduled-refreshes]: /docs/explore-analyze/scheduled-refreshes
