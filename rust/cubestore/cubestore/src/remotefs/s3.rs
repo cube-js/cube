@@ -234,17 +234,7 @@ fn spawn_creds_refresh_loop(
     let server_side_encryption = fs.server_side_encryption.clone();
     let is_web_identity = token_file.is_some() && role_arn.is_some();
 
-    // Web identity STS credentials expire in ~1 hour, so poll the token file
-    // every 30s by default. Static credentials use 3-hour default.
-    // CUBESTORE_AWS_CREDS_REFRESH_EVERY_MINS overrides both.
-    let refresh_every = {
-        let configured = refresh_interval_from_env();
-        if is_web_identity && configured == Duration::from_secs(60 * 180) {
-            Duration::from_secs(30)
-        } else {
-            configured
-        }
-    };
+    let refresh_every = creds_refresh_interval(refresh_interval_from_env(), is_web_identity);
 
     if refresh_every.as_secs() == 0 {
         return;
@@ -337,8 +327,25 @@ fn spawn_creds_refresh_loop(
     });
 }
 
+const DEFAULT_CREDS_REFRESH_INTERVAL: Duration = Duration::from_secs(60 * 180);
+const WEB_IDENTITY_DEFAULT_POLL: Duration = Duration::from_secs(30);
+/// An STS session can be as short as 15 min; a longer poll would sleep through it.
+const WEB_IDENTITY_MAX_POLL: Duration = Duration::from_secs(5 * 60);
+
+/// Zero still disables the loop. The default and any override are sized to the
+/// STS session in web identity mode; static credentials keep the configured value.
+fn creds_refresh_interval(configured: Duration, is_web_identity: bool) -> Duration {
+    if !is_web_identity || configured.is_zero() {
+        configured
+    } else if configured == DEFAULT_CREDS_REFRESH_INTERVAL {
+        WEB_IDENTITY_DEFAULT_POLL
+    } else {
+        configured.min(WEB_IDENTITY_MAX_POLL)
+    }
+}
+
 fn refresh_interval_from_env() -> Duration {
-    let mut mins = 180; // 3 hours by default.
+    let mut mins = DEFAULT_CREDS_REFRESH_INTERVAL.as_secs() / 60;
     if let Ok(s) = std::env::var("CUBESTORE_AWS_CREDS_REFRESH_EVERY_MINS") {
         match s.parse::<u64>() {
             Ok(i) => mins = i,
@@ -872,6 +879,38 @@ mod tests {
         let margin = web_identity_expiry_margin(poll_every);
         assert!(
             web_identity_refresh_reason(&state, state.token_file_modified, now(), margin).is_some()
+        );
+    }
+
+    #[test]
+    fn web_identity_poll_is_capped_inside_the_sts_session() {
+        let two_hours = Duration::from_secs(120 * 60);
+        assert_eq!(
+            creds_refresh_interval(two_hours, true),
+            WEB_IDENTITY_MAX_POLL
+        );
+        let margin = web_identity_expiry_margin(creds_refresh_interval(two_hours, true));
+        assert!(margin < Duration::from_secs(15 * 60));
+    }
+
+    #[test]
+    fn web_identity_poll_defaults_to_seconds_and_keeps_short_overrides() {
+        assert_eq!(
+            creds_refresh_interval(DEFAULT_CREDS_REFRESH_INTERVAL, true),
+            WEB_IDENTITY_DEFAULT_POLL
+        );
+        let one_min = Duration::from_secs(60);
+        assert_eq!(creds_refresh_interval(one_min, true), one_min);
+        assert_eq!(creds_refresh_interval(Duration::ZERO, true), Duration::ZERO);
+    }
+
+    #[test]
+    fn static_credentials_keep_the_configured_interval() {
+        let two_hours = Duration::from_secs(120 * 60);
+        assert_eq!(creds_refresh_interval(two_hours, false), two_hours);
+        assert_eq!(
+            creds_refresh_interval(DEFAULT_CREDS_REFRESH_INTERVAL, false),
+            DEFAULT_CREDS_REFRESH_INTERVAL
         );
     }
 
