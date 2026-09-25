@@ -163,6 +163,11 @@ fn new_bucket(
 /// nearly-dead session token.
 const WEB_IDENTITY_EXPIRY_MARGIN: Duration = Duration::from_secs(5 * 60);
 
+/// The next wake-up is the last chance to react, so one poll plus the headroom.
+fn web_identity_expiry_margin(refresh_every: Duration) -> Duration {
+    refresh_every + WEB_IDENTITY_EXPIRY_MARGIN
+}
+
 fn credentials_expiration(credentials: &Credentials) -> Option<SystemTime> {
     let unix_seconds = credentials.expiration.as_ref()?.unix_timestamp();
     if unix_seconds < 0 {
@@ -178,6 +183,17 @@ struct WebIdentityCredsState {
     token_file_modified: Option<SystemTime>,
     expiration: Option<SystemTime>,
     last_attempted: SystemTime,
+}
+
+impl WebIdentityCredsState {
+    fn record_attempt(&mut self, now: SystemTime) {
+        self.last_attempted = now;
+    }
+
+    fn commit(&mut self, token_file_modified: Option<SystemTime>, expiration: Option<SystemTime>) {
+        self.token_file_modified = token_file_modified;
+        self.expiration = expiration;
+    }
 }
 
 /// The mtime alone is not sufficient: Kubernetes rotates the projected token on a
@@ -234,8 +250,7 @@ fn spawn_creds_refresh_loop(
         return;
     }
 
-    // The next wake-up is the last chance to react, so one poll plus the headroom.
-    let expiry_margin = refresh_every + WEB_IDENTITY_EXPIRY_MARGIN;
+    let expiry_margin = web_identity_expiry_margin(refresh_every);
 
     let fs = Arc::downgrade(fs);
     let mut state = WebIdentityCredsState {
@@ -275,7 +290,7 @@ fn spawn_creds_refresh_loop(
                     Some(reason) => {
                         info!("Refreshing S3 credentials: {}", reason);
                         observed_token_file_modified = token_file_modified;
-                        state.last_attempted = SystemTime::now();
+                        state.record_attempt(SystemTime::now());
                     }
                 }
             }
@@ -315,8 +330,7 @@ fn spawn_creds_refresh_loop(
             };
             fs.bucket.swap(Arc::new(b));
             if is_web_identity {
-                state.token_file_modified = observed_token_file_modified;
-                state.expiration = expiration;
+                state.commit(observed_token_file_modified, expiration);
             }
             log::debug!("Successfully refreshed S3 credentials")
         }
@@ -748,19 +762,53 @@ mod tests {
 
     #[test]
     fn unknown_expiry_throttle_survives_failed_exchanges() {
-        // A failing exchange advances the attempt but never the expiration.
-        let state = WebIdentityCredsState {
+        // The loop records the attempt and, on failure, never reaches commit.
+        let margin = web_identity_expiry_margin(Duration::from_secs(30));
+        let mut state = WebIdentityCredsState {
             expiration: None,
-            last_attempted: now() - Duration::from_secs(30),
+            last_attempted: now() - margin,
             ..fresh_state()
         };
+        let mtime = state.token_file_modified;
+        assert!(web_identity_refresh_reason(&state, mtime, now(), margin).is_some());
+        state.record_attempt(now());
+
+        let next_poll = now() + Duration::from_secs(30);
         assert_eq!(
-            web_identity_refresh_reason(
-                &state,
-                state.token_file_modified,
-                now(),
-                Duration::from_secs(30) + WEB_IDENTITY_EXPIRY_MARGIN
-            ),
+            web_identity_refresh_reason(&state, mtime, next_poll, margin),
+            None
+        );
+        assert!(web_identity_refresh_reason(&state, mtime, now() + margin, margin).is_some());
+    }
+
+    #[test]
+    fn failed_exchange_near_expiry_retries_on_next_poll() {
+        let margin = web_identity_expiry_margin(Duration::from_secs(30));
+        let mut state = WebIdentityCredsState {
+            expiration: Some(now() + Duration::from_secs(60)),
+            ..fresh_state()
+        };
+        let mtime = state.token_file_modified;
+        state.record_attempt(now());
+
+        let next_poll = now() + Duration::from_secs(30);
+        assert!(web_identity_refresh_reason(&state, mtime, next_poll, margin).is_some());
+    }
+
+    #[test]
+    fn committed_exchange_stops_the_refresh() {
+        let margin = web_identity_expiry_margin(Duration::from_secs(30));
+        let mut state = WebIdentityCredsState {
+            expiration: Some(now() + Duration::from_secs(60)),
+            ..fresh_state()
+        };
+        let mtime = state.token_file_modified;
+        state.record_attempt(now());
+        state.commit(mtime, Some(now() + Duration::from_secs(60 * 60)));
+
+        let next_poll = now() + Duration::from_secs(30);
+        assert_eq!(
+            web_identity_refresh_reason(&state, mtime, next_poll, margin),
             None
         );
     }
@@ -803,7 +851,7 @@ mod tests {
     fn margin_keeps_full_headroom_on_top_of_a_poll_interval() {
         // The margin must not collapse to the poll interval.
         let poll_every = WEB_IDENTITY_EXPIRY_MARGIN;
-        let margin = poll_every + WEB_IDENTITY_EXPIRY_MARGIN;
+        let margin = web_identity_expiry_margin(poll_every);
         let state = WebIdentityCredsState {
             expiration: Some(now() + poll_every + WEB_IDENTITY_EXPIRY_MARGIN),
             ..fresh_state()
@@ -821,7 +869,7 @@ mod tests {
             expiration: Some(now() + Duration::from_secs(30 * 60)),
             ..fresh_state()
         };
-        let margin = poll_every + WEB_IDENTITY_EXPIRY_MARGIN;
+        let margin = web_identity_expiry_margin(poll_every);
         assert!(
             web_identity_refresh_reason(&state, state.token_file_modified, now(), margin).is_some()
         );
