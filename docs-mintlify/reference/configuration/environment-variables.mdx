@@ -1418,6 +1418,17 @@ from the console.
 | --------------- | ---------------------- | --------------------- |
 | `true`, `false` | `false`                | `true`                |
 
+## `CUBEJS_MAX_MULTI_STAGE_DEPTH`
+
+The maximum number of [multi-stage](/docs/data-modeling/measures#multi-stage-measures) members
+chained along a single dependency path. Each one is planned as its own stage, and a chain past
+this limit is refused with an error naming the member and the depth reached, rather than crashing
+the query.
+
+| Possible Values | Default in Development | Default in Production |
+| --------------- | ---------------------- | --------------------- |
+| A valid number  | `150`                  | `150`                  |
+
 ## `CUBEJS_MAX_PARTITIONS_PER_CUBE`
 
 The maximum number of partitions each pre-aggregation in a cube can use.
@@ -2106,6 +2117,48 @@ The logging level for Cube Store.
 
 See also [`CUBEJS_LOG_LEVEL`](/reference/configuration/environment-variables#cubejs_log_level).
 
+## `CUBESTORE_MAIN_STACK_SIZE`
+
+The stack size, in bytes, for Cube Store's main thread pool. Raise it together with
+[`CUBESTORE_MAX_QUERY_PLAN_DEPTH`](#cubestore_max_query_plan_depth) and
+[`CUBESTORE_SQL_PARSER_RECURSION_LIMIT`](#cubestore_sql_parser_recursion_limit); both are stack
+budgets, and raising either one without the stack to match trades a reportable error for a stack
+overflow. The minimum accepted value is `2097152` (2 MiB).
+
+| Possible Values | Default in Development | Default in Production |
+| --------------- | ----------------------- | ----------------------- |
+| A valid number  | `8388608` (8 MiB)       | `8388608` (8 MiB)       |
+
+## `CUBESTORE_MAX_CONCURRENT_QUERY_PLANS`
+
+The maximum number of logical query plans Cube Store builds at the same time. Queries beyond the
+limit wait for a free slot, up to
+[`CUBESTORE_MAX_QUEUED_QUERY_PLANS`](#cubestore_max_queued_query_plans); `0` disables the limit.
+
+| Possible Values         | Default in Development | Default in Production |
+| ------------------------ | ----------------------- | ----------------------- |
+| `auto` or a valid number | `auto` (`max(4, 2 × cores)`) | `auto` (`max(4, 2 × cores)`) |
+
+## `CUBESTORE_MAX_QUERY_PLAN_DEPTH`
+
+The maximum nesting depth of a query plan — plan nodes, expression nodes, and the plans of
+subqueries carried in expressions all count. A query nested past this limit is refused with an
+error naming the depth reached, rather than crashing.
+
+| Possible Values | Default in Development | Default in Production |
+| --------------- | ---------------------- | --------------------- |
+| A valid number  | `150`                  | `150`                  |
+
+## `CUBESTORE_MAX_QUEUED_QUERY_PLANS`
+
+The maximum number of queries allowed to wait for a query-planning slot once
+[`CUBESTORE_MAX_CONCURRENT_QUERY_PLANS`](#cubestore_max_concurrent_query_plans) is reached. Past
+this limit, a query is rejected instead of queued; `0` disables the limit.
+
+| Possible Values | Default in Development | Default in Production |
+| --------------- | ---------------------- | --------------------- |
+| A valid number  | `5000`                 | `5000`                 |
+
 ## `CUBESTORE_MAX_WS_CONNECTIONS_PER_USER`
 
 The maximum number of concurrent WebSocket connections a single authenticated
@@ -2288,6 +2341,16 @@ The number of Cube Store sub-processes that handle `SELECT` queries.
 | Possible Values | Default in Development | Default in Production |
 | --------------- | ---------------------- | --------------------- |
 | A valid number  | `4`                    | `4`                   |
+
+## `CUBESTORE_SQL_PARSER_RECURSION_LIMIT`
+
+The nesting depth the Cube Store SQL parser accepts inside a single statement,
+e.g., a deeply nested filter or calculated expression. A query nested past this
+limit is rejected with an error naming the depth reached, rather than crashing.
+
+| Possible Values | Default in Development | Default in Production |
+| --------------- | ---------------------- | --------------------- |
+| A valid number  | `128`                  | `128`                  |
 
 ## `CUBESTORE_SERVER_NAME`
 
