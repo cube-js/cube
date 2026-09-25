@@ -9,30 +9,34 @@ Area charts add a filled region beneath the line. The fill communicates magnitud
 
 ### Stacked
 
-Each series is stacked on top of the previous one. The top edge shows the cumulative total; each filled band shows the individual contribution. Use this for part-to-whole breakdowns over time (e.g. revenue by product category over months).
+Break the measure down by a dimension and leave its placement at **Stacked**: the areas stack on each other. The top edge shows the cumulative total and each filled band its individual contribution. Use this for part-to-whole breakdowns over time, such as revenue by product category over months.
 
 {/* Screenshot: stacked area chart — total sale price by month, split by product category (4–5 stacked bands). Place directly below this heading, full-width. (hidden — replace this comment with <Frame><img src="..." /></Frame> when image is ready) */}
 
-### Percentage stacked (Stack %)
+### Stacked to 100%
 
-Each series is normalized to 100% at every X-axis value, showing proportional contribution over time. Use when relative share matters more than absolute volume.
+Set the placement to **Stacked to 100%** and the areas fill the full height at every position, showing proportional contribution over time. Use when relative share matters more than absolute volume.
 
 {/* Screenshot: percentage stacked area chart — same data normalized to 100%. Place directly below this heading, full-width. (hidden — replace this comment with <Frame><img src="..." /></Frame> when image is ready) */}
 
 ### Overlaid
 
-All series share the same baseline. Use only when series are clearly separated in value and you want to compare trajectories rather than totals — with many series, fills will occlude each other.
+Set the placement to **Overlaid** and the areas share the baseline. Use only when the series are clearly separated in value and you want to compare trajectories rather than totals — with many series, the fills occlude each other.
 
 {/* Screenshot: overlaid area chart — two series, clearly separated in value. Place directly below this heading, full-width. (hidden — replace this comment with <Frame><img src="..." /></Frame> when image is ready) */}
 
-## Stacking
+## Placement
 
-Set stacking behavior in the **Color & stacking** section of the Style tab. The **Stack**, **Stack %**, and **Overlay** options are the relevant modes for area charts.
+Placement is set on the measure's **Break down by** row in the Fields tab: **Stacked**, **Overlaid**, or **Stacked to 100%**. Each measure is placed independently. See [Fields](/docs/explore-analyze/charts/configuration/fields#break-down-by) for the full reference.
 
-{/* Screenshot: stacking dropdown in the Style tab. Place inline, 50% width, right-aligned. (hidden — replace this comment with <Frame><img src="..." /></Frame> when image is ready) */}
+{/* Screenshot: the placement segments on a measure's Break down by row — stacked, overlaid, stacked to 100%. Place inline, 50% width, right-aligned. (hidden — replace this comment with <Frame><img src="..." /></Frame> when image is ready) */}
 
-See [Color & stacking](/docs/explore-analyze/charts/configuration/color-and-stacking) for palette options and stacked segment sorting.
+See [Color & legend](/docs/explore-analyze/charts/configuration/color-and-stacking) for palette options.
+
+## Area appearance
+
+An area's row in its axis section on the Style tab carries an **Interpolation** picker — **Linear**, **Step**, or **Smooth** — and a **Trend line** toggle.
 
 ## Axis behavior
 
-Area charts use a temporal X axis for time dimensions — continuous and time-aware. For non-time fields, the axis is ordinal.
+Area charts use a temporal dimension axis for time dimensions — continuous and time-aware. For non-time fields, the axis is ordinal.
