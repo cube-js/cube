@@ -1980,7 +1980,8 @@ The Secret Access Key for AWS. Required when using AWS S3.
 
 The number of minutes after which Cube Store should refresh AWS credentials.
 Required when using an AWS instance role. In web identity mode, the default is a
-30-second poll and any override is capped at 5 minutes.
+30-second poll, any override is capped at 5 minutes, and `0` disables the refresh
+(STS credentials then expire after one session).
 
 | Possible Values           | Default in Development | Default in Production |
 | ------------------------- | ---------------------- | --------------------- |
