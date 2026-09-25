@@ -33,10 +33,7 @@ import {
 } from './utils';
 import { CacheAndQueryDriverType, MetadataOperationType } from './QueryOrchestrator';
 
-/**
- * Refresh key cache TTL in seconds for the pre-aggregation loader.
- */
-export const REFRESH_KEY_CACHE_TTL = 60 * 60;
+export const REFRESH_KEY_CACHE_TTL_SECONDS = 60 * 60;
 
 export type CacheQueryResultOptions = {
   /** Compute this refresh key directly instead of executing its SQL. */
@@ -240,18 +237,13 @@ export class QueryCache {
     this.localRefreshKeyEnabled = options.localRefreshKey ?? false;
   }
 
-  /** Whether interval based refresh keys use the instance clock instead of executing SQL. */
-  public isLocalRefreshKeyActive(): boolean {
-    return this.localRefreshKeyEnabled;
-  }
-
   /** Whether eligible local refresh keys have no shared cache entry to warm. */
   public usesUncachedLocalRefreshKey(): boolean {
-    return this.isLocalRefreshKeyActive() && !this.options.refreshKeyRenewalThreshold;
+    return this.localRefreshKeyEnabled && !this.options.refreshKeyRenewalThreshold;
   }
 
   private localRefreshKeyFor(queryOptions?: QueryOptions): LocalRefreshKeyDescriptor | null {
-    if (!this.isLocalRefreshKeyActive() || queryOptions?.incremental || !isValidLocalRefreshKey(queryOptions?.localRefreshKey)) {
+    if (!this.localRefreshKeyEnabled || queryOptions?.incremental || !isValidLocalRefreshKey(queryOptions?.localRefreshKey)) {
       return null;
     }
 
@@ -524,7 +516,7 @@ export class QueryCache {
     }
 
     // An explicit threshold retains the shared entry and the SQL path's TTL and renewal rules.
-    // Local evaluation bypasses queue slots and deduplication so it cannot wait behind SQL.
+    // Local evaluation avoids SQL queue waits; concurrent cache writes are last-writer-wins.
     return this.cacheQueryResult(query, values, cacheKey, expiration, {
       ...options,
       localRefreshKey,
