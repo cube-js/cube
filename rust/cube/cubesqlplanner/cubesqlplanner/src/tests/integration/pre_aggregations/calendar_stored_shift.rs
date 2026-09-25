@@ -292,14 +292,16 @@ async fn stored_named_shift_resolved_differently_by_a_stored_member_falls_back()
     }
 }
 
-/// Without a time member of the calendar the query applies no shift at all,
-/// while the build mapped every stored row through the calendar, so the
-/// stored shifted column must not be read. The unshifted leaves still are.
+/// Reading none of the shifted time members, the query applies no shift at
+/// all, while the build shifted every stored row, so the stored shifted
+/// column must not be read. The unshifted leaves still are.
 #[tokio::test(flavor = "multi_thread")]
-async fn stored_calendar_shift_without_a_calendar_member_is_not_read() {
+async fn stored_shift_without_its_time_member_is_not_read() {
     for (measure, pre_agg) in [
         ("amount_ly", "sales_ly_by_week"),
         ("amount_ly_named", "sales_ly_named_by_week"),
+        ("amount_prev_year", "sales_prev_year_by_day"),
+        ("max_amount_prev_month", "sales_prev_year_by_day"),
     ] {
         let query = format!(
             indoc! {r#"

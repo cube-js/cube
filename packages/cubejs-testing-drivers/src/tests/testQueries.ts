@@ -2312,10 +2312,8 @@ export function testQueries(type: string, { includeIncrementalSchemaSuite, exten
       expect(rollup.rawData()).toMatchSnapshot();
     });
 
-    // A rollup keeps the named prior retail month by product and day; the
-    // queries ask for it by category alone, so the stored value is rolled up.
-    // The prior month is the calendar's mapping, not an interval: 2020-12-14
-    // maps to 2020-11-16, while one month back is the empty 2020-11-14.
+    // Rollup stores the named prior retail month by product and day; queries read it by category.
+    // It's the calendar mapping, not an interval: 2020-12-14 maps to 2020-11-16, not the empty 2020-11-14.
     const priorMonthByCategory = (variant: '' | 'NoPreAgg', dateRange: [string, string]) => ({
       measures: [
         'RetailOrders.retailOrderCount',

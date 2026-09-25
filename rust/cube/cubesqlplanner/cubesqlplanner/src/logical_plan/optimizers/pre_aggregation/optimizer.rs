@@ -629,26 +629,27 @@ impl PreAggregationOptimizer {
                 .all(|measure| !time_shifts.has_shift_under(measure))
     }
 
-    // A named or common shift takes its calendar mapping from every time
-    // member it lands on, and the build lands it on the stored members while
-    // a rolled-up query lands it only on the ones it reads. The stored value
-    // therefore stands for the query's only when both sides reach the same
-    // calendars — a side reaching none applies no mapping at all — and every
-    // member reached resolves the shift to the same declaration. Shifts along
-    // a chain of proxies land together, as the planner composes them.
-    fn stored_shifts_resolve_alike(
+    // A stored shift stands for the query's only where both sides land it
+    // alike: the query reads every stored time member the build shifted and
+    // reaches the same calendars, which resolve it to the same declaration.
+    fn stored_shifts_carry_over(
         pre_aggregation: &CompiledPreAggregation,
         matched_measures: &HashSet<String>,
         schema: &LogicalSchema,
         filter: &LogicalFilter,
     ) -> Result<bool, CubeError> {
+        let read = Self::read_member_names(schema, filter);
         let mut shifts = Vec::new();
         for stored in pre_aggregation
             .measures
             .iter()
             .filter(|m| matched_measures.contains(&m.full_name()))
         {
-            match Self::composed_calendar_shift(&stored.as_measure()?)? {
+            let measure = stored.as_measure()?;
+            if !Self::shifted_members_are_read(pre_aggregation, &measure, &read)? {
+                return Ok(false);
+            }
+            match Self::composed_calendar_shift(&measure)? {
                 ComposedShift::None => {}
                 ComposedShift::Unsupported => return Ok(false),
                 ComposedShift::Shift(shift) => shifts.push(shift),
@@ -714,6 +715,50 @@ impl PreAggregationOptimizer {
             }
         }
         Ok(true)
+    }
+
+    // The build lands a named or common shift on every stored time member and
+    // a dimension shift on the members it lists; a query lands either only on
+    // the members it reads.
+    fn shifted_members_are_read(
+        pre_aggregation: &CompiledPreAggregation,
+        measure: &Rc<MeasureSymbol>,
+        read: &HashSet<String>,
+    ) -> Result<bool, CubeError> {
+        let base_name = |member: &Rc<MemberSymbol>| {
+            resolve_base_symbol(member)
+                .resolve_reference_chain()
+                .full_name()
+        };
+        let mut on_every_member = false;
+        let mut targets = HashSet::new();
+        let mut measure = measure.clone();
+        loop {
+            match measure.time_shift() {
+                Some(MeasureTimeShifts::Dimensions(shifts)) => {
+                    targets.extend(shifts.iter().map(|shift| base_name(&shift.dimension)))
+                }
+                Some(_) => on_every_member = true,
+                None => {}
+            }
+            match measure.time_shift_proxy_target() {
+                Some(target) => measure = target.as_measure()?,
+                None => break,
+            }
+        }
+        Ok(pre_aggregation
+            .time_dimensions
+            .iter()
+            .chain(pre_aggregation.dimensions.iter())
+            .filter(|member| {
+                resolve_base_symbol(member)
+                    .resolve_reference_chain()
+                    .as_dimension()
+                    .is_ok_and(|dimension| dimension.is_time())
+            })
+            .map(base_name)
+            .filter(|name| on_every_member || targets.contains(name))
+            .all(|name| read.contains(&name)))
     }
 
     // The named or common shift a stored measure's chain of proxies lands on
@@ -869,12 +914,7 @@ impl PreAggregationOptimizer {
         };
 
         if match_state == MatchState::Partial
-            && !Self::stored_shifts_resolve_alike(
-                pre_aggregation,
-                &matched_measures,
-                schema,
-                filters,
-            )?
+            && !Self::stored_shifts_carry_over(pre_aggregation, &matched_measures, schema, filters)?
         {
             return Ok(None);
         }
