@@ -11,8 +11,8 @@ use datafusion::{
             Limit, Partitioning, Projection, Repartition, Sort, Subquery, TableScan, TableUDFs,
             Union, Values, Window,
         },
-        union_with_alias, Column, DFSchema, ExprRewritable, ExprSchemable, LogicalPlan,
-        LogicalPlanBuilder, Operator,
+        union_with_alias, Column, DFSchema, ExprRewritable, ExprSchemable, ExprVisitable,
+        ExpressionVisitor, LogicalPlan, LogicalPlanBuilder, Operator, Recursion,
     },
     optimizer::{
         optimizer::{OptimizerConfig, OptimizerRule},
@@ -1476,7 +1476,8 @@ fn normalize_temporal_operand(
             data_type: target_type.clone(),
         }));
     }
-    if matches!(expr_type, DataType::Date32) {
+    // A stand-in the rewrite replaces is not folded; see `holds_timestamp_stand_in`
+    if matches!(expr_type, DataType::Date32) && !holds_timestamp_stand_in(&expr) {
         return evaluate_expr(optimizer, expr.cast_to(target_type, schema)?);
     }
     Ok(expr)
@@ -1622,7 +1623,9 @@ fn in_list_expr_normalize(
             }
 
             let list_expr_type = list_expr_normalized.get_type(schema)?;
-            if !matches!(list_expr_type, DataType::Date32) {
+            if !matches!(list_expr_type, DataType::Date32)
+                || holds_timestamp_stand_in(&list_expr_normalized)
+            {
                 return Ok(list_expr_normalized);
             }
 
@@ -1682,6 +1685,12 @@ fn between_expr_normalize(
         if !bound_is_temporal || (bound_type == expr_type && !bound_is_computed) {
             return Ok(Box::new(bound));
         }
+        // `current_timestamp` and `localtimestamp` are stand-ins the rewrite
+        // replaces, which constant folding must not run; a bound holding one
+        // is left to the rewrite, as a comparison operand or IN item is
+        if holds_timestamp_stand_in(&bound) {
+            return Ok(Box::new(bound));
+        }
 
         let casted = Expr::Cast {
             expr: Box::new(bound),
@@ -1699,6 +1708,31 @@ fn between_expr_normalize(
         low,
         high,
     }))
+}
+
+/// Whether the expression holds `current_timestamp` or `localtimestamp`, the
+/// stand-ins whose body panics, anywhere in it.
+fn holds_timestamp_stand_in(expr: &Expr) -> bool {
+    struct Finder(bool);
+
+    impl ExpressionVisitor for Finder {
+        fn pre_visit(mut self, expr: &Expr) -> Result<Recursion<Self>> {
+            let is_stand_in = matches!(
+                expr,
+                Expr::ScalarUDF { fun, .. }
+                    if fun.name == "current_timestamp" || fun.name == "localtimestamp"
+            );
+            if is_stand_in {
+                self.0 = true;
+                return Ok(Recursion::Stop(self));
+            }
+            Ok(Recursion::Continue(self))
+        }
+    }
+
+    expr.accept(Finder(false))
+        .map(|found| found.0)
+        .unwrap_or(true)
 }
 
 fn evaluate_expr_stacked(optimizer: &PlanNormalize, expr: Expr) -> Result<Expr> {
