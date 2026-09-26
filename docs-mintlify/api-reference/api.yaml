@@ -30,6 +30,7 @@ tags:
   - name: dbt Sync
   - name: Databricks Metric View Publication
   - name: Databricks Metric View Integration
+  - name: Snowflake Semantic View Sync
   - name: Folders
   - name: Reports
   - name: External Documents
@@ -2783,6 +2784,180 @@ paths:
           Accepts the same `folderId`, `types`, `search`, sorting, and cursor-pagination parameters
           as `GET /workspace`. Folders reachable only because a nested item inside them was shared
           are surfaced as navigation, but their unshared siblings stay hidden.
+  /api/v1/deployments/{deploymentId}/snowflake-semantic-view-pulls:
+    post:
+      operationId: startPull
+      parameters:
+        - in: path
+          name: deploymentId
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/StartSnowflakeSemanticViewPullInput'
+        description: StartSnowflakeSemanticViewPullInput
+        required: true
+      responses:
+        '202':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SnowflakeSemanticViewSyncStartResponse'
+          description: ''
+      summary: Pull Snowflake Semantic Views into Cube
+      tags:
+        - Snowflake Semantic View Sync
+      x-mint:
+        content: >-
+          Pulls Snowflake Semantic Views into a Cube branch and returns a job ID to poll. Generated
+          files are committed to the branch. Requires an API key or OAuth deployment.write token,
+          SQL runner access, and preview enablement.
+  /api/v1/deployments/{deploymentId}/snowflake-semantic-view-pulls/{syncJobId}:
+    get:
+      operationId: getPullStatus
+      parameters:
+        - in: path
+          name: deploymentId
+          required: true
+          schema:
+            type: integer
+        - in: path
+          name: syncJobId
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SnowflakeSemanticViewSyncStatusResponse'
+          description: ''
+      summary: Get Snowflake Semantic View pull status
+      tags:
+        - Snowflake Semantic View Sync
+      x-mint:
+        content: >-
+          Poll the syncJobId returned by the pull start request. COMPLETED and FAILED are terminal;
+          a 404 means the job is not visible to this deployment.
+  /api/v1/deployments/{deploymentId}/snowflake-semantic-view-pulls/{syncJobId}/result:
+    get:
+      operationId: getPullResult
+      parameters:
+        - in: path
+          name: deploymentId
+          required: true
+          schema:
+            type: integer
+        - in: path
+          name: syncJobId
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SnowflakeSemanticViewPullResultResponse'
+          description: ''
+      summary: Get the result of a completed Snowflake Semantic View pull
+      tags:
+        - Snowflake Semantic View Sync
+      x-mint:
+        content: >-
+          Returns the generated file paths committed to the Cube branch, view count, and duration.
+          Poll status first; this endpoint returns 404 until the pull completes.
+  /api/v1/deployments/{deploymentId}/snowflake-semantic-view-syncs:
+    post:
+      operationId: startSync
+      parameters:
+        - in: path
+          name: deploymentId
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/StartSnowflakeSemanticViewSyncInput'
+        description: StartSnowflakeSemanticViewSyncInput
+        required: true
+      responses:
+        '202':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SnowflakeSemanticViewSyncStartResponse'
+          description: ''
+      summary: Push Cube views to Snowflake Semantic Views
+      tags:
+        - Snowflake Semantic View Sync
+      x-mint:
+        content: >-
+          Queues a push of selected Cube views to Snowflake and returns a syncJobId for polling.
+          Requires an API key or OAuth deployment.write token, Semantic View sync, SQL DDL access,
+          and preview enablement.
+  /api/v1/deployments/{deploymentId}/snowflake-semantic-view-syncs/{syncJobId}:
+    get:
+      operationId: getPushStatus
+      parameters:
+        - in: path
+          name: deploymentId
+          required: true
+          schema:
+            type: integer
+        - in: path
+          name: syncJobId
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SnowflakeSemanticViewSyncStatusResponse'
+          description: ''
+      summary: Get Snowflake Semantic View push status
+      tags:
+        - Snowflake Semantic View Sync
+      x-mint:
+        content: >-
+          Poll the syncJobId returned by the push start request. COMPLETED and FAILED are terminal;
+          a 404 means the job is not visible to this deployment.
+  /api/v1/deployments/{deploymentId}/snowflake-semantic-view-syncs/{syncJobId}/result:
+    get:
+      operationId: getPushResult
+      parameters:
+        - in: path
+          name: deploymentId
+          required: true
+          schema:
+            type: integer
+        - in: path
+          name: syncJobId
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SnowflakeSemanticViewPushResultResponse'
+          description: ''
+      summary: Get the result of a completed Snowflake Semantic View push
+      tags:
+        - Snowflake Semantic View Sync
+      x-mint:
+        content: >-
+          Returns the number of Snowflake Semantic Views published and the duration. Poll status
+          first; this endpoint returns 404 until the push completes.
   /api/v1/deployments/{deploymentId}/token:
     post:
       operationId: deploymentToken
@@ -12305,6 +12480,10 @@ components:
       properties:
         at:
           type: string
+        dataRefreshedAt:
+          oneOf:
+            - type: string
+            - type: 'null'
         executionError:
           oneOf:
             - type: string
@@ -13223,6 +13402,100 @@ components:
             - type: boolean
             - type: 'null'
       type: object
+    SnowflakeSemanticViewGeneratedFileResponse:
+      properties:
+        hash:
+          oneOf:
+            - type: string
+            - type: 'null'
+        path:
+          type: string
+      required:
+        - path
+      type: object
+    SnowflakeSemanticViewPullResultResponse:
+      properties:
+        completedAt:
+          type: string
+        durationMs:
+          type: integer
+        generatedFiles:
+          items:
+            $ref: '#/components/schemas/SnowflakeSemanticViewGeneratedFileResponse'
+          type: array
+        syncJobId:
+          type: string
+        viewCount:
+          type: integer
+      required:
+        - generatedFiles
+        - syncJobId
+        - viewCount
+        - completedAt
+        - durationMs
+      type: object
+    SnowflakeSemanticViewPushResultResponse:
+      properties:
+        completedAt:
+          type: string
+        durationMs:
+          type: integer
+        syncJobId:
+          type: string
+        viewCount:
+          type: integer
+      required:
+        - syncJobId
+        - viewCount
+        - completedAt
+        - durationMs
+      type: object
+    SnowflakeSemanticViewSyncProgressResponse:
+      properties:
+        message:
+          oneOf:
+            - type: string
+            - type: 'null'
+        percentComplete:
+          type: integer
+        stage:
+          type: string
+      required:
+        - stage
+        - percentComplete
+      type: object
+    SnowflakeSemanticViewSyncStartResponse:
+      properties:
+        syncJobId:
+          format: uuid
+          type: string
+        workflowId:
+          type: string
+      required:
+        - syncJobId
+        - workflowId
+      type: object
+    SnowflakeSemanticViewSyncStatusResponse:
+      properties:
+        error:
+          oneOf:
+            - type: string
+            - type: 'null'
+        progress:
+          $ref: '#/components/schemas/SnowflakeSemanticViewSyncProgressResponse'
+        status:
+          description: COMPLETED and FAILED are terminal. Treat other values as in progress.
+          type: string
+        syncJobId:
+          type: string
+        updatedAt:
+          type: string
+      required:
+        - syncJobId
+        - status
+        - progress
+        - updatedAt
+      type: object
     SourceTreeResponse:
       properties:
         data:
@@ -13369,6 +13642,93 @@ components:
           oneOf:
             - type: string
             - type: 'null'
+      type: object
+    StartSnowflakeSemanticViewPullInput:
+      properties:
+        branchName:
+          oneOf:
+            - type: string
+            - type: 'null'
+          description: Cube branch to write. Defaults to the deployment's deploy branch.
+        commitMessage:
+          oneOf:
+            - type: string
+            - type: 'null'
+        dataSource:
+          oneOf:
+            - type: string
+            - type: 'null'
+        idempotencyKey:
+          oneOf:
+            - format: uuid
+              type: string
+            - type: 'null'
+          description: >-
+            Optional idempotency key. Repeating a pull with the same key and inputs returns the
+            original sync.
+        namePrefix:
+          oneOf:
+            - type: string
+            - type: 'null'
+        outputPath:
+          minLength: 1
+          type: string
+        schema:
+          minLength: 1
+          type: string
+        titlePrefix:
+          oneOf:
+            - type: string
+            - type: 'null'
+        viewNames:
+          oneOf:
+            - items:
+                type: string
+              type: array
+            - type: 'null'
+          description: Semantic view names or * patterns to pull. Omit to pull every view in the schema.
+      required:
+        - schema
+        - outputPath
+      type: object
+    StartSnowflakeSemanticViewSyncInput:
+      properties:
+        branchName:
+          oneOf:
+            - type: string
+            - type: 'null'
+          description: Cube branch to publish. Defaults to the deployment's deploy branch when omitted.
+        dataSource:
+          oneOf:
+            - type: string
+            - type: 'null'
+        idempotencyKey:
+          oneOf:
+            - format: uuid
+              type: string
+            - type: 'null'
+          description: >-
+            Optional idempotency key. Repeating a start with the same key returns the original sync
+            instead of pushing the views twice.
+        prefix:
+          minLength: 1
+          type: string
+        schema:
+          minLength: 1
+          type: string
+        schemaPath:
+          oneOf:
+            - type: string
+            - type: 'null'
+        viewNames:
+          items:
+            type: string
+          minItems: 1
+          type: array
+      required:
+        - schema
+        - prefix
+        - viewNames
       type: object
     StartUploadResponse:
       properties:

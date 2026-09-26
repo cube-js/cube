@@ -4,11 +4,17 @@ sidebarTitle: Snowflake Semantic Views
 description: Snowflake Semantic Views integration is available in Cube on the Enterprise plan.
 ---
 
-<Info>
+<Warning>
+
+Snowflake Semantic Views integration is in preview. Reach out to the [Cube support team](/admin/account-billing/support) to activate it for your account.
+
+</Warning>
+
+<Note>
 
 Snowflake Semantic Views integration is available in Cube on the [Enterprise plan](https://cube.dev/pricing).
 
-</Info>
+</Note>
 
 Cube supports bi-directional integration with Snowflake Semantic Views. This integration enables you to author views in Cube and use them in Snowflake, or work with Snowflake semantic views directly in Cube. This ensures consistency between your Cube definitions and Snowflake's semantic layer, allowing teams to work in their preferred environment.
 
@@ -117,6 +123,40 @@ When pushing a Cube view to Snowflake, the following are currently not supported
 
 We're working closely with Snowflake to expand coverage as Snowflake Semantic
 Views evolves.
+
+## Use the Platform API
+
+You can start a push or pull through the [Platform API](/api-reference/introduction) and poll its progress. Use your tenant URL (`https://<tenant>.cubecloud.dev`), deployment ID, and an API key in the `Authorization: Api-Key <key>` header. An OAuth token with the `deployment.write` scope also works. The credential needs schema-update and SQL Runner read access to the deployment. Push additionally requires [DDL operations](#prerequisites) to be enabled.
+
+| Action | Push | Pull |
+| --- | --- | --- |
+| Start | `POST /api/v1/deployments/{deploymentId}/snowflake-semantic-view-syncs` | `POST /api/v1/deployments/{deploymentId}/snowflake-semantic-view-pulls` |
+| Check progress | `GET /api/v1/deployments/{deploymentId}/snowflake-semantic-view-syncs/{syncJobId}` | `GET /api/v1/deployments/{deploymentId}/snowflake-semantic-view-pulls/{syncJobId}` |
+| Get result | `GET /api/v1/deployments/{deploymentId}/snowflake-semantic-view-syncs/{syncJobId}/result` | `GET /api/v1/deployments/{deploymentId}/snowflake-semantic-view-pulls/{syncJobId}/result` |
+
+For a push, send `schema`, `prefix`, and an array of Cube `viewNames`. For a pull, send `schema` and `outputPath`; optionally specify Snowflake semantic `viewNames` (including `*` patterns), or omit them to pull every view in the schema. Both start requests accept `branchName`, which otherwise defaults to the deployment's deploy branch. A pull commits generated files to that branch, so use an existing review branch when you want to inspect the changes first. Both also accept an optional UUID `idempotencyKey` for safe retries.
+
+For example, start a push with:
+
+```bash
+curl -X POST "https://<tenant>.cubecloud.dev/api/v1/deployments/<deploymentId>/snowflake-semantic-view-syncs" \
+  -H "Authorization: Api-Key <api-key>" \
+  -H "Content-Type: application/json" \
+  -d '{"schema":"ECOMMERCE","prefix":"CUBE_","viewNames":["orders_view"]}'
+```
+
+Or pull a semantic view into a review branch:
+
+```bash
+curl -X POST "https://<tenant>.cubecloud.dev/api/v1/deployments/<deploymentId>/snowflake-semantic-view-pulls" \
+  -H "Authorization: Api-Key <api-key>" \
+  -H "Content-Type: application/json" \
+  -d '{"schema":"ECOMMERCE","outputPath":"model/snowflake","viewNames":["ORDERS_VIEW"],"branchName":"review-snowflake-views"}'
+```
+
+Each start request returns HTTP `202` with a `syncJobId` and `workflowId`. Use the `syncJobId` on the corresponding status endpoint. Its `progress` object contains `stage` and `percentComplete`; `COMPLETED` and `FAILED` are terminal statuses. If a job fails, inspect the status response's `error`. After `COMPLETED`, the result endpoint returns `viewCount`, `completedAt`, and `durationMs`; pull results also include `generatedFiles` with their paths. The result endpoint returns `404` until the job completes.
+
+See the [Snowflake Semantic View Sync API reference](/api-reference/snowflake-semantic-view-sync/push-cube-views-to-snowflake-semantic-views) for request and response schemas, including optional fields.
 
 ## Benefits
 
