@@ -247,7 +247,9 @@ export class PinotQuery extends BaseQuery {
     templates.expressions.sort = '{{ expr }} IS NULL {% if nulls_first %}DESC{% else %}ASC{% endif %}, {{ expr }} {% if asc %}ASC{% else %}DESC{% endif %}';
     templates.expressions.ilike = 'LOWER({{ expr }}) {% if negated %}NOT {% endif %}LIKE LOWER({{ pattern }})';
     templates.filters.like_pattern = 'CONCAT({% if start_wild %}\'%\'{% else %}\'\'{% endif %}, LOWER({{ value }}), {% if end_wild %}\'%\'{% else %}\'\'{% endif %})';
-    templates.tesseract.ilike = 'LOWER({{ expr }}) {% if negated %}NOT {% endif %} LIKE {{ pattern }}';
+    // Pinot has no default LIKE escape character. The clause cannot go inside
+    // `like_pattern` because the pattern is wrapped in CONCAT(...) here.
+    templates.tesseract.ilike = 'LOWER({{ expr }}) {% if negated %}NOT {% endif %}LIKE {{ pattern }} ESCAPE \'\\\'';
     templates.tesseract.series_bounds_cast = 'CAST({{ expr }} AS TIMESTAMP)';
     templates.expressions.rolling_window_expr_timestamp_cast = 'CAST({{ value }} AS TIMESTAMP)';
     templates.statements.time_series_select = 'SELECT CAST(f AS TIMESTAMP) date_from, CAST(t AS TIMESTAMP) date_to \n' +
