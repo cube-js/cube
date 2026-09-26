@@ -64,12 +64,8 @@ describe('DruidDriver', () => {
 
     const composePath = path.resolve(path.dirname(__filename), '../../');
 
-    // The compose file bind-mounts ./storage as /opt/data - Druid's local deep
-    // storage and its indexing-log directory. Docker creates a missing
-    // bind-mount source owned by root while the image runs as `druid`, so an
-    // indexing task cannot publish a segment unless the directory already
-    // exists and is writable. Docker Desktop makes bind mounts writable
-    // whatever the container user, which hides this everywhere but Linux.
+    // ./storage is Druid's deep storage (bind-mounted as /opt/data). Docker would create it
+    // root-owned and the `druid` user could not publish segments, so pre-create it writable.
     for (const dir of ['', 'segments', 'indexing-logs']) {
       const created = path.join(composePath, 'storage', dir);
 

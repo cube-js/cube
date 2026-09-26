@@ -4775,15 +4775,9 @@ export class BaseQuery {
         lt: '{{ column }} < {{ param }}',
         lte: '{{ column }} <= {{ param }}',
         like_pattern: '{% if start_wild %}\'%\' || {% endif %}{{ value }}{% if end_wild %}|| \'%\'{% endif %}',
-        // Character the native planner uses to escape `%`, `_` and itself inside a
-        // user-supplied LIKE value, mirroring BaseFilter.escapeWildcardChars. It
-        // stays a bare character: Cube Store's parser rejects an ESCAPE clause.
-        // Dialects whose LIKE has no default escape character add the clause
-        // themselves - Presto and Trino in `like_pattern`; MSSQL, Oracle,
-        // Snowflake and, in their own driver packages, DuckDB, Pinot, Dremio and
-        // Druid in `tesseract.ilike`, whose pattern is wrapped and cannot hold it.
-        // ksqlDB is the exception this character is wrong for: its LIKE takes no
-        // ESCAPE clause at all, so the backslashes are matched as data.
+        // Escapes `%`, `_` and itself in LIKE values (as BaseFilter.escapeWildcardChars does).
+        // Stays bare - Cube Store rejects ESCAPE; dialects with no default escape char add
+        // the clause in `like_pattern` or `tesseract.ilike`. Wrong for ksqlDB (no ESCAPE).
         like_escape_char: '\\',
         always_true: '1 = 1'
 
