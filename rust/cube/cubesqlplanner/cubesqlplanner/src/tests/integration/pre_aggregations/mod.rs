@@ -4,6 +4,7 @@ mod external_split;
 mod multi_fact;
 mod multi_fact_view_stored_shift;
 mod multi_stage;
+mod query_join_hints;
 mod rollup_join_keys;
 mod sql_generation;
 mod ungrouped_gate;
