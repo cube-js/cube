@@ -51,16 +51,24 @@ Filters can allow either a single value or multiple values. The filter's edit si
 
 You can set a default value that's applied when the dashboard loads. Defaults are useful for scoping the dashboard to "this quarter" or "the user's region" without requiring viewers to interact with the filter first.
 
-There are two ways to set a default:
+Where the default comes from is set by the **Default value** dropdown in the filter's edit sidebar, below **Visibility**. It offers one source at a time:
 
-- **Static default** — pick a value (or values) directly in the filter. Every viewer sees the same default.
-- **User attribute default** — resolve the default from the viewer's [user attribute][ref-user-attributes] at load time, so each viewer sees their own personalized default. [Time granularity switchers](#time-granularity-user-attribute-default), [field switchers](#field-switcher-user-attribute-default) and [parent controls](#parent-user-attribute-default) support this too.
+| Default value | What the filter opens on |
+|---|---|
+| **Saved widget value** | A static default: the value (or values) you pick in the filter in the dashboard builder, saved on the widget. Every viewer sees the same default. This is the source of any filter you haven't set another one for. |
+| **From user attribute** | The viewer's [user attribute](#user-attribute-default), resolved at load time, so each viewer sees their own personalized default. [Time granularity switchers](#time-granularity-user-attribute-default), [field switchers](#field-switcher-user-attribute-default) and [parent controls](#parent-user-attribute-default) offer this too — their **Default value** dropdown has only these first two options. |
+| **First value of dimension**, **Last value of dimension** | A value of the filter's dimension, [looked up in the data](#defaults-resolved-from-the-data) every time the dashboard opens. |
+| **Max value by measure**, **Min value by measure** | The value of the filter's dimension with the highest or lowest value of a measure you pick, [looked up in the data](#defaults-resolved-from-the-data) every time the dashboard opens. |
 
 Static defaults are configured by interacting with the filter in the dashboard builder — the value you select is saved on the widget and applied to every viewer when the dashboard loads.
 
+<Warning>
+Saving the filter with a different **Default value** discards the value saved on the widget. Switching back to **Saved widget value** later does not restore it: the filter has no default until you pick a value in it again.
+</Warning>
+
 #### User attribute default
 
-Use the **User attribute default** toggle in the filter's edit sidebar to pre-fill a filter from the viewer's [user attribute][ref-user-attributes]. When the dashboard loads, Cube looks up the attribute value for the current viewer and applies it as the filter's default.
+Set **Default value** to **From user attribute** in the filter's edit sidebar to pre-fill a filter from the viewer's [user attribute][ref-user-attributes]. When the dashboard loads, Cube looks up the attribute value for the current viewer and applies it as the filter's default.
 
 This is useful for scoping a dashboard to the viewer's own slice of the data — for example, defaulting a **Region** filter to the viewer's `region` attribute, or a **Sales rep** filter to their `email`.
 
@@ -68,13 +76,13 @@ To configure it:
 
 <Steps>
  <Step title="Open the filter's settings">
-   In the dashboard builder, click the filter widget's settings menu and choose **Edit Filter**.
+   In the dashboard builder, open the filter widget's settings menu and choose **Edit Control**.
  </Step>
- <Step title="Enable User attribute default">
-   Scroll to the **User attribute default** switch and turn it on.
+ <Step title="Choose From user attribute">
+   Set the **Default value** dropdown to **From user attribute**. The sidebar explains the option and shows the attribute picker below it.
  </Step>
  <Step title="Pick the attribute">
-   Select the [user attribute][ref-user-attributes] whose value should be used as the default. Only attributes defined in your account appear in the picker.
+   Select the [user attribute][ref-user-attributes] whose value should be used as the default. Only attributes defined in your account appear in the picker. Until you pick one, the sidebar reads *Pick an attribute — otherwise the saved value is kept.*, and saving without one keeps the filter on **Saved widget value**.
  </Step>
 </Steps>
 
@@ -85,11 +93,59 @@ How the attribute value is matched to the filter:
 | **String**, **Number** | Used as a single value, including in a filter that accepts several — it seeds a one-item selection there. |
 | **String array**, **Number array** | Used as a list of values, one per array entry. Empty values are dropped. |
 
-Empty, `null`, or unresolvable attribute values are skipped — the filter falls back to whatever static default it has, or no default if none is set.
+Empty, `null`, or unresolvable attribute values are skipped — the filter falls back to whatever static default it has, or no default if none is set. Saving the filter on **From user attribute** discards the value saved on the widget, as the warning above says, so a filter has this fallback only when you pick a value in it in the dashboard builder after that save.
 
 The user attribute default only seeds the filter's *initial* value. Viewers can still change the filter unless its [visibility](#visibility) is set to **Disabled**, in which case the resolved attribute value is locked against their own edits. Values passed via URL parameters also take precedence over user attribute defaults, so deep links continue to work.
 
 If a [parent control](#parent) drives this filter, the option the viewer is on decides it — unless the link they opened carries a value for this filter, which [wins at load](#sharing-the-current-selection). One that [keeps the filter as-is](#children) lets the attribute seed it, and one set to **Reset to default** returns the filter to the value it opens on *for that viewer* — the attribute value when one resolves, otherwise its own static default; with neither, its default is no value, so the reset clears it. One set to **Clear** empties it and the attribute does *not* seed it back: the filter stays unfiltered until the viewer sets it or a value arrives [in the URL](#sharing-the-current-selection).
+
+#### Defaults resolved from the data
+
+A saved value is fixed when you pick it, so it goes stale as the dimension's values change: a filter defaulting to the newest release keeps opening on that release after the next one ships. The four remaining **Default value** options look the value up in the data instead, every time the dashboard opens:
+
+| Default value | Resolves to |
+|---|---|
+| **First value of dimension** | The first value of the filter's dimension, in the sort order you choose. |
+| **Last value of dimension** | The last value of the filter's dimension, in the same sort order. |
+| **Max value by measure** | The value of the filter's dimension whose row has the highest value of the measure you pick — on a **City** filter with **Count**, the city with the most rows. |
+| **Min value by measure** | The value of the filter's dimension whose row has the lowest value of that measure. |
+
+Rows where the dimension, or the measure you pick, is empty (`null`) are left out, so a default never resolves to an empty value while the dimension has others.
+
+The first and last value are offered on string, number and time dimensions. Picking either shows a sentence — *The first value of Status, according to the selected sort order.* — and a sort order dropdown beneath it:
+
+- **Natural**, the default, is the dimension's own order: alphabetical for a string, numeric for a number, chronological for a time dimension. The first value is the lowest, and the last value is the highest.
+- **Database** is the order this filter's own value list shows its values in, and is offered on a string dimension only. That list holds the first 100 values, so **Last value of dimension** under **Database** is the last of those 100 — not the last value the dimension holds.
+
+The max and min options show a measure dropdown instead, grouped by semantic view, with nothing picked and the note *Measures of views that share this dimension.* under it. It lists the measures of the filter's own view first, followed by those of every other view that includes the same dimension — one the data model declares as the same underlying cube member, the way a **Customers** view and an **Orders** view can both include the users cube's city. For a measure of another view, the ranking query runs in that view, over its own copy of the dimension, and the value it returns is applied to this filter. A view is not matched by name: one holding a same-named dimension of a *different* cube offers no measures. Where no view has any measures to offer, neither option appears in the **Default value** dropdown.
+
+Until you pick a measure, the sidebar reads *Pick a measure — otherwise the saved value is kept.*, and saving without one keeps the filter on **Saved widget value**. Choosing a different dimension for the filter also puts a data-resolved default back on **Saved widget value**, so pick the option again for the new dimension.
+
+<Warning>
+A filter with a default resolved from the data cannot be changed by hand — in the dashboard builder or on the published dashboard, whatever its [visibility](#visibility). Its operator and value are greyed out, and the action that [clears or resets](#clearing-and-resetting) it is unavailable. To change the value, change the **Default value** in the filter's settings.
+</Warning>
+
+A muted note right after the filter's title, on the same line, names the source of its value, such as *First value of Status* or *Max by Count*. When the title leaves it too little room, the note is cut off with an ellipsis, and hovering it shows the whole note. On a published dashboard, the information icon at the end of the title line says the same: *This filter's value comes from First value of Status. Change it in the filter's settings.*
+
+The value is resolved for each viewer and never saved on the dashboard, so a published dashboard keeps following the data without being republished. A value set elsewhere still wins: a filter value passed [in the URL](#sharing-the-current-selection) replaces the resolved one, and so does a [parent control](#parent) option that sets this filter to a value. The resolved value itself is never written into the URL.
+
+A parent control option set to [**Reset to default**](#children) returns the filter to the value the data resolves to, as if the dashboard had just opened. One set to **Clear** does not:
+
+<Warning>
+Moving the parent to an option that sets or resets this filter gives it a value again. Until then, a parent option set to **Clear** leaves a filter with a default resolved from the data empty: the default is not resolved again, and because the filter cannot be changed by hand, the viewer cannot fill it either. Its charts stay unfiltered while that option is on.
+</Warning>
+
+A [faceted filter](#faceted-filters) resolves its default inside its facet scope, so the default is always a value its own value list offers, and it resolves again when a sibling filter changes. For a measure of another view, each sibling's condition is carried over to that view's matching dimension, and a condition with no match there leaves the filter with no value rather than resolving over rows its value list excludes. The warning icon described below names that case.
+
+When the data gives no value, the filter applies none: the note after its title reads *No value applied*, and a warning icon at the end of the title line says why:
+
+- The dimension returned no rows — for example, because the filter is [faceted](#faceted-filters) and a sibling narrows it to a period with none.
+- The data could not be loaded — for example, because the query failed.
+- The measure you picked has been removed from its view.
+- The measure's view no longer includes the filter's dimension.
+- A faceted filter's sibling condition has no matching dimension in the view of the measure you picked, so it cannot be carried over. The measure itself is fine; the sibling filter's dimension has no counterpart in that view.
+
+In the dashboard builder, clicking the warning icon opens the filter's settings, where you can pick another measure or option.
 
 ### Faceted filters
 
@@ -163,7 +219,7 @@ You can configure a default granularity that's applied when the dashboard loads.
 
 #### User attribute default {#time-granularity-user-attribute-default}
 
-The default above is one granularity for everyone. To give each viewer their own, turn on **User attribute default** in the switcher's settings and pick a [user attribute][ref-user-attributes]. When the dashboard loads, Cube reads that attribute for the current viewer and opens the control on the granularity it names.
+The default above is one granularity for everyone. To give each viewer their own, set **Default value** to **From user attribute** in the switcher's settings and pick a [user attribute][ref-user-attributes]. When the dashboard loads, Cube reads that attribute for the current viewer and opens the control on the granularity it names.
 
 This is how one dashboard opens at the interval each audience works in — daily for the operations team, monthly for the executives who read the same charts — from a single published dashboard.
 
@@ -173,8 +229,8 @@ To configure it:
  <Step title="Open the switcher's settings">
    In the dashboard builder, open the widget's settings menu and choose **Edit Control**.
  </Step>
- <Step title="Enable User attribute default">
-   Below **Visibility**, turn on the **User attribute default** switch.
+ <Step title="Choose From user attribute">
+   Below **Visibility**, set the **Default value** dropdown to **From user attribute**.
  </Step>
  <Step title="Pick the attribute">
    Select the [user attribute][ref-user-attributes] to resolve. Only attributes defined in your account appear in the picker.
@@ -234,7 +290,7 @@ If the dashboard also has a [time granularity switcher](#time-granularity-switch
 
 ### User attribute default {#field-switcher-user-attribute-default}
 
-Like [filters](#user-attribute-default), [time granularity switchers](#time-granularity-user-attribute-default) and [parent controls](#parent-user-attribute-default), a field switcher can start each viewer on their own member. Turn on **User attribute default** in the control's settings and pick a [user attribute][ref-user-attributes]; when the dashboard loads, Cube reads that attribute for the current viewer and opens the control on the member it names.
+Like [filters](#user-attribute-default), [time granularity switchers](#time-granularity-user-attribute-default) and [parent controls](#parent-user-attribute-default), a field switcher can start each viewer on their own member. Set **Default value** to **From user attribute** in the control's settings and pick a [user attribute][ref-user-attributes]; when the dashboard loads, Cube reads that attribute for the current viewer and opens the control on the member it names.
 
 This is how one dashboard opens on the breakdown each audience cares about — a **Breakdown** switcher opening on `region` for one team and `channel` for another, from a single published dashboard.
 
@@ -284,7 +340,7 @@ Each control on an option's tab carries a dropdown saying what that option does 
 |---|---|
 | **Set to** | The child is set to the value you choose. The row renders *that child's own control* — a time granularity switcher shows its granularity picker, limited to the granularities that switcher allows; a filter shows its operator and value inputs; a field switcher shows its member picker, limited to the members that switcher offers — its **Alternatives**, plus the replaced member. So the values you can offer are exactly the ones a viewer could pick in the child itself. |
 | **Clear** | The child stops applying, as if the viewer had cleared it: a filter leaves its charts unfiltered, a time granularity switcher hands each chart back to the granularity it was built with. Offered for filters and time granularity switchers only — a field switcher always resolves to some member, so it has no cleared state. |
-| **Reset to default** | The child is put back to the value it opens on *for that viewer*. When the child takes its default from a **User attribute default** — a [filter](#user-attribute-default)'s, a [time granularity switcher](#time-granularity-user-attribute-default)'s, or a [field switcher](#field-switcher-user-attribute-default)'s — that's the attribute value; otherwise it's the child's own static default: a filter's [default value](#default-values), a time granularity switcher's [default granularity](#default-granularity), a field switcher's [default option](#field-switcher-default-option) — and where the child has none, its default *is* no value, so the reset clears it: the filter stops filtering, the time granularity switcher stops imposing a granularity. (A field switcher never ends up empty: with no default option it resets to the member it replaces.) |
+| **Reset to default** | The child is put back to the value it opens on *for that viewer*. When the child takes its default from a user attribute — a [filter](#user-attribute-default)'s, a [time granularity switcher](#time-granularity-user-attribute-default)'s, or a [field switcher](#field-switcher-user-attribute-default)'s — that's the attribute value; for a filter whose default is [resolved from the data](#defaults-resolved-from-the-data), it's the value the data resolves to; otherwise it's the child's own static default: a filter's [default value](#default-values), a time granularity switcher's [default granularity](#default-granularity), a field switcher's [default option](#field-switcher-default-option) — and where the child has none, its default *is* no value, so the reset clears it: the filter stops filtering, the time granularity switcher stops imposing a granularity. (A field switcher never ends up empty: with no default option it resets to the member it replaces.) |
 | **Keep as-is** | The child is left alone — it keeps whatever value the viewer already had. Use this deliberately when an option shouldn't have an opinion about a particular child. |
 
 A control you haven't touched on a tab still reads as one of these: the **first** tab starts every control on **Reset to default**, and every later tab starts them on **Keep as-is**, so a new option changes only what you actually set. The first tab's displayed defaults become real mappings when you save — see [what a save writes](#mapping-status-on-child-controls).
@@ -344,7 +400,7 @@ If you never pick an option, the parent opens with nothing selected and the chil
 
 #### User attribute default {#parent-user-attribute-default}
 
-The default above is one arrangement for everyone. To give each viewer their own, turn on **User attribute default** in the parent control's settings and pick a [user attribute][ref-user-attributes]. When the dashboard loads, Cube reads that attribute for the current viewer and opens the control on the option it names — and drives the children with it, exactly as if the viewer had picked that option themselves.
+The default above is one arrangement for everyone. To give each viewer their own, set **Default value** to **From user attribute** in the parent control's settings and pick a [user attribute][ref-user-attributes]. When the dashboard loads, Cube reads that attribute for the current viewer and opens the control on the option it names — and drives the children with it, exactly as if the viewer had picked that option themselves.
 
 This is how you ship one dashboard that opens differently per audience: a **Reporting period** parent whose options are `Month` and `Quarter`, opening on whichever one the viewer's `reporting_period` attribute says, with every control behind it already set to match.
 
@@ -354,8 +410,8 @@ To configure it:
  <Step title="Open the parent control's settings">
    In the dashboard builder, click **Configure Parent** on the control.
  </Step>
- <Step title="Enable User attribute default">
-   Below the option tabs — next to **Visibility** — turn on the **User attribute default** switch.
+ <Step title="Choose From user attribute">
+   Below the option tabs — next to **Visibility** — set the **Default value** dropdown to **From user attribute**.
  </Step>
  <Step title="Pick the attribute">
    Select the [user attribute][ref-user-attributes] to resolve. Only attributes defined in your account appear in the picker.
@@ -387,8 +443,8 @@ Every control offers at most one of two actions in the control itself, beside it
 
 | Action | When it shows | What it does |
 |---|---|---|
-| **Clear** (✕) | The control has a value, and is not a [field switcher](#field-switcher) — that one carries no ✕. | Stops applying the control: a cleared filter leaves its charts unfiltered, and a cleared switcher hands each chart back to the granularity or member it was built with. Clearing a [parent control](#parent) mid-session only deselects it: the parent stops driving, and each child keeps the value it is showing rather than reverting. |
-| **Reset to default** (↩) | The control has been changed, it has a value published in the last dashboard version, and the two differ. | Puts the control back on that published value. |
+| **Clear** (✕) | The control has a value, and is neither a [field switcher](#field-switcher), which carries no ✕, nor a filter whose default is [resolved from the data](#defaults-resolved-from-the-data), which cannot be changed by hand. | Stops applying the control: a cleared filter leaves its charts unfiltered, and a cleared switcher hands each chart back to the granularity or member it was built with. Clearing a [parent control](#parent) mid-session only deselects it: the parent stops driving, and each child keeps the value it is showing rather than reverting. |
+| **Reset to default** (↩) | The control has been changed, it has a value published in the last dashboard version, and the two differ — except on a filter whose default is [resolved from the data](#defaults-resolved-from-the-data), which cannot be changed by hand. | Puts the control back on that published value. |
 
 <Note>
 This is the control's *own* published value, which is not always what a [parent control](#parent) means by its **Reset to default** [child mapping](#children): despite the shared label, that one returns the child to the value it opens on *for that viewer*.
@@ -439,7 +495,7 @@ Outside `between`, a `value` may still be a list, and what a condition makes of 
 
 What travels in the link, and what wins when a link value arrives:
 
-- **Only what the viewer chose.** Values that came from the control's own configuration — a static default, a [default granularity](#default-granularity) — are not written into the URL. Every viewer already gets those from the dashboard itself, and leaving them out means a link stays correct after the dashboard's defaults change.
+- **Only what the viewer chose.** Values that came from the control's own configuration — a static default, a [default granularity](#default-granularity), a filter default [resolved from the data](#defaults-resolved-from-the-data) — are not written into the URL. Every viewer already gets those from the dashboard itself, and leaving them out means a link stays correct after the dashboard's defaults change.
 - **Never a personalized default.** A value resolved from a [user attribute](#user-attribute-default) stays out of the link — whether it seeded a filter, a [time granularity switcher](#time-granularity-user-attribute-default) or a [field switcher](#field-switcher-user-attribute-default) directly, or reached one through a [parent control](#parent) opening on the viewer's own option. Sharing a dashboard never pins your attribute value onto the recipient; they see it through their own attributes.
 - **Every control's pick, together.** Picking in several controls puts them all in the link, including when a [parent control](#parent) sets several children at once — filters, time granularity switchers and [field switchers](#field-switcher) alike. A parent control isn't serialized itself — the link carries the values the **Set to** children of an option the sharer *picked* ended up with, while the parent dropdown opens on whatever default it resolves for the recipient, which may not be that option. An option the sharer never picked, resolved from the default or their own attribute, seeds its children as defaults and puts nothing in the link. What happens to children the option cleared or reset is the bullet below.
 - **Neither a clear nor a reset.** [Clearing or resetting](#clearing-and-resetting) a control drops its parameter rather than recording the result, so the control is indistinguishable in the link from one nobody touched and the recipient opens it on whatever it opens on for them. The same holds for [what a parent option did](#children) to its children: of the four states, only **Set to** puts a value in the link by way of the option. **Clear** leaves the child empty, and **Reset to default** lands it on a configuration or attribute value — or clears it where the child has no default — none of which go in the URL, by **Only what the viewer chose** and **Never a personalized default** above. So for either state the link carries nothing for that child. A child left **Keep as-is** is untouched by the option, so it travels or not by the rules above: the viewer's own earlier pick is in the link, a default is not.
@@ -454,7 +510,7 @@ Each control has a **Visibility** setting that determines how it appears on the 
 
 | Visibility | Behavior on the published dashboard |
 |---|---|
-| **Visible** (default) | Shown on the dashboard and viewers can change its value. |
+| **Visible** (default) | Shown on the dashboard and viewers can change its value — except a filter whose default is [resolved from the data](#defaults-resolved-from-the-data), which no one can change by hand. |
 | **Hidden** | Not shown to viewers, but the control's value is still applied to the charts it targets. Use this to scope a dashboard with a fixed value — e.g., always filter to the current quarter — without exposing the control. Hiding the *children* of a [parent control](#parent) is the usual way to present one dropdown instead of the row of controls behind it. |
 | **Disabled** | Shown on the dashboard so viewers can see the active value, but they cannot change it. A [parent control](#parent) still drives a Disabled child — the setting stops the viewer, not the parent. |
 
