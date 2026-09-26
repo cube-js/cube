@@ -59,7 +59,10 @@ export class DruidQuery extends BaseQuery {
     const templates = super.sqlTemplates();
 
     // Druid doesn't support ILIKE, so case-insensitive matching is emulated with LOWER(...) LIKE CONCAT(...)
-    templates.expressions.ilike = 'LOWER({{ expr }}) {% if negated %}NOT {% endif %}LIKE LOWER({{ pattern }})';
+    // `default_escape` means the pushed-down LIKE carried no ESCAPE of its own, so it keeps
+    // Postgres' backslash - which Druid does not default to and has to be told.
+    templates.expressions.like = '{{ expr }} {% if negated %}NOT {% endif %}LIKE {{ pattern }}{% if default_escape %} ESCAPE \'\\\'{% endif %}';
+    templates.expressions.ilike = 'LOWER({{ expr }}) {% if negated %}NOT {% endif %}LIKE LOWER({{ pattern }}){% if default_escape %} ESCAPE \'\\\'{% endif %}';
     // Timestamp constants arrive as ISO-8601 UTC strings ('2021-01-01T00:00:00.000Z');
     // TIME_PARSE without a pattern parses ISO-8601, which is also Druid's native
     // timestamp format. The base template renders the value bare, which is invalid
