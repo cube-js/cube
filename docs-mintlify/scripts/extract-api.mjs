@@ -224,6 +224,7 @@ const TAG_ORDER = [
   'Deployments', 'Deployment Creation', 'Environments', 'Env Variables', 'Regions',
   'Data Model', 'Data Model Uploads', 'GitHub', 'GitHub Connection', 'dbt Sync',
   'Databricks Metric View Publication', 'Databricks Metric View Integration',
+  'Snowflake Semantic View Sync',
   'Folders', 'Reports', 'External Documents', 'Workbooks', 'Workbook Promotions', 'Dashboard Exports', 'Notifications', 'Scheduled Tasks', 'Workspace', 'Agents', 'Metadata',
   'Users', 'Users Admin', 'Groups', 'User Groups', 'API Keys',
   'User Attributes', 'User Attribute Values', 'Resource Policies', 'Tenant Settings',

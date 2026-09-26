@@ -893,6 +893,18 @@
                 ]
               },
               {
+                "group": "Snowflake Semantic View Sync",
+                "openapi": "/api-reference/api.yaml",
+                "pages": [
+                  "POST /api/v1/deployments/{deploymentId}/snowflake-semantic-view-pulls",
+                  "GET /api/v1/deployments/{deploymentId}/snowflake-semantic-view-pulls/{syncJobId}",
+                  "GET /api/v1/deployments/{deploymentId}/snowflake-semantic-view-pulls/{syncJobId}/result",
+                  "POST /api/v1/deployments/{deploymentId}/snowflake-semantic-view-syncs",
+                  "GET /api/v1/deployments/{deploymentId}/snowflake-semantic-view-syncs/{syncJobId}",
+                  "GET /api/v1/deployments/{deploymentId}/snowflake-semantic-view-syncs/{syncJobId}/result"
+                ]
+              },
+              {
                 "group": "Folders",
                 "openapi": "/api-reference/api.yaml",
                 "pages": [
