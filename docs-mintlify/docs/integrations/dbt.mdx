@@ -205,6 +205,7 @@ defaults below. Options that require Cube to run dbt apply only to the Git sourc
 | **Include descriptions** | On | Carries dbt model and column descriptions into cubes and dimensions. |
 | **Generate joins** | On | Infers joins between cubes from dbt `relationships` tests and foreign-key constraints. |
 | **Also generate reverse joins** | Off | Adds a `one_to_many` join back to the referencing cube, so a query can start from either side. Only shown when **Generate joins** is on. |
+| **Mark pulled cubes as public** | On | Turn off to make every generated cube private (`public: false`) unless its dbt model declares its own visibility. See [Cube visibility](#cube-visibility). |
 | **Infer column types from dbt catalog** | Off | **Git source only.** Reads real warehouse column types from dbt's `catalog.json` instead of guessing from column names. See [below](#infer-column-types-from-dbt-catalog). |
 
 ### Primary key detection
@@ -307,6 +308,64 @@ An explicit `data_type` in your dbt YAML still wins; the catalog only fills the 
 - **Best-effort.** If catalog generation or the catalog read fails — no connectivity,
   unbuilt models, unreadable file — it's logged and skipped, and the pull completes on
   declared and name-based types exactly as it would with the option off.
+
+### Cube visibility
+
+Generated cubes are [public](/reference/data-modeling/cube#public) by default. There
+are two ways to hide them, and both survive every pull.
+
+**Per model or column, in dbt.** Declare `public` under `meta.cube` in your dbt YAML:
+
+```yaml
+models:
+  - name: raw_orders
+    config:
+      meta:
+        cube:
+          public: false
+
+  - name: dim_customers
+    columns:
+      - name: customer_email
+        config:
+          meta:
+            cube:
+              public: false
+```
+
+- On a **model**, this sets the generated cube's `public`.
+- On a **column**, it hides that column's dimension and any `sum` measure built from it.
+  The cube's `count` measure stays visible.
+- The top-level `meta:` key works too, on models and columns. If one carries both,
+  `config.meta` wins.
+- A column's `config:` block needs dbt Core 1.10 or later. On older versions, declare
+  a column's `meta:` at the top level of the column instead.
+- Use a boolean. In dbt YAML the pull also accepts the strings `"true"` / `"false"` in
+  any casing and writes a real boolean to the generated cube. Any other value is
+  treated as not declared: a column stays public, and a model falls back to
+  **Mark pulled cubes as public**.
+
+**For the whole pull.** Turn off **Mark pulled cubes as public** to make every
+generated cube private unless its dbt model declares `meta.cube.public`. This also
+covers models added to dbt later, so a raw layer stays private without a `meta` block
+on each model. A model's own declaration always takes precedence, so you can still
+expose selected models with `public: true`. The option sets the cube's `public` only
+and leaves its dimensions and measures as they are.
+
+A common pattern is to keep the pulled layer private and expose it through
+[views](/reference/data-modeling/view), which can include members of private cubes.
+A cube that [`extends`](/reference/data-modeling/cube#extends) a private generated
+cube inherits `public: false`, so set `public: true` on it to expose it.
+
+<Warning>
+
+A view doesn't inherit member-level visibility. A column hidden with
+`meta.cube.public: false` becomes queryable again through a view that includes it,
+for example with `includes: "*"`. Use
+[`excludes`](/reference/data-modeling/view#includes-and-excludes) to keep such members
+out of the view.
+
+</Warning>
 
 ## Pass environment variables to dbt
 
@@ -688,6 +747,8 @@ For each dbt model in your project:
 - **A `count` measure** is added to every cube.
 - **`total_<column>` sum measures** are added for numeric columns whose names suggest
   an additive metric (names containing `amount`, `price`, `cost`, `total`, or `value`).
+- **Visibility** (`public`) comes from `meta.cube.public` in dbt, then from the
+  **Mark pulled cubes as public** option — see [Cube visibility](#cube-visibility).
 - **Primary keys** are detected from dbt `primary_key` constraints, then `unique` +
   `not_null` tests, then column-name suffixes — see
   [Primary key detection](#primary-key-detection).
