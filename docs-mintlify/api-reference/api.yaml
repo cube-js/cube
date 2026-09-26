@@ -42,6 +42,7 @@ tags:
   - name: Users
   - name: Users Admin
   - name: API Keys
+  - name: Roles
   - name: User Attributes
   - name: User Attribute Values
   - name: Tenant Settings
@@ -5202,6 +5203,297 @@ paths:
           Lists the regions available to the account, cursor-paginated via `first`/`after`. The
           legacy `data` field returns the full, unpaginated list and is deprecated — use `items` +
           `pageInfo` instead.
+  /api/v1/roles:
+    get:
+      operationId: getRoles
+      parameters:
+        - in: query
+          name: after
+          schema:
+            oneOf:
+              - type: string
+              - type: 'null'
+        - in: query
+          name: first
+          schema:
+            oneOf:
+              - minimum: 1
+                type: integer
+              - type: 'null'
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RolesListResponse'
+          description: ''
+      summary: List custom roles
+      tags:
+        - Roles
+      x-mint:
+        content: >-
+          **🔒 Admin only.** Requires administrator privileges — the authenticated principal (API
+          key, embed JWT, or any bearer token) must belong to a user with the admin role.
+
+
+          Lists the tenant's custom roles, newest first, cursor-paginated via `first`/`after`.
+          Cube's built-in roles are not included — they are not tenant data.
+    post:
+      operationId: createRole
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RoleCreateBody'
+        description: RoleCreateBody
+        required: false
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Role'
+          description: ''
+        '400':
+          description: >-
+            The name is one of the built-in role names, or a policy grants no action, names no
+            resource, or scopes a `Deployment` to something that is not a deployment id.
+        '409':
+          description: A role with that name already exists.
+      summary: Create a custom role
+      tags:
+        - Roles
+      x-mint:
+        content: >-
+          **🔒 Admin only.** Requires administrator privileges — the authenticated principal (API
+          key, embed JWT, or any bearer token) must belong to a user with the admin role.
+
+
+          Creates a role and returns it with the `id` to assign it by. Role names are unique, so
+          recreating one that already exists answers `409`.
+
+
+          To scope the role to specific deployments, send a `Deployment` policy whose `resources`
+          are the deployment ids as strings. A role usually also needs a `Global` policy naming the
+          holder's license tier — `AIBIView`, `AIBIExplore` or `AIBIDevelop` — which is what the
+          console calls the role's Base Role. Pick a tier that covers the deployment actions you
+          grant: the console forces Developer (`AIBIDevelop`) for every deployment action except
+          `DeploymentRead`, `DeploymentAgentRead`, `DownloadData` and `ChatHistoryRead`, so a lower
+          tier here produces a role its role builder would not have let you save:
+
+
+          ```json
+
+          {
+            "name": "team-analytics",
+            "policies": [
+              {
+                "resourceType": "Global",
+                "actions": ["AIBIDevelop"],
+                "resources": ["All"]
+              },
+              {
+                "resourceType": "Deployment",
+                "actions": ["DeploymentRead", "SchemaRead", "SqlRunnerRead"],
+                "resources": ["1734"]
+              }
+            ]
+          }
+
+          ```
+
+
+          The tier is **not** required and is **not** derived from the deployment actions: a role
+          sent without one is accepted and simply confers no tier, so a user holding only that role
+          gets the deployment grants and still cannot use the product. That is deliberate — a user
+          holds the union of their roles, so a role that only adds a deployment scope beside another
+          role carrying the tier is valid — but it means nothing warns you. Omit the `Global` policy
+          only when some other role supplies the tier. Note the console does require one on every
+          role it writes, so a role created here without a tier shows an unset Base Role when opened
+          in the role builder.
+
+
+          Use `["All"]` as `resources` to cover every deployment, and `"All"` as the single action
+          for full access to the deployments in scope. A policy is rejected when it grants no
+          action, when it names no resource, or when a `Deployment` resource is not a deployment id
+          — pass the numeric id returned by POST /build/api/v1/deployments, not a slug or a name.
+          Ids are checked for shape, not existence, so an id whose deployment was since deleted is
+          kept and simply grants nothing.
+  /api/v1/roles/{roleId}:
+    delete:
+      operationId: deleteRole
+      parameters:
+        - in: path
+          name: roleId
+          required: true
+          schema:
+            type: number
+      responses:
+        '200':
+          content:
+            application/json: {}
+          description: Successful response
+        '204':
+          description: Role deleted.
+        '404':
+          description: No custom role has that id.
+      summary: Delete a custom role
+      tags:
+        - Roles
+      x-mint:
+        content: >-
+          **🔒 Admin only.** Requires administrator privileges — the authenticated principal (API
+          key, embed JWT, or any bearer token) must belong to a user with the admin role.
+
+
+          Deletes the role and every assignment of it, from users and from groups. Built-in roles
+          cannot be deleted.
+    get:
+      operationId: getRole
+      parameters:
+        - in: path
+          name: roleId
+          required: true
+          schema:
+            type: number
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Role'
+          description: ''
+        '404':
+          description: No custom role has that id.
+      summary: Get a custom role
+      tags:
+        - Roles
+      x-mint:
+        content: >-
+          **🔒 Admin only.** Requires administrator privileges — the authenticated principal (API
+          key, embed JWT, or any bearer token) must belong to a user with the admin role.
+
+
+          Returns one custom role by id, with its policies.
+    put:
+      operationId: updateRole
+      parameters:
+        - in: path
+          name: roleId
+          required: true
+          schema:
+            type: number
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RoleUpdateBody'
+        description: RoleUpdateBody
+        required: false
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Role'
+          description: ''
+        '400':
+          description: >-
+            `name` or `policies` was `null`, the new name is one of the built-in role names, or a
+            policy is not a valid one.
+        '404':
+          description: No custom role has that id.
+        '409':
+          description: A role with that name already exists.
+      summary: Update a custom role
+      tags:
+        - Roles
+      x-mint:
+        content: >-
+          **🔒 Admin only.** Requires administrator privileges — the authenticated principal (API
+          key, embed JWT, or any bearer token) must belong to a user with the admin role.
+
+
+          Updates the fields present in the body and leaves the rest alone. Sending `policies`
+          replaces the role's policies outright, so read the role first if you mean to add one
+          rather than start over. Renaming to a name another role already holds answers `409`.
+          Built-in roles cannot be updated.
+  /api/v1/roles/{roleId}/users/{userId}:
+    delete:
+      operationId: removeRoleFromUser
+      parameters:
+        - in: path
+          name: roleId
+          required: true
+          schema:
+            type: number
+        - in: path
+          name: userId
+          required: true
+          schema:
+            type: number
+      responses:
+        '200':
+          content:
+            application/json: {}
+          description: Successful response
+        '204':
+          description: Role removed, or was not held.
+        '404':
+          description: The user is unknown.
+      summary: Remove a role from a user
+      tags:
+        - Roles
+      x-mint:
+        content: >-
+          **🔒 Admin only.** Requires administrator privileges — the authenticated principal (API
+          key, embed JWT, or any bearer token) must belong to a user with the admin role.
+
+
+          Takes the role away from the user. Idempotent — removing a role the user does not hold
+          changes nothing. Returns `404` if the user is unknown.
+    put:
+      operationId: assignRoleToUser
+      parameters:
+        - in: path
+          name: roleId
+          required: true
+          schema:
+            type: number
+        - in: path
+          name: userId
+          required: true
+          schema:
+            type: number
+      responses:
+        '200':
+          content:
+            application/json: {}
+          description: Successful response
+        '204':
+          description: Role assigned, or already held.
+        '404':
+          description: >-
+            The user or the role is unknown. Cube's Admin role is not resolvable here, so its id
+            answers `404` as well.
+      summary: Assign a role to a user
+      tags:
+        - Roles
+      x-mint:
+        content: >-
+          **🔒 Admin only.** Requires administrator privileges — the authenticated principal (API
+          key, embed JWT, or any bearer token) must belong to a user with the admin role.
+
+
+          Gives the user everything the role grants. Idempotent — assigning a role the user already
+          holds changes nothing. Returns `404` if either the user or the role is unknown.
+
+
+          Unlike the other endpoints here, this one is not limited to your custom roles: it also
+          accepts the id of a built-in role, and assigning one grants everything that role confers.
+          **Cube's Admin role is the exception and cannot be granted this way** — it is not among
+          the built-in roles this endpoint resolves, so its id returns `404`. No call to this
+          endpoint can make a user an account-wide administrator.
   /api/v1/spec:
     get:
       operationId: getSpec
@@ -12923,6 +13215,79 @@ components:
       required:
         - sessionId
       type: object
+    Role:
+      properties:
+        description:
+          oneOf:
+            - type: string
+            - type: 'null'
+        id:
+          type: integer
+        name:
+          type: string
+        policies:
+          items:
+            $ref: '#/components/schemas/Policy'
+          type: array
+      required:
+        - id
+        - name
+        - policies
+      type: object
+    RoleCreateBody:
+      properties:
+        description:
+          oneOf:
+            - maxLength: 255
+              type: string
+            - type: 'null'
+        name:
+          description: >-
+            Unique role name. Cannot be one of the built-in role names, which are rejected with
+            `400`: `Admin`, `Developer`, `AIBIDeveloper`, `D3User`, `AIBIUser`, `AIBIViewer`,
+            `Guest`, `EmbedUser`. (The console additionally refuses `None` and `All` in its own role
+            builder; those are accepted here.)
+          maxLength: 255
+          minLength: 1
+          type: string
+        policies:
+          description: >-
+            What the role grants. Scope a policy to specific deployments by setting `resourceType`
+            to `Deployment` and listing the deployment ids — as returned by POST
+            /build/api/v1/deployments — in `resources`, or `["All"]` for every deployment. An empty
+            `policies` list is accepted and creates a role that grants nothing yet; an individual
+            policy with no actions, or none naming a resource, is rejected.
+          items:
+            $ref: '#/components/schemas/Policy'
+          maxItems: 200
+          type: array
+      required:
+        - name
+        - policies
+      type: object
+    RoleUpdateBody:
+      properties:
+        description:
+          oneOf:
+            - maxLength: 255
+              type: string
+            - type: 'null'
+          description: Omit to leave the description unchanged; `null` clears it.
+        name:
+          description: Omit to leave the name unchanged. `null` is rejected.
+          maxLength: 255
+          minLength: 1
+          type: string
+        policies:
+          description: >-
+            Replaces the role's policies outright when present — there is no per-policy merge. Omit
+            it to leave them unchanged, or send `[]` to remove them all. `null` is rejected, so a
+            partly-filled client object cannot strip a role's grants by accident.
+          items:
+            $ref: '#/components/schemas/Policy'
+          maxItems: 200
+          type: array
+      type: object
     RoleWithAccess:
       properties:
         actions:
@@ -12991,6 +13356,18 @@ components:
         - id
         - name
         - actions
+      type: object
+    RolesListResponse:
+      properties:
+        items:
+          items:
+            $ref: '#/components/schemas/Role'
+          type: array
+        pageInfo:
+          $ref: '#/components/schemas/PageInfo'
+      required:
+        - items
+        - pageInfo
       type: object
     RunScheduledTaskResponse:
       properties:
