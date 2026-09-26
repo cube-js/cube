@@ -428,6 +428,23 @@ cube(`orders`, {
 
 </CodeGroup>
 
+<Warning>
+
+Every rollup listed in `rollups` must declare the dimensions that its own joins
+are on, **including keys that no query selects**. Above, `orders_rollup` includes
+`CUBE.user_id` for exactly this reason: it is the key the `orders` → `users` join
+uses, even though `orders_with_users_rollup` only exposes `users.name` and
+`orders.count`.
+
+A `rollup_join` is resolved one join at a time, and each one needs a rollup
+carrying that join's key on *each* side. So on a longer chain, a cube in the
+middle has to declare the keys of *both* joins it takes part in. A rollup missing
+one of them fails with an error starting `No rollups found that can be used for`.
+The error does not point at the key that is missing, so check each rollup in
+`rollups` against the joins on the path between the cubes being joined.
+
+</Warning>
+
 <Info>
 
 `rollup_join` is not required to join cubes from the same data source; instead,
