@@ -93,7 +93,7 @@ How the attribute value is matched to the filter:
 | **String**, **Number** | Used as a single value, including in a filter that accepts several — it seeds a one-item selection there. |
 | **String array**, **Number array** | Used as a list of values, one per array entry. Empty values are dropped. |
 
-Empty, `null`, or unresolvable attribute values are skipped — the filter falls back to whatever static default it has, or no default if none is set. Saving the switch to **From user attribute** discards the value saved on the widget, as the warning above says, so a filter has this fallback only when you pick a value in it in the dashboard builder after that save.
+Empty, `null`, or unresolvable attribute values are skipped — the filter falls back to whatever static default it has, or no default if none is set. Saving the filter on **From user attribute** discards the value saved on the widget, as the warning above says, so a filter has this fallback only when you pick a value in it in the dashboard builder after that save.
 
 The user attribute default only seeds the filter's *initial* value. Viewers can still change the filter unless its [visibility](#visibility) is set to **Disabled**, in which case the resolved attribute value is locked against their own edits. Values passed via URL parameters also take precedence over user attribute defaults, so deep links continue to work.
 
@@ -110,12 +110,14 @@ A saved value is fixed when you pick it, so it goes stale as the dimension's val
 | **Max value by measure** | The value of the filter's dimension whose row has the highest value of the measure you pick — on a **City** filter with **Count**, the city with the most rows. |
 | **Min value by measure** | The value of the filter's dimension whose row has the lowest value of that measure. |
 
+Rows where the dimension, or the measure you pick, is empty (`null`) are left out, so a default never resolves to an empty value while the dimension has others.
+
 The first and last value are offered on string, number and time dimensions. Picking either shows a sentence — *The first value of Status, according to the selected sort order.* — and a sort order dropdown beneath it:
 
 - **Natural**, the default, is the dimension's own order: alphabetical for a string, numeric for a number, chronological for a time dimension. The first value is the lowest, and the last value is the highest.
 - **Database** is the order this filter's own value list shows its values in, and is offered on a string dimension only. That list holds the first 100 values, so **Last value of dimension** under **Database** is the last of those 100 — not the last value the dimension holds.
 
-The max and min options show a measure dropdown instead, grouped by semantic view, with nothing picked. It lists the measures of the filter's own view first, followed by those of every other view that includes the same dimension — one the data model declares as the same underlying cube member, the way a **Customers** view and an **Orders** view can both include the users cube's city. For a measure of another view, the ranking query runs in that view, over its own copy of the dimension, and the value it returns is applied to this filter. A view is not matched by name: one holding a same-named dimension of a *different* cube offers no measures. Where no view has any measures to offer, neither option appears in the **Default value** dropdown.
+The max and min options show a measure dropdown instead, grouped by semantic view, with nothing picked and the note *Measures of views that share this dimension.* under it. It lists the measures of the filter's own view first, followed by those of every other view that includes the same dimension — one the data model declares as the same underlying cube member, the way a **Customers** view and an **Orders** view can both include the users cube's city. For a measure of another view, the ranking query runs in that view, over its own copy of the dimension, and the value it returns is applied to this filter. A view is not matched by name: one holding a same-named dimension of a *different* cube offers no measures. Where no view has any measures to offer, neither option appears in the **Default value** dropdown.
 
 Until you pick a measure, the sidebar reads *Pick a measure — otherwise the saved value is kept.*, and saving without one keeps the filter on **Saved widget value**. Choosing a different dimension for the filter also puts a data-resolved default back on **Saved widget value**, so pick the option again for the new dimension.
 
@@ -123,7 +125,7 @@ Until you pick a measure, the sidebar reads *Pick a measure — otherwise the sa
 A filter with a default resolved from the data cannot be changed by hand — in the dashboard builder or on the published dashboard, whatever its [visibility](#visibility). Its operator and value are greyed out, and the action that [clears or resets](#clearing-and-resetting) it is unavailable. To change the value, change the **Default value** in the filter's settings.
 </Warning>
 
-A line under the filter names the source of its value, such as *First value of Status* or *Max by Count*, and on a published dashboard the information icon beside the filter's title says the same: *This filter's value comes from First value of Status. Change it in the filter's settings.*
+A muted note right after the filter's title, on the same line, names the source of its value, such as *First value of Status* or *Max by Count*. When the title leaves it too little room, the note is cut off with an ellipsis, and hovering it shows the whole note. On a published dashboard, the information icon at the end of the title line says the same: *This filter's value comes from First value of Status. Change it in the filter's settings.*
 
 The value is resolved for each viewer and never saved on the dashboard, so a published dashboard keeps following the data without being republished. A value set elsewhere still wins: a filter value passed [in the URL](#sharing-the-current-selection) replaces the resolved one, and so does a [parent control](#parent) option that sets this filter to a value. The resolved value itself is never written into the URL.
 
@@ -135,9 +137,10 @@ Moving the parent to an option that sets or resets this filter gives it a value 
 
 A [faceted filter](#faceted-filters) resolves its default inside its facet scope, so the default is always a value its own value list offers, and it resolves again when a sibling filter changes. For a measure of another view, each sibling's condition is carried over to that view's matching dimension, and a condition with no match there leaves the filter with no value rather than resolving over rows its value list excludes. The warning icon described below names that case.
 
-When the data gives no value, the filter applies none: the line under it reads *No value applied*, and a warning icon beside the filter's title says why:
+When the data gives no value, the filter applies none: the note after its title reads *No value applied*, and a warning icon at the end of the title line says why:
 
 - The dimension returned no rows — for example, because the filter is [faceted](#faceted-filters) and a sibling narrows it to a period with none.
+- The data could not be loaded — for example, because the query failed.
 - The measure you picked has been removed from its view.
 - The measure's view no longer includes the filter's dimension.
 - A faceted filter's sibling condition has no matching dimension in the view of the measure you picked, so it cannot be carried over. The measure itself is fine; the sibling filter's dimension has no counterpart in that view.
