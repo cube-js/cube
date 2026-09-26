@@ -49,12 +49,27 @@ pub struct MockPreAggregationDescription {
     #[builder(default)]
     #[cfg_attr(not(feature = "integration-cubestore"), allow(dead_code))]
     indexes: Vec<MockPreAggregationIndex>,
+    #[builder(default)]
+    #[cfg_attr(not(feature = "integration-postgres"), allow(dead_code))]
+    build_range_start: Option<String>,
+    #[builder(default)]
+    #[cfg_attr(not(feature = "integration-postgres"), allow(dead_code))]
+    build_range_end: Option<String>,
 }
 
 impl MockPreAggregationDescription {
     #[cfg_attr(not(feature = "integration-cubestore"), allow(dead_code))]
     pub fn indexes(&self) -> &[MockPreAggregationIndex] {
         &self.indexes
+    }
+
+    /// The SQL of `build_range_start` and `build_range_end`, when both are set.
+    #[cfg_attr(not(feature = "integration-postgres"), allow(dead_code))]
+    pub fn build_range(&self) -> Option<(&str, &str)> {
+        Some((
+            self.build_range_start.as_deref()?,
+            self.build_range_end.as_deref()?,
+        ))
     }
 }
 

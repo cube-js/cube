@@ -1,0 +1,160 @@
+# Two facts sharing a calendar and a product dimension through a multi-fact
+# view. The demand fact stores a named calendar shift in a rollup keyed by a
+# three-level product hierarchy, so a query by the top level alone rolls the
+# stored shifted measure up.
+cubes:
+  - name: mf_calendar
+    calendar: true
+    sql_table: mf_dates
+
+    dimensions:
+      - name: date_key
+        sql: "{CUBE}.date_val"
+        type: time
+        primary_key: true
+
+      - name: report_date
+        sql: "{CUBE}.date_val"
+        type: time
+        time_shift:
+          - name: prior_year_mapped
+            sql: "{CUBE}.mapped_prior_date"
+
+      # Another dimension of the same calendar declaring an unrelated shift.
+      - name: report_date_raw
+        sql: "{CUBE}.date_val"
+        type: time
+        time_shift:
+          - interval: 1 week
+            type: prior
+            sql: "{CUBE}.week_begin"
+
+      - name: week_begin_date
+        sql: "{CUBE}.week_begin"
+        type: time
+
+  - name: mf_product
+    sql_table: mf_products
+
+    dimensions:
+      - name: product_id
+        sql: product_id
+        type: string
+        primary_key: true
+
+      - name: category_name
+        sql: category
+        type: string
+
+      - name: subcategory_name
+        sql: subcategory
+        type: string
+
+      - name: department_name
+        sql: department
+        type: string
+
+  - name: mf_demand
+    sql_table: mf_demand_lines
+
+    joins:
+      - name: mf_calendar
+        relationship: many_to_one
+        sql: "{CUBE.partition_date} = {mf_calendar.date_key}"
+      - name: mf_product
+        relationship: many_to_one
+        sql: "{CUBE.product_id} = {mf_product.product_id}"
+
+    dimensions:
+      - name: id
+        sql: id
+        type: number
+        primary_key: true
+
+      - name: product_id
+        sql: product_id
+        type: string
+
+      - name: partition_date
+        sql: partition_date
+        type: time
+
+    measures:
+      - name: amount
+        type: sum
+        sql: amount
+
+      - name: amount_ly
+        type: number
+        multi_stage: true
+        sql: "{amount}"
+        time_shift:
+          - name: prior_year_mapped
+
+      - name: order_count
+        type: count_distinct
+        sql: order_ref
+
+    pre_aggregations:
+      - name: demand_by_hierarchy
+        measures:
+          - amount
+          - amount_ly
+          - order_count
+        dimensions:
+          - mf_product.category_name
+          - mf_product.subcategory_name
+          - mf_product.department_name
+        time_dimension: mf_calendar.report_date
+        granularity: day
+        partition_granularity: day
+        allow_non_strict_date_range_match: true
+
+  - name: mf_visits
+    sql_table: mf_visit_rows
+
+    joins:
+      - name: mf_calendar
+        relationship: many_to_one
+        sql: "{CUBE.partition_date} = {mf_calendar.date_key}"
+      - name: mf_product
+        relationship: many_to_one
+        sql: "{CUBE.product_id} = {mf_product.product_id}"
+
+    dimensions:
+      - name: id
+        sql: id
+        type: number
+        primary_key: true
+
+      - name: product_id
+        sql: product_id
+        type: string
+
+      - name: partition_date
+        sql: partition_date
+        type: time
+
+    measures:
+      - name: visits
+        type: sum
+        sql: visits
+
+views:
+  - name: mf_view
+    cubes:
+      - join_path: mf_visits
+        includes:
+          - visits
+      - join_path: mf_demand
+        includes:
+          - amount
+          - amount_ly
+          - order_count
+      - join_path: mf_product
+        includes: "*"
+      - join_path: mf_calendar
+        includes:
+          - report_date
+          - report_date_raw
+          - week_begin_date

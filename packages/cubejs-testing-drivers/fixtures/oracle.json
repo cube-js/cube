@@ -213,7 +213,11 @@
     "SQL API: Rolling Window YTD (year + month + day + date_trunc IN)",
     "SQL API: SQL push down push to cube quoted alias",
     "SQL API: Date/time comparison with date_trunc with SQL push down",
-    "SQL API: Window function over measure (running total)"
+    "SQL API: Window function over measure (running total)",
+    "---- Time-shifted measure rolled up from a rollup: native planner, Postgres and BigQuery only ----",
+    "querying RetailOrders: named prior month by category for one day (pre-aggregation in CubeStore)",
+    "querying RetailOrders: named prior month by category over two months (pre-aggregation in CubeStore)",
+    "SQL API: named prior month by category for one day"
   ],
   "tesseractSkip": [
     "querying Products: dimensions -- doesn't work wo ordering",
@@ -264,6 +268,10 @@
     "SQL API: Rolling Window YTD (year + month + day + date_trunc IN)",
     "---- Calendar-shifted measure stored in a rollup: covered on Postgres only for now ----",
     "querying BigECommerce with Retail Calendar: prior year and month by week (no pre-aggregation)",
-    "querying BigECommerce with Retail Calendar: prior year and month by week (pre-aggregation in CubeStore)"
+    "querying BigECommerce with Retail Calendar: prior year and month by week (pre-aggregation in CubeStore)",
+    "---- Time-shifted measure rolled up from a rollup: native planner, Postgres and BigQuery only ----",
+    "querying RetailOrders: named prior month by category for one day (pre-aggregation in CubeStore)",
+    "querying RetailOrders: named prior month by category over two months (pre-aggregation in CubeStore)",
+    "SQL API: named prior month by category for one day"
   ]
 }

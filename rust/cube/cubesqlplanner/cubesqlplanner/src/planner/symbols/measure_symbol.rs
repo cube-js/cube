@@ -1,6 +1,7 @@
 use super::common::{Case, CompiledMemberPath, MultiStageProperties};
 use super::deps::{self, symbol_deps};
 use super::measure_kinds::MeasureKind;
+use super::AggregationType;
 use super::SymbolPath;
 use super::{MemberSymbol, SymbolFactory};
 use crate::cube_bridge::evaluator::CubeEvaluator;
@@ -257,14 +258,65 @@ impl MeasureSymbol {
     }
 
     /// True when the measure's aggregation distributes over row union
-    /// (sum-like). Multi-stage measures are never additive — their
-    /// value depends on the windowed stage, not on a plain sum.
+    /// (sum-like). A time-shift proxy is additive when the plain measure it
+    /// reads is; a rolling window stores overlapping windows, which are not.
     pub fn is_additive(&self) -> bool {
-        if self.is_multi_stage() {
-            false
-        } else {
-            self.kind.is_additive()
+        match self.rollup_target() {
+            Some(target) => {
+                !target.is_multi_stage() && !target.is_cumulative() && target.kind.is_additive()
+            }
+            None => !self.is_multi_stage() && self.kind.is_additive(),
         }
+    }
+
+    /// The kind whose roll-up rules a stored column of this measure follows.
+    /// A time-shift proxy stores the value of the measure it reads, so it
+    /// rolls up by that measure's kind, an HLL state included.
+    pub fn rollup_kind(&self) -> MeasureKind {
+        match self.rollup_target() {
+            Some(target) => target.kind.clone(),
+            None => self.kind.clone(),
+        }
+    }
+
+    fn rollup_target(&self) -> Option<Rc<MeasureSymbol>> {
+        let target = self.time_shift_proxy_target()?.as_measure().ok()?;
+        Some(target.rollup_target().unwrap_or(target))
+    }
+
+    /// The measure a multi-stage measure reads unchanged under its time
+    /// shift: `sql` is a bare reference, the shift is the only modifier, and
+    /// the measure's own aggregation returns a single value as it is.
+    pub fn time_shift_proxy_target(&self) -> Option<Rc<MemberSymbol>> {
+        let multi_stage = self.multi_stage.as_ref()?;
+        multi_stage.time_shift.as_ref()?;
+        let grain = &multi_stage.grain;
+        let keeps_single_value = match &self.kind {
+            MeasureKind::Calculated(_) => true,
+            MeasureKind::Aggregated(a) => matches!(
+                a.agg_type(),
+                AggregationType::Sum
+                    | AggregationType::Min
+                    | AggregationType::Max
+                    | AggregationType::Avg
+            ),
+            _ => false,
+        };
+        if grain.exclude.is_some()
+            || grain.keep_only.is_some()
+            || grain.include.is_some()
+            || multi_stage.filter.is_some()
+            || self.rolling_window.is_some()
+            || self.case.is_some()
+            || !self.measure_filters.is_empty()
+            || !keeps_single_value
+        {
+            return None;
+        }
+        self.kind
+            .member_sql()?
+            .resolve_direct_reference()
+            .map(|target| target.resolve_reference_chain())
     }
 
     /// SQL calls inside the measure's kind and `case` body.

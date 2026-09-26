@@ -140,6 +140,18 @@
         "measures": [
           "CUBE.totalProfit"
         ]
+      },
+      {
+        "name": "RetailPriorMonthByProductDay",
+        "time_dimension": "RetailCalendar.retail_date",
+        "granularity": "day",
+        "partition_granularity": "month",
+        "allow_non_strict_date_range_match": true,
+        "dimensions": ["CUBE.category", "CUBE.subCategory", "CUBE.productName"],
+        "measures": [
+          "CUBE.retailOrderCount",
+          "CUBE.retailOrderCountPriorMonth"
+        ]
       }
     ]
   },
@@ -211,7 +223,11 @@
     "SQL API: Rollup with aliases",
     "SQL API: Nested Rollup over asterisk",
     "SQL API: Extended nested Rollup over asterisk",
-    "SQL API: Window function over measure (running total)"
+    "SQL API: Window function over measure (running total)",
+    "---- Time-shifted measure rolled up from a rollup: native planner, Postgres and BigQuery only ----",
+    "querying RetailOrders: named prior month by category for one day (pre-aggregation in CubeStore)",
+    "querying RetailOrders: named prior month by category over two months (pre-aggregation in CubeStore)",
+    "SQL API: named prior month by category for one day"
   ],
   "tesseractSkip": [
     "must download query from the data source via memory",
