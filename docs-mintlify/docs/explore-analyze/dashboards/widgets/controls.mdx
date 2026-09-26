@@ -443,7 +443,7 @@ Every control offers at most one of two actions in the control itself, beside it
 
 | Action | When it shows | What it does |
 |---|---|---|
-| **Clear** (✕) | The control has a value, and is not a [field switcher](#field-switcher) — that one carries no ✕. | Stops applying the control: a cleared filter leaves its charts unfiltered, and a cleared switcher hands each chart back to the granularity or member it was built with. Clearing a [parent control](#parent) mid-session only deselects it: the parent stops driving, and each child keeps the value it is showing rather than reverting. |
+| **Clear** (✕) | The control has a value, and is neither a [field switcher](#field-switcher), which carries no ✕, nor a filter whose default is [resolved from the data](#defaults-resolved-from-the-data), which cannot be changed by hand. | Stops applying the control: a cleared filter leaves its charts unfiltered, and a cleared switcher hands each chart back to the granularity or member it was built with. Clearing a [parent control](#parent) mid-session only deselects it: the parent stops driving, and each child keeps the value it is showing rather than reverting. |
 | **Reset to default** (↩) | The control has been changed, it has a value published in the last dashboard version, and the two differ. | Puts the control back on that published value. |
 
 <Note>
@@ -510,7 +510,7 @@ Each control has a **Visibility** setting that determines how it appears on the 
 
 | Visibility | Behavior on the published dashboard |
 |---|---|
-| **Visible** (default) | Shown on the dashboard and viewers can change its value. |
+| **Visible** (default) | Shown on the dashboard and viewers can change its value — except a filter whose default is [resolved from the data](#defaults-resolved-from-the-data), which no one can change by hand. |
 | **Hidden** | Not shown to viewers, but the control's value is still applied to the charts it targets. Use this to scope a dashboard with a fixed value — e.g., always filter to the current quarter — without exposing the control. Hiding the *children* of a [parent control](#parent) is the usual way to present one dropdown instead of the row of controls behind it. |
 | **Disabled** | Shown on the dashboard so viewers can see the active value, but they cannot change it. A [parent control](#parent) still drives a Disabled child — the setting stops the viewer, not the parent. |
 
