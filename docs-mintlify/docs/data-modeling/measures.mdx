@@ -301,7 +301,9 @@ measures:
 
 Time-shift measures can also be used with [calendar cubes][ref-calendar-cubes]
 to customize how time-shifting works, e.g., to shift by retail calendar
-periods.
+periods. Such a [calendar-overridden time shift][ref-calendar-cubes-time-shift]
+can only be accelerated by a pre-aggregation that stores the shifted measure
+itself, not by offsetting a stored column.
 
 ### Percent of total (fixed dimension)
 
@@ -519,5 +521,6 @@ measures:
 [ref-case]: /reference/data-modeling/measures#case
 [ref-switch-dim]: /reference/data-modeling/dimensions#type
 [ref-calendar-cubes]: /docs/data-modeling/concepts/calendar-cubes
+[ref-calendar-cubes-time-shift]: /docs/data-modeling/concepts/calendar-cubes#overriding-time-shifts
 [ref-pop-recipe]: /recipes/data-modeling/period-over-period
 [link-tesseract]: https://cube.dev/blog/introducing-next-generation-data-modeling-engine
