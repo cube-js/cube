@@ -444,7 +444,7 @@ Every control offers at most one of two actions in the control itself, beside it
 | Action | When it shows | What it does |
 |---|---|---|
 | **Clear** (✕) | The control has a value, and is neither a [field switcher](#field-switcher), which carries no ✕, nor a filter whose default is [resolved from the data](#defaults-resolved-from-the-data), which cannot be changed by hand. | Stops applying the control: a cleared filter leaves its charts unfiltered, and a cleared switcher hands each chart back to the granularity or member it was built with. Clearing a [parent control](#parent) mid-session only deselects it: the parent stops driving, and each child keeps the value it is showing rather than reverting. |
-| **Reset to default** (↩) | The control has been changed, it has a value published in the last dashboard version, and the two differ. | Puts the control back on that published value. |
+| **Reset to default** (↩) | The control has been changed, it has a value published in the last dashboard version, and the two differ — except on a filter whose default is [resolved from the data](#defaults-resolved-from-the-data), which cannot be changed by hand. | Puts the control back on that published value. |
 
 <Note>
 This is the control's *own* published value, which is not always what a [parent control](#parent) means by its **Reset to default** [child mapping](#children): despite the shared label, that one returns the child to the value it opens on *for that viewer*.
