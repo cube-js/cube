@@ -321,6 +321,18 @@ queried together with the `custom_calendar.date` time dimension, the generated S
 custom time shifts defined in the `custom_calendar` cube: one with the `month_ago`
 column and another with `INTERVAL '42 days'`.
 
+<Warning>
+
+**A [pre-aggregation][ref-pre-aggregations] cannot serve a calendar-overridden time shift
+by offsetting a stored column.** Because the shift is a join against the calendar's
+mapped column rather than arithmetic on the time value, a rollup that stores only the
+unshifted measure is never used for it — the query always falls back to the source
+database. To accelerate it, build the rollup on the already-shifted measure itself (as in
+`total_sales_prior_month` above), so the rollup's build runs the calendar join and stores
+the shifted result directly.
+
+</Warning>
+
 ## Overriding granularities
 
 Calendar cubes can be used to override the default [granularities][ref-granularities] of
