@@ -427,7 +427,6 @@ A filter's JSON carries the condition in its `type` key, alongside the `value`. 
 | `in the month`, `in the quarter`, `in the year` and their `not` forms | `in_month`, `in_quarter`, `in_year`, `not_in_month`, `not_in_quarter`, `not_in_year` |
 | `contains`, `starts with`, `ends with` and their `not` forms | `contains`, `starts_with`, `ends_with`, `not_contains`, `not_starts_with`, `not_ends_with` |
 | `is null`, `is not null`, `is empty`, `is not empty` | `is_null`, `is_not_null`, `is_empty`, `is_not_empty` — these take no `value` |
-| Custom SQL, which no operator menu offers | `custom` — a facet source set to it scopes nothing |
 
 A **Boolean** dimension's `is true` and `is false` sit on the `is` row: both are `equals`, with `value` set to the string `"true"` or `"false"` — `f_orders.is_paid={"value":"true"}`.
 
