@@ -218,6 +218,10 @@ If direct conversion is not possible, different SQL transformation rewrite rules
 Please refer to the [SQL API reference][ref-ref-sql-api] for the list of supported SQL functions and clauses.
 Support varies based on the target database.
 
+Pushdown also works for [views][ref-views] that combine cubes from
+[several data sources][ref-multiple-data-sources]: each part of the query is
+transpiled and pushed down to the data source it targets.
+
 ## Top-down and bottom-up evaluation
 
 Fundamentally, every SQL operation results in a tabular data set.
@@ -464,5 +468,7 @@ If a query of yours has that shape, you can:
 [ref-env-non-streaming-limit]: /reference/configuration/environment-variables#cubesql_non_streaming_query_max_row_limit
 [ref-ref-sql-api]: /reference/core-data-apis/sql-api/reference
 [ref-env-var-push-down]: /reference/configuration/environment-variables#cubesql_sql_push_down
+[ref-views]: /reference/data-modeling/view
+[ref-multiple-data-sources]: /admin/connect-to-data/multiple-data-sources
 [link-postgres-boolean]: https://www.postgresql.org/docs/current/datatype-boolean.html
 [link-selection-projection]: https://stackoverflow.com/a/1031101

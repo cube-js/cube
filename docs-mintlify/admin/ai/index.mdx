@@ -26,10 +26,17 @@ your-cube-project/
 │   │   └── fiscal-year.md
 │   └── certified_queries/         # Certified queries as Markdown
 │       └── quarterly-revenue.md
+├── knowledge/                     # Read-only reference files for the agent
+│   └── examples.md
 └── cube.py
 ```
 
 Storing configuration as code in your repository enables version control, code review, and consistent behavior across environments.
+
+Files under a top-level `knowledge/` directory in your project are available to the agent
+as read-only reference material — examples, playbooks, or other documents — independent of
+data-model access. The agent can list and read them to inform its answers, but can't modify
+them; edit them in your project through git or the data-model editor.
 
 ## Configure the agent
 

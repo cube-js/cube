@@ -148,6 +148,29 @@ same audience. The option appears only if you have **Full access** to the
 original, since copying its sharing means granting that access again. See
 [Duplicates][ref-sharing-duplicates] for what does and doesn't carry over.
 
+## Copying a workbook to another deployment
+
+If your account has more than one deployment, you can copy a workbook — and
+publish its dashboard — from one to another. This is how you move a workbook
+built and tested on a staging deployment into production.
+
+On the workspace page, open a workbook's row-actions menu and choose **Copy to
+another deployment** (shown only for workbooks with a published dashboard).
+Pick the destination deployment; Cube previews how many report tabs will be
+copied, including unpublished drafts, then copies all of them and publishes
+the source's currently published dashboard in the destination immediately.
+
+The first copy creates a new linked workbook in the destination, owned by
+you — sharing and embedding settings aren't copied. Copying again updates
+that same linked workbook, keeping its URL, access settings, and slug.
+
+- You need **Manage** permission on the source workbook.
+- Both deployments must use compatible data models — the destination must
+  already define every cube and member the workbook's queries use, with
+  matching types.
+- If the destination workbook changed since the last copy, you must confirm
+  **Overwrite destination changes** before Cube will replace them.
+
 ## Workbook versions
 
 When you [publish a dashboard][ref-dashboards] from a workbook, Cube

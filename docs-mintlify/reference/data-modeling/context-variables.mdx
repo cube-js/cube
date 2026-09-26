@@ -869,6 +869,18 @@ Use [`query_rewrite`][ref-config-queryrewrite] instead.
 Please read the [Security Context page][ref-sec-ctx] for more information on how
 to provide security context to Cube.
 
+<Warning>
+
+Referencing `SECURITY_CONTEXT` directly in a member's `sql` — with either curly-brace form,
+`{SECURITY_CONTEXT...}` in YAML or `${SECURITY_CONTEXT...}` in JavaScript — is resolved once
+at schema-compile time, not per request. On a deployment where the compiled schema is cached
+per app id (e.g. a multi-tenant setup on a dedicated cluster), the same compiled value can be
+served across different requests instead of being re-evaluated for each one — even though it
+resolves correctly in development. `query_rewrite` doesn't have this issue because it runs per
+request. The data model IDE flags this pattern with a lint warning.
+
+</Warning>
+
 
 ```javascript
 cube(`orders`, {
