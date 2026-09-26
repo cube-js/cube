@@ -36,6 +36,7 @@ const meta = new Meta({
 
 const flush = () => act(async () => {
   for (let i = 0; i < 10; i++) {
+    // eslint-disable-next-line no-await-in-loop
     await Promise.resolve();
   }
 });

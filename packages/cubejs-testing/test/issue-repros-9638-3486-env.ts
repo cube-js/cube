@@ -34,6 +34,7 @@ export function pgClient(): Client {
 export async function pgExec(sql: string) {
   const client = pgClient();
   await client.connect();
+
   try {
     return await client.query(sql);
   } finally {
@@ -121,6 +122,7 @@ export async function startReproEnv(fixture: string, extraEnv: Record<string, st
   };
   const loadUntilReady = async (query: any, timeoutMs = 90000) => {
     const start = Date.now();
+
     for (;;) {
       const r = await load(query);
       if (r.error !== 'Continue wait') {
