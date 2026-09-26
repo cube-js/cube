@@ -64,6 +64,10 @@ const PREDICATES: [string, string, boolean, string][] = [
 ];
 /* eslint-enable quotes */
 
+// Building a query loads the native planner, which on a cold run - the unit job
+// starts one right after installing - takes longer than jest's default budget.
+const COLD_START_TIMEOUT = 60 * 1000;
+
 describe('PinotQuery SQL templates', () => {
   it('renders Tesseract sql_table queries with a prepared FROM source', async () => {
     const { compiler, joinGraph, cubeEvaluator } = prepareCompiler(`
@@ -113,6 +117,7 @@ describe('PinotQuery SQL templates', () => {
 
       expect(params).toEqual(['\\%']);
       expect(sql).toContain(predicate);
-    }
+    },
+    COLD_START_TIMEOUT
   );
 });

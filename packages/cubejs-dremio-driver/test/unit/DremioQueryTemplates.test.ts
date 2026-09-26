@@ -63,6 +63,10 @@ const PREDICATES: [string, string, boolean, string][] = [
 ];
 /* eslint-enable quotes */
 
+// Building a query loads the native planner, which on a cold run - the unit job
+// starts one right after installing - takes longer than jest's default budget.
+const COLD_START_TIMEOUT = 60 * 1000;
+
 describe('DremioQuery SQL templates', () => {
   it.each(PREDICATES)(
     'escapes and interprets LIKE wildcards for %s on the %s planner',
@@ -71,7 +75,8 @@ describe('DremioQuery SQL templates', () => {
 
       expect(params).toEqual(['\\%']);
       expect(sql).toContain(predicate);
-    }
+    },
+    COLD_START_TIMEOUT
   );
 
   // Dremio's ILIKE is a function taking no escape argument, so neither planner
@@ -83,6 +88,7 @@ describe('DremioQuery SQL templates', () => {
       const { sql } = await buildFilter('contains', useNativeSqlPlanner);
 
       expect(sql).not.toMatch(/ILIKE/i);
-    }
+    },
+    COLD_START_TIMEOUT
   );
 });

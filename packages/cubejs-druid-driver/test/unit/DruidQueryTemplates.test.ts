@@ -66,6 +66,10 @@ const CASES: [string, string, boolean, string][] = PREDICATES.flatMap(
   ] as [string, string, boolean, string][])
 );
 
+// Building a query loads the native planner, which on a cold run - the unit job
+// starts one right after installing - takes longer than jest's default budget.
+const COLD_START_TIMEOUT = 60 * 1000;
+
 describe('DruidQuery SQL templates', () => {
   it.each(CASES)(
     'escapes and interprets LIKE wildcards for %s on the %s planner',
@@ -74,6 +78,7 @@ describe('DruidQuery SQL templates', () => {
 
       expect(params).toEqual(['\\%']);
       expect(sql).toContain(predicate);
-    }
+    },
+    COLD_START_TIMEOUT
   );
 });
