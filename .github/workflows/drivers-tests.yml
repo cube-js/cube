@@ -362,9 +362,9 @@ jobs:
           CUBESTORE_SKIP_POST_INSTALL: true
         with:
           max_attempts: 3
-          retry_on: error
+          retry_on: any
           retry_wait_seconds: 15
-          timeout_minutes: 20
+          timeout_minutes: 10
           command: yarn install --frozen-lockfile
 
       - name: Build client
