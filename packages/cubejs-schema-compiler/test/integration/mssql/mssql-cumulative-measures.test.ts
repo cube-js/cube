@@ -24,6 +24,15 @@ describe('MSSqlCumulativeMeasures', () => {
           rollingWindow: {
             trailing: 'unbounded'
           }
+        },
+
+        amountYtd: {
+          type: 'sum',
+          sql: 'amount',
+          rollingWindow: {
+            type: 'to_date',
+            granularity: 'year'
+          }
         }
       },
 
@@ -275,5 +284,52 @@ describe('MSSqlCumulativeMeasures', () => {
         }
       ]);
     }
+  }));
+
+  // https://github.com/cube-js/cube/issues/12015
+  it.each([
+    {
+      granularity: 'quarter',
+      dateRange: ['2017-01-01', '2017-12-31'],
+      expected: [
+        { visitors__created_at_quarter: '2017-01-01T00:00:00.000Z', visitors__amount_ytd: '1500' },
+        { visitors__created_at_quarter: '2017-04-01T00:00:00.000Z', visitors__amount_ytd: '1500' },
+        { visitors__created_at_quarter: '2017-07-01T00:00:00.000Z', visitors__amount_ytd: '1500' },
+        { visitors__created_at_quarter: '2017-10-01T00:00:00.000Z', visitors__amount_ytd: '1500' },
+      ],
+    },
+    {
+      granularity: 'week',
+      dateRange: ['2017-01-02', '2017-01-22'],
+      expected: [
+        { visitors__created_at_week: '2017-01-02T00:00:00.000Z', visitors__amount_ytd: '1500' },
+        { visitors__created_at_week: '2017-01-09T00:00:00.000Z', visitors__amount_ytd: '1500' },
+        { visitors__created_at_week: '2017-01-16T00:00:00.000Z', visitors__amount_ytd: '1500' },
+      ],
+    },
+  ])('should step the to_date rolling window time series by $granularity', ({ granularity, dateRange, expected }) => compiler.compile().then(async () => {
+    const query = new MssqlQuery(
+      { joinGraph, cubeEvaluator, compiler },
+      {
+        measures: ['visitors.amountYtd'],
+        timeDimensions: [
+          {
+            dimension: 'visitors.createdAt',
+            granularity,
+            dateRange,
+          },
+        ],
+        timezone: 'UTC',
+        order: [
+          {
+            id: 'visitors.createdAt',
+          },
+        ],
+      }
+    );
+
+    const queryAndParams = query.buildSqlAndParams();
+
+    expect(await dbRunner.testQuery(queryAndParams)).toEqual(expected);
   }));
 });
