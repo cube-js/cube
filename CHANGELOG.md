@@ -3,6 +3,19 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.7.46](https://github.com/cube-js/cube/compare/v1.7.45...v1.7.46) (2026-09-26)
+
+### Bug Fixes
+
+- **cubeorchestrator:** Render Arrow binary columns as hex strings ([#12006](https://github.com/cube-js/cube/issues/12006)) ([0aa1a28](https://github.com/cube-js/cube/commit/0aa1a28779ce4ab2b906840ba5aaeae03a374f53))
+- **cubestore:** refresh S3 web identity credentials before STS expiry ([#11808](https://github.com/cube-js/cube/issues/11808)) ([64185da](https://github.com/cube-js/cube/commit/64185dad7a3965a772c356d3848cb6da4ca5e7e9)), closes [#11622](https://github.com/cube-js/cube/issues/11622)
+- **docker-jdbc:** Use bundled Node headers for JDBC builds ([#12002](https://github.com/cube-js/cube/issues/12002)) ([5dd3e2f](https://github.com/cube-js/cube/commit/5dd3e2f08f9763d9464d43859a63b01593a525a3))
+
+### Features
+
+- **query-orchestrator:** honour refreshKeyRenewalThreshold on locally evaluated refresh keys ([#11720](https://github.com/cube-js/cube/issues/11720)) ([935e094](https://github.com/cube-js/cube/commit/935e0948104476631bbe15aa787065aa7ee45ba2))
+- **tesseract:** roll up stored time-shifted measures from pre-aggregations ([#12010](https://github.com/cube-js/cube/issues/12010)) ([3d602b2](https://github.com/cube-js/cube/commit/3d602b29207548a2da8b8f8a4d5dc7863e53e4e7))
+
 ## [1.7.45](https://github.com/cube-js/cube/compare/v1.7.44...v1.7.45) (2026-09-25)
 
 ### Bug Fixes

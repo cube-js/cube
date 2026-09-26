@@ -2,7 +2,7 @@
   "name": "@cubejs-backend/postgres-driver",
   "description": "Cube Postgres database driver",
   "author": "Cube Dev, Inc.",
-  "version": "1.7.45",
+  "version": "1.7.46",
   "repository": {
     "type": "git",
     "url": "https://github.com/cube-js/cube.git",
@@ -34,8 +34,8 @@
     "integration:postgres": "NODE_OPTIONS=--experimental-vm-modules jest --verbose dist/test"
   },
   "dependencies": {
-    "@cubejs-backend/base-driver": "1.7.45",
-    "@cubejs-backend/shared": "1.7.45",
+    "@cubejs-backend/base-driver": "1.7.46",
+    "@cubejs-backend/shared": "1.7.46",
     "@types/pg": "^8.16.0",
     "@types/pg-query-stream": "^1.0.3",
     "pg": "^8.18.0",
@@ -43,8 +43,8 @@
   },
   "license": "Apache-2.0",
   "devDependencies": {
-    "@cubejs-backend/linter": "1.7.45",
-    "@cubejs-backend/testing-shared": "1.7.45",
+    "@cubejs-backend/linter": "1.7.46",
+    "@cubejs-backend/testing-shared": "1.7.46",
     "@types/jest": "^29",
     "@types/node": "^22",
     "testcontainers": "^12.1.0",
