@@ -162,13 +162,13 @@ The first promotion to a given deployment creates a linked copy there and publis
 dashboard; every later promotion to the same deployment updates that copy, instead of
 creating another one, and republishes the dashboard.
 
-You need read access to the source workbook and, once a linked copy exists at the
-destination, edit access to it. If the destination copy was edited since the last
-promotion, applying the promotion is blocked until you choose to override those edits,
-replacing them with the source's. Sharing, embedding, and ownership settings on the
-destination copy are never changed by a promotion — set them separately there. A
-promoted workbook can still fail at query time if the destination's data model differs
-from the source's.
+You need read access to the source workbook and access to the target deployment; once a
+linked copy exists there, you also need edit access to it. If the destination copy was
+edited since the last promotion, applying the promotion is blocked until you choose to
+override those edits, replacing them with the source's. Sharing, embedding, and
+ownership settings on the destination copy are never changed by a promotion — set them
+separately there. A promoted workbook can still fail at query time if the destination's
+data model differs from the source's.
 
 You can also promote workbooks programmatically with the
 [Workbook Promotions API][ref-promotions-api].
