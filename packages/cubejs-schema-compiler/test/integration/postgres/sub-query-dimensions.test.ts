@@ -270,3 +270,104 @@ cube(\`CustomerOrders\`, {
     sales__total_amount: '375',
   }]));
 });
+
+describe('Sub Query Dimension selected with the measure it references', () => {
+  jest.setTimeout(200000);
+
+  const { compiler, joinGraph, cubeEvaluator } = prepareJsCompiler(`
+cube(\`customers\`, {
+  sql: \`
+    SELECT 1 AS id, 'Alice' AS name UNION ALL
+    SELECT 2 AS id, 'Bob' AS name UNION ALL
+    SELECT 3 AS id, 'Carol' AS name
+  \`,
+
+  joins: {
+    orders: {
+      relationship: \`one_to_many\`,
+      sql: \`\${CUBE}.id = \${orders.customer_id}\`,
+    },
+  },
+
+  dimensions: {
+    id: {
+      sql: \`id\`,
+      type: \`number\`,
+      primaryKey: true,
+    },
+
+    total_spend: {
+      sql: \`\${orders.revenue}\`,
+      type: \`number\`,
+      subQuery: true,
+    },
+
+    spend_tier: {
+      sql: \`CASE WHEN \${total_spend} >= 100 THEN 'high' ELSE 'low' END\`,
+      type: \`string\`,
+    },
+  },
+
+  measures: {
+    count: {
+      type: \`count\`,
+    },
+  },
+});
+
+cube(\`orders\`, {
+  sql: \`
+    SELECT 10 AS id, 1 AS customer_id, 100 AS amount UNION ALL
+    SELECT 11 AS id, 1 AS customer_id, 50 AS amount UNION ALL
+    SELECT 12 AS id, 2 AS customer_id, 40 AS amount UNION ALL
+    SELECT 13 AS id, 3 AS customer_id, 30 AS amount
+  \`,
+
+  dimensions: {
+    id: {
+      sql: \`id\`,
+      type: \`number\`,
+      primaryKey: true,
+    },
+
+    customer_id: {
+      sql: \`customer_id\`,
+      type: \`number\`,
+    },
+  },
+
+  measures: {
+    revenue: {
+      sql: \`amount\`,
+      type: \`sum\`,
+    },
+  },
+});
+  `);
+
+  async function runQueryTest(q, expectedResult) {
+    await compiler.compile();
+    const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, q);
+
+    console.log(query.buildSqlAndParams());
+
+    const res = await dbRunner.testQuery(query.buildSqlAndParams());
+    console.log(JSON.stringify(res));
+
+    expect(res).toEqual(
+      expectedResult
+    );
+  }
+
+  it('renders the outer measure as an aggregate, not as the subquery column', async () => runQueryTest({
+    measures: ['orders.revenue'],
+    dimensions: ['customers.spend_tier'],
+    order: [{ id: 'customers.spend_tier' }],
+  }, [{
+    customers__spend_tier: 'high',
+    orders__revenue: '150',
+  }, {
+    customers__spend_tier: 'low',
+    orders__revenue: '70',
+  }]));
+});
