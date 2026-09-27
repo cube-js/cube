@@ -1424,7 +1424,10 @@ The maximum number of chained [multi-stage][ref-multi-stage-calculations] member
 Cube will plan along a single dependency path. A query whose multi-stage members
 chain deeper than this is refused with an error naming the member and the limit,
 rather than failing with an internal error. Only enforced when [Tesseract][link-tesseract]
-plans the query; it has no effect with `CUBEJS_TESSERACT_SQL_PLANNER=false`.
+plans the query; it has no effect with `CUBEJS_TESSERACT_SQL_PLANNER=false`. For a
+query served from a pre-aggregation, the lower
+[`CUBESTORE_MAX_QUERY_PLAN_DEPTH`](#cubestore_max_query_plan_depth) limit applies
+first.
 
 | Possible Values | Default in Development | Default in Production |
 | --------------- | ---------------------- | --------------------- |
