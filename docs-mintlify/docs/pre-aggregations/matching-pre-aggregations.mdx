@@ -193,6 +193,15 @@ the two are equal by the join condition, but matching only considers members the
 pre-aggregation stores. Key every pre-aggregation on the time dimension the query
 groups by. Results stay correct either way; only the acceleration is lost.
 
+A stored time-shifted measure — a [multi-stage measure][ref-multi-stage] whose `sql`
+is a bare reference to another measure with a `time_shift`, and no other multi-stage
+modifiers — rolls up by that measure's own additivity rule. This lets it match a
+pre-aggregation at a coarser grain than the one it was built at, and be reached
+through a view, unlike other multi-stage measures, which only match at the exact
+build grain. A time-shifted measure that also uses `reduce_by`, `group_by`,
+`add_group_by` with mixed aggregations, `filter`, or shifts a rolling-window measure
+is still treated as non-additive and requires an exact grain match.
+
 <Warning>
 
 Matching separate pre-aggregations to multi-fact and multi-stage subqueries is
