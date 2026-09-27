@@ -150,16 +150,17 @@ original, since copying its sharing means granting that access again. See
 
 ## Promote a workbook to another deployment
 
-You can copy a workbook, along with its published dashboard, from one deployment to
-another deployment in the same account — for example, to ship a dashboard built and
-validated in development to production without rebuilding it by hand.
+You can copy a workbook from one deployment to another deployment in the same account —
+for example, to ship a dashboard built and validated in development to production
+without rebuilding it by hand. The workbook must already have a published dashboard;
+Cube asks you to publish it first otherwise.
 
 From the workbook's row actions menu on the Workspace page (not available in Creator
 Mode), select **Copy to another deployment** and choose the target. Cube previews what
-will change before you apply it. Each promotion also publishes the source's currently
-published dashboard at the destination. The first promotion to a given deployment
-creates a linked copy there; every later promotion to the same deployment updates that
-copy instead of creating a new one.
+will change before you apply it. The first promotion to a given deployment creates a
+linked copy there and publishes the dashboard; every later promotion to the same
+deployment updates that copy and republishes the dashboard, instead of creating a new
+one.
 
 You need access to both the source and target deployments. If the destination copy was
 edited since the last promotion, applying the promotion is blocked until you choose to
