@@ -32,13 +32,19 @@ const FILTER_MODEL = `
   });
 `;
 
-const buildFilter = async (operator: string, useNativeSqlPlanner: boolean) => {
+const buildQuery = async (query: Record<string, unknown> = {}) => {
   const { compiler, joinGraph, cubeEvaluator } = prepareCompiler(FILTER_MODEL);
 
   await compiler.compile();
 
-  const query = new PinotQuery({ joinGraph, cubeEvaluator, compiler }, {
+  return new PinotQuery({ joinGraph, cubeEvaluator, compiler }, {
     measures: ['orders.count'],
+    ...query,
+  });
+};
+
+const buildFilter = async (operator: string, useNativeSqlPlanner: boolean) => {
+  const query = await buildQuery({
     filters: [{ member: 'orders.status', operator, values: ['%'] }],
     useNativeSqlPlanner,
   });
@@ -120,4 +126,16 @@ describe('PinotQuery SQL templates', () => {
     },
     COLD_START_TIMEOUT
   );
+
+  // The SQL API push-down renders `expressions.like` / `expressions.ilike` in Rust, so the
+  // rendering cannot be exercised from here - these pin the gate the rendering reads.
+  // `default_escape` is set when the pushed-down LIKE carried no ESCAPE of its own and so
+  // still means Postgres' backslash; Pinot has no default escape character, so dropping
+  // the gate sends the escaping on with nothing to interpret it.
+  it.each(['like', 'ilike'])('gates an ESCAPE clause on default_escape in expressions.%s', async (key) => {
+    const templates = (await buildQuery()).sqlTemplates();
+
+    // eslint-disable-next-line quotes -- double quotes keep the escaping readable
+    expect(templates.expressions[key]).toContain("{% if default_escape %} ESCAPE '\\'{% endif %}");
+  }, COLD_START_TIMEOUT);
 });
