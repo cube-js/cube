@@ -175,6 +175,7 @@ pub fn sql_tests(prefix: &str) -> Vec<(&'static str, TestFn)> {
         t("topk_query", topk_query),
         t("topk_having", topk_having),
         t("topk_decimals", topk_decimals),
+        t("topk_having_decimals", topk_having_decimals),
         t("planning_topk_having", planning_topk_having),
         t("planning_topk_hll", planning_topk_hll),
         t("topk_hll", topk_hll),
@@ -4480,6 +4481,41 @@ async fn topk_decimals(service: Box<dyn SqlClient>) -> Result<(), CubeError> {
                                SELECT * FROM s.Data2) AS `Data` \
                          GROUP BY 1 \
                          ORDER BY 2 DESC NULLS LAST \
+                         LIMIT 3",
+        )
+        .await?;
+    assert_eq!(
+        to_rows(&r),
+        rows(&[("z", dec5(100)), ("y", dec5(80)), ("b", dec5(52))])
+    );
+    Ok(())
+}
+
+async fn topk_having_decimals(service: Box<dyn SqlClient>) -> Result<(), CubeError> {
+    service.exec_query("CREATE SCHEMA s").await?;
+    service
+        .exec_query("CREATE TABLE s.Data1(url text, hits decimal)")
+        .await?;
+    service
+        .exec_query("INSERT INTO s.Data1(url, hits) VALUES ('a', 1), ('b', 2), ('c', 3), ('d', 4), ('e', 5), ('z', 100)")
+        .await?;
+    service
+        .exec_query("CREATE TABLE s.Data2(url text, hits decimal)")
+        .await?;
+    service
+        .exec_query("INSERT INTO s.Data2(url, hits) VALUES ('b', 50), ('c', 45), ('d', 40), ('e', 35), ('y', 80)")
+        .await?;
+
+    // HAVING on a decimal sum combined with ORDER BY a measure goes through the top-k path.
+    let r = service
+        .exec_query(
+            "SELECT `url` `url`, SUM(`hits`) `hits` \
+                         FROM (SELECT * FROM s.Data1 \
+                               UNION ALL \
+                               SELECT * FROM s.Data2) AS `Data` \
+                         GROUP BY 1 \
+                         HAVING SUM(`hits`) > 45 \
+                         ORDER BY 2 DESC \
                          LIMIT 3",
         )
         .await?;
