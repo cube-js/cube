@@ -43,6 +43,7 @@ cubes:
   // Day n (0-based from 2026-01-01) has 3 rows summing to 300.75 * (n + 1) + 7.5.
   const expectedRows = Array.from({ length: 60 }, (_, n) => {
     let sum = 0;
+
     for (let i = Math.max(0, n - 6); i <= n; i++) {
       sum += 300.75 * (i + 1) + 7.5;
     }
