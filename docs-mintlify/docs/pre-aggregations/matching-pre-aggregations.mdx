@@ -194,13 +194,14 @@ pre-aggregation stores. Key every pre-aggregation on the time dimension the quer
 groups by. Results stay correct either way; only the acceleration is lost.
 
 A stored time-shifted measure — a [multi-stage measure][ref-multi-stage] of type
-`sum`, `min`, `max`, `avg`, or `number` whose `sql` is a bare reference to another
-measure, with `time_shift` as its only multi-stage modifier — rolls up by the
-referenced measure's additivity rule. When that measure is additive, the shifted
-measure can match a pre-aggregation at a coarser grain than the one it was built at,
-and be reached through a view; other multi-stage measures only match at the exact
-build grain. Adding `reduce_by`, `group_by`, `add_group_by`, `filter`, `filters`, or
-`case`, or shifting a rolling-window measure, makes it non-additive again.
+`sum`, `min`, `max`, `avg`, or a calculated type such as `number`, whose `sql` is a
+bare reference to another measure, with `time_shift` as its only multi-stage
+modifier — rolls up by the referenced measure's additivity rule. When that measure
+is additive, the shifted measure can match a pre-aggregation at a coarser grain
+than the one it was built at, and be reached through a view; other multi-stage
+measures only match at the exact build grain. Adding `reduce_by`, `group_by`,
+`add_group_by`, `filter`, `filters`, or `case`, or shifting a rolling-window
+measure, makes it non-additive again.
 
 <Warning>
 
