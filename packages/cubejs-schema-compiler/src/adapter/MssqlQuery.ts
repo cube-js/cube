@@ -353,10 +353,13 @@ export class MssqlQuery extends BaseQuery {
       'FROM time_series\n' +
       'WHERE DATEADD({{ minimal_time_unit }}, 1, date_from) <= CAST({{ end }} AS DATETIME2)';
 
+    // Range bounds come from truncated time dimensions, which are legacy DATETIME
+    // (`dateadd(day, ..., 0)`). DATETIME has ~3ms precision, so subtracting 1ms
+    // rounds `date_to` back up to the next period start. Cast to DATETIME2 first.
     templates.statements.generated_time_series_with_cte_range_source =
-      'SELECT {{ range_source }}.{{ min_name }} AS date_from,\n' +
-      '       DATEADD(MILLISECOND, -1, DATEADD({{ minimal_time_unit }}, 1, {{ range_source }}.{{ min_name }})) AS date_to,\n' +
-      '       {{ range_source }}.{{ max_name }} AS max_date\n' +
+      'SELECT CAST({{ range_source }}.{{ min_name }} AS DATETIME2) AS date_from,\n' +
+      '       DATEADD(MILLISECOND, -1, DATEADD({{ minimal_time_unit }}, 1, CAST({{ range_source }}.{{ min_name }} AS DATETIME2))) AS date_to,\n' +
+      '       CAST({{ range_source }}.{{ max_name }} AS DATETIME2) AS max_date\n' +
       'FROM {{ range_source }}\n' +
       'UNION ALL\n' +
       'SELECT DATEADD({{ minimal_time_unit }}, 1, date_from),\n' +
