@@ -1418,6 +1418,17 @@ from the console.
 | --------------- | ---------------------- | --------------------- |
 | `true`, `false` | `false`                | `true`                |
 
+## `CUBEJS_MAX_MULTI_STAGE_DEPTH`
+
+The maximum number of chained [multi-stage][ref-multi-stage-calculations] members
+Cube will plan along a single dependency path. A query whose multi-stage members
+chain deeper than this is refused with an error naming the member and the limit,
+rather than failing with an internal error.
+
+| Possible Values | Default in Development | Default in Production |
+| --------------- | ---------------------- | --------------------- |
+| A valid number  | `32`                   | `32`                  |
+
 ## `CUBEJS_MAX_PARTITIONS_PER_CUBE`
 
 The maximum number of partitions each pre-aggregation in a cube can use.
@@ -2110,6 +2121,28 @@ The logging level for Cube Store.
 
 See also [`CUBEJS_LOG_LEVEL`](/reference/configuration/environment-variables#cubejs_log_level).
 
+## `CUBESTORE_MAIN_STACK_SIZE`
+
+The stack size, in MiB, reserved for Cube Store's main thread. Raised alongside
+[`CUBESTORE_MAX_QUERY_PLAN_DEPTH`](#cubestore_max_query_plan_depth) so that deeper,
+still within-budget query plans have room to execute safely.
+
+| Possible Values | Default in Development | Default in Production |
+| --------------- | ---------------------- | --------------------- |
+| A valid number  | `8`                    | `8`                   |
+
+## `CUBESTORE_MAX_QUERY_PLAN_DEPTH`
+
+The maximum nesting depth of a Cube Store query plan Cube Store will accept, counting
+plan nodes, expression nodes, and nested subquery plans. A query whose plan exceeds
+this depth — for example, many chained multi-stage subqueries, or a deeply nested
+measure expression — fails with an explicit "query is too deep" error naming the
+limit, instead of crashing or returning an opaque recursion error.
+
+| Possible Values | Default in Development | Default in Production |
+| --------------- | ---------------------- | --------------------- |
+| A valid number  | `150`                  | `150`                 |
+
 ## `CUBESTORE_MAX_WS_CONNECTIONS_PER_USER`
 
 The maximum number of concurrent WebSocket connections a single authenticated
@@ -2303,6 +2336,15 @@ Should be passed to the Cube Store router and to each Cube Store worker.
 | Possible Values           | Default in Development | Default in Production |
 | ------------------------- | ---------------------- | --------------------- |
 | A valid address/port pair | `localhost`            | `localhost`           |
+
+## `CUBESTORE_SQL_PARSER_RECURSION_LIMIT`
+
+The maximum nesting depth Cube Store's SQL parser will accept before rejecting a
+query as too deep, rather than failing internally.
+
+| Possible Values | Default in Development | Default in Production |
+| --------------- | ---------------------- | --------------------- |
+| A valid number  | `128`                  | `128`                 |
 
 ## `CUBESTORE_TELEMETRY`
 
