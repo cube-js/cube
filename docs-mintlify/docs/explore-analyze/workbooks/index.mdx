@@ -157,19 +157,18 @@ Cube asks you to publish it first otherwise.
 
 From the workbook's row actions menu on the workspace page (not available in
 [Creator Mode](/embedding/iframe/creator-mode)), select **Copy to another deployment**
-and choose the target. Cube previews what will change before you apply it. The first
-promotion to a given deployment creates a linked copy there and publishes the
+and choose the target deployment. Cube previews what will change before you apply it.
+The first promotion to a given deployment creates a linked copy there and publishes the
 dashboard; every later promotion to the same deployment updates that copy, instead of
 creating another one, and republishes the dashboard.
 
-You need read access to the source workbook and, at the destination, edit access to the
-existing linked copy — or, on the first promotion into a folder, edit access to that
-folder. If the destination copy was edited since the last promotion, applying the
-promotion is blocked until you choose to override those edits, replacing them with the
-source's. Sharing, embedding, and ownership settings on the destination copy are never
-changed by a promotion — set them separately there. A promoted workbook can still fail
-at query time if the destination's
-data model differs from the source's.
+You need read access to the source workbook and, once a linked copy exists at the
+destination, edit access to it. If the destination copy was edited since the last
+promotion, applying the promotion is blocked until you choose to override those edits,
+replacing them with the source's. Sharing, embedding, and ownership settings on the
+destination copy are never changed by a promotion — set them separately there. A
+promoted workbook can still fail at query time if the destination's data model differs
+from the source's.
 
 ## Workbook versions
 
