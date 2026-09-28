@@ -36,13 +36,20 @@ export interface QueryDefObject {
   addedToQueueTime: number;
 }
 
-export interface PromiseWithResolve<T = any> extends Promise<T> {
-  resolve?: (value: T) => void;
-  resolved?: boolean;
+export interface QueueResult {
+  promise: Promise<any>;
+  resolve: (value: any) => void;
+  resolved: boolean;
+  // Set once any reader got the result, `getResult` no longer serves it after that
+  consumed: boolean;
 }
 
 export class LocalQueueDriverConnectionState {
-  public resultPromises: Record<QueryKeyHash, PromiseWithResolve> = {};
+  // By `resultKey`: every run of a query key has its own result, like the queue items of Cube Store
+  public results: Record<string, QueueResult> = {};
+
+  // The run which acknowledged the last result of a query key, for the lookup by key of `getResult`
+  public lastResultQueueId: Record<QueryKeyHash, QueueId> = {};
 
   public queryDef: Record<QueryKeyHash, QueryDefObject> = {};
 
@@ -99,43 +106,58 @@ export class LocalQueueDriverConnection implements QueueDriverConnectionInterfac
     ];
   }
 
-  public getResultPromise(resultListKey: string): PromiseWithResolve {
-    if (!this.state.resultPromises[resultListKey]) {
-      let resolveMethod: ((value: any) => void) | undefined;
-      this.state.resultPromises[resultListKey] = new Promise(resolve => {
-        resolveMethod = resolve;
-      }) as PromiseWithResolve;
-      this.state.resultPromises[resultListKey].resolve = resolveMethod;
-    }
-
-    return this.state.resultPromises[resultListKey];
+  protected resultKey(queryKeyHash: QueryKeyHash, queueId: QueueId): string {
+    // A queue id alone isn't unique, every QueryQueue sharing this state counts from 1
+    return `${this.resultListKey(queryKeyHash)}_${queueId}`;
   }
 
-  public async getResultBlocking(queryKeyHash: QueryKeyHash, _queueId?: QueueId): Promise<any> {
-    const resultListKey = this.resultListKey(queryKeyHash);
-    if (!this.state.queryDef[queryKeyHash] && !this.state.resultPromises[resultListKey]) {
-      return null;
+  protected getOrCreateResult(queryKeyHash: QueryKeyHash, queueId: QueueId): QueueResult {
+    const key = this.resultKey(queryKeyHash, queueId);
+    if (!this.state.results[key]) {
+      let resolve: ((value: any) => void) | undefined;
+      const promise = new Promise(r => {
+        resolve = r;
+      });
+      this.state.results[key] = { promise, resolve: resolve!, resolved: false, consumed: false };
     }
+
+    return this.state.results[key];
+  }
+
+  public async getResultBlocking(queryKeyHash: QueryKeyHash, queueId: QueueId): Promise<any> {
+    let result = this.state.results[this.resultKey(queryKeyHash, queueId)];
+    if (!result) {
+      if (this.state.queryDef[queryKeyHash]?.queueId !== queueId) {
+        return null;
+      }
+
+      result = this.getOrCreateResult(queryKeyHash, queueId);
+    }
+
     const timeoutPromise = (timeout: number) => new Promise((resolve) => setTimeout(() => resolve(null), timeout));
 
     const res = await Promise.race([
-      this.getResultPromise(resultListKey),
+      result.promise,
       timeoutPromise(this.continueWaitTimeout * 1000),
     ]);
 
+    // Not removed, the other waiters of this run can get here after it's done
     if (res) {
-      delete this.state.resultPromises[resultListKey];
+      result.consumed = true;
     }
     return res;
   }
 
   public async getResult(queryKey: QueryKey, _externalId?: string): Promise<any> {
-    const resultListKey = this.resultListKey(queryKey);
-    if (this.state.resultPromises[resultListKey] && this.state.resultPromises[resultListKey].resolved) {
-      return this.getResultBlocking(this.redisHash(queryKey));
+    const queryKeyHash = this.redisHash(queryKey);
+    const queueId = this.state.lastResultQueueId[queryKeyHash];
+    const result = queueId !== undefined ? this.state.results[this.resultKey(queryKeyHash, queueId)] : undefined;
+    if (!result?.resolved || result.consumed) {
+      return null;
     }
 
-    return null;
+    result.consumed = true;
+    return result.promise;
   }
 
   private orderedQueueItems(queueObj: Record<QueryKeyHash, QueueItem>, orderFilterLessThan?: number): QueueItem[] {
@@ -169,6 +191,8 @@ export class LocalQueueDriverConnection implements QueueDriverConnectionInterfac
 
     if (!this.state.queryDef[key]) {
       this.state.queryDef[key] = queryQueueObj;
+      // A run of another queue could have used the same id for this key
+      delete this.state.results[this.resultKey(key, options.queueId)];
     }
 
     let added = 0;
@@ -190,11 +214,14 @@ export class LocalQueueDriverConnection implements QueueDriverConnectionInterfac
       queueId: options.queueId,
     };
 
+    const { queueId, addedToQueueTime } = this.state.queryDef[key];
+
+    // The run which is already queued is the one to wait for, as Cube Store answers
     return [
       added,
-      queryQueueObj.queueId,
+      queueId,
       Object.keys(this.state.toProcess).length,
-      queryQueueObj.addedToQueueTime,
+      addedToQueueTime,
       // There is no round-trip to save in memory, the item is left for reconcile to pick up
       null
     ];
@@ -210,6 +237,11 @@ export class LocalQueueDriverConnection implements QueueDriverConnectionInterfac
 
   public async getQueryAndRemove(queryKeyHash: QueryKeyHash, _queueId?: QueueId | null): Promise<[QueryDef]> {
     const query = this.state.queryDef[queryKeyHash];
+
+    // The run won't be acknowledged, its waiters still time out on the promise they hold
+    if (query && !this.state.results[this.resultKey(queryKeyHash, query.queueId)]?.resolved) {
+      delete this.state.results[this.resultKey(queryKeyHash, query.queueId)];
+    }
 
     delete this.state.active[queryKeyHash];
     delete this.state.heartBeat[queryKeyHash];
@@ -230,7 +262,8 @@ export class LocalQueueDriverConnection implements QueueDriverConnectionInterfac
       return false;
     }
 
-    const promise = this.getResultPromise(this.resultListKey(queryKeyHash));
+    const result = this.getOrCreateResult(queryKeyHash, queueId);
+    const key = this.resultKey(queryKeyHash, queueId);
 
     delete this.state.active[queryKeyHash];
     delete this.state.heartBeat[queryKeyHash];
@@ -238,10 +271,19 @@ export class LocalQueueDriverConnection implements QueueDriverConnectionInterfac
     delete this.state.recent[queryKeyHash];
     delete this.state.queryDef[queryKeyHash];
 
-    promise.resolved = true;
-    if (promise.resolve) {
-      promise.resolve(executionResult);
-    }
+    result.resolved = true;
+    result.resolve(executionResult);
+    this.state.lastResultQueueId[queryKeyHash] = queueId;
+
+    // A waiter which saw the query in flight re-polls within `continueWaitTimeout`
+    setTimeout(() => {
+      if (this.state.results[key] === result) {
+        delete this.state.results[key];
+      }
+      if (this.state.lastResultQueueId[queryKeyHash] === queueId) {
+        delete this.state.lastResultQueueId[queryKeyHash];
+      }
+    }, this.continueWaitTimeout * 1000).unref();
 
     return true;
   }

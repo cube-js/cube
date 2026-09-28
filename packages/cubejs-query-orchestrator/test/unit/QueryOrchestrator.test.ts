@@ -312,8 +312,7 @@ describe('QueryOrchestrator', () => {
   let queryOrchestratorExternalRefresh: TestQueryOrchestrator;
   let queryOrchestratorDropWithoutTouch: TestQueryOrchestrator;
   let testCount = 1;
-  // Clients poll on `Continue wait`. The memory queue hands out a finished result only once, so a
-  // query awaited by several concurrent partitions can answer one of them with `Continue wait`.
+  // Clients poll on `Continue wait`, which a stream queued past the concurrency gets.
   const fetchLongPolling = (orchestrator: TestQueryOrchestrator, q: TestQueryBody) => orchestrator.fetchQuery(q).catch(e => {
     if (e.toString().match(/Continue wait/)) {
       return fetchLongPolling(orchestrator, q);
@@ -1172,11 +1171,11 @@ describe('QueryOrchestrator', () => {
       }],
       requestId: 'range partitions',
     };
-    await fetchLongPolling(queryOrchestrator, query);
+    await queryOrchestrator.fetchQuery(query);
     console.log(JSON.stringify(mockDriver.executedQueries));
     const nowQueries = mockDriver.executedQueries.filter(q => typeof q === 'string' && q.match(/NOW/)).length;
     await mockDriver.delay(2000);
-    await fetchLongPolling(queryOrchestrator, query);
+    await queryOrchestrator.fetchQuery(query);
     console.log(JSON.stringify(mockDriver.executedQueries));
     expect(mockDriver.executedQueries.filter(q => typeof q === 'string' && q.match(/NOW/)).length).toEqual(nowQueries);
   });
@@ -1305,8 +1304,8 @@ describe('QueryOrchestrator', () => {
     }).rejects.toThrow(
       /refresh worker/
     );
-    await fetchLongPolling(queryOrchestrator, query({ startQuery: 'SELECT \'2021-05-01\'', endQuery: 'SELECT \'2021-05-15\'' }));
-    const result = await fetchLongPolling(queryOrchestratorExternalRefresh, query({
+    await queryOrchestrator.fetchQuery(query({ startQuery: 'SELECT \'2021-05-01\'', endQuery: 'SELECT \'2021-05-15\'' }));
+    const result = await queryOrchestratorExternalRefresh.fetchQuery(query({
       startQuery: 'SELECT \'2021-05-01\'',
       endQuery: 'SELECT \'2021-05-15\'',
       matchedTimeDimensionDateRange: ['2021-05-31T00:00:00.000', '2021-05-31T23:59:59.999']
@@ -1512,7 +1511,7 @@ describe('QueryOrchestrator', () => {
       requestId: 'lambda partitions',
       external: true,
     });
-    const result = await fetchLongPolling(queryOrchestrator, query());
+    const result = await queryOrchestrator.fetchQuery(query());
     console.log(JSON.stringify(result, null, 2));
     expect(result.data[0]).not.toMatch(/orders_h2021053000/);
     expect(result.data[0]).toMatch(/orders_h2021053100/);
