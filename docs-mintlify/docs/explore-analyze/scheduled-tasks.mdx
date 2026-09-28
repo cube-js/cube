@@ -72,8 +72,13 @@ Check the **Scheduled** page of each deployment you work in to find them.
 
 ## Managing tasks
 
-Anyone who can use the deployment can see its tasks and create new ones.
-Only a task's creator, or a user with the **Admin**
+Anyone who can use the deployment can see its tasks. Creating one needs the
+**Create scheduled tasks**
+[permission](/admin/users-and-permissions/custom-roles#deployment-permissions),
+which every built-in role grants. A custom role can withhold it: its members
+get no **New task** button, and the agent and the Platform API refuse to
+create a task for them, while they can still edit, pause, run, and delete the
+tasks they created. Only a task's creator, or a user with the **Admin**
 [role](/admin/users-and-permissions/roles-and-permissions), can edit, pause,
 run, or delete it, because every run executes as the creator (see
 [Reading the output](#reading-the-output)).
