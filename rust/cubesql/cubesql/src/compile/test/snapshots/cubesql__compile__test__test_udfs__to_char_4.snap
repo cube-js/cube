@@ -1,0 +1,11 @@
+---
+source: cubesql/src/compile/test/test_udfs.rs
+expression: "execute_query(\"\n                SELECT TO_CHAR(CAST('2021-08-31 11:05:00' AS TIMESTAMP), 'YYYY-MM-DD HH24:MI:SS.US')\n                UNION ALL\n                SELECT TO_CHAR(CAST('2021-08-31 11:05:00.123' AS TIMESTAMP), 'YYYY-MM-DD HH24:MI:SS.US')\n                UNION ALL\n                SELECT TO_CHAR(CAST('2021-08-31 11:05:00.123456' AS TIMESTAMP), 'YYYY-MM-DD HH24:MI:SS.US')\n                \".to_string(),\nDatabaseProtocol::PostgreSQL).await?"
+---
++------------------------------------------------------------------------------------------------------------+
+| to_char(CAST(Utf8("2021-08-31 11:05:00") AS Timestamp(Nanosecond, None)),Utf8("YYYY-MM-DD HH24:MI:SS.US")) |
++------------------------------------------------------------------------------------------------------------+
+| 2021-08-31 11:05:00.000000                                                                                 |
+| 2021-08-31 11:05:00.123000                                                                                 |
+| 2021-08-31 11:05:00.123456                                                                                 |
++------------------------------------------------------------------------------------------------------------+
