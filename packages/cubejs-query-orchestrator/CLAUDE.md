@@ -83,8 +83,8 @@ The pre-aggregation system includes:
 ### Unit Tests (`test/unit/`)
 - `QueryCache.test.ts`: Query caching functionality
 - `QueryQueue.test.ts`: Queue management and processing
-- `QueryOrchestrator.test.js`: Main orchestrator logic
-- `PreAggregations.test.js`: Pre-aggregation management
+- `QueryOrchestrator.test.ts`: Main orchestrator logic
+- `PreAggregations.test.ts`: Pre-aggregation management
 
 ### Integration Tests (`test/integration/`)
 - `cubestore/`: CubeStore-specific integration tests
