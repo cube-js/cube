@@ -1,11 +1,8 @@
 import { PostgresQuery } from '../../src/adapter/PostgresQuery';
 import { prepareYamlCompiler } from './PrepareCompiler';
 
-// A view that `extends` another view gets the parent's `cubes` includes and
-// also the parent's own measures, dimensions and folders. So a measure that
-// is defined on a view, such as a ratio over two fact cubes that do not join
-// to each other, can be defined once on a base view and reused by every view
-// that extends it.
+// A view's own measures, dimensions and folders are inherited by views that `extend` it,
+// so a multi-fact view measure can be defined once on a base view.
 const cubes = `
 cubes:
   - name: customers

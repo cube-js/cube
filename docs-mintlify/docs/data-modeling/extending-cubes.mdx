@@ -142,18 +142,20 @@ A child view that extends a parent view gets these items from the parent view:
   [dimensions][ref-view-dimensions], defined on the parent view.
 - The [folders][ref-view-folders]. The child view's own folders are added to
   them.
+- The [access policies][ref-view-access-policy]. The child view's own policies
+  are added to them; they do not replace the parent's.
 - Each other parameter that the child view does not set, such as `public` and
   `description`.
 
 In the example below, `sales_overview` gets `orders_total_amount`,
-`returns_total_refund` and `refund_rate` from `customer_metrics`, and adds
-`orders_count`:
+`orders_count` and `average_order_value` from `orders_base`, and adds
+`orders_status`:
 
 <CodeGroup>
 
 ```yaml title="YAML"
 views:
-  - name: customer_metrics
+  - name: orders_base
     public: false
 
     cubes:
@@ -161,64 +163,53 @@ views:
         prefix: true
         includes:
           - total_amount
-
-      - join_path: returns
-        prefix: true
-        includes:
-          - total_refund
+          - count
 
     measures:
-      - name: refund_rate
+      - name: average_order_value
         type: number
-        multi_stage: true
-        sql: "{CUBE.returns_total_refund} / NULLIF({CUBE.orders_total_amount}, 0)"
+        sql: "{CUBE.orders_total_amount} / NULLIF({CUBE.orders_count}, 0)"
 
   - name: sales_overview
-    extends: customer_metrics
+    extends: orders_base
     public: true
 
     cubes:
       - join_path: orders
         prefix: true
         includes:
-          - count
+          - status
 ```
 
 ```javascript title="JavaScript"
-view(`customer_metrics`, {
+view(`orders_base`, {
   public: false,
 
   cubes: [
     {
       join_path: orders,
       prefix: true,
-      includes: [`total_amount`]
-    },
-    {
-      join_path: returns,
-      prefix: true,
-      includes: [`total_refund`]
+      includes: [`total_amount`, `count`]
     }
   ],
 
   measures: {
-    refund_rate: {
+    average_order_value: {
       type: `number`,
-      multi_stage: true,
-      sql: `${CUBE.returns_total_refund} / NULLIF(${CUBE.orders_total_amount}, 0)`
+      sql: `${CUBE.orders_total_amount} / NULLIF(${CUBE.orders_count}, 0)`
     }
   }
 })
 
 view(`sales_overview`, {
-  extends: customer_metrics,
+  extends: orders_base,
   public: true,
 
   cubes: [
     {
       join_path: orders,
       prefix: true,
-      includes: [`count`]
+      includes: [`status`]
     }
   ]
 })
@@ -226,14 +217,9 @@ view(`sales_overview`, {
 
 </CodeGroup>
 
-A child view cannot remove an inherited member. [`excludes`][ref-view-excludes]
-applies only to the child view's own `cubes` items. A measure or dimension that
-the child view defines with the name of an inherited one replaces its
-definition in the child view. A folder with the name of an inherited folder is
-an error.
-
-To reuse a measure that only a view defines, see [Reusing a view measure across
-views][ref-recipe-reuse-view-measures].
+A child view cannot remove an inherited member. To reuse a multi-fact measure
+that only a view defines, and for the limits of view inheritance, see [Reusing a
+view measure across views][ref-recipe-reuse-view-measures].
 
 ## Usage with `FILTER_PARAMS`
 
@@ -313,7 +299,7 @@ cube(`base_events`, {
 [ref-view-measures]: /reference/data-modeling/view#measures
 [ref-view-dimensions]: /reference/data-modeling/view#dimensions
 [ref-view-folders]: /reference/data-modeling/view#folders
-[ref-view-excludes]: /reference/data-modeling/view#includes-and-excludes
+[ref-view-access-policy]: /reference/data-modeling/view#access_policy
 [ref-recipe-reuse-view-measures]: /recipes/data-modeling/reusing-view-measures
 [ref-schema-ref-cube-filter-params]: /reference/data-modeling/context-variables#filter_params
 [ref-cube-variable]: /docs/data-modeling/concepts/syntax#cube-variable
