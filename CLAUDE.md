@@ -138,6 +138,7 @@ Use conventional commits with these prefixes:
 - `fix:` — bug fixes users can observe
 - `docs:` — documentation changes
 - `refactor:` — code refactoring
+- `perf:` — performance improvements
 - `chore:` — internal changes: tests, CI, build/tooling, dependency bumps
 
 `feat:` and `fix:` exist to surface a change to users in the changelog. If users can't notice the
