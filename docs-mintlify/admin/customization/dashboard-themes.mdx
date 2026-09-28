@@ -1,0 +1,97 @@
+---
+title: Dashboard themes
+description: Style dashboards with reusable themes that control backgrounds, widget cards, borders, titles, and text.
+---
+
+Dashboard themes control the look and feel of [dashboards][ref-dashboards] — including the dashboard background, widget cards, borders, titles, and text. Cube ships with a built-in theme, and you can also create your own custom themes and reuse them across dashboards in the account.
+
+Themes are designed and saved from the dashboard builder, then managed centrally in the admin area.
+
+[ref-dashboards]: /workbooks/dashboards
+
+## Requirements
+
+Custom dashboard themes are managed under the **Manage dashboard themes** permission. The built-in **Admin** [role][ref-roles] has this permission by default; for other users, grant the **Manage dashboard themes** global permission via a [custom role][ref-custom-roles].
+
+[ref-roles]: /admin/users-and-permissions/roles-and-permissions
+[ref-custom-roles]: /admin/users-and-permissions/custom-roles
+
+## What you can theme
+
+A theme defines styles for the following parts of a dashboard:
+
+| Section        | Properties                                                |
+| -------------- | --------------------------------------------------------- |
+| **Dashboard**  | Background color, padding                                 |
+| **Widgets**    | Card background color, padding                            |
+| **Borders**    | Color, width, style, corner radius                        |
+| **Titles**     | Color, font size, font weight, font family                |
+| **Text**       | Color, secondary color, font family, code font family     |
+
+The built-in **Cube** theme provides Cube's default look and is always available. It can be selected on dashboards but cannot be edited, renamed, or deleted.
+
+## Browse themes
+
+Go to **Admin → Customization → Dashboard Themes** to see every theme available in your account. The list combines the built-in **Cube** theme and any custom themes saved from dashboards.
+
+For each custom theme you can:
+
+- **Rename** the theme.
+- **Delete** the theme.
+
+Themes are created from the dashboard builder rather than from this page — see [Create a custom theme](#create-a-custom-theme) below.
+
+## Create a custom theme
+
+Custom themes are saved from the dashboard builder's **Styling** tab.
+
+<Steps>
+  <Step title="Open a dashboard">
+    Open a dashboard in a workbook and switch to the dashboard builder.
+  </Step>
+  <Step title="Open dashboard options">
+    Click the dashboard options button and switch to the **Styling** tab.
+  </Step>
+  <Step title="Edit styling">
+    Adjust the dashboard background, widget card styles, borders, titles, and text until the dashboard looks the way you want.
+  </Step>
+  <Step title="Save as new theme">
+    Click **Save as new**, give the theme a name, and confirm.
+  </Step>
+</Steps>
+
+The new theme appears in the **Admin → Customization → Dashboard Themes** list and becomes selectable in the **Styling** tab on every other dashboard in the account.
+
+## Apply a theme to a dashboard
+
+1. Open the dashboard in the dashboard builder.
+2. Open dashboard options and switch to the **Styling** tab.
+3. Pick a theme from the theme picker.
+
+You can also tweak any styling properties on top of the selected theme — those changes are stored as overrides on the dashboard and do not modify the underlying theme.
+
+## Update a saved theme
+
+After tweaking styling on a dashboard that uses a custom theme, you can push those changes back into the theme so every other dashboard using it picks them up.
+
+1. From the dashboard's **Styling** tab, make your changes.
+2. Click **Save** to write the current effective styles back into the theme.
+
+<Warning>
+
+Saving a theme updates **every dashboard** that uses it. Already-published dashboard snapshots keep their previous styling until they are re-published.
+
+</Warning>
+
+## Delete a custom theme
+
+1. Go to **Admin → Customization → Dashboard Themes**.
+2. Click the row action on the theme you want to remove and select **Delete**.
+
+Dashboards that were using the deleted theme revert to the built-in **Cube** theme.
+
+## Theme scope
+
+- **Themes** are defined once and shared across all deployments in the account.
+- **Theme assignment** is per dashboard — different dashboards in the same workbook can use different themes.
+- New dashboards use the built-in **Cube** theme until you assign a custom theme.

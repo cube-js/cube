@@ -12,6 +12,7 @@ export CUBEJS_DB_SNOWFLAKE_WAREHOUSE=COMPUTE_WH
 export CUBEJS_DB_USER=$DRIVERS_TESTS_SNOWFLAKE_CUBEJS_DB_USER
 export CUBEJS_DB_PASS=$DRIVERS_TESTS_SNOWFLAKE_CUBEJS_DB_PASS
 
+yarn lerna run --concurrency 1 --stream --no-prefix integration:snowflake
 yarn lerna run --concurrency 1 --stream --no-prefix smoke:snowflake
 
 echo "::endgroup::"

@@ -1,8 +1,10 @@
 import Joi from 'joi';
 import cronParser from 'cron-parser';
 
-import type { CubeSymbols, CubeDefinition } from './CubeSymbols';
+import { CubeSymbols, CubeDefinition, ToString } from './CubeSymbols';
 import type { ErrorReporter } from './ErrorReporter';
+import { CompilerInterface } from './PrepareCompiler';
+import { NAMED_NUMERIC_FORMATS } from './named-numeric-formats';
 
 /* *****************************
  * ATTENTION:
@@ -26,6 +28,7 @@ export const nonStringFields = new Set([
   'useOriginalSqlPreAggregations',
   'readOnly',
   'prefix',
+  'mask',
 ]);
 
 const identifierRegex = /^[_a-zA-Z][_a-zA-Z0-9]*$/;
@@ -110,13 +113,233 @@ const GranularityInterval = Joi.string().pattern(/^\d+\s+(second|minute|hour|day
 // Do not allow negative intervals for granularities, while offsets could be negative
 const GranularityOffset = Joi.string().pattern(/^-?(\d+\s+)(second|minute|hour|day|week|month|quarter|year)s?(\s-?\d+\s+(second|minute|hour|day|week|month|quarter|year)s?){0,7}$/, 'granularity offset');
 
-const formatSchema = Joi.alternatives([
+const formatAlternatives = [
   Joi.string().valid('imageUrl', 'link', 'currency', 'percent', 'number', 'id'),
   Joi.object().keys({
     type: Joi.string().valid('link'),
     label: Joi.string().required()
   })
+];
+const formatSchema = Joi.alternatives(formatAlternatives);
+
+// POSIX strftime specification (IEEE Std 1003.1 / POSIX.1) with d3-time-format extensions
+// See: https://pubs.opengroup.org/onlinepubs/009695399/functions/strptime.html
+// See: https://d3js.org/d3-time-format
+const TIME_SPECIFIERS = new Set([
+  // POSIX standard specifiers
+  'a', 'A', 'b', 'B', 'c', 'd', 'H', 'I', 'j', 'm',
+  'M', 'n', 'p', 'S', 't', 'U', 'w', 'W', 'x', 'X',
+  'y', 'Y', 'Z', '%',
+  // d3-time-format extensions
+  'e', // space-padded day of month
+  'f', // microseconds
+  'g', // ISO 8601 year without century
+  'G', // ISO 8601 year with century
+  'L', // milliseconds
+  'q', // quarter
+  'Q', // milliseconds since UNIX epoch
+  's', // seconds since UNIX epoch
+  'u', // Monday-based weekday [1,7]
+  'V', // ISO 8601 week number
 ]);
+
+const customTimeFormatSchema = Joi.string().custom((value, helper) => {
+  let hasSpecifier = false;
+  let i = 0;
+
+  while (i < value.length) {
+    if (value[i] === '%') {
+      if (i + 1 >= value.length) {
+        return helper.message({ custom: `Invalid time format "${value}". Incomplete specifier at end of string` });
+      }
+
+      const specifier = value[i + 1];
+
+      if (!TIME_SPECIFIERS.has(specifier)) {
+        return helper.message({ custom: `Invalid time format "${value}". Unknown specifier '%${specifier}'` });
+      }
+
+      // %% is an escape for literal %, not a date/time specifier
+      if (specifier !== '%') {
+        hasSpecifier = true;
+      }
+
+      i += 2;
+    } else {
+      // Any other character is treated as literal text
+      i++;
+    }
+  }
+
+  if (!hasSpecifier) {
+    return helper.message({
+      custom: `Invalid strptime format "${value}". Format must contain at least one strptime specifier (e.g., %Y, %m, %d)`
+    });
+  }
+
+  return value;
+});
+
+const timeFormatSchema = Joi.alternatives([
+  formatSchema,
+  customTimeFormatSchema
+]);
+
+// d3-format specification (Python format spec mini-language)
+// See: https://d3js.org/d3-format
+// See: https://docs.python.org/3/library/string.html#format-specification-mini-language
+// Format specifier: [[fill]align][sign][symbol][0][width][,][.precision][~][type]
+const NUMERIC_FORMAT_TYPES = new Set([
+  'e', // exponent notation
+  'f', // fixed-point notation
+  'g', // either decimal or exponent notation
+  'r', // decimal notation, rounded to significant digits
+  's', // decimal notation with an SI prefix
+  '%', // multiply by 100 and format as percentage
+  'p', // multiply by 100, round to significant digits, and format as percentage
+  'b', // binary notation
+  'o', // octal notation
+  'd', // decimal notation (integer)
+  'x', // lowercase hexadecimal notation
+  'X', // uppercase hexadecimal notation
+  'c', // character data
+  'n', // like g, but with locale-specific thousand separator
+]);
+
+// d3-format specifier: [[fill]align][sign][symbol][0][width][,][.precision][~][type]
+// Regex breakdown:
+// (?:(.)?([<>=^]))?           - optional fill (any char) + align (<>=^)
+// ([+\-( ])?                  - optional sign (+, -, (, or space)
+// ([$#])?                     - optional symbol ($ or #)
+// (0)?                        - optional zero flag
+// (\d+)?                      - optional width (positive integer)
+// (,)?                        - optional comma flag (grouping)
+// (?:\.(\d+))?                - optional precision (.N where N is non-negative integer)
+// (~)?                        - optional tilde (trim insignificant zeros)
+// ([a-zA-Z%])?                - optional type character
+const NUMERIC_FORMAT_REGEX = /^(?:(.)?([<>=^]))?([+\-( ])?([$#])?(0)?(\d+)?(,)?(?:\.(\d+))?(~)?([a-zA-Z%])?$/;
+
+const customNumericFormatSchema = Joi.string().custom((value, helper) => {
+  const match = value.match(NUMERIC_FORMAT_REGEX);
+  if (!match) {
+    return helper.message({
+      custom: `Invalid numeric format "${value}". Must be a valid d3-format specifier (e.g., ".2f", ",.0f", "$,.2f", ".0%", ".2s")`
+    });
+  }
+
+  const [, fill, align, sign, symbol, zero, width, comma, precision, tilde, type] = match;
+
+  if (fill && !align) {
+    return helper.message({
+      custom: `Invalid numeric format "${value}". Fill character requires alignment specifier (<, >, =, or ^)`
+    });
+  }
+
+  if (type && !NUMERIC_FORMAT_TYPES.has(type.toLowerCase())) {
+    return helper.message({
+      custom: `Invalid numeric format "${value}". Unknown type character '${type}'. Valid types: ${[...NUMERIC_FORMAT_TYPES].join(', ')}`
+    });
+  }
+
+  // Validate that the format is not empty (must have at least something meaningful)
+  if (!sign && !symbol && !zero && !width && !comma && precision === undefined && !tilde && !type) {
+    return helper.message({
+      custom: `Invalid numeric format "${value}". Format must contain at least one specifier (e.g., type, precision, comma, sign, symbol)`
+    });
+  }
+
+  return value;
+});
+
+const namedNumericFormatSchema = Joi.string().custom((value, helper) => {
+  if (value in NAMED_NUMERIC_FORMATS) {
+    return value;
+  }
+
+  return helper.message({
+    custom: `"${value}" is not a valid named numeric format. Valid named formats: number, percent, currency, id, abbr, accounting (with optional _N decimal suffix, e.g. percent_3)`
+  });
+});
+
+const measureFormatSchema = Joi.alternatives([
+  Joi.string().valid('percent', 'currency', 'number'),
+  namedNumericFormatSchema,
+  customNumericFormatSchema
+]);
+
+const dimensionNumericFormatSchema = Joi.alternatives([
+  ...formatAlternatives,
+  namedNumericFormatSchema,
+  customNumericFormatSchema
+]);
+
+// ISO 4217 currency codes
+const KNOWN_CURRENCY_CODES = new Set([
+  'AED', 'AFN', 'ALL', 'AMD', 'ANG', 'AOA', 'ARS', 'AUD', 'AWG', 'AZN',
+  'BAM', 'BBD', 'BDT', 'BGN', 'BHD', 'BIF', 'BMD', 'BND', 'BOB', 'BRL',
+  'BSD', 'BTN', 'BWP', 'BYN', 'BZD', 'CAD', 'CDF', 'CHF', 'CLP', 'CNY',
+  'COP', 'CRC', 'CUP', 'CVE', 'CZK', 'DJF', 'DKK', 'DOP', 'DZD', 'EGP',
+  'ERN', 'ETB', 'EUR', 'FJD', 'FKP', 'GBP', 'GEL', 'GHS', 'GIP', 'GMD',
+  'GNF', 'GTQ', 'GYD', 'HKD', 'HNL', 'HRK', 'HTG', 'HUF', 'IDR', 'ILS',
+  'INR', 'IQD', 'IRR', 'ISK', 'JMD', 'JOD', 'JPY', 'KES', 'KGS', 'KHR',
+  'KMF', 'KPW', 'KRW', 'KWD', 'KYD', 'KZT', 'LAK', 'LBP', 'LKR', 'LRD',
+  'LSL', 'LYD', 'MAD', 'MDL', 'MGA', 'MKD', 'MMK', 'MNT', 'MOP', 'MRU',
+  'MUR', 'MVR', 'MWK', 'MXN', 'MYR', 'MZN', 'NAD', 'NGN', 'NIO', 'NOK',
+  'NPR', 'NZD', 'OMR', 'PAB', 'PEN', 'PGK', 'PHP', 'PKR', 'PLN', 'PYG',
+  'QAR', 'RON', 'RSD', 'RUB', 'RWF', 'SAR', 'SBD', 'SCR', 'SDG', 'SEK',
+  'SGD', 'SHP', 'SLE', 'SOS', 'SRD', 'SSP', 'STN', 'SYP', 'SZL', 'THB',
+  'TJS', 'TMT', 'TND', 'TOP', 'TRY', 'TTD', 'TWD', 'TZS', 'UAH', 'UGX',
+  'USD', 'UYU', 'UZS', 'VES', 'VND', 'VUV', 'WST', 'XAF', 'XCD', 'XOF',
+  'XPF', 'YER', 'ZAR', 'ZMW', 'ZWL',
+]);
+
+const currencySchema = Joi.string().custom((value, helper) => {
+  const upper = value.toUpperCase();
+  if (KNOWN_CURRENCY_CODES.has(upper)) {
+    return upper;
+  }
+
+  return helper.message({
+    custom: `"${value}" is not a valid currency code. Expected a valid 3-letter ISO 4217 code (e.g. USD, EUR)`
+  });
+});
+
+const MaskSchema = Joi.alternatives([
+  Joi.object().keys({ sql: Joi.func().required() }),
+  Joi.number(),
+  Joi.boolean().strict(),
+  Joi.string(),
+]);
+
+const LinkItemSchema = Joi.object().keys({
+  name: identifier.required(),
+  label: Joi.string().required(),
+  url: Joi.func(),
+  dashboard: Joi.string(),
+  icon: Joi.string(),
+  target: Joi.string().valid('blank', 'self'),
+  primary: Joi.boolean().strict(),
+  params: Joi.array().items(Joi.object().keys({
+    key: Joi.string().required(),
+    value: Joi.func().required(),
+  })),
+}).oxor('url', 'dashboard');
+
+const LinksSchema = Joi.array().items(LinkItemSchema).custom((value, helpers) => {
+  const names = value.map((link: any) => (typeof link.name === 'function' ? link.name() : link.name));
+  const seen = new Set<string>();
+  for (const name of names) {
+    if (seen.has(name)) {
+      return helpers.error('any.custom', { message: `Duplicate link name '${name}'` });
+    }
+    seen.add(name);
+  }
+  const primaryCount = value.filter((link: any) => link.primary === true).length;
+  if (primaryCount > 1) {
+    return helpers.error('any.custom', { message: 'Only one link can be marked as primary' });
+  }
+  return value;
+});
 
 const BaseDimensionWithoutSubQuery = {
   aliases: Joi.array().items(Joi.string()),
@@ -130,8 +353,26 @@ const BaseDimensionWithoutSubQuery = {
   description: Joi.string(),
   suggestFilterValues: Joi.boolean().strict(),
   enableSuggestions: Joi.boolean().strict(),
-  format: formatSchema,
+  links: LinksSchema,
+  mask: MaskSchema,
+  format: Joi.when('type', {
+    switch: [
+      { is: 'time', then: timeFormatSchema },
+      { is: 'number', then: dimensionNumericFormatSchema },
+    ],
+    otherwise: formatSchema
+  }),
+  currency: Joi.when('type', {
+    is: 'number',
+    then: currencySchema,
+    otherwise: Joi.any().custom((_value, helper) => helper.message({
+      custom: '"currency" property can only be used with dimensions of type "number"'
+    }))
+  }),
   meta: Joi.any(),
+  order: Joi.string().valid('asc', 'desc'),
+  key: Joi.func(),
+  keyReference: Joi.string(),
   values: Joi.when('type', {
     is: 'switch',
     then: Joi.array().items(Joi.string()),
@@ -232,15 +473,28 @@ const ToDate = {
   granularity: GranularitySchema,
 };
 
+const forbiddenCurrencyNonNumericMeasure = (value: string) => Joi.forbidden().messages({
+  'any.unknown': `"currency" property can only be used with numeric measures, actual type: ${value}`,
+});
+
 const BaseMeasure = {
   aliases: Joi.array().items(Joi.string()),
-  format: Joi.any().valid('percent', 'currency', 'number'),
+  format: measureFormatSchema,
+  currency: Joi.when('type', {
+    switch: [
+      { is: 'string', then: forbiddenCurrencyNonNumericMeasure('string') },
+      { is: 'boolean', then: forbiddenCurrencyNonNumericMeasure('boolean') },
+      { is: 'time', then: forbiddenCurrencyNonNumericMeasure('time') },
+    ],
+    otherwise: currencySchema,
+  }),
   public: Joi.boolean().strict(),
   // TODO: Deprecate and remove, please use public
   visible: Joi.boolean().strict(),
   // TODO: Deprecate and remove, please use public
   shown: Joi.boolean().strict(),
   cumulative: Joi.boolean().strict(),
+  mask: MaskSchema,
   filters: Joi.array().items(
     Joi.object().keys({
       sql: Joi.func().required()
@@ -588,6 +842,69 @@ const timeShiftItemOptional = Joi.object({
   .xor('name', 'interval')
   .and('interval', 'type');
 
+// Top-level predicate inside `filter.include`: same shape as a query-time
+// filter. `member` and `values` are plain string/array only — neither
+// `filter.include[*].member` nor `filter.include[*].values` is covered by
+// `CubePropContextTranspiler.transpiledFieldsPatterns`, so a function form
+// here would never receive the `CUBE`/`SECURITY_CONTEXT` arguments and would
+// fail at runtime. Use the existing `accessPolicy.rowLevel.filters` if you
+// need dynamic predicates resolved against the security context.
+const MultiStageIncludeMemberFilterSchema = Joi.object().keys({
+  member: Joi.string().required(),
+  operator: Joi.any().valid(
+    'equals',
+    'notEquals',
+    'contains',
+    'notContains',
+    'startsWith',
+    'notStartsWith',
+    'endsWith',
+    'notEndsWith',
+    'in',
+    'notIn',
+    'gt',
+    'gte',
+    'lt',
+    'lte',
+    'set',
+    'notSet',
+    'inDateRange',
+    'notInDateRange',
+    'onTheDate',
+    'beforeDate',
+    'beforeOrOnDate',
+    'afterDate',
+    'afterOrOnDate',
+    'measureFilter',
+  ).required(),
+  values: Joi.when('operator', {
+    is: Joi.valid('set', 'notSet'),
+    then: Joi.array().optional(),
+    otherwise: Joi.array().required()
+  })
+});
+
+const MultiStageIncludeConditionSchema = Joi.object().keys({
+  or: Joi.array().items(MultiStageIncludeMemberFilterSchema, Joi.link('...').description('Multi-stage include condition')),
+  and: Joi.array().items(MultiStageIncludeMemberFilterSchema, Joi.link('...').description('Multi-stage include condition')),
+}).xor('or', 'and');
+
+const MultiStageFilter = Joi.object().keys({
+  mode: Joi.string().valid('relative', 'fixed'),
+  exclude: Joi.func(),
+  keepOnly: Joi.func(),
+  include: Joi.array().items(
+    MultiStageIncludeMemberFilterSchema,
+    MultiStageIncludeConditionSchema
+  ),
+}).nand('exclude', 'keepOnly');
+
+const MultiStageGrain = Joi.object().keys({
+  exclude: Joi.func(),
+  keepOnly: Joi.func(),
+  include: Joi.func(),
+}).nand('exclude', 'keepOnly');
+
 const CaseSchema = Joi.object().keys({
   when: Joi.array().items(Joi.object().keys({
     sql: Joi.func().required(),
@@ -635,6 +952,8 @@ const MeasuresSchema = Joi.object().pattern(identifierRegex, Joi.alternatives().
       groupBy: Joi.func(),
       reduceBy: Joi.func(),
       addGroupBy: Joi.func(),
+      filter: MultiStageFilter,
+      grain: MultiStageGrain,
       timeShift: Joi.alternatives().conditional(Joi.array().length(1), {
         then: Joi.array().items(timeShiftItemOptional),
         otherwise: Joi.array().items(timeShiftItemRequired)
@@ -717,6 +1036,7 @@ const DimensionsSchema = Joi.object().pattern(identifierRegex, Joi.alternatives(
       multiStage: Joi.boolean().valid(true),
       sql: Joi.func().required(),
       addGroupBy: Joi.func(),
+      filter: MultiStageFilter,
     }),
     // TODO should be valid only for calendar cubes, but this requires significant refactoring
     // of all schemas. Left for the future when we'll switch to zod.
@@ -792,6 +1112,19 @@ const MemberLevelPolicySchema = Joi.object().keys({
   excludesMembers: Joi.array().items(Joi.string().required()),
 });
 
+const MemberMaskingPolicySchema = Joi.object().keys({
+  includes: Joi.alternatives([
+    Joi.string().valid('*'),
+    Joi.array().items(Joi.string())
+  ]),
+  excludes: Joi.alternatives([
+    Joi.string().valid('*'),
+    Joi.array().items(Joi.string().required())
+  ]),
+  includesMembers: Joi.array().items(Joi.string().required()),
+  excludesMembers: Joi.array().items(Joi.string().required()),
+});
+
 const RowLevelPolicySchema = Joi.object().keys({
   filters: Joi.array().items(PolicyFilterSchema, PolicyFilterConditionSchema),
   allowAll: Joi.boolean().valid(true).strict(),
@@ -802,6 +1135,7 @@ const RolePolicySchema = Joi.object().keys({
   group: Joi.string(),
   groups: Joi.array().items(Joi.string()),
   memberLevel: MemberLevelPolicySchema,
+  memberMasking: MemberMaskingPolicySchema,
   rowLevel: RowLevelPolicySchema,
   conditions: Joi.array().items(Joi.object().keys({
     if: Joi.func().required(),
@@ -810,7 +1144,8 @@ const RolePolicySchema = Joi.object().keys({
   .nand('group', 'groups') // Cannot have both group and groups
   .nand('role', 'group') // Cannot have both role and group
   .nand('role', 'groups') // Cannot have both role and groups
-  .or('role', 'group', 'groups'); // Must have at least one
+  .or('role', 'group', 'groups') // Must have at least one
+  .with('memberMasking', 'memberLevel'); // memberMasking requires memberLevel
 
 /* *****************************
  * ATTENTION:
@@ -883,14 +1218,54 @@ const folderSchema = Joi.object().keys({
     Joi.array().items(
       Joi.alternatives([
         Joi.string().required(),
+        Joi.object().keys({
+          joinPath: Joi.func().required(),
+        }),
         Joi.link('#folderSchema'), // Can contain nested folders
       ]),
     ),
   ]).required(),
 }).id('folderSchema');
 
+const ViewDefaultFilterSchema = Joi.object().keys({
+  member: Joi.func().required(),
+  operator: Joi.any().valid(
+    'equals',
+    'notEquals',
+    'contains',
+    'notContains',
+    'startsWith',
+    'notStartsWith',
+    'endsWith',
+    'notEndsWith',
+    'in',
+    'notIn',
+    'gt',
+    'gte',
+    'lt',
+    'lte',
+    'set',
+    'notSet',
+    'inDateRange',
+    'notInDateRange',
+    'onTheDate',
+    'beforeDate',
+    'beforeOrOnDate',
+    'afterDate',
+    'afterOrOnDate',
+  ).required(),
+  values: Joi.when('operator', {
+    is: Joi.valid('set', 'notSet'),
+    then: Joi.func().optional(),
+    otherwise: Joi.func().required()
+  }),
+  unless: Joi.func(),
+});
+
 const viewSchema = inherit(baseSchema, {
   isView: Joi.boolean().strict(),
+  viewGroup: Joi.alternatives([Joi.string(), Joi.func()]),
+  viewGroups: Joi.alternatives([Joi.array().items(Joi.string().required()), Joi.func()]),
   cubes: Joi.array().items(
     Joi.object().keys({
       joinPath: Joi.func().required(),
@@ -917,6 +1292,7 @@ const viewSchema = inherit(baseSchema, {
     })
   ),
   folders: Joi.array().items(folderSchema),
+  defaultFilters: Joi.array().items(ViewDefaultFilterSchema),
 });
 
 function formatErrorMessageFromDetails(explain, d) {
@@ -978,7 +1354,7 @@ export function functionFieldsPatterns(): string[] {
   return Array.from(functionPatterns);
 }
 
-export class CubeValidator {
+export class CubeValidator implements CompilerInterface {
   protected readonly validCubes: Map<string, boolean> = new Map();
 
   public constructor(
@@ -999,6 +1375,11 @@ export class CubeValidator {
     };
     const result = cube.isView ? viewSchema.validate(cube, options) : cubeSchema.validate(cube, options);
 
+    if (cube.isView) {
+      // We need to verify that leaf cubes in view are present only once
+      this.validateUniqueLeafCubes(cube.name, cube.cubes, errorReporter);
+    }
+
     if (result.error != null) {
       errorReporter.error(formatErrorMessage(result.error));
     } else {
@@ -1006,6 +1387,55 @@ export class CubeValidator {
     }
 
     return result;
+  }
+
+  /**
+   * Validates that each cube appears only once within each root path in a view.
+   * This ensures that there is only one path to reach each cube within each root's join graph.
+   * For example: 'a.b.c' + 'd.b.c' is valid (different roots), but 'a.b.c' + 'a.d.c' is invalid (same root 'a').
+   */
+  private validateUniqueLeafCubes(viewName: string, cubesArray: any[], errorReporter: ErrorReporter) {
+    if (!cubesArray || cubesArray.length === 0) {
+      return;
+    }
+
+    const rootCubePaths = new Map<string, Map<string, Set<string>>>();
+
+    for (const cube of cubesArray) {
+      try {
+        const fullPath = this.cubeSymbols.evaluateReferences(null, cube.joinPath as () => ToString, { collectJoinHints: true });
+        const split = fullPath.split('.');
+        const rootCube = split[0];
+
+        if (!rootCubePaths.has(rootCube)) {
+          rootCubePaths.set(rootCube, new Map<string, Set<string>>());
+        }
+
+        const cubesJoinPaths = rootCubePaths.get(rootCube)!;
+
+        for (let i = 0; i < split.length; i++) {
+          const cubeName = split[i];
+          const path = split.slice(0, i + 1).join('.');
+
+          if (!cubesJoinPaths.has(cubeName)) {
+            cubesJoinPaths.set(cubeName, new Set<string>());
+          }
+          cubesJoinPaths.get(cubeName)!.add(path);
+        }
+      } catch (e) {
+        // Ignore errors during joinPath evaluation - cube may not be defined yet
+      }
+    }
+
+    // Check for cubes with multiple paths within each root
+    for (const [rootCube, cubesJoinPaths] of rootCubePaths.entries()) {
+      for (const [cubeName, paths] of cubesJoinPaths.entries()) {
+        if (paths.size > 1) {
+          const pathList = Array.from(paths).map(path => `'${path}'`).join(', ');
+          errorReporter.error(`Views can't define multiple join paths to the same cube. View '${viewName}' has multiple paths to '${cubeName}' within root '${rootCube}': ${pathList}. Use extends to create a child cube and reference it instead`);
+        }
+      }
+    }
   }
 
   public isCubeValid(cube: CubeDefinition): boolean {

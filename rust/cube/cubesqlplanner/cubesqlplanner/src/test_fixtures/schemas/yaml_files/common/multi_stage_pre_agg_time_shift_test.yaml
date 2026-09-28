@@ -1,0 +1,57 @@
+cubes:
+    - name: orders
+      sql: "SELECT * FROM ms_pa_ts_orders"
+      dimensions:
+          - name: id
+            type: number
+            sql: id
+            primary_key: true
+          - name: status
+            type: string
+            sql: status
+          - name: created_at
+            type: time
+            sql: created_at
+
+      measures:
+          - name: count
+            type: count
+            public: false
+
+          - name: revenue
+            type: sum
+            sql: amount
+            public: false
+
+          # Multi-stage: count with time shift (prior 1 month)
+          - name: count_prev_month
+            type: number
+            sql: "{CUBE.count}"
+            multi_stage: true
+            time_shift:
+                - interval: "1 month"
+                  type: prior
+                  timeDimension: orders.created_at
+
+          # Multi-stage: revenue reducing by status
+          - name: revenue_reduce_status
+            type: sum
+            sql: "{CUBE.revenue}"
+            multi_stage: true
+            reduce_by:
+                - orders.status
+
+      pre_aggregations:
+          - name: count_rollup
+            measures:
+                - count
+            time_dimension: created_at
+            granularity: day
+
+          - name: revenue_rollup
+            measures:
+                - revenue
+            dimensions:
+                - status
+            time_dimension: created_at
+            granularity: day

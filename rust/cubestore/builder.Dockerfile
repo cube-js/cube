@@ -1,7 +1,9 @@
-ARG OS_NAME=bookworm-slim
+ARG RUST_TAG=bookworm-slim
+ARG OS_NAME=bookworm
 
-FROM rust:$OS_NAME
+FROM rust:$RUST_TAG AS base
 
+ARG OS_NAME=bookworm
 ARG LLVM_VERSION=18
 
 RUN rustup update && \
@@ -13,9 +15,8 @@ RUN apt update \
     && DEBIAN_FRONTEND=noninteractive apt-get install -y software-properties-common libssl-dev pkg-config wget gnupg git apt-transport-https ca-certificates \
     && wget -O - https://apt.llvm.org/llvm-snapshot.gpg.key | apt-key add - \
     # https://github.com/llvm/llvm-project/issues/62475 \
-    # add it twice to workaround:
-    && add-apt-repository --yes "deb https://apt.llvm.org/bookworm/ llvm-toolchain-bookworm-$LLVM_VERSION main" \
-    && add-apt-repository --yes "deb https://apt.llvm.org/bookworm/ llvm-toolchain-bookworm-$LLVM_VERSION main" \
+    && add-apt-repository --yes "deb https://apt.llvm.org/$OS_NAME/ llvm-toolchain-$OS_NAME-$LLVM_VERSION main" \
+    && add-apt-repository --yes "deb https://apt.llvm.org/$OS_NAME/ llvm-toolchain-$OS_NAME-$LLVM_VERSION main" \
     && apt update \
     && apt install -y git llvm-$LLVM_VERSION clang-$LLVM_VERSION libclang-$LLVM_VERSION-dev clang-$LLVM_VERSION lld-$LLVM_VERSION cmake \
     && rm -rf /var/lib/apt/lists/*;
@@ -26,4 +27,15 @@ RUN update-alternatives --install /usr/bin/clang++ clang++ /usr/bin/clang++-$LLV
     && update-alternatives --install /usr/bin/c++ c++ /usr/bin/clang++-$LLVM_VERSION 100 \
     && update-alternatives --install /usr/bin/lld lld /usr/bin/lld-$LLVM_VERSION 100;
 
-WORKDIR /usr/src
+# Platform-specific OpenSSL paths for static linking
+FROM base AS final-amd64
+ENV OPENSSL_LIB_DIR=/usr/lib/x86_64-linux-gnu
+ENV OPENSSL_INCLUDE_DIR=/usr/include
+
+FROM base AS final-arm64
+ENV OPENSSL_LIB_DIR=/usr/lib/aarch64-linux-gnu
+ENV OPENSSL_INCLUDE_DIR=/usr/include
+
+# Select final stage based on target architecture
+ARG TARGETARCH=amd64
+FROM final-${TARGETARCH}

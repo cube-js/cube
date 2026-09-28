@@ -1,0 +1,12 @@
+---
+source: cubesqlplanner/src/tests/integration/time_dimensions.rs
+expression: result
+---
+customers__city | orders__created_at_month | orders__count
+----------------+--------------------------+--------------
+New York        | 2024-01-01 00:00:00      | 2            
+NULL            | 2024-01-01 00:00:00      | 1            
+San Francisco   | 2024-02-01 00:00:00      | 2            
+New York        | 2024-03-01 00:00:00      | 2            
+NULL            | 2024-03-01 00:00:00      | 1            
+Boston          | 2024-04-01 00:00:00      | 1

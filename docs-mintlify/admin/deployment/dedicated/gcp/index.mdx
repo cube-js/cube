@@ -1,0 +1,42 @@
+---
+title: Dedicated Infrastructure on GCP
+sidebarTitle: GCP
+description: Connect Cube's Dedicated Infrastructure on GCP to your VPC networks via Private Service Connect or VPC Peering, or deploy the entire data plane inside your own GCP project via BYOC.
+---
+
+On GCP, Cube offers single-tenant Dedicated Infrastructure operated by Cube,
+and Bring Your Own Cloud (BYOC) operated inside your own GCP project. Both
+options support private network connectivity to your data sources.
+
+## Backend connectivity (Cube → your network)
+
+Use these options to give Cube private access to your data sources, auth
+providers, BI APIs targeted by Semantic Layer Sync, and anything else Cube
+needs to query. See [Backend and frontend connectivity][backend-frontend] for
+the full picture.
+
+- [**Private Service Connect**][gcp-private-service-connect] — connect to
+  data sources exposed through GCP Service Attachments without routing traffic
+  over the public internet.
+- [**VPC Peering**][gcp-vpc-peering] — establish a VPC peering connection
+  between the Cube VPC and your own VPC.
+
+## Frontend connectivity (your clients → Cube)
+
+Expose Cube's APIs to your applications, browsers, BI tools, embedded
+analytics clients, and Semantic Layer Sync-generated configs over a private
+network. The pattern mirrors the AWS implementation documented in
+[Private API Connectivity on AWS][aws-private-api-connectivity];
+[contact us](https://cube.dev/contact) to enable the equivalent on GCP for
+your tenant.
+
+## Bring Your Own Cloud
+
+If you'd like the entire Cube data plane to live inside your own GCP project,
+see [Bring Your Own Cloud on GCP][gcp-byoc].
+
+[gcp-private-service-connect]: /admin/deployment/dedicated/gcp/private-service-connect
+[gcp-vpc-peering]: /admin/deployment/dedicated/gcp/vpc-peering
+[gcp-byoc]: /admin/deployment/dedicated/gcp/byoc
+[aws-private-api-connectivity]: /admin/deployment/dedicated/aws/private-api-connectivity
+[backend-frontend]: /admin/deployment/dedicated#backend-and-frontend-connectivity

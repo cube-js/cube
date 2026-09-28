@@ -1,0 +1,53 @@
+---
+source: cubesqlplanner/src/tests/integration/rolling_window/with_dimensions.rs
+expression: result
+---
+orders__status | orders__category | orders__created_at_day | orders__rolling_sum_trailing_7d
+---------------+------------------+------------------------+--------------------------------
+cancelled      | electronics      | 2024-01-13 00:00:00    | 200.00                         
+cancelled      | electronics      | 2024-01-22 00:00:00    | 120.00                         
+cancelled      | electronics      | 2024-01-21 00:00:00    | 120.00                         
+cancelled      | electronics      | 2024-01-20 00:00:00    | 120.00                         
+cancelled      | electronics      | 2024-01-19 00:00:00    | 120.00                         
+cancelled      | electronics      | 2024-01-10 00:00:00    | 200.00                         
+cancelled      | electronics      | 2024-01-18 00:00:00    | 120.00                         
+cancelled      | electronics      | 2024-01-11 00:00:00    | 200.00                         
+cancelled      | electronics      | 2024-01-17 00:00:00    | 120.00                         
+cancelled      | electronics      | 2024-01-12 00:00:00    | 200.00                         
+cancelled      | electronics      | 2024-01-16 00:00:00    | 120.00                         
+cancelled      | electronics      | 2024-01-14 00:00:00    | 200.00                         
+completed      | books            | 2024-01-10 00:00:00    | 30.00                          
+completed      | books            | 2024-01-16 00:00:00    | 90.00                          
+completed      | books            | 2024-01-17 00:00:00    | 60.00                          
+completed      | books            | 2024-01-18 00:00:00    | 60.00                          
+completed      | books            | 2024-01-19 00:00:00    | 60.00                          
+completed      | books            | 2024-01-20 00:00:00    | 60.00                          
+completed      | books            | 2024-01-21 00:00:00    | 60.00                          
+completed      | books            | 2024-01-11 00:00:00    | 30.00                          
+completed      | books            | 2024-01-12 00:00:00    | 30.00                          
+completed      | books            | 2024-01-13 00:00:00    | 30.00                          
+completed      | books            | 2024-01-14 00:00:00    | 30.00                          
+completed      | books            | 2024-01-15 00:00:00    | 90.00                          
+completed      | clothing         | 2024-01-21 00:00:00    | 180.00                         
+completed      | clothing         | 2024-01-10 00:00:00    | 75.00                          
+completed      | clothing         | 2024-01-18 00:00:00    | 180.00                         
+completed      | clothing         | 2024-01-19 00:00:00    | 180.00                         
+completed      | clothing         | 2024-01-20 00:00:00    | 180.00                         
+completed      | clothing         | 2024-01-22 00:00:00    | 180.00                         
+completed      | clothing         | 2024-01-23 00:00:00    | 180.00                         
+completed      | clothing         | 2024-01-24 00:00:00    | 180.00                         
+completed      | electronics      | 2024-01-25 00:00:00    | 250.00                         
+completed      | electronics      | 2024-01-12 00:00:00    | 350.00                         
+completed      | electronics      | 2024-01-14 00:00:00    | 350.00                         
+completed      | electronics      | 2024-01-15 00:00:00    | 350.00                         
+completed      | electronics      | 2024-01-16 00:00:00    | 350.00                         
+completed      | electronics      | 2024-01-17 00:00:00    | 350.00                         
+completed      | electronics      | 2024-01-18 00:00:00    | 350.00                         
+completed      | electronics      | 2024-01-13 00:00:00    | 350.00                         
+pending        | clothing         | 2024-01-18 00:00:00    | 90.00                          
+pending        | clothing         | 2024-01-14 00:00:00    | 90.00                          
+pending        | clothing         | 2024-01-17 00:00:00    | 90.00                          
+pending        | clothing         | 2024-01-20 00:00:00    | 90.00                          
+pending        | clothing         | 2024-01-16 00:00:00    | 90.00                          
+pending        | clothing         | 2024-01-19 00:00:00    | 90.00                          
+pending        | clothing         | 2024-01-15 00:00:00    | 90.00

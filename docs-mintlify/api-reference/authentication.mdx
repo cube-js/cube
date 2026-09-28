@@ -1,0 +1,60 @@
+---
+title: Authentication
+description: Authenticate REST and SCIM requests with a token sent using the Bearer prefix.
+---
+
+How you authenticate depends on which API you call. Both the REST management API
+(`/api/v1/…`) and the SCIM API (`/api/scim/v2/…`) take a token in the
+`Authorization` header with the `Bearer` prefix, and only HTTPS is accepted.
+
+## REST API (`/api/v1`)
+
+Authenticate deployment, report, and workbook requests with a token sent using
+the `Bearer` prefix:
+
+```text
+Authorization: Bearer <YOUR_TOKEN>
+```
+
+The token can be an API key generated in your Cube Cloud account settings, or an
+OAuth access token from Cube Cloud's OAuth flow — both are sent the same way.
+
+```bash
+curl --request GET \
+  --url 'https://<tenant>.cubecloud.dev/api/v1/deployments' \
+  --header 'Authorization: Bearer <YOUR_TOKEN>'
+```
+
+## SCIM API (`/api/scim/v2`)
+
+Authenticate user and group provisioning requests with a SCIM bearer token,
+configured in your identity provider's SCIM integration:
+
+```text
+Authorization: Bearer <YOUR_SCIM_TOKEN>
+```
+
+The SCIM API requires the `Bearer` prefix because identity providers (Microsoft
+Entra ID, Okta, and others) send credentials this way per
+[RFC 7644](https://datatracker.ietf.org/doc/html/rfc7644). The SCIM token is a
+Cube Cloud API key, so `Api-Key <YOUR_SCIM_TOKEN>` is also accepted here.
+
+Generate a SCIM token in your Cube Cloud account settings, then configure it in
+your identity provider alongside the
+[base URL](/api-reference/introduction#platform-api).
+
+```bash
+curl --request GET \
+  --url 'https://<tenant>.cubecloud.dev/api/scim/v2/Users?count=100&startIndex=1' \
+  --header 'Authorization: Bearer <YOUR_SCIM_TOKEN>'
+```
+
+<Warning>
+
+Treat API keys and SCIM tokens like passwords — they grant full access to your
+account's resources. Store them securely and rotate them if they are exposed.
+
+</Warning>
+
+A `401 Unauthorized` response means the credential is missing, malformed, or
+expired.

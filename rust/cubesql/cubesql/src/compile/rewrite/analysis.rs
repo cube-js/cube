@@ -297,7 +297,7 @@ impl LogicalPlanAnalysis {
     ) -> Option<OriginalExpr> {
         let id_to_original_expr = |id| {
             egraph[id].data.original_expr.clone().ok_or_else(|| {
-                CubeError::internal(format!(
+                CubeError::rewrite(format!(
                     "Original expr wasn't prepared for {:?}",
                     egraph[id]
                 ))
@@ -306,7 +306,7 @@ impl LogicalPlanAnalysis {
         let id_to_expr = |id| {
             id_to_original_expr(id).and_then(|e| match e {
                 OriginalExpr::Expr(expr) => Ok(expr),
-                OriginalExpr::List(_) => Err(CubeError::internal(format!(
+                OriginalExpr::List(_) => Err(CubeError::rewrite(format!(
                     "Original expr list can't be used in expr eval {:?}",
                     egraph[id]
                 ))),
@@ -995,7 +995,7 @@ impl LogicalPlanAnalysis {
                         None
                     }
                 })
-                .ok_or_else(|| CubeError::internal("Not a constant".to_string()))
+                .ok_or_else(|| CubeError::rewrite("Not a constant".to_string()))
         };
         match enode {
             LogicalPlanLanguage::LiteralExpr(_) => {

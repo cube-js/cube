@@ -1,0 +1,249 @@
+use crate::cube_bridge::base_query_options::FilterItem as NativeFilterItem;
+use crate::cube_bridge::case_variant::CaseVariant;
+use crate::cube_bridge::measure_definition::{RollingWindow, TimeShiftReference};
+use crate::test_fixtures::cube_bridge::yaml::case::YamlCaseVariant;
+use crate::test_fixtures::cube_bridge::yaml::mask::YamlMask;
+use crate::test_fixtures::cube_bridge::{
+    MockMeasureDefinition, MockMemberOrderBy, MockMultiStageFilterReferences,
+    MockMultiStageGrainReferences, MockStructWithSqlMember,
+};
+use serde::Deserialize;
+use std::rc::Rc;
+
+#[derive(Debug, Deserialize)]
+pub struct YamlMeasureDefinition {
+    #[serde(rename = "type")]
+    measure_type: String,
+    #[serde(default)]
+    multi_stage: Option<bool>,
+    #[serde(default, alias = "reduce_by")]
+    reduce_by_references: Option<Vec<String>>,
+    #[serde(default, alias = "add_group_by")]
+    add_group_by_references: Option<Vec<String>>,
+    #[serde(default, alias = "group_by")]
+    group_by_references: Option<Vec<String>>,
+    #[serde(default, alias = "time_shift")]
+    time_shift_references: Option<Vec<TimeShiftReference>>,
+    #[serde(default)]
+    rolling_window: Option<RollingWindow>,
+    #[serde(default)]
+    filter: Option<YamlMultiStageFilter>,
+    #[serde(default)]
+    grain: Option<YamlMultiStageGrain>,
+    #[serde(default)]
+    sql: Option<String>,
+    #[serde(default)]
+    case: Option<YamlCaseVariant>,
+    #[serde(default)]
+    filters: Vec<YamlFilter>,
+    #[serde(default)]
+    drill_filters: Vec<YamlFilter>,
+    #[serde(default)]
+    order_by: Vec<YamlOrderBy>,
+    #[serde(default)]
+    mask: Option<YamlMask>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct YamlMultiStageFilter {
+    #[serde(default)]
+    mode: Option<String>,
+    #[serde(default)]
+    exclude: Option<Vec<String>>,
+    #[serde(default)]
+    keep_only: Option<Vec<String>>,
+    #[serde(default)]
+    include: Vec<YamlIncludeFilter>,
+}
+
+#[derive(Debug, Deserialize)]
+struct YamlIncludeFilter {
+    #[serde(default)]
+    member: Option<String>,
+    #[serde(default)]
+    dimension: Option<String>,
+    #[serde(default)]
+    operator: Option<String>,
+    #[serde(default)]
+    values: Option<Vec<Option<String>>>,
+    #[serde(default)]
+    and: Option<Vec<YamlIncludeFilter>>,
+    #[serde(default)]
+    or: Option<Vec<YamlIncludeFilter>>,
+}
+
+impl YamlIncludeFilter {
+    fn into_native(self, cube_name: Option<&str>) -> NativeFilterItem {
+        fn qualify(s: String, cube_name: Option<&str>) -> String {
+            match cube_name {
+                Some(cn) if !s.contains('.') => format!("{}.{}", cn, s),
+                _ => s,
+            }
+        }
+        NativeFilterItem {
+            member: self.member.map(|s| qualify(s, cube_name)),
+            dimension: self.dimension.map(|s| qualify(s, cube_name)),
+            operator: self.operator,
+            values: self.values,
+            and: self.and.map(|items| {
+                items
+                    .into_iter()
+                    .map(|i| i.into_native(cube_name))
+                    .collect()
+            }),
+            or: self.or.map(|items| {
+                items
+                    .into_iter()
+                    .map(|i| i.into_native(cube_name))
+                    .collect()
+            }),
+        }
+    }
+}
+
+impl YamlMultiStageFilter {
+    pub(super) fn build(self, cube_name: Option<&str>) -> Rc<MockMultiStageFilterReferences> {
+        let include = if self.include.is_empty() {
+            None
+        } else {
+            Some(
+                self.include
+                    .into_iter()
+                    .map(|i| i.into_native(cube_name))
+                    .collect(),
+            )
+        };
+        Rc::new(
+            MockMultiStageFilterReferences::builder()
+                .mode(self.mode)
+                .exclude(qualify_references(self.exclude, cube_name))
+                .keep_only(qualify_references(self.keep_only, cube_name))
+                .include(include)
+                .build(),
+        )
+    }
+}
+
+#[derive(Debug, Deserialize)]
+pub struct YamlMultiStageGrain {
+    #[serde(default)]
+    exclude: Option<Vec<String>>,
+    #[serde(default)]
+    keep_only: Option<Vec<String>>,
+    #[serde(default)]
+    include: Option<Vec<String>>,
+}
+
+impl YamlMultiStageGrain {
+    pub(super) fn build(self, cube_name: Option<&str>) -> Rc<MockMultiStageGrainReferences> {
+        Rc::new(
+            MockMultiStageGrainReferences::builder()
+                .exclude(qualify_references(self.exclude, cube_name))
+                .keep_only(qualify_references(self.keep_only, cube_name))
+                .include(qualify_references(self.include, cube_name))
+                .build(),
+        )
+    }
+}
+
+#[derive(Debug, Deserialize)]
+struct YamlFilter {
+    sql: String,
+}
+
+#[derive(Debug, Deserialize)]
+struct YamlOrderBy {
+    sql: String,
+    dir: String,
+}
+
+fn qualify_references(refs: Option<Vec<String>>, cube_name: Option<&str>) -> Option<Vec<String>> {
+    match cube_name {
+        Some(cn) => refs.map(|v| {
+            v.into_iter()
+                .map(|r| {
+                    if r.contains('.') {
+                        r
+                    } else {
+                        format!("{}.{}", cn, r)
+                    }
+                })
+                .collect()
+        }),
+        None => refs,
+    }
+}
+
+impl YamlMeasureDefinition {
+    pub fn build(self) -> Rc<MockMeasureDefinition> {
+        self.build_with_cube_name(None)
+    }
+
+    pub fn build_with_cube_name(self, cube_name: Option<&str>) -> Rc<MockMeasureDefinition> {
+        let case = self.case.map(|cv| match cv {
+            YamlCaseVariant::Case(case_def) => Rc::new(CaseVariant::Case(case_def.build())),
+            YamlCaseVariant::CaseSwitch(switch_def) => {
+                Rc::new(CaseVariant::CaseSwitch(switch_def.build()))
+            }
+        });
+
+        let filters = if !self.filters.is_empty() {
+            Some(
+                self.filters
+                    .into_iter()
+                    .map(|f| Rc::new(MockStructWithSqlMember::builder().sql(f.sql).build()))
+                    .collect(),
+            )
+        } else {
+            None
+        };
+
+        let drill_filters = if !self.drill_filters.is_empty() {
+            Some(
+                self.drill_filters
+                    .into_iter()
+                    .map(|f| Rc::new(MockStructWithSqlMember::builder().sql(f.sql).build()))
+                    .collect(),
+            )
+        } else {
+            None
+        };
+
+        let order_by = if !self.order_by.is_empty() {
+            Some(
+                self.order_by
+                    .into_iter()
+                    .map(|o| Rc::new(MockMemberOrderBy::builder().sql(o.sql).dir(o.dir).build()))
+                    .collect(),
+            )
+        } else {
+            None
+        };
+
+        let filter = self.filter.map(|f| f.build(cube_name));
+        let grain = self.grain.map(|g| g.build(cube_name));
+
+        Rc::new(
+            MockMeasureDefinition::builder()
+                .measure_type(self.measure_type)
+                .multi_stage(self.multi_stage)
+                .reduce_by_references(qualify_references(self.reduce_by_references, cube_name))
+                .add_group_by_references(qualify_references(
+                    self.add_group_by_references,
+                    cube_name,
+                ))
+                .group_by_references(qualify_references(self.group_by_references, cube_name))
+                .time_shift_references(self.time_shift_references)
+                .rolling_window(self.rolling_window)
+                .sql_opt(self.sql)
+                .case(case)
+                .filters(filters)
+                .drill_filters(drill_filters)
+                .filter(filter)
+                .grain(grain)
+                .order_by(order_by)
+                .resolved_mask_sql_opt(self.mask.map(|m| m.to_sql_string()))
+                .build(),
+        )
+    }
+}

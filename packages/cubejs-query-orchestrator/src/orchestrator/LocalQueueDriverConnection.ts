@@ -134,7 +134,7 @@ export class LocalQueueDriverConnection implements QueueDriverConnectionInterfac
     return res;
   }
 
-  public async getResult(queryKey: QueryKey): Promise<any> {
+  public async getResult(queryKey: QueryKey, _externalId?: string): Promise<any> {
     const resultListKey = this.resultListKey(queryKey);
     if (this.state.resultPromises[resultListKey] && this.state.resultPromises[resultListKey].resolved) {
       return this.getResultBlocking(this.redisHash(queryKey));

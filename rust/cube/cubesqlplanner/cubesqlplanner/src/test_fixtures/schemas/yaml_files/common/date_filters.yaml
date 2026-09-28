@@ -1,0 +1,13 @@
+cubes:
+  - name: visitors
+    sql: "SELECT * FROM visitors"
+    dimensions:
+      - name: source
+        type: string
+        sql: source
+      - name: created_at
+        type: time
+        sql: created_at
+      - name: updated_at
+        type: time
+        sql: updated_at

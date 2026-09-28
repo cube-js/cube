@@ -1,0 +1,12 @@
+---
+source: cubesqlplanner/src/tests/integration/pre_aggregations/multi_fact.rs
+expression: result
+---
+addresses__street | addresses__count | customers__count | orders__count
+------------------+------------------+------------------+--------------
+Birch Way         | 1                | 1                | 1            
+Elm St            | 1                | 1                | 3            
+Main St           | 1                | 1                | 4            
+Maple Ln          | 1                | 1                | 1            
+Oak Ave           | 1                | 1                | 4            
+Pine Rd           | 1                | 1                | 0

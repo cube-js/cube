@@ -33,9 +33,10 @@ class SqliteDriver extends BaseDriver {
     const dataSource =
       config.dataSource ||
       assertDataSource('default');
+    const preAggregations = config.preAggregations || false;
 
     this.config = {
-      database: getEnv('dbName', { dataSource }),
+      database: getEnv('dbName', { dataSource, preAggregations }),
       ...config
     };
 

@@ -1,0 +1,7 @@
+---
+source: cubesqlplanner/src/tests/integration/calendar.rs
+expression: result
+---
+custom_calendar__date_val_year
+------------------------------
+2025-02-02

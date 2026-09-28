@@ -95,7 +95,7 @@ type ErrorResponse = {
   error: string,
 };
 
-type MetaResponse = { cubes: any[], compilerId?: string };
+type MetaResponse = { cubes: any[], viewGroups?: any[], compilerId?: string };
 type MetaResponseResultFn = (message: MetaResponse | ErrorResponse) => void;
 
 /**
@@ -140,6 +140,16 @@ type QueryRequest = BaseRequest & {
   disableExternalPreAggregations?: boolean;
   disableLimitEnforcing?: boolean;
   cacheMode?: CacheMode;
+};
+
+type ConvertQuery = {
+  input: 'sql';
+  output: 'rest';
+  query: string;
+};
+
+type QueryConvertRequest = BaseRequest & {
+  payload: ConvertQuery;
 };
 
 type SqlApiRequest = BaseRequest & {
@@ -215,6 +225,7 @@ type PreAggJobStatusResponse =
   | PreAggJobStatusObject;
 
 export {
+  ConvertQuery,
   RequestContext,
   RequestExtension,
   ExtendedRequestContext,
@@ -228,6 +239,7 @@ export {
   BaseRequest,
   RequestQuery,
   QueryRequest,
+  QueryConvertRequest,
   PreAggsJobsRequest,
   PreAggsSelector,
   PreAggJob,

@@ -19,6 +19,7 @@ import { CubeSymbols } from './CubeSymbols';
 import { CubeDictionary } from './CubeDictionary';
 import { CubeEvaluator } from './CubeEvaluator';
 import { ContextEvaluator } from './ContextEvaluator';
+import { ViewGroupEvaluator } from './ViewGroupEvaluator';
 import { JoinGraph } from './JoinGraph';
 import { CubeToMetaTransformer } from './CubeToMetaTransformer';
 import { CompilerCache } from './CompilerCache';
@@ -45,7 +46,19 @@ export interface CompilerInterface {
   compile: (cubes: any[], errorReporter: ErrorReporter) => void;
 }
 
-export const prepareCompiler = (repo: SchemaFileRepository, options: PrepareCompilerOptions = {}) => {
+export type Compiler = {
+    compiler: DataSchemaCompiler;
+    metaTransformer: CubeToMetaTransformer;
+    cubeEvaluator: CubeEvaluator;
+    contextEvaluator: ContextEvaluator;
+    viewGroupEvaluator: ViewGroupEvaluator;
+    joinGraph: JoinGraph;
+    compilerCache: CompilerCache;
+    headCommitId?: string;
+    compilerId: string;
+};
+
+export const prepareCompiler = (repo: SchemaFileRepository, options: PrepareCompilerOptions = {}): Compiler => {
   const nativeInstance = options.nativeInstance || new NativeInstance();
   const cubeDictionary = new CubeDictionary();
   const cubeSymbols = new CubeSymbols();
@@ -54,8 +67,9 @@ export const prepareCompiler = (repo: SchemaFileRepository, options: PrepareComp
   const cubeValidator = new CubeValidator(cubeSymbols);
   const cubeEvaluator = new CubeEvaluator(cubeValidator);
   const contextEvaluator = new ContextEvaluator(cubeEvaluator);
+  const viewGroupEvaluator = new ViewGroupEvaluator(cubeEvaluator);
   const joinGraph = new JoinGraph(cubeValidator, cubeEvaluator);
-  const metaTransformer = new CubeToMetaTransformer(cubeValidator, cubeEvaluator, contextEvaluator, joinGraph);
+  const metaTransformer = new CubeToMetaTransformer(cubeValidator, cubeEvaluator, contextEvaluator, viewGroupEvaluator, joinGraph);
   const { maxQueryCacheSize, maxQueryCacheAge } = options;
   const compilerCache = new CompilerCache({ maxQueryCacheSize, maxQueryCacheAge });
   const yamlCompiler = new YamlCompiler(cubeSymbols, cubeDictionary, nativeInstance, viewCompiler);
@@ -86,8 +100,10 @@ export const prepareCompiler = (repo: SchemaFileRepository, options: PrepareComp
     compiledYamlCache,
     compiledJinjaCache,
     viewCompilers: [viewCompiler],
-    cubeCompilers: [cubeEvaluator, joinGraph, metaTransformer],
+    cubeCompilers: [cubeEvaluator, joinGraph],
     contextCompilers: [contextEvaluator],
+    viewGroupCompilers: [viewGroupEvaluator],
+    metaCompilers: [metaTransformer],
     cubeFactory: cubeSymbols.createCube.bind(cubeSymbols),
     compilerCache,
     cubeDictionary,
@@ -111,6 +127,7 @@ export const prepareCompiler = (repo: SchemaFileRepository, options: PrepareComp
     metaTransformer,
     cubeEvaluator,
     contextEvaluator,
+    viewGroupEvaluator,
     joinGraph,
     compilerCache,
     headCommitId: options.headCommitId,
@@ -118,9 +135,8 @@ export const prepareCompiler = (repo: SchemaFileRepository, options: PrepareComp
   };
 };
 
-export const compile = (repo: SchemaFileRepository, options?: PrepareCompilerOptions) => {
+export const compile = async (repo: SchemaFileRepository, options?: PrepareCompilerOptions): Promise<Compiler> => {
   const compilers = prepareCompiler(repo, options);
-  return compilers.compiler.compile().then(
-    () => compilers
-  );
+  await compilers.compiler.compile();
+  return compilers;
 };

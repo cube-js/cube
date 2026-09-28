@@ -7,7 +7,6 @@ import { graphqlHTTP } from 'express-graphql';
 import { GraphQLObjectType } from 'graphql';
 // eslint-disable-next-line import/no-extraneous-dependencies
 import fs from 'fs-extra';
-// eslint-disable-next-line import/no-extraneous-dependencies
 import request from 'supertest';
 
 import { makeSchema } from '../src/graphql';
@@ -19,6 +18,10 @@ const metaConfig = [
       measures: [
         {
           name: 'Orders.count',
+          isVisible: true,
+        },
+        {
+          name: 'Orders.totalAmount',
           isVisible: true,
         },
       ],
@@ -151,15 +154,16 @@ describe('GraphQL Schema', () => {
 
     app.use('/graphql', jsonParser, (req, res) => {
       const schema = makeSchema(metaConfig);
-  
+
       return graphqlHTTP({
         schema,
         context: {
           req,
+          res,
           apiGateway: {
             async load({ query, res: response }) {
               expect(query).toMatchSnapshot(req.body.query);
-  
+
               response({
                 query,
                 annotation: {},
@@ -172,18 +176,19 @@ describe('GraphQL Schema', () => {
     });
 
     const GRAPHQL_QUERIES_PATH = `${process.cwd()}/test/graphql-queries/base.gql`;
-    
+
     app.use('/graphql', jsonParser, (req, res) => {
       const schema = makeSchema(metaConfig);
-    
+
       return graphqlHTTP({
         schema,
         context: {
           req,
+          res,
           apiGateway: {
             async load({ query, res: response }) {
               expect(query).toMatchSnapshot(req.body.query);
-    
+
               response({
                 query,
                 annotation: {},
@@ -194,7 +199,7 @@ describe('GraphQL Schema', () => {
         },
       })(req, res);
     });
-    
+
     test('should make valid schema', () => {
       const schema = makeSchema(metaConfig);
       expectValidSchema(schema);
@@ -221,21 +226,22 @@ describe('GraphQL Schema', () => {
       });
     });
   });
-    
+
   describe('with snake_case', () => {
     const app = express();
 
     app.use('/graphql', jsonParser, (req, res) => {
       const schema = makeSchema(metaConfigSnakeCase);
-      
+
       return graphqlHTTP({
         schema,
         context: {
           req,
+          res,
           apiGateway: {
             async load({ query, res: response }) {
               expect(query).toMatchSnapshot(req.body.query);
-      
+
               response({
                 query,
                 annotation: {},
@@ -260,6 +266,101 @@ describe('GraphQL Schema', () => {
 
         expect((<any>error)?.text).toBeUndefined();
       });
+    });
+  });
+
+  describe('extensions', () => {
+    const mockAnnotation = {
+      measures: {
+        'Orders.count': {
+          title: 'Orders Count',
+          shortTitle: 'Count',
+          type: 'number',
+        },
+        'Orders.totalAmount': {
+          title: 'Orders Total Amount',
+          shortTitle: 'Total Amount',
+          type: 'number',
+        },
+      },
+      dimensions: {
+        'Orders.status': {
+          title: 'Orders Status',
+          shortTitle: 'Status',
+          type: 'string',
+        },
+      },
+      segments: {},
+      timeDimensions: {},
+    };
+
+    const mockLastRefreshTime = '2025-06-01T12:00:00.000Z';
+
+    const app = express();
+
+    app.use('/graphql', jsonParser, (req: any, res: any) => {
+      const schema = makeSchema(metaConfig);
+
+      return graphqlHTTP({
+        schema,
+        context: {
+          req,
+          res,
+          apiGateway: {
+            async load({ query, res: response }) {
+              response({
+                query,
+                annotation: mockAnnotation,
+                lastRefreshTime: mockLastRefreshTime,
+                data: [
+                  { 'Orders.count': 10, 'Orders.totalAmount': 500, 'Orders.status': 'completed' },
+                  { 'Orders.count': 5, 'Orders.totalAmount': 200, 'Orders.status': 'pending' },
+                ],
+              });
+            },
+          },
+        },
+        extensions: () => res.extensions || {},
+      })(req, res);
+    });
+
+    test('should return annotation and lastRefreshTime in extensions', async () => {
+      const query = `query CubeQuery {
+        cube {
+          orders { count totalAmount status }
+        }
+      }`;
+
+      const res = await request(app)
+        .post('/graphql')
+        .set('Content-Type', 'application/json')
+        .send(gqlQuery(query));
+
+      expect(res.body.errors).toBeUndefined();
+      expect(res.body.data.cube).toBeDefined();
+      expect(res.body.extensions).toBeDefined();
+
+      expect(res.body).toMatchSnapshot();
+    });
+
+    it('should accumulate all measures and dimensions', async () => {
+      const query = `query CubeQuery {
+        cube {
+          orders { count totalAmount status }
+        }
+      }`;
+
+      const res = await request(app)
+        .post('/graphql')
+        .set('Content-Type', 'application/json')
+        .send(gqlQuery(query));
+
+      expect(res.body.errors).toBeUndefined();
+
+      expect(res.body.data.cube).toEqual([
+        { orders: { count: '10', totalAmount: '500', status: 'completed' } },
+        { orders: { count: '5', totalAmount: '200', status: 'pending' } },
+      ]);
     });
   });
 });

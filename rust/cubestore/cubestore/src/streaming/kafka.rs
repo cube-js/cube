@@ -2,6 +2,7 @@ use crate::config::injection::DIService;
 use crate::config::ConfigObj;
 use crate::metastore::table::StreamOffset;
 use crate::metastore::Column;
+use crate::queryplanner::metadata_cache::MetadataCacheFactory;
 use crate::streaming::kafka_post_processing::{KafkaPostProcessPlan, KafkaPostProcessPlanner};
 use crate::streaming::traffic_sender::TrafficSender;
 use crate::streaming::{parse_json_payload_and_key, StreamingSource};
@@ -11,7 +12,6 @@ use async_std::stream;
 use async_trait::async_trait;
 use datafusion::arrow::array::ArrayRef;
 use datafusion::cube_ext;
-use datafusion::physical_plan::parquet::MetadataCacheFactory;
 use futures::Stream;
 use json::object::Object;
 use json::JsonValue;
@@ -44,7 +44,7 @@ pub struct KafkaStreamingSource {
 }
 
 impl KafkaStreamingSource {
-    pub fn try_new(
+    pub async fn try_new(
         table_id: u64,
         unique_key_columns: Vec<Column>,
         seq_column: Column,
@@ -70,8 +70,11 @@ impl KafkaStreamingSource {
                     seq_column,
                     columns.clone(),
                     source_columns,
+                    metadata_cache_factory.clone(),
                 );
-                let plan = planner.build(select_statement.clone(), metadata_cache_factory)?;
+                let plan = planner
+                    .build(select_statement.clone(), metadata_cache_factory)
+                    .await?;
                 let columns = plan.source_columns().clone();
                 let seq_column_index = plan.source_seq_column_index();
                 let unique_columns = plan.source_unique_columns().clone();
@@ -412,14 +415,14 @@ mod tests {
     use super::*;
     use crate::metastore::{Column, ColumnType};
     use crate::queryplanner::query_executor::batches_to_dataframe;
+    use crate::queryplanner::{sql_to_rel_options, try_make_memory_data_source};
     use crate::sql::MySqlDialectWithBackTicks;
     use crate::streaming::topic_table_provider::TopicTableProvider;
     use datafusion::arrow::array::StringArray;
     use datafusion::arrow::record_batch::RecordBatch;
     use datafusion::datasource::TableProvider;
     use datafusion::physical_plan::collect;
-    use datafusion::physical_plan::memory::MemoryExec;
-    use datafusion::prelude::ExecutionContext;
+    use datafusion::prelude::SessionContext;
     use datafusion::sql::parser::Statement as DFStatement;
     use datafusion::sql::planner::SqlToRel;
     use sqlparser::parser::Parser;
@@ -429,18 +432,25 @@ mod tests {
         let dialect = &MySqlDialectWithBackTicks {};
         let mut tokenizer = Tokenizer::new(dialect, &select_statement);
         let tokens = tokenizer.tokenize().unwrap();
-        let statement = Parser::new(tokens, dialect).parse_statement().unwrap();
+        let statement = Parser::new(dialect)
+            .with_tokens(tokens)
+            .parse_statement()
+            .unwrap();
 
         let provider = TopicTableProvider::new("t".to_string(), &vec![]);
-        let query_planner = SqlToRel::new(&provider);
+        let query_planner = SqlToRel::new_with_options(&provider, sql_to_rel_options());
 
         let logical_plan = query_planner
-            .statement_to_plan(&DFStatement::Statement(statement.clone()))
+            .statement_to_plan(DFStatement::Statement(Box::new(statement.clone())))
             .unwrap();
-        let plan_ctx = Arc::new(ExecutionContext::new());
-        let phys_plan = plan_ctx.create_physical_plan(&logical_plan).unwrap();
+        let plan_ctx = Arc::new(SessionContext::new());
+        let phys_plan = plan_ctx
+            .state()
+            .create_physical_plan(&logical_plan)
+            .await
+            .unwrap();
 
-        let batches = collect(phys_plan).await.unwrap();
+        let batches = collect(phys_plan, plan_ctx.task_ctx()).await.unwrap();
         let res = batches_to_dataframe(batches).unwrap();
         res.get_rows()[0].values()[0].clone()
     }
@@ -454,23 +464,30 @@ mod tests {
         let batch =
             RecordBatch::try_new(schema.clone(), vec![Arc::new(StringArray::from(input))]).unwrap();
         let memery_input = vec![vec![batch]];
-        let inp = Arc::new(MemoryExec::try_new(&memery_input, schema.clone(), None).unwrap());
+        let inp = try_make_memory_data_source(&memery_input, schema.clone(), None).unwrap();
 
         let dialect = &MySqlDialectWithBackTicks {};
         let mut tokenizer = Tokenizer::new(dialect, &select_statement);
         let tokens = tokenizer.tokenize().unwrap();
-        let statement = Parser::new(tokens, dialect).parse_statement().unwrap();
+        let statement = Parser::new(dialect)
+            .with_tokens(tokens)
+            .parse_statement()
+            .unwrap();
 
-        let query_planner = SqlToRel::new(&provider);
+        let query_planner = SqlToRel::new_with_options(&provider, sql_to_rel_options());
 
         let logical_plan = query_planner
-            .statement_to_plan(&DFStatement::Statement(statement.clone()))
+            .statement_to_plan(DFStatement::Statement(Box::new(statement.clone())))
             .unwrap();
-        let plan_ctx = Arc::new(ExecutionContext::new());
-        let phys_plan = plan_ctx.create_physical_plan(&logical_plan).unwrap();
+        let plan_ctx = Arc::new(SessionContext::new());
+        let phys_plan = plan_ctx
+            .state()
+            .create_physical_plan(&logical_plan)
+            .await
+            .unwrap();
         let phys_plan = phys_plan.with_new_children(vec![inp]).unwrap();
 
-        let batches = collect(phys_plan).await.unwrap();
+        let batches = collect(phys_plan, plan_ctx.task_ctx()).await.unwrap();
         let res = batches_to_dataframe(batches).unwrap();
         res.get_rows().to_vec()
     }

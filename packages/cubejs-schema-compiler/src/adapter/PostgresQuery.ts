@@ -1,3 +1,4 @@
+import { parseSqlInterval } from '@cubejs-backend/shared';
 import { BaseQuery } from './BaseQuery';
 import { ParamAllocator } from './ParamAllocator';
 
@@ -38,11 +39,24 @@ export class PostgresQuery extends BaseQuery {
    * This implementation should also work for AWS RedShift.
    */
   public dateBin(interval: string, source: string, origin: string): string {
-    return `('${origin}'::timestamp + INTERVAL '${interval}' *
+    const intervalStr = this.intervalString(interval);
+    return `('${origin}'::timestamp + INTERVAL ${intervalStr} *
       FLOOR(
         EXTRACT(EPOCH FROM (${source} - '${origin}'::timestamp)) /
-        EXTRACT(EPOCH FROM INTERVAL '${interval}')
+        EXTRACT(EPOCH FROM INTERVAL ${intervalStr})
       ))`;
+  }
+
+  public override intervalString(interval: string): string {
+    const parsed = parseSqlInterval(interval);
+    if (parsed.quarter) {
+      parsed.month = (parsed.month || 0) + parsed.quarter * 3;
+      delete parsed.quarter;
+    }
+    const normalized = Object.entries(parsed)
+      .map(([unit, value]) => `${value} ${unit}${value !== 1 ? 's' : ''}`)
+      .join(' ');
+    return `'${normalized}'`;
   }
 
   public hllInit(sql) {

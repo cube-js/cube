@@ -1,0 +1,124 @@
+cubes:
+    - name: customers
+      sql: "SELECT * FROM customers"
+      joins:
+          - name: orders
+            relationship: one_to_many
+            sql: "{customers}.id = {orders.customer_id}"
+          - name: returns
+            relationship: one_to_many
+            sql: "{customers}.id = {returns.customer_id}"
+      dimensions:
+          - name: id
+            type: number
+            sql: id
+            primary_key: true
+          - name: name
+            type: string
+            sql: name
+          - name: city
+            type: string
+            sql: city
+      measures:
+          - name: count
+            type: count
+      segments:
+          - name: ny_customers
+            sql: "{CUBE}.city = 'New York'"
+
+    - name: orders
+      sql: "SELECT * FROM orders"
+      joins:
+          - name: customers
+            relationship: many_to_one
+            sql: "{orders}.customer_id = {customers.id}"
+      dimensions:
+          - name: id
+            type: number
+            sql: id
+            primary_key: true
+          - name: customer_id
+            type: number
+            sql: customer_id
+          - name: status
+            type: string
+            sql: status
+          - name: created_at
+            type: time
+            sql: created_at
+      measures:
+          - name: count
+            type: count
+          - name: total_amount
+            type: sum
+            sql: amount
+      segments:
+          - name: completed_orders
+            sql: "{CUBE}.status = 'completed'"
+
+    - name: returns
+      sql: "SELECT * FROM returns"
+      joins:
+          - name: customers
+            relationship: many_to_one
+            sql: "{returns}.customer_id = {customers.id}"
+      dimensions:
+          - name: id
+            type: number
+            sql: id
+            primary_key: true
+          - name: customer_id
+            type: number
+            sql: customer_id
+          - name: reason
+            type: string
+            sql: reason
+      measures:
+          - name: count
+            type: count
+          - name: total_refund
+            type: sum
+            sql: refund_amount
+
+views:
+    - name: orders_view
+      cubes:
+          - join_path: orders
+            includes:
+                - id
+                - status
+                - count
+                - total_amount
+
+    - name: orders_with_customers
+      cubes:
+          - join_path: orders
+            includes:
+                - status
+                - created_at
+                - count
+                - total_amount
+                - completed_orders
+          - join_path: orders.customers
+            includes:
+                - name
+                - city
+                - ny_customers
+
+    - name: customer_overview
+      cubes:
+          - join_path: customers
+            includes:
+                - name
+                - city
+                - count
+          - join_path: customers.orders
+            includes:
+                - count
+                - total_amount
+            prefix: true
+          - join_path: customers.returns
+            includes:
+                - count
+                - total_refund
+            prefix: true

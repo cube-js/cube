@@ -181,9 +181,7 @@ export class OrchestratorApi {
    */
   public async testConnection() {
     if (this.options.rollupOnlyMode) {
-      return Promise.all([
-        this.testDriverConnection(this.options.externalDriverFactory, DriverType.External),
-      ]);
+      return this.testDriverConnection(this.options.externalDriverFactory, DriverType.External);
     } else {
       return Promise.all([
         ...Object.keys(this.seenDataSources).map(
@@ -297,6 +295,10 @@ export class OrchestratorApi {
 
   public async cancelPreAggregationQueriesFromQueue(queryKeys: string[], dataSource: string) {
     return this.orchestrator.cancelPreAggregationQueriesFromQueue(queryKeys, dataSource);
+  }
+
+  public async cancelQueryByRequestId(requestId: string) {
+    return this.orchestrator.cancelQueryByRequestId(requestId);
   }
 
   public async updateRefreshEndReached() {

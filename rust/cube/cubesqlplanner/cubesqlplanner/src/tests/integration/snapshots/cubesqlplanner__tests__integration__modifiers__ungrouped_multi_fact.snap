@@ -1,0 +1,19 @@
+---
+source: cubesqlplanner/src/tests/integration/modifiers.rs
+expression: result
+---
+customers__name | orders__count | returns__count
+----------------+---------------+---------------
+Alice           | 1             | 1             
+Alice           | 1             | 1             
+Alice           | 1             | 1             
+Alice           | 1             | 1             
+Bob             | 1             | 1             
+Bob             | 1             | 1             
+Bob             | 1             | 1             
+Bob             | 1             | 1             
+Bob             | 1             | 1             
+Bob             | 1             | 1             
+Charlie         | NULL          | 1             
+Charlie         | NULL          | 1             
+Diana           | 1             | NULL

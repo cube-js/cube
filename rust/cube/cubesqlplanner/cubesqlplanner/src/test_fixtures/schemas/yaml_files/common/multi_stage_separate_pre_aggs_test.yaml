@@ -1,0 +1,50 @@
+cubes:
+    - name: orders
+      sql: "SELECT * FROM ms_pa_orders"
+      dimensions:
+          - name: id
+            type: number
+            sql: id
+            primary_key: true
+          - name: status
+            type: string
+            sql: status
+
+      measures:
+          - name: count
+            type: count
+            public: false
+
+          - name: revenue
+            type: sum
+            sql: amount
+            public: false
+
+          # Multi-stage: sum of count, reducing by status
+          - name: count_reduce_status
+            type: sum
+            sql: "{CUBE.count}"
+            multi_stage: true
+            reduce_by:
+                - orders.status
+
+          # Multi-stage: sum of revenue, reducing by status
+          - name: revenue_reduce_status
+            type: sum
+            sql: "{CUBE.revenue}"
+            multi_stage: true
+            reduce_by:
+                - orders.status
+
+      pre_aggregations:
+          - name: count_rollup
+            measures:
+                - count
+            dimensions:
+                - status
+
+          - name: revenue_rollup
+            measures:
+                - revenue
+            dimensions:
+                - status

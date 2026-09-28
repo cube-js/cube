@@ -84,7 +84,7 @@ impl FlattenRules {
                                 flat_list,
                             )
                             .map_err(|e| {
-                                CubeError::internal(format!(
+                                CubeError::rewrite(format!(
                                     "FlattenColumnPushdown: Can't add expression to egraph: {:?}: {}",
                                     expr, e
                                 ))

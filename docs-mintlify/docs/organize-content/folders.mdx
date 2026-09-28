@@ -1,0 +1,144 @@
+---
+title: Folders
+description: Organize workbooks, dashboards, and explorations into a hierarchical folder structure for easy navigation and access control.
+---
+
+As your team creates workbooks, dashboards, and explorations, folders help you
+keep content organized and easy to find. Folders provide a hierarchical
+structure that mirrors how your team thinks about its data — by team,
+project, domain, or any other grouping that makes sense.
+
+## Creating folders
+
+To create a folder:
+
+1. Navigate to the **Workspace** page.
+2. Click **New folder**.
+3. Enter a name for the folder (up to 255 characters).
+4. Click **Create**.
+
+You can also create folders inside existing folders to build a nested
+hierarchy. Open the parent folder first, then follow the same steps.
+
+{/* Screenshot: Workspace page with the "New folder" button visible in the
+toolbar and the folder name dialog open, showing the name input field and
+Create button. */}
+
+<Info>
+
+Folder names must be unique within the same parent folder.
+
+</Info>
+
+## Nesting folders
+
+Folders support up to **10 levels** of nesting, allowing you to build
+detailed hierarchies. For example:
+
+```text
+Workspace (root)
+└── Marketing
+    └── Campaigns
+        └── Q1 2025
+            └── Email Performance
+```
+
+Each level provides further categorization while keeping content accessible
+through the folder tree.
+
+## What can go in a folder
+
+Folders can contain the following content types:
+
+- **Workbooks** — multi-tab analyses built with the semantic layer or
+  source SQL
+- **Dashboards** — published views of workbook reports
+- **Explorations** — saved explorations from Analytics Chat or the Explore
+  page
+
+Content that is not placed in a folder appears at the root level of your
+workspace.
+
+{/* Screenshot: Workspace page showing a folder containing a mix of content
+types — at least one workbook, one dashboard, and one exploration visible
+in the list. */}
+
+## Moving content into folders
+
+To move a workbook, dashboard, or exploration into a folder, open the
+item's action menu and select **Move**. Choose the target folder from the
+folder picker and confirm. You can also move items to the root level by
+selecting the workspace root as the destination.
+
+{/* Screenshot: The folder picker dialog that appears after clicking "Move" on
+a workbook, showing the folder tree with nested folders to choose from and
+a confirm button. */}
+
+## Renaming folders
+
+To rename a folder:
+
+1. Open the folder's action menu.
+2. Select **Rename**.
+3. Enter the new name.
+4. Click **Save**.
+
+{/* Screenshot: A folder's action menu (three-dot / context menu) open, showing
+options including Rename, Move, Share, and Delete. */}
+
+<Info>
+
+The new name must be unique within the same parent folder.
+
+</Info>
+
+## Moving folders
+
+You can rearrange your folder hierarchy by moving folders to a different
+parent:
+
+1. Open the folder's action menu.
+2. Select **Move**.
+3. Choose the new parent folder (or the workspace root).
+4. Confirm the move.
+
+<Warning>
+
+A folder cannot be moved into one of its own subfolders.
+
+</Warning>
+
+## Deleting folders
+
+To delete a folder:
+
+1. Open the folder's action menu.
+2. Select **Delete**.
+
+<Warning>
+
+A folder can only be deleted if it contains no subfolders. Move or delete
+any subfolders first.
+
+</Warning>
+
+## Folder permissions
+
+Folder access is controlled through three permission levels:
+
+| Level | Allows |
+| --- | --- |
+| **Can view** | View the folder and its contents |
+| **Can edit** | Rename the folder, move content into it, and create subfolders |
+| **Full access** | Full control including moving and deleting the folder, and managing folder permissions |
+
+The creator of a folder automatically receives **Full access**.
+
+To learn how to share folders with users, groups, or your entire
+organization — and how permissions are inherited by content inside
+folders — see [Share content][ref-sharing].
+
+[ref-workbooks]: /docs/explore-analyze/workbooks
+[ref-dashboards]: /docs/explore-analyze/dashboards
+[ref-sharing]: /docs/organize-content/sharing
+[ref-roles]: /admin/users-and-permissions/roles-and-permissions

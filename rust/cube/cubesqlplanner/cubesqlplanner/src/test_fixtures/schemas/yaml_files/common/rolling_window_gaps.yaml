@@ -1,0 +1,35 @@
+cubes:
+    - name: orders
+      sql: "SELECT * FROM rwg_orders"
+      dimensions:
+          - name: id
+            type: number
+            sql: id
+            primary_key: true
+          - name: created_at
+            type: time
+            sql: created_at
+      measures:
+          - name: count
+            type: count
+          - name: rolling_count_3m
+            type: count
+            rolling_window:
+                trailing: 3 month
+                offset: end
+          # Multi-stage cumulative measure: same rolling-window contract
+          # as `rolling_count_3m` but flagged `multi_stage: true` with a
+          # custom SQL. Exercises the `try_build_rolling_window` path
+          # where `base_member = measure.new_unrolling()` keeps the same
+          # `full_name` as `member`; if `base_state` collapses to the
+          # outer `state` (rolling granularity matches time-dim
+          # granularity + no dateRange), the inode-stage CTE for the
+          # base ends up sharing the dedup key with the rolling-stage
+          # CTE that wraps it.
+          - name: rolling_count_3m_ms
+            type: sum
+            sql: "{CUBE.count}"
+            multi_stage: true
+            rolling_window:
+                trailing: 3 month
+                offset: end

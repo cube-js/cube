@@ -1,0 +1,177 @@
+---
+title: Share content
+description: Share workbooks, dashboards, and explorations with specific users, groups, or your entire organization.
+---
+
+Sharing content with your team keeps everyone aligned on key metrics,
+reduces duplicated work, and ensures stakeholders have access to the
+insights they need. Cube lets you control exactly who can see and edit
+each piece of content — from individual users to your entire organization.
+
+## What can be shared
+
+You can share the following content types:
+
+- **Workbooks** — share the full workbook including all tabs and reports
+- **Dashboards** — share published dashboard views with stakeholders
+- **Explorations** — share saved explorations from Analytics Chat, the
+  Explore page, or dashboards
+
+<Info>
+
+Shared explorations are also available to users through the
+[Google Sheets][ref-google-sheets] and [Microsoft Excel][ref-excel]
+integrations, allowing them to pull exploration results directly into
+their spreadsheets.
+
+</Info>
+
+## Access levels
+
+Sharing permissions are organized into three levels:
+
+| Level | Description |
+| --- | --- |
+| **Can view** | View the content and its data |
+| **Can edit** | View and modify the content |
+| **Full access** | Full control including managing who the content is shared with |
+
+The creator of a piece of content automatically receives **Full access**.
+
+<Info>
+
+When sharing is set at the [folder level][ref-folders], content inside
+the folder inherits those permissions. See
+[Permission inheritance](#permission-inheritance) for details.
+
+</Info>
+
+## Sharing with users and groups
+
+To share content with specific people or groups:
+
+1. Open the workbook, dashboard, or exploration you want to share.
+2. Click the **Share** button.
+3. In the **Share** dialog, type a name or email in the search field to
+   find users or [user groups][ref-groups].
+4. Select the desired [access level](#access-levels) from the dropdown
+   next to the user or group.
+5. Click **Invite**.
+
+{/* Screenshot: Share dialog showing the user/group search input, access level
+dropdown, and Invite button. A user and a group should be visible in the
+"People with access" list with different access levels. */}
+
+Invited users and groups appear in the **People with access** list. You
+can change their access level or remove their access at any time from the
+same dialog.
+
+### Changing access for existing collaborators
+
+To update a collaborator's access level:
+
+1. Open the **Share** dialog for the content.
+2. Find the user or group in the **People with access** list.
+3. Select a new access level from the dropdown next to their name.
+
+To remove access entirely, select **Remove** from the dropdown.
+
+{/* Screenshot: Share dialog "People with access" list showing the access level
+dropdown open for one user, with "Can view", "Can edit", "Full access", and
+"Remove" options visible. */}
+
+## Sharing with your organization
+
+You can make content available to everyone in your Cube Cloud account:
+
+1. Open the **Share** dialog for the content.
+2. In the **General access** section, change the setting from **Only
+   people invited** to **Organization**.
+3. Select the access level that all organization members should receive.
+
+{/* Screenshot: Share dialog with the "General access" section expanded, showing
+the dropdown changed from "Only people invited" to "Organization" with a
+"Can view" access level selected. */}
+
+When organization-wide access is set, individual users and groups can
+still be granted higher access levels. For example, the organization
+might have **Can view** access while a specific team has **Can edit**.
+
+## Permission inheritance
+
+Permissions flow down through the [folder hierarchy][ref-folders]. When
+you share a folder, all content inside it — including workbooks,
+dashboards, explorations, and subfolders — inherits the folder's
+permissions.
+
+```text
+Marketing (Full access for Marketing team)
+├── Q1 Campaign Dashboard    ← inherits Full access
+├── Revenue Workbook         ← inherits Full access
+└── Weekly Reports           ← inherits Full access
+    └── Week 1 Exploration   ← inherits Full access
+```
+
+### How inheritance works
+
+- **Direct permissions override inherited ones.** If a workbook has an
+  explicit permission set, that takes priority over the folder permission.
+- **Closest folder wins.** When multiple ancestor folders have
+  permissions for the same user, the nearest folder in the hierarchy
+  determines the effective access level.
+- **Inherited permissions are visible in the Share dialog.** Users and
+  groups with inherited access appear in the collaborator list with an
+  indication of which folder the permission comes from.
+
+{/* Screenshot: Share dialog for a workbook inside a folder, showing the "People
+with access" list where some users have a "via Marketing folder" inherited
+access badge next to their access level, distinguished from users with direct
+access. */}
+
+### Folder visibility
+
+Users can see a folder if any of the following apply:
+
+- They have been granted direct access to the folder
+- They have access to a parent or child folder (ancestor folders are
+  visible for navigation)
+- They have access to content inside the folder
+
+This ensures users can always navigate to content they have permission to
+view, even if they don't have explicit access to every folder along the
+path.
+
+## Sharing folders
+
+Sharing a folder is the most efficient way to manage access for a
+collection of related content:
+
+1. Navigate to the folder in the **Workspace** page.
+2. Open the folder's action menu and select **Share** (or open the folder
+   and click the **Share** button).
+3. Add users, groups, or set organization-wide access as described above.
+
+{/* Screenshot: Workspace page showing a folder's action menu with the "Share"
+option highlighted. */}
+
+All current and future content added to the folder will inherit its
+permissions. This makes folders ideal for organizing content by team or
+project, where everyone on the team needs the same level of access.
+
+## Sharing explorations for spreadsheet integrations
+
+When you share an exploration with a user, that exploration becomes
+available in the [Google Sheets][ref-google-sheets] and
+[Microsoft Excel][ref-excel] add-ins. Users can browse their shared
+explorations directly from the add-in and pull the results into their
+spreadsheets.
+
+This lets analysts share governed, pre-built queries with spreadsheet
+users who can refresh the data on demand without needing to use the Cube
+interface.
+
+[ref-folders]: /docs/organize-content/folders
+[ref-groups]: /admin/users-and-permissions/user-groups
+[ref-roles]: /admin/users-and-permissions/roles-and-permissions
+[ref-google-sheets]: /docs/integrations/google-sheets
+[ref-excel]: /docs/integrations/microsoft-excel

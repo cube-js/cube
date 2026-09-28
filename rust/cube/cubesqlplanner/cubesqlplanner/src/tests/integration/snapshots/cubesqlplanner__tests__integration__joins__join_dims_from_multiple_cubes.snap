@@ -1,0 +1,10 @@
+---
+source: cubesqlplanner/src/tests/integration/joins.rs
+expression: result
+---
+products__category | orders__status | order_items__count
+-------------------+----------------+-------------------
+Education          | cancelled      | 1                 
+Education          | completed      | 2                 
+Electronics        | completed      | 5                 
+Electronics        | pending        | 2

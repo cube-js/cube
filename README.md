@@ -1,62 +1,40 @@
 ![]()
 <p align="center">
-  <a href="https://cube.dev?ref=github-readme"><img src="https://raw.githubusercontent.com/cube-js/cube/master/docs/content/cube-logo-with-bg.png" alt="Cube — Semantic Layer for Data Applications" width="300px"></a>
+  <a href="https://cube.dev?ref=github-readme"><img src="https://raw.githubusercontent.com/cube-js/cube/master/docs/content/cube-core-logo.png" alt="Cube Core — Open-Source Semantic Layer" width="300px"></a>
 </p>
 <br/>
 
-[Website](https://cube.dev?ref=github-readme) • [Getting Started](https://cube.dev/docs/getting-started?ref=github-readme) • [Docs](https://cube.dev/docs?ref=github-readme) • [Examples](https://cube.dev/docs/examples?ref=github-readme) • [Blog](https://cube.dev/blog?ref=github-readme) • [Slack](https://slack.cube.dev?ref=github-readme) • [X](https://twitter.com/the_cube_dev)
+[Website](https://cube.dev?ref=github-readme) • [Docs](https://cube.dev/docs?ref=github-readme) • [Examples](https://cube.dev/docs/examples?ref=github-readme) • [Blog](https://cube.dev/blog?ref=github-readme) • [Slack](https://slack.cube.dev?ref=github-readme) • [X](https://twitter.com/the_cube_dev)
 
 [![npm version](https://badge.fury.io/js/%40cubejs-backend%2Fserver.svg)](https://badge.fury.io/js/%40cubejs-backend%2Fserver)
 [![GitHub Actions](https://github.com/cube-js/cube/workflows/Build/badge.svg)](https://github.com/cube-js/cube/actions?query=workflow%3ABuild+branch%3Amaster)
 [![FOSSA Status](https://app.fossa.io/api/projects/git%2Bgithub.com%2Fcube-js%2Fcube.js.svg?type=shield)](https://app.fossa.io/projects/git%2Bgithub.com%2Fcube-js%2Fcube.js?ref=badge_shield)
 
-__Cube Core is an open-source semantic layer and LookML alternative.__ It can be used by data professionals to access data from modern data stores, organize it into consistent definitions, and deliver it to every application. Cube Core is headless and comes with multiple APIs for embedded analytics and BI: REST, GraphQL and SQL. If you are looking for a fully integrated platform, similar to Looker, check out our commercial product - [Cube](https://cube.dev).
+__Cube Core is the open-source semantic layer.__ Define metrics, dimensions, joins, and access rules once in code, then expose them through SQL, REST, and GraphQL APIs to anything downstream — BI tools, custom applications, or AI agents. Cube Core is headless: it doesn't ship a UI, so you can build the analytics experience that fits your product.
+
+Cube Core works with all SQL data sources, including cloud data warehouses like Snowflake, Databricks, and BigQuery; query engines like Presto and Amazon Athena; and application databases like Postgres. It has a built-in relational caching engine to provide sub-second latency and high concurrency for API requests.
 
 <img
-  src="https://ucarecdn.com/8d945f29-e9eb-4e7f-9e9e-29ae7074e195/"
+  src="https://lgo0ecceic.ucarecd.net/418db1f9-7597-4e00-8c10-eba19fcac20f/"
   style="border: none"
   width="100%"
 />
 
 <p align="center">
-  <i>Learn more about connecting Cube to <a href="https://cube.dev/docs/config/databases?ref=github-readme" target="_blank">data sources</a> and <a href="https://cube.dev/docs/config/downstream?ref=github-readme" target="_blank">analytics & visualization tools</a>.</i>
+  <i>Learn more about connecting Cube to <a href="https://cube.dev/cube-core/getting-started/create-a-project?ref=github-readme" target="_blank">data sources</a> and <a href="https://cube.dev/docs/integrations?ref=github-readme" target="_blank">analytics & visualization tools</a>.</i>
 </p>
 
-Cube was designed to work with all SQL-enabled data sources, including cloud data warehouses like Snowflake or Google BigQuery, query engines like Presto or Amazon Athena, and application databases like Postgres. Cube has a built-in relational caching engine to provide sub-second latency and high concurrency for API requests.
+## Why Cube Core?
 
-For more details, see the [introduction](https://cube.dev/docs/cubejs-introduction?ref=github-readme) page in our documentation.
+Every BI tool relies on a semantic layer as its core engine — the component that defines metrics, dimensions, and business logic and hides the complexity of the underlying data sources. Most semantic layers are proprietary, tightly coupled to a single BI platform, and can't be reused across other tools.
 
-## Why Cube?
+Cube Core is an open, standalone semantic layer that any analytics application or AI agent can consume through standard APIs. Define your metrics once and use them everywhere — internal BI, embedded analytics, AI agents — without re-implementing the model in each place.
 
-As data infrastructure evolved from traditional relational databases to cloud data platforms, OLAP capabilities that once lived in specialized servers like SQL Server Analysis Services and Oracle Essbase were left behind. Today's organizations face several challenges:
+## Getting Started
 
-1. __Analytics Modeling and Multidimensionality.__ Modern cloud data platforms excel at processing large volumes of data but lack native support for multidimensional analysis and modeling. Cube brings OLAP-style analytics to these platforms, enabling consistent metric definitions and multidimensional analysis.
+You can run Cube Core locally or self-host it with [Docker](https://www.docker.com/).
 
-2. __Performance Optimization.__ While cloud data warehouses have improved query performance through column-oriented storage and distributed processing, they still struggle with complex analytical workloads. Cube provides intelligent caching and pre-aggregation strategies that dramatically improve query response times.
-
-3. __Access Control and Governance.__ Securing and governing access to data across all consuming applications remains critical. Cube offers robust access control to ensure consistent security across your entire data ecosystem.
-
-4. __API Flexibility.__ Legacy OLAP tools were limited in how they exposed data. Cube provides modern REST, GraphQL, and SQL APIs along with support for traditional MDX and DAX interfaces, making it a truly universal semantic layer.
-
-Cube is the missing OLAP engine for the cloud data platform era that provides the necessary infrastructure and features to implement efficient data modeling, access control, and performance optimizations without duplicating analytics modeling, data, or security permissions across different tools.
-
-![](https://raw.githubusercontent.com/cube-js/cube.js/master/docs/content/old-was-vs-cubejs-way.png)
-
-## Getting Started 🚀
-
-### Cube Cloud
-
-[Cube Cloud](https://cube.dev/cloud?ref=github-readme) is the fastest way to get started with Cube. It provides managed infrastructure as well as an instant and free access for development projects and proofs of concept.
-
-<a href="https://cubecloud.dev/auth/signup?ref=github-readme"><img src="https://cubedev-blog-images.s3.us-east-2.amazonaws.com/f1f1eac0-0b44-4c47-936e-33b5c06eedf0.png" alt="Get started now" width="200px"></a>
-
-For a step-by-step guide on Cube Cloud, [see the docs](https://cube.dev/docs/getting-started/cloud/overview?ref=github-readme).
-
-### Docker
-
-Alternatively, you can get started with Cube locally or self-host it with [Docker](https://www.docker.com/).
-
-Once Docker is installed, in a new folder for your project, run the following command:
+Once Docker is installed, in a new folder for your project, run:
 
 ```bash
 docker run -p 4000:4000 \
@@ -66,29 +44,48 @@ docker run -p 4000:4000 \
   cubejs/cube
 ```
 
-Then, open http://localhost:4000 in your browser to continue setup.
+Then open http://localhost:4000 in your browser to continue setup.
 
-For a step-by-step guide on Docker, [see the docs](https://cube.dev/docs/getting-started-docker?ref=github-readme).
+For a step-by-step guide, [see the docs](https://cube.dev/cube-core/getting-started/create-a-project?ref=github-readme).
+
+## Cube Core vs. Cube
+
+[Cube](https://cube.dev?ref=github-readme) is our commercial product — an agentic analytics platform built on Cube Core. Same semantic layer underneath, plus the rest of what makes it a full BI platform: Analytics Chat, workbooks and dashboards, embedded analytics surfaces, managed deployment, RBAC, multi-tenancy, and integrations with Tableau, Power BI, Excel, and Google Sheets.
+
+The data model is fully compatible both ways: a model you build in Cube Core runs unchanged in Cube, and vice versa. Cube Core stays open-source and is what we run inside Cube ourselves.
+
+- **Use Cube Core** when you want to own the stack — a custom BI experience, deeply integrated embedded analytics, or AI agents that need a governed semantic foundation.
+- **Use Cube** when you want a managed, full-featured BI platform out of the box — internal analytics or customer-facing embedded analytics without building the surrounding platform yourself.
+
+For more on how we think about the split, see [The Future of Cube Core and Cube](https://cube.dev/blog/cube-core-and-cube).
+
+For a tour of what's in Cube today, watch the workshop:
+
+<a href="https://www.youtube.com/watch?v=7ZQGGepDjUQ" target="_blank">
+  <img src="https://img.youtube.com/vi/7ZQGGepDjUQ/maxresdefault.jpg" alt="Cube agentic analytics workshop on YouTube" width="600">
+</a>
+
+Or [try Cube for free](https://cubecloud.dev/auth/signup?ref=github-readme).
 
 ## Resources
 
 - [Documentation](https://cube.dev/docs?ref=github-readme)
-- [Getting Started](https://cube.dev/docs/getting-started?ref=github-readme)
-- [Examples & Tutorials](https://cube.dev/docs/examples?ref=github-readme)
-- [Architecture](https://cube.dev/docs/product/introduction#four-layers-of-semantic-layer)
+- [Getting Started](https://cube.dev/cube-core/getting-started?ref=github-readme)
+- [Examples & Tutorials](https://cube.dev/recipes?ref=github-readme)
+- [Architecture](https://cube.dev/docs/introduction)
 
 ## Contributing
 
-There are many ways you can contribute to Cube! Here are a few possibilities:
+There are many ways you can contribute to Cube Core! Here are a few possibilities:
 
 * Star this repo and follow us on [X](https://twitter.com/the_cube_dev).
 * Add Cube to your stack on [Stackshare](https://stackshare.io/cube-js).
-* Upvote issues with 👍 reaction so we know what's the demand for particular issue to prioritize it within road map.
+* Upvote issues with 👍 reaction so we know what the demand is for particular issues to prioritize them within the roadmap.
 * Create issues every time you feel something is missing or goes wrong.
-* Ask questions on [Stack Overflow with cube.js tag](https://stackoverflow.com/questions/tagged/cube.js) if others can have these questions as well.
+* Ask questions on [Stack Overflow with cube.js tag](https://stackoverflow.com/questions/tagged/cube.js) if others might have these questions as well.
 * Provide pull requests for all open issues and especially for those with [help wanted](https://github.com/cube-js/cube/issues?q=is%3Aissue+is%3Aopen+label%3A"help+wanted") and [good first issue](https://github.com/cube-js/cube/issues?q=is%3Aissue+is%3Aopen+label%3A"good+first+issue") labels.
 
-All sort of contributions are **welcome and extremely helpful** 🙌 Please refer to [the contribution guide](https://github.com/cube-js/cube/blob/master/CONTRIBUTING.md) for more information.
+All sorts of contributions are **welcome and extremely helpful** 🙌 Please refer to [the contribution guide](https://github.com/cube-js/cube/blob/master/CONTRIBUTING.md) for more information.
 
 ## License
 

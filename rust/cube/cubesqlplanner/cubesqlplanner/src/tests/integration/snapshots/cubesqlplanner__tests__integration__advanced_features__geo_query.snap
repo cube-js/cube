@@ -1,0 +1,9 @@
+---
+source: cubesqlplanner/src/tests/integration/advanced_features.rs
+expression: result
+---
+stores__name | stores__location     
+-------------+----------------------
+Store A      | 40.712776,-74.005974 
+Store B      | 34.052235,-118.243683
+Store C      | 40.730610,-73.935242

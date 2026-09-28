@@ -8,18 +8,21 @@ use crate::import::ImportService;
 use crate::metastore::job::JobType;
 use crate::metastore::table::StreamOffset;
 use crate::metastore::{
-    table::Table, HllFlavour, IdRow, ImportFormat, IndexDef, IndexType, RowKey, TableId,
+    table::Table, HllFlavour, IdRow, ImportFormat, IndexDef, IndexType, MetaStoreEvent, RowKey,
+    TableId,
 };
 use crate::metastore::{Column, ColumnType, MetaStore};
 use crate::sql::cache::SqlResultCache;
 use crate::sql::parser::{CubeStoreParser, PartitionedIndexRef};
+use crate::sql::{normalize_for_column_name, normalize_for_schema_table_or_index_name};
 use crate::telemetry::incoming_traffic_agent_event;
 use crate::CubeError;
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
 use futures::future::join_all;
+use log;
 use sqlparser::ast::*;
-use std::mem::take;
+use tokio::sync::broadcast;
 
 #[async_trait]
 
@@ -228,7 +231,7 @@ impl TableCreator {
                         table
                     ))
                 })
-                .flatten();
+                .and_then(|r| r);
                 match finalize_res {
                     Ok(FinalizeExternalTableResult::Orphaned) => {
                         if let Err(inner) = self.db.drop_table(table.get_id()).await {
@@ -287,17 +290,17 @@ impl TableCreator {
         trace_obj: &Option<String>,
         extension: &Option<serde_json::Value>,
     ) -> Result<IdRow<Table>, CubeError> {
-        let columns_to_set = convert_columns_type(columns)?;
+        let columns_to_set = convert_columns_type(columns, self.config_obj.allow_decimal128())?;
         let mut indexes_to_create = Vec::new();
         if let Some(mut p) = partitioned_index {
             let part_index_name = match p.name.0.as_mut_slice() {
                 &mut [ref schema, ref mut name] => {
-                    if schema.value != schema_name {
+                    if normalize_for_schema_table_or_index_name(&schema) != schema_name {
                         return Err(CubeError::user(format!("CREATE TABLE in schema '{}' cannot reference PARTITIONED INDEX from schema '{}'", schema_name, schema)));
                     }
-                    take(&mut name.value)
+                    normalize_for_schema_table_or_index_name(&name)
                 }
-                &mut [ref mut name] => take(&mut name.value),
+                &mut [ref mut name] => normalize_for_schema_table_or_index_name(&name),
                 _ => {
                     return Err(CubeError::user(format!(
                         "PARTITIONED INDEX must consist of 1 or 2 identifiers, got '{}'",
@@ -307,8 +310,8 @@ impl TableCreator {
             };
 
             let mut columns = Vec::new();
-            for mut c in p.columns {
-                columns.push(take(&mut c.value));
+            for c in p.columns {
+                columns.push(normalize_for_column_name(&c));
             }
 
             indexes_to_create.push(IndexDef {
@@ -320,13 +323,17 @@ impl TableCreator {
         }
 
         for index in indexes.iter() {
-            if let Statement::CreateIndex {
+            if let Statement::CreateIndex(CreateIndex {
                 name,
                 columns,
                 unique,
                 ..
-            } = index
+            }) = index
             {
+                let name = name.as_ref().ok_or(CubeError::user(format!(
+                    "Index name is not defined during index creation for {}.{}",
+                    schema_name, table_name
+                )))?;
                 indexes_to_create.push(IndexDef {
                     name: name.to_string(),
                     multi_index: None,
@@ -334,7 +341,7 @@ impl TableCreator {
                         .iter()
                         .map(|c| {
                             if let Expr::Identifier(ident) = &c.expr {
-                                Ok(ident.value.to_string())
+                                Ok(normalize_for_column_name(&ident))
                             } else {
                                 Err(CubeError::internal(format!(
                                     "Unexpected column expression: {:?}",
@@ -395,10 +402,16 @@ impl TableCreator {
                     select_statement,
                     None,
                     stream_offset,
-                    unique_key.map(|keys| keys.iter().map(|c| c.value.to_string()).collect()),
+                    unique_key
+                        .map(|keys| keys.iter().map(|c| normalize_for_column_name(&c)).collect()),
                     aggregates.map(|keys| {
                         keys.iter()
-                            .map(|c| (c.0.value.to_string(), c.1.value.to_string()))
+                            .map(|c| {
+                                (
+                                    normalize_for_column_name(&c.0),
+                                    normalize_for_column_name(&c.1),
+                                )
+                            })
                             .collect()
                     }),
                     None,
@@ -450,11 +463,11 @@ impl TableCreator {
         let trace_obj_to_save = trace_obj.clone();
 
         let source_columns = if let Some(source_table) = source_table {
-            let mut parser = CubeStoreParser::new(&source_table)?;
+            let mut parser = CubeStoreParser::new(&source_table, None)?;
             let cols = parser
                 .parse_streaming_source_table()
                 .map_err(|e| CubeError::user(format!("Unexpected source_table param: {}", e)))?;
-            let res = convert_columns_type(&cols)
+            let res = convert_columns_type(&cols, self.config_obj.allow_decimal128())
                 .map_err(|e| CubeError::user(format!("Unexpected source_table param: {}", e)))?;
             Some(res)
         } else {
@@ -476,10 +489,15 @@ impl TableCreator {
                 select_statement,
                 source_columns,
                 stream_offset,
-                unique_key.map(|keys| keys.iter().map(|c| c.value.to_string()).collect()),
+                unique_key.map(|keys| keys.iter().map(|c| normalize_for_column_name(&c)).collect()),
                 aggregates.map(|keys| {
                     keys.iter()
-                        .map(|c| (c.0.value.to_string(), c.1.value.to_string()))
+                        .map(|c| {
+                            (
+                                normalize_for_column_name(&c.0),
+                                normalize_for_column_name(&c.1),
+                            )
+                        })
                         .collect()
                 }),
                 partition_split_threshold,
@@ -521,7 +539,12 @@ impl TableCreator {
                 .validate_table_location(table.get_id(), stream_location)
                 .await?;
         }
-        let imports = listener.wait_for_job_results(wait_for).await?;
+        // Poll job statuses from the metastore every 30s as a safety net: if an import
+        // completion event is lost/dropped by the broadcast channel, the periodic re-check still
+        // observes it so finalize doesn't hang and leave the table stuck "processing".
+        let imports = listener
+            .wait_for_job_results_with_poll(wait_for, Some(Duration::from_secs(30)))
+            .await?;
         for r in imports {
             if let JobEvent::Error(_, _, e) = r {
                 return Err(CubeError::user(format!("Create table failed: {}", e)));
@@ -530,23 +553,42 @@ impl TableCreator {
             }
         }
 
-        let mut futures = Vec::new();
-        let indexes = self.db.get_table_indexes(table.get_id()).await?;
-        let partitions = self
-            .db
-            .get_active_partitions_and_chunks_by_index_id_for_select(
-                indexes.iter().map(|i| i.get_id()).collect(),
-            )
-            .await?;
-        // Omit warming up chunks as those shouldn't affect select times much however will affect
-        // warming up time a lot in case of big tables when a lot of chunks pending for repartition
-        for (partition, _) in partitions.into_iter().flatten() {
-            futures.push(self.cluster.warmup_partition(partition, Vec::new()));
+        // Warming up partitions on finalize is not required for correctness: warmup only
+        // pre-downloads partition files to the local cache, and select still works without it.
+        // Under heavy import load this is the main candidate for finalize timeouts — it fetches
+        // every active partition across all indexes and waits for all downloads to complete, which
+        // is slow and unbounded for big multi-index tables, while imports/repartition are still in
+        // flight. Disabled so finalize doesn't block on it.
+        // let mut futures = Vec::new();
+        // let indexes = self.db.get_table_indexes(table.get_id()).await?;
+        // let partitions = self
+        //     .db
+        //     .get_active_partitions_and_chunks_by_index_id_for_select(
+        //         indexes.iter().map(|i| i.get_id()).collect(),
+        //     )
+        //     .await?;
+        // // Omit warming up chunks as those shouldn't affect select times much however will affect
+        // // warming up time a lot in case of big tables when a lot of chunks pending for repartition
+        // for (partition, _) in partitions.into_iter().flatten() {
+        //     futures.push(self.cluster.warmup_partition(partition, Vec::new()));
+        // }
+        // join_all(futures)
+        //     .await
+        //     .into_iter()
+        //     .collect::<Result<Vec<_>, _>>()?;
+
+        let has_streaming_location = table
+            .get_row()
+            .locations()
+            .map(|locs| locs.iter().any(|l| Table::is_stream_location(l)))
+            .unwrap_or(false);
+        if !has_streaming_location {
+            if let Some(threshold) = self.config_obj.compaction_readiness_chunks_threshold() {
+                let mut receiver = self.cluster.job_result_listener().into_receiver();
+                self.wait_for_compaction_readiness(table, threshold, &mut receiver)
+                    .await?;
+            }
         }
-        join_all(futures)
-            .await
-            .into_iter()
-            .collect::<Result<Vec<_>, _>>()?;
 
         let ready_table = self.db.table_ready(table.get_id(), true).await?;
 
@@ -556,30 +598,192 @@ impl TableCreator {
 
         Ok(FinalizeExternalTableResult::Ok)
     }
+
+    async fn wait_for_compaction_readiness(
+        &self,
+        table: &IdRow<Table>,
+        max_chunks_per_partition: u64,
+        receiver: &mut broadcast::Receiver<MetaStoreEvent>,
+    ) -> Result<(), CubeError> {
+        let table_id = table.get_id();
+        let debounce_interval = Duration::from_secs(1);
+
+        if self
+            .check_partition_chunks_within_threshold(table_id, max_chunks_per_partition)
+            .await?
+        {
+            return Ok(());
+        }
+
+        let fallback_interval = Duration::from_secs(5);
+        let mut skip_wait = false;
+        loop {
+            if !skip_wait {
+                Self::wait_for_compaction_event(receiver, table_id, fallback_interval).await?;
+            }
+
+            if self
+                .check_partition_chunks_within_threshold(table_id, max_chunks_per_partition)
+                .await?
+            {
+                return Ok(());
+            }
+
+            tokio::time::sleep(debounce_interval).await;
+            skip_wait = Self::drain_compaction_events(receiver, table_id);
+        }
+    }
+
+    async fn wait_for_compaction_event(
+        receiver: &mut broadcast::Receiver<MetaStoreEvent>,
+        table_id: u64,
+        fallback_interval: Duration,
+    ) -> Result<(), CubeError> {
+        loop {
+            tokio::select! {
+                result = receiver.recv() => {
+                    match result {
+                        Ok(MetaStoreEvent::CompactionResult {
+                            table_id: event_table_id,
+                        }) if event_table_id == table_id => return Ok(()),
+                        Ok(_) => continue,
+                        Err(broadcast::error::RecvError::Lagged(n)) => {
+                            log::warn!(
+                                "Compaction readiness listener for table {} lagged by {} events",
+                                table_id,
+                                n,
+                            );
+                            return Ok(());
+                        }
+                        Err(broadcast::error::RecvError::Closed) => {
+                            return Err(CubeError::internal(format!(
+                                "Metastore event channel closed while waiting for compaction readiness of table {}",
+                                table_id,
+                            )));
+                        }
+                    }
+                }
+                _ = tokio::time::sleep(fallback_interval) => {
+                    log::debug!(
+                        "Compaction readiness: fallback timer fired for table {}, checking status",
+                        table_id,
+                    );
+                    return Ok(());
+                }
+            }
+        }
+    }
+
+    fn drain_compaction_events(
+        receiver: &mut broadcast::Receiver<MetaStoreEvent>,
+        table_id: u64,
+    ) -> bool {
+        let mut found = false;
+        loop {
+            match receiver.try_recv() {
+                Ok(MetaStoreEvent::CompactionResult {
+                    table_id: event_table_id,
+                }) if event_table_id == table_id => {
+                    found = true;
+                }
+                Ok(_) => {}
+                Err(broadcast::error::TryRecvError::Lagged(_)) => {
+                    found = true;
+                }
+                Err(broadcast::error::TryRecvError::Empty)
+                | Err(broadcast::error::TryRecvError::Closed) => break,
+            }
+        }
+        found
+    }
+
+    async fn check_partition_chunks_within_threshold(
+        &self,
+        table_id: u64,
+        max_chunks_per_partition: u64,
+    ) -> Result<bool, CubeError> {
+        let indexes = self.db.get_table_indexes(table_id).await?;
+        let partitions_and_chunks = self
+            .db
+            .get_active_partitions_and_chunks_by_index_id_for_select(
+                indexes.iter().map(|i| i.get_id()).collect(),
+            )
+            .await?;
+
+        for index_partitions in &partitions_and_chunks {
+            for (partition, chunks) in index_partitions {
+                let active_chunk_count =
+                    chunks.iter().filter(|c| c.get_row().active()).count() as u64;
+                if active_chunk_count > max_chunks_per_partition {
+                    log::debug!(
+                        "Compaction readiness: partition {} has {} active chunks, threshold is {}",
+                        partition.get_id(),
+                        active_chunk_count,
+                        max_chunks_per_partition,
+                    );
+                    return Ok(false);
+                }
+            }
+        }
+
+        log::debug!(
+            "Compaction readiness: table {} is ready (all partitions within threshold {})",
+            table_id,
+            max_chunks_per_partition,
+        );
+        Ok(true)
+    }
 }
 
-pub fn convert_columns_type(columns: &Vec<ColumnDef>) -> Result<Vec<Column>, CubeError> {
+pub fn convert_columns_type(
+    columns: &Vec<ColumnDef>,
+    allow_decimal128: bool,
+) -> Result<Vec<Column>, CubeError> {
     let mut rolupdb_columns = Vec::new();
 
     for (i, col) in columns.iter().enumerate() {
         let cube_col = Column::new(
-            col.name.value.clone(),
+            normalize_for_column_name(&col.name),
             match &col.data_type {
                 DataType::Date
-                | DataType::Time
+                | DataType::Time(_, _)
                 | DataType::Char(_)
                 | DataType::Varchar(_)
                 | DataType::Clob(_)
                 | DataType::Text
-                | DataType::String => ColumnType::String,
+                | DataType::TinyText
+                | DataType::MediumText
+                | DataType::LongText
+                | DataType::String(_)
+                | DataType::Character(_)
+                | DataType::CharacterVarying(_)
+                | DataType::CharVarying(_)
+                | DataType::Nvarchar(_)
+                | DataType::CharacterLargeObject(_)
+                | DataType::CharLargeObject(_)
+                | DataType::FixedString(_) => ColumnType::String,
                 DataType::Uuid
                 | DataType::Binary(_)
                 | DataType::Varbinary(_)
                 | DataType::Blob(_)
+                | DataType::TinyBlob
+                | DataType::MediumBlob
+                | DataType::LongBlob
                 | DataType::Bytea
-                | DataType::Array(_) => ColumnType::Bytes,
-                DataType::Decimal(precision, scale) => {
-                    let (precision, scale) = proper_decimal_args(precision, scale);
+                | DataType::Array(_)
+                | DataType::Bytes(_) => ColumnType::Bytes,
+                DataType::Decimal(number_info)
+                | DataType::Numeric(number_info)
+                | DataType::BigNumeric(number_info)
+                | DataType::BigDecimal(number_info)
+                | DataType::Dec(number_info) => {
+                    let (precision, scale) = match number_info {
+                        ExactNumberInfo::None => (None, None),
+                        ExactNumberInfo::Precision(p) => (Some(*p), None),
+                        ExactNumberInfo::PrecisionAndScale(p, s) => (Some(*p), Some(*s)),
+                    };
+                    let (precision, scale) =
+                        proper_decimal_args(&precision, &scale, allow_decimal128);
                     if precision > 18 {
                         ColumnType::Decimal96 {
                             precision: precision as i32,
@@ -592,13 +796,50 @@ pub fn convert_columns_type(columns: &Vec<ColumnDef>) -> Result<Vec<Column>, Cub
                         }
                     }
                 }
-                DataType::SmallInt | DataType::Int | DataType::BigInt | DataType::Interval => {
-                    ColumnType::Int
-                }
-                DataType::Boolean => ColumnType::Boolean,
-                DataType::Float(_) | DataType::Real | DataType::Double => ColumnType::Float,
-                DataType::Timestamp => ColumnType::Timestamp,
-                DataType::Custom(custom) => {
+                DataType::SmallInt(_)
+                | DataType::Int(_)
+                | DataType::BigInt(_)
+                | DataType::Interval
+                | DataType::TinyInt(_)
+                | DataType::UnsignedTinyInt(_)
+                | DataType::Int2(_)
+                | DataType::UnsignedInt2(_)
+                | DataType::UnsignedSmallInt(_)
+                | DataType::MediumInt(_)
+                | DataType::UnsignedMediumInt(_)
+                | DataType::Int4(_)
+                | DataType::Int8(_)
+                | DataType::Int16
+                | DataType::Int32
+                | DataType::Int64
+                | DataType::Int128
+                | DataType::Int256
+                | DataType::Integer(_)
+                | DataType::UnsignedInt(_)
+                | DataType::UnsignedInt4(_)
+                | DataType::UnsignedInteger(_)
+                | DataType::UInt8
+                | DataType::UInt16
+                | DataType::UInt32
+                | DataType::UInt64
+                | DataType::UInt128
+                | DataType::UInt256
+                | DataType::UnsignedBigInt(_)
+                | DataType::UnsignedInt8(_) => ColumnType::Int,
+                DataType::Boolean | DataType::Bool => ColumnType::Boolean,
+                DataType::Float(_)
+                | DataType::Real
+                | DataType::Double(_)
+                | DataType::Float4
+                | DataType::Float32
+                | DataType::Float64
+                | DataType::Float8
+                | DataType::DoublePrecision => ColumnType::Float,
+                DataType::Timestamp(_, _)
+                | DataType::Date32
+                | DataType::Datetime(_)
+                | DataType::Datetime64(_, _) => ColumnType::Timestamp,
+                DataType::Custom(custom, _) => {
                     let custom_type_name = custom.to_string().to_lowercase();
                     match custom_type_name.as_str() {
                         "tinyint" | "mediumint" => ColumnType::Int,
@@ -622,10 +863,27 @@ pub fn convert_columns_type(columns: &Vec<ColumnDef>) -> Result<Vec<Column>, Cub
                         }
                     }
                 }
-                DataType::Regclass => {
-                    return Err(CubeError::user(
-                        "Type 'RegClass' is not suppored.".to_string(),
-                    ));
+                DataType::Regclass
+                | DataType::JSON
+                | DataType::JSONB
+                | DataType::Map(_, _)
+                | DataType::Tuple(_)
+                | DataType::Nested(_)
+                | DataType::Enum(_, _)
+                | DataType::Set(_)
+                | DataType::Struct(_, _)
+                | DataType::Union(_)
+                | DataType::Nullable(_)
+                | DataType::LowCardinality(_)
+                | DataType::Bit(_)
+                | DataType::BitVarying(_)
+                | DataType::AnyType
+                | DataType::Unspecified
+                | DataType::Trigger => {
+                    return Err(CubeError::user(format!(
+                        "Type '{}' is not supported.",
+                        col.data_type
+                    )));
                 }
             },
             i,
@@ -634,14 +892,20 @@ pub fn convert_columns_type(columns: &Vec<ColumnDef>) -> Result<Vec<Column>, Cub
     }
     Ok(rolupdb_columns)
 }
-fn proper_decimal_args(precision: &Option<u64>, scale: &Option<u64>) -> (i32, i32) {
+fn proper_decimal_args(
+    precision: &Option<u64>,
+    scale: &Option<u64>,
+    allow_decimal128: bool,
+) -> (i32, i32) {
     let mut precision = precision.unwrap_or(18);
     let mut scale = scale.unwrap_or(5);
-    if precision > 27 {
-        precision = 27;
-    }
-    if scale > 5 {
-        scale = 10;
+    if !allow_decimal128 {
+        if precision > 27 {
+            precision = 27;
+        }
+        if scale > 5 {
+            scale = 10;
+        }
     }
     if scale > precision {
         precision = scale;

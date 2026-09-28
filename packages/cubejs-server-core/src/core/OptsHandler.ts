@@ -8,14 +8,20 @@ import {
   displayCLIWarning,
 } from '@cubejs-backend/shared';
 import {
+  isCubeStoreSupported,
+  CubeStoreHandler,
+  CubeStoreDevDriver
+} from '@cubejs-backend/cubestore-driver';
+
+import {
   CreateOptions,
   SystemOptions,
   DriverDecoratedOptions,
   ServerCoreInitializedOptions,
   RequestContext,
   DriverContext,
-  DbTypeAsyncFn,
-  DriverFactoryAsyncFn,
+  DbTypeInternalFn,
+  DriverFactoryInternalFn,
   DatabaseType,
   DriverConfig,
   OrchestratorOptions,
@@ -56,6 +62,13 @@ export class OptsHandler {
    * Decorated driverFactory flag.
    */
   private decoratedFactory = false;
+
+  /**
+   * Returns true if the user provided a custom driverFactory.
+   */
+  public isCustomDriverFactory(): boolean {
+    return !this.decoratedFactory;
+  }
 
   /**
    * driverFactory function result type.
@@ -197,6 +210,7 @@ export class OptsHandler {
   private defaultDriverFactory(ctx: DriverContext): DriverConfig {
     const type = <DatabaseType>getEnv('dbType', {
       dataSource: assertDataSource(ctx.dataSource),
+      preAggregations: ctx.preAggregations,
     });
     return { type };
   }
@@ -204,7 +218,7 @@ export class OptsHandler {
   /**
    * Async driver factory getter.
    */
-  private getDriverFactory(opts: CreateOptions): DriverFactoryAsyncFn {
+  private getDriverFactory(opts: CreateOptions): DriverFactoryInternalFn {
     const { dbType, driverFactory } = opts;
     this.decoratedType = !dbType;
     this.decoratedFactory = !driverFactory;
@@ -234,9 +248,9 @@ export class OptsHandler {
    */
   private getDbType(
     opts: CreateOptions & {
-      driverFactory: DriverFactoryAsyncFn,
+      driverFactory: DriverFactoryInternalFn,
     },
-  ): DbTypeAsyncFn {
+  ): DbTypeInternalFn {
     const { dbType, driverFactory } = opts;
     return async (ctx: DriverContext) => {
       if (!dbType) {
@@ -403,15 +417,8 @@ export class OptsHandler {
 
     if (externalDbType === 'cubestore' && this.isDevMode() && !opts.serverless) {
       if (!definedExtDBVariables.length) {
-        // There is no @cubejs-backend/cubestore-driver dependency in the core
-        // package. At the same time, @cubejs-backend/cubestore-driver is already
-        // exist at the moment, when the core server instance is up. That is the
-        // reason why we inject it in this way.
-        //
-        // eslint-disable-next-line global-require,import/no-extraneous-dependencies
-        const cubeStorePackage = require('@cubejs-backend/cubestore-driver');
-        if (cubeStorePackage.isCubeStoreSupported()) {
-          const cubeStoreHandler = new cubeStorePackage.CubeStoreHandler({
+        if (isCubeStoreSupported()) {
+          const cubeStoreHandler = new CubeStoreHandler({
             stdout: (data) => {
               console.log(data.toString().trim());
             },
@@ -436,7 +443,7 @@ export class OptsHandler {
 
           // Lazy loading for Cube Store
           externalDriverFactory =
-            () => new cubeStorePackage.CubeStoreDevDriver(cubeStoreHandler);
+            () => new CubeStoreDevDriver(cubeStoreHandler);
         } else {
           this.core.logger('Cube Store is not supported on your system', {
             warning: (
@@ -460,7 +467,8 @@ export class OptsHandler {
       externalDbType,
       externalDriverFactory,
       externalDialectFactory,
-      apiSecret: process.env.CUBEJS_API_SECRET,
+      apiSecret: getEnv('apiSecret'),
+      apiSecrets: getEnv('apiSecrets'),
       telemetry: getEnv('telemetry'),
       scheduledRefreshTimeZones: getEnv('scheduledRefreshTimezones'),
       scheduledRefreshContexts: async () => [null],

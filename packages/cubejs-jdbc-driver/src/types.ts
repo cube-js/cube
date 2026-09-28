@@ -1,4 +1,4 @@
-import { Options } from 'generic-pool';
+import { PoolOptions } from '@cubejs-backend/shared';
 
 export type JDBCDriverConfiguration = {
   database: string,
@@ -7,6 +7,6 @@ export type JDBCDriverConfiguration = {
   drivername: string,
   customClassPath?: string,
   properties: Record<string, any>,
-  poolOptions?: Options;
+  poolOptions?: PoolOptions;
   prepareConnectionQueries?: string[];
 };

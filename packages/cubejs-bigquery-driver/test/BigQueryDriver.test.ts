@@ -10,7 +10,7 @@ describe('BigQueryDriver', () => {
   jest.setTimeout(2 * 60 * 1000);
 
   beforeAll(async () => {
-    tests = new DriverTests(new BigQueryDriver({}));
+    tests = new DriverTests(new BigQueryDriver({}), { expectStringFields: true });
   });
 
   afterAll(async () => {
@@ -36,18 +36,22 @@ describe('BigQueryDriver', () => {
   });
 
   const QUERY_TO_TEST_HYDRATION = `
-      SELECT CAST(1 as NUMERIC) as numeric
+      SELECT CAST(1 as NUMERIC) as numeric, CAST(9223372036854775807 as INT64) as bigint, CAST(1265.88 as FLOAT64) as float
       UNION ALL
-      SELECT CAST(255.44 as NUMERIC);
+      SELECT CAST(255.44 as NUMERIC), CAST(-9223372036854775808 as INT64), CAST(0.1 as FLOAT64);
   `;
 
   function assertHydrationResults(tableData: any) {
     expect(tableData).toEqual([
       {
         numeric: '1',
+        bigint: '9223372036854775807',
+        float: '1265.88',
       },
       {
-        numeric: '255.44'
+        numeric: '255.44',
+        bigint: '-9223372036854775808',
+        float: '0.1',
       }
     ]);
   }

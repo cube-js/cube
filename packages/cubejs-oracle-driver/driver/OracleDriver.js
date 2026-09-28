@@ -65,6 +65,7 @@ class OracleDriver extends BaseDriver {
     const dataSource =
       config.dataSource ||
       assertDataSource('default');
+    const preAggregations = config.preAggregations || false;
 
     this.db = oracledb;
     this.db.outFormat = this.db.OBJECT;
@@ -72,15 +73,15 @@ class OracleDriver extends BaseDriver {
     this.db.maxRows = 100000;
     this.db.prefetchRows = 500;
     this.config = {
-      user: getEnv('dbUser', { dataSource }),
-      password: getEnv('dbPass', { dataSource }),
-      db: getEnv('dbName', { dataSource }),
-      host: getEnv('dbHost', { dataSource }),
-      port: getEnv('dbPort', { dataSource }) || 1521,
+      user: getEnv('dbUser', { dataSource, preAggregations }),
+      password: getEnv('dbPass', { dataSource, preAggregations }),
+      db: getEnv('dbName', { dataSource, preAggregations }),
+      host: getEnv('dbHost', { dataSource, preAggregations }),
+      port: getEnv('dbPort', { dataSource, preAggregations }) || 1521,
       poolMin: 0,
       poolMax:
         config.maxPoolSize ||
-        getEnv('dbMaxPoolSize', { dataSource }) ||
+        getEnv('dbMaxPoolSize', { dataSource, preAggregations }) ||
         50,
       ...config
     };

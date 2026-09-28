@@ -1,0 +1,8 @@
+---
+source: cubesqlplanner/cubesqlplanner/src/tests/integration/view_default_filters.rs
+assertion_line: 115
+expression: result
+---
+orders_view_with_unless__currency | orders_view_with_unless__count
+----------------------------------+-------------------------------
+EUR                               | 5

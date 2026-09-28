@@ -1,0 +1,8 @@
+---
+source: cubesqlplanner/src/tests/integration/views.rs
+expression: result
+---
+orders_with_customers__name | orders_with_customers__count | orders_with_customers__total_amount
+----------------------------+------------------------------+------------------------------------
+Alice                       | 4                            | 425.00                             
+Diana                       | 1                            | 400.00

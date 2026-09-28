@@ -1,0 +1,13 @@
+---
+source: cubesqlplanner/cubesqlplanner/src/tests/integration/rolling_window/custom_granularities.rs
+expression: result
+---
+orders__created_at_bi_weekly | orders__rolling_sum_7d
+-----------------------------+-----------------------
+2024-01-01 00:00:00          | NULL                  
+2024-01-15 00:00:00          | NULL                  
+2024-01-29 00:00:00          | 20.00                 
+2024-02-12 00:00:00          | NULL                  
+2024-02-26 00:00:00          | NULL                  
+2024-03-11 00:00:00          | 30.00                 
+2024-03-25 00:00:00          | NULL

@@ -35,6 +35,11 @@ pub struct V1LoadRequestQuery {
     pub subquery_joins: Option<Vec<models::V1LoadRequestQueryJoinSubquery>>,
     #[serde(rename = "joinHints", skip_serializing_if = "Option::is_none")]
     pub join_hints: Option<Vec<Vec<String>>>,
+    #[serde(rename = "timezone", skip_serializing_if = "Option::is_none")]
+    pub timezone: Option<String>,
+    /// Output format of the result `data` payload. `default` returns row-oriented data (`V1LoadResultDataRow`); `compact` returns a `{ members, dataset }` object with rows of primitive arrays (`V1LoadResultDataCompact`); `columnar` returns a `{ members, columns }` object with one primitive array per member (`V1LoadResultDataColumnar`).
+    #[serde(rename = "responseFormat", skip_serializing_if = "Option::is_none")]
+    pub response_format: Option<ResponseFormat>,
 }
 
 impl V1LoadRequestQuery {
@@ -51,6 +56,24 @@ impl V1LoadRequestQuery {
             ungrouped: None,
             subquery_joins: None,
             join_hints: None,
+            timezone: None,
+            response_format: None,
         }
+    }
+}
+/// Output format of the result `data` payload. `default` returns row-oriented data (`V1LoadResultDataRow`); `compact` returns a `{ members, dataset }` object with rows of primitive arrays (`V1LoadResultDataCompact`); `columnar` returns a `{ members, columns }` object with one primitive array per member (`V1LoadResultDataColumnar`).
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd, Hash, Serialize, Deserialize)]
+pub enum ResponseFormat {
+    #[serde(rename = "default")]
+    Default,
+    #[serde(rename = "compact")]
+    Compact,
+    #[serde(rename = "columnar")]
+    Columnar,
+}
+
+impl Default for ResponseFormat {
+    fn default() -> ResponseFormat {
+        Self::Default
     }
 }

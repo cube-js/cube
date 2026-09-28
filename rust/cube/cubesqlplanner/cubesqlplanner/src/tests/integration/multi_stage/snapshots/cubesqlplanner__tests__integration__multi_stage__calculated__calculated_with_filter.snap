@@ -1,0 +1,9 @@
+---
+source: cubesqlplanner/src/tests/integration/multi_stage/calculated.rs
+expression: result
+---
+orders__created_at_month | orders__total_amount | orders__mom_growth    
+-------------------------+----------------------+-----------------------
+2024-01-01 00:00:00      | 300.00               | NULL                  
+2024-02-01 00:00:00      | 500.00               | 0.66666666666666666667
+2024-03-01 00:00:00      | 600.00               | 0.20000000000000000000

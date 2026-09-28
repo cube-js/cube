@@ -1,0 +1,87 @@
+union HttpCommand {
+    HttpQuery,
+    HttpResultSet,
+    HttpError,
+    HttpQueryResult
+}
+
+table HttpMessage {
+    message_id: uint;
+    command: HttpCommand;
+    connection_id: string;
+}
+
+table Int64Value { v: int64; }
+table BoolValue { v: bool; }
+table StringValue { v: string (required); }
+table BinaryValue { v: [ubyte] (required); }
+table Float64Value { v: float64; }
+table NullValue { }
+union HttpParameterValue { Int64Value, BoolValue, StringValue, BinaryValue, Float64Value, NullValue }
+
+table HttpParameter {
+    value: HttpParameterValue (required);
+}
+
+enum QueryResultFormat: ubyte {
+    // HttpResultSet will be returned.
+    Legacy = 0,
+    Arrow = 1,
+}
+
+table HttpQuery {
+    query: string;
+    trace_obj: string;
+    inline_tables: [HttpTable];
+    parameters: [HttpParameter];
+    response_format: QueryResultFormat = Legacy;
+}
+
+table HttpTable {
+    name: string;
+    columns: [string];
+    types: [string];
+    // csv format to replicate the usual csv import path.
+    csv_rows: string;
+}
+
+table HttpError {
+    error: string;
+}
+
+table HttpResultSet {
+    columns: [string];
+    rows: [HttpRow];
+}
+
+table HttpRow {
+    values: [HttpColumnValue];
+}
+
+table HttpColumnValue {
+    string_value: string;
+}
+
+table HttpQueryResultArrow {
+    // Self-contained Arrow IPC stream payload. Contains a schema header
+    // followed by one or more RecordBatch messages. Consumers must use a
+    // streaming IPC reader (not assume a single batch).
+    data: [ubyte] (required);
+    // True on the final frame of a streamed result.
+    is_last: bool;
+}
+
+// Returned for commands that complete without a result set (zero columns):
+// CREATE TABLE/INSERT, queue/cache writes. A marker — carries no payload.
+table HttpQueryResultCompleted {}
+
+union HttpQueryResultData {
+    HttpQueryResultArrow,
+    HttpQueryResultCompleted,
+}
+
+table HttpQueryResult {
+    data: HttpQueryResultData (required);
+}
+
+root_type HttpMessage;

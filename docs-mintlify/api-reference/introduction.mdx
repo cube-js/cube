@@ -1,0 +1,167 @@
+---
+title: Introduction
+description: Cube's HTTP APIs — query your data with the Core Data API, stream agent conversations with the AI API, and manage Cube Cloud with the Platform API.
+---
+
+Cube exposes three HTTP API families, each for a different job and with slightly
+different authentication:
+
+| API | What it's for | Authentication |
+| --- | --- | --- |
+| **Core Data API** | Query your data model over HTTP — run queries (`/v1/load`) and read metadata (`/v1/meta`) | Cube API token (a JWT) sent **directly** in the `Authorization` header — no prefix |
+| **AI API** | Stream conversations with Cube AI agents (`/chat/stream-chat-state`) | Cube Cloud API key with the **`Api-Key`** prefix |
+| **Platform API** | Manage Cube Cloud — deployments, reports, workbooks, users, policies, and more | **`Bearer`** prefix for REST and SCIM 2.0 |
+
+The exact header for each is shown above. The Platform and SCIM schemes are
+detailed on the [Authentication](/api-reference/authentication) page; the Core
+Data and AI headers are also documented on their own reference pages.
+
+## Available endpoints
+
+Each API family has its own base URL — copy the exact host from Cube Cloud where
+noted. Only HTTPS is accepted, and every request must be authenticated (see
+[Authentication](/api-reference/authentication)).
+
+### Core Data API
+
+Base URL — your deployment's data API host (the `/cubejs-api` base path is configurable):
+
+```text
+https://{deployment}.{region}.cubecloudapp.dev/cubejs-api
+```
+
+| Endpoint | Path |
+| --- | --- |
+| [JSON query](/api-reference/data/json-query) | `POST /v1/load` |
+| [SQL query](/api-reference/data/sql-query) | `POST /v1/cubesql` |
+| [Metadata](/api-reference/data/load-metadata) | `GET /v1/meta` |
+
+### AI API
+
+Base URL — your agent's Chat API URL (copy it from **Admin → Agents → Chat API URL**):
+
+```text
+https://ai.{cloudRegion}.cubecloud.dev/api/v1/public/{accountName}/agents/{agentId}
+```
+
+| Endpoint | Path |
+| --- | --- |
+| [Stream chat state](/api-reference/chat/stream-chat-state) | `POST /chat/stream-chat-state` |
+
+### Platform API
+
+Base URL — your Cube Cloud tenant host under `/api` (endpoints live under
+`/api/v1/…` for REST management and `/api/scim/v2/…` for SCIM 2.0 provisioning):
+
+```text
+https://{tenant}.cubecloud.dev/api
+```
+
+| Entity | Resource | Version |
+| --- | --- | --- |
+| [Deployments](/api-reference/deployments/get-deployments) | `/v1/deployments` | v1 |
+| [Environments](/api-reference/environments/get-deployment-environments) | `/v1/deployments/{deploymentId}/environments` | v1 |
+| [Folders](/api-reference/folders/list-folders) | `/v1/deployments/{deploymentId}/folders` | v1 |
+| [Reports](/api-reference/reports/list-reports) | `/v1/deployments/{deploymentId}/reports` | v1 |
+| [Workbooks](/api-reference/workbooks/get-workbooks) | `/v1/deployments/{deploymentId}/workbooks` | v1 |
+| [Notifications](/api-reference/notifications/list-scheduled-notifications) | `/v1/deployments/{deploymentId}/notifications` | v1 |
+| [Workspace](/api-reference/workspace/list-shared-workspace-items) | `/v1/deployments/{deploymentId}/workspace` | v1 |
+| [Embed](/api-reference/embed/get-an-embeddable-dashboard) | `/v1/embed` | v1 |
+| [Embed Tenants](/api-reference/embed-tenants/get-groups) | `/v1/embed-tenants` | v1 |
+| [Users (SCIM)](/api-reference/scim-users/list-users) | `/scim/v2/Users` | SCIM 2.0 |
+| [Groups (SCIM)](/api-reference/scim-groups/list-groups) | `/scim/v2/Groups` | SCIM 2.0 |
+
+## Client libraries
+
+### Core Data API
+
+Query the Core Data API from JavaScript or TypeScript with Cube's JS client,
+[`@cubejs-client/core`](https://www.npmjs.com/package/@cubejs-client/core), which
+also ships React, Vue, and Angular bindings and a WebSocket transport for
+real-time updates. See the [JavaScript SDK](/reference/javascript-sdk) reference
+for full usage.
+
+```bash
+npm install @cubejs-client/core
+```
+
+### Platform API
+
+The recommended way to call the Platform API from JavaScript or TypeScript is the
+official client, [`@cube-dev/platform-client`](https://www.npmjs.com/package/@cube-dev/platform-client).
+It wraps the OpenAPI spec on this site with end-to-end types for every endpoint,
+request, and response, plus optional [React Query](https://tanstack.com/query)
+bindings.
+
+<CodeGroup>
+
+```bash npm
+npm install @cube-dev/platform-client
+```
+
+```bash yarn
+yarn add @cube-dev/platform-client
+```
+
+```bash pnpm
+pnpm add @cube-dev/platform-client
+```
+
+</CodeGroup>
+
+Create a client with your tenant's base URL and an auth header (see
+[Authentication](/api-reference/authentication)), then call any endpoint through
+the fully-typed `fetchClient`:
+
+```ts
+import { createCubePlatformClient } from '@cube-dev/platform-client';
+
+const client = createCubePlatformClient({
+  baseUrl: 'https://<tenant>.cubecloud.dev',
+  // Returned on every request — provide the Platform API auth header.
+  getHeaders: () => ({ Authorization: `Bearer ${process.env.CUBE_API_KEY}` }),
+});
+
+const { data, error } = await client.fetchClient.GET('/api/v1/deployments/', {
+  params: { query: { first: 50 } },
+});
+
+for (const deployment of data?.items ?? []) {
+  console.log(deployment.id, deployment.name);
+}
+```
+
+#### React Query bindings
+
+The `@cube-dev/platform-client/react-query` entry point adds a provider and typed
+hooks built on `@tanstack/react-query` (a peer dependency alongside `react`):
+
+```tsx
+import { createCubePlatformClient } from '@cube-dev/platform-client';
+import {
+  CubePlatformApiProvider,
+  useCubePlatformApiQuery,
+} from '@cube-dev/platform-client/react-query';
+
+const client = createCubePlatformClient({ baseUrl, getHeaders });
+
+function App() {
+  return (
+    <CubePlatformApiProvider client={client}>
+      <Deployments />
+    </CubePlatformApiProvider>
+  );
+}
+
+function Deployments() {
+  const { data } = useCubePlatformApiQuery('get', '/api/v1/deployments/');
+  return <ul>{data?.items.map((d) => <li key={d.id}>{d.name}</li>)}</ul>;
+}
+```
+
+<Info>
+  Schema types are exported as `PlatformApiSchemas` (e.g.
+  `PlatformApiSchemas['Deployment']`). See the package
+  [`CHANGELOG`](/api-reference/changelog) for release notes and breaking changes.
+</Info>
+

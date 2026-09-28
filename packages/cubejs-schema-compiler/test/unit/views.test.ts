@@ -391,6 +391,175 @@ describe('Views YAML', () => {
     });
   });
 
+  it('explicit includes + prefix a,b', async () => {
+    const { cubeEvaluator } = await schemaCompile([{
+      name: 'simple_view',
+      cubes: [
+        {
+          join_path: 'CubeA',
+          prefix: true,
+          includes: ['id', 'count_a']
+        },
+        {
+          join_path: 'CubeB',
+          prefix: true,
+          includes: ['id', 'count_b']
+        },
+      ]
+    }]);
+
+    expect(cubeEvaluator.getCubeDefinition('simple_view').dimensions).toEqual({
+      CubeA_id: dimensionFixtureForCube('CubeA.id'),
+      CubeB_id: dimensionFixtureForCube('CubeB.id'),
+    });
+
+    expect(cubeEvaluator.getCubeDefinition('simple_view').measures).toEqual({
+      CubeA_count_a: measuresFixtureForCube('CubeA.count_a'),
+      CubeB_count_b: measuresFixtureForCube('CubeB.count_b'),
+    });
+  });
+
+  it('explicit includes + prefix on b only', async () => {
+    const { cubeEvaluator } = await schemaCompile([{
+      name: 'simple_view',
+      cubes: [
+        {
+          join_path: 'CubeA',
+          includes: ['id', 'count_a']
+        },
+        {
+          join_path: 'CubeB',
+          prefix: true,
+          includes: ['id', 'count_b']
+        },
+      ]
+    }]);
+
+    expect(cubeEvaluator.getCubeDefinition('simple_view').dimensions).toEqual({
+      id: dimensionFixtureForCube('CubeA.id'),
+      CubeB_id: dimensionFixtureForCube('CubeB.id'),
+    });
+
+    expect(cubeEvaluator.getCubeDefinition('simple_view').measures).toEqual({
+      count_a: measuresFixtureForCube('CubeA.count_a'),
+      CubeB_count_b: measuresFixtureForCube('CubeB.count_b'),
+    });
+  });
+
+  it('explicit includes + prefix b,c with overlapping names', async () => {
+    const { cubeEvaluator } = await schemaCompile([{
+      name: 'simple_view',
+      cubes: [
+        {
+          join_path: 'CubeA',
+          includes: ['count_a']
+        },
+        {
+          join_path: 'CubeB',
+          prefix: true,
+          includes: ['id']
+        },
+        {
+          join_path: 'CubeA.CubeC',
+          prefix: true,
+          includes: ['id']
+        },
+      ]
+    }]);
+
+    expect(cubeEvaluator.getCubeDefinition('simple_view').dimensions).toEqual({
+      CubeB_id: dimensionFixtureForCube('CubeB.id'),
+      CubeC_id: dimensionFixtureForCube('CubeC.id'),
+    });
+
+    expect(cubeEvaluator.getCubeDefinition('simple_view').measures).toEqual({
+      count_a: measuresFixtureForCube('CubeA.count_a'),
+    });
+  });
+
+  it('explicit includes + prefix with overlapping names across cubes (issue #10520)', async () => {
+    const { compiler, cubeEvaluator } = prepareYamlCompiler(`
+      cubes:
+        - name: orders
+          sql_table: orders
+          measures:
+            - name: count
+              type: count
+          dimensions:
+            - name: id
+              sql: id
+              type: number
+              primary_key: true
+            - name: status
+              sql: status
+              type: string
+          joins:
+            - name: customers
+              relationship: many_to_one
+              sql: "{CUBE}.customer_id = {customers}.id"
+
+        - name: customers
+          sql_table: customers
+          measures:
+            - name: count
+              type: count
+          dimensions:
+            - name: id
+              sql: id
+              type: number
+              primary_key: true
+            - name: name
+              sql: name
+              type: string
+
+        - name: products
+          sql_table: products
+          measures:
+            - name: count
+              type: count
+          dimensions:
+            - name: id
+              sql: id
+              type: number
+              primary_key: true
+            - name: name
+              sql: name
+              type: string
+
+      views:
+        - name: sales_overview
+          cubes:
+            - join_path: orders
+              includes:
+                - count
+                - status
+
+            - join_path: orders.customers
+              prefix: true
+              includes:
+                - count
+                - name
+
+            - join_path: orders.products
+              prefix: true
+              includes:
+                - count
+                - name
+`);
+
+    await compiler.compile();
+
+    const viewDef = cubeEvaluator.getCubeDefinition('sales_overview');
+
+    expect(Object.keys(viewDef.dimensions!).sort()).toEqual([
+      'customers_name', 'products_name', 'status'
+    ]);
+
+    expect(Object.keys(viewDef.measures!).sort()).toEqual([
+      'count', 'customers_count', 'products_count'
+    ]);
+  });
+
   it('throws error for unresolved members', async () => {
     const { compiler } = prepareYamlCompiler(`
       cubes:

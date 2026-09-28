@@ -1,0 +1,69 @@
+---
+description: Canonical data model to use as the basis for all documentation examples
+globs: docs-mintlify/**
+alwaysApply: false
+---
+
+# Canonical Example Data Model
+
+All documentation examples and recipes must use the [ecommerce demo data model](https://github.com/cubedevinc/ecommerce_demo) as their basis unless the topic genuinely requires a different domain.
+
+## Cubes
+
+### `order_items` (fact, `ECOMMERCE.ORDER_ITEMS`)
+The primary fact table. Use this as the starting point for most examples.
+
+Key fields:
+- `id` — primary key
+- `order_id`, `user_id`, `product_id`, `inventory_item_id` — foreign keys
+- `status` (string) — `complete`, `processing`, `shipped`, `cancelled`, `returned`
+- `sale_price` (number) — revenue per line item; measure `total_sale_price` (sum, currency)
+- `created_at`, `shipped_at`, `delivered_at`, `returned_at` (time)
+- `is_delivered` (boolean)
+- measures: `count`, `order_count` (count_distinct on order_id), `total_sale_price`
+
+### `orders` (`ECOMMERCE.ORDERS`)
+Order-level table. Use when examples are about order status or counts.
+
+Key fields:
+- `order_id` — primary key
+- `user_id`, `status`, `gender`, `num_of_item`
+- `created_at`, `delivered_at`, `shipped_at` (time)
+- measures: `count`
+
+### `products` (`ECOMMERCE.PRODUCTS`)
+Product catalog. Use when examples need brand, category, or product dimensions.
+
+Key fields:
+- `id` — primary key
+- `brand`, `category`, `department`, `name`, `sku`
+- `cost`, `retail_price` (number)
+- measures: `count`
+
+### `users` (`ECOMMERCE.USERS`)
+Customer table. Use when examples need demographic or geographic dimensions.
+
+Key fields:
+- `id` — primary key
+- `first_name`, `last_name`, `full_name`, `email`
+- `age`, `gender`
+- `city`, `state`, `country`
+- `traffic_source`
+- `created_at` (time)
+- measures: `count`
+
+## Common example patterns
+
+**Revenue over time** → `order_items.total_sale_price` + `order_items.created_at`
+
+**Orders by status** → `order_items.count` + `order_items.status`
+
+**Revenue by brand/category** → `order_items.total_sale_price` joined to `products.brand` / `products.category`
+
+**User demographics** → `users.count` + `users.city` / `users.country` / `users.traffic_source`
+
+**Multi-cube join** → `order_items` joins `orders`, `products`, `users` via foreign keys defined in the repo
+
+## Reference
+
+Full model: https://github.com/cubedevinc/ecommerce_demo

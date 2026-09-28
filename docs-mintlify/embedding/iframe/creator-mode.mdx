@@ -1,0 +1,99 @@
+---
+title: Creator Mode
+description: Embed the full Cube application so users can build and modify their own dashboards.
+---
+
+<Info>
+  Creator Mode is available on the [Enterprise plan](https://cube.dev/pricing).
+</Info>
+
+Creator Mode embeds the full Cube application instead of an individual dashboard or chat. Users can create and modify workbooks, dashboards, and reports inside the iframe.
+
+To enable it, pass `creatorMode: true` to the [Generate Session API][ref-generate-session].
+
+<Note>
+  Creator Mode requires [Signed embedding](/embedding/iframe/auth/signed). Private embedding is not supported.
+</Note>
+
+## Embed tenant scoping
+
+In Creator Mode, content (workbooks, dashboards) and the groups/user attributes referenced by the session are scoped to an **embed tenant**. Pass `embedTenantName` to isolate content per customer; omit it to use the current tenant.
+
+`embedTenantName` must be lowercase, 5–36 chars, start with a letter, end with a letter or digit, and contain only `a-z`, `0-9`, or `-`.
+
+## Provisioning groups and user attributes
+
+In Creator Mode, `groups` and `userAttributes` resolve against the embed tenant's scoped catalog (separate from the tenant-wide one used by read-only embedding). To define those entries from your backend in the same call, pass `groupDefinitions` and `userAttributeDefinitions` — they are idempotent and validated before memberships and values are applied.
+
+See [Generate Session → Creator mode bootstrap][ref-bootstrap] for the input shape, value types, and the immutable-`type` rule on attribute definitions.
+
+## Default dashboards
+
+You can pre-populate every embed user's workspace with ready-made content so they see useful dashboards the first time they open the embedded app, instead of an empty workspace. This is a good way to ship templates or starter reports that your users can explore and build on.
+
+Default dashboards are shared from your **main workspace** with the **All embed users** (`all_embed_users`) group — a system group that Cube creates automatically once Creator Mode is enabled. Sharing is read-only: embed users can open and explore the shared content but can't edit it.
+
+To set up default dashboards:
+
+1. Build the workbooks, dashboards, folders, and reports you want everyone to see in your main workspace.
+2. Open the share dialog for a workbook or folder and share it with **All embed users**. The only available access level is **Can view**.
+3. Embed users in Creator Mode now see the shared items at the root of their workspace as soon as they open the app.
+
+<Note>
+  **All embed users** is a system group: it can't be renamed or deleted, and it can only be granted read-only (**Can view**) access. It appears automatically in **Admin → User Groups** and in the share dialog once Creator Mode is enabled for your workspace.
+</Note>
+
+Keep the following behavior in mind:
+
+- **Sharing a folder** shares everything inside it — all nested folders, workbooks, and reports become available to embed users.
+- **Sharing a single workbook or report** exposes that item plus the folders above it (so users can navigate to it), but not the other contents of those folders.
+- All embed users see the **same** default dashboards, regardless of their [groups](/admin/users-and-permissions/user-groups) or user attributes. The shared set applies across every embed tenant that belongs to your account.
+- Embed users can't edit content shared from the main workspace. Opening a shared workbook shows its published dashboard, so a workbook must have a published dashboard for users to open it.
+- Removing the share from the **All embed users** group removes those items from embed users' workspaces immediately.
+
+## Sharing workbooks and dashboards
+
+Embed users in Creator Mode can share the workbooks and dashboards they build with other users, the same way they would in the full Cube app.
+
+<Note>
+  Sharing is scoped to the [embed tenant](#embed-tenant-scoping): users can only share with others in the same tenant, never across tenants.
+</Note>
+
+## Example
+
+```javascript
+const session = await fetch(
+  "https://your-account.cubecloud.dev/api/v1/embed/generate-session",
+  {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Api-Key ${API_KEY}`,
+    },
+    body: JSON.stringify({
+      deploymentId: 32,
+      externalId: "user@example.com",
+      embedTenantName: "acme-corp",
+      creatorMode: true,
+    }),
+  },
+);
+
+const { sessionId } = await session.json();
+```
+
+Embed the app with the returned session ID:
+
+```html
+<iframe
+  title="Cube App"
+  src="https://your-tenant.cubecloud.dev/embed/d/{deploymentId}/app?session={sessionId}"
+  width="100%"
+  height="800"
+></iframe>
+```
+
+For a complete working example, see the [cube-embedding-demo](https://github.com/cubedevinc/cube-embedding-demo) repository.
+
+[ref-generate-session]: /reference/embed-apis/generate-session
+[ref-bootstrap]: /reference/embed-apis/generate-session#creator-mode-bootstrapping-groups-and-user-attributes

@@ -1,0 +1,10 @@
+---
+source: cubesqlplanner/src/tests/integration/joins.rs
+expression: result
+---
+customers__city | order_items__count | order_items__total_quantity
+----------------+--------------------+----------------------------
+Boston          | 3                  | 3                          
+New York        | 4                  | 7                          
+San Francisco   | 2                  | 4                          
+NULL            | 1                  | 2

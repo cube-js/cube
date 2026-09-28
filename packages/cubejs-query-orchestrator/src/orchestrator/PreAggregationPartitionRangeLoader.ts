@@ -10,6 +10,7 @@ import {
   timeSeries,
   localTimestampToUtc,
   parseUtcIntoLocalDate,
+  LoggerFn,
 } from '@cubejs-backend/shared';
 import { InlineTable, TableStructure } from '@cubejs-backend/base-driver';
 import { DriverFactory } from './DriverFactory';
@@ -64,7 +65,7 @@ export class PreAggregationPartitionRangeLoader {
 
   public constructor(
     private readonly driverFactory: DriverFactory,
-    private readonly logger: any,
+    private readonly logger: LoggerFn,
     private readonly queryCache: QueryCache,
     private readonly preAggregations: PreAggregations,
     private readonly preAggregation: PreAggregationDescription,
@@ -295,16 +296,61 @@ export class PreAggregationPartitionRangeLoader {
       const unionTargetTableName = allTableTargetNames
         .map(targetTableName => `SELECT * FROM ${targetTableName}${emptyResult ? ' WHERE 1 = 0' : ''}`)
         .join(' UNION ALL ');
+
+      const baseTargetTableName = allTableTargetNames.length === 1 && !emptyResult ? allTableTargetNames[0] : `(${unionTargetTableName})`;
+
+      // Build per-usage target table names if usageMapping is present
+      let usageTargetTableNames: Record<string, string> | undefined;
+      if (this.preAggregation.usageMapping) {
+        usageTargetTableNames = {};
+        for (const [suffix, usageInfo] of Object.entries(this.preAggregation.usageMapping)) {
+          if (usageInfo.dateRange && this.preAggregation.partitionGranularity) {
+            // Load partition ranges specific to this usage's dateRange.
+            // Use partitionRange (generated locally via timeSeries, always in DEFAULT_TS_FORMAT)
+            // instead of buildRangeEnd (from DB, may include Z suffix depending on driver timestampFormat).
+            const usageDateRange = PreAggregationPartitionRangeLoader.intersectDateRanges(
+              [loadResults[0]?.partitionRange?.[0] || null, loadResults[loadResults.length - 1]?.partitionRange?.[1] || null] as QueryDateRange,
+              usageInfo.dateRange as QueryDateRange,
+            );
+            if (usageDateRange) {
+              const usagePartitions = loadResults.filter(r => {
+                if (!r.partitionRange) return true;
+                const [pStart, pEnd] = r.partitionRange;
+                const [uStart, uEnd] = usageDateRange;
+                return pEnd >= uStart && pStart <= uEnd;
+              });
+              const usageTableNames = usagePartitions.map(r => r.targetTableName);
+              if (usageTableNames.length === 1) {
+                [usageTargetTableNames[suffix]] = usageTableNames;
+              } else if (usageTableNames.length > 0) {
+                const usageUnion = usageTableNames
+                  .map(t => `SELECT * FROM ${t}`)
+                  .join(' UNION ALL ');
+                usageTargetTableNames[suffix] = `(${usageUnion})`;
+              } else {
+                usageTargetTableNames[suffix] = baseTargetTableName;
+              }
+            } else {
+              usageTargetTableNames[suffix] = baseTargetTableName;
+            }
+          } else {
+            usageTargetTableNames[suffix] = baseTargetTableName;
+          }
+        }
+      }
+
       return {
-        targetTableName: allTableTargetNames.length === 1 && !emptyResult ? allTableTargetNames[0] : `(${unionTargetTableName})`,
+        targetTableName: baseTargetTableName,
         refreshKeyValues: loadResults.map(t => t.refreshKeyValues),
         lastUpdatedAt,
         buildRangeEnd: !emptyResult && loadResults.length && loadResults[loadResults.length - 1].buildRangeEnd,
         lambdaTable,
         rollupLambdaId: this.preAggregation.rollupLambdaId,
+        isMultiTableUnion: allTableTargetNames.length > 1,
+        usageTargetTableNames,
       };
     } else {
-      return new PreAggregationLoader(
+      const result = await new PreAggregationLoader(
         this.driverFactory,
         this.logger,
         this.queryCache,
@@ -314,6 +360,14 @@ export class PreAggregationPartitionRangeLoader {
         this.loadCache,
         this.options
       ).loadPreAggregation(true);
+      if (result && this.preAggregation.usageMapping) {
+        const usageTargetTableNames: Record<string, string> = {};
+        for (const suffix of Object.keys(this.preAggregation.usageMapping)) {
+          usageTargetTableNames[suffix] = result.targetTableName;
+        }
+        return { ...result, usageTargetTableNames };
+      }
+      return result;
     }
   }
 

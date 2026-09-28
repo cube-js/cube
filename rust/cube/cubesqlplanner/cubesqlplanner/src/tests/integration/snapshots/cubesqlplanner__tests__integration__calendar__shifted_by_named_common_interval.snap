@@ -1,0 +1,7 @@
+---
+source: cubesqlplanner/src/tests/integration/calendar.rs
+expression: result
+---
+custom_calendar__retail_date_year | calendar_orders__count | calendar_orders__count_shifted_y_named_common_interval
+----------------------------------+------------------------+-------------------------------------------------------
+2025-02-02                        | 37                     | 39

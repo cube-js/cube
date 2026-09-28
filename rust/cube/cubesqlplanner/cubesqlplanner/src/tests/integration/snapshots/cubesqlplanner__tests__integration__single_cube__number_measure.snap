@@ -1,0 +1,7 @@
+---
+source: cubesqlplanner/src/tests/integration/single_cube.rs
+expression: result
+---
+orders__avg_order_value
+-----------------------
+160.0000000000000000

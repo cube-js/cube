@@ -1,3 +1,4 @@
+import R from 'ramda';
 import {
   BaseFilter,
   BaseQuery,
@@ -89,6 +90,21 @@ export class QuestQuery extends BaseQuery {
     return dimensionAliases
       .map(alias => `(${leftAlias}.${alias} = ${rightAlias}.${alias} OR (${leftAlias}.${alias} = NULL AND ${rightAlias}.${alias} = NULL))`)
       .join(' AND ');
+  }
+
+  public baseHaving(query: string, filters: BaseFilter[]) {
+    // QuestDB doesn't support HAVING syntax.
+    // `( <query> ) WHERE <filter>` should be used instead.
+
+    if (filters.length > 0) {
+      let filter = filters.map(t => t.filterToWhere()).filter(R.identity).map(f => `(${f})`).join(' AND ');
+      // Replace measures with their aliases in the filter.
+      this.measures.forEach((m) => {
+        filter = filter.replace(m.measureSql(), m.aliasName());
+      });
+      return `SELECT * FROM (${query}) WHERE ${filter}`;
+    }
+    return query;
   }
 
   public renderSqlMeasure(name: string, evaluateSql: string, symbol: any, cubeName: string, parentMeasure: string, orderBySql: string[]): string {

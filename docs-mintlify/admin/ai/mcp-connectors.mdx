@@ -1,0 +1,136 @@
+---
+title: MCP Connectors
+description: Connect external MCP servers so the agent can use their tools — search Notion, file Linear issues, query Sentry, and more — from chat.
+---
+
+<Warning>
+
+MCP Connectors is currently in preview, and the user experience may still change.
+Reach out to the [Cube support team](/admin/account-billing/support) to activate this
+feature for your account.
+
+</Warning>
+
+MCP Connectors let the [agent](/admin/ai) use tools from external services. An
+administrator connects an external [MCP](https://modelcontextprotocol.io) server — such as
+Notion, Linear, Sentry, or Attio — and its tools become available to the agent in
+[Analytics Chat](/docs/explore-analyze/analytics-chat). The agent can then search a Notion
+workspace, file a Linear issue, look up a Sentry error, or call any tool a connected server
+exposes, alongside the data it queries from your semantic model.
+
+<Note>
+
+**MCP Connectors are the inverse of the [MCP server](/docs/integrations/mcp-server).** A
+connector lets the **Cube agent reach out** to an external MCP server and call its tools.
+The MCP server lets **external MCP clients reach in** to Cube and query your data. One is
+outbound, the other inbound — you can use either or both.
+
+</Note>
+
+## Concepts
+
+- A **connector** is a connection to one external MCP server. Each connector is configured
+  and authenticated once, at the organization level, by an administrator.
+- Each connector exposes one or more **tools** — the individual actions the agent can call
+  (for example, "search pages" or "create issue"). A single connector typically exposes
+  many tools.
+- Connectors are managed in the admin panel under **MCP Connectors** and apply across the
+  organization, so every agent can use the tools you enable.
+
+## Adding a connector
+
+Open the admin panel and go to **MCP Connectors**. You can add a connector from the
+built-in directory or connect a custom MCP server.
+
+{/* TODO: screenshot — MCP Connectors admin page with the directory and connectors list */}
+
+### From the directory
+
+The connector directory includes vetted, first-party integrations with streamlined setup.
+
+<Steps>
+  <Step title="Browse the directory">
+    Select **Browse directory** and choose a service (for example, Notion, Linear, Sentry,
+    or Attio).
+  </Step>
+  <Step title="Authenticate">
+    Complete the connector's authentication flow (see [Authentication](#authentication)
+    below). For OAuth-based connectors you'll be redirected to the provider to authorize
+    access.
+  </Step>
+  <Step title="Enable tools">
+    Review the tools the connector exposes and choose which ones are available to the
+    agent. See [Choosing which tools are available](#choosing-which-tools-are-available).
+  </Step>
+</Steps>
+
+### Custom connector
+
+Any service that exposes a remote MCP endpoint can be connected as a custom connector.
+
+<Steps>
+  <Step title="Add a custom connector">
+    Select **Add custom connector** and provide a name and the server's HTTPS endpoint URL
+    (for example, `https://mcp.example.com/mcp`).
+  </Step>
+  <Step title="Authenticate">
+    Choose the authentication method the server requires — OAuth or a user-provided
+    credential such as an API key or token.
+  </Step>
+  <Step title="Enable tools">
+    Once connected, the server's tools are discovered automatically. Choose which ones the
+    agent may call.
+  </Step>
+</Steps>
+
+## Authentication
+
+Connectors authenticate to the external service in one of two ways, depending on what the
+service supports:
+
+| Method | How it works |
+|--------|--------------|
+| **OAuth** | You authorize Cube with the provider through a standard OAuth flow. The connector stores the resulting tokens and refreshes them as needed. Used by most directory connectors. |
+| **User-provided credential** | You supply a credential — such as an API key or access token — that the connector uses to authenticate. Used when a service does not offer OAuth. |
+
+A connector's status indicator in the connectors list shows whether it is connected and
+authenticated.
+
+## Choosing which tools are available
+
+Each connected server reports the full set of tools it exposes (shown as a count, for
+example `16 / 16`). You control which of those tools the agent is allowed to call.
+Enabling only the tools you need keeps the agent focused and limits what it can do through
+each connector.
+
+## How the agent uses connector tools
+
+Once a connector is configured and its tools are enabled, the agent can call them in
+[Analytics Chat](/docs/explore-analyze/analytics-chat) as part of answering a request — the
+same way it queries your semantic model. The agent decides when a tool is relevant based on
+the user's request and the tool's description. If a tool requires the user to authenticate
+to the external service, the agent prompts for authorization in chat before the tool runs.
+
+## Permissions
+
+Managing MCP Connectors requires administrator access in Cube Cloud — the same access
+needed to manage other organization-level settings in the admin panel. Connectors apply
+across the organization; using the tools they expose is available to anyone with chat
+access, subject to the tools you enable.
+
+## Related
+
+<CardGroup cols={2}>
+  <Card title="MCP server" icon="plug" href="/docs/integrations/mcp-server">
+    Let external MCP clients connect to Cube and query your data over HTTPS.
+  </Card>
+  <Card title="Overview" icon="robot" href="/admin/ai">
+    Configure the agent that powers Cube's AI features.
+  </Card>
+  <Card title="Skills" icon="wand-magic-sparkles" href="/admin/ai/skills">
+    Package reusable, named agent workflows users can run on demand from chat.
+  </Card>
+  <Card title="Analytics Chat" icon="comments" href="/docs/explore-analyze/analytics-chat">
+    Ask questions of your data in natural language.
+  </Card>
+</CardGroup>

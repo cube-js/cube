@@ -205,6 +205,18 @@ export function testQueries(type: string, { includeIncrementalSchemaSuite, exten
 
       await delay(OP_DELAY);
 
+      if (type !== 'clickhouse') {
+        // ClickHouse cannot build this non-partitioned rollup; the
+        // corresponding test is skipped in both skip lists for clickhouse.
+        await buildPreaggs(env.cube.port, apiToken, {
+          timezones: ['UTC'],
+          preAggregations: ['BigECommerce.CategoryFlatExternal'],
+          contexts: [{ securityContext: { tenant: 't1' } }],
+        });
+
+        await delay(OP_DELAY);
+      }
+
       if (includeHLLSuite) {
         await buildPreaggs(env.cube.port, apiToken, {
           timezones: ['UTC'],
@@ -214,6 +226,18 @@ export function testQueries(type: string, { includeIncrementalSchemaSuite, exten
 
         await delay(OP_DELAY);
       }
+
+      // Exercise pre-aggregation build with a custom granularity for every
+      // driver. The granularity name `build_only_half_year` is unique to this
+      // rollup — no query test references it, so the rollup cannot match any
+      // test query and only the build path is exercised.
+      await buildPreaggs(env.cube.port, apiToken, {
+        timezones: ['UTC'],
+        preAggregations: ['ECommerce.TBuildOnlyHalfYearExternal'],
+        contexts: [{ securityContext: { tenant: 't1' } }],
+      });
+
+      await delay(OP_DELAY);
     });
 
     execute('must not fetch a hidden cube', async () => {
@@ -232,6 +256,20 @@ export function testQueries(type: string, { includeIncrementalSchemaSuite, exten
       promise().catch(e => {
         expect(e.toString()).toMatch(/hidden/);
       });
+    });
+
+    // https://github.com/cube-js/cube/issues/10601
+    execute('querying ECommerce: dimensions + filter-only by TD to get empty results', async () => {
+      const response = await client.load({
+        dimensions: [
+          'ECommerce.city',
+        ],
+        timeDimensions: [{
+          dimension: 'ECommerce.orderDate',
+          dateRange: ['2099-01-01', '2099-12-31'],
+        }],
+      });
+      expect(response.rawData()).toEqual([]);
     });
 
     execute('querying Customers: dimensions', async () => {
@@ -1144,6 +1182,24 @@ export function testQueries(type: string, { includeIncrementalSchemaSuite, exten
       expect(response.rawData()).toMatchSnapshot();
     });
 
+    execute('querying ECommerce: count by month + order with non-UTC timezone (Asia/Kolkata)', async () => {
+      const response = await client.load({
+        measures: [
+          'ECommerce.count',
+        ],
+        timeDimensions: [{
+          dimension: 'ECommerce.customOrderDateNoPreAgg',
+          granularity: 'month',
+          dateRange: ['2020-01-01', '2020-12-31'],
+        }],
+        order: {
+          'ECommerce.customOrderDateNoPreAgg': 'asc'
+        },
+        timezone: 'Asia/Kolkata',
+      });
+      expect(response.rawData()).toMatchSnapshot();
+    });
+
     execute('filtering ECommerce: contains dimensions, first', async () => {
       const response = await client.load({
         dimensions: [
@@ -1849,6 +1905,43 @@ export function testQueries(type: string, { includeIncrementalSchemaSuite, exten
           granularity: 'month',
           dateRange: ['2020-01-01', '2020-12-31'],
         }],
+      });
+      expect(response.rawData()).toMatchSnapshot();
+    });
+
+    execute('querying BigECommerce: base measure plus multi-stage over non-partitioned pre-aggregation', async () => {
+      const response = await client.load({
+        measures: [
+          'BigECommerce.totalProfit',
+          'BigECommerce.profitInCategory',
+        ],
+        dimensions: [
+          'BigECommerce.category',
+          'BigECommerce.productName',
+        ],
+        order: [
+          ['BigECommerce.totalProfit', 'desc'],
+          ['BigECommerce.category', 'asc'],
+          ['BigECommerce.productName', 'asc'],
+        ],
+      });
+      expect(response.rawData()).toMatchSnapshot();
+    });
+
+    execute('querying BigECommerce: two multi-stage branches sharing one pre-aggregation', async () => {
+      const response = await client.load({
+        measures: [
+          'BigECommerce.totalProfitNoId',
+          'BigECommerce.totalProfitNoIdPct',
+        ],
+        timeDimensions: [{
+          dimension: 'BigECommerce.orderDate',
+          granularity: 'month',
+          dateRange: ['2020-01-01', '2020-12-31'],
+        }],
+        order: [
+          ['BigECommerce.orderDate', 'asc'],
+        ],
       });
       expect(response.rawData()).toMatchSnapshot();
     });

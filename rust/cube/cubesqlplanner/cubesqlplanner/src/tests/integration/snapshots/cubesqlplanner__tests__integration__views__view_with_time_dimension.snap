@@ -1,0 +1,10 @@
+---
+source: cubesqlplanner/src/tests/integration/views.rs
+expression: result
+---
+orders_with_customers__created_at_day | orders_with_customers__count
+--------------------------------------+-----------------------------
+2025-03-01 00:00:00                   | 1                           
+2025-03-02 00:00:00                   | 1                           
+2025-03-03 00:00:00                   | 1                           
+2025-03-04 00:00:00                   | 1

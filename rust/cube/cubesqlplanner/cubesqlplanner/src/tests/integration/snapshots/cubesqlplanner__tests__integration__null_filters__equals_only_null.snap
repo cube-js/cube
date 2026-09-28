@@ -1,0 +1,7 @@
+---
+source: cubesqlplanner/src/tests/integration/null_filters.rs
+expression: result
+---
+orders__count
+-------------
+2

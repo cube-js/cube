@@ -50,12 +50,23 @@ yarn test
 ```
 
 ### Documentation Development
-The documentation is in `/docs` directory:
+
+**IMPORTANT: `/docs-mintlify` is the active documentation site. `/docs` is the legacy
+docs site and is deprecated — do NOT add or edit content there.** When asked to write or
+update documentation, work in `/docs-mintlify` unless the user explicitly says otherwise.
+
 ```bash
-cd docs
-yarn dev    # Start development server
-yarn build  # Build for production
+cd docs-mintlify
+yarn dev    # Start the Mintlify dev server
 ```
+
+- Content is authored as `.mdx` under topic directories (e.g. `admin/ai/`, `docs/explore-analyze/`).
+- Frontmatter uses `title` and `description` keys.
+- Navigation is registered in `docs-mintlify/docs.json` (pages must be added to the
+  relevant `group` to appear in the sidebar).
+- Use Mintlify components: `<Note>`, `<Warning>`, `<Info>`, `<Tip>`, `<Steps>`/`<Step>`,
+  `<CardGroup>`/`<Card>`. Internal links are root-relative (e.g. `/admin/ai/rules`).
+- See `docs-mintlify/CLAUDE.md` for full conventions.
 
 ## Architecture Overview
 
@@ -66,7 +77,8 @@ yarn build  # Build for production
   - Database drivers: `cubejs-postgres-driver`, `cubejs-bigquery-driver`, etc.
   - API layer: `cubejs-api-gateway`
 - **`/rust`**: Rust components including CubeSQL (SQL interface) and CubeStore (distributed storage)
-- **`/docs`**: Next.js documentation site
+- **`/docs-mintlify`**: Mintlify documentation site — **the active docs site** (author docs here)
+- **`/docs`**: Legacy Next.js/Nextra documentation site — **deprecated**, do not edit
 - **`/examples`**: Example implementations and recipes
 
 ### Key Components
@@ -75,6 +87,7 @@ yarn build  # Build for production
 3. **API Gateway**: Provides REST, GraphQL, and SQL APIs
 4. **CubeSQL**: Postgres-compatible SQL interface (Rust)
 5. **CubeStore**: Distributed OLAP storage engine (Rust)
+6. **Tesseract**: Native SQL planner (Rust) located in `/rust/cube/cubesqlplanner` - enabled via `CUBESQL_SQL_PUSH_DOWN=true` environment variable
 
 ### Package Management
 - Uses Yarn workspaces with Lerna for package management
@@ -111,6 +124,16 @@ yarn test
 3. **Testing**: Run relevant tests for modified packages
 4. **Linting**: Ensure code passes `yarn lint` before committing
 
+## Git
+
+Use conventional commits with these prefixes:
+- `feat:` — new features
+- `fix:` — bug fixes
+- `docs:` — documentation changes
+- `refactor:` — code refactoring
+
+Include scope in parentheses when applicable, e.g., `fix(tesseract):` or `feat(databricks-jdbc-driver):`.
+
 ## Common File Patterns
 
 - `*.test.ts/js`: Jest unit tests
@@ -122,7 +145,8 @@ yarn test
 
 ## Important Notes
 
-- This is documentation for the old Cube docs site structure (the existing `/docs/CLAUDE.md` refers to the documentation site)
+- Documentation lives in `/docs-mintlify` (active, Mintlify). `/docs` is the legacy docs
+  site and is deprecated — do not add or edit content there. See `docs-mintlify/CLAUDE.md`.
 - The main Cube application development happens in `/packages`
 - For data model changes, focus on `cubejs-schema-compiler` package
 - For query execution changes, focus on `cubejs-query-orchestrator` package

@@ -1,0 +1,9 @@
+---
+source: cubesqlplanner/src/tests/integration/joins.rs
+expression: result
+---
+products__name | order_items__count
+---------------+-------------------
+Book           | 2                 
+Laptop         | 3                 
+Phone          | 2

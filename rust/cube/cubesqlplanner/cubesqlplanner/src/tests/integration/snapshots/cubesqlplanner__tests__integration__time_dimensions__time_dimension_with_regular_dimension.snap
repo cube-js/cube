@@ -1,0 +1,14 @@
+---
+source: cubesqlplanner/src/tests/integration/time_dimensions.rs
+expression: result
+---
+orders__status | orders__created_at_month | orders__count
+---------------+--------------------------+--------------
+completed      | 2024-01-01 00:00:00      | 2            
+pending        | 2024-01-01 00:00:00      | 1            
+completed      | 2024-02-01 00:00:00      | 1            
+pending        | 2024-02-01 00:00:00      | 1            
+cancelled      | 2024-03-01 00:00:00      | 1            
+completed      | 2024-03-01 00:00:00      | 1            
+pending        | 2024-03-01 00:00:00      | 1            
+completed      | 2024-04-01 00:00:00      | 1

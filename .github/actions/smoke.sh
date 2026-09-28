@@ -14,6 +14,10 @@ yarn lerna run --concurrency 1 --stream --no-prefix integration:duckdb
 yarn lerna run --concurrency 1 --stream --no-prefix smoke:duckdb
 echo "::endgroup::"
 
+echo "::group::View Groups"
+yarn lerna run --concurrency 1 --stream --no-prefix smoke:view-groups
+echo "::endgroup::"
+
 echo "::group::Postgres"
 yarn lerna run --concurrency 1 --stream --no-prefix smoke:postgres
 echo "::endgroup::"
@@ -66,4 +70,12 @@ echo "::endgroup::"
 
 echo "::group::RBAC"
 yarn lerna run --concurrency 1 --stream --no-prefix smoke:rbac
+echo "::endgroup::"
+
+echo "::group::RBAC GraphQL"
+yarn lerna run --concurrency 1 --stream --no-prefix smoke:rbac-graphql
+echo "::endgroup::"
+
+echo "::group::Links"
+yarn lerna run --concurrency 1 --stream --no-prefix smoke:links
 echo "::endgroup::"

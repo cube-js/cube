@@ -326,11 +326,11 @@ export class DevServer {
     app.get('/playground/driver', catchErrors(async (req: Request, res: Response) => {
       const { driver } = req.query;
 
-      if (!driver || !DriverDependencies[driver]) {
+      if (!driver || typeof driver !== 'string' || !DriverDependencies[driver as keyof typeof DriverDependencies]) {
         return res.status(400).json('Wrong driver');
       }
 
-      if (packageExists(DriverDependencies[driver])) {
+      if (packageExists(DriverDependencies[driver as keyof typeof DriverDependencies])) {
         return res.json({ status: 'installed' });
       } else if (driverPromise) {
         return res.json({ status: 'installing' });
@@ -347,9 +347,11 @@ export class DevServer {
     app.post('/playground/driver', catchErrors((req, res) => {
       const { driver } = req.body;
 
-      if (!DriverDependencies[driver]) {
+      if (!driver || typeof driver !== 'string' || !DriverDependencies[driver as keyof typeof DriverDependencies]) {
         return res.status(400).json(`'${driver}' driver dependency not found`);
       }
+
+      const driverKey = driver as keyof typeof DriverDependencies;
 
       async function installDriver() {
         driverError = null;
@@ -357,7 +359,7 @@ export class DevServer {
         try {
           await executeCommand(
             'npm',
-            ['install', DriverDependencies[driver], '--save-dev'],
+            ['install', DriverDependencies[driverKey], '--save-dev'],
             { cwd: path.resolve('.') }
           );
         } catch (error) {
@@ -372,7 +374,7 @@ export class DevServer {
       }
 
       return res.json({
-        dependency: DriverDependencies[driver]
+        dependency: DriverDependencies[driverKey]
       });
     }));
 
@@ -506,17 +508,14 @@ export class DevServer {
             throw new Error(`${type} is required`);
           }
 
-          // Backup env variables for restoring
-          const originalProcessEnv = process.env;
-          process.env = {
-            ...process.env,
-          };
+          // Backup env variables and set new ones in-place.
+          // We must mutate the existing process.env object (not replace it)
+          // because env-var holds a reference to the original object.
+          const backup: Record<string, string | undefined> = {};
 
-          // We suppose that variables names passed to the endpoint have their
-          // final form depending on whether multiple data sources are enabled
-          // or not. So, we don't need to convert anything here.
-          for (const [envName, value] of Object.entries(variables)) {
-            process.env[envName] = <string>value;
+          for (const [envName, envValue] of Object.entries(variables)) {
+            backup[envName] = process.env[envName];
+            process.env[envName] = <string>envValue;
           }
 
           // With multiple data sources enabled, we need to put the dataSource
@@ -528,8 +527,14 @@ export class DevServer {
             { dataSource },
           );
 
-          // Restore original process.env
-          process.env = originalProcessEnv;
+          // Restore original env values
+          for (const [envName, envValue] of Object.entries(backup)) {
+            if (envValue === undefined) {
+              delete process.env[envName];
+            } else {
+              process.env[envName] = envValue;
+            }
+          }
 
           await driver.testConnection();
 

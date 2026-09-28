@@ -31,7 +31,7 @@ cube(`ActiveUsers`, {
 
     wauToMau: {
       title: `WAU to MAU`,
-      sql: `100.000 * ${weeklyActiveUsers} / NULLIF(${monthlyActiveUsers}, 0)`,
+      sql: `1.0 * ${weeklyActiveUsers} / NULLIF(${monthlyActiveUsers}, 0)`,
       type: `number`,
       format: `percent`,
     },

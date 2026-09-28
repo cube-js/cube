@@ -1,0 +1,9 @@
+---
+source: cubesqlplanner/src/tests/integration/multi_fact.rs
+expression: result
+---
+orders__status | customers__total_lifetime_value_for_east
+---------------+-----------------------------------------
+completed      | 4500.00                                 
+pending        | 3000.00                                 
+NULL           | NULL

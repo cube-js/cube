@@ -36,7 +36,7 @@ const formatTableData = (columns, data) => {
     }
 
     if (type === 'number' && format === 'percent') {
-      return [parseFloat(value).toFixed(2), '%'].join('');
+      return [(parseFloat(value) * 100).toFixed(2), '%'].join('');
     }
 
     return value.toString();

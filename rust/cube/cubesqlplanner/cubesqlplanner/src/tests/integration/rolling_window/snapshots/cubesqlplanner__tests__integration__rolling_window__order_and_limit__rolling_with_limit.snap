@@ -1,0 +1,11 @@
+---
+source: cubesqlplanner/src/tests/integration/rolling_window/order_and_limit.rs
+expression: result
+---
+orders__created_at_day | orders__rolling_sum_trailing_7d
+-----------------------+--------------------------------
+2024-01-10 00:00:00    | 305.00                         
+2024-01-11 00:00:00    | 230.00                         
+2024-01-12 00:00:00    | 580.00                         
+2024-01-13 00:00:00    | 580.00                         
+2024-01-14 00:00:00    | 670.00

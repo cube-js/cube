@@ -1,0 +1,60 @@
+---
+title: Styling
+description: Customize the appearance of a dashboard from the Styling panel in the Dashboard Builder.
+---
+
+You can customize the appearance of any dashboard — background, padding, widget cards, borders, titles, and fonts — from the **Styling** panel in the Dashboard Builder.
+
+Styling is **per-dashboard**: settings are saved to the dashboard's configuration and apply equally to the dashboard in Cube and to its [embedded view](/embedding/iframe/dashboards) (both [private](/embedding/iframe/auth/private) and [signed](/embedding/iframe/auth/signed) embedding).
+
+## Open the Styling panel
+
+1. Open your dashboard
+2. Click **Dashboard Builder** in the top bar
+3. Click the gear icon to open the **Styling** panel
+
+Click **Apply** to preview your changes. Click **Reset** to revert to the defaults. Publish the dashboard for the styling to take effect in embedded views.
+
+## Options
+
+All values accept standard CSS — colors as hex (`#1a1a2e`), `rgb()`, or named colors; lengths as CSS units (e.g., `16px`).
+
+### Background
+
+Settings that apply to the dashboard canvas as a whole.
+
+| Option       | Description                                        | Example     |
+|--------------|----------------------------------------------------|-------------|
+| Background   | Dashboard background color                         | `#f9f9fb`   |
+| Padding      | Outer padding around the dashboard grid            | `16px`      |
+
+### Widgets
+
+Settings that apply to every widget (chart card) on the dashboard.
+
+| Option       | Description                                        | Example     |
+|--------------|----------------------------------------------------|-------------|
+| Background   | Widget card background color                       | `#ffffff`   |
+| Padding      | Inner padding within each widget                   | `12px`      |
+
+### Widgets → Borders
+
+Border styling for widget cards.
+
+| Option   | Description                                                          | Example     |
+|----------|----------------------------------------------------------------------|-------------|
+| Color    | Border color                                                         | `#E1E2E8`   |
+| Radius   | Corner radius                                                        | `8px`       |
+| Style    | Border style (`solid`, `dashed`, `dotted`, `double`, `none`)         | `solid`     |
+| Width    | Border thickness                                                     | `1px`       |
+
+### Widgets → Titles
+
+Typography for widget titles.
+
+| Option       | Description                  | Example       |
+|--------------|------------------------------|---------------|
+| Color        | Title text color             | `#1a1a2e`     |
+| Font Size    | Title font size              | `18px`        |
+| Font Weight  | Title font weight            | `600`         |
+| Font Family  | Title font family            | `system-ui`   |

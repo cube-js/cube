@@ -1,0 +1,47 @@
+# React Embed SDK
+
+<InfoBox>
+  React Embed SDK is currently in **public preview**. The API may change in future releases.
+</InfoBox>
+
+The React Embed SDK provides React components for embedding Cube analytics directly into your React applications. It offers tighter integration with React's component model, giving you more control over styling, theming, and user interactions compared to iframe-based embedding.
+
+## Installation
+
+```bash
+npm install @cube-dev/embed-sdk
+# or
+yarn add @cube-dev/embed-sdk
+```
+
+## Quick Start
+
+The SDK requires [TanStack Query](https://tanstack.com/query) as a peer dependency. Wrap your application with `QueryClientProvider`, then add `CubeEmbedProvider` inside it:
+
+```jsx
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { CubeEmbedProvider } from "@cube-dev/embed-sdk";
+
+const queryClient = new QueryClient();
+
+function App() {
+  return (
+    <QueryClientProvider client={queryClient}>
+      <CubeEmbedProvider
+        apiUrl="https://your-account.cubecloud.dev"
+        sessionId="YOUR_SESSION_ID"
+      >
+        {/* Your embedded analytics components go here */}
+      </CubeEmbedProvider>
+    </QueryClientProvider>
+  );
+}
+```
+
+## Authentication
+
+The React Embed SDK uses the same session-based authentication as [signed embedding](/product/embedding/signed-embedding). Generate a session using the [Generate Session API](/product/apis-integrations/embed-apis/generate-session) and pass the `sessionId` to the provider.
+
+## Example
+
+For a complete working implementation, see the [antd-cube-embed-sdk example](https://github.com/cubedevinc/cube-agent-examples/tree/main/examples/antd-cube-embed-sdk) on GitHub.

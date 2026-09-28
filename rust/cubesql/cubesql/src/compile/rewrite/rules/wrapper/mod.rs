@@ -24,6 +24,7 @@ mod projection;
 mod scalar_function;
 mod sort_expr;
 mod subquery;
+mod udaf_function;
 mod udf_function;
 mod window;
 mod window_function;
@@ -76,6 +77,7 @@ impl RewriteRules for WrapperRules {
         self.window_function_rules(&mut rules);
         self.scalar_function_rules(&mut rules);
         self.udf_function_rules(&mut rules);
+        self.udaf_function_rules(&mut rules);
         self.extract_rules(&mut rules);
         self.alias_rules(&mut rules);
         self.case_rules(&mut rules);

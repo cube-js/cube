@@ -555,8 +555,16 @@ impl RowDescription {
     pub fn new(fields: Vec<RowDescriptionField>) -> Self {
         Self { fields }
     }
+
     pub fn len(&self) -> usize {
         self.fields.len()
+    }
+
+    /// Returns the resolved per-column format codes.
+    /// These account for `is_binary_supported()` — if a type doesn't support
+    /// binary encoding, the format is downgraded to Text even if Binary was requested.
+    pub fn get_formats(&self) -> Vec<Format> {
+        self.fields.iter().map(|f| f.format).collect()
     }
 }
 
@@ -963,6 +971,8 @@ pub enum FrontendMessage {
 #[derive(Debug)]
 #[allow(dead_code)]
 pub enum ErrorCode {
+    // Class 03 — SQL Statement Not Yet Complete
+    SqlStatementNotYetComplete,
     // 0A — Feature Not Supported
     FeatureNotSupported,
     // 8 -  Connection Exception
@@ -980,6 +990,7 @@ pub enum ErrorCode {
     // 34
     InvalidCursorName,
     // Class 42 — Syntax Error or Access Rule Violation
+    SyntaxErrorOrAccessRuleViolation,
     DuplicateCursor,
     SyntaxError,
     // Class 53 — Insufficient Resources
@@ -990,6 +1001,8 @@ pub enum ErrorCode {
     // Class 57 - Operator Intervention
     QueryCanceled,
     AdminShutdown,
+    // Class 58 — System Error (errors external to PostgreSQL itself)
+    SystemError,
     // XX - Internal Error
     InternalError,
 }
@@ -997,6 +1010,7 @@ pub enum ErrorCode {
 impl Display for ErrorCode {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         let string = match self {
+            Self::SqlStatementNotYetComplete => "03000",
             Self::FeatureNotSupported => "0A000",
             Self::ProtocolViolation => "08P01",
             Self::InvalidAuthorizationSpecification => "28000",
@@ -1006,6 +1020,7 @@ impl Display for ErrorCode {
             Self::NoActiveSqlTransaction => "25P01",
             Self::InvalidSqlStatement => "26000",
             Self::InvalidCursorName => "34000",
+            Self::SyntaxErrorOrAccessRuleViolation => "42000",
             Self::DuplicateCursor => "42P03",
             Self::SyntaxError => "42601",
             Self::TooManyConnections => "53300",
@@ -1013,6 +1028,7 @@ impl Display for ErrorCode {
             Self::ObjectNotInPrerequisiteState => "55000",
             Self::QueryCanceled => "57014",
             Self::AdminShutdown => "57P01",
+            Self::SystemError => "58000",
             Self::InternalError => "XX000",
         };
         write!(f, "{}", string)

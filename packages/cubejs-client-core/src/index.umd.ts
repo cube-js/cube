@@ -1,4 +1,4 @@
-import cube, * as clientCoreExports from './index';
+import cube, * as clientCoreExports from './index.js';
 
 const cubeAll: any = cube;
 

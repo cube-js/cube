@@ -563,7 +563,7 @@ impl DecomposedDayTime {
         match (self.days as i64, self.millis as i64) {
             (0, millis) => templates.interval_single_expr(millis, Self::MILLIS_LABEL),
             (days, 0) => templates.interval_single_expr(days, Self::DAY_LABEL),
-            (days, millis) => Err(CubeError::internal(format!(
+            (days, millis) => Err(CubeError::rewrite(format!(
                 "Expected simple interval, found composite: (days: {days};  millis: {millis})"
             ))),
         }
@@ -713,7 +713,7 @@ impl DecomposedMonthDayNano {
             (0, 0, millis) => templates.interval_single_expr(millis, Self::MILLIS),
             (0, days, 0) => templates.interval_single_expr(days, Self::DAY),
             (mons, 0, 0) => templates.interval_single_expr(mons, Self::MONTH),
-            (mons, days, millis) => Err(CubeError::internal(format!(
+            (mons, days, millis) => Err(CubeError::rewrite(format!(
                 "Expected simple interval, found composite (months: {mons};  days: {days};  millis: {millis})"
             ))),
         }

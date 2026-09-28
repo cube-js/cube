@@ -1,0 +1,103 @@
+cubes:
+    - name: Customers
+      sql: "SELECT * FROM customers"
+      joins:
+          - name: CustomerOrders
+            relationship: one_to_many
+            sql: "{CUBE}.id = {CustomerOrders.customerId}"
+          - name: Orders
+            relationship: one_to_many
+            sql: "{CUBE}.id = {Orders.customerId}"
+          - name: Returns
+            relationship: one_to_many
+            sql: "{CUBE}.id = {Returns.customerId}"
+      dimensions:
+          - name: id
+            type: number
+            sql: id
+            primary_key: true
+          - name: name
+            type: string
+            sql: name
+          - name: city
+            type: string
+            sql: city
+          - name: totalSpend
+            type: number
+            sql: "{CustomerOrders.orderTotal}"
+            sub_query: true
+      measures:
+          - name: count
+            type: count
+      segments:
+          - name: ny_customers
+            sql: "{CUBE}.city = 'New York'"
+
+    - name: CustomerOrders
+      sql: "SELECT * FROM customer_orders"
+      dimensions:
+          - name: id
+            type: number
+            sql: id
+            primary_key: true
+          - name: customerId
+            type: number
+            sql: customer_id
+      measures:
+          - name: orderTotal
+            type: sum
+            sql: amount
+
+    - name: Orders
+      sql: "SELECT * FROM orders"
+      joins:
+          - name: Customers
+            relationship: many_to_one
+            sql: "{CUBE}.customer_id = {Customers.id}"
+      dimensions:
+          - name: id
+            type: number
+            sql: id
+            primary_key: true
+          - name: customerId
+            type: number
+            sql: customer_id
+          - name: status
+            type: string
+            sql: status
+          - name: created_at
+            type: time
+            sql: created_at
+      measures:
+          - name: count
+            type: count
+          - name: total_amount
+            type: sum
+            sql: amount
+      segments:
+          - name: completed_orders
+            sql: "{CUBE}.status = 'completed'"
+
+    - name: Returns
+      sql: "SELECT * FROM returns"
+      joins:
+          - name: Customers
+            relationship: many_to_one
+            sql: "{CUBE}.customer_id = {Customers.id}"
+      dimensions:
+          - name: id
+            type: number
+            sql: id
+            primary_key: true
+          - name: customerId
+            type: number
+            sql: customer_id
+          - name: created_at
+            type: time
+            sql: created_at
+      measures:
+          - name: count
+            type: count
+          - name: total_refund
+            type: sum
+            sql: refund_amount

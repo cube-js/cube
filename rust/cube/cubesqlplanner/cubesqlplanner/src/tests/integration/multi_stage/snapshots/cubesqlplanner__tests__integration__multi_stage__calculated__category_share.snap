@@ -1,0 +1,15 @@
+---
+source: cubesqlplanner/src/tests/integration/multi_stage/calculated.rs
+expression: result
+---
+orders__status | orders__category | orders__total_amount | orders__category_share
+---------------+------------------+----------------------+-----------------------
+cancelled      | books            | 100.00               | 0.50000000000000000000
+cancelled      | clothing         | 50.00                | 0.25000000000000000000
+cancelled      | electronics      | 50.00                | 0.25000000000000000000
+completed      | books            | 600.00               | 0.42857142857142857143
+completed      | clothing         | 300.00               | 0.21428571428571428571
+completed      | electronics      | 500.00               | 0.35714285714285714286
+pending        | books            | 180.00               | 0.27692307692307692308
+pending        | clothing         | 370.00               | 0.56923076923076923077
+pending        | electronics      | 100.00               | 0.15384615384615384615

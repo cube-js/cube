@@ -1,0 +1,115 @@
+cubes:
+  - name: facts
+    sql: "SELECT * FROM visitor_checkins"
+
+    dimensions:
+      - name: id
+        type: number
+        sql: id
+        primary_key: true
+      - name: line_item_id
+        type: number
+        sql: visitor_id
+      - name: day
+        type: time
+        sql: created_at
+    measures:
+      - name: count
+        type: count
+        sql: "COUNT(*)"
+      - name: total_cost
+        type: sum
+        sql: id
+      - name: avg_cost
+        type: number
+        sql: "{CUBE.total_cost} / {CUBE.count}"
+    pre_aggregations:
+      - name: facts_rollup
+        type: rollup
+        measures:
+          - count
+          - total_cost
+          - avg_cost
+        dimensions:
+          - line_item_id
+        time_dimension: day
+        granularity: day
+
+  - name: line_items
+    sql: "SELECT * FROM visitors"
+
+    joins:
+      - name: facts
+        relationship: one_to_many
+        sql: "{CUBE.id} = {facts.line_item_id}"
+      - name: campaigns
+        relationship: many_to_one
+        sql: "{CUBE.id} = {campaigns.id}"
+    dimensions:
+      - name: id
+        type: number
+        sql: id
+        primary_key: true
+      - name: name
+        type: string
+        sql: source
+    measures:
+      - name: count
+        type: count
+        sql: "COUNT(*)"
+    pre_aggregations:
+      - name: li_rollup
+        type: rollup
+        dimensions:
+          - id
+          - name
+      - name: combined_rollup_join
+        type: rollupJoin
+        measures:
+          - facts.count
+          - facts.total_cost
+          - facts.avg_cost
+        dimensions:
+          - name
+          - campaigns.campaign_name
+        time_dimension: facts.day
+        granularity: day
+        rollups:
+          - campaigns.campaigns_rollup
+          - facts.facts_rollup
+          - line_items.li_rollup
+
+  - name: campaigns
+    sql: "SELECT 1 as id, 'camp1' as campaign_name"
+
+    dimensions:
+      - name: id
+        type: number
+        sql: id
+        primary_key: true
+      - name: campaign_name
+        type: string
+        sql: campaign_name
+    measures:
+      - name: count
+        type: count
+        sql: "COUNT(*)"
+    pre_aggregations:
+      - name: campaigns_rollup
+        type: rollup
+        dimensions:
+          - id
+          - campaign_name
+
+views:
+  - name: my_view
+    cubes:
+      - join_path: line_items.facts
+        includes: "*"
+        prefix: true
+      - join_path: line_items
+        includes: "*"
+        prefix: true
+      - join_path: line_items.campaigns
+        includes: "*"
+        prefix: true

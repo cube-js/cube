@@ -42,14 +42,22 @@ impl HttpError {
     pub fn from_user_with_status_code(error: CubeError, code: HttpErrorCode) -> Self {
         Self {
             code: match error.cause {
-                CubeErrorCauseType::User(_) => code,
-                CubeErrorCauseType::Internal(_) => {
-                    HttpErrorCode::StatusCode(axum::http::StatusCode::INTERNAL_SERVER_ERROR)
-                }
+                CubeErrorCauseType::User(_)
+                | CubeErrorCauseType::SqlParser(_)
+                | CubeErrorCauseType::Unsupported(_)
+                | CubeErrorCauseType::Planning(_)
+                | CubeErrorCauseType::PostProcessing(_)
+                | CubeErrorCauseType::DatabaseExecution(_) => code,
+                _ => HttpErrorCode::StatusCode(axum::http::StatusCode::INTERNAL_SERVER_ERROR),
             },
             message: match error.cause {
-                CubeErrorCauseType::User(_) => error.message,
-                CubeErrorCauseType::Internal(_) => "Internal Server Error".to_string(),
+                CubeErrorCauseType::User(_)
+                | CubeErrorCauseType::SqlParser(_)
+                | CubeErrorCauseType::Unsupported(_)
+                | CubeErrorCauseType::Planning(_)
+                | CubeErrorCauseType::PostProcessing(_)
+                | CubeErrorCauseType::DatabaseExecution(_) => error.message,
+                _ => "Internal Server Error".to_string(),
             },
         }
     }

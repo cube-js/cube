@@ -1,0 +1,98 @@
+cubes:
+    - name: employees
+      sql: "SELECT * FROM employees"
+      joins:
+          - name: employee_profiles
+            relationship: one_to_one
+            sql: "{employees}.id = {employee_profiles.employee_id}"
+          - name: managers
+            relationship: many_to_one
+            sql: "{employees}.manager_id = {managers.id}"
+      dimensions:
+          - name: id
+            type: number
+            sql: id
+            primary_key: true
+          - name: name
+            type: string
+            sql: name
+          - name: department
+            type: string
+            sql: department
+      measures:
+          - name: count
+            type: count
+
+    - name: managers
+      sql: "SELECT * FROM employees"
+      dimensions:
+          - name: id
+            type: number
+            sql: id
+            primary_key: true
+          - name: name
+            type: string
+            sql: name
+
+    - name: employee_profiles
+      sql: "SELECT * FROM employee_profiles"
+      dimensions:
+          - name: id
+            type: number
+            sql: id
+            primary_key: true
+          - name: employee_id
+            type: number
+            sql: employee_id
+          - name: email
+            type: string
+            sql: email
+      measures:
+          - name: total_salary
+            type: sum
+            sql: salary
+          - name: avg_salary
+            type: avg
+            sql: salary
+
+    - name: sales
+      sql: "SELECT * FROM sales"
+      joins:
+          - name: targets
+            relationship: many_to_one
+            sql: "{sales}.region = {targets.region} AND {sales}.category = {targets.category}"
+      dimensions:
+          - name: id
+            type: number
+            sql: id
+            primary_key: true
+          - name: region
+            type: string
+            sql: region
+          - name: category
+            type: string
+            sql: category
+      measures:
+          - name: count
+            type: count
+          - name: total_amount
+            type: sum
+            sql: amount
+
+    - name: targets
+      sql: "SELECT * FROM targets"
+      dimensions:
+          - name: id
+            type: number
+            sql: id
+            primary_key: true
+          - name: region
+            type: string
+            sql: region
+          - name: category
+            type: string
+            sql: category
+      measures:
+          - name: total_target
+            type: sum
+            sql: target_amount

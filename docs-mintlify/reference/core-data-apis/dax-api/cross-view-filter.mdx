@@ -1,0 +1,56 @@
+---
+title: Cross-view filtering
+description: "Enable cross-view filtering in the DAX API to build dashboards that span multiple views in Power BI."
+---
+
+By default, the [DAX API][ref-dax-api] exposes each [view][ref-views] as a
+separate perspective in [Power BI][ref-powerbi]. Visualizations from different
+views can't share the same filters, and a single report can't combine measures
+and dimensions across views.
+
+Cross-view filtering removes this limitation, letting you build dashboards
+that span multiple views and apply filters consistently across visualizations.
+
+To use cross-view filters such as slicers, you must enable single-perspective mode
+in the DAX API. To enable single-perspective mode in the DAX API,
+set the `CUBEJS_DAX_SINGLE_PERSPECTIVE` environment variable to `true`.
+
+In single-perspective mode, all views are exposed as part of a single perspective.
+This allows you to use a single connection and show visualizations from different
+views on the same dashboard.
+
+<Warning>
+
+Single-perspective mode changes the way views are exposed by the DAX API.
+Because of that, it is not backwards-compatible with dashboards created before
+enabling this environment variable.
+
+</Warning>
+
+## How it works
+
+Cross-view filters work automatically, provided that the following two
+conditions are met:
+
+- The column used in the filter must be present in every view that the
+cross-filter has to be applied to, and named exactly the same in each view.
+- The column in all such views must resolve to the same cube member.
+
+For example, if views `orders_view` and `users_view` both expose a column named
+`address_country` pointing to the `country.country` cube member, cross-filtering
+will be applied across these views.
+
+If the `address_country` column in `orders_view` points to `orders.country`
+while the `address_country` column in `users_view` points to `users.country`,
+cross-filtering will not be applied, because the columns resolve to different
+cube members.
+
+Likewise, if `orders_view` exposes an `address_country` column pointing to
+`country.country` and `users_view` exposes a `country` column also pointing to
+`country.country`, cross-filtering will not be applied, because the column
+names differ between the views.
+
+
+[ref-dax-api]: /reference/core-data-apis/dax-api
+[ref-views]: /docs/data-modeling/views
+[ref-powerbi]: /admin/connect-to-data/visualization-tools/powerbi

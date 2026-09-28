@@ -1,0 +1,8 @@
+---
+source: cubesqlplanner/src/tests/integration/filters_segments.rs
+expression: result
+---
+customers__name | orders__count
+----------------+--------------
+Alice Cooper    | 2            
+Alice Johnson   | 2

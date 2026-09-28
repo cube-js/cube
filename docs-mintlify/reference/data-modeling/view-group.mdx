@@ -1,0 +1,330 @@
+---
+title: View groups
+description: View groups organize views into named collections, making it easier for data consumers to navigate and discover related views.
+---
+
+View groups let you organize [views][ref-views] into named collections.
+When a data model contains many views, grouping them by domain or purpose
+helps downstream consumers — including AI agents, embedded analytics, and
+visualization tools — discover the right dataset faster.
+
+View groups are returned as a top-level `viewGroups` array in the
+[`/v1/meta`][ref-meta-endpoint] response, alongside the `cubes` array.
+Each view that belongs to at least one group also carries a `viewGroups`
+string array on its own entry.
+
+A view group should have the following parameter: [`name`](#name).
+
+## Parameters
+
+### `name`
+
+The `name` parameter serves as the identifier of a view group. It must be
+unique among all view groups within a deployment and follow the [naming
+conventions][ref-naming].
+
+<CodeGroup>
+
+```yaml title="YAML"
+view_groups:
+  - name: sales
+```
+
+```javascript title="JavaScript"
+view_group(`sales`, {})
+```
+
+</CodeGroup>
+
+### `title`
+
+Use the `title` parameter to set a human-readable display name for the
+view group.
+
+<CodeGroup>
+
+```yaml title="YAML"
+view_groups:
+  - name: sales
+    title: Sales
+```
+
+```javascript title="JavaScript"
+view_group(`sales`, {
+  title: `Sales`
+})
+```
+
+</CodeGroup>
+
+### `description`
+
+This parameter provides a human-readable description of the view group.
+
+<CodeGroup>
+
+```yaml title="YAML"
+view_groups:
+  - name: sales
+    title: Sales
+    description: Revenue, order, and customer views for the sales team
+```
+
+```javascript title="JavaScript"
+view_group(`sales`, {
+  title: `Sales`,
+  description: `Revenue, order, and customer views for the sales team`
+})
+```
+
+</CodeGroup>
+
+### `views`
+
+A list of view names that belong to this group.
+
+<CodeGroup>
+
+```yaml title="YAML"
+view_groups:
+  - name: sales
+    title: Sales
+    views:
+      - orders_overview
+      - revenue
+```
+
+```javascript title="JavaScript"
+view_group(`sales`, {
+  title: `Sales`,
+  views: [`orders_overview`, `revenue`]
+})
+```
+
+</CodeGroup>
+
+## Assigning views to groups
+
+To associate a view with a view group, list its name in the
+[`views`](#views) parameter on the view group.
+
+### Example
+
+The following model defines two view groups. The `sales` group lists
+`orders_overview` and `revenue` in its `views` parameter, while the
+`people` group lists `customers_view`.
+
+<CodeGroup>
+
+```yaml title="YAML"
+cubes:
+  - name: order_items
+    sql_table: ECOMMERCE.ORDER_ITEMS
+
+    measures:
+      - name: count
+        type: count
+
+      - name: total_sale_price
+        sql: sale_price
+        type: sum
+
+    dimensions:
+      - name: id
+        sql: id
+        type: number
+        primary_key: true
+
+      - name: status
+        sql: status
+        type: string
+
+      - name: created_at
+        sql: created_at
+        type: time
+
+  - name: users
+    sql_table: ECOMMERCE.USERS
+
+    measures:
+      - name: count
+        type: count
+
+    dimensions:
+      - name: id
+        sql: id
+        type: number
+        primary_key: true
+
+      - name: city
+        sql: city
+        type: string
+
+views:
+  - name: orders_overview
+    cubes:
+      - join_path: order_items
+        includes:
+          - count
+          - total_sale_price
+          - status
+          - created_at
+
+  - name: revenue
+    cubes:
+      - join_path: order_items
+        includes:
+          - total_sale_price
+          - created_at
+
+  - name: customers_view
+    cubes:
+      - join_path: users
+        includes: "*"
+
+view_groups:
+  - name: sales
+    title: Sales
+    description: Revenue and order views for the sales team
+    views:
+      - orders_overview
+      - revenue
+
+  - name: people
+    title: People
+    description: Customer and user views
+    views:
+      - customers_view
+```
+
+```javascript title="JavaScript"
+cube(`order_items`, {
+  sql_table: `ECOMMERCE.ORDER_ITEMS`,
+
+  measures: {
+    count: {
+      type: `count`
+    },
+
+    total_sale_price: {
+      sql: `sale_price`,
+      type: `sum`
+    }
+  },
+
+  dimensions: {
+    id: {
+      sql: `id`,
+      type: `number`,
+      primary_key: true
+    },
+
+    status: {
+      sql: `status`,
+      type: `string`
+    },
+
+    created_at: {
+      sql: `created_at`,
+      type: `time`
+    }
+  }
+})
+
+cube(`users`, {
+  sql_table: `ECOMMERCE.USERS`,
+
+  measures: {
+    count: {
+      type: `count`
+    }
+  },
+
+  dimensions: {
+    id: {
+      sql: `id`,
+      type: `number`,
+      primary_key: true
+    },
+
+    city: {
+      sql: `city`,
+      type: `string`
+    }
+  }
+})
+
+view(`orders_overview`, {
+  cubes: [
+    {
+      join_path: order_items,
+      includes: [
+        `count`,
+        `total_sale_price`,
+        `status`,
+        `created_at`
+      ]
+    }
+  ]
+})
+
+view(`revenue`, {
+  cubes: [
+    {
+      join_path: order_items,
+      includes: [
+        `total_sale_price`,
+        `created_at`
+      ]
+    }
+  ]
+})
+
+view(`customers_view`, {
+  cubes: [
+    {
+      join_path: users,
+      includes: `*`
+    }
+  ]
+})
+
+view_group(`sales`, {
+  title: `Sales`,
+  description: `Revenue and order views for the sales team`,
+  views: [`orders_overview`, `revenue`]
+})
+
+view_group(`people`, {
+  title: `People`,
+  description: `Customer and user views`,
+  views: [`customers_view`]
+})
+```
+
+</CodeGroup>
+
+With this model, the `/v1/meta` response includes a `viewGroups` array:
+
+```json
+{
+  "viewGroups": [
+    {
+      "name": "sales",
+      "title": "Sales",
+      "description": "Revenue and order views for the sales team",
+      "views": ["orders_overview", "revenue"]
+    },
+    {
+      "name": "people",
+      "title": "People",
+      "description": "Customer and user views",
+      "views": ["customers_view"]
+    }
+  ]
+}
+```
+
+[ref-views]: /docs/data-modeling/views
+[ref-naming]: /docs/data-modeling/concepts/syntax#naming
+[ref-meta-endpoint]: /reference/core-data-apis/rest-api/reference

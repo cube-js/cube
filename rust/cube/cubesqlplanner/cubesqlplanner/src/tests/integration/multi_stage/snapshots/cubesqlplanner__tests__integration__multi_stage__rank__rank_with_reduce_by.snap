@@ -1,0 +1,15 @@
+---
+source: cubesqlplanner/src/tests/integration/multi_stage/rank.rs
+expression: result
+---
+orders__status | orders__category | orders__total_amount | orders__amount_rank_by_status
+---------------+------------------+----------------------+------------------------------
+cancelled      | books            | 100.00               | 3                            
+cancelled      | clothing         | 50.00                | 3                            
+cancelled      | electronics      | 50.00                | 3                            
+completed      | books            | 600.00               | 1                            
+completed      | clothing         | 300.00               | 2                            
+completed      | electronics      | 500.00               | 1                            
+pending        | books            | 180.00               | 2                            
+pending        | clothing         | 370.00               | 1                            
+pending        | electronics      | 100.00               | 2

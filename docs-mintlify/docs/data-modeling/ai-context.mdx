@@ -1,0 +1,353 @@
+---
+title: AI context
+description: Improve AI accuracy and trust by enriching your semantic layer with descriptions and AI-specific context that helps agents generate better insights.
+---
+
+When using [Analytics Chat][ref-analytics-chat] or other AI-powered features,
+the AI agent relies on your data model to understand your data. You can
+optimize your data model to help the AI generate more accurate queries and
+provide better insights.
+
+There are two ways to provide additional context to the AI:
+
+- **Descriptions** — visible to both end users and the AI agent.
+- **AI context via `meta`** — only visible to the AI agent, not exposed in the
+  user interface.
+
+## Using descriptions
+
+The [`description`][ref-cube-description] parameter on cubes, views, measures,
+dimensions, and segments provides human-readable context that is displayed in
+the UI and also consumed by the AI agent.
+
+Use descriptions to clarify the meaning of a member for both your team and
+end users:
+
+<CodeGroup>
+
+```yaml title="YAML"
+cubes:
+  - name: orders
+    sql_table: orders
+    description: All orders including pending, shipped, and completed
+
+    measures:
+      - name: total_revenue
+        sql: amount
+        type: sum
+        description: Total revenue from completed orders only
+        filters:
+          - sql: "{CUBE}.status = 'completed'"
+
+    dimensions:
+      - name: status
+        sql: status
+        type: string
+        description: "Current order status: pending, shipped, or completed"
+```
+
+```javascript title="JavaScript"
+cube(`orders`, {
+  sql_table: `orders`,
+  description: `All orders including pending, shipped, and completed`,
+
+  measures: {
+    total_revenue: {
+      sql: `amount`,
+      type: `sum`,
+      description: `Total revenue from completed orders only`,
+      filters: [{ sql: `${CUBE}.status = 'completed'` }]
+    }
+  },
+
+  dimensions: {
+    status: {
+      sql: `status`,
+      type: `string`,
+      description: `Current order status: pending, shipped, or completed`
+    }
+  }
+})
+```
+
+</CodeGroup>
+
+Descriptions are a good starting point because they serve double duty — they
+help end users understand the data and also give the AI agent context for
+query generation.
+
+## Using AI context
+
+If you want to provide context to the AI agent **without exposing it in the
+user interface**, use the `ai_context` key inside the
+[`meta`][ref-cube-meta] parameter. The `meta` parameter accepts custom
+metadata on views, measures, and dimensions.
+
+<Note>
+
+`ai_context` must be defined on **views** or on **individual members**
+(measures, dimensions). `ai_context` defined at the cube level is **not
+consumed by the AI agent**.
+
+</Note>
+
+Use `ai_context` on [views][ref-view-meta] to provide high-level guidance,
+and on individual members for member-specific instructions:
+
+<CodeGroup>
+
+```yaml title="YAML"
+views:
+  - name: revenue_overview
+    description: Revenue metrics and breakdowns
+    meta:
+      ai_context: >
+        This is the primary view for revenue analysis. It combines
+        order, product, and user data. Use this view when users ask
+        about sales, revenue, or product performance.
+
+    cubes:
+      - join_path: order_items
+        includes:
+          - total_sale_price
+          - count
+          - status
+          - created_at
+      - join_path: order_items.products
+        includes:
+          - brand
+          - category
+```
+
+```javascript title="JavaScript"
+view(`revenue_overview`, {
+  description: `Revenue metrics and breakdowns`,
+  meta: {
+    ai_context: `This is the primary view for revenue analysis. It combines
+      order, product, and user data. Use this view when users ask about
+      sales, revenue, or product performance.`
+  },
+
+  cubes: [
+    {
+      join_path: order_items,
+      includes: [
+        `total_sale_price`,
+        `count`,
+        `status`,
+        `created_at`
+      ]
+    },
+    {
+      join_path: order_items.products,
+      includes: [
+        `brand`,
+        `category`
+      ]
+    }
+  ]
+})
+```
+
+</CodeGroup>
+
+For member-level context, define `ai_context` directly on the measure or
+dimension:
+
+<CodeGroup>
+
+```yaml title="YAML"
+cubes:
+  - name: order_items
+    sql_table: ECOMMERCE.ORDER_ITEMS
+
+    measures:
+      - name: total_sale_price
+        sql: sale_price
+        type: sum
+        format: currency
+        meta:
+          ai_context: >
+            Use this measure for any revenue-related questions.
+            It includes all line items regardless of order status.
+
+    dimensions:
+      - name: created_at
+        sql: created_at
+        type: time
+        meta:
+          ai_context: >
+            This is the order creation timestamp in UTC.
+            For delivery analysis, use delivered_at instead.
+```
+
+```javascript title="JavaScript"
+cube(`order_items`, {
+  sql_table: `ECOMMERCE.ORDER_ITEMS`,
+
+  measures: {
+    total_sale_price: {
+      sql: `sale_price`,
+      type: `sum`,
+      format: `currency`,
+      meta: {
+        ai_context: `Use this measure for any revenue-related questions.
+          It includes all line items regardless of order status.`
+      }
+    }
+  },
+
+  dimensions: {
+    created_at: {
+      sql: `created_at`,
+      type: `time`,
+      meta: {
+        ai_context: `This is the order creation timestamp in UTC.
+          For delivery analysis, use delivered_at instead.`
+      }
+    }
+  }
+})
+```
+
+</CodeGroup>
+
+You can also override member-level `ai_context` when including members in
+a view — for example, to define synonyms or acronyms that only apply in the
+context of that view:
+
+<CodeGroup>
+
+```yaml title="YAML"
+views:
+  - name: sales_overview
+    description: Sales metrics and breakdowns
+    meta:
+      ai_context: >
+        This view is for sales performance analysis across brands.
+
+    cubes:
+      - join_path: order_items
+        includes:
+          - total_sale_price
+      - join_path: order_items.products
+        includes:
+          - name: brand
+            meta:
+              ai_context: >
+                Common acronyms: LC = Lucky Charms,
+                HNC = Honey Nut Cheerios.
+```
+
+```javascript title="JavaScript"
+view(`sales_overview`, {
+  description: `Sales metrics and breakdowns`,
+  meta: {
+    ai_context: `This view is for sales performance analysis across brands.`
+  },
+
+  cubes: [
+    {
+      join_path: order_items,
+      includes: [`total_sale_price`]
+    },
+    {
+      join_path: order_items.products,
+      includes: [
+        {
+          name: `brand`,
+          meta: {
+            ai_context: `Common acronyms: LC = Lucky Charms,
+              HNC = Honey Nut Cheerios.`
+          }
+        }
+      ]
+    }
+  ]
+})
+```
+
+</CodeGroup>
+
+## Descriptions vs. AI context
+
+| | `description` | `meta.ai_context` |
+| --- | --- | --- |
+| Visible in the UI | Yes | No |
+| Used by the AI agent | Yes | Yes |
+| Supported on | Cubes, views, measures, dimensions, segments | Views, measures, dimensions |
+
+Use `description` when the context is useful to both end users and the AI
+agent. Use `ai_context` when you want to provide additional instructions or
+context that is only relevant to the AI agent — for example, guidance on
+which measures to prefer, nuances about data quality, or business logic that
+would be confusing in a user-facing description.
+
+You can use both together. The AI agent reads both the `description` and
+`ai_context` when generating queries:
+
+<CodeGroup>
+
+```yaml title="YAML"
+cubes:
+  - name: order_items
+    sql_table: ECOMMERCE.ORDER_ITEMS
+    description: Line items for all orders
+
+    measures:
+      - name: total_sale_price
+        sql: sale_price
+        type: sum
+        format: currency
+        description: Total revenue across all line items
+        meta:
+          ai_context: >
+            This is the primary revenue metric. Always use this
+            instead of summing the sale_price column directly.
+            When users ask about "sales", they mean this measure.
+```
+
+```javascript title="JavaScript"
+cube(`order_items`, {
+  sql_table: `ECOMMERCE.ORDER_ITEMS`,
+  description: `Line items for all orders`,
+
+  measures: {
+    total_sale_price: {
+      sql: `sale_price`,
+      type: `sum`,
+      format: `currency`,
+      description: `Total revenue across all line items`,
+      meta: {
+        ai_context: `This is the primary revenue metric. Always use this
+          instead of summing the sale_price column directly.
+          When users ask about "sales", they mean this measure.`
+      }
+    }
+  }
+})
+```
+
+</CodeGroup>
+
+## Best practices
+
+- **Add descriptions to all public members.** Descriptions help both end users
+  and the AI agent understand your data model.
+- **Use AI context for agent-specific guidance.** If you need to tell the AI
+  agent which measure to prefer or how to interpret ambiguous terms, use
+  `ai_context`.
+- **Define context on views or individual members.** `ai_context` defined
+  at the cube level is not consumed by the AI agent. Place it on the view
+  itself or on individual measures and dimensions.
+- **Be specific.** Vague context like "important metric" is less helpful than
+  "use this measure when users ask about monthly recurring revenue."
+- **Document relationships.** Use AI context to explain how cubes relate to each
+  other and which views to prefer for common questions.
+- **Keep it up to date.** As your data model evolves, update descriptions and AI
+  context to reflect the current state.
+
+[ref-analytics-chat]: /docs/explore-analyze/analytics-chat
+[ref-cube-description]: /reference/data-modeling/cube#description
+[ref-cube-meta]: /reference/data-modeling/cube#meta
+[ref-view-meta]: /reference/data-modeling/view#meta

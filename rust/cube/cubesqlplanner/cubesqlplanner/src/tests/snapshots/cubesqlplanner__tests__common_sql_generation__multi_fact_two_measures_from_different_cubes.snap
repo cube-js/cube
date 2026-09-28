@@ -1,0 +1,9 @@
+---
+source: cubesqlplanner/src/tests/common_sql_generation.rs
+expression: result
+---
+customers__name | orders__count | returns__count
+----------------+---------------+---------------
+Alice           | 3             | 1             
+Bob             | 1             | 0             
+Charlie         | 0             | 2

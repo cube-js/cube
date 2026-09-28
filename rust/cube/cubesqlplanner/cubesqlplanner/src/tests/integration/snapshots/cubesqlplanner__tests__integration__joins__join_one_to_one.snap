@@ -1,0 +1,8 @@
+---
+source: cubesqlplanner/src/tests/integration/joins.rs
+expression: result
+---
+employees__department | employee_profiles__total_salary
+----------------------+--------------------------------
+Engineering           | 380000.00                      
+Sales                 | 230000.00

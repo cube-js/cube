@@ -1,0 +1,13 @@
+---
+source: cubesqlplanner/src/tests/integration/time_dimensions.rs
+expression: result
+---
+orders__created_at_week | orders__count
+------------------------+--------------
+2024-01-15 00:00:00     | 3            
+2024-02-05 00:00:00     | 1            
+2024-02-12 00:00:00     | 1            
+2024-02-26 00:00:00     | 1            
+2024-03-04 00:00:00     | 1            
+2024-03-11 00:00:00     | 1            
+2024-04-01 00:00:00     | 1

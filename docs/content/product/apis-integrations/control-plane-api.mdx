@@ -1,0 +1,218 @@
+# Control Plane API
+
+Control Plane API enables programmatic management of [deployments][ref-deployments]
+and [environments][ref-environments] in Cube Cloud. You can use it to list
+deployments, manage environments, and generate JWT tokens for accessing
+[Core Data APIs][ref-core-data-apis].
+
+<InfoBox>
+
+Control Plane API is only available in Cube Cloud.
+
+</InfoBox>
+
+## Prerequisites
+
+### Authentication
+
+Control Plane API uses [API key][ref-api-keys] authentication. Include your API
+key in the `Authorization` header with the `Api-Key` prefix:
+
+```bash
+curl \
+  -H "Authorization: Api-Key YOUR_API_KEY" \
+  https://YOUR_CUBE_CLOUD_HOST/api/v1/deployments
+```
+
+### Error handling
+
+In case of an error, Control Plane API returns a JSON object with an `error` property:
+
+```json
+{
+  "error": "Error message"
+}
+```
+
+### Pagination
+
+Endpoints that return lists support pagination using `offset` and `limit` query
+parameters:
+
+| Parameter | Description |
+| --- | --- |
+| `offset` | Number of items to skip. Default: `0` |
+| `limit` | Maximum number of items to return. Default: `20` |
+
+Paginated responses include a `pagination` object:
+
+```json
+{
+  "data": [...],
+  "pagination": {
+    "offset": 0,
+    "limit": 20,
+    "total": 42
+  }
+}
+```
+
+## Reference
+
+### `/api/v1/deployments`
+
+Send a `GET` request to list all [deployments][ref-deployments] accessible to the authenticated user.
+
+Query parameters:
+
+| Parameter | Description | Required |
+| --- | --- | --- |
+| `offset` | Pagination offset | No |
+| `limit` | Pagination limit | No |
+
+Example request:
+
+```bash
+curl \
+  -H "Authorization: Api-Key YOUR_API_KEY" \
+  "https://YOUR_CUBE_CLOUD_HOST/api/v1/deployments"
+```
+
+Example response:
+
+```json
+{
+  "data": {
+    "deployments": [
+      {
+        "id": "123",
+        "name": "My Deployment",
+        "created_at": "2024-01-15T10:30:00.000Z"
+      }
+    ]
+  },
+  "pagination": {
+    "offset": 0,
+    "limit": 20,
+    "total": 1
+  }
+}
+```
+
+### `/api/v1/deployments/{deployment_id}/environments`
+
+Send a `GET` request to list [environments][ref-environments] for a specific [deployment][ref-deployments].
+
+Path parameters:
+
+| Parameter | Description |
+| --- | --- |
+| `deployment_id` | The deployment ID |
+
+Query parameters:
+
+| Parameter | Description | Required |
+| --- | --- | --- |
+| `type` | Filter by environment type: `production`, `staging`, or `development` | No |
+| `offset` | Pagination offset | No |
+| `limit` | Pagination limit | No |
+
+Example request:
+
+```bash
+curl \
+  -H "Authorization: Api-Key YOUR_API_KEY" \
+  "https://YOUR_CUBE_CLOUD_HOST/api/v1/deployments/123/environments"
+```
+
+Example response:
+
+```json
+{
+  "data": {
+    "environments": [
+      {
+        "id": "456",
+        "name": "Production",
+        "type": "production",
+        "api_credentials": {
+          "rest": {
+            "url": "https://example.cubecloud.dev/cubejs-api"
+          },
+          "sql": {
+            "host": "example.sql.cubecloud.dev",
+            "port": 5432
+          }
+        }
+      }
+    ]
+  },
+  "pagination": {
+    "offset": 0,
+    "limit": 20,
+    "total": 1
+  }
+}
+```
+
+### `/api/v1/deployments/{deployment_id}/environments/{environment_id}/tokens-for-meta-sync`
+
+Send a `POST` request to create a JWT token for accessing the
+[Metadata API][ref-metadata-api]. The generated token is scoped specifically
+to metadata endpoints (e.g., `/v1/data-sources`, `/v1/entities`) and cannot
+be used to query data via the [REST API][ref-rest-api]. This makes it suitable
+for integrations such as data catalogs and lineage tools that only need to
+read data model metadata.
+
+The [security context][ref-security-context] you provide is embedded in the
+token and controls which parts of the data model are visible, following the
+same multi-tenancy rules as regular API tokens.
+
+Path parameters:
+
+| Parameter | Description |
+| --- | --- |
+| `deployment_id` | The deployment ID |
+| `environment_id` | The environment ID |
+
+Request body:
+
+| Property | Type | Description | Required |
+| --- | --- | --- | --- |
+| `security_context` | `object` | [Security context][ref-security-context] to embed in the token. Controls data model visibility based on your multi-tenancy configuration. | Yes |
+| `expires_in` | `number` | Token expiration time in seconds. Default: `86400` (24 hours) | No |
+
+Example request:
+
+```bash
+curl \
+  -X POST \
+  -H "Authorization: Api-Key YOUR_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "security_context": {"tenant_id": "acme"},
+    "expires_in": 3600
+  }' \
+  "https://YOUR_CUBE_CLOUD_HOST/api/v1/deployments/123/environments/456/tokens-for-meta-sync"
+```
+
+Example response:
+
+```json
+{
+  "data": {
+    "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+    "created_at": "2024-01-15T10:30:00.000Z",
+    "expires_at": "2024-01-15T11:30:00.000Z"
+  }
+}
+```
+
+
+[ref-core-data-apis]: /product/apis-integrations/core-data-apis
+[ref-rest-api]: /product/apis-integrations/core-data-apis/rest-api
+[ref-metadata-api]: /product/apis-integrations/core-data-apis/rest-api/reference#metadata-api
+[ref-deployments]: /product/administration/deployment/deployments
+[ref-environments]: /product/administration/workspace/environments
+[ref-api-keys]: /product/administration/api-keys
+[ref-security-context]: /product/auth/context

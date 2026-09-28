@@ -1,0 +1,10 @@
+---
+source: cubesqlplanner/src/tests/integration/joins.rs
+expression: result
+---
+managers__name | employees__count
+---------------+-----------------
+Alice          | 2               
+Bob            | 1               
+Charlie        | 1               
+NULL           | 1

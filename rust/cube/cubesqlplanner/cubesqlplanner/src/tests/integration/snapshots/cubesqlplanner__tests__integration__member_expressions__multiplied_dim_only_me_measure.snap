@@ -1,0 +1,10 @@
+---
+source: cubesqlplanner/cubesqlplanner/src/tests/integration/member_expressions.rs
+assertion_line: 176
+expression: result
+---
+orders__status | orders__count | city_max     
+---------------+---------------+--------------
+completed      | 5             | San Francisco
+pending        | 3             | San Francisco
+cancelled      | 1             | NULL

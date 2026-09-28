@@ -169,7 +169,7 @@ describe('SQL API', () => {
       const execute = () => new Promise<void>((resolve, reject) => {
         const onData = jest.fn((chunk: Buffer) => {
           const chunkStr = chunk.toString('utf-8');
-          
+
           if (isFirstChunk) {
             isFirstChunk = false;
             const json = JSON.parse(chunkStr);
@@ -201,13 +201,13 @@ describe('SQL API', () => {
       });
 
       await execute();
-      
+
       // Verify schema was sent first
       expect(schemaReceived).toBe(true);
-      
+
       // Verify empty data was sent
       expect(emptyDataReceived).toBe(true);
-      
+
       // Verify no actual rows were returned
       const dataLines = data.split('\n').filter((it) => it.trim());
       if (dataLines.length > 0) {
@@ -216,6 +216,29 @@ describe('SQL API', () => {
           .reduce((a, b) => a + b, 0);
         expect(rows).toBe(0);
       }
+    });
+
+    it('includes format in schema columns', async () => {
+      const response = await fetch(`${birdbox.configuration.apiUrl}/cubesql`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: token,
+        },
+        body: JSON.stringify({
+          query: 'SELECT DATE_TRUNC(\'year\', createdAt) AS createdAt, totalAmount, numberTotal, status FROM Orders LIMIT 1',
+        }),
+      });
+
+      const text = await response.text();
+      const { schema } = JSON.parse(text.split('\n')[0]);
+
+      expect(schema).toEqual([
+        { name: 'createdAt', column_type: 'Timestamp', format: { type: 'custom-time', value: '%Y-%m-%d' } },
+        { name: 'totalAmount', column_type: 'Double', format: 'currency', currency: 'USD' },
+        { name: 'numberTotal', column_type: 'Double', format: { type: 'custom-numeric', value: '$,.2f' } },
+        { name: 'status', column_type: 'String' },
+      ]);
     });
 
     describe('sql4sql', () => {
@@ -315,6 +338,59 @@ describe('SQL API', () => {
       it('set variable', async () => {
         expect(await generateSql(`
           SET MyVariable = 'Foo'
+        `)).toMatchSnapshot();
+      });
+    });
+
+    describe('Query convert API', () => {
+      async function generateSql(query: string) {
+        const response = await fetch(`${birdbox.configuration.apiUrl}/convert-query`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: token,
+          },
+          body: JSON.stringify({
+            input: 'sql',
+            output: 'rest',
+            query,
+          }),
+        });
+        const { status, statusText } = response;
+        const body = await response.json();
+
+        // To stabilize responses
+        delete body.requestId;
+
+        return {
+          status,
+          statusText,
+          body,
+        };
+      }
+
+      it('regular query', async () => {
+        expect(await generateSql('SELECT SUM(totalAmount) AS total FROM Orders;')).toMatchSnapshot();
+      });
+
+      it('regular query with filter', async () => {
+        expect(await generateSql('SELECT SUM(totalAmount) AS total FROM Orders WHERE status = \'foo\';')).toMatchSnapshot();
+      });
+
+      it('regular query with time dimension filter', async () => {
+        expect(await generateSql(`
+          SELECT status
+          FROM Orders
+          WHERE createdAt > CAST('2024-01-01' AS DATE) and createdAt < CAST('2026-01-01' AS DATE)
+        `)).toMatchSnapshot();
+      });
+
+      it('wrapper with parameters', async () => {
+        expect(await generateSql(`
+          SELECT
+            SUM(totalAmount) AS total
+          FROM Orders
+          WHERE LOWER(status) = 'foo'
         `)).toMatchSnapshot();
       });
     });
@@ -957,6 +1033,38 @@ filter_subq AS (
       expect(res.rows).toMatchSnapshot('measure-with-ad-hoc-filters-and-original-measure');
     });
 
+    test('measure in view with ad-hoc filter', async () => {
+      const query = `
+      SELECT
+        SUM(CASE
+          WHEN status = 'processed' THEN totalAmount
+        END) AS new_amount,
+        AVG(CASE
+          WHEN status = 'processed' THEN avgAmount
+        END) AS new_avg_amount,
+        MIN(CASE
+          WHEN status = 'processed' THEN minAmount
+        END) AS new_min_amount,
+        MAX(CASE
+          WHEN status = 'processed' THEN maxAmount
+        END) AS new_max_amount,
+        COUNT(DISTINCT CASE
+          WHEN status = 'shipped' THEN orderCount
+        END) AS new_count_distinct
+
+        /* Works but testing Postgres does not include "hll_hash_any" function
+        APPROX_DISTINCT(CASE
+          WHEN status = 'shipped' THEN approxOrderCount
+        END) AS new_approx_distinct
+        */
+      FROM
+        OrdersView
+      `;
+
+      const res = await connection.query(query);
+      expect(res.rows).toMatchSnapshot('measure-in-view-with-ad-hoc-filters');
+    });
+
     /// Query references `updatedAt` in three places: in outer projection, in grouping key and in window
     /// Incoming query is consistent: all three references same column
     /// This tests that generated SQL for pushdown remains consistent:
@@ -983,6 +1091,85 @@ filter_subq AS (
 
       const res = await connection.query(query);
       expect(res.rows).toMatchSnapshot();
+    });
+  });
+
+  describe('Query cancellation by request ID', () => {
+    test('cancel a running query via REST API', async () => {
+      const requestId = 'cancel-test-request-id-12345';
+      const token = jwt.sign({ user: 'admin' }, DEFAULT_CONFIG.CUBEJS_API_SECRET, { expiresIn: '1h' });
+
+      // Connect directly to the underlying Postgres to check pg_stat_activity
+      const pgConn = new PgClient({
+        host: db.getHost(),
+        port: db.getMappedPort(5432),
+        database: 'test',
+        user: 'test',
+        password: 'test',
+        ssl: false,
+      });
+      await pgConn.connect();
+
+      try {
+        // Start a slow query (pg_sleep(30) in the SlowQuery cube SQL)
+        // via the REST SQL API. Use AbortController so we can close the
+        // connection to trigger the Rust-side close detection.
+        const abortController = new AbortController();
+        const queryPromise = fetch(`${birdbox.configuration.apiUrl}/cubesql`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: token,
+            'x-request-id': requestId,
+          },
+          body: JSON.stringify({
+            query: 'SELECT count FROM SlowQuery',
+          }),
+          signal: abortController.signal,
+        }).then(r => r.text()).catch(e => e);
+
+        // Wait for pg_sleep to appear in pg_stat_activity
+        let sleepRunning = false;
+        for (let i = 0; i < 20; i++) {
+          await new Promise(resolve => setTimeout(resolve, 500));
+          const { rows } = await pgConn.query(
+            "SELECT count(*) as cnt FROM pg_stat_activity WHERE query LIKE '%pg_sleep%' AND state = 'active' AND pid != pg_backend_pid()"
+          );
+          if (parseInt(rows[0].cnt, 10) > 0) {
+            sleepRunning = true;
+            break;
+          }
+        }
+        expect(sleepRunning).toBe(true);
+
+        // Close the HTTP connection — this triggers the Rust-side
+        // OnCloseHandler which drops the execute future via tokio::select!
+        abortController.abort();
+        await queryPromise;
+
+        // Cancel the query in the queue by request ID
+        const cancelRes = await fetch(`${birdbox.configuration.apiUrl}/running-query/${requestId}`, {
+          method: 'DELETE',
+          headers: { Authorization: token },
+        });
+        expect(cancelRes.status).toBe(200);
+
+        await new Promise(resolve => setTimeout(resolve, 2000));
+
+        // A second cancel should return empty — the query is gone from the queue
+        const cancelRes2 = await fetch(`${birdbox.configuration.apiUrl}/running-query/${requestId}`, {
+          method: 'DELETE',
+          headers: { Authorization: token },
+        });
+        const cancelBody2 = await cancelRes2.json() as any;
+        expect(cancelBody2.result).toEqual([]);
+      } finally {
+        // pg_terminate_backend for any lingering pg_sleep queries
+        await pgConn.query(
+          "SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE query LIKE '%pg_sleep%' AND state = 'active' AND pid != pg_backend_pid()"
+        );
+        await pgConn.end();
+      }
     });
   });
 });

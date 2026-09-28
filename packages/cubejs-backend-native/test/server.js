@@ -4,16 +4,6 @@ const native = require('../js/index');
 const meta_fixture = require('./meta');
 
 (async () => {
-  const load = async ({ request, session, query }) => {
-    console.log('[js] load', {
-      request,
-      session,
-      query,
-    });
-
-    throw new Error('load is not implemented');
-  };
-
   const sqlApiLoad = async ({ request, session, query, streaming }) => {
     console.log('[js] sqlApiLoad', {
       request,
@@ -116,12 +106,12 @@ const meta_fixture = require('./meta');
   native.setupLogger(
     ({ event }) => console.log(event),
     'trace',
+    false,
   );
 
   const server = await native.registerInterface({
     // nonce: '12345678910111213141516'.substring(0, 20),
     checkAuth,
-    load,
     sql,
     meta,
     stream,

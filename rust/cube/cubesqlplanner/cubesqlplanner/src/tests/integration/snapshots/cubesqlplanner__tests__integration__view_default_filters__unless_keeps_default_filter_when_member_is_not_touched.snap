@@ -1,0 +1,12 @@
+---
+source: cubesqlplanner/cubesqlplanner/src/tests/integration/view_default_filters.rs
+assertion_line: 104
+expression: result
+---
+orders_view_with_unless__country | orders_view_with_unless__count
+---------------------------------+-------------------------------
+CA                               | 1                             
+DE                               | 1                             
+FR                               | 1                             
+GB                               | 1                             
+US                               | 1

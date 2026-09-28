@@ -1,0 +1,9 @@
+---
+source: cubesqlplanner/src/tests/integration/multi_stage/granularities.rs
+expression: result
+---
+orders__created_at_month | orders__total_amount | orders__amount_prev_month
+-------------------------+----------------------+--------------------------
+2024-01-01 00:00:00      | 500.00               | NULL                     
+2024-02-01 00:00:00      | 750.00               | 500.00                   
+2024-03-01 00:00:00      | 1000.00              | 750.00

@@ -1,13 +1,11 @@
-/// <reference types="vitest" />
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
-import environmentPlugin from 'vite-plugin-environment';
 
 export default defineConfig(({ mode }) => ({
   base: './',
   build: {
     outDir: 'build',
-    target: 'es2018',
+    target: 'es2020',
   },
   server: {
     port: 3080,
@@ -17,12 +15,6 @@ export default defineConfig(({ mode }) => ({
     },
   },
   plugins: [
-    environmentPlugin(
-      {
-        SC_DISABLE_SPEEDY: 'false',
-      },
-      { loadEnvFiles: true }
-    ),
     react(),
   ],
   css: {
@@ -33,10 +25,8 @@ export default defineConfig(({ mode }) => ({
       },
     },
   },
-  define:
-    mode === 'development'
-      ? {
-          global: {},
-        }
-      : undefined,
+  define: {
+    'process.env.SC_DISABLE_SPEEDY': JSON.stringify('false'),
+    ...(mode === 'development' ? { global: {} } : {}),
+  },
 }));

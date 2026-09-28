@@ -24,7 +24,8 @@ pub enum LazyRocksCacheStoreState {
         metastore_fs: Arc<dyn MetaStoreFs>,
         config: Arc<dyn ConfigObj>,
         listeners: Vec<tokio::sync::broadcast::Sender<MetaStoreEvent>>,
-        _init_flag: Sender<bool>,
+        #[allow(dead_code)] // Receiver closed on drop
+        init_flag: Sender<bool>,
     },
     Closed {},
     Initialized {
@@ -72,7 +73,7 @@ impl LazyRocksCacheStore {
                 metastore_fs,
                 config,
                 listeners,
-                _init_flag: init_flag,
+                init_flag,
             }),
         }))
     }
@@ -101,7 +102,7 @@ impl LazyRocksCacheStore {
                 config,
                 listeners,
                 // receiver will be closed on drop
-                _init_flag: _,
+                init_flag: _,
             } => {
                 let store =
                     RocksCacheStore::load_from_remote(&path, metastore_fs.clone(), config.clone())
@@ -248,10 +249,17 @@ impl CacheStore for LazyRocksCacheStore {
         status_filter: Option<QueueItemStatus>,
         priority_sort: bool,
         with_payload: bool,
+        caller_process_id: Option<String>,
     ) -> Result<Vec<QueueListItem>, CubeError> {
         self.init()
             .await?
-            .queue_list(prefix, status_filter, priority_sort, with_payload)
+            .queue_list(
+                prefix,
+                status_filter,
+                priority_sort,
+                with_payload,
+                caller_process_id,
+            )
             .await
     }
 
@@ -271,10 +279,11 @@ impl CacheStore for LazyRocksCacheStore {
         &self,
         path: String,
         allow_concurrency: u32,
+        caller_process_id: Option<String>,
     ) -> Result<QueueRetrieveResponse, CubeError> {
         self.init()
             .await?
-            .queue_retrieve_by_path(path, allow_concurrency)
+            .queue_retrieve_by_path(path, allow_concurrency, caller_process_id)
             .await
     }
 
@@ -282,11 +291,12 @@ impl CacheStore for LazyRocksCacheStore {
         self.init().await?.queue_ack(key, result).await
     }
 
-    async fn queue_result_by_path(
+    async fn queue_result(
         &self,
-        path: String,
+        key: QueueKey,
+        external_id: Option<String>,
     ) -> Result<Option<QueueResultResponse>, CubeError> {
-        self.init().await?.queue_result_by_path(path).await
+        self.init().await?.queue_result(key, external_id).await
     }
 
     async fn queue_result_blocking(

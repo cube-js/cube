@@ -1,0 +1,9 @@
+---
+source: cubesqlplanner/src/tests/common_sql_generation.rs
+expression: result
+---
+cube_c__created_at_day | cube_a__count
+-----------------------+--------------
+2025-01-01 00:00:00    | 2            
+2025-01-02 00:00:00    | 2            
+2025-01-03 00:00:00    | 1

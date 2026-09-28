@@ -1,0 +1,110 @@
+---
+description: Mintlify MDX parsing gotchas — patterns that look correct but render broken
+globs: docs-mintlify/**
+alwaysApply: true
+---
+
+# Mintlify MDX gotchas
+
+Mintlify uses MDX (Markdown + JSX). A handful of patterns parse cleanly in
+plain Markdown but render broken once wrapped in JSX components like
+`<Step>`. Use these rules when authoring or editing pages in
+`docs-mintlify/`.
+
+## `<Step>` must start with prose, not a fenced code block
+
+When a fenced code block is the **first child** of a `<Step>` component,
+Mintlify's MDX parser collapses the entire block onto one line, exposing
+the literal triple backticks. Every `<Step>` body must begin with at least
+one line of prose (a single sentence is enough).
+
+❌ Renders broken — fence is the first child:
+
+````mdx
+<Step title="Attach the bucket permissions">
+  ```json
+  {
+    "Version": "2012-10-17",
+    ...
+  }
+  ```
+</Step>
+````
+
+✅ Add a one-line lead-in:
+
+````mdx
+<Step title="Attach the bucket permissions">
+  Allow the role to read, write, and list objects in your bucket:
+
+  ```json
+  {
+    "Version": "2012-10-17",
+    ...
+  }
+  ```
+</Step>
+````
+
+The intro line also reads better — it tells the user what the snippet does
+before they hit it. Apply the same rule to any code block (`json`, `bash`,
+`dotenv`, `yaml`, `sql`, …) that would otherwise be the first child of a
+`<Step>`.
+
+This rule applies anywhere a fenced code block sits at the top of a JSX
+component body. `<Step>` is the most common offender; `<Tab>` and `<Card>`
+behave the same way.
+
+## Angle-bracket placeholders must be backticked in prose
+
+`<tenant-name>`, `<aws-account-id>`, `<deployment-id>`, etc. are useful
+placeholders inside fenced code blocks (they're plain text there) but in
+prose they have to be wrapped in backticks. Otherwise MDX tries to parse
+them as JSX components and either errors out or silently swallows them.
+
+❌ MDX tries to parse `<tenant-name>` as a component:
+
+```mdx
+The issuer URL is https://<tenant-name>.cubecloud.dev.
+```
+
+✅ Backticked:
+
+```mdx
+The issuer URL is `https://<tenant-name>.cubecloud.dev`.
+```
+
+Inside fenced ```` ``` ```` blocks (and Mermaid diagrams that don't pass
+through the JSX parser) the bare form is fine.
+
+## Mermaid participant labels can't carry angle-bracket placeholders
+
+Mermaid renders `<br/>` inside participant labels as a line break, but it
+doesn't tolerate other `<…>` tags — they break the diagram. Use a plain
+description ("your tenant URL") instead of `<tenant-name>.cubecloud.dev`
+in `participant` labels.
+
+## Bash heredoc / assignment with `<placeholder>` breaks copy-paste
+
+`PROJECT_NUMBER=<project-number>` looks fine in a doc, but bash interprets
+`<` as input redirection — pasting the line errors out. Quote it:
+
+```bash
+PROJECT_NUMBER="<project-number>"
+DEPLOYMENT_ID="<deployment-id>"
+```
+
+Quotes preserve the placeholder visually and let the user `sed`-replace
+without the line failing first.
+
+## Don't use a body H1
+
+Mintlify renders the frontmatter `title` as the page H1. Adding `# Heading`
+in the body produces two H1s and breaks the doc outline. Use `## Heading`
+for the first body section.
+
+## Verifying
+
+`mintlify dev --no-open` boots a local preview and surfaces compile errors
+on startup. `mintlify broken-links` flags dead internal anchors. Run both
+before publishing a non-trivial doc change.

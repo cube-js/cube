@@ -1,0 +1,207 @@
+cubes:
+    - name: customers
+      sql: "SELECT * FROM customers"
+      joins:
+          - name: orders
+            relationship: one_to_many
+            sql: "{customers}.id = {orders.customer_id}"
+          - name: returns
+            relationship: one_to_many
+            sql: "{customers}.id = {returns.customer_id}"
+          - name: addresses
+            relationship: one_to_many
+            sql: "{customers}.id = {addresses.customer_id}"
+      dimensions:
+          - name: id
+            type: number
+            sql: id
+            primary_key: true
+          - name: name
+            type: string
+            sql: name
+          - name: city
+            type: string
+            sql: city
+          - name: created_at
+            type: time
+            sql: created_at
+      measures:
+          - name: count
+            type: count
+          - name: total_lifetime_value
+            type: sum
+            sql: lifetime_value
+      pre_aggregations:
+          # Multiplied pre-agg: customer measures aggregated by joined cube dim
+          - name: customers_by_order_status
+            type: rollup
+            measures:
+                - count
+                - total_lifetime_value
+            dimensions:
+                - orders.status
+          - name: customers_by_order_status_with_name
+            type: rollup
+            measures:
+                - count
+                - total_lifetime_value
+            dimensions:
+                - orders.status
+                - name
+          # Cross-cube rollup: multiplied customer measure + regular orders measure.
+          # Designed to match both regular orders subquery and multiplied
+          # customers subquery in a single multi-fact + multiplied query.
+          - name: customers_and_orders_combo
+            type: rollup
+            measures:
+                - count
+                - orders.count
+            dimensions:
+                - city
+          - name: customers_and_orders_combo_with_name
+            type: rollup
+            measures:
+                - count
+                - orders.count
+            dimensions:
+                - city
+                - name
+          # Multiplied customers rollup by addresses.street (one_to_many)
+          - name: customers_by_addr_street
+            type: rollup
+            measures:
+                - count
+            dimensions:
+                - addresses.street
+
+    - name: orders
+      sql: "SELECT * FROM orders"
+      dimensions:
+          - name: id
+            type: number
+            sql: id
+            primary_key: true
+          - name: customer_id
+            type: number
+            sql: customer_id
+          - name: status
+            type: string
+            sql: status
+          - name: created_at
+            type: time
+            sql: created_at
+      measures:
+          - name: count
+            type: count
+          - name: total_amount
+            type: sum
+            sql: amount
+      pre_aggregations:
+          - name: orders_totals
+            type: rollup
+            measures:
+                - count
+                - total_amount
+          - name: orders_by_customer_city
+            type: rollup
+            measures:
+                - count
+                - total_amount
+            dimensions:
+                - customers.city
+          - name: orders_by_customer_city_with_name
+            type: rollup
+            measures:
+                - count
+                - total_amount
+            dimensions:
+                - customers.city
+                - customers.name
+          - name: orders_by_status
+            type: rollup
+            measures:
+                - count
+                - total_amount
+            dimensions:
+                - status
+          # Multiplied orders rollup: path orders → customers → addresses
+          # passes through one_to_many, so orders.count is multiplied here.
+          - name: orders_by_addr_street
+            type: rollup
+            measures:
+                - count
+            dimensions:
+                - addresses.street
+
+    - name: returns
+      sql: "SELECT * FROM returns"
+      dimensions:
+          - name: id
+            type: number
+            sql: id
+            primary_key: true
+          - name: customer_id
+            type: number
+            sql: customer_id
+          - name: reason
+            type: string
+            sql: reason
+          - name: created_at
+            type: time
+            sql: created_at
+      measures:
+          - name: count
+            type: count
+          - name: total_refund
+            type: sum
+            sql: refund_amount
+      pre_aggregations:
+          - name: returns_totals
+            type: rollup
+            measures:
+                - count
+                - total_refund
+          - name: returns_by_customer_city
+            type: rollup
+            measures:
+                - count
+                - total_refund
+            dimensions:
+                - customers.city
+          - name: returns_by_customer_city_with_name
+            type: rollup
+            measures:
+                - count
+                - total_refund
+            dimensions:
+                - customers.city
+                - customers.name
+
+    - name: addresses
+      sql: "SELECT * FROM addresses"
+      joins:
+          - name: customers
+            relationship: many_to_one
+            sql: "{addresses.customer_id} = {customers.id}"
+      dimensions:
+          - name: id
+            type: number
+            sql: id
+            primary_key: true
+          - name: customer_id
+            type: number
+            sql: customer_id
+          - name: street
+            type: string
+            sql: street
+      measures:
+          - name: count
+            type: count
+      pre_aggregations:
+          # Regular rollup (own cube dim)
+          - name: addresses_by_street
+            type: rollup
+            measures:
+                - count
+            dimensions:
+                - street

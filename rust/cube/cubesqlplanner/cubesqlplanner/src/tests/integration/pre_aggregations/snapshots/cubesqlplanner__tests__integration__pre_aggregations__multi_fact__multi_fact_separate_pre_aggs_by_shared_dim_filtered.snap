@@ -1,0 +1,7 @@
+---
+source: cubesqlplanner/src/tests/integration/pre_aggregations/multi_fact.rs
+expression: result
+---
+customers__city | orders__count | orders__total_amount | returns__count | returns__total_refund
+----------------+---------------+----------------------+----------------+----------------------
+New York        | 4             | 425.00               | 1              | 100.00

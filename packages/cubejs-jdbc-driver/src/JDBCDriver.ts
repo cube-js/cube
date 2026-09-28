@@ -8,16 +8,17 @@ import {
   getEnv,
   assertDataSource,
   CancelablePromise,
+  Pool,
 } from '@cubejs-backend/shared';
 import {
   BaseDriver,
+  createPoolName,
   DownloadQueryResultsOptions,
   DownloadQueryResultsResult,
   StreamOptions,
 } from '@cubejs-backend/base-driver';
 import * as SqlString from 'sqlstring';
 import { promisify } from 'util';
-import genericPool, { Factory, Pool } from 'generic-pool';
 import path from 'path';
 
 import { SupportedDrivers } from './supported-drivers';
@@ -72,14 +73,10 @@ Connection.prototype.getMetaDataAsync = promisify(Connection.prototype.getMetaDa
 DatabaseMetaData.prototype.getSchemasAsync = promisify(DatabaseMetaData.prototype.getSchemas);
 DatabaseMetaData.prototype.getTablesAsync = promisify(DatabaseMetaData.prototype.getTables);
 
-interface ExtendedPool extends Pool<any> {
-  _factory: Factory<any>;
-}
-
 export class JDBCDriver extends BaseDriver {
   protected readonly config: JDBCDriverConfiguration;
 
-  protected pool: ExtendedPool;
+  protected pool: Pool<any>;
 
   protected jdbcProps: any;
 
@@ -89,6 +86,11 @@ export class JDBCDriver extends BaseDriver {
        * Data source name.
        */
       dataSource?: string,
+
+      /**
+       * Whether this driver is used for pre-aggregations.
+       */
+      preAggregations?: boolean,
 
       /**
        * Max pool size value for the [cube]<-->[db] pool.
@@ -109,20 +111,21 @@ export class JDBCDriver extends BaseDriver {
     const dataSource =
       config.dataSource ||
       assertDataSource('default');
+    const preAggregations = config.preAggregations || false;
 
     const { poolOptions, ...dbOptions } = config;
 
     const dbTypeDescription = JDBCDriver.dbTypeDescription(
-      <string>(config.dbType || getEnv('dbType', { dataSource })),
+      <string>(config.dbType || getEnv('dbType', { dataSource, preAggregations })),
     );
 
     this.config = {
-      dbType: getEnv('dbType', { dataSource }),
+      dbType: getEnv('dbType', { dataSource, preAggregations }),
       url:
-        getEnv('jdbcUrl', { dataSource }) ||
+        getEnv('jdbcUrl', { dataSource, preAggregations }) ||
         dbTypeDescription && dbTypeDescription.jdbcUrl(),
       drivername:
-        getEnv('jdbcDriver', { dataSource }) ||
+        getEnv('jdbcDriver', { dataSource, preAggregations }) ||
         dbTypeDescription && dbTypeDescription.driverClass,
       properties: dbTypeDescription && dbTypeDescription.properties,
       ...dbOptions
@@ -136,7 +139,8 @@ export class JDBCDriver extends BaseDriver {
       throw new Error('url is required property');
     }
 
-    this.pool = genericPool.createPool({
+    const poolName = createPoolName('jdbc', dataSource, preAggregations);
+    this.pool = new Pool(poolName, {
       create: async () => {
         await initMvn(await this.getCustomClassPath());
 
@@ -175,14 +179,14 @@ export class JDBCDriver extends BaseDriver {
       )
     }, {
       min: 0,
-      max: config.maxPoolSize || getEnv('dbMaxPoolSize', { dataSource }) || 8,
+      max: config.maxPoolSize || getEnv('dbMaxPoolSize', { dataSource, preAggregations }) || 8,
       evictionRunIntervalMillis: 10000,
       softIdleTimeoutMillis: 30000,
       idleTimeoutMillis: 30000,
       testOnBorrow: true,
       acquireTimeoutMillis: 120000,
       ...(poolOptions || {})
-    }) as ExtendedPool;
+    });
 
     // https://github.com/coopernurse/node-pool/blob/ee5db9ddb54ce3a142fde3500116b393d4f2f755/README.md#L220-L226
     this.pool.on('factoryCreateError', (err) => {
@@ -212,11 +216,13 @@ export class JDBCDriver extends BaseDriver {
   public async testConnection() {
     let err;
     let connection;
+
     try {
       connection = await this.pool._factory.create();
     } catch (e: any) {
       err = e.message || e;
     }
+
     if (err) {
       throw new Error(err.toString());
     } else {

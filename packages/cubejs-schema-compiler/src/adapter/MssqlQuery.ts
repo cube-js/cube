@@ -1,11 +1,12 @@
 import R from 'ramda';
 import moment from 'moment-timezone';
 
-import { QueryAlias, parseSqlInterval } from '@cubejs-backend/shared';
+import { getEnv, QueryAlias, parseSqlInterval } from '@cubejs-backend/shared';
 import { BaseQuery } from './BaseQuery';
 import { BaseFilter } from './BaseFilter';
 import { BaseSegment } from './BaseSegment';
 import { ParamAllocator } from './ParamAllocator';
+import { resolveWindowsTimezone } from './windows-iana';
 
 const abbrs = {
   EST: 'Eastern Standard Time',
@@ -73,6 +74,14 @@ class MssqlSegment extends BaseSegment {
 }
 
 export class MssqlQuery extends BaseQuery {
+  private readonly useNamedTimezones: boolean;
+
+  public constructor(compilers: any, options: any) {
+    super(compilers, options);
+
+    this.useNamedTimezones = getEnv('mssqlUseNamedTimezones', { dataSource: this.dataSource });
+  }
+
   public newFilter(filter) {
     return new MssqlFilter(this, filter);
   }
@@ -90,7 +99,17 @@ export class MssqlQuery extends BaseQuery {
   }
 
   public convertTz(field) {
-    return `TODATETIMEOFFSET(${field}, '${moment().tz(this.timezone).format('Z')}')`;
+    if (this.useNamedTimezones) {
+      const windowsTz = resolveWindowsTimezone(this.timezone);
+      return `CAST(${field} AT TIME ZONE 'UTC' AT TIME ZONE '${windowsTz}' AS DATETIME2)`;
+    }
+
+    const offset = moment().tz(this.timezone).format('Z');
+
+    // 1. Treating the field as UTC (add '+00:00' offset)
+    // 2. Switch to target timezone offset
+    // 3. Cast to DATETIME2 to get naive timestamp in target timezone
+    return `CAST(SWITCHOFFSET(TODATETIMEOFFSET(${field}, '+00:00'), '${offset}') AS DATETIME2)`;
   }
 
   public timeStampCast(value: string) {
@@ -106,21 +125,24 @@ export class MssqlQuery extends BaseQuery {
   }
 
   /**
-   * Returns sql for source expression floored to timestamps aligned with
-   * intervals relative to origin timestamp point.
-   * The formula operates with seconds diffs so it won't produce human-expected dates aligned with offset date parts.
+   * Returns SQL for source expression floored to timestamps aligned with
+   * intervals relative to the origin timestamp point.
+   * The formula operates with seconds diffs, so it won't produce human-expected dates aligned with offset date parts.
    */
   public dateBin(interval: string, source: string, origin: string): string {
+    // Both source and origin are now DATETIME2 in the query timezone (naive timestamps),
+    // ensuring their in the same timezone context for correct date bin calculation.
+    const originAligned = this.dateTimeCast(`'${origin}'`);
     const beginOfTime = this.dateTimeCast('DATEFROMPARTS(1970, 1, 1)');
     const timeUnit = this.diffTimeUnitForInterval(interval);
 
     // Need to explicitly cast one argument of floor to float to trigger correct sign logic
     return `DATEADD(${timeUnit},
         FLOOR(
-          CAST(DATEDIFF(${timeUnit}, ${this.dateTimeCast(`'${origin}'`)}, ${source}) AS FLOAT) /
+          CAST(DATEDIFF(${timeUnit}, ${originAligned}, ${source}) AS FLOAT) /
           DATEDIFF(${timeUnit}, ${beginOfTime}, ${this.addInterval(beginOfTime, interval)})
         ) * DATEDIFF(${timeUnit}, ${beginOfTime}, ${this.addInterval(beginOfTime, interval)}),
-        ${this.dateTimeCast(`'${origin}'`)}
+        ${originAligned}
     )`;
   }
 
@@ -246,9 +268,16 @@ export class MssqlQuery extends BaseQuery {
     const templates = super.sqlTemplates();
     templates.functions.LEAST = 'LEAST({{ args_concat }})';
     templates.functions.GREATEST = 'GREATEST({{ args_concat }})';
+    // MSSQL ROUND requires 2 arguments: ROUND(number, length)
+    templates.functions.ROUND = 'ROUND({{ args_concat }}{% if args | length < 2 %}, 0{% endif %})';
+    // NOTE: MSSQL does not support DISTINCT clause. No workaround is available
+    delete templates.functions.STRING_AGG;
     // PERCENTILE_CONT works but requires PARTITION BY
     delete templates.functions.PERCENTILECONT;
+    templates.expressions.like = '{{ expr }} {% if negated %}NOT {% endif %}LIKE {{ pattern }}{% if default_escape %} ESCAPE \'\\\'{% endif %}';
     delete templates.expressions.ilike;
+    // MSSQL uses + for string concatenation instead of ||
+    templates.expressions.concat_strings = '{{ strings | join(\' + \' ) }}';
     // NOTE: this template contains a comma; two order expressions are being generated
     templates.expressions.sort = '{{ expr }} IS NULL {% if nulls_first %}DESC{% else %}ASC{% endif %}, {{ expr }} {% if asc %}ASC{% else %}DESC{% endif %}';
     templates.types.string = 'VARCHAR';
@@ -259,6 +288,69 @@ export class MssqlQuery extends BaseQuery {
     templates.types.timestamp = 'DATETIME2';
     delete templates.types.interval;
     templates.types.binary = 'VARBINARY';
+    templates.params.param = '@_{{ param_index + 1 }}';
+    // MSSQL does not support ordinal GROUP BY (GROUP BY 1, 2), must use expressions
+    templates.statements.group_by_exprs = '{{ group_by | map(attribute=\'expr\') | join(\', \') }}';
+    // MSSQL does not support ordinal ORDER BY (ORDER BY 1, 2), must use expressions
+    templates.expressions.order_by = '{{ expr }} {% if asc %}ASC{% else %}DESC{% endif %}';
+    // MSSQL uses CAST(...AS DATETIME2) instead of ::timestamp
+    templates.statements.time_series_select = 'SELECT CAST(date_from AS DATETIME2) AS "date_from",\n' +
+      'CAST(date_to AS DATETIME2) AS "date_to" \n' +
+      'FROM(\n' +
+      '    VALUES ' +
+      '{% for time_item in seria  %}' +
+      '(\'{{ time_item[0] }}\', \'{{ time_item[1] }}\')' +
+      '{% if not loop.last %}, {% endif %}' +
+      '{% endfor %}' +
+      ') AS dates (date_from, date_to)';
+    // MSSQL uses recursive CTE for time series generation.
+    // The template body becomes content of `time_series AS (...)` CTE,
+    // so it self-references `time_series` for recursion.
+    templates.statements.generated_time_series_select =
+      'SELECT CAST({{ start }} AS DATETIME2) AS date_from,\n' +
+      '       DATEADD(MILLISECOND, -1, DATEADD({{ minimal_time_unit }}, 1, CAST({{ start }} AS DATETIME2))) AS date_to\n' +
+      'UNION ALL\n' +
+      'SELECT DATEADD({{ minimal_time_unit }}, 1, date_from),\n' +
+      '       DATEADD(MILLISECOND, -1, DATEADD({{ minimal_time_unit }}, 1, DATEADD({{ minimal_time_unit }}, 1, date_from)))\n' +
+      'FROM time_series\n' +
+      'WHERE DATEADD({{ minimal_time_unit }}, 1, date_from) <= CAST({{ end }} AS DATETIME2)';
+
+    templates.statements.generated_time_series_with_cte_range_source =
+      'SELECT {{ range_source }}.{{ min_name }} AS date_from,\n' +
+      '       DATEADD(MILLISECOND, -1, DATEADD({{ minimal_time_unit }}, 1, {{ range_source }}.{{ min_name }})) AS date_to,\n' +
+      '       {{ range_source }}.{{ max_name }} AS max_date\n' +
+      'FROM {{ range_source }}\n' +
+      'UNION ALL\n' +
+      'SELECT DATEADD({{ minimal_time_unit }}, 1, date_from),\n' +
+      '       DATEADD(MILLISECOND, -1, DATEADD({{ minimal_time_unit }}, 1, DATEADD({{ minimal_time_unit }}, 1, date_from))),\n' +
+      '       max_date\n' +
+      'FROM time_series\n' +
+      'WHERE DATEADD({{ minimal_time_unit }}, 1, date_from) <= max_date';
+
+    // MSSQL uses OFFSET/FETCH instead of LIMIT/OFFSET
+    templates.tesseract.ilike = 'LOWER({{ expr }}) {% if negated %}NOT {% endif %}LIKE LOWER({{ pattern }})';
+    templates.filters.like_pattern = 'CONCAT({% if start_wild %}\'%\'{% else %}\'\'{% endif %}, LOWER({{ value }}), {% if end_wild %}\'%\'{% else %}\'\'{% endif %})';
+    templates.statements.select = '{% if ctes %} WITH \n' +
+      '{{ ctes | join(\',\n\') }}\n' +
+      '{% endif %}' +
+      'SELECT {% if limit is not none and not order_by %}TOP {{ limit }} {% endif %}{% if distinct %}DISTINCT {% endif %}' +
+      '{{ select_concat | map(attribute=\'aliased\') | join(\', \') }} {% if from %}\n' +
+      'FROM (\n' +
+      '{{ from | indent(2, true) }}\n' +
+      ') AS {{ from_alias }}{% elif from_prepared %}\n' +
+      'FROM {{ from_prepared }}' +
+      '{% endif %}' +
+      '{% if filter %}\nWHERE {{ filter }}{% endif %}' +
+      '{% if group_by %}\nGROUP BY {{ group_by }}{% endif %}' +
+      '{% if having %}\nHAVING {{ having }}{% endif %}' +
+      '{% if order_by %}\nORDER BY {{ order_by | map(attribute=\'expr\') | join(\', \') }}\nOFFSET {% if offset is not none %}{{ offset }}{% else %}0{% endif %} ROWS' +
+      '\nFETCH NEXT {% if limit is not none %}{{ limit }}{% else %}2147483647{% endif %} ROWS ONLY{% endif %}' +
+      '{% if ctes %}\nOPTION (MAXRECURSION 0){% endif %}';
+    // MSSQL has no boolean type — a segment projected as a dimension must be a BIT.
+    templates.expressions.wrap_segment_select = 'CAST((CASE WHEN {{ expr }} THEN 1 ELSE 0 END) AS BIT)';
+    // Reading a segment back from a pre-aggregation: it is a stored BIT column,
+    // which MSSQL can't use as a bare predicate, so compare it explicitly.
+    templates.expressions.wrap_segment_filter = '{{ expr }} = 1';
     return templates;
   }
 }

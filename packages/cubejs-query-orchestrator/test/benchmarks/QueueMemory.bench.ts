@@ -16,6 +16,7 @@ QueryQueueBenchmark(
   {
     cacheAndQueueDriver: 'memory',
     beforeAll,
-    afterAll
+    afterAll,
+    workers: 0,
   }
 );

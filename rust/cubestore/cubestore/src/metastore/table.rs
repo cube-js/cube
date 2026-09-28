@@ -11,17 +11,19 @@ use byteorder::{BigEndian, WriteBytesExt};
 use chrono::DateTime;
 use chrono::Utc;
 use datafusion::arrow::datatypes::Schema as ArrowSchema;
-use datafusion::physical_plan::expressions::{
-    sum_return_type, Column as FusionColumn, Max, Min, Sum,
-};
-use datafusion::physical_plan::{udaf, AggregateExpr, PhysicalExpr};
+use datafusion::physical_plan::expressions::Column as FusionColumn;
 use itertools::Itertools;
 
+use datafusion::functions_aggregate::min_max::{Max, Min};
+use datafusion::functions_aggregate::sum::Sum;
+use datafusion::logical_expr::AggregateUDF;
+use datafusion::physical_expr::aggregate::AggregateExprBuilder;
+use datafusion::physical_plan::udaf::AggregateFunctionExpr;
 use serde::{Deserialize, Deserializer, Serialize};
 use std::io::Write;
 use std::sync::Arc;
 
-#[derive(Clone, Serialize, Deserialize, Debug, Eq, PartialEq, Hash)]
+#[derive(Clone, Serialize, Deserialize, Debug, Eq, PartialEq, Hash, PartialOrd)]
 pub struct AggregateColumnIndex {
     index: u64,
     function: AggregateFunction,
@@ -70,33 +72,34 @@ impl AggregateColumn {
 
     pub fn aggregate_expr(
         &self,
-        schema: &ArrowSchema,
-    ) -> Result<Arc<dyn AggregateExpr>, CubeError> {
+        schema: &Arc<ArrowSchema>,
+    ) -> Result<AggregateFunctionExpr, CubeError> {
         let col = Arc::new(FusionColumn::new_with_schema(
             self.column.get_name().as_str(),
-            &schema,
+            schema,
         )?);
-        let res: Arc<dyn AggregateExpr> = match self.function {
-            AggregateFunction::SUM => {
-                let input_data_type = col.data_type(schema)?;
-                Arc::new(Sum::new(
-                    col.clone(),
-                    col.name(),
-                    sum_return_type(&input_data_type)?,
-                    &input_data_type,
-                ))
-            }
-            AggregateFunction::MAX => {
-                Arc::new(Max::new(col.clone(), col.name(), col.data_type(schema)?))
-            }
-            AggregateFunction::MIN => {
-                Arc::new(Min::new(col.clone(), col.name(), col.data_type(schema)?))
-            }
-            AggregateFunction::MERGE => {
-                let fun = aggregate_udf_by_kind(CubeAggregateUDFKind::MergeHll).descriptor();
-                udaf::create_aggregate_expr(&fun, &[col.clone()], schema, col.name())?
-            }
+        let (name, udaf): (&str, AggregateUDF) = match self.function {
+            AggregateFunction::SUM => ("SUM", AggregateUDF::new_from_impl(Sum::new())),
+            AggregateFunction::MAX => ("MAX", AggregateUDF::new_from_impl(Max::new())),
+            AggregateFunction::MIN => ("MIN", AggregateUDF::new_from_impl(Min::new())),
+            AggregateFunction::MERGE => (
+                "MERGE",
+                aggregate_udf_by_kind(CubeAggregateUDFKind::MergeHll),
+            ),
         };
+
+        // TODO upgrade DF: Understand what effect the choice of alias value has.
+        // TODO upgrade DF: schema.clone() is wasteful; pass an &Arc<ArrowSchema> to this function.
+        // TODO upgrade DF: Do we want more than .alias and .schema?  It seems some stuff is mandatory, in general
+
+        // A comment in DF downstream name() fn suggests 'Human readable name such as
+        // `"MIN(c2)"`.'  It is mandatory that a .alias be supplied.
+        let alias = format!("{}({})", name, col.name());
+        let res: AggregateFunctionExpr = AggregateExprBuilder::new(Arc::new(udaf), vec![col])
+            .schema(schema.clone())
+            .alias(alias)
+            .build()?;
+
         Ok(res)
     }
 }
@@ -111,7 +114,7 @@ impl core::fmt::Display for AggregateColumn {
     }
 }
 
-#[derive(Clone, Serialize, Deserialize, Debug, Eq, PartialEq, Hash)]
+#[derive(Clone, Serialize, Deserialize, Debug, Eq, PartialEq, Hash, PartialOrd)]
 pub enum StreamOffset {
     Earliest = 1,
     Latest = 2,
@@ -126,7 +129,7 @@ impl DataFrameValue<String> for Option<StreamOffset> {
 }
 
 data_frame_from! {
-#[derive(Clone, Serialize, Deserialize, Debug, Eq, PartialEq, Hash)]
+#[derive(Clone, Serialize, Deserialize, Debug, Eq, PartialEq, Hash, PartialOrd)]
 pub struct Table {
     table_name: String,
     schema_id: u64,
@@ -169,13 +172,26 @@ pub struct Table {
 
 impl RocksEntity for Table {}
 
-#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize, Hash, PartialOrd)]
 pub struct TablePath {
     pub table: IdRow<Table>,
     pub schema: Arc<IdRow<Schema>>,
+    pub schema_lower_name: String,
+    pub table_lower_name: String,
 }
 
 impl TablePath {
+    pub fn new(schema: Arc<IdRow<Schema>>, table: IdRow<Table>) -> Self {
+        let schema_lower_name = schema.get_row().get_name().to_lowercase();
+        let table_lower_name = table.get_row().get_table_name().to_lowercase();
+        Self {
+            table,
+            schema,
+            schema_lower_name,
+            table_lower_name,
+        }
+    }
+
     pub fn table_name(&self) -> String {
         let schema_name = self.schema.get_row().get_name();
         let table_name = self.table.get_row().get_table_name();

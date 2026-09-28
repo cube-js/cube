@@ -29,6 +29,13 @@ class CubejsServerCoreOpen extends CubejsServerCore {
   }
 }
 
+// Mock to expose protected methods for testing
+class CompilerApiOpen extends CompilerApi {
+  public getRolesFromContext = super.getRolesFromContext;
+
+  public getGroupsFromContext = super.getGroupsFromContext;
+}
+
 const repositoryWithoutPreAggregations: SchemaFileRepository = {
   localPath: () => __dirname,
   dataSchemaFiles: () => Promise.resolve([
@@ -362,6 +369,16 @@ describe('index.test', () => {
       metaConfigSpy.mockClear();
     });
 
+    test('CompilerApi metaConfig with includeViewGroups', async () => {
+      const metaConfig = await compilerApi.metaConfig({ securityContext: {} }, { requestId: 'XXX', includeViewGroups: true });
+      expect(metaConfig).toHaveProperty('cubes');
+      expect(metaConfig).toHaveProperty('viewGroups');
+      expect((<any[]>metaConfig.cubes)?.length).toBeGreaterThan(0);
+      expect(metaConfig.cubes[0]).toHaveProperty('config');
+      expect(metaConfigSpy).toHaveBeenCalled();
+      metaConfigSpy.mockClear();
+    });
+
     test('CompilerApi metaConfigExtended', async () => {
       const metaConfigExtended = await compilerApi.metaConfigExtended({ securityContext: {} }, { requestId: 'XXX' });
       expect(metaConfigExtended).toHaveProperty('metaConfig');
@@ -385,6 +402,16 @@ describe('index.test', () => {
     test('CompilerApi metaConfig', async () => {
       const metaConfig = await compilerApi.metaConfig({ securityContext: {} }, { requestId: 'XXX' });
       expect(metaConfig).toEqual([]);
+      expect(metaConfigSpy).toHaveBeenCalled();
+      metaConfigSpy.mockClear();
+    });
+
+    test('CompilerApi metaConfig with includeViewGroups', async () => {
+      const metaConfig = await compilerApi.metaConfig({ securityContext: {} }, { requestId: 'XXX', includeViewGroups: true });
+      expect(metaConfig).toHaveProperty('cubes');
+      expect(metaConfig).toHaveProperty('viewGroups');
+      expect(metaConfig.cubes).toEqual([]);
+      expect(metaConfig.viewGroups).toEqual([]);
       expect(metaConfigSpy).toHaveBeenCalled();
       metaConfigSpy.mockClear();
     });
@@ -448,6 +475,42 @@ describe('index.test', () => {
           contextToGroups: async () => ['analytics']
         }
       )).not.toThrow();
+    });
+
+    test('contextToRoles should be called and return expected roles', async () => {
+      const logger = jest.fn(() => {});
+      const contextToRoles = jest.fn(async () => ['admin', 'manager']);
+
+      const compilerApi = new CompilerApiOpen(
+        repositoryWithoutPreAggregations,
+        async () => 'mysql',
+        {
+          logger,
+          contextToRoles
+        }
+      );
+
+      const roles = await compilerApi.getRolesFromContext({ securityContext: { userId: 123 } });
+      expect(contextToRoles).toHaveBeenCalledWith({ securityContext: { userId: 123 } });
+      expect(roles).toEqual(new Set(['admin', 'manager']));
+    });
+
+    test('contextToGroups should be called and return expected groups', async () => {
+      const logger = jest.fn(() => {});
+      const contextToGroups = jest.fn(async () => ['analytics', 'engineering']);
+
+      const compilerApi = new CompilerApiOpen(
+        repositoryWithoutPreAggregations,
+        async () => 'mysql',
+        {
+          logger,
+          contextToGroups
+        }
+      );
+
+      const groups = await compilerApi.getGroupsFromContext({ securityContext: { userId: 456 } });
+      expect(contextToGroups).toHaveBeenCalledWith({ securityContext: { userId: 456 } });
+      expect(groups).toEqual(new Set(['analytics', 'engineering']));
     });
   });
 

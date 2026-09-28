@@ -80,17 +80,17 @@ export class ClickHouseQuery extends BaseQuery {
   public dateBin(interval: string, source: string, origin: string): string {
     // Pass timezone to dateTimeCast to ensure origin is in the same timezone as a source, because ClickHouse aligns
     // both timestamps internally to the same timezone before computing the difference, causing an unintended offset.
-    const alignedOrigin = this.dateTimeCast(`'${origin}'`, this.timezone);
+    const originAligned = this.dateTimeCast(`'${origin}'`, this.timezone);
     const intervalFormatted = this.formatInterval(interval);
     const timeUnit = this.diffTimeUnitForInterval(interval);
     const beginOfTime = 'fromUnixTimestamp(0)';
 
     return `date_add(${timeUnit},
         FLOOR(
-          date_diff(${timeUnit}, ${alignedOrigin}, ${source}) /
+          date_diff(${timeUnit}, ${originAligned}, ${source}) /
           date_diff(${timeUnit}, ${beginOfTime}, ${beginOfTime} + ${intervalFormatted})
         ) * date_diff(${timeUnit}, ${beginOfTime}, ${beginOfTime} + ${intervalFormatted}),
-        ${alignedOrigin}
+        ${originAligned}
     )`;
   }
 
@@ -274,6 +274,7 @@ export class ClickHouseQuery extends BaseQuery {
   public sqlTemplates() {
     const templates = super.sqlTemplates();
     templates.functions.DATETRUNC = 'DATE_TRUNC({{ args_concat }})';
+    templates.functions.STRING_AGG = 'arrayStringConcat(group{% if distinct %}Uniq{% endif %}Array({{ args[0] }}), {{ args[1] }})';
     // TODO: Introduce additional filter in jinja? or parseDateTimeBestEffort?
     // https://github.com/ClickHouse/ClickHouse/issues/19351
     templates.expressions.timestamp_literal = 'parseDateTimeBestEffort(\'{{ value }}\')';
@@ -287,6 +288,16 @@ export class ClickHouseQuery extends BaseQuery {
     // ClickHouse intervals have a distinct type for each granularity
     delete templates.types.interval;
     delete templates.types.binary;
+    templates.expressions.is_not_distinct_from = 'isNotDistinctFrom({{ left }}, {{ right }})';
+
+    templates.statements.time_series_select = 'SELECT parseDateTimeBestEffort(dates.f) date_from, parseDateTimeBestEffort(dates.t) date_to \n' +
+    'FROM (\n' +
+    '{% for time_item in seria  %}' +
+    '    select \'{{ time_item[0] }}\' f, \'{{ time_item[1] }}\' t \n' +
+    '{% if not loop.last %} UNION ALL\n{% endif %}' +
+    '{% endfor %}' +
+    ') AS dates';
+
     return templates;
   }
 }

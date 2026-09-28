@@ -35,6 +35,8 @@ import type { Query } from '@google-cloud/bigquery/build/src/bigquery';
 
 import { HydrationStream, transformRow } from './HydrationStream';
 
+import { version } from '../package.json';
+
 interface BigQueryDriverOptions extends BigQueryOptions {
   readOnly?: boolean
   projectId?: string,
@@ -52,6 +54,13 @@ interface BigQueryDriverOptions extends BigQueryOptions {
 
 type BigQueryDriverOptionsInitialized =
   Required<BigQueryDriverOptions, 'pollTimeout' | 'pollMaxInterval'>;
+
+// BigQuery type mappings for types not in the base DbTypeToGenericType
+const BigQueryToGenericType: Record<string, string> = {
+  bignumeric: 'decimal',
+  bigdecimal: 'decimal',
+  decimal: 'decimal'
+};
 
 /**
  * BigQuery driver.
@@ -83,6 +92,11 @@ export class BigQueryDriver extends BaseDriver implements DriverInterface {
       dataSource?: string,
 
       /**
+       * Whether this driver is used for pre-aggregations.
+       */
+      preAggregations?: boolean,
+
+      /**
        * Max pool size value for the [cube]<-->[db] pool.
        */
       maxPoolSize?: number,
@@ -101,41 +115,44 @@ export class BigQueryDriver extends BaseDriver implements DriverInterface {
     const dataSource =
       config.dataSource ||
       assertDataSource('default');
+    const preAggregations = config.preAggregations || false;
 
     this.options = {
       scopes: [
         'https://www.googleapis.com/auth/bigquery',
         'https://www.googleapis.com/auth/drive',
       ],
-      projectId: getEnv('bigqueryProjectId', { dataSource }),
-      keyFilename: getEnv('bigqueryKeyFile', { dataSource }),
-      credentials: getEnv('bigqueryCredentials', { dataSource })
+      projectId: getEnv('bigqueryProjectId', { dataSource, preAggregations }),
+      keyFilename: getEnv('bigqueryKeyFile', { dataSource, preAggregations }),
+      credentials: getEnv('bigqueryCredentials', { dataSource, preAggregations })
         ? JSON.parse(
           Buffer.from(
-            getEnv('bigqueryCredentials', { dataSource }),
+            getEnv('bigqueryCredentials', { dataSource, preAggregations }),
             'base64',
           ).toString('utf8')
         )
         : undefined,
       exportBucket:
-        getEnv('dbExportBucket', { dataSource }) ||
-        getEnv('bigqueryExportBucket', { dataSource }),
-      location: getEnv('bigqueryLocation', { dataSource }),
+        getEnv('dbExportBucket', { dataSource, preAggregations }) ||
+        getEnv('bigqueryExportBucket', { dataSource, preAggregations }),
+      location: getEnv('bigqueryLocation', { dataSource, preAggregations }),
       ...config,
       pollTimeout: (
         config.pollTimeout ||
-        getEnv('dbPollTimeout', { dataSource }) ||
-        getEnv('dbQueryTimeout', { dataSource })
+        getEnv('dbPollTimeout', { dataSource, preAggregations }) ||
+        getEnv('dbQueryTimeout', { dataSource, preAggregations })
       ) * 1000,
       pollMaxInterval: (
         config.pollMaxInterval ||
-        getEnv('dbPollMaxInterval', { dataSource })
+        getEnv('dbPollMaxInterval', { dataSource, preAggregations })
       ) * 1000,
-      exportBucketCsvEscapeSymbol: getEnv('dbExportBucketCsvEscapeSymbol', { dataSource }),
+      exportBucketCsvEscapeSymbol: getEnv('dbExportBucketCsvEscapeSymbol', { dataSource, preAggregations }),
+      userAgent: `CubeDev_Cube/${version}`,
     };
 
     getEnv('dbExportBucketType', {
       dataSource,
+      preAggregations,
       supported: ['gcp'],
     });
 
@@ -177,7 +194,8 @@ export class BigQueryDriver extends BaseDriver implements DriverInterface {
       query,
       params: values,
       parameterMode: 'positional',
-      useLegacySql: false
+      useLegacySql: false,
+      wrapIntegers: true,
     }, options);
 
     return <any>(
@@ -291,7 +309,17 @@ export class BigQueryDriver extends BaseDriver implements DriverInterface {
   public async tableColumnTypes(table: string) {
     const [schema, name] = table.split('.');
     const [bigQueryTable] = await this.bigquery.dataset(schema).table(name).getMetadata();
-    return bigQueryTable.schema.fields.map((c: any) => ({ name: c.name, type: this.toGenericType(c.type) }));
+    return bigQueryTable.schema.fields.map((c: any) => {
+      // BigQuery NUMERIC is always (38, 9), BIGNUMERIC is (76, 38)
+      // https://cloud.google.com/bigquery/docs/reference/standard-sql/data-types#decimal_types
+      if (c.type === 'NUMERIC' || c.type === 'DECIMAL') {
+        return { name: c.name, type: this.toGenericType(c.type, 38, 9) };
+      }
+      if (c.type === 'BIGNUMERIC' || c.type === 'BIGDECIMAL') {
+        return { name: c.name, type: this.toGenericType(c.type, 76, 38) };
+      }
+      return { name: c.name, type: this.toGenericType(c.type) };
+    });
   }
 
   public async createSchemaIfNotExists(schemaName: string): Promise<void> {
@@ -310,7 +338,8 @@ export class BigQueryDriver extends BaseDriver implements DriverInterface {
       query,
       params: values,
       parameterMode: 'positional',
-      useLegacySql: false
+      useLegacySql: false,
+      wrapIntegers: true,
     });
 
     const rowStream = new HydrationStream();
@@ -386,7 +415,7 @@ export class BigQueryDriver extends BaseDriver implements DriverInterface {
       return null;
     }
 
-    return withResults ? job.getQueryResults() : true;
+    return withResults ? job.getQueryResults({ wrapIntegers: true }) : true;
   }
 
   protected async runQueryJob<T = QueryRowsResponse>(
@@ -433,5 +462,10 @@ export class BigQueryDriver extends BaseDriver implements DriverInterface {
     return {
       incrementalSchemaLoading: true,
     };
+  }
+
+  protected override toGenericType(columnType: string, precision?: number | null, scale?: number | null): string {
+    const mappedType = BigQueryToGenericType[columnType.toLowerCase()] || columnType;
+    return super.toGenericType(mappedType, precision, scale);
   }
 }

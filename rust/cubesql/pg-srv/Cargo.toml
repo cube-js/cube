@@ -1,6 +1,6 @@
 [package]
 name = "pg-srv"
-version = "0.2.0"
+version = "0.3.0"
 authors = ["Cube Dev, Inc."]
 edition = "2018"
 license = "Apache-2.0"

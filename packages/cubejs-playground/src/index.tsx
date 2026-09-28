@@ -9,7 +9,7 @@ import {
   ConnectionWizardPage,
   SchemaPage,
   IndexPage,
-  ConnectToBiPage,
+  CubeBiPage,
   FrontendIntegrationsPage,
 } from './pages';
 import { SecurityContextProvider } from './components/SecurityContext/SecurityContextProvider';
@@ -75,9 +75,9 @@ ReactDOM.render(
           component={() => <ConnectionWizardPage history={history} />}
         />
         <Route
-          key="connect-to-bi"
-          path="/connect-to-bi"
-          component={ConnectToBiPage}
+          key="cube-bi"
+          path="/cube-bi"
+          component={CubeBiPage}
         />
         <Route
           key="frontend-integrations"

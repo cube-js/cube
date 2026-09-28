@@ -37,7 +37,7 @@ where
     for inputs in worker_inputs {
         let (send_done, recv_done) = ipc_channel::ipc::bytes_channel().unwrap();
         let args = (send_init.clone(), recv_done, inputs, timeout);
-        let handle = respawn(args, &[], &[]).unwrap();
+        let handle = respawn(args, &["--".to_string(), "--nocapture".to_string()], &[]).unwrap();
         // Ensure we signal completion to all started workers even if errors occur along the way.
         join_workers.push(scopeguard::guard(
             (send_done, handle),
@@ -52,7 +52,7 @@ where
         // Wait until the workers are ready.
         tokio::time::timeout(test.worker_init_timeout(), async move {
             let mut recv_init = recv_inits;
-            for _ in 0..num_workers as usize {
+            for _ in 0..num_workers {
                 recv_init = tokio::task::spawn_blocking(move || {
                     recv_init.recv().unwrap();
                     recv_init
@@ -97,7 +97,7 @@ where
             eprintln!("ERROR: Stopping worker after timeout");
             return -1;
         }
-        return 0;
+        0
     })
 }
 
@@ -155,7 +155,7 @@ impl WaitCompletion {
     }
 }
 
-fn ack_error<R, E: Debug>(r: Result<R, E>) -> () {
+fn ack_error<R, E: Debug>(r: Result<R, E>) {
     if let Err(e) = r {
         eprintln!("Error: {:?}", e);
     }

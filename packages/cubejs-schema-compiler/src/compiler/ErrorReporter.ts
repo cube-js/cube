@@ -1,4 +1,5 @@
 import { codeFrameColumns, SourceLocation } from '@babel/code-frame';
+import { LoggerFn } from '@cubejs-backend/shared';
 
 import { UserError } from './UserError';
 import { CompileError } from './CompileError';
@@ -30,7 +31,7 @@ interface File {
 }
 
 export interface ErrorReporterOptions {
-  logger: (msg: string) => void
+  logger: LoggerFn
 }
 
 const NO_FILE_SPECIFIED = '_No-file-specified';
@@ -46,7 +47,7 @@ export class ErrorReporter {
     protected readonly parent: ErrorReporter | null = null,
     protected readonly context: any[] = [],
     protected readonly options: ErrorReporterOptions = {
-      logger: (msg) => console.log(msg),
+      logger: (msg, _params) => console.log(msg),
     },
   ) {
   }
@@ -82,9 +83,9 @@ export class ErrorReporter {
       });
 
       if (targetFileName) {
-        this.options.logger(`${targetFileName}:\n${message}`);
+        this.options.logger(`${targetFileName}:\n${message}`, {});
       } else {
-        this.options.logger(message);
+        this.options.logger(message, {});
       }
     } else {
       if (this.rootReporter().warnings.find(m => (m.message || m) === e.message)) {
@@ -97,9 +98,9 @@ export class ErrorReporter {
       });
 
       if (targetFileName) {
-        this.options.logger(`${targetFileName}:\n${e.message}`);
+        this.options.logger(`${targetFileName}:\n${e.message}`, {});
       } else {
-        this.options.logger(e.message);
+        this.options.logger(e.message, {});
       }
     }
   }

@@ -3,10 +3,11 @@ use crate::compile::{
     StatusFlags,
 };
 use sqlparser::ast;
-use std::{collections::HashMap, sync::Arc};
+use std::{collections::HashMap, str::FromStr, sync::Arc};
 
 use crate::{
     compile::{
+        engine::df::scan::CacheMode,
         error::{CompilationError, CompilationResult},
         parser::parse_sql_to_statement,
         DatabaseVariable, DatabaseVariablesToUpdate,
@@ -16,7 +17,8 @@ use crate::{
         dataframe,
         statement::{
             ApproximateCountDistinctVisitor, CastReplacer, RedshiftDatePartReplacer,
-            SensitiveDataSanitizer, ToTimestampReplacer, UdfWildcardArgReplacer,
+            SensitiveDataSanitizer, SqlParser062Normalizer, ToTimestampReplacer,
+            UdfWildcardArgReplacer,
         },
         ColumnFlags, ColumnType, Session, SessionManager, SessionState,
     },
@@ -30,7 +32,7 @@ use datafusion::{
     scalar::ScalarValue,
 };
 use itertools::Itertools;
-use sqlparser::ast::escape_single_quote_string;
+use sqlparser::ast::escape_quoted_string;
 
 #[derive(Clone)]
 pub struct QueryRouter {
@@ -90,7 +92,7 @@ impl QueryRouter {
     ) -> CompilationResult<QueryPlan> {
         let plan = match (stmt, &self.state.protocol) {
             (ast::Statement::Query(q), _) => {
-                if let ast::SetExpr::Select(select) = &q.body {
+                if let ast::SetExpr::Select(select) = &*q.body {
                     if let Some(into) = &select.into {
                         return self.select_into_to_plan(into, q, qtrace, span_id).await;
                     }
@@ -98,15 +100,25 @@ impl QueryRouter {
 
                 self.select_to_plan(stmt, qtrace, span_id.clone()).await
             }
-            (ast::Statement::SetTransaction { .. }, _) => Ok(QueryPlan::MetaTabular(
-                StatusFlags::empty(),
-                Box::new(dataframe::DataFrame::new(vec![], vec![])),
-            )),
-            (ast::Statement::SetRole { role_name, .. }, _) => {
+            (ast::Statement::Set(ast::Set::SetTransaction { .. }), _) => {
+                Ok(QueryPlan::MetaTabular(
+                    StatusFlags::empty(),
+                    Box::new(dataframe::DataFrame::new(vec![], vec![])),
+                ))
+            }
+            (ast::Statement::Set(ast::Set::SetRole { role_name, .. }), _) => {
                 self.set_role_to_plan(role_name).await
             }
-            (ast::Statement::SetVariable { key_values }, _) => {
-                self.set_variable_to_plan(&key_values).await
+            (
+                ast::Statement::Set(
+                    set @ (ast::Set::SingleAssignment { .. }
+                    | ast::Set::ParenthesizedAssignments { .. }
+                    | ast::Set::MultipleAssignments { .. }),
+                ),
+                _,
+            ) => self.set_variable_to_plan(set).await,
+            (ast::Statement::Set(ast::Set::SetTimeZone { value, local }), _) => {
+                self.set_time_zone_to_plan(value, *local).await
             }
             (ast::Statement::ShowVariable { variable }, _) => {
                 self.show_variable_to_plan(variable, span_id.clone()).await
@@ -139,7 +151,7 @@ impl QueryRouter {
                     CommandCompletion::Savepoint,
                 ))
             }
-            (ast::Statement::Release { .. }, DatabaseProtocol::PostgreSQL) => {
+            (ast::Statement::ReleaseSavepoint { .. }, DatabaseProtocol::PostgreSQL) => {
                 // TODO: Real support
                 Ok(QueryPlan::MetaOk(
                     StatusFlags::empty(),
@@ -156,21 +168,19 @@ impl QueryRouter {
                 ))
             }
             (
-                ast::Statement::CreateTable {
+                ast::Statement::CreateTable(ast::CreateTable {
                     query: Some(query),
                     name,
                     columns,
                     constraints,
-                    table_properties,
-                    with_options,
+                    table_options,
                     temporary,
                     ..
-                },
+                }),
                 DatabaseProtocol::PostgreSQL,
             ) if columns.is_empty()
                 && constraints.is_empty()
-                && table_properties.is_empty()
-                && with_options.is_empty()
+                && matches!(table_options, ast::CreateTableOptions::None)
                 && *temporary =>
             {
                 let stmt = ast::Statement::Query(query.clone());
@@ -230,7 +240,7 @@ impl QueryRouter {
                 // TODO: column name might be expected to match variable name
                 &format!(
                     "SELECT setting FROM pg_catalog.pg_settings where name = '{}'",
-                    escape_single_quote_string(full_variable),
+                    escape_quoted_string(full_variable, '\''),
                 ),
                 self.state.protocol.clone(),
                 &mut None,
@@ -306,7 +316,7 @@ impl QueryRouter {
         let flags = StatusFlags::SERVER_STATE_CHANGED;
         let username = role_name.as_ref().map(|role_name| role_name.value.clone());
         let Some(to_user) = username.clone().or_else(|| self.state.original_user()) else {
-            return Err(CompilationError::user(
+            return Err(CompilationError::internal(
                 "Cannot reset role when original role has not been set".to_string(),
             ));
         };
@@ -320,19 +330,51 @@ impl QueryRouter {
         Ok(QueryPlan::MetaOk(flags, CommandCompletion::Set))
     }
 
-    async fn set_variable_to_plan(
-        &self,
-        key_values: &Vec<ast::SetVariableKeyValue>,
-    ) -> Result<QueryPlan, CompilationError> {
+    async fn set_variable_to_plan(&self, set: &ast::Set) -> Result<QueryPlan, CompilationError> {
+        // Normalize the various sqlparser SET shapes into a flat list of (name, value-exprs).
+        let key_values: Vec<(String, &[ast::Expr])> = match set {
+            ast::Set::SingleAssignment {
+                variable, values, ..
+            } => vec![(variable.to_string(), values.as_slice())],
+            ast::Set::ParenthesizedAssignments { variables, values } => {
+                if variables.len() != values.len() {
+                    return Err(CompilationError::user(
+                        "SET (...) = (...) requires matching number of variables and values"
+                            .to_string(),
+                    ));
+                }
+
+                variables
+                    .iter()
+                    .zip(values.iter())
+                    .map(|(variable, value)| (variable.to_string(), std::slice::from_ref(value)))
+                    .collect()
+            }
+            ast::Set::MultipleAssignments { assignments } => assignments
+                .iter()
+                .map(|assignment| {
+                    (
+                        assignment.name.to_string(),
+                        std::slice::from_ref(&assignment.value),
+                    )
+                })
+                .collect(),
+            _ => {
+                return Err(CompilationError::unsupported(format!(
+                    "Unsupported SET statement: {set}"
+                )))
+            }
+        };
+
         let mut session_columns_to_update =
             DatabaseVariablesToUpdate::with_capacity(key_values.len());
 
         match self.state.protocol {
             DatabaseProtocol::PostgreSQL => {
-                for key_value in key_values.iter() {
-                    let value: String = match &key_value.value[0] {
-                        ast::Expr::Identifier(ident) => ident.value.to_string(),
-                        ast::Expr::Value(val) => match val {
+                for (key, exprs) in key_values.iter() {
+                    let value: String = match exprs.first() {
+                        Some(ast::Expr::Identifier(ident)) => ident.value.to_string(),
+                        Some(ast::Expr::Value(val)) => match &val.value {
                             ast::Value::SingleQuotedString(single_quoted_str) => {
                                 single_quoted_str.to_string()
                             }
@@ -342,21 +384,19 @@ impl QueryRouter {
                             ast::Value::Number(number, _) => number.to_string(),
                             _ => {
                                 return Err(CompilationError::user(format!(
-                                    "invalid {} variable format",
-                                    key_value.key.value
+                                    "invalid {key} variable format"
                                 )))
                             }
                         },
                         _ => {
                             return Err(CompilationError::user(format!(
-                                "invalid {} variable format",
-                                key_value.key.value
+                                "invalid {key} variable format"
                             )))
                         }
                     };
 
                     session_columns_to_update.push(DatabaseVariable::system(
-                        key_value.key.value.to_lowercase(),
+                        key.to_lowercase(),
                         ScalarValue::Utf8(Some(value.clone())),
                         None,
                     ));
@@ -367,22 +407,59 @@ impl QueryRouter {
             }
         }
 
-        let (user_variables, session_columns_to_update): (Vec<_>, Vec<_>) =
+        let (special_variables, session_columns_to_update): (Vec<_>, Vec<_>) =
             session_columns_to_update.into_iter().partition(|v| {
-                v.name.to_lowercase() == "user" || v.name.to_lowercase() == "current_user"
+                matches!(
+                    v.name.to_lowercase().as_str(),
+                    "user" | "current_user" | "timezone" | "cube_cache"
+                )
             });
 
-        for v in user_variables {
-            let to_user = match v.value {
-                ScalarValue::Utf8(Some(user)) => user,
+        for v in special_variables {
+            match v.name.as_str() {
+                "user" | "current_user" => {
+                    let to_user = match v.value {
+                        ScalarValue::Utf8(Some(user)) => user,
+                        _ => {
+                            return Err(CompilationError::user(format!(
+                                "Invalid user value: {:?}",
+                                v.value
+                            )))
+                        }
+                    };
+                    self.change_user(to_user).await?;
+                }
+                "timezone" => {
+                    let timezone = match v.value {
+                        ScalarValue::Utf8(Some(tz)) => tz,
+                        _ => {
+                            return Err(CompilationError::user(format!(
+                                "Invalid timezone value: {:?}",
+                                v.value
+                            )))
+                        }
+                    };
+                    self.change_timezone(timezone).await?;
+                }
+                "cube_cache" => {
+                    let cache_mode = match v.value {
+                        ScalarValue::Utf8(Some(mode)) => mode,
+                        _ => {
+                            return Err(CompilationError::user(format!(
+                                "Invalid cube_cache value: {:?}",
+                                v.value
+                            )))
+                        }
+                    };
+                    self.change_cache_mode(cache_mode).await?;
+                }
                 _ => {
                     return Err(CompilationError::user(format!(
-                        "Invalid user value: {:?}",
-                        v.value
+                        "Invalid special variable: {:?}",
+                        v.name
                     )))
                 }
-            };
-            self.change_user(to_user).await?;
+            }
         }
 
         if !session_columns_to_update.is_empty() {
@@ -395,10 +472,42 @@ impl QueryRouter {
         ))
     }
 
+    async fn set_time_zone_to_plan(
+        &self,
+        timezone: &ast::Expr,
+        local: bool,
+    ) -> Result<QueryPlan, CompilationError> {
+        if local {
+            return Err(CompilationError::unsupported(
+                "SET TIME ZONE is not supported with LOCAL, omit or use SESSION".to_string(),
+            ));
+        }
+
+        let timezone_str = match timezone {
+            ast::Expr::Identifier(ident) => ident.value.to_string(),
+            ast::Expr::Value(ast::ValueWithSpan {
+                value: ast::Value::SingleQuotedString(string),
+                ..
+            }) => string.clone(),
+            _ => {
+                return Err(CompilationError::unsupported(format!(
+                    "Unsupported TimeZone value: {}",
+                    timezone
+                )))
+            }
+        };
+
+        self.change_timezone(timezone_str).await?;
+        Ok(QueryPlan::MetaOk(
+            StatusFlags::empty(),
+            CommandCompletion::Set,
+        ))
+    }
+
     async fn change_user(&self, username: String) -> Result<(), CompilationError> {
         self.reauthenticate_if_needed().await?;
 
-        let auth_context = self.state.auth_context().ok_or(CompilationError::user(
+        let auth_context = self.state.auth_context().ok_or(CompilationError::internal(
             "No auth context set but tried to set current user".to_string(),
         ))?;
 
@@ -445,6 +554,51 @@ impl QueryRouter {
         Ok(())
     }
 
+    async fn change_timezone(&self, timezone: String) -> Result<(), CompilationError> {
+        let mut query_timezone = self.state.query_timezone.write().map_err(|err| {
+            CompilationError::internal(format!("Unable to acquire query timezone lock: {}", err))
+        })?;
+        let tz_name =
+            if timezone.eq_ignore_ascii_case("default") || timezone.eq_ignore_ascii_case("local") {
+                *query_timezone = None;
+                "GMT".to_string()
+            } else {
+                *query_timezone = Some(timezone.clone());
+                timezone
+            };
+
+        let variable = DatabaseVariable::system(
+            "timezone".to_string(),
+            ScalarValue::Utf8(Some(tz_name)),
+            None,
+        );
+        self.state.set_variables(vec![variable]);
+        Ok(())
+    }
+
+    async fn change_cache_mode(&self, cache_mode_str: String) -> Result<(), CompilationError> {
+        let mut cache_mode = self.state.cache_mode.write().map_err(|err| {
+            CompilationError::internal(format!("Unable to acquire cache mode lock: {}", err))
+        })?;
+        let cache_mode_value = if cache_mode_str.eq_ignore_ascii_case("default") {
+            *cache_mode = None;
+            None
+        } else {
+            let cache_mode_parsed = CacheMode::from_str(&cache_mode_str).map_err(|_| {
+                CompilationError::user(format!("Invalid value for cache mode: {}", cache_mode_str))
+            })?;
+            *cache_mode = Some(cache_mode_parsed);
+            Some(cache_mode_parsed.to_string())
+        };
+        let variable = DatabaseVariable::user_defined(
+            "cube_cache".to_string(),
+            ScalarValue::Utf8(cache_mode_value),
+            None,
+        );
+        self.state.set_variables(vec![variable]);
+        Ok(())
+    }
+
     async fn create_table_to_plan(
         &self,
         name: &ast::ObjectName,
@@ -469,7 +623,13 @@ impl QueryRouter {
         Ok(QueryPlan::CreateTempTable(
             plan,
             ctx,
-            table_name.value.to_string(),
+            table_name
+                .as_ident()
+                .ok_or_else(|| {
+                    CompilationError::internal("table name is not a plain identifier".to_string())
+                })?
+                .value
+                .clone(),
             self.state.temp_tables(),
         ))
     }
@@ -488,7 +648,7 @@ impl QueryRouter {
         }
 
         let mut new_query = query.clone();
-        if let ast::SetExpr::Select(ref mut select) = new_query.body {
+        if let ast::SetExpr::Select(ref mut select) = *new_query.body {
             select.into = None
         } else {
             return Err(CompilationError::internal(
@@ -515,12 +675,17 @@ impl QueryRouter {
                 "table name contains no ident parts".to_string(),
             ));
         };
-        let table_name_lower = table_name.value.to_ascii_lowercase();
+        let table_name_lower = table_name
+            .as_ident()
+            .ok_or_else(|| {
+                CompilationError::internal("table name is not a plain identifier".to_string())
+            })?
+            .value
+            .to_ascii_lowercase();
         let temp_tables = self.state.temp_tables();
         tokio::task::spawn_blocking(move || temp_tables.remove(&table_name_lower))
             .await
-            .map_err(|err| CompilationError::internal(err.to_string()))?
-            .map_err(|err| CompilationError::internal(err.to_string()))?;
+            .map_err(|err| CompilationError::internal(err.to_string()))??;
         let flags = StatusFlags::empty();
         Ok(QueryPlan::MetaOk(flags, CommandCompletion::DropTable))
     }
@@ -557,7 +722,7 @@ impl QueryRouter {
     ) -> CompilationResult<QueryPlan> {
         self.reauthenticate_if_needed().await?;
         match &stmt {
-            ast::Statement::Query(query) => match &query.body {
+            ast::Statement::Query(query) => match &*query.body {
                 ast::SetExpr::Select(select) if select.into.is_some() => {
                     return Err(CompilationError::unsupported(
                         "Unsupported query type: SELECT INTO".to_string(),
@@ -578,6 +743,7 @@ impl QueryRouter {
 }
 
 pub fn rewrite_statement(stmt: ast::Statement) -> ast::Statement {
+    let stmt = SqlParser062Normalizer::new().replace(stmt);
     let stmt = CastReplacer::new().replace(stmt);
     let stmt = ToTimestampReplacer::new().replace(stmt);
     let stmt = UdfWildcardArgReplacer::new().replace(stmt);

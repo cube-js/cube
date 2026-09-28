@@ -1,0 +1,15 @@
+---
+source: cubesqlplanner/src/tests/integration/multi_stage/rank.rs
+expression: result
+---
+orders__status | orders__created_at_month | orders__total_amount | orders__amount_rank
+---------------+--------------------------+----------------------+--------------------
+cancelled      | 2024-01-01 00:00:00      | 50.00                | 1                  
+cancelled      | 2024-02-01 00:00:00      | 50.00                | 1                  
+cancelled      | 2024-03-01 00:00:00      | 100.00               | 1                  
+completed      | 2024-01-01 00:00:00      | 300.00               | 1                  
+completed      | 2024-02-01 00:00:00      | 500.00               | 1                  
+completed      | 2024-03-01 00:00:00      | 600.00               | 1                  
+pending        | 2024-01-01 00:00:00      | 150.00               | 1                  
+pending        | 2024-02-01 00:00:00      | 200.00               | 1                  
+pending        | 2024-03-01 00:00:00      | 300.00               | 1

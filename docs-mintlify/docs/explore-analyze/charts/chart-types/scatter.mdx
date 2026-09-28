@@ -1,0 +1,38 @@
+---
+title: Scatter
+description: Plot two measures against each other to find correlations, clusters, and outliers.
+---
+
+Scatter charts plot individual data points using two measures as X and Y coordinates. Use them to explore relationships between measures, identify clusters, and spot outliers across a population of entities.
+
+## Variants
+
+### Basic scatter
+
+Two measures on the X and Y axes. Each row in your result set becomes one point.
+
+{/* Screenshot: scatter chart — average order value (X) vs. order count (Y), one point per user. Place directly below this heading, full-width. (hidden — replace this comment with <Frame><img src="..." /></Frame> when image is ready) */}
+
+### With color grouping
+
+Map a dimension to the **Color** channel to assign each point a color by category. Use this to compare how different groups distribute across the same two measures.
+
+{/* Screenshot: scatter chart — same axes, points colored by traffic source (4–5 colors). Place directly below this heading, full-width. (hidden — replace this comment with <Frame><img src="..." /></Frame> when image is ready) */}
+
+### With size encoding
+
+Map a third numeric measure to the **Size** channel to scale each point's radius by value. Use this to encode a third variable without adding a new axis.
+
+{/* Screenshot: scatter chart with sized and colored points — average order value (X), return rate (Y), total revenue as size, colored by category. Place directly below this heading, full-width. (hidden — replace this comment with <Frame><img src="..." /></Frame> when image is ready) */}
+
+## Size encoding
+
+Assign a measure to the **Size** channel in the Fields tab. Points scale proportionally to the measure value. Configure the minimum and maximum radius in the Style tab.
+
+{/* Screenshot: Fields tab with Size channel assigned — showing the size field token. Place inline, 50% width, right-aligned. (hidden — replace this comment with <Frame><img src="..." /></Frame> when image is ready) */}
+
+## Tooltips
+
+All mapped fields appear in the tooltip by default. Add or remove fields in the **Tooltips** section of the Fields tab.
+
+See [Tooltips](/docs/explore-analyze/charts/configuration/tooltips) for details.

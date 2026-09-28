@@ -5,7 +5,7 @@
  */
 
 import fetch from 'node-fetch';
-import { assertDataSource, getEnv, } from '@cubejs-backend/shared';
+import { assertDataSource, getEnv, LoggerFn } from '@cubejs-backend/shared';
 import {
   DatabaseStructure,
   DriverCapabilities,
@@ -188,6 +188,11 @@ export class DatabricksDriver extends JDBCDriver {
       dataSource?: string,
 
       /**
+       * Whether this driver is used for pre-aggregations.
+       */
+      preAggregations?: boolean,
+
+      /**
        * Max pool size value for the [cube]<-->[db] pool.
        */
       maxPoolSize?: number,
@@ -202,12 +207,13 @@ export class DatabricksDriver extends JDBCDriver {
     const dataSource =
       conf.dataSource ||
       assertDataSource('default');
+    const preAggregations = conf.preAggregations || false;
 
     let showSparkProtocolWarn = false;
     let url: string =
       conf?.url ||
-      getEnv('databricksUrl', { dataSource }) ||
-      getEnv('jdbcUrl', { dataSource });
+      getEnv('databricksUrl', { dataSource, preAggregations }) ||
+      getEnv('jdbcUrl', { dataSource, preAggregations });
     if (url.indexOf('jdbc:spark://') !== -1) {
       showSparkProtocolWarn = true;
       url = url.replace('jdbc:spark://', 'jdbc:databricks://');
@@ -215,10 +221,10 @@ export class DatabricksDriver extends JDBCDriver {
 
     const [uid, pwd, cleanedUrl] = extractAndRemoveUidPwdFromJdbcUrl(url);
     const passwd = conf?.token ||
-          getEnv('databricksToken', { dataSource }) ||
+          getEnv('databricksToken', { dataSource, preAggregations }) ||
           pwd;
-    const oauthClientId = conf?.oauthClientId || getEnv('databricksOAuthClientId', { dataSource });
-    const oauthClientSecret = conf?.oauthClientSecret || getEnv('databricksOAuthClientSecret', { dataSource });
+    const oauthClientId = conf?.oauthClientId || getEnv('databricksOAuthClientId', { dataSource, preAggregations });
+    const oauthClientSecret = conf?.oauthClientSecret || getEnv('databricksOAuthClientSecret', { dataSource, preAggregations });
 
     if (oauthClientId && !oauthClientSecret) {
       throw new Error('Invalid credentials: No OAuth Client Secret provided');
@@ -260,52 +266,52 @@ export class DatabricksDriver extends JDBCDriver {
       },
       catalog:
         conf?.catalog ||
-        getEnv('databricksCatalog', { dataSource }),
-      database: getEnv('dbName', { required: false, dataSource }),
+        getEnv('databricksCatalog', { dataSource, preAggregations }),
+      database: getEnv('dbName', { required: false, dataSource, preAggregations }),
       // common export bucket config
       bucketType:
         conf?.bucketType ||
-        getEnv('dbExportBucketType', { supported: SUPPORTED_BUCKET_TYPES, dataSource }),
+        getEnv('dbExportBucketType', { supported: SUPPORTED_BUCKET_TYPES, dataSource, preAggregations }),
       exportBucket:
         conf?.exportBucket ||
-        getEnv('dbExportBucket', { dataSource }),
+        getEnv('dbExportBucket', { dataSource, preAggregations }),
       exportBucketMountDir:
         conf?.exportBucketMountDir ||
-        getEnv('dbExportBucketMountDir', { dataSource }),
+        getEnv('dbExportBucketMountDir', { dataSource, preAggregations }),
       pollInterval: (
         conf?.pollInterval ||
-        getEnv('dbPollMaxInterval', { dataSource })
+        getEnv('dbPollMaxInterval', { dataSource, preAggregations })
       ) * 1000,
       // AWS export bucket config
       awsKey:
         conf?.awsKey ||
-        getEnv('dbExportBucketAwsKey', { dataSource }),
+        getEnv('dbExportBucketAwsKey', { dataSource, preAggregations }),
       awsSecret:
         conf?.awsSecret ||
-        getEnv('dbExportBucketAwsSecret', { dataSource }),
+        getEnv('dbExportBucketAwsSecret', { dataSource, preAggregations }),
       awsRegion:
         conf?.awsRegion ||
-        getEnv('dbExportBucketAwsRegion', { dataSource }),
+        getEnv('dbExportBucketAwsRegion', { dataSource, preAggregations }),
       // Azure export bucket
       azureKey:
         conf?.azureKey ||
-        getEnv('dbExportBucketAzureKey', { dataSource }),
+        getEnv('dbExportBucketAzureKey', { dataSource, preAggregations }),
       exportBucketCsvEscapeSymbol:
-        getEnv('dbExportBucketCsvEscapeSymbol', { dataSource }),
+        getEnv('dbExportBucketCsvEscapeSymbol', { dataSource, preAggregations }),
       // Azure service principal
       azureTenantId:
         conf?.azureTenantId ||
-        getEnv('dbExportBucketAzureTenantId', { dataSource }),
+        getEnv('dbExportBucketAzureTenantId', { dataSource, preAggregations }),
       azureClientId:
         conf?.azureClientId ||
-        getEnv('dbExportBucketAzureClientId', { dataSource }),
+        getEnv('dbExportBucketAzureClientId', { dataSource, preAggregations }),
       azureClientSecret:
         conf?.azureClientSecret ||
-        getEnv('dbExportBucketAzureClientSecret', { dataSource }),
+        getEnv('dbExportBucketAzureClientSecret', { dataSource, preAggregations }),
       // GCS credentials
       gcsCredentials:
         conf?.gcsCredentials ||
-        getEnv('dbExportGCSCredentials', { dataSource }),
+        getEnv('dbExportGCSCredentials', { dataSource, preAggregations }),
     };
     if (config.readOnly === undefined) {
       // we can set readonly to true if there is no bucket config provided
@@ -329,7 +335,7 @@ export class DatabricksDriver extends JDBCDriver {
     };
   }
 
-  public override setLogger(logger: any) {
+  public override setLogger(logger: LoggerFn) {
     super.setLogger(logger);
     this.showDeprecations();
   }
@@ -480,7 +486,7 @@ export class DatabricksDriver extends JDBCDriver {
         ?.split('=')[1];
 
       if (result) {
-        this.logger('PWD Parameter Deprecation in connection string', {
+        this.logger?.('PWD Parameter Deprecation in connection string', {
           warning:
             'PWD parameter is deprecated and will be ignored in future releases. ' +
             'Please migrate to the CUBEJS_DB_DATABRICKS_TOKEN environment variable.'
@@ -488,7 +494,7 @@ export class DatabricksDriver extends JDBCDriver {
       }
     }
     if (this.showSparkProtocolWarn) {
-      this.logger('jdbc:spark protocol deprecation', {
+      this.logger?.('jdbc:spark protocol deprecation', {
         warning:
           'The `jdbc:spark` protocol is deprecated and will be ignored in future releases. ' +
           'Please migrate your CUBEJS_DB_DATABRICKS_URL environment variable to the ' +
@@ -736,8 +742,15 @@ export class DatabricksDriver extends JDBCDriver {
   /**
    * Returns the JS type by the Databricks type.
    */
-  protected toGenericType(columnType: string): string {
-    return DatabricksToGenericType[columnType.toLowerCase()] || super.toGenericType(columnType);
+  protected override toGenericType(columnType: string, precision?: number | null, scale?: number | null): GenericDataBaseType {
+    const match = columnType.trim().toLowerCase().match(/^numeric\s*\(\s*(\d+)\s*,\s*(\d+)\s*\)$/i);
+
+    if (match) {
+      precision = Number(match[1]);
+      scale = Number(match[2]);
+    }
+
+    return DatabricksToGenericType[columnType.toLowerCase()] || super.toGenericType(columnType, precision, scale);
   }
 
   /**
@@ -905,19 +918,15 @@ export class DatabricksDriver extends JDBCDriver {
       select = `SELECT ${this.generateTableColumnsForExport(columns)} FROM (${sql})`;
     }
 
-    try {
-      await this.query(
-        `
-        CREATE TABLE ${tableFullName}_tmp
-        USING CSV LOCATION '${this.config.exportBucketMountDir || this.config.exportBucket}/${tableFullName}'
-        OPTIONS (escape = '"')
-        AS (${select});
-        `,
-        params,
-      );
-    } finally {
-      await this.query(`DROP TABLE IF EXISTS ${tableFullName}_tmp;`, []);
-    }
+    await this.query(
+      `
+        INSERT OVERWRITE DIRECTORY '${this.config.exportBucketMountDir || this.config.exportBucket}/${tableFullName}'
+        USING CSV
+        OPTIONS (escape '"')
+        ${select}
+      `,
+      params,
+    );
   }
 
   /**
@@ -944,18 +953,14 @@ export class DatabricksDriver extends JDBCDriver {
    * https://docs.databricks.com/aws/en/connect/storage/gcs
    */
   private async createExternalTableFromTable(tableFullName: string, columns: ColumnInfo[]) {
-    try {
-      await this.query(
-        `
-        CREATE TABLE ${tableFullName}_tmp
-        USING CSV LOCATION '${this.config.exportBucketMountDir || this.config.exportBucket}/${tableFullName}'
-        OPTIONS (escape = '"')
-        AS SELECT ${this.generateTableColumnsForExport(columns)} FROM ${tableFullName}
-        `,
-        [],
-      );
-    } finally {
-      await this.query(`DROP TABLE IF EXISTS ${tableFullName}_tmp;`, []);
-    }
+    await this.query(
+      `
+        INSERT OVERWRITE DIRECTORY '${this.config.exportBucketMountDir || this.config.exportBucket}/${tableFullName}'
+        USING CSV
+        OPTIONS (escape '"')
+        SELECT ${this.generateTableColumnsForExport(columns)} FROM ${tableFullName}
+      `,
+      [],
+    );
   }
 }

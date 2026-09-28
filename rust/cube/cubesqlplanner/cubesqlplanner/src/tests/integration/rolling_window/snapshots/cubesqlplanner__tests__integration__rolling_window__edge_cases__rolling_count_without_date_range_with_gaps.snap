@@ -1,0 +1,12 @@
+---
+source: cubesqlplanner/cubesqlplanner/src/tests/integration/rolling_window/edge_cases.rs
+assertion_line: 129
+expression: result
+---
+orders__created_at_month | orders__rolling_count_3m
+-------------------------+-------------------------
+2024-01-01 00:00:00      | 1                       
+2024-02-01 00:00:00      | 1                       
+2024-03-01 00:00:00      | 1                       
+2024-04-01 00:00:00      | NULL                    
+2024-05-01 00:00:00      | 5

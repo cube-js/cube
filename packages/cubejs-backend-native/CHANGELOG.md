@@ -3,6 +3,376 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.6.59](https://github.com/cube-js/cube/compare/v1.6.58...v1.6.59) (2026-06-17)
+
+**Note:** Version bump only for package @cubejs-backend/native
+
+## [1.6.58](https://github.com/cube-js/cube/compare/v1.6.57...v1.6.58) (2026-06-17)
+
+**Note:** Version bump only for package @cubejs-backend/native
+
+## [1.6.57](https://github.com/cube-js/cube/compare/v1.6.56...v1.6.57) (2026-06-09)
+
+**Note:** Version bump only for package @cubejs-backend/native
+
+## [1.6.56](https://github.com/cube-js/cube/compare/v1.6.55...v1.6.56) (2026-06-08)
+
+### Bug Fixes
+
+- **native:** Don't fail deserializing JS numbers above u64/i64 range ([#11034](https://github.com/cube-js/cube/issues/11034)) ([44bd455](https://github.com/cube-js/cube/commit/44bd455bbaa4446088e9f20c2014d06c8da24031))
+
+## [1.6.55](https://github.com/cube-js/cube/compare/v1.6.54...v1.6.55) (2026-06-05)
+
+**Note:** Version bump only for package @cubejs-backend/native
+
+## [1.6.54](https://github.com/cube-js/cube/compare/v1.6.53...v1.6.54) (2026-06-04)
+
+**Note:** Version bump only for package @cubejs-backend/native
+
+## [1.6.53](https://github.com/cube-js/cube/compare/v1.6.52...v1.6.53) (2026-06-02)
+
+### Features
+
+- **tesseract:** native Rust time-series generation ([#10980](https://github.com/cube-js/cube/issues/10980)) ([48a3e41](https://github.com/cube-js/cube/commit/48a3e419b31b294b9980a35c229d54383c45726a))
+- **tesseract:** NativeRustHandle/NativeRustBox in cubenativeutils ([#10979](https://github.com/cube-js/cube/issues/10979)) ([852790f](https://github.com/cube-js/cube/commit/852790fcbdbfe4b23088861b5729b1ce6769a5a5))
+
+## [1.6.52](https://github.com/cube-js/cube/compare/v1.6.51...v1.6.52) (2026-05-29)
+
+### Features
+
+- **cubesql:** Universally prefix all errors ([#10758](https://github.com/cube-js/cube/issues/10758)) ([6c13990](https://github.com/cube-js/cube/commit/6c139904509892ec5da464b1e753de14c37b0497))
+- support distributed query cancellation in query queue and cancellation promise for Athena ([#10953](https://github.com/cube-js/cube/issues/10953)) ([0c08a78](https://github.com/cube-js/cube/commit/0c08a78edc01e5979d5e6e483854f6b971e84ebb))
+- **tesseract:** Multi-stage filter directives ([#10827](https://github.com/cube-js/cube/issues/10827)) ([2c7a614](https://github.com/cube-js/cube/commit/2c7a61422454a8d7dc30076292f341a59084a483))
+- **tesseract:** multi-stage grain directive ([#10957](https://github.com/cube-js/cube/issues/10957)) ([76eb75b](https://github.com/cube-js/cube/commit/76eb75b5a99ab863a661bc5d93ea61c05ee58ae9))
+
+## [1.6.51](https://github.com/cube-js/cube/compare/v1.6.50...v1.6.51) (2026-05-27)
+
+### Features
+
+- **cubesql:** expose pre-aggregation indicator ([#10944](https://github.com/cube-js/cube/issues/10944)) ([552a93e](https://github.com/cube-js/cube/commit/552a93ec9fd7a2fce7a93ef01769f1ca8b8d84f2))
+
+### Performance Improvements
+
+- **cubeorchestrator:** QueryResult - migrate to columnar storage ([#10829](https://github.com/cube-js/cube/issues/10829)) ([cfe7f38](https://github.com/cube-js/cube/commit/cfe7f38bbbc660ba6a8a6ff410e675031cdcd528))
+
+## [1.6.50](https://github.com/cube-js/cube/compare/v1.6.49...v1.6.50) (2026-05-22)
+
+### Features
+
+- Enable native orchestrator for all cases (don't allow to disable it) ([#10919](https://github.com/cube-js/cube/issues/10919)) ([9268376](https://github.com/cube-js/cube/commit/9268376f1aed7c280e15dea7d52449792270d350))
+
+## [1.6.49](https://github.com/cube-js/cube/compare/v1.6.48...v1.6.49) (2026-05-21)
+
+### Features
+
+- **cubesql:** Support parsing extra timezone formats ([#10913](https://github.com/cube-js/cube/issues/10913)) ([346eb56](https://github.com/cube-js/cube/commit/346eb567808363efb39c623f25f056018ce5a981))
+- **tesseract:** default value filters for views (CORE-357) ([#10892](https://github.com/cube-js/cube/issues/10892)) ([3477776](https://github.com/cube-js/cube/commit/34777768be099310e59fa02f0c2db6ef5e74aed4))
+
+## [1.6.48](https://github.com/cube-js/cube/compare/v1.6.47...v1.6.48) (2026-05-19)
+
+**Note:** Version bump only for package @cubejs-backend/native
+
+## [1.6.47](https://github.com/cube-js/cube/compare/v1.6.46...v1.6.47) (2026-05-18)
+
+### Bug Fixes
+
+- **tesseract:** align bridge member SQL with JS proxy reference ([#10850](https://github.com/cube-js/cube/issues/10850)) ([d5da121](https://github.com/cube-js/cube/commit/d5da121820e120d9a7012e5a787d3780953d915c))
+
+### Performance Improvements
+
+- **backend-native:** String interning for keys in get_cubestore_result ([#10869](https://github.com/cube-js/cube/issues/10869)) ([22031fb](https://github.com/cube-js/cube/commit/22031fb00b40fd553dc6aca5c2333064f04bf222))
+- **cubeorchestrator:** Improve performance of vanilla format ([#10876](https://github.com/cube-js/cube/issues/10876)) ([3975ae3](https://github.com/cube-js/cube/commit/3975ae3b41f81d29e50c3b3abd30e2d42db58b68))
+
+## [1.6.46](https://github.com/cube-js/cube/compare/v1.6.45...v1.6.46) (2026-05-11)
+
+**Note:** Version bump only for package @cubejs-backend/native
+
+## [1.6.45](https://github.com/cube-js/cube/compare/v1.6.44...v1.6.45) (2026-05-11)
+
+### Performance Improvements
+
+- **cubeorchestrator:** Drop DBResponseValue wrapper (-15% transform) ([#10844](https://github.com/cube-js/cube/issues/10844)) ([4e26c26](https://github.com/cube-js/cube/commit/4e26c26cd722cec721953ce7330d1f865d56ee5c))
+- **cubeorchestrator:** Use columnar format between JS->Rust data transport (-20%) ([#10837](https://github.com/cube-js/cube/issues/10837)) ([1a64945](https://github.com/cube-js/cube/commit/1a64945546a1ca5facc8ac3ff611be4daccf5c52))
+
+## [1.6.44](https://github.com/cube-js/cube/compare/v1.6.43...v1.6.44) (2026-05-06)
+
+### Performance Improvements
+
+- **cubesql:** Migrate to columnar format in transport (~5x) ([#10805](https://github.com/cube-js/cube/issues/10805)) ([87f4dc1](https://github.com/cube-js/cube/commit/87f4dc1c2cc47b76c8b72cf96010e94d50a748bd))
+
+## [1.6.43](https://github.com/cube-js/cube/compare/v1.6.42...v1.6.43) (2026-05-02)
+
+**Note:** Version bump only for package @cubejs-backend/native
+
+## [1.6.42](https://github.com/cube-js/cube/compare/v1.6.41...v1.6.42) (2026-05-01)
+
+**Note:** Version bump only for package @cubejs-backend/native
+
+## [1.6.41](https://github.com/cube-js/cube/compare/v1.6.40...v1.6.41) (2026-05-01)
+
+**Note:** Version bump only for package @cubejs-backend/native
+
+## [1.6.40](https://github.com/cube-js/cube/compare/v1.6.39...v1.6.40) (2026-04-30)
+
+### Bug Fixes
+
+- **backend-native:** Respect `isDataQuery` flag in `cubesql` endpoint ([#10774](https://github.com/cube-js/cube/issues/10774)) ([6f3c031](https://github.com/cube-js/cube/commit/6f3c031993a292acca7d7031b18e2e31c8523d1a))
+- **cubesql:** Do not throw error on empty peer based evaluation in window aggregates ([#10776](https://github.com/cube-js/cube/issues/10776)) ([d6ca598](https://github.com/cube-js/cube/commit/d6ca598d9080ffc960a63ac5ca4e7a02486385d6))
+- **cubesql:** Preserve errors when panicking ([#10771](https://github.com/cube-js/cube/issues/10771)) ([5d571d4](https://github.com/cube-js/cube/commit/5d571d4229a5419ddf5340739c6af64b87769b2e))
+- **tesseract:** CASE handling fixes in multi-stage measures ([#10764](https://github.com/cube-js/cube/issues/10764)) ([cb66e8e](https://github.com/cube-js/cube/commit/cb66e8e755824319007f5ff90e1663c9d6f51137))
+
+### Features
+
+- Support columnar format in REST-API /v1/load ([#10775](https://github.com/cube-js/cube/issues/10775)) ([1f749cf](https://github.com/cube-js/cube/commit/1f749cf5c37d5f8dbe70fb6d785f66da02408507))
+
+## [1.6.39](https://github.com/cube-js/cube/compare/v1.6.38...v1.6.39) (2026-04-24)
+
+### Performance Improvements
+
+- **cubejs-backend-native:** Transfer ResultWrapper rawData as Buffer(JSON), ~10x faster ([#10728](https://github.com/cube-js/cube/issues/10728)) ([291205f](https://github.com/cube-js/cube/commit/291205f62b982be135ea153faaee9886e3fc4534))
+
+## [1.6.38](https://github.com/cube-js/cube/compare/v1.6.37...v1.6.38) (2026-04-23)
+
+**Note:** Version bump only for package @cubejs-backend/native
+
+## [1.6.37](https://github.com/cube-js/cube/compare/v1.6.36...v1.6.37) (2026-04-20)
+
+### Features
+
+- **cubeshared:** Upgrade flatbuffers to 25.12.19 ([#10709](https://github.com/cube-js/cube/issues/10709)) ([107f339](https://github.com/cube-js/cube/commit/107f33931c6d18800c7d579ef5d33e8932f34ac3))
+
+## [1.6.36](https://github.com/cube-js/cube/compare/v1.6.35...v1.6.36) (2026-04-16)
+
+**Note:** Version bump only for package @cubejs-backend/native
+
+## [1.6.35](https://github.com/cube-js/cube/compare/v1.6.34...v1.6.35) (2026-04-15)
+
+### Features
+
+- **api-gateway:** Introduce Query format Convertion API ([#10286](https://github.com/cube-js/cube/issues/10286)) ([9ba2897](https://github.com/cube-js/cube/commit/9ba289732c5d6c2545ce3ce086003d1caea3dd58))
+
+## [1.6.34](https://github.com/cube-js/cube/compare/v1.6.33...v1.6.34) (2026-04-14)
+
+**Note:** Version bump only for package @cubejs-backend/native
+
+## [1.6.33](https://github.com/cube-js/cube/compare/v1.6.32...v1.6.33) (2026-04-09)
+
+### Bug Fixes
+
+- **backend-native:** Fix `Continue wait` SQL API over HTTP event reporting ([#10649](https://github.com/cube-js/cube/issues/10649)) ([18d1e65](https://github.com/cube-js/cube/commit/18d1e65e7b7195de634dc74b17e2bc824ae0e3cf))
+
+### Features
+
+- **api-gateway:** propagate request ID for REST /cubesql endpoint ([#10633](https://github.com/cube-js/cube/issues/10633)) ([1bce74b](https://github.com/cube-js/cube/commit/1bce74bc1ec6dac8f3eae5cf9d76a2e9915123e3))
+
+## [1.6.32](https://github.com/cube-js/cube/compare/v1.6.31...v1.6.32) (2026-04-06)
+
+**Note:** Version bump only for package @cubejs-backend/native
+
+## [1.6.31](https://github.com/cube-js/cube/compare/v1.6.30...v1.6.31) (2026-04-02)
+
+**Note:** Version bump only for package @cubejs-backend/native
+
+## [1.6.30](https://github.com/cube-js/cube/compare/v1.6.29...v1.6.30) (2026-04-01)
+
+**Note:** Version bump only for package @cubejs-backend/native
+
+## [1.6.29](https://github.com/cube-js/cube/compare/v1.6.28...v1.6.29) (2026-03-27)
+
+### Features
+
+- **cubesql:** Expose format in /v1/cubesql schema response ([#10555](https://github.com/cube-js/cube/issues/10555)) ([f8d79a2](https://github.com/cube-js/cube/commit/f8d79a2e8c0e1fb291d7d55a21cb329c387605a4))
+- **schema-compiler:** Support currency for numeric measures and dimensions ([#10561](https://github.com/cube-js/cube/issues/10561)) ([5fc721f](https://github.com/cube-js/cube/commit/5fc721f98429cc46395673b03283c501a59c5cdd))
+
+## [1.6.28](https://github.com/cube-js/cube/compare/v1.6.27...v1.6.28) (2026-03-25)
+
+**Note:** Version bump only for package @cubejs-backend/native
+
+## [1.6.27](https://github.com/cube-js/cube/compare/v1.6.26...v1.6.27) (2026-03-24)
+
+**Note:** Version bump only for package @cubejs-backend/native
+
+## [1.6.26](https://github.com/cube-js/cube/compare/v1.6.25...v1.6.26) (2026-03-23)
+
+**Note:** Version bump only for package @cubejs-backend/native
+
+## [1.6.25](https://github.com/cube-js/cube/compare/v1.6.24...v1.6.25) (2026-03-20)
+
+**Note:** Version bump only for package @cubejs-backend/native
+
+## [1.6.24](https://github.com/cube-js/cube/compare/v1.6.23...v1.6.24) (2026-03-18)
+
+**Note:** Version bump only for package @cubejs-backend/native
+
+## [1.6.23](https://github.com/cube-js/cube/compare/v1.6.22...v1.6.23) (2026-03-13)
+
+**Note:** Version bump only for package @cubejs-backend/native
+
+## [1.6.22](https://github.com/cube-js/cube/compare/v1.6.21...v1.6.22) (2026-03-11)
+
+**Note:** Version bump only for package @cubejs-backend/native
+
+## [1.6.21](https://github.com/cube-js/cube/compare/v1.6.20...v1.6.21) (2026-03-10)
+
+### Features
+
+- **cubesql:** Introduce `cube_cache` session variable ([#10483](https://github.com/cube-js/cube/issues/10483)) ([541aa34](https://github.com/cube-js/cube/commit/541aa3465f25cb55328249b95fa9c258c95f5e07))
+
+## [1.6.20](https://github.com/cube-js/cube/compare/v1.6.19...v1.6.20) (2026-03-09)
+
+### Features
+
+- **backend-native:** Add `throwContinueWait` parameter to `/cubesql` API endpoint ([#10385](https://github.com/cube-js/cube/issues/10385)) ([3687c5f](https://github.com/cube-js/cube/commit/3687c5f422d6b265409a3e539fc77f37df207eb1))
+
+## [1.6.19](https://github.com/cube-js/cube/compare/v1.6.18...v1.6.19) (2026-03-03)
+
+**Note:** Version bump only for package @cubejs-backend/native
+
+## [1.6.18](https://github.com/cube-js/cube/compare/v1.6.17...v1.6.18) (2026-03-02)
+
+**Note:** Version bump only for package @cubejs-backend/native
+
+## [1.6.17](https://github.com/cube-js/cube/compare/v1.6.16...v1.6.17) (2026-02-26)
+
+**Note:** Version bump only for package @cubejs-backend/native
+
+## [1.6.16](https://github.com/cube-js/cube/compare/v1.6.15...v1.6.16) (2026-02-25)
+
+### Features
+
+- **cubesql:** Improve Talend compatibility ([#10430](https://github.com/cube-js/cube/issues/10430)) ([e4f39e5](https://github.com/cube-js/cube/commit/e4f39e5cc016b5c0a15a5ca74fdac197bd0d4290))
+
+## [1.6.15](https://github.com/cube-js/cube/compare/v1.6.14...v1.6.15) (2026-02-23)
+
+**Note:** Version bump only for package @cubejs-backend/native
+
+## [1.6.14](https://github.com/cube-js/cube/compare/v1.6.13...v1.6.14) (2026-02-18)
+
+**Note:** Version bump only for package @cubejs-backend/native
+
+## [1.6.13](https://github.com/cube-js/cube/compare/v1.6.12...v1.6.13) (2026-02-17)
+
+### Features
+
+- **schema-compiler:** Pass jinjaUsed flag to native transpileYaml ([#10402](https://github.com/cube-js/cube/issues/10402)) ([884811a](https://github.com/cube-js/cube/commit/884811a85ff940834722876b1570fa861f387ed5))
+
+## [1.6.12](https://github.com/cube-js/cube/compare/v1.6.11...v1.6.12) (2026-02-16)
+
+**Note:** Version bump only for package @cubejs-backend/native
+
+## [1.6.11](https://github.com/cube-js/cube/compare/v1.6.10...v1.6.11) (2026-02-12)
+
+### Features
+
+- **cubesql:** Support setting time zone with `SET TIMEZONE` ([#10364](https://github.com/cube-js/cube/issues/10364)) ([5bb1e7d](https://github.com/cube-js/cube/commit/5bb1e7d45c94cadd221a5b19c29f818c3d654e57))
+
+## [1.6.10](https://github.com/cube-js/cube/compare/v1.6.9...v1.6.10) (2026-02-09)
+
+**Note:** Version bump only for package @cubejs-backend/native
+
+## [1.6.9](https://github.com/cube-js/cube/compare/v1.6.8...v1.6.9) (2026-02-06)
+
+**Note:** Version bump only for package @cubejs-backend/native
+
+## [1.6.8](https://github.com/cube-js/cube/compare/v1.6.7...v1.6.8) (2026-02-04)
+
+### Bug Fixes
+
+- **cubesql:** Fix planning with `CASE` and `LIKE` ([#10346](https://github.com/cube-js/cube/issues/10346)) ([285185f](https://github.com/cube-js/cube/commit/285185f63380fc4a279fd2100f6e7a98beadadc3))
+
+## [1.6.7](https://github.com/cube-js/cube/compare/v1.6.6...v1.6.7) (2026-01-29)
+
+### Features
+
+- **backend-native:** Add JSON format logging for production environment ([#10338](https://github.com/cube-js/cube/issues/10338)) ([1bc88f9](https://github.com/cube-js/cube/commit/1bc88f9e2be8fbf1fe8099f58e66df25987b5549))
+- **server-core:** Add level field for log messages ([#10337](https://github.com/cube-js/cube/issues/10337)) ([1e7dcb6](https://github.com/cube-js/cube/commit/1e7dcb614dd6537b3bb2a1f9bd04e96c2374a673))
+
+## [1.6.6](https://github.com/cube-js/cube/compare/v1.6.5...v1.6.6) (2026-01-23)
+
+**Note:** Version bump only for package @cubejs-backend/native
+
+## [1.6.5](https://github.com/cube-js/cube/compare/v1.6.4...v1.6.5) (2026-01-22)
+
+**Note:** Version bump only for package @cubejs-backend/native
+
+## [1.6.4](https://github.com/cube-js/cube/compare/v1.6.3...v1.6.4) (2026-01-16)
+
+**Note:** Version bump only for package @cubejs-backend/native
+
+## [1.6.3](https://github.com/cube-js/cube/compare/v1.6.2...v1.6.3) (2026-01-15)
+
+**Note:** Version bump only for package @cubejs-backend/native
+
+## [1.6.2](https://github.com/cube-js/cube/compare/v1.6.1...v1.6.2) (2026-01-10)
+
+**Note:** Version bump only for package @cubejs-backend/native
+
+## [1.6.1](https://github.com/cube-js/cube/compare/v1.6.0...v1.6.1) (2025-12-18)
+
+**Note:** Version bump only for package @cubejs-backend/native
+
+# [1.6.0](https://github.com/cube-js/cube/compare/v1.5.16...v1.6.0) (2025-12-18)
+
+**Note:** Version bump only for package @cubejs-backend/native
+
+## [1.5.16](https://github.com/cube-js/cube/compare/v1.5.15...v1.5.16) (2025-12-17)
+
+### Features
+
+- **cubesql:** Support `DISTINCT` flag in UDAFs ([#10252](https://github.com/cube-js/cube/issues/10252)) ([1d93825](https://github.com/cube-js/cube/commit/1d93825d5b010c16e52dcf10b5cd1b395fb308f4))
+
+## [1.5.15](https://github.com/cube-js/cube/compare/v1.5.14...v1.5.15) (2025-12-15)
+
+**Note:** Version bump only for package @cubejs-backend/native
+
+## [1.5.14](https://github.com/cube-js/cube/compare/v1.5.13...v1.5.14) (2025-12-11)
+
+**Note:** Version bump only for package @cubejs-backend/native
+
+## [1.5.13](https://github.com/cube-js/cube/compare/v1.5.12...v1.5.13) (2025-12-10)
+
+### Features
+
+- **backend-native:** expose lastRefreshTime via /cubesql API ([#10206](https://github.com/cube-js/cube/issues/10206)) ([fb5a40f](https://github.com/cube-js/cube/commit/fb5a40f0e225208cb56febc54e0ebfb6e94a6bc3))
+
+## [1.5.12](https://github.com/cube-js/cube/compare/v1.5.11...v1.5.12) (2025-12-04)
+
+### Features
+
+- **cubesql:** Speed up field lookups in DFSchema ([#10214](https://github.com/cube-js/cube/issues/10214)) ([52fe97f](https://github.com/cube-js/cube/commit/52fe97fd47deeffbeb930745fb43fae4b040bc6b))
+
+## [1.5.11](https://github.com/cube-js/cube/compare/v1.5.10...v1.5.11) (2025-12-02)
+
+**Note:** Version bump only for package @cubejs-backend/native
+
+## [1.5.10](https://github.com/cube-js/cube/compare/v1.5.9...v1.5.10) (2025-11-28)
+
+### Features
+
+- **api-gateway:** Support query timezone in `/cubesql` API endpoint ([#10189](https://github.com/cube-js/cube/issues/10189)) ([499ddc6](https://github.com/cube-js/cube/commit/499ddc62fc1618b78f16a17943e1c72a670f6b48))
+
+## [1.5.9](https://github.com/cube-js/cube/compare/v1.5.8...v1.5.9) (2025-11-26)
+
+**Note:** Version bump only for package @cubejs-backend/native
+
+## [1.5.8](https://github.com/cube-js/cube/compare/v1.5.7...v1.5.8) (2025-11-26)
+
+### Features
+
+- **cubesql:** Implement time to idle eviction for query cache ([#10176](https://github.com/cube-js/cube/issues/10176)) ([4f9ccba](https://github.com/cube-js/cube/commit/4f9ccba8f90c7c133757842cd1df325d7cb1e122))
+
+## [1.5.7](https://github.com/cube-js/cube/compare/v1.5.6...v1.5.7) (2025-11-24)
+
+**Note:** Version bump only for package @cubejs-backend/native
+
+## [1.5.6](https://github.com/cube-js/cube/compare/v1.5.5...v1.5.6) (2025-11-24)
+
+**Note:** Version bump only for package @cubejs-backend/native
+
+## [1.5.5](https://github.com/cube-js/cube/compare/v1.5.4...v1.5.5) (2025-11-24)
+
+**Note:** Version bump only for package @cubejs-backend/native
+
 ## [1.5.4](https://github.com/cube-js/cube/compare/v1.5.3...v1.5.4) (2025-11-18)
 
 ### Bug Fixes

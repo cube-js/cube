@@ -1,0 +1,19 @@
+---
+asIndexPage: true
+---
+
+# Connecting with a VNet on Azure
+
+[Dedicated infrastructure][dedicated-infrastructure] in Cube Cloud comes with
+an option of setting up a direct network connection between
+an Azure VNet on the Cube Cloud side and your own VNet(s). Such a connection allows you to
+access internal datasources without the need to expose any ports publicly.
+
+On Azure, Cube Cloud supports two main ways of establishing a private network connection:
+
+- [Azure Private Link][azure-private-link]
+- [VNet Peering][azure-vnet-peering]
+
+[dedicated-infrastructure]: /product/administration/deployment/infrastructure#dedicated-infrastructure
+[azure-private-link]: /product/administration/deployment/vpc/azure/private-link
+[azure-vnet-peering]: /product/administration/deployment/vpc/azure/vpc-peering

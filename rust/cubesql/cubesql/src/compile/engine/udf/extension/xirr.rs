@@ -91,9 +91,16 @@ pub fn create_xirr_udaf() -> AggregateUDF {
         Volatility::Volatile, // due to the usage of [`f64::powf`]
     );
     let return_type: ReturnTypeFunction = Arc::new(|_| Ok(Arc::new(DataType::Float64)));
-    let accumulator: AccumulatorFunctionImplementation =
-        Arc::new(|| Ok(Box::new(XirrAccumulator::new())));
-    let state_type: StateTypeFunction = Arc::new(|_| {
+    let accumulator: AccumulatorFunctionImplementation = Arc::new(|distinct| {
+        if distinct {
+            Err(DataFusionError::NotImplemented(
+                "XIRR with DISTINCT flag is not supported".to_string(),
+            ))
+        } else {
+            Ok(Box::new(XirrAccumulator::new()))
+        }
+    });
+    let state_type: StateTypeFunction = Arc::new(|_, _| {
         Ok(Arc::new(vec![
             DataType::List(Box::new(Field::new("item", DataType::Float64, true))),
             DataType::List(Box::new(Field::new("item", DataType::Date32, true))),

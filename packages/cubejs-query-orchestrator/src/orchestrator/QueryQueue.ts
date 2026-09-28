@@ -1,5 +1,5 @@
 import { EventEmitter } from 'events';
-import { getEnv, getProcessUid } from '@cubejs-backend/shared';
+import { getEnv, getProcessUid, LoggerFn } from '@cubejs-backend/shared';
 import {
   QueueDriverInterface,
   QueryKey,
@@ -16,6 +16,7 @@ import { ContinueWaitError } from './ContinueWaitError';
 import { LocalQueueDriver } from './LocalQueueDriver';
 import { QueryStream } from './QueryStream';
 import { CacheAndQueryDriverType } from './QueryOrchestrator';
+import { extractRequestUUID } from './utils';
 
 export type CancelHandlerFn = (query: QueryDef) => Promise<void>;
 export type QueryHandlerFn = (query: QueryDef, cancelHandler: CancelHandlerFn) => Promise<unknown>;
@@ -88,7 +89,7 @@ export class QueryQueue {
 
   protected cancelHandlers: Record<string, CancelHandlerFn>;
 
-  protected logger: any;
+  protected logger: LoggerFn;
 
   protected processUid: string;
 
@@ -193,6 +194,11 @@ export class QueryQueue {
       ...executeOptions,
     };
 
+    if (options.requestId) {
+      const idx = options.requestId.lastIndexOf('-span-');
+      options.externalId = idx !== -1 ? options.requestId.substring(0, idx) : options.requestId;
+    }
+
     if (this.skipQueue) {
       const queryDef = {
         queryHandler,
@@ -233,7 +239,7 @@ export class QueryQueue {
       // Result here won't be fetched for a forced build query and a jobbed build
       // query (initialized by the /cubejs-system/v1/pre-aggregations/jobs
       // endpoint).
-      let result = !query.forceBuild && await queueConnection.getResult(queryKey);
+      let result = !query.forceBuild && await queueConnection.getResult(queryKey, options.externalId);
       if (result && !result.streamResult) {
         return this.parseResult(result);
       }
@@ -512,6 +518,21 @@ export class QueryQueue {
     }
   }
 
+  public async cancelQueryByRequestId(requestId: string): Promise<QueryDef[]> {
+    const targetUUID = extractRequestUUID(requestId);
+    const queries: any[] = await this.getQueries();
+    const cancelled: QueryDef[] = [];
+
+    for (const query of queries) {
+      if (query.requestId && extractRequestUUID(query.requestId) === targetUUID) {
+        await this.cancelQuery(query.queryKey, null);
+        cancelled.push(query);
+      }
+    }
+
+    return cancelled;
+  }
+
   /**
    * Reconciliation logic: cancel stalled and orphaned queries from the queue
    * and pick some planned to be processed queries to process.
@@ -543,7 +564,16 @@ export class QueryQueue {
         }
       }));
 
-      const [_active, toProcess] = await queueConnection.getActiveAndToProcess();
+      const [active, toProcess] = await queueConnection.getActiveAndToProcess();
+
+      /**
+       * Important notice: Concurrency configuration works per a specific queue, not per node.
+       *
+       * In production clusters where it contains N nodes, it shares the same concurrency. It leads to a point
+       * where every node tries to pick up jobs as much as concurrency is defined for the whole cluster. To minimize
+       * the effect of competition between nodes, it's important to reduce the number of tries to process by active jobs.
+       */
+      const toProcessLimit = active.length >= this.concurrency ? 1 : this.concurrency - active.length;
 
       const tasks = toProcess
         .filter(([queryKey, _queueId]) => {
@@ -559,7 +589,7 @@ export class QueryQueue {
             return false;
           }
         })
-        .slice(0, this.concurrency)
+        .slice(0, toProcessLimit)
         .map(([queryKey, queueId]) => this.sendProcessMessageFn(queryKey, queueId));
 
       await Promise.all(tasks);
@@ -740,6 +770,10 @@ export class QueryQueue {
 
       if (query && insertedCount && activated && processingLockAcquired) {
         let executionResult;
+        let queryExecutionFinished = false;
+        // Set by the query handler's setCancelHandler callback once execution begins.
+        // Not available on the original query def from retrieveForProcessing.
+        let localCancelHandler: unknown = null;
         const startQueryTime = (new Date()).getTime();
         const timeInQueue = (new Date()).getTime() - query.addedToQueueTime;
         this.logger('Performing query', {
@@ -760,7 +794,7 @@ export class QueryQueue {
 
         let queryProcessHeartbeat = Date.now();
         const heartBeatTimer = setInterval(
-          () => {
+          async () => {
             if ((Date.now() - queryProcessHeartbeat) > 5 * 60 * 1000) {
               this.logger('Query processing heartbeat', {
                 queueId,
@@ -770,7 +804,46 @@ export class QueryQueue {
               queryProcessHeartbeat = Date.now();
             }
 
-            return queueConnection.updateHeartBeat(queryKeyHashed, queueId);
+            try {
+              await queueConnection.updateHeartBeat(queryKeyHashed, queueId);
+            } catch (e: any) {
+              this.logger('Error updating heartbeat', {
+                queueId,
+                queryKey: query.queryKey,
+                error: e.stack || e,
+                queuePrefix: this.redisQueuePrefix,
+                requestId: query.requestId,
+              });
+            }
+
+            if (!queryExecutionFinished && localCancelHandler !== null) {
+              try {
+                const currentDef = await queueConnection.getQueryDef(queryKeyHashed, queueId);
+                if (!currentDef && !queryExecutionFinished) {
+                  this.logger('Cancelling query due to external cancellation', {
+                    queueId,
+                    queryKey: query.queryKey,
+                    queuePrefix: this.redisQueuePrefix,
+                    requestId: query.requestId,
+                    metadata: query.query?.metadata,
+                    preAggregationId: query.query?.preAggregation?.preAggregationId,
+                    newVersionEntry: query.query?.newVersionEntry,
+                    preAggregation: query.query?.preAggregation,
+                    addedToQueueTime: query.addedToQueueTime,
+                  });
+                  const cancelQuery = { ...query, cancelHandler: localCancelHandler };
+                  await this.processCancel(cancelQuery, queueId);
+                }
+              } catch (e: any) {
+                this.logger('Error checking for external cancellation', {
+                  queueId,
+                  queryKey: query.queryKey,
+                  error: e.stack || e,
+                  queuePrefix: this.redisQueuePrefix,
+                  requestId: query.requestId,
+                });
+              }
+            }
           },
           this.heartBeatInterval * 1000
         );
@@ -799,6 +872,7 @@ export class QueryQueue {
                   this.queryHandlers[handler](
                     query.query,
                     async (cancelHandler) => {
+                      localCancelHandler = cancelHandler;
                       try {
                         await queueConnection.optimisticQueryUpdate(queryKeyHashed, { cancelHandler }, processingId, queueId);
                       } catch (e: any) {
@@ -877,7 +951,7 @@ export class QueryQueue {
             }
           }
         } finally {
-          // catch block can throw an exception, it's why it's important to clearInterval here
+          queryExecutionFinished = true;
           clearInterval(heartBeatTimer);
         }
 

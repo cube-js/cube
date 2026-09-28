@@ -1,38 +1,43 @@
-import nextra from "nextra";
-import remarkMath from "remark-math";
-import remarkFrontmatter from "remark-frontmatter";
-import remarkHtmlKatex from "remark-html-katex";
-import linkEnvironmentVariables from "./plugins/link-environment-variables.mjs";
-
-import redirects from './redirects.json' with { type: "json" };
-
-/**
- * @type {import('next').NextConfig}
- */
-const config = {
-  basePath: process.env.BASE_PATH || "",
-  async redirects() {
-    return redirects;
-  },
-};
+import nextra from 'nextra'
+import path from 'path'
+// Cross-domain redirects to the new Mintlify docs at docs.cube.dev.
+// Generated from redirects.json by docs-mintlify/scripts/build_old_site_redirects.py.
+import redirects from './redirects-new-docs.json' with { type: 'json' }
 
 const withNextra = nextra({
-  theme: "nextra-theme-docs",
-  themeConfig: "./theme.config.tsx",
-  defaultShowCopyCode: true,
-  flexsearch: false,
+  contentDirBasePath: '/',
+  search: false,
   mdxOptions: {
-    remarkPlugins: [
-      remarkMath,
-      remarkFrontmatter,
-      remarkHtmlKatex,
-      linkEnvironmentVariables,
-    ],
-  },
-  transform: async (result, options) => {
-    console.log(`${options.route}.mdx`);
-    return result;
-  },
-});
+    rehypePrettyCodeOptions: {
+      theme: {
+        light: 'one-light',
+        dark: 'one-dark-pro'
+      }
+    }
+  }
+})
 
-export default withNextra(config);
+export default withNextra({
+  basePath: process.env.BASE_PATH || '',
+  async redirects() {
+    return [
+      {
+        source: '/',
+        destination: 'https://docs.cube.dev/docs/introduction',
+        permanent: true
+      },
+      ...redirects
+    ]
+  },
+  outputFileTracingRoot: import.meta.dirname,
+  turbopack: {
+    root: import.meta.dirname,
+    resolveAlias: {
+      'next-mdx-import-source-file': './mdx-components.jsx'
+    }
+  },
+  webpack: (config) => {
+    config.resolve.alias['next-mdx-import-source-file'] = path.resolve(import.meta.dirname, 'mdx-components.jsx')
+    return config
+  }
+})

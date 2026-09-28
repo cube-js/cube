@@ -1,4 +1,4 @@
-import type { ConfigItem } from '../helpers/prepareAnnotation';
+import type { ConfigItem } from '../helpers/prepare-annotation';
 import type { NormalizedQuery } from './query';
 import type { QueryType, ResultType } from './strings';
 
@@ -7,11 +7,6 @@ export type DBResponsePrimitive =
   boolean |
   number |
   string;
-
-export type DBResponseValue =
-  Date |
-  DBResponsePrimitive |
-  { value: DBResponsePrimitive };
 
 export type TransformDataResponse = {
   members: string[],

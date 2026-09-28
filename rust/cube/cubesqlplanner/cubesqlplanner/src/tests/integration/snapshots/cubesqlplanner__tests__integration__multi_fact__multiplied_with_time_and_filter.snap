@@ -1,0 +1,8 @@
+---
+source: cubesqlplanner/src/tests/integration/multi_fact.rs
+expression: result
+---
+customers__created_at_month | orders__count | returns__count
+----------------------------+---------------+---------------
+2025-01-01 00:00:00         | 4             | 1             
+2025-03-01 00:00:00         | 1             | 0

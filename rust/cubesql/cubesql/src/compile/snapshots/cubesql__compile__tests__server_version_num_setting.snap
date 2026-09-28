@@ -1,0 +1,9 @@
+---
+source: cubesql/src/compile/mod.rs
+expression: "execute_query(\"select cast(setting as integer) from pg_settings where name = 'server_version_num'\".to_string(),\nDatabaseProtocol::PostgreSQL).await?"
+---
++------------------------------------+
+| CAST(pg_settings.setting AS Int32) |
++------------------------------------+
+| 140002                             |
++------------------------------------+

@@ -3,7 +3,7 @@ use crate::metastore::{IdRow, MetaStoreTable, Partition};
 use crate::queryplanner::{InfoSchemaTableDef, InfoSchemaTableDefContext};
 use crate::CubeError;
 use async_trait::async_trait;
-use datafusion::arrow::array::{ArrayRef, BooleanArray, StringArray, UInt64Array};
+use datafusion::arrow::array::{ArrayRef, BooleanBuilder, StringBuilder, UInt64Builder};
 use datafusion::arrow::datatypes::{DataType, Field};
 use std::sync::Arc;
 
@@ -17,8 +17,8 @@ impl InfoSchemaTableDef for SystemPartitionsTableDef {
         &self,
         ctx: InfoSchemaTableDefContext,
         _limit: Option<usize>,
-    ) -> Result<Arc<Vec<Self::T>>, CubeError> {
-        Ok(Arc::new(ctx.meta_store.partition_table().all_rows().await?))
+    ) -> Result<Vec<Self::T>, CubeError> {
+        Ok(ctx.meta_store.partition_table().all_rows().await?)
     }
 
     fn schema(&self) -> Vec<Field> {
@@ -39,107 +39,54 @@ impl InfoSchemaTableDef for SystemPartitionsTableDef {
         ]
     }
 
-    fn columns(&self) -> Vec<Box<dyn Fn(Arc<Vec<Self::T>>) -> ArrayRef>> {
+    fn columns(&self, rows: Vec<Self::T>) -> Vec<ArrayRef> {
+        let num_rows = rows.len();
+        let mut id_builder = UInt64Builder::with_capacity(num_rows);
+        let mut file_name_builder = StringBuilder::with_capacity(num_rows, num_rows * 64);
+        let mut index_id_builder = UInt64Builder::with_capacity(num_rows);
+        let mut parent_id_builder = UInt64Builder::with_capacity(num_rows);
+        let mut multi_id_builder = UInt64Builder::with_capacity(num_rows);
+        let mut min_val_builder = StringBuilder::with_capacity(num_rows, num_rows * 64);
+        let mut max_val_builder = StringBuilder::with_capacity(num_rows, num_rows * 64);
+        let mut min_row_builder = StringBuilder::with_capacity(num_rows, num_rows * 64);
+        let mut max_row_builder = StringBuilder::with_capacity(num_rows, num_rows * 64);
+        let mut active_builder = BooleanBuilder::with_capacity(num_rows);
+        let mut warmed_builder = BooleanBuilder::with_capacity(num_rows);
+        let mut row_count_builder = UInt64Builder::with_capacity(num_rows);
+        let mut file_size_builder = UInt64Builder::with_capacity(num_rows);
+
+        for row in rows.into_iter() {
+            let id = row.get_id();
+            let part = row.get_row();
+            id_builder.append_value(id);
+            file_name_builder.append_value(partition_file_name(id, part.suffix()));
+            index_id_builder.append_value(part.get_index_id());
+            parent_id_builder.append_option(*part.parent_partition_id());
+            multi_id_builder.append_option(part.multi_partition_id());
+            min_val_builder.append_option(part.get_min_val().as_ref().map(|v| format!("{:?}", v)));
+            max_val_builder.append_option(part.get_max_val().as_ref().map(|v| format!("{:?}", v)));
+            min_row_builder.append_option(part.get_min().as_ref().map(|v| format!("{:?}", v)));
+            max_row_builder.append_option(part.get_max().as_ref().map(|v| format!("{:?}", v)));
+            active_builder.append_value(part.is_active());
+            warmed_builder.append_value(part.is_warmed_up());
+            row_count_builder.append_value(part.main_table_row_count());
+            file_size_builder.append_option(part.file_size());
+        }
+
         vec![
-            Box::new(|partitions| {
-                Arc::new(UInt64Array::from_iter_values(
-                    partitions.iter().map(|row| row.get_id()),
-                ))
-            }),
-            Box::new(|partitions| {
-                Arc::new(StringArray::from_iter_values(partitions.iter().map(
-                    |row| partition_file_name(row.get_id(), row.get_row().suffix()),
-                )))
-            }),
-            Box::new(|partitions| {
-                Arc::new(UInt64Array::from_iter_values(
-                    partitions.iter().map(|row| row.get_row().get_index_id()),
-                ))
-            }),
-            Box::new(|partitions| {
-                Arc::new(UInt64Array::from_iter(
-                    partitions
-                        .iter()
-                        .map(|row| row.get_row().parent_partition_id().clone()),
-                ))
-            }),
-            Box::new(|partitions| {
-                Arc::new(UInt64Array::from_iter(
-                    partitions
-                        .iter()
-                        .map(|row| row.get_row().multi_partition_id().clone()),
-                ))
-            }),
-            Box::new(|partitions| {
-                let min_array = partitions
-                    .iter()
-                    .map(|row| {
-                        row.get_row()
-                            .get_min_val()
-                            .as_ref()
-                            .map(|x| format!("{:?}", x))
-                    })
-                    .collect::<Vec<_>>();
-                Arc::new(StringArray::from_iter(
-                    min_array.iter().map(|v| v.as_deref()),
-                ))
-            }),
-            Box::new(|partitions| {
-                let max_array = partitions
-                    .iter()
-                    .map(|row| {
-                        row.get_row()
-                            .get_max_val()
-                            .as_ref()
-                            .map(|x| format!("{:?}", x))
-                    })
-                    .collect::<Vec<_>>();
-                Arc::new(StringArray::from_iter(
-                    max_array.iter().map(|v| v.as_deref()),
-                ))
-            }),
-            Box::new(|partitions| {
-                let min_array = partitions
-                    .iter()
-                    .map(|row| row.get_row().get_min().as_ref().map(|x| format!("{:?}", x)))
-                    .collect::<Vec<_>>();
-                Arc::new(StringArray::from_iter(
-                    min_array.iter().map(|v| v.as_deref()),
-                ))
-            }),
-            Box::new(|partitions| {
-                let max_array = partitions
-                    .iter()
-                    .map(|row| row.get_row().get_max().as_ref().map(|x| format!("{:?}", x)))
-                    .collect::<Vec<_>>();
-                Arc::new(StringArray::from_iter(
-                    max_array.iter().map(|v| v.as_deref()),
-                ))
-            }),
-            Box::new(|partitions| {
-                Arc::new(BooleanArray::from_iter(
-                    partitions.iter().map(|row| Some(row.get_row().is_active())),
-                ))
-            }),
-            Box::new(|partitions| {
-                Arc::new(BooleanArray::from_iter(
-                    partitions
-                        .iter()
-                        .map(|row| Some(row.get_row().is_warmed_up())),
-                ))
-            }),
-            Box::new(|partitions| {
-                Arc::new(UInt64Array::from_iter_values(
-                    partitions
-                        .iter()
-                        .map(|row| row.get_row().main_table_row_count()),
-                ))
-            }),
-            Box::new(|partitions| {
-                Arc::new(UInt64Array::from_iter(
-                    partitions.iter().map(|row| row.get_row().file_size()),
-                ))
-            }),
+            Arc::new(id_builder.finish()),
+            Arc::new(file_name_builder.finish()),
+            Arc::new(index_id_builder.finish()),
+            Arc::new(parent_id_builder.finish()),
+            Arc::new(multi_id_builder.finish()),
+            Arc::new(min_val_builder.finish()),
+            Arc::new(max_val_builder.finish()),
+            Arc::new(min_row_builder.finish()),
+            Arc::new(max_row_builder.finish()),
+            Arc::new(active_builder.finish()),
+            Arc::new(warmed_builder.finish()),
+            Arc::new(row_count_builder.finish()),
+            Arc::new(file_size_builder.finish()),
         ]
     }
 }

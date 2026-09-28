@@ -1,0 +1,147 @@
+---
+description: Configure the agent that ships with every Cube deployment — accessible views, LLM, runtime, and memory.
+title: Overview
+---
+
+Every Cube deployment ships with an agent that powers AI features such as [Analytics Chat](/docs/explore-analyze/analytics-chat). You can customize the agent's behavior with rules, certified queries, accessible views, model selection, and memory configuration.
+
+<Warning>
+  Configuring the agent in the UI is **deprecated** in favor of code-first configuration. Cube version 1.6.5 or above is required.
+
+  Deployments created after **April 30, 2026** have code-first agent configuration enabled by default. Existing deployments need to opt in by setting `CUBE_CLOUD_AGENTS_CONFIG_ENABLED=true`. The directory path defaults to `agents` and can be overridden with `CUBE_CLOUD_AGENTS_CONFIG_PATH`.
+</Warning>
+
+## Agent configuration
+
+Agent configuration lives in your **Cube data model repository**, alongside your cubes and views. Configuration is defined as YAML and Markdown files under an `agents/` directory in your project:
+
+```text
+your-cube-project/
+├── model/
+│   └── cubes/
+│       └── orders.yml
+├── agents/
+│   ├── config.yml                 # Agent configuration
+│   ├── rules/                     # Rules as Markdown
+│   │   └── fiscal-year.md
+│   └── certified_queries/         # Certified queries as Markdown
+│       └── quarterly-revenue.md
+└── cube.py
+```
+
+Storing configuration as code in your repository enables version control, code review, and consistent behavior across environments.
+
+## Configure the agent
+
+Place agent properties at the root of `agents/config.yml`:
+
+```yaml
+# agents/config.yml
+llm: claude_4_sonnet
+runtime: plain
+accessible_views:
+  - orders_view
+  - customers_view
+memory_mode: user
+```
+
+### Properties
+
+| Property            | Type             | Default                  | Description                                                                                                             |
+|---------------------|------------------|--------------------------|-------------------------------------------------------------------------------------------------------------------------|
+| `llm`               | string or object | `auto`                   | LLM provider — `auto`, a [predefined model](#llm) name, or a [BYOM](/admin/ai/bring-your-own-model) reference.          |
+| `embedding_llm`     | string or object | `text-embedding-3-large` | Embedding model — a predefined name or a BYOM reference.                                                                |
+| `runtime`           | string           | `plain`                  | [Runtime mode](#runtime) — `plain` or `reasoning`.                                                                      |
+| `accessible_views`  | array            | _all views_              | List of view names exposed to the agent as context guidance for which views to query. This is not a security control — if omitted or empty, all views are exposed. Use [access policies](/reference/data-modeling/data-access-policies) to enforce actual access restrictions. |
+| `memory_mode`       | string           | `space`                  | [Memory isolation mode](#memory) — `space`, `user`, or `disabled`.                                                      |
+
+Rules and certified queries have their own dedicated pages:
+
+- [Rules](/admin/ai/rules) — instructions that guide the agent's behavior
+- [Certified queries](/admin/ai/certified-queries) — a library of trusted SQL examples for the agent
+- [Skills](/admin/ai/skills) — reusable, named agent workflows users can run on demand from chat
+
+## LLM
+
+The default value is `auto` — Cube picks a recommended model on your behalf and may change it as better models become available. Use `auto` unless you have a reason to pin a specific model.
+
+To pin a specific model, set the `llm` property to one of the predefined models:
+
+**Anthropic Claude:**
+- `claude_3_5_sonnetv2`
+- `claude_3_7_sonnet`
+- `claude_3_7_sonnet_thinking`
+- `claude_4_sonnet`
+- `claude_4_5_sonnet`
+- `claude_4_5_haiku`
+- `claude_4_5_opus`
+- `claude_4_6_sonnet`
+- `claude_4_6_opus`
+- `claude_4_7_opus`
+
+**OpenAI GPT:**
+- `gpt_4o`
+- `gpt_4_1`
+- `gpt_4_1_mini`
+- `gpt_5`
+- `gpt_5_mini`
+- `gpt_5_3`
+- `gpt_5_4`
+- `o3`
+- `o4_mini`
+
+To use your own model, see [Bring your own model](/admin/ai/bring-your-own-model).
+
+### Embedding models
+
+Predefined embedding models for the `embedding_llm` property:
+
+- `text-embedding-3-large`
+- `text-embedding-3-small`
+
+BYOM is also supported for embedding models.
+
+## Runtime
+
+The `runtime` property controls how the agent processes requests:
+
+| Mode         | Description                                                                                |
+|--------------|--------------------------------------------------------------------------------------------|
+| `plain`      | Default. Optimized for speed and cost. Recommended for most use cases.                     |
+| `reasoning`  | Enables extended thinking for complex analysis.                                            |
+
+<Warning>
+  `reasoning` is **experimental**. It may be unstable and is not yet feature-complete. Stick with `plain` unless you have a specific need for extended reasoning.
+</Warning>
+
+## Memory
+
+The `memory_mode` property controls how the agent persists context across conversations:
+
+| Mode        | Description                                                                                  |
+|-------------|----------------------------------------------------------------------------------------------|
+| `space`     | Default. Memories are shared across all users — useful when the agent serves a single team. |
+| `user`      | Memories are isolated per user — useful when each user has private context.                  |
+| `disabled`  | The agent does not persist memory between conversations.                                     |
+
+See [Memories](/admin/ai/memory-isolation) for details on how memories are stored and used.
+
+## Customize the agent
+
+<CardGroup cols={2}>
+  <Card title="Rules" icon="list-check" href="/admin/ai/rules">
+    Define instructions that guide how the agent responds and analyzes data.
+  </Card>
+  <Card title="Certified queries" icon="certificate" href="/admin/ai/certified-queries">
+    Provide a library of trusted SQL queries for the agent to reference.
+  </Card>
+  <Card title="Skills" icon="wand-magic-sparkles" href="/admin/ai/skills">
+    Package reusable, named agent workflows that users can run on demand from chat.
+  </Card>
+  <Card title="Bring your own model" icon="brain" href="/admin/ai/bring-your-own-model">
+    Configure the agent to use your own LLM provider or model.
+  </Card>
+  <Card title="Memories" icon="database" href="/admin/ai/memory-isolation">
+    Control how the agent persists context across conversations and users.
+  </Card>
+</CardGroup>

@@ -1,0 +1,10 @@
+---
+source: cubesqlplanner/src/tests/integration/joins.rs
+expression: result
+---
+targets__region | targets__category | sales__total_amount
+----------------+-------------------+--------------------
+East            | Clothing          | 50.00              
+East            | Electronics       | 250.00             
+West            | Clothing          | 75.00              
+West            | Electronics       | 200.00

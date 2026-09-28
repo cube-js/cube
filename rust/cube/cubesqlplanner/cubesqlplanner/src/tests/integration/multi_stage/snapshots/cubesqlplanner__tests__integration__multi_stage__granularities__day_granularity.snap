@@ -1,0 +1,15 @@
+---
+source: cubesqlplanner/src/tests/integration/multi_stage/granularities.rs
+expression: result
+---
+orders__created_at_day | orders__total_amount | orders__amount_prev_month
+-----------------------+----------------------+--------------------------
+2024-02-03 00:00:00    | 300.00               | NULL                     
+2024-02-05 00:00:00    | NULL                 | 100.00                   
+2024-02-08 00:00:00    | 200.00               | NULL                     
+2024-02-10 00:00:00    | NULL                 | 200.00                   
+2024-02-14 00:00:00    | 150.00               | NULL                     
+2024-02-15 00:00:00    | NULL                 | 120.00                   
+2024-02-19 00:00:00    | 50.00                | NULL                     
+2024-02-20 00:00:00    | NULL                 | 50.00                    
+2024-02-25 00:00:00    | 50.00                | 30.00

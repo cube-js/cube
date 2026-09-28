@@ -1,0 +1,215 @@
+---
+title: SAML authentication with Microsoft Entra ID
+sidebarTitle: SAML
+description: Step-by-step guide for configuring Microsoft Entra ID as a SAML identity provider for Cube sign-in.
+---
+
+With SAML (Security Assertion Markup Language) enabled, you can authenticate
+users in Cube through Microsoft Entra ID (formerly Azure Active Directory),
+allowing your team to access Cube using single sign-on.
+
+<Note>
+
+Available on [Enterprise plan](https://cube.dev/pricing).
+
+</Note>
+
+## Prerequisites
+
+Before proceeding, ensure you have the following:
+
+- Admin permissions in Cube.
+- Sufficient permissions in Microsoft Entra to create and configure
+  Enterprise Applications.
+
+## Enable SAML in Cube
+
+First, enable SAML authentication in Cube:
+
+1. In Cube, navigate to **Admin → Settings**.
+2. On the **Authentication & SSO** tab, enable the **SAML**
+   toggle.
+3. Take note of the **Single Sign-On URL** and **Audience**
+   values — you'll need them when configuring the Enterprise Application
+   in Entra.
+
+## Create an Enterprise Application in Entra
+
+1. Sign in to the [Microsoft Entra admin center](https://entra.microsoft.com).
+2. Go to [Enterprise Applications](https://portal.azure.com/#view/Microsoft_AAD_IAM/StartboardApplicationsMenuBlade/~/AppAppsPreview)
+   and click **New application**.
+3. Select **Create your own application**.
+4. Give it a name and choose a **non-gallery application**, then click
+   **Create**.
+
+## Configure SAML in Entra
+
+1. In your new Enterprise Application, go to the **Single sign-on**
+   section and select **SAML**.
+2. In the **Basic SAML Configuration** section, enter the following:
+   - **Entity ID** — Use the **Single Sign-On URL** value from Cube.
+   - **Reply URL** — Use the **Single Sign-On URL** value from Cube.
+3. Go to **Attributes & Claims → Edit → Advanced settings** and
+   set the audience claim override to the **Audience** value from Cube.
+4. Go to **SAML Certificates → Edit** and select **Sign SAML
+   response and assertion** for the **Signing Option**.
+5. Download the **Federation Metadata XML** file — you'll need it
+   when completing the Cube configuration.
+
+## Configure attribute mappings
+
+Before returning to Cube, configure the SAML claims Entra sends during
+login. Cube uses these claims to identify the user and map optional
+attributes such as display name.
+
+Create explicit SAML claims in Entra with the names Cube uses by default.
+
+1. In your Entra Enterprise Application, go to **Single sign-on →
+   Attributes & Claims**.
+2. Add the following claims. Leave **Namespace** blank for each claim:
+   - **Email** — Set **Name** to `email` and **Source attribute** to
+     `user.userprincipalname` or `user.mail`.
+   - **Display name** — Set **Name** to `name` and **Source attribute** to
+     `user.displayname`.
+
+If you plan to map Cube roles based on Entra group membership (see
+[Map roles by group](#map-roles-by-group) below), also add a group claim:
+
+1. Still in **Attributes & Claims**, click **Add a group claim**.
+2. Choose which groups to include (e.g. **Security groups** or **Groups
+   assigned to the application**) and pick a **Source attribute** for the
+   group name. For most setups, select **sAMAccountName** or
+   **Cloud-only group display names** so the assertion carries
+   human-readable group names that match the **IdP group name** values
+   you'll configure in Cube Cloud.
+3. Save the claim.
+
+   Cube reads Entra's canonical groups claim URL
+   (`http://schemas.microsoft.com/ws/2008/06/identity/claims/groups`)
+   automatically, so no further attribute renaming is required on the
+   Entra side.
+
+## Complete configuration in Cube
+
+Return to the SAML configuration page in Cube and provide the identity
+provider details. You can do this in one of two ways:
+
+**Option A: Upload metadata file**
+
+1. In the **Import IdP Metadata** section, click **Upload
+   Metadata File**.
+2. Select the **Federation Metadata XML** file you downloaded from Entra.
+   This will automatically populate the **Entity ID / Issuer**,
+   **SSO (Sign on) URL**, and **Certificate** fields.
+
+**Option B: Enter details manually**
+
+If you prefer to configure the fields manually, enter the following
+values from the Entra **Single sign-on** page:
+
+- **Entity ID / Issuer** — Use the **Microsoft Entra Identifier**
+  value.
+- **SSO (Sign on) URL** — Use the **Login URL** value.
+- **Certificate** — Paste the Base64-encoded certificate from the
+  **SAML Certificates** section.
+
+In both options, also configure the following setting:
+
+- **Auto-provision new users** — When enabled, users are automatically
+  created in Cube on their first login via this SAML provider. Enable this
+  if you want to provision users only when they first access Cube and you
+  are not using SCIM provisioning. New users receive the Viewer role by
+  default; see [Default role for new users](#default-role-for-new-users)
+  to choose a different role.
+
+## Default role for new users
+
+Auto-provisioned users — both via SAML and via [SCIM][ref-scim] — receive
+the **Viewer** role by default. To assign a different role, expand the
+**Advanced** section of the SAML configuration form and pick from
+**Default role for new users**:
+
+- **Developer**, **Explorer**, or **Viewer** — Cube's [default
+  roles][ref-roles].
+- Any [custom role][ref-custom-roles] defined in your account, listed
+  below the divider.
+
+The selected role applies **only when a user is first created** during
+provisioning. Existing users are not modified on subsequent SSO logins or
+SCIM updates.
+
+<Info>
+
+Admin status is not assignable through this picker — Admin is controlled
+separately. To grant admin permissions, update the user's role manually
+under [Admin → Users][ref-manage-users].
+
+</Info>
+
+<Warning>
+
+If the selected role is later renamed or deleted, new users will fall
+back to the **Viewer** role until you pick a valid role here. The Viewer
+fallback applies whenever the configured default cannot be resolved —
+whether that's because no default is set or the configured role no longer
+exists.
+
+</Warning>
+
+## Map roles by group
+
+For finer-grained role assignment, enable **Map roles by group** in the
+**Advanced Settings** section to assign Cube roles based on a user's
+Entra group memberships.
+
+To configure group-based role mapping:
+
+1. Make sure Entra sends a group claim on the SAML assertion. See the
+   group-claim step in [Configure attribute
+   mappings](#configure-attribute-mappings).
+2. In the SAML configuration form in Cube, expand **Advanced Settings**.
+3. (Optional) Under **SAML attribute customization**, set the **Groups
+   attribute** to the simple name of the SAML attribute carrying group
+   memberships. Defaults to `groups`. Cube also reads Entra's canonical
+   groups claim URL automatically, so the default usually works
+   out of the box.
+4. Enable the **Map roles by group** toggle.
+5. Click **Add group mapping** and create one entry per group you want
+   to map:
+   - **IdP group name** — the group display name as it appears in the
+     assertion (case-insensitive). With **Source attribute** set to
+     **sAMAccountName** or **Cloud-only group display names**, this is
+     the human-readable group name. If you left the default (group object
+     ID), use the GUID instead.
+   - **Cube role** — pick a default or [custom role][ref-custom-roles].
+
+For SAML SSO, group mappings are evaluated **only when a new user is
+auto-provisioned** on first login. If any matching group resolves to a
+Cube role, those roles are assigned to the new user **instead of** the
+configured [default role](#default-role-for-new-users). The default role
+is used as a fallback when no IdP group matches (or when the mapped Cube
+roles no longer exist). Existing users' role assignments are never
+modified by subsequent logins.
+
+The same mapping is also applied by [SCIM][ref-scim] when group
+memberships are pushed, so a single configuration drives both SAML SSO
+and SCIM group sync.
+
+## Assign users
+
+Make sure the new Enterprise Application is assigned to the relevant
+users or groups in Entra before testing.
+
+## Test the integration
+
+1. In the Entra **Single sign-on** section, click **Test**
+   to verify the SAML integration works for your Cube account.
+2. Alternatively, copy the **Single Sign-On URL** from Cube,
+   open it in a new browser tab, and verify you are redirected to
+   Entra for authentication and then back to Cube.
+
+[ext-ms-entra-id]: https://www.microsoft.com/en-us/security/business/identity-access/microsoft-entra-id
+[ref-scim]: /admin/sso/microsoft-entra-id/scim
+[ref-roles]: /admin/users-and-permissions/roles-and-permissions
+[ref-custom-roles]: /admin/users-and-permissions/custom-roles
+[ref-manage-users]: /admin/users-and-permissions/manage-users

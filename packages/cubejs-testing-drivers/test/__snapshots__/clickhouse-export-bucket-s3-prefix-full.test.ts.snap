@@ -1945,6 +1945,10 @@ Array [
 exports[`Queries with the @cubejs-backend/clickhouse-driver export-bucket-s3-prefix SQL API: ungrouped pre-agg: ungrouped_pre_agg 1`] = `
 Array [
   Object {
+    "productName": "Lexmark 20R1285 X6650 Wireless All-in-One Printer",
+    "totalSales": null,
+  },
+  Object {
     "productName": "Canon PC1080F Personal Copier",
     "totalSales": 2399.96,
   },
@@ -2115,10 +2119,6 @@ Array [
   Object {
     "productName": "OIC #2 Pencils, Medium Soft",
     "totalSales": 3.76,
-  },
-  Object {
-    "productName": "Lexmark 20R1285 X6650 Wireless All-in-One Printer",
-    "totalSales": null,
   },
 ]
 `;
@@ -9206,6 +9206,61 @@ exports[`Queries with the @cubejs-backend/clickhouse-driver export-bucket-s3-pre
 Array [
   Object {
     "measure(BigECommerce.rollingCountBy2Week)": "12",
+  },
+]
+`;
+
+exports[`Queries with the @cubejs-backend/clickhouse-driver export-bucket-s3-prefix querying ECommerce: count by month + order with non-UTC timezone (Asia/Kolkata) 1`] = `
+Array [
+  Object {
+    "ECommerce.count": "2",
+    "ECommerce.customOrderDateNoPreAgg": "2020-01-01T00:00:00.000",
+    "ECommerce.customOrderDateNoPreAgg.month": "2020-01-01T00:00:00.000",
+  },
+  Object {
+    "ECommerce.count": "1",
+    "ECommerce.customOrderDateNoPreAgg": "2020-02-01T00:00:00.000",
+    "ECommerce.customOrderDateNoPreAgg.month": "2020-02-01T00:00:00.000",
+  },
+  Object {
+    "ECommerce.count": "2",
+    "ECommerce.customOrderDateNoPreAgg": "2020-03-01T00:00:00.000",
+    "ECommerce.customOrderDateNoPreAgg.month": "2020-03-01T00:00:00.000",
+  },
+  Object {
+    "ECommerce.count": "1",
+    "ECommerce.customOrderDateNoPreAgg": "2020-04-01T00:00:00.000",
+    "ECommerce.customOrderDateNoPreAgg.month": "2020-04-01T00:00:00.000",
+  },
+  Object {
+    "ECommerce.count": "5",
+    "ECommerce.customOrderDateNoPreAgg": "2020-05-01T00:00:00.000",
+    "ECommerce.customOrderDateNoPreAgg.month": "2020-05-01T00:00:00.000",
+  },
+  Object {
+    "ECommerce.count": "7",
+    "ECommerce.customOrderDateNoPreAgg": "2020-06-01T00:00:00.000",
+    "ECommerce.customOrderDateNoPreAgg.month": "2020-06-01T00:00:00.000",
+  },
+  Object {
+    "ECommerce.count": "6",
+    "ECommerce.customOrderDateNoPreAgg": "2020-09-01T00:00:00.000",
+    "ECommerce.customOrderDateNoPreAgg.month": "2020-09-01T00:00:00.000",
+  },
+  Object {
+    "ECommerce.count": "4",
+    "ECommerce.customOrderDateNoPreAgg": "2020-10-01T00:00:00.000",
+    "ECommerce.customOrderDateNoPreAgg.month": "2020-10-01T00:00:00.000",
+  },
+  Object {
+    "ECommerce.count": "9",
+    "ECommerce.customOrderDateNoPreAgg": "2020-11-01T00:00:00.000",
+    "ECommerce.customOrderDateNoPreAgg.month": "2020-11-01T00:00:00.000",
+  },
+  Object {
+    "ECommerce.count": "7",
+    "ECommerce.customOrderDateNoPreAgg": "2020-12-01T00:00:00.000",
+    "ECommerce.customOrderDateNoPreAgg.month": "2020-12-01T00:00:00.000",
   },
 ]
 `;

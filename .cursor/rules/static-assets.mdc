@@ -1,0 +1,135 @@
+---
+description: How to upload and reference static images/assets for Mintlify docs
+globs: docs-mintlify/**
+alwaysApply: false
+---
+
+# Static assets for the Mintlify docs
+
+## Where assets live
+
+- **Editorial assets** (provider logos, UI screenshots, architecture diagrams,
+  recipe images, etc.) → S3 bucket `cube-dev-websites-shared`, served via CDN
+  at `https://static.cube.dev/<key>`. **Never** commit these binaries to the
+  repo.
+- **Site chrome** that ships with Mintlify itself (the favicon and the logos
+  in `docs-mintlify/logo/`) stays in the repo. Don't add new files there.
+
+If you're not sure: anything you'd reference from an `.mdx` page → S3.
+
+## Uploading editorial assets
+
+Use the script in `docs-mintlify/scripts/` (no AWS console clicks needed).
+Run it from the `docs-mintlify/` directory:
+
+```bash
+./scripts/upload-asset.sh <local-file> <dest-key>
+```
+
+Examples:
+
+```bash
+./scripts/upload-asset.sh ./snowflake.svg     icons/snowflake.svg
+./scripts/upload-asset.sh ./architecture.png  docs/getting-started/architecture.png
+./scripts/upload-asset.sh ./flow.svg          diagrams/pre-aggregations-flow.svg
+```
+
+The script prints (and copies to clipboard on macOS) the final
+`https://static.cube.dev/<key>` URL. Paste that URL into the relevant
+`.mdx` file.
+
+Full docs: `docs-mintlify/scripts/README.md`.
+
+## First-time AWS setup
+
+The upload script needs the AWS CLI and credentials for the
+`cube-dev-websites-shared` bucket. If `./scripts/upload-asset.sh` fails with
+`command not found: aws` or an AWS auth error, run through these steps once.
+
+If the user hasn't configured AWS yet, walk them through this — don't try to
+guess credentials or upload without a working profile.
+
+1. **Install the AWS CLI**
+
+   ```bash
+   brew install awscli         # macOS
+   # or: pipx install awscli    # cross-platform
+   ```
+
+2. **Get credentials**
+
+   You need an IAM user / SSO role with `s3:PutObject` and `s3:HeadObject`
+   on `cube-dev-websites-shared`. Ask whoever manages Cube's AWS account
+   (post in the internal infra/ops channel) — don't reuse personal keys.
+
+3. **Configure a local profile**
+
+   The script picks up the `cube-static` profile by default. Use that name
+   to avoid having to set `AWS_PROFILE` every time:
+
+   ```bash
+   aws configure --profile cube-static
+   # AWS Access Key ID:     <your key>
+   # AWS Secret Access Key: <your secret>
+   # Default region name:   us-west-2
+   # Default output format: json
+   ```
+
+   If you must use a different profile name, prefix every invocation:
+
+   ```bash
+   AWS_PROFILE=my-profile ./scripts/upload-asset.sh ./logo.svg icons/foo.svg
+   ```
+
+4. **Verify access** before your first real upload:
+
+   ```bash
+   aws sts get-caller-identity --profile cube-static
+   aws s3 ls s3://cube-dev-websites-shared/icons/ --profile cube-static | head
+   ```
+
+   Both commands should succeed. If `ls` returns an `AccessDenied` error,
+   credentials are wrong or lack S3 permissions — fix that before uploading.
+
+Never commit AWS keys to the repo or paste them into chat. They live only in
+`~/.aws/credentials` (or your SSO config).
+
+## Path conventions
+
+| Prefix                            | Use for                                            |
+| --------------------------------- | -------------------------------------------------- |
+| `icons/<slug>.svg`                | Provider / integration / vendor logos for `<Card>` |
+| `icons/<slug>-light.svg`          | Logo, light variant (use on dark backgrounds)      |
+| `icons/<slug>-dark.svg`           | Logo, dark variant (use on light backgrounds)      |
+| `docs/<section>/<slug>/<file>`    | Screenshots & images for a specific docs page      |
+| `diagrams/<slug>.svg`             | Architecture / flow diagrams                       |
+| `recipes/<slug>/<file>`           | Recipe-specific screenshots                        |
+
+Use kebab-case slugs. Match the existing `icons/<slug>.svg` pattern already
+referenced from pages like `admin/connect-to-data/visualization-tools/index.mdx`
+and `admin/deployment/providers/index.mdx` — don't invent a new top-level
+prefix when one of the above fits.
+
+For provider logos, prefer SVG. For UI screenshots, prefer PNG (or WebP for
+larger images). Compress before uploading — the bucket is cached aggressively.
+
+## Immutability rule
+
+Asset URLs are **immutable by convention** — files are served with
+`Cache-Control: public, max-age=31536000, immutable`. The upload script
+refuses to overwrite existing keys.
+
+When an asset needs to change:
+
+1. Upload a new key with a version suffix (e.g. `snowflake-v2.svg`).
+2. Update the `.mdx` reference in the same PR.
+
+Never use `--force` on an asset that is already live.
+
+## Don't
+
+- Don't commit screenshots, provider logos, or diagrams into `docs-mintlify/`
+  itself — they bloat the repo and Mintlify build, and can't be reused.
+- Don't reference Contentful (`ucarecdn.com`, `images.ctfassets.net`) URLs in
+  new docs content. Mirror to `static.cube.dev` first.
+- Don't reuse the same key for a different image. Bump the version suffix.

@@ -1,14 +1,17 @@
 import { v4 as uuidv4 } from 'uuid';
-import ResultSet from './ResultSet';
-import SqlQuery from './SqlQuery';
-import Meta from './Meta';
-import ProgressResult from './ProgressResult';
-import HttpTransport, { ErrorResponse, ITransport, TransportOptions } from './HttpTransport';
-import RequestError from './RequestError';
+import ResultSet from './ResultSet.js';
+import SqlQuery from './SqlQuery.js';
+import Meta from './Meta.js';
+import ProgressResult from './ProgressResult.js';
+import HttpTransport, { ErrorResponse, ITransport, TransportOptions } from './HttpTransport.js';
+import RequestError from './RequestError.js';
 import {
   CacheMode,
+  DeeplyReadonly,
+  DimensionFormat,
   ExtractTimeMembers,
   LoadResponse,
+  MeasureFormat,
   MetaResponse,
   PivotQuery,
   ProgressResponse,
@@ -16,7 +19,7 @@ import {
   QueryOrder,
   QueryType,
   TransformedQuery
-} from './types';
+} from './types.js';
 
 export type LoadMethodCallback<T> = (error: Error | null, resultSet: T) => void;
 
@@ -47,13 +50,18 @@ export type LoadMethodOptions = {
    */
   progressCallback?(result: ProgressResult): void;
   /**
+   * Server-side cache policy for query execution. Does not control client-side caching.
+   */
+  cache?: CacheMode;
+  /**
    * AbortSignal to cancel requests
    */
   signal?: AbortSignal;
-};
 
-export type DeeplyReadonly<T> = {
-  readonly [K in keyof T]: DeeplyReadonly<T[K]>;
+  /**
+   * Client provided request ID, if client wants to track request onb their own
+   */
+  baseRequestId?: string;
 };
 
 export type ExtractMembers<T extends DeeplyReadonly<Query>> =
@@ -108,26 +116,25 @@ export type CubeSqlOptions = LoadMethodOptions & {
    * Query timeout in milliseconds
    */
   timeout?: number;
-  /**
-   * Cache mode for query execution
-   */
-  cache?: CacheMode;
 };
 
 export type CubeSqlSchemaColumn = {
   name: string;
   // eslint-disable-next-line camelcase
   column_type: string;
+  format?: DimensionFormat | MeasureFormat;
 };
 
 export type CubeSqlResult = {
   schema: CubeSqlSchemaColumn[];
   data: (string | number | boolean | null)[][];
+  lastRefreshTime?: string;
 };
 
 export type CubeSqlStreamChunk = {
   type: 'schema';
   schema: CubeSqlSchemaColumn[];
+  lastRefreshTime?: string;
 } | {
   type: 'data';
   data: (string | number | boolean | null)[];
@@ -145,17 +152,19 @@ let mutexCounter = 0;
 
 const MUTEX_ERROR = 'Mutex has been changed';
 
-function mutexPromise(promise: Promise<any>) {
+function mutexPromise<T>(promise: Promise<T>): Promise<T | null> {
   return promise
     .then((result) => result)
     .catch((error) => {
       if (error !== MUTEX_ERROR) {
         throw error;
       }
+
+      return null;
     });
 }
 
-export type ResponseFormat = 'compact' | 'default' | undefined;
+export type ResponseFormat = 'compact' | 'columnar' | 'default' | undefined;
 
 export type CubeApiOptions = {
   /**
@@ -171,7 +180,7 @@ export type CubeApiOptions = {
   pollInterval?: number;
   credentials?: TransportOptions['credentials'];
   parseDateMeasures?: boolean;
-  resType?: 'default' | 'compact';
+  resType?: 'default' | 'compact' | 'columnar';
   castNumerics?: boolean;
   /**
    * How many network errors would be retried before returning to users. Default to 0.
@@ -277,8 +286,8 @@ class CubeApi {
 
   protected request(method: string, params?: any) {
     return this.transport.request(method, {
-      baseRequestId: uuidv4(),
-      ...params
+      ...params,
+      baseRequestId: params?.baseRequestId || uuidv4(),
     });
   }
 
@@ -370,7 +379,7 @@ class CubeApi {
         body.error = text;
       }
 
-      if (body.error === 'Continue wait') {
+      if (body.error?.includes('Continue wait')) {
         await checkMutex();
         if (options?.progressCallback) {
           options.progressCallback(new ProgressResult(body as ProgressResponse));
@@ -407,7 +416,8 @@ class CubeApi {
       return subscribeNext();
     };
 
-    const promise = requestPromise.then(requestInstance => mutexPromise(requestInstance.subscribe(loadImpl)));
+    const promise: Promise<any> = requestPromise
+      .then(requestInstance => mutexPromise(requestInstance.subscribe(loadImpl)));
 
     if (callback) {
       return {
@@ -457,12 +467,12 @@ class CubeApi {
    */
   private patchQueryInternal(query: DeeplyReadonly<Query>, responseFormat: ResponseFormat): DeeplyReadonly<Query> {
     if (
-      responseFormat === 'compact' &&
-      query.responseFormat !== 'compact'
+      (responseFormat === 'compact' || responseFormat === 'columnar') &&
+      query.responseFormat !== responseFormat
     ) {
       return {
         ...query,
-        responseFormat: 'compact',
+        responseFormat,
       };
     } else {
       return query;
@@ -513,6 +523,21 @@ class CubeApi {
             });
             data.push(row);
           });
+          response.results[j].data = data;
+        });
+      } else if (response.results[0].query.responseFormat &&
+        response.results[0].query.responseFormat === 'columnar') {
+        response.results.forEach((result, j) => {
+          const { columns, members } = result.data as unknown as { columns: any[][]; members: string[] };
+          const rowCount = columns[0]?.length ?? 0;
+          const data: Record<string, any>[] = [];
+          for (let i = 0; i < rowCount; i++) {
+            const row: Record<string, any> = {};
+            members.forEach((m, k) => {
+              row[m] = columns[k][i];
+            });
+            data.push(row);
+          }
           response.results[j].data = data;
         });
       }
@@ -570,12 +595,20 @@ class CubeApi {
    */
   public load<QueryType extends DeeplyReadonly<Query | Query[]>>(query: QueryType, options?: LoadMethodOptions, callback?: CallableFunction, responseFormat: ResponseFormat = 'default') {
     [query, options] = this.prepareQueryOptions(query, options, responseFormat);
+
+    const params: Record<string, unknown> = {
+      query,
+      queryType: 'multi',
+      signal: options?.signal,
+      baseRequestId: options?.baseRequestId,
+    };
+
+    if (options?.cache) {
+      params.cache = options.cache;
+    }
+
     return this.loadMethod(
-      () => this.request('load', {
-        query,
-        queryType: 'multi',
-        signal: options?.signal
-      }),
+      () => this.request('load', params),
       (response: any) => this.loadResponseInternal(response, options),
       options,
       callback
@@ -588,12 +621,12 @@ class CubeApi {
       ...options
     };
 
-    if (responseFormat === 'compact') {
+    if (responseFormat === 'compact' || responseFormat === 'columnar') {
       if (Array.isArray(query)) {
-        const patched = query.map((q) => this.patchQueryInternal(q, 'compact'));
+        const patched = query.map((q) => this.patchQueryInternal(q, responseFormat));
         return [patched as unknown as QueryType, options];
       } else {
-        const patched = this.patchQueryInternal(query as DeeplyReadonly<Query>, 'compact');
+        const patched = this.patchQueryInternal(query as DeeplyReadonly<Query>, responseFormat);
         return [patched as QueryType, options];
       }
     }
@@ -640,7 +673,8 @@ class CubeApi {
       () => this.request('subscribe', {
         query,
         queryType: 'multi',
-        signal: options?.signal
+        signal: options?.signal,
+        baseRequestId: options?.baseRequestId,
       }),
       (response: any) => this.loadResponseInternal(response, options),
       { ...options, subscribe: true },
@@ -659,7 +693,8 @@ class CubeApi {
     return this.loadMethod(
       () => this.request('sql', {
         query,
-        signal: options?.signal
+        signal: options?.signal,
+        baseRequestId: options?.baseRequestId,
       }),
       (response: any) => (Array.isArray(response) ? response.map((body) => new SqlQuery(body)) : new SqlQuery(response)),
       options,
@@ -677,7 +712,8 @@ class CubeApi {
   public meta(options?: LoadMethodOptions, callback?: LoadMethodCallback<Meta>): Promise<Meta> | UnsubscribeObj {
     return this.loadMethod(
       () => this.request('meta', {
-        signal: options?.signal
+        signal: options?.signal,
+        baseRequestId: options?.baseRequestId,
       }),
       (body: MetaResponse) => new Meta(body),
       options,
@@ -696,7 +732,8 @@ class CubeApi {
     return this.loadMethod(
       () => this.request('dry-run', {
         query,
-        signal: options?.signal
+        signal: options?.signal,
+        baseRequestId: options?.baseRequestId,
       }),
       (response: DryRunResponse) => response,
       options,
@@ -714,13 +751,20 @@ class CubeApi {
   public cubeSql(sqlQuery: string, options?: CubeSqlOptions, callback?: LoadMethodCallback<CubeSqlResult>): Promise<CubeSqlResult> | UnsubscribeObj {
     return this.loadMethod(
       () => {
-        const request = this.request('cubesql', {
+        const cubesqlParams: Record<string, unknown> = {
           query: sqlQuery,
-          cache: options?.cache,
           method: 'POST',
           signal: options?.signal,
-          fetchTimeout: options?.timeout
-        });
+          fetchTimeout: options?.timeout,
+          baseRequestId: options?.baseRequestId,
+          throwContinueWait: true,
+        };
+
+        if (options?.cache) {
+          cubesqlParams.cache = options.cache;
+        }
+
+        const request = this.request('cubesql', cubesqlParams);
 
         return request;
       },
@@ -743,12 +787,14 @@ class CubeApi {
         const [schema, ...data] = response.error.split('\n');
 
         try {
+          const parsedSchema = JSON.parse(schema);
           return {
-            schema: JSON.parse(schema).schema,
+            schema: parsedSchema.schema,
             data: data
               .filter((d: string) => d.trim().length)
               .map((d: string) => JSON.parse(d).data)
               .reduce((a: any, b: any) => a.concat(b), []),
+            ...(parsedSchema.lastRefreshTime ? { lastRefreshTime: parsedSchema.lastRefreshTime } : {}),
           };
         } catch (err) {
           throw new Error(response.error);
@@ -799,7 +845,8 @@ class CubeApi {
               if (parsed.schema) {
                 yield {
                   type: 'schema' as const,
-                  schema: parsed.schema
+                  schema: parsed.schema,
+                  ...(parsed.lastRefreshTime ? { lastRefreshTime: parsed.lastRefreshTime } : {}),
                 };
               } else if (parsed.data) {
                 yield {
@@ -829,7 +876,8 @@ class CubeApi {
           if (parsed.schema) {
             yield {
               type: 'schema' as const,
-              schema: parsed.schema
+              schema: parsed.schema,
+              ...(parsed.lastRefreshTime ? { lastRefreshTime: parsed.lastRefreshTime } : {}),
             };
           } else if (parsed.data) {
             yield {
@@ -865,12 +913,14 @@ class CubeApi {
 export default (apiToken: string | (() => Promise<string>), options: CubeApiOptions) => new CubeApi(apiToken, options);
 
 export { CubeApi };
-export { default as Meta } from './Meta';
-export { default as SqlQuery } from './SqlQuery';
-export { default as RequestError } from './RequestError';
-export { default as ProgressResult } from './ProgressResult';
-export { default as ResultSet } from './ResultSet';
-export * from './HttpTransport';
-export * from './utils';
-export * from './time';
-export * from './types';
+export { default as Meta } from './Meta.js';
+export { default as SqlQuery } from './SqlQuery.js';
+export { default as RequestError } from './RequestError.js';
+export { default as ProgressResult } from './ProgressResult.js';
+export { default as ResultSet } from './ResultSet.js';
+export * from './HttpTransport.js';
+export * from './utils.js';
+export * from './time.js';
+export * from './types.js';
+// We don't export it for now, because size of builds for cjs/umd users will be affected
+// export * from './format.js';

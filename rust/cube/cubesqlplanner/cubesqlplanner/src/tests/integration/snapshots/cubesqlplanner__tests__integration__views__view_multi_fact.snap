@@ -1,0 +1,10 @@
+---
+source: cubesqlplanner/src/tests/integration/views.rs
+expression: result
+---
+customer_overview__name | customer_overview__orders_count | customer_overview__orders_total_amount | customer_overview__returns_count | customer_overview__returns_total_refund
+------------------------+---------------------------------+----------------------------------------+----------------------------------+----------------------------------------
+Alice                   | 4                               | 425.00                                 | 1                                | 100.00                                 
+Bob                     | 3                               | 550.00                                 | 2                                | 130.00                                 
+Charlie                 | 0                               | NULL                                   | 2                                | 100.00                                 
+Diana                   | 1                               | 400.00                                 | 0                                | NULL

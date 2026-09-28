@@ -45,7 +45,7 @@ ${eventJoin.join('\nLEFT JOIN\n')}
           shown: false
         },
         conversionsPercent: {
-          sql: (conversions, firstStepConversions) => `CASE WHEN ${firstStepConversions} > 0 THEN 100.0 * ${conversions} / ${firstStepConversions} ELSE NULL END`,
+          sql: (conversions, firstStepConversions) => `CASE WHEN ${firstStepConversions} > 0 THEN 1.0 * ${conversions} / ${firstStepConversions} ELSE NULL END`,
           type: 'number',
           format: 'percent'
         }

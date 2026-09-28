@@ -1,0 +1,66 @@
+cubes:
+    - name: source_a
+      sql: "SELECT * FROM calc_groups_source_a"
+      dimensions:
+          - name: pk
+            type: number
+            sql: id
+            primary_key: true
+          - name: product_category
+            type: string
+            sql: product_category
+          - name: created_at
+            type: time
+            sql: created_at
+      measures:
+          - name: count
+            type: count
+          - name: price_usd
+            type: sum
+            sql: price_usd
+          - name: price_eur
+            type: sum
+            sql: price_eur
+
+    - name: source_b
+      sql: "SELECT * FROM calc_groups_source_b"
+      dimensions:
+          - name: pk
+            type: number
+            sql: id
+            primary_key: true
+          - name: product_category
+            type: string
+            sql: product_category
+          - name: created_at
+            type: time
+            sql: created_at
+      measures:
+          - name: count
+            type: count
+          - name: price_usd
+            type: sum
+            sql: price_usd
+          - name: price_eur
+            type: sum
+            sql: price_eur
+
+views:
+    - name: source
+      dimensions:
+          - name: source
+            type: switch
+            values: ["A", "B"]
+
+          - name: product_category
+            type: string
+            multi_stage: true
+            case:
+              switch: "{CUBE.source}"
+              when:
+                - value: A
+                  sql: "{source_a.product_category}"
+                - value: B
+                  sql: "{source_b.product_category}"
+              else:
+                sql: "{source_a.product_category}"

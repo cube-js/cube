@@ -1,0 +1,150 @@
+---
+title: Continuous deployment
+description: This guide covers features and tools you can use to deploy your Cube project to Cube Cloud.
+---
+
+Each Cube deployment is configured to use one of the following deploy modes:
+
+- **Deploy with Git** — Cube Cloud builds and deploys your project from a Git
+  repository. Use this mode when you want commits to the production branch
+  (or merges performed from the Cube Cloud UI) to automatically trigger a
+  production build.
+- **Deploy with CLI** — you push your project to Cube Cloud from your local
+  machine or CI/CD pipeline by running the `cubejs-cli deploy` command. The
+  production branch is **never** built automatically; it only changes when
+  somebody explicitly runs `cubejs-cli deploy`.
+
+You can change the deploy mode at any time on the **Build & Deploy** tab of
+the **Settings** screen.
+
+Independently of the deploy mode, you can [connect a GitHub
+repository](#deploy-with-github) to the deployment. Non-production branches
+pushed to GitHub are then auto-synced into Cube Cloud and reflected in their
+[staging environments][ref-environments-staging]. The production branch
+follows the deploy mode: it auto-deploys in Git mode and stays manual in CLI
+mode.
+
+## Deploy with Git
+
+Continuous deployment works by connecting a Git repository to a Cube Cloud
+deployment and keeping the two in sync.
+
+First, go to the **Build & Deploy** tab on the **Settings** screen and
+select **Deploy with Git** under **Deploy with**. From the same screen you
+can pick the production branch, connect a Git repository, and copy the
+commands that set up Cube Cloud as a Git remote:
+
+<Frame>
+  <img src="https://static.cube.dev/docs/admin/deployment/continuous-deployment/build-deploy-tab.png" alt="Build & Deploy settings tab with Deploy with Git selected" />
+</Frame>
+
+Click **Generate Git credentials** to obtain Git credentials. The instructions
+to set up Cube Cloud as a Git remote are also available on the same screen:
+
+```bash
+git config credential.helper store
+git remote add cubecloud <YOUR-CUBE-CLOUD-GIT-URL>
+git push cubecloud master
+```
+
+## Deploy with GitHub
+
+You can connect a GitHub repository to your deployment by clicking the
+**Connect to GitHub** button on the **Build & Deploy** tab of the
+**Settings** screen and selecting your repository. This works with both the
+**Deploy with Git** and **Deploy with CLI** deploy modes.
+
+<Warning>
+
+If your organization uses SAML SSO for GitHub authentication, make sure to start an active SAML 
+session prior to connecting to your GitHub account from Cube.
+
+</Warning>
+
+What happens after connecting depends on the deploy mode:
+
+- In **Deploy with Git** mode, Cube Cloud will automatically deploy from the
+  specified production branch (`master` by default) on every push, and also
+  sync non-production branches into their staging environments.
+- In **Deploy with CLI** mode, only non-production branches are auto-synced
+  into their staging environments. See [Connecting GitHub on a CLI
+  deployment](#connecting-github-on-a-cli-deployment) for details.
+
+## Deploy with CLI
+
+When a deployment is configured to deploy with CLI, production builds are
+**only** triggered when you (or your CI/CD pipeline) push the project to
+Cube Cloud by running:
+
+```bash
+npx cubejs-cli deploy --token <TOKEN>
+```
+
+You can find your Deploy Token, along with copy-paste instructions and an
+example CI/CD pipeline config (such as a GitHub Actions workflow), on the
+**Build & Deploy** tab of the **Settings** screen. The same screen lets you
+regenerate the token if it needs to be rotated.
+
+<Frame>
+  <img src="https://static.cube.dev/docs/admin/deployment/continuous-deployment/cli-deploy-token.png" alt="Build & Deploy settings tab with Deploy with CLI selected, showing the Deploy Token and a sample GitHub Actions workflow" />
+</Frame>
+
+<Note>
+
+Cube Cloud still maintains an internal Git repository for the deployment so
+that features such as [development mode][ref-dev-mode] and branching can work.
+This internal repository is overwritten on every successful CLI deploy — only
+the contents of your most recent `cubejs-cli deploy` invocation are used to
+build and run production.
+
+</Note>
+
+### Connecting GitHub on a CLI deployment
+
+You can still [connect a GitHub repository](#deploy-with-github) to a CLI
+deployment. When you do:
+
+- Pushes to **non-production branches** (typically feature branches) are
+  picked up by the GitHub webhook and automatically synced into Cube Cloud,
+  so the corresponding [staging environments][ref-environments-staging]
+  reflect the latest commits without any manual step.
+- Pushes to the **production branch** are intentionally **not**
+  auto-deployed in CLI mode. The production branch only changes when
+  somebody runs `cubejs-cli deploy` against the deployment.
+
+This gives you GitHub-driven previews for feature work while keeping the
+production deploy gated on an explicit CLI invocation (for example, from your
+CI/CD pipeline after a release is approved).
+
+### Development mode with CLI deployments
+
+[Development mode][ref-dev-mode] is fully available on CLI deployments:
+developers can enter dev mode, switch branches, save changes, commit them,
+and even merge branches into the production branch from the Cube Cloud UI.
+
+However, in CLI mode, **none of these actions trigger a production build or
+redeploy**. Specifically:
+
+- Saving or committing changes in dev mode only updates the per-developer
+  [development environment][ref-environments-dev] and the corresponding
+  branch in the internal repository. Production is not affected.
+- Merging a branch into the production branch from the Cube Cloud UI updates
+  the production branch in the internal repository but **does not** rebuild
+  or redeploy the [production environment][ref-environments-prod].
+- Any changes made through the UI are **overwritten on the next
+  `cubejs-cli deploy`**, which uploads the contents of your local project to
+  Cube Cloud and triggers a production build.
+
+In other words, a CLI-mode deployment will not change production just because
+somebody pressed **Enter Development Mode** and merged a work-in-progress
+branch — production only changes when somebody (or some pipeline) explicitly
+runs `cubejs-cli deploy` against the deployment.
+
+If you want changes made in the Cube Cloud UI to flow to production
+automatically, switch the deployment to [Deploy with Git](#deploy-with-git).
+
+
+[ref-dev-mode]: /docs/data-modeling/dev-mode
+[ref-environments-dev]: /admin/deployment/environments#development-environments
+[ref-environments-prod]: /admin/deployment/environments#production-environment
+[ref-environments-staging]: /admin/deployment/environments#staging-environments

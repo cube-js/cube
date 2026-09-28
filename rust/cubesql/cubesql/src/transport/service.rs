@@ -8,6 +8,7 @@ use datafusion::{
         datatypes::{DataType, SchemaRef},
         record_batch::RecordBatch,
     },
+    logical_expr::AggregateUDF,
     logical_plan::window_frames::{WindowFrame, WindowFrameBound, WindowFrameUnits},
     physical_plan::{aggregates::AggregateFunction, windows::WindowFunction},
 };
@@ -145,6 +146,7 @@ pub trait TransportService: Send + Sync + Debug {
         schema: SchemaRef,
         member_fields: Vec<MemberField>,
         cache_mode: Option<CacheMode>,
+        throw_continue_wait: bool,
     ) -> Result<Vec<RecordBatch>, CubeError>;
 
     async fn load_stream(
@@ -156,6 +158,7 @@ pub trait TransportService: Send + Sync + Debug {
         meta_fields: LoadRequestMeta,
         schema: SchemaRef,
         member_fields: Vec<MemberField>,
+        throw_continue_wait: bool,
     ) -> Result<CubeStreamReceiver, CubeError>;
 
     async fn can_switch_user_for_session(
@@ -193,11 +196,11 @@ struct MetaCacheBucket {
     value: Arc<MetaContext>,
 }
 
-/// This transports is used in standalone mode
+/// This transport is used in standalone mode
 #[derive(Debug)]
 pub struct HttpTransport {
     /// We use simple cache to improve DX with standalone mode
-    /// because currently we dont persist DF in the SessionState
+    /// because currently we don't persist DF in the SessionState,
     /// and it causes a lot of HTTP requests which slow down BI connections
     cache: RwLockAsync<Option<MetaCacheBucket>>,
 }
@@ -286,9 +289,10 @@ impl TransportService for HttpTransport {
         schema: SchemaRef,
         member_fields: Vec<MemberField>,
         cache_mode: Option<CacheMode>,
+        _throw_continue_wait: bool,
     ) -> Result<Vec<RecordBatch>, CubeError> {
         if meta.change_user().is_some() {
-            return Err(CubeError::internal(
+            return Err(CubeError::user(
                 "Changing security context (__user) is not supported in the standalone mode"
                     .to_string(),
             ));
@@ -308,7 +312,7 @@ impl TransportService for HttpTransport {
 
         // TODO: support meta_fields for HTTP
         let request = TransportLoadRequest {
-            query: Some(query),
+            query: Some(Box::new(query)),
             query_type: Some("multi".to_string()),
             cache: cache_mode,
         };
@@ -327,6 +331,7 @@ impl TransportService for HttpTransport {
         _meta_fields: LoadRequestMeta,
         _schema: SchemaRef,
         _member_fields: Vec<MemberField>,
+        _throw_continue_wait: bool,
     ) -> Result<CubeStreamReceiver, CubeError> {
         panic!("Does not work for standalone mode yet");
     }
@@ -412,9 +417,14 @@ impl SqlTemplates {
         aggregate_function.to_string()
     }
 
+    pub fn udaf_function_name(&self, udaf: &AggregateUDF, _distinct: bool) -> String {
+        udaf.name.to_ascii_uppercase()
+    }
+
     pub fn select(
         &self,
         from: String,
+        joins: Vec<String>,
         projection: Vec<AliasedColumn>,
         group_by: Vec<AliasedColumn>,
         group_descs: Vec<Option<GroupingSetDesc>>,
@@ -454,6 +464,7 @@ impl SqlTemplates {
             "statements/select",
             context! {
                 from => from,
+                joins => joins,
                 select_concat => select_concat,
                 group_by => group_by_expr,
                 aggregate => aggregate,
@@ -533,14 +544,13 @@ impl SqlTemplates {
     }
 
     pub fn quote_identifier(&self, column_name: &str) -> Result<String, CubeError> {
-        let quote = self
-            .templates
-            .get("quotes/identifiers")
-            .ok_or_else(|| CubeError::user("quotes/identifiers template not found".to_string()))?;
+        let quote = self.templates.get("quotes/identifiers").ok_or_else(|| {
+            CubeError::internal("quotes/identifiers template not found".to_string())
+        })?;
         let escape = self
             .templates
             .get("quotes/escape")
-            .ok_or_else(|| CubeError::user("quotes/escape template not found".to_string()))?;
+            .ok_or_else(|| CubeError::internal("quotes/escape template not found".to_string()))?;
         Ok(format!(
             "{}{}{}",
             quote,
@@ -581,6 +591,20 @@ impl SqlTemplates {
         self.render_template(
             "expressions/within_group",
             context! { fun_sql => sql, within_group_concat => within_group_concat },
+        )
+    }
+
+    pub fn udaf_function(
+        &self,
+        udaf: &AggregateUDF,
+        args: Vec<String>,
+        distinct: bool,
+    ) -> Result<String, CubeError> {
+        let function = self.udaf_function_name(udaf, distinct);
+        let args_concat = args.join(", ");
+        self.render_template(
+            &format!("functions/{}", function),
+            context! { args_concat => args_concat, args => args, distinct => distinct },
         )
     }
 
@@ -766,7 +790,7 @@ impl SqlTemplates {
         } else if self.contains_template(INTERVAL_SINGLE_TEMPLATE) {
             self.interval_single_expr(num, date_part)
         } else {
-            Err(CubeError::internal(
+            Err(CubeError::unsupported(
                 "Interval template generation is not supported".to_string(),
             ))
         }
@@ -880,7 +904,7 @@ impl SqlTemplates {
             LikeType::Like => "like",
             LikeType::ILike => "ilike",
             _ => {
-                return Err(CubeError::internal(format!(
+                return Err(CubeError::unsupported(format!(
                     "Error rendering template: like type {} is not supported",
                     like_type
                 )))
@@ -889,7 +913,12 @@ impl SqlTemplates {
 
         let rendered_like = self.render_template(
             &format!("expressions/{}", expression_name),
-            context! { expr => expr, negated => negated, pattern => pattern },
+            context! {
+                expr => expr,
+                negated => negated,
+                pattern => pattern,
+                default_escape => escape_char.is_none(),
+            },
         )?;
 
         let Some(escape_char) = escape_char else {
@@ -949,7 +978,7 @@ impl SqlTemplates {
             DataType::Duration(_) | DataType::Interval(_) => "interval",
             DataType::Binary | DataType::FixedSizeBinary(_) | DataType::LargeBinary => "binary",
             dt => {
-                return Err(CubeError::internal(format!(
+                return Err(CubeError::unsupported(format!(
                     "Can't generate SQL for type {:?}: not supported",
                     dt
                 )))
@@ -964,5 +993,34 @@ impl SqlTemplates {
 
     pub fn inner_join(&self) -> Result<String, CubeError> {
         self.render_template("join_types/inner", context! {})
+    }
+
+    pub fn full_join(&self) -> Result<String, CubeError> {
+        self.render_template("join_types/full", context! {})
+    }
+
+    pub fn right_join(&self) -> Result<String, CubeError> {
+        self.render_template("join_types/right", context! {})
+    }
+
+    pub fn query_aliased(&self, query: &str, alias: &str) -> Result<String, CubeError> {
+        let bracketed_query = format!("({})", query);
+        let quoted_alias = self.quote_identifier(alias)?;
+        self.render_template(
+            "expressions/query_aliased",
+            context! { query => bracketed_query, quoted_alias => quoted_alias },
+        )
+    }
+
+    pub fn join(
+        &self,
+        join_type: &str,
+        source: &str,
+        condition: &str,
+    ) -> Result<String, CubeError> {
+        self.render_template(
+            "statements/join",
+            context! { join_type => join_type, source => source, condition => condition },
+        )
     }
 }

@@ -3,7 +3,10 @@ use std::{
     time::SystemTime,
 };
 
-use super::{extended::PreparedStatement, pg_auth_service::AuthenticationStatus};
+use super::{
+    ast_helpers::parse_fetch_limit, error::ConnectionError, extended::PreparedStatement,
+    pg_auth_service::AuthenticationStatus,
+};
 use crate::{
     compile::{
         convert_statement_to_cube_query,
@@ -14,7 +17,7 @@ use crate::{
     sql::{
         compiler_cache::CompilerCacheEntry,
         df_type_to_pg_tid,
-        extended::{Cursor, Portal, PortalBatch, PortalFrom},
+        extended::{Cursor, Portal, PortalBatch, PortalFrom, ResultFormat},
         statement::{PostgresStatementParamsFinder, StatementPlaceholderReplacer},
         AuthContextRef, Session, SessionState,
     },
@@ -22,9 +25,8 @@ use crate::{
     transport::{MetaContext, SpanId},
     CubeError,
 };
-use datafusion::{arrow::error::ArrowError, error::DataFusionError};
 use futures::{FutureExt, StreamExt};
-use log::{debug, error, trace};
+use log::{debug, trace};
 use pg_srv::{
     buffer,
     protocol::{
@@ -33,7 +35,7 @@ use pg_srv::{
     },
     PgType, PgTypeId, ProtocolError,
 };
-use sqlparser::ast::{self, CloseCursor, FetchDirection, Query, SetExpr, Statement, Value};
+use sqlparser::ast::{self, CloseCursor, FetchDirection, SetExpr, Statement};
 use tokio::{io::AsyncWriteExt, net::TcpStream};
 use tokio_util::sync::CancellationToken;
 use uuid::Uuid;
@@ -62,7 +64,7 @@ pub enum StartupState {
 pub trait QueryPlanExt {
     fn to_row_description(
         &self,
-        required_format: protocol::Format,
+        format: &ResultFormat,
     ) -> Result<Option<protocol::RowDescription>, ConnectionError>;
 }
 
@@ -71,18 +73,18 @@ impl QueryPlanExt for QueryPlan {
     /// None is used for special queries, which doesnt have any data, for example: DISCARD ALL
     fn to_row_description(
         &self,
-        required_format: protocol::Format,
+        format: &ResultFormat,
     ) -> Result<Option<protocol::RowDescription>, ConnectionError> {
         match &self {
             QueryPlan::MetaOk(_, _) | QueryPlan::CreateTempTable(_, _, _, _) => Ok(None),
             QueryPlan::MetaTabular(_, frame) => {
                 let mut result = vec![];
 
-                for field in frame.get_columns() {
+                for (idx, field) in frame.get_columns().iter().enumerate() {
                     result.push(protocol::RowDescriptionField::new(
                         field.get_name(),
                         PgType::get_by_tid(PgTypeId::TEXT),
-                        required_format,
+                        format.format_for(idx),
                     ));
                 }
 
@@ -91,196 +93,17 @@ impl QueryPlanExt for QueryPlan {
             QueryPlan::DataFusionSelect(logical_plan, _) => {
                 let mut result = vec![];
 
-                for field in logical_plan.schema().fields() {
+                for (idx, field) in logical_plan.schema().fields().iter().enumerate() {
                     result.push(protocol::RowDescriptionField::new(
                         field.name().clone(),
                         df_type_to_pg_tid(field.data_type())?.to_type(),
-                        required_format,
+                        format.format_for(idx),
                     ));
                 }
 
                 Ok(Some(protocol::RowDescription::new(result)))
             }
         }
-    }
-}
-
-#[derive(thiserror::Error, Debug)]
-pub enum ConnectionError {
-    #[error("CubeError: {0}")]
-    Cube(CubeError, Option<Arc<SpanId>>),
-    #[error("DataFusionError: {0}")]
-    DataFusion(DataFusionError, Option<Arc<SpanId>>),
-    #[error("ArrowError: {0}")]
-    Arrow(ArrowError, Option<Arc<SpanId>>),
-    #[error("CompilationError: {0}")]
-    CompilationError(CompilationError, Option<Arc<SpanId>>),
-    #[error("ProtocolError: {0}")]
-    Protocol(ProtocolError, Option<Arc<SpanId>>),
-}
-
-impl ConnectionError {
-    /// Return Backtrace from any variant of Enum
-    pub fn backtrace(&self) -> Option<&Backtrace> {
-        match &self {
-            ConnectionError::Cube(e, _) => e.backtrace(),
-            ConnectionError::CompilationError(e, _) => e.backtrace(),
-            ConnectionError::Protocol(e, _) => e.backtrace(),
-            ConnectionError::DataFusion(_, _) | ConnectionError::Arrow(_, _) => None,
-        }
-    }
-
-    /// Converts Error to protocol::ErrorResponse which is usefully for writing response to the client
-    pub fn to_error_response(self) -> protocol::ErrorResponse {
-        match self {
-            ConnectionError::Cube(e, _) => Self::cube_to_error_response(&e),
-            ConnectionError::DataFusion(e, _) => Self::df_to_error_response(&e),
-            ConnectionError::Arrow(e, _) => Self::arrow_to_error_response(&e),
-            ConnectionError::CompilationError(e, _) => {
-                fn to_error_response(e: CompilationError) -> protocol::ErrorResponse {
-                    match e {
-                        CompilationError::Internal(_, _, _) => protocol::ErrorResponse::error(
-                            protocol::ErrorCode::InternalError,
-                            e.to_string(),
-                        ),
-                        CompilationError::User(_, _) => protocol::ErrorResponse::error(
-                            protocol::ErrorCode::InvalidSqlStatement,
-                            e.to_string(),
-                        ),
-                        CompilationError::Unsupported(_, _) => protocol::ErrorResponse::error(
-                            protocol::ErrorCode::FeatureNotSupported,
-                            e.to_string(),
-                        ),
-                        CompilationError::Fatal(_, _) => protocol::ErrorResponse::fatal(
-                            protocol::ErrorCode::InternalError,
-                            e.to_string(),
-                        ),
-                    }
-                }
-
-                to_error_response(e)
-            }
-            ConnectionError::Protocol(e, _) => e.to_error_response(),
-        }
-    }
-
-    pub fn with_span_id(self, span_id: Option<Arc<SpanId>>) -> Self {
-        match self {
-            ConnectionError::Cube(e, _) => ConnectionError::Cube(e, span_id),
-            ConnectionError::DataFusion(e, _) => ConnectionError::DataFusion(e, span_id),
-            ConnectionError::Arrow(e, _) => ConnectionError::Arrow(e, span_id),
-            ConnectionError::CompilationError(e, _) => {
-                ConnectionError::CompilationError(e, span_id)
-            }
-            ConnectionError::Protocol(e, _) => ConnectionError::Protocol(e, span_id),
-        }
-    }
-
-    pub fn span_id(&self) -> Option<Arc<SpanId>> {
-        match self {
-            ConnectionError::Cube(_, span_id) => span_id.clone(),
-            ConnectionError::DataFusion(_, span_id) => span_id.clone(),
-            ConnectionError::Arrow(_, span_id) => span_id.clone(),
-            ConnectionError::CompilationError(_, span_id) => span_id.clone(),
-            ConnectionError::Protocol(_, span_id) => span_id.clone(),
-        }
-    }
-
-    fn cube_to_error_response(e: &CubeError) -> protocol::ErrorResponse {
-        let message = e.to_string();
-        // Remove `Error: ` prefix that can come from JS
-        let message = if let Some(message) = message.strip_prefix("Error: ") {
-            message.to_string()
-        } else {
-            message
-        };
-        protocol::ErrorResponse::error(protocol::ErrorCode::InternalError, message)
-    }
-
-    fn df_to_error_response(e: &DataFusionError) -> protocol::ErrorResponse {
-        match e {
-            DataFusionError::ArrowError(arrow_err) => {
-                return Self::arrow_to_error_response(arrow_err);
-            }
-            DataFusionError::External(err) => {
-                if let Some(cube_err) = err.downcast_ref::<CubeError>() {
-                    return Self::cube_to_error_response(cube_err);
-                }
-            }
-            _ => {}
-        }
-        protocol::ErrorResponse::error(
-            protocol::ErrorCode::InternalError,
-            format!("Post-processing Error: {}", e),
-        )
-    }
-
-    fn arrow_to_error_response(e: &ArrowError) -> protocol::ErrorResponse {
-        match e {
-            ArrowError::ExternalError(err) => {
-                if let Some(df_err) = err.downcast_ref::<DataFusionError>() {
-                    return Self::df_to_error_response(df_err);
-                }
-                if let Some(cube_err) = err.downcast_ref::<CubeError>() {
-                    return Self::cube_to_error_response(cube_err);
-                }
-            }
-            _ => {}
-        }
-        protocol::ErrorResponse::error(
-            protocol::ErrorCode::InternalError,
-            format!("Post-processing Error: {}", e),
-        )
-    }
-}
-
-impl From<CubeError> for ConnectionError {
-    fn from(e: CubeError) -> Self {
-        ConnectionError::Cube(e, None)
-    }
-}
-
-impl From<CompilationError> for ConnectionError {
-    fn from(e: CompilationError) -> Self {
-        ConnectionError::CompilationError(e, None)
-    }
-}
-
-impl From<ProtocolError> for ConnectionError {
-    fn from(e: ProtocolError) -> Self {
-        ConnectionError::Protocol(e, None)
-    }
-}
-
-impl From<tokio::task::JoinError> for ConnectionError {
-    fn from(e: tokio::task::JoinError) -> Self {
-        ConnectionError::Cube(e.into(), None)
-    }
-}
-
-impl From<DataFusionError> for ConnectionError {
-    fn from(e: DataFusionError) -> Self {
-        ConnectionError::DataFusion(e, None)
-    }
-}
-
-impl From<ArrowError> for ConnectionError {
-    fn from(e: ArrowError) -> Self {
-        ConnectionError::Arrow(e, None)
-    }
-}
-
-/// Auto converting for all kind of io:Error to ConnectionError, sugar
-impl From<std::io::Error> for ConnectionError {
-    fn from(e: std::io::Error) -> Self {
-        ConnectionError::Protocol(e.into(), None)
-    }
-}
-
-/// Auto converting for all kind of io:Error to ConnectionError, sugar
-impl From<ErrorResponse> for ConnectionError {
-    fn from(e: ErrorResponse) -> Self {
-        ConnectionError::Protocol(e.into(), None)
     }
 }
 
@@ -625,21 +448,35 @@ impl AsyncPostgresShim {
     ) -> Result<(), ConnectionError> {
         let (message, props) = match &err {
             ConnectionError::CompilationError(e, _) => match e {
-                CompilationError::Unsupported(msg, meta)
-                | CompilationError::User(msg, meta)
-                | CompilationError::Internal(msg, _, meta) => (msg.clone(), meta.clone()),
+                CompilationError::Unsupported(_, meta)
+                | CompilationError::User(_, meta)
+                | CompilationError::Internal(_, _, meta)
+                | CompilationError::RestApi(_, meta)
+                | CompilationError::SqlParser(_, meta)
+                | CompilationError::Planning(_, meta)
+                | CompilationError::PostProcessing(_, meta)
+                | CompilationError::Rewrite(_, meta)
+                | CompilationError::DatabaseExecution(_, meta) => (e.to_string(), meta.clone()),
                 CompilationError::Fatal(_, _) => return Err(err),
+                // Should never execute
+                CompilationError::ContinueWait => ("Continue wait".to_string(), None),
             },
             ConnectionError::Protocol(ProtocolError::IO { source, .. }, _) => match source.kind() {
                 // Propagate unrecoverable errors to top level - run_on
                 ErrorKind::UnexpectedEof | ErrorKind::BrokenPipe => return Err(err),
                 _ => (
-                    format!("Error during processing PostgreSQL message: {}", err),
+                    format!(
+                        "Internal Error: Error during processing PostgreSQL message: {}",
+                        err
+                    ),
                     None,
                 ),
             },
             _ => (
-                format!("Error during processing PostgreSQL message: {}", err),
+                format!(
+                    "Internal Error: Error during processing PostgreSQL message: {}",
+                    err
+                ),
                 None,
             ),
         };
@@ -1114,7 +951,7 @@ impl AsyncPostgresShim {
             )
         })?;
 
-        let format = body.result_formats.first().copied().unwrap_or(Format::Text);
+        let format = ResultFormat::from(body.result_formats.clone());
         let portal = match source_statement {
             PreparedStatement::Empty { .. } => {
                 drop(statements_guard);
@@ -1261,15 +1098,15 @@ impl AsyncPostgresShim {
 
                 match plan {
                     Ok(plan) => {
-                        let description =
-                            plan.to_row_description(Format::Text)?
-                                .and_then(|description| {
-                                    if description.len() > 0 {
-                                        Some(description)
-                                    } else {
-                                        None
-                                    }
-                                });
+                        let description = plan
+                            .to_row_description(&ResultFormat::AllText)?
+                            .and_then(|description| {
+                                if description.len() > 0 {
+                                    Some(description)
+                                } else {
+                                    None
+                                }
+                            });
 
                         (
                             PreparedStatement::Query {
@@ -1396,7 +1233,12 @@ impl AsyncPostgresShim {
                 let plan = QueryPlan::MetaOk(StatusFlags::empty(), CommandCompletion::Begin);
 
                 self.write_portal(
-                    &mut Portal::new(plan, Format::Text, PortalFrom::Simple, span_id.clone()),
+                    &mut Portal::new(
+                        plan,
+                        ResultFormat::AllText,
+                        PortalFrom::Simple,
+                        span_id.clone(),
+                    ),
                     0,
                     cancel,
                 )
@@ -1415,7 +1257,12 @@ impl AsyncPostgresShim {
                 let plan = QueryPlan::MetaOk(StatusFlags::empty(), CommandCompletion::Rollback);
 
                 self.write_portal(
-                    &mut Portal::new(plan, Format::Text, PortalFrom::Simple, span_id.clone()),
+                    &mut Portal::new(
+                        plan,
+                        ResultFormat::AllText,
+                        PortalFrom::Simple,
+                        span_id.clone(),
+                    ),
                     0,
                     CancellationToken::new(),
                 )
@@ -1434,7 +1281,12 @@ impl AsyncPostgresShim {
                 let plan = QueryPlan::MetaOk(StatusFlags::empty(), CommandCompletion::Commit);
 
                 self.write_portal(
-                    &mut Portal::new(plan, Format::Text, PortalFrom::Simple, span_id.clone()),
+                    &mut Portal::new(
+                        plan,
+                        ResultFormat::AllText,
+                        PortalFrom::Simple,
+                        span_id.clone(),
+                    ),
                     0,
                     CancellationToken::new(),
                 )
@@ -1444,6 +1296,7 @@ impl AsyncPostgresShim {
                 name,
                 direction,
                 into,
+                ..
             } => {
                 if into.is_some() {
                     return Err(ConnectionError::Protocol(
@@ -1457,39 +1310,26 @@ impl AsyncPostgresShim {
                 };
 
                 let limit: usize = match direction {
-                    FetchDirection::Count { limit } => {
-                        match limit {
-                            Value::Number(v, negative) => {
-                                if negative {
-                                    // HINT:  Declare it with SCROLL option to enable backward scan.
-                                    // But it's not supported right now!
-                                    return Err(ConnectionError::Protocol(
-                                        protocol::ErrorResponse::error(
-                                            protocol::ErrorCode::ObjectNotInPrerequisiteState,
-                                            "cursor can only scan forward".to_string(),
-                                        )
-                                        .into(),
-                                        span_id.clone(),
-                                    ));
-                                }
+                    FetchDirection::Count { limit } => parse_fetch_limit(&limit, &span_id)?,
 
-                                v.parse::<usize>().map_err(|err| ConnectionError::Protocol(
-                                protocol::ErrorResponse::error(
-                                    protocol::ErrorCode::ProtocolViolation,
-                                    format!(r#""Unable to parse number "{}" for fetch limit: {}"#, v, err),
-                                )
-                                    .into(),
-                                span_id.clone(),
-                            ))?
-                            }
-                            _ => unreachable!(),
-                        }
-                    }
+                    // Fetch the next row. This is the default if direction is omitted.
+                    FetchDirection::Next => 1,
+
+                    FetchDirection::Forward { limit } => match limit {
+                        // Fetch the next count rows. FORWARD 0 re-fetches the current row.
+                        Some(v) => parse_fetch_limit(&v, &span_id)?,
+                        // Fetch the next row (same as NEXT).
+                        None => 1,
+                    },
+
+                    // Fetch all remaining rows.
+                    FetchDirection::All | FetchDirection::ForwardAll => usize::MAX,
+
                     other => {
                         return Err(ConnectionError::Protocol(
                             protocol::ErrorResponse::error(
-                                protocol::ErrorCode::ProtocolViolation,
-                                format!("Limit {} is not supported for FETCH statement", other),
+                                protocol::ErrorCode::FeatureNotSupported,
+                                format!("FETCH with direction ({}) is not supported", other),
                             )
                             .into(),
                             span_id.clone(),
@@ -1544,20 +1384,64 @@ impl AsyncPostgresShim {
                 )
                 .await?;
 
-                let mut portal =
-                    Portal::new(plan, cursor.format, PortalFrom::Fetch, span_id.clone());
+                let mut portal = Portal::new(
+                    plan,
+                    ResultFormat::from(vec![cursor.format]),
+                    PortalFrom::Fetch,
+                    span_id.clone(),
+                );
 
                 self.write_portal(&mut portal, limit, cancel).await?;
                 self.portals.insert(name.value, portal);
             }
-            Statement::Declare {
-                name,
-                binary,
-                query,
-                scroll,
-                sensitive,
-                hold,
-            } => {
+            Statement::Declare { mut stmts } => {
+                if stmts.len() != 1 {
+                    return Err(ConnectionError::Protocol(
+                        protocol::ErrorResponse::error(
+                            protocol::ErrorCode::FeatureNotSupported,
+                            "Only a single cursor per DECLARE statement is supported".to_string(),
+                        )
+                        .into(),
+                        span_id.clone(),
+                    ));
+                }
+                let ast::Declare {
+                    names,
+                    binary,
+                    for_query: query,
+                    scroll,
+                    sensitive,
+                    hold,
+                    ..
+                } = stmts
+                    .pop()
+                    .expect("DECLARE must contain a single statement");
+
+                if names.len() > 1 {
+                    return Err(ConnectionError::Protocol(
+                        protocol::ErrorResponse::error(
+                            protocol::ErrorCode::FeatureNotSupported,
+                            "Only a single cursor name per DECLARE statement is supported"
+                                .to_string(),
+                        )
+                        .into(),
+                        span_id.clone(),
+                    ));
+                }
+
+                let Some(name) = names.into_iter().next() else {
+                    return Err(ConnectionError::Protocol(
+                        protocol::ErrorResponse::error(
+                            protocol::ErrorCode::FeatureNotSupported,
+                            "DECLARE statement must specify a cursor name".to_string(),
+                        )
+                        .into(),
+                        span_id.clone(),
+                    ));
+                };
+
+                let binary = binary.unwrap_or(false);
+
                 // The default is to allow scrolling in some cases; this is not the same as specifying SCROLL.
                 if scroll.is_some() {
                     return Err(ConnectionError::Protocol(
@@ -1601,6 +1485,16 @@ impl AsyncPostgresShim {
                     ));
                 }
 
+                let Some(query) = query else {
+                    return Err(ConnectionError::Protocol(
+                        protocol::ErrorResponse::error(
+                            protocol::ErrorCode::FeatureNotSupported,
+                            "DECLARE statement must specify a query".to_string(),
+                        )
+                        .into(),
+                        span_id.clone(),
+                    ));
+                };
                 let select_stmt = Statement::Query(query);
                 // It's just a verification that we can compile that query.
                 let _ = convert_statement_to_cube_query(
@@ -1638,7 +1532,12 @@ impl AsyncPostgresShim {
                     QueryPlan::MetaOk(StatusFlags::empty(), CommandCompletion::DeclareCursor);
 
                 self.write_portal(
-                    &mut Portal::new(plan, Format::Text, PortalFrom::Simple, span_id.clone()),
+                    &mut Portal::new(
+                        plan,
+                        ResultFormat::AllText,
+                        PortalFrom::Simple,
+                        span_id.clone(),
+                    ),
                     0,
                     cancel,
                 )
@@ -1655,7 +1554,12 @@ impl AsyncPostgresShim {
                 );
 
                 self.write_portal(
-                    &mut Portal::new(plan, Format::Text, PortalFrom::Simple, span_id.clone()),
+                    &mut Portal::new(
+                        plan,
+                        ResultFormat::AllText,
+                        PortalFrom::Simple,
+                        span_id.clone(),
+                    ),
                     0,
                     cancel,
                 )
@@ -1689,7 +1593,12 @@ impl AsyncPostgresShim {
                 }?;
 
                 self.write_portal(
-                    &mut Portal::new(plan, Format::Text, PortalFrom::Simple, span_id.clone()),
+                    &mut Portal::new(
+                        plan,
+                        ResultFormat::AllText,
+                        PortalFrom::Simple,
+                        span_id.clone(),
+                    ),
                     0,
                     cancel,
                 )
@@ -1730,7 +1639,12 @@ impl AsyncPostgresShim {
                 }?;
 
                 self.write_portal(
-                    &mut Portal::new(plan, Format::Text, PortalFrom::Simple, span_id.clone()),
+                    &mut Portal::new(
+                        plan,
+                        ResultFormat::AllText,
+                        PortalFrom::Simple,
+                        span_id.clone(),
+                    ),
                     0,
                     cancel,
                 )
@@ -1741,18 +1655,19 @@ impl AsyncPostgresShim {
             } => {
                 // Ensure the statement isn't wrapped in extra parens
                 let statement = match *statement.clone() {
-                    Statement::Query(outer_query) => match *outer_query {
-                        Query {
-                            with: None,
-                            body: SetExpr::Query(inner_query),
-                            order_by,
-                            limit: None,
-                            offset: None,
-                            fetch: None,
-                            lock: None,
-                        } if order_by.is_empty() => Statement::Query(inner_query),
-                        _ => *statement,
-                    },
+                    Statement::Query(outer_query)
+                        if outer_query.with.is_none()
+                            && outer_query.order_by.is_none()
+                            && outer_query.limit_clause.is_none()
+                            && outer_query.fetch.is_none()
+                            && outer_query.locks.is_empty()
+                            && matches!(*outer_query.body, SetExpr::Query(_)) =>
+                    {
+                        match *outer_query.body {
+                            SetExpr::Query(inner_query) => Statement::Query(inner_query),
+                            _ => unreachable!(),
+                        }
+                    }
                     _ => *statement,
                 };
 
@@ -1769,7 +1684,12 @@ impl AsyncPostgresShim {
                 let plan = QueryPlan::MetaOk(StatusFlags::empty(), CommandCompletion::Prepare);
 
                 self.write_portal(
-                    &mut Portal::new(plan, Format::Text, PortalFrom::Simple, span_id.clone()),
+                    &mut Portal::new(
+                        plan,
+                        ResultFormat::AllText,
+                        PortalFrom::Simple,
+                        span_id.clone(),
+                    ),
                     0,
                     cancel,
                 )
@@ -1786,7 +1706,12 @@ impl AsyncPostgresShim {
                 .await?;
 
                 self.write_portal(
-                    &mut Portal::new(plan, Format::Text, PortalFrom::Simple, span_id.clone()),
+                    &mut Portal::new(
+                        plan,
+                        ResultFormat::AllText,
+                        PortalFrom::Simple,
+                        span_id.clone(),
+                    ),
                     0,
                     cancel,
                 )

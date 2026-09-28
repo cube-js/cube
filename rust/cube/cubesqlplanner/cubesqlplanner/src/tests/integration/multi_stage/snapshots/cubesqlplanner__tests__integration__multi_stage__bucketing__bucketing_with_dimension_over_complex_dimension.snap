@@ -1,0 +1,10 @@
+---
+source: cubesqlplanner/src/tests/integration/multi_stage/bucketing.rs
+expression: result
+---
+orders__change_type_concat | orders__created_at_year | orders__revenue | orders__revenue_year_ago
+---------------------------+-------------------------+-----------------+-------------------------
+Down-test                  | 2024-01-01 00:00:00     | 20400           | 22800                   
+Down-test                  | 2025-01-01 00:00:00     | 17800           | 20400                   
+Grow-test                  | 2024-01-01 00:00:00     | 11700           | 9400                    
+Grow-test                  | 2025-01-01 00:00:00     | 14100           | 11700

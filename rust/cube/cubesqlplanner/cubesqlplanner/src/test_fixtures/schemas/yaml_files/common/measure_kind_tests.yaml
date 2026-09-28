@@ -1,0 +1,57 @@
+cubes:
+    - name: test_measures
+      sql: "SELECT * FROM test_measures"
+      dimensions:
+          - name: id
+            type: number
+            sql: id
+            primary_key: true
+          - name: created_at
+            type: time
+            sql: created_at
+          - name: status
+            type: string
+            sql: "{CUBE}.status"
+      measures:
+          - name: total
+            type: sum
+            sql: amount
+          - name: average
+            type: avg
+            sql: amount
+          - name: minimum
+            type: min
+            sql: amount
+          - name: maximum
+            type: max
+            sql: amount
+          - name: cnt
+            type: count
+          - name: distinct_count
+            type: countDistinct
+            sql: user_id
+          - name: approx_count
+            type: countDistinctApprox
+            sql: user_id
+          - name: running
+            type: runningTotal
+            sql: amount
+          - name: number_agg
+            type: numberAgg
+            sql: amount
+          - name: calculated
+            type: number
+            sql: "{CUBE.total} / {CUBE.cnt}"
+          - name: rank_measure
+            type: rank
+          - name: rolling_sum
+            type: sum
+            sql: amount
+            rolling_window:
+              trailing: "7 day"
+              offset: start
+          - name: filtered_total
+            type: sum
+            sql: amount
+            filters:
+              - sql: "{CUBE}.status = 'active'"

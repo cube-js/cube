@@ -1,0 +1,7 @@
+---
+source: cubesqlplanner/src/tests/integration/single_cube.rs
+expression: result
+---
+orders__unique_customers | orders__unique_statuses
+-------------------------+------------------------
+5                        | 3

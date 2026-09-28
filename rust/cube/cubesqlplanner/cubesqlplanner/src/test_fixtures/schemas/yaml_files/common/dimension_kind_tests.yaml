@@ -1,0 +1,68 @@
+cubes:
+    - name: aux
+      sql: "SELECT * FROM aux"
+      dimensions:
+          - name: id
+            type: number
+            sql: id
+            primary_key: true
+          - name: min_date
+            type: time
+            sql: "MIN(created_at)"
+
+    - name: test_dims
+      sql: "SELECT * FROM test_dims"
+      joins:
+          - name: aux
+            relationship: many_to_one
+            sql: "{CUBE}.aux_id = {aux}.id"
+      dimensions:
+          - name: id
+            type: number
+            sql: id
+            primary_key: true
+          - name: name
+            type: string
+            sql: "{CUBE}.name"
+          - name: amount
+            type: number
+            sql: "{CUBE}.amount"
+          - name: created_at
+            type: time
+            sql: created_at
+          - name: is_active
+            type: boolean
+            sql: "{CUBE}.is_active"
+          - name: location
+            type: geo
+            latitude: "{CUBE}.lat"
+            longitude: "{CUBE}.lng"
+          - name: currency
+            type: switch
+            sql: "{CUBE}.currency"
+            values:
+              - USD
+              - EUR
+              - GBP
+          - name: calc_group
+            type: switch
+            values:
+              - option_a
+              - option_b
+          - name: status_label
+            type: string
+            case:
+              when:
+                - sql: "{CUBE}.status = 1"
+                  label: Active
+                - sql: "{CUBE}.status = 2"
+                  label: Inactive
+              else:
+                label: Unknown
+          - name: sub_query_dim
+            type: time
+            sql: "{aux.min_date}"
+            sub_query: true
+      measures:
+          - name: cnt
+            type: count

@@ -466,6 +466,10 @@ const TypeToChartComponent = {
                         return text && text !== '0' ? 'true' : 'false';
                       }
 
+                      if (c.format === 'percent' && text != null) {
+                        return `${(parseFloat(text) * 100).toFixed(2)}%`;
+                      }
+
                       return text;
                   }
                 },

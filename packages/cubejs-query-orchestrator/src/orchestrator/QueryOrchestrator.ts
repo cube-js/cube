@@ -1,6 +1,6 @@
 import * as stream from 'stream';
 import R from 'ramda';
-import { CacheMode, getEnv } from '@cubejs-backend/shared';
+import { CacheMode, getEnv, LoggerFn } from '@cubejs-backend/shared';
 import { CubeStoreDriver } from '@cubejs-backend/cubestore-driver';
 import {
   QuerySchemasResult,
@@ -71,7 +71,7 @@ export class QueryOrchestrator {
   public constructor(
     protected readonly redisPrefix: string,
     protected readonly driverFactory: DriverFactoryByDataSource,
-    protected readonly logger: any,
+    protected readonly logger: LoggerFn,
     options: QueryOrchestratorOptions = {}
   ) {
     this.rollupOnlyMode = options.rollupOnlyMode;
@@ -433,6 +433,20 @@ export class QueryOrchestrator {
 
   public async cancelPreAggregationQueriesFromQueue(queryKeys: string[], dataSource = 'default') {
     return this.preAggregations.cancelQueriesFromQueue(queryKeys, dataSource);
+  }
+
+  public async cancelQueryByRequestId(requestId: string) {
+    const cancelled = [];
+
+    for (const queue of Object.values(this.queryCache.getQueues())) {
+      cancelled.push(...await queue.cancelQueryByRequestId(requestId));
+    }
+
+    for (const queue of Object.values(this.preAggregations.getQueues())) {
+      cancelled.push(...await queue.cancelQueryByRequestId(requestId));
+    }
+
+    return cancelled;
   }
 
   public async updateRefreshEndReached() {

@@ -1,0 +1,12 @@
+---
+source: cubesqlplanner/cubesqlplanner/src/tests/integration/subquery_in_join.rs
+assertion_line: 40
+expression: result
+---
+b__id | c__important_value
+------+-------------------
+100   | NULL              
+101   | NULL              
+102   | NULL              
+103   | 11.20             
+104   | 81.50

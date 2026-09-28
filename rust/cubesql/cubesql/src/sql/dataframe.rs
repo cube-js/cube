@@ -332,7 +332,7 @@ pub fn arrow_to_column_type(arrow_type: DataType) -> Result<ColumnType, CubeErro
         | DataType::UInt16
         | DataType::UInt64 => Ok(ColumnType::Int64),
         DataType::Null => Ok(ColumnType::String),
-        x => Err(CubeError::internal(format!("unsupported type {:?}", x))),
+        x => Err(CubeError::unsupported(format!("unsupported type {:?}", x))),
     }
 }
 
