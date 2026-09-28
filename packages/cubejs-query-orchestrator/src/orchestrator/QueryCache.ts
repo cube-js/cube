@@ -25,7 +25,7 @@ import { QueryQueue, QueryQueueOptions } from './QueryQueue';
 import { ContinueWaitError } from './ContinueWaitError';
 import { LocalCacheDriver } from './LocalCacheDriver';
 import { DriverFactory, DriverFactoryByDataSource } from './DriverFactory';
-import { LoadPreAggregationResult, PreAggregationDescription } from './PreAggregations';
+import { LambdaQuery, LoadPreAggregationResult, PreAggregationDescription } from './PreAggregations';
 import {
   getCacheHash,
   evaluateLocalRefreshKey,
@@ -125,7 +125,22 @@ export type QueryBody = {
   preAggregationsLoadCacheByDataSource?: {
     [key: string]: any;
   };
-  [key: string]: any;
+  queuePriority?: number;
+  cacheKeyQueries?: QueryWithParams[] | {
+    queries?: QueryWithParams[];
+    renewalThreshold?: number;
+  };
+  expireSecs?: number;
+  invalidate?: RefreshKeyIdentity | false;
+  useCsvQuery?: boolean;
+  lambdaTypes?: TableStructure;
+  lambdaQueries?: Record<string, LambdaQuery>;
+  forceBuildPreAggregations?: boolean;
+  orphanedTimeout?: number;
+  metadata?: any;
+  compilerCacheFn?: <T>(subKey: string[], cacheFn: () => T) => T;
+  timezone?: string;
+  context?: unknown;
 };
 
 /**
@@ -144,7 +159,11 @@ export type PreAggTableToTempTable = [
 
 export type PreAggTableToTempTableNames = [string, { targetTableName: string; }];
 
-export type CacheKeyItem = string | string[] | boolean | QueryWithParams | QueryWithParams[] | undefined;
+/** `refreshKeyIdentity`: sql, params, external, dataSource. */
+export type RefreshKeyIdentity = [string, string[], boolean, string];
+
+export type CacheKeyItem =
+  string | string[] | boolean | QueryWithParams | QueryWithParams[] | RefreshKeyIdentity | undefined;
 
 export type CacheKey =
   [CacheKeyItem, CacheKeyItem] |
@@ -298,7 +317,9 @@ export class QueryCache {
         preAggregationsTablesToTempTables,
       ));
 
-    const renewalThreshold = queryBody.cacheKeyQueries?.renewalThreshold;
+    const renewalThreshold = Array.isArray(queryBody.cacheKeyQueries)
+      ? undefined
+      : queryBody.cacheKeyQueries?.renewalThreshold;
 
     const expireSecs = this.getExpireSecs(queryBody);
 
@@ -452,9 +473,12 @@ export class QueryCache {
   }
 
   private cacheKeyQueriesFrom(queryBody: QueryBody): QueryWithParams[] {
-    return queryBody.cacheKeyQueries?.queries ||
-      queryBody.cacheKeyQueries ||
-      [];
+    const { cacheKeyQueries } = queryBody;
+    if (Array.isArray(cacheKeyQueries)) {
+      return cacheKeyQueries;
+    }
+
+    return cacheKeyQueries?.queries || [];
   }
 
   public static queryCacheKey(queryBody: QueryBody): CacheKey {
@@ -481,7 +505,7 @@ export class QueryCache {
   public static refreshKeyIdentity(
     sqlQuery: QueryWithParams,
     dataSource: string,
-  ): [string, string[], boolean, string] {
+  ): RefreshKeyIdentity {
     const [query, values, options] = sqlQuery;
     // Both spellings of each default have to collapse to one key: producers write "source database"
     // as `false` or as an absent option, and `getQueue` resolves an absent `dataSource` to `default`.
@@ -496,7 +520,7 @@ export class QueryCache {
    */
   public static buildRangeInvalidateKey(
     preAggregation: { invalidateKeyQueries?: QueryWithParams[], dataSource?: string },
-  ): [string, string[], boolean, string] | false {
+  ): RefreshKeyIdentity | false {
     const keyQuery = preAggregation.invalidateKeyQueries?.[0];
     return keyQuery ? QueryCache.refreshKeyIdentity(keyQuery, preAggregation.dataSource) : false;
   }
@@ -992,7 +1016,7 @@ export class QueryCache {
       ));
   }
 
-  public async loadRefreshKeysFromQuery(query: Query) {
+  public async loadRefreshKeysFromQuery(query: QueryBody) {
     return Promise.all(
       this.loadRefreshKeys(
         this.cacheKeyQueriesFrom(query),

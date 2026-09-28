@@ -290,11 +290,11 @@ export class QueryOrchestrator {
     };
   }
 
-  public async loadRefreshKeys(query) {
+  public async loadRefreshKeys(query: QueryBody) {
     return this.queryCache.loadRefreshKeysFromQuery(query);
   }
 
-  public async queryStage(queryBody: any) {
+  public async queryStage(queryBody: QueryBody) {
     const preAggregationsQueryStageStateByDataSource = {};
 
     const preAggregationsQueryStageState = async (dataSource) => {
