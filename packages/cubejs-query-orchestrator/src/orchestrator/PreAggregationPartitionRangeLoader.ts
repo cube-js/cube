@@ -448,8 +448,12 @@ export class PreAggregationPartitionRangeLoader {
       const cachedPlan = this.compilerCacheFn<{ rangeKey: string | null; descriptions: PreAggregationDescription[] }>(
         ['partitionPlan', JSON.stringify(identity)], () => ({ rangeKey: null, descriptions: [] })
       );
-      // Descriptions depend on the build range only through its end, which clips the last partition.
-      const rangeKey = JSON.stringify([dateRange, buildRange[1]]);
+      // Descriptions depend on the build range only through its end, and only while it falls inside the last partition.
+      const [, lastPartition] = timeSeriesBoundaries(
+        partitionGranularity, dateRange, { timestampPrecision }
+      );
+      const clipEnd = lastPartition && buildRange[1] < lastPartition[1] ? buildRange[1] : null;
+      const rangeKey = JSON.stringify([dateRange, clipEnd]);
       if (cachedPlan.rangeKey === rangeKey) {
         this.checkMaxPartitions(cachedPlan.descriptions.length);
         return cachedPlan.descriptions;

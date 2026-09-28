@@ -1690,10 +1690,22 @@ describe('PreAggregations', () => {
       expect(second.map(p => p.buildRangeEnd)).toEqual(['2024-01-01T23:59:59.999', '2024-01-02T18:00:00.000']);
     });
 
+    test('keeps the plan when the build range end moves past the last selected partition', async () => {
+      const { compilerCacheFn } = cache();
+      const matchedTimeDimensionDateRange = ['2024-01-01T00:00:00.000', '2024-01-02T06:00:00.000'];
+      const loader = createLoader({ matchedTimeDimensionDateRange, partitionInvalidateKeyQueries: [['SELECT 1', []]] }, { compilerCacheFn });
+      const bounds = jest.spyOn(loader, 'loadBuildRange').mockResolvedValue(['2024-01-01T00:00:00.000', '2024-01-05T10:00:00.000']);
+      const first = await loader.partitionPreAggregations();
+      expect(first.map(p => p.buildRangeEnd)).toEqual(['2024-01-01T23:59:59.999', '2024-01-02T23:59:59.999']);
+
+      bounds.mockResolvedValue(['2024-01-01T00:00:00.000', '2024-01-05T10:10:00.000']);
+      expect(await loader.partitionPreAggregations()).toBe(first);
+    });
+
     // https://github.com/cube-js/cube/issues/11317
     test('keeps the partition a query ends in for a rollupLambda member', async () => {
       // A fresh build reports the partition's own load range end.
-      jest.spyOn(PreAggregationLoader.prototype, 'loadPreAggregation').mockImplementation(async function loadPreAggregation(this: any) {
+      const loadSpy = jest.spyOn(PreAggregationLoader.prototype, 'loadPreAggregation').mockImplementation(async function loadPreAggregation(this: any) {
         return {
           targetTableName: this.preAggregation.tableName,
           refreshKeyValues: [],
@@ -1701,16 +1713,21 @@ describe('PreAggregations', () => {
           buildRangeEnd: this.preAggregation.buildRangeEnd,
         };
       });
-      const loader = createLoader({
-        rollupLambdaId: 'orders.lambda',
-        lastRollupLambda: false,
-        matchedTimeDimensionDateRange: ['2024-01-01T00:00:00.000', '2024-01-02T11:59:59.999'],
-        partitionInvalidateKeyQueries: [['SELECT 1', []]],
-      });
 
-      const result = await loader.loadPreAggregations();
-      expect(result.targetTableName).toBe('(SELECT * FROM test_table20240101 UNION ALL SELECT * FROM test_table20240102)');
-      expect(result.buildRangeEnd).toBe('2024-01-02T23:59:59.999');
+      try {
+        const loader = createLoader({
+          rollupLambdaId: 'orders.lambda',
+          lastRollupLambda: false,
+          matchedTimeDimensionDateRange: ['2024-01-01T00:00:00.000', '2024-01-02T11:59:59.999'],
+          partitionInvalidateKeyQueries: [['SELECT 1', []]],
+        });
+
+        const result = await loader.loadPreAggregations();
+        expect(result.targetTableName).toBe('(SELECT * FROM test_table20240101 UNION ALL SELECT * FROM test_table20240102)');
+        expect(result.buildRangeEnd).toBe('2024-01-02T23:59:59.999');
+      } finally {
+        loadSpy.mockRestore();
+      }
     });
 
     test.each([{ partitionGranularity: undefined }, { expandedPartition: true }])('passes through unpartitioned or expanded descriptions: %j', async overrides => {
