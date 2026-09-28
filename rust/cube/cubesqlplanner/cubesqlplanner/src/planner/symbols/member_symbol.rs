@@ -25,6 +25,9 @@ use std::rc::Rc;
 /// Indivisible: renders as a single SQL expression. A symbol may depend
 /// on other symbols (`get_dependencies`); whether those deps are
 /// inlined or pushed into a CTE / subquery is a physical-plan decision.
+///
+/// Matches over the variants list every variant, with no `_ =>` arm, so
+/// that a new variant fails to compile wherever a decision depends on it.
 #[derive(Clone)]
 pub enum MemberSymbol {
     Dimension(Rc<DimensionSymbol>),
@@ -102,7 +105,7 @@ impl MemberSymbol {
             Self::Dimension(d) => d.mask_sql().as_ref(),
             Self::TimeDimension(td) => td.base_symbol().mask_sql(),
             Self::Measure(m) => m.mask_sql().as_ref(),
-            _ => None,
+            Self::MemberExpression(_) => None,
         }
     }
 
@@ -132,7 +135,7 @@ impl MemberSymbol {
             Self::Dimension(d) => d.is_multi_stage(),
             Self::TimeDimension(d) => d.is_multi_stage(),
             Self::Measure(m) => m.is_multi_stage(),
-            _ => false,
+            Self::MemberExpression(_) => false,
         }
     }
 
@@ -144,7 +147,7 @@ impl MemberSymbol {
             MemberSymbol::TimeDimension(time_dimension_symbol) => {
                 time_dimension_symbol.base_symbol().case()
             }
-            _ => None,
+            MemberSymbol::MemberExpression(_) => None,
         }
     }
 
@@ -253,40 +256,36 @@ impl MemberSymbol {
     pub fn as_time_dimension(&self) -> Result<Rc<TimeDimensionSymbol>, CubeError> {
         match self {
             Self::TimeDimension(d) => Ok(d.clone()),
-            _ => Err(CubeError::internal(format!(
-                "{} is not a time dimension",
-                self.full_name()
-            ))),
+            Self::Dimension(_) | Self::Measure(_) | Self::MemberExpression(_) => Err(
+                CubeError::internal(format!("{} is not a time dimension", self.full_name())),
+            ),
         }
     }
 
     pub fn as_dimension(&self) -> Result<Rc<DimensionSymbol>, CubeError> {
         match self {
             Self::Dimension(d) => Ok(d.clone()),
-            _ => Err(CubeError::internal(format!(
-                "{} is not a dimension",
-                self.full_name()
-            ))),
+            Self::TimeDimension(_) | Self::Measure(_) | Self::MemberExpression(_) => Err(
+                CubeError::internal(format!("{} is not a dimension", self.full_name())),
+            ),
         }
     }
 
     pub fn as_measure(&self) -> Result<Rc<MeasureSymbol>, CubeError> {
         match self {
             Self::Measure(m) => Ok(m.clone()),
-            _ => Err(CubeError::internal(format!(
-                "{} is not a measure",
-                self.full_name()
-            ))),
+            Self::Dimension(_) | Self::TimeDimension(_) | Self::MemberExpression(_) => Err(
+                CubeError::internal(format!("{} is not a measure", self.full_name())),
+            ),
         }
     }
 
     pub fn as_member_expression(&self) -> Result<Rc<MemberExpressionSymbol>, CubeError> {
         match self {
             Self::MemberExpression(m) => Ok(m.clone()),
-            _ => Err(CubeError::internal(format!(
-                "{} is not a member expression",
-                self.full_name()
-            ))),
+            Self::Dimension(_) | Self::TimeDimension(_) | Self::Measure(_) => Err(
+                CubeError::internal(format!("{} is not a member expression", self.full_name())),
+            ),
         }
     }
 
@@ -295,7 +294,7 @@ impl MemberSymbol {
     pub fn alias_suffix(&self) -> Option<String> {
         match self {
             Self::TimeDimension(d) => Some(d.alias_suffix()),
-            _ => None,
+            Self::Dimension(_) | Self::Measure(_) | Self::MemberExpression(_) => None,
         }
     }
 
@@ -310,7 +309,7 @@ impl MemberSymbol {
         let sql_calls = match self {
             Self::Dimension(dim) => dim.iter_sql_calls(),
             Self::Measure(meas) => meas.iter_sql_calls(),
-            _ => Box::new(std::iter::empty()),
+            Self::TimeDimension(_) | Self::MemberExpression(_) => Box::new(std::iter::empty()),
         };
         if self.is_multi_stage() {
             for call in sql_calls {

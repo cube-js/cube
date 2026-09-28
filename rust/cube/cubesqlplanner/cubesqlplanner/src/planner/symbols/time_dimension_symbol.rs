@@ -236,7 +236,9 @@ impl TimeDimensionSymbol {
                         s.clone()
                     }
                 }
-                _ => s.clone(),
+                MemberSymbol::TimeDimension(_)
+                | MemberSymbol::Measure(_)
+                | MemberSymbol::MemberExpression(_) => s.clone(),
             })
             .collect()
     }

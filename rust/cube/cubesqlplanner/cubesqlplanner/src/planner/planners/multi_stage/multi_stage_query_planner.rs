@@ -501,7 +501,9 @@ impl MultiStageQueryPlanner {
                 ),
                 None => member.full_name(),
             },
-            _ => member.full_name(),
+            MemberSymbol::Dimension(_)
+            | MemberSymbol::Measure(_)
+            | MemberSymbol::MemberExpression(_) => member.full_name(),
         }
     }
 
@@ -516,7 +518,9 @@ impl MultiStageQueryPlanner {
                         .full_name()
                 })
             }
-            _ => None,
+            MemberSymbol::Dimension(_)
+            | MemberSymbol::Measure(_)
+            | MemberSymbol::MemberExpression(_) => None,
         }
     }
 

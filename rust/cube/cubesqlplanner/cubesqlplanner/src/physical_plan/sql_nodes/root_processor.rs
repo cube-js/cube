@@ -75,7 +75,7 @@ impl SqlNode for RootSqlNode {
                 node_processor.clone(),
                 templates,
             )?,
-            _ => self.default_processor.to_sql(
+            MemberSymbol::MemberExpression(_) => self.default_processor.to_sql(
                 visitor,
                 node,
                 query_tools.clone(),

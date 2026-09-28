@@ -41,7 +41,7 @@ impl TraversalVisitor for HasMultiStageMembersCollector {
                 }
             }
             MemberSymbol::TimeDimension(s) => self.apply(s.base_symbol(), &())?,
-            _ => {}
+            MemberSymbol::MemberExpression(_) => {}
         };
         if self.has_multi_stage {
             Ok(None)

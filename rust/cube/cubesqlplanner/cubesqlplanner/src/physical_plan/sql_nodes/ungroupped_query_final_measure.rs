@@ -34,43 +34,37 @@ impl SqlNode for UngroupedQueryFinalMeasureSqlNode {
         node_processor: Rc<dyn SqlNode>,
         templates: &PlanSqlTemplates,
     ) -> Result<String, CubeError> {
-        let res = match node.as_ref() {
-            MemberSymbol::Measure(ev) => {
-                let is_count_like = match ev.kind() {
-                    MeasureKind::Count(_) | MeasureKind::MultipliedCount(_) => true,
-                    MeasureKind::Aggregated(a) | MeasureKind::AggregatedState(a) => matches!(
-                        a.agg_type(),
-                        AggregationType::CountDistinct | AggregationType::CountDistinctApprox
-                    ),
-                    MeasureKind::Calculated(_) | MeasureKind::Rank => false,
-                };
-                // Count-likes wrap the child in `CASE WHEN … IS NOT NULL THEN 1 END`
-                // (safe), other kinds pass through and must propagate the flag.
-                let child_visitor = if is_count_like {
-                    visitor.with_arg_needs_paren_safe(false)
-                } else {
-                    visitor.clone()
-                };
-                let input = self.input.to_sql(
-                    &child_visitor,
-                    node,
-                    query_tools.clone(),
-                    node_processor.clone(),
-                    templates,
-                )?;
+        let ev = node.as_measure()?;
+        let res = {
+            let is_count_like = match ev.kind() {
+                MeasureKind::Count(_) | MeasureKind::MultipliedCount(_) => true,
+                MeasureKind::Aggregated(a) | MeasureKind::AggregatedState(a) => matches!(
+                    a.agg_type(),
+                    AggregationType::CountDistinct | AggregationType::CountDistinctApprox
+                ),
+                MeasureKind::Calculated(_) | MeasureKind::Rank => false,
+            };
+            // Count-likes wrap the child in `CASE WHEN … IS NOT NULL THEN 1 END`
+            // (safe), other kinds pass through and must propagate the flag.
+            let child_visitor = if is_count_like {
+                visitor.with_arg_needs_paren_safe(false)
+            } else {
+                visitor.clone()
+            };
+            let input = self.input.to_sql(
+                &child_visitor,
+                node,
+                query_tools.clone(),
+                node_processor.clone(),
+                templates,
+            )?;
 
-                if input == "*" {
-                    "1".to_string()
-                } else if is_count_like {
-                    format!("CASE WHEN ({}) IS NOT NULL THEN 1 END", input) //TODO templates!!
-                } else {
-                    input
-                }
-            }
-            _ => {
-                return Err(CubeError::internal(format!(
-                    "Measure filter node processor called for wrong node",
-                )));
+            if input == "*" {
+                "1".to_string()
+            } else if is_count_like {
+                format!("CASE WHEN ({}) IS NOT NULL THEN 1 END", input) //TODO templates!!
+            } else {
+                input
             }
         };
         Ok(res)

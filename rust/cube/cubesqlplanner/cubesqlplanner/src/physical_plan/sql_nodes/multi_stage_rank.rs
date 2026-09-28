@@ -34,53 +34,47 @@ impl SqlNode for MultiStageRankNode {
         node_processor: Rc<dyn SqlNode>,
         templates: &PlanSqlTemplates,
     ) -> Result<String, CubeError> {
-        let res = match node.as_ref() {
-            MemberSymbol::Measure(m) => {
-                if let Some(modifier @ MeasureRenderModifier::MultiStageRank { partition }) =
-                    m.render_modifier()
-                {
-                    modifier.ensure_applies_to(m)?;
-                    let inner_visitor = visitor.with_arg_needs_paren_safe(false);
-                    let order_by = if !m.measure_order_by().is_empty() {
-                        let sql = m
-                            .measure_order_by()
-                            .iter()
-                            .map(|item| -> Result<String, CubeError> {
-                                let sql = item.sql_call().eval(
-                                    &inner_visitor,
-                                    node_processor.clone(),
-                                    query_tools.clone(),
-                                    templates,
-                                )?;
-                                Ok(format!("{} {}", sql, item.direction()))
-                            })
-                            .collect::<Result<Vec<_>, _>>()?
-                            .join(", ");
-                        format!("ORDER BY {sql}")
-                    } else {
-                        "".to_string()
-                    };
-                    let partition_by = render_partition_by(
-                        partition,
-                        &inner_visitor,
-                        node_processor.clone(),
-                        templates,
-                    )?;
-                    format!("rank() OVER ({partition_by}{order_by})")
+        let m = node.as_measure()?;
+        let res = {
+            if let Some(modifier @ MeasureRenderModifier::MultiStageRank { partition }) =
+                m.render_modifier()
+            {
+                modifier.ensure_applies_to(&m)?;
+                let inner_visitor = visitor.with_arg_needs_paren_safe(false);
+                let order_by = if !m.measure_order_by().is_empty() {
+                    let sql = m
+                        .measure_order_by()
+                        .iter()
+                        .map(|item| -> Result<String, CubeError> {
+                            let sql = item.sql_call().eval(
+                                &inner_visitor,
+                                node_processor.clone(),
+                                query_tools.clone(),
+                                templates,
+                            )?;
+                            Ok(format!("{} {}", sql, item.direction()))
+                        })
+                        .collect::<Result<Vec<_>, _>>()?
+                        .join(", ");
+                    format!("ORDER BY {sql}")
                 } else {
-                    self.else_processor.to_sql(
-                        visitor,
-                        node,
-                        query_tools.clone(),
-                        node_processor.clone(),
-                        templates,
-                    )?
-                }
-            }
-            _ => {
-                return Err(CubeError::internal(format!(
-                    "Unexpected evaluation node type for MultStageRankNode"
-                )));
+                    "".to_string()
+                };
+                let partition_by = render_partition_by(
+                    partition,
+                    &inner_visitor,
+                    node_processor.clone(),
+                    templates,
+                )?;
+                format!("rank() OVER ({partition_by}{order_by})")
+            } else {
+                self.else_processor.to_sql(
+                    visitor,
+                    node,
+                    query_tools.clone(),
+                    node_processor.clone(),
+                    templates,
+                )?
             }
         };
         Ok(res)

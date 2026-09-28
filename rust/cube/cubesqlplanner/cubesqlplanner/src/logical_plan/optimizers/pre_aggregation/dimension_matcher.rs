@@ -181,7 +181,7 @@ impl<'a> DimensionMatcher<'a> {
                     }
                 }
             }
-            _ => Ok(MatchState::NotMatched),
+            MemberSymbol::Measure(_) => Ok(MatchState::NotMatched),
         }
     }
 

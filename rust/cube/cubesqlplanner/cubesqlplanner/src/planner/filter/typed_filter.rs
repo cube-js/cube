@@ -170,7 +170,7 @@ impl TypedFilterBuilder {
                 "string" | "time" => None,
                 _ => Some("number".to_string()),
             },
-            _ => None,
+            MemberSymbol::TimeDimension(_) | MemberSymbol::MemberExpression(_) => None,
         }
     }
 

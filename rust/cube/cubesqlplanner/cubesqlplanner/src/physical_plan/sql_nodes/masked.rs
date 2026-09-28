@@ -78,7 +78,9 @@ impl MaskedSqlNode {
                     m.render_modifier(),
                     Some(MeasureRenderModifier::RawValue | MeasureRenderModifier::UngroupedFinal)
                 ),
-                _ => false,
+                MemberSymbol::Dimension(_)
+                | MemberSymbol::TimeDimension(_)
+                | MemberSymbol::MemberExpression(_) => false,
             };
 
         let masked_sql = if let Some(mask_call) = node.mask_sql() {

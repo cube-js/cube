@@ -114,7 +114,7 @@ impl SqlNode for TimeDimensionNode {
                     )
                 }
             }
-            _ => self.input.to_sql(
+            MemberSymbol::Measure(_) | MemberSymbol::MemberExpression(_) => self.input.to_sql(
                 visitor,
                 node,
                 query_tools.clone(),

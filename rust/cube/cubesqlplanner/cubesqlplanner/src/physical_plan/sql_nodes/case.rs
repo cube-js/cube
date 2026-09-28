@@ -189,7 +189,7 @@ impl SqlNode for CaseSqlNode {
                     )?
                 }
             }
-            _ => {
+            MemberSymbol::TimeDimension(_) | MemberSymbol::MemberExpression(_) => {
                 return Err(CubeError::internal(format!(
                     "Case node processor called for wrong node",
                 )));

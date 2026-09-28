@@ -44,7 +44,9 @@ impl TraversalVisitor for MemberChildsCollector {
                     self.childs.push(node.clone());
                     Ok(None)
                 }
-                _ => Ok(Some(state.clone())),
+                MemberSymbol::TimeDimension(_) | MemberSymbol::MemberExpression(_) => {
+                    Ok(Some(state.clone()))
+                }
             }
         }
     }

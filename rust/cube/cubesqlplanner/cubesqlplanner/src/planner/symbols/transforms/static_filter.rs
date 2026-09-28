@@ -63,7 +63,7 @@ pub fn apply_static_filter_to_symbol(
                     }
                 }
             }
-            _ => {}
+            MemberSymbol::TimeDimension(_) | MemberSymbol::MemberExpression(_) => {}
         }
         Ok(symbol.clone())
     })

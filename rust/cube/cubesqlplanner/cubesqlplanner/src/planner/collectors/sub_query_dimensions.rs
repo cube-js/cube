@@ -52,7 +52,7 @@ impl TraversalVisitor for SubQueryDimensionsCollector {
                 Ok(Some(()))
             }
             MemberSymbol::TimeDimension(dim) => self.on_node_traverse(dim.base_symbol(), &()),
-            _ => Ok(Some(())),
+            MemberSymbol::Measure(_) | MemberSymbol::MemberExpression(_) => Ok(Some(())),
         }
     }
 }

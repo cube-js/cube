@@ -418,26 +418,12 @@ impl MultiStageMemberQueryPlanner {
         let mut time_dimensions = self.description.state().time_dimensions().clone();
         let mut measures = vec![];
         let cte_member = self.description.member().evaluation_node();
-        match cte_member.as_ref() {
-            MemberSymbol::Dimension(_) => {
-                if !dimensions.iter().any(|d| {
-                    d.clone().resolve_reference_chain()
-                        == cte_member.clone().resolve_reference_chain()
-                }) {
-                    dimensions.push(cte_member.clone())
-                }
-            }
-            MemberSymbol::TimeDimension(_) => {
-                if !time_dimensions.iter().any(|d| {
-                    d.clone().resolve_reference_chain()
-                        == cte_member.clone().resolve_reference_chain()
-                }) {
-                    time_dimensions.push(cte_member.clone())
-                }
-            }
-            MemberSymbol::Measure(_) => measures.push(cte_member.clone()),
-            _ => {}
-        }
+        add_member_by_kind(
+            cte_member,
+            &mut dimensions,
+            &mut time_dimensions,
+            &mut measures,
+        );
         // We add all non–multi-stage dimensions from the underlying states because
         // they’re needed to join a multi-stage dimension into the measure query
         let (all_dependend_dimensions, all_dependend_time_dimensions) =
@@ -520,26 +506,12 @@ impl MultiStageMemberQueryPlanner {
         let mut time_dimensions = self.description.state().time_dimensions().clone();
         let mut measures = vec![];
         if !self.description.member().is_without_member_leaf() {
-            match member_node.as_ref() {
-                MemberSymbol::Dimension(_) => {
-                    if !dimensions.iter().any(|d| {
-                        d.clone().resolve_reference_chain()
-                            == member_node.clone().resolve_reference_chain()
-                    }) {
-                        dimensions.push(member_node.clone())
-                    }
-                }
-                MemberSymbol::TimeDimension(_) => {
-                    if !time_dimensions.iter().any(|d| {
-                        d.clone().resolve_reference_chain()
-                            == member_node.clone().resolve_reference_chain()
-                    }) {
-                        time_dimensions.push(member_node.clone())
-                    }
-                }
-                MemberSymbol::Measure(_) => measures.push(member_node.clone()),
-                _ => {}
-            }
+            add_member_by_kind(
+                member_node,
+                &mut dimensions,
+                &mut time_dimensions,
+                &mut measures,
+            );
         }
 
         let mut measures_filters = self.description.state().measures_filters().clone();
@@ -676,5 +648,32 @@ impl MultiStageMemberQueryPlanner {
             &measures,
         );
         Ok(order_items)
+    }
+}
+
+/// Adds `member` to the schema list of its kind, skipping a dimension already
+/// present under another name of the same reference chain.
+fn add_member_by_kind(
+    member: &Rc<MemberSymbol>,
+    dimensions: &mut Vec<Rc<MemberSymbol>>,
+    time_dimensions: &mut Vec<Rc<MemberSymbol>>,
+    measures: &mut Vec<Rc<MemberSymbol>>,
+) {
+    let same_chain = |d: &Rc<MemberSymbol>| {
+        d.clone().resolve_reference_chain() == member.clone().resolve_reference_chain()
+    };
+    match member.as_ref() {
+        MemberSymbol::Dimension(_) => {
+            if !dimensions.iter().any(same_chain) {
+                dimensions.push(member.clone())
+            }
+        }
+        MemberSymbol::TimeDimension(_) => {
+            if !time_dimensions.iter().any(same_chain) {
+                time_dimensions.push(member.clone())
+            }
+        }
+        MemberSymbol::Measure(_) => measures.push(member.clone()),
+        MemberSymbol::MemberExpression(_) => {}
     }
 }

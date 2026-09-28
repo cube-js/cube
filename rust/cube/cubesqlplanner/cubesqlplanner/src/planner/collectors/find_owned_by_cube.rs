@@ -36,7 +36,7 @@ impl FindOwnedByCubeChildCollector {
                     self.process_deps(&node, origin_node_name)
                 }
             }
-            _ => Err(CubeError::internal(format!(
+            MemberSymbol::MemberExpression(_) => Err(CubeError::internal(format!(
                 "FindOwnedByCubeChild cannot be processed on node {}",
                 node.full_name()
             ))),

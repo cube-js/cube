@@ -91,7 +91,9 @@ impl SqlNode for CalendarTimeShiftSqlNode {
                     )?
                 }
             }
-            _ => self.input.to_sql(
+            MemberSymbol::TimeDimension(_)
+            | MemberSymbol::Measure(_)
+            | MemberSymbol::MemberExpression(_) => self.input.to_sql(
                 visitor,
                 node,
                 query_tools.clone(),

@@ -43,7 +43,9 @@ impl MeasureFilterOp {
                     Ok(parts.join(" AND "))
                 }
             }
-            _ => plan_templates.always_true(),
+            MemberSymbol::Dimension(_)
+            | MemberSymbol::TimeDimension(_)
+            | MemberSymbol::MemberExpression(_) => plan_templates.always_true(),
         }
     }
 }

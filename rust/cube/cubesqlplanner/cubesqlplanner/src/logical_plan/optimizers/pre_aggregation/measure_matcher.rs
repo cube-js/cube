@@ -60,7 +60,7 @@ impl MeasureMatcher {
             MemberSymbol::MemberExpression(_) => {
                 return Ok(false); //TODO We not allow to use pre-aggregations with member expressions before sqlapi ready for it
             }
-            _ => return Ok(false),
+            MemberSymbol::Dimension(_) | MemberSymbol::TimeDimension(_) => return Ok(false),
         }
 
         if symbol.get_dependencies().is_empty() {
