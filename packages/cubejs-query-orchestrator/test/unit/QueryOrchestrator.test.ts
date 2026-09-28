@@ -6,8 +6,6 @@ import { LocalCacheDriver } from '../../src/orchestrator/LocalCacheDriver';
 import type { QueryBody } from '../../src/orchestrator/QueryCache';
 import type { PreAggregationDescription, QueryDateRange } from '../../src/orchestrator/PreAggregations';
 
-// Fixtures spell out only the pre-aggregation fields a test exercises. The index signature of QueryBody
-// makes `Omit` erase every field to `any`, so `cacheMode` is typed again explicitly.
 type TestQueryBody = Omit<QueryBody, 'cacheMode' | 'preAggregations'> & {
   cacheMode?: CacheMode;
   preAggregations?: (Partial<PreAggregationDescription> & { streamOffset?: string, readOnly?: boolean })[];
