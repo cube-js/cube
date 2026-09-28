@@ -1,13 +1,12 @@
 import { Readable } from 'stream';
 import type { BaseDriver } from '@cubejs-backend/base-driver';
+import type { OmitKnown } from '@cubejs-backend/shared';
 import { QueryOrchestrator } from '../../src/orchestrator/QueryOrchestrator';
 import { LocalCacheDriver } from '../../src/orchestrator/LocalCacheDriver';
 import type { QueryBody } from '../../src/orchestrator/QueryCache';
 import type { PreAggregationDescription, QueryDateRange } from '../../src/orchestrator/PreAggregations';
 
-// Fixtures spell out only the pre-aggregation fields a test exercises.
-type TestQueryBody = Omit<QueryBody, 'cacheMode' | 'preAggregations'> & {
-  cacheMode?: string;
+type TestQueryBody = OmitKnown<QueryBody, 'preAggregations'> & {
   preAggregations?: (Partial<PreAggregationDescription> & { streamOffset?: string, readOnly?: boolean })[];
 };
 
@@ -310,7 +309,6 @@ describe('QueryOrchestrator', () => {
   let streamingSourceMockDriver: StreamingSourceMockDriver;
   let externalMockDriver: ExternalMockDriver;
   let queryOrchestrator: TestQueryOrchestrator;
-  let queryOrchestrator2: TestQueryOrchestrator;
   let queryOrchestratorExternalRefresh: TestQueryOrchestrator;
   let queryOrchestratorDropWithoutTouch: TestQueryOrchestrator;
   let testCount = 1;
@@ -384,8 +382,6 @@ describe('QueryOrchestrator', () => {
 
     queryOrchestrator =
       new TestQueryOrchestrator(redisPrefix, driverFactory, logger, options('p1'));
-    queryOrchestrator2 =
-      new TestQueryOrchestrator(redisPrefix, driverFactory, logger, options('p2'));
     queryOrchestratorExternalRefresh =
       new TestQueryOrchestrator(redisPrefix, driverFactory, logger, {
         ...options('p1'),
@@ -1813,6 +1809,25 @@ describe('QueryOrchestrator', () => {
   });
 
   test('streaming two nodes', async () => {
+    // A persistent stream on a node which didn't free the slot starts on its `Continue wait` retry,
+    // so a short timeout keeps the test fast.
+    const redisPrefix = `ORCHESTRATOR_TEST_${testCount++}`;
+    const streamingNode = (processUid: string) => new TestQueryOrchestrator(
+      redisPrefix,
+      () => mockDriver as unknown as BaseDriver,
+      (msg, params) => console.log(new Date().toJSON(), msg, params),
+      {
+        continueWaitTimeout: 1,
+        queryCacheOptions: {
+          queueOptions: () => ({
+            concurrency: 2,
+            processUid,
+          }),
+        },
+      }
+    );
+    const streamingNode1 = streamingNode('p1');
+    const streamingNode2 = streamingNode('p2');
     const query = (id: number): TestQueryBody => ({
       query: `SELECT * FROM stb_pre_aggregations.orders_d WHERE id = ${id}`,
       values: [],
@@ -1826,7 +1841,12 @@ describe('QueryOrchestrator', () => {
         query: 'Foo.query'
       }
     });
-    const readFirstRow = async (streamPromise) => {
+    await Promise.all([
+      fetchLongPolling(streamingNode1, query(1)),
+      fetchLongPolling(streamingNode1, query(2)),
+      fetchLongPolling(streamingNode2, query(3)),
+      fetchLongPolling(streamingNode2, query(4)),
+    ].map(async streamPromise => {
       const stream = await streamPromise;
       const data = await new Promise((resolve, reject) => {
         stream.on('data', (row) => {
@@ -1837,18 +1857,8 @@ describe('QueryOrchestrator', () => {
         });
       });
       expect(data['Foo.query']).toMatch(/orders_d/);
-    };
-    // A persistent stream is only picked up by the reconcile of its own node, and nothing wakes a node
-    // up when another one frees a concurrency slot. So each round stays within the queue concurrency.
-    await Promise.all([
-      fetchLongPolling(queryOrchestrator, query(1)),
-      fetchLongPolling(queryOrchestrator2, query(3)),
-    ].map(readFirstRow));
-    await Promise.all([
-      fetchLongPolling(queryOrchestrator, query(2)),
-      fetchLongPolling(queryOrchestrator2, query(4)),
-    ].map(readFirstRow));
-  });
+    }));
+  }, 5000);
 
   test('drop lock', async () => {
     mockDriver.tablesDropDelay = 300;

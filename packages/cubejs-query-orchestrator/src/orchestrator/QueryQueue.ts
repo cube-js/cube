@@ -404,7 +404,7 @@ export class QueryQueue {
 
             resolve(null);
           },
-          this.continueWaitTimeout * 10000
+          this.continueWaitTimeout * 1000
         );
       }
     });
