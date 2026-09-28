@@ -531,6 +531,10 @@ export class QueryCache {
     return this.queryCacheKey(QueryCache.refreshKeyIdentity(sqlQuery, dataSource));
   }
 
+  public hasMemoryCacheEntry(redisKey: string): boolean {
+    return this.memoryCache.has(redisKey);
+  }
+
   public static extractRequestUUID(requestId: string): string {
     return extractRequestUUID(requestId);
   }

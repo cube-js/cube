@@ -134,12 +134,22 @@ yarn test
 ## Git
 
 Use conventional commits with these prefixes:
-- `feat:` — new features
-- `fix:` — bug fixes
+- `feat:` — new user-facing features
+- `fix:` — bug fixes users can observe
 - `docs:` — documentation changes
-- `refactor:` — code refactoring
+- `refactor:` — refactoring of shipped code (refactors of tests, CI or tooling are `chore:`)
+- `perf:` — performance improvements
+- `chore:` — internal changes: tests, CI, build/tooling, dependency bumps
+
+`feat:` and `fix:` exist to surface a change to users in the changelog. If users can't notice the
+change (a test fix, a CI tweak, a refactor of test helpers), use `chore:` even when it "fixes"
+something — e.g. `chore(query-orchestrator): Revive QueryOrchestrator.test`, not `fix(...)`.
+The same rule applies to PR titles, since the squash commit takes the PR title.
 
 Include scope in parentheses when applicable, e.g., `fix(tesseract):` or `feat(databricks-jdbc-driver):`.
+
+Start the subject after the prefix with a capital letter: `feat(tesseract): Support rolling windows`,
+not `feat(tesseract): support rolling windows`. This applies to PR titles too.
 
 PRs are squash-merged. When merging one, use the `merge-pr` skill: always pass `--body` (but not
 `--subject`) to `gh pr merge`, otherwise the raw PR description (template checklist included)
