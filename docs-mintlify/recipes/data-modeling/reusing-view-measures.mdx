@@ -218,7 +218,7 @@ include and every measure, dimension and folder of the base view:
   applies only to the `cubes` item where you write it. If a child view excludes
   a member that the base view includes or defines, the member stays in the
   child view. Cube does not show an error.
-- **A redefined member replaces the inherited one, but does not remove it.** If
+- **A redefined member overrides the inherited one only in the child view.** If
   a child view defines a measure or dimension with the same name as a measure
   or dimension of the base view, the child's definition applies in the child
   view. The base view keeps its own definition.
