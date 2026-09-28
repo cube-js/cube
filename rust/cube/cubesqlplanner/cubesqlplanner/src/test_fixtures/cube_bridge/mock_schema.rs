@@ -328,7 +328,7 @@ impl MockSchemaBuilder {
             segments: HashMap::new(),
             pre_aggregations: Vec::new(),
             granularities: HashMap::new(),
-            joins: HashMap::new(),
+            joins: Vec::new(),
         }
     }
 
@@ -366,7 +366,7 @@ pub struct MockCubeBuilder {
     pre_aggregations: Vec<(String, Rc<MockPreAggregationDescription>)>,
     granularities: HashMap<String, HashMap<String, Rc<MockGranularityDefinition>>>,
     #[allow(dead_code)]
-    joins: HashMap<String, MockJoinItemDefinition>,
+    joins: Vec<MockJoinItemDefinition>,
 }
 
 impl MockCubeBuilder {
@@ -430,8 +430,8 @@ impl MockCubeBuilder {
     }
 
     #[allow(dead_code)]
-    pub fn add_join(mut self, name: impl Into<String>, definition: MockJoinItemDefinition) -> Self {
-        self.joins.insert(name.into(), definition);
+    pub fn add_join(mut self, definition: MockJoinItemDefinition) -> Self {
+        self.joins.push(definition);
         self
     }
 

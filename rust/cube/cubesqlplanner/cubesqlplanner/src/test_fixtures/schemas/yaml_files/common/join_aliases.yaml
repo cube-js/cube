@@ -1,0 +1,79 @@
+cubes:
+  - name: orders
+    sql_table: orders
+    joins:
+      - name: users
+        alias: customer
+        sql: "{CUBE}.customer_id = {users}.id"
+        relationship: many_to_one
+      - name: users
+        alias: manager
+        sql: "{CUBE}.manager_id = {users}.id"
+        relationship: many_to_one
+      - name: products
+        sql: "{CUBE}.product_id = {products}.id"
+        relationship: many_to_one
+    dimensions:
+      - name: id
+        type: number
+        sql: id
+        primary_key: true
+      - name: status
+        type: string
+        sql: status
+    measures:
+      - name: count
+        type: count
+
+  - name: invoices
+    sql_table: invoices
+    joins:
+      - name: users
+        alias: payer
+        sql: "{CUBE}.payer_id = {users}.id"
+        relationship: many_to_one
+    dimensions:
+      - name: id
+        type: number
+        sql: id
+        primary_key: true
+    measures:
+      - name: count
+        type: count
+
+  - name: users
+    sql_table: users
+    joins:
+      - name: departments
+        sql: "{CUBE}.department_id = {departments}.id"
+        relationship: many_to_one
+    dimensions:
+      - name: id
+        type: number
+        sql: id
+        primary_key: true
+      - name: city
+        type: string
+        sql: city
+
+  - name: products
+    sql_table: products
+    dimensions:
+      - name: id
+        type: number
+        sql: id
+        primary_key: true
+      - name: name
+        type: string
+        sql: name
+
+  - name: departments
+    sql_table: departments
+    dimensions:
+      - name: id
+        type: number
+        sql: id
+        primary_key: true
+      - name: name
+        type: string
+        sql: name

@@ -1198,6 +1198,7 @@ const baseSchema = {
     })),
     Joi.array().items(Joi.object().keys({
       name: identifier.required(),
+      alias: identifier,
       sql: Joi.func().required(),
       relationship: Joi.any().valid(
         'belongsTo', 'belongs_to', 'many_to_one', 'manyToOne',
