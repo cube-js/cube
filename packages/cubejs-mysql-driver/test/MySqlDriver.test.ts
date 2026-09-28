@@ -54,6 +54,29 @@ describe('MySqlDriver', () => {
       ]);
   });
 
+  // https://github.com/cube-js/cube/issues/12035
+  test('decimal precision and scale with CUBEJS_DB_PRECISE_DECIMAL_IN_CUBESTORE', async () => {
+    process.env.CUBEJS_DB_PRECISE_DECIMAL_IN_CUBESTORE = 'true';
+    try {
+      await mySqlDriver.query('CREATE TABLE test.precise_decimal (amount DECIMAL(20,10))', []);
+      await mySqlDriver.query('INSERT INTO test.precise_decimal (amount) VALUES (0.0000012345)', []);
+
+      const expected = [{ name: 'amount', type: 'decimal(20, 10)' }];
+
+      expect(JSON.parse(JSON.stringify((await mySqlDriver.downloadQueryResults('select * from test.precise_decimal', [], { highWaterMark: 1000 })).types)))
+        .toStrictEqual(expected);
+
+      const tableData = await mySqlDriver.stream('select * from test.precise_decimal', [], { highWaterMark: 1000 });
+      try {
+        expect(tableData.types).toStrictEqual(expected);
+      } finally {
+        await (<any>tableData).release();
+      }
+    } finally {
+      delete process.env.CUBEJS_DB_PRECISE_DECIMAL_IN_CUBESTORE;
+    }
+  });
+
   test('boolean field', async () => {
     await mySqlDriver.uploadTable('test.boolean', [{ name: 'b_value', type: 'boolean' }], {
       rows: [
