@@ -19,6 +19,8 @@ import {
   getRealType,
   hasPreAggregationsEnvVars,
   internalExceptions,
+  pinPreAggregationsSchema,
+  releasePreAggregationsSchemaPin,
   track,
   FileRepository,
   SchemaFileRepository,
@@ -153,6 +155,12 @@ export class CubejsServerCore {
 
   protected readonly preAggregationsSchema: PreAggregationsSchemaFn;
 
+  /**
+   * This instance's share of the process-wide pre-aggregation schema pin, when it took
+   * one. Undefined when it did not, or once shutdown has released it.
+   */
+  private heldPreAggregationsSchemaPin: symbol | undefined;
+
   protected readonly scheduledRefreshTimeZones: ScheduledRefreshTimeZonesFn;
 
   protected readonly orchestratorOptions: OrchestratorOptionsFn;
@@ -192,13 +200,18 @@ export class CubejsServerCore {
   ) {
     this.coreServerVersion = version;
 
+    // Same resolution the gateway and OptsHandler do, so a `devServer: true` embedder
+    // gets the dev logger and unredacted SQL, and a `devServer: false` one gets neither
+    // from the env var alone
+    const devMode = opts.devServer ?? getEnv('devMode');
+
     const logger = opts.logger || createLogger(
-      process.env.NODE_ENV === 'production',
+      !devMode,
       getEnv('logLevel'),
     );
     // Wraps the log sink only: the agent and telemetry wrappers installed below
     // sit outside it and forward the original params
-    this.logger = getEnv('logRedaction') ? withLogRedaction(logger) : logger;
+    this.logger = getEnv('logRedaction', devMode) ? withLogRedaction(logger) : logger;
 
     this.optsHandler = new OptsHandler(this, opts, systemOptions);
     this.options = this.optsHandler.getCoreInitializedOptions();
@@ -355,6 +368,13 @@ export class CubejsServerCore {
 
       this.event('Server Start');
     }
+
+    // Last in the constructor, so anything that throws above takes no pin; shutdown
+    // releases it
+    if (typeof this.options.preAggregationsSchema === 'string') {
+      this.heldPreAggregationsSchemaPin =
+        pinPreAggregationsSchema(this.options.preAggregationsSchema);
+    }
   }
 
   protected createContextAcceptor(): ContextAcceptor {
@@ -484,6 +504,7 @@ export class CubejsServerCore {
       this.logger,
       {
         standalone: this.standalone,
+        devServer: this.options.devServer,
         dataSourceStorage: this.orchestratorStorage,
         basePath: this.options.basePath,
         contextRejectionMiddleware: this.contextRejectionMiddleware.bind(this),
@@ -993,6 +1014,15 @@ export class CubejsServerCore {
 
   public async shutdown() {
     this.compilerCache.clear();
+
+    // Undefined when this instance never took a share, and cleared here because this
+    // method is public and unguarded: a second call must not release the share again
+    if (this.heldPreAggregationsSchemaPin !== undefined) {
+      const holder = this.heldPreAggregationsSchemaPin;
+
+      this.heldPreAggregationsSchemaPin = undefined;
+      releasePreAggregationsSchemaPin(holder);
+    }
 
     if (this.devServer) {
       if (!process.env.CI) {

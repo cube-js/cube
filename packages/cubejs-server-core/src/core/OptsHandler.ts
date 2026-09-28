@@ -6,6 +6,7 @@ import {
   assertDataSource,
   isDockerImage,
   displayCLIWarning,
+  userPreAggregationsSchema,
 } from '@cubejs-backend/shared';
 import {
   isCubeStoreSupported,
@@ -286,6 +287,14 @@ export class OptsHandler {
   private initializeCoreOptions(
     opts: DriverDecoratedOptions
   ): ServerCoreInitializedOptions {
+    // Not getEnv: a schema this process pinned is not a user's choice, so a second
+    // instance resolves its own default rather than inheriting the first's
+    const preAggregationsSchema =
+      userPreAggregationsSchema() ||
+      (this.isDevMode()
+        ? 'dev_pre_aggregations'
+        : 'prod_pre_aggregations');
+
     const skipOnEnv = [
       // Default EXT_DB variables
       'CUBEJS_EXT_DB_URL',
@@ -307,7 +316,7 @@ export class OptsHandler {
     const externalDbType =
       opts.externalDbType ||
       <DatabaseType | undefined>process.env.CUBEJS_EXT_DB_TYPE ||
-      (getEnv('devMode') || definedExtDBVariables.length > 0) && 'cubestore' ||
+      (this.isDevMode() || definedExtDBVariables.length > 0) && 'cubestore' ||
       undefined;
 
     let externalDriverFactory =
@@ -408,11 +417,7 @@ export class OptsHandler {
       scheduledRefreshConcurrency: getEnv('scheduledRefreshQueriesPerAppId'),
       scheduledRefreshBatchSize: getEnv('scheduledRefreshBatchSize'),
       compilerCacheSize: getEnv('compilerCacheSize'),
-      preAggregationsSchema:
-        getEnv('preAggregationsSchema') ||
-        (this.isDevMode()
-          ? 'dev_pre_aggregations'
-          : 'prod_pre_aggregations'),
+      preAggregationsSchema,
       schemaPath: getEnv('schemaPath'),
       scheduledRefreshTimer: getEnv('refreshWorkerMode'),
       sqlCache: true,
@@ -480,13 +485,11 @@ export class OptsHandler {
 
   /**
    * Determines whether current instance should be bootstraped in the
-   * dev mode or not.
+   * dev mode or not. CreateOptions.devServer if the embedder set it, otherwise
+   * CUBEJS_DEV_MODE; off by default, and NODE_ENV has no say in it.
    */
   private isDevMode(): boolean {
-    return (
-      process.env.NODE_ENV !== 'production' ||
-      getEnv('devMode')
-    );
+    return this.createOptions.devServer ?? getEnv('devMode');
   }
 
   /**
