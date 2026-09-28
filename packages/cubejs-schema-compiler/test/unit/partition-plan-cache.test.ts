@@ -69,7 +69,7 @@ test('CompilerCache retains only the last partition plan per identity across hun
   expect(entries.size).toBe(2);
   expect([...entries.keys()].map(key => JSON.parse(key)[0])).toEqual(['partitionPlan', 'partitionPlan']);
   expect([...entries.values()]).toEqual(lastPlans.map(descriptions => ({
-    rangeKey: JSON.stringify(lastRange), descriptions,
+    rangeKey: JSON.stringify([lastRange, lastRange[1]]), descriptions,
   })));
 
   for (const [index, loader] of loaders.entries()) {
