@@ -1,0 +1,47 @@
+---
+source: cubesql/src/compile/test/test_df_execution.rs
+expression: "results.join(\"\\n\")"
+---
+SELECT x FROM (SELECT 1 x) t WHERE x = 2
++---+
+| x |
++---+
++---+
+SELECT x FROM (SELECT 1 x) t WHERE x = 1
++---+
+| x |
++---+
+| 1 |
++---+
+SELECT x FROM (SELECT 1 x) t WHERE x + 0 = 2
++---+
+| x |
++---+
++---+
+SELECT g FROM (SELECT 'a' g UNION ALL SELECT 'b') t WHERE g = 'b'
++---+
+| g |
++---+
+| b |
++---+
+SELECT x FROM (SELECT 1 x UNION SELECT 2) t WHERE x = 2
++---+
+| x |
++---+
+| 2 |
++---+
+SELECT 1 x WHERE 1 = 2
++---+
+| x |
++---+
++---+
+SELECT x FROM (SELECT 1 x) t WHERE x = NULL
++---+
+| x |
++---+
++---+
+SELECT x FROM (SELECT 1 x) t WHERE x + NULL = 1
++---+
+| x |
++---+
++---+
