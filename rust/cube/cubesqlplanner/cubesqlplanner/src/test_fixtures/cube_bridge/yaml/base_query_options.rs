@@ -1,5 +1,5 @@
 use crate::cube_bridge::base_query_options::{
-    FilterItem, MaskedMemberItem, OrderByItem, TimeDimension,
+    FilterItem, FilterValue, MaskedMemberItem, OrderByItem, TimeDimension,
 };
 use serde::de;
 use serde::{Deserialize, Deserializer};
@@ -30,9 +30,12 @@ pub struct YamlBaseQueryOptions {
     #[serde(default)]
     pub pre_aggregation_query: Option<bool>,
     #[serde(default)]
+    pub use_original_sql_pre_aggregations_in_pre_aggregation: Option<bool>,
+    #[serde(default)]
     pub total_query: Option<bool>,
     #[serde(default)]
     pub cubestore_support_multistage: Option<bool>,
+    pub max_multi_stage_depth: Option<usize>,
     #[serde(default)]
     pub disable_external_pre_aggregations: Option<bool>,
     #[serde(default)]
@@ -114,7 +117,7 @@ pub struct YamlBaseFilter {
     #[serde(default)]
     pub operator: Option<String>,
     #[serde(default)]
-    pub values: Option<Vec<Option<String>>>,
+    pub values: Option<Vec<FilterValue>>,
 }
 
 impl YamlFilterItem {

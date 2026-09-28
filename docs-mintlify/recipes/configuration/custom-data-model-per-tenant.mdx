@@ -23,6 +23,16 @@ from security contexts.
 - [`scheduled_refresh_contexts`][ref-scheduled-refresh-contexts] to provide
 a list of security contexts.
 
+<Note>
+
+`context_to_app_id` makes the data model per-tenant, which is all this recipe
+needs. Querying and caching (database connections, query queues, and
+pre-aggregations) stay shared between tenants unless you also configure
+[`context_to_orchestrator_id`][ref-context-to-orchestrator-id] and
+[`pre_aggregations_schema`][ref-pre-aggregations-schema].
+
+</Note>
+
 Put the following code into your `cube.py` or `cube.js` [configuration
 file][ref-config-files]:
 
@@ -525,6 +535,8 @@ code that fetches data model files for each tenant.
 [ref-multitenancy]: /embedding/multitenancy
 [ref-scheduled-refresh-contexts]: /reference/configuration/config#scheduled_refresh_contexts
 [ref-context-to-app-id]: /reference/configuration/config#context_to_app_id
+[ref-context-to-orchestrator-id]: /reference/configuration/config#context_to_orchestrator_id
+[ref-pre-aggregations-schema]: /reference/configuration/config#pre_aggregations_schema
 [ref-config-files]: /admin/connect-to-data#cubepy-and-cubejs-files
 [ref-mls]: /docs/data-modeling/access-control/member-level-security
 [ref-cubes-public]: /reference/data-modeling/cube#public

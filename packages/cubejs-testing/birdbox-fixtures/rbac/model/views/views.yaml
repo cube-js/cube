@@ -4,7 +4,7 @@ views:
       - join_path: line_items
         includes: "*"
     access_policy:
-      - role: "*"
+      - group: "*"
         row_level:
           filters:
             - member: "${CUBE}.price_dim"
@@ -30,14 +30,14 @@ views:
       - join_path: orders
         includes: "*"
     access_policy:
-      - role: admin
+      - group: admin
         member_level:
           includes: "*"
         row_level:
           allow_all: true
 
   # Two-layer row-level filtering: the underlying `orders` cube restricts rows
-  # to id IN {1, 10, 11} (role "*" → id = 1, role admin → id = 10 OR id = 11),
+  # to id IN {1, 10, 11} (group "*" → id = 1, group admin → id = 10 OR id = 11),
   # while this view adds its own row filter id < 11. A row must satisfy BOTH
   # the cube policy AND the view policy, so the result is id IN {1, 10}.
   - name: orders_two_layer_test
@@ -45,7 +45,7 @@ views:
       - join_path: orders
         includes: "*"
     access_policy:
-      - role: "*"
+      - group: "*"
         member_level:
           includes: "*"
         row_level:

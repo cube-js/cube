@@ -1,8 +1,8 @@
-use async_std::task::{Context, Poll};
 use core::pin::Pin;
 use futures::stream::{Fuse, FusedStream};
 use futures::{Stream, StreamExt};
 use pin_project_lite::pin_project;
+use std::task::{Context, Poll};
 use tokio::time::{interval, Duration, Instant, Interval};
 
 pin_project! {

@@ -32,7 +32,7 @@ export function LocalhostTipBox({ onHostnameCopy }: TLocalhostTipBoxProps) {
     <StyledAlert
       data-testid="wizard-localhost-tipbox"
       type="warning"
-      message={
+      message={(
         <Space direction="vertical" size="middle">
           <Typography.Text>
             To connect to the database running on the localhost use the
@@ -66,7 +66,7 @@ export function LocalhostTipBox({ onHostnameCopy }: TLocalhostTipBoxProps) {
                   href="https://docs.docker.com/network/host/"
                   target="_blank"
                 >
-                  network mode "host"
+                  network mode &quot;host&quot;
                 </Typography.Link>{' '}
                 to be able to connect to the database running on localhost.
               </Typography.Text>
@@ -78,7 +78,7 @@ export function LocalhostTipBox({ onHostnameCopy }: TLocalhostTipBoxProps) {
             </Space>
           </StyledForm>
         </Space>
-      }
+      )}
     />
   );
 }

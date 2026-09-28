@@ -48,6 +48,14 @@ enabled = false
 Commit the configuration for Vector, it should take effect in a minute. Then,
 navigate to your S3 bucket and watch the logs coming.
 
+<Note>
+
+The `aws_s3` sink can also authenticate with the deployment's OIDC identity
+instead of an access key pair — the credentials apply to the whole Vector agent.
+See [Keyless authentication][ref-keyless-auth].
+
+</Note>
+
 ## Troubleshooting
 
 ### Bucket region mismatch
@@ -63,5 +71,8 @@ This often happens if the bucket on Amazon S3 is in a region that is different
 from the one you’ve specified in the configuration for Vector.
 
 
+
+
 [ref-monitoring-integrations]: /admin/monitoring/monitoring-integrations
 [ref-monitoring-integrations-conf]: /admin/monitoring/monitoring-integrations#configuration
+[ref-keyless-auth]: /admin/monitoring/monitoring-integrations/cloudwatch#keyless-authentication

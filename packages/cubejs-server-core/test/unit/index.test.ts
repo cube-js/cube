@@ -31,8 +31,6 @@ class CubejsServerCoreOpen extends CubejsServerCore {
 
 // Mock to expose protected methods for testing
 class CompilerApiOpen extends CompilerApi {
-  public getRolesFromContext = super.getRolesFromContext;
-
   public getGroupsFromContext = super.getGroupsFromContext;
 }
 
@@ -98,34 +96,24 @@ describe('index.test', () => {
     delete process.env.CUBEJS_ROLLUP_ONLY;
     delete process.env.CUBEJS_SCHEDULED_REFRESH;
     delete process.env.CUBEJS_SCHEDULED_REFRESH_TIMER;
+    delete process.env.CUBEJS_LOG_REDACTION;
 
     process.env.NODE_ENV = 'development';
     process.env.CUBEJS_API_SECRET = 'api-secret';
   });
 
-  test('Should create instance of CubejsServerCore, dbType as string', () => {
-    expect(new CubejsServerCore({
-      dbType: 'mysql'
-    })).toBeInstanceOf(CubejsServerCore);
+  test('Should throw error, dbType has been removed (string)', () => {
+    expect(() => new CubejsServerCore(<any>{ dbType: 'mysql' }))
+      .toThrowError(/CreateOptions.dbType was removed in v1\.7\.0/);
   });
 
-  test('Should create instance of CubejsServerCore, dbType as func', () => {
-    const options = { dbType: () => <DatabaseType>'postgres' };
-
-    expect(new CubejsServerCore(options))
-      .toBeInstanceOf(CubejsServerCore);
-  });
-
-  test('Should throw error, unknown dbType', () => {
-    const options = { dbType: <any>'unknown-db' };
-
-    expect(() => new CubejsServerCore(options))
-      .toThrowError(/"dbType" must be one of/);
+  test('Should throw error, dbType has been removed (func)', () => {
+    expect(() => new CubejsServerCore(<any>{ dbType: () => 'postgres' }))
+      .toThrowError(/CreateOptions.dbType was removed in v1\.7\.0/);
   });
 
   test('Should throw error, invalid options', () => {
     const options = {
-      dbType: <DatabaseType>'mysql',
       externalDbType: <DatabaseType>'mysql',
       schemaPath: '/test/path/test/',
       basePath: '/basePath',
@@ -135,11 +123,27 @@ describe('index.test', () => {
     };
 
     expect(() => new CubejsServerCore(options))
-      .toThrowError(/"compilerCacheSize" must be greater than or equal to 0/);
+      .toThrowError(/"compilerCacheSize" must be greater than or equal to 1/);
+  });
+
+  // 0 used to validate and then get silently replaced by the default through the
+  // `|| 250` guards, which reads like a way to disable the compiler cache but isn't.
+  test('Should throw error, compilerCacheSize of 0', () => {
+    const options = {
+      externalDbType: <DatabaseType>'mysql',
+      devServer: true,
+      compilerCacheSize: 0,
+    };
+
+    expect(() => new CubejsServerCore(options))
+      .toThrowError(/"compilerCacheSize" must be greater than or equal to 1/);
   });
 
   test('Should create instance of CubejsServerCore, orchestratorOptions as func', () => {
-    const options = { dbType: <DatabaseType>'mysql', orchestratorOptions: () => <any>{} };
+    const options = {
+      driverFactory: () => <any>({ type: 'mysql' }),
+      orchestratorOptions: () => <any>{}
+    };
 
     expect(new CubejsServerCore(options))
       .toBeInstanceOf(CubejsServerCore);
@@ -160,23 +164,8 @@ describe('index.test', () => {
     return createOrchestratorApiSpy.mock.calls[0];
   };
 
-  test('dbType should return string, failure', async () => {
-    const options: CreateOptions = { dbType: () => <any>null };
-
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    const [driverFactory, orchestratorOptions] = await getCreateOrchestratorOptionsFromServer(options);
-
-    try {
-      await driverFactory('mongo');
-
-      throw new Error('driverFactory will call dbType and dbType must throw an exception');
-    } catch (e: any) {
-      expect(e.message).toEqual('Unexpected CreateOptions.dbType result type: <object>null');
-    }
-  });
-
   test('driverFactory should return driver, failure', async () => {
-    const options: CreateOptions = { dbType: () => <any>'mongo', driverFactory: () => <any>null, };
+    const options: CreateOptions = { driverFactory: () => <any>null, };
 
     const [driverFactory, _orchestratorOptions] = await getCreateOrchestratorOptionsFromServer(options);
 
@@ -190,7 +179,7 @@ describe('index.test', () => {
   });
 
   test('externalDriverFactory should return driver, failure', async () => {
-    const options: CreateOptions = { dbType: () => <any>'mongo', externalDriverFactory: () => <any>null, };
+    const options: CreateOptions = { externalDriverFactory: () => <any>null, };
 
     const [_driverFactory, orchestratorOptions] = await getCreateOrchestratorOptionsFromServer(options);
 
@@ -215,7 +204,6 @@ describe('index.test', () => {
     };
 
     const options = {
-      dbType: <any>'mysql',
       externalDbType: 'cubestore',
       schemaPath: '/test/path/test/',
       basePath: '/basePath',
@@ -224,11 +212,7 @@ describe('index.test', () => {
       devServer: false,
       apiSecret: 'randomstring',
       logger: () => {},
-      driverFactory: () => <any>{
-        setLogger: () => {},
-        testConnection: async () => {},
-        release: () => {}
-      },
+      driverFactory: () => <any>({ type: 'mysql' }),
       dialectFactory: () => {},
       externalDriverFactory: () => <any>{
         setLogger: () => {},
@@ -437,33 +421,6 @@ describe('index.test', () => {
   });
 
   describe('CompilerApi validation', () => {
-    test('Should allow both contextToRoles and contextToGroups together', () => {
-      const logger = jest.fn(() => {});
-
-      expect(() => new CompilerApi(
-        repositoryWithoutPreAggregations,
-        async () => 'mysql',
-        {
-          logger,
-          contextToRoles: async () => ['admin'],
-          contextToGroups: async () => ['analytics']
-        }
-      )).not.toThrow();
-    });
-
-    test('Should allow only contextToRoles', () => {
-      const logger = jest.fn(() => {});
-
-      expect(() => new CompilerApi(
-        repositoryWithoutPreAggregations,
-        async () => 'mysql',
-        {
-          logger,
-          contextToRoles: async () => ['admin']
-        }
-      )).not.toThrow();
-    });
-
     test('Should allow only contextToGroups', () => {
       const logger = jest.fn(() => {});
 
@@ -475,24 +432,6 @@ describe('index.test', () => {
           contextToGroups: async () => ['analytics']
         }
       )).not.toThrow();
-    });
-
-    test('contextToRoles should be called and return expected roles', async () => {
-      const logger = jest.fn(() => {});
-      const contextToRoles = jest.fn(async () => ['admin', 'manager']);
-
-      const compilerApi = new CompilerApiOpen(
-        repositoryWithoutPreAggregations,
-        async () => 'mysql',
-        {
-          logger,
-          contextToRoles
-        }
-      );
-
-      const roles = await compilerApi.getRolesFromContext({ securityContext: { userId: 123 } });
-      expect(contextToRoles).toHaveBeenCalledWith({ securityContext: { userId: 123 } });
-      expect(roles).toEqual(new Set(['admin', 'manager']));
     });
 
     test('contextToGroups should be called and return expected groups', async () => {
@@ -595,19 +534,52 @@ describe('index.test', () => {
     ]);
   });
 
-  // TODO (buntarb): This test doesn't have any sense anymore, because dbType
-  // property is deprecated and doesn't required in any mode. Need to be removed
-  test.skip('Should throw error, options are required (dev mode)', () => {
-    delete process.env.CUBEJS_API_SECRET;
+  test('Should log query values as they are in development mode by default', async () => {
+    const logger = jest.fn(() => {
+      //
+    });
+    const params = { query: { filters: [{ member: 'Orders.email', operator: 'equals', values: ['john@example.com'] }] } };
+
+    process.env.CUBEJS_DB_TYPE = 'mysql';
     process.env.CUBEJS_DEV_MODE = 'true';
 
-    expect(() => {
-      jest.spyOn(CubejsServerCoreOpen.prototype, 'isReadyForQueryProcessing').mockImplementation(() => true);
-      // eslint-disable-next-line
-      new CubejsServerCoreOpen({});
-      jest.restoreAllMocks();
-    })
-      .toThrowError(/dbType is required/);
+    const cubejsServerCore = new CubejsServerCoreOpen({ logger });
+    cubejsServerCore.logger('Load Request', params);
+    await cubejsServerCore.beforeShutdown();
+    await cubejsServerCore.shutdown();
+
+    expect(logger.mock.calls).toEqual([['Load Request', params]]);
+  });
+
+  test('Should redact query values in every log event in production by default', async () => {
+    const logger = jest.fn(() => {
+      //
+    });
+    const queryKey = ['SELECT * FROM orders WHERE email = ?', ['john@example.com'], []];
+
+    process.env.NODE_ENV = 'production';
+    process.env.CUBEJS_DB_TYPE = 'mysql';
+
+    const cubejsServerCore = new CubejsServerCoreOpen({ logger });
+    // What the gateway and the query orchestrator hand to the core logger
+    cubejsServerCore.logger('Load Request', {
+      query: { filters: [{ member: 'Orders.email', operator: 'equals', values: ['john@example.com'] }] },
+      apiType: 'rest',
+    });
+    cubejsServerCore.logger('Performing query', {
+      queryKey,
+      requestId: 'r1',
+    });
+    await cubejsServerCore.beforeShutdown();
+    await cubejsServerCore.shutdown();
+
+    expect(logger.mock.calls).toEqual([
+      ['Load Request', { query: { filters: [{ member: 'Orders.email', operator: 'equals', values: ['redacted'] }] }, apiType: 'rest' }],
+      ['Performing query', {
+        queryKey: ['SELECT * FROM orders WHERE email = ?', ['redacted'], []],
+        requestId: 'r1',
+      }],
+    ]);
   });
 
   test('Pass all required (dev mode) without apiSecret (should be autogenerated)', () => {
@@ -629,7 +601,7 @@ describe('index.test', () => {
       new CubejsServerCoreOpen({});
       jest.restoreAllMocks();
     })
-      .toThrowError('Either CUBEJS_DB_TYPE, CreateOptions.dbType or CreateOptions.driverFactory must be specified');
+      .toThrowError('Either CUBEJS_DB_TYPE or CreateOptions.driverFactory must be specified');
   });
 
   test('Should throw error, options are required (production mode with jwkUrl)', () => {
@@ -641,7 +613,7 @@ describe('index.test', () => {
       new CubejsServerCoreOpen({ jwt: { jwkUrl: 'https://test.com/j.json' } });
       jest.restoreAllMocks();
     })
-      .toThrowError('Either CUBEJS_DB_TYPE, CreateOptions.dbType or CreateOptions.driverFactory must be specified');
+      .toThrowError('Either CUBEJS_DB_TYPE or CreateOptions.driverFactory must be specified');
   });
 
   test('Pass all required props (production mode with JWK URL)', () => {
@@ -670,7 +642,7 @@ describe('index.test', () => {
       }
 
       const cubejsServerCore = new CubejsServerCoreOpen({
-        dbType: 'mysql',
+        driverFactory: () => (<any>{ type: 'mysql' }),
         apiSecret: 'secret',
         scheduledRefreshTimer: input
       });
@@ -699,7 +671,7 @@ describe('index.test', () => {
     process.env.CUBEJS_REFRESH_WORKER = 'false';
 
     const cubejsServerCore = new CubejsServerCoreOpen({
-      dbType: 'mysql',
+      driverFactory: () => (<any>{ type: 'mysql' }),
       apiSecret: 'secret',
     });
     expect(cubejsServerCore).toBeInstanceOf(CubejsServerCore);
@@ -745,7 +717,7 @@ describe('index.test', () => {
       process.env.CUBEJS_ROLLUP_ONLY = rollupOnlyMode.toString();
 
       const cubejsServerCore = new CubejsServerCoreOpen({
-        dbType: 'mysql',
+        driverFactory: () => (<any>{ type: 'mysql' }),
         apiSecret: 'secret',
         ...options,
       });
@@ -815,7 +787,7 @@ describe('index.test', () => {
     expect(options.preAggregationsOptions.externalRefresh).toEqual(false);
   });
 
-  // Cube.js can override env
+  // cube.js config can override env
   testRefreshWorkerAndRollupModes(
     {
       testName: 'Override scheduledRefreshTimer (true) & rollupOnlyMode from cube.js',
@@ -836,7 +808,7 @@ describe('index.test', () => {
     }
   );
 
-  // Cube.js can override env
+  // cube.js config can override env
   testRefreshWorkerAndRollupModes(
     {
       testName: 'Override scheduledRefreshTimer (false) & rollupOnlyMode from cube.js',
@@ -864,7 +836,7 @@ describe('index.test', () => {
     );
 
     const cubejsServerCore = new CubejsServerCoreOpen({
-      dbType: 'mysql',
+      driverFactory: () => (<any>{ type: 'mysql' }),
       apiSecret: 'secret',
       // 250ms
       scheduledRefreshTimer: 1,
@@ -964,7 +936,7 @@ describe('index.test', () => {
     let counter = 0;
 
     const cubejsServerCore = new CubejsServerCoreOpen({
-      dbType: 'mysql',
+      driverFactory: () => (<any>{ type: 'mysql' }),
       apiSecret: 'secret',
       // 250ms
       scheduledRefreshTimer: 1,

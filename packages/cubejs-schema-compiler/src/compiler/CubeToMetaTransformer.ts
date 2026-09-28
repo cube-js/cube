@@ -10,6 +10,7 @@ import {
   GranularityDefinition,
 } from './CubeSymbols';
 import { UserError } from './UserError';
+import { memoizeString } from './utils';
 import { BaseMeasure } from '../adapter';
 import type { CubeDefinitionExtended } from './CubeSymbols';
 import type { CubeValidator } from './CubeValidator';
@@ -112,7 +113,7 @@ export type LinkConfig = {
   label: string;
   dashboard?: string;
   icon?: string;
-  target: 'blank' | 'self';
+  target?: 'blank' | 'self';
   primary?: boolean;
   params?: string[];
 };
@@ -177,6 +178,13 @@ export type TransformedCube = {
   config: CubeConfig;
 };
 
+const titleize = memoizeString((name: string) => {
+  const titleized = inflection.titleize(inflection.underscore(camelCase(name, { pascalCase: true })));
+  // Capitalize common identifier acronyms so e.g. `userId` reads as "User ID"
+  // rather than "User Id" and an `id` member becomes "ID" instead of "Id".
+  return titleized.replace(/\bId(s?)\b/g, (_match, plural) => `ID${plural}`);
+});
+
 export class CubeToMetaTransformer implements CompilerInterface {
   private readonly cubeValidator: CubeValidator;
 
@@ -229,7 +237,7 @@ export class CubeToMetaTransformer implements CompilerInterface {
   protected transform(cube: CubeDefinitionExtended, _errorReporter?: ErrorReporter): TransformedCube {
     const extendedCube = cube as ExtendedCubeDefinition;
     const cubeName = extendedCube.name;
-    const cubeTitle = extendedCube.title || this.titleize(cubeName);
+    const cubeTitle = extendedCube.title || titleize(cubeName);
 
     const isCubeVisible = this.isVisible(extendedCube, true);
 
@@ -341,7 +349,7 @@ export class CubeToMetaTransformer implements CompilerInterface {
               label: link.label,
               ...(link.dashboard ? { dashboard: typeof link.dashboard === 'function' ? link.dashboard() : link.dashboard } : {}),
               icon: link.icon,
-              target: link.target || 'blank',
+              ...(link.target ? { target: link.target } : {}),
               ...(link.primary ? { primary: true } : {}),
               ...(link.params && Array.isArray(link.params) && link.params.length > 0
                 ? { params: link.params.map((p: any) => (typeof p.key === 'function' ? p.key() : p.key)) }
@@ -435,6 +443,7 @@ export class CubeToMetaTransformer implements CompilerInterface {
     const isCumulative = extendedMetricDef.cumulative || BaseMeasure.isCumulative(extendedMetricDef);
 
     const drillMembersGrouped: { measures: string[]; dimensions: string[] } = { measures: [], dimensions: [] };
+
     for (const member of drillMembersArray) {
       if (this.cubeEvaluator.isMeasure(member)) {
         drillMembersGrouped.measures.push(member);
@@ -468,15 +477,8 @@ export class CubeToMetaTransformer implements CompilerInterface {
   private title(cubeTitle: string, nameToDef: [string, any], short: boolean): string {
     const prefix = short ? '' : `${cubeTitle} `;
     const def = nameToDef[1] as ExtendedCubeSymbolDefinition;
-    const suffix = def.title || this.titleize(nameToDef[0]);
+    const suffix = def.title || titleize(nameToDef[0]);
     return `${prefix}${suffix}`;
-  }
-
-  private titleize(name: string): string {
-    const titleized = inflection.titleize(inflection.underscore(camelCase(name, { pascalCase: true })));
-    // Capitalize common identifier acronyms so e.g. `userId` reads as "User ID"
-    // rather than "User Id" and an `id` member becomes "ID" instead of "Id".
-    return titleized.replace(/\bId(s?)\b/g, (_match, plural) => `ID${plural}`);
   }
 
   private transformDimensionFormat({ format: formatOrName, type }: ExtendedCubeSymbolDefinition): DimensionFormat | undefined {

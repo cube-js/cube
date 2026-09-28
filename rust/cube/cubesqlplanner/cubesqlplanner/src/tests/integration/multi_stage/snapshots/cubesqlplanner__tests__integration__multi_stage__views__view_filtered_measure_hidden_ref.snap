@@ -1,0 +1,9 @@
+---
+source: cubesqlplanner/cubesqlplanner/src/tests/integration/multi_stage/views.rs
+expression: result
+---
+orders_ms_view__status | orders_ms_view__amount_filtered_hidden
+-----------------------+---------------------------------------
+cancelled              | 100.00                                
+completed              | 600.00                                
+pending                | 180.00

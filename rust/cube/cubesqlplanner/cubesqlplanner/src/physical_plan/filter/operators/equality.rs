@@ -9,10 +9,10 @@ impl FilterOperationSql for EqualityOp {
         let need_null_check = self.negated;
         if self.negated {
             ctx.plan_templates
-                .not_equals(ctx.member_sql.to_string(), param, need_null_check)
+                .not_equals(ctx.member_sql().to_string(), param, need_null_check)
         } else {
             ctx.plan_templates
-                .equals(ctx.member_sql.to_string(), param, false)
+                .equals(ctx.member_sql().to_string(), param, false)
         }
     }
 }

@@ -33,20 +33,20 @@ cube('Orders', {
 
   accessPolicy: [
     {
-      role: '*',
+      group: '*',
       memberLevel: {
         includes: [],
       },
     },
     {
-      role: 'tenant-a',
+      group: 'tenant-a',
       memberLevel: {
         includes: '*',
         excludes: ['tier'],
       },
     },
     {
-      role: 'tenant-b',
+      group: 'tenant-b',
       memberLevel: {
         includes: '*',
         excludes: ['internalCode'],

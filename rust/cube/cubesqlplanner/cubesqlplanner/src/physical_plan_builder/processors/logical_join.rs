@@ -1,6 +1,6 @@
 use super::super::{LogicalNodeProcessor, ProcessableNode, PushDownBuilderContext};
 use crate::logical_plan::LogicalJoin;
-use crate::physical_plan::{From, JoinBuilder, JoinCondition};
+use crate::physical_plan::{From, JoinBuilder, JoinCondition, SingleSource};
 use crate::physical_plan_builder::PhysicalPlanBuilder;
 use crate::planner::SqlJoinCondition;
 use cubenativeutils::CubeError;
@@ -38,6 +38,7 @@ impl<'a> LogicalNodeProcessor<'a, LogicalJoin> for LogicalJoinProcessor<'a> {
         let root = logical_join.root().clone().unwrap().cube().clone();
         if logical_join.joins().is_empty()
             && logical_join.dimension_subqueries().is_empty()
+            && logical_join.subquery_joins().is_empty()
             && multi_stage_dimension.is_none()
         {
             Ok(From::new_from_cube(
@@ -61,6 +62,7 @@ impl<'a> LogicalNodeProcessor<'a, LogicalJoin> for LogicalJoinProcessor<'a> {
                     context,
                 )?;
             }
+
             for join in logical_join.joins().iter() {
                 join_builder.left_join_cube(
                     join.cube().cube().clone(),
@@ -83,6 +85,7 @@ impl<'a> LogicalNodeProcessor<'a, LogicalJoin> for LogicalJoinProcessor<'a> {
                     )?;
                 }
             }
+
             if let Some(multi_stage_dimension) = &multi_stage_dimension {
                 self.builder.add_multistage_dimension_join(
                     multi_stage_dimension,
@@ -90,6 +93,25 @@ impl<'a> LogicalNodeProcessor<'a, LogicalJoin> for LogicalJoinProcessor<'a> {
                     &context,
                 )?;
             }
+
+            for subquery_join in logical_join.subquery_joins().iter() {
+                let source = SingleSource::RawSubquerySql(subquery_join.sql.clone());
+                let on = JoinCondition::new_base_join(SqlJoinCondition::try_new(
+                    subquery_join.on_sql.clone(),
+                )?);
+
+                if subquery_join.join_type.eq_ignore_ascii_case("INNER") {
+                    join_builder.inner_join_source(source, subquery_join.alias.clone(), on);
+                } else if subquery_join.join_type.eq_ignore_ascii_case("LEFT") {
+                    join_builder.left_join_source(source, subquery_join.alias.clone(), on);
+                } else {
+                    return Err(CubeError::user(format!(
+                        "Unsupported join type '{}' for sub-query join, expected INNER or LEFT",
+                        subquery_join.join_type
+                    )));
+                }
+            }
+
             Ok(From::new_from_join(join_builder.build()))
         }
     }

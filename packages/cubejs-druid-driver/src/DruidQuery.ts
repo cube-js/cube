@@ -12,10 +12,13 @@ const GRANULARITY_TO_INTERVAL: Record<string, (date: string) => string> = {
 };
 
 class DruidFilter extends BaseFilter {
+  // Druid's LIKE has no default escape character, so the clause is what makes
+  // the wildcard escaping applied to the value mean anything. It honours the
+  // clause on a CONCAT(...) pattern, which druid-driver.test.ts checks by values.
   public likeIgnoreCase(column, not, param, type: string) {
     const p = (!type || type === 'contains' || type === 'ends') ? '%' : '';
     const s = (!type || type === 'contains' || type === 'starts') ? '%' : '';
-    return `LOWER(${column})${not ? ' NOT' : ''} LIKE CONCAT('${p}', LOWER(${this.allocateParam(param)}), '${s}')`;
+    return `LOWER(${column})${not ? ' NOT' : ''} LIKE CONCAT('${p}', LOWER(${this.allocateParam(param)}), '${s}') ESCAPE '\\'`;
   }
 }
 
@@ -33,7 +36,7 @@ export class DruidQuery extends BaseQuery {
   }
 
   public subtractInterval(date: string, interval: string) {
-    return `(${date} + INTERVAL ${interval})`;
+    return `(${date} - INTERVAL ${interval})`;
   }
 
   public addInterval(date: string, interval: string) {
@@ -50,5 +53,34 @@ export class DruidQuery extends BaseQuery {
 
   public nowTimestampSql(): string {
     return 'CURRENT_TIMESTAMP';
+  }
+
+  public sqlTemplates() {
+    const templates = super.sqlTemplates();
+
+    // Druid doesn't support ILIKE, so case-insensitive matching is emulated with LOWER(...) LIKE CONCAT(...)
+    // `default_escape` means the pushed-down LIKE carried no ESCAPE of its own, so it keeps
+    // Postgres' backslash - which Druid does not default to and has to be told.
+    templates.expressions.like = '{{ expr }} {% if negated %}NOT {% endif %}LIKE {{ pattern }}{% if default_escape %} ESCAPE \'\\\'{% endif %}';
+    templates.expressions.ilike = 'LOWER({{ expr }}) {% if negated %}NOT {% endif %}LIKE LOWER({{ pattern }}){% if default_escape %} ESCAPE \'\\\'{% endif %}';
+    // Timestamp constants arrive as ISO-8601 UTC strings ('2021-01-01T00:00:00.000Z');
+    // TIME_PARSE without a pattern parses ISO-8601, which is also Druid's native
+    // timestamp format. The base template renders the value bare, which is invalid
+    // syntax
+    templates.expressions.timestamp_literal = 'TIME_PARSE(\'{{ value }}\')';
+    templates.filters.like_pattern = 'CONCAT({% if start_wild %}\'%\'{% else %}\'\'{% endif %}, LOWER({{ value }}), {% if end_wild %}\'%\'{% else %}\'\'{% endif %})';
+    // Same escape clause as DruidFilter.likeIgnoreCase; it cannot go inside
+    // `like_pattern`, whose pattern is wrapped in CONCAT(...).
+    templates.tesseract.ilike = 'LOWER({{ expr }}) {% if negated %}NOT {% endif %}LIKE {{ pattern }} ESCAPE \'\\\'';
+    // Druid evaluates CURRENT_TIMESTAMP in the sqlTimeZone query context, which
+    // defaults to UTC — assumes the connection does not override sqlTimeZone
+    templates.functions.UTCTIMESTAMP = 'CURRENT_TIMESTAMP';
+    delete templates.functions.WIDTH_BUCKET;
+
+    // Druid only accepts set operations in narrow forms and has no UNION of distinct rows,
+    // so the SQL API leaves them to post processing here.
+    delete templates.statements.union;
+
+    return templates;
   }
 }

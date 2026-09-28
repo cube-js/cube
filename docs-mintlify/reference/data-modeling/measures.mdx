@@ -380,8 +380,7 @@ a measure. A measure can only have one type.
 <Warning>
 
 The `number_agg` type is only available in Tesseract, the [next-generation data modeling
-engine][link-tesseract]. Tesseract is currently in preview. Use the
-[`CUBEJS_TESSERACT_SQL_PLANNER`](/reference/configuration/environment-variables#cubejs_tesseract_sql_planner) environment variable to enable it.
+engine][link-tesseract]. In versions before v1.7.0, it was not enabled by default.
 
 </Warning>
 
@@ -462,11 +461,77 @@ with a provided date range. It is used to calculate the minimum and maximum valu
 for the series of time windows.
 
 With Tesseract, the [next-generation data modeling engine][link-tesseract],
-rolling window calculations don't require the date range for the time dimension.
-Tesseract is currently in preview. Use the [`CUBEJS_TESSERACT_SQL_PLANNER`](/reference/configuration/environment-variables#cubejs_tesseract_sql_planner)
-environment variable to enable it.
+rolling window calculations don't require the date range for the time dimension. In versions before v1.7.0, Tesseract was not enabled by default.
+
+Omitting the date range requires the data source to generate the time series in
+SQL. It is supported for Amazon Athena, Databricks, Google BigQuery, Microsoft SQL
+Server, Postgres, Presto, Snowflake, and Trino, as well as for MySQL with the
+`CUBEJS_DB_MYSQL_USE_GENERATED_TIME_SERIES` environment variable set. With other
+data sources, and with [custom granularities][ref-custom-granularities] on Google
+BigQuery, Microsoft SQL Server, and Snowflake, the date range is still required.
 
 </Warning>
+
+#### `type` and `granularity`
+
+Set `type` to `to_date` to accumulate from the start of the period that contains each
+data point, instead of over a window of fixed size. A `to_date` window also requires
+`granularity`, which names that period: a default granularity such as `week`, `month`,
+`quarter`, or `year`, or a [custom granularity][ref-custom-granularities]. Omitting it
+fails validation.
+
+<Warning>
+
+A custom granularity here is only available in Tesseract, the [next-generation data
+modeling engine][link-tesseract]. In versions before v1.7.0, it was not enabled by
+default. Without Tesseract, the model still compiles and the query fails.
+
+</Warning>
+
+<CodeGroup>
+
+```yaml title="YAML"
+cubes:
+  - name: orders
+    # ...
+
+    measures:
+      - name: revenue_year_to_date
+        sql: amount
+        type: sum
+        rolling_window:
+          type: to_date
+          granularity: year
+```
+
+```javascript title="JavaScript"
+cube(`orders`, {
+  // ...
+
+  measures: {
+    revenue_year_to_date: {
+      sql: `amount`,
+      type: `sum`,
+      rolling_window: {
+        type: `to_date`,
+        granularity: `year`
+      }
+    }
+  }
+})
+```
+
+</CodeGroup>
+
+A window of type `to_date` takes none of the `offset`, `trailing`, or `leading`
+parameters documented below; those apply to fixed-size windows, which are selected by
+`type: fixed` — the default when `type` is omitted. To apply the same
+period-to-date logic across many measures without writing each one by hand, see
+[reusing period-to-date logic][ref-recipe-period-to-date].
+
+The `year_to_date`, `quarter_to_date`, and `month_to_date` types are deprecated. On the
+legacy planner they are equivalent to `to_date` with the matching `granularity`.
+Tesseract does not recognize them. Use `to_date` with an explicit `granularity`.
 
 #### `offset`
 
@@ -689,6 +754,11 @@ measures: {
 | `exclude` | Query dimensions minus listed | Query dimensions |
 | `include` | Query dimensions plus listed | Query dimensions |
 
+`grain` applies to the measure it's declared on and does not expose the added
+dimension to a measure built on top of it. When a measure combines several
+other multi-stage measures at a shared grain, declare `grain` on the
+combining measure — see [nested aggregates][ref-nested-aggregate].
+
 <Note>
 
 `grain` replaces the standalone `group_by`, `reduce_by`, and `add_group_by` parameters,
@@ -724,13 +794,6 @@ stage.
 This is commonly used for "share of total" calculations where the denominator
 must ignore a filter applied by the query — for example, computing each status's
 share of the per-category total while the query is filtered to a single status.
-
-<Note>
-
-The `filter` parameter requires the [Tesseract SQL planner][ref-tesseract-env]
-(`CUBEJS_TESSERACT_SQL_PLANNER=true`).
-
-</Note>
 
 <CodeGroup>
 
@@ -1186,14 +1249,14 @@ calculated based on the value of a [`switch` dimension][ref-switch-dimensions].
 <Warning>
 
 `case` measures are powered by Tesseract, the [next-generation data modeling
-engine][link-tesseract]. Tesseract is currently in preview. Use the
-[`CUBEJS_TESSERACT_SQL_PLANNER`](/reference/configuration/environment-variables#cubejs_tesseract_sql_planner) environment variable to enable it.
+engine][link-tesseract]. In versions before v1.7.0, it was not enabled by default.
 
 </Warning>
 
 You do not need to include the [`sql` parameter](#sql) if the `case` parameter is used.
 However, the [`multi_stage` parameter](#multi_stage) must be set to `true` for `case`
-measures.
+measures, and an `else` branch is required to provide the value when the `switch`
+dimension matches none of the `when` clauses.
 
 <CodeGroup>
 
@@ -1293,6 +1356,13 @@ cube(`orders`, {
 ```
 
 </CodeGroup>
+
+When `case` measures span multiple cubes, define the `switch` dimension on a
+single shared cube joined into every fact cube, rather than defining a separate
+one on each cube. All `case` measures then dispatch on the same dimension, so one
+filter resolves every measure. With a `switch` dimension per cube, a single
+filter pins only one of them; the others fall back to their full set of values,
+and each value emits its own row — so the query returns extra rows.
 
 ### `format`
 
@@ -1491,8 +1561,8 @@ cube(`orders`, {
 [ref-ai-context]: /docs/data-modeling/ai-context
 [ref-ref-cubes]: /reference/data-modeling/cube
 [ref-schema-ref-types-formats-measures-formats]: /reference/data-modeling/measures#format
-[ref-drilldowns]: /reference/recipes/drilldowns
-[ref-naming]: /docs/data-modeling/syntax#naming
+[ref-drilldowns]: /recipes/core-data-api/drilldowns
+[ref-naming]: /docs/data-modeling/concepts/syntax#naming
 [ref-playground]: /docs/explore-analyze/playground
 [ref-apis]: /reference
 [ref-rolling-window]: /docs/data-modeling/measures#rolling-windows
@@ -1502,10 +1572,11 @@ cube(`orders`, {
 [ref-nested-aggregate]: /docs/data-modeling/measures#nested-aggregates
 [ref-calendar-cubes]: /docs/data-modeling/concepts/calendar-cubes
 [ref-switch-dimensions]: /reference/data-modeling/dimensions#type
-[ref-tesseract-env]: /reference/configuration/environment-variables#cubejs_tesseract_sql_planner
+[ref-custom-granularities]: /reference/data-modeling/dimensions#granularities
 [ref-filters-query]: /reference/core-data-apis/rest-api/query-format#filters-format
 [ref-data-masking]: /docs/data-modeling/data-access-policies#data-masking
 [link-d3-format]: https://d3js.org/d3-format
 [link-iso-4217]: https://en.wikipedia.org/wiki/ISO_4217
 [ref-calculated-measures]: /docs/data-modeling/measures#calculated-measures
 [ref-schema-ref-preaggs-rollup]: /reference/data-modeling/pre-aggregations#rollup
+[ref-recipe-period-to-date]: /recipes/data-modeling/reusable-period-to-date

@@ -8,6 +8,7 @@ import {
   getEnv,
   assertDataSource,
   checkNonNullable,
+  formatAnsi,
   pausePromise,
   Required,
   MaybeCancelablePromise,
@@ -35,7 +36,6 @@ import {
   DownloadQueryResultsResult,
   DownloadQueryResultsOptions,
 } from '@cubejs-backend/base-driver';
-import * as SqlString from 'sqlstring';
 import { AthenaClientConfig } from '@aws-sdk/client-athena/dist-types/AthenaClient';
 import { fromTemporaryCredentials } from '@aws-sdk/credential-providers';
 import { URL } from 'url';
@@ -67,8 +67,8 @@ export interface AthenaQueryId {
   QueryExecutionId: string;
 }
 
-function applyParams(query: string, params: any[]): string {
-  return SqlString.format(query, params);
+export function applyParams(query: string, params: unknown[]): string {
+  return formatAnsi(query, params);
 }
 
 interface AthenaTable {
@@ -280,6 +280,7 @@ export class AthenaDriver extends BaseDriver implements DriverInterface {
       const iter = this.lazyRowIterator(qid, query, true);
       const types = <TableStructure><unknown>((await iter.next()).value);
       const rows: Row[] = [];
+
       for await (const row of iter) {
         if (cancelled) throw new Error('Query was cancelled');
         rows.push(<Row>row);
@@ -362,6 +363,7 @@ export class AthenaDriver extends BaseDriver implements DriverInterface {
       }
       await this.waitForSuccess(qid, () => cancelled);
       const rows: R[] = [];
+
       for await (const row of this.lazyRowIterator<R>(qid, query)) {
         if (cancelled) throw new Error('Query was cancelled');
         rows.push(row);
@@ -390,6 +392,7 @@ export class AthenaDriver extends BaseDriver implements DriverInterface {
   ): AsyncGenerator<R> {
     let isFirstBatch = true;
     let columnInfo: { Name: string }[] = [];
+
     for (
       let results: GetQueryResultsCommandOutput | undefined =
         await this.athena.getQueryResults(qid);
@@ -415,6 +418,7 @@ export class AthenaDriver extends BaseDriver implements DriverInterface {
             results.ResultSet?.ResultSetMetadata?.ColumnInfo,
           ).map(info => ({ Name: checkNonNullable('Name', info.Name) }));
       }
+
       for (const row of rows) {
         const fields: Record<string, any> = {};
         columnInfo
@@ -588,12 +592,7 @@ export class AthenaDriver extends BaseDriver implements DriverInterface {
   }
 
   protected async startQuery(query: string, values: unknown[]): Promise<AthenaQueryId> {
-    const queryString = applyParams(
-      query,
-      (values || []).map(s => (typeof s === 'string' ? {
-        toSqlString: () => SqlString.escape(s).replace(/\\\\([_%])/g, '\\$1').replace(/\\'/g, '\'\'')
-      } : s))
-    );
+    const queryString = applyParams(query, values || []);
     const request: StartQueryExecutionCommandInput = {
       QueryString: queryString,
       WorkGroup: this.config.workGroup,
@@ -628,6 +627,7 @@ export class AthenaDriver extends BaseDriver implements DriverInterface {
 
   protected async waitForSuccess(qid: AthenaQueryId, isCancelled?: () => boolean): Promise<void> {
     const startedTime = Date.now();
+
     for (let i = 0; Date.now() - startedTime <= this.config.pollTimeout; i++) {
       if (isCancelled?.()) {
         throw new Error('Query was cancelled');

@@ -1,0 +1,24 @@
+---
+source: cubesqlplanner/cubesqlplanner/src/tests/integration/ungrouped_forms.rs
+expression: result
+---
+orders__status | customers__count | orders__count
+---------------+------------------+--------------
+cancelled      | NULL             | 1            
+completed      | 1                | 1            
+completed      | 1                | 1            
+completed      | 1                | 1            
+completed      | 1                | 1            
+completed      | 1                | 1            
+completed      | 1                | 1            
+completed      | 1                | 1            
+completed      | 1                | 1            
+completed      | 1                | 1            
+completed      | 1                | 1            
+completed      | 1                | 1            
+completed      | 1                | 1            
+completed      | 1                | 1            
+completed      | 1                | 1            
+completed      | 1                | 1            
+completed      | 1                | 1            
+pending        | 1                | 1

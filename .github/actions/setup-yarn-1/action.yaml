@@ -1,0 +1,21 @@
+name: 'Setup Yarn'
+description: 'Pin Yarn to the given version, skipping the download when the runner already has it'
+inputs:
+  version:
+    description: 'Yarn version'
+    default: '1.22.22'
+runs:
+  using: "composite"
+  steps:
+    - name: Set Yarn version
+      shell: bash
+      env:
+        YARN_VERSION: ${{ inputs.version }}
+      run: |
+        # set-version downloads from GitHub Releases, which intermittently returns 5xx
+        [ "$(yarn --version)" = "$YARN_VERSION" ] && exit 0
+        for i in 1 2 3; do
+          yarn policies set-version "v$YARN_VERSION" && exit 0
+          sleep $((i * 15))
+        done
+        exit 1

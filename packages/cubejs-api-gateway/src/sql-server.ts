@@ -347,7 +347,7 @@ export class SQLServer {
         allowedUser = 'cube';
 
         displayCLIWarning(
-          'Option sqlUser is required in production mode. Cube.js will use \'cube\' as a default username.'
+          'Option sqlUser is required in production mode. Cube will use \'cube\' as a default username.'
         );
       }
 
@@ -355,7 +355,7 @@ export class SQLServer {
         allowedPassword = crypto.randomBytes(16).toString('hex');
 
         displayCLIWarning(
-          `Option sqlPassword is required in production mode. Cube.js has generated it as '${allowedPassword}'`
+          `Option sqlPassword is required in production mode. Cube has generated it as '${allowedPassword}'`
         );
       }
     }

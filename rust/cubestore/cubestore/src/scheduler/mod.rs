@@ -1,12 +1,12 @@
 use crate::cluster::{pick_import_worker, pick_worker_by_ids, Cluster};
-use crate::config::ConfigObj;
+use crate::config::{ConfigObj, RepartitionStrategy};
 use crate::metastore::chunks::chunk_file_name;
 use crate::metastore::job::{Job, JobStatus, JobType};
 use crate::metastore::partition::partition_file_name;
 use crate::metastore::replay_handle::ReplayHandle;
 use crate::metastore::replay_handle::{
     subtract_from_right_seq_pointer_by_location, subtract_if_covers_seq_pointer_by_location,
-    union_seq_pointer_by_location, SeqPointerForLocation,
+    union_seq_pointer_by_location, SeqPointer, SeqPointerForLocation,
 };
 use crate::metastore::table::Table;
 use crate::metastore::{
@@ -51,6 +51,9 @@ pub struct SchedulerImpl {
     // Serializes load-aware import placement so concurrent CREATE TABLE events don't read
     // the same in-flight counts and pile onto the same worker before either job is scheduled.
     import_placement_lock: Mutex<()>,
+    // Short-TTL memo of the inactive parents still draining (range repartition), so the GC
+    // loop doesn't re-scan the whole chunk table on every cycle just to gate their deletion.
+    repartition_parents_cache: Mutex<Option<(Instant, Arc<HashSet<u64>>)>>,
 }
 
 crate::di_service!(SchedulerImpl, []);
@@ -107,7 +110,35 @@ impl SchedulerImpl {
             node_last_actions: Mutex::new(workers),
             chunk_processing_loop: WorkerLoop::new("ChunkProcessing"),
             import_placement_lock: Mutex::new(()),
+            repartition_parents_cache: Mutex::new(None),
         }
+    }
+
+    // Inactive parents that still have active chunks (range repartition in progress),
+    // memoized with a short TTL. The GC loop consults this to keep such parents' inactive
+    // chunks until they fully drain; the underlying query scans the chunk table, so caching
+    // avoids re-scanning it on every GC cycle. Staleness up to the TTL is harmless: the
+    // actual chunk deletion is already delayed by not_used_timeout.
+    async fn draining_repartition_parents(&self) -> Result<Arc<HashSet<u64>>, CubeError> {
+        const TTL: Duration = Duration::from_secs(5);
+        {
+            let guard = self.repartition_parents_cache.lock().await;
+            if let Some((at, set)) = guard.as_ref() {
+                if at.elapsed() < TTL {
+                    return Ok(set.clone());
+                }
+            }
+        }
+        let set = Arc::new(
+            self.meta_store
+                .all_inactive_partitions_to_repartition()
+                .await?
+                .into_iter()
+                .map(|p| p.get_id())
+                .collect::<HashSet<u64>>(),
+        );
+        *self.repartition_parents_cache.lock().await = Some((Instant::now(), set.clone()));
+        Ok(set)
     }
 
     pub fn spawn_processing_loops(self: Arc<Self>) -> Vec<JoinHandle<Result<(), CubeError>>> {
@@ -481,67 +512,85 @@ impl SchedulerImpl {
             .into_iter()
             .chunk_by(|(h, _)| h.get_row().table_id())
         {
-            let mut seq_pointer_by_location = None;
-            let mut ids = Vec::new();
             let handles = handles.collect::<Vec<_>>();
-            for (handle, _) in handles
-                .iter()
-                .filter(|(handle, no_active_chunks)| !is_newest_handle(handle) && *no_active_chunks)
-            {
-                union_seq_pointer_by_location(
-                    &mut seq_pointer_by_location,
-                    handle.get_row().seq_pointers_by_location(),
-                )?;
-                ids.push(handle.get_id());
-            }
             let empty_vec = Vec::new();
             let failed = table_to_failed.get(&table_id).unwrap_or(&empty_vec);
 
-            for (failed_handle, no_active_chunks) in failed.iter() {
-                let mut failed_seq_pointers =
-                    failed_handle.get_row().seq_pointers_by_location().clone();
-                let mut replay_after_failed_union = None;
-                let replay_after_failed = handles
-                    .iter()
-                    .filter(|(h, _)| {
-                        h.get_id() > failed_handle.get_id()
-                            && !h.get_row().has_failed_to_persist_chunks()
-                    })
-                    .collect::<Vec<_>>();
-                for (replay, _) in replay_after_failed.iter() {
-                    union_seq_pointer_by_location(
-                        &mut replay_after_failed_union,
-                        replay.get_row().seq_pointers_by_location(),
-                    )?;
-                }
-                subtract_if_covers_seq_pointer_by_location(
-                    &mut failed_seq_pointers,
-                    &replay_after_failed_union,
-                )?;
-                let empty_seq_pointers = failed_seq_pointers
-                    .map(|p| {
-                        p.iter()
-                            .all(|p| p.as_ref().map(|p| p.is_empty()).unwrap_or(true))
-                    })
-                    .unwrap_or(true);
-                if empty_seq_pointers && *no_active_chunks {
-                    ids.push(failed_handle.get_id());
-                } else if !empty_seq_pointers {
-                    subtract_from_right_seq_pointer_by_location(
-                        &mut seq_pointer_by_location,
-                        failed_handle.get_row().seq_pointers_by_location(),
-                    )?;
+            // Isolate per-table merge: a corrupt handle (e.g. seq pointer / location
+            // length mismatch) must not abort merging of the remaining tables.
+            let table_merge =
+                (|| -> Result<(Vec<u64>, Option<Vec<Option<SeqPointer>>>), CubeError> {
+                    let mut seq_pointer_by_location = None;
+                    let mut ids = Vec::new();
+                    for (handle, _) in handles.iter().filter(|(handle, no_active_chunks)| {
+                        !is_newest_handle(handle) && *no_active_chunks
+                    }) {
+                        union_seq_pointer_by_location(
+                            &mut seq_pointer_by_location,
+                            handle.get_row().seq_pointers_by_location(),
+                        )?;
+                        ids.push(handle.get_id());
+                    }
+
+                    for (failed_handle, no_active_chunks) in failed.iter() {
+                        let mut failed_seq_pointers =
+                            failed_handle.get_row().seq_pointers_by_location().clone();
+                        let mut replay_after_failed_union = None;
+                        let replay_after_failed = handles
+                            .iter()
+                            .filter(|(h, _)| {
+                                h.get_id() > failed_handle.get_id()
+                                    && !h.get_row().has_failed_to_persist_chunks()
+                            })
+                            .collect::<Vec<_>>();
+                        for (replay, _) in replay_after_failed.iter() {
+                            union_seq_pointer_by_location(
+                                &mut replay_after_failed_union,
+                                replay.get_row().seq_pointers_by_location(),
+                            )?;
+                        }
+                        subtract_if_covers_seq_pointer_by_location(
+                            &mut failed_seq_pointers,
+                            &replay_after_failed_union,
+                        )?;
+                        let empty_seq_pointers = failed_seq_pointers
+                            .map(|p| {
+                                p.iter()
+                                    .all(|p| p.as_ref().map(|p| p.is_empty()).unwrap_or(true))
+                            })
+                            .unwrap_or(true);
+                        if empty_seq_pointers && *no_active_chunks {
+                            ids.push(failed_handle.get_id());
+                        } else if !empty_seq_pointers {
+                            subtract_from_right_seq_pointer_by_location(
+                                &mut seq_pointer_by_location,
+                                failed_handle.get_row().seq_pointers_by_location(),
+                            )?;
+                        }
+                    }
+
+                    Ok((ids, seq_pointer_by_location))
+                })();
+
+            match table_merge {
+                Ok(merge) => to_merge.push(merge),
+                Err(e) => {
+                    error!("Skipping replay handle merge for table {}: {}", table_id, e);
+                    continue;
                 }
             }
-
-            to_merge.push((ids, seq_pointer_by_location));
         }
 
         for (ids, seq_pointer_by_location) in to_merge.into_iter() {
             if !ids.is_empty() {
-                self.meta_store
+                if let Err(e) = self
+                    .meta_store
                     .replace_replay_handles(ids, seq_pointer_by_location)
-                    .await?;
+                    .await
+                {
+                    error!("Skipping replay handle merge: {}", e);
+                    continue;
+                }
             }
         }
 
@@ -633,8 +682,20 @@ impl SchedulerImpl {
         if !persistent_inactive.is_empty() {
             let seconds = self.config.not_used_timeout();
             let deadline = Instant::now() + Duration::from_secs(seconds);
+            // Range-based repartition slices an inactive parent over ALL its chunks
+            // (active and inactive) so the [start, end] ranges stay pinned to chunk ids.
+            // While such a parent is still draining, keep its inactive chunks: deleting
+            // them would shift the slicing boundaries on the next re-slice. Once the
+            // parent has no active chunks it is no longer in this set and its inactive
+            // chunks are collected normally.
+            let keep_parents = if self.config.repartition_strategy() == RepartitionStrategy::Range {
+                self.draining_repartition_parents().await?
+            } else {
+                Arc::new(HashSet::new())
+            };
             let ids = persistent_inactive
                 .iter()
+                .filter(|c| !keep_parents.contains(&c.get_row().get_partition_id()))
                 .map(|c| c.get_id())
                 .collect::<Vec<_>>();
             for part in ids.as_slice().chunks(10000) {
@@ -859,20 +920,25 @@ impl SchedulerImpl {
         }
         if let MetaStoreEvent::DeleteJob(job) = event {
             match job.get_row().job_type() {
-                JobType::RepartitionChunk => match job.get_row().row_reference() {
-                    RowKey::Table(TableId::Chunks, c) => {
-                        let c = self.meta_store.get_chunk(*c).await?;
-                        let p = self
-                            .meta_store
-                            .get_partition(c.get_row().get_partition_id())
-                            .await?;
-                        self.schedule_repartition_if_needed(&p).await?
+                JobType::RepartitionChunk | JobType::RepartitionRange(_) => {
+                    match job.get_row().row_reference() {
+                        RowKey::Table(TableId::Chunks, c) => {
+                            let c = self.meta_store.get_chunk(*c).await?;
+                            let p = self
+                                .meta_store
+                                .get_partition(c.get_row().get_partition_id())
+                                .await?;
+                            // Re-slice the parent: drains any range whose job has not run
+                            // yet and picks up a tail chunk that landed after the previous
+                            // slicing (re-slicing is id-pinned, so existing ranges dedup).
+                            self.schedule_repartition_if_needed(&p).await?
+                        }
+                        _ => panic!(
+                            "Unexpected row reference: {:?}",
+                            job.get_row().row_reference()
+                        ),
                     }
-                    _ => panic!(
-                        "Unexpected row reference: {:?}",
-                        job.get_row().row_reference()
-                    ),
-                },
+                }
                 JobType::MultiPartitionSplit => match job.get_row().row_reference() {
                     RowKey::Table(TableId::MultiPartitions, m) => {
                         self.schedule_finish_multi_split_if_needed(*m).await?
@@ -1175,6 +1241,32 @@ impl SchedulerImpl {
         self.cluster.schedule_repartition(p).await
     }
 
+    // Stateless hash placement of (table_id, location). Empty counts make every worker tie,
+    // so pick_import_worker degenerates to the plain hash pick.
+    async fn schedule_import_jobs_hashed(
+        &self,
+        table_id: u64,
+        locations: &[&String],
+    ) -> Result<(), CubeError> {
+        let empty = HashMap::new();
+        for &l in locations {
+            let node = pick_import_worker(self.config.as_ref(), table_id, l, &empty);
+            let job = self
+                .meta_store
+                .add_job(Job::new(
+                    RowKey::Table(TableId::Tables, table_id),
+                    JobType::TableImportCSV(l.clone()),
+                    node.clone(),
+                ))
+                .await?;
+            if job.is_some() {
+                // TODO queue failover
+                self.cluster.notify_job_runner(node).await?;
+            }
+        }
+        Ok(())
+    }
+
     async fn schedule_table_import(
         &self,
         table_id: u64,
@@ -1185,25 +1277,26 @@ impl SchedulerImpl {
             return Ok(());
         }
 
+        // Stream imports are long-lived and run on a separate pool; they need stable,
+        // deterministic placement, so they always use plain hash placement and are never
+        // affected by load-aware placement, which targets bursty CSV file imports only.
+        let (csv_locations, stream_locations): (Vec<&String>, Vec<&String>) = locations
+            .iter()
+            .copied()
+            .partition(|&l| !Table::is_stream_location(l));
+
+        self.schedule_import_jobs_hashed(table_id, &stream_locations)
+            .await?;
+
+        // Stream-only tables (the common reconcile path) have nothing left to place; skip the
+        // load-aware lock and the in_flight_import_jobs_by_node scan entirely.
+        if csv_locations.is_empty() {
+            return Ok(());
+        }
+
         if !self.config.load_aware_import_placement_enabled() {
-            // Default: stateless hash placement of (table_id, location). Empty counts make
-            // every worker tie, so pick_import_worker degenerates to the plain hash pick.
-            let empty = HashMap::new();
-            for &l in locations {
-                let node = pick_import_worker(self.config.as_ref(), table_id, l, &empty);
-                let job = self
-                    .meta_store
-                    .add_job(Job::new(
-                        RowKey::Table(TableId::Tables, table_id),
-                        JobType::TableImportCSV(l.clone()),
-                        node.clone(),
-                    ))
-                    .await?;
-                if job.is_some() {
-                    // TODO queue failover
-                    self.cluster.notify_job_runner(node).await?;
-                }
-            }
+            self.schedule_import_jobs_hashed(table_id, &csv_locations)
+                .await?;
             return Ok(());
         }
 
@@ -1222,7 +1315,7 @@ impl SchedulerImpl {
                 );
             }
             let mut counts = self.meta_store.in_flight_import_jobs_by_node().await?;
-            for &l in locations {
+            for &l in &csv_locations {
                 let node = pick_import_worker(self.config.as_ref(), table_id, l, &counts);
                 let job = self
                     .meta_store
@@ -1640,10 +1733,58 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn schedule_table_import_hash_placement_by_default() {
+    async fn schedule_table_import_stream_ignores_load_aware() {
+        let config =
+            Config::test("schedule_table_import_stream_load_aware").update_config(|mut c| {
+                c.select_workers = (0..4).map(|i| format!("worker{}", i)).collect();
+                c.load_aware_import_placement_enabled = true;
+                c
+            });
+        let (meta_store, scheduler) = test_scheduler(
+            "schedule_table_import_stream_load_aware",
+            config.config_obj(),
+        );
+        meta_store
+            .create_schema("s".to_string(), false)
+            .await
+            .unwrap();
+
+        // Heavily pre-seed worker0 with CSV imports. Stream locations must ignore this load and
+        // follow the stateless hash, since load-aware placement targets CSV imports only.
+        let seed = create_import_table(&meta_store, "seed").await;
+        for i in 0..5 {
+            add_import_job(&meta_store, seed, &format!("seed-{}", i), "worker0").await;
+        }
+
+        let table = create_import_table(&meta_store, "bar").await;
+        let locs: Vec<String> = (0..6).map(|i| format!("stream:topic-{}", i)).collect();
+        let loc_refs: Vec<&String> = locs.iter().collect();
+        scheduler
+            .schedule_table_import(table, &loc_refs)
+            .await
+            .unwrap();
+
+        let placement = import_placement(&meta_store, table).await;
+        let empty = HashMap::new();
+        for l in &locs {
+            let expected = pick_import_worker(config.config_obj().as_ref(), table, l, &empty);
+            assert_eq!(
+                placement.get(l),
+                Some(&expected),
+                "stream placement must follow the stateless hash even with load-aware enabled"
+            );
+        }
+
+        RocksMetaStore::cleanup_test_metastore("schedule_table_import_stream_load_aware");
+        let _ = fs::remove_dir_all(config.local_dir());
+        let _ = fs::remove_dir_all(config.remote_dir());
+    }
+
+    #[tokio::test]
+    async fn schedule_table_import_hash_placement() {
         let config = Config::test("schedule_table_import_hash").update_config(|mut c| {
             c.select_workers = (0..4).map(|i| format!("worker{}", i)).collect();
-            // load_aware_import_placement_enabled defaults to false (old behavior).
+            c.load_aware_import_placement_enabled = false;
             c
         });
         let (meta_store, scheduler) =
@@ -1675,7 +1816,7 @@ mod tests {
             assert_eq!(
                 placement.get(l),
                 Some(&expected),
-                "default placement must follow the stateless hash"
+                "hash placement must follow the stateless hash"
             );
         }
 

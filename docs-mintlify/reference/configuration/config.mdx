@@ -11,6 +11,14 @@ JavaScript (`basePath`).
 
 </Info>
 
+<Warning>
+
+A `cube.ts` configuration file is no longer supported — use `cube.js` or
+`cube.py` instead. A server that finds only `cube.ts` fails to start with
+`Configuration in cube.ts is no longer supported`.
+
+</Warning>
+
 Every configuration option that is a function (e.g., `query_rewrite`)
 can be defined as either synchronous or asynchronous. Cube will await for
 the completion of asynchronous functions.
@@ -51,9 +59,27 @@ or when a more flexible setup is needed.
 
 It's a [multitenancy][ref-multitenancy] option.
 
-`context_to_app_id` is a function to determine an app id which is used as
-caching key for various in-memory structures like data model compilation
-results, etc.
+`context_to_app_id` is a function to determine an app id which is used as the
+caching key for the compiled data model and other data model-related in-memory
+structures. Each distinct app id gets its own data model compilation, which is
+what enables [`COMPILE_CONTEXT`][ref-compile-context] and per-tenant
+[`repository_factory`][self-repofactory].
+
+<Warning>
+
+`context_to_app_id` enables multitenancy for data model compilation only. On its
+own, it leaves querying and caching shared across app ids. To isolate those per
+tenant as well:
+
+- [`pre_aggregations_schema`][self-pre-aggregations-schema] gives each tenant its
+  own pre-aggregation tables. It is resolved per app id, so a schema name derived
+  from the security context requires `context_to_app_id` to be defined as well.
+- [`context_to_orchestrator_id`][self-orchestrator-id] gives each tenant its own
+  database connections, query queues, and query results cache.
+
+See [multitenancy][ref-multitenancy] for details.
+
+</Warning>
 
 Called on each request.
 
@@ -198,6 +224,7 @@ module.exports = {
 Maximum number of compiled data models to persist with in-memory cache. Defaults
 to 250, but optimum value will depend on deployed environment. When the max is
 reached, will start dropping the least recently used data models from the cache.
+Must be a positive integer; the cache can not be disabled.
 
 <CodeGroup>
 
@@ -214,6 +241,11 @@ module.exports = {
 ```
 
 </CodeGroup>
+
+This configuration option can also be set using the [`CUBEJS_COMPILER_CACHE_SIZE`](/reference/configuration/environment-variables#cubejs_compiler_cache_size)
+environment variable, and takes precedence over it. Note that the environment
+variable also sizes the SQL API's compiler cache, which this option does not
+affect.
 
 ### `max_compiler_cache_keep_alive`
 
@@ -385,21 +417,56 @@ Called on each request.
 
 ```python title="Python"
 from cube import config
+import zlib
+
+NUMBER_OF_CLUSTERS = 3
+
+@config('context_to_app_id')
+def context_to_app_id(ctx: dict) -> str:
+  return f"CUBE_APP_{ctx['securityContext']['tenant_id']}"
+
+@config('context_to_orchestrator_id')
+def context_to_orchestrator_id(ctx: dict) -> str:
+  return f"CUBE_APP_{ctx['securityContext']['tenant_id']}"
+
+@config('pre_aggregations_schema')
+def pre_aggregations_schema(ctx: dict) -> str:
+  return f"pre_aggregations_{ctx['securityContext']['tenant_id']}"
 
 @config('context_to_cube_store_router_id')
 def context_to_cube_store_router_id(ctx: dict) -> str:
-  return f"CUBE_ROUTER_{ctx['securityContext']['tenant_id']}"
+  tenant_id = str(ctx['securityContext']['tenant_id'])
+  return f"CUBE_ROUTER_{zlib.crc32(tenant_id.encode()) % NUMBER_OF_CLUSTERS}"
 ```
 
 ```javascript title="JavaScript"
+const zlib = require('zlib')
+
+const NUMBER_OF_CLUSTERS = 3
+
 module.exports = {
+  contextToAppId: ({ securityContext }) => {
+    return `CUBE_APP_${securityContext.tenant_id}`
+  },
+  contextToOrchestratorId: ({ securityContext }) => {
+    return `CUBE_APP_${securityContext.tenant_id}`
+  },
+  preAggregationsSchema: ({ securityContext }) => {
+    return `pre_aggregations_${securityContext.tenant_id}`
+  },
   contextToCubeStoreRouterId: ({ securityContext }) => {
-    return `CUBE_ROUTER_${securityContext.tenant_id}`
+    const tenantId = `${securityContext.tenant_id}`
+    return `CUBE_ROUTER_${zlib.crc32(tenantId) % NUMBER_OF_CLUSTERS}`
   }
 }
 ```
 
 </CodeGroup>
+
+The example maps tenants onto a fixed set of router ids. In Cube, multiple Cube
+Store routers are available on Multi-cluster deployments with
+[Multi-router Cube Store][ref-multi-router-cube-store] enabled, and the number
+of distinct ids should stay at or below **Number of clusters**.
 
 ### `driver_factory`
 
@@ -421,6 +488,21 @@ In Python, should return a dictionary; in JavaScript, should return an object.
 It should contain the `type` element corresponding to data source type and other
 options that will be passed to a data source driver. You can lookup supported options
 in the drivers' [source code][link-github-cube-drivers]. 
+
+<Info>
+
+A custom `driver_factory` takes precedence over the [`CUBEJS_PRE_AGGREGATIONS_*`
+environment variables][ref-preagg-data-source], for every data source rather than only the
+ones it handles. If both are configured, the `driver_factory` connection is used for
+pre-aggregations as well and a `Pre-aggregation driver conflict` warning is logged.
+
+The factory can't return a different connection for pre-aggregations either, since it
+receives no signal distinguishing a pre-aggregation connection request from a regular one.
+To use a dedicated connection for pre-aggregation builds, define it entirely through the
+`CUBEJS_PRE_AGGREGATIONS_*` environment variables and don't configure a custom
+`driver_factory`.
+
+</Info>
 
 <CodeGroup>
 
@@ -474,6 +556,12 @@ module.exports = {
 }
 ```
 
+Cube's own drivers can also be loaded with a named ESM import instead of `require`:
+
+```javascript
+import { PostgresDriver } from '@cubejs-backend/postgres-driver'
+```
+
 ### `orchestrator_options`
 
 <Warning>
@@ -487,7 +575,7 @@ You can pass this object to set advanced options for the query orchestrator.
 
 | Option                                         | Description                                                                                                                                                                                                                                                                                                                                                                                       | Default Value           |
 |------------------------------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|-------------------------|
-| `continueWaitTimeout`                          | Long polling interval in seconds, maximum is 90                                                                                                                                                                                                                                                                                                                                                   | `5`                     |
+| `continueWaitTimeout`                          | Long polling interval in seconds, maximum is 90                                                                                                                                                                                                                                                                                                                                                   | `10`                    |
 | `rollupOnlyMode`                               | When enabled, an error will be thrown if a query can't be served from a pre-aggregation (rollup)                                                                                                                                                                                                                                                                                                  | `false`                 |
 | `queryCacheOptions`                            | Query cache options for DB queries                                                                                                                                                                                                                                                                                                                                                                | `{}`                    |
 | `queryCacheOptions.refreshKeyRenewalThreshold` | Time in seconds to cache the result of [`refresh_key`][ref-schema-cube-ref-refresh-key] check                                                                                                                                                                                                                                                                                                     | `defined by DB dialect` |
@@ -617,6 +705,16 @@ be used exclusively by Cube and shall not be shared with any application.
 </Warning>
 
 Called once per [`app_id`][self-opts-ctx-to-appid].
+
+<Warning>
+
+Because this option is evaluated once per app id, deriving the schema name from
+the security context requires [`context_to_app_id`][self-opts-ctx-to-appid] to be
+defined as well. Otherwise all tenants share a single app id, and every one of
+them ends up pinned to the schema name resolved for whichever tenant triggered
+the first data model compilation.
+
+</Warning>
 
 <CodeGroup>
 
@@ -1302,7 +1400,7 @@ module.exports = {
 </CodeGroup>
 
 You can also check for the protocol and the authentication method as follows. This can
-be useful for handling the [NTLM][ref-ntlm] authentication in the [DAX API][ref-dax-api]:
+be useful for handling the NTLM authentication in the DAX API:
 
 <CodeGroup>
 
@@ -1437,6 +1535,12 @@ Accepts the following arguments:
 - `message`: the message to be logged
 - `params`: additional parameters
 
+Filter values, SQL parameters, and string literals in SQL API statements in `params`
+arrive as `redacted` when
+[`CUBEJS_LOG_REDACTION`](/reference/configuration/environment-variables#cubejs_log_redaction)
+is on (the default outside development mode); error messages from a data source arrive as
+returned, and a SQL API error that quotes the statement has it redacted.
+
 <CodeGroup>
 
 ```python title="Python"
@@ -1462,9 +1566,9 @@ See also the [`CUBEJS_LOG_LEVEL`](/reference/configuration/environment-variables
 ### `telemetry`
 
 Cube collects high-level anonymous usage statistics for servers started in
-development mode. It doesn't track any credentials, data model contents or
-queries issued. This statistics is used solely for the purpose of constant
-cube.js improvement.
+[development mode][ref-development-mode]. It doesn't track any credentials, data
+model contents or queries issued. This statistics is used solely for the purpose of
+constant cube.js improvement.
 
 You can opt out of it any time by setting `telemetry` option to `False` or,
 alternatively, by setting [`CUBEJS_TELEMETRY`](/reference/configuration/environment-variables#cubejs_telemetry) environment variable to `false`.
@@ -1485,70 +1589,6 @@ module.exports = {
 
 </CodeGroup>
 
-## Deprecated
-
-### `dbType`
-
-<Warning>
-
-`dbType` is deprecated and will be removed in a future release.
-Use [`driverFactory`][self-driver-factory] instead.
-
-</Warning>
-
-Data source type. Called only once per [`appId`][self-opts-ctx-to-appid].
-
-```javascript
-module.exports = {
-  // string
-  dbType: 'snowflake',
-
-  // function
-  dbType: ({ securityContext }) => 'databricks'
-}
-```
-
-Either `string` or `function` could be passed. Providing a `Function` allows
-to dynamically select a database type depending on the security context.
-Usually used for [multitenancy][ref-multitenancy].
-
-If not defined, Cube will lookup for environment variable
-[`CUBEJS_DB_TYPE`](/reference/configuration/environment-variables#cubejs_db_type) to resolve the data source type.
-
-### `context_to_roles`
-
-<Warning>
-
-`context_to_roles` is deprecated and will be removed in a future release.
-Use [`context_to_groups`](#context_to_groups) instead.
-
-</Warning>
-
-Used by [access policies][ref-dap]. This option is used to derive a list of
-[data access roles][ref-dap-roles] from the [security context][ref-sec-ctx].
-
-<CodeGroup>
-
-```python title="Python"
-from cube import config
-
-@config('context_to_roles')
-def context_to_roles(ctx: dict) -> list[str]:
-  return ctx['securityContext'].get('roles', ['default'])
-```
-
-```javascript title="JavaScript"
-
-module.exports = {
-  contextToRoles: ({ securityContext }) => {
-    return securityContext.roles || ['default']
-  }
-}
-```
-
-</CodeGroup>
-
-
 [gh-jsonwebtoken-algs]:
   https://github.com/auth0/node-jsonwebtoken#algorithms-supported
 [link-express-cors-opts]:
@@ -1558,8 +1598,9 @@ module.exports = {
 [link-jwt-ref-sub]: https://tools.ietf.org/html/rfc7519#section-4.1.2
 [link-jwt-ref-aud]: https://tools.ietf.org/html/rfc7519#section-4.1.3
 [link-wiki-tz]: https://en.wikipedia.org/wiki/Tz_database
-[ref-development-mode]: /docs/data-modeling/dev-mode
+[ref-development-mode]: /reference/configuration/environment-variables#cubejs_dev_mode
 [ref-multitenancy]: /embedding/multitenancy
+[ref-preagg-data-source]: /docs/pre-aggregations/refreshing-pre-aggregations#pre-aggregation-data-source
 [ref-rest-api]: /reference/core-data-apis/rest-api
 [ref-sql-api]: /reference/core-data-apis/sql-api
 [ref-pre-aggregations-refresh-key]: /reference/data-modeling/pre-aggregations#refresh_key
@@ -1568,7 +1609,6 @@ module.exports = {
 [ref-sec-ctx]: /docs/data-modeling/access-control/context
 [self-pre-aggregations-schema]: #pre_aggregations_schema
 [self-opts-ctx-to-appid]: #context_to_app_id
-[self-driver-factory]: #driver_factory
 [ref-schema-ref-datasource]: /reference/data-modeling/cube#data_source
 [self-repofactory]: #repository_factory
 [ref-exec-environment-globals]: /docs/data-modeling/dynamic/schema-execution-environment#nodejs-globals-processenv-consolelog-and-others
@@ -1576,8 +1616,10 @@ module.exports = {
 [ref-rest-scopes]: /reference/core-data-apis/rest-api#api-scopes
 [ref-config-options]: /admin/connect-to-data#configuration-options
 [self-orchestrator-id]: #context_to_orchestrator_id
+[ref-multi-router-cube-store]: /admin/deployment/deployment-types#multi-router-cube-store
+[ref-compile-context]: /reference/data-modeling/context-variables#compile_context
 [ref-multiple-data-sources]: /admin/connect-to-data/multiple-data-sources
-[ref-websockets]: /reference/core-data-apis/rest-api/real-time-data-fetch
+[ref-websockets]: /recipes/core-data-api/real-time-data-fetch
 [ref-matching-preaggs]: /docs/pre-aggregations/matching-pre-aggregations
 [link-snake-case]: https://en.wikipedia.org/wiki/Snake_case
 [link-camel-case]: https://en.wikipedia.org/wiki/Camel_case
@@ -1586,6 +1628,4 @@ module.exports = {
 [ref-dap]: /docs/data-modeling/data-access-policies
 [ref-dap-roles]: /docs/data-modeling/data-access-policies#data-access-roles
 [ref-auth-integration]: /docs/data-modeling/access-control#authentication-integration
-[ref-dax-api]: /reference/dax-api
-[ref-ntlm]: /docs/integrations/power-bi/ntlm
 [ref-environments]: /admin/deployment/environments

@@ -37,8 +37,8 @@ export interface CompilerApiOptions {
   preAggregationsSchema?: string | ((context: Context) => string | Promise<string>);
   allowUngroupedWithoutPrimaryKey?: boolean;
   convertTzForRawTimeDimension?: boolean;
+  localRefreshKey?: boolean;
   schemaVersion?: () => string | object | Promise<string | object>;
-  contextToRoles?: (context: Context) => string[] | Promise<string[]>;
   contextToGroups?: (context: Context) => string[] | Promise<string[]>;
   compileContext?: any;
   allowJsDuplicatePropsInSchema?: boolean;
@@ -58,6 +58,11 @@ export interface GetSqlOptions {
   includeDebugInfo?: boolean;
   exportAnnotatedSql?: boolean;
   requestId?: string;
+  // Build only the pre-aggregation descriptions, skipping the outer query SQL.
+  // Used by the refresh/metadata path, which consumes `preAggregations` but not `sql`.
+  // Avoids building a rolling-window time series that would require a date range the
+  // refresh path doesn't provide.
+  preAggregationsOnly?: boolean;
 }
 
 export interface SqlResult {
@@ -101,9 +106,9 @@ export class CompilerApi {
 
   protected readonly convertTzForRawTimeDimension?: boolean;
 
-  public schemaVersion?: () => string | object | Promise<string | object>;
+  protected readonly localRefreshKey?: boolean;
 
-  protected readonly contextToRoles?: (context: Context) => string[] | Promise<string[]>;
+  public schemaVersion?: () => string | object | Promise<string | object>;
 
   protected readonly contextToGroups?: (context: Context) => string[] | Promise<string[]>;
 
@@ -144,8 +149,8 @@ export class CompilerApi {
     this.preAggregationsSchema = this.options.preAggregationsSchema;
     this.allowUngroupedWithoutPrimaryKey = this.options.allowUngroupedWithoutPrimaryKey;
     this.convertTzForRawTimeDimension = this.options.convertTzForRawTimeDimension;
+    this.localRefreshKey = this.options.localRefreshKey;
     this.schemaVersion = this.options.schemaVersion;
-    this.contextToRoles = this.options.contextToRoles;
     this.contextToGroups = this.options.contextToGroups;
     this.compileContext = options.compileContext;
     this.allowJsDuplicatePropsInSchema = options.allowJsDuplicatePropsInSchema;
@@ -251,6 +256,7 @@ export class CompilerApi {
 
   public async compileSchema(compilerVersion: string, requestId?: string): Promise<Compiler> {
     const startCompilingTime = new Date().getTime();
+
     try {
       this.logger(this.compilers ? 'Recompiling schema' : 'Compiling schema', {
         version: compilerVersion,
@@ -347,13 +353,13 @@ export class CompilerApi {
   }
 
   public async getSql(query: NormalizedQuery, options: GetSqlOptions = {}): Promise<SqlResult> {
-    const { includeDebugInfo, exportAnnotatedSql } = options;
+    const { includeDebugInfo, exportAnnotatedSql, preAggregationsOnly } = options;
     const { sqlGenerator, compilers } = await this.getSqlGenerator(query);
 
     const getSqlFn = () => compilers.compiler.withQuery(sqlGenerator, () => ({
       external: sqlGenerator.externalPreAggregationQuery(),
-      sql: sqlGenerator.buildSqlAndParams(exportAnnotatedSql),
-      lambdaQueries: sqlGenerator.buildLambdaQuery(),
+      sql: preAggregationsOnly ? null : sqlGenerator.buildSqlAndParams(exportAnnotatedSql),
+      lambdaQueries: preAggregationsOnly ? [] : sqlGenerator.buildLambdaQuery(),
       timeDimensionAlias: sqlGenerator.timeDimensions[0]?.unescapedAliasName(),
       timeDimensionField: sqlGenerator.timeDimensions[0]?.dimension,
       order: sqlGenerator.order,
@@ -377,22 +383,11 @@ export class CompilerApi {
     }
   }
 
-  protected async getRolesFromContext(context: Context): Promise<Set<string>> {
-    if (!this.contextToRoles) {
-      return new Set();
-    }
-    return new Set(await this.contextToRoles(context));
-  }
-
   protected async getGroupsFromContext(context: Context): Promise<Set<string>> {
     if (!this.contextToGroups) {
       return new Set();
     }
     return new Set(await this.contextToGroups(context));
-  }
-
-  protected userHasRole(userRoles: Set<string>, role: string): boolean {
-    return userRoles.has(role) || role === '*';
   }
 
   protected userHasGroup(userGroups: Set<string>, group: string | string[]): boolean {
@@ -402,7 +397,7 @@ export class CompilerApi {
     return userGroups.has(group) || group === '*';
   }
 
-  protected roleMeetsConditions(evaluatedConditions?: any[]): boolean {
+  protected policyMeetsConditions(evaluatedConditions?: any[]): boolean {
     if (evaluatedConditions?.length) {
       return evaluatedConditions.reduce((a, b) => {
         if (typeof b !== 'boolean') {
@@ -430,19 +425,8 @@ export class CompilerApi {
     const cache = compilers.compilerCache.getRbacCacheInstance();
     const cacheKey = `${cube.name}_${this.hashRequestContext(context)}`;
     if (!cache.has(cacheKey)) {
-      const userRoles = await this.getRolesFromContext(context);
       const userGroups = await this.getGroupsFromContext(context);
       const policies = cube.accessPolicy.filter((policy: AccessPolicyDefinition) => {
-        // Validate that policy doesn't have both role and group/groups - this is invalid
-        if (policy.role && (policy.group || policy.groups)) {
-          const groupValue = policy.group || policy.groups;
-          const groupDisplay = Array.isArray(groupValue) ? groupValue.join(', ') : groupValue;
-          const groupProp = policy.group ? 'group' : 'groups';
-          throw new Error(
-            `Access policy cannot have both 'role' and '${groupProp}' properties.\nPolicy in cube '${cube.name}' has role '${policy.role}' and ${groupProp} '${groupDisplay}'.\nUse either 'role' or '${groupProp}', not both.`
-          );
-        }
-
         // Validate that policy doesn't have both group and groups
         if (policy.group && policy.groups) {
           const groupDisplay = Array.isArray(policy.group) ? policy.group.join(', ') : policy.group;
@@ -456,22 +440,19 @@ export class CompilerApi {
           (condition: any) => compilers.cubeEvaluator.evaluateContextFunction(cube, condition.if, context)
         );
 
-        // Check if policy matches by role, group, or groups
+        // Check if policy matches by group or groups
         let hasAccess = false;
 
-        if (policy.role) {
-          hasAccess = this.userHasRole(userRoles, policy.role);
-        } else if (policy.group) {
+        if (policy.group) {
           hasAccess = this.userHasGroup(userGroups, policy.group);
         } else if (policy.groups) {
           hasAccess = this.userHasGroup(userGroups, policy.groups);
         } else {
-          // If policy has neither role nor group/groups, default to checking role for backward compatibility
-          hasAccess = this.userHasRole(userRoles, '*');
+          // A policy without group/groups applies to everyone
+          hasAccess = this.userHasGroup(userGroups, '*');
         }
 
-        const res = hasAccess && this.roleMeetsConditions(evaluatedConditions);
-        return res;
+        return hasAccess && this.policyMeetsConditions(evaluatedConditions);
       });
       cache.set(cacheKey, policies);
     }
@@ -503,10 +484,10 @@ export class CompilerApi {
    * This method rewrites the query according to RBAC row level security policies.
    *
    * If RBAC is enabled, it looks at all the Cubes from the query with accessPolicy defined.
-   * It extracts all policies applicable to for the current user context (contextToRoles() + conditions).
+   * It extracts all policies applicable to for the current user context (contextToGroups() + conditions).
    * It then generates a rls filter by
-   * - combining all filters for the same role with AND
-   * - combining all filters for different roles with OR
+   * - combining all filters for the same group with AND
+   * - combining all filters for different groups with OR
    * - combining cube and view filters with AND
   */
   public async applyRowLevelSecurity(
@@ -531,6 +512,7 @@ export class CompilerApi {
     // When a cube is accessed via a view, we skip the cube's member-level restrictions
     // and only apply row-level filters. The view controls what members are exposed.
     const cubesAccessedViaView = new Set<string>();
+
     for (const cubeName of queryCubes) {
       const cube = cubeEvaluator.cubeFromPath(cubeName);
       if (cube.isView) {
@@ -991,6 +973,7 @@ export class CompilerApi {
         preAggregationsSchema: this.preAggregationsSchema,
         allowUngroupedWithoutPrimaryKey: this.allowUngroupedWithoutPrimaryKey,
         convertTzForRawTimeDimension: this.convertTzForRawTimeDimension,
+        localRefreshKey: this.localRefreshKey,
         queryFactory: this.queryFactory,
       }
     );

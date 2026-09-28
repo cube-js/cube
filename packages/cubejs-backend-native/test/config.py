@@ -100,15 +100,6 @@ def logger(msg, params):
 
 
 @config
-def context_to_roles(ctx):
-    print("[python] context_to_roles", ctx)
-
-    return [
-        "admin",
-    ]
-
-
-@config
 def context_to_groups(ctx):
     print("[python] context_to_groups", ctx)
 

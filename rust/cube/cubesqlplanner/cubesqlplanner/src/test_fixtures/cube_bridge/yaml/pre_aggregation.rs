@@ -1,7 +1,8 @@
 use crate::cube_bridge::member_sql::MemberSql;
 use crate::test_fixtures::cube_bridge::yaml::pre_aggregation_time_dimension::YamlPreAggregationTimeDimension;
 use crate::test_fixtures::cube_bridge::{
-    MockMemberSql, MockPreAggregationDescription, MockPreAggregationTimeDimension,
+    MockMemberSql, MockPreAggregationDescription, MockPreAggregationIndex,
+    MockPreAggregationTimeDimension,
 };
 use cubenativeutils::CubeError;
 use serde::Deserialize;
@@ -42,10 +43,8 @@ pub struct YamlPreAggregationDefinition {
     #[allow(dead_code)]
     incremental: Option<bool>,
     #[serde(default)]
-    #[allow(dead_code)]
     build_range_start: Option<String>,
     #[serde(default)]
-    #[allow(dead_code)]
     build_range_end: Option<String>,
     #[serde(default)]
     #[allow(dead_code)]
@@ -54,7 +53,6 @@ pub struct YamlPreAggregationDefinition {
     #[allow(dead_code)]
     union_with_source_data: Option<bool>,
     #[serde(default)]
-    #[allow(dead_code)]
     indexes: Option<Vec<YamlIndex>>,
     #[serde(default)]
     rollups: Option<Vec<String>>,
@@ -72,10 +70,15 @@ struct YamlRefreshKey {
 }
 
 #[derive(Debug, Deserialize)]
-#[allow(dead_code)]
 struct YamlIndex {
     name: String,
     columns: Vec<String>,
+    #[serde(rename = "type", default = "default_index_type")]
+    index_type: String,
+}
+
+fn default_index_type() -> String {
+    "regular".to_string()
 }
 
 fn default_type() -> String {
@@ -118,13 +121,30 @@ impl YamlPreAggregationDefinition {
             .transpose()
             .expect("Failed to build rollup references");
 
+        let indexes = self
+            .indexes
+            .unwrap_or_default()
+            .into_iter()
+            .map(|i| MockPreAggregationIndex {
+                name: i.name,
+                columns: i.columns,
+                index_type: i.index_type,
+            })
+            .collect::<Vec<_>>();
+
+        // Mirror the JS default (CUBEJS_EXTERNAL_DEFAULT=true): rollup and
+        // rollupJoin are external unless explicitly set otherwise.
+        let external = self.external.or_else(|| {
+            matches!(self.pre_aggregation_type.as_str(), "rollup" | "rollupJoin").then_some(true)
+        });
+
         Rc::new(
             MockPreAggregationDescription::builder()
                 .name(name)
                 .pre_aggregation_type(self.pre_aggregation_type)
                 .granularity(self.granularity)
                 .sql_alias(self.sql_alias)
-                .external(self.external)
+                .external(external)
                 .allow_non_strict_date_range_match(self.allow_non_strict_date_range_match)
                 .measure_references_opt(measure_references)
                 .dimension_references_opt(dimension_references)
@@ -132,13 +152,20 @@ impl YamlPreAggregationDefinition {
                 .segment_references_opt(segment_references)
                 .rollup_references_opt(rollup_references)
                 .time_dimension_references(time_dimension_references)
+                .indexes(indexes)
+                .build_range_start(self.build_range_start)
+                .build_range_end(self.build_range_end)
                 .build(),
         )
     }
 }
 
 fn build_array_references(members: Vec<String>) -> Result<Rc<dyn MemberSql>, CubeError> {
-    MockMemberSql::pre_agg_array_refs(members).map(|m| m as Rc<dyn MemberSql>)
+    if members.iter().any(|m| m.contains('{')) {
+        MockMemberSql::pre_agg_array_templates(members).map(|m| m as Rc<dyn MemberSql>)
+    } else {
+        MockMemberSql::pre_agg_array_refs(members).map(|m| m as Rc<dyn MemberSql>)
+    }
 }
 
 fn build_single_reference(member: String) -> Result<Rc<dyn MemberSql>, CubeError> {

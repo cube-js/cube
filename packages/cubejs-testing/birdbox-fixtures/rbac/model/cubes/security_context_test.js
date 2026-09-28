@@ -96,7 +96,7 @@ cube('sc_ua_mask_test', {
 
   accessPolicy: [
     {
-      role: '*',
+      group: '*',
       memberLevel: {
         includes: [],
       },
@@ -133,7 +133,7 @@ cube('sc_cube_mask_test', {
 
   accessPolicy: [
     {
-      role: '*',
+      group: '*',
       memberLevel: {
         includes: [],
       },
@@ -181,7 +181,7 @@ cube('sc_joined_mask_test', {
 
   accessPolicy: [
     {
-      role: '*',
+      group: '*',
       memberLevel: {
         includes: [],
       },
@@ -215,7 +215,7 @@ cube('sc_groups_shorthand_test', {
 
   accessPolicy: [
     {
-      role: '*',
+      group: '*',
       rowLevel: {
         filters: [{
           member: 'product_id',

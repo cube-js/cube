@@ -27,16 +27,17 @@ and dimension definitions), the Workbook Agent can:
 - **Create and save reports** in the workbook from a natural-language request
 - **Search existing reports** to find and reuse work already in the workbook
 - **Build and edit dashboards** — add and configure chart, KPI, filter,
-  time-grain, and text widgets
+  time-grain, field switcher, parent control, and text widgets, plus stack and
+  grid layout containers
 - **Publish dashboards**
 
 ## How charts get added to a dashboard
 
 When the agent adds a chart to a dashboard, the chart widget references a
-**saved report**, not a one-off query. So to put a new chart on a dashboard, the
-agent first saves it as a report in the workbook, then adds a widget that points
-at that report. This keeps every dashboard chart backed by a reusable,
-governed report.
+**report in the workbook**, not a one-off query. So to put a new chart on a
+dashboard, the agent first saves the query as a report in the workbook, then
+adds a widget that points at that report. This keeps every dashboard chart
+backed by a reusable, governed report.
 
 ## Getting help with Cube
 

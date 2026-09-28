@@ -20,19 +20,14 @@ Available on [Enterprise plan](https://cube.dev/pricing).
 First, we'll enable SAML authentication in Cube Cloud. To do this, log in to
 Cube Cloud and
 
-1. Click your username from the top-right corner, then click **Team &
-   Security**.
+1. Navigate to **Admin → Settings**.
+2. On the **Authentication & SSO** tab, enable **SAML**.
+3. For a new integration, replace any prefilled **Audience (SP Entity ID)**
+   value with the **Single Sign-On URL** shown directly above it.
 
-2. On the **Authentication & SSO** tab, ensure **SAML** is
-   enabled:
-
-<Frame>
-  <img src="https://ucarecdn.com/f5ff1413-f37c-4476-afcc-0ff29e87e80a/" alt="Cube Cloud Team Authentication and SSO tab" />
-</Frame>
-
-Take note of the **Single Sign On URL** and **Service Provider Entity
-ID** values here, as we will need them in the next step when we configure
-the SAML integration in Google Workspace.
+Take note of the **Single Sign-On URL** and **Audience (SP Entity ID)**
+values. You will need them when you configure the SAML integration in Google
+Workspace.
 
 ## Create a SAML Integration in Google Workspace
 
@@ -69,48 +64,53 @@ Workspace][google-docs-create-saml-app].
 5. Enter the following values for the **Service provider details**
    section and click **Continue**.
 
-| Name      | Description                                                         |
-| --------- | ------------------------------------------------------------------- |
-| ACS URL   | Use the **Single Sign On URL** value from Cube Cloud         |
-| Entity ID | Use the **Service Provider Entity ID** value from Cube Cloud |
+| Name      | Description |
+| --------- | ----------- |
+| ACS URL   | Use the **Single Sign-On URL** value from Cube Cloud. |
+| Entity ID | Use the **Audience (SP Entity ID)** value from Cube Cloud. |
 
-5. On the final screen, click **Finish**.
+6. On the final screen, click **Finish**.
 
-6. From the app details page, click **User access** and ensure the app is
+7. From the app details page, click **User access** and ensure the app is
    **ON for everyone**:
 
 <Frame>
   <img src="https://ucarecdn.com/8e1696fa-828c-4be5-a1d8-81c7b054dadb/" />
 </Frame>
 
-## Enable SAML in Cube Cloud
+## Complete SAML configuration in Cube Cloud
 
 In this step, we'll finalise the configuration by entering the values from our
 SAML integration in Google into Cube Cloud.
 
-1. From the same **Authentication & SSO > SAML** tab, click the
-   **Advanced Settings** tab:
+1. Return to **Admin → Settings → Authentication & SSO → SAML**.
+2. Confirm that **Audience (SP Entity ID)** still matches the **Single
+   Sign-On URL** exactly.
+3. Enter the following values in the **SAML Settings** section:
 
-<Frame>
-  <img src="https://ucarecdn.com/5359c52e-69c1-45fa-baf2-d3bb07d72634/" />
-</Frame>
+| Name | Description |
+| --- | --- |
+| Entity ID / Issuer | Use the **Entity ID** value from Google Workspace. |
+| SSO (Sign on) URL | Use the **SSO URL** value from Google Workspace. |
+| Certificate | Use the **Certificate** value from Google Workspace. |
 
-2. Enter the following values in the **SAML Settings** section:
-
-| Name                        | Description                                                        |
-| --------------------------- | ------------------------------------------------------------------ |
-| Audience (SP Entity ID)     | Delete the prefilled value and leave empty                         |
-| IdP Issuer (IdP Entity ID)  | Use the **Issuer** value from Google Workspace              |
-| Identity Provider Login URL | Use the **Sign on URL** value from Google Workspace         |
-| Certificate                 | Use the **Signing Certificate** value from Google Workspace |
-
-3. Enable **Auto-provision new users** if you want users to be automatically
+4. Enable **Auto-provision new users** if you want users to be automatically
    created in Cube on their first login via this SAML provider. New users
    are assigned the Viewer role by default — see
    [Default role for new users](#default-role-for-new-users) to choose a
    different role. Enable this if you are not using SCIM provisioning.
 
-4. Scroll down and click **Save SAML Settings** to save the changes.
+5. Click **Apply** to save the changes.
+
+<Note>
+
+Existing working Google Workspace integrations with a blank Audience do not
+need to change immediately. A blank Audience disables audience validation. To
+enable validation, update the Google **Entity ID** and Cube **Audience (SP
+Entity ID)** together, keep another authentication method enabled, and test
+SAML sign-in before you disable the fallback method.
+
+</Note>
 
 ## Default role for new users
 

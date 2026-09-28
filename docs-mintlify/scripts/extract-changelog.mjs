@@ -110,11 +110,11 @@ const blocks = releases.map((r) => {
 const out =
   `---\n` +
   `title: Changelog\n` +
-  `description: Release notes for the Cube Cloud platform client and management API.\n` +
+  `description: Release notes for the Cube platform client and management API.\n` +
   `rss: true\n` +
   `---\n\n` +
   `{/* GENERATED FILE — do not edit by hand. */}\n` +
-  `{/* Run scripts/extract-changelog.js against the platform client CHANGELOG.md. */}\n\n` +
+  `{/* Run scripts/extract-changelog.mjs against the platform client CHANGELOG.md. */}\n\n` +
   blocks.join('\n\n') +
   `\n`;
 

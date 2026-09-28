@@ -1,6 +1,5 @@
 use crate::cube_bridge::member_sql::MemberSql;
 use crate::cube_bridge::segment_definition::{SegmentDefinition, SegmentDefinitionStatic};
-use crate::impl_static_data;
 use crate::test_fixtures::cube_bridge::yaml::segment::YamlSegmentDefinition;
 use crate::test_fixtures::cube_bridge::MockMemberSql;
 use cubenativeutils::CubeError;

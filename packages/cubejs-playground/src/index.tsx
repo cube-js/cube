@@ -40,8 +40,8 @@ async function onTokenPayloadChange(payload: Record<string, any>, token) {
 }
 
 if (
-  window.location.port === '3080' &&
-  window.location.pathname.includes('/playground/live-preview/start')
+  window.location.port === '3080'
+  && window.location.pathname.includes('/playground/live-preview/start')
 ) {
   fetch(window.location.pathname).then(() => window.close());
 }
@@ -58,15 +58,13 @@ ReactDOM.render(
         <Route
           key="build"
           path="/build"
-          component={(props) => {
-            return (
-              <SecurityContextProvider
-                onTokenPayloadChange={onTokenPayloadChange}
-              >
-                <ExplorePage {...props} />
-              </SecurityContextProvider>
-            );
-          }}
+          component={(props) => (
+            <SecurityContextProvider
+              onTokenPayloadChange={onTokenPayloadChange}
+            >
+              <ExplorePage {...props} />
+            </SecurityContextProvider>
+          )}
         />
         <Route key="schema" path="/schema" component={SchemaPage} />
         <Route

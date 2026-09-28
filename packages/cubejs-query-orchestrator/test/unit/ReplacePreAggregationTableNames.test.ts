@@ -1,9 +1,9 @@
 import { QueryCache } from '../../src';
 import type { PreAggTableToTempTableNames } from '../../src';
 
-describe('QueryCache.replacePreAggregationTableNames', () => {
+describe('QueryCache.replacePreAggregationTableNamesInSql', () => {
   test('replaces a single table name', () => {
-    const result = QueryCache.replacePreAggregationTableNames(
+    const result = QueryCache.replacePreAggregationTableNamesInSql(
       'SELECT * FROM dev_pre_aggregations.orders_rollup',
       [['dev_pre_aggregations.orders_rollup', { targetTableName: 'dev_pre_aggregations.orders_rollup_20250401_abc' }]],
     );
@@ -23,7 +23,7 @@ describe('QueryCache.replacePreAggregationTableNames', () => {
       .map(([tableName], i) => `SELECT * FROM ${tableName} AS "alias${i}"`)
       .join(' UNION ALL ');
 
-    const result = QueryCache.replacePreAggregationTableNames(query, entries) as string;
+    const result = QueryCache.replacePreAggregationTableNamesInSql(query, entries);
 
     entries.forEach(([, { targetTableName }], i) => {
       expect(result).toContain(`${targetTableName} AS "alias${i}"`);
@@ -40,32 +40,20 @@ describe('QueryCache.replacePreAggregationTableNames', () => {
       ['pa.rollup1', { targetTableName: 'pa.rollup1_aaa_bbb_111' }],
       ['pa.rollup10', { targetTableName: 'pa.rollup10_ccc_ddd_222' }],
     ];
-    const result = QueryCache.replacePreAggregationTableNames(
+    const result = QueryCache.replacePreAggregationTableNamesInSql(
       'SELECT * FROM pa.rollup10 JOIN pa.rollup1',
       entries,
     );
     expect(result).toBe('SELECT * FROM pa.rollup10_ccc_ddd_222 JOIN pa.rollup1_aaa_bbb_111');
   });
 
-  test('keeps params and query options for QueryWithParams input', () => {
-    const result = QueryCache.replacePreAggregationTableNames(
-      ['SELECT * FROM dev_pre_aggregations.orders_rollup WHERE id = ?', ['1'], { external: true }],
-      [['dev_pre_aggregations.orders_rollup', { targetTableName: 'dev_pre_aggregations.orders_rollup_20250401_abc' }]],
-    );
-    expect(result).toEqual([
-      'SELECT * FROM dev_pre_aggregations.orders_rollup_20250401_abc WHERE id = ?',
-      ['1'],
-      { external: true },
-    ]);
-  });
-
   test('returns query as is for empty replacements', () => {
-    const result = QueryCache.replacePreAggregationTableNames('SELECT 1', []);
+    const result = QueryCache.replacePreAggregationTableNamesInSql('SELECT 1', []);
     expect(result).toBe('SELECT 1');
   });
 
   test('treats $ in target names literally', () => {
-    const result = QueryCache.replacePreAggregationTableNames(
+    const result = QueryCache.replacePreAggregationTableNamesInSql(
       'SELECT * FROM pa.rollup',
       [['pa.rollup', { targetTableName: 'pa.rollup_$&_$1' }]],
     );
@@ -77,7 +65,21 @@ describe('QueryCache.replacePreAggregationTableNames', () => {
       ['name1', { targetTableName: 'target1' }],
       ['name10', { targetTableName: 'target10' }],
     ];
-    QueryCache.replacePreAggregationTableNames('SELECT * FROM name1, name10', entries);
+    QueryCache.replacePreAggregationTableNamesInSql('SELECT * FROM name1, name10', entries);
     expect(entries.map(([tableName]) => tableName)).toEqual(['name1', 'name10']);
+  });
+});
+
+describe('QueryCache.replacePreAggregationTableNames', () => {
+  test('keeps params and query options for QueryWithParams input', () => {
+    const result = QueryCache.replacePreAggregationTableNames(
+      ['SELECT * FROM dev_pre_aggregations.orders_rollup WHERE id = ?', ['1'], { external: true }],
+      [['dev_pre_aggregations.orders_rollup', { targetTableName: 'dev_pre_aggregations.orders_rollup_20250401_abc' }]],
+    );
+    expect(result).toEqual([
+      'SELECT * FROM dev_pre_aggregations.orders_rollup_20250401_abc WHERE id = ?',
+      ['1'],
+      { external: true },
+    ]);
   });
 });

@@ -55,8 +55,6 @@ When a deployment is auto-suspended:
 API instances are de-provisioned.
 - [Refresh worker][ref-refresh-worker] is suspended, which stops pre-aggregation
 builds and prevents the pre-aggregations from being kept up-to-date.
-- [Semantic Layer Sync][ref-sls] is suspended, which prevents scheduled syncs
-from running.
 - [Monitoring integrations][ref-monitoring] are also suspended, which prevents
 the export of metrics and logs.
 
@@ -90,10 +88,39 @@ it's not recommended to choose anything below 1 hour.
 The deployment will temporarily become unavailable for reconfiguration; this
 usually takes less than a minute.
 
+## Checking whether a deployment is suspended
+
+Go to **Admin → Deployments**. The **Status** column shows whether each
+deployment is currently suspended, without opening it.
+
+<Warning>
+
+Opening a deployment in Cube resumes it, so browsing to a deployment is not a
+way to check whether it was suspended. The Deployments page reads stored state
+and leaves the deployment alone.
+
+</Warning>
+
+A deployment shows **Always on** when it never auto-suspends: a
+[Multi-cluster deployment][ref-prod-multi-cluster], or a
+[Dedicated deployment][ref-deployment-prod-cluster] with auto-suspension turned
+off.
+
+To find deployments that are unused, rather than merely suspended right now, go
+to **Billing → Cost and Usage** and group by deployment: for a
+[Shared deployment][ref-deployment-dev-instance],
+[CCU][ref-deployment-pricing] corresponds to the hours it was allocated. Like
+the Deployments page, this reads stored data and resumes nothing.
+
 ## Resuming a suspended deployment
 
 To resume a suspended deployment, send a query to Cube using the API or by
 navigating to the deployment in Cube Cloud.
+
+Users who can resume the deployment are also notified in their notification
+inbox when it suspends, with a link straight to it. This excludes anyone
+already working on the deployment in dev mode, since their own branch stays
+unaffected by suspension.
 
 <Warning>
 
@@ -123,5 +150,4 @@ response times to be significantly longer than usual.
 [ref-multitenancy]: /embedding/multitenancy
 [self-effects]: #effects-on-experience
 [ref-refresh-worker]: /cube-core/architecture#refresh-worker
-[ref-sls]: /docs/integrations/semantic-layer-sync#on-schedule
-[ref-cube-version]: /admin/deployment/index#cube-version
+[ref-cube-version]: /admin/deployment#cube-version

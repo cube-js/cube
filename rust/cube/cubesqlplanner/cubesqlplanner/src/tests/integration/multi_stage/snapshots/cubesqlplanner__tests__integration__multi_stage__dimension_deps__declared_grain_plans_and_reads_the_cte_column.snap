@@ -1,0 +1,9 @@
+---
+source: cubesqlplanner/cubesqlplanner/src/tests/integration/multi_stage/dimension_deps.rs
+expression: result
+---
+orders__created_at_month | orders__amount_first_half_of_month_with_grain
+-------------------------+----------------------------------------------
+2024-01-01 00:00:00      | 420.00                                       
+2024-02-01 00:00:00      | 650.00                                       
+2024-03-01 00:00:00      | 850.00

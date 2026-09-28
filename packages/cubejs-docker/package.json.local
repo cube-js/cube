@@ -1,7 +1,7 @@
 {
   "name": "@cubejs-backend/docker",
   "version": "0.31.20",
-  "description": "Cube.js In Docker (virtual package)",
+  "description": "Cube In Docker (virtual package)",
   "author": "Cube Dev, Inc.",
   "license": "Apache-2.0",
   "private": true,
@@ -21,7 +21,6 @@
     "@cubejs-backend/dremio-driver": "file:/cube-build/packages/cubejs-dremio-driver",
     "@cubejs-backend/druid-driver": "file:/cube-build/packages/cubejs-druid-driver",
     "@cubejs-backend/duckdb-driver": "file:/cube-build/packages/cubejs-duckdb-driver",
-    "@cubejs-backend/elasticsearch-driver": "file:/cube-build/packages/cubejs-elasticsearch-driver",
     "@cubejs-backend/firebolt-driver": "file:/cube-build/packages/cubejs-firebolt-driver",
     "@cubejs-backend/hive-driver": "file:/cube-build/packages/cubejs-hive-driver",
     "@cubejs-backend/ksql-driver": "file:/cube-build/packages/cubejs-ksql-driver",
@@ -39,8 +38,7 @@
     "@cubejs-backend/sqlite-driver": "file:/cube-build/packages/cubejs-sqlite-driver",
     "@cubejs-backend/trino-driver": "file:/cube-build/packages/cubejs-trino-driver",
     "@cubejs-backend/pinot-driver": "file:/cube-build/packages/cubejs-pinot-driver",
-    "cubejs-cli": "file:/cube-build/packages/cubejs-cli",
-    "typescript": "~4.1.5"
+    "cubejs-cli": "file:/cube-build/packages/cubejs-cli"
   },
   "resolutions": {
     "colors": "1.4.0"

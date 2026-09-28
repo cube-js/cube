@@ -23,9 +23,10 @@ use crate::CubeError;
 use async_trait::async_trait;
 use chrono::Utc;
 use datafusion::arrow::array::UInt64Array;
-use datafusion::arrow::compute::{concat_batches, SortOptions};
-use datafusion::arrow::datatypes::Schema;
+use datafusion::arrow::compute::{concat_batches, CastOptions, SortOptions};
+use datafusion::arrow::datatypes::{DataType, Schema};
 use datafusion::arrow::record_batch::RecordBatch;
+use datafusion::arrow::util::display::FormatOptions;
 use datafusion::config::TableParquetOptions;
 use datafusion::cube_ext;
 use datafusion::datasource::listing::PartitionedFile;
@@ -40,7 +41,8 @@ use datafusion::physical_expr::{LexOrdering, PhysicalSortExpr};
 use datafusion::physical_plan::aggregates::{AggregateExec, AggregateMode, PhysicalGroupBy};
 use datafusion::physical_plan::common::collect;
 use datafusion::physical_plan::empty::EmptyExec;
-use datafusion::physical_plan::expressions::{Column, Literal};
+use datafusion::physical_plan::expressions::{CastExpr, Column, Literal};
+use datafusion::physical_plan::projection::ProjectionExec;
 use datafusion::physical_plan::sorts::sort_preserving_merge::SortPreservingMergeExec;
 use datafusion::physical_plan::union::UnionExec;
 use datafusion::physical_plan::{ExecutionPlan, PhysicalExpr, SendableRecordBatchStream};
@@ -310,7 +312,7 @@ impl CompactionServiceImpl {
             )
             .await?;
             let batches = collect(batches_stream).await?;
-            let batch = concat_batches(&schema, &batches).unwrap();
+            let batch = concat_batches(&schema, &batches)?;
 
             let oldest_insert_at = group_chunks
                 .iter()
@@ -413,7 +415,7 @@ impl CompactionServiceImpl {
             self.meta_store.deactivate_chunks(old_chunk_ids).await?;
             return Ok(());
         }
-        let batch = concat_batches(&schema, &batches).unwrap();
+        let batch = concat_batches(&schema, &batches)?;
 
         let (chunk, file_size) = self
             .chunk_store
@@ -608,12 +610,19 @@ impl CompactionService for CompactionServiceImpl {
             let new_partitions_count =
                 new_partitions_count_by_rows.max(new_partitions_count_by_file_size);
 
-            for _ in 0..new_partitions_count {
-                new_partitions.push(
-                    self.meta_store
-                        .create_partition(Partition::new_child(&partition, None))
-                        .await?,
-                );
+            if self.config.metastore_batch_rpc() {
+                let children = (0..new_partitions_count)
+                    .map(|_| Partition::new_child(&partition, None))
+                    .collect::<Vec<_>>();
+                new_partitions = self.meta_store.create_partitions(children).await?;
+            } else {
+                for _ in 0..new_partitions_count {
+                    new_partitions.push(
+                        self.meta_store
+                            .create_partition(Partition::new_child(&partition, None))
+                            .await?,
+                    );
+                }
             }
         }
 
@@ -694,10 +703,8 @@ impl CompactionService for CompactionServiceImpl {
             None => Arc::new(EmptyExec::new(schema.clone())),
         };
 
-        let table = self
-            .meta_store
-            .get_table_by_id(index.get_row().table_id())
-            .await?;
+        // `table` is already loaded by get_partition_for_compaction above and is immutable for
+        // the duration of the job, so reuse it instead of re-fetching over the metastore RPC.
         let unique_key = table.get_row().unique_key_columns();
         let aggregate_columns = match index.get_row().get_type() {
             IndexType::Regular => None,
@@ -960,6 +967,7 @@ impl CompactionService for CompactionServiceImpl {
             self.meta_store.clone(),
             self.remote_fs.clone(),
             self.metadata_cache_factory.clone(),
+            self.config.metastore_batch_rpc(),
             keys,
             key_len,
             multi_partition_id,
@@ -1003,6 +1011,7 @@ impl CompactionService for CompactionServiceImpl {
             self.meta_store.clone(),
             self.remote_fs.clone(),
             self.metadata_cache_factory.clone(),
+            self.config.metastore_batch_rpc(),
             keys,
             key_len,
             multi_partition_id,
@@ -1435,6 +1444,179 @@ async fn write_to_files_by_keys(
     Ok(row_counts)
 }
 
+/// One chunk file produced by `write_chunks_split_into_children`: which child (index into the
+/// ordered children list) it belongs to, the temp file it was written to, its row count and the
+/// min/max sort-key rows. Empty children yield an entry with `num_rows == 0`.
+pub(crate) struct WrittenChunk {
+    pub child_index: usize,
+    pub file: String,
+    pub num_rows: usize,
+    pub min: Vec<TableValue>,
+    pub max: Vec<TableValue>,
+}
+
+/// Splits a sorted [records] stream into chunk files for repartitioning a parent's chunks into its
+/// already-active children. Cuts a new file whenever a row crosses into the next child (per the
+/// exclusive upper bounds in [boundaries], one per child except the last) OR the current file
+/// reaches [rows_per_chunk]. [files] must over-estimate the number of produced files
+/// (`children + ceil(num_rows / rows_per_chunk)` is a safe bound). Returns the produced files in
+/// order; the caller creates a chunk per non-empty file under `children[child_index]`.
+pub(crate) async fn write_chunks_split_into_children(
+    records: SendableRecordBatchStream,
+    store: ParquetTableStore,
+    table: &IdRow<Table>,
+    files: Vec<String>,
+    boundaries: Vec<Row>,
+    rows_per_chunk: usize,
+) -> Result<Vec<WrittenChunk>, CubeError> {
+    assert!(rows_per_chunk > 0);
+    let key_size = store.key_size() as usize;
+    // Route on the partition-split key prefix (the authoritative partition boundary),
+    // but record chunk min/max on the full sort key.
+    let partition_split_key_size = store.partition_split_key_size() as usize;
+    let written = Arc::new(Mutex::new(vec![WrittenChunk {
+        child_index: 0,
+        file: files[0].clone(),
+        num_rows: 0,
+        min: Vec::new(),
+        max: Vec::new(),
+    }]));
+    let written_ref = written.clone();
+    let files_ref = files.clone();
+    // Current child index == number of boundaries already crossed.
+    let mut current_child = 0usize;
+    let mut next_file = 1usize;
+
+    let pick_writer = move |b: &RecordBatch| -> WriteBatchTo {
+        let n = b.num_rows();
+        let mut written = written_ref.lock().unwrap();
+
+        let rows_until_boundary = if current_child < boundaries.len() {
+            let mut i = 0;
+            while i < n
+                && cmp_partition_key(
+                    partition_split_key_size,
+                    boundaries[current_child].values().as_slice(),
+                    b.columns(),
+                    i,
+                ) > Ordering::Equal
+            {
+                i += 1;
+            }
+            i
+        } else {
+            n
+        };
+
+        let cur = written.last_mut().unwrap();
+        let rows_until_size = rows_per_chunk.saturating_sub(cur.num_rows);
+        let cut = rows_until_boundary.min(rows_until_size);
+
+        if cut >= n {
+            if n > 0 {
+                if cur.num_rows == 0 {
+                    cur.min = TableValue::from_columns(&b.columns()[0..key_size], 0);
+                }
+                cur.max = TableValue::from_columns(&b.columns()[0..key_size], n - 1);
+                cur.num_rows += n;
+            }
+            return WriteBatchTo::Current;
+        }
+
+        if cut > 0 {
+            if cur.num_rows == 0 {
+                cur.min = TableValue::from_columns(&b.columns()[0..key_size], 0);
+            }
+            cur.max = TableValue::from_columns(&b.columns()[0..key_size], cut - 1);
+            cur.num_rows += cut;
+        }
+
+        // Boundary cut advances the child; a pure size cut keeps the same child.
+        if rows_until_boundary <= rows_until_size {
+            current_child += 1;
+        }
+        let file = files_ref[next_file].clone();
+        next_file += 1;
+        written.push(WrittenChunk {
+            child_index: current_child,
+            file,
+            num_rows: 0,
+            min: Vec::new(),
+            max: Vec::new(),
+        });
+        WriteBatchTo::Next {
+            rows_for_current: cut,
+        }
+    };
+
+    write_to_files_impl(records, store, files, table, pick_writer).await?;
+
+    Ok(Arc::try_unwrap(written)
+        .map_err(|_| CubeError::internal("write_chunks stats still borrowed".to_string()))?
+        .into_inner()
+        .unwrap())
+}
+
+/// Wraps `plan` into a projection that casts every column whose type diverged from `schema`
+/// back to the declared type. DataFusion widens some aggregate output types (e.g. a decimal
+/// SUM gains 10 digits of precision), while chunk data must keep the index schema.
+pub fn cast_plan_to_schema(
+    plan: Arc<dyn ExecutionPlan>,
+    schema: &Arc<Schema>,
+) -> Result<Arc<dyn ExecutionPlan>, CubeError> {
+    let plan_schema = plan.schema();
+    if plan_schema.fields().len() != schema.fields().len() {
+        return Err(CubeError::internal(format!(
+            "Cannot cast plan schema {} to {}: different number of columns",
+            plan_schema, schema
+        )));
+    }
+    let mut exprs: Vec<(Arc<dyn PhysicalExpr>, String)> = Vec::with_capacity(schema.fields().len());
+    let mut needs_cast = false;
+    for (i, target) in schema.fields().iter().enumerate() {
+        let source = plan_schema.field(i);
+        let col: Arc<dyn PhysicalExpr> = Arc::new(Column::new(source.name().as_str(), i));
+        let expr: Arc<dyn PhysicalExpr> = if source.data_type() == target.data_type() {
+            col
+        } else {
+            // Only a precision change of a decimal aggregate is a known-legitimate
+            // divergence. Anything else means the plan output no longer lines up with
+            // the index columns positionally, and casting it would silently corrupt
+            // the stored data — fail loudly instead.
+            let same_scale_decimals = match (source.data_type(), target.data_type()) {
+                (DataType::Decimal128(_, s1), DataType::Decimal128(_, s2)) => s1 == s2,
+                _ => false,
+            };
+            if !same_scale_decimals {
+                return Err(CubeError::internal(format!(
+                    "Cannot cast column {} of type {} to column {} of type {}: only a decimal precision change is expected here",
+                    source.name(),
+                    source.data_type(),
+                    target.name(),
+                    target.data_type()
+                )));
+            }
+            needs_cast = true;
+            // safe: false so a value that doesn't fit the declared type (e.g. a sum
+            // overflowing the declared decimal precision) fails the job instead of
+            // silently becoming NULL.
+            Arc::new(CastExpr::new(
+                col,
+                target.data_type().clone(),
+                Some(CastOptions {
+                    safe: false,
+                    format_options: FormatOptions::default(),
+                }),
+            ))
+        };
+        exprs.push((expr, target.name().clone()));
+    }
+    if !needs_cast {
+        return Ok(plan);
+    }
+    Ok(Arc::new(ProjectionExec::try_new(exprs, plan)?))
+}
+
 /// Builds a `SendableRecordBatchStream` merging the persistent partition data `l` with the
 /// already-sorted chunk inputs `r` (one sorted ExecutionPlan per chunk). Inputs are merged with a
 /// k-way `SortPreservingMergeExec` instead of being concatenated and re-sorted.
@@ -1488,8 +1670,9 @@ pub async fn merge_chunks(
             aggregates,
             vec![None; aggregates_len],
             res.clone(),
-            schema,
+            schema.clone(),
         )?);
+        res = cast_plan_to_schema(res, &schema)?;
     } else if let Some(key_columns) = unique_key_columns {
         res = Arc::new(LastRowByUniqueKeyExec::try_new(
             res.clone(),
@@ -1555,7 +1738,7 @@ mod tests {
     use crate::table::parquet::CubestoreMetadataCacheFactoryImpl;
     use crate::table::{cmp_same_types, Row, TableValue};
     use cuberockstore::rocksdb::{Options, DB};
-    use datafusion::arrow::array::{ArrayRef, Int64Array, StringArray};
+    use datafusion::arrow::array::{ArrayRef, Decimal128Array, Int64Array, StringArray};
     use datafusion::arrow::datatypes::{Field, Schema};
     use datafusion::arrow::record_batch::RecordBatch;
     use datafusion::physical_plan::collect;
@@ -1676,6 +1859,9 @@ mod tests {
         config
             .expect_compaction_split_by_total_file_size_enabled()
             .returning(|| false);
+
+        // Exercise the batched create_partitions path for the split below.
+        config.expect_metastore_batch_rpc().returning(|| true);
 
         let compaction_service = CompactionServiceImpl::new(
             metastore.clone(),
@@ -2186,6 +2372,14 @@ mod tests {
             Column::new("foo".to_string(), ColumnType::String, 0),
             Column::new("boo".to_string(), ColumnType::Int, 1),
             Column::new("sum_int".to_string(), ColumnType::Int, 2),
+            Column::new(
+                "sum_dec".to_string(),
+                ColumnType::Decimal {
+                    scale: 5,
+                    precision: 18,
+                },
+                3,
+            ),
         ];
         let table = metastore
             .create_table(
@@ -2202,7 +2396,10 @@ mod tests {
                 None,
                 None,
                 None,
-                Some(vec![("sum".to_string(), "sum_int".to_string())]),
+                Some(vec![
+                    ("sum".to_string(), "sum_int".to_string()),
+                    ("sum".to_string(), "sum_dec".to_string()),
+                ]),
                 None,
                 None,
                 false,
@@ -2233,6 +2430,11 @@ mod tests {
             ])),
             Arc::new(Int64Array::from(vec![1, 10, 2, 20, 10])),
             Arc::new(Int64Array::from(vec![1, 2, 3, 4, 5])),
+            Arc::new(
+                Decimal128Array::from(vec![100000_i128, 200000, 300000, 400000, 500000])
+                    .with_precision_and_scale(18, 5)
+                    .unwrap(),
+            ),
         ];
         let data2: Vec<ArrayRef> = vec![
             Arc::new(StringArray::from(vec![
@@ -2245,10 +2447,28 @@ mod tests {
             ])),
             Arc::new(Int64Array::from(vec![1, 10, 2, 20, 10, 30])),
             Arc::new(Int64Array::from(vec![10, 20, 30, 40, 50, 60])),
+            Arc::new(
+                Decimal128Array::from(vec![
+                    1000000_i128,
+                    2000000,
+                    3000000,
+                    4000000,
+                    5000000,
+                    6000000,
+                ])
+                .with_precision_and_scale(18, 5)
+                .unwrap(),
+            ),
         ];
 
         let (chunk, _) = chunk_store
-            .add_chunk_columns(aggr_index.clone(), partition.clone(), data1.clone(), false)
+            .add_chunk_columns(
+                aggr_index.clone(),
+                &table,
+                partition.clone(),
+                data1.clone(),
+                false,
+            )
             .await
             .unwrap()
             .await
@@ -2257,7 +2477,13 @@ mod tests {
         metastore.chunk_uploaded(chunk.get_id()).await.unwrap();
 
         let (chunk, _) = chunk_store
-            .add_chunk_columns(aggr_index.clone(), partition.clone(), data2.clone(), false)
+            .add_chunk_columns(
+                aggr_index.clone(),
+                &table,
+                partition.clone(),
+                data2.clone(),
+                false,
+            )
             .await
             .unwrap()
             .await
@@ -2323,7 +2549,21 @@ mod tests {
         let boos = Arc::new(Int64Array::from(vec![1, 10, 2, 20, 10, 30]));
 
         let sums = Arc::new(Int64Array::from(vec![11, 22, 33, 44, 55, 60]));
-        let expected: Vec<ArrayRef> = vec![foos, boos, sums];
+        // The decimal sum's DataFusion output is wider than the declared Decimal128(18, 5);
+        // compaction must cast it back to the index schema.
+        let dec_sums = Arc::new(
+            Decimal128Array::from(vec![
+                1100000_i128,
+                2200000,
+                3300000,
+                4400000,
+                5500000,
+                6000000,
+            ])
+            .with_precision_and_scale(18, 5)
+            .unwrap(),
+        );
+        let expected: Vec<ArrayRef> = vec![foos, boos, sums, dec_sums];
 
         assert_eq!(res_data.columns(), &expected);
 
@@ -2743,6 +2983,7 @@ struct MultiSplit {
     meta: Arc<dyn MetaStore>,
     fs: Arc<dyn RemoteFs>,
     metadata_cache_factory: Arc<dyn CubestoreMetadataCacheFactory>,
+    metastore_batch_rpc: bool,
     keys: Vec<Row>,
     key_len: usize,
     multi_partition_id: u64,
@@ -2759,6 +3000,7 @@ impl MultiSplit {
         meta: Arc<dyn MetaStore>,
         fs: Arc<dyn RemoteFs>,
         metadata_cache_factory: Arc<dyn CubestoreMetadataCacheFactory>,
+        metastore_batch_rpc: bool,
         keys: Vec<Row>,
         key_len: usize,
         multi_partition_id: u64,
@@ -2769,6 +3011,7 @@ impl MultiSplit {
             meta,
             fs,
             metadata_cache_factory,
+            metastore_batch_rpc,
             keys,
             key_len,
             multi_partition_id,
@@ -2789,18 +3032,28 @@ impl MultiSplit {
         let new_partition_rows = &mut self.new_partition_rows;
         let uploads = &mut self.uploads;
 
-        let mut children = Vec::with_capacity(mchildren.len());
-        for mc in mchildren.iter() {
-            let c = Partition::new_child(&p.partition, Some(mc.get_id()));
-            let c = c.update_min_max_and_row_count(
-                mc.get_row().min_row().cloned(),
-                mc.get_row().max_row().cloned(),
-                0,
-                None,
-                None,
-            );
-            children.push(self.meta.create_partition(c).await?)
-        }
+        let child_defs = mchildren
+            .iter()
+            .map(|mc| {
+                let c = Partition::new_child(&p.partition, Some(mc.get_id()));
+                c.update_min_max_and_row_count(
+                    mc.get_row().min_row().cloned(),
+                    mc.get_row().max_row().cloned(),
+                    0,
+                    None,
+                    None,
+                )
+            })
+            .collect::<Vec<_>>();
+        let children = if self.metastore_batch_rpc {
+            self.meta.create_partitions(child_defs).await?
+        } else {
+            let mut children = Vec::with_capacity(child_defs.len());
+            for c in child_defs {
+                children.push(self.meta.create_partition(c).await?);
+            }
+            children
+        };
 
         let mut in_files = Vec::new();
         collect_remote_files(&p, &mut in_files);

@@ -21,7 +21,7 @@ The diagram below shows how it works during the request processing in Cube:
 
 Relevant configuration options: [`check_auth`][ref-config-check-auth] and [`jwt`][ref-config-jwt].
 
-Relevant environment variables: [`CUBEJS_API_SECRET`](/reference/configuration/environment-variables#cubejs_api_secret), [`CUBEJS_JWT_KEY`](/reference/configuration/environment-variables#cubejs_jwt_key), [`CUBEJS_JWK_URL`](/reference/configuration/environment-variables#cubejs_jwk_url),
+Relevant environment variables: [`CUBEJS_API_SECRET`](/reference/configuration/environment-variables#cubejs_api_secret), [`CUBEJS_API_SECRETS`](/reference/configuration/environment-variables#cubejs_api_secrets), [`CUBEJS_JWT_KEY`](/reference/configuration/environment-variables#cubejs_jwt_key), [`CUBEJS_JWK_URL`](/reference/configuration/environment-variables#cubejs_jwk_url),
 [`CUBEJS_JWT_AUDIENCE`](/reference/configuration/environment-variables#cubejs_jwt_audience), [`CUBEJS_JWT_ISSUER`](/reference/configuration/environment-variables#cubejs_jwt_issuer), [`CUBEJS_JWT_SUBJECT`](/reference/configuration/environment-variables#cubejs_jwt_subject), [`CUBEJS_JWT_CLAIMS_NAMESPACE`](/reference/configuration/environment-variables#cubejs_jwt_claims_namespace).
 
 ## Custom authentication
@@ -41,12 +41,29 @@ A typical use case would be:
 5.  Once decoded, the token claims are injected into the [security
     context][ref-sec-ctx].
 
-<Info>
+<Warning>
 
-**In development mode, the token is not required for authorization**, but you
-can still use it to [pass a security context][ref-sec-ctx].
+**In development mode, the token is not required for authorization.** JWT
+verification on this API is enabled by `NODE_ENV=production`, so it is off whenever
+`NODE_ENV` is anything else. Under the `cubejs` CLI and the official Docker images,
+setting
+[`CUBEJS_DEV_MODE=true`](/reference/configuration/environment-variables#cubejs_dev_mode)
+also forces `NODE_ENV=development`, which switches verification off even where it was
+otherwise on. A custom [`check_auth`](/reference/configuration/config#check_auth) that
+rejects unauthenticated requests enforces it whatever `NODE_ENV` is.
 
-</Info>
+`cubejs server` and the official Docker images set `NODE_ENV=production`, so
+verification is on there unless you enable development mode. Development mode also
+exposes Playground's unauthenticated endpoints, which hand out and mint valid tokens
+carrying any security context, signed with your API secret. This is
+intentional — development mode is designed for local development machines only. Never
+use it in production, and using it in the Cube cloud platform is highly discouraged
+because it bypasses the platform's security model.
+
+You can still pass a token in development mode to [set a security
+context][ref-sec-ctx].
+
+</Warning>
 
 ## Generating JSON Web Tokens
 

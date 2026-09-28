@@ -1,4 +1,5 @@
 use super::*;
+use crate::planner::filter::Filter;
 use crate::planner::MemberSymbol;
 use cubenativeutils::CubeError;
 use std::rc::Rc;
@@ -29,6 +30,12 @@ impl KeysSubQuery {
     }
     pub fn filter(&self) -> &Rc<LogicalFilter> {
         &self.filter
+    }
+    /// The WHERE this subquery applies. The measure side of the join back
+    /// resolves its `FILTER_PARAMS` bindings against the same filters, so the
+    /// two sides of the join stay one expression - they read it from here.
+    pub fn where_filter(&self) -> Option<Filter> {
+        self.filter.all_filters()
     }
     pub fn source(&self) -> &Rc<LogicalJoin> {
         &self.source

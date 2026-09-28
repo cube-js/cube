@@ -16,6 +16,7 @@ import {
 import {
   getEnv,
   assertDataSource,
+  formatAnsi,
 } from '@cubejs-backend/shared';
 
 import { Transform, TransformCallback } from 'stream';
@@ -24,7 +25,6 @@ import type { ConnectionOptions as TLSConnectionOptions } from 'tls';
 import {
   map, zipObj, prop, concat
 } from 'ramda';
-import SqlString from 'sqlstring';
 
 const presto = require('presto-client');
 
@@ -40,7 +40,7 @@ export type PrestoDriverExportBucket = {
 };
 
 export type PrestoDriverInternalConfiguration = {
-    engine?: 'presto' | 'trino';
+  engine?: 'presto' | 'trino';
 };
 
 export type PrestoDriverConfiguration = PrestoDriverExportBucket & PrestoDriverInternalConfiguration & {
@@ -53,7 +53,7 @@ export type PrestoDriverConfiguration = PrestoDriverExportBucket & PrestoDriverI
   custom_auth?: string;
   // eslint-disable-next-line camelcase
   basic_auth?: { user: string, password: string };
-  ssl?: string | TLSConnectionOptions;
+  ssl?: TLSConnectionOptions;
   dataSource?: string;
   queryTimeout?: number;
   preAggregations?: boolean;
@@ -164,6 +164,7 @@ export class PrestoDriver extends BaseDriver implements DriverInterface {
         // otherwise forces the client's configured host, so the view preserves
         // upstream's host-following behaviour.
         let href;
+
         try {
           href = new URL(opts);
         } catch (error) {
@@ -208,18 +209,15 @@ export class PrestoDriver extends BaseDriver implements DriverInterface {
   }
 
   protected async testConnectionViaSelect() {
-    const query = SqlString.format('SELECT 1', []);
-    await this.queryPromised(query, false);
+    await this.queryPromised('SELECT 1', false);
   }
 
   public query(query: string, values: unknown[]): Promise<any[]> {
     return <Promise<any[]>> this.queryPromised(this.prepareQueryWithParams(query, values), false);
   }
 
-  public prepareQueryWithParams(query: string, values: unknown[]) {
-    return SqlString.format(query, (values || []).map(value => (typeof value === 'string' ? {
-      toSqlString: () => SqlString.escape(value).replace(/\\\\([_%])/g, '\\$1'),
-    } : value)));
+  protected prepareQueryWithParams(query: string, values: unknown[]) {
+    return formatAnsi(query, values || []);
   }
 
   public queryPromised(query: string, streaming: boolean): Promise<any[] | StreamTableData> {
@@ -248,6 +246,7 @@ export class PrestoDriver extends BaseDriver implements DriverInterface {
           },
           data: (error: any, data: any[], columns: TableStructure) => {
             const normalData = this.normalizeResultOverColumns(data, columns);
+
             for (const obj of normalData) {
               rowStream.write(obj);
             }
@@ -460,6 +459,7 @@ export class PrestoDriver extends BaseDriver implements DriverInterface {
   public async queryColumnTypes(sql: string, params: unknown[]): Promise<{ name: string; type: string; }[]> {
     const response = await this.stream(`${sql} LIMIT 0`, params || [], { highWaterMark: 1 });
     const result = [];
+
     for (const column of response.types || []) {
       result.push({ name: column.name, type: this.toGenericType(column.type) });
     }

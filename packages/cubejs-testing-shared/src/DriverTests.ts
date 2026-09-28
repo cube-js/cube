@@ -184,6 +184,7 @@ export class DriverTests {
 
     for (const row of rows) {
       const newRow: Record<string, string> = {};
+
       for (const k of Object.keys(row)) {
         newRow[k] = row[k] === null ? null : row[k].toString();
       }

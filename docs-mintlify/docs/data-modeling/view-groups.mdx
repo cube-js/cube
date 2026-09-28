@@ -41,7 +41,7 @@ view_group(`sales`, {
 ## Assigning views to a group
 
 To assign a view to a group, list its name on the group via the
-[`views`][ref-view-group-views] parameter. This keeps the full
+[`includes`][ref-view-group-includes] parameter. This keeps the full
 membership in one place, which makes it easy to review a group at a glance.
 
 <CodeGroup>
@@ -50,7 +50,7 @@ membership in one place, which makes it easy to review a group at a glance.
 view_groups:
   - name: sales
     title: Sales
-    views:
+    includes:
       - orders_overview
       - revenue
 ```
@@ -58,14 +58,53 @@ view_groups:
 ```javascript title="JavaScript"
 view_group(`sales`, {
   title: `Sales`,
-  views: [`orders_overview`, `revenue`]
+  includes: [`orders_overview`, `revenue`]
 })
 ```
 
 </CodeGroup>
 
-A view can belong to more than one group — list it under the `views`
+A view can belong to more than one group — list it under the `includes`
 parameter of every group it should appear in.
+
+## Nesting
+
+View groups can be nested, similar to [nested folders][ref-view-nesting]. Add a
+nested view group — with its own `name`, `title`, `description`, and
+`includes` — directly inside a parent group's `includes`.
+
+<CodeGroup>
+
+```yaml title="YAML"
+view_groups:
+  - name: sales
+    title: Sales
+    includes:
+      - orders_overview
+      - revenue
+
+      - name: enterprise_sales
+        title: Enterprise Sales
+        includes:
+          - enterprise_deals
+```
+
+```javascript title="JavaScript"
+view_group(`sales`, {
+  title: `Sales`,
+  includes: [
+    `orders_overview`,
+    `revenue`,
+    {
+      name: `enterprise_sales`,
+      title: `Enterprise Sales`,
+      includes: [`enterprise_deals`]
+    }
+  ]
+})
+```
+
+</CodeGroup>
 
 ## Where view groups live in the model
 
@@ -83,8 +122,9 @@ entity and can be split across multiple files as your model grows.
 - Explore [AI context][ref-ai-context] to improve AI query accuracy
 
 [ref-views]: /docs/data-modeling/views
+[ref-view-nesting]: /reference/data-modeling/view#nesting
 [ref-syntax]: /docs/data-modeling/concepts/syntax
 [ref-ai-context]: /docs/data-modeling/ai-context
 [ref-view-group-ref]: /reference/data-modeling/view-group
-[ref-view-group-views]: /reference/data-modeling/view-group#views
+[ref-view-group-includes]: /reference/data-modeling/view-group#includes
 [ref-meta-endpoint]: /reference/core-data-apis/rest-api/reference

@@ -1,6 +1,5 @@
 import fs from 'fs-extra';
-import decompress from 'decompress';
-import decompressTargz from 'decompress-targz';
+import * as tar from 'tar';
 import path from 'path';
 import { executeCommand } from '@cubejs-backend/shared';
 
@@ -61,8 +60,14 @@ export class PackageFetcher {
   public async downloadPackages() {
     await this.downloadRepo();
 
-    await decompress(this.repoArchivePath, this.tmpFolderPath, {
-      plugins: [decompressTargz()],
+    // Only ever a gzipped tar (GitHub's /archive/<ref>.tar.gz). `tar.x` refuses to
+    // write outside `cwd`: a leading `/` is stripped on extraction and entries containing `..` are
+    // dropped — but dropped with a warning rather than an error, so surface it.
+    await tar.x({
+      file: this.repoArchivePath,
+      cwd: this.tmpFolderPath,
+      preserveOwner: false,
+      onwarn: (code, message) => console.warn(`tar skipped an entry (${code}): ${message}`),
     });
 
     const dir = fs.readdirSync(this.tmpFolderPath).find((name) => !name.endsWith('tar.gz'));

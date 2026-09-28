@@ -1,5 +1,7 @@
 import ResultSet from '../src/ResultSet.js';
-import { loadResponse, loadResponseWithoutDateRange } from './fixtures/datablending/load-responses.json';
+import loadResponses from './fixtures/datablending/load-responses.json' with { type: 'json' };
+
+const { loadResponse, loadResponseWithoutDateRange } = loadResponses;
 
 describe('data blending', () => {
   const resultSet1 = new ResultSet(loadResponse as any);

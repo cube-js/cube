@@ -11,6 +11,9 @@ export function getCore(
   storage: BaseDriver,
 ): CubejsServerCoreExposed {
   const _path = path.resolve(process.cwd(), './.temp/model/ecommerce.yaml');
+  // CreateOptions.dbType has been removed; the driver type for a driverFactory
+  // returning a BaseDriver instance is resolved from CUBEJS_DB_TYPE.
+  process.env.CUBEJS_DB_TYPE = sourceType;
   return new CubejsServerCore({
     apiSecret: 'mysupersecret',
     // devServer: true,
@@ -18,7 +21,6 @@ export function getCore(
     logger: (msg: string, params: Record<string, any>) => {
       // process.stdout.write(`${msg}\n${JSON.stringify(params, undefined, 2)}\n`);
     },
-    dbType: <DatabaseType>sourceType,
     driverFactory: async () => source,
     externalDbType: <DatabaseType>storageType,
     externalDriverFactory: async () => storage,

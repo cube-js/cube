@@ -23,11 +23,11 @@ By contributing to Cube Dev, Inc., You accept and agree to the terms and conditi
 ## Step-by-step guide to contributing
 
 1. Find [issues](https://github.com/cube-js/cube/issues?q=is%3Aissue+is%3Aopen+sort%3Aupdated-desc) where we need help. Search for issues with either [`good first issue`](https://github.com/cube-js/cube/issues?q=is%3Aissue+is%3Aopen+sort%3Aupdated-desc+label%3A%22good+first+issue%22+) and/or [`help wanted`](https://github.com/cube-js/cube/issues?q=is%3Aissue+is%3Aopen+sort%3Aupdated-desc+label%3A%22help+wanted%22) labels.
-2. Follow the directions in the [Getting Started guide](https://cube.dev/docs/getting-started) to get Cube up and running (incl. the [Developer Playground](https://cube.dev/docs/dev-tools/dev-playground)). 
+2. Follow the directions in the [Getting Started guide](https://docs.cube.dev/cube-core/getting-started) to get Cube up and running (incl. the [Developer Playground](https://docs.cube.dev/docs/explore-analyze/playground)). 
 3. Clone the [Cube repo](https://github.com/cube-js/cube).
 4. Submit your Pull Request. 
 5. Testing: Please include test(s) for your code contribution. Depending on a change it can be tested by unit, integration or E2E test. See some of the test examples for [drivers](https://github.com/cube-js/cube/pull/1333/commits/56dadccd62ac4eaceafe650d2853406f5d3d9d43) and [backend](https://github.com/cube-js/cube/tree/master/packages/cubejs-backend-shared/test). There're separate packages for [E2E testing](https://github.com/cube-js/cube/tree/master/packages/cubejs-testing/) and [E2E driver testing](https://github.com/cube-js/cube/tree/master/packages/cubejs-testing-drivers/). **Tests are required for most of the contributions.**
-6. Documentation: When new features are added or there are changes to existing features that require updates to documentation, we encourage you to add/update any missing documentation in the [`/docs` folder](https://github.com/cube-js/cube/tree/master/docs). To update an existing documentation page, you can simply click on the `Edit this page` button on the top right corner of the documentation page. 
+6. Documentation: When new features are added or there are changes to existing features that require updates to documentation, we encourage you to add/update any missing documentation in the [`/docs-mintlify` folder](https://github.com/cube-js/cube/tree/master/docs-mintlify). 
 7. Relevant team(s) will be pinged automatically for a review based on information in the `CODEOWNERS` file. 
 
 ## Development Workflow
@@ -82,7 +82,7 @@ https://github.com/cube-js/cube/blob/master/packages/cubejs-jdbc-driver/README.m
 
 #### Development
 
-Cube.is written in a mixture of JavaScript, TypeScript, and Rust. TypeScript and Rust are preferred for new code.
+Cube is written in a mixture of JavaScript, TypeScript, and Rust. TypeScript and Rust are preferred for new code.
 
 > Attention: Cube uses TypeScript configured in incremental mode, which uses cache to speed up compilation,  
 > but in some cases, you can run into a problem with a not recompiled file. To fix it, we recommend running `$ yarn clean` and `$ yarn tsc`.
@@ -97,7 +97,7 @@ Cube.is written in a mixture of JavaScript, TypeScript, and Rust. TypeScript and
 8. Run `yarn link @cubejs-backend/<pkg>` in `packages/cubejs-server-core` to link drivers and dependent packages.
 9. Run `yarn link` in `packages/cubejs-server-core`.
 10. Create or choose an existing project for testing. You can generate a new one with 
-    [cubejs-cli](https://cube.dev/docs/reference/cli) tool.
+    [cubejs-cli](https://docs.cube.dev/cube-core/getting-started/create-a-project) tool.
 11. Run `yarn link @cubejs-backend/server-core` in your project directory. 
 12. Run `yarn dev` to start your testing project and verify changes.
 
@@ -121,7 +121,7 @@ Instead of running all of the above commands manually you can use the `dev-env.s
 To enhance the adoption of community-contributed drivers, we decided to split the database driver contribution process into multiple stages.
 
 1. Each driver which is planned to be contributed to the main Cube repository should be published first as an npm package. Please see [Publishing Driver npm package](#publishing-driver-npm-package) on how to do that.
-2. This NPM package should be contributed to the list of [Third-party community drivers](https://cube.dev/docs/config/databases#third-party-community-drivers).
+2. This NPM package should be contributed to the list of [Third-party community drivers](https://docs.cube.dev/admin/connect-to-data/data-sources#third-party-drivers).
 3. Please make sure each npm package has a README with instructions on how to install it to the official docker image and how to connect it to the database.
 4. Posting a backlink to an open-source repository would be a good idea here so people can provide feedback on it by posting issues.
 5. Before creating PR for the main repository, please make sure it's tested with the standard Cube E2E testing suite. An example of an E2E testing suite can be found here: https://github.com/cube-js/cube/blob/master/packages/cubejs-testing/test/driver-postgres.test.ts
@@ -181,7 +181,7 @@ When it's up and running just use `yarn test` in `packages/cubejs-schema-compile
 
 ### Client Packages
 
-If you want to make changes to the Cube.js client packages and test them locally in your project you can do it the following way:
+If you want to make changes to the Cube client packages and test them locally in your project you can do it the following way:
 1. Make the desired changes and run `yarn build` in the root directory (you can also use `yarn watch`)
 2. Go to the `~/some-path/cube.js/packages/cubejs-client-core` directory and run `yarn link`. (You'll see the messages _Registered **"@cubejs-client/core"**_)
 3. Now you can link it in your project (e.g. _/my-project/dashboard-app_). You can do so running `yarn link "@cubejs-client/core"`
@@ -206,10 +206,13 @@ Following these guidelines is not a requirement, but you can save some time for 
 
 ### Code
 
-1. Run `yarn lint` in package before committing your changes.
-If package doesn't have lint script, please add it and run.
-There's one root `.eslintrc.js` file for all packages except client ones.
-Client packages has it's own `.eslintrc.js` files.
+1. Run `yarn lint` from the repository root before committing your changes.
+Linting is a whole-repo operation now (oxlint covers every package in about a second),
+so packages don't carry their own lint scripts.
+The shared rule set lives in `packages/cubejs-linter/.oxlintrc.json` and is wired up by the
+root `.oxlintrc.json`. A package that needs to diverge gets its own `.oxlintrc.json`
+extending the root one - see `packages/cubejs-client-react` for an example.
+Use `yarn lint:fix` to apply the fixable violations.
 2. Run `yarn test` before committing if package has tests.
 3. Please use [conventional commits name](https://www.conventionalcommits.org/) for your PR.
 It'll be used to build change logs.

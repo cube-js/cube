@@ -49,13 +49,33 @@ pub enum DataSourceError {
     Conflict(String, String),
     #[error("Data source not found for member '{0}'")]
     Missing(String),
+    #[error("Data source not found for cube '{0}'")]
+    MissingForCube(String),
+    #[error("Data source not found for any of the cubes: {0}")]
+    MissingForEveryCube(String),
 }
 
 impl<'meta> DataSource<'meta> {
+    /// The data source when there is a specific one, `None` when unrestricted.
+    pub fn specific(&self) -> Option<&'meta str> {
+        match self {
+            DataSource::Unrestricted => None,
+            DataSource::Specific(data_source) => Some(data_source),
+        }
+    }
+
     pub fn specific_or<E>(self, err: E) -> Result<&'meta str, E> {
         match self {
             DataSource::Unrestricted => Err(err),
             DataSource::Specific(data_source) => Ok(data_source),
+        }
+    }
+
+    /// Resolve again with `f` when nothing has restricted the data source yet.
+    pub fn or_else_try<E>(self, f: impl FnOnce() -> Result<Self, E>) -> Result<Self, E> {
+        match self {
+            Self::Unrestricted => f(),
+            specific => Ok(specific),
         }
     }
 
@@ -136,6 +156,78 @@ impl MetaContext {
             .into_iter()
             .map(|member| self.data_source_for_member_name(member))
             .try_fold(DataSource::Unrestricted, |l, r| l.merge(&r?))
+    }
+
+    /// Every data source reached by `members`, sorted and without duplicates. Unlike
+    /// [`Self::data_source_for_member_names`] this does not treat several data sources as
+    /// a conflict: members of a view can come from different data sources, and a caller
+    /// that does not know yet which of them a query will use keeps them all as the bound.
+    /// Synthetic fields reach no data source of their own and add nothing.
+    pub fn data_sources_for_member_names<'mem>(
+        &self,
+        members: impl IntoIterator<Item = &'mem str>,
+    ) -> Result<Vec<&str>, DataSourceError> {
+        // This runs inside rewrite transforms, so it stays a single allocation
+        let mut data_sources: Vec<&str> = Vec::new();
+        for member in members {
+            if let DataSource::Specific(data_source) = self.data_source_for_member_name(member)? {
+                data_sources.push(data_source);
+            }
+        }
+        data_sources.sort_unstable();
+        data_sources.dedup();
+        Ok(data_sources)
+    }
+
+    /// Data source for a cube or a view as a whole.
+    /// A query can reference a cube without referencing any of its members,
+    /// like when it selects only synthetic fields (`__user`, `__cubeJoinField`).
+    /// Members of a single view can come from different data sources,
+    /// so the first member with a known data source wins.
+    pub fn data_source_for_cube_name(
+        &self,
+        cube_name: &str,
+    ) -> Result<DataSource<'_>, DataSourceError> {
+        let cube = self
+            .find_cube_with_name(cube_name)
+            .ok_or_else(|| DataSourceError::MissingForCube(cube_name.to_string()))?;
+
+        cube.dimensions
+            .iter()
+            .map(|dimension| &dimension.name)
+            .chain(cube.measures.iter().map(|measure| &measure.name))
+            .chain(cube.segments.iter().map(|segment| &segment.name))
+            .find_map(|member| self.member_to_data_source.get(member))
+            .map(|data_source| DataSource::Specific(data_source.as_ref()))
+            .ok_or_else(|| DataSourceError::MissingForCube(cube_name.to_string()))
+    }
+
+    /// Data source shared by `cube_names`, as a fallback for a query that
+    /// references no members at all. Cubes without a data source of their own are
+    /// skipped, so that one unresolvable cube does not mask a resolvable one; the
+    /// rest are merged, which reports two different data sources as a conflict
+    /// like every other resolution path here. An empty `cube_names` is
+    /// `Unrestricted`; `cube_names` where nothing at all resolves names them all,
+    /// since the caller has no other way to tell what was tried.
+    pub fn data_source_for_cube_names<'names>(
+        &self,
+        cube_names: impl IntoIterator<Item = &'names str>,
+    ) -> Result<DataSource<'_>, DataSourceError> {
+        let mut tried = Vec::new();
+        let data_source = cube_names
+            .into_iter()
+            .filter_map(|cube_name| {
+                tried.push(cube_name);
+                self.data_source_for_cube_name(cube_name).ok()
+            })
+            .try_fold(DataSource::Unrestricted, |l, r| l.merge(&r))?;
+
+        match data_source {
+            DataSource::Unrestricted if !tried.is_empty() => {
+                Err(DataSourceError::MissingForEveryCube(tried.join(", ")))
+            }
+            data_source => Ok(data_source),
+        }
     }
 
     pub fn find_cube_with_name(&self, name: &str) -> Option<&CubeMeta> {
@@ -309,5 +401,178 @@ mod tests {
             Some(table) => assert_eq!(18005, table.oid),
             _ => panic!("wrong name!"),
         }
+    }
+
+    fn cube_with_members(name: &str, members: &[&str]) -> CubeMeta {
+        CubeMeta {
+            name: name.to_string(),
+            description: None,
+            title: None,
+            r#type: CubeMetaType::Cube,
+            dimensions: members
+                .iter()
+                .map(|member| CubeMetaDimension::new(member.to_string(), "string".to_string()))
+                .collect(),
+            measures: vec![],
+            segments: vec![],
+            joins: None,
+            folders: None,
+            nested_folders: None,
+            hierarchies: None,
+            meta: None,
+        }
+    }
+
+    /// `orders` resolves through its member, `logs` has a member with no data
+    /// source of its own, and `events` is not in the schema at all.
+    fn data_source_test_context() -> MetaContext {
+        MetaContext::new(
+            vec![
+                cube_with_members("orders", &["orders.status"]),
+                cube_with_members("logs", &["logs.line"]),
+            ],
+            HashMap::from([("orders.status".to_string(), "warehouse".to_string())]),
+            HashMap::new(),
+            Uuid::new_v4(),
+        )
+    }
+
+    #[test]
+    fn test_data_source_for_cube_name() {
+        let ctx = data_source_test_context();
+
+        assert!(matches!(
+            ctx.data_source_for_cube_name("orders"),
+            Ok(DataSource::Specific("warehouse"))
+        ));
+        assert!(matches!(
+            ctx.data_source_for_cube_name("logs"),
+            Err(DataSourceError::MissingForCube(cube)) if cube == "logs"
+        ));
+        assert!(matches!(
+            ctx.data_source_for_cube_name("events"),
+            Err(DataSourceError::MissingForCube(cube)) if cube == "events"
+        ));
+    }
+
+    #[test]
+    fn test_data_source_for_cube_names() {
+        let ctx = data_source_test_context();
+
+        // Nothing to resolve from leaves the data source open, so that the caller
+        // can raise its own error.
+        assert!(matches!(
+            ctx.data_source_for_cube_names(Vec::<&str>::new()),
+            Ok(DataSource::Unrestricted)
+        ));
+        // A cube without a data source of its own does not mask a cube that has
+        // one, whichever order they come in.
+        assert!(matches!(
+            ctx.data_source_for_cube_names(vec!["logs", "orders"]),
+            Ok(DataSource::Specific("warehouse"))
+        ));
+        assert!(matches!(
+            ctx.data_source_for_cube_names(vec!["orders", "logs"]),
+            Ok(DataSource::Specific("warehouse"))
+        ));
+        // When nothing resolves, the error names everything that was tried.
+        let err = ctx
+            .data_source_for_cube_names(vec!["logs", "events"])
+            .expect_err("neither cube has a data source");
+        assert!(
+            matches!(&err, DataSourceError::MissingForEveryCube(cubes) if cubes == "logs, events"),
+            "expected every tried cube to be named, got: {}",
+            err
+        );
+    }
+
+    /// A view can include members from cubes on different data sources. There is
+    /// no single right answer then, and resolving a whole cube is only ever a
+    /// fallback for a query that names no members, so the first member that has a
+    /// data source wins. This pins that choice rather than endorsing it.
+    #[test]
+    fn test_data_source_for_cube_name_of_multi_data_source_view() {
+        let mut view = cube_with_members("everything", &["everything.url", "everything.status"]);
+        view.r#type = CubeMetaType::View;
+
+        let ctx = MetaContext::new(
+            vec![view],
+            HashMap::from([
+                ("everything.url".to_string(), "analytics".to_string()),
+                ("everything.status".to_string(), "warehouse".to_string()),
+            ]),
+            HashMap::new(),
+            Uuid::new_v4(),
+        );
+
+        assert!(matches!(
+            ctx.data_source_for_cube_name("everything"),
+            Ok(DataSource::Specific("analytics"))
+        ));
+    }
+
+    /// Members on several data sources are all kept, once each and in a stable order, so
+    /// that a caller can carry them as a bound; a member without a data source is still
+    /// an error, and synthetic fields add nothing.
+    #[test]
+    fn test_data_sources_for_member_names() {
+        let ctx = MetaContext::new(
+            vec![
+                cube_with_members("orders", &["orders.status"]),
+                cube_with_members("visits", &["visits.url"]),
+                cube_with_members("logs", &["logs.line"]),
+            ],
+            HashMap::from([
+                ("orders.status".to_string(), "warehouse".to_string()),
+                ("visits.url".to_string(), "analytics".to_string()),
+            ]),
+            HashMap::new(),
+            Uuid::new_v4(),
+        );
+
+        assert_eq!(
+            ctx.data_sources_for_member_names(vec![
+                "visits.url",
+                "orders.status",
+                "orders.__user",
+                "visits.url",
+            ])
+            .unwrap(),
+            vec!["analytics", "warehouse"]
+        );
+        assert_eq!(
+            ctx.data_sources_for_member_names(vec!["orders.__user"])
+                .unwrap(),
+            Vec::<&str>::new()
+        );
+        assert!(matches!(
+            ctx.data_sources_for_member_names(vec!["orders.status", "logs.line"]),
+            Err(DataSourceError::Missing(member)) if member == "logs.line"
+        ));
+    }
+
+    #[test]
+    fn test_data_source_for_cube_names_reports_conflict() {
+        let ctx = MetaContext::new(
+            vec![
+                cube_with_members("orders", &["orders.status"]),
+                cube_with_members("visits", &["visits.url"]),
+            ],
+            HashMap::from([
+                ("orders.status".to_string(), "warehouse".to_string()),
+                ("visits.url".to_string(), "analytics".to_string()),
+            ]),
+            HashMap::new(),
+            Uuid::new_v4(),
+        );
+
+        let err = ctx
+            .data_source_for_cube_names(vec!["orders", "visits"])
+            .expect_err("two data sources should conflict");
+        assert!(
+            matches!(&err, DataSourceError::Conflict(..)),
+            "expected a conflict, got: {}",
+            err
+        );
     }
 }

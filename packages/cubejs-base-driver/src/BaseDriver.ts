@@ -1,9 +1,3 @@
-/**
- * @copyright Cube Dev, Inc.
- * @license Apache-2.0
- * @fileoverview The `BaseDriver` and related types declaration.
- */
-
 import * as stream from 'stream';
 import type { ConnectionOptions as TLSConnectionOptions } from 'tls';
 
@@ -18,6 +12,7 @@ import {
 import fs from 'fs';
 
 import { cancelCombinator } from './utils';
+import { detectTypesFromTabular } from './type-detection';
 import {
   ExternalCreateTableOptions,
   DownloadQueryResultsOptions,
@@ -64,16 +59,6 @@ export type ParsedBucketUrl = {
   original: string;
 };
 
-const sortByKeys = (unordered: any) => {
-  const ordered: any = {};
-
-  Object.keys(unordered).sort().forEach((key) => {
-    ordered[key] = unordered[key];
-  });
-
-  return ordered;
-};
-
 const DbTypeToGenericType: Record<string, string> = {
   'timestamp without time zone': 'timestamp',
   'character varying': 'text',
@@ -97,54 +82,6 @@ const DbTypeToGenericType: Record<string, string> = {
   bool: 'boolean',
   float4: 'float',
   float8: 'double',
-};
-
-const DB_BIG_INT_MAX = BigInt('9223372036854775807');
-const DB_BIG_INT_MIN = BigInt('-9223372036854775808');
-
-const DB_INT_MAX = 2147483647;
-const DB_INT_MIN = -2147483648;
-
-// Order of keys is important here: from more specific to less specific
-const DbTypeValueMatcher: Record<string, ((v: any) => boolean)> = {
-  timestamp: (v) => v instanceof Date || v.toString().match(/^\d\d\d\d-\d\d-\d\dT\d\d:\d\d:\d\d/),
-  date: (v) => v instanceof Date || v.toString().match(/^\d\d\d\d-\d\d-\d\d$/),
-  int: (v) => {
-    if (Number.isInteger(v)) {
-      return (v <= DB_INT_MAX && v >= DB_INT_MIN);
-    }
-
-    if (v.toString().match(/^[-]?\d+$/)) {
-      const value = BigInt(v.toString());
-
-      return value <= DB_INT_MAX && value >= DB_INT_MIN;
-    }
-
-    return false;
-  },
-  bigint: (v) => {
-    if (Number.isInteger(v)) {
-      return (v <= DB_BIG_INT_MAX && v >= DB_BIG_INT_MIN);
-    }
-
-    if (v.toString().match(/^[-]?\d+$/)) {
-      const value = BigInt(v.toString());
-
-      return value <= DB_BIG_INT_MAX && value >= DB_BIG_INT_MIN;
-    }
-
-    return false;
-  },
-  decimal: (v) => {
-    if (v instanceof Number) {
-      return true;
-    }
-
-    return v.toString().match(/^[-]?\d+(\.\d+)?$/);
-  },
-  boolean: (v) => v === false || v === true || v.toString().toLowerCase() === 'true' || v.toString().toLowerCase() === 'false',
-  string: (v) => v.length < 256,
-  text: () => true
 };
 
 export function createPoolName(driverName: string, dataSource: string, preAggregations: boolean = false): string {
@@ -361,21 +298,7 @@ export abstract class BaseDriver implements DriverInterface {
 
   public async downloadQueryResults(query: string, values: unknown[], _options: DownloadQueryResultsOptions): Promise<DownloadQueryResultsResult> {
     const rows = await this.query<Row>(query, values);
-    if (rows.length === 0) {
-      throw new Error(
-        'Unable to detect column types for pre-aggregation on empty values in readOnly mode.'
-      );
-    }
-
-    const fields = Object.keys(rows[0]);
-
-    const types = fields.map(field => ({
-      name: field,
-      type: Object.keys(DbTypeValueMatcher).find(
-        type => !rows.filter(row => field in row).find(row => !DbTypeValueMatcher[type](row[field])) &&
-          rows.find(row => field in row)
-      ) || 'text'
-    }));
+    const types = detectTypesFromTabular(rows);
 
     return {
       rows,
@@ -567,6 +490,7 @@ export abstract class BaseDriver implements DriverInterface {
     }
 
     await this.createTable(table, columns);
+
     try {
       if (isDownloadTableMemoryData(tableData)) {
         for (let i = 0; i < tableData.rows.length; i++) {
@@ -577,6 +501,7 @@ export abstract class BaseDriver implements DriverInterface {
             columns.map(c => this.toColumnValue(tableData.rows[i][c.name] as string, c.type))
           );
         }
+
         for (let i = 0; i < indexesSql.length; i++) {
           const [query, params] = indexesSql[i].sql;
           await this.query(query, params);
@@ -629,7 +554,7 @@ export abstract class BaseDriver implements DriverInterface {
   }
 
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  public async queryColumnTypes(sql: string, params: unknown[]): Promise<{ name: any; type: string; }[]> {
+  public async queryColumnTypes(sql: string, params: unknown[], options?: QueryOptions): Promise<{ name: any; type: string; }[]> {
     return [];
   }
 
@@ -712,7 +637,7 @@ export abstract class BaseDriver implements DriverInterface {
     return Date.now();
   }
 
-  public wrapQueryWithLimit(query: { query: string, limit: number}) {
+  public wrapQueryWithLimit(query: { query: string, limit: number }) {
     query.query = `SELECT * FROM (${query.query}) AS t LIMIT ${query.limit}`;
   }
 
@@ -763,7 +688,7 @@ export abstract class BaseDriver implements DriverInterface {
     prefix: string
   ): Promise<string[]> {
     // Lazy loading, because it's using azure SDK, which is quite heavy.
-    return (await import('./storage-fs/aws.fs')).extractUnloadedFilesFromS3(clientOptions, bucketName, prefix);
+    return (await import('./storage-fs/aws.fs.js')).extractUnloadedFilesFromS3(clientOptions, bucketName, prefix);
   }
 
   /**
@@ -775,7 +700,7 @@ export abstract class BaseDriver implements DriverInterface {
     tableName: string
   ): Promise<string[]> {
     // Lazy loading, because it's using azure SDK, which is quite heavy.
-    return (await import('./storage-fs/gcs.fs')).extractFilesFromGCS(gcsConfig, bucketName, tableName);
+    return (await import('./storage-fs/gcs.fs.js')).extractFilesFromGCS(gcsConfig, bucketName, tableName);
   }
 
   protected async extractFilesFromAzure(
@@ -784,6 +709,6 @@ export abstract class BaseDriver implements DriverInterface {
     tableName: string
   ): Promise<string[]> {
     // Lazy loading, because it's using azure SDK, which is quite (extremely) heavy.
-    return (await import('./storage-fs/azure.fs')).extractFilesFromAzure(azureConfig, bucketName, tableName);
+    return (await import('./storage-fs/azure.fs.js')).extractFilesFromAzure(azureConfig, bucketName, tableName);
   }
 }

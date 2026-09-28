@@ -3,9 +3,8 @@ use crate::cachestore::cache_item::{
     CACHE_ITEM_SIZE_WITHOUT_VALUE,
 };
 use crate::cachestore::queue_item::{
-    QueueItem, QueueItemIndexKey, QueueItemRocksIndex, QueueItemRocksTable, QueueItemStatus,
-    QueueResultAckEvent, QueueResultAckEventResult, QueueRetrieveResponse,
-    QUEUE_ITEM_EXTERNAL_ID_MAX_LEN, QUEUE_ITEM_PROCESS_ID_MAX_LEN,
+    active_keys_to_value, QueueItem, QueueItemIndexKey, QueueItemRocksIndex, QueueItemRocksTable,
+    QueueItemStatus, QueueResultAckEvent, QueueResultAckEventResult, QueueRetrieveResponse,
 };
 use crate::cachestore::queue_result::{QueueResultRocksIndex, QueueResultRocksTable};
 use crate::cachestore::{compaction, QueueItemPayload, QueueResult};
@@ -488,6 +487,27 @@ impl RocksCacheStore {
     pub async fn check_all_indexes(&self) -> Result<(), CubeError> {
         RocksStore::check_all_indexes(&self.store).await
     }
+
+    /// Schedules a no-op on both RW loops (default + queue) and awaits them, so that any
+    /// operation previously enqueued on those loops has finished and released its transient
+    /// Arc<DB> clone. NOTE: this only flushes the two RW loops; it does NOT wait for out-of-queue
+    /// readers (read_operation_out_of_queue), which run on detached spawn_blocking tasks with
+    /// their own Arc<DB> clone. LazyRocksCacheStore::wipe additionally waits on db_strong_count()
+    /// to cover those before closing the DB.
+    pub async fn drain_rw_loops(&self) -> Result<(), CubeError> {
+        self.store
+            .read_operation("wipe_barrier", |_| Ok(()))
+            .await?;
+        self.read_operation_queue("wipe_barrier", |_| Ok(()))
+            .await?;
+
+        Ok(())
+    }
+
+    /// Number of strong references to the underlying RocksDB handle.
+    pub fn db_strong_count(&self) -> usize {
+        Arc::strong_count(&self.store.db)
+    }
 }
 
 impl RocksCacheStore {
@@ -690,6 +710,105 @@ impl RocksCacheStore {
             })
             .collect()
     }
+
+    /// The budget is prefix scoped, exclusivity and priority blind. Shared by
+    /// `QUEUE RETRIEVE` and `QUEUE ADD_AND_RETRIEVE` so that they cannot drift apart.
+    fn queue_prefix_counters(
+        queue_schema: &QueueItemRocksTable,
+        path: &str,
+    ) -> Result<(u64, Vec<String>), CubeError> {
+        let prefix = QueueItem::extract_prefix(path.to_string()).unwrap_or("".to_string());
+
+        let pending = queue_schema.count_rows_by_index(
+            &QueueItemIndexKey::ByPrefixAndStatus(prefix.clone(), QueueItemStatus::Pending),
+            &QueueItemRocksIndex::ByPrefixAndStatus,
+        )?;
+
+        let active = queue_schema
+            .get_rows_by_index(
+                &QueueItemIndexKey::ByPrefixAndStatus(prefix, QueueItemStatus::Active),
+                &QueueItemRocksIndex::ByPrefixAndStatus,
+            )?
+            .into_iter()
+            .map(|item| item.into_row().key)
+            .collect();
+
+        Ok((pending, active))
+    }
+
+    /// Moves the item to the active status inside the caller's batch. Shared by
+    /// `QUEUE RETRIEVE` and `QUEUE ADD_AND_RETRIEVE`, so both use identical exclusivity,
+    /// heartbeat and missing payload semantics. The budget is checked by the caller.
+    fn try_claim_queue_item(
+        queue_schema: &QueueItemRocksTable,
+        queue_payload_schema: &QueueItemPayloadRocksTable,
+        batch_pipe: &mut BatchPipe,
+        id_row: IdRow<QueueItem>,
+        caller_process_id: &Option<String>,
+        pending: u64,
+        mut active: Vec<String>,
+    ) -> Result<QueueRetrieveResponse, CubeError> {
+        if id_row.get_row().get_status() != &QueueItemStatus::Pending {
+            return Ok(QueueRetrieveResponse::LockFailed { pending, active });
+        }
+
+        if id_row.get_row().get_exclusive() {
+            match (id_row.get_row().get_process_id(), caller_process_id) {
+                (Some(_), None) => {
+                    return Err(CubeError::user(
+                        "Claiming an exclusive queue item requires a process_id in the connection context (x-process-id header)".to_string(),
+                    ))
+                }
+                (None, Some(_)) => {
+                    log::warn!(
+                        "Incorrect queue_item with exclusive flag, empty process_id, id: {:?}",
+                        caller_process_id
+                    );
+
+                    return Ok(QueueRetrieveResponse::NotFound { pending, active });
+                }
+                (Some(item_process_id), Some(caller_id)) => {
+                    if item_process_id != caller_id {
+                        return Ok(QueueRetrieveResponse::ExclusiveAccessFailed {
+                            pending,
+                            active,
+                        });
+                    }
+                }
+                (None, None) => {}
+            }
+        }
+
+        let mut new = id_row.get_row().clone();
+        new.status = QueueItemStatus::Active;
+        // It's important to insert heartbeat, because
+        // without that created datetime will be used for orphaned filtering
+        new.update_heartbeat();
+
+        let res = queue_schema.update(id_row.get_id(), new, id_row.get_row(), batch_pipe)?;
+        let payload = if let Some(r) = queue_payload_schema.get_row(res.get_id())? {
+            r.into_row().value
+        } else {
+            error!(
+                "Unable to find payload for queue item, id = {}",
+                res.get_id()
+            );
+
+            queue_schema.delete_row(res, batch_pipe)?;
+
+            return Ok(QueueRetrieveResponse::NotFound { pending, active });
+        };
+
+        active.push(res.get_row().get_key().clone());
+
+        Ok(QueueRetrieveResponse::Success {
+            id: res.get_id(),
+            payload,
+            item: res.into_row(),
+            pending: pending.saturating_sub(1),
+            active,
+        })
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, DeepSizeOf)]
@@ -735,6 +854,72 @@ pub struct QueueAddPayload {
     pub process_id: Option<String>,
     pub exclusive: bool,
     pub external_id: Option<String>,
+}
+
+#[derive(Clone, Serialize, Deserialize, Debug, Eq, PartialEq)]
+pub struct QueueAddAndRetrievePayload {
+    pub path: String,
+    pub value: String,
+    pub priority: i64,
+    pub orphaned: Option<u32>,
+    pub process_id: Option<String>,
+    pub exclusive: bool,
+    pub external_id: Option<String>,
+    /// The same budget as `QUEUE RETRIEVE CONCURRENCY` uses
+    pub concurrency: u32,
+}
+
+#[derive(Clone, Serialize, Deserialize, Debug, Eq, PartialEq)]
+pub struct QueueAddAndRetrieveResponse {
+    pub id: u64,
+    pub added: bool,
+    pub pending: u64,
+    /// Keys of the active items in the prefix after this operation
+    pub active: Vec<String>,
+    /// `Some` only when the item was claimed (moved to the active status) by this call
+    pub payload: Option<String>,
+    pub extra: Option<String>,
+}
+
+impl QueueAddAndRetrieveResponse {
+    pub fn from_claim(id: u64, claim: QueueRetrieveResponse) -> Self {
+        let (payload, extra, pending, active) = match claim {
+            QueueRetrieveResponse::Success {
+                item,
+                payload,
+                pending,
+                active,
+                ..
+            } => (Some(payload), item.extra, pending, active),
+            QueueRetrieveResponse::LockFailed { pending, active }
+            | QueueRetrieveResponse::NotEnoughConcurrency { pending, active }
+            | QueueRetrieveResponse::NotFound { pending, active }
+            | QueueRetrieveResponse::ExclusiveAccessFailed { pending, active } => {
+                (None, None, pending, active)
+            }
+        };
+
+        Self {
+            id,
+            // An existing item is never added twice, it's unique by path
+            added: false,
+            pending,
+            active,
+            payload,
+            extra,
+        }
+    }
+
+    pub fn into_queue_add_and_retrieve_row(self) -> Row {
+        Row::new(vec![
+            TableValue::String(self.id.to_string()),
+            TableValue::Boolean(self.added),
+            TableValue::Int(self.pending as i64),
+            active_keys_to_value(self.active),
+            self.payload.map_or(TableValue::Null, TableValue::String),
+            self.extra.map_or(TableValue::Null, TableValue::String),
+        ])
+    }
 }
 
 #[derive(Clone, Serialize, Deserialize, Debug, Eq, PartialEq)]
@@ -865,7 +1050,9 @@ pub trait CacheStore: DIService + Send + Sync {
         item: CacheItem,
         update_if_not_exists: bool,
     ) -> Result<bool, CubeError>;
-    async fn cache_truncate(&self) -> Result<(), CubeError>;
+    async fn cache_clear(&self) -> Result<(), CubeError>;
+    // Wipe the whole cachestore keyspace with a low-level RocksDB range delete.
+    async fn truncate(&self) -> Result<(), CubeError>;
     async fn cache_delete(&self, key: String) -> Result<(), CubeError>;
     async fn cache_get(&self, key: String) -> Result<Option<IdRow<CacheItem>>, CubeError>;
     async fn cache_keys(&self, prefix: String) -> Result<Vec<IdRow<CacheItem>>, CubeError>;
@@ -879,7 +1066,11 @@ pub trait CacheStore: DIService + Send + Sync {
     ) -> Result<Vec<IdRow<QueueResult>>, CubeError>;
     async fn queue_results_multi_delete(&self, ids: Vec<u64>) -> Result<(), CubeError>;
     async fn queue_add(&self, payload: QueueAddPayload) -> Result<QueueAddResponse, CubeError>;
-    async fn queue_truncate(&self) -> Result<(), CubeError>;
+    async fn queue_add_and_retrieve(
+        &self,
+        payload: QueueAddAndRetrievePayload,
+    ) -> Result<QueueAddAndRetrieveResponse, CubeError>;
+    async fn queue_clear(&self) -> Result<(), CubeError>;
     async fn queue_to_cancel(
         &self,
         prefix: String,
@@ -928,6 +1119,9 @@ pub trait CacheStore: DIService + Send + Sync {
     async fn persist(&self) -> Result<(), CubeError>;
     async fn healthcheck(&self) -> Result<(), CubeError>;
     async fn rocksdb_properties(&self) -> Result<Vec<RocksPropertyRow>, CubeError>;
+    // Wipe all cachestore state (cache + queue) and persist a fresh snapshot, updating the
+    // remote cachestore-current pointer so a poisoned snapshot is not re-hydrated on reload
+    async fn wipe(&self) -> Result<(), CubeError>;
 }
 
 #[async_trait]
@@ -989,18 +1183,37 @@ impl CacheStore for RocksCacheStore {
         Ok(result)
     }
 
-    async fn cache_truncate(&self) -> Result<(), CubeError> {
+    async fn cache_clear(&self) -> Result<(), CubeError> {
         let block = self.cache_eviction_manager.truncation_block().await;
 
         let result = self
             .store
-            .write_operation("cache_truncate", move |db_ref, batch_pipe| {
+            .write_operation("cache_clear", move |db_ref, batch_pipe| {
                 let cache_schema = CacheItemRocksTable::new(db_ref);
                 cache_schema.truncate(batch_pipe)?;
 
                 Ok(())
             })
             .await;
+
+        self.cache_eviction_manager.notify_truncate_end().await?;
+        drop(block);
+
+        result
+    }
+
+    async fn truncate(&self) -> Result<(), CubeError> {
+        let block = self.cache_eviction_manager.truncation_block().await;
+
+        let mut result = self.store.truncate().await;
+
+        // Re-seed migration metadata so the emptied store is usable again. Fold
+        // any re-seed error into `result` rather than early-returning with `?`,
+        // so the eviction manager is always notified and the block released even
+        // on failure (mirrors `cache_clear`); otherwise waiters could get stuck.
+        if result.is_ok() {
+            result = self.check_all_indexes().await;
+        }
 
         self.cache_eviction_manager.notify_truncate_end().await?;
         drop(block);
@@ -1154,23 +1367,6 @@ impl CacheStore for RocksCacheStore {
     }
 
     async fn queue_add(&self, payload: QueueAddPayload) -> Result<QueueAddResponse, CubeError> {
-        if let Some(ref id) = payload.process_id {
-            if id.len() > QUEUE_ITEM_PROCESS_ID_MAX_LEN {
-                return Err(CubeError::user(format!(
-                    "process_id exceeds maximum allowed length of {} characters",
-                    QUEUE_ITEM_PROCESS_ID_MAX_LEN
-                )));
-            }
-        }
-        if let Some(ref id) = payload.external_id {
-            if id.len() > QUEUE_ITEM_EXTERNAL_ID_MAX_LEN {
-                return Err(CubeError::user(format!(
-                    "external_id exceeds maximum allowed length of {} characters",
-                    QUEUE_ITEM_EXTERNAL_ID_MAX_LEN
-                )));
-            }
-        }
-
         self.write_operation_queue("queue_add", move |db_ref, batch_pipe| {
             let queue_schema = QueueItemRocksTable::new(db_ref.clone());
             let pending = queue_schema.count_rows_by_index(
@@ -1223,8 +1419,116 @@ impl CacheStore for RocksCacheStore {
         .await
     }
 
-    async fn queue_truncate(&self) -> Result<(), CubeError> {
-        self.write_operation_queue("queue_truncate", move |db_ref, batch_pipe| {
+    async fn queue_add_and_retrieve(
+        &self,
+        payload: QueueAddAndRetrievePayload,
+    ) -> Result<QueueAddAndRetrieveResponse, CubeError> {
+        if payload.exclusive && payload.process_id.is_none() {
+            return Err(CubeError::user(
+                "An exclusive queue item requires a process_id".to_string(),
+            ));
+        }
+
+        self.write_operation_queue("queue_add_and_retrieve", move |db_ref, batch_pipe| {
+            let queue_schema = QueueItemRocksTable::new(db_ref.clone());
+            let (pending, mut active) = Self::queue_prefix_counters(&queue_schema, &payload.path)?;
+
+            let index_key = QueueItemIndexKey::ByPath(payload.path.clone());
+            let id_row_opt = queue_schema
+                .get_single_opt_row_by_index(&index_key, &QueueItemRocksIndex::ByPath)?;
+
+            // An item which is already pending is not a part of its own backlog
+            let backlog = match &id_row_opt {
+                Some(id_row) if id_row.get_row().get_status() == &QueueItemStatus::Pending => {
+                    pending.saturating_sub(1)
+                }
+                _ => pending,
+            };
+
+            // Claiming the item being added ignores priority, it's harmless exactly while a
+            // slot is left over for every pending item too, so nothing can be jumped over.
+            // A deeper backlog is left to QUEUE PENDING + reconcile, which pick by priority.
+            let claim = (active.len() as u64) + backlog < (payload.concurrency as u64);
+
+            if let Some(id_row) = id_row_opt {
+                let id = id_row.get_id();
+                let claim_result = if claim {
+                    let queue_payload_schema = QueueItemPayloadRocksTable::new(db_ref.clone());
+
+                    Self::try_claim_queue_item(
+                        &queue_schema,
+                        &queue_payload_schema,
+                        batch_pipe,
+                        id_row,
+                        &payload.process_id,
+                        pending,
+                        active,
+                    )?
+                } else {
+                    QueueRetrieveResponse::NotEnoughConcurrency { pending, active }
+                };
+
+                return Ok(QueueAddAndRetrieveResponse::from_claim(id, claim_result));
+            }
+
+            // Inserting a claimed item as active saves an update of the just written row
+            // (and its secondary indexes) inside the same batch
+            let mut item = QueueItem::new(
+                payload.path,
+                if claim {
+                    QueueItemStatus::Active
+                } else {
+                    QueueItem::status_default()
+                },
+                payload.priority,
+                payload.orphaned,
+                payload.process_id,
+                payload.exclusive,
+                payload.external_id,
+            );
+            if claim {
+                // It's important to insert heartbeat, because
+                // without that created datetime will be used for orphaned filtering
+                item.update_heartbeat();
+            }
+
+            let queue_item_row = queue_schema.insert(item, batch_pipe)?;
+
+            let queue_payload_schema = QueueItemPayloadRocksTable::new(db_ref.clone());
+            let queue_payload_row = queue_payload_schema.insert_with_pk(
+                queue_item_row.id,
+                QueueItemPayload::new(
+                    payload.value,
+                    queue_item_row.row.get_created().clone(),
+                    queue_item_row.row.get_expire().clone(),
+                ),
+                batch_pipe,
+            )?;
+
+            // The value can be huge, take it back from the inserted row instead of cloning
+            let claimed_payload = if claim {
+                active.push(queue_item_row.row.get_key().clone());
+
+                Some(queue_payload_row.into_row().value)
+            } else {
+                None
+            };
+
+            Ok(QueueAddAndRetrieveResponse {
+                id: queue_item_row.id,
+                added: true,
+                // A claimed item is inserted as active, it was never counted as pending
+                pending: if claim { pending } else { pending + 1 },
+                active,
+                payload: claimed_payload,
+                extra: None,
+            })
+        })
+        .await
+    }
+
+    async fn queue_clear(&self) -> Result<(), CubeError> {
+        self.write_operation_queue("queue_clear", move |db_ref, batch_pipe| {
             let queue_item_schema = QueueItemRocksTable::new(db_ref.clone());
             queue_item_schema.truncate(batch_pipe)?;
 
@@ -1404,22 +1708,7 @@ impl CacheStore for RocksCacheStore {
     ) -> Result<QueueRetrieveResponse, CubeError> {
         self.write_operation_queue("queue_retrieve_by_path", move |db_ref, batch_pipe| {
             let queue_schema = QueueItemRocksTable::new(db_ref.clone());
-            let prefix = QueueItem::parse_path(path.clone())
-                .0
-                .unwrap_or("".to_string());
-            let mut pending = queue_schema.count_rows_by_index(
-                &QueueItemIndexKey::ByPrefixAndStatus(prefix.clone(), QueueItemStatus::Pending),
-                &QueueItemRocksIndex::ByPrefixAndStatus,
-            )?;
-
-            let mut active: Vec<String> = queue_schema
-                .get_rows_by_index(
-                    &QueueItemIndexKey::ByPrefixAndStatus(prefix, QueueItemStatus::Active),
-                    &QueueItemRocksIndex::ByPrefixAndStatus,
-                )?
-                .into_iter()
-                .map(|item| item.into_row().key)
-                .collect();
+            let (pending, active) = Self::queue_prefix_counters(&queue_schema, &path)?;
             if active.len() >= (allow_concurrency as usize) {
                 return Ok(QueueRetrieveResponse::NotEnoughConcurrency { pending, active });
             }
@@ -1434,66 +1723,17 @@ impl CacheStore for RocksCacheStore {
                 return Ok(QueueRetrieveResponse::NotFound { pending, active });
             };
 
-            if id_row.get_row().get_status() == &QueueItemStatus::Pending {
-                if id_row.get_row().get_exclusive() {
-                    match (id_row.get_row().get_process_id(), &caller_process_id) {
-                        (Some(_), None) => return Err(CubeError::user(
-                            "QUEUE RETRIEVE requires a process_id in the connection context (x-process-id header)".to_string(),
-                        )),
-                        (None, Some(_)) => {
-                            log::warn!("Incorrect queue_item with exclusive flag, empty process_id, id: {:?}", caller_process_id);
+            let queue_payload_schema = QueueItemPayloadRocksTable::new(db_ref.clone());
 
-                            return Ok(QueueRetrieveResponse::NotFound { pending, active })
-                        }
-                        (Some(item_process_id), Some(caller_id)) => if item_process_id == caller_id {
-                            // OK, caller matches the exclusive item owner
-                        } else {
-                            return Ok(QueueRetrieveResponse::ExclusiveAccessFailed {
-                                pending,
-                                active,
-                            })
-                        },
-                        (None, None) => {
-                            // No process_id on item and no caller — allow retrieval
-                        }
-                    }
-                }
-
-                let mut new = id_row.get_row().clone();
-                new.status = QueueItemStatus::Active;
-                // It's important to insert heartbeat, because
-                // without that created datetime will be used for orphaned filtering
-                new.update_heartbeat();
-
-                let queue_payload_schema = QueueItemPayloadRocksTable::new(db_ref.clone());
-
-                let res =
-                    queue_schema.update(id_row.get_id(), new, id_row.get_row(), batch_pipe)?;
-                let payload = if let Some(r) = queue_payload_schema.get_row(res.get_id())? {
-                    r.into_row().value
-                } else {
-                    error!(
-                        "Unable to find payload for queue item, id = {}",
-                        res.get_id()
-                    );
-
-                    queue_schema.delete_row(res, batch_pipe)?;
-
-                    return Ok(QueueRetrieveResponse::NotFound { pending, active });
-                };
-
-                active.push(res.get_row().get_key().clone());
-                pending -= 1;
-                Ok(QueueRetrieveResponse::Success {
-                    id: id_row.get_id(),
-                    payload,
-                    item: res.into_row(),
-                    pending,
-                    active,
-                })
-            } else {
-                Ok(QueueRetrieveResponse::LockFailed { pending, active })
-            }
+            Self::try_claim_queue_item(
+                &queue_schema,
+                &queue_payload_schema,
+                batch_pipe,
+                id_row,
+                &caller_process_id,
+                pending,
+                active,
+            )
         })
         .await
     }
@@ -1683,6 +1923,15 @@ impl CacheStore for RocksCacheStore {
     async fn rocksdb_properties(&self) -> Result<Vec<RocksPropertyRow>, CubeError> {
         self.store.rocksdb_properties()
     }
+
+    async fn wipe(&self) -> Result<(), CubeError> {
+        // Wiping requires dropping and reopening the RocksDB from scratch, which a bare inner
+        // store cannot do to itself (it cannot rebuild its own Arc / swap the state). The
+        // registered production impl is always LazyRocksCacheStore, which owns the teardown.
+        Err(CubeError::internal(
+            "cachestore wipe is only supported through LazyRocksCacheStore".to_string(),
+        ))
+    }
 }
 
 crate::di_service!(RocksCacheStore, [CacheStore]);
@@ -1704,8 +1953,12 @@ impl CacheStore for ClusterCacheStoreClient {
         panic!("CacheStore cannot be used on the worker node! cache_set was used.")
     }
 
-    async fn cache_truncate(&self) -> Result<(), CubeError> {
-        panic!("CacheStore cannot be used on the worker node! cache_truncate was used.")
+    async fn cache_clear(&self) -> Result<(), CubeError> {
+        panic!("CacheStore cannot be used on the worker node! cache_clear was used.")
+    }
+
+    async fn truncate(&self) -> Result<(), CubeError> {
+        panic!("CacheStore cannot be used on the worker node! truncate was used.")
     }
 
     async fn cache_delete(&self, _key: String) -> Result<(), CubeError> {
@@ -1743,8 +1996,15 @@ impl CacheStore for ClusterCacheStoreClient {
         panic!("CacheStore cannot be used on the worker node! queue_add was used.")
     }
 
-    async fn queue_truncate(&self) -> Result<(), CubeError> {
-        panic!("CacheStore cannot be used on the worker node! queue_truncate was used.")
+    async fn queue_add_and_retrieve(
+        &self,
+        _payload: QueueAddAndRetrievePayload,
+    ) -> Result<QueueAddAndRetrieveResponse, CubeError> {
+        panic!("CacheStore cannot be used on the worker node! queue_add_and_retrieve was used.")
+    }
+
+    async fn queue_clear(&self) -> Result<(), CubeError> {
+        panic!("CacheStore cannot be used on the worker node! queue_clear was used.")
     }
 
     async fn queue_to_cancel(
@@ -1835,6 +2095,10 @@ impl CacheStore for ClusterCacheStoreClient {
     async fn rocksdb_properties(&self) -> Result<Vec<RocksPropertyRow>, CubeError> {
         panic!("CacheStore cannot be used on the worker node! rocksdb_properties was used.")
     }
+
+    async fn wipe(&self) -> Result<(), CubeError> {
+        panic!("CacheStore cannot be used on the worker node! wipe was used.")
+    }
 }
 
 crate::di_service!(ClusterCacheStoreClient, [CacheStore]);
@@ -1921,6 +2185,67 @@ mod tests {
         assert_eq!(row.expire.is_some(), true);
 
         RocksCacheStore::cleanup_test_cachestore("cache_set");
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_truncate() -> Result<(), CubeError> {
+        init_test_logger().await;
+
+        let (_, cachestore) = RocksCacheStore::prepare_test_cachestore(
+            "cachestore_truncate",
+            Config::test("cachestore_truncate"),
+        );
+
+        // Populate both the cache and the queue tables.
+        cachestore
+            .cache_set(
+                CacheItem::new("prefix:k1".to_string(), Some(60), "v1".to_string()),
+                false,
+            )
+            .await?;
+        cachestore
+            .cache_set(
+                CacheItem::new("prefix:k2".to_string(), Some(60), "v2".to_string()),
+                false,
+            )
+            .await?;
+        cachestore
+            .queue_add(QueueAddPayload {
+                path: "queue:p1".to_string(),
+                value: "qv1".to_string(),
+                priority: 0,
+                orphaned: None,
+                process_id: None,
+                exclusive: false,
+                external_id: None,
+            })
+            .await?;
+
+        assert_eq!(cachestore.cache_all(None).await?.len(), 2);
+        assert_eq!(cachestore.queue_all(None).await?.len(), 1);
+
+        // Low-level whole-store wipe (no per-row reads).
+        cachestore.truncate().await?;
+
+        assert_eq!(cachestore.cache_all(None).await?.len(), 0);
+        assert_eq!(cachestore.queue_all(None).await?.len(), 0);
+
+        // The emptied store must remain usable (migration metadata re-seeded,
+        // sequence counters reset).
+        assert_eq!(
+            cachestore
+                .cache_set(
+                    CacheItem::new("prefix:again".to_string(), Some(60), "v".to_string()),
+                    false
+                )
+                .await?,
+            true
+        );
+        assert_eq!(cachestore.cache_all(None).await?.len(), 1);
+
+        RocksCacheStore::cleanup_test_cachestore("cachestore_truncate");
 
         Ok(())
     }
@@ -2424,49 +2749,272 @@ mod tests {
             assert!(res.unwrap().added);
         }
 
-        // external_id exceeding max length should fail
-        {
-            let long_id = "x".repeat(QUEUE_ITEM_EXTERNAL_ID_MAX_LEN + 1);
-            let res = cachestore
+        RocksCacheStore::cleanup_test_cachestore("test_queue_add_validations");
+
+        Ok(())
+    }
+
+    async fn assert_queue_item_status(
+        cachestore: &Arc<RocksCacheStore>,
+        key: &str,
+        status: QueueItemStatus,
+        with_heartbeat: bool,
+    ) -> Result<(), CubeError> {
+        let item = cachestore
+            .queue_all(None)
+            .await?
+            .into_iter()
+            .find(|row| row.item.get_row().get_key() == key)
+            .expect("queue item must exist");
+
+        assert_eq!(item.item.get_row().get_status(), &status, "key: {}", key);
+        assert_eq!(
+            item.item.get_row().get_heartbeat().is_some(),
+            with_heartbeat,
+            "heartbeat for key: {}",
+            key
+        );
+
+        Ok(())
+    }
+
+    fn queue_add_and_retrieve_payload(
+        path: &str,
+        value: &str,
+        concurrency: u32,
+    ) -> QueueAddAndRetrievePayload {
+        QueueAddAndRetrievePayload {
+            path: path.to_string(),
+            value: value.to_string(),
+            priority: 0,
+            orphaned: None,
+            process_id: None,
+            exclusive: false,
+            external_id: None,
+            concurrency,
+        }
+    }
+
+    #[tokio::test]
+    async fn test_queue_add_and_retrieve() -> Result<(), CubeError> {
+        init_test_logger().await;
+
+        let (_, cachestore) = RocksCacheStore::prepare_test_cachestore(
+            "test_queue_add_and_retrieve",
+            Config::test("test_queue_add_and_retrieve"),
+        );
+
+        let res = cachestore
+            .queue_add_and_retrieve(queue_add_and_retrieve_payload("prefix:path1", "v1", 1))
+            .await?;
+        assert!(res.added);
+        assert_eq!(res.payload, Some("v1".to_string()));
+        assert_eq!(res.extra, None);
+        assert_eq!(res.active, vec!["path1".to_string()]);
+        // A claimed item is inserted as active, it was never pending
+        assert_eq!(res.pending, 0);
+
+        assert_queue_item_status(&cachestore, "path1", QueueItemStatus::Active, true).await?;
+
+        let res = cachestore
+            .queue_add_and_retrieve(queue_add_and_retrieve_payload("prefix:path2", "v2", 1))
+            .await?;
+        assert!(res.added);
+        assert_eq!(res.payload, None);
+        assert_eq!(res.active, vec!["path1".to_string()]);
+        assert_eq!(res.pending, 1);
+
+        assert_queue_item_status(&cachestore, "path2", QueueItemStatus::Pending, false).await?;
+
+        // The stored value is returned, not the value of this call
+        let res = cachestore
+            .queue_add_and_retrieve(queue_add_and_retrieve_payload("prefix:path2", "v2-dup", 2))
+            .await?;
+        assert!(!res.added);
+        assert_eq!(res.payload, Some("v2".to_string()));
+        assert_eq!(res.pending, 0);
+
+        let mut active = res.active;
+        active.sort();
+        assert_eq!(active, vec!["path1".to_string(), "path2".to_string()]);
+
+        assert_queue_item_status(&cachestore, "path2", QueueItemStatus::Active, true).await?;
+
+        let res = cachestore
+            .queue_add_and_retrieve(queue_add_and_retrieve_payload("prefix:path1", "v1", 5))
+            .await?;
+        assert!(!res.added);
+        assert_eq!(res.payload, None);
+        assert_eq!(res.pending, 0);
+        assert_eq!(res.active.len(), 2);
+
+        let res = cachestore
+            .queue_add_and_retrieve(queue_add_and_retrieve_payload("prefix:path3", "v3", 0))
+            .await?;
+        assert!(res.added);
+        assert_eq!(res.payload, None);
+        assert_eq!(res.pending, 1);
+
+        assert_queue_item_status(&cachestore, "path3", QueueItemStatus::Pending, false).await?;
+
+        let res = cachestore
+            .queue_add(QueueAddPayload {
+                path: "prefix:path4".to_string(),
+                value: "v4".to_string(),
+                priority: 0,
+                orphaned: None,
+                process_id: None,
+                exclusive: false,
+                external_id: None,
+            })
+            .await?;
+        assert!(res.added);
+        assert_eq!(res.pending, 2);
+
+        assert_queue_item_status(&cachestore, "path4", QueueItemStatus::Pending, false).await?;
+
+        RocksCacheStore::cleanup_test_cachestore("test_queue_add_and_retrieve");
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_queue_add_and_retrieve_backlog() -> Result<(), CubeError> {
+        init_test_logger().await;
+
+        let (_, cachestore) = RocksCacheStore::prepare_test_cachestore(
+            "test_queue_add_and_retrieve_backlog",
+            Config::test("test_queue_add_and_retrieve_backlog"),
+        );
+
+        for path in ["prefix:path1", "prefix:path2"] {
+            cachestore
                 .queue_add(QueueAddPayload {
-                    path: "prefix:path5".to_string(),
-                    value: "v5".to_string(),
+                    path: path.to_string(),
+                    value: "v".to_string(),
                     priority: 0,
                     orphaned: None,
                     process_id: None,
                     exclusive: false,
-                    external_id: Some(long_id),
-                })
-                .await;
-            assert!(res.is_err(), "external_id exceeding max length should fail");
-            assert!(res
-                .unwrap_err()
-                .to_string()
-                .contains("external_id exceeds maximum allowed length"));
-        }
-
-        // process_id exceeding max length should fail
-        {
-            let long_id = "x".repeat(QUEUE_ITEM_PROCESS_ID_MAX_LEN + 1);
-            let res = cachestore
-                .queue_add(QueueAddPayload {
-                    path: "prefix:path6".to_string(),
-                    value: "v6".to_string(),
-                    priority: 0,
-                    orphaned: None,
-                    process_id: Some(long_id),
-                    exclusive: false,
                     external_id: None,
                 })
-                .await;
-            assert!(res.is_err(), "process_id exceeding max length should fail");
-            assert!(res
-                .unwrap_err()
-                .to_string()
-                .contains("process_id exceeds maximum allowed length"));
+                .await?;
         }
 
-        RocksCacheStore::cleanup_test_cachestore("test_queue_add_validations");
+        // Every concurrency slot is free, but claiming would leave the 2 pending items
+        // a single slot to share, so the item takes its place in the backlog instead
+        let res = cachestore
+            .queue_add_and_retrieve(queue_add_and_retrieve_payload("prefix:path3", "v3", 2))
+            .await?;
+        assert!(res.added);
+        assert_eq!(res.payload, None);
+        assert_eq!(res.active, Vec::<String>::new());
+        assert_eq!(res.pending, 3);
+
+        assert_queue_item_status(&cachestore, "path3", QueueItemStatus::Pending, false).await?;
+
+        // A slot is left over for every one of the 3 pending items, nothing is jumped over
+        let res = cachestore
+            .queue_add_and_retrieve(queue_add_and_retrieve_payload("prefix:path4", "v4", 4))
+            .await?;
+        assert!(res.added);
+        assert_eq!(res.payload, Some("v4".to_string()));
+        assert_eq!(res.active, vec!["path4".to_string()]);
+        assert_eq!(res.pending, 3);
+
+        assert_queue_item_status(&cachestore, "path4", QueueItemStatus::Active, true).await?;
+
+        // The very same budget declines the next claim, the slot it took is now busy
+        let res = cachestore
+            .queue_add_and_retrieve(queue_add_and_retrieve_payload("prefix:path5", "v5", 4))
+            .await?;
+        assert!(res.added);
+        assert_eq!(res.payload, None);
+        assert_eq!(res.active, vec!["path4".to_string()]);
+        assert_eq!(res.pending, 4);
+
+        assert_queue_item_status(&cachestore, "path5", QueueItemStatus::Pending, false).await?;
+
+        RocksCacheStore::cleanup_test_cachestore("test_queue_add_and_retrieve_backlog");
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_queue_add_and_retrieve_exclusive() -> Result<(), CubeError> {
+        init_test_logger().await;
+
+        let (_, cachestore) = RocksCacheStore::prepare_test_cachestore(
+            "test_queue_add_and_retrieve_excl",
+            Config::test("test_queue_add_and_retrieve_excl"),
+        );
+
+        // The process_id of a brand new item is the process_id of the caller,
+        // the exclusive flag can never block the claim on insert
+        let res = cachestore
+            .queue_add_and_retrieve(QueueAddAndRetrievePayload {
+                process_id: Some("process-a".to_string()),
+                exclusive: true,
+                ..queue_add_and_retrieve_payload("prefix:path1", "v1", 1)
+            })
+            .await?;
+        assert!(res.added);
+        assert_eq!(res.payload, Some("v1".to_string()));
+
+        let res = cachestore
+            .queue_add_and_retrieve(QueueAddAndRetrievePayload {
+                process_id: Some("process-a".to_string()),
+                exclusive: true,
+                ..queue_add_and_retrieve_payload("prefix:path2", "v2", 1)
+            })
+            .await?;
+        assert!(res.added);
+        assert_eq!(res.payload, None);
+
+        let res = cachestore
+            .queue_add_and_retrieve(QueueAddAndRetrievePayload {
+                process_id: Some("process-b".to_string()),
+                exclusive: true,
+                ..queue_add_and_retrieve_payload("prefix:path2", "v2", 5)
+            })
+            .await?;
+        assert!(!res.added);
+        assert_eq!(res.payload, None);
+        assert_queue_item_status(&cachestore, "path2", QueueItemStatus::Pending, false).await?;
+
+        // Reachable without the EXCLUSIVE keyword, because the item itself is exclusive
+        let res = cachestore
+            .queue_add_and_retrieve(queue_add_and_retrieve_payload("prefix:path2", "v2", 5))
+            .await;
+        assert!(res.is_err(), "expected an error, actual: {:?}", res);
+        assert!(res.unwrap_err().to_string().contains("process_id"));
+        assert_eq!(cachestore.queue_all(None).await?.len(), 2);
+        assert_queue_item_status(&cachestore, "path2", QueueItemStatus::Pending, false).await?;
+
+        let res = cachestore
+            .queue_add_and_retrieve(QueueAddAndRetrievePayload {
+                process_id: Some("process-a".to_string()),
+                exclusive: true,
+                ..queue_add_and_retrieve_payload("prefix:path2", "v2", 5)
+            })
+            .await?;
+        assert!(!res.added);
+        assert_eq!(res.payload, Some("v2".to_string()));
+        assert_queue_item_status(&cachestore, "path2", QueueItemStatus::Active, true).await?;
+
+        // An exclusive item without an owner would be inserted straight in the active
+        // status and could never be claimed back
+        let res = cachestore
+            .queue_add_and_retrieve(QueueAddAndRetrievePayload {
+                exclusive: true,
+                ..queue_add_and_retrieve_payload("prefix:path3", "v3", 5)
+            })
+            .await;
+        assert!(res.is_err(), "expected an error, actual: {:?}", res);
+        assert!(res.unwrap_err().to_string().contains("process_id"));
+        assert_eq!(cachestore.queue_all(None).await?.len(), 2);
+
+        RocksCacheStore::cleanup_test_cachestore("test_queue_add_and_retrieve_excl");
 
         Ok(())
     }

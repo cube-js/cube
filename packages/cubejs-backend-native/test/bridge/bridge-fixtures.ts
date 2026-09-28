@@ -225,6 +225,7 @@ export const driverToolsFixture = (): unknown => ({
   dateTimeCast: () => 'dt',
   inDbTimeZone: () => 'tz',
   getAllocatedParams: () => [],
+  shouldReuseParams: false,
   subtractInterval: () => 'd',
   addInterval: () => 'd',
   intervalString: () => 's',
@@ -248,6 +249,13 @@ export const baseToolsFixture = (): unknown => ({
   getPreAggregationByName: () => preAggregationObjFixture(),
   preAggregationTableName: () => 'pre_aggr_table',
   joinTreeForHints: () => joinDefinitionFixture(),
+  compileMemberSql: () => ({
+    template: '',
+    symbolPaths: [],
+    filterParams: [],
+    filterGroups: [],
+    securityContextValues: [],
+  }),
 });
 
 export const baseQueryOptionsFixture = (): unknown => ({

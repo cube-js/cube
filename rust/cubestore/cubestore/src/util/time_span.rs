@@ -1,4 +1,4 @@
-use async_std::future::Future;
+use std::future::Future;
 use std::time::{Duration, SystemTime};
 
 /// The returned object will [log::warn] if it is alive longer than [timeout].

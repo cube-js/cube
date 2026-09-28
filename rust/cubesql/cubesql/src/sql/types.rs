@@ -148,6 +148,7 @@ impl CommandCompletion {
             // ROWS COUNT
             CommandCompletion::Select(rows) => CommandComplete::Select(rows),
             CommandCompletion::DropTable => CommandComplete::Plain("DROP TABLE".to_string()),
+            CommandCompletion::CreateTable => CommandComplete::Plain("CREATE TABLE".to_string()),
         }
     }
 }

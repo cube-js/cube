@@ -1,6 +1,7 @@
 use super::sql_nodes::SqlNode;
 use super::CubeRefEvaluator;
 use crate::planner::filter::Filter;
+use crate::planner::planners::multi_stage::FilterParamsTimeShifts;
 use crate::planner::query_tools::QueryTools;
 use crate::planner::sql_call::CubeRef;
 use crate::planner::sql_templates::PlanSqlTemplates;
@@ -13,6 +14,9 @@ pub struct SqlEvaluatorVisitor {
     query_tools: Rc<QueryTools>,
     cube_ref_evaluator: Rc<CubeRefEvaluator>,
     all_filters: Option<Filter>, //To pass to FILTER_PARAMS and FILTER_GROUP
+    /// The stage's time shifts as FILTER_PARAMS rendering sees them: which
+    /// binding of a member renders, and whether its column carries an offset.
+    filter_params_time_shifts: FilterParamsTimeShifts,
     ignore_tz_convert: bool,
     /// When `true`, the caller (typically a `SqlCall` substitution site) expects
     /// the rendered expression to be safe for embedding next to operators —
@@ -30,9 +34,20 @@ impl SqlEvaluatorVisitor {
             query_tools,
             cube_ref_evaluator,
             all_filters,
+            filter_params_time_shifts: FilterParamsTimeShifts::default(),
             ignore_tz_convert: false,
             arg_needs_paren_safe: false,
         }
+    }
+
+    pub fn with_filter_params_time_shifts(&self, shifts: FilterParamsTimeShifts) -> Self {
+        let mut self_copy = self.clone();
+        self_copy.filter_params_time_shifts = shifts;
+        self_copy
+    }
+
+    pub fn filter_params_time_shifts(&self) -> &FilterParamsTimeShifts {
+        &self.filter_params_time_shifts
     }
 
     pub fn with_ignore_tz_convert(&self) -> Self {

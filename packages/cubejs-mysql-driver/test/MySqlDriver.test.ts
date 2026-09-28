@@ -108,9 +108,9 @@ describe('MySqlDriver', () => {
         },
       ]);
       expect(await streamToArray(tableData.rowStream)).toEqual([
-        { id: 1, created: '2020-01-01', price: 100 },
-        { id: 2, created: '2020-01-02', price: 200 },
-        { id: 3, created: '2020-01-03', price: 300 }
+        { id: 1, created: '2020-01-01', price: '100.0000000000' },
+        { id: 2, created: '2020-01-02', price: '200.0000000000' },
+        { id: 3, created: '2020-01-03', price: '300.0000000000' }
       ]);
     } finally {
       await tableData.release();
@@ -119,6 +119,7 @@ describe('MySqlDriver', () => {
 
   test('table name check', async () => {
     const tblName = 'really-really-really-looooooooooooooooooooooooooooooooooooooooooooooooooooong-table-name';
+
     try {
       await mySqlDriver.createTable(tblName, [{ name: 'id', type: 'bigint' }]);
 

@@ -1,7 +1,7 @@
 import process from 'process';
 import color from '@oclif/color';
 
-const leastSupportedVersion = 20;
+const leastSupportedVersion = 22;
 const currentNodeVersion = process.versions.node;
 const semver = currentNodeVersion.split('.');
 const major = parseInt(<string> semver[0], 10);
@@ -10,7 +10,7 @@ if (major < leastSupportedVersion) {
   console.error(
     color.red(
       `You are running Node.js ${currentNodeVersion}.\n` +
-      `Cube.js CLI requires Node.js ${leastSupportedVersion} or higher.\n` +
+      `Cube CLI requires Node.js ${leastSupportedVersion} or higher.\n` +
       'Please update your Node.js version.'
     )
   );

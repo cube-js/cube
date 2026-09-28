@@ -1,13 +1,19 @@
+import type { EscapeDialect } from '@cubejs-backend/shared';
+
+export type { EscapeDialect };
+
 export interface DriverOptionsInterface {
   driverClass: string;
   prepareConnectionQueries: string[];
   mavenDependency: Record<string, any>;
   properties: Record<string, any>;
   jdbcUrl: () => string;
+  escapeDialect: EscapeDialect;
 }
 
 export const SupportedDrivers: Record<string, DriverOptionsInterface> = {
   mysql: {
+    escapeDialect: 'mysql',
     driverClass: 'com.mysql.jdbc.Driver',
     prepareConnectionQueries: ['SET time_zone = \'+00:00\''],
     mavenDependency: {
@@ -22,6 +28,7 @@ export const SupportedDrivers: Record<string, DriverOptionsInterface> = {
     jdbcUrl: () => `jdbc:mysql://${process.env.CUBEJS_DB_HOST}:3306/${process.env.CUBEJS_DB_NAME}`
   },
   athena: {
+    escapeDialect: 'ansi',
     driverClass: 'com.qubole.jdbc.jdbc41.core.QDriver',
     prepareConnectionQueries: [],
     mavenDependency: {
@@ -37,6 +44,7 @@ export const SupportedDrivers: Record<string, DriverOptionsInterface> = {
     }
   },
   sparksql: {
+    escapeDialect: 'spark',
     driverClass: 'org.apache.hive.jdbc.HiveDriver',
     prepareConnectionQueries: [],
     mavenDependency: {
@@ -51,6 +59,7 @@ export const SupportedDrivers: Record<string, DriverOptionsInterface> = {
     }
   },
   hive: {
+    escapeDialect: 'spark',
     driverClass: 'org.apache.hive.jdbc.HiveDriver',
     prepareConnectionQueries: [],
     mavenDependency: {

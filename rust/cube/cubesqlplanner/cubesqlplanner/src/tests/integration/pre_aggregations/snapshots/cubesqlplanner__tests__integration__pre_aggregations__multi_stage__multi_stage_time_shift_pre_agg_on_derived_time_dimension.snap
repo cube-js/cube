@@ -1,0 +1,9 @@
+---
+source: cubesqlplanner/cubesqlplanner/src/tests/integration/pre_aggregations/multi_stage.rs
+expression: result
+---
+pa_customers__return_day_month | pa_customers__total_value | pa_customers__total_value_prev_month
+-------------------------------+---------------------------+-------------------------------------
+2024-01-01T00:00:00.000Z       | 2000                      | 1000                                
+2024-02-01T00:00:00.000Z       | 500                       | 2000                                
+2024-03-01T00:00:00.000Z       | 1000                      | 500

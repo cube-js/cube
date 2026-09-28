@@ -22,6 +22,9 @@ pub trait LogicalPlanTestUtils {
 
     fn find_cube_scan_wrapped_sql(&self) -> CubeScanWrappedSqlNode;
 
+    /// Same, but for plans that still have post processing above the pushed down part.
+    fn find_cube_scan_wrapped_sql_deep(&self) -> CubeScanWrappedSqlNode;
+
     fn find_cube_scans(&self) -> Vec<CubeScanNode>;
 
     fn find_filter(&self) -> Option<Filter>;
@@ -57,6 +60,33 @@ impl LogicalPlanTestUtils for LogicalPlan {
         }
     }
 
+    fn find_cube_scan_wrapped_sql_deep(&self) -> CubeScanWrappedSqlNode {
+        pub struct FindWrappedSqlNodeVisitor(Vec<CubeScanWrappedSqlNode>);
+
+        impl PlanVisitor for FindWrappedSqlNodeVisitor {
+            type Error = CubeError;
+
+            fn pre_visit(&mut self, plan: &LogicalPlan) -> Result<bool, Self::Error> {
+                if let LogicalPlan::Extension(ext) = plan {
+                    if let Some(node) = ext.node.as_any().downcast_ref::<CubeScanWrappedSqlNode>() {
+                        self.0.push(node.clone());
+                    }
+                }
+                Ok(true)
+            }
+        }
+
+        let mut visitor = FindWrappedSqlNodeVisitor(Vec::new());
+        self.accept(&mut visitor).unwrap();
+        match visitor.0.len() {
+            1 => visitor.0.remove(0),
+            found => panic!(
+                "The plan includes {} cube_scan_wrapped_sql nodes, expected 1",
+                found
+            ),
+        }
+    }
+
     fn find_cube_scans(&self) -> Vec<CubeScanNode> {
         find_cube_scans_deep_search(Arc::new(self.clone()), true)
     }
@@ -64,6 +94,28 @@ impl LogicalPlanTestUtils for LogicalPlan {
     fn find_filter(&self) -> Option<Filter> {
         find_filter_deep_search(Arc::new(self.clone()))
     }
+}
+
+/// SQL of every member in a pushed down request, in order.
+///
+/// A pushed down query carries its members as member expressions: JSON holding a generated
+/// alias, the cube it came from and the SQL to evaluate. Only the SQL is worth asserting on,
+/// since aliases are generated and truncated to 16 characters. Members that are plain names
+/// are returned as they are, so a request can mix both.
+pub fn member_expression_sql(members: &Option<Vec<String>>) -> Vec<String> {
+    let Some(members) = members else {
+        return vec![];
+    };
+
+    members
+        .iter()
+        .map(|member| {
+            serde_json::from_str::<serde_json::Value>(member)
+                .ok()
+                .and_then(|member| member["expr"]["sql"].as_str().map(String::from))
+                .unwrap_or_else(|| member.clone())
+        })
+        .collect()
 }
 
 pub fn find_cube_scans_deep_search(

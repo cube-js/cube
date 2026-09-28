@@ -52,6 +52,18 @@ cubes:
           - name: total_amount
             type: sum
             sql: amount
+          - name: total_amount_by_status
+            type: number
+            sql: "{CUBE.total_amount}"
+            multi_stage: true
+            add_group_by:
+                - orders.status
+          # Not multi-stage itself, but depends on a multi-stage measure, so it
+          # is skipped when building per-measure hints while still counting
+          # towards the hints of the view it is included in.
+          - name: amount_share
+            type: number
+            sql: "{CUBE.total_amount} / NULLIF({CUBE.total_amount_by_status}, 0)"
       segments:
           - name: completed_orders
             sql: "{CUBE}.status = 'completed'"
@@ -89,6 +101,7 @@ views:
                 - status
                 - count
                 - total_amount
+                - amount_share
 
     - name: orders_with_customers
       cubes:
@@ -104,6 +117,43 @@ views:
                 - name
                 - city
                 - ny_customers
+
+    # Join paths whose heads differ, but where one head is reached from the
+    # other, so `returns` is the single root. Real view YAML anchors every path
+    # at the view root and cannot produce this, but the root rule should not
+    # depend on that.
+    # The reached cube heads the *first* path on purpose, so that taking the first
+    # head instead of the unreached one picks the wrong cube.
+    - name: nested_root_view
+      cubes:
+          - join_path: customers.orders
+            includes:
+                - status
+          - join_path: returns.customers
+            includes:
+                - city
+
+    # Join paths that lead in a circle, so every head is reached from another
+    # path and none of them is the view's root.
+    - name: cyclic_paths_view
+      cubes:
+          - join_path: orders.customers
+            includes:
+                - city
+          - join_path: customers.orders
+            includes:
+                - status
+
+    # Join paths under two different roots, so the join map alone does not say
+    # which cube a member expression with no hints of its own should query.
+    - name: two_roots_view
+      cubes:
+          - join_path: orders.customers
+            includes:
+                - city
+          - join_path: returns.customers
+            includes:
+                - name
 
     - name: customer_overview
       cubes:

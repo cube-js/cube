@@ -1,0 +1,8 @@
+---
+source: cubesqlplanner/cubesqlplanner/src/tests/integration/calculated_multi_fact.rs
+expression: result
+---
+payments__status | payment_meta__count | payment_tags__count | payments__total_amount
+-----------------+---------------------+---------------------+-----------------------
+DECLINED         | 1                   | 0                   | 300.00                
+SUCCESS          | 5                   | 4                   | 1200.00

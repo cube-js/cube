@@ -1,0 +1,9 @@
+---
+source: cubesqlplanner/src/tests/integration/custom_granularities.rs
+expression: result
+---
+orders__created_at_monthly_from_15th | orders__count
+-------------------------------------+--------------
+2024-12-15 00:00:00                  | 2            
+2025-01-15 00:00:00                  | 1            
+2025-03-15 00:00:00                  | 2

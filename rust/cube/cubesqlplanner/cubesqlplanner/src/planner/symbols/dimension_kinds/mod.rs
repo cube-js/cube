@@ -9,9 +9,10 @@ pub use regular::*;
 pub use switch::*;
 
 use super::common::DimensionType;
-use super::MemberSymbol;
-use crate::planner::{CubeRef, SqlCall};
+use super::deps::{DepVisitor, DepVisitorMut, SymbolDeps};
+use crate::planner::SqlCall;
 use cubenativeutils::CubeError;
+use std::ops::ControlFlow;
 use std::rc::Rc;
 
 /// Form of a dimension's value, classified from its data-model
@@ -32,43 +33,33 @@ pub enum DimensionKind {
     Case(CaseDimension),
 }
 
-impl DimensionKind {
-    pub fn get_dependencies(&self) -> Vec<Rc<MemberSymbol>> {
+impl SymbolDeps for DimensionKind {
+    fn visit_deps(&self, visitor: &mut dyn DepVisitor) -> ControlFlow<()> {
         match self {
-            Self::Regular(r) => r.get_dependencies(),
-            Self::Geo(g) => g.get_dependencies(),
-            Self::Switch(s) => s.get_dependencies(),
-            Self::Case(c) => c.get_dependencies(),
+            Self::Regular(r) => r.visit_deps(visitor),
+            Self::Geo(g) => g.visit_deps(visitor),
+            Self::Switch(s) => s.visit_deps(visitor),
+            Self::Case(c) => c.visit_deps(visitor),
         }
     }
 
-    pub fn apply_to_deps<F: Fn(&Rc<MemberSymbol>) -> Result<Rc<MemberSymbol>, CubeError>>(
-        &self,
-        f: &F,
-    ) -> Result<Self, CubeError> {
-        Ok(match self {
-            Self::Regular(r) => Self::Regular(r.apply_to_deps(f)?),
-            Self::Geo(g) => Self::Geo(g.apply_to_deps(f)?),
-            Self::Switch(s) => Self::Switch(s.apply_to_deps(f)?),
-            Self::Case(c) => Self::Case(c.apply_to_deps(f)?),
-        })
+    fn visit_deps_mut(&mut self, visitor: &mut dyn DepVisitorMut) -> Result<(), CubeError> {
+        match self {
+            Self::Regular(r) => r.visit_deps_mut(visitor),
+            Self::Geo(g) => g.visit_deps_mut(visitor),
+            Self::Switch(s) => s.visit_deps_mut(visitor),
+            Self::Case(c) => c.visit_deps_mut(visitor),
+        }
     }
+}
 
+impl DimensionKind {
     pub fn iter_sql_calls(&self) -> Box<dyn Iterator<Item = &Rc<SqlCall>> + '_> {
         match self {
             Self::Regular(r) => r.iter_sql_calls(),
             Self::Geo(g) => g.iter_sql_calls(),
             Self::Switch(s) => s.iter_sql_calls(),
             Self::Case(c) => c.iter_sql_calls(),
-        }
-    }
-
-    pub fn get_cube_refs(&self) -> Vec<CubeRef> {
-        match self {
-            Self::Regular(r) => r.get_cube_refs(),
-            Self::Geo(g) => g.get_cube_refs(),
-            Self::Switch(s) => s.get_cube_refs(),
-            Self::Case(c) => c.get_cube_refs(),
         }
     }
 

@@ -121,7 +121,6 @@ type BaseRequest = {
 };
 
 type RequestQuery = Record<string, any> | Record<string, any>[] & {
-  renewQuery?: boolean;
   cacheMode?: CacheMode;
 };
 
@@ -166,7 +165,7 @@ type SqlApiRequest = BaseRequest & {
  * Pre-aggregations selector object.
  */
 type PreAggsSelector = {
-  contexts: {securityContext: any}[],
+  contexts: { securityContext: any }[],
   timezones: string[],
   dataSources?: string[],
   cubes?: string[],
@@ -179,7 +178,7 @@ type PreAggsSelector = {
  */
 type PreAggJob = {
   request: string;
-  context: {securityContext: any};
+  context: { securityContext: any };
   preagg: string;
   table: string;
   target: string;

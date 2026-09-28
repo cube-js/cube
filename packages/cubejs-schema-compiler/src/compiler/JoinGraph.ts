@@ -63,11 +63,11 @@ export class JoinGraph implements CompilerInterface {
 
   public compile(cubes: unknown, errorReporter: ErrorReporter): void {
     this.edges = R.compose<
-        Array<CubeDefinition>,
-        Array<CubeDefinition>,
-        Array<[string, JoinEdge][]>,
-        Array<[string, JoinEdge]>,
-        Record<string, JoinEdge>
+      Array<CubeDefinition>,
+      Array<CubeDefinition>,
+      Array<[string, JoinEdge][]>,
+      Array<[string, JoinEdge]>,
+      Record<string, JoinEdge>
     >(
       R.fromPairs,
       R.unnest,
@@ -78,11 +78,11 @@ export class JoinGraph implements CompilerInterface {
     // This requires @types/ramda@0.29 or newer
     // @ts-ignore
     this.nodes = R.compose<
-        Record<string, JoinEdge>,
-        Array<[string, JoinEdge]>,
-        Array<JoinEdge>,
-        Record<string, Array<JoinEdge> | undefined>,
-        Record<string, Record<string, 1>>
+      Record<string, JoinEdge>,
+      Array<[string, JoinEdge]>,
+      Array<JoinEdge>,
+      Record<string, Array<JoinEdge> | undefined>,
+      Record<string, Record<string, 1>>
     >(
       // This requires @types/ramda@0.29 or newer
       // @ts-ignore
@@ -125,8 +125,16 @@ export class JoinGraph implements CompilerInterface {
     const joinRequired =
       (v) => `primary key for '${v}' is required when join is defined in order to make aggregates work properly`;
 
+    const duplicates = this.reportDuplicateJoinTargets(cube, errorReporter);
+
     return cube.joins
       .filter(join => {
+        // Which of the conflicting declarations was meant is unknowable, so none
+        // of them becomes an edge
+        if (duplicates.has(join.name)) {
+          return false;
+        }
+
         if (!this.cubeEvaluator.cubeExists(join.name)) {
           errorReporter.error(`Cube ${join.name} doesn't exist`);
           return false;
@@ -159,6 +167,48 @@ export class JoinGraph implements CompilerInterface {
       });
   }
 
+  /**
+   * Only one edge per pair of cubes fits into the graph, so several declarations
+   * for the same pair would leave the join path ambiguous.
+   */
+  protected reportDuplicateJoinTargets(cube: CubeDefinition, errorReporter: ErrorReporter): Set<string> {
+    const duplicates = new Set<string>();
+    // The raw definition, not `cube.joins`: `extends` merges the parent's joins
+    // in, and a child redeclaring one of them is a supported override. Duplicates
+    // a parent declares are reported and dropped on the parent's own edges; a
+    // cube extending it still resolves through one of them
+    const ownJoins = this.cubeEvaluator.cubeDefinitions[cube.name]?.joins;
+
+    // The map form is keyed by the joined cube name and can not hold duplicates
+    if (!Array.isArray(ownJoins)) {
+      return duplicates;
+    }
+
+    const declarationsByCube = new Map<string, number[]>();
+
+    ownJoins.forEach((join, index) => {
+      if (!join?.name) {
+        return;
+      }
+      const declarations = declarationsByCube.get(join.name) ?? [];
+      declarations.push(index);
+      declarationsByCube.set(join.name, declarations);
+    });
+
+    for (const [joinedCube, indexes] of declarationsByCube.entries()) {
+      if (indexes.length > 1) {
+        duplicates.add(joinedCube);
+        const declarations = indexes.map(index => `joins[${index}]`).join(', ');
+        errorReporter.error(
+          `Cube '${cube.name}' declares ${indexes.length} joins to '${joinedCube}' (${declarations}). Only one join per pair of cubes is supported. Keep a single join to '${joinedCube}', or use extends to create a child cube of '${joinedCube}' and join that instead`,
+          cube.fileName
+        );
+      }
+    }
+
+    return duplicates;
+  }
+
   protected buildJoinNode(cube: CubeDefinition): Record<string, 1> {
     if (!cube.joins) {
       return {};
@@ -177,10 +227,10 @@ export class JoinGraph implements CompilerInterface {
     const key = JSON.stringify(cubesToJoin);
     if (!this.builtJoins[key]) {
       const join = R.pipe<
-          JoinHints,
-          Array<JoinTree | null>,
-          Array<JoinTree>,
-          Array<JoinTree>
+        JoinHints,
+        Array<JoinTree | null>,
+        Array<JoinTree>,
+        Array<JoinTree>
       >(
         R.map(
           (cube: JoinHint): JoinTree | null => this.buildJoinTreeForRoot(cube, R.without([cube], cubesToJoin))

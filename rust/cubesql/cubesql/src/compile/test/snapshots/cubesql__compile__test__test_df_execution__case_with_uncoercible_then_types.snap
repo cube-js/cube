@@ -1,0 +1,5 @@
+---
+source: cubesql/src/compile/test/test_df_execution.rs
+expression: "execute_query(r#\"\n                SELECT\n                    CASE WHEN i > 1 THEN true ELSE DATE '2022-01-01' END AS c\n                FROM (SELECT 1::int4 AS i) AS t\n                \"#.to_string(),\nDatabaseProtocol::PostgreSQL,).await.unwrap_err().to_string()"
+---
+Planning Error: Initial planning error: Error during planning: CASE branches have no common type to coerce the results to: [Boolean, Date32]

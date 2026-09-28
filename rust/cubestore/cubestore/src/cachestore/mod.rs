@@ -14,12 +14,16 @@ pub use cache_eviction_manager::{
 };
 pub use cache_item::CacheItem;
 pub use cache_rocksstore::{
-    CacheStore, CacheStoreRpcClient, CachestoreInfo, ClusterCacheStoreClient, QueueAddPayload,
-    QueueAddResponse, QueueAllItem, QueueCancelResponse, QueueGetResponse, QueueKey, QueueListItem,
+    CacheStore, CacheStoreRpcClient, CachestoreInfo, ClusterCacheStoreClient,
+    QueueAddAndRetrievePayload, QueueAddAndRetrieveResponse, QueueAddPayload, QueueAddResponse,
+    QueueAllItem, QueueCancelResponse, QueueGetResponse, QueueKey, QueueListItem,
     QueueResultResponse, RocksCacheStore,
 };
 pub use lazy::LazyRocksCacheStore;
-pub use queue_item::{QueueItem, QueueItemStatus, QueueResultAckEvent, QueueRetrieveResponse};
+pub use queue_item::{
+    QueueItem, QueueItemStatus, QueueResultAckEvent, QueueRetrieveResponse,
+    QUEUE_ITEM_EXTERNAL_ID_MAX_LEN, QUEUE_ITEM_PROCESS_ID_MAX_LEN,
+};
 pub use queue_item_payload::QueueItemPayload;
 pub use queue_result::QueueResult;
 pub use scheduler::CacheStoreSchedulerImpl;

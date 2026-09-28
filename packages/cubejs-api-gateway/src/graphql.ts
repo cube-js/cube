@@ -363,7 +363,7 @@ function parseDates(result: any) {
 }
 
 export function getJsonQuery(metaConfig: any, args: Record<string, any>, infos: GraphQLResolveInfo) {
-  const { where, limit, offset, timezone, orderBy, renewQuery, ungrouped, cache } = args;
+  const { where, limit, offset, timezone, orderBy, ungrouped, cache } = args;
 
   const measures: string[] = [];
   const dimensions: string[] = [];
@@ -460,7 +460,6 @@ export function getJsonQuery(metaConfig: any, args: Record<string, any>, infos: 
     ...(offset && { offset }),
     ...(timezone && { timezone }),
     ...(filters.length && { filters }),
-    ...(renewQuery && { renewQuery }),
     ...(cache && { cache }),
     ...(ungrouped && { ungrouped }),
   };
@@ -476,6 +475,7 @@ export function getJsonQueryFromGraphQLQuery(query: string, metaConfig: any, var
   const fieldNodes = operation?.selectionSet.selections;
 
   let args = {};
+
   for (const argument of fieldNodes[0].arguments) {
     args = { ...args, [argument.name.value]: parseArgumentValue(argument.value, variableValues) };
   }
@@ -639,7 +639,6 @@ export function makeSchema(metaConfig: any): GraphQLSchema {
           limit: intArg(),
           offset: intArg(),
           timezone: stringArg(),
-          renewQuery: booleanArg(),
           cache: stringArg(),
           ungrouped: booleanArg(),
           orderBy: arg({
@@ -677,6 +676,7 @@ export function makeSchema(metaConfig: any): GraphQLSchema {
           res.extensions = {
             annotation: results.annotation,
             lastRefreshTime: results.lastRefreshTime,
+            usedPreAggregations: results.usedPreAggregations,
           };
 
           return results.data.map(entry => R.toPairs(entry)

@@ -354,7 +354,16 @@ impl Rewriter {
             _ => false,
         };
 
-        let (plan, qtrace_egraph_iterations, qtrace_best_graph) =
+        // In stream mode an unlimited Cube query is streamed in full rather than capped, so
+        // post processing on top of it reads every row and stays correct. Neither the
+        // preference for pushing it down nor the failure applies there
+        let config_obj = &self.cube_context.sessions.server.config_obj;
+        let penalize_limitless_post_processing = !config_obj.stream_mode();
+        let max_row_limit = config_obj.non_streaming_query_max_row_limit().max(0) as usize;
+        let fail_on_limitless_post_processing =
+            config_obj.fail_on_limitless_post_processing() && penalize_limitless_post_processing;
+
+        let (plan, qtrace_egraph_iterations, qtrace_best_graph, truncates_post_processing) =
             tokio::task::spawn_blocking(move || {
                 let (runner, qtrace_egraph_iterations) =
                     Self::run_rewrites(&cube_context, egraph, rules, "final")?;
@@ -362,8 +371,13 @@ impl Rewriter {
                 // TODO maybe check replacers and penalized_ast_size_outside_wrapper right after extraction?
                 let mut extractor = TopDownExtractor::new(
                     &runner.egraph,
-                    BestCubePlan::new(cube_context.meta.clone(), penalize_post_processing),
-                    CubePlanTopDownState::new(),
+                    BestCubePlan::new(
+                        cube_context.meta.clone(),
+                        penalize_post_processing,
+                        penalize_limitless_post_processing,
+                        max_row_limit,
+                    ),
+                    CubePlanTopDownState::new(max_row_limit),
                 );
                 let Some((best_cost, best)) = extractor.find_best(root) else {
                     return Err(CubeError::rewrite("Unable to find best plan".to_string()));
@@ -388,6 +402,7 @@ impl Rewriter {
                     converter.to_logical_plan(new_root),
                     qtrace_egraph_iterations,
                     qtrace_best_graph,
+                    best_cost.truncates_post_processing(),
                 ))
             })
             .await??;
@@ -395,6 +410,21 @@ impl Rewriter {
         if let Some(qtrace) = qtrace {
             qtrace.set_egraph_iterations(qtrace_egraph_iterations);
             qtrace.set_best_graph(&qtrace_best_graph);
+        }
+
+        // Checked once the qtrace is recorded: the plan that would have run is exactly what
+        // is worth looking at when this fires. No representation of this query pushes the
+        // post processing down to the data source, so it would run over a Cube query
+        // truncated to the maximum row limit
+        if fail_on_limitless_post_processing && truncates_post_processing {
+            return Err(CubeError::user(
+                "Query requires post-processing of a Cube query with no LIMIT, or with one \
+                above the maximum row limit, so it would be truncated to that limit and \
+                produce incorrect results. Add a LIMIT at or below it, or rewrite the query \
+                so that it can be pushed down to the data source. This check is enabled by \
+                CUBESQL_FAIL_ON_LIMITLESS_POST_PROCESSING."
+                    .to_string(),
+            ));
         }
 
         plan

@@ -9,10 +9,10 @@ impl FilterOperationSql for DateSingleOp {
                 let param = ctx.format_and_allocate_from_date(&self.value)?;
                 match self.kind {
                     DateSingleKind::Before => {
-                        ctx.plan_templates.lt(ctx.member_sql.to_string(), param)
+                        ctx.plan_templates.lt(ctx.member_sql().to_string(), param)
                     }
                     DateSingleKind::AfterOrOn => {
-                        ctx.plan_templates.gte(ctx.member_sql.to_string(), param)
+                        ctx.plan_templates.gte(ctx.member_sql().to_string(), param)
                     }
                     _ => unreachable!(),
                 }
@@ -21,10 +21,10 @@ impl FilterOperationSql for DateSingleOp {
                 let param = ctx.format_and_allocate_to_date(&self.value)?;
                 match self.kind {
                     DateSingleKind::BeforeOrOn => {
-                        ctx.plan_templates.lte(ctx.member_sql.to_string(), param)
+                        ctx.plan_templates.lte(ctx.member_sql().to_string(), param)
                     }
                     DateSingleKind::After => {
-                        ctx.plan_templates.gt(ctx.member_sql.to_string(), param)
+                        ctx.plan_templates.gt(ctx.member_sql().to_string(), param)
                     }
                     _ => unreachable!(),
                 }

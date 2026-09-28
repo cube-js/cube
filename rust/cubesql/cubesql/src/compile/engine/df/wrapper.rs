@@ -26,11 +26,17 @@ use cubeclient::models::{V1LoadRequestQuery, V1LoadRequestQueryJoinSubquery};
 use datafusion::logical_plan::{ExprVisitable, ExpressionVisitor, Recursion};
 use datafusion::{
     error::{DataFusionError, Result},
+    logical_expr::{ReturnTypeFunction, ScalarFunctionImplementation},
     logical_plan::{
-        plan::Extension, replace_col, Column, DFSchema, DFSchemaRef, Expr, GroupingSet, JoinType,
-        LogicalPlan, Operator, UserDefinedLogicalNode,
+        plan::Extension, replace_col, Column, DFSchema, DFSchemaRef, Expr, ExprRewritable,
+        ExprRewriter, ExprSchemable, GroupingSet, JoinType, LogicalPlan, Operator,
+        UserDefinedLogicalNode,
     },
-    physical_plan::{aggregates::AggregateFunction, functions::BuiltinScalarFunction},
+    physical_plan::{
+        aggregates::AggregateFunction,
+        functions::{BuiltinScalarFunction, Signature, Volatility},
+        udf::ScalarUDF,
+    },
     scalar::ScalarValue,
 };
 use futures::FutureExt;
@@ -575,18 +581,29 @@ impl Remapper {
         }
 
         if let Some(from_alias) = &self.from_alias {
-            // Always map the column under the new from_alias so plans above (which see
-            // this remapper's output through `from_alias`) can resolve it. When the
-            // source column already had a different relation, also keep a mapping under
-            // that original relation, so plans that still reference the inner qualifier
-            // continue to resolve.
-            self.remapping.insert(
-                Column {
-                    name: original_column.name.clone(),
-                    relation: Some(from_alias.clone()),
-                },
-                target_column.clone(),
-            );
+            // Map the column under the new from_alias so plans above (which see
+            // this remapper's output through `from_alias`) can resolve it. When join sides
+            // project colliding column names, the column actually qualified with `from_alias`
+            // owns this mapping; a column from another relation only fills a vacancy, so it
+            // cannot clobber the from-side column's mapping. When the source column has a
+            // different relation, also keep a mapping under that original relation, so plans
+            // that still reference the inner qualifier continue to resolve.
+            //
+            // NOTE: this relies on the from-side column being added before a colliding
+            // column from another relation. If the other side is added first, its vacancy
+            // fill maps `{from_alias}.{name}` to its own target, and a later add of the
+            // actual from-side column short-circuits on that entry in `add_column`/`add_expr`,
+            // returning the other side's alias. Callers iterate the from side's columns
+            // before joined sides' ones, preserving this invariant.
+            let from_alias_column = Column {
+                name: original_column.name.clone(),
+                relation: Some(from_alias.clone()),
+            };
+            let original_is_from_side = original_column.relation.as_ref() == Some(from_alias);
+            if original_is_from_side || !self.remapping.contains_key(&from_alias_column) {
+                self.remapping
+                    .insert(from_alias_column, target_column.clone());
+            }
             if let Some(original_relation) = &original_column.relation {
                 if original_relation != from_alias {
                     self.remapping
@@ -661,6 +678,82 @@ pub struct SqlGenerationResult {
 }
 
 static DATE_PART_REGEX: LazyLock<Regex> = LazyLock::new(|| Regex::new("^[A-Za-z_ ]+$").unwrap());
+
+/// Marker function for integer division. DataFusion types `int / int` as integer
+/// division (PostgreSQL semantics: truncation toward zero), but `/` in some dialects
+/// (Snowflake, BigQuery, MySQL, ...) performs decimal or float division. Integer
+/// divisions are rewritten to this marker during SQL generation, and the marker is
+/// rendered with the `expressions/int_division` template, so each dialect can map it
+/// to a construct that keeps PostgreSQL semantics. The marker never reaches execution.
+const INT_DIVISION_MARKER: &str = "__int_division";
+
+static INT_DIVISION_UDF: LazyLock<Arc<ScalarUDF>> = LazyLock::new(|| {
+    let fun: ScalarFunctionImplementation = Arc::new(|_| {
+        Err(DataFusionError::Internal(format!(
+            "{INT_DIVISION_MARKER} marker is only used for SQL generation and can't be evaluated"
+        )))
+    });
+    let return_type: ReturnTypeFunction = Arc::new(|types| Ok(Arc::new(types[0].clone())));
+    Arc::new(ScalarUDF::new(
+        INT_DIVISION_MARKER,
+        &Signature::any(2, Volatility::Immutable),
+        &return_type,
+        &fun,
+    ))
+});
+
+fn is_integer_type(data_type: &DataType) -> bool {
+    matches!(
+        data_type,
+        DataType::Int8
+            | DataType::Int16
+            | DataType::Int32
+            | DataType::Int64
+            | DataType::UInt8
+            | DataType::UInt16
+            | DataType::UInt32
+            | DataType::UInt64
+    )
+}
+
+/// Replaces `left / right` with the `__int_division` marker when both operands are
+/// integers per `schema`. Subtrees whose types can't be resolved are left unchanged.
+struct IntDivisionRewriter<'a> {
+    schema: &'a DFSchema,
+}
+
+impl ExprRewriter for IntDivisionRewriter<'_> {
+    fn mutate(&mut self, expr: Expr) -> Result<Expr> {
+        match expr {
+            Expr::BinaryExpr {
+                left,
+                op: Operator::Divide,
+                right,
+            } => {
+                let operand_is_integer = |operand: &Expr| {
+                    operand
+                        .get_type(self.schema)
+                        .map(|t| is_integer_type(&t))
+                        .unwrap_or(false)
+                };
+                let is_int_division = operand_is_integer(&left) && operand_is_integer(&right);
+                if is_int_division {
+                    Ok(Expr::ScalarUDF {
+                        fun: INT_DIVISION_UDF.clone(),
+                        args: vec![*left, *right],
+                    })
+                } else {
+                    Ok(Expr::BinaryExpr {
+                        left,
+                        op: Operator::Divide,
+                        right,
+                    })
+                }
+            }
+            _ => Ok(expr),
+        }
+    }
+}
 
 macro_rules! generate_sql_for_timestamp {
     (@generic $literal:ident, $value:ident, $value_block:expr, $sql_generator:expr, $sql_query:expr) => {
@@ -746,6 +839,15 @@ impl CubeScanWrapperNode {
                                 .map(|subq| subq.as_ref())
                                 .any(Self::has_ungrouped_wrapped_node)
                     }
+                } else if let Some(wrapped_union) = node.as_any().downcast_ref::<WrappedUnionNode>()
+                {
+                    wrapped_union
+                        .inputs
+                        .iter()
+                        .any(|input| Self::has_ungrouped_wrapped_node(input))
+                } else if let Some(wrapper) = node.as_any().downcast_ref::<CubeScanWrapperNode>() {
+                    // A query of a pushed down union
+                    Self::has_ungrouped_wrapped_node(wrapper.wrapped_plan.as_ref())
                 } else {
                     false
                 }
@@ -848,6 +950,18 @@ impl CubeScanWrapperNode {
                     Arc::new(LogicalPlan::Extension(Extension {
                         node: Arc::new(new_node),
                     }))
+                } else if let Some(node) = extension_node
+                    .as_any()
+                    .downcast_ref::<WrappedUnionNode>()
+                    .cloned()
+                {
+                    let mut new_node = node.clone();
+                    new_node.limit = Some(new_node.limit.map_or(query_limit as usize, |limit| {
+                        min(limit, query_limit as usize)
+                    }));
+                    Arc::new(LogicalPlan::Extension(Extension {
+                        node: Arc::new(new_node),
+                    }))
                 } else {
                     node.clone()
                 }
@@ -869,6 +983,13 @@ impl CubeScanWrapperNode {
                 })
                 .map(|mem| mem.member.as_str()),
         )
+        // A scan can have no members to resolve from, like when it selects only
+        // synthetic fields, so fall back to the cubes it scans.
+        .and_then(|data_source| {
+            data_source.or_else_try(|| {
+                meta.data_source_for_cube_names(node.used_cubes.iter().map(|c| c.as_str()))
+            })
+        })
         .map_err(|err| {
             CubeError::internal(format!(
                 "Can't generate SQL for node; error: {err}; node: {node:?}"
@@ -909,9 +1030,9 @@ impl CubeScanWrapperNode {
         let mut remapper = Remapper::new(from_alias.clone(), true);
         let mut member_to_alias = HashMap::new();
         // Probably it should just use member expression for all MemberField::Literal
-        // But turning literals to dimensions could mess up with NULL in grouping key and joins on Cube.js side (like in fullKeyQuery)
+        // But turning literals to dimensions could mess up with NULL in grouping key and joins on Cube side (like in fullKeyQuery)
         // And tuning literals to measures would require ugly wrapping with noop aggregation function
-        // TODO investigate Cube.js joins, try to implement dimension member expression
+        // TODO investigate Cube joins, try to implement dimension member expression
         let mut has_literal_members = false;
         let mut has_duplicated_members = false;
         let mut wrapper_exprs = vec![];
@@ -924,7 +1045,7 @@ impl CubeScanWrapperNode {
                     match member_to_alias.entry(f) {
                         Entry::Vacant(entry) => {
                             entry.insert(alias.clone());
-                            // `alias` is column name that would be generated by Cube.js, just reference that
+                            // `alias` is column name that would be generated by Cube, just reference that
                             Expr::Column(Column::from_name(alias.clone()))
                         }
                         Entry::Occupied(entry) => {
@@ -936,7 +1057,7 @@ impl CubeScanWrapperNode {
                 }
                 MemberField::Literal(value) => {
                     has_literal_members = true;
-                    // Don't care for `member_to_alias`, Cube.js does not handle literals
+                    // Don't care for `member_to_alias`, Cube does not handle literals
                     // Generate literal expression, and put alias into remapper to use higher up
                     Expr::Literal(value.clone())
                 }
@@ -944,7 +1065,7 @@ impl CubeScanWrapperNode {
             wrapper_exprs.push((expr, alias));
         }
 
-        // This is SQL for CubeScan from Cube.js
+        // This is SQL for CubeScan from Cube
         // It does have all the members with aliases from `member_to_alias`
         // But it does not have any literal members
         let sql = transport
@@ -993,7 +1114,7 @@ impl CubeScanWrapperNode {
                 new_sql = sql;
             }
 
-            // Use SQL from Cube.js as FROM, and prepared expressions as projection
+            // Use SQL from Cube as FROM, and prepared expressions as projection
             let resulting_sql = generator
                 .get_sql_templates()
                 .select(
@@ -1092,6 +1213,32 @@ impl CubeScanWrapperNode {
                             parent_data_source,
                         )
                         .await
+                } else if let Some(wrapped_union_node) = node_any.downcast_ref::<WrappedUnionNode>()
+                {
+                    wrapped_union_node
+                        .generate_sql(
+                            meta,
+                            transport,
+                            load_request_meta,
+                            state,
+                            values,
+                            parent_data_source,
+                        )
+                        .await
+                } else if let Some(wrapper) = node_any.downcast_ref::<CubeScanWrapperNode>() {
+                    // The queries of a pushed down union are the wrappers they were pulled
+                    // up into, and each renders as the query it holds
+                    Self::generate_sql_for_node_rec(
+                        meta,
+                        transport,
+                        load_request_meta,
+                        state,
+                        wrapper.wrapped_plan.clone(),
+                        can_rename_columns,
+                        values,
+                        parent_data_source,
+                    )
+                    .await
                 } else {
                     return Err(CubeError::internal(format!(
                         "Can't generate SQL for node: {node:?}"
@@ -1176,6 +1323,232 @@ impl UserDefinedLogicalNode for CubeScanWrapperNode {
             auth_context: self.auth_context.clone(),
             span_id: self.span_id.clone(),
             config_obj: self.config_obj.clone(),
+        })
+    }
+}
+
+/// A set operation whose inputs all push down to the same data source, rendered as a
+/// `UNION` in the generated SQL rather than run as post processing in DataFusion.
+///
+/// The row limit is not part of the plan the rewriter builds: like [`WrappedSelectNode`],
+/// this node is capped by [`CubeScanWrapperNode::set_max_limit_for_node`] when it ends up
+/// at the root of a wrapped plan.
+#[derive(Debug, Clone)]
+pub struct WrappedUnionNode {
+    pub schema: DFSchemaRef,
+    pub inputs: Vec<Arc<LogicalPlan>>,
+    /// `UNION` when set, `UNION ALL` when not
+    pub distinct: bool,
+    pub alias: Option<String>,
+    pub limit: Option<usize>,
+}
+
+impl WrappedUnionNode {
+    pub fn new(
+        schema: DFSchemaRef,
+        inputs: Vec<Arc<LogicalPlan>>,
+        distinct: bool,
+        alias: Option<String>,
+        limit: Option<usize>,
+    ) -> Self {
+        Self {
+            schema,
+            inputs,
+            distinct,
+            alias,
+            limit,
+        }
+    }
+
+    /// Renders every input as its own query and joins them into one set operation.
+    ///
+    /// Every input has to reach the same data source: a set operation the data source
+    /// evaluates cannot span two of them.
+    async fn generate_sql(
+        &self,
+        meta: &MetaContext,
+        transport: Arc<dyn TransportService>,
+        load_request_meta: Arc<LoadRequestMeta>,
+        state: Arc<SessionState>,
+        values: Vec<Option<String>>,
+        parent_data_source: Option<&str>,
+    ) -> result::Result<SqlGenerationResult, CubeError> {
+        let Some((first_input, rest_inputs)) = self.inputs.split_first() else {
+            return Err(CubeError::internal(
+                "Can't generate SQL for wrapped union: no inputs".to_string(),
+            ));
+        };
+
+        let SqlGenerationResult {
+            data_source,
+            from_alias,
+            column_remapping,
+            mut sql,
+            request,
+        } = CubeScanWrapperNode::generate_sql_for_node_rec(
+            meta,
+            Arc::clone(&transport),
+            Arc::clone(&load_request_meta),
+            Arc::clone(&state),
+            Arc::clone(first_input),
+            // Every input must keep the column names of the union's schema, which is the
+            // schema of the first one
+            false,
+            values.clone(),
+            parent_data_source,
+        )
+        .await?;
+
+        let Some(data_source) = data_source else {
+            return Err(CubeError::internal(
+                "Can't generate SQL for wrapped union: no data source for the first input"
+                    .to_string(),
+            ));
+        };
+
+        let mut queries = Vec::with_capacity(self.inputs.len());
+        queries.push(sql.sql.to_string());
+
+        for input in rest_inputs {
+            let input_result = CubeScanWrapperNode::generate_sql_for_node_rec(
+                meta,
+                Arc::clone(&transport),
+                Arc::clone(&load_request_meta),
+                Arc::clone(&state),
+                Arc::clone(input),
+                false,
+                values.clone(),
+                Some(&data_source),
+            )
+            .await?;
+
+            if input_result.data_source.as_ref() != Some(&data_source) {
+                return Err(CubeError::internal(format!(
+                    "Can't generate SQL for wrapped union: inputs use different data sources, {:?} and {:?}",
+                    data_source, input_result.data_source
+                )));
+            }
+
+            // Every input generated its SQL on its own, so its placeholders reference its
+            // own values and have to be remapped onto the combined ones
+            let (input_sql, input_values) = input_result.sql.unpack();
+            let mapping = sql.add_values(input_values);
+            queries.push(SqlQuery::remap_placeholders(&input_sql, &mapping)?);
+        }
+
+        let generator = meta
+            .data_source_to_sql_generator
+            .get(&data_source)
+            .ok_or_else(|| {
+                CubeError::internal(format!(
+                    "Can't generate SQL for wrapped union: no sql generator for '{data_source}' data source"
+                ))
+            })?;
+
+        let resulting_sql = generator
+            .get_sql_templates()
+            .union(queries, self.distinct, self.limit)
+            .map_err(|e| {
+                CubeError::internal(format!("Can't generate SQL for wrapped union: {e}"))
+            })?;
+        sql.replace_sql(resulting_sql);
+
+        // Plans above see the union through a single alias, and read its columns by the
+        // names the first input gave them
+        let alias = self.alias.clone().or(from_alias);
+        let column_remapping = column_remapping
+            .map(|column_remapping| self.requalify_remapping(column_remapping, alias.as_deref()));
+
+        // The column names of the union are the first input's, so its remapping is the one
+        // that describes them for the plans above.
+        // TODO only the first input's request is carried up, so the request that travels
+        //  with this SQL describes one input out of several. `WrappedSelectNode` drops the
+        //  requests of its joins the same way
+        Ok(SqlGenerationResult {
+            data_source: Some(data_source),
+            from_alias: alias,
+            sql,
+            column_remapping,
+            request,
+        })
+    }
+
+    /// The union's own schema drops the qualifiers of the first input, or replaces them with
+    /// its alias, so a column reference from above can carry a qualifier the first input's
+    /// remapping has never seen. Add those references, pointing at the same targets.
+    fn requalify_remapping(
+        &self,
+        column_remapping: ColumnRemapping,
+        alias: Option<&str>,
+    ) -> ColumnRemapping {
+        let mut column_remapping = column_remapping;
+        for field in self.schema.fields() {
+            let name = field.name();
+            let Some(target) = column_remapping
+                .column_remapping
+                .get(&Column::from_name(name.clone()))
+                .cloned()
+            else {
+                continue;
+            };
+            for qualifier in alias.map(str::to_string).into_iter().chain(
+                field
+                    .qualifier()
+                    .filter(|qualifier| Some(qualifier.as_str()) != alias)
+                    .cloned(),
+            ) {
+                column_remapping.column_remapping.insert(
+                    Column {
+                        relation: Some(qualifier),
+                        name: name.clone(),
+                    },
+                    target.clone(),
+                );
+            }
+        }
+        column_remapping
+    }
+}
+
+impl UserDefinedLogicalNode for WrappedUnionNode {
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+
+    fn inputs(&self) -> Vec<&LogicalPlan> {
+        self.inputs.iter().map(|input| input.as_ref()).collect()
+    }
+
+    fn schema(&self) -> &DFSchemaRef {
+        &self.schema
+    }
+
+    fn expressions(&self) -> Vec<Expr> {
+        vec![]
+    }
+
+    fn fmt_for_explain(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(
+            f,
+            "WrappedUnion: distinct={:?}, alias={:?}, limit={:?}",
+            self.distinct, self.alias, self.limit
+        )
+    }
+
+    fn from_template(
+        &self,
+        exprs: &[Expr],
+        inputs: &[LogicalPlan],
+    ) -> Arc<dyn UserDefinedLogicalNode + Send + Sync> {
+        assert_eq!(inputs.len(), self.inputs.len(), "input size inconsistent");
+        assert_eq!(exprs.len(), 0, "expression size inconsistent");
+
+        Arc::new(WrappedUnionNode {
+            schema: self.schema.clone(),
+            inputs: inputs.iter().cloned().map(Arc::new).collect(),
+            distinct: self.distinct,
+            alias: self.alias.clone(),
+            limit: self.limit,
         })
     }
 }
@@ -1390,6 +1763,7 @@ impl WrappedSelectNode {
                             Some(push_to_cube_context),
                             subqueries,
                         )?;
+                        let filter = Self::escape_interpolation_quotes(filter, true);
 
                         let used_cubes = Self::prepare_used_cubes(&used_members);
 
@@ -1504,6 +1878,34 @@ impl WrappedSelectNode {
         Ok((patches, other, sql_query))
     }
 
+    /// Rewrites integer divisions in `exprs` to the `__int_division` marker (see
+    /// [`INT_DIVISION_UDF`]). When a rewrite changes an expression, it is wrapped in an
+    /// alias with the original expression name, so generated column aliases stay stable.
+    fn rewrite_int_divisions(exprs: Vec<Expr>, input_schema: &DFSchema) -> Vec<Expr> {
+        exprs
+            .into_iter()
+            .map(|expr| {
+                let Ok(rewritten) = expr.clone().rewrite(&mut IntDivisionRewriter {
+                    schema: input_schema,
+                }) else {
+                    return expr;
+                };
+                if rewritten == expr {
+                    return expr;
+                }
+                match &rewritten {
+                    // Sort and alias expressions can't be wrapped in an alias, and
+                    // their names are not used for generated column aliases
+                    Expr::Sort { .. } | Expr::Alias(_, _) => rewritten,
+                    _ => match expr.name(input_schema) {
+                        Ok(name) => Expr::Alias(Box::new(rewritten), name),
+                        Err(_) => rewritten,
+                    },
+                }
+            })
+            .collect()
+    }
+
     async fn generate_columns(
         &self,
         meta: &MetaContext,
@@ -1545,9 +1947,22 @@ impl WrappedSelectNode {
                 ))
             })?
             .clone();
+
+        // Integer division type detection needs a schema that resolves input columns
+        // of this select: `from` combined with any join inputs
+        let mut input_schema = self.from.schema().as_ref().clone();
+        for (join_plan, _, _) in &self.joins {
+            input_schema = input_schema.join(join_plan.schema()).map_err(|e| {
+                CubeError::internal(format!(
+                    "Can't join schemas for wrapped select input: {}",
+                    e
+                ))
+            })?;
+        }
+
         let (projection, sql) = Self::generate_column_expr(
             schema.clone(),
-            self.projection_expr.iter().cloned(),
+            Self::rewrite_int_divisions(self.projection_expr.clone(), &input_schema),
             sql,
             generator.clone(),
             column_remapping,
@@ -1560,7 +1975,7 @@ impl WrappedSelectNode {
         let flat_group_expr = extract_exprlist_from_groupping_set(&self.group_expr);
         let (group_by, sql) = Self::generate_column_expr(
             schema.clone(),
-            flat_group_expr.clone(),
+            Self::rewrite_int_divisions(flat_group_expr.clone(), &input_schema),
             sql,
             generator.clone(),
             column_remapping,
@@ -1587,7 +2002,7 @@ impl WrappedSelectNode {
 
         let (aggregate, sql) = Self::generate_column_expr(
             schema.clone(),
-            aggr_expr.clone(),
+            Self::rewrite_int_divisions(aggr_expr.clone(), &input_schema),
             sql,
             generator.clone(),
             column_remapping,
@@ -1600,7 +2015,7 @@ impl WrappedSelectNode {
 
         let (filter, sql) = Self::generate_column_expr(
             schema.clone(),
-            self.filter_expr.iter().cloned(),
+            Self::rewrite_int_divisions(self.filter_expr.clone(), &input_schema),
             sql,
             generator.clone(),
             column_remapping,
@@ -1613,7 +2028,7 @@ impl WrappedSelectNode {
 
         let (window, sql) = Self::generate_column_expr(
             schema.clone(),
-            self.window_expr.iter().cloned(),
+            Self::rewrite_int_divisions(self.window_expr.clone(), &input_schema),
             sql,
             generator.clone(),
             column_remapping,
@@ -1624,9 +2039,86 @@ impl WrappedSelectNode {
         )
         .await?;
 
+        // Sort pushdown can replace a select-list alias with the literal expression.
+        // Integer literals in ORDER BY are interpreted as select-list positions by some SQL
+        // dialects, so restore the generated alias when the literal is selected in this query.
+        fn unalias(mut expr: &Expr) -> &Expr {
+            while let Expr::Alias(inner, _) = expr {
+                expr = inner;
+            }
+            expr
+        }
+        // Push-to-Cube discards this `order` and builds its own from `self.order_expr`, so
+        // there is nothing to fix there, and a generated alias is not a scan member.
+        let literal_aliases = if push_to_cube_context.is_some() {
+            vec![]
+        } else {
+            self.projection_expr
+                .iter()
+                .zip(projection.iter())
+                .chain(flat_group_expr.iter().zip(group_by.iter()))
+                .filter_map(|(selected_expr, (aliased_column, _))| {
+                    let expr = unalias(selected_expr);
+                    matches!(expr, Expr::Literal(_)).then(|| (expr, &aliased_column.alias))
+                })
+                .collect::<Vec<_>>()
+        };
+        let order_expr = if literal_aliases.is_empty() {
+            self.order_expr.clone()
+        } else {
+            self.order_expr
+                .iter()
+                .map(|order_expr| {
+                    let Expr::Sort {
+                        expr,
+                        asc,
+                        nulls_first,
+                    } = order_expr
+                    else {
+                        return order_expr.clone();
+                    };
+                    let Some((_, alias)) = literal_aliases
+                        .iter()
+                        .find(|(literal, _)| *literal == unalias(expr))
+                    else {
+                        return order_expr.clone();
+                    };
+                    Expr::Sort {
+                        expr: Box::new(Expr::Column(Column::from_name(*alias))),
+                        asc: *asc,
+                        nulls_first: *nulls_first,
+                    }
+                })
+                .collect()
+        };
+
+        // Sort expressions can reference window expressions computed in this same select
+        // by their full DataFusion name. Those columns don't exist in the source SQL, so
+        // rewrite them to the generated window aliases, which ORDER BY can reference by name.
+        let order_expr = if window.is_empty() {
+            order_expr
+        } else {
+            let window_columns = self
+                .window_expr
+                .iter()
+                .zip(window.iter())
+                .map(|(window_expr, (aliased_column, _))| {
+                    Ok((
+                        Column::from_name(expr_name(window_expr, schema)?),
+                        Column::from_name(&aliased_column.alias),
+                    ))
+                })
+                .collect::<result::Result<HashMap<_, _>, CubeError>>()?;
+            let window_columns_ref = window_columns.iter().collect();
+            order_expr
+                .into_iter()
+                .map(|e| replace_col(e, &window_columns_ref))
+                .collect::<Result<Vec<_>>>()?
+        };
+
         let (order, sql) = Self::generate_column_expr(
             schema.clone(),
-            self.order_expr.iter().cloned(),
+            Self::rewrite_int_divisions(order_expr, &input_schema),
             sql,
             generator.clone(),
             column_remapping,
@@ -1835,6 +2327,12 @@ impl WrappedSelectNode {
         };
 
         let sql_type = Self::generate_sql_type(sql_generator.clone(), data_type)?;
+        let sql_type = sql_generator
+            .get_sql_templates()
+            .nullable_type(sql_type)
+            .map_err(|e| {
+                DataFusionError::Internal(format!("Can't generate SQL for nullable type: {}", e))
+            })?;
         let result = Self::generate_sql_cast_expr(sql_generator, "NULL".to_string(), sql_type)?;
         Ok(result)
     }
@@ -2381,7 +2879,7 @@ impl WrappedSelectNode {
         {
             if let Some(relation) = c.relation.as_ref() {
                 if known_join_subqueries.contains(relation) {
-                    // SQL API passes fixed aliases to Cube.js for join subqueries
+                    // SQL API passes fixed aliases to Cube for join subqueries
                     // It means we don't need to use member expressions here, and can just use that fixed alias
                     // So we can generate that as if it were regular column expression
 
@@ -2934,6 +3432,37 @@ impl WrappedSelectNode {
                 "generate_sql_for_scalar_udf called with non-ScalarUDF expr".to_string(),
             ));
         };
+        if fun.name == INT_DIVISION_MARKER {
+            let [left, right]: [Expr; 2] = args.try_into().map_err(|args| {
+                DataFusionError::Internal(format!(
+                    "{INT_DIVISION_MARKER} marker expects exactly 2 arguments, got {args:?}"
+                ))
+            })?;
+            let (left, sql_query) = Self::generate_sql_for_expr(
+                sql_query,
+                sql_generator.clone(),
+                left,
+                push_to_cube_context,
+                subqueries,
+            )?;
+            let (right, sql_query) = Self::generate_sql_for_expr(
+                sql_query,
+                sql_generator.clone(),
+                right,
+                push_to_cube_context,
+                subqueries,
+            )?;
+            let resulting_sql = sql_generator
+                .get_sql_templates()
+                .int_division_expr(left, right)
+                .map_err(|e| {
+                    DataFusionError::Internal(format!(
+                        "Can't generate SQL for integer division: {}",
+                        e
+                    ))
+                })?;
+            return Ok((resulting_sql, sql_query));
+        }
         let date_part_err = |dp| {
             DataFusionError::Internal(format!(
                 "Can't generate SQL for scalar function: date part '{}' is not supported",
@@ -3063,6 +3592,22 @@ impl WrappedSelectNode {
         ))
     }
 
+    /// Returns the operands of a timestamp/date subtraction `left - right`,
+    /// peeling any cast wrapping the subtraction. Used to rewrite
+    /// `EXTRACT(EPOCH FROM (left - right))` for dialects that don't support
+    /// taking the epoch of an interval.
+    fn timestamp_diff_operands(expr: &Expr) -> Option<(&Expr, &Expr)> {
+        match expr {
+            Expr::BinaryExpr {
+                left,
+                op: Operator::Minus,
+                right,
+            } => Some((left, right)),
+            Expr::Cast { expr, .. } => Self::timestamp_diff_operands(expr),
+            _ => None,
+        }
+    }
+
     #[inline(never)]
     fn generate_sql_for_scalar_function<'ctx>(
         mut sql_query: SqlQuery,
@@ -3124,6 +3669,42 @@ impl WrappedSelectNode {
                                         date_part
                                     )));
                         }
+                        // Some dialects (e.g. Snowflake) can't EXTRACT(EPOCH FROM <interval>),
+                        // i.e. take the epoch of a timestamp difference `a - b`. When the
+                        // dialect provides a dedicated template, render the difference as a
+                        // diff in seconds instead.
+                        let sql_templates = sql_generator.get_sql_templates();
+                        if date_part.eq_ignore_ascii_case("epoch")
+                            && sql_templates.contains_template("expressions/extract_epoch_diff")
+                        {
+                            if let Some((left, right)) = Self::timestamp_diff_operands(&args[1]) {
+                                let (left_sql, query) = Self::generate_sql_for_expr(
+                                    sql_query,
+                                    sql_generator.clone(),
+                                    left.clone(),
+                                    push_to_cube_context,
+                                    subqueries,
+                                )?;
+                                let (right_sql, query) = Self::generate_sql_for_expr(
+                                    query,
+                                    sql_generator.clone(),
+                                    right.clone(),
+                                    push_to_cube_context,
+                                    subqueries,
+                                )?;
+                                return Ok((
+                                    sql_templates
+                                        .extract_epoch_diff_expr(left_sql, right_sql)
+                                        .map_err(|e| {
+                                            DataFusionError::Internal(format!(
+                                                "Can't generate SQL for scalar function: {}",
+                                                e
+                                            ))
+                                        })?,
+                                    query,
+                                ));
+                            }
+                        }
                         let (arg_sql, query) = Self::generate_sql_for_expr(
                             sql_query,
                             sql_generator.clone(),
@@ -3132,8 +3713,7 @@ impl WrappedSelectNode {
                             subqueries,
                         )?;
                         return Ok((
-                            sql_generator
-                                .get_sql_templates()
+                            sql_templates
                                 .extract_expr(date_part.to_string(), arg_sql)
                                 .map_err(|e| {
                                     DataFusionError::Internal(format!(
@@ -3402,6 +3982,15 @@ impl WrappedSelectNode {
             }
 
             meta.data_source_for_member_names(every_used_member.iter().map(|m| m.as_str()))
+                // A query can reference no members to resolve from, like when it
+                // selects only synthetic fields, so fall back to the cubes it scans.
+                .and_then(|data_source| {
+                    data_source.or_else_try(|| {
+                        meta.data_source_for_cube_names(
+                            ungrouped_scan_node.used_cubes.iter().map(|c| c.as_str()),
+                        )
+                    })
+                })
                 .map_err(|err| {
                     CubeError::internal(format!("Could not determine data source: {err}"))
                 })?
@@ -3701,13 +4290,15 @@ impl WrappedSelectNode {
                                 let aliased_column = find_column(&self.aggr_expr, &aggregate)
                                     .or_else(|| find_column(&self.projection_expr, &projection))
                                     .or_else(|| find_column(&flat_group_expr, &group_by))
+                                    .or_else(|| find_column(&self.window_expr, &window))
                                     .ok_or_else(|| {
                                         DataFusionError::Execution(format!(
-                                            "Can't find column {} in projection {:?} or aggregate {:?} or group {:?}",
+                                            "Can't find column {} in projection {:?} or aggregate {:?} or group {:?} or window {:?}",
                                             col_name,
                                             self.projection_expr,
                                             self.aggr_expr,
-                                            flat_group_expr
+                                            flat_group_expr,
+                                            self.window_expr
                                         ))
                                     })?;
                                 Ok(vec![
@@ -4247,6 +4838,125 @@ impl<'ctx, 'mem> ExpressionVisitor for CollectMembersVisitor<'ctx, 'mem> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::{
+        compile::engine::df::scan::CubeScanOptions,
+        sql::HttpAuthContext,
+        transport::{CubeMeta, CubeMetaDimension, CubeMetaType},
+    };
+    use datafusion::logical_plan::DFField;
+    use std::collections::HashMap;
+
+    /// Each entry is a cube with one dimension, on a data source of its own.
+    fn meta_context_with_cubes(cubes: &[(&str, &str, &str)]) -> MetaContext {
+        MetaContext::new(
+            cubes
+                .iter()
+                .map(|(cube_name, member, _)| CubeMeta {
+                    name: cube_name.to_string(),
+                    description: None,
+                    title: None,
+                    r#type: CubeMetaType::Cube,
+                    dimensions: vec![CubeMetaDimension::new(
+                        member.to_string(),
+                        "string".to_string(),
+                    )],
+                    measures: vec![],
+                    segments: vec![],
+                    joins: None,
+                    folders: None,
+                    nested_folders: None,
+                    hierarchies: None,
+                    meta: None,
+                })
+                .collect(),
+            cubes
+                .iter()
+                .map(|(_, member, data_source)| (member.to_string(), data_source.to_string()))
+                .collect(),
+            HashMap::new(),
+            uuid::Uuid::new_v4(),
+        )
+    }
+
+    fn cube_scan_node(member_fields: Vec<MemberField>, used_cubes: Vec<String>) -> CubeScanNode {
+        let schema = Arc::new(
+            DFSchema::new_with_metadata(
+                member_fields
+                    .iter()
+                    .enumerate()
+                    .map(|(i, _)| DFField::new(None, &format!("c{i}"), DataType::Utf8, true))
+                    .collect::<Vec<_>>(),
+                HashMap::new(),
+            )
+            .unwrap(),
+        );
+
+        CubeScanNode::new(
+            schema,
+            member_fields,
+            V1LoadRequestQuery::new(),
+            Arc::new(HttpAuthContext {
+                access_token: "token".to_string(),
+                base_path: "path".to_string(),
+            }),
+            CubeScanOptions {
+                change_user: None,
+                max_records: None,
+                cache_mode: None,
+                throw_continue_wait: false,
+            },
+            used_cubes,
+            None,
+        )
+    }
+
+    /// A plain wrapped `CubeScan` whose columns are all literals has no member to
+    /// resolve a data source from, so it falls back to the cubes it scans. The
+    /// push-to-cube path has `test_wrapper_only_system_fields` for this; the SQL
+    /// surface never reaches this one, so it is covered here directly.
+    #[test]
+    fn test_data_source_for_cube_scan_without_members() {
+        let meta = meta_context_with_cubes(&[("Orders", "Orders.status", "warehouse")]);
+        let node = cube_scan_node(
+            vec![MemberField::Literal(ScalarValue::Utf8(Some(
+                "anything".to_string(),
+            )))],
+            vec!["Orders".to_string()],
+        );
+
+        let data_source = CubeScanWrapperNode::data_source_for_cube_scan(&meta, &node).unwrap();
+        assert!(matches!(data_source, DataSource::Specific("warehouse")));
+    }
+
+    /// With a member to resolve from, that member decides and the fallback must not
+    /// take over. `used_cubes` holds a second cube on another data source, so
+    /// falling back would merge the two into a conflict instead - that is what
+    /// makes the precedence observable rather than assumed.
+    #[test]
+    fn test_data_source_for_cube_scan_with_members() {
+        let meta = meta_context_with_cubes(&[
+            ("Orders", "Orders.status", "warehouse"),
+            ("Visits", "Visits.url", "analytics"),
+        ]);
+        let node = cube_scan_node(
+            vec![MemberField::regular("Orders.status".to_string())],
+            vec!["Orders".to_string(), "Visits".to_string()],
+        );
+
+        let data_source = CubeScanWrapperNode::data_source_for_cube_scan(&meta, &node).unwrap();
+        assert!(matches!(data_source, DataSource::Specific("warehouse")));
+    }
+
+    /// Literal-only columns and no cubes to fall back to: nothing restricts the
+    /// data source, and the caller raises its own error.
+    #[test]
+    fn test_data_source_for_cube_scan_without_members_or_cubes() {
+        let meta = meta_context_with_cubes(&[("Orders", "Orders.status", "warehouse")]);
+        let node = cube_scan_node(vec![MemberField::Literal(ScalarValue::Utf8(None))], vec![]);
+
+        let data_source = CubeScanWrapperNode::data_source_for_cube_scan(&meta, &node).unwrap();
+        assert!(matches!(data_source, DataSource::Unrestricted));
+    }
 
     #[test]
     fn test_member_expression_sql() {

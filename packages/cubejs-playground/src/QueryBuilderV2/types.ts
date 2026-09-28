@@ -33,7 +33,7 @@ export interface QueryBuilderSharedProps {
 
 export interface QueryBuilderContextProps
   extends ReturnType<typeof useQueryBuilder>,
-    QueryBuilderSharedProps {
+  QueryBuilderSharedProps {
   selectedCube: Cube | null;
   selectCube: (cube: string | null) => void;
   connectionId?: number;

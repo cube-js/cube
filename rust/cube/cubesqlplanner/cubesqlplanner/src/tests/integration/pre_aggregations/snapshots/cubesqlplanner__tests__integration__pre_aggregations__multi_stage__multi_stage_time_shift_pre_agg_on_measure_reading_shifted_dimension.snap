@@ -1,0 +1,9 @@
+---
+source: cubesqlplanner/cubesqlplanner/src/tests/integration/pre_aggregations/multi_stage.rs
+expression: result
+---
+mdd_events__batch_at_month | mdd_events__late_total | mdd_events__late_prev_month
+---------------------------+------------------------+----------------------------
+2024-01-01 00:00:00        | NULL                   | NULL                       
+2024-02-01 00:00:00        | NULL                   | 2000.00                    
+2024-03-01 00:00:00        | 1000.00                | 1000.00

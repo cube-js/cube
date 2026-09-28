@@ -78,6 +78,11 @@ view(`extended_orders`, {
 
 </CodeGroup>
 
+The child view also gets the [measures](#measures), [dimensions](#dimensions)
+and [folders](#folders) that the parent view defines. So you can define a view
+measure once and reuse it in other views. See [Reusing a view measure across
+views][ref-recipe-reuse-view-measures].
+
 ### `title`
 
 Use the `title` parameter to change the display name of the view.
@@ -287,14 +292,15 @@ over the view's default. When `auto_run` is not set, auto-run is on.
 #### `default_ui_filters`
 
 In the Cube cloud platform, you can use the `default_ui_filters` key in a
-view's `meta` to define default filters for [workbooks][ref-workbook-filtering].
-When the view is selected in a new workbook tab, these filters are
-pre-populated as regular, fully editable filters — data consumers can change
-their values, switch operators, or remove them entirely.
+view's `meta` to define default filters for [workbooks][ref-workbook-filtering],
+views embedded via the React Embed SDK, and the Google Sheets / Excel add-in.
+When the view is selected, these filters are pre-populated as regular, fully
+editable filters — data consumers can change their values, switch operators,
+or remove them entirely.
 
-Each entry has the same shape as a [`default_filters`](#default_filters) entry:
-a `member` (a dimension or measure exposed by the view), an `operator`, and a
-list of `values`.
+Each entry has a `member` (a dimension or measure exposed by the view), an
+`operator`, and a list of `values` — or a single `value`, which is natural for
+single-value operators. The null and empty checks take no value.
 
 <Info>
 
@@ -315,15 +321,17 @@ views:
 
     meta:
       default_ui_filters:
-        - member: status
-          operator: equals
-          values:
-            - completed
+        # "is yesterday" → equality at day grain, shows yesterday's data
         - member: created_at
-          operator: inDateRange
-          values:
-            - 2024-01-01
-            - 2024-12-31
+          operator: is
+          value: yesterday
+        # Rolling window → use "between" with two bounds
+        - member: updated_at
+          operator: between
+          values: ["7 days ago", "today"]
+        - member: status
+          operator: is
+          values: ["completed", "shipped"]
 ```
 
 ```javascript title="JavaScript"
@@ -337,15 +345,22 @@ view(`orders_view`, {
 
   meta: {
     default_ui_filters: [
-      {
-        member: `status`,
-        operator: `equals`,
-        values: [`completed`]
-      },
+      // "is yesterday" → equality at day grain, shows yesterday's data
       {
         member: `created_at`,
-        operator: `inDateRange`,
-        values: [`2024-01-01`, `2024-12-31`]
+        operator: `is`,
+        value: `yesterday`
+      },
+      // Rolling window → use "between" with two bounds
+      {
+        member: `updated_at`,
+        operator: `between`,
+        values: [`7 days ago`, `today`]
+      },
+      {
+        member: `status`,
+        operator: `is`,
+        values: [`completed`, `shipped`]
       }
     ]
   }
@@ -354,12 +369,66 @@ view(`orders_view`, {
 
 </CodeGroup>
 
+##### Operators
+
+Operators use the same labels data consumers see in the workbook filter bar —
+what you see in the filter bar is what you type:
+
+- Any member: `is`, `is not`, `is null`, `is not null`.
+- Strings: `contains`, `not contains`, `starts with`, `not starts with`,
+  `ends with`, `not ends with`, `is empty`, `is not empty`.
+- Numbers: `greater than`, `greater than or equal`, `less than`,
+  `less than or equal`, `between`.
+- Dates and times: `after`, `after or on`, `before`, `before or on`, `between`,
+  and the period comparisons `in the month`, `not in the month`,
+  `in the quarter`, `not in the quarter`, `in the year`, `not in the year`. A
+  period comparison takes any date inside the period, so `in the year` with
+  `2026-03-14` means all of 2026.
+
+Operators are case-insensitive and whitespace-tolerant. Internal type names and
+REST (JSON) API aliases (e.g. `equals`, `gte`, `inDateRange`) are also accepted,
+as are the older `after date` / `before or on date` spellings the filter bar used
+before the noun was dropped.
+
+On a date or time member, `is` with a relative value is an **equality** at that
+value's grain, not a range — `is yesterday` matches yesterday only (e.g.
+`DATE_TRUNC('day', created_at) = CURRENT_DATE - INTERVAL '1 day'`), and
+`is this month` matches the current month. For a rolling window, use `between`
+with two bounds.
+
+##### Relative date values
+
+A `between` filter always takes an explicit two-element `[start, end]` pair.
+Each bound is one of:
+
+- **A relative value**: `today`, `yesterday`,
+  `N days|weeks|months|quarters|years ago` (e.g. `7 days ago`),
+  `N ... from now` (e.g. `2 weeks from now`), or
+  `this week|month|quarter|year`. `now` is accepted as an alias for `today`.
+- **A fixed ISO date**: `"2026-01-15"`, meaning that whole day.
+- **A number**, for numeric members.
+
+Relative values also work with `is` and the open-ended comparison operators —
+for example, `after date` with `value: 7 days ago`.
+
+Relative bounds resolve when a query runs, not when the filter is seeded:
+`["7 days ago", "today"]` produces SQL based on the current date (e.g.
+`BETWEEN CURRENT_DATE - INTERVAL '7 days' AND CURRENT_DATE`), so the window
+rolls forward day over day. Both bounds are inclusive — `["7 days ago",
+"today"]` covers 8 calendar days for daily data. In the workbook, the seeded
+filter opens the date editor on the **Relative** tab showing its bounds.
+
+Values are case- and whitespace-insensitive. Entries are validated: an
+unrecognized operator or value, or a `between` filter without exactly two
+bounds, drops that filter entry with a browser-console warning — the remaining
+entries still apply, and view selection never breaks.
+
 Unlike [`default_filters`](#default_filters), which are enforced on every query
-against the view, `default_ui_filters` only provide a starting point for the
-workbook UI: they don't apply to queries made through APIs or other
-visualization tools, and workbook users can freely modify or remove them.
-They also only apply to new queries — defining or changing them in the data
-model does not add them to existing queries.
+against the view, `default_ui_filters` only provide a starting point: they
+don't apply to queries made through APIs or other visualization tools, and
+data consumers can freely modify or remove them. They also only apply to new
+queries — defining or changing them in the data model does not add them to
+existing queries or saved explorations.
 
 ### `cubes`
 
@@ -463,6 +532,15 @@ To include all members from a cube, use the _includes all_ shorthand: `includes:
 In that case, you can also use the `excludes` parameter to list members that
 you'd like to exclude.
 
+<Info>
+
+A view defines its own surface, so included members don't inherit the
+[`public`][ref-dim-public] flag from the underlying cube: a member that is
+`public: false` on the cube becomes queryable through the view. Use `excludes`
+to keep such members out of the view.
+
+</Info>
+
 #### `prefix`
 
 If you'd like to prefix exposed members with the cube name, you can do so by setting the
@@ -493,6 +571,127 @@ If you'd like to override the [format][ref-dim-format] of a member, you can use 
 
 If you'd like to override the [metadata][ref-dim-meta] of a member, you can use the
 `meta` parameter. Note that the `meta` is overridded as a whole.
+
+### `measures`
+
+The `measures` parameter defines measures on the view itself. A view measure is
+always _derived_: its `sql` may only reference members that the view already
+includes, never columns of a table. Use it for a metric whose parts come from
+different cubes. (A cube can own such a metric too, by referencing the other
+cube's member; the [average order value recipe][ref-recipe-aov] compares the two
+placements.)
+
+Reference the included members as `{CUBE.member}` (or `{view_name.member}`); a
+bare `{member}` does not resolve inside a view.
+
+In the example below, `orders` joins `line_items` `one_to_many`:
+
+<CodeGroup>
+
+```yaml title="YAML"
+views:
+  - name: orders_overview
+    cubes:
+      - join_path: orders
+        includes:
+          - total_amount
+      - join_path: orders.line_items
+        includes:
+          - count
+
+    measures:
+      - name: average_line_value
+        type: number
+        multi_stage: true
+        sql: "{CUBE.total_amount} / NULLIF({CUBE.count}, 0)"
+```
+
+```javascript title="JavaScript"
+view(`orders_overview`, {
+  cubes: [
+    {
+      join_path: orders,
+      includes: [`total_amount`]
+    },
+    {
+      join_path: orders.line_items,
+      includes: [`count`]
+    }
+  ],
+
+  measures: {
+    average_line_value: {
+      type: `number`,
+      multi_stage: true,
+      sql: `${CUBE.total_amount} / NULLIF(${CUBE.count}, 0)`
+    }
+  }
+})
+```
+
+</CodeGroup>
+
+A view measure that owns its SQL — anything that reads a column rather than a
+member — is rejected at compile time with `View 'orders_overview' defines own
+member 'orders_overview.average_line_value'`. Move that definition to a cube and
+include it instead.
+
+Mark a measure that combines members of **different cubes**
+[`multi_stage`][ref-ref-multi-stage], as above. Without it the expression is
+evaluated inside a single joined scan, which is only correct when nothing in it
+is affected by the join:
+
+- Across cubes joined `one_to_many`, an aggregate on the one side is taken over
+  the rows the join multiplied, so the result is silently inflated.
+- Across cubes that don't join to each other at all, there is no single join
+  tree to evaluate it in and the query fails with `Can't find join path to
+  join …`. See [multi-fact views][ref-multi-fact-views].
+
+`multi_stage` defers the expression until each referenced measure has been
+aggregated on its own, so neither happens.
+
+### `dimensions`
+
+The `dimensions` parameter defines dimensions on the view itself, under the same
+rule as [`measures`](#measures): the `sql` may only combine members the view
+already includes.
+
+<CodeGroup>
+
+```yaml title="YAML"
+views:
+  - name: orders_overview
+    cubes:
+      - join_path: orders.products
+        includes:
+          - category
+          - name
+
+    dimensions:
+      - name: category_and_name
+        type: string
+        sql: "{CUBE.category} || ' / ' || {CUBE.name}"
+```
+
+```javascript title="JavaScript"
+view(`orders_overview`, {
+  cubes: [
+    {
+      join_path: orders.products,
+      includes: [`category`, `name`]
+    }
+  ],
+
+  dimensions: {
+    category_and_name: {
+      type: `string`,
+      sql: `${CUBE.category} || ' / ' || ${CUBE.name}`
+    }
+  }
+})
+```
+
+</CodeGroup>
 
 ### `folders`
 
@@ -916,9 +1115,12 @@ The `access_policy` parameter is used to configure [access policies][ref-ref-dap
 
 [ref-ai-context]: /docs/data-modeling/ai-context
 [ref-recipe-control-access-cubes-views]: /docs/data-modeling/access-control
-[ref-naming]: /docs/data-modeling/syntax#naming
+[ref-naming]: /docs/data-modeling/concepts/syntax#naming
 [ref-apis]: /reference
 [ref-ref-cubes]: /reference/data-modeling/cube
+[ref-ref-multi-stage]: /reference/data-modeling/measures#multi_stage
+[ref-multi-fact-views]: /docs/data-modeling/multi-fact-views
+[ref-recipe-aov]: /recipes/data-modeling/average-order-value#where-to-put-the-measure
 [ref-ref-hierarchies]: /reference/data-modeling/hierarchies
 [ref-ref-dap]: /reference/data-modeling/data-access-policies
 [ref-rest-query-ops]: /reference/core-data-apis/rest-api/query-format#filters-operators
@@ -927,8 +1129,10 @@ The `access_policy` parameter is used to configure [access policies][ref-ref-dap
 [ref-viz-tools]: /admin/connect-to-data/visualization-tools
 [ref-workbook-filtering]: /docs/explore-analyze/workbooks/querying-data#filtering
 [ref-workbook-running]: /docs/explore-analyze/workbooks/querying-data#running-queries
-[ref-extension]: /docs/data-modeling/extending-cubes
+[ref-extension]: /docs/data-modeling/extending-cubes#extending-views
+[ref-recipe-reuse-view-measures]: /recipes/data-modeling/reusing-view-measures
 [ref-dim-name]: /reference/data-modeling/dimensions#name
+[ref-dim-public]: /reference/data-modeling/dimensions#public
 [ref-dim-title]: /reference/data-modeling/dimensions#title
 [ref-dim-description]: /reference/data-modeling/dimensions#description
 [ref-dim-format]: /reference/data-modeling/dimensions#format

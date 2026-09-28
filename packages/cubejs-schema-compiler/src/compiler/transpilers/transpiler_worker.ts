@@ -35,7 +35,11 @@ const transpilers = {
   IIFETranspiler: new IIFETranspiler(),
 };
 
+// The reporter accumulates across calls, so each file gets only the errors and warnings it added
 const transpileJs = (data: TransferContent) => {
+  const errorsBefore = errorsReport.getErrors().length;
+  const warningsBefore = errorsReport.getWarnings().length;
+
   cubeDictionary.setCubeNames(data.cubeNames);
   cubeSymbols.setSymbols(data.cubeSymbols);
 
@@ -62,12 +66,15 @@ const transpileJs = (data: TransferContent) => {
 
   return {
     content,
-    errors: errorsReport.getErrors(),
-    warnings: errorsReport.getWarnings()
+    errors: errorsReport.getErrors().slice(errorsBefore),
+    warnings: errorsReport.getWarnings().slice(warningsBefore)
   };
 };
 
 const transpileYaml = (data: TransferContent) => {
+  const errorsBefore = errorsReport.getErrors().length;
+  const warningsBefore = errorsReport.getWarnings().length;
+
   cubeDictionary.setCubeNames(data.cubeNames);
   cubeSymbols.setSymbols(data.cubeSymbols);
 
@@ -77,12 +84,26 @@ const transpileYaml = (data: TransferContent) => {
 
   return {
     content: transpiledFile?.content || '',
-    errors: errorsReport.getErrors(),
-    warnings: errorsReport.getWarnings()
+    errors: errorsReport.getErrors().slice(errorsBefore),
+    warnings: errorsReport.getWarnings().slice(warningsBefore)
   };
 };
 
+type BulkTransferContent = Omit<TransferContent, 'fileName' | 'content'> & {
+  files: { fileName: string; content: string }[];
+};
+
+// A file that throws gets null: the caller retries it alone to report the error as the per-file call does
+const transpileJsBulk = ({ files, ...shared }: BulkTransferContent) => files.map(({ fileName, content }) => {
+  try {
+    return transpileJs({ ...shared, fileName, content });
+  } catch {
+    return null;
+  }
+});
+
 workerpool.worker({
   transpileJs,
+  transpileJsBulk,
   transpileYaml,
 });

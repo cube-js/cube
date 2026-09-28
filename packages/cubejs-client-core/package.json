@@ -1,7 +1,9 @@
 {
   "name": "@cubejs-client/core",
-  "version": "1.6.59",
-  "engines": {},
+  "version": "1.7.46",
+  "engines": {
+    "node": ">=20.0.0"
+  },
   "type": "module",
   "repository": {
     "type": "git",
@@ -33,14 +35,13 @@
     }
   },
   "dependencies": {
-    "core-js": "^3.6.5",
-    "cross-fetch": "^3.0.2",
+    "core-js": "^3.34.0",
     "d3-format": "^3.1.0",
     "d3-time-format": "^4.1.0",
     "dayjs": "^1.10.4",
     "ramda": "^0.27.2",
     "url-search-params-polyfill": "^7.0.0",
-    "uuid": "^11.1.0"
+    "uuid": "^11.1.1"
   },
   "scripts": {
     "build:client-core": "rm -rf dist && npm run tsc",
@@ -48,25 +49,21 @@
     "watch": "tsc -w",
     "test": "npm run unit",
     "unit": "vitest run --coverage",
-    "bench": "vitest bench",
-    "lint": "eslint src/* test/ --ext .ts,.js",
-    "lint:fix": "eslint --fix src/* test/ --ext .ts,js"
+    "bench": "vitest bench"
   },
   "files": [
-    "dist"
+    "dist",
+    "!dist/tsconfig.tsbuildinfo"
   ],
   "license": "MIT",
   "devDependencies": {
-    "@cubejs-backend/linter": "1.6.59",
+    "@cubejs-backend/linter": "1.7.46",
     "@types/d3-format": "^3",
     "@types/d3-time-format": "^4",
     "@types/moment-range": "^4.0.0",
-    "@types/ramda": "^0.27.34",
+    "@types/ramda": "^0.27.40",
     "@vitest/coverage-v8": "^4",
-    "typescript": "~5.2.2",
+    "typescript": "~6.0.3",
     "vitest": "^4"
-  },
-  "eslintConfig": {
-    "extends": "../cubejs-linter"
   }
 }

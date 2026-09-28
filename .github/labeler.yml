@@ -1,6 +1,6 @@
 docs:
 - changed-files:
-  - any-glob-to-any-file: docs/*
+  - any-glob-to-any-file: docs-mintlify/**/*
 
 # Data source drivers
 data source driver:
@@ -43,10 +43,6 @@ driver:druid:
 driver:duckdb:
 - changed-files:
   - any-glob-to-any-file: packages/cubejs-duckdb-driver/**/*
-
-driver:elasticsearch:
-- changed-files:
-  - any-glob-to-any-file: packages/cubejs-elasticsearch-driver/**/*
 
 driver:firebolt:
 - changed-files:

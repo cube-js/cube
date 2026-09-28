@@ -1,0 +1,7 @@
+---
+source: cubesqlplanner/cubesqlplanner/src/tests/integration/modifiers.rs
+expression: result
+---
+dup_customers__name | dup_orders__status | dup_customers__ltv_agg_number
+--------------------+--------------------+------------------------------
+dup                 | new                | 150.00

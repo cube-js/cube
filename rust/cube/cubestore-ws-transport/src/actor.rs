@@ -285,8 +285,7 @@ pub(crate) async fn connect_ws(
         builder = builder.header("Authorization", value);
     }
 
-    let truncated: String = process_id.chars().take(64).collect();
-    let value = HeaderValue::from_str(&truncated)
+    let value = HeaderValue::from_str(process_id)
         .map_err(|e| TransportError::Auth(format!("x-process-id: {e}")))?;
     builder = builder.header("x-process-id", value);
 

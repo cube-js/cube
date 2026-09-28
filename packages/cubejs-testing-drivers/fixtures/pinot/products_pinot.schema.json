@@ -1,0 +1,22 @@
+{
+  "schemaName": "products_pinot",
+  "dimensionFieldSpecs": [
+    {
+      "name": "category",
+      "dataType": "STRING"
+    },
+    {
+      "name": "sub_category",
+      "dataType": "STRING"
+    },
+    {
+      "name": "product_name",
+      "dataType": "STRING"
+    }
+  ],
+  "primaryKeyColumns": [
+    "category",
+    "sub_category",
+    "product_name"
+  ]
+}

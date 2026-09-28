@@ -1,9 +1,21 @@
-use crate::cube_bridge::base_tools::BaseTools;
-use crate::cube_bridge::member_sql::{MemberSql, SqlTemplate, SqlTemplateArgs};
-use crate::cube_bridge::security_context::SecurityContext;
+use crate::cube_bridge::member_sql::{
+    CompiledMemberTemplate, FilterGroupItem, FilterParamsColumn, FilterParamsItem, MemberSql,
+    SqlTemplate, SqlTemplateArgs,
+};
+use crate::test_fixtures::cube_bridge::MockFilterParamsCallback;
 use cubenativeutils::CubeError;
 use std::any::Any;
 use std::rc::Rc;
+
+/// Test helper: extract the compiled `(template, args)` from a mock member sql.
+pub fn mock_compiled(sql: Rc<dyn MemberSql>) -> (SqlTemplate, SqlTemplateArgs) {
+    let c = sql
+        .as_any()
+        .downcast::<MockMemberSql>()
+        .expect("expected MockMemberSql")
+        .compiled();
+    (c.template, c.args)
+}
 
 /// Mock implementation of MemberSql for testing
 /// Parses template strings like "{CUBE.field} / {other_cube.field} + {revenue}"
@@ -92,12 +104,63 @@ impl MockMemberSql {
         }))
     }
 
+    /// Pre-aggregation array references where an element may interpolate the
+    /// cube itself: `["{CUBE}.count", "{CUBE.status}", "city"]`. A brace-free
+    /// element is a plain member path, recorded the way
+    /// `pre_agg_array_refs` records it, so both forms can be mixed in one list.
+    pub fn pre_agg_array_templates(members: Vec<String>) -> Result<Rc<Self>, CubeError> {
+        let mut args = SqlTemplateArgs::default();
+        let mut args_names = Vec::new();
+        let mut template_elements = Vec::new();
+
+        for member in &members {
+            if member.contains('{') {
+                template_elements.push(Self::parse_template_into(
+                    member,
+                    &mut args,
+                    &mut args_names,
+                )?);
+            } else {
+                let path_parts: Vec<String> = member.split('.').map(|s| s.to_string()).collect();
+                if path_parts.iter().any(|p| p.is_empty()) {
+                    return Err(CubeError::user(format!(
+                        "Invalid path in pre-aggregation: {}",
+                        member
+                    )));
+                }
+                let arg_name = path_parts[0].clone();
+                if !args_names.contains(&arg_name) {
+                    args_names.push(arg_name);
+                }
+                let index = args.insert_symbol_path(path_parts);
+                template_elements.push(format!("{{arg:{}}}", index));
+            }
+        }
+
+        Ok(Rc::new(Self {
+            template: SqlTemplate::StringVec(template_elements),
+            args,
+            args_names,
+        }))
+    }
+
     /// Parse the template string and extract symbol paths
     /// Converts "{path.to.symbol}" to "{arg:N}" and collects paths
     fn parse_template(template: &str) -> Result<(String, SqlTemplateArgs, Vec<String>), CubeError> {
-        let mut result = String::new();
         let mut args = SqlTemplateArgs::default();
         let mut args_names = Vec::new();
+        let result = Self::parse_template_into(template, &mut args, &mut args_names)?;
+        Ok((result, args, args_names))
+    }
+
+    // Parses one template, recording its dependencies into the given args so
+    // several templates can share one dependency list.
+    fn parse_template_into(
+        template: &str,
+        args: &mut SqlTemplateArgs,
+        args_names: &mut Vec<String>,
+    ) -> Result<String, CubeError> {
+        let mut result = String::new();
 
         let mut chars = template.chars().peekable();
 
@@ -127,6 +190,46 @@ impl MockMemberSql {
                         "Unclosed brace in template: {}",
                         template
                     )));
+                }
+
+                // `{SECURITY_VALUE:<value>}` records a security context value and
+                // yields `{sv:N}`. Equal values collapse to one index, the way the
+                // JS member-sql compiler dedups them.
+                if let Some(value) = path.strip_prefix("SECURITY_VALUE:") {
+                    let index = args.insert_security_context_value(value.to_string());
+                    result.push_str(&format!("{{sv:{}}}", index));
+                    continue;
+                }
+
+                // `{FILTER_PARAMS_COLUMN:<member>:<column>}` records a FILTER_PARAMS
+                // binding whose column is a plain string, the way
+                // `.filter('created_at')` is written in the data model, and
+                // `{FILTER_PARAMS:<member>:<column>}` one whose column is a
+                // callback, where `[path]` is a member reference recorded into
+                // this template's own args and `%N` stands for the Nth filter
+                // value the planner passes at render time. `<member>` is
+                // `<cube>.<member>` optionally followed by `@<shift>`, which
+                // addresses the named time shift the way
+                // `.time_shifts.<shift>.filter(...)` does.
+                if path.starts_with("FILTER_PARAMS_COLUMN:") || path.starts_with("FILTER_PARAMS:") {
+                    let item = Self::parse_filter_params_item(&path, args, args_names)?;
+                    let index = args.insert_filter_params(item);
+                    result.push_str(&format!("{{fp:{}}}", index));
+                    continue;
+                }
+
+                // `{FILTER_GROUP|<item>|<item>}` records several of the bindings
+                // above as one group and yields `{fg:N}`. `|` separates the
+                // items, since the scanner above stops at the first `}` and so
+                // cannot nest their braces.
+                if let Some(body) = path.strip_prefix("FILTER_GROUP|") {
+                    let filter_params = body
+                        .split('|')
+                        .map(|spec| Self::parse_filter_params_item(spec.trim(), args, args_names))
+                        .collect::<Result<Vec<_>, _>>()?;
+                    let index = args.insert_filter_group(FilterGroupItem { filter_params });
+                    result.push_str(&format!("{{fg:{}}}", index));
+                    continue;
                 }
 
                 // Parse the path and add to symbol_paths
@@ -160,7 +263,134 @@ impl MockMemberSql {
             }
         }
 
-        Ok((result, args, args_names))
+        Ok(result)
+    }
+
+    // Parses one `FILTER_PARAMS_COLUMN:<member>:<column>` /
+    // `FILTER_PARAMS:<member>:<column>` binding spec.
+    fn parse_filter_params_item(
+        spec: &str,
+        args: &mut SqlTemplateArgs,
+        args_names: &mut Vec<String>,
+    ) -> Result<FilterParamsItem, CubeError> {
+        if let Some(body) = spec.strip_prefix("FILTER_PARAMS_COLUMN:") {
+            let (cube_name, name, time_shift_name, column) = Self::parse_filter_params_body(body)?;
+            Ok(FilterParamsItem {
+                cube_name,
+                name,
+                time_shift_name,
+                column: FilterParamsColumn::String(column),
+            })
+        } else if let Some(body) = spec.strip_prefix("FILTER_PARAMS:") {
+            let (cube_name, name, time_shift_name, column) = Self::parse_filter_params_body(body)?;
+            let column = Self::parse_column_references(&column, args, args_names)?;
+            Ok(FilterParamsItem {
+                cube_name,
+                name,
+                time_shift_name,
+                column: FilterParamsColumn::Callback(Rc::new(MockFilterParamsCallback::new(
+                    column,
+                ))),
+            })
+        } else {
+            Err(CubeError::user(format!(
+                "FILTER_PARAMS binding must start with `FILTER_PARAMS:` or \
+                 `FILTER_PARAMS_COLUMN:`: {}",
+                spec
+            )))
+        }
+    }
+
+    // Splits a `<cube>.<member>[@<shift>]:<column>` FILTER_PARAMS body.
+    fn parse_filter_params_body(
+        body: &str,
+    ) -> Result<(String, String, Option<String>, String), CubeError> {
+        let (member, column) = body.split_once(':').ok_or_else(|| {
+            CubeError::user(format!(
+                "FILTER_PARAMS needs a `<cube>.<member>:<column>` body: {}",
+                body
+            ))
+        })?;
+        // The scanner above stops at the first `}`, so a column carrying one
+        // would have been cut short here.
+        if column.is_empty() || column.contains('{') {
+            return Err(CubeError::user(format!(
+                "FILTER_PARAMS column must be non-empty and reference members as `[path]`: {}",
+                column
+            )));
+        }
+        let (member, time_shift_name) = match member.split_once('@') {
+            Some((member, shift)) if !shift.is_empty() => (member, Some(shift.to_string())),
+            Some(_) => {
+                return Err(CubeError::user(format!(
+                    "FILTER_PARAMS time shift name must be non-empty: {}",
+                    member
+                )))
+            }
+            None => (member, None),
+        };
+        let member_parts = member.split('.').collect::<Vec<_>>();
+        if member_parts.len() != 2 || member_parts.iter().any(|p| p.is_empty()) {
+            return Err(CubeError::user(format!(
+                "FILTER_PARAMS member must be `<cube>.<member>`: {}",
+                member
+            )));
+        }
+        Ok((
+            member_parts[0].to_string(),
+            member_parts[1].to_string(),
+            time_shift_name,
+            column.to_string(),
+        ))
+    }
+
+    // Replaces every `[path.to.member]` in a callback column with the `{arg:N}`
+    // placeholder of its recorded path.
+    fn parse_column_references(
+        column: &str,
+        args: &mut SqlTemplateArgs,
+        args_names: &mut Vec<String>,
+    ) -> Result<String, CubeError> {
+        let mut result = String::new();
+        let mut rest = column;
+
+        while let Some(open) = rest.find('[') {
+            result.push_str(&rest[..open]);
+            let after = &rest[open + 1..];
+            let close = after.find(']').ok_or_else(|| {
+                CubeError::user(format!("Unclosed member reference in column: {}", column))
+            })?;
+
+            let path_parts: Vec<String> =
+                after[..close].split('.').map(|s| s.to_string()).collect();
+            if path_parts.iter().any(|p| p.is_empty()) {
+                return Err(CubeError::user(format!(
+                    "Invalid member reference in column: {}",
+                    column
+                )));
+            }
+
+            let arg_name = path_parts[0].clone();
+            if !args_names.contains(&arg_name) {
+                args_names.push(arg_name);
+            }
+            let index = args.insert_symbol_path(path_parts);
+            result.push_str(&format!("{{arg:{}}}", index));
+
+            rest = &after[close + 1..];
+        }
+        result.push_str(rest);
+
+        Ok(result)
+    }
+}
+
+impl MockMemberSql {
+    pub fn compiled(&self) -> CompiledMemberTemplate {
+        CompiledMemberTemplate {
+            template: self.template.clone(),
+            args: self.args.clone(),
+        }
     }
 }
 
@@ -171,14 +401,6 @@ impl MemberSql for MockMemberSql {
 
     fn as_any(self: Rc<Self>) -> Rc<dyn Any> {
         self
-    }
-
-    fn compile_template_sql(
-        &self,
-        _base_tools: Rc<dyn BaseTools>,
-        _security_context: Rc<dyn SecurityContext>,
-    ) -> Result<(SqlTemplate, SqlTemplateArgs), CubeError> {
-        Ok((self.template.clone(), self.args.clone()))
     }
 }
 
@@ -314,12 +536,7 @@ mod tests {
     #[test]
     fn test_compile_template_sql() {
         let mock = Rc::new(MockMemberSql::new("{CUBE.field} / {other.field}").unwrap());
-        let (template, args) = mock
-            .compile_template_sql(
-                Rc::new(crate::test_fixtures::cube_bridge::MockBaseTools::default()),
-                Rc::new(crate::test_fixtures::cube_bridge::MockSecurityContext),
-            )
-            .unwrap();
+        let (template, args) = mock_compiled(mock);
 
         match template {
             SqlTemplate::String(s) => {
@@ -425,12 +642,7 @@ mod tests {
             MockMemberSql::pre_agg_array_refs(vec!["orders.status", "line_items.product_id"])
                 .unwrap();
 
-        let (template, args) = mock
-            .compile_template_sql(
-                Rc::new(crate::test_fixtures::cube_bridge::MockBaseTools::default()),
-                Rc::new(crate::test_fixtures::cube_bridge::MockSecurityContext),
-            )
-            .unwrap();
+        let (template, args) = mock_compiled(mock);
 
         match template {
             SqlTemplate::StringVec(vec) => {

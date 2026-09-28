@@ -28,6 +28,7 @@ use std::sync::Arc;
 
 use crate::queryplanner::check_memory::CheckMemoryExec;
 use crate::queryplanner::filter_by_key_range::FilterByKeyRangeExec;
+use crate::queryplanner::group_by_limit_aggregate::GroupByLimitAggregateExec;
 use crate::queryplanner::inline_aggregate::{InlineAggregateExec, InlineAggregateMode};
 use crate::queryplanner::merge_sort::LastRowByUniqueKeyExec;
 use crate::queryplanner::panic::{PanicWorkerExec, PanicWorkerNode};
@@ -66,6 +67,11 @@ pub struct PPOptions {
     pub show_partitions: bool,
     pub show_metrics: bool,
     pub traverse_past_clustersend: bool,
+    /// Print the worker limit-pushdown descriptors a `ClusterSend` carries. Off everywhere by
+    /// default: the tests that pin plan strings must not grow a new field, and the router's own
+    /// plan traces run before `choose_index_ext`, so no `ClusterSend` carries a descriptor yet.
+    /// `test_limit_pushdown_scope` turns it on explicitly.
+    pub show_limit_pushdown: bool,
 }
 
 impl PPOptions {
@@ -81,6 +87,7 @@ impl PPOptions {
             show_partitions: true,
             show_metrics: false, // yeah.  Is useful only after plan is evaluated, so defaults to false.
             traverse_past_clustersend: false,
+            show_limit_pushdown: false,
         }
     }
 
@@ -99,6 +106,7 @@ impl PPOptions {
             show_check_memory_nodes: false,
             show_partitions: false,
             show_metrics: false,
+            show_limit_pushdown: false,
         }
     }
 
@@ -320,7 +328,30 @@ pub fn pp_plan_ext(p: &LogicalPlan, opts: &PPOptions) -> String {
                                     .map_or(-1, |i| i))
                                     .collect_vec())
                                 .collect_vec()
-                        )
+                        );
+                        if self.opts.show_limit_pushdown {
+                            if let Some((limit, reverse)) = cs.limit_and_reverse {
+                                self.output += &format!(", limit: {}, reverse: {}", limit, reverse);
+                            }
+                            if let Some((cols, fetch)) = &cs.worker_sort_and_limit {
+                                self.output += &format!(
+                                    ", worker_sort: [{}], worker_fetch: {}",
+                                    cols.iter()
+                                        .map(|(i, asc, nulls_first)| format!(
+                                            "{} {} {}",
+                                            i,
+                                            if *asc { "asc" } else { "desc" },
+                                            if *nulls_first {
+                                                "nulls first"
+                                            } else {
+                                                "nulls last"
+                                            }
+                                        ))
+                                        .join(", "),
+                                    fetch
+                                );
+                            }
+                        }
                     } else if let Some(topk) =
                         node.as_any().downcast_ref::<ClusterAggregateTopKUpper>()
                     {
@@ -616,6 +647,16 @@ fn pp_phys_plan_indented(p: &dyn ExecutionPlan, indent: usize, o: &PPOptions, ou
             }
             if let Some(limit) = agg.limit() {
                 *out += &format!(", limit: {}", limit)
+            }
+        } else if let Some(agg) = a.downcast_ref::<GroupByLimitAggregateExec>() {
+            *out += &format!(
+                "GroupByLimitAggregate, k: {}, factor: {}, order: {:?}",
+                agg.k(),
+                agg.factor(),
+                agg.order()
+            );
+            if o.show_aggregations {
+                *out += &format!(", aggs: {:?}", agg.aggr_expr())
             }
         } else if let Some(l) = a.downcast_ref::<LocalLimitExec>() {
             *out += &format!("LocalLimit, n: {}", l.fetch());

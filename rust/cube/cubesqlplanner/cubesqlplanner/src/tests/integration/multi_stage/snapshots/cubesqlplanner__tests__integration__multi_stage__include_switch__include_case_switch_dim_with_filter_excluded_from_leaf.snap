@@ -1,0 +1,8 @@
+---
+source: cubesqlplanner/cubesqlplanner/src/tests/integration/multi_stage/include_switch.rs
+assertion_line: 70
+expression: result
+---
+orders__amount_by_status_case_unfiltered
+----------------------------------------
+2250.00

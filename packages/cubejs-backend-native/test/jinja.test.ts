@@ -102,6 +102,7 @@ suite('Python model', () => {
       new_safe_string: expect.any(Object),
       new_object_from_dict: expect.any(Object),
       load_class_model: expect.any(Object),
+      load_callable: expect.any(Object),
       throw_exception: expect.any(Object),
     });
 

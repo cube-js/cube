@@ -10,7 +10,7 @@ use crate::{
     CubeError, CubeErrorCauseType,
 };
 use async_trait::async_trait;
-use chrono::{Datelike, NaiveDate};
+use chrono::{DateTime, Datelike, NaiveDate, Utc};
 use cubeclient::models::{
     V1LoadRequestQuery, V1LoadResponse, V1LoadResult, V1LoadResultDataColumnar,
 };
@@ -45,7 +45,7 @@ use datafusion::{
 };
 use futures::Stream;
 use log::warn;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::str::FromStr;
 use std::{
@@ -310,16 +310,6 @@ pub enum FieldValue<'a> {
     Null,
 }
 
-pub trait ValueObject {
-    fn len(&mut self) -> std::result::Result<usize, CubeError>;
-
-    fn get(
-        &mut self,
-        index: usize,
-        field_name: &str,
-    ) -> std::result::Result<FieldValue<'_>, CubeError>;
-}
-
 pub trait ColumnarValueObject {
     fn len(&mut self) -> std::result::Result<usize, CubeError>;
 
@@ -332,16 +322,6 @@ pub trait ColumnarValueObject {
     >;
 }
 
-pub struct JsonValueObject {
-    rows: Vec<Value>,
-}
-
-impl JsonValueObject {
-    pub fn new(rows: Vec<Value>) -> Self {
-        JsonValueObject { rows }
-    }
-}
-
 fn json_value_to_field_value(value: &Value) -> std::result::Result<FieldValue<'_>, CubeError> {
     Ok(match value {
         Value::String(s) => FieldValue::String(Cow::Borrowed(s)),
@@ -350,50 +330,52 @@ fn json_value_to_field_value(value: &Value) -> std::result::Result<FieldValue<'_
         })?),
         Value::Bool(b) => FieldValue::Bool(*b),
         Value::Null => FieldValue::Null,
-        x => {
-            return Err(CubeError::user(format!(
-                "Expected primitive value but found: {:?}",
-                x
-            )));
+        x @ (Value::Array(_) | Value::Object(_)) => {
+            FieldValue::String(Cow::Owned(serde_json::to_string(x).map_err(|e| {
+                CubeError::internal(format!("Can't serialize non-scalar value to JSON: {}", e))
+            })?))
         }
     })
 }
 
-impl ValueObject for JsonValueObject {
-    fn len(&mut self) -> std::result::Result<usize, CubeError> {
-        Ok(self.rows.len())
-    }
+#[derive(Deserialize)]
+pub struct JsonColumnarValueObjectRaw {
+    members: Vec<String>,
+    columns: Vec<Vec<Value>>,
+}
 
-    fn get(
-        &mut self,
-        index: usize,
-        field_name: &str,
-    ) -> std::result::Result<FieldValue<'_>, CubeError> {
-        let Some(as_object) = self.rows[index].as_object() else {
-            return Err(CubeError::internal(format!(
-                "Unexpected response from Cube, row is not an object: {:?}",
-                self.rows[index]
-            )));
-        };
+impl std::convert::TryFrom<JsonColumnarValueObjectRaw> for JsonColumnarValueObject {
+    type Error = CubeError;
 
-        let value = as_object.get(field_name).unwrap_or(&Value::Null);
-        json_value_to_field_value(value)
+    fn try_from(raw: JsonColumnarValueObjectRaw) -> std::result::Result<Self, Self::Error> {
+        Self::try_new(raw.members, raw.columns)
     }
 }
 
+#[derive(Deserialize)]
+#[serde(try_from = "JsonColumnarValueObjectRaw")]
 pub struct JsonColumnarValueObject {
     members: Vec<String>,
     columns: Vec<Vec<Value>>,
 }
 
 impl JsonColumnarValueObject {
-    pub fn new(members: Vec<String>, columns: Vec<Vec<Value>>) -> Self {
-        debug_assert!(
-            columns.windows(2).all(|w| w[0].len() == w[1].len()),
-            "columnar response has ragged columns"
-        );
+    pub fn try_new(
+        members: Vec<String>,
+        columns: Vec<Vec<Value>>,
+    ) -> std::result::Result<Self, CubeError> {
+        if let Some(expected) = columns.first().map(|c| c.len()) {
+            if let Some(idx) = columns.iter().position(|c| c.len() != expected) {
+                return Err(CubeError::internal(format!(
+                    "columnar response has ragged columns: column {} has {} rows, expected {}",
+                    idx,
+                    columns[idx].len(),
+                    expected
+                )));
+            }
+        }
 
-        Self { members, columns }
+        Ok(Self { members, columns })
     }
 }
 
@@ -410,8 +392,7 @@ impl ColumnarValueObject for JsonColumnarValueObject {
         CubeError,
     > {
         let Some(idx) = self.members.iter().position(|m| m == field_name) else {
-            // Match the row-mode `JsonValueObject::get` semantics: a missing field
-            // is treated as a column of NULLs.
+            // A missing field is treated as a column of NULLs.
             let len = self.columns.first().map(|c| c.len()).unwrap_or(0);
             return Ok(Box::new((0..len).map(|_| Ok(FieldValue::Null))));
         };
@@ -427,39 +408,46 @@ impl ColumnarValueObject for JsonColumnarValueObject {
     }
 }
 
-// `$mode` is one of `row` or `columnar`. The `row` arm calls `$response.get(i, field_name)?`
-// per cell; the `columnar` arm fetches the entire column slice once via
-// `$response.column(field_name)?` and iterates it.
-macro_rules! build_column_iter_loop {
-    (row, $response:expr, $len:expr, $field_name:expr, $value:ident, $body:block) => {{
-        for i in 0..$len {
-            let $value = $response.get(i, $field_name)?;
-            $body
-        }
-    }};
-    (columnar, $response:expr, $len:expr, $field_name:expr, $value:ident, $body:block) => {{
-        for cell in $response.column($field_name)? {
-            let $value = cell?;
-            $body
-        }
-    }};
+/// A columnar value object with no data columns, representing `row_count` rows of a
+/// literal-only projection (the `no_members_query` shortcut). Every schema field is a
+/// `MemberField::Literal`, so `column()` is never actually invoked — only `len()` matters.
+struct LiteralRowsValueObject {
+    row_count: usize,
+}
+
+impl ColumnarValueObject for LiteralRowsValueObject {
+    fn len(&mut self) -> std::result::Result<usize, CubeError> {
+        Ok(self.row_count)
+    }
+
+    fn column<'a>(
+        &'a mut self,
+        _field_name: &str,
+    ) -> std::result::Result<
+        Box<dyn Iterator<Item = std::result::Result<FieldValue<'a>, CubeError>> + 'a>,
+        CubeError,
+    > {
+        let row_count = self.row_count;
+        Ok(Box::new((0..row_count).map(|_| Ok(FieldValue::Null))))
+    }
 }
 
 macro_rules! build_column {
-    ($data_type:expr, $builder_ty:ty, $mode:tt, $response:expr, $field_name:expr, { $($builder_block:tt)* }, { $($scalar_block:tt)* }) => {{
+    ($data_type:expr, $builder_ty:ty, $response:expr, $field_name:expr, { $($builder_block:tt)* }, { $($scalar_block:tt)* }) => {{
         let len = $response.len()?;
         let mut builder = <$builder_ty>::new(len);
 
-        build_column_custom_builder!($data_type, $mode, len, builder, $response, $field_name, { $($builder_block)* }, { $($scalar_block)* })
+        build_column_custom_builder!($data_type, len, builder, $response, $field_name, { $($builder_block)* }, { $($scalar_block)* })
     }}
 }
 
 macro_rules! build_column_custom_builder {
-    ($data_type:expr, $mode:tt, $len:expr, $builder:expr, $response:expr, $field_name: expr, { $($builder_block:tt)* }, { $($scalar_block:tt)* }) => {{
+    ($data_type:expr, $len:expr, $builder:expr, $response:expr, $field_name: expr, { $($builder_block:tt)* }, { $($scalar_block:tt)* }) => {{
         match $field_name {
             MemberField::Member(member) => {
                 let field_name = &member.field_name;
-                build_column_iter_loop!($mode, $response, $len, &field_name, value, {
+                for cell in $response.column(&field_name)? {
+                    let value = cell?;
                     match (value, &mut $builder) {
                         (FieldValue::Null, builder) => builder.append_null()?,
                         $($builder_block)*
@@ -472,7 +460,7 @@ macro_rules! build_column_custom_builder {
                             )));
                         }
                     };
-                });
+                }
             }
             MemberField::Literal(value) => {
                 for _ in 0..$len {
@@ -535,6 +523,7 @@ impl ExecutionPlan for CubeScanExecutionPlan {
         // TODO: move envs to config
         let stream_mode = self.config_obj.stream_mode();
         let query_limit = self.config_obj.non_streaming_query_max_row_limit();
+        let max_batch_rows = self.config_obj.cube_scan_max_batch_rows();
 
         let stream_mode = match (stream_mode, self.request.limit) {
             (true, None) => true,
@@ -583,6 +572,7 @@ impl ExecutionPlan for CubeScanExecutionPlan {
                 Some(main_stream),
                 one_shot_stream,
                 self.schema.clone(),
+                max_batch_rows,
             )));
         }
 
@@ -608,6 +598,7 @@ impl ExecutionPlan for CubeScanExecutionPlan {
             None,
             one_shot_stream,
             rb_schema,
+            max_batch_rows,
         )))
     }
 
@@ -701,7 +692,15 @@ impl CubeScanMemoryStream {
                 } else {
                     err.message
                 };
-                if !err.message.eq_ignore_ascii_case("continue wait") {
+                // A continue wait also gets the `ContinueWait` cause here, the way
+                // `load_data` sets it below, so consumers can match on the cause
+                // rather than on the message. The other branch still only
+                // prefixes the message: unlike `load_data` this path leaves the
+                // incoming cause alone, and re-classifying it would change which
+                // Postgres error code a streaming failure reports.
+                if err.is_continue_wait() {
+                    err.cause = CubeErrorCauseType::ContinueWait;
+                } else {
                     err.message = format!("Database Execution Error: {}", err.message);
                 }
                 Some(Err(ArrowError::ExternalError(Box::new(err))))
@@ -712,10 +711,75 @@ impl CubeScanMemoryStream {
     }
 }
 
+/// Splits oversized `RecordBatch`es coming out of a `CubeScan` into chunks of at most
+/// `max_rows` rows. Cube can hand back a whole result set as a single batch (see
+/// `CubeScanOneShotStream`), which forces every downstream consumer to materialize it
+/// in one piece — most visibly the `/v1/cubesql` JSONL writer, which emits one line
+/// per batch. Slicing is zero-copy, so only the batch wrappers are allocated.
+struct RecordBatchSplitter {
+    /// Maximum rows per emitted batch. `None` disables splitting.
+    max_rows: Option<usize>,
+    /// Chunks left to emit, in reverse row order so `pop()` yields them front-to-back.
+    pending: Vec<RecordBatch>,
+}
+
+impl RecordBatchSplitter {
+    pub fn new(max_rows: usize) -> Self {
+        Self {
+            // 0 turns splitting off
+            max_rows: (max_rows > 0).then_some(max_rows),
+            pending: Vec::new(),
+        }
+    }
+
+    /// Takes the next buffered chunk, if any. Must be drained before feeding another
+    /// batch into `split`.
+    fn next_pending(&mut self) -> Option<RecordBatch> {
+        self.pending.pop()
+    }
+
+    /// Returns the first chunk of `batch`, buffering the rest for `next_pending`.
+    fn split(&mut self, batch: RecordBatch) -> ArrowResult<RecordBatch> {
+        debug_assert!(
+            self.pending.is_empty(),
+            "pending chunks must be drained before splitting the next batch"
+        );
+
+        let num_rows = batch.num_rows();
+        let Some(max_rows) = self.max_rows.filter(|max_rows| num_rows > *max_rows) else {
+            return Ok(batch);
+        };
+
+        let schema = batch.schema();
+        let mut chunks = Vec::with_capacity(num_rows.div_ceil(max_rows));
+        let mut offset = 0;
+        while offset < num_rows {
+            let len = max_rows.min(num_rows - offset);
+            let columns = batch
+                .columns()
+                .iter()
+                .map(|column| column.slice(offset, len))
+                .collect();
+            chunks.push(RecordBatch::try_new(schema.clone(), columns)?);
+            offset += len;
+        }
+
+        // `pending` is popped from the back, so reverse to keep rows in order
+        chunks.reverse();
+        let first = chunks
+            .pop()
+            .expect("num_rows > max_rows >= 1 always yields at least one chunk");
+        self.pending = chunks;
+
+        Ok(first)
+    }
+}
+
 struct CubeScanStreamRouter {
     main_stream: Option<CubeScanMemoryStream>,
     one_shot_stream: CubeScanOneShotStream,
     schema: SchemaRef,
+    splitter: RecordBatchSplitter,
 }
 
 impl CubeScanStreamRouter {
@@ -723,12 +787,41 @@ impl CubeScanStreamRouter {
         main_stream: Option<CubeScanMemoryStream>,
         one_shot_stream: CubeScanOneShotStream,
         schema: SchemaRef,
+        max_batch_rows: usize,
     ) -> Self {
         Self {
             main_stream,
             one_shot_stream,
             schema,
+            splitter: RecordBatchSplitter::new(max_batch_rows),
         }
+    }
+
+    /// Pulls the next batch from the streaming transport, falling back to a one-shot
+    /// load when it turns out to not implement streaming.
+    fn poll_next_batch(&mut self, cx: &mut Context<'_>) -> Poll<Option<ArrowResult<RecordBatch>>> {
+        let Some(main_stream) = &mut self.main_stream else {
+            return Poll::Ready(self.one_shot_stream.poll_next());
+        };
+
+        let next = main_stream.poll_next(cx);
+        if let Poll::Ready(Some(Err(ArrowError::ExternalError(err)))) = &next {
+            if err
+                .to_string()
+                .contains("streamQuery() method is not implemented yet")
+            {
+                warn!("{}", err);
+
+                self.main_stream = None;
+
+                return Poll::Ready(match load_to_stream_sync(&mut self.one_shot_stream) {
+                    Ok(_) => self.one_shot_stream.poll_next(),
+                    Err(e) => Some(Err(e.into())),
+                });
+            }
+        }
+
+        next
     }
 }
 
@@ -739,28 +832,14 @@ impl Stream for CubeScanStreamRouter {
         mut self: std::pin::Pin<&mut Self>,
         cx: &mut Context<'_>,
     ) -> Poll<Option<Self::Item>> {
-        match &mut self.main_stream {
-            Some(main_stream) => {
-                let next = main_stream.poll_next(cx);
-                if let Poll::Ready(Some(Err(ArrowError::ExternalError(err)))) = &next {
-                    if err
-                        .to_string()
-                        .contains("streamQuery() method is not implemented yet")
-                    {
-                        warn!("{}", err);
+        // Emit the leftovers of an already split batch before pulling more data
+        if let Some(batch) = self.splitter.next_pending() {
+            return Poll::Ready(Some(Ok(batch)));
+        }
 
-                        self.main_stream = None;
-
-                        return Poll::Ready(match load_to_stream_sync(&mut self.one_shot_stream) {
-                            Ok(_) => self.one_shot_stream.poll_next(),
-                            Err(e) => Some(Err(e.into())),
-                        });
-                    }
-                }
-
-                return next;
-            }
-            None => Poll::Ready(self.one_shot_stream.poll_next()),
+        match self.poll_next_batch(cx) {
+            Poll::Ready(Some(Ok(batch))) => Poll::Ready(Some(self.splitter.split(batch))),
+            next => next,
         }
     }
 }
@@ -794,13 +873,10 @@ async fn load_data(
 
     let result = if no_members_query {
         let limit = request.limit.unwrap_or(1);
-        let mut data = Vec::new();
 
-        for _ in 0..limit {
-            data.push(serde_json::Value::Null)
-        }
-
-        let mut response = JsonValueObject::new(data);
+        let mut response = LiteralRowsValueObject {
+            row_count: limit as usize,
+        };
         let rec = transform_response(&mut response, schema.clone(), &member_fields)
             .map_err(|e| ArrowError::ExternalError(Box::new(e)))?;
 
@@ -808,7 +884,7 @@ async fn load_data(
     } else {
         let result = transport
             .load(
-                span_id,
+                span_id.clone(),
                 request,
                 sql_query,
                 auth_context,
@@ -827,7 +903,7 @@ async fn load_data(
                     err.message
                 };
 
-                if err.message.eq_ignore_ascii_case("continue wait") {
+                if err.is_continue_wait() {
                     err.cause = CubeErrorCauseType::ContinueWait;
                 } else {
                     err.cause = CubeErrorCauseType::DatabaseExecution(err.cause.meta().cloned());
@@ -837,6 +913,44 @@ async fn load_data(
             })?;
 
         if let Some(data) = result.into_iter().next() {
+            // Mirror the result freshness metadata onto the span. The schema
+            // metadata only survives while this scan's batch is the root of the
+            // plan — any post-processing DataFusion node on top (a calculated
+            // projection over MEASURE(), a sort, a filter) builds its own schema
+            // and drops it. The span outlives the whole plan, so consumers that
+            // report freshness read it from there instead.
+            if let Some(span_id) = &span_id {
+                let schema = data.schema();
+                let metadata = schema.metadata();
+
+                if let Some(last_refresh_time) = metadata.get("lastRefreshTime") {
+                    if let Ok(last_refresh_time) = DateTime::parse_from_rfc3339(last_refresh_time) {
+                        span_id
+                            .set_last_refresh_time(last_refresh_time.with_timezone(&Utc))
+                            .await;
+                    }
+                }
+
+                span_id
+                    .set_external(
+                        metadata
+                            .get("external")
+                            .map(|v| v == "true")
+                            .unwrap_or(false),
+                    )
+                    .await;
+
+                if let Some(used_pre_aggregations) = metadata
+                    .get("usedPreAggregations")
+                    .map(String::as_str)
+                    .and_then(parse_used_pre_aggregations)
+                {
+                    span_id
+                        .merge_used_pre_aggregations(used_pre_aggregations)
+                        .await;
+                }
+            }
+
             match (options.max_records, data.num_rows()) {
                 (Some(max_records), len) if len >= max_records => {
                     return Err(ArrowError::ExternalError(Box::new(CubeError::user(
@@ -897,12 +1011,10 @@ fn load_to_stream_sync(one_shot_stream: &mut CubeScanOneShotStream) -> Result<()
     Ok(())
 }
 
-// Body of `transform_response` / `transform_columnar_response`. The two functions differ
-// only in how they iterate per-cell values: row-major (`$mode = row`) goes through
-// `ValueObject::get` per cell, columnar (`$mode = columnar`) fetches the whole column once
-// via `ColumnarValueObject::column`. Per-`DataType` coercion arms are shared.
+// Body of `transform_response`: builds one Arrow column per schema field from a
+// `ColumnarValueObject`, fetching each column once via `ColumnarValueObject::column`.
 macro_rules! transform_response_body {
-    ($mode:tt, $response:expr, $schema:expr, $member_fields:expr) => {{
+    ($response:expr, $schema:expr, $member_fields:expr) => {{
         let mut columns = vec![];
 
         for (i, schema_field) in $schema.fields().iter().enumerate() {
@@ -912,7 +1024,6 @@ macro_rules! transform_response_body {
                     build_column!(
                         DataType::Utf8,
                         StringBuilder,
-                        $mode,
                         $response,
                         field_name,
                         {
@@ -929,7 +1040,6 @@ macro_rules! transform_response_body {
                     build_column!(
                         DataType::Int16,
                         Int16Builder,
-                        $mode,
                         $response,
                         field_name,
                         {
@@ -955,7 +1065,6 @@ macro_rules! transform_response_body {
                     build_column!(
                         DataType::Int32,
                         Int32Builder,
-                        $mode,
                         $response,
                         field_name,
                         {
@@ -981,7 +1090,6 @@ macro_rules! transform_response_body {
                     build_column!(
                         DataType::Int64,
                         Int64Builder,
-                        $mode,
                         $response,
                         field_name,
                         {
@@ -1007,7 +1115,6 @@ macro_rules! transform_response_body {
                     build_column!(
                         DataType::Float32,
                         Float32Builder,
-                        $mode,
                         $response,
                         field_name,
                         {
@@ -1033,7 +1140,6 @@ macro_rules! transform_response_body {
                     build_column!(
                         DataType::Float64,
                         Float64Builder,
-                        $mode,
                         $response,
                         field_name,
                         {
@@ -1059,7 +1165,6 @@ macro_rules! transform_response_body {
                     build_column!(
                         DataType::Boolean,
                         BooleanBuilder,
-                        $mode,
                         $response,
                         field_name,
                         {
@@ -1083,7 +1188,6 @@ macro_rules! transform_response_body {
                     build_column!(
                         DataType::Timestamp(TimeUnit::Nanosecond, None),
                         TimestampNanosecondBuilder,
-                        $mode,
                         $response,
                         field_name,
                         {
@@ -1110,7 +1214,6 @@ macro_rules! transform_response_body {
                     build_column!(
                         DataType::Timestamp(TimeUnit::Millisecond, None),
                         TimestampMillisecondBuilder,
-                        $mode,
                         $response,
                         field_name,
                         {
@@ -1128,7 +1231,6 @@ macro_rules! transform_response_body {
                     build_column!(
                         DataType::Date32,
                         Date32Builder,
-                        $mode,
                         $response,
                         field_name,
                         {
@@ -1161,7 +1263,6 @@ macro_rules! transform_response_body {
 
                     build_column_custom_builder!(
                         DataType::Decimal(*precision, *scale),
-                        $mode,
                         len,
                         builder,
                         $response,
@@ -1208,7 +1309,6 @@ macro_rules! transform_response_body {
                     build_column!(
                         DataType::Interval(IntervalUnit::YearMonth),
                         IntervalYearMonthBuilder,
-                        $mode,
                         $response,
                         field_name,
                         {
@@ -1223,7 +1323,6 @@ macro_rules! transform_response_body {
                     build_column!(
                         DataType::Interval(IntervalUnit::DayTime),
                         IntervalDayTimeBuilder,
-                        $mode,
                         $response,
                         field_name,
                         {
@@ -1238,7 +1337,6 @@ macro_rules! transform_response_body {
                     build_column!(
                         DataType::Interval(IntervalUnit::MonthDayNano),
                         IntervalMonthDayNanoBuilder,
-                        $mode,
                         $response,
                         field_name,
                         {
@@ -1269,45 +1367,62 @@ macro_rules! transform_response_body {
     }};
 }
 
-pub fn transform_response<V: ValueObject>(
-    response: &mut V,
-    schema: SchemaRef,
-    member_fields: &Vec<MemberField>,
-) -> std::result::Result<RecordBatch, CubeError> {
-    transform_response_body!(row, response, schema, member_fields)
-}
-
-pub fn transform_columnar_response<C: ColumnarValueObject>(
+pub fn transform_response<C: ColumnarValueObject>(
     response: &mut C,
     schema: SchemaRef,
     member_fields: &Vec<MemberField>,
 ) -> std::result::Result<RecordBatch, CubeError> {
-    transform_response_body!(columnar, response, schema, member_fields)
+    transform_response_body!(response, schema, member_fields)
 }
 
-/// Builds a schema with `lastRefreshTime` / `external` metadata.
+/// Result metadata of a single load response, as reported by the API gateway.
+/// Grouped in one struct so every value is named at the call site instead of
+/// riding along as a positional argument.
+#[derive(Debug, Clone, Default)]
+pub struct ResultMetadata {
+    pub last_refresh_time: Option<String>,
+    /// `true` when the result was served from an external (CubeStore)
+    /// pre-aggregation.
+    pub external: bool,
+    /// `usedPreAggregations` object of the load response, passed through
+    /// verbatim.
+    pub used_pre_aggregations: Option<serde_json::Value>,
+}
+
+/// Builds a schema with `lastRefreshTime` / `external` / `usedPreAggregations`
+/// metadata.
 ///
 /// `lastRefreshTime` is passed through unchanged. The `external` marker is
 /// added when the flag is set so downstream code can tell that the result
 /// was served from an external (CubeStore) pre-aggregation — the case
 /// where cubesql's own cache-freshness decisions actually need to look at
 /// the pre-agg refresh, as internal pre-aggregations hit the source DB
-/// and rely on its own caching.
-pub fn build_response_schema(
-    schema: &SchemaRef,
-    last_refresh_time: Option<String>,
-    external: bool,
-) -> SchemaRef {
-    if last_refresh_time.is_none() && !external {
+/// and rely on its own caching. `usedPreAggregations` rides along the same
+/// way, JSON-encoded because Arrow schema metadata is a string map; it names
+/// the pre-aggregations behind the result so a client can match it to a build.
+pub fn build_response_schema(schema: &SchemaRef, result_metadata: &ResultMetadata) -> SchemaRef {
+    let used_pre_aggregations = result_metadata
+        .used_pre_aggregations
+        .as_ref()
+        .filter(|v| is_reportable_used_pre_aggregations(v))
+        .and_then(|v| serde_json::to_string(v).ok());
+
+    if result_metadata.last_refresh_time.is_none()
+        && !result_metadata.external
+        && used_pre_aggregations.is_none()
+    {
         return schema.clone();
     }
 
     let mut metadata = schema.metadata().clone();
-    if let Some(t) = last_refresh_time {
-        metadata.insert("lastRefreshTime".to_string(), t);
+    if let Some(t) = &result_metadata.last_refresh_time {
+        metadata.insert("lastRefreshTime".to_string(), t.clone());
     }
-    if external {
+    if result_metadata.external {
         metadata.insert("external".to_string(), "true".to_string());
+    }
+    if let Some(used_pre_aggregations) = used_pre_aggregations {
+        metadata.insert("usedPreAggregations".to_string(), used_pre_aggregations);
     }
 
     Arc::new(Schema::new_with_metadata(
@@ -1316,32 +1431,36 @@ pub fn build_response_schema(
     ))
 }
 
-pub fn convert_transport_response(
-    response: V1LoadResponse,
-    schema: SchemaRef,
-    member_fields: Vec<MemberField>,
-) -> std::result::Result<Vec<RecordBatch>, CubeError> {
-    response
-        .results
-        .into_iter()
-        .map(|result| {
-            let V1LoadResult {
-                data,
-                last_refresh_time,
-                external,
-                ..
-            } = result;
-
-            let mut response = JsonValueObject::new(data);
-            let updated_schema =
-                build_response_schema(&schema, last_refresh_time, external.unwrap_or(false));
-
-            transform_response(&mut response, updated_schema, &member_fields)
-        })
-        .collect::<std::result::Result<Vec<RecordBatch>, CubeError>>()
+/// Whether a `usedPreAggregations` value is worth passing on: a query that hit
+/// no pre-aggregation reports an empty object, and anything that is not an
+/// object at all is not something a reader can merge into a span or hand to a
+/// client. The API gateway is the only writer and always sends an object, so
+/// the type check is defensive.
+fn is_reportable_used_pre_aggregations(value: &serde_json::Value) -> bool {
+    matches!(value, serde_json::Value::Object(map) if !map.is_empty())
 }
 
-pub fn convert_transport_response_columnar(
+/// Reads the `usedPreAggregations` schema metadata written by
+/// `build_response_schema` back into a value, applying the same
+/// nothing-to-report normalization so that every reader of the metadata agrees
+/// on it - the writer and the readers live in different crates. A blob that
+/// does not parse is reported and dropped rather than failing the query: the
+/// metadata is reporting only, and no result depends on it.
+pub fn parse_used_pre_aggregations(encoded: &str) -> Option<serde_json::Value> {
+    match serde_json::from_str::<serde_json::Value>(encoded) {
+        Ok(value) if is_reportable_used_pre_aggregations(&value) => Some(value),
+        Ok(_) => None,
+        Err(e) => {
+            warn!(
+                "Unable to parse usedPreAggregations of a load response: {}",
+                e
+            );
+            None
+        }
+    }
+}
+
+pub fn convert_transport_response(
     response: V1LoadResponse<V1LoadResultDataColumnar>,
     schema: SchemaRef,
     member_fields: Vec<MemberField>,
@@ -1354,15 +1473,22 @@ pub fn convert_transport_response_columnar(
                 data,
                 last_refresh_time,
                 external,
+                used_pre_aggregations,
                 ..
             } = result;
             let V1LoadResultDataColumnar { members, columns } = data;
 
-            let mut response = JsonColumnarValueObject::new(members, columns);
-            let updated_schema =
-                build_response_schema(&schema, last_refresh_time, external.unwrap_or(false));
+            let mut response = JsonColumnarValueObject::try_new(members, columns)?;
+            let updated_schema = build_response_schema(
+                &schema,
+                &ResultMetadata {
+                    last_refresh_time,
+                    external: external.unwrap_or(false),
+                    used_pre_aggregations,
+                },
+            );
 
-            transform_columnar_response(&mut response, updated_schema, &member_fields)
+            transform_response(&mut response, updated_schema, &member_fields)
         })
         .collect::<std::result::Result<Vec<RecordBatch>, CubeError>>()
 }
@@ -1376,11 +1502,12 @@ mod tests {
         transport::{MetaContext, SqlResponse},
         CubeError,
     };
-    use cubeclient::models::V1LoadResponse;
+    use cubeclient::models::{V1LoadResponse, V1LoadResultDataColumnar};
     use datafusion::{
         arrow::{
             array::{
-                BooleanArray, Date32Array, Float64Array, StringArray, TimestampNanosecondArray,
+                Array, BooleanArray, Date32Array, Float64Array, Int64Array, StringArray,
+                TimestampNanosecondArray,
             },
             datatypes::{Field, Schema},
         },
@@ -1400,20 +1527,26 @@ mod tests {
     #[test]
     fn build_response_schema_no_metadata_when_nothing_to_add() {
         let schema = build_schema();
-        let updated = build_response_schema(&schema, None, false);
+        let updated = build_response_schema(&schema, &ResultMetadata::default());
         assert!(updated.metadata().is_empty());
     }
 
     #[test]
     fn build_response_schema_passes_through_last_refresh_time() {
         let schema = build_schema();
-        let updated =
-            build_response_schema(&schema, Some("2024-01-01T00:00:00.000Z".to_string()), false);
+        let updated = build_response_schema(
+            &schema,
+            &ResultMetadata {
+                last_refresh_time: Some("2024-01-01T00:00:00.000Z".to_string()),
+                ..Default::default()
+            },
+        );
         assert_eq!(
             updated.metadata().get("lastRefreshTime"),
             Some(&"2024-01-01T00:00:00.000Z".to_string())
         );
         assert!(updated.metadata().get("external").is_none());
+        assert!(updated.metadata().get("usedPreAggregations").is_none());
     }
 
     #[test]
@@ -1422,7 +1555,14 @@ mod tests {
         // passed through unchanged. The marker reports the external hit.
         let schema = build_schema();
         let stale = "2000-01-01T00:00:00.000Z".to_string();
-        let updated = build_response_schema(&schema, Some(stale.clone()), true);
+        let updated = build_response_schema(
+            &schema,
+            &ResultMetadata {
+                last_refresh_time: Some(stale.clone()),
+                external: true,
+                ..Default::default()
+            },
+        );
 
         assert_eq!(updated.metadata().get("lastRefreshTime"), Some(&stale));
         assert_eq!(
@@ -1436,7 +1576,13 @@ mod tests {
         let schema = build_schema();
         // No incoming last_refresh_time, but external flag is set — emit
         // only the marker; do NOT synthesize a `lastRefreshTime`.
-        let updated = build_response_schema(&schema, None, true);
+        let updated = build_response_schema(
+            &schema,
+            &ResultMetadata {
+                external: true,
+                ..Default::default()
+            },
+        );
         assert!(updated.metadata().get("lastRefreshTime").is_none());
         assert_eq!(
             updated.metadata().get("external"),
@@ -1445,12 +1591,177 @@ mod tests {
     }
 
     #[test]
+    fn build_response_schema_json_encodes_used_pre_aggregations() {
+        // Arrow schema metadata is a string map, so the object travels as JSON
+        // and has to come back out of it unchanged.
+        let schema = build_schema();
+        let used_pre_aggregations = serde_json::json!({
+            "schema.orders_main20240101": {
+                "preAggregationId": "Orders.main",
+                "targetTableName": "schema.orders_main20240101_abc_def_1712",
+                "lastUpdatedAt": 1712000000000u64,
+                "type": "rollup",
+            }
+        });
+        let updated = build_response_schema(
+            &schema,
+            &ResultMetadata {
+                used_pre_aggregations: Some(used_pre_aggregations.clone()),
+                ..Default::default()
+            },
+        );
+
+        let encoded = updated.metadata().get("usedPreAggregations").unwrap();
+        assert_eq!(
+            serde_json::from_str::<serde_json::Value>(encoded).unwrap(),
+            used_pre_aggregations
+        );
+    }
+
+    #[test]
+    fn parse_used_pre_aggregations_normalizes_nothing_to_report() {
+        // Same normalization as the writer applies, so a reader of the metadata
+        // never has to special-case an empty object or a null
+        assert_eq!(parse_used_pre_aggregations("null"), None);
+        assert_eq!(parse_used_pre_aggregations("{}"), None);
+        // Nothing a reader could merge or report, however well-formed
+        assert_eq!(parse_used_pre_aggregations("\"nonsense\""), None);
+        assert_eq!(parse_used_pre_aggregations("[]"), None);
+        // Not JSON at all - reported and dropped, never fatal
+        assert_eq!(parse_used_pre_aggregations("{oops"), None);
+
+        let used_pre_aggregations = serde_json::json!({
+            "schema.orders_main": { "preAggregationId": "Orders.main" }
+        });
+        assert_eq!(
+            parse_used_pre_aggregations(&used_pre_aggregations.to_string()),
+            Some(used_pre_aggregations)
+        );
+    }
+
+    #[test]
+    fn build_response_schema_skips_unreportable_used_pre_aggregations() {
+        // A query that hit no pre-aggregation reports an empty object; passing
+        // that on would make every plain SQL result carry a useless key. The
+        // same goes for a value no reader could merge.
+        let schema = build_schema();
+        for used_pre_aggregations in [
+            serde_json::json!({}),
+            serde_json::Value::Null,
+            serde_json::json!("nonsense"),
+        ] {
+            let updated = build_response_schema(
+                &schema,
+                &ResultMetadata {
+                    used_pre_aggregations: Some(used_pre_aggregations),
+                    ..Default::default()
+                },
+            );
+
+            assert!(updated.metadata().is_empty());
+        }
+    }
+
+    /// Collects everything a splitter produces for a single input batch: the chunk
+    /// returned by `split` plus every buffered leftover, as row values.
+    fn split_to_rows(splitter: &mut RecordBatchSplitter, batch: RecordBatch) -> Vec<Vec<i64>> {
+        let to_rows = |batch: &RecordBatch| {
+            let column = batch
+                .column(0)
+                .as_any()
+                .downcast_ref::<Int64Array>()
+                .expect("Int64 column");
+            (0..batch.num_rows()).map(|i| column.value(i)).collect()
+        };
+
+        let mut chunks = vec![to_rows(&splitter.split(batch).unwrap())];
+        while let Some(pending) = splitter.next_pending() {
+            chunks.push(to_rows(&pending));
+        }
+
+        chunks
+    }
+
+    fn build_int64_batch(rows: usize) -> RecordBatch {
+        RecordBatch::try_new(
+            build_schema(),
+            vec![Arc::new(Int64Array::from((0..rows as i64).collect::<Vec<_>>())) as ArrayRef],
+        )
+        .unwrap()
+    }
+
+    #[test]
+    fn record_batch_splitter_passes_through_batches_within_limit() {
+        let mut splitter = RecordBatchSplitter::new(5);
+
+        assert_eq!(
+            split_to_rows(&mut splitter, build_int64_batch(5)),
+            vec![vec![0, 1, 2, 3, 4]]
+        );
+        assert_eq!(
+            split_to_rows(&mut splitter, build_int64_batch(0)),
+            vec![Vec::<i64>::new()]
+        );
+    }
+
+    #[test]
+    fn record_batch_splitter_splits_oversized_batches_preserving_row_order() {
+        let mut splitter = RecordBatchSplitter::new(2);
+
+        // Uneven split: the trailing chunk holds the remainder
+        assert_eq!(
+            split_to_rows(&mut splitter, build_int64_batch(5)),
+            vec![vec![0, 1], vec![2, 3], vec![4]]
+        );
+
+        // Even split: no short trailing chunk
+        assert_eq!(
+            split_to_rows(&mut splitter, build_int64_batch(4)),
+            vec![vec![0, 1], vec![2, 3]]
+        );
+    }
+
+    #[test]
+    fn record_batch_splitter_disabled_with_zero_max_rows() {
+        let mut splitter = RecordBatchSplitter::new(0);
+
+        assert_eq!(
+            split_to_rows(&mut splitter, build_int64_batch(3)),
+            vec![vec![0, 1, 2]]
+        );
+    }
+
+    #[tokio::test]
+    async fn test_df_cube_scan_execute_splits_batches() -> Result<(), CubeError> {
+        // The test transport returns all 5 rows as a single batch; the splitter
+        // must break that into 3 batches of at most 2 rows each.
+        let scan_node = CubeScanExecutionPlan {
+            config_obj: crate::config::Config::test()
+                .update_config(|mut config| {
+                    config.cube_scan_max_batch_rows = 2;
+                    config
+                })
+                .config_obj(),
+            ..build_test_scan_node()
+        };
+
+        let batches =
+            common::collect(scan_node.execute(0, build_test_task_context()?).await?).await?;
+
+        assert_eq!(
+            batches.iter().map(|b| b.num_rows()).collect::<Vec<_>>(),
+            vec![2, 2, 1]
+        );
+
+        Ok(())
+    }
+
+    #[test]
     fn convert_transport_response_threads_external_flag_into_schema_metadata() {
-        // End-to-end coverage of the row-format `convert_transport_response`
-        // path: a V1LoadResponse with `external: true` and a
-        // `lastRefreshTime` should produce a RecordBatch whose schema
-        // metadata has the `external` marker set and `lastRefreshTime`
-        // passed through unchanged.
+        // End-to-end coverage of `convert_transport_response`: a columnar
+        // V1LoadResponse with `external: true` and a `lastRefreshTime` should
+        // produce a RecordBatch whose schema metadata has the `external` marker
+        // set and `lastRefreshTime` passed through unchanged.
         let raw = r#"
             {
                 "results": [{
@@ -1460,13 +1771,13 @@ mod tests {
                         "segments": [],
                         "timeDimensions": []
                     },
-                    "data": [{"c": 1}],
+                    "data": {"members": ["c"], "columns": [[1]]},
                     "lastRefreshTime": "2000-01-01T00:00:00.000Z",
                     "external": true
                 }]
             }
         "#;
-        let response: V1LoadResponse = serde_json::from_str(raw).unwrap();
+        let response: V1LoadResponse<V1LoadResultDataColumnar> = serde_json::from_str(raw).unwrap();
         let schema = build_schema();
         let member_fields = vec![MemberField::regular("c".to_string())];
         let batches = convert_transport_response(response, schema, member_fields).unwrap();
@@ -1477,6 +1788,55 @@ mod tests {
             metadata.get("lastRefreshTime"),
             Some(&"2000-01-01T00:00:00.000Z".to_string())
         );
+    }
+
+    #[test]
+    fn convert_transport_response_serializes_non_scalar_values_to_json_strings() {
+        let raw = r#"
+            {
+                "results": [{
+                    "annotation": {
+                        "measures": [],
+                        "dimensions": [],
+                        "segments": [],
+                        "timeDimensions": []
+                    },
+                    "data": {
+                        "members": ["c", "d"],
+                        "columns": [
+                            [["a", "b"], null],
+                            [{"k": 1}, "plain"]
+                        ]
+                    }
+                }]
+            }
+        "#;
+        let response: V1LoadResponse<V1LoadResultDataColumnar> = serde_json::from_str(raw).unwrap();
+        let schema = Arc::new(Schema::new(vec![
+            Field::new("c", DataType::Utf8, true),
+            Field::new("d", DataType::Utf8, true),
+        ]));
+        let member_fields = vec![
+            MemberField::regular("c".to_string()),
+            MemberField::regular("d".to_string()),
+        ];
+        let batches = convert_transport_response(response, schema, member_fields).unwrap();
+
+        let c = batches[0]
+            .column(0)
+            .as_any()
+            .downcast_ref::<StringArray>()
+            .unwrap();
+        assert_eq!(c.value(0), r#"["a","b"]"#);
+        assert!(c.is_null(1));
+
+        let d = batches[0]
+            .column(1)
+            .as_any()
+            .downcast_ref::<StringArray>()
+            .unwrap();
+        assert_eq!(d.value(0), r#"{"k":1}"#);
+        assert_eq!(d.value(1), "plain");
     }
 
     fn get_test_load_meta(protocol: DatabaseProtocol) -> LoadRequestMeta {
@@ -1532,18 +1892,30 @@ mod tests {
                             "segments": [],
                             "timeDimensions": []
                         },
-                        "data": [
-                            {"KibanaSampleDataEcommerce.count": null, "KibanaSampleDataEcommerce.maxPrice": null, "KibanaSampleDataEcommerce.isBool": null, "KibanaSampleDataEcommerce.orderTimestamp": null, "KibanaSampleDataEcommerce.orderDate": null, "KibanaSampleDataEcommerce.city": "City 1"},
-                            {"KibanaSampleDataEcommerce.count": 5, "KibanaSampleDataEcommerce.maxPrice": 5.05, "KibanaSampleDataEcommerce.isBool": true, "KibanaSampleDataEcommerce.orderTimestamp": "2022-01-01 00:00:00.000", "KibanaSampleDataEcommerce.orderDate": "2022-01-01", "KibanaSampleDataEcommerce.city": "City 2"},
-                            {"KibanaSampleDataEcommerce.count": "5", "KibanaSampleDataEcommerce.maxPrice": "5.05", "KibanaSampleDataEcommerce.isBool": false, "KibanaSampleDataEcommerce.orderTimestamp": "2023-01-01 00:00:00.000", "KibanaSampleDataEcommerce.orderDate": "2023-01-01", "KibanaSampleDataEcommerce.city": "City 3"},
-                            {"KibanaSampleDataEcommerce.count": null, "KibanaSampleDataEcommerce.maxPrice": null, "KibanaSampleDataEcommerce.isBool": "true", "KibanaSampleDataEcommerce.orderTimestamp": "9999-12-31 00:00:00.000", "KibanaSampleDataEcommerce.orderDate": "9999-12-31", "KibanaSampleDataEcommerce.city": "City 4"},
-                            {"KibanaSampleDataEcommerce.count": null, "KibanaSampleDataEcommerce.maxPrice": null, "KibanaSampleDataEcommerce.isBool": "false", "KibanaSampleDataEcommerce.orderTimestamp": null, "KibanaSampleDataEcommerce.orderDate": null, "KibanaSampleDataEcommerce.city": null}
-                        ]
+                        "data": {
+                            "members": [
+                                "KibanaSampleDataEcommerce.count",
+                                "KibanaSampleDataEcommerce.maxPrice",
+                                "KibanaSampleDataEcommerce.isBool",
+                                "KibanaSampleDataEcommerce.orderTimestamp",
+                                "KibanaSampleDataEcommerce.orderDate",
+                                "KibanaSampleDataEcommerce.city"
+                            ],
+                            "columns": [
+                                [null, 5, "5", null, null],
+                                [null, 5.05, "5.05", null, null],
+                                [null, true, false, "true", "false"],
+                                [null, "2022-01-01 00:00:00.000", "2023-01-01 00:00:00.000", "9999-12-31 00:00:00.000", null],
+                                [null, "2022-01-01", "2023-01-01", "9999-12-31", null],
+                                ["City 1", "City 2", "City 3", "City 4", null]
+                            ]
+                        }
                     }]
                 }
                 "#;
 
-                let result: V1LoadResponse = serde_json::from_str(response).unwrap();
+                let result: V1LoadResponse<V1LoadResultDataColumnar> =
+                    serde_json::from_str(response).unwrap();
                 convert_transport_response(result, schema.clone(), member_fields)
             }
 
@@ -1588,11 +1960,8 @@ mod tests {
         Arc::new(TestConnectionTransport {})
     }
 
-    #[tokio::test]
-    async fn test_df_cube_scan_execute() -> Result<(), CubeError> {
-        assert_eq!(std::mem::size_of::<FieldValue>(), 24);
-
-        let schema = Arc::new(Schema::new(vec![
+    fn build_test_scan_schema() -> SchemaRef {
+        Arc::new(Schema::new(vec![
             Field::new("KibanaSampleDataEcommerce.count", DataType::Utf8, false),
             Field::new("KibanaSampleDataEcommerce.count", DataType::Utf8, false),
             Field::new(
@@ -1617,9 +1986,26 @@ mod tests {
                 DataType::Date32,
                 false,
             ),
-        ]));
+        ]))
+    }
 
-        let scan_node = CubeScanExecutionPlan {
+    fn build_test_task_context() -> Result<Arc<TaskContext>, CubeError> {
+        let runtime = Arc::new(RuntimeEnv::new(RuntimeConfig::new())?);
+
+        Ok(Arc::new(TaskContext::new(
+            "test".to_string(),
+            "session".to_string(),
+            HashMap::new(),
+            HashMap::new(),
+            HashMap::new(),
+            runtime,
+        )))
+    }
+
+    fn build_test_scan_node() -> CubeScanExecutionPlan {
+        let schema = build_test_scan_schema();
+
+        CubeScanExecutionPlan {
             schema: schema.clone(),
             member_fields: schema
                 .fields()
@@ -1660,18 +2046,17 @@ mod tests {
             meta: get_test_load_meta(DatabaseProtocol::PostgreSQL),
             span_id: None,
             config_obj: crate::config::Config::test().config_obj(),
-        };
+        }
+    }
 
-        let runtime = Arc::new(RuntimeEnv::new(RuntimeConfig::new())?);
-        let task = Arc::new(TaskContext::new(
-            "test".to_string(),
-            "session".to_string(),
-            HashMap::new(),
-            HashMap::new(),
-            HashMap::new(),
-            runtime,
-        ));
-        let stream = scan_node.execute(0, task).await?;
+    #[tokio::test]
+    async fn test_df_cube_scan_execute() -> Result<(), CubeError> {
+        assert_eq!(std::mem::size_of::<FieldValue>(), 24);
+
+        let scan_node = build_test_scan_node();
+        let schema = scan_node.schema.clone();
+
+        let stream = scan_node.execute(0, build_test_task_context()?).await?;
         let batches = common::collect(stream).await?;
 
         assert_eq!(

@@ -40,6 +40,20 @@ fn get_env_var(env_name: &'static str) -> Option<String> {
     }
 }
 
+fn pg_tokio_error_to_string(err: &tokio_postgres::Error) -> String {
+    match std::error::Error::source(err) {
+        Some(cause) => format!("{}: {}", err, cause),
+        None => err.to_string(),
+    }
+}
+
+fn drop_row_descriptions(messages: Vec<SimpleQueryMessage>) -> Vec<SimpleQueryMessage> {
+    messages
+        .into_iter()
+        .filter(|message| !matches!(message, SimpleQueryMessage::RowDescription(_)))
+        .collect()
+}
+
 impl PostgresIntegrationTestSuite {
     pub(crate) async fn before_all() -> AsyncTestConstructorResult {
         let mut env_defined = false;
@@ -399,7 +413,7 @@ impl PostgresIntegrationTestSuite {
     {
         print!("test {} .. ", query);
 
-        let res = self.client.simple_query(&query).await?;
+        let res = drop_row_descriptions(self.client.simple_query(&query).await?);
         f(res);
 
         println!("ok");
@@ -434,7 +448,7 @@ impl PostgresIntegrationTestSuite {
         };
 
         assert_contains!(
-            actual_err.to_string(),
+            pg_tokio_error_to_string(&actual_err),
             "Error during planning: Table or CTE with name 'unknown_cube_will_lead_to_an_error'"
         );
 
@@ -791,7 +805,7 @@ impl PostgresIntegrationTestSuite {
             .await
             .unwrap_err();
         assert_eq!(
-            err.to_string(),
+            pg_tokio_error_to_string(&err),
             "db error: ERROR: cursor \"test_without_hold\" does not exist"
         );
 
@@ -820,7 +834,7 @@ impl PostgresIntegrationTestSuite {
             .await
             .unwrap_err();
         assert_eq!(
-            err.to_string(),
+            pg_tokio_error_to_string(&err),
             "db error: ERROR: cursor \"test_with_hold\" does not exist"
         );
 
@@ -852,7 +866,7 @@ impl PostgresIntegrationTestSuite {
             .await
             .unwrap_err();
         assert_eq!(
-            err.to_string(),
+            pg_tokio_error_to_string(&err),
             "db error: ERROR: cursor \"cursor_1\" does not exist"
         );
 
@@ -862,7 +876,7 @@ impl PostgresIntegrationTestSuite {
             .await
             .unwrap_err();
         assert_eq!(
-            err.to_string(),
+            pg_tokio_error_to_string(&err),
             "db error: ERROR: cursor \"cursor_2\" does not exist"
         );
 
@@ -999,9 +1013,11 @@ impl PostgresIntegrationTestSuite {
         )
         .await;
 
-        let messages = new_client
-            .simple_query(&"SELECT current_database()")
-            .await?;
+        let messages = drop_row_descriptions(
+            new_client
+                .simple_query(&"SELECT current_database()")
+                .await?,
+        );
         if let SimpleQueryMessage::Row(row) = &messages[0] {
             // default one
             assert_eq!(row.get(0), Some("meow"));
@@ -1009,9 +1025,11 @@ impl PostgresIntegrationTestSuite {
             panic!("Must be Row command, 0")
         }
 
-        let messages = new_client
-            .simple_query(&"SELECT table_catalog FROM information_schema.tables LIMIT 1")
-            .await?;
+        let messages = drop_row_descriptions(
+            new_client
+                .simple_query(&"SELECT table_catalog FROM information_schema.tables LIMIT 1")
+                .await?,
+        );
         if let SimpleQueryMessage::Row(row) = &messages[0] {
             // default one
             assert_eq!(row.get(0), Some("meow"));
@@ -1033,7 +1051,7 @@ impl PostgresIntegrationTestSuite {
             .unwrap_err();
 
         assert_eq!(
-            err.to_string(),
+            pg_tokio_error_to_string(&err),
             "db error: ERROR: Internal Error: Unexpected panic. Reason: value can not be represented in a timestamp with nanosecond precision."
         );
 
@@ -1202,9 +1220,7 @@ impl PostgresIntegrationTestSuite {
                 |_| {},
             )
             .await;
-        assert!(result
-            .unwrap_err()
-            .to_string()
+        assert!(pg_tokio_error_to_string(&result.unwrap_err())
             .contains("temporary table memory limit reached"));
 
         // We are currently at 4.5 MiB total limit, hence we should be allowed
@@ -1236,9 +1252,7 @@ impl PostgresIntegrationTestSuite {
                 |_| {},
             )
             .await;
-        assert!(result
-            .unwrap_err()
-            .to_string()
+        assert!(pg_tokio_error_to_string(&result.unwrap_err())
             .contains("temporary table memory limit reached"));
 
         Ok(())

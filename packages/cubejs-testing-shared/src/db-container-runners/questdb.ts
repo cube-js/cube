@@ -1,10 +1,11 @@
 import { GenericContainer } from 'testcontainers';
 
 import { DbRunnerAbstract, DBRunnerContainerOptions } from './db-runner.abstract';
+import { startContainerWithRetry } from './start-with-retry';
 
 export class QuestDBRunner extends DbRunnerAbstract {
   public static startContainer(options: DBRunnerContainerOptions) {
-    const version = process.env.TEST_QUEST_DB_VERSION || options.version || '9.2.3';
+    const version = process.env.TEST_QUEST_DB_VERSION || options.version || '9.4.3';
 
     const container = new GenericContainer(`questdb/questdb:${version}`)
       .withExposedPorts(8812)
@@ -15,6 +16,6 @@ export class QuestDBRunner extends DbRunnerAbstract {
       container.withBindMounts(binds);
     }
 
-    return container.start();
+    return startContainerWithRetry(container);
   }
 }

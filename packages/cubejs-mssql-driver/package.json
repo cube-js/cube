@@ -1,43 +1,47 @@
 {
   "name": "@cubejs-backend/mssql-driver",
-  "description": "Cube.js MS SQL database driver",
+  "description": "Cube MS SQL database driver",
   "author": "Cube Dev, Inc.",
-  "version": "1.6.59",
+  "version": "1.7.46",
   "repository": {
     "type": "git",
     "url": "https://github.com/cube-js/cube.git",
     "directory": "packages/cubejs-mssql-driver"
   },
   "engines": {
-    "node": "^14.0.0 || ^16.0.0 || >=17.0.0"
+    "node": ">=20.0.0"
   },
   "files": [
     "dist/src",
     "index.js"
   ],
   "main": "index.js",
+  "exports": {
+    ".": {
+      "types": "./dist/src/index.d.ts",
+      "import": "./dist/src/index.js",
+      "require": "./index.js"
+    },
+    "./dist/*": "./dist/*",
+    "./package.json": "./package.json"
+  },
   "typings": "dist/src/index.d.ts",
   "scripts": {
     "build": "rm -rf dist && npm run tsc",
     "tsc": "tsc",
-    "watch": "tsc -w",
-    "lint": "eslint src/* --ext .ts,.js",
-    "lint:fix": "eslint --fix src/* --ext .ts,.js"
+    "watch": "tsc -w"
   },
   "dependencies": {
-    "@cubejs-backend/base-driver": "1.6.59",
-    "@cubejs-backend/shared": "1.6.59",
+    "@cubejs-backend/base-driver": "1.7.46",
+    "@cubejs-backend/shared": "1.7.46",
     "mssql": "^11.0.1"
   },
   "devDependencies": {
     "@types/mssql": "^9.1.7",
-    "@types/node": "^20"
+    "@types/node": "^22"
   },
   "jest": {
     "testEnvironment": "node"
-  },
-  "eslintConfig": {
-    "extends": "../cubejs-linter"
   },
   "license": "Apache-2.0",
   "publishConfig": {

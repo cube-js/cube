@@ -388,3 +388,23 @@ async fn test_convert_tz_for_raw_time_dimensions() {
         insta::assert_snapshot!(result);
     }
 }
+
+// The conversion belongs to the cube that owns the column, and stays there when
+// the dimension is asked for without a granularity.
+#[test]
+fn test_raw_time_dimension_converted_once() {
+    let ctx = create_context();
+
+    let sql = ctx
+        .build_sql(indoc! {"
+            measures:
+              - orders.count
+            dimensions:
+              - orders.created_at
+            timezone: \"America/Chicago\"
+            convert_tz_for_raw_time_dimension: true
+        "})
+        .unwrap();
+
+    assert_eq!(sql.matches("AT TIME ZONE").count(), 1, "got: {sql}");
+}

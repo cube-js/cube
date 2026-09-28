@@ -1,0 +1,16 @@
+{
+  "schemaName": "customers_pinot",
+  "dimensionFieldSpecs": [
+    {
+      "name": "customer_id",
+      "dataType": "STRING"
+    },
+    {
+      "name": "customer_name",
+      "dataType": "STRING"
+    }
+  ],
+  "primaryKeyColumns": [
+    "customer_id"
+  ]
+}

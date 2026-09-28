@@ -29,8 +29,19 @@ First, enable SAML authentication in Cube Cloud:
 1. In Cube Cloud, navigate to **Admin → Settings**.
 2. On the **Authentication & SSO** tab, enable the **SAML**
    toggle.
-3. Take note of the **Single Sign-On URL** and **Audience**
+3. For a new integration, set **Audience (SP Entity ID)** to the
+   **Single Sign-On URL** shown directly above it. This gives the AuthnRequest
+   issuer and response audience one matching service provider identifier.
+4. Take note of the **Single Sign-On URL** and **Audience (SP Entity ID)**
    values — you'll need them when configuring the SAML integration in Okta.
+
+<Note>
+
+Existing working Okta integrations with a different Audience do not need to
+change. If you update the value, change it in Cube and Okta together and test
+SAML sign-in before disabling another authentication method.
+
+</Note>
 
 ## Create a SAML integration in Okta
 
@@ -43,8 +54,8 @@ First, enable SAML authentication in Cube Cloud:
 5. Enter the following values in the **SAML Settings** section:
    - **Single sign on URL** — Use the **Single Sign-On URL**
      value from Cube Cloud.
-   - **Audience URI (SP Entity ID)** — Use the **Audience**
-     value from Cube Cloud.
+   - **Audience URI (SP Entity ID)** — Use the **Audience (SP Entity ID)**
+     value from Cube Cloud. It must match exactly.
 6. Click **Next** to go to the **Feedback** screen, fill in
    any necessary details and click **Finish**.
 

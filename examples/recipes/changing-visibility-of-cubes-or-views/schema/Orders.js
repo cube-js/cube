@@ -4,7 +4,7 @@ cube(`Orders`, {
 
   preAggregations: {
     // Pre-Aggregations definitions go here
-    // Learn more here: https://cube.dev/docs/caching/pre-aggregations/getting-started
+    // Learn more here: https://docs.cube.dev/docs/pre-aggregations/getting-started-pre-aggregations
     main: {
       dimensions: [Users.company],
       measures: [CUBE.count],

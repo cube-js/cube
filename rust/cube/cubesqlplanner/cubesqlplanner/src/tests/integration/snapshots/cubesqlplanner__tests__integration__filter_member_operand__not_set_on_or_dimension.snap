@@ -1,0 +1,7 @@
+---
+source: cubesqlplanner/cubesqlplanner/src/tests/integration/filter_member_operand.rs
+expression: result
+---
+customers__id
+-------------
+3

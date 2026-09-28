@@ -60,17 +60,16 @@ impl PhysicalPlanBuilder {
         logical_plan: Rc<RootQuery>,
         original_sql_pre_aggregations: HashMap<String, String>,
         total_query: bool,
-        pre_aggregation_query: bool,
     ) -> Result<Rc<Select>, CubeError> {
         let mut context = PushDownBuilderContext::default();
         context.original_sql_pre_aggregations = original_sql_pre_aggregations;
-        context.render_measure_as_state = pre_aggregation_query;
         let query = self.build_impl(logical_plan, &context)?;
         let query = if total_query {
             self.build_total_count(query, &context)?
         } else {
             query
         };
+        let query = collapse_trivial_subqueries(&query)?;
         Ok(query)
     }
 

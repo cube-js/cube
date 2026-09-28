@@ -11,6 +11,7 @@ export class QueryCache {
   public cache(key: any[], fn: Function): any {
     let keyHolder = this.storage;
     const { length } = key;
+
     for (let i = 0; i < length - 1; i++) {
       if (!keyHolder[key[i]]) {
         keyHolder[key[i]] = {};

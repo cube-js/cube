@@ -4,10 +4,12 @@ use super::{
 };
 use crate::logical_plan::*;
 use crate::planner::planners::{multi_stage::RollingWindowType, QueryPlanner, SimpleQueryPlanner};
-use crate::planner::query_tools::QueryTools;
+use crate::planner::state::State;
+use crate::planner::symbols::transforms;
 use crate::planner::GranularityHelper;
 use crate::planner::MemberSymbol;
 use crate::planner::MultiStageGrain;
+use crate::planner::TimeDimensionSymbol;
 use crate::planner::{OrderByItem, QueryProperties};
 
 use cubenativeutils::CubeError;
@@ -21,14 +23,14 @@ use std::vec;
 /// dimension / measure inode, or a leaf (base measure /
 /// time-series / time-series-get-range).
 pub struct MultiStageMemberQueryPlanner {
-    query_tools: Rc<QueryTools>,
+    query_tools: Rc<State>,
     query_properties: Rc<QueryProperties>,
     description: Rc<MultiStageQueryDescription>,
 }
 
 impl MultiStageMemberQueryPlanner {
     pub fn new(
-        query_tools: Rc<QueryTools>,
+        query_tools: Rc<State>,
         query_properties: Rc<QueryProperties>,
         description: Rc<MultiStageQueryDescription>,
     ) -> Self {
@@ -59,7 +61,7 @@ impl MultiStageMemberQueryPlanner {
             MultiStageMemberType::Leaf(node) => match node {
                 super::MultiStageLeafMemberType::Measure => self.plan_for_leaf_cte_query(scope),
                 super::MultiStageLeafMemberType::TimeSeries(time_dimension) => {
-                    self.plan_time_series_query(time_dimension.clone())
+                    self.plan_time_series_query(time_dimension.clone(), scope)
                 }
                 super::MultiStageLeafMemberType::TimeSeriesGetRange(time_dimension) => {
                     self.plan_time_series_get_range_query(time_dimension.clone(), scope)
@@ -111,17 +113,97 @@ impl MultiStageMemberQueryPlanner {
     fn plan_time_series_query(
         &self,
         time_series_description: Rc<TimeSeriesDescription>,
+        scope: &mut PlanningScope,
     ) -> Result<Rc<LogicalMultiStageMember>, CubeError> {
         let time_dimension = time_series_description.time_dimension.clone();
+        let period_dimensions = self.calendar_period_dimensions(&time_series_description)?;
+        let calendar_source = if period_dimensions.is_empty() {
+            None
+        } else {
+            Some(self.plan_calendar_period_source(&time_dimension, &period_dimensions, scope)?)
+        };
         let result = MultiStageTimeSeries::builder()
             .time_dimension(time_dimension.clone())
             .date_range(time_dimension.as_time_dimension()?.date_range_vec())
             .get_date_range_multistage_ref(time_series_description.date_range_cte.clone())
+            .calendar_source(calendar_source)
+            .period_dimensions(period_dimensions)
             .build();
         Ok(Rc::new(LogicalMultiStageMember {
             name: self.description.alias().clone(),
             member_type: MultiStageMemberLogicalType::TimeSeries(Rc::new(result)),
         }))
+    }
+
+    /// The series time dimension re-granularized to each calendar granularity
+    /// a `to_date` window on this series bounds itself by.
+    fn calendar_period_dimensions(
+        &self,
+        time_series_description: &Rc<TimeSeriesDescription>,
+    ) -> Result<Vec<Rc<MemberSymbol>>, CubeError> {
+        let time_dimension = time_series_description.time_dimension.as_time_dimension()?;
+        let granularities = time_series_description
+            .calendar_period_granularities
+            .borrow();
+
+        let evaluator_compiler_cell = self.query_tools.compiler().clone();
+        let mut evaluator_compiler = evaluator_compiler_cell.borrow_mut();
+
+        granularities
+            .iter()
+            .map(|granularity| {
+                let granularity_obj = GranularityHelper::make_granularity_obj(
+                    self.query_tools.cube_evaluator().clone(),
+                    &mut evaluator_compiler,
+                    &time_dimension.cube_name(),
+                    &time_dimension.name(),
+                    Some(granularity.clone()),
+                )?;
+                Ok(MemberSymbol::new_time_dimension(TimeDimensionSymbol::new(
+                    time_dimension.base_symbol().clone(),
+                    Some(granularity.clone()),
+                    granularity_obj,
+                    time_dimension
+                        .date_range_vec()
+                        .map(|range| (range[0].clone(), range[1].clone())),
+                )))
+            })
+            .collect()
+    }
+
+    /// A query over the calendar cube pairing every point of the series with
+    /// the period it falls into, so a `to_date` window can bound itself by the
+    /// calendar instead of by interval math.
+    fn plan_calendar_period_source(
+        &self,
+        time_dimension: &Rc<MemberSymbol>,
+        period_dimensions: &[Rc<MemberSymbol>],
+        scope: &mut PlanningScope,
+    ) -> Result<Rc<Query>, CubeError> {
+        // The series may already be granularized to the period a window bounds
+        // itself by; projecting it twice makes the column ambiguous.
+        let mut time_dimensions = vec![time_dimension.clone()];
+        for period_dimension in period_dimensions {
+            if !time_dimensions
+                .iter()
+                .any(|dimension| dimension.full_name() == period_dimension.full_name())
+            {
+                time_dimensions.push(period_dimension.clone());
+            }
+        }
+
+        // Left unfiltered on purpose: the series restricts itself to the query
+        // range only after it has read each period's end off the next point.
+        let cte_query_properties = QueryProperties::builder()
+            .query_tools(self.query_tools.clone())
+            .time_dimensions(time_dimensions)
+            .ignore_cumulative(true)
+            .disable_external_pre_aggregations(
+                self.query_properties.disable_external_pre_aggregations(),
+            )
+            .build()?;
+
+        SimpleQueryPlanner::new(self.query_tools.clone(), cte_query_properties).plan(scope)
     }
 
     /// Builds the rolling-window CTE that combines a time-series
@@ -146,7 +228,7 @@ impl MultiStageMemberQueryPlanner {
                 let time_dimension = &rolling_window_desc.time_dimension;
                 let query_granularity = to_date_rolling_window.granularity.clone();
 
-                let evaluator_compiler_cell = self.query_tools.evaluator_compiler().clone();
+                let evaluator_compiler_cell = self.query_tools.compiler().clone();
                 let mut evaluator_compiler = evaluator_compiler_cell.borrow_mut();
 
                 let Some(granularity_obj) = GranularityHelper::make_granularity_obj(
@@ -168,12 +250,17 @@ impl MultiStageMemberQueryPlanner {
                     granularity_obj: Rc::new(granularity_obj),
                 })
             }
-            RollingWindowType::RunningTotal => MultiStageRollingWindowType::RunningTotal,
         };
 
+        // The CTE must project the dimensions of the state this rolling
+        // window is requested at, not the root query dimensions: a parent
+        // inode can widen the grain (`grain.include`, a `case` switch
+        // dimension) and consumers resolve those dimensions — e.g. as
+        // `partition_by` of the enclosing window function — against this
+        // CTE's schema.
         let schema = LogicalSchema::default()
-            .set_dimensions(self.query_properties.dimensions().clone())
-            .set_time_dimensions(self.query_properties.time_dimensions().clone())
+            .set_dimensions(self.description.state().dimensions().clone())
+            .set_time_dimensions(self.description.state().time_dimensions().clone())
             .set_measures(vec![self.description.member().evaluation_node().clone()])
             .into_rc();
 
@@ -419,7 +506,16 @@ impl MultiStageMemberQueryPlanner {
         &self,
         scope: &mut PlanningScope,
     ) -> Result<Rc<LogicalMultiStageMember>, CubeError> {
-        let member_node = self.description.member_node();
+        // An aggregating stage on top (a rolling window) merges the leaf's
+        // values, so measures with a mergeable state form must materialize
+        // the state, not the final value.
+        let leaf_as_state = self.description.member().has_aggregates_on_top();
+        let member_node = if leaf_as_state {
+            transforms::measures_as_state(self.description.member_node())?
+        } else {
+            self.description.member_node().clone()
+        };
+        let member_node = &member_node;
         let mut dimensions = self.description.state().dimensions().clone();
         let mut time_dimensions = self.description.state().time_dimensions().clone();
         let mut measures = vec![];
@@ -446,6 +542,15 @@ impl MultiStageMemberQueryPlanner {
             }
         }
 
+        let mut measures_filters = self.description.state().measures_filters().clone();
+        if leaf_as_state {
+            for filter_item in measures_filters.iter_mut() {
+                *filter_item = transforms::map_filter_item_symbols(
+                    filter_item,
+                    &transforms::measures_as_state,
+                )?;
+            }
+        }
         let cte_query_properties = QueryProperties::builder()
             .query_tools(self.query_tools.clone())
             .measures(measures)
@@ -453,7 +558,7 @@ impl MultiStageMemberQueryPlanner {
             .time_dimensions(time_dimensions)
             .time_dimensions_filters(self.description.state().time_dimensions_filters().clone())
             .dimensions_filters(self.description.state().dimensions_filters().clone())
-            .measures_filters(self.description.state().measures_filters().clone())
+            .measures_filters(measures_filters)
             .segments(self.description.state().segments().clone())
             .ignore_cumulative(true)
             .ungrouped(self.description.member().is_ungrupped())
@@ -471,7 +576,6 @@ impl MultiStageMemberQueryPlanner {
         // itself renders with.
         let evaluation_context = EvaluationContext {
             time_shifts: self.description.state().time_shifts().clone(),
-            measure_as_state: self.description.member().has_aggregates_on_top(),
             measure_for_ungrouped: self.description.member().is_ungrupped(),
         };
         let query = scope.with_evaluation_context(evaluation_context.clone(), |scope| {
@@ -542,7 +646,7 @@ impl MultiStageMemberQueryPlanner {
         let dimensions = if let Some(exclude) = &grain.exclude {
             dimensions
                 .into_iter()
-                .filter(|d| !exclude.iter().any(|m| d.has_member_in_reference_chain(m)))
+                .filter(|d| !exclude.iter().any(|m| d.matches_grain_reference(m)))
                 .collect_vec()
         } else {
             dimensions
@@ -550,7 +654,7 @@ impl MultiStageMemberQueryPlanner {
         let dimensions = if let Some(keep_only) = &grain.keep_only {
             dimensions
                 .into_iter()
-                .filter(|d| keep_only.iter().any(|m| d.has_member_in_reference_chain(m)))
+                .filter(|d| keep_only.iter().any(|m| d.matches_grain_reference(m)))
                 .collect_vec()
         } else {
             dimensions

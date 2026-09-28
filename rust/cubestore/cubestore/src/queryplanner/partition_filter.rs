@@ -1531,6 +1531,131 @@ mod tests {
             Vec::new()
         }
     }
+
+    /// Exhaustive check that [MinMaxCondition] never prunes a range that holds a matching row.
+    ///
+    /// Enumerates every per-column bound combination over a small integer domain against every
+    /// ordered pair of min/max rows, and compares the verdict with a direct search for a tuple
+    /// that both satisfies the bounds and lies inside the range. A false negative here means a
+    /// query silently returning fewer rows than it should.
+    fn assert_no_false_negatives(n: usize, d: i64) {
+        // Rows and bounds use 0..d; candidate tuples reach one step further on both sides to
+        // stand in for the unbounded parts of the domain.
+        let rows = cross(n, &(0..d).collect::<Vec<_>>());
+        let candidates = cross(n, &(-1..=d).collect::<Vec<_>>());
+
+        for cond in column_bounds(n, d) {
+            let min_max = MinMaxCondition {
+                min: cond.iter().map(|(mn, _)| mn.map(TableValue::Int)).collect(),
+                max: cond.iter().map(|(_, mx)| mx.map(TableValue::Int)).collect(),
+            };
+            let matching = candidates
+                .iter()
+                .filter(|t| satisfies(&cond, t))
+                .collect::<Vec<_>>();
+
+            for mn in &rows {
+                for mx in &rows {
+                    if mn > mx {
+                        continue;
+                    }
+                    let min_row = mn.iter().cloned().map(TableValue::Int).collect::<Vec<_>>();
+                    let max_row = mx.iter().cloned().map(TableValue::Int).collect::<Vec<_>>();
+
+                    if matching.iter().any(|t| *t >= mn && *t <= mx) {
+                        assert!(
+                            min_max.can_match(&min_row, &max_row),
+                            "pruned a matching range: cond {:?}, min_row {:?}, max_row {:?}",
+                            cond,
+                            mn,
+                            mx
+                        );
+                    }
+                    if matching.iter().any(|t| *t >= mn) {
+                        assert!(
+                            min_max.can_match_min(&min_row),
+                            "pruned a matching range with unbounded max: cond {:?}, min_row {:?}",
+                            cond,
+                            mn
+                        );
+                    }
+                    if matching.iter().any(|t| *t <= mx) {
+                        assert!(
+                            min_max.can_match_max(&max_row),
+                            "pruned a matching range with unbounded min: cond {:?}, max_row {:?}",
+                            cond,
+                            mx
+                        );
+                    }
+                }
+            }
+        }
+    }
+
+    /// All tuples of length `n` over `vals`.
+    fn cross(n: usize, vals: &[i64]) -> Vec<Vec<i64>> {
+        let mut r = vec![vec![]];
+        for _ in 0..n {
+            r = r
+                .iter()
+                .flat_map(|t| {
+                    vals.iter().map(move |v| {
+                        let mut t = t.clone();
+                        t.push(*v);
+                        t
+                    })
+                })
+                .collect();
+        }
+        r
+    }
+
+    /// All per-column `(min, max)` bound combinations over `0..d`, `None` meaning unbounded.
+    fn column_bounds(n: usize, d: i64) -> Vec<Vec<(Option<i64>, Option<i64>)>> {
+        let mut per_col = Vec::new();
+        for mn in 0..=d {
+            for mx in 0..=d {
+                let mn = (mn != d).then_some(mn);
+                let mx = (mx != d).then_some(mx);
+                if let (Some(mn), Some(mx)) = (mn, mx) {
+                    if mn > mx {
+                        continue;
+                    }
+                }
+                per_col.push((mn, mx));
+            }
+        }
+        let mut r = vec![vec![]];
+        for _ in 0..n {
+            r = r
+                .iter()
+                .flat_map(|t| {
+                    per_col.iter().map(move |c| {
+                        let mut t = t.clone();
+                        t.push(*c);
+                        t
+                    })
+                })
+                .collect();
+        }
+        r
+    }
+
+    fn satisfies(cond: &[(Option<i64>, Option<i64>)], t: &[i64]) -> bool {
+        cond.iter()
+            .zip(t)
+            .all(|((mn, mx), v)| mn.map_or(true, |mn| mn <= *v) && mx.map_or(true, |mx| *v <= mx))
+    }
+
+    #[test]
+    fn no_false_negatives_two_columns() {
+        assert_no_false_negatives(2, 3);
+    }
+
+    #[test]
+    fn no_false_negatives_three_columns() {
+        assert_no_false_negatives(3, 3);
+    }
 }
 
 struct ColumnStat {

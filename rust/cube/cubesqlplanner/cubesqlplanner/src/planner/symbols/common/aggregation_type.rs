@@ -11,7 +11,6 @@ pub enum AggregationType {
     CountDistinct,
     CountDistinctApprox,
     NumberAgg,
-    RunningTotal,
 }
 
 impl AggregationType {
@@ -24,7 +23,6 @@ impl AggregationType {
             "countDistinct" | "count_distinct" => Ok(Self::CountDistinct),
             "countDistinctApprox" | "count_distinct_approx" => Ok(Self::CountDistinctApprox),
             "numberAgg" | "number_agg" => Ok(Self::NumberAgg),
-            "runningTotal" | "running_total" => Ok(Self::RunningTotal),
             other => Err(CubeError::user(format!(
                 "Unknown aggregation type: '{}'",
                 other
@@ -35,12 +33,29 @@ impl AggregationType {
     pub fn is_additive(&self) -> bool {
         matches!(
             self,
-            Self::Sum | Self::Min | Self::Max | Self::CountDistinctApprox | Self::RunningTotal
+            Self::Sum | Self::Min | Self::Max | Self::CountDistinctApprox
         )
     }
 
     pub fn is_distinct(&self) -> bool {
         matches!(self, Self::CountDistinct | Self::CountDistinctApprox)
+    }
+
+    /// Whether feeding a row more than once leaves the result unchanged.
+    ///
+    /// A distinct count collapses repeats by definition, and a minimum or a
+    /// maximum does not move when a value it has already seen arrives again.
+    /// `sum`, `avg`, `count` and `numberAgg` all count every row they are
+    /// given, so a repeated row shows up in the answer.
+    ///
+    /// Not the same question as `is_additive`, which asks whether partial
+    /// results can be rolled up further: `sum` is additive but sensitive to
+    /// repeats, `countDistinct` is insensitive to them but not additive.
+    pub fn is_duplicate_insensitive(&self) -> bool {
+        matches!(
+            self,
+            Self::Min | Self::Max | Self::CountDistinct | Self::CountDistinctApprox
+        )
     }
 
     pub fn as_str(&self) -> &'static str {
@@ -52,7 +67,6 @@ impl AggregationType {
             Self::CountDistinct => "countDistinct",
             Self::CountDistinctApprox => "countDistinctApprox",
             Self::NumberAgg => "numberAgg",
-            Self::RunningTotal => "runningTotal",
         }
     }
 }
@@ -99,10 +113,6 @@ mod tests {
             AggregationType::from_str("numberAgg").unwrap(),
             AggregationType::NumberAgg
         );
-        assert_eq!(
-            AggregationType::from_str("runningTotal").unwrap(),
-            AggregationType::RunningTotal
-        );
     }
 
     #[test]
@@ -119,10 +129,6 @@ mod tests {
             AggregationType::from_str("number_agg").unwrap(),
             AggregationType::NumberAgg
         );
-        assert_eq!(
-            AggregationType::from_str("running_total").unwrap(),
-            AggregationType::RunningTotal
-        );
     }
 
     #[test]
@@ -134,7 +140,17 @@ mod tests {
         assert!(!AggregationType::CountDistinct.is_additive());
         assert!(AggregationType::CountDistinctApprox.is_additive());
         assert!(!AggregationType::NumberAgg.is_additive());
-        assert!(AggregationType::RunningTotal.is_additive());
+    }
+
+    #[test]
+    fn test_is_duplicate_insensitive() {
+        assert!(AggregationType::Min.is_duplicate_insensitive());
+        assert!(AggregationType::Max.is_duplicate_insensitive());
+        assert!(AggregationType::CountDistinct.is_duplicate_insensitive());
+        assert!(AggregationType::CountDistinctApprox.is_duplicate_insensitive());
+        assert!(!AggregationType::Sum.is_duplicate_insensitive());
+        assert!(!AggregationType::Avg.is_duplicate_insensitive());
+        assert!(!AggregationType::NumberAgg.is_duplicate_insensitive());
     }
 
     #[test]
@@ -146,7 +162,6 @@ mod tests {
         assert!(!AggregationType::Min.is_distinct());
         assert!(!AggregationType::Max.is_distinct());
         assert!(!AggregationType::NumberAgg.is_distinct());
-        assert!(!AggregationType::RunningTotal.is_distinct());
     }
 
     #[test]
@@ -159,7 +174,6 @@ mod tests {
             AggregationType::CountDistinct,
             AggregationType::CountDistinctApprox,
             AggregationType::NumberAgg,
-            AggregationType::RunningTotal,
         ];
         for v in &variants {
             let s = v.as_str();

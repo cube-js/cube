@@ -1,0 +1,8 @@
+---
+source: cubesqlplanner/cubesqlplanner/src/tests/integration/multi_stage/include_switch.rs
+assertion_line: 116
+expression: result
+---
+orders__amount_by_group_mode
+----------------------------
+2250.00

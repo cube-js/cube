@@ -6,9 +6,79 @@ title: Workbooks
 Workbooks allow you to build reports and explore data with AI agents, organize the results of your
 analysis, and share trusted insights with your team.
 
+A report inside a workbook and a standalone [exploration](/docs/explore-analyze/explore#saving-explorations)
+are the same kind of object — the only difference is whether it's filed inside a workbook.
+
 ## Tabs
 
 Workbooks can contain one or more tabs, each providing a different way to query and analyze your data. Tabs enable you to organize multiple analyses within a single workbook, making it easy to explore different aspects of your data or combine insights from different sources.
+
+## New tab page
+
+When you open [Explore](/docs/explore-analyze/explore) or add a new tab in a workbook, Cube shows
+the **new tab page** — a single launchpad for starting a report. From here you can search across
+your data model, browse starting points by type, or jump straight to pasting a query or asking an
+AI agent.
+
+### Searching and browsing
+
+A search box sits at the top of the launchpad. Typing filters every category at once; categories
+with no matches appear disabled, so you can tell at a glance which ones hold results.
+
+The category selector lets you switch between starting-point types:
+
+- **View groups** — browse [view groups](/docs/data-modeling/view-groups) as folders. Drilling
+  into a group reveals its sub-groups and views.
+- **Views** — every [view](/docs/data-modeling/views) in the model. Search also matches a view's
+  measures and dimensions; when a view matches through a member, the row notes which one.
+- **Workbooks** — drill into an existing workbook and pick one of its reports to reuse its query
+  as the starting point for the new report. The workbook you are currently in and empty tabs
+  (which have no query to reuse) appear disabled.
+- **Source tables** — raw tables from your connected
+  [data sources](/admin/connect-to-data/data-sources), browsable by data source and schema.
+
+Click through the list to drill down to an individual view, report, or table. Once you reach a
+starting point, the data model sidebar activates so you can continue building your query there.
+
+### Starting from a pasted query or an agent
+
+The launchpad also offers shortcuts at the bottom:
+
+- **Paste semantic SQL query** — opens the SQL panel so you can paste a semantic SQL query. The
+  dropdown adds **Paste source SQL query** (raw data-source SQL), **Paste JSON query** (a
+  [REST API query](/reference/core-data-apis/rest-api/query-format)), and **Paste GraphQL query** (a
+  [GraphQL API query](/reference/core-data-apis/graphql-api)) — the JSON and GraphQL queries are
+  converted to a semantic query for you.
+- **Ask Cube agent** — opens the chat sidebar so you can describe the report you want in natural
+  language.
+
+### Configuring the launchpad
+
+Administrators can tailor the launchpad per deployment under **Settings → Configuration**, in the
+**Workbooks and Explore** section. Two settings are available.
+
+**Available tabs** — choose which categories appear on the launchpad. **View groups** and **Views**
+are always shown and cannot be turned off; **Workbooks** and **Source tables** can each be enabled
+or disabled to simplify the starting points your users see.
+
+**Default view group** — set a default view group so the launchpad opens inside a specific
+top-level view group instead of listing all of them, useful for steering users toward a curated set
+of governed starting points.
+
+<Steps>
+  <Step title="Open deployment settings">
+    Go to **Settings → Configuration** for your deployment.
+  </Step>
+  <Step title="Choose the available tabs and default group">
+    In the **Workbooks and Explore** section, select the tabs to show and, optionally, enter the
+    **name** of the view group the launchpad should open inside. Leave the group empty to show all
+    view groups. Save your changes.
+  </Step>
+</Steps>
+
+When a default view group is set, new Explore and workbook tabs open inside that group. You can
+still navigate up to **All view groups** to browse everything. If the configured group no longer
+exists, the launchpad falls back to showing all categories.
 
 ## Tab types
 
@@ -62,8 +132,46 @@ and paste it as a new tab in any workbook using the same workflow.
 ## Duplicating workbooks
 
 You can duplicate a workbook by selecting **Duplicate** from the row
-actions menu on the workspace page. This creates a full copy of the
-workbook, including all its tabs, reports, and any published dashboard.
+actions menu on the workspace page, from the workbook menu while the
+workbook is open, or from a published dashboard's options menu. This
+creates a full copy of the workbook, including all its tabs, reports, and
+any published dashboard.
+
+A duplicate does not carry the original's sharing over by default. The
+copy is visible only to you, plus anyone with access to the folder it is
+created in.
+
+If the original is shared — with people, with groups, with your whole
+organization, or through signed embedding — the duplicate dialog offers
+**Copy sharing and embedding settings**. Selecting it gives the copy the
+same audience. The option appears only if you have **Full access** to the
+original, since copying its sharing means granting that access again. See
+[Duplicates][ref-sharing-duplicates] for what does and doesn't carry over.
+
+## Promoting workbooks to another deployment
+
+You can copy a workbook from one deployment to another deployment in the same account —
+for example, to ship a dashboard built and validated in development to production
+without rebuilding it by hand. The workbook must already have a published dashboard;
+Cube asks you to publish it first otherwise.
+
+From the workbook's row actions menu on the workspace page (not available in
+[Creator Mode](/embedding/iframe/creator-mode)), select **Copy to another deployment**
+and choose the target deployment. Cube previews what will change before you apply it.
+The first promotion to a given deployment creates a linked copy there and publishes the
+dashboard; every later promotion to the same deployment updates that copy, instead of
+creating another one, and republishes the dashboard.
+
+You need read access to the source workbook and access to the target deployment; once a
+linked copy exists there, you also need edit access to it. If the destination copy was
+edited since the last promotion, applying the promotion is blocked until you choose to
+override those edits, replacing them with the source's. Sharing, embedding, and
+ownership settings on the destination copy are never changed by a promotion — set them
+separately there. A promoted workbook can still fail at query time if the destination's
+data model differs from the source's.
+
+You can also promote workbooks programmatically with the
+[Workbook Promotions API][ref-promotions-api].
 
 ## Workbook versions
 
@@ -84,4 +192,6 @@ has not been published will be lost.
 </Warning>
 
 [ref-dashboards]: /docs/explore-analyze/dashboards
+[ref-sharing-duplicates]: /docs/organize-content/sharing#duplicates
+[ref-promotions-api]: /api-reference/workbook-promotions/promote-and-publish-a-workbook
 

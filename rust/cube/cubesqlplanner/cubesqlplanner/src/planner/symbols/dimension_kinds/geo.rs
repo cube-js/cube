@@ -1,6 +1,5 @@
-use super::super::MemberSymbol;
-use crate::planner::{CubeRef, SqlCall};
-use cubenativeutils::CubeError;
+use super::super::deps::symbol_deps;
+use crate::planner::SqlCall;
 use std::rc::Rc;
 
 /// `type: geo` dimension from the data model: a geographic dimension
@@ -9,6 +8,13 @@ use std::rc::Rc;
 pub struct GeoDimension {
     latitude: Rc<SqlCall>,
     longitude: Rc<SqlCall>,
+}
+
+symbol_deps! {
+    GeoDimension {
+        latitude: dep,
+        longitude: dep,
+    }
 }
 
 impl GeoDimension {
@@ -27,32 +33,8 @@ impl GeoDimension {
         &self.longitude
     }
 
-    pub fn get_dependencies(&self) -> Vec<Rc<MemberSymbol>> {
-        let mut deps = vec![];
-        self.latitude.extract_symbol_deps(&mut deps);
-        self.longitude.extract_symbol_deps(&mut deps);
-        deps
-    }
-
-    pub fn apply_to_deps<F: Fn(&Rc<MemberSymbol>) -> Result<Rc<MemberSymbol>, CubeError>>(
-        &self,
-        f: &F,
-    ) -> Result<Self, CubeError> {
-        Ok(Self {
-            latitude: self.latitude.apply_recursive(f)?,
-            longitude: self.longitude.apply_recursive(f)?,
-        })
-    }
-
     pub fn iter_sql_calls(&self) -> Box<dyn Iterator<Item = &Rc<SqlCall>> + '_> {
         Box::new(std::iter::once(&self.latitude).chain(std::iter::once(&self.longitude)))
-    }
-
-    pub fn get_cube_refs(&self) -> Vec<CubeRef> {
-        let mut refs = vec![];
-        self.latitude.extract_cube_refs(&mut refs);
-        self.longitude.extract_cube_refs(&mut refs);
-        refs
     }
 
     pub fn is_owned_by_cube(&self) -> bool {

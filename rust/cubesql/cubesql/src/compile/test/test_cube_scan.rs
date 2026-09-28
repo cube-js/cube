@@ -1,4 +1,4 @@
-use cubeclient::models::V1LoadRequestQuery;
+use cubeclient::models::{V1LoadRequestQuery, V1LoadRequestQueryFilterItem};
 use pretty_assertions::assert_eq;
 
 use crate::compile::{
@@ -94,6 +94,73 @@ async fn cubescan_limit_limit() {
                 segments: Some(vec![]),
                 order: Some(vec![]),
                 limit: Some(2),
+                ..Default::default()
+            }
+        );
+    }
+}
+
+/// LIMIT 0 should be pushed to CubeScan as limit=0, and not replaced with a default limit
+#[tokio::test]
+async fn cubescan_limit_zero() {
+    init_testing_logger();
+
+    let variants = vec![
+        // language=PostgreSQL
+        r#"
+        SELECT
+            customer_gender
+        FROM
+            KibanaSampleDataEcommerce
+        GROUP BY
+            1
+        LIMIT 0
+        "#,
+        // language=PostgreSQL
+        r#"
+        SELECT
+            customer_gender
+        FROM (
+            SELECT
+                customer_gender
+            FROM
+                KibanaSampleDataEcommerce
+            GROUP BY
+                1
+            LIMIT 3
+        ) scan
+        LIMIT 0
+        "#,
+        // language=PostgreSQL
+        r#"
+        SELECT
+            customer_gender
+        FROM (
+            SELECT
+                customer_gender
+            FROM
+                KibanaSampleDataEcommerce
+            GROUP BY
+                1
+            LIMIT 0
+        ) scan
+        LIMIT 3
+        "#,
+    ];
+
+    for variant in variants {
+        let query_plan =
+            convert_select_to_query_plan(variant.to_string(), DatabaseProtocol::PostgreSQL).await;
+
+        let logical_plan = query_plan.as_logical_plan();
+        assert_eq!(
+            logical_plan.find_cube_scan().request,
+            V1LoadRequestQuery {
+                measures: Some(vec![]),
+                dimensions: Some(vec!["KibanaSampleDataEcommerce.customer_gender".to_string()]),
+                segments: Some(vec![]),
+                order: Some(vec![]),
+                limit: Some(0),
                 ..Default::default()
             }
         );
@@ -223,4 +290,50 @@ async fn cubescan_limit_offset_limit_offset() {
             }
         );
     }
+}
+
+/// GROUP BY () is an empty grouping set, equivalent to aggregation without GROUP BY
+#[tokio::test]
+async fn cubescan_empty_group_by_tuple() {
+    init_testing_logger();
+
+    let query_plan = convert_select_to_query_plan(
+        // language=PostgreSQL
+        r#"
+        SELECT
+            MEASURE(count),
+            MEASURE(maxPrice)
+        FROM
+            KibanaSampleDataEcommerce
+        WHERE customer_gender = 'female'
+        GROUP BY ()
+        LIMIT 100
+        "#
+        .to_string(),
+        DatabaseProtocol::PostgreSQL,
+    )
+    .await;
+
+    let logical_plan = query_plan.as_logical_plan();
+    assert_eq!(
+        logical_plan.find_cube_scan().request,
+        V1LoadRequestQuery {
+            measures: Some(vec![
+                "KibanaSampleDataEcommerce.count".to_string(),
+                "KibanaSampleDataEcommerce.maxPrice".to_string(),
+            ]),
+            dimensions: Some(vec![]),
+            segments: Some(vec![]),
+            order: Some(vec![]),
+            limit: Some(100),
+            filters: Some(vec![V1LoadRequestQueryFilterItem {
+                member: Some("KibanaSampleDataEcommerce.customer_gender".to_string()),
+                operator: Some("equals".to_string()),
+                values: Some(vec!["female".to_string()]),
+                or: None,
+                and: None,
+            }]),
+            ..Default::default()
+        }
+    );
 }

@@ -1,30 +1,38 @@
 import { pipeline, Writable } from 'stream';
 import { createGzip } from 'zlib';
-import { createWriteStream, createReadStream } from 'fs';
+import { createReadStream, createWriteStream } from 'fs';
 import { unlink } from 'fs-extra';
 import tempy from 'tempy';
 import csvWriter from 'csv-write-stream';
 import {
   BaseDriver,
+  CreateTableIndex,
   DownloadTableCSVData,
+  DownloadTableMemoryData,
+  DriverInterface,
   ExternalCreateTableOptions,
-  DownloadTableMemoryData, DriverInterface, IndexesSQL, CreateTableIndex,
-  StreamTableData,
-  StreamingSourceTableData,
+  ExternalDriverCompatibilities,
+  IndexesSQL,
   QueryOptions,
-  ExternalDriverCompatibilities, TableStructure, TableColumnQueryResult,
+  StreamingSourceTableData,
+  StreamTableData,
+  TableColumnQueryResult,
+  TableStructure,
 } from '@cubejs-backend/base-driver';
 import { AsyncDebounce, getEnv, isVersionGte } from '@cubejs-backend/shared';
-import { format as formatSql, escape } from 'sqlstring';
+import { escape, format as formatSql } from 'sqlstring';
 import fetch from 'node-fetch';
 
 import { ConnectionConfig } from './types';
 import { WebSocketConnection } from './WebSocketConnection';
+import { QueryResultFormat } from '../codegen';
 
 const CubeStoreCapabilityMinVersion = {
   queueExclusive: '1.6.22',
   queueExternalId: '1.6.26',
+  queueAddAndRetrieve: '1.7.25',
   sendableParameters: '1.6.38',
+  arrowFormat: '1.6.66',
 } satisfies Record<string, string>;
 type CubeStoreCapability = keyof typeof CubeStoreCapabilityMinVersion;
 
@@ -61,6 +69,7 @@ type CreateTableOptions = {
 
 type CubeStoreQueryOptions = QueryOptions & {
   sendParameters?: boolean,
+  responseFormat?: QueryResultFormat,
 };
 
 export class CubeStoreDriver extends BaseDriver implements DriverInterface {
@@ -98,7 +107,7 @@ export class CubeStoreDriver extends BaseDriver implements DriverInterface {
   }
 
   public async query<R = any>(query: string, values: any[], options?: CubeStoreQueryOptions): Promise<R[]> {
-    const { inlineTables, sendParameters, ...queryTracingObj } = options ?? {};
+    const { inlineTables, sendParameters, responseFormat, ...queryTracingObj } = options ?? {};
 
     if (!sendParameters) {
       query = formatSql(query, values || []);
@@ -106,7 +115,13 @@ export class CubeStoreDriver extends BaseDriver implements DriverInterface {
 
     const tracingObj = { ...queryTracingObj, instance: getEnv('instanceId') };
 
-    return this.connection.query(query, inlineTables ?? [], tracingObj, sendParameters ? values : undefined);
+    return this.connection.query(query, sendParameters ? values : [], {
+      inlineTables: inlineTables ?? [],
+      queryTracingObj: tracingObj,
+      responseFormat: responseFormat ?? (
+        await this.hasCapability('arrowFormat') ? QueryResultFormat.Arrow : QueryResultFormat.Legacy
+      ),
+    });
   }
 
   public async release() {
@@ -180,7 +195,7 @@ export class CubeStoreDriver extends BaseDriver implements DriverInterface {
     }
 
     return this.query(sql, params, queryTracingObj).catch(e => {
-      e.message = `Error during create table: ${sql}: ${e.message}`;
+      e.message = `Error during create table ${tableName}: ${e.message}`;
       throw e;
     });
   }
@@ -281,8 +296,10 @@ export class CubeStoreDriver extends BaseDriver implements DriverInterface {
     }
 
     await this.createTableWithOptions(table, columns, { indexes: indexesSql, aggregations, buildRangeEnd: queryTracingObj?.buildRangeEnd }, queryTracingObj);
+
     try {
       const batchSize = 2000; // TODO make dynamic?
+
       for (let j = 0; j < Math.ceil(tableData.rows.length / batchSize); j++) {
         const currentBatchSize = Math.min(tableData.rows.length - j * batchSize, batchSize);
         const indexArray = Array.from({ length: currentBatchSize }, (v, i) => i);
@@ -337,6 +354,7 @@ export class CubeStoreDriver extends BaseDriver implements DriverInterface {
     }
 
     const tempFiles: string[] = [];
+
     try {
       const pipelinePromises: Promise<any>[] = [];
       const filePromises: Promise<string>[] = [];
@@ -350,10 +368,6 @@ export class CubeStoreDriver extends BaseDriver implements DriverInterface {
 
       const { baseUrl } = this;
       let fileCounter = 0;
-
-      this.createTableSql(table, columns);
-      // eslint-disable-next-line no-unused-vars
-      const createTableSqlWithoutLocation = this.createTableSqlWithOptions(table, columns, options);
 
       const getFileStream = () => {
         if (!currentFileStream) {
@@ -374,7 +388,7 @@ export class CubeStoreDriver extends BaseDriver implements DriverInterface {
               }).then(async res => {
                 if (res.status !== 200) {
                   const error = await res.json();
-                  throw new Error(`Error during upload of ${fileName} create table: ${createTableSqlWithoutLocation}: ${error.error}`);
+                  throw new Error(`Error during upload of ${fileName}: ${error.error}`);
                 }
                 return fileName;
               }));
@@ -456,6 +470,7 @@ export class CubeStoreDriver extends BaseDriver implements DriverInterface {
 
     if (tableData.partitions) {
       locations = [];
+
       for (let i = 0; i < tableData.partitions; i++) {
         locations.push(`stream://${tableData.streamingSource.name}/${tableData.streamingTable}/${i}`);
       }

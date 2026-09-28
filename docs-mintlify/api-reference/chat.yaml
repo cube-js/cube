@@ -5,12 +5,16 @@ info:
   description: |-
     Real-time streaming conversations with Cube Cloud AI agents for analytics and
     data exploration. Copy the exact Chat API URL from your agent settings
-    (Admin → Agents → Chat API URL).
+    (Admin → Agents → Chat API URL), or — to talk to a deployment's Auto agent —
+    from the deployment's Settings → API credentials → Chat API tab.
+
+    The deployment-scoped base URL accepts only Cube token authentication; an API
+    key carries no agent, so it cannot resolve the Auto agent.
 servers:
   - url: https://ai.{cloudRegion}.cubecloud.dev/api/v1/public/{accountName}/agents/{agentId}
     description: >-
-      Chat API base URL. Copy the exact URL from your agent settings (Admin → Agents → Chat API
-      URL).
+      Agent-scoped base URL — talks to that specific agent. Copy the exact URL from your agent
+      settings (Admin → Agents → Chat API URL). Accepts an API key or a Cube token.
     variables:
       cloudRegion:
         default: gcp-us-central1
@@ -21,8 +25,25 @@ servers:
       agentId:
         default: '1'
         description: AI agent identifier (Admin → Agents)
+  - url: https://ai.{cloudRegion}.cubecloud.dev/api/v1/public/{accountName}/deployments/{deploymentId}
+    description: >-
+      Deployment-scoped base URL — talks to the deployment's Auto agent. Copy the exact URL from
+      Settings → API credentials → Chat API. Accepts only Cube token authentication, which is
+      disabled by default (Settings → Configuration → Use Cube authentication for Chat and
+      embedding APIs).
+    variables:
+      cloudRegion:
+        default: gcp-us-central1
+        description: Cloud region identifier
+      accountName:
+        default: your-account
+        description: Your Cube Cloud account/tenant name
+      deploymentId:
+        default: '9'
+        description: Deployment identifier (from the deployment URL, e.g. /d/9)
 security:
   - apiKey: []
+  - cubeToken: []
 tags:
   - name: Chat
 paths:
@@ -36,9 +57,11 @@ paths:
 
         terminated by `\n`) and served with `Content-Type: application/json`. Each line represents a
 
-        chat message, a state update, or an error object. Assistant content arrives incrementally —
+        chat message, a state update, a usage frame, or an error object. Assistant content arrives
 
-        updates to a previously emitted message carry the same `id` with `isDelta: true`.
+        incrementally — updates to a previously emitted message carry the same `id` with
+
+        `isDelta: true`.
 
 
         Provide `input` to send a new message. Omit `input` (with a `chatId`) to retrieve the
@@ -54,8 +77,13 @@ paths:
         - `__cutoff__` — initial marker emitted before new content; also carries the thread `chatId`
         and `isStreaming` under `state`.
 
-        - `__state__` — final thread snapshot emitted at the end, carrying the full `{ messages:
-        [...] }` state.
+        - `__state__` — thread snapshot emitted near the end, carrying the full `{ messages: [...] }`
+        state.
+
+        - `__usage__` — always the last frame on the stream, whether the run completed, was aborted,
+        or errored (all counts are `0` and `models` is empty if the request was rejected before any
+        LLM call). Carries `type: "usage"` and `{ models, llmCalls, inputTokens, outputTokens,
+        cacheWriteTokens, cacheReadTokens, totalTokens }` under `usage`. There is no cost field.
 
 
         Errors mid-stream are emitted as a standalone line `{ "error": "<message>" }` rather than a
@@ -107,14 +135,6 @@ paths:
                   summary: Error line
                   value:
                     error: 'BadRequestError: Bad branch'
-                finalState:
-                  summary: Final state (__state__)
-                  value:
-                    id: __state__
-                    isDelta: false
-                    role: assistant
-                    state:
-                      messages: []
                 initialState:
                   summary: Initial state (__cutoff__)
                   value:
@@ -124,6 +144,15 @@ paths:
                     state:
                       chatId: a1b2c3d4-08d7-40b9-8b1c-e7e3a698647e
                       isStreaming: false
+                threadState:
+                  summary: Thread state snapshot (__state__)
+                  value:
+                    id: __state__
+                    isDelta: false
+                    role: assistant
+                    sort: 10
+                    state:
+                      messages: []
                 toolCall:
                   summary: Tool call (cubeMeta)
                   value:
@@ -136,6 +165,20 @@ paths:
                     toolCall:
                       input: '{"searchQuery":"revenue trends"}'
                       name: cubeMeta
+                usage:
+                  summary: Usage (__usage__, always the last frame)
+                  value:
+                    id: __usage__
+                    type: usage
+                    usage:
+                      cacheReadTokens: 264118
+                      cacheWriteTokens: 31006
+                      inputTokens: 18412
+                      llmCalls: 7
+                      models:
+                        - claude-sonnet-5
+                      outputTokens: 2280
+                      totalTokens: 315816
                 userEcho:
                   summary: User message echo
                   value:
@@ -164,8 +207,9 @@ paths:
                   id:
                     description: >-
                       Unique message identifier. Sentinel values: `__cutoff__` (initial marker,
-                      carries the chatId under `state`) and `__state__` (final thread state
-                      snapshot). Absent on error lines.
+                      carries the chatId under `state`), `__state__` (thread state snapshot), and
+                      `__usage__` (always the last frame, carries model/token counts under `usage`).
+                      Absent on error lines.
                     type: string
                   isDelta:
                     description: >-
@@ -176,12 +220,14 @@ paths:
                     description: Whether the message is still being generated.
                     type: boolean
                   role:
+                    description: Absent on error lines and on the `__usage__` frame.
                     enum:
                       - user
                       - assistant
                     type: string
                   sort:
-                    description: Message ordering sequence.
+                    description: >-
+                      Message ordering sequence. Absent on the `__usage__` frame.
                     type: number
                   state:
                     description: >-
@@ -206,14 +252,88 @@ paths:
                           contains a JSON object with an `error` field.
                         type: string
                     type: object
+                  type:
+                    description: >-
+                      Present only on the `__usage__` frame, where it is always `usage`. Absent on
+                      every other message.
+                    enum:
+                      - usage
+                    type: string
+                  usage:
+                    description: >-
+                      Model and token counts for the run. Present only on the `__usage__` frame.
+                    properties:
+                      cacheReadTokens:
+                        type: number
+                      cacheWriteTokens:
+                        type: number
+                      inputTokens:
+                        type: number
+                      llmCalls:
+                        description: Number of LLM calls made during the run.
+                        type: number
+                      models:
+                        description: >-
+                          Distinct models used across the run's LLM calls, deduplicated. For a BYOM
+                          model, normalized to omit infrastructure detail (e.g. a Bedrock
+                          inference-profile ARN is reduced to its model name) rather than the raw
+                          configured identifier.
+                        items:
+                          type: string
+                        type: array
+                      outputTokens:
+                        type: number
+                      totalTokens:
+                        description: >-
+                          Sum of `inputTokens`, `outputTokens`, `cacheWriteTokens`, and
+                          `cacheReadTokens`.
+                        type: number
+                    type: object
                 type: object
             text/html; charset=utf-8: {}
           description: >-
-            Newline-delimited stream of chat message / state / error objects (served as
+            Newline-delimited stream of chat message / state / usage / error objects (served as
             `Content-Type: application/json`). Each line is a JSON object of the schema below.
       security:
         - apiKey: []
+        - cubeToken: []
       summary: Stream chat state
+      tags:
+        - Chat
+  /chat/abort:
+    post:
+      description: >-
+        Stops an in-progress chat stream — for example, when the user cancels a request or
+        navigates away while the agent is still generating a response.
+
+
+        The abort URL is derived from the Chat API URL by replacing `/stream-chat-state` with
+        `/abort`.
+
+
+        A successful cancellation is indicated solely by the `204 No Content` status — the
+        response has no body. Note that the aborted `stream-chat-state` request itself does not
+        fail with an HTTP error: the streaming response already returned `200 OK` when the stream
+        opened, so treat this endpoint's `204` as the confirmation that the stream was aborted.
+      operationId: abortChat
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AbortChatRequest'
+        description: Abort request identifying the chat thread to stop.
+        required: true
+      responses:
+        '204':
+          description: Chat streaming was aborted successfully. The response has no body.
+        '403':
+          description: The authenticated user does not own the specified chat thread.
+        '404':
+          description: The specified `chatId` does not exist.
+      security:
+        - apiKey: []
+        - cubeToken: []
+      summary: Abort chat stream
       tags:
         - Chat
 components:
@@ -223,38 +343,39 @@ components:
       in: header
       name: Authorization
       description: 'API key authentication. Send `Authorization: Api-Key <YOUR_API_KEY>`.'
+    cubeToken:
+      type: apiKey
+      in: header
+      name: X-Cube-Auth-Token
+      description: >-
+        Cube token authentication. Send your deployment's own Cube token (JWT) in the
+        `X-Cube-Auth-Token` header. The token must be valid for the agent's deployment, include
+        an `externalId` (or `sub`) claim identifying the external user, and carry the `chat`
+        scope in its `scope` claim (an array). Disabled by default — enable it in your
+        deployment settings.
   schemas:
+    AbortChatRequest:
+      properties:
+        chatId:
+          description: >-
+            Chat thread ID to abort. Must match the `chatId` of an active or recently completed
+            chat session.
+          type: string
+        sessionSettings:
+          $ref: '#/components/schemas/SessionSettingsDto'
+      required:
+        - chatId
+      type: object
     ChatRequest:
       properties:
         activeBranchName:
           description: Development branch name to run queries against. Uses the main branch if omitted.
           type: string
-        agentId:
-          nullable: true
-          type: number
         chatId:
           description: >-
             Chat thread ID. If omitted, a new thread is created automatically. Should match the
             previously returned `chatId` carried on the `__cutoff__` message.
           type: string
-        context:
-          enum:
-            - chat
-            - workbook
-            - model
-            - dashboard
-            - external
-            - mcp
-            - ai-widget
-            - onboarding
-            - explore
-            - connection_setup
-            - slack_dm
-            - published-dashboard
-          type: string
-        cubeCredentials: {}
-        dashboardContext:
-          $ref: '#/components/schemas/DashboardContextDto'
         images:
           items:
             $ref: '#/components/schemas/ImageAttachmentDto'
@@ -267,8 +388,6 @@ components:
         isDefaultBranch:
           description: Whether `activeBranchName` is the default branch. Defaults to `true` when not set.
           type: boolean
-        isDevMode:
-          type: boolean
         messageId:
           description: >-
             Client-provided identifier in the format `<timestamp>-message` (13+ digit Unix
@@ -277,49 +396,6 @@ components:
           type: string
         sessionSettings:
           $ref: '#/components/schemas/SessionSettingsDto'
-        workbookContext:
-          $ref: '#/components/schemas/WorkbookContextDto'
-        workbookId:
-          type: number
-      type: object
-    DashboardContextDto:
-      properties:
-        publicId:
-          type: string
-        snapshots:
-          items:
-            $ref: '#/components/schemas/DashboardContextSnapshotDto'
-          type: array
-        title:
-          type: string
-        viewerState:
-          $ref: '#/components/schemas/DashboardViewerStateDto'
-        widgets:
-          items: {}
-          type: array
-      required:
-        - publicId
-      type: object
-    DashboardContextSnapshotDto:
-      properties:
-        data:
-          items: {}
-          type: array
-        spec:
-          type: object
-        sqlQuery:
-          type: string
-        widgetId:
-          type: string
-      required:
-        - widgetId
-      type: object
-    DashboardViewerStateDto:
-      properties:
-        filterState:
-          type: object
-        timeGrainState:
-          type: object
       type: object
     ImageAttachmentDto:
       properties:
@@ -369,44 +445,4 @@ components:
             `internalId`.
           items: {}
           type: array
-      type: object
-    WorkbookContextChartDto:
-      properties:
-        baseSql:
-          type: string
-        logicalFilters: {}
-        reportId:
-          type: number
-        sql:
-          type: string
-        title:
-          type: string
-        widgetId:
-          type: string
-      required:
-        - widgetId
-        - sql
-      type: object
-    WorkbookContextDto:
-      properties:
-        charts:
-          items:
-            $ref: '#/components/schemas/WorkbookContextChartDto'
-          type: array
-        filters:
-          items:
-            $ref: '#/components/schemas/WorkbookContextFilterDto'
-          type: array
-      type: object
-    WorkbookContextFilterDto:
-      properties:
-        filter:
-          type: object
-        semanticView:
-          type: string
-        widgetId:
-          type: string
-      required:
-        - widgetId
-        - semanticView
       type: object

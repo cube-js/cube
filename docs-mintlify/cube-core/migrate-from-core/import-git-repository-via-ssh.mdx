@@ -73,6 +73,41 @@ repository's webhooks. Ensure that the Git repository can push events which
 should trigger a build on Cube Cloud. Back in Cube Cloud,
 click **Connect** to test the webhook.
 
+### Webhook format
+
+Cube recognizes push webhooks in the formats sent by GitLab, Bitbucket, and
+Azure DevOps out of the box, so you can usually point your repository's native
+webhook integration at the webhook URL without any extra configuration.
+
+If your Git host does not send one of these formats (for example, AWS
+CodeCommit), or you want to trigger a sync from a CI/CD pipeline or manually,
+send a `POST` request to the webhook URL with the `x-git-event: push` header:
+
+```bash
+curl -X POST "<CUBE-GIT-WEBHOOK-URL>" \
+  -H "x-git-event: push" \
+  -H "Content-Type: application/json" \
+  --data '{"ref": "refs/heads/main"}'
+```
+
+- Use the full webhook URL exactly as shown in the UI — it includes the
+  `token` query parameter that authenticates the request.
+- The `x-git-event: push` header is required. Requests that do not carry a
+  recognized Git event are ignored: Cube responds with `204`, does not pull
+  the repository, and the request is not shown under recent webhook requests.
+- `ref` is optional and names the branch to sync (in the `refs/heads/<branch>`
+  form). If omitted, the production branch configured for the deployment is
+  used.
+
+Response status codes:
+
+| Status | Meaning                                                                                   |
+| ------ | ----------------------------------------------------------------------------------------- |
+| `201`  | The event was accepted and a build was triggered                                           |
+| `204`  | The event was ignored — no recognized Git event in the request, or nothing new to build    |
+| `403`  | The `token` query parameter is missing or invalid                                          |
+| `429`  | Rate limited — there is a short per-branch cooldown between webhook calls; retry in ~30 s  |
+
 ## Step 4: Connect your Database
 
 Enter your credentials to connect to your database. Check the [connecting to

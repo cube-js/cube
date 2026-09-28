@@ -162,8 +162,6 @@ export interface Query {
   offset?: number;
   order?: TQueryOrderObject | TQueryOrderArray;
   timezone?: string;
-  // @deprecated
-  renewQuery?: boolean;
   ungrouped?: boolean;
   responseFormat?: 'compact' | 'columnar' | 'default';
   total?: boolean;
@@ -199,7 +197,17 @@ export type TransformedQuery = {
 export type PreAggregationType = 'rollup' | 'rollupJoin' | 'rollupLambda' | 'originalSql';
 
 export type UsedPreAggregation = {
-  targetTableName: string;
+  /**
+   * Identity of the pre-aggregation in the data model, e.g. `Orders.main`.
+   * Stable across rebuilds, unlike `targetTableName`.
+   */
+  preAggregationId?: string;
+  /**
+   * Physical table of one specific build, content and structure versions
+   * included. Returned in dev mode and to the Playground only.
+   */
+  targetTableName?: string;
+  lastUpdatedAt?: number;
   type: PreAggregationType;
 };
 
@@ -212,6 +220,11 @@ export type LoadResponseResult<T> = {
   dbType: string;
   extDbType: string;
   requestId?: string;
+  /**
+   * Pre-aggregations this result was served from, keyed by pre-aggregation
+   * table name. Absent when the query hit none. Only carries identity fields;
+   * `refreshKeyValues` is added in dev mode and for the Playground.
+   */
   usedPreAggregations?: Record<string, UsedPreAggregation>;
   transformedQuery?: TransformedQuery;
   total?: number;
@@ -545,7 +558,16 @@ export type ViewGroup = {
   name: string;
   title?: string;
   description?: string;
+  /**
+   * The group's own direct view references at this level.
+   */
   views: string[];
+  /**
+   * Recursive representation: view names interleaved with nested view groups,
+   * preserving authoring order. Present when the group is defined via
+   * `includes` (including nested view groups).
+   */
+  includes?: (string | ViewGroup)[];
 };
 
 export type MetaResponse = {
@@ -600,7 +622,7 @@ export type ProgressResponse = {
 /**
  * Cache mode options for query execution.
  *
- * - **stale-if-slow** (default): Equivalent to previously used `renewQuery: false`.
+ * - **stale-if-slow** (default):
  *   If refresh keys are up-to-date, returns the value from cache.
  *   If refresh keys are expired, tries to return the value from the database.
  *   Returns fresh value from the database if the query executed until the first "Continue wait" interval is reached.
@@ -611,7 +633,7 @@ export type ProgressResponse = {
  *   If refresh keys are expired, returns stale data from cache.
  *   Updates the cache in background.
  *
- * - **must-revalidate**: Equivalent to previously used `renewQuery: true`.
+ * - **must-revalidate**:
  *   If refresh keys are up-to-date, returns the value from cache.
  *   If refresh keys are expired, tries to return the value from the database.
  *   Returns fresh value from the database even if it takes minutes and many "Continue wait" intervals.

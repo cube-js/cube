@@ -1,7 +1,7 @@
 ######################################################################
 # Base image                                                         #
 ######################################################################
-FROM node:22.22.0-bookworm-slim AS base
+FROM node:24.21.0-trixie-slim AS base
 
 ARG IMAGE_VERSION=dev
 
@@ -12,12 +12,16 @@ ENV CI=0
 
 RUN DEBIAN_FRONTEND=noninteractive \
     && apt-get update \
-    && apt-get install -y --no-install-recommends libssl3 curl \
-       cmake python3 gcc g++ make cmake openjdk-17-jdk-headless unzip \
+    && apt-get install -y --no-install-recommends libssl3t64 curl \
+       cmake python3.13 gcc g++ make cmake openjdk-21-jdk-headless unzip \
+    && update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.13 1 \
+    && update-alternatives --install /usr/bin/python python /usr/bin/python3.13 1 \
     && rm -rf /var/lib/apt/lists/*
 
 ENV CUBESTORE_SKIP_POST_INSTALL=true
 ENV NODE_ENV=development
+# Use the image's Node headers to avoid concurrent node-gyp downloads and copies.
+ENV npm_config_nodedir=/usr/local
 
 WORKDIR /cubejs
 
@@ -46,7 +50,6 @@ COPY packages/cubejs-crate-driver/package.json packages/cubejs-crate-driver/pack
 COPY packages/cubejs-dremio-driver/package.json packages/cubejs-dremio-driver/package.json
 COPY packages/cubejs-druid-driver/package.json packages/cubejs-druid-driver/package.json
 COPY packages/cubejs-duckdb-driver/package.json packages/cubejs-duckdb-driver/package.json
-COPY packages/cubejs-elasticsearch-driver/package.json packages/cubejs-elasticsearch-driver/package.json
 COPY packages/cubejs-firebolt-driver/package.json packages/cubejs-firebolt-driver/package.json
 COPY packages/cubejs-hive-driver/package.json packages/cubejs-hive-driver/package.json
 COPY packages/cubejs-mongobi-driver/package.json packages/cubejs-mongobi-driver/package.json
@@ -71,9 +74,9 @@ COPY packages/cubejs-ksql-driver/package.json packages/cubejs-ksql-driver/packag
 COPY packages/cubejs-dbt-schema-extension/package.json packages/cubejs-dbt-schema-extension/package.json
 COPY packages/cubejs-jdbc-driver/package.json packages/cubejs-jdbc-driver/package.json
 COPY packages/cubejs-vertica-driver/package.json packages/cubejs-vertica-driver/package.json
+COPY packages/cubejs-templates/package.json packages/cubejs-templates/package.json
 
 # We dont need client libraries
-#COPY packages/cubejs-templates/package.json packages/cubejs-templates/package.json
 #COPY packages/cubejs-client-core/package.json packages/cubejs-client-core/package.json
 #COPY packages/cubejs-client-react/package.json packages/cubejs-client-react/package.json
 #COPY packages/cubejs-client-vue3/package.json packages/cubejs-client-vue3/package.json
@@ -121,7 +124,6 @@ COPY packages/cubejs-crate-driver/ packages/cubejs-crate-driver/
 COPY packages/cubejs-dremio-driver/ packages/cubejs-dremio-driver/
 COPY packages/cubejs-druid-driver/ packages/cubejs-druid-driver/
 COPY packages/cubejs-duckdb-driver/ packages/cubejs-duckdb-driver/
-COPY packages/cubejs-elasticsearch-driver/ packages/cubejs-elasticsearch-driver/
 COPY packages/cubejs-firebolt-driver/ packages/cubejs-firebolt-driver/
 COPY packages/cubejs-hive-driver/ packages/cubejs-hive-driver/
 COPY packages/cubejs-mongobi-driver/ packages/cubejs-mongobi-driver/
@@ -147,9 +149,9 @@ COPY packages/cubejs-dbt-schema-extension/ packages/cubejs-dbt-schema-extension/
 COPY packages/cubejs-jdbc-driver/ packages/cubejs-jdbc-driver/
 COPY packages/cubejs-databricks-jdbc-driver/ packages/cubejs-databricks-jdbc-driver/
 COPY packages/cubejs-vertica-driver/ packages/cubejs-vertica-driver/
+COPY packages/cubejs-templates/ packages/cubejs-templates/
 
 # We dont need client libraries
-#COPY packages/cubejs-templates/ packages/cubejs-templates/
 #COPY packages/cubejs-client-core/ packages/cubejs-client-core/
 #COPY packages/cubejs-client-react/ packages/cubejs-client-react/
 #COPY packages/cubejs-client-vue3/ packages/cubejs-client-vue3/
@@ -169,7 +171,9 @@ FROM base AS final
 
 ENV DEBIAN_FRONTEND=noninteractive
 RUN apt-get update \
-    && apt-get install -y ca-certificates python3.11 libpython3.11-dev \
+    && apt-get install -y ca-certificates python3.13 libpython3.13-dev \
+    && update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.13 1 \
+    && update-alternatives --install /usr/bin/python python /usr/bin/python3.13 1 \
     && apt-get clean
 
 COPY --from=build /cubejs .

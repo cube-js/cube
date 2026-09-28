@@ -106,7 +106,7 @@ pub fn pretty_print_filter_item(
                     item.filter_operator().to_string(),
                     item.values()
                         .iter()
-                        .map(|v| v.clone().unwrap_or("null".to_string()))
+                        .map(|v| v.to_param_string().unwrap_or_else(|| "null".to_string()))
                         .collect::<Vec<_>>()
                         .join(", ")
                 ),

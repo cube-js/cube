@@ -68,7 +68,6 @@ suite('Python Config', () => {
       queryRewrite: expect.any(Function),
       repositoryFactory: expect.any(Function),
       schemaVersion: expect.any(Function),
-      contextToRoles: expect.any(Function),
       contextToGroups: expect.any(Function),
       scheduledRefreshContexts: expect.any(Function),
       scheduledRefreshTimeZones: expect.any(Function),
@@ -90,14 +89,6 @@ suite('Python Config', () => {
         user_id: 42
       },
     });
-  });
-
-  test('context_to_roles', async () => {
-    if (!config.contextToRoles) {
-      throw new Error('contextToRoles was not defined in config.py');
-    }
-
-    expect(await config.contextToRoles({})).toEqual(['admin']);
   });
 
   test('context_to_groups', async () => {
@@ -251,7 +242,6 @@ darwinSuite('Old Python Config', () => {
       queryRewrite: expect.any(Function),
       repositoryFactory: expect.any(Function),
       schemaVersion: expect.any(Function),
-      contextToRoles: expect.any(Function),
       contextToGroups: expect.any(Function),
       scheduledRefreshContexts: expect.any(Function),
       scheduledRefreshTimeZones: expect.any(Function),

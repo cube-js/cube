@@ -1,4 +1,4 @@
-use super::{Expr, SingleAliasedSource, VisitorContext};
+use super::{Expr, SingleAliasedSource, TimeSeries, VisitorContext};
 use crate::planner::query_tools::QueryTools;
 use crate::planner::sql_templates::PlanSqlTemplates;
 use crate::planner::{BaseJoinCondition, Granularity};
@@ -92,34 +92,6 @@ impl RegularRollingWindowJoinCondition {
 }
 
 #[derive(Clone)]
-pub struct RollingTotalJoinCondition {
-    time_series_source: String,
-    time_dimension: Expr,
-}
-
-impl RollingTotalJoinCondition {
-    pub fn new(time_series_source: String, time_dimension: Expr) -> Self {
-        Self {
-            time_series_source,
-            time_dimension,
-        }
-    }
-
-    pub fn to_sql(
-        &self,
-        templates: &PlanSqlTemplates,
-        context: Rc<VisitorContext>,
-    ) -> Result<String, CubeError> {
-        let date_column = self.time_dimension.to_sql(templates, context)?;
-        let date_to =
-            templates.column_reference(&Some(self.time_series_source.clone()), "date_to")?;
-        let date_to = templates.rolling_window_expr_timestamp_cast(&date_to)?;
-        let result = format!("{date_column} <= {date_to}");
-        Ok(result)
-    }
-}
-
-#[derive(Clone)]
 pub struct ToDateRollingWindowJoinCondition {
     time_series_source: String,
     granularity: Rc<Granularity>,
@@ -155,7 +127,17 @@ impl ToDateRollingWindowJoinCondition {
             templates.column_reference(&Some(self.time_series_source.clone()), "date_to")?;
         let date_from = templates.rolling_window_expr_timestamp_cast(&date_from)?;
         let date_to = templates.rolling_window_expr_timestamp_cast(&date_to)?;
-        let grouped_from = self.granularity.apply_to_input_sql(templates, date_from)?;
+        // A calendar period cannot be derived from a timestamp — the series
+        // carries the boundary it read off the calendar cube.
+        let grouped_from = if self.granularity.calendar_sql().is_some() {
+            let period_start = templates.column_reference(
+                &Some(self.time_series_source.clone()),
+                &TimeSeries::period_start_column(self.granularity.granularity()),
+            )?;
+            templates.rolling_window_expr_timestamp_cast(&period_start)?
+        } else {
+            self.granularity.apply_to_input_sql(templates, date_from)?
+        };
         let result = format!("{date_column} >= {grouped_from} and {date_column} <= {date_to}");
         Ok(result)
     }
@@ -223,7 +205,6 @@ pub enum JoinCondition {
     BaseJoinCondition(Rc<dyn BaseJoinCondition>),
     RegularRollingWindowJoinCondition(RegularRollingWindowJoinCondition),
     ToDateRollingWindowJoinCondition(ToDateRollingWindowJoinCondition),
-    RollingTotalJoinCondition(RollingTotalJoinCondition),
 }
 
 impl JoinCondition {
@@ -261,13 +242,6 @@ impl JoinCondition {
         ))
     }
 
-    pub fn new_rolling_total_join(time_series_source: String, time_dimension: Expr) -> Self {
-        Self::RollingTotalJoinCondition(RollingTotalJoinCondition::new(
-            time_series_source,
-            time_dimension,
-        ))
-    }
-
     pub fn new_base_join(base: Rc<dyn BaseJoinCondition>) -> Self {
         Self::BaseJoinCondition(base)
     }
@@ -286,7 +260,6 @@ impl JoinCondition {
             JoinCondition::ToDateRollingWindowJoinCondition(cond) => {
                 cond.to_sql(templates, context)
             }
-            JoinCondition::RollingTotalJoinCondition(cond) => cond.to_sql(templates, context),
         }
     }
 }

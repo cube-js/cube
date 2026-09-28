@@ -1,8 +1,9 @@
 use super::common::CompiledMemberPath;
+use super::deps::{self, symbol_deps, DepVisitor, DepVisitorMut, SymbolDeps};
 use super::MemberSymbol;
 use crate::planner::collectors::member_childs;
 use crate::planner::sql_templates::PlanSqlTemplates;
-use crate::planner::{CubeRef, CubeTableSymbol, SqlCall};
+use crate::planner::{CubeTableSymbol, SqlCall};
 use crate::utils::debug::DebugSql;
 use cubenativeutils::CubeError;
 use itertools::Itertools;
@@ -20,22 +21,49 @@ pub enum MemberExpressionExpression {
     PatchedSymbol(Rc<MemberSymbol>),
 }
 
+impl SymbolDeps for MemberExpressionExpression {
+    fn visit_deps(&self, visitor: &mut dyn DepVisitor) -> std::ops::ControlFlow<()> {
+        match self {
+            Self::SqlCall(sql_call) => sql_call.visit_deps(visitor),
+            Self::PatchedSymbol(symbol) => visitor.symbol(symbol),
+        }
+    }
+
+    fn visit_deps_mut(&mut self, visitor: &mut dyn DepVisitorMut) -> Result<(), CubeError> {
+        match self {
+            Self::SqlCall(sql_call) => sql_call.visit_deps_mut(visitor),
+            Self::PatchedSymbol(symbol) => visitor.symbol(symbol),
+        }
+    }
+}
+
 /// `MemberSymbol::MemberExpression` body: a synthetic member built
 /// at query time from a SQL expression or from another member with
 /// query-time modifications. Not declared in the data model. Its
 /// full name lives in the `expr:` namespace.
 #[derive(Clone)]
 pub struct MemberExpressionSymbol {
-    compiled_path: CompiledMemberPath,
-    expression: MemberExpressionExpression,
+    pub(super) compiled_path: CompiledMemberPath,
+    pub(super) expression: MemberExpressionExpression,
     #[allow(dead_code)]
-    definition: Option<String>,
-    is_reference: bool,
-    parenthesized: bool,
+    pub(super) definition: Option<String>,
+    pub(super) is_reference: bool,
+    pub(super) parenthesized: bool,
     /// True when this expression materialises a `segments:` entry used as a
     /// selected dimension (in a pre-aggregation). Such a boolean must be
     /// wrapped per dialect when projected/grouped (e.g. MSSQL `BIT`).
-    is_segment: bool,
+    pub(super) is_segment: bool,
+}
+
+symbol_deps! {
+    MemberExpressionSymbol {
+        expression: dep,
+        compiled_path: skip,
+        definition: skip,
+        is_reference: skip,
+        parenthesized: skip,
+        is_segment: skip,
+    }
 }
 
 impl MemberExpressionSymbol {
@@ -96,12 +124,6 @@ impl MemberExpressionSymbol {
         &self.compiled_path
     }
 
-    /// Trims the join-chain prefix from `compiled_path` in place so
-    /// the path points only at the owning cube.
-    pub fn strip_join_prefix(&mut self) {
-        self.compiled_path = self.compiled_path.strip_join_prefix();
-    }
-
     /// Full unique identifier of the symbol; lives in the `expr:`
     /// namespace to keep it disjoint from data-model member names.
     pub fn full_name(&self) -> String {
@@ -125,50 +147,11 @@ impl MemberExpressionSymbol {
         if !self.is_reference() {
             return None;
         }
-        let deps = self.get_dependencies();
-        if deps.is_empty() {
-            return None;
-        }
-        deps.first().cloned()
-    }
-
-    pub fn apply_to_deps<F: Fn(&Rc<MemberSymbol>) -> Result<Rc<MemberSymbol>, CubeError>>(
-        &self,
-        f: &F,
-    ) -> Result<Rc<MemberSymbol>, CubeError> {
-        let mut result = self.clone();
-        match &mut result.expression {
-            MemberExpressionExpression::SqlCall(sql_call) => {
-                *sql_call = sql_call.apply_recursive(f)?
-            }
-            MemberExpressionExpression::PatchedSymbol(member_symbol) => {
-                *member_symbol = f(member_symbol)?
-            }
-        }
-
-        Ok(MemberSymbol::new_member_expression(Rc::new(result)))
+        self.get_dependencies().first().cloned()
     }
 
     pub fn get_dependencies(&self) -> Vec<Rc<MemberSymbol>> {
-        let mut deps = vec![];
-        match &self.expression {
-            MemberExpressionExpression::SqlCall(sql_call) => {
-                sql_call.extract_symbol_deps(&mut deps)
-            }
-            MemberExpressionExpression::PatchedSymbol(member_symbol) => {
-                deps.push(member_symbol.clone())
-            }
-        }
-        deps
-    }
-
-    pub fn get_cube_refs(&self) -> Vec<CubeRef> {
-        let mut refs = vec![];
-        match &self.expression {
-            MemberExpressionExpression::SqlCall(sql_call) => sql_call.extract_cube_refs(&mut refs),
-            MemberExpressionExpression::PatchedSymbol(_) => {}
-        }
-        refs
+        deps::collect_deps(self)
     }
 
     /// If every leaf member referenced by the expression is a
@@ -182,9 +165,12 @@ impl MemberExpressionSymbol {
         if childs.iter().any(|s| !s.is_dimension()) {
             Ok(None)
         } else {
+            // Single member expression can reference multiple dimensions from
+            // the same cube
             let cube_names = childs
                 .into_iter()
                 .map(|child| child.cube_name())
+                .unique()
                 .collect_vec();
             Ok(Some(cube_names))
         }

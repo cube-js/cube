@@ -1,4 +1,5 @@
-use crate::cachestore::{QueueItemStatus, QueueKey};
+use crate::cachestore::{QueueItemStatus, QueueKey, QUEUE_ITEM_EXTERNAL_ID_MAX_LEN};
+use crate::config::env_parse_positive_lenient;
 use crate::sql::{QueryParameter, QueryParameters};
 use sqlparser::ast::{
     ColumnDef, CreateIndex, CreateTable, HiveDistributionStyle, Ident, ObjectName, Query,
@@ -8,6 +9,7 @@ use sqlparser::dialect::keywords::Keyword;
 use sqlparser::dialect::Dialect;
 use sqlparser::parser::{Parser, ParserError};
 use sqlparser::tokenizer::{Span, Token, Tokenizer};
+use std::sync::OnceLock;
 
 #[derive(Debug)]
 pub struct MySqlDialectWithBackTicks {}
@@ -92,7 +94,7 @@ pub enum CacheCommand {
     Remove {
         key: Ident,
     },
-    Truncate {},
+    Clear {},
     Incr {
         path: Ident,
     },
@@ -105,7 +107,7 @@ impl CacheCommand {
             CacheCommand::Get { .. } => "get",
             CacheCommand::Keys { .. } => "keys",
             CacheCommand::Remove { .. } => "remove",
-            CacheCommand::Truncate { .. } => "truncate",
+            CacheCommand::Clear { .. } => "clear",
             CacheCommand::Incr { .. } => "incr",
         }
     }
@@ -120,6 +122,17 @@ pub enum QueueCommand {
         key: Ident,
         value: String,
         external_id: Option<String>,
+    },
+    /// `QUEUE ADD` which also claims the item (moves it to the active status) in the
+    /// same atomic operation, when the `concurrency` budget of the prefix allows it.
+    AddAndRetrieve {
+        exclusive: bool,
+        priority: i64,
+        orphaned: Option<u32>,
+        key: Ident,
+        value: String,
+        external_id: Option<String>,
+        concurrency: u32,
     },
     Get {
         key: QueueKey,
@@ -162,13 +175,14 @@ pub enum QueueCommand {
         key: QueueKey,
         timeout: u64,
     },
-    Truncate {},
+    Clear {},
 }
 
 impl QueueCommand {
     pub fn as_tag_command(&self) -> &'static str {
         match self {
             QueueCommand::Add { .. } => "add",
+            QueueCommand::AddAndRetrieve { .. } => "add_and_retrieve",
             QueueCommand::Get { .. } => "get",
             QueueCommand::ToCancel { .. } => "to_cancel",
             QueueCommand::List { status_filter, .. } => match status_filter {
@@ -183,7 +197,7 @@ impl QueueCommand {
             QueueCommand::Retrieve { .. } => "retrieve",
             QueueCommand::Result { .. } => "result",
             QueueCommand::ResultBlocking { .. } => "result_blocking",
-            QueueCommand::Truncate { .. } => "truncate",
+            QueueCommand::Clear { .. } => "clear",
         }
     }
 }
@@ -209,6 +223,7 @@ pub enum MetaStoreCommand {
     SetCurrent { id: u128 },
     Compaction,
     Healthcheck,
+    Truncate,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -218,6 +233,8 @@ pub enum CacheStoreCommand {
     Eviction,
     Info,
     Persist,
+    Wipe,
+    Truncate,
 }
 
 type QueryParameterHolder = Option<QueryParameter>;
@@ -256,6 +273,20 @@ macro_rules! parse_sql_options {
     }};
 }
 
+/// Nesting the parser accepts inside a single statement. Parsing recurses per level with no
+/// stack growth, so this is a budget on the stack it runs on (`CUBESTORE_MAIN_STACK_SIZE`).
+const DEFAULT_SQL_PARSER_RECURSION_LIMIT: usize = 128;
+
+pub(crate) fn sql_parser_recursion_limit() -> usize {
+    static LIMIT: OnceLock<usize> = OnceLock::new();
+    *LIMIT.get_or_init(|| {
+        env_parse_positive_lenient(
+            "CUBESTORE_SQL_PARSER_RECURSION_LIMIT",
+            DEFAULT_SQL_PARSER_RECURSION_LIMIT,
+        )
+    })
+}
+
 impl<'a> CubeStoreParser<'a> {
     pub fn new(sql: &str, parameters: Option<QueryParameters>) -> Result<Self, ParserError> {
         let dialect = &MySqlDialectWithBackTicks {};
@@ -263,7 +294,9 @@ impl<'a> CubeStoreParser<'a> {
         let tokens = tokenizer.tokenize()?;
 
         Ok(CubeStoreParser {
-            parser: Parser::new(dialect).with_tokens(tokens),
+            parser: Parser::new(dialect)
+                .with_recursion_limit(sql_parser_recursion_limit())
+                .with_tokens(tokens),
             parameters: parameters
                 .map(|parameters| parameters.into_iter().map(|p| Some(p)).collect()),
             placeholder_index: 0,
@@ -443,6 +476,18 @@ impl<'a> CubeStoreParser<'a> {
         }
     }
 
+    fn parse_external_id(&mut self) -> Result<String, ParserError> {
+        let external_id = self.parse_literal_string()?;
+        if external_id.len() > QUEUE_ITEM_EXTERNAL_ID_MAX_LEN {
+            return Err(ParserError::ParserError(format!(
+                "external_id exceeds maximum allowed length of {} characters",
+                QUEUE_ITEM_EXTERNAL_ID_MAX_LEN
+            )));
+        }
+
+        Ok(external_id)
+    }
+
     fn parse_identifier(&mut self) -> Result<Ident, ParserError> {
         if let Token::Placeholder(placeholder) = self.parser.peek_token().token {
             self.parser.next_token();
@@ -502,10 +547,10 @@ impl<'a> CubeStoreParser<'a> {
             "remove" => CacheCommand::Remove {
                 key: self.parse_identifier()?,
             },
-            "truncate" => CacheCommand::Truncate {},
+            "clear" => CacheCommand::Clear {},
             other => {
                 return Err(ParserError::ParserError(format!(
-                    "Unknown cache command: {}, available: SET|GET|KEYS|INC|REMOVE|TRUNCATE",
+                    "Unknown cache command: {}, available: SET|GET|KEYS|INCR|REMOVE|CLEAR",
                     other
                 )))
             }
@@ -605,6 +650,10 @@ impl<'a> CubeStoreParser<'a> {
             CacheStoreCommand::Info
         } else if self.parse_custom_token("healthcheck") {
             CacheStoreCommand::Healthcheck
+        } else if self.parse_custom_token("wipe") {
+            CacheStoreCommand::Wipe
+        } else if self.parse_custom_token("truncate") {
+            CacheStoreCommand::Truncate
         } else {
             return Err(ParserError::ParserError(
                 "Unknown cachestore command".to_string(),
@@ -623,6 +672,8 @@ impl<'a> CubeStoreParser<'a> {
             MetaStoreCommand::Compaction
         } else if self.parse_custom_token("healthcheck") {
             MetaStoreCommand::Healthcheck
+        } else if self.parse_custom_token("truncate") {
+            MetaStoreCommand::Truncate
         } else {
             return Err(ParserError::ParserError(
                 "Unknown metastore command".to_string(),
@@ -654,7 +705,7 @@ impl<'a> CubeStoreParser<'a> {
                     "exclusive" => { exclusive = true },
                     "priority" => { priority = self.parse_integer("priority", true)? },
                     "orphaned" => { orphaned = Some(self.parse_integer("orphaned", false)?) },
-                    "external_id" => { external_id = Some(self.parser.parse_literal_string()?) },
+                    "external_id" => { external_id = Some(self.parse_external_id()?) },
                 });
 
                 QueueCommand::Add {
@@ -664,6 +715,29 @@ impl<'a> CubeStoreParser<'a> {
                     key: self.parse_identifier()?,
                     value: self.parse_literal_string()?,
                     external_id,
+                }
+            }
+            "add_and_retrieve" => {
+                let mut exclusive = false;
+                let mut priority = 0i64;
+                let mut orphaned: Option<u32> = None;
+                let mut external_id: Option<String> = None;
+
+                parse_sql_options!(self, {
+                    "exclusive" => { exclusive = true },
+                    "priority" => { priority = self.parse_integer("priority", true)? },
+                    "orphaned" => { orphaned = Some(self.parse_integer("orphaned", false)?) },
+                    "external_id" => { external_id = Some(self.parse_external_id()?) },
+                });
+
+                QueueCommand::AddAndRetrieve {
+                    exclusive,
+                    priority,
+                    orphaned,
+                    key: self.parse_identifier()?,
+                    value: self.parse_literal_string()?,
+                    external_id,
+                    concurrency: self.parse_integer("concurrency", false)?,
                 }
             }
             "cancel" => QueueCommand::Cancel {
@@ -764,7 +838,7 @@ impl<'a> CubeStoreParser<'a> {
             }
             "result" => {
                 let external_id = if self.parse_custom_token("external_id") {
-                    Some(self.parser.parse_literal_string()?)
+                    Some(self.parse_external_id()?)
                 } else {
                     None
                 };
@@ -782,7 +856,7 @@ impl<'a> CubeStoreParser<'a> {
                     key: self.parse_queue_key()?,
                 }
             }
-            "truncate" => QueueCommand::Truncate {},
+            "clear" => QueueCommand::Clear {},
             other => {
                 return Err(ParserError::ParserError(format!(
                     "Unknown queue command: {}",
@@ -1052,6 +1126,35 @@ mod tests {
     }
 
     #[test]
+    fn parse_truncate_and_clear_commands() -> Result<(), CubeError> {
+        // New low-level whole-store wipes.
+        match parse_stmt("SYS CACHESTORE TRUNCATE")? {
+            Statement::System(SystemCommand::CacheStore(CacheStoreCommand::Truncate)) => {}
+            s => panic!("Expected SYS CACHESTORE TRUNCATE, got {:?}", s),
+        }
+        match parse_stmt("SYS METASTORE TRUNCATE")? {
+            Statement::System(SystemCommand::MetaStore(MetaStoreCommand::Truncate)) => {}
+            s => panic!("Expected SYS METASTORE TRUNCATE, got {:?}", s),
+        }
+
+        // Renamed logical per-table empties (were CACHE/QUEUE TRUNCATE).
+        match parse_stmt("CACHE CLEAR")? {
+            Statement::Cache(CacheCommand::Clear {}) => {}
+            s => panic!("Expected CACHE CLEAR, got {:?}", s),
+        }
+        match parse_stmt("QUEUE CLEAR")? {
+            Statement::Queue(QueueCommand::Clear {}) => {}
+            s => panic!("Expected QUEUE CLEAR, got {:?}", s),
+        }
+
+        // The old keywords must no longer parse.
+        assert!(parse_stmt("CACHE TRUNCATE").is_err());
+        assert!(parse_stmt("QUEUE TRUNCATE").is_err());
+
+        Ok(())
+    }
+
+    #[test]
     fn parse_explain_variants() -> Result<(), CubeError> {
         match parse_stmt("EXPLAIN ANALYZE DETAILED SELECT 1")? {
             Statement::ExplainAnalyzeDetailed(_) => {}
@@ -1196,6 +1299,156 @@ mod tests {
     }
 
     #[test]
+    fn parse_queue_add_and_retrieve() -> Result<(), CubeError> {
+        let res = parse_stmt("QUEUE ADD_AND_RETRIEVE 'key' 'value' 4")?;
+        match res {
+            Statement::Queue(QueueCommand::AddAndRetrieve {
+                exclusive,
+                priority,
+                orphaned,
+                key,
+                value,
+                external_id,
+                concurrency,
+            }) => {
+                assert!(!exclusive);
+                assert_eq!(priority, 0);
+                assert_eq!(orphaned, None);
+                assert_eq!(key.value, "key");
+                assert_eq!(value, "value");
+                assert_eq!(external_id, None);
+                assert_eq!(concurrency, 4);
+            }
+            _ => panic!("Expected QueueCommand::AddAndRetrieve"),
+        }
+
+        let res = parse_stmt(
+            "QUEUE ADD_AND_RETRIEVE ORPHANED 60 EXCLUSIVE PRIORITY -3 EXTERNAL_ID 'ext' 'key' 'value' 1",
+        )?;
+        match res {
+            Statement::Queue(QueueCommand::AddAndRetrieve {
+                exclusive,
+                priority,
+                orphaned,
+                external_id,
+                concurrency,
+                ..
+            }) => {
+                assert!(exclusive);
+                assert_eq!(priority, -3);
+                assert_eq!(orphaned, Some(60));
+                assert_eq!(external_id, Some("ext".to_string()));
+                assert_eq!(concurrency, 1);
+            }
+            _ => panic!("Expected QueueCommand::AddAndRetrieve"),
+        }
+
+        let res = parse_stmt("QUEUE ADD_AND_RETRIEVE 'key' 'value'");
+        assert!(res.is_err(), "expected parse error, got: {:?}", res);
+
+        Ok(())
+    }
+
+    #[test]
+    fn parse_queue_add_and_retrieve_placeholders() -> Result<(), CubeError> {
+        let mut parser = CubeStoreParser::new(
+            "QUEUE ADD_AND_RETRIEVE ? ? ?",
+            Some(vec![
+                QueryParameter::StringValue("key".to_string()),
+                QueryParameter::StringValue("value".to_string()),
+                QueryParameter::Int64Value(8),
+            ]),
+        )?;
+
+        match parser.parse_statement()? {
+            Statement::Queue(QueueCommand::AddAndRetrieve {
+                key,
+                value,
+                concurrency,
+                ..
+            }) => {
+                assert_eq!(key.value, "key");
+                assert_eq!(value, "value");
+                assert_eq!(concurrency, 8);
+            }
+            other => panic!("Expected QueueCommand::AddAndRetrieve, actual: {:?}", other),
+        }
+
+        Ok(())
+    }
+
+    #[test]
+    fn parse_queue_external_id_max_len() -> Result<(), CubeError> {
+        let max_id = "x".repeat(QUEUE_ITEM_EXTERNAL_ID_MAX_LEN);
+        let too_long_id = "x".repeat(QUEUE_ITEM_EXTERNAL_ID_MAX_LEN + 1);
+
+        // The limit is inclusive
+        match parse_stmt(&format!("QUEUE ADD EXTERNAL_ID '{}' 'key' 'value'", max_id))? {
+            Statement::Queue(QueueCommand::Add { external_id, .. }) => {
+                assert_eq!(external_id, Some(max_id.clone()));
+            }
+            other => panic!("Expected QueueCommand::Add, actual: {:?}", other),
+        }
+
+        match parse_stmt(&format!(
+            "QUEUE ADD_AND_RETRIEVE EXTERNAL_ID '{}' 'key' 'value' 1",
+            max_id
+        ))? {
+            Statement::Queue(QueueCommand::AddAndRetrieve { external_id, .. }) => {
+                assert_eq!(external_id, Some(max_id.clone()));
+            }
+            other => panic!("Expected QueueCommand::AddAndRetrieve, actual: {:?}", other),
+        }
+
+        match parse_stmt(&format!("QUEUE RESULT EXTERNAL_ID '{}' 'key'", max_id))? {
+            Statement::Queue(QueueCommand::Result { external_id, .. }) => {
+                assert_eq!(external_id, Some(max_id.clone()));
+            }
+            other => panic!("Expected QueueCommand::Result, actual: {:?}", other),
+        }
+
+        for query in [
+            format!("QUEUE ADD EXTERNAL_ID '{}' 'key' 'value'", too_long_id),
+            format!(
+                "QUEUE ADD_AND_RETRIEVE EXTERNAL_ID '{}' 'key' 'value' 1",
+                too_long_id
+            ),
+            format!("QUEUE RESULT EXTERNAL_ID '{}' 'key'", too_long_id),
+        ] {
+            let res = parse_stmt(&query);
+            assert!(res.is_err(), "expected parse error for: {}", query);
+
+            let msg = res.unwrap_err().to_string();
+            assert!(
+                msg.contains("external_id exceeds maximum allowed length"),
+                "unexpected error for {}: {}",
+                query,
+                msg
+            );
+        }
+
+        // Values coming from parameters are validated too
+        {
+            let mut parser = CubeStoreParser::new(
+                "QUEUE ADD EXTERNAL_ID ? 'key' 'value'",
+                Some(vec![QueryParameter::StringValue(too_long_id)]),
+            )?;
+
+            let res = parser.parse_statement();
+            assert!(res.is_err(), "expected parse error, got: {:?}", res);
+
+            let msg = res.unwrap_err().to_string();
+            assert!(
+                msg.contains("external_id exceeds maximum allowed length"),
+                "unexpected error: {}",
+                msg
+            );
+        }
+
+        Ok(())
+    }
+
+    #[test]
     fn parse_queue_add_duplicate_option_error() -> Result<(), CubeError> {
         let res = parse_stmt("QUEUE ADD PRIORITY 1 PRIORITY 2 'key' 'value'");
         assert!(res.is_err());
@@ -1210,6 +1463,13 @@ mod tests {
             .unwrap_err()
             .to_string()
             .contains("Duplicate option: EXCLUSIVE"));
+
+        let res = parse_stmt("QUEUE ADD_AND_RETRIEVE ORPHANED 1 ORPHANED 2 'key' 'value' 1");
+        assert!(res.is_err());
+        assert!(res
+            .unwrap_err()
+            .to_string()
+            .contains("Duplicate option: ORPHANED"));
 
         Ok(())
     }
@@ -1265,5 +1525,55 @@ mod tests {
         }
 
         Ok(())
+    }
+
+    /// Nesting a generated query easily reaches, and well past `sqlparser`'s own default of 50.
+    fn nested_expression_query(levels: usize) -> String {
+        let mut expr = String::from("sum(amount)");
+        for _ in 0..levels {
+            expr = format!("({} + 1)", expr);
+        }
+        format!("SELECT category, {} FROM s.t GROUP BY 1", expr)
+    }
+
+    /// Recursive descent means the budget is only usable on a stack that fits it, so parse on
+    /// the size `cubestore-main` gives its threads rather than whatever the harness provides.
+    fn parse_on_a_main_sized_stack(query: String) -> Result<(), CubeError> {
+        std::thread::Builder::new()
+            .stack_size(8 * 1024 * 1024)
+            .spawn(move || parse_stmt(&query).map(|_| ()))
+            .unwrap()
+            .join()
+            .expect("parsing must not exhaust the stack")
+    }
+
+    /// A nesting depth `sqlparser`'s own default of 50 rejects outright.
+    #[test]
+    fn parse_deeply_nested_expression() {
+        parse_on_a_main_sized_stack(nested_expression_query(100)).unwrap();
+    }
+
+    /// Past the budget the message has to say so: depth is the one thing the caller can act on.
+    #[test]
+    fn parse_over_recursion_limit_names_nesting() {
+        let err = parse_on_a_main_sized_stack(nested_expression_query(200))
+            .expect_err("200 levels is past any budget this node accepts");
+
+        let message = err.to_string();
+        assert!(
+            message.contains("nested too deeply"),
+            "message must name nesting as the cause, got: {}",
+            message
+        );
+        assert!(
+            message.contains("CUBESTORE_SQL_PARSER_RECURSION_LIMIT"),
+            "message must name the knob that raises the budget, got: {}",
+            message
+        );
+        assert_eq!(
+            err.cause,
+            crate::CubeErrorCauseType::User,
+            "a query the user has to flatten is not an internal error"
+        );
     }
 }

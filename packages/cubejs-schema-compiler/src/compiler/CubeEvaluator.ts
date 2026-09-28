@@ -4,6 +4,7 @@ import R from 'ramda';
 import {
   AccessPolicyDefinition,
   CubeDefinitionExtended,
+  CubeRefreshKey,
   CubeSymbols,
   Folder,
   FolderInclude,
@@ -160,6 +161,7 @@ export type PreAggregationInfo = {
   preAggregationName: string,
   preAggregation: any,
   cube: string,
+  dataSource: string,
   references: PreAggregationReferences,
   refreshKey: unknown,
   indexesReferences: unknown,
@@ -198,6 +200,7 @@ export type EvaluatedCube = {
   isView?: boolean;
   includedMembers?: ViewIncludedMember[];
   defaultFilters?: ViewDefaultValueFilter[];
+  refreshKey?: CubeRefreshKey;
 };
 
 export class CubeEvaluator extends CubeSymbols {
@@ -299,6 +302,12 @@ export class CubeEvaluator extends CubeSymbols {
       return `${cube.name}.${match.name}`;
     };
 
+    // A view extending another one inherits its `default_filters` entries by
+    // reference, so the resolved references have to go into a copy owned by this
+    // view. Written in place they would resolve to whichever view is prepared
+    // last, pointing the other views' filters at members they do not include.
+    cube.defaultFilters = (cube.defaultFilters as ViewDefaultValueFilter[]).map(f => ({ ...f }));
+
     for (const filter of cube.defaultFilters as ViewDefaultValueFilter[]) {
       const rawMember = this.evaluateReferences(cube.name, filter.member);
       const resolved = resolveViewMember('member', rawMember);
@@ -328,6 +337,7 @@ export class CubeEvaluator extends CubeSymbols {
           { originalSorting: true }
         );
         const resolvedUnless: string[] = [];
+
         for (const ref of rawUnless) {
           const r = resolveViewMember('unless', ref);
           if (r !== null) {
@@ -641,24 +651,33 @@ export class CubeEvaluator extends CubeSymbols {
               : {}),
           }));
         }
+        // `filter` and `grain` are nested objects, and a cube extending another
+        // one inherits them by reference, so the resolved references have to go
+        // into a copy owned by this cube. Written in place they would resolve to
+        // whichever cube is prepared last, pointing every member of the other
+        // cubes at that cube's dimensions.
         if (member.filter) {
-          if (typeof member.filter.exclude === 'function') {
-            member.filter.excludeReferences = this.evaluateReferences(cubeName, member.filter.exclude);
+          const filter = { ...member.filter };
+          if (typeof filter.exclude === 'function') {
+            filter.excludeReferences = this.evaluateReferences(cubeName, filter.exclude);
           }
-          if (typeof member.filter.keepOnly === 'function') {
-            member.filter.keepOnlyReferences = this.evaluateReferences(cubeName, member.filter.keepOnly);
+          if (typeof filter.keepOnly === 'function') {
+            filter.keepOnlyReferences = this.evaluateReferences(cubeName, filter.keepOnly);
           }
+          member.filter = filter;
         }
         if (member.grain) {
-          if (typeof member.grain.exclude === 'function') {
-            member.grain.excludeReferences = this.evaluateReferences(cubeName, member.grain.exclude);
+          const grain = { ...member.grain };
+          if (typeof grain.exclude === 'function') {
+            grain.excludeReferences = this.evaluateReferences(cubeName, grain.exclude);
           }
-          if (typeof member.grain.keepOnly === 'function') {
-            member.grain.keepOnlyReferences = this.evaluateReferences(cubeName, member.grain.keepOnly);
+          if (typeof grain.keepOnly === 'function') {
+            grain.keepOnlyReferences = this.evaluateReferences(cubeName, grain.keepOnly);
           }
-          if (typeof member.grain.include === 'function') {
-            member.grain.includeReferences = this.evaluateReferences(cubeName, member.grain.include);
+          if (typeof grain.include === 'function') {
+            grain.includeReferences = this.evaluateReferences(cubeName, grain.include);
           }
+          member.grain = grain;
         }
       }
     }
@@ -711,7 +730,7 @@ export class CubeEvaluator extends CubeSymbols {
   protected preparePreAggregations(cube: any, errorReporter: ErrorReporter) {
     if (cube.preAggregations) {
       // eslint-disable-next-line no-restricted-syntax
-      for (const preAggregation of Object.values(cube.preAggregations) as any) {
+      for (const [preAggregationName, preAggregation] of Object.entries(cube.preAggregations) as any) {
         // preAggregation is actually (PreAggregationDefinitionRollup | PreAggregationDefinitionOriginalSql)
         if (preAggregation.timeDimension) {
           preAggregation.timeDimensionReference = preAggregation.timeDimension;
@@ -767,10 +786,17 @@ export class CubeEvaluator extends CubeSymbols {
           delete preAggregation.buildRangeEnd;
         }
 
+        // `outputColumnTypes` names are resolved against this cube, and a cube
+        // extending another one inherits the pre-aggregation by reference, so
+        // both the entry and its columns have to be copies owned by this cube.
         if (preAggregation.outputColumnTypes) {
-          preAggregation.outputColumnTypes.forEach(column => {
-            column.name = this.evaluateReferences(cube.name, column.member, { originalSorting: true });
-          });
+          cube.preAggregations[preAggregationName] = {
+            ...preAggregation,
+            outputColumnTypes: preAggregation.outputColumnTypes.map(column => ({
+              ...column,
+              name: this.evaluateReferences(cube.name, column.member, { originalSorting: true }),
+            })),
+          };
         }
       }
     }
@@ -941,6 +967,7 @@ export class CubeEvaluator extends CubeSymbols {
               preAggregationName,
               preAggregation: preAggregations[preAggregationName],
               cube,
+              dataSource: this.evaluatedCubes[cube].dataSource || 'default',
               references: this.evaluatePreAggregationReferences(cube, preAggregations[preAggregationName]),
               refreshKey,
               indexesReferences: indexes && Object.keys(indexes).reduce((obj, indexName) => {

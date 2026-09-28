@@ -5,7 +5,7 @@ pub(crate) fn format_python_error(py_err: PyErr) -> String {
     let err = format!("Python error: {}", py_err);
 
     let bt = Python::with_gil(move |py| -> PyResult<Option<String>> {
-        if let Some(trace_back) = py_err.traceback(py) {
+        if let Some(trace_back) = py_err.traceback_bound(py) {
             Ok(Some(trace_back.format()?))
         } else {
             Ok(None)

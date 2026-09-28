@@ -43,6 +43,11 @@ impl MeasureMatcher {
                     self.matched_measures.insert(measure.full_name());
                     return Ok(true);
                 }
+                // A reference not stored under its own name, such as a view
+                // member, is the member it names, multi-stage or not.
+                if let Some(target) = measure.reference_member() {
+                    return self.try_match(&target);
+                }
                 // Multi-stage measures carry their own aggregate semantics
                 // (time_shift, reduce_by, add_group_by, rolling window) that
                 // recursing into base dependencies silently discards. If the
@@ -193,6 +198,24 @@ mod tests {
         assert!(!additive_matcher
             .try_match(&ctx.create_measure("orders.multi_level_measure").unwrap())
             .unwrap());
+    }
+
+    #[test]
+    fn test_reference_stored_under_its_own_name() {
+        let ctx = create_test_context();
+        let pre_agg = compile_pre_agg(&ctx, "alias_only_rollup");
+        let alias = ctx.create_measure("orders.total_amount_alias").unwrap();
+        assert!(alias.as_measure().unwrap().is_reference());
+
+        let mut matcher = MeasureMatcher::new(&pre_agg, false);
+        assert!(matcher.try_match(&alias).unwrap());
+        assert!(matcher
+            .matched_measures()
+            .contains("orders.total_amount_alias"));
+
+        // Rolled up, the alias resolves to a measure the rollup does not store.
+        let mut additive_matcher = MeasureMatcher::new(&pre_agg, true);
+        assert!(!additive_matcher.try_match(&alias).unwrap());
     }
 
     #[test]

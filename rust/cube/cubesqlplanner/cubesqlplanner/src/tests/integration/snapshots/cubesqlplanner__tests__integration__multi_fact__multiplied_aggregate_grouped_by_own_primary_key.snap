@@ -1,0 +1,12 @@
+---
+source: cubesqlplanner/cubesqlplanner/src/tests/integration/multi_fact.rs
+expression: result
+---
+customers__id | orders__status | customers__total_lifetime_value | orders__count
+--------------+----------------+---------------------------------+--------------
+1             | completed      | 1000.00                         | 2            
+1             | pending        | 1000.00                         | 2            
+2             | completed      | 2000.00                         | 2            
+2             | pending        | 2000.00                         | 1            
+3             | NULL           | 500.00                          | 0            
+4             | completed      | 1500.00                         | 1

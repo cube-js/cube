@@ -1,0 +1,9 @@
+---
+source: cubesqlplanner/cubesqlplanner/src/tests/integration/calculated_multi_fact.rs
+expression: result
+---
+payment_meta__value | payments__total_amount | payments__gold_amount
+--------------------+------------------------+----------------------
+A                   | 600.00                 | 300.00               
+B                   | 400.00                 | NULL                 
+C                   | 500.00                 | NULL

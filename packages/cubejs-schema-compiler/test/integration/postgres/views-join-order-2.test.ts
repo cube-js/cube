@@ -158,7 +158,6 @@ cube('D', {
     segments: [],
     filters: [],
     total: true,
-    renewQuery: false,
     limit: 1
   }, [{
     view___a_id: 1,

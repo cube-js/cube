@@ -1,0 +1,24 @@
+{
+  "tableName": "bigecommerce_pinot",
+  "tableType": "OFFLINE",
+  "segmentsConfig": {
+    "schemaName": "bigecommerce_pinot",
+    "replication": "1",
+    "timeColumnName": "order_date"
+  },
+  "tenants": {
+    "broker": "DefaultTenant",
+    "server": "DefaultTenant"
+  },
+  "tableIndexConfig": {
+    "loadMode": "MMAP",
+    "nullHandlingEnabled": true
+  },
+  "metadata": {},
+  "ingestionConfig": {
+    "batchIngestionConfig": {
+      "segmentIngestionType": "REFRESH",
+      "segmentIngestionFrequency": "DAILY"
+    }
+  }
+}

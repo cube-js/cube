@@ -35,13 +35,12 @@ export function useFilteredMembers(
   const filterMemberFn = useEvent(
     <T extends TCubeMeasure | TCubeDimension | TCubeSegment | TCubeFolder | TCubeHierarchy>(
       items: T[]
-    ): T[] => {
-      return items.filter((item: T) => {
-        const itemId = getMemberSearchName(item, memberViewType);
+    ): T[] => items.filter((item: T) => {
+      const itemId = getMemberSearchName(item, memberViewType);
 
-        return itemId && rawFilterFn(itemId, filterString);
-      });
-    }
+      return itemId && rawFilterFn(itemId, filterString);
+    })
+    
   );
 
   if (!filterString) {
@@ -92,11 +91,10 @@ export function useFilteredMembers(
 
     if (
       folder.members.find(
-        (memberName) =>
-          filteredDimensionNames.includes(memberName) ||
-          filteredMeasuresNames.includes(memberName) ||
-          filteredSegmentNames.includes(memberName) ||
-          filteredHierarchyNames.includes(memberName)
+        (memberName) => filteredDimensionNames.includes(memberName)
+          || filteredMeasuresNames.includes(memberName)
+          || filteredSegmentNames.includes(memberName)
+          || filteredHierarchyNames.includes(memberName)
       )
     ) {
       filteredFolders.push(folder);

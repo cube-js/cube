@@ -50,6 +50,51 @@ async fn test_ends_with() -> Result<(), CubeError> {
 }
 
 #[tokio::test]
+async fn test_date() -> Result<(), CubeError> {
+    assert_eq!(
+        execute_query(
+            "select \
+                    DATE('2019-01-15 10:30:35.5') as r1,
+                    DATE('2019-01-15') as r2,
+                    DATE(CAST('2019-01-15 10:30:35' AS TIMESTAMP)) as r3;
+                "
+            .to_string(),
+            DatabaseProtocol::PostgreSQL
+        )
+        .await?,
+        "+------------+------------+------------+\n\
+            | r1         | r2         | r3         |\n\
+            +------------+------------+------------+\n\
+            | 2019-01-15 | 2019-01-15 | 2019-01-15 |\n\
+            +------------+------------+------------+"
+    );
+
+    Ok(())
+}
+
+#[tokio::test]
+async fn test_to_date() -> Result<(), CubeError> {
+    assert_eq!(
+        execute_query(
+            "select \
+                    TO_DATE('2020-02-20', 'YYYY-MM-DD') as r1,
+                    TO_DATE('2020-02-20', 'yyyy-MM-dd') as r2;
+                "
+            .to_string(),
+            DatabaseProtocol::PostgreSQL
+        )
+        .await?,
+        "+------------+------------+\n\
+            | r1         | r2         |\n\
+            +------------+------------+\n\
+            | 2020-02-20 | 2020-02-20 |\n\
+            +------------+------------+"
+    );
+
+    Ok(())
+}
+
+#[tokio::test]
 async fn test_locate() -> Result<(), CubeError> {
     assert_eq!(
         execute_query(
@@ -1351,6 +1396,64 @@ async fn test_pg_tablespace_location() -> Result<(), CubeError> {
             DatabaseProtocol::PostgreSQL
         )
         .await?
+    );
+
+    Ok(())
+}
+
+#[tokio::test]
+async fn test_string_agg() -> Result<(), CubeError> {
+    init_testing_logger();
+
+    assert_eq!(
+        execute_query(
+            "SELECT
+                STRING_AGG(x, ', ') AS r1,
+                STRING_AGG(DISTINCT x, ', ') AS r2,
+                STRING_AGG(nothing, ', ') AS r3
+            FROM (
+                SELECT x, NULLIF(x, x) AS nothing
+                FROM (SELECT UNNEST(ARRAY['b', 'a', 'b', 'c']) AS x) t
+            ) t"
+            .to_string(),
+            DatabaseProtocol::PostgreSQL
+        )
+        .await?,
+        "+------------+---------+------+\n\
+            | r1         | r2      | r3   |\n\
+            +------------+---------+------+\n\
+            | b, a, b, c | a, b, c | NULL |\n\
+            +------------+---------+------+"
+    );
+
+    Ok(())
+}
+
+#[tokio::test]
+async fn test_string_agg_group_by() -> Result<(), CubeError> {
+    init_testing_logger();
+
+    // GROUP BY goes through the partial/final aggregate path, exercising
+    // per-group state merges
+    assert_eq!(
+        execute_query(
+            "SELECT k, STRING_AGG(DISTINCT x, ', ') AS r
+            FROM (
+                SELECT UNNEST(ARRAY[1, 1, 1, 2, 2]) AS k,
+                       UNNEST(ARRAY['b', 'a', 'b', 'c', 'a']) AS x
+            ) t
+            GROUP BY k
+            ORDER BY k"
+                .to_string(),
+            DatabaseProtocol::PostgreSQL
+        )
+        .await?,
+        "+---+------+\n\
+            | k | r    |\n\
+            +---+------+\n\
+            | 1 | a, b |\n\
+            | 2 | a, c |\n\
+            +---+------+"
     );
 
     Ok(())

@@ -194,7 +194,7 @@ impl CubeTableSymbolFactory {
             is_table_sql,
         } = self;
         let sql = if let Some(sql) = sql {
-            Some(compiler.compile_sql_call(&cube_name, sql)?)
+            Some(compiler.compile_cube_sql_call(&cube_name, sql)?)
         } else {
             None
         };

@@ -43,19 +43,19 @@ cubes:
         type: sum
 
     access_policy:
-      - role: "*"
+      - group: "*"
         member_level:
           includes: []
         member_masking:
           includes: "*"
 
-      - role: "masking_full_access"
+      - group: "masking_full_access"
         member_level:
           includes: "*"
         row_level:
           allow_all: true
 
-      - role: "masking_partial"
+      - group: "masking_partial"
         member_level:
           includes:
             - id
@@ -102,7 +102,7 @@ cubes:
         type: sum
 
     access_policy:
-      - role: "*"
+      - group: "*"
         member_level:
           includes: []
 
@@ -126,7 +126,7 @@ cubes:
         type: count
 
     access_policy:
-      - role: "*"
+      - group: "*"
         member_level:
           includes: []
         member_masking:
@@ -205,7 +205,7 @@ cubes:
         type: count
 
     access_policy:
-      - role: "*"
+      - group: "*"
         member_level:
           includes:
             - id
@@ -231,7 +231,7 @@ views:
           - count_d
           - total_quantity
     access_policy:
-      - role: "*"
+      - group: "*"
         member_level:
           includes: "*"
         row_level:
@@ -249,14 +249,14 @@ views:
           - count_d
           - total_quantity
     access_policy:
-      - role: "*"
+      - group: "*"
         member_level:
           includes: []
         member_masking:
           includes: "*"
         row_level:
           allow_all: true
-      - role: "masking_full_access"
+      - group: "masking_full_access"
         member_level:
           includes: "*"
         row_level:
@@ -274,7 +274,7 @@ views:
           - count_d
           - total_quantity
     access_policy:
-      - role: "*"
+      - group: "*"
         member_level:
           includes:
             - public_dim
@@ -304,7 +304,7 @@ views:
           - count
 
     access_policy:
-      - role: "*"
+      - group: "*"
         member_level:
           includes:
             - view_mask_base_id
@@ -330,7 +330,7 @@ views:
           - count
           - total_quantity
     access_policy:
-      - role: "*"
+      - group: "*"
         member_level:
           includes:
             - public_dim
@@ -339,7 +339,7 @@ views:
           includes: "*"
         row_level:
           allow_all: true
-      - role: "masking_full_access"
+      - group: "masking_full_access"
         member_level:
           includes: "*"
         row_level:

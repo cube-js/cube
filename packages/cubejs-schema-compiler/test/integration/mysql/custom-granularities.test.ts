@@ -1,5 +1,15 @@
+import { getEnv } from '@cubejs-backend/shared';
 import { prepareYamlCompiler } from '../../unit/PrepareCompiler';
 import { MySqlDbRunner } from './MySqlDbRunner';
+
+// Tesseract renders rolling-window queries using recursive CTEs, which require
+// MySQL 8.0+. That capability is controlled by mysqlUseGeneratedTimeSeries
+// (CUBEJS_DB_MYSQL_USE_GENERATED_TIME_SERIES), which is disabled for MySQL < 8.0.
+// The legacy planner does not use CTEs and works on all versions, so only skip
+// these cases when running under Tesseract with generated time series disabled.
+const nativeSqlPlanner = getEnv('nativeSqlPlanner');
+const useGeneratedTimeSeries = getEnv('mysqlUseGeneratedTimeSeries', { dataSource: 'default' });
+const itRollingWindow = nativeSqlPlanner && !useGeneratedTimeSeries ? it.skip : it;
 
 describe('Custom Granularities', () => {
   jest.setTimeout(200000);
@@ -387,7 +397,7 @@ describe('Custom Granularities', () => {
     { joinGraph, cubeEvaluator, compiler }
   ));
 
-  it('works with half_year custom granularity w/o dimensions with unbounded rolling window query', async () => dbRunner.runQueryTest(
+  itRollingWindow('works with half_year custom granularity w/o dimensions with unbounded rolling window query', async () => dbRunner.runQueryTest(
     {
       measures: ['orders.rollingCountByUnbounded'],
       timeDimensions: [{
@@ -420,7 +430,7 @@ describe('Custom Granularities', () => {
     { joinGraph, cubeEvaluator, compiler }
   ));
 
-  it('works with half_year custom granularity with dimension with unbounded rolling window query', async () => dbRunner.runQueryTest(
+  itRollingWindow('works with half_year custom granularity with dimension with unbounded rolling window query', async () => dbRunner.runQueryTest(
     {
       measures: ['orders.rollingCountByUnbounded'],
       timeDimensions: [{
@@ -498,7 +508,7 @@ describe('Custom Granularities', () => {
     { joinGraph, cubeEvaluator, compiler }
   ));
 
-  it('works with half_year_by_1st_april custom granularity with dimension with unbounded rolling window query', async () => dbRunner.runQueryTest(
+  itRollingWindow('works with half_year_by_1st_april custom granularity with dimension with unbounded rolling window query', async () => dbRunner.runQueryTest(
     {
       measures: ['orders.rollingCountByUnbounded'],
       timeDimensions: [{
@@ -591,7 +601,7 @@ describe('Custom Granularities', () => {
     { joinGraph, cubeEvaluator, compiler }
   ));
 
-  it('works with half_year custom granularity w/o dimensions with trailing rolling window query', async () => dbRunner.runQueryTest(
+  itRollingWindow('works with half_year custom granularity w/o dimensions with trailing rolling window query', async () => dbRunner.runQueryTest(
     {
       measures: ['orders.rollingCountByTrailing3Months'],
       timeDimensions: [{
@@ -624,7 +634,7 @@ describe('Custom Granularities', () => {
     { joinGraph, cubeEvaluator, compiler }
   ));
 
-  it('works with half_year custom granularity with dimension with trailing rolling window query', async () => dbRunner.runQueryTest(
+  itRollingWindow('works with half_year custom granularity with dimension with trailing rolling window query', async () => dbRunner.runQueryTest(
     {
       measures: ['orders.rollingCountByTrailing3Months'],
       timeDimensions: [{
@@ -702,7 +712,7 @@ describe('Custom Granularities', () => {
     { joinGraph, cubeEvaluator, compiler }
   ));
 
-  it('works with half_year_by_1st_april custom granularity w/o dimensions with trailing rolling window query', async () => dbRunner.runQueryTest(
+  itRollingWindow('works with half_year_by_1st_april custom granularity w/o dimensions with trailing rolling window query', async () => dbRunner.runQueryTest(
     {
       measures: ['orders.rollingCountByTrailing3Months'],
       timeDimensions: [{
@@ -739,7 +749,7 @@ describe('Custom Granularities', () => {
     { joinGraph, cubeEvaluator, compiler }
   ));
 
-  it('works with half_year custom granularity w/o dimensions with leading rolling window query', async () => dbRunner.runQueryTest(
+  itRollingWindow('works with half_year custom granularity w/o dimensions with leading rolling window query', async () => dbRunner.runQueryTest(
     {
       measures: ['orders.rollingCountByLeading4Months'],
       timeDimensions: [{
@@ -772,7 +782,7 @@ describe('Custom Granularities', () => {
     { joinGraph, cubeEvaluator, compiler }
   ));
 
-  it('works with half_year custom granularity with dimension with leading rolling window query', async () => dbRunner.runQueryTest(
+  itRollingWindow('works with half_year custom granularity with dimension with leading rolling window query', async () => dbRunner.runQueryTest(
     {
       measures: ['orders.rollingCountByLeading4Months'],
       timeDimensions: [{
@@ -850,7 +860,7 @@ describe('Custom Granularities', () => {
     { joinGraph, cubeEvaluator, compiler }
   ));
 
-  it('works with half_year_by_1st_april custom granularity w/o dimensions with leading rolling window query', async () => dbRunner.runQueryTest(
+  itRollingWindow('works with half_year_by_1st_april custom granularity w/o dimensions with leading rolling window query', async () => dbRunner.runQueryTest(
     {
       measures: ['orders.rollingCountByLeading4Months'],
       timeDimensions: [{

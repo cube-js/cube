@@ -62,6 +62,9 @@ cubes:
       - name: multi_level_measure
         type: number
         sql: "{amount_per_count} / {max_amount}"
+      - name: total_amount_alias
+        type: number
+        sql: "{total_amount}"
     pre_aggregations:
       - name: main_rollup
         type: rollup
@@ -124,6 +127,14 @@ cubes:
           - status
           - city
 
+      # Stores the alias only, not the measure it references.
+      - name: alias_only_rollup
+        type: rollup
+        measures:
+          - total_amount_alias
+        dimensions:
+          - status
+          - city
       - name: calculated_measure_rollup
         type: rollup
         measures:
@@ -169,4 +180,29 @@ cubes:
         segments:
           - high_priority
         time_dimension: created_at
+        granularity: day
+
+      # Groups by the primary key, so every stored row is a single order —
+      # the only shape a rollup may serve an ungrouped query from.
+      - name: primary_key_rollup
+        type: rollup
+        measures:
+          - total_amount
+        dimensions:
+          - id
+          - status
+          - city
+
+      # Same members as `segment_rollup`, but every reference is written as a
+      # cube-name interpolation — `(CUBE) => `${CUBE}.count``.
+      - name: interpolated_refs_rollup
+        type: rollup
+        measures:
+          - '{CUBE}.count'
+          - '{CUBE}.total_amount'
+        dimensions:
+          - '{CUBE}.status'
+        segments:
+          - '{CUBE}.high_priority'
+        time_dimension: '{CUBE}.created_at'
         granularity: day

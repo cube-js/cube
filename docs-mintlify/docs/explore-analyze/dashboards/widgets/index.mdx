@@ -1,9 +1,9 @@
 ---
 title: Widgets
-description: Building blocks for dashboards — charts, text, controls, and AI summaries that you arrange on the canvas to tell your data story.
+description: Building blocks for dashboards — charts, text, controls, AI summaries, and layout elements that you arrange on the canvas to tell your data story.
 ---
 
-Widgets are the building blocks of a dashboard. Each tile placed on the canvas in the [dashboard builder][ref-workbooks] is a widget — a chart, a block of text, a control that viewers interact with, or an AI-generated summary. Combine them to assemble polished, interactive views of your data.
+Widgets are the building blocks of a dashboard. Each tile placed on the canvas in the [dashboard builder][ref-workbooks] is a widget — a chart, a block of text, a control that viewers interact with, an AI-generated summary, or a layout element such as a spacer, divider, stack, grid, or tabs container. Combine them to assemble polished, interactive views of your data.
 
 ## Widget types
 
@@ -11,9 +11,48 @@ The dashboard builder supports the following widget types:
 
 - [Charts](/docs/explore-analyze/dashboards/widgets/charts) — Visualize reports from your workbook
 - [Text](/docs/explore-analyze/dashboards/widgets/text) — Add titles, descriptions, and rich formatting in Markdown
-- [Controls](/docs/explore-analyze/dashboards/widgets/controls) — Let viewers filter the data or switch the time granularity
+- [Controls](/docs/explore-analyze/dashboards/widgets/controls) — Let viewers filter the data, switch the time granularity, swap which field the charts are built on, or drive several controls at once
 - [AI summary](/docs/explore-analyze/dashboards/widgets/ai-summary) — Generate narrative summaries of dashboard data on demand
+- [Spacer, Divider, Stack, Grid & Tabs](/docs/explore-analyze/dashboards/widgets/layout) — Non-data layout elements for whitespace, section breaks, and grouping widgets
 
-In the dashboard builder, add widgets using the toolbar at the top of the canvas: pick reports from the **Charts** picker to add charts, click **Add Text** or **Add AI Summary**, or add a **Filter** or **Time Granularity** control from the **Add Controls** group.
+## Adding widgets
+
+Add widgets from the toolbar at the top of the dashboard builder, in the order the buttons sit there: pick reports from the **Charts** picker to add charts, then **Add Controls** for **Filter**, **Time Granularity**, **Field Switcher** and **Parent** controls, **Add Containers** for **Tabs**, **Horizontal stack**, **Vertical stack** and **Grid**, and **Add Other Widgets** for **Text**, **Analysis** (the [AI summary](/docs/explore-analyze/dashboards/widgets/ai-summary) widget), **Spacer** and **Divider**.
+
+Each item — a toolbar button, or an option inside the **Add Controls**, **Add Containers** or **Add Other Widgets** menus — can be added in two ways:
+
+- **Click** it to drop the widget into the first open spot on the canvas.
+- **Drag** it from the toolbar onto the canvas to place it exactly where you want. As you drag, a full-size placeholder previews the widget's footprint and the surrounding widgets reflow to open a slot; release to drop it there. Dragging is especially handy on dense dashboards, where clicking would otherwise place the new widget far down the page.
+
+Starting a drag from a menu option closes the menu, so it doesn't cover the canvas while you place the widget.
+
+## Widget size
+
+Widgets are sized in the dashboard's grid cells. Each type is added at its own size on a 12-column dashboard, and has a minimum it can't be dragged below:
+
+| Widget | Added at | Minimum |
+| --- | --- | --- |
+| Chart | 6×8 | 2×3 |
+| Text | 6×6 | 2×3 |
+| AI summary | 6×10 | 2×4 |
+
+A [KPI chart](/docs/explore-analyze/charts/chart-types/kpi) is added smaller, at 3×3, and carries the same minimum as any other chart. A control resizes by width only — its height is fixed by the input it renders — and never narrows below 2 columns. The [layout widgets](/docs/explore-analyze/dashboards/widgets/layout) carry their own sizes, listed on their page.
+
+A minimum only constrains a resize you make in the builder. A dashboard that already stores a widget smaller than its minimum keeps that size — in the builder and on the published dashboard alike — until you resize that widget yourself. The board's edge outranks a minimum too, so a widget with less room than its minimum between it and the right edge is held to the room it has rather than pushed off the board.
+
+## Arranging widgets
+
+Drag any widget to move it, and use the handle in its bottom-right corner to resize it — the surrounding widgets shift to make room.
+
+To work with several widgets at once, select them first:
+
+- **Click** a widget to select it.
+- **Shift-click** to add widgets to, or remove them from, the selection.
+- **Drag a marquee** — press on any empty part of the canvas and drag a rectangle over the widgets you want; every widget it touches is selected.
+
+With a selection in place:
+
+- **Move the group** — drag any selected widget and the whole selection moves together, keeping its relative arrangement.
+- **Delete the group** — press **Delete** or **Backspace** to remove every selected widget at once. If the selection holds a container that still has widgets in it, Cube [asks you to confirm first](/docs/explore-analyze/dashboards/widgets/layout#deleting-a-container).
 
 [ref-workbooks]: /docs/explore-analyze/workbooks

@@ -650,16 +650,13 @@ FROM
     context
         .add_cube_load_mock(
             expected_cube_scan.clone(),
-            crate::compile::tests::simple_load_response(vec![
-                json!({
-                    "KibanaSampleDataEcommerce.notes": "foo",
-                    "Logs.content": "bar",
-                }),
-                json!({
-                    "Logs.content": "quux",
-                    "KibanaSampleDataEcommerce.notes": "baz",
-                }),
-            ]),
+            crate::compile::tests::simple_load_response(
+                vec!["KibanaSampleDataEcommerce.notes", "Logs.content"],
+                vec![
+                    vec![json!("foo"), json!("baz")],
+                    vec![json!("bar"), json!("quux")],
+                ],
+            ),
         )
         .await;
 

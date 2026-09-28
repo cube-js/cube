@@ -1,41 +1,34 @@
 {
   "name": "@cubejs-backend/hive-driver",
-  "description": "Cube.js Hive database driver",
+  "description": "Cube Hive database driver",
   "author": "Cube Dev, Inc.",
-  "version": "1.6.59",
+  "version": "1.7.46",
   "repository": {
     "type": "git",
     "url": "https://github.com/cube-js/cube.git",
     "directory": "packages/cubejs-hive-driver"
   },
   "engines": {
-    "node": "^14.0.0 || ^16.0.0 || >=17.0.0"
+    "node": ">=20.0.0"
   },
   "main": "src/HiveDriver.js",
-  "scripts": {
-    "lint": "eslint src/* --ext .ts",
-    "lint:fix": "eslint --fix src/* --ext .ts"
-  },
   "dependencies": {
-    "@cubejs-backend/base-driver": "1.6.59",
-    "@cubejs-backend/shared": "1.6.59",
+    "@cubejs-backend/base-driver": "1.7.46",
+    "@cubejs-backend/shared": "1.7.46",
     "jshs2": "^0.4.4",
     "sasl-plain": "^0.1.0",
     "saslmechanisms": "^0.1.1",
-    "sqlstring": "^2.3.1",
-    "thrift": "^0.20.0"
+    "sqlstring": "^2.3.3",
+    "thrift": "^0.23.0"
   },
   "license": "Apache-2.0",
   "devDependencies": {
-    "@cubejs-backend/linter": "1.6.59"
+    "@cubejs-backend/linter": "1.7.46"
   },
   "publishConfig": {
     "access": "public"
   },
   "jest": {
     "testEnvironment": "node"
-  },
-  "eslintConfig": {
-    "extends": "../cubejs-linter"
   }
 }

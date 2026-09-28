@@ -1,7 +1,7 @@
 {
   "name": "@cubejs-backend/templates",
-  "version": "1.6.59",
-  "description": "Cube.js Templates helpers",
+  "version": "1.7.46",
+  "description": "Cube Templates helpers",
   "author": "Cube Dev, Inc.",
   "repository": {
     "type": "git",
@@ -12,14 +12,12 @@
   "main": "dist/src/index.js",
   "typings": "dist/src/index.d.ts",
   "engines": {
-    "node": "^14.0.0 || ^16.0.0 || >=17.0.0"
+    "node": ">=20.0.0"
   },
   "scripts": {
     "build": "rm -rf dist && npm run tsc",
     "tsc": "tsc",
-    "watch": "tsc -w",
-    "lint": "eslint src/* --ext .ts",
-    "lint:fix": "eslint --fix src/* --ext .ts"
+    "watch": "tsc -w"
   },
   "files": [
     "dist"
@@ -27,21 +25,18 @@
   "publishConfig": {
     "access": "public"
   },
-  "eslintConfig": {
-    "extends": "../cubejs-linter"
-  },
   "dependencies": {
-    "@cubejs-backend/shared": "1.6.59",
+    "@cubejs-backend/shared": "1.7.46",
     "cross-spawn": "^7.0.3",
-    "decompress": "^4.2.1",
-    "decompress-targz": "^4.1.1",
-    "fs-extra": "^9.1.0",
-    "node-fetch": "^2.6.1",
+    "fs-extra": "^11.1.1",
+    "node-fetch": "^2.7.0",
     "ramda": "^0.27.2",
-    "source-map-support": "^0.5.19"
+    "source-map-support": "^0.5.19",
+    "tar": "^7.5.22"
   },
   "devDependencies": {
-    "@cubejs-backend/linter": "1.6.59",
-    "typescript": "~5.2.2"
+    "@cubejs-backend/linter": "1.7.46",
+    "@types/node": "^22",
+    "typescript": "~6.0.3"
   }
 }

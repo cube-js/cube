@@ -1,0 +1,9 @@
+---
+source: cubesqlplanner/cubesqlplanner/src/tests/integration/calculated_multi_fact.rs
+expression: result
+---
+payment_meta__value | payments__success_rate
+--------------------+-----------------------
+A                   | 66.6666666666666667   
+B                   | 100.0000000000000000  
+C                   | 100.0000000000000000

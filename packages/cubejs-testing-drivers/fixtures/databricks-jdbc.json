@@ -73,7 +73,7 @@
       "CUBEJS_DB_DATABRICKS_TOKEN": "${DRIVERS_TESTS_CUBEJS_DB_DATABRICKS_TOKEN}",
       "CUBEJS_DB_DATABRICKS_URL": "${DRIVERS_TESTS_CUBEJS_DB_DATABRICKS_URL}",
       "CUBEJS_DB_DATABRICKS_ACCEPT_POLICY": "true",
-      "CUBEJS_PRE_AGGREGATIONS_SCHEMA": "drivers_tests_preaggs",
+      "CUBEJS_PRE_AGGREGATIONS_SCHEMA": "${DRIVERS_TESTS_CUBEJS_PRE_AGGREGATIONS_SCHEMA:-drivers_tests_preaggs}",
       "CUBEJS_PG_SQL_PORT": "5656",
       "CUBEJS_SQL_USER": "admin",
       "CUBEJS_SQL_PASSWORD": "admin_password",
@@ -232,11 +232,17 @@
     "---------------------------------------",
     "Requires Tesseract.                    ",
     "---------------------------------------",
+    "    A custom granularity origin on a single-unit interval only reaches the grouping under Tesseract.",
+    "querying custom granularities ECommerce: count by fiscal_year_by_1st_april + no dimension",
+    "querying custom granularities ECommerce: count by fiscal_year_by_15th_april + no dimension",
+    "querying custom granularities ECommerce: count by monthly_from_15th + no dimension",
     "querying BigECommerce: rolling window by 2 day without date range",
     "querying BigECommerce: rolling window by 2 month without date range",
     "querying BigECommerce: rolling window YTD without date range",
     "querying custom granularities ECommerce: count by two_mo_by_feb + no dimension + rollingCountByLeading without date range",
     "querying BigECommerce with Retail Calendar: totalCountRetailYearAgo",
+    "querying BigECommerce with Retail Calendar: prior year and month by week (no pre-aggregation)",
+    "querying BigECommerce with Retail Calendar: prior year and month by week (pre-aggregation in CubeStore)",
     "querying BigECommerce with Retail Calendar: totalCountRetailMonthAgo",
     "querying BigECommerce with Retail Calendar: totalCountRetailWeekAgo",
     "Tesseract: querying BigECommerce with Retail Calendar: totalCountRetailMonthAgo",
@@ -262,7 +268,12 @@
     "SQL API: Nested Rollup",
     "SQL API: Nested Rollup with aliases",
     "SQL API: Nested Rollup over asteriks",
-    "SQL API: Extended nested Rollup over asterisk"
+    "SQL API: Extended nested Rollup over asterisk",
+    "SQL API: Window function over measure (running total)",
+    "---- Time-shifted measure rolled up from a rollup: native planner, Postgres and BigQuery only ----",
+    "querying RetailOrders: named prior month by category for one day (pre-aggregation in CubeStore)",
+    "querying RetailOrders: named prior month by category over two months (pre-aggregation in CubeStore)",
+    "SQL API: named prior month by category for one day"
   ],
   "tesseractSkip": [
     "must download query from the data source via memory",
@@ -294,6 +305,7 @@
     "Tesseract: querying BigECommerce with Retail Calendar: totalCountRetailWeekAgo",
     "Tesseract: SQL API: Timeshift measure from cube",
     "querying BigECommerce: SeveralMultiStageMeasures",
+    "SQL API: Window function over measure (running total)",
 
     "---- Different results comparing to baseQuery version. Need to investigate ----",
     "querying ECommerce: dimensions",
@@ -311,6 +323,13 @@
     "filtering ECommerce: endsWith + dimensions, second",
     "querying BigECommerce: rolling window YTD (month + week)",
     "querying BigECommerce: rolling window YTD (month + week + no gran)",
-    "querying BigECommerce: two multi-stage branches sharing one pre-aggregation"
+    "querying BigECommerce: two multi-stage branches sharing one pre-aggregation",
+    "---- Calendar-shifted measure stored in a rollup: covered on Postgres only for now ----",
+    "querying BigECommerce with Retail Calendar: prior year and month by week (no pre-aggregation)",
+    "querying BigECommerce with Retail Calendar: prior year and month by week (pre-aggregation in CubeStore)",
+    "---- Time-shifted measure rolled up from a rollup: native planner, Postgres and BigQuery only ----",
+    "querying RetailOrders: named prior month by category for one day (pre-aggregation in CubeStore)",
+    "querying RetailOrders: named prior month by category over two months (pre-aggregation in CubeStore)",
+    "SQL API: named prior month by category for one day"
   ]
 }

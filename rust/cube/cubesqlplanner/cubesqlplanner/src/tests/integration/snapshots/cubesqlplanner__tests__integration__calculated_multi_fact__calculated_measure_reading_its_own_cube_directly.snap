@@ -1,0 +1,8 @@
+---
+source: cubesqlplanner/cubesqlplanner/src/tests/integration/calculated_multi_fact.rs
+expression: result
+---
+payments__status | payments__converted_per_max_amount | payment_meta__count
+-----------------+------------------------------------+--------------------
+DECLINED         | 1.00000000000000000000             | 1                  
+SUCCESS          | 2.0000000000000000                 | 5

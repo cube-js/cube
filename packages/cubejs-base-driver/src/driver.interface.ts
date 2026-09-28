@@ -131,6 +131,11 @@ export interface DriverCapabilities extends ExternalDriverCompatibilities {
 
 export type StreamOptions = {
   highWaterMark: number;
+  /**
+   * Cube request identifier, forwarded so drivers can tag the underlying
+   * database job/query for tracing (e.g. BigQuery job labels).
+   */
+  requestId?: string;
 };
 
 export type StreamingSourceOptions = {
@@ -162,10 +167,12 @@ type UnloadQuery = {
 export type UnloadOptions = {
   maxFileSize: number,
   query?: UnloadQuery;
+  requestId?: string;
 };
 
 export type QueryOptions = {
   inlineTables?: InlineTables,
+  requestId?: string,
   [key: string]: any
 };
 
@@ -245,7 +252,7 @@ export interface DriverInterface {
   query<R = unknown>(query: string, params: unknown[], options?: QueryOptions): Promise<R[]>;
   //
   tableColumnTypes: (table: string) => Promise<TableStructure>;
-  queryColumnTypes: (sql: string, params: unknown[]) => Promise<{ name: any; type: string; }[]>;
+  queryColumnTypes: (sql: string, params: unknown[], options?: QueryOptions) => Promise<{ name: any; type: string; }[]>;
   //
   getSchemas: () => Promise<QuerySchemasResult[]>;
   tablesSchema: () => Promise<any>;

@@ -1,4 +1,4 @@
-FROM cubejs/rust-builder:bookworm-llvm-18 AS builder
+FROM cubejs/rust-builder:trixie-llvm-22 AS builder
 
 WORKDIR /build/cubestore
 
@@ -19,22 +19,31 @@ RUN mkdir -p cubestore/src/bin && \
     echo "fn main() {print!(\"Dummy main\");} // dummy file" > cubestore/src/bin/cubestored.rs
 
 ARG WITH_AVX2=1
+ARG TARGETARCH
+# jemalloc bakes the page size in at build time. The arm64 builders use 4 KiB
+# pages, but arm64 hosts can use up to 64 KiB (Raspberry Pi, Ubuntu
+# arm64-largemem, Asahi), so build for the largest one there.
+# TODO: drop once we are on jemalloc 5.3.1+, where this is the default.
 RUN [ "$WITH_AVX2" -eq "1" ] && export RUSTFLAGS="-C target-feature=+avx2"; \
+    [ "$TARGETARCH" = "arm64" ] && export JEMALLOC_SYS_WITH_LG_PAGE="16"; \
     cargo build --release -p cubestore
 
 # Cube Store get version from his own package
 COPY cubestore/package.json package.json
 COPY cubestore/cubestore cubestore
+# TODO: drop the JEMALLOC_SYS_WITH_LG_PAGE export once we are on jemalloc
+# 5.3.1+, where this is the default.
 RUN [ "$WITH_AVX2" -eq "1" ] && export RUSTFLAGS="-C target-feature=+avx2"; \
+    [ "$TARGETARCH" = "arm64" ] && export JEMALLOC_SYS_WITH_LG_PAGE="16"; \
     cargo build --release -p cubestore
 
-FROM debian:bookworm-slim
+FROM debian:trixie-slim
 
 WORKDIR /cube
 
 RUN set -ex; \
     apt-get update; \
-    apt-get install -y libssl3 ca-certificates
+    apt-get install -y libssl3t64 ca-certificates
 
 COPY --from=builder /build/cubestore/target/release/cubestored .
 

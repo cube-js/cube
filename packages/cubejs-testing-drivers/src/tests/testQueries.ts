@@ -9,6 +9,7 @@ import { Environment } from '../types/Environment';
 import {
   getFixtures,
   getCreateQueries,
+  getRefreshQueries,
   getDriver,
   runEnvironment,
   buildPreaggs,
@@ -113,7 +114,9 @@ export function testQueries(type: string, { includeIncrementalSchemaSuite, exten
 
     const apiToken = sign({}, 'mysupersecret');
 
-    const suffix = randomBytes(8).toString('hex');
+    // Pinot uses a fixed suffix so the model lines up with the committed
+    // `<table>_pinot` resources; every other driver isolates runs with random hex.
+    const suffix = type === 'pinot' ? 'pinot' : randomBytes(8).toString('hex');
     const tables = Object
       .keys(fixtures.tables)
       .map((key: string) => `${fixtures.tables[key]}_${suffix}`);
@@ -127,36 +130,53 @@ export function testQueries(type: string, { includeIncrementalSchemaSuite, exten
       process.env.CUBEJS_CUBESTORE_PASS = 'root';
       process.env.CUBEJS_CACHE_AND_QUEUE_DRIVER = 'cubestore'; // memory
       if (env.data) {
-        process.env.CUBEJS_DB_HOST = '127.0.0.1';
+        process.env.CUBEJS_DB_HOST = type === 'pinot' ? 'http://127.0.0.1' : '127.0.0.1';
         process.env.CUBEJS_DB_PORT = `${env.data.port}`;
       }
       client = cubejs(apiToken, {
         apiUrl: `http://127.0.0.1:${env.cube.port}/cubejs-api/v1`,
       });
       driver = (await getDriver(type)).source;
-      queries = getCreateQueries(type, suffix);
-      console.log(`Creating ${queries.length} fixture tables`);
-      try {
-        for (const q of queries) {
-          await driver.createTableRaw(q);
-          if (type.includes('redshift')) {
-            await delay(10 * OP_DELAY);
+
+      // Pinot has no SQL DDL — runEnvironment already ingested the fixture tables
+      // via the controller. Every other driver seeds via CREATE TABLE here.
+      if (type !== 'pinot') {
+        queries = getCreateQueries(type, suffix);
+        console.log(`Creating ${queries.length} fixture tables`);
+
+        try {
+          for (const q of queries) {
+            await driver.createTableRaw(q);
+            if (type.includes('redshift')) {
+              await delay(10 * OP_DELAY);
+            }
           }
+          // CrateDB is eventually consistent: make the freshly loaded rows visible
+          // before any queries run against the fixture tables.
+          if (type === 'crate') {
+            for (const q of getRefreshQueries(type, suffix)) {
+              await driver.query(q);
+            }
+          }
+          console.log(`Creating ${queries.length} fixture tables completed`);
+        } catch (e: any) {
+          console.log('Error creating fixtures', e.stack);
+          throw e;
         }
-        console.log(`Creating ${queries.length} fixture tables completed`);
-      } catch (e: any) {
-        console.log('Error creating fixtures', e.stack);
-        throw e;
       }
     });
 
     afterAll(async () => {
       try {
-        console.log(`Dropping ${tables.length} fixture tables`);
-        for (const t of tables) {
-          await driver.dropTable(t);
+        // Pinot has no dropTable; the cluster is torn down with the environment.
+        if (type !== 'pinot') {
+          console.log(`Dropping ${tables.length} fixture tables`);
+
+          for (const t of tables) {
+            await driver.dropTable(t);
+          }
+          console.log(`Dropping ${tables.length} fixture tables completed`);
         }
-        console.log(`Dropping ${tables.length} fixture tables completed`);
       } finally {
         await driver.release();
         await env.stop();
@@ -227,17 +247,47 @@ export function testQueries(type: string, { includeIncrementalSchemaSuite, exten
         await delay(OP_DELAY);
       }
 
-      // Exercise pre-aggregation build with a custom granularity for every
-      // driver. The granularity name `build_only_half_year` is unique to this
-      // rollup — no query test references it, so the rollup cannot match any
-      // test query and only the build path is exercised.
-      await buildPreaggs(env.cube.port, apiToken, {
-        timezones: ['UTC'],
-        preAggregations: ['ECommerce.TBuildOnlyHalfYearExternal'],
-        contexts: [{ securityContext: { tenant: 't1' } }],
-      });
+      // Stores calendar-shifted measures, whose build runs the shifted joins.
+      // Only the native planner serves a multi-stage measure from a rollup, and
+      // only the fixtures that declare this rollup build it.
+      if (isTesseractEnv && fixtures.preAggregations?.BigECommerce?.some((pa) => pa.name === 'RetailPriorPeriodsByWeek')) {
+        await buildPreaggs(env.cube.port, apiToken, {
+          timezones: ['UTC'],
+          preAggregations: ['BigECommerce.RetailPriorPeriodsByWeekExternal'],
+          contexts: [{ securityContext: { tenant: 't1' } }],
+        });
 
-      await delay(OP_DELAY);
+        await delay(OP_DELAY);
+      }
+
+      // Stores a named calendar shift by product and day for queries that
+      // roll it up to the category.
+      if (isTesseractEnv && fixtures.preAggregations?.BigECommerce?.some((pa) => pa.name === 'RetailPriorMonthByProductDay')) {
+        await buildPreaggs(env.cube.port, apiToken, {
+          timezones: ['UTC'],
+          preAggregations: ['BigECommerce.RetailPriorMonthByProductDayExternal'],
+          contexts: [{ securityContext: { tenant: 't1' } }],
+        });
+
+        await delay(OP_DELAY);
+      }
+
+      // Exercise pre-aggregation build with a custom granularity. The
+      // granularity name `build_only_half_year` is unique to this rollup — no
+      // query test references it, so the rollup cannot match any test query and
+      // only the build path is exercised.
+      // QuestDB is skipped: its dialect has no date_bin implementation, so
+      // custom time-dimension granularities cannot be materialized (the
+      // corresponding query cases are skipped in fixtures/questdb.json too).
+      if (type !== 'questdb') {
+        await buildPreaggs(env.cube.port, apiToken, {
+          timezones: ['UTC'],
+          preAggregations: ['ECommerce.TBuildOnlyHalfYearExternal'],
+          contexts: [{ securityContext: { tenant: 't1' } }],
+        });
+
+        await delay(OP_DELAY);
+      }
     });
 
     execute('must not fetch a hidden cube', async () => {
@@ -444,6 +494,206 @@ export function testQueries(type: string, { includeIncrementalSchemaSuite, exten
         ],
       });
       expect(response.rawData()).toMatchSnapshot();
+    });
+
+    // A `%` or `_` typed by a user is a literal, not a LIKE wildcard. Each
+    // dialect gets there differently - some rely on backslash being the default
+    // escape character, others have to emit an explicit ESCAPE clause - so this
+    // only means anything when it runs against the real engine.
+    //
+    // The pairs below run the same filter twice: once against a cube with no
+    // pre-aggregations, so it reaches the database, and once through a query the
+    // ECommerce `SA` rollup serves, so the filter SQL is generated for the
+    // rollup store instead. Those are two different escaping paths, and the
+    // rollup one is where this last broke in production - a filter that was
+    // correct against the source database changed meaning once a rollup started
+    // answering it.
+    //
+    // These assert exact result sets rather than snapshots deliberately: the
+    // wrong answer here is a *superset*, and a snapshot would have recorded that
+    // superset as expected without anyone noticing.
+    //
+    // Each case also pins which engine answered. Without that the pairing is
+    // only an intention: `contains '%'` returns nothing on both paths, so if the
+    // rollup ever stopped matching, the pre-aggregated cases would keep passing
+    // as duplicates of the ones above and the rollup-store escaping path would
+    // quietly lose its only coverage here.
+    //
+    // `external` is the field that carries this - it is true only when a
+    // pre-aggregation in the rollup store served the query. (`usedPreAggregations`
+    // names the pre-aggregations behind a result, but says nothing about which
+    // engine answered: an internal rollup, which never reaches the rollup store,
+    // shows up there too.)
+    function servedByRollupStore(response: any): boolean {
+      // `loadResponse` is not part of the public ResultSet type.
+      const [result] = response.loadResponse?.results ?? [];
+      return Boolean(result?.external);
+    }
+
+    execute('filtering Products: contains a literal percent sign (no pre-aggregation)', async () => {
+      const response = await client.load({
+        dimensions: [
+          'Products.productName'
+        ],
+        filters: [
+          {
+            member: 'Products.productName',
+            operator: 'contains',
+            values: ['%'],
+          },
+        ],
+      });
+      // No product name contains a percent sign. An unescaped `%` would make the
+      // pattern `%%%` and match every row.
+      expect(response.rawData()).toEqual([]);
+      expect(servedByRollupStore(response)).toBe(false);
+    });
+
+    execute('filtering Products: contains a literal underscore (no pre-aggregation)', async () => {
+      const response = await client.load({
+        dimensions: [
+          'Products.productName'
+        ],
+        filters: [
+          {
+            member: 'Products.productName',
+            operator: 'contains',
+            values: ['_'],
+          },
+        ],
+      });
+      // An unescaped `_` would make the pattern `%_%` and match every non-empty
+      // name; exactly one product has a literal underscore.
+      expect(
+        response.rawData().map((row: any) => row['Products.productName'])
+      ).toEqual(['Logitech di_Novo Edge Keyboard']);
+      expect(servedByRollupStore(response)).toBe(false);
+    });
+
+    execute('filtering Products: notContains a literal percent sign (no pre-aggregation)', async () => {
+      const [filtered, all] = await Promise.all([
+        client.load({
+          dimensions: ['Products.productName'],
+          filters: [
+            {
+              member: 'Products.productName',
+              operator: 'notContains',
+              values: ['%'],
+            },
+          ],
+        }),
+        client.load({ dimensions: ['Products.productName'] }),
+      ]);
+      // The mirror image: an unescaped `%` would exclude every row instead of
+      // none. Compared against the unfiltered query so this does not depend on
+      // the row count of the fixture.
+      expect(filtered.rawData().length).toEqual(all.rawData().length);
+      expect(filtered.rawData().length).toBeGreaterThan(0);
+      expect(servedByRollupStore(filtered)).toBe(false);
+    });
+
+    execute('filtering Products: startsWith a literal percent sign (no pre-aggregation)', async () => {
+      const response = await client.load({
+        dimensions: [
+          'Products.productName'
+        ],
+        filters: [
+          {
+            member: 'Products.productName',
+            operator: 'startsWith',
+            values: ['%'],
+          },
+        ],
+      });
+      // `startsWith` only appends the trailing wildcard, so an unescaped `%`
+      // leaves the pattern `%%` and matches every row rather than none.
+      expect(response.rawData()).toEqual([]);
+      expect(servedByRollupStore(response)).toBe(false);
+    });
+
+    execute('filtering Products: endsWith a literal percent sign (no pre-aggregation)', async () => {
+      const response = await client.load({
+        dimensions: [
+          'Products.productName'
+        ],
+        filters: [
+          {
+            member: 'Products.productName',
+            operator: 'endsWith',
+            values: ['%'],
+          },
+        ],
+      });
+      // The leading-wildcard mirror of the case above.
+      expect(response.rawData()).toEqual([]);
+      expect(servedByRollupStore(response)).toBe(false);
+    });
+
+    execute('filtering ECommerce: notContains a literal percent sign (pre-aggregated)', async () => {
+      const [filtered, all] = await Promise.all([
+        client.load({
+          measures: ['ECommerce.totalQuantity'],
+          dimensions: ['ECommerce.productName'],
+          filters: [
+            {
+              member: 'ECommerce.productName',
+              operator: 'notContains',
+              values: ['%'],
+            },
+          ],
+        }),
+        client.load({
+          measures: ['ECommerce.totalQuantity'],
+          dimensions: ['ECommerce.productName'],
+        }),
+      ]);
+      // Same mirror image as the Products case, but rendered by the Cube Store
+      // dialect because the rollup answers it.
+      expect(filtered.rawData().length).toEqual(all.rawData().length);
+      expect(filtered.rawData().length).toBeGreaterThan(0);
+      expect(servedByRollupStore(filtered)).toBe(true);
+    });
+
+    execute('filtering ECommerce: contains a literal percent sign (pre-aggregated)', async () => {
+      const response = await client.load({
+        measures: [
+          'ECommerce.totalQuantity'
+        ],
+        dimensions: [
+          'ECommerce.productName'
+        ],
+        filters: [
+          {
+            member: 'ECommerce.productName',
+            operator: 'contains',
+            values: ['%'],
+          },
+        ],
+      });
+      expect(response.rawData()).toEqual([]);
+      expect(servedByRollupStore(response)).toBe(true);
+    });
+
+    execute('filtering ECommerce: contains a literal underscore (pre-aggregated)', async () => {
+      const response = await client.load({
+        measures: [
+          'ECommerce.totalQuantity'
+        ],
+        dimensions: [
+          'ECommerce.productName'
+        ],
+        filters: [
+          {
+            member: 'ECommerce.productName',
+            operator: 'contains',
+            values: ['_'],
+          },
+        ],
+      });
+      expect(
+        response.rawData().map((row: any) => row['ECommerce.productName'])
+      ).toEqual(['Logitech di_Novo Edge Keyboard']);
+      expect(servedByRollupStore(response)).toBe(true);
     });
 
     execute('filtering Customers: endsWith filter + dimensions, first', async () => {
@@ -2010,6 +2260,115 @@ export function testQueries(type: string, { includeIncrementalSchemaSuite, exten
       expect(response.rawData()).toMatchSnapshot();
     });
 
+    // Grouped by a retail week: a calendar column, not arithmetic on the date.
+    // The prior month carries the comparison: retail months are 4 or 5 weeks
+    // long, and unlike the sparse prior year it has rows in almost every week.
+    const priorPeriodsByWeek = (variant: '' | 'NoPreAgg') => ({
+      measures: [
+        'BigECommerce.count',
+        `BigECommerce.totalCountRetailYearAgo${variant}`,
+        `BigECommerce.totalCountRetailMonthAgo${variant}`,
+      ],
+      timeDimensions: [{
+        dimension: 'RetailCalendar.retail_date',
+        granularity: 'week',
+        dateRange: ['2020-02-02', '2021-01-30'],
+      }],
+      order: {
+        'RetailCalendar.retail_date': 'asc',
+      },
+    } as const);
+
+    execute('querying BigECommerce with Retail Calendar: prior year and month by week (no pre-aggregation)', async () => {
+      const response = await client.load(priorPeriodsByWeek('NoPreAgg'));
+      expect(servedByRollupStore(response)).toBe(false);
+      expect(response.rawData()).toMatchSnapshot();
+    });
+
+    execute('querying BigECommerce with Retail Calendar: prior year and month by week (pre-aggregation in CubeStore)', async () => {
+      const [rollup, source] = await Promise.all([
+        client.load(priorPeriodsByWeek('')),
+        client.load(priorPeriodsByWeek('NoPreAgg')),
+      ]);
+      expect(servedByRollupStore(rollup)).toBe(true);
+      expect(servedByRollupStore(source)).toBe(false);
+
+      const sourceRows = source.rawData().map(({
+        'BigECommerce.totalCountRetailYearAgoNoPreAgg': yearAgo,
+        'BigECommerce.totalCountRetailMonthAgoNoPreAgg': monthAgo,
+        ...row
+      }: any) => ({
+        ...row,
+        'BigECommerce.totalCountRetailYearAgo': yearAgo,
+        'BigECommerce.totalCountRetailMonthAgo': monthAgo,
+      }));
+      // Agreeing proves little unless the prior month is mostly populated and
+      // is not simply the current period again, which is what a rollup that
+      // dropped the shift would return.
+      const monthAgo = sourceRows.filter((row: any) => row['BigECommerce.totalCountRetailMonthAgo'] !== null);
+      expect(monthAgo.length).toBeGreaterThan(sourceRows.length / 2);
+      expect(monthAgo.some((row: any) => row['BigECommerce.totalCountRetailMonthAgo'] !== row['BigECommerce.count'])).toBe(true);
+      expect(rollup.rawData()).toEqual(sourceRows);
+      expect(rollup.rawData()).toMatchSnapshot();
+    });
+
+    // Rollup stores the named prior retail month by product and day; queries read it by category.
+    // It's the calendar mapping, not an interval: 2020-12-14 maps to 2020-11-16, not the empty 2020-11-14.
+    const priorMonthByCategory = (variant: '' | 'NoPreAgg', dateRange: [string, string]) => ({
+      measures: [
+        'RetailOrders.retailOrderCount',
+        `RetailOrders.retailOrderCountPriorMonth${variant}`,
+      ],
+      dimensions: ['RetailOrders.category'],
+      timeDimensions: [{
+        dimension: 'RetailOrders.retail_date',
+        dateRange,
+      }],
+      order: {
+        'RetailOrders.category': 'asc',
+      },
+    } as const);
+
+    const asRollupRows = (rows: any[]) => rows.map(({
+      'RetailOrders.retailOrderCountPriorMonthNoPreAgg': priorMonth,
+      ...row
+    }: any) => ({
+      ...row,
+      'RetailOrders.retailOrderCountPriorMonth': priorMonth,
+    }));
+
+    // The SQL API renders `retail_date = '<day>'` as a range over one instant.
+    execute('querying RetailOrders: named prior month by category for one day (pre-aggregation in CubeStore)', async () => {
+      const day: [string, string] = ['2020-12-14T00:00:00.000', '2020-12-14T00:00:00.000'];
+      const [rollup, source] = await Promise.all([
+        client.load(priorMonthByCategory('', day)),
+        client.load(priorMonthByCategory('NoPreAgg', day)),
+      ]);
+      expect(servedByRollupStore(rollup)).toBe(true);
+      expect(servedByRollupStore(source)).toBe(false);
+      expect(rollup.rawData()).toEqual(asRollupRows(source.rawData()));
+      const technology = rollup.rawData().find((row: any) => row['RetailOrders.category'] === 'Technology');
+      expect(technology).toMatchObject({
+        'RetailOrders.retailOrderCount': '2',
+        'RetailOrders.retailOrderCountPriorMonth': '1',
+      });
+      expect(rollup.rawData()).toMatchSnapshot();
+    });
+
+    execute('querying RetailOrders: named prior month by category over two months (pre-aggregation in CubeStore)', async () => {
+      const months: [string, string] = ['2020-11-01', '2020-12-31'];
+      const [rollup, source] = await Promise.all([
+        client.load(priorMonthByCategory('', months)),
+        client.load(priorMonthByCategory('NoPreAgg', months)),
+      ]);
+      expect(servedByRollupStore(rollup)).toBe(true);
+      expect(servedByRollupStore(source)).toBe(false);
+      expect(rollup.rawData()).toEqual(asRollupRows(source.rawData()));
+      expect(rollup.rawData().some((row: any) => row['RetailOrders.retailOrderCountPriorMonth'] !== null
+        && row['RetailOrders.retailOrderCountPriorMonth'] !== row['RetailOrders.retailOrderCount'])).toBe(true);
+      expect(rollup.rawData()).toMatchSnapshot();
+    });
+
     execute('querying BigECommerce with Retail Calendar: totalCountRetailMonthAgo', async () => {
       const response = await client.load({
         measures: [
@@ -2103,6 +2462,48 @@ export function testQueries(type: string, { includeIncrementalSchemaSuite, exten
         timeDimensions: [{
           dimension: 'ECommerce.customOrderDateNoPreAgg',
           granularity: 'half_year_by_1st_april',
+          dateRange: ['2020-01-01', '2020-12-31'],
+        }],
+      });
+      expect(response.rawData()).toMatchSnapshot();
+    });
+
+    execute('querying custom granularities ECommerce: count by fiscal_year_by_1st_april + no dimension', async () => {
+      const response = await client.load({
+        measures: [
+          'ECommerce.count',
+        ],
+        timeDimensions: [{
+          dimension: 'ECommerce.customOrderDateNoPreAgg',
+          granularity: 'fiscal_year_by_1st_april',
+          dateRange: ['2020-01-01', '2020-12-31'],
+        }],
+      });
+      expect(response.rawData()).toMatchSnapshot();
+    });
+
+    execute('querying custom granularities ECommerce: count by fiscal_year_by_15th_april + no dimension', async () => {
+      const response = await client.load({
+        measures: [
+          'ECommerce.count',
+        ],
+        timeDimensions: [{
+          dimension: 'ECommerce.customOrderDateNoPreAgg',
+          granularity: 'fiscal_year_by_15th_april',
+          dateRange: ['2020-01-01', '2020-12-31'],
+        }],
+      });
+      expect(response.rawData()).toMatchSnapshot();
+    });
+
+    execute('querying custom granularities ECommerce: count by monthly_from_15th + no dimension', async () => {
+      const response = await client.load({
+        measures: [
+          'ECommerce.count',
+        ],
+        timeDimensions: [{
+          dimension: 'ECommerce.customOrderDateNoPreAgg',
+          granularity: 'monthly_from_15th',
           dateRange: ['2020-01-01', '2020-12-31'],
         }],
       });
@@ -2391,6 +2792,27 @@ from
   ) "rows"
   `);
       expect(res.rows).toMatchSnapshot('powerbi_min_max_ungrouped_flag');
+    });
+
+    executePg('SQL API: named prior month by category for one day', async (connection) => {
+      const priorMonth = (measure: string) => connection.query(`
+    select
+      category,
+      MEASURE(retailOrderCount) as order_count,
+      MEASURE(${measure}) as prior_month
+    from
+      "public"."RetailOrders"
+    where
+      retail_date = '2020-12-14'
+    group by 1
+    order by 1
+  `);
+      const [rollup, source] = await Promise.all([
+        priorMonth('retailOrderCountPriorMonth'),
+        priorMonth('retailOrderCountPriorMonthNoPreAgg'),
+      ]);
+      expect(rollup.rows).toEqual(source.rows);
+      expect(rollup.rows).toMatchSnapshot();
     });
 
     executePg('SQL API: ungrouped pre-agg', async (connection) => {
@@ -2686,6 +3108,23 @@ from
         FROM BigECommerce
         WHERE date_trunc('day', BigECommerce.orderDate) < CAST('2021-01-01' AS TIMESTAMP) AND
               LOWER("city") = 'columbus'
+      `);
+      expect(res.rows).toMatchSnapshot();
+    });
+
+    executePg('SQL API: Window function over measure (running total)', async (connection) => {
+      const res = await connection.query(`
+        SELECT
+          DATE_TRUNC('quarter', orderDate) AS "orderDateQ",
+          MEASURE(count) AS "count",
+          SUM(MEASURE(count)) OVER (
+            ORDER BY DATE_TRUNC('quarter', orderDate)
+            ROWS UNBOUNDED PRECEDING
+          ) AS "runningTotal"
+        FROM "BigECommerce"
+        WHERE DATE_TRUNC('year', orderDate) = CAST('2020-01-01' AS DATE)
+        GROUP BY 1
+        ORDER BY 1 ASC NULLS FIRST;
       `);
       expect(res.rows).toMatchSnapshot();
     });

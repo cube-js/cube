@@ -471,6 +471,16 @@ cube(`orders`, {
 
 </CodeGroup>
 
+<Info>
+
+Each referenced rollup needs an [index][self-indexes] whose leading columns
+cover the join key. For queries that also filter the joined rollup by a
+selective, single-value dimension, put that dimension before the join key in
+the index so that Cube Store can prune partitions — see
+[indexing the joined rollup for partition pruning][ref-rollup-join-indexing].
+
+</Info>
+
 #### `rollup_lambda`
 
 <Warning>
@@ -1134,8 +1144,7 @@ Cube would not use such a pre-aggregation.
 
 With this flag set to `true`, that strict check is lifted. It allows queries from BI tools
 to still match pre-aggregations at the cost of a slight potential data discrepancy.
-This is convenient when using Cube with visualization tools such as [Tableau][ref-config-downstream-tableau]
-or [Apache Superset][ref-config-downstream-superset] that use loose date ranges.
+This is convenient when using Cube with visualization tools that use loose date ranges.
 
 <CodeGroup>
 
@@ -1276,8 +1285,9 @@ starting with most recent ones in time and checks if the
 [`refresh_key`][self-refreshkey] has changed. If a change was detected, then
 that partition will be refreshed.
 
-In development mode, Cube runs the background refresh by default and will
-refresh all pre-aggregations which have `scheduled_refresh: true`.
+In [development mode](/reference/configuration/environment-variables#cubejs_dev_mode),
+Cube runs the background refresh by default and will refresh all pre-aggregations
+which have `scheduled_refresh: true`.
 
 Please consult [Production Checklist][ref-production-checklist-refresh] for best
 practices on running background refresh in production environments.
@@ -1811,16 +1821,15 @@ cube(`orders`, {
 [ref-caching-lambda-preaggs]: /docs/pre-aggregations/lambda-pre-aggregations
 [ref-caching-partitioning]: /docs/pre-aggregations/using-pre-aggregations#partitioning
 [ref-caching-preaggs-target]: /docs/pre-aggregations/matching-pre-aggregations#matching-algorithm
-[ref-config-downstream-superset]: /admin/connect-to-data/visualization-tools/superset
 [ref-cube-refreshkey]: /reference/data-modeling/cube#refresh_key
-[ref-production-checklist-refresh]: /cube-core/running-in-production#set-up-refresh-worker
+[ref-production-checklist-refresh]: /cube-core/deployment#set-up-refresh-worker
 [ref-recipe-funnels]: /recipes/data-modeling/funnels
 [ref-schema-ref-cube-datasource]: /reference/data-modeling/cube#data_source
 [ref-schema-dimensions]: /reference/data-modeling/dimensions
 [ref-schema-measures]: /reference/data-modeling/measures
 [ref-schema-segments]: /reference/data-modeling/segments
 [ref-schema-types-dim-time]: /reference/data-modeling/dimensions#type
-[ref-naming]: /docs/data-modeling/syntax#naming
+[ref-naming]: /docs/data-modeling/concepts/syntax#naming
 [self-granularity]: #granularity
 [self-incremental]: #incremental
 [self-origsql-preaggs]: #use_original_sql_pre_aggregations
@@ -1830,6 +1839,7 @@ cube(`orders`, {
 [self-refreshkey-sql]: #sql
 [self-rollup]: #rollup
 [self-rollupjoin]: #rollup_join
+[self-indexes]: #indexes
 [self-rolluplambda]: #rollup_lambda
 [self-timedimension]: #time_dimension
 [self-buildrange]: #build_range_start-and-build_range_end
@@ -1842,4 +1852,4 @@ cube(`orders`, {
 [ref-ref-cubes]: /reference/data-modeling/cube
 [ref-custom-granularity]: /reference/data-modeling/dimensions#granularities
 [ref-env-allow-non-strict]: /reference/configuration/environment-variables#cubejs-pre-aggregations-allow-non-strict-date-range-match
-[ref-config-downstream-tableau]: /admin/connect-to-data/visualization-tools/tableau
+[ref-rollup-join-indexing]: /docs/pre-aggregations/using-pre-aggregations#indexing-the-joined-rollup-for-partition-pruning

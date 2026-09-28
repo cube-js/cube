@@ -1,10 +1,11 @@
-use super::planners::multi_stage::PlanningScope;
+use super::planners::multi_stage::{check_multi_stage_depth, PlanningScope};
 use super::planners::QueryPlanner;
-use super::query_tools::QueryTools;
+use super::state::State;
 use super::QueryProperties;
 use crate::logical_plan::OriginalSqlCollector;
 use crate::logical_plan::PreAggregationOptimizer;
 use crate::logical_plan::PreAggregationUsage;
+use crate::logical_plan::RollingBaseScanOptimizer;
 use crate::logical_plan::RootQuery;
 use crate::physical_plan_builder::PhysicalPlanBuilder;
 use cubenativeutils::CubeError;
@@ -12,7 +13,7 @@ use std::collections::HashMap;
 use std::rc::Rc;
 
 pub struct TopLevelPlanner {
-    query_tools: Rc<QueryTools>,
+    query_tools: Rc<State>,
     request: Rc<QueryProperties>,
     cubestore_support_multistage: bool,
 }
@@ -20,7 +21,7 @@ pub struct TopLevelPlanner {
 impl TopLevelPlanner {
     pub fn new(
         request: Rc<QueryProperties>,
-        query_tools: Rc<QueryTools>,
+        query_tools: Rc<State>,
         cubestore_support_multistage: bool,
     ) -> Self {
         Self {
@@ -31,6 +32,11 @@ impl TopLevelPlanner {
     }
 
     pub fn plan(&self) -> Result<(String, Vec<PreAggregationUsage>), CubeError> {
+        check_multi_stage_depth(
+            &self.request.all_used_symbols()?,
+            self.request.max_multi_stage_depth(),
+        )?;
+
         let query_planner = QueryPlanner::new(self.request.clone(), self.query_tools.clone());
         let mut scope = PlanningScope::new();
         let query = query_planner.plan(&mut scope)?;
@@ -43,6 +49,22 @@ impl TopLevelPlanner {
 
         let (optimized_plan, usages) = self.try_pre_aggregations(logical_plan.clone())?;
 
+        // Match-only mode (refresh/metadata path): the caller only needs the matched
+        // pre-aggregation(s), not the outer query SQL. Skip the physical build, which for a
+        // rolling-window measure would render a time series that requires a date range the
+        // refresh path doesn't provide (and which non-generated-time-series dialects can't
+        // build without one). The pre-agg's own load SQL is built separately on the JS side.
+        if self.request.is_pre_aggregations_match_only() {
+            return Ok((String::new(), usages));
+        }
+
+        // Ordering is load-bearing: merging is only safe once rollups have been
+        // matched, because a scan carrying two measures can no longer be served
+        // by a rollup holding one of them. Moved above `try_pre_aggregations`,
+        // a model storing one rollup per rolling measure silently falls back to
+        // the fact table for all of them.
+        let optimized_plan = RollingBaseScanOptimizer::new().optimize(optimized_plan);
+
         let is_external = if !usages.is_empty() {
             usages.iter().all(|usage| usage.pre_aggregation.external())
         } else {
@@ -50,11 +72,19 @@ impl TopLevelPlanner {
         };
 
         let templates = self.query_tools.plan_sql_templates(is_external)?;
-
         let physical_plan_builder =
-            PhysicalPlanBuilder::new(self.query_tools.clone(), templates.clone());
-        let original_sql_pre_aggregations = if !self.request.is_pre_aggregation_query() {
-            OriginalSqlCollector::new(self.query_tools.clone()).collect(&optimized_plan)?
+            PhysicalPlanBuilder::new(self.query_tools.query_tools().clone(), templates.clone());
+
+        // Substitute a cube's base SQL with its `originalSql` pre-aggregation table when:
+        // reading (regular query), or building a rollup that opted in via
+        // `useOriginalSqlPreAggregationsInPreAggregation`.
+        let original_sql_pre_aggregations = if !self.request.is_pre_aggregation_query()
+            || self
+                .request
+                .use_original_sql_pre_aggregations_in_pre_aggregation()
+        {
+            OriginalSqlCollector::new(self.query_tools.query_tools().clone())
+                .collect(&optimized_plan)?
         } else {
             HashMap::new()
         };
@@ -63,7 +93,6 @@ impl TopLevelPlanner {
             optimized_plan,
             original_sql_pre_aggregations,
             self.request.is_total_query(),
-            self.request.is_pre_aggregation_query(),
         )?;
 
         let sql = physical_plan.to_sql(&templates)?;

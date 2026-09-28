@@ -17,6 +17,7 @@ pub struct SelectBuilder {
     projection_columns: Vec<AliasedExpr>,
     from: Rc<From>,
     filter: Option<Filter>,
+    filter_params_filters: Option<Filter>,
     group_by: Vec<Expr>,
     having: Option<Filter>,
     order_by: Vec<OrderBy>,
@@ -33,6 +34,7 @@ impl SelectBuilder {
             projection_columns: vec![],
             from,
             filter: None,
+            filter_params_filters: None,
             group_by: vec![],
             having: None,
             order_by: vec![],
@@ -41,22 +43,6 @@ impl SelectBuilder {
             limit: None,
             offset: None,
             result_schema: Schema::empty(),
-        }
-    }
-
-    pub fn new_from_select(select: Rc<Select>) -> Self {
-        Self {
-            projection_columns: select.projection_columns.clone(),
-            from: select.from.clone(),
-            filter: select.filter.clone(),
-            group_by: select.group_by.clone(),
-            having: select.having.clone(),
-            order_by: select.order_by.clone(),
-            ctes: select.ctes.clone(),
-            is_distinct: select.is_distinct,
-            limit: select.limit,
-            offset: select.offset,
-            result_schema: Schema::clone(&select.schema),
         }
     }
 
@@ -252,6 +238,15 @@ impl SelectBuilder {
         self.filter = filter;
     }
 
+    /// Filters an enclosing construct applies on this select's behalf, for
+    /// the `FILTER_PARAMS` and `FILTER_GROUP` bindings of its sources to
+    /// resolve against. Set it where a select carries no WHERE of its own but
+    /// its sources still have to see the query's filters; it is conjoined
+    /// with the WHERE filter, never substituted for it.
+    pub fn set_filter_params_filters(&mut self, filters: Option<Filter>) {
+        self.filter_params_filters = filters;
+    }
+
     pub fn set_group_by(&mut self, group_by: Vec<Expr>) {
         self.group_by = group_by;
     }
@@ -339,6 +334,22 @@ impl SelectBuilder {
         schema
     }
 
+    /// Everything that constrains the rows this select emits, as one
+    /// conjunction: its own WHERE and whatever an enclosing construct applies
+    /// on its behalf. A binding may push any of it into a source's scan.
+    fn binding_filters(filter: Option<Filter>, from_enclosing: Option<Filter>) -> Option<Filter> {
+        match (filter, from_enclosing) {
+            (Some(filter), Some(from_enclosing)) => Some(Filter {
+                items: filter
+                    .items
+                    .into_iter()
+                    .chain(from_enclosing.items)
+                    .collect(),
+            }),
+            (filter, from_enclosing) => filter.or(from_enclosing),
+        }
+    }
+
     pub fn build(self, query_tools: Rc<QueryTools>, mut nodes_factory: SqlNodesFactory) -> Select {
         let cube_references = Self::make_cube_references(self.from.clone());
         nodes_factory.set_cube_name_references(cube_references);
@@ -357,7 +368,7 @@ impl SelectBuilder {
             context: Rc::new(VisitorContext::new(
                 query_tools,
                 &nodes_factory,
-                self.filter,
+                Self::binding_filters(self.filter, self.filter_params_filters),
             )),
             ctes: self.ctes,
             is_distinct: self.is_distinct,
@@ -365,5 +376,52 @@ impl SelectBuilder {
             offset: self.offset,
             schema,
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::planner::filter::{FilterGroup, FilterGroupOperator, FilterItem};
+
+    // Two items that compare unequal, so the merged order is observable.
+    fn items() -> (FilterItem, FilterItem) {
+        let inner = FilterItem::Group(Rc::new(FilterGroup::new(FilterGroupOperator::And, vec![])));
+        let outer = FilterItem::Group(Rc::new(FilterGroup::new(
+            FilterGroupOperator::Or,
+            vec![inner.clone()],
+        )));
+        (inner, outer)
+    }
+
+    fn filter(item: &FilterItem) -> Option<Filter> {
+        Some(Filter {
+            items: vec![item.clone()],
+        })
+    }
+
+    #[test]
+    fn binding_filters_conjoins_both_sides_where_first() {
+        let (a, b) = items();
+
+        let merged = SelectBuilder::binding_filters(filter(&a), filter(&b))
+            .expect("a filter when either side is set");
+
+        assert_eq!(merged.items, vec![a, b]);
+    }
+
+    #[test]
+    fn binding_filters_keeps_whichever_side_is_set() {
+        let (a, b) = items();
+
+        assert_eq!(
+            SelectBuilder::binding_filters(filter(&a), None).map(|f| f.items),
+            Some(vec![a])
+        );
+        assert_eq!(
+            SelectBuilder::binding_filters(None, filter(&b)).map(|f| f.items),
+            Some(vec![b])
+        );
+        assert!(SelectBuilder::binding_filters(None, None).is_none());
     }
 }

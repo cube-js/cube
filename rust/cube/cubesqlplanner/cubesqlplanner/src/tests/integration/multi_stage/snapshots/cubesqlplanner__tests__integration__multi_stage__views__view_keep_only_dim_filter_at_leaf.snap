@@ -1,0 +1,7 @@
+---
+source: cubesqlplanner/cubesqlplanner/src/tests/integration/multi_stage/views.rs
+expression: result
+---
+orders_ms_view__status | orders_ms_view__total_amount | orders_ms_view__amount_keep_only_status
+-----------------------+------------------------------+----------------------------------------
+completed              | 600.00                       | 1400.00

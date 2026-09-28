@@ -1,12 +1,7 @@
-/* eslint-disable import/first */
 import { vi, MockedFunction } from 'vitest';
-import fetch from 'cross-fetch';
-
-vi.mock('cross-fetch');
-
 import HttpTransport from '../src/HttpTransport.js';
 
-const mockedFetch = fetch as MockedFunction<typeof fetch>;
+const mockedFetch = vi.fn() as MockedFunction<typeof fetch>;
 
 describe('HttpTransport', () => {
   const apiUrl = 'http://localhost:3000/cubejs-api/v1';
@@ -33,7 +28,12 @@ describe('HttpTransport', () => {
   const largeQueryJson = `{"query":{"measures":["Orders.count"],"dimensions":["Users.country"],"filters":[{"member":"Users.id","operator":"equals","values":${JSON.stringify(ids)}}]}}`;
 
   beforeAll(() => {
+    vi.stubGlobal('fetch', mockedFetch);
     mockedFetch.mockReturnValue(Promise.resolve({ ok: true } as Response));
+  });
+
+  afterAll(() => {
+    vi.unstubAllGlobals();
   });
 
   afterEach(() => {
@@ -47,8 +47,8 @@ describe('HttpTransport', () => {
     });
     const req = transport.request('load', { query });
     await req.subscribe(() => { console.log('subscribe cb'); });
-    expect(fetch).toHaveBeenCalledTimes(1);
-    expect(fetch).toHaveBeenCalledWith(`${apiUrl}/load?query=${queryUrlEncoded}`, {
+    expect(mockedFetch).toHaveBeenCalledTimes(1);
+    expect(mockedFetch).toHaveBeenCalledWith(`${apiUrl}/load?query=${queryUrlEncoded}`, {
       method: 'GET',
       headers: {
         Authorization: 'token',
@@ -69,8 +69,8 @@ describe('HttpTransport', () => {
     });
     const req = transport.request('meta', { extraParams });
     await req.subscribe(() => { console.log('subscribe cb'); });
-    expect(fetch).toHaveBeenCalledTimes(1);
-    expect(fetch).toHaveBeenCalledWith(`${apiUrl}/meta?extraParams=${serializedExtraParams}`, {
+    expect(mockedFetch).toHaveBeenCalledTimes(1);
+    expect(mockedFetch).toHaveBeenCalledWith(`${apiUrl}/meta?extraParams=${serializedExtraParams}`, {
       method: 'GET',
       headers: {
         Authorization: 'token',
@@ -78,6 +78,30 @@ describe('HttpTransport', () => {
       },
       body: null
     });
+  });
+
+  test('it sends the meta request with no query string when there are no params', async () => {
+    const transport = new HttpTransport({
+      authorization: 'token',
+      apiUrl,
+    });
+    const req = transport.request('meta', { signal: undefined, baseRequestId: undefined });
+    await req.subscribe(() => { console.log('subscribe cb'); });
+    expect(mockedFetch).toHaveBeenCalledTimes(1);
+    expect(mockedFetch.mock.calls[0]?.[0]).toBe(`${apiUrl}/meta`);
+  });
+
+  // CubeApi.meta() sends the boolean; URLSearchParams renders it as `onlyViews=true`,
+  // which is what the gateway's `req.query.onlyViews === 'true'` check expects.
+  test('it sends onlyViews in the meta query string', async () => {
+    const transport = new HttpTransport({
+      authorization: 'token',
+      apiUrl,
+    });
+    const req = transport.request('meta', { signal: undefined, baseRequestId: undefined, onlyViews: true });
+    await req.subscribe(() => { console.log('subscribe cb'); });
+    expect(mockedFetch).toHaveBeenCalledTimes(1);
+    expect(mockedFetch.mock.calls[0]?.[0]).toBe(`${apiUrl}/meta?onlyViews=true`);
   });
 
   test('it serializes the query object and sends it in the body', async () => {
@@ -88,8 +112,8 @@ describe('HttpTransport', () => {
     });
     const req = transport.request('load', { query });
     await req.subscribe(() => { console.log('subscribe cb'); });
-    expect(fetch).toHaveBeenCalledTimes(1);
-    expect(fetch).toHaveBeenCalledWith(`${apiUrl}/load`, {
+    expect(mockedFetch).toHaveBeenCalledTimes(1);
+    expect(mockedFetch).toHaveBeenCalledWith(`${apiUrl}/load`, {
       method: 'POST',
       headers: {
         Authorization: 'token',
@@ -106,8 +130,8 @@ describe('HttpTransport', () => {
     });
     const req = transport.request('load', { query: LargeQuery });
     await req.subscribe(() => { console.log('subscribe cb'); });
-    expect(fetch).toHaveBeenCalledTimes(1);
-    expect(fetch).toHaveBeenCalledWith(`${apiUrl}/load`, {
+    expect(mockedFetch).toHaveBeenCalledTimes(1);
+    expect(mockedFetch).toHaveBeenCalledWith(`${apiUrl}/load`, {
       method: 'POST',
       headers: {
         Authorization: 'token',

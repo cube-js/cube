@@ -1,0 +1,15 @@
+---
+source: cubesqlplanner/cubesqlplanner/src/tests/integration/multi_stage/views.rs
+expression: result
+---
+orders_ms_view__status | orders_ms_view__created_at_month | orders_ms_view__total_amount | orders_ms_view__amount_reduce_time
+-----------------------+----------------------------------+------------------------------+-----------------------------------
+cancelled              | 2024-01-01 00:00:00              | 50.00                        | 200.00                            
+cancelled              | 2024-02-01 00:00:00              | 50.00                        | 200.00                            
+cancelled              | 2024-03-01 00:00:00              | 100.00                       | 200.00                            
+completed              | 2024-01-01 00:00:00              | 300.00                       | 1400.00                           
+completed              | 2024-02-01 00:00:00              | 500.00                       | 1400.00                           
+completed              | 2024-03-01 00:00:00              | 600.00                       | 1400.00                           
+pending                | 2024-01-01 00:00:00              | 150.00                       | 650.00                            
+pending                | 2024-02-01 00:00:00              | 200.00                       | 650.00                            
+pending                | 2024-03-01 00:00:00              | 300.00                       | 650.00

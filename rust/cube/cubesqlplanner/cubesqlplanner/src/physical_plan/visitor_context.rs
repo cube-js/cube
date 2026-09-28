@@ -2,6 +2,7 @@ use crate::physical_plan::cube_ref_evaluator::CubeRefEvaluator;
 use crate::physical_plan::sql_nodes::{SqlNode, SqlNodesFactory};
 use crate::physical_plan::sql_visitor::SqlEvaluatorVisitor;
 use crate::planner::filter::Filter;
+use crate::planner::planners::multi_stage::FilterParamsTimeShifts;
 use crate::planner::query_tools::QueryTools;
 use crate::planner::sql_templates::PlanSqlTemplates;
 use crate::planner::FiltersContext;
@@ -15,6 +16,8 @@ pub struct VisitorContext {
     node_processor: Rc<dyn SqlNode>,
     cube_ref_evaluator: Rc<CubeRefEvaluator>,
     all_filters: Option<Filter>, //To pass to FILTER_PARAMS and FILTER_GROUP
+    // To pick, and shift, the FILTER_PARAMS binding a time-shifted CTE renders.
+    filter_params_time_shifts: FilterParamsTimeShifts,
     filters_context: FiltersContext,
 }
 
@@ -29,11 +32,13 @@ impl VisitorContext {
             filter_params_columns: HashMap::new(),
             reading_pre_aggregation: nodes_factory.reading_pre_aggregation(),
         };
+        let node_processor = nodes_factory.default_node_processor(&query_tools);
         Self {
             query_tools,
-            node_processor: nodes_factory.default_node_processor(),
+            node_processor,
             cube_ref_evaluator: Rc::new(nodes_factory.cube_ref_evaluator()),
             all_filters,
+            filter_params_time_shifts: nodes_factory.filter_params_time_shifts().clone(),
             filters_context,
         }
     }
@@ -41,18 +46,24 @@ impl VisitorContext {
     pub fn new_for_filter_params(
         query_tools: Rc<QueryTools>,
         nodes_factory: &SqlNodesFactory,
-        filter_params_columns: HashMap<String, crate::cube_bridge::member_sql::FilterParamsColumn>,
+        filter_params_columns: HashMap<
+            String,
+            Vec<crate::planner::sql_call::SqlCallFilterParamsItem>,
+        >,
+        filter_params_time_shifts: FilterParamsTimeShifts,
     ) -> Self {
         let filters_context = FiltersContext {
             use_local_tz: nodes_factory.use_local_tz_in_date_range(),
             filter_params_columns,
             reading_pre_aggregation: nodes_factory.reading_pre_aggregation(),
         };
+        let node_processor = nodes_factory.default_node_processor(&query_tools);
         Self {
             query_tools,
-            node_processor: nodes_factory.default_node_processor(),
+            node_processor,
             cube_ref_evaluator: Rc::new(nodes_factory.cube_ref_evaluator()),
             all_filters: None,
+            filter_params_time_shifts,
             filters_context,
         }
     }
@@ -63,6 +74,7 @@ impl VisitorContext {
             self.cube_ref_evaluator.clone(),
             self.all_filters.clone(),
         )
+        .with_filter_params_time_shifts(self.filter_params_time_shifts.clone())
     }
 
     pub fn node_processor(&self) -> Rc<dyn SqlNode> {

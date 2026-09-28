@@ -8,12 +8,12 @@ impl FilterOperationSql for DateRangeOp {
         let to_param = ctx.format_and_allocate_to_date(&self.to)?;
         match self.kind {
             DateRangeKind::InRange => ctx.plan_templates.time_range_filter(
-                ctx.member_sql.to_string(),
+                ctx.member_sql().to_string(),
                 from_param,
                 to_param,
             ),
             DateRangeKind::NotInRange => ctx.plan_templates.time_not_in_range_filter(
-                ctx.member_sql.to_string(),
+                ctx.member_sql().to_string(),
                 from_param,
                 to_param,
             ),

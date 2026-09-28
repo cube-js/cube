@@ -1,5 +1,18 @@
 use crate::planner::filter::{BaseFilter, Filter, FilterGroup, FilterGroupOperator, FilterItem};
 use crate::planner::DebugSql;
+use std::fmt;
+
+impl fmt::Debug for Filter {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(&self.debug_sql(false))
+    }
+}
+
+impl fmt::Debug for FilterItem {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(&self.debug_sql(false))
+    }
+}
 
 impl DebugSql for BaseFilter {
     fn debug_sql(&self, expand_deps: bool) -> String {
@@ -12,10 +25,7 @@ impl DebugSql for BaseFilter {
         let values_str = self
             .values()
             .iter()
-            .map(|v| match v {
-                Some(val) => format!("'{}'", val),
-                None => "NULL".to_string(),
-            })
+            .map(|v| v.to_debug_string())
             .collect::<Vec<_>>()
             .join(", ");
 

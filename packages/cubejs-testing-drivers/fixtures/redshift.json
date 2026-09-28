@@ -22,6 +22,7 @@
       "CUBEJS_DB_HOST": "${DRIVERS_TESTS_CUBEJS_DB_REDSHIFT_HOST}",
       "CUBEJS_DB_PORT": "5439",
       "CUBEJS_DB_NAME": "dev",
+      "CUBEJS_PRE_AGGREGATIONS_SCHEMA": "${DRIVERS_TESTS_CUBEJS_PRE_AGGREGATIONS_SCHEMA:-dev_pre_aggregations}",
       "CUBEJS_DB_USER": "${DRIVERS_TESTS_CUBEJS_DB_REDSHIFT_USER}",
       "CUBEJS_DB_PASS": "${DRIVERS_TESTS_CUBEJS_DB_REDSHIFT_PASS}",
       "CUBEJS_DB_MAX_POOL": "2",
@@ -192,11 +193,17 @@
     "---------------------------------------",
     "Requires Tesseract.                    ",
     "---------------------------------------",
+    "    A custom granularity origin on a single-unit interval only reaches the grouping under Tesseract.",
+    "querying custom granularities ECommerce: count by fiscal_year_by_1st_april + no dimension",
+    "querying custom granularities ECommerce: count by fiscal_year_by_15th_april + no dimension",
+    "querying custom granularities ECommerce: count by monthly_from_15th + no dimension",
     "querying BigECommerce: rolling window by 2 day without date range",
     "querying BigECommerce: rolling window by 2 month without date range",
     "querying BigECommerce: rolling window YTD without date range",
     "querying custom granularities ECommerce: count by two_mo_by_feb + no dimension + rollingCountByLeading without date range",
     "querying BigECommerce with Retail Calendar: totalCountRetailYearAgo",
+    "querying BigECommerce with Retail Calendar: prior year and month by week (no pre-aggregation)",
+    "querying BigECommerce with Retail Calendar: prior year and month by week (pre-aggregation in CubeStore)",
     "querying BigECommerce with Retail Calendar: totalCountRetailMonthAgo",
     "querying BigECommerce with Retail Calendar: totalCountRetailWeekAgo",
     "Tesseract: querying BigECommerce with Retail Calendar: totalCountRetailMonthAgo",
@@ -223,7 +230,11 @@
 
     "Skipped because are too heavy and leads to Connection terminated unexpectedly or ECONNREFUSED or ECONNRESET",
     "SQL API: Rolling Window YTD (year + month + day + date_trunc equal)",
-    "SQL API: Rolling Window YTD (year + month + day + date_trunc IN)"
+    "SQL API: Rolling Window YTD (year + month + day + date_trunc IN)",
+    "---- Time-shifted measure rolled up from a rollup: native planner, Postgres and BigQuery only ----",
+    "querying RetailOrders: named prior month by category for one day (pre-aggregation in CubeStore)",
+    "querying RetailOrders: named prior month by category over two months (pre-aggregation in CubeStore)",
+    "SQL API: named prior month by category for one day"
   ],
   "tesseractSkip": [
     "querying custom granularities ECommerce: count by three_months_by_march + no dimension",
@@ -261,6 +272,13 @@
     "Skipped because are too heavy and leads to Connection terminated unexpectedly or ECONNREFUSED or ECONNRESET",
     "SQL API: Rolling Window YTD (year + month + day + date_trunc equal)",
     "SQL API: Rolling Window YTD (year + month + day + date_trunc IN)",
-    "querying BigECommerce: two multi-stage branches sharing one pre-aggregation"
+    "querying BigECommerce: two multi-stage branches sharing one pre-aggregation",
+    "---- Calendar-shifted measure stored in a rollup: covered on Postgres only for now ----",
+    "querying BigECommerce with Retail Calendar: prior year and month by week (no pre-aggregation)",
+    "querying BigECommerce with Retail Calendar: prior year and month by week (pre-aggregation in CubeStore)",
+    "---- Time-shifted measure rolled up from a rollup: native planner, Postgres and BigQuery only ----",
+    "querying RetailOrders: named prior month by category for one day (pre-aggregation in CubeStore)",
+    "querying RetailOrders: named prior month by category over two months (pre-aggregation in CubeStore)",
+    "SQL API: named prior month by category for one day"
   ]
 }

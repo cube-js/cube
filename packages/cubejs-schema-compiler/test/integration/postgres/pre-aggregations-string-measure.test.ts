@@ -102,7 +102,7 @@ describe('PreAggregations string type measure', () => {
     });
   });
 
-  if (getEnv('nativeSqlPlanner') && getEnv('nativeSqlPlannerPreAggregations')) {
+  if (getEnv('nativeSqlPlanner')) {
     it('string type measure with pre-aggregation', async () => {
       await compiler.compile();
 

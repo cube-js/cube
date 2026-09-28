@@ -1,0 +1,69 @@
+# Both rollups on the `td_dates` side of the hop carry the join key, one as a plain dimension
+# and one as a time dimension. The plain one holds the untruncated value the hop has always
+# been resolved through, so it has to stay the one picked.
+cubes:
+  - name: td_facts
+    sql: "SELECT 1 as id, '2026-01-01'::timestamp as day, 10 as amount"
+
+    dimensions:
+      - name: id
+        type: number
+        sql: id
+        primary_key: true
+      - name: day
+        type: time
+        sql: day
+    measures:
+      - name: total_amount
+        type: sum
+        sql: amount
+    pre_aggregations:
+      - name: td_facts_rollup
+        type: rollup
+        measures:
+          - total_amount
+        dimensions:
+          - day
+
+  - name: td_dates
+    sql: "SELECT '2026-01-01'::timestamp as day, 'Q1' as quarter_label"
+
+    joins:
+      - name: td_facts
+        relationship: one_to_many
+        sql: "{CUBE.day} = {td_facts.day}"
+    dimensions:
+      - name: day
+        type: time
+        sql: day
+        primary_key: true
+      - name: quarter_label
+        type: string
+        sql: quarter_label
+    measures:
+      - name: count
+        type: count
+        sql: "COUNT(*)"
+    pre_aggregations:
+      - name: td_dates_plain_rollup
+        type: rollup
+        dimensions:
+          - quarter_label
+          - day
+      - name: td_dates_time_rollup
+        type: rollup
+        dimensions:
+          - quarter_label
+        time_dimension: day
+        granularity: day
+      - name: td_rollup_join
+        type: rollupJoin
+        measures:
+          - td_facts.total_amount
+        dimensions:
+          - quarter_label
+          - td_facts.day
+        rollups:
+          - td_dates.td_dates_plain_rollup
+          - td_dates.td_dates_time_rollup
+          - td_facts.td_facts_rollup

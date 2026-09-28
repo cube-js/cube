@@ -136,8 +136,10 @@ impl PreAggregation {
         if let PreAggregationSource::Join(join) = self.source().as_ref() {
             for item in join.items.iter() {
                 for member in item.from_members.iter().chain(item.to_members.iter()) {
-                    let alias = member.alias();
-                    res.insert(member.full_name(), QualifiedColumnName::new(None, alias));
+                    res.insert(
+                        member.symbol.full_name(),
+                        QualifiedColumnName::new(None, member.column.clone()),
+                    );
                 }
             }
         }
@@ -178,7 +180,10 @@ impl PrettyPrint for PreAggregation {
                 result.println("Union:", &state);
                 let state = state.new_level();
                 for item in union.items.iter() {
-                    result.println(&format!("-{}.{}", item.cube_name, item.name), &state);
+                    result.println(
+                        &format!("-{}.{}", item.table.cube_name, item.table.name),
+                        &state,
+                    );
                 }
             }
         }
@@ -193,8 +198,7 @@ impl PrettyPrint for PreAggregation {
         result.println(
             &format!(
                 "-time_dimensions: {}",
-                &self
-                    .time_dimensions()
+                self.time_dimensions()
                     .iter()
                     .map(|d| d.full_name())
                     .join(", ")

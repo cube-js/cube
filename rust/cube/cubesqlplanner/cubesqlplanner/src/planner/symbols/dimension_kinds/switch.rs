@@ -1,6 +1,5 @@
-use super::super::MemberSymbol;
-use crate::planner::{CubeRef, SqlCall};
-use cubenativeutils::CubeError;
+use super::super::deps::symbol_deps;
+use crate::planner::SqlCall;
 use std::rc::Rc;
 
 /// `type: switch` dimension from the data model: an enum with a
@@ -12,6 +11,13 @@ use std::rc::Rc;
 pub struct SwitchDimension {
     values: Vec<String>,
     member_sql: Option<Rc<SqlCall>>,
+}
+
+symbol_deps! {
+    SwitchDimension {
+        values: skip,
+        member_sql: dep,
+    }
 }
 
 impl SwitchDimension {
@@ -34,39 +40,8 @@ impl SwitchDimension {
         self.member_sql.is_none()
     }
 
-    pub fn get_dependencies(&self) -> Vec<Rc<MemberSymbol>> {
-        let mut deps = vec![];
-        if let Some(member_sql) = &self.member_sql {
-            member_sql.extract_symbol_deps(&mut deps);
-        }
-        deps
-    }
-
-    pub fn apply_to_deps<F: Fn(&Rc<MemberSymbol>) -> Result<Rc<MemberSymbol>, CubeError>>(
-        &self,
-        f: &F,
-    ) -> Result<Self, CubeError> {
-        let member_sql = if let Some(sql) = &self.member_sql {
-            Some(sql.apply_recursive(f)?)
-        } else {
-            None
-        };
-        Ok(Self {
-            values: self.values.clone(),
-            member_sql,
-        })
-    }
-
     pub fn iter_sql_calls(&self) -> Box<dyn Iterator<Item = &Rc<SqlCall>> + '_> {
         Box::new(self.member_sql.iter())
-    }
-
-    pub fn get_cube_refs(&self) -> Vec<CubeRef> {
-        let mut refs = vec![];
-        if let Some(member_sql) = &self.member_sql {
-            member_sql.extract_cube_refs(&mut refs);
-        }
-        refs
     }
 
     pub fn is_owned_by_cube(&self) -> bool {

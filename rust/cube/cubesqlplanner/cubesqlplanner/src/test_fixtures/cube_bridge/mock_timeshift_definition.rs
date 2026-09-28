@@ -1,6 +1,5 @@
 use crate::cube_bridge::member_sql::MemberSql;
 use crate::cube_bridge::timeshift_definition::{TimeShiftDefinition, TimeShiftDefinitionStatic};
-use crate::impl_static_data;
 use crate::test_fixtures::cube_bridge::yaml::timeshift::YamlTimeShiftDefinition;
 use crate::test_fixtures::cube_bridge::MockMemberSql;
 use cubenativeutils::CubeError;

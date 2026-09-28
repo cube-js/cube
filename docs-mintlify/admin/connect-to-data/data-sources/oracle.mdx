@@ -15,6 +15,14 @@ The driver for Oracle is community-supported and is not maintained by Cube or th
 - The username/password for the [Oracle][oracle] database server
 - The name of the database to use within the [Oracle][oracle] database server
 
+<Info>
+
+The driver uses [`node-oracledb`][node-oracledb] in Thin mode, which supports Oracle Database
+12.1 and later. Older servers (e.g. 11g) require [Thick mode][node-oracledb-thick], which the
+driver does not currently enable — [track this issue](https://github.com/cube-js/cube/issues/10756).
+
+</Info>
+
 ## Setup
 
 ### Manual
@@ -43,6 +51,7 @@ CUBEJS_DB_PASS=**********
 | [`CUBEJS_CONCURRENCY`](/reference/configuration/environment-variables#cubejs_concurrency) | The number of [concurrent queries][ref-data-source-concurrency] to the data source | A valid number |    ❌    |
 
 [ref-data-source-concurrency]: /admin/connect-to-data/concurrency#data-source-concurrency
+
 ## SSL
 
 To enable SSL-encrypted connections between Cube and Oracle, set the
@@ -51,4 +60,6 @@ configure custom certificates, please check out [Enable SSL Connections to the
 Database][ref-recipe-enable-ssl].
 
 [oracle]: https://www.oracle.com/uk/index.html
+[node-oracledb]: https://node-oracledb.readthedocs.io/en/latest/user_guide/introduction.html#architecture
+[node-oracledb-thick]: https://node-oracledb.readthedocs.io/en/latest/user_guide/initialization.html#enabling-node-oracledb-thick-mode
 [ref-recipe-enable-ssl]: /recipes/configuration/using-ssl-connections-to-data-source

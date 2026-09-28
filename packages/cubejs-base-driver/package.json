@@ -1,15 +1,15 @@
 {
   "name": "@cubejs-backend/base-driver",
-  "description": "Cube.js Base Driver",
+  "description": "Cube Base Driver",
   "author": "Cube Dev, Inc.",
-  "version": "1.6.59",
+  "version": "1.7.46",
   "repository": {
     "type": "git",
     "url": "https://github.com/cube-js/cube.git",
     "directory": "packages/cubejs-base-driver"
   },
   "engines": {
-    "node": "^14.0.0 || ^16.0.0 || >=17.0.0"
+    "node": ">=20.0.0"
   },
   "main": "dist/src/index.js",
   "typings": "dist/src/index.d.ts",
@@ -18,9 +18,7 @@
     "tsc": "tsc",
     "watch": "tsc -w",
     "test": "npm run unit && npm run integration",
-    "unit": "jest --runInBand --coverage --verbose test/unit",
-    "lint": "eslint src/* test/* --ext .ts,.js",
-    "lint:fix": "eslint --fix src/* test/* --ext .ts,.js"
+    "unit": "NODE_OPTIONS=--experimental-vm-modules jest --runInBand --coverage --verbose test/unit"
   },
   "files": [
     "README.md",
@@ -29,25 +27,22 @@
     "dist/src/*"
   ],
   "dependencies": {
-    "@aws-sdk/client-s3": "^3.49.0",
+    "@aws-sdk/client-s3": "^3.726.0",
     "@aws-sdk/s3-request-presigner": "^3.49.0",
     "@azure/identity": "^4.4.1",
     "@azure/storage-blob": "^12.9.0",
-    "@cubejs-backend/shared": "1.6.59",
-    "@google-cloud/storage": "^7.13.0"
+    "@cubejs-backend/shared": "1.7.46",
+    "@google-cloud/storage": "^8.1.0"
   },
   "devDependencies": {
-    "@cubejs-backend/linter": "1.6.59",
+    "@cubejs-backend/linter": "1.7.46",
     "@types/jest": "^29",
-    "@types/node": "^20",
+    "@types/node": "^22",
     "jest": "^29",
-    "ts-jest": "^29",
-    "typescript": "~5.2.2"
+    "ts-jest": "^29.4.12",
+    "typescript": "~6.0.3"
   },
   "license": "Apache-2.0",
-  "eslintConfig": {
-    "extends": "../cubejs-linter"
-  },
   "publishConfig": {
     "access": "public"
   }

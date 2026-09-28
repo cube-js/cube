@@ -44,7 +44,16 @@ impl<'a> LogicalNodeProcessor<'a, RootQuery> for RootQueryProcessor<'a> {
                     query.schema(),
                 );
             }
-            ctes.push(Rc::new(Cte::new(Rc::new(query), alias)));
+            // A generated time series is a self-referencing recursive CTE in
+            // some dialects (e.g. MySQL), which need the `WITH RECURSIVE` form.
+            let is_recursive = matches!(
+                &cte_member.member_type,
+                MultiStageMemberLogicalType::TimeSeries(_)
+            ) && self
+                .builder
+                .templates()
+                .generated_time_series_is_recursive();
+            ctes.push(Rc::new(Cte::new(Rc::new(query), alias, is_recursive)));
         }
 
         let select = self

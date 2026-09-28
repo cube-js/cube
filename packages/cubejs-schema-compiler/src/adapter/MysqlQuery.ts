@@ -1,5 +1,5 @@
 import moment from 'moment-timezone';
-import { getEnv, parseSqlInterval } from '@cubejs-backend/shared';
+import { getEnv, parseSqlInterval, splitSqlInterval } from '@cubejs-backend/shared';
 import { BaseQuery } from './BaseQuery';
 import { BaseFilter } from './BaseFilter';
 import { UserError } from '../compiler/UserError';
@@ -27,10 +27,13 @@ class MysqlFilter extends BaseFilter {
 export class MysqlQuery extends BaseQuery {
   private readonly useNamedTimezones: boolean;
 
+  private readonly useGeneratedTimeSeries: boolean;
+
   public constructor(compilers: any, options: any) {
     super(compilers, options);
 
     this.useNamedTimezones = getEnv('mysqlUseNamedTimezones', { dataSource: this.dataSource });
+    this.useGeneratedTimeSeries = getEnv('mysqlUseGeneratedTimeSeries', { dataSource: this.dataSource });
   }
 
   public newFilter(filter) {
@@ -62,11 +65,22 @@ export class MysqlQuery extends BaseQuery {
   }
 
   public subtractInterval(date: string, interval: string) {
-    return `DATE_SUB(${date}, INTERVAL ${this.formatInterval(interval)})`;
+    return this.applyInterval('DATE_SUB', date, interval);
   }
 
   public addInterval(date: string, interval: string) {
-    return `DATE_ADD(${date}, INTERVAL ${this.formatInterval(interval)})`;
+    return this.applyInterval('DATE_ADD', date, interval);
+  }
+
+  /**
+   * MySQL compound INTERVAL units only cover contiguous unit ranges (DAY_HOUR, HOUR_SECOND, ...),
+   * so an interval it can not spell in one go is applied one unit at a time, coarsest first.
+   */
+  private applyInterval(fn: string, date: string, interval: string): string {
+    const whole = this.tryFormatInterval(interval);
+    const parts = whole ? [whole] : splitSqlInterval(interval).map(part => this.formatInterval(part));
+
+    return parts.reduce((acc, part) => `${fn}(${acc}, INTERVAL ${part})`, date);
   }
 
   public timeGroupedColumn(granularity: string, dimension) {
@@ -100,6 +114,19 @@ export class MysqlQuery extends BaseQuery {
    * @see https://dev.mysql.com/doc/refman/8.4/en/expressions.html#temporal-intervals
    */
   private formatInterval(interval: string): string {
+    const formatted = this.tryFormatInterval(interval);
+
+    if (!formatted) {
+      throw new Error(`Cannot transform interval expression "${interval}" to MySQL dialect`);
+    }
+
+    return formatted;
+  }
+
+  /**
+   * The formatted interval, or undefined when MySQL has no single INTERVAL spelling for it.
+   */
+  private tryFormatInterval(interval: string): string | undefined {
     const intervalParsed = parseSqlInterval(interval);
     const intKeys = Object.keys(intervalParsed).length;
 
@@ -138,7 +165,7 @@ export class MysqlQuery extends BaseQuery {
       return `${intervalParsed.millisecond * 1000} MICROSECOND`;
     }
 
-    throw new Error(`Cannot transform interval expression "${interval}" to MySQL dialect`);
+    return undefined;
   }
 
   public escapeColumnName(name: string): string {
@@ -173,7 +200,7 @@ export class MysqlQuery extends BaseQuery {
   }
 
   public supportGeneratedSeriesForCustomTd(): boolean {
-    return true;
+    return this.useGeneratedTimeSeries;
   }
 
   public intervalString(interval: string): string {
@@ -183,12 +210,28 @@ export class MysqlQuery extends BaseQuery {
   public sqlTemplates() {
     const templates = super.sqlTemplates();
     templates.functions.STRING_AGG = 'GROUP_CONCAT({% if distinct %}DISTINCT {% endif %}{{ args[0] }} SEPARATOR {{ args[1] }})';
+    templates.functions.UTCTIMESTAMP = 'UTC_TIMESTAMP()';
+    // DATEADD is being rewritten to DATE_ADD, which reports sub-day intervals in
+    // milliseconds. MySQL has no MILLISECOND unit, so those are scaled to microseconds
+    templates.functions.DATE_ADD = 'DATE_ADD({{ args[0] }}, INTERVAL '
+      + '{% if date_part == "MILLISECOND" %}{{ interval }}000 MICROSECOND'
+      + '{% else %}{{ interval }} {{ date_part }}{% endif %})';
     // PERCENTILE_CONT works but requires PARTITION BY
     delete templates.functions.PERCENTILECONT;
+    delete templates.functions.WIDTH_BUCKET;
     templates.quotes.identifiers = '`';
     templates.quotes.escape = '\\`';
     // NOTE: this template contains a comma; two order expressions are being generated
     templates.expressions.sort = '{{ expr }} IS NULL {% if nulls_first %}DESC{% else %}ASC{% endif %}, {{ expr }} {% if asc %}ASC{% else %}DESC{% endif %}';
+    // MySQL `/` returns DECIMAL even for integer operands; DIV discards the
+    // fractional part (truncation toward zero), matching PostgreSQL (-5 DIV 2 = -2)
+    templates.expressions.int_division = '({{ left }} DIV {{ right }})';
+    // Timestamp constants arrive as ISO-8601 UTC strings ('2021-01-01T00:00:00.000Z').
+    // MySQL parses the 'T'/'Z' markers only with a "Truncated incorrect datetime value"
+    // warning and ignores the zone, so both markers are stripped instead. The driver
+    // pins the session time zone to UTC, which keeps the naive literal on the same
+    // instant. The base template renders the value bare, which is invalid MySQL syntax
+    templates.expressions.timestamp_literal = 'TIMESTAMP(\'{{ value | replace("T", " ") | replace("Z", "") }}\')';
     delete templates.expressions.ilike;
     templates.types.string = 'CHAR';
     templates.types.boolean = 'TINYINT';
@@ -211,31 +254,43 @@ export class MysqlQuery extends BaseQuery {
       '{% endfor %}' +
       ') AS dates';
 
-    templates.statements.generated_time_series_select =
-      'WITH RECURSIVE date_series AS (\n' +
-      '  SELECT TIMESTAMP({{ start }}) AS date_from\n' +
-      '  UNION ALL\n' +
-      '  SELECT DATE_ADD(date_from, INTERVAL {{ granularity }})\n' +
-      '  FROM date_series\n' +
-      '  WHERE DATE_ADD(date_from, INTERVAL {{ granularity }}) <= TIMESTAMP({{ end }})\n' +
-      ')\n' +
-      'SELECT CAST(date_from AS DATETIME) AS date_from,\n' +
-      '       CAST(DATE_SUB(DATE_ADD(date_from, INTERVAL {{ granularity }}), INTERVAL 1000 MICROSECOND) AS DATETIME) AS date_to\n' +
-      'FROM date_series';
+    // Generated (recursive CTE based) time series. Recursive CTEs require
+    // MySQL 8.0+, so they are only registered when explicitly enabled via
+    // CUBEJS_DB_MYSQL_USE_GENERATED_TIME_SERIES. When absent, the Tesseract
+    // planner falls back to the portable VALUES/UNION ALL `time_series_select`
+    // template, which also works on MySQL 5.6/5.7.
+    //
+    // The template body becomes the content of `time_series AS (...)` CTE, so
+    // it self-references `time_series` for recursion (no nested WITH). The
+    // outer WITH is emitted as `WITH RECURSIVE` because the
+    // `generated_time_series_recursive` marker below is present.
+    if (this.useGeneratedTimeSeries) {
+      templates.statements.generated_time_series_select =
+        'SELECT CAST(TIMESTAMP({{ start }}) AS DATETIME(6)) AS date_from,\n' +
+        '       CAST(DATE_SUB(DATE_ADD(TIMESTAMP({{ start }}), INTERVAL {{ granularity }}), INTERVAL 1000 MICROSECOND) AS DATETIME(6)) AS date_to\n' +
+        'UNION ALL\n' +
+        'SELECT DATE_ADD(date_from, INTERVAL {{ granularity }}),\n' +
+        '       CAST(DATE_SUB(DATE_ADD(DATE_ADD(date_from, INTERVAL {{ granularity }}), INTERVAL {{ granularity }}), INTERVAL 1000 MICROSECOND) AS DATETIME(6))\n' +
+        'FROM time_series\n' +
+        'WHERE DATE_ADD(date_from, INTERVAL {{ granularity }}) <= TIMESTAMP({{ end }})';
 
-    templates.statements.generated_time_series_with_cte_range_source =
-      'WITH RECURSIVE date_series AS (\n' +
-      '  SELECT {{ range_source }}.{{ min_name }} AS date_from,\n' +
-      '         {{ range_source }}.{{ max_name }} AS max_date\n' +
-      '  FROM {{ range_source }}\n' +
-      '  UNION ALL\n' +
-      '  SELECT DATE_ADD(date_from, INTERVAL {{ granularity }}), max_date\n' +
-      '  FROM date_series\n' +
-      '  WHERE DATE_ADD(date_from, INTERVAL {{ granularity }}) <= max_date\n' +
-      ')\n' +
-      'SELECT CAST(date_from AS DATETIME) AS date_from,\n' +
-      '       CAST(DATE_SUB(DATE_ADD(date_from, INTERVAL {{ granularity }}), INTERVAL 1000 MICROSECOND) AS DATETIME) AS date_to\n' +
-      'FROM date_series';
+      templates.statements.generated_time_series_with_cte_range_source =
+        'SELECT CAST({{ range_source }}.{{ min_name }} AS DATETIME(6)) AS date_from,\n' +
+        '       CAST(DATE_SUB(DATE_ADD({{ range_source }}.{{ min_name }}, INTERVAL {{ granularity }}), INTERVAL 1000 MICROSECOND) AS DATETIME(6)) AS date_to,\n' +
+        '       {{ range_source }}.{{ max_name }} AS max_date\n' +
+        'FROM {{ range_source }}\n' +
+        'UNION ALL\n' +
+        'SELECT DATE_ADD(date_from, INTERVAL {{ granularity }}),\n' +
+        '       CAST(DATE_SUB(DATE_ADD(DATE_ADD(date_from, INTERVAL {{ granularity }}), INTERVAL {{ granularity }}), INTERVAL 1000 MICROSECOND) AS DATETIME(6)),\n' +
+        '       max_date\n' +
+        'FROM time_series\n' +
+        'WHERE DATE_ADD(date_from, INTERVAL {{ granularity }}) <= max_date';
+
+      // Marker (presence-only) telling the Tesseract planner that the generated
+      // time series is a self-referencing recursive CTE and the outer WITH must
+      // be emitted as `WITH RECURSIVE`.
+      templates.statements.generated_time_series_recursive = 'true';
+    }
     templates.expressions.wrap_segment_select = 'IF({{ expr }}, 1, 0)';
     templates.expressions.wrap_segment_filter = '{{ expr }} = 1';
 

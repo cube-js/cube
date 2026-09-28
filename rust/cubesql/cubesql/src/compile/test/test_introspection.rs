@@ -3437,3 +3437,81 @@ async fn test_pg_user_mapping() -> Result<(), CubeError> {
 
     Ok(())
 }
+
+/// Domo's live Postgres connection issues this to inspect the columns of a table picked in
+/// its UI. It tests `atttypid` against a set of types spelled as a `regtype[]` literal.
+///
+/// The `is_matched` columns are not part of Domo's query; they project the type test itself
+/// so that the snapshot pins which OIDs a `regtype[]` literal resolves to. Every row here has
+/// `atttypmod = -1`, so Domo's own columns are `NULL` either way.
+#[tokio::test]
+async fn domo_column_inspection_query() -> Result<(), CubeError> {
+    insta::assert_snapshot!(
+        "domo_column_inspection_query",
+        execute_query(
+            r#"
+            SELECT
+              a.attname AS column_name,
+              format_type(a.atttypid, NULL) AS data_type,
+              a.atttypid = ANY ('{int8,numeric,bool}'::regtype[]) AS is_matched,
+              a.atttypid::regtype = ANY ('{int8,numeric,bool}'::regtype[]) AS is_matched_as_regtype,
+              CASE
+                WHEN a.atttypid = ANY ('{int,int8,int2}'::regtype[]) THEN NULL
+                ELSE CASE
+                  WHEN a.atttypmod = -1 THEN NULL
+                  ELSE (a.atttypmod - 4) >> 16
+                END
+              END AS numeric_precision,
+              CASE
+                WHEN a.atttypid = ANY ('{int,int8,int2}'::regtype[]) THEN NULL
+                ELSE CASE
+                  WHEN a.atttypmod = -1 THEN NULL
+                  ELSE (a.atttypmod - 4) & 65535
+                END
+              END AS numeric_scale
+            FROM pg_catalog.pg_attribute a
+              JOIN pg_catalog.pg_class c ON a.attrelid = c.oid
+              JOIN pg_catalog.pg_namespace n ON c.relnamespace = n.oid
+            WHERE c.relname = 'KibanaSampleDataEcommerce'
+              AND n.nspname = 'public'
+              AND a.attnum > 0
+              AND NOT a.attisdropped
+              AND c.relkind IN ('r', 'v', 'm')
+            ORDER BY a.attnum
+            "#
+            .to_string(),
+            DatabaseProtocol::PostgreSQL
+        )
+        .await?
+    );
+
+    Ok(())
+}
+
+/// An empty `regtype[]` literal is rewritten to an empty `ARRAY[]`, which has to plan and
+/// compare false, as Postgres answers for an empty array. Pins both spellings: the column keeps
+/// its OID when the literal resolves, and renders as a type name when there is no regtype to
+/// key off, as with the untyped `ARRAY[]`.
+#[tokio::test]
+async fn empty_regtype_array_comparison() -> Result<(), CubeError> {
+    insta::assert_snapshot!(
+        "empty_regtype_array_comparison",
+        execute_query(
+            r#"
+            SELECT
+              a.atttypid = ANY ('{}'::regtype[]) AS is_matched,
+              a.atttypid::regtype = ANY ('{}'::regtype[]) AS is_matched_as_regtype,
+              a.atttypid::regtype = ANY (ARRAY[]) AS is_matched_in_untyped_array
+            FROM pg_catalog.pg_attribute a
+              JOIN pg_catalog.pg_class c ON a.attrelid = c.oid
+            WHERE c.relname = 'KibanaSampleDataEcommerce'
+              AND a.attnum = 1
+            "#
+            .to_string(),
+            DatabaseProtocol::PostgreSQL
+        )
+        .await?
+    );
+
+    Ok(())
+}

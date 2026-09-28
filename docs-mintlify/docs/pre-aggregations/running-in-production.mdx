@@ -3,12 +3,16 @@ title: Running in production
 description: "Cube makes use of two different kinds of cache:"
 ---
 
+import DevModeWarningShort from '/snippets/dev-mode-warning-short.mdx';
+
 - In-memory storage of query results
 - Pre-aggregations
 
 Cube Store is enabled by default when running Cube in development mode. In
 production, Cube Store **must** run as a separate process. The easiest way to do
 this is to use the official Docker images for Cube and Cube Store.
+
+<DevModeWarningShort />
 
 <Info>
 

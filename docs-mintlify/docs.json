@@ -20,6 +20,7 @@
             "group": "Getting Started",
             "pages": [
               "docs/introduction",
+              "docs/preferences",
               {
                 "group": "Getting Started",
                 "pages": [
@@ -52,6 +53,7 @@
                   "docs/explore-analyze/workbooks/querying-data",
                   "docs/explore-analyze/workbooks/calculated-fields",
                   "docs/explore-analyze/workbooks/source-sql-tabs",
+                  "docs/explore-analyze/workbooks/python-analysis",
                   "docs/explore-analyze/workbooks/workbook-agent"
                 ]
               },
@@ -69,6 +71,8 @@
                       "docs/explore-analyze/charts/chart-types/area",
                       "docs/explore-analyze/charts/chart-types/scatter",
                       "docs/explore-analyze/charts/chart-types/pie",
+                      "docs/explore-analyze/charts/chart-types/funnel",
+                      "docs/explore-analyze/charts/chart-types/sankey",
                       "docs/explore-analyze/charts/chart-types/heatmap",
                       "docs/explore-analyze/charts/chart-types/boxplot",
                       "docs/explore-analyze/charts/chart-types/table",
@@ -85,6 +89,7 @@
                       "docs/explore-analyze/charts/configuration/series-mapping",
                       "docs/explore-analyze/charts/configuration/series-configuration",
                       "docs/explore-analyze/charts/configuration/color-and-stacking",
+                      "docs/explore-analyze/charts/configuration/small-multiples",
                       "docs/explore-analyze/charts/configuration/axes",
                       "docs/explore-analyze/charts/configuration/tooltips",
                       "docs/explore-analyze/charts/configuration/data-labels"
@@ -93,6 +98,7 @@
                 ]
               },
               "docs/explore-analyze/analytics-chat",
+              "docs/explore-analyze/scheduled-tasks",
               "docs/explore-analyze/skills"
             ]
           },
@@ -110,13 +116,16 @@
                       "docs/explore-analyze/dashboards/widgets/charts",
                       "docs/explore-analyze/dashboards/widgets/text",
                       "docs/explore-analyze/dashboards/widgets/controls",
-                      "docs/explore-analyze/dashboards/widgets/ai-summary"
+                      "docs/explore-analyze/dashboards/widgets/ai-summary",
+                      "docs/explore-analyze/dashboards/widgets/layout"
                     ]
                   },
                   "docs/explore-analyze/dashboards/styling",
+                  "docs/explore-analyze/dashboards/dashboards-as-code",
                   "docs/explore-analyze/dashboards/dashboard-agent"
                 ]
               },
+              "docs/explore-analyze/apps",
               "docs/explore-analyze/scheduled-refreshes",
               "docs/explore-analyze/notifications"
             ]
@@ -150,6 +159,7 @@
               "docs/data-modeling/joins",
               "docs/data-modeling/measures",
               "docs/data-modeling/dimensions",
+              "docs/data-modeling/concepts/calendar-cubes",
               "docs/data-modeling/ai-context",
               "docs/data-modeling/concepts/syntax",
               {
@@ -193,7 +203,8 @@
               "docs/pre-aggregations/using-pre-aggregations",
               "docs/pre-aggregations/matching-pre-aggregations",
               "docs/pre-aggregations/refreshing-pre-aggregations",
-              "docs/pre-aggregations/lambda-pre-aggregations"
+              "docs/pre-aggregations/lambda-pre-aggregations",
+              "docs/pre-aggregations/cube-store-architecture"
             ]
           },
           {
@@ -201,17 +212,11 @@
             "pages": [
               "docs/integrations/slack",
               "docs/integrations/tableau",
-              {
-                "group": "Power BI",
-                "root": "docs/integrations/power-bi/index",
-                "pages": [
-                  "docs/integrations/power-bi/kerberos",
-                  "docs/integrations/power-bi/ntlm"
-                ]
-              },
+              "docs/integrations/power-bi/index",
               "docs/integrations/microsoft-excel",
               "docs/integrations/google-sheets",
               "docs/integrations/snowflake-semantic-views",
+              "docs/integrations/databricks-metric-views",
               "docs/integrations/dbt",
               {
                 "group": "Semantic Layer Sync",
@@ -222,7 +227,8 @@
                   "docs/integrations/semantic-layer-sync/tableau"
                 ]
               },
-              "docs/integrations/mcp-server"
+              "docs/integrations/mcp-server",
+              "docs/integrations/agent-skills"
             ]
           }
         ]
@@ -244,7 +250,6 @@
                   "admin/connect-to-data/data-sources/databricks-jdbc",
                   "admin/connect-to-data/data-sources/druid",
                   "admin/connect-to-data/data-sources/duckdb",
-                  "admin/connect-to-data/data-sources/elasticsearch",
                   "admin/connect-to-data/data-sources/firebolt",
                   "admin/connect-to-data/data-sources/google-bigquery",
                   "admin/connect-to-data/data-sources/hive",
@@ -326,7 +331,6 @@
                     "root": "admin/deployment/dedicated/aws/index",
                     "pages": [
                       "admin/deployment/dedicated/aws/private-link",
-                      "admin/deployment/dedicated/aws/vpc-peering",
                       "admin/deployment/dedicated/aws/private-api-connectivity",
                       "admin/deployment/dedicated/aws/byoc"
                     ]
@@ -336,7 +340,6 @@
                     "root": "admin/deployment/dedicated/azure/index",
                     "pages": [
                       "admin/deployment/dedicated/azure/private-link",
-                      "admin/deployment/dedicated/azure/vpc-peering",
                       "admin/deployment/dedicated/azure/byoc"
                     ]
                   },
@@ -345,7 +348,6 @@
                     "root": "admin/deployment/dedicated/gcp/index",
                     "pages": [
                       "admin/deployment/dedicated/gcp/private-service-connect",
-                      "admin/deployment/dedicated/gcp/vpc-peering",
                       "admin/deployment/dedicated/gcp/byoc"
                     ]
                   },
@@ -380,10 +382,12 @@
                   "admin/monitoring/monitoring-integrations/cloudwatch",
                   "admin/monitoring/monitoring-integrations/s3",
                   "admin/monitoring/monitoring-integrations/datadog",
+                  "admin/monitoring/monitoring-integrations/gcs",
                   "admin/monitoring/monitoring-integrations/grafana-cloud",
                   "admin/monitoring/monitoring-integrations/new-relic"
                 ]
-              }
+              },
+              "admin/monitoring/alerts"
             ]
           },
           {
@@ -411,6 +415,7 @@
                   "admin/customization/dashboard-themes"
                 ]
               },
+              "admin/time-zones",
               "admin/account-billing/ai-tokens",
               "admin/account-billing/api-keys",
               "admin/account-billing/billing-faq",
@@ -435,7 +440,11 @@
               "embedding/iframe/dashboards",
               "embedding/iframe/analytics-chat",
               "embedding/iframe/creator-mode",
+              "embedding/iframe/feature-visibility",
               "embedding/iframe/customization",
+              "embedding/iframe/localization",
+              "embedding/iframe/time-zones",
+              "embedding/iframe/events",
               {
                 "group": "Authentication",
                 "pages": [
@@ -531,6 +540,8 @@
                 "root": "reference/core-data-apis/dax-api/index",
                 "pages": [
                   "reference/core-data-apis/dax-api/cross-view-filter",
+                  "reference/core-data-apis/dax-api/kerberos",
+                  "reference/core-data-apis/dax-api/ntlm",
                   "reference/core-data-apis/dax-api/reference"
                 ]
               }
@@ -541,7 +552,8 @@
             "pages": [
               "reference/embed-apis/index",
               "reference/embed-apis/chat-api",
-              "reference/embed-apis/generate-session"
+              "reference/embed-apis/generate-session",
+              "reference/embed-apis/dashboard-comments"
             ]
           },
           {
@@ -557,6 +569,18 @@
                   "reference/orchestration-api/prefect"
                 ]
               }
+            ]
+          },
+          {
+            "group": "Cube Store",
+            "pages": [
+              "reference/cubestore/sql-commands"
+            ]
+          },
+          {
+            "group": "CLI",
+            "pages": [
+              "reference/cli"
             ]
           },
           {
@@ -614,27 +638,52 @@
               {
                 "group": "Data Modeling",
                 "pages": [
+                  {
+                    "group": "Calculations & Metrics",
+                    "pages": [
+                      "recipes/data-modeling/percentiles",
+                      "recipes/data-modeling/nested-aggregates",
+                      "recipes/data-modeling/filtered-aggregates",
+                      "recipes/data-modeling/share-of-total",
+                      "recipes/data-modeling/average-order-value",
+                      "recipes/data-modeling/period-over-period",
+                      "recipes/data-modeling/reusable-period-to-date"
+                    ]
+                  },
+                  {
+                    "group": "Query-time parameters",
+                    "pages": [
+                      "recipes/data-modeling/dynamic-rolling-windows",
+                      "recipes/data-modeling/passing-dynamic-parameters-in-a-query"
+                    ]
+                  },
+                  {
+                    "group": "Time Series & Calendars",
+                    "pages": [
+                      "recipes/data-modeling/string-time-dimensions",
+                      "recipes/data-modeling/custom-granularity",
+                      "recipes/data-modeling/custom-calendar",
+                      "recipes/data-modeling/snapshots"
+                    ]
+                  },
+                  {
+                    "group": "User & Event Analytics",
+                    "pages": [
+                      "recipes/data-modeling/active-users",
+                      "recipes/data-modeling/event-analytics",
+                      "recipes/data-modeling/cohort-retention"
+                    ]
+                  },
                   "recipes/data-modeling/style-guide",
                   "recipes/data-modeling/designing-metrics",
-                  "recipes/data-modeling/percentiles",
-                  "recipes/data-modeling/nested-aggregates",
-                  "recipes/data-modeling/filtered-aggregates",
-                  "recipes/data-modeling/share-of-total",
-                  "recipes/data-modeling/period-over-period",
-                  "recipes/data-modeling/passing-dynamic-parameters-in-a-query",
+                  "recipes/data-modeling/entity-attribute-value",
+                  "recipes/data-modeling/dbt",
                   "recipes/data-modeling/using-dynamic-measures",
                   "recipes/data-modeling/dynamic-union-tables",
-                  "recipes/data-modeling/string-time-dimensions",
-                  "recipes/data-modeling/custom-granularity",
-                  "recipes/data-modeling/custom-calendar",
-                  "recipes/data-modeling/entity-attribute-value",
-                  "recipes/data-modeling/snapshots",
-                  "recipes/data-modeling/active-users",
-                  "recipes/data-modeling/event-analytics",
-                  "recipes/data-modeling/cohort-retention",
-                  "recipes/data-modeling/dbt",
-                  "recipes/data-modeling/custom-order",
-                  "recipes/data-modeling/polymorphic-cubes"
+                  "recipes/data-modeling/cross-data-source-queries",
+                  "recipes/data-modeling/polymorphic-cubes",
+                  "recipes/data-modeling/reusing-view-measures",
+                  "recipes/data-modeling/custom-order"
                 ]
               },
               {
@@ -704,7 +753,8 @@
             "group": "AI Endpoints",
             "openapi": "/api-reference/chat.yaml",
             "pages": [
-              "POST /chat/stream-chat-state"
+              "POST /chat/stream-chat-state",
+              "POST /chat/abort"
             ]
           },
           {
@@ -714,102 +764,407 @@
                 "group": "Deployments",
                 "openapi": "/api-reference/api.yaml",
                 "pages": [
-                  "GET /v1/deployments",
-                  "GET /v1/deployments/{deploymentId}",
-                  "POST /v1/deployments/{deploymentId}/token"
+                  "GET /api/v1/deployments",
+                  "GET /api/v1/deployments/{deploymentId}",
+                  "PUT /api/v1/deployments/{deploymentId}",
+                  "DELETE /api/v1/deployments/{deploymentId}",
+                  "GET /api/v1/deployments/{deploymentId}/build-status",
+                  "POST /api/v1/deployments/{deploymentId}/creation-step/advance",
+                  "POST /api/v1/deployments/{deploymentId}/creation-step/reset",
+                  "GET /api/v1/deployments/{deploymentId}/logs",
+                  "GET /api/v1/deployments/{deploymentId}/pods",
+                  "GET /api/v1/deployments/{deploymentId}/settings",
+                  "POST /api/v1/deployments/{deploymentId}/token",
+                  "GET /api/v1/deployments/{deploymentId}/versions"
+                ]
+              },
+              {
+                "group": "Deployment Creation",
+                "openapi": "/api-reference/api.yaml",
+                "pages": [
+                  "POST /build/api/v1/deployments"
                 ]
               },
               {
                 "group": "Environments",
                 "openapi": "/api-reference/api.yaml",
                 "pages": [
-                  "GET /v1/deployments/{deploymentId}/environments",
-                  "GET /v1/deployments/{deploymentId}/environments/{environmentId}/tokens",
-                  "POST /v1/deployments/{deploymentId}/environments/{environmentId}/tokens",
-                  "POST /v1/deployments/{deploymentId}/environments/{environmentId}/tokens-for-meta-sync"
+                  "GET /api/v1/deployments/{deploymentId}/environments",
+                  "GET /api/v1/deployments/{deploymentId}/environments/{environmentId}/tokens",
+                  "POST /api/v1/deployments/{deploymentId}/environments/{environmentId}/tokens",
+                  "POST /api/v1/deployments/{deploymentId}/environments/{environmentId}/tokens-for-meta-sync"
+                ]
+              },
+              {
+                "group": "Env Variables",
+                "openapi": "/api-reference/api.yaml",
+                "pages": [
+                  "GET /api/v1/deployments/{deploymentId}/env-vars",
+                  "PUT /api/v1/deployments/{deploymentId}/env-vars"
+                ]
+              },
+              {
+                "group": "Regions",
+                "openapi": "/api-reference/api.yaml",
+                "pages": [
+                  "GET /api/v1/regions"
+                ]
+              },
+              {
+                "group": "Data Model",
+                "openapi": "/api-reference/api.yaml",
+                "pages": [
+                  "GET /build/api/v1/deployments/{deploymentId}/branches",
+                  "POST /build/api/v1/deployments/{deploymentId}/branches",
+                  "DELETE /build/api/v1/deployments/{deploymentId}/branches",
+                  "PUT /build/api/v1/deployments/{deploymentId}/branches/staging-environment",
+                  "POST /build/api/v1/deployments/{deploymentId}/commit",
+                  "GET /build/api/v1/deployments/{deploymentId}/data-model/files",
+                  "PUT /build/api/v1/deployments/{deploymentId}/data-model/files",
+                  "DELETE /build/api/v1/deployments/{deploymentId}/data-model/files",
+                  "POST /build/api/v1/deployments/{deploymentId}/data-model/files/rename",
+                  "GET /build/api/v1/deployments/{deploymentId}/data-model/validate",
+                  "POST /build/api/v1/deployments/{deploymentId}/dev-mode",
+                  "DELETE /build/api/v1/deployments/{deploymentId}/dev-mode",
+                  "POST /build/api/v1/deployments/{deploymentId}/merge",
+                  "POST /build/api/v1/deployments/{deploymentId}/merge-to-default",
+                  "POST /build/api/v1/deployments/{deploymentId}/pull"
+                ]
+              },
+              {
+                "group": "Data Model Uploads",
+                "openapi": "/api-reference/api.yaml",
+                "pages": [
+                  "GET /build/api/v1/deployments/{deploymentId}/data-model/file-hashes",
+                  "POST /build/api/v1/deployments/{deploymentId}/data-model/upload/file",
+                  "POST /build/api/v1/deployments/{deploymentId}/data-model/upload/finish",
+                  "POST /build/api/v1/deployments/{deploymentId}/data-model/upload/start"
+                ]
+              },
+              {
+                "group": "GitHub",
+                "openapi": "/api-reference/api.yaml",
+                "pages": [
+                  "GET /api/v1/github/installations",
+                  "GET /api/v1/github/installations/{installationId}/repositories",
+                  "GET /api/v1/github/repositories/{owner}/{repo}/branches",
+                  "GET /api/v1/github/status"
+                ]
+              },
+              {
+                "group": "GitHub Connection",
+                "openapi": "/api-reference/api.yaml",
+                "pages": [
+                  "POST /build/api/v1/deployments/{deploymentId}/github/connect"
+                ]
+              },
+              {
+                "group": "dbt Sync",
+                "openapi": "/api-reference/api.yaml",
+                "pages": [
+                  "GET /api/v1/deployments/{deploymentId}/dbt-sync",
+                  "POST /api/v1/deployments/{deploymentId}/dbt-sync",
+                  "GET /api/v1/deployments/{deploymentId}/dbt-sync/{syncJobId}",
+                  "DELETE /api/v1/deployments/{deploymentId}/dbt-sync/{syncJobId}",
+                  "GET /api/v1/deployments/{deploymentId}/dbt-sync/{syncJobId}/generated-files",
+                  "GET /api/v1/deployments/{deploymentId}/dbt-sync/{syncJobId}/logs",
+                  "GET /api/v1/deployments/{deploymentId}/dbt-sync/{syncJobId}/result"
+                ]
+              },
+              {
+                "group": "Databricks Metric View Publication",
+                "openapi": "/api-reference/api.yaml",
+                "pages": [
+                  "POST /api/v1/deployments/{deploymentId}/databricks-metric-view-previews",
+                  "GET /api/v1/deployments/{deploymentId}/databricks-metric-view-previews/{previewId}",
+                  "DELETE /api/v1/deployments/{deploymentId}/databricks-metric-view-previews/{previewId}",
+                  "GET /api/v1/deployments/{deploymentId}/databricks-metric-view-previews/{previewId}/result"
+                ]
+              },
+              {
+                "group": "Databricks Metric View Integration",
+                "openapi": "/api-reference/api.yaml",
+                "pages": [
+                  "GET /api/v1/deployments/{deploymentId}/databricks-metric-view-integrations/{dataSourceName}",
+                  "PUT /api/v1/deployments/{deploymentId}/databricks-metric-view-integrations/{dataSourceName}",
+                  "GET /api/v1/deployments/{deploymentId}/databricks-metric-view-integrations/{dataSourceName}/syncs",
+                  "POST /api/v1/deployments/{deploymentId}/databricks-metric-view-integrations/{dataSourceName}/syncs",
+                  "GET /api/v1/deployments/{deploymentId}/databricks-metric-view-integrations/{dataSourceName}/syncs/{runId}",
+                  "DELETE /api/v1/deployments/{deploymentId}/databricks-metric-view-integrations/{dataSourceName}/syncs/{runId}"
+                ]
+              },
+              {
+                "group": "Snowflake Semantic View Sync",
+                "openapi": "/api-reference/api.yaml",
+                "pages": [
+                  "POST /api/v1/deployments/{deploymentId}/snowflake-semantic-view-pulls",
+                  "GET /api/v1/deployments/{deploymentId}/snowflake-semantic-view-pulls/{syncJobId}",
+                  "GET /api/v1/deployments/{deploymentId}/snowflake-semantic-view-pulls/{syncJobId}/result",
+                  "POST /api/v1/deployments/{deploymentId}/snowflake-semantic-view-syncs",
+                  "GET /api/v1/deployments/{deploymentId}/snowflake-semantic-view-syncs/{syncJobId}",
+                  "GET /api/v1/deployments/{deploymentId}/snowflake-semantic-view-syncs/{syncJobId}/result"
                 ]
               },
               {
                 "group": "Folders",
                 "openapi": "/api-reference/api.yaml",
                 "pages": [
-                  "GET /v1/deployments/{deploymentId}/folders",
-                  "POST /v1/deployments/{deploymentId}/folders",
-                  "PUT /v1/deployments/{deploymentId}/folders/{folderId}",
-                  "DELETE /v1/deployments/{deploymentId}/folders/{folderId}",
-                  "GET /v1/deployments/{deploymentId}/folders/{folderId}/ancestors"
+                  "GET /api/v1/deployments/{deploymentId}/folders",
+                  "POST /api/v1/deployments/{deploymentId}/folders",
+                  "PUT /api/v1/deployments/{deploymentId}/folders/{folderId}",
+                  "DELETE /api/v1/deployments/{deploymentId}/folders/{folderId}",
+                  "GET /api/v1/deployments/{deploymentId}/folders/{folderId}/ancestors"
                 ]
               },
               {
                 "group": "Reports",
                 "openapi": "/api-reference/api.yaml",
                 "pages": [
-                  "GET /v1/deployments/{deploymentId}/reports",
-                  "POST /v1/deployments/{deploymentId}/reports",
-                  "GET /v1/deployments/{deploymentId}/reports/{reportId}",
-                  "PUT /v1/deployments/{deploymentId}/reports/{reportId}",
-                  "DELETE /v1/deployments/{deploymentId}/reports/{reportId}",
-                  "PUT /v1/deployments/{deploymentId}/reports/{reportId}/refresh"
+                  "GET /api/v1/deployments/{deploymentId}/reports",
+                  "POST /api/v1/deployments/{deploymentId}/reports",
+                  "PUT /api/v1/deployments/{deploymentId}/reports/by-public-id/{publicId}",
+                  "GET /api/v1/deployments/{deploymentId}/reports/{reportId}",
+                  "PUT /api/v1/deployments/{deploymentId}/reports/{reportId}",
+                  "DELETE /api/v1/deployments/{deploymentId}/reports/{reportId}",
+                  "PUT /api/v1/deployments/{deploymentId}/reports/{reportId}/connect-workbook",
+                  "DELETE /api/v1/deployments/{deploymentId}/reports/{reportId}/connect-workbook",
+                  "PUT /api/v1/deployments/{deploymentId}/reports/{reportId}/refresh"
+                ]
+              },
+              {
+                "group": "External Documents",
+                "openapi": "/api-reference/api.yaml",
+                "pages": [
+                  "GET /api/v1/external-documents/{externalWorkbookId}/placements"
                 ]
               },
               {
                 "group": "Workbooks",
                 "openapi": "/api-reference/api.yaml",
                 "pages": [
-                  "GET /v1/deployments/{deploymentId}/workbooks",
-                  "POST /v1/deployments/{deploymentId}/workbooks",
-                  "GET /v1/deployments/{deploymentId}/workbooks/{workbookId}",
-                  "PUT /v1/deployments/{deploymentId}/workbooks/{workbookId}",
-                  "DELETE /v1/deployments/{deploymentId}/workbooks/{workbookId}",
-                  "PUT /v1/deployments/{deploymentId}/workbooks/{workbookId}/dashboard",
-                  "POST /v1/deployments/{deploymentId}/workbooks/{workbookId}/duplicate",
-                  "POST /v1/deployments/{deploymentId}/workbooks/{workbookId}/publish"
+                  "GET /api/v1/deployments/{deploymentId}/workbooks",
+                  "POST /api/v1/deployments/{deploymentId}/workbooks",
+                  "PUT /api/v1/deployments/{deploymentId}/workbooks/by-slug/{slug}",
+                  "GET /api/v1/deployments/{deploymentId}/workbooks/{workbookId}",
+                  "PUT /api/v1/deployments/{deploymentId}/workbooks/{workbookId}",
+                  "DELETE /api/v1/deployments/{deploymentId}/workbooks/{workbookId}",
+                  "PUT /api/v1/deployments/{deploymentId}/workbooks/{workbookId}/dashboard",
+                  "POST /api/v1/deployments/{deploymentId}/workbooks/{workbookId}/dashboard/ai-widget-thread",
+                  "POST /api/v1/deployments/{deploymentId}/workbooks/{workbookId}/duplicate",
+                  "POST /api/v1/deployments/{deploymentId}/workbooks/{workbookId}/publish"
+                ]
+              },
+              {
+                "group": "Workbook Promotions",
+                "openapi": "/api-reference/api.yaml",
+                "pages": [
+                  "GET /api/v1/deployments/{deploymentId}/workbooks/{workbookId}/promotion",
+                  "GET /api/v1/deployments/{deploymentId}/workbooks/{workbookId}/promotion-links",
+                  "POST /api/v1/deployments/{deploymentId}/workbooks/{workbookId}/promotion-previews",
+                  "GET /api/v1/deployments/{deploymentId}/workbooks/{workbookId}/promotions",
+                  "POST /api/v1/deployments/{deploymentId}/workbooks/{workbookId}/promotions"
+                ]
+              },
+              {
+                "group": "Dashboard Exports",
+                "openapi": "/api-reference/api.yaml",
+                "pages": [
+                  "POST /api/v1/deployments/{deploymentId}/dashboard-exports",
+                  "GET /api/v1/deployments/{deploymentId}/dashboard-exports/{jobId}",
+                  "GET /api/v1/deployments/{deploymentId}/dashboard-exports/{jobId}/download"
                 ]
               },
               {
                 "group": "Notifications",
                 "openapi": "/api-reference/api.yaml",
                 "pages": [
-                  "GET /v1/deployments/{deploymentId}/notifications",
-                  "POST /v1/deployments/{deploymentId}/notifications",
-                  "GET /v1/deployments/{deploymentId}/notifications/{id}",
-                  "PUT /v1/deployments/{deploymentId}/notifications/{id}",
-                  "DELETE /v1/deployments/{deploymentId}/notifications/{id}",
-                  "GET /v1/deployments/{deploymentId}/notifications/{id}/recipients",
-                  "POST /v1/deployments/{deploymentId}/notifications/{id}/recipients",
-                  "DELETE /v1/deployments/{deploymentId}/notifications/{id}/recipients"
+                  "GET /api/v1/deployments/{deploymentId}/notifications",
+                  "POST /api/v1/deployments/{deploymentId}/notifications",
+                  "GET /api/v1/deployments/{deploymentId}/notifications/{id}",
+                  "PUT /api/v1/deployments/{deploymentId}/notifications/{id}",
+                  "DELETE /api/v1/deployments/{deploymentId}/notifications/{id}",
+                  "GET /api/v1/deployments/{deploymentId}/notifications/{id}/recipients",
+                  "POST /api/v1/deployments/{deploymentId}/notifications/{id}/recipients",
+                  "DELETE /api/v1/deployments/{deploymentId}/notifications/{id}/recipients"
+                ]
+              },
+              {
+                "group": "Scheduled Tasks",
+                "openapi": "/api-reference/api.yaml",
+                "pages": [
+                  "GET /api/v1/deployments/{deploymentId}/scheduled-tasks",
+                  "POST /api/v1/deployments/{deploymentId}/scheduled-tasks",
+                  "GET /api/v1/deployments/{deploymentId}/scheduled-tasks/{taskId}",
+                  "PUT /api/v1/deployments/{deploymentId}/scheduled-tasks/{taskId}",
+                  "DELETE /api/v1/deployments/{deploymentId}/scheduled-tasks/{taskId}",
+                  "POST /api/v1/deployments/{deploymentId}/scheduled-tasks/{taskId}/run",
+                  "GET /api/v1/deployments/{deploymentId}/scheduled-tasks/{taskId}/runs"
                 ]
               },
               {
                 "group": "Workspace",
                 "openapi": "/api-reference/api.yaml",
                 "pages": [
-                  "GET /v1/deployments/{deploymentId}/shared-workspace",
-                  "GET /v1/deployments/{deploymentId}/workspace",
-                  "POST /v1/deployments/{deploymentId}/workspace/move"
+                  "GET /api/v1/deployments/{deploymentId}/shared-workspace",
+                  "GET /api/v1/deployments/{deploymentId}/workspace",
+                  "POST /api/v1/deployments/{deploymentId}/workspace/bulk-delete",
+                  "POST /api/v1/deployments/{deploymentId}/workspace/bulk-move",
+                  "POST /api/v1/deployments/{deploymentId}/workspace/move"
+                ]
+              },
+              {
+                "group": "Users",
+                "openapi": "/api-reference/api.yaml",
+                "pages": [
+                  "PATCH /api/v1/users/me/settings"
+                ]
+              },
+              {
+                "group": "Users Admin",
+                "openapi": "/api-reference/api.yaml",
+                "pages": [
+                  "POST /api/v1/users",
+                  "POST /api/v1/users/bulk",
+                  "PUT /api/v1/users/{id}",
+                  "DELETE /api/v1/users/{id}"
+                ]
+              },
+              {
+                "group": "API Keys",
+                "openapi": "/api-reference/api.yaml",
+                "pages": [
+                  "GET /api/v1/api-keys",
+                  "POST /api/v1/api-keys",
+                  "GET /api/v1/api-keys/{id}",
+                  "DELETE /api/v1/api-keys/{id}"
+                ]
+              },
+              {
+                "group": "User Attributes",
+                "openapi": "/api-reference/api.yaml",
+                "pages": [
+                  "GET /api/v1/user-attributes",
+                  "POST /api/v1/user-attributes",
+                  "PUT /api/v1/user-attributes/{id}"
+                ]
+              },
+              {
+                "group": "User Attribute Values",
+                "openapi": "/api-reference/api.yaml",
+                "pages": [
+                  "POST /api/v1/user-attribute-values",
+                  "GET /api/v1/user-attribute-values/{userId}"
+                ]
+              },
+              {
+                "group": "Tenant Settings",
+                "openapi": "/api-reference/api.yaml",
+                "pages": [
+                  "GET /api/v1/tenant/settings",
+                  "PUT /api/v1/tenant/settings"
+                ]
+              },
+              {
+                "group": "OAuth Integrations",
+                "openapi": "/api-reference/api.yaml",
+                "pages": [
+                  "GET /api/v1/oauth-integrations",
+                  "POST /api/v1/oauth-integrations",
+                  "GET /api/v1/oauth-integrations/{id}",
+                  "PUT /api/v1/oauth-integrations/{id}",
+                  "DELETE /api/v1/oauth-integrations/{id}"
+                ]
+              },
+              {
+                "group": "User OAuth Tokens",
+                "openapi": "/api-reference/api.yaml",
+                "pages": [
+                  "GET /api/v1/user-oauth-tokens",
+                  "GET /api/v1/user-oauth-tokens/{integrationId}",
+                  "DELETE /api/v1/user-oauth-tokens/{integrationId}",
+                  "POST /api/v1/user-oauth-tokens/{integrationId}/initiate"
+                ]
+              },
+              {
+                "group": "OIDC Token Configs",
+                "openapi": "/api-reference/api.yaml",
+                "pages": [
+                  "GET /api/v1/oidc-token-configs",
+                  "POST /api/v1/oidc-token-configs",
+                  "GET /api/v1/oidc-token-configs/{id}",
+                  "PUT /api/v1/oidc-token-configs/{id}",
+                  "DELETE /api/v1/oidc-token-configs/{id}"
+                ]
+              },
+              {
+                "group": "App Theme",
+                "openapi": "/api-reference/api.yaml",
+                "pages": [
+                  "GET /api/v1/app-config"
                 ]
               },
               {
                 "group": "Embed",
                 "openapi": "/api-reference/api.yaml",
                 "pages": [
-                  "GET /v1/embed/dashboard/{publicId}",
-                  "POST /v1/embed/generate-session",
-                  "POST /v1/embed/session/token"
+                  "GET /api/v1/embed/dashboard/{publicId}",
+                  "PATCH /api/v1/embed/dashboard/{publicId}",
+                  "GET /api/v1/embed/dashboard/{publicId}/comments",
+                  "POST /api/v1/embed/dashboard/{publicId}/comments",
+                  "GET /api/v1/embed/dashboard/{publicId}/comments/mentionable-users",
+                  "PATCH /api/v1/embed/dashboard/{publicId}/comments/{commentId}",
+                  "DELETE /api/v1/embed/dashboard/{publicId}/comments/{commentId}",
+                  "POST /api/v1/embed/dashboard/{publicId}/comments/{commentId}/resolve",
+                  "POST /api/v1/embed/dashboard/{publicId}/python-run",
+                  "POST /api/v1/embed/generate-session",
+                  "POST /api/v1/embed/session/revoke",
+                  "POST /api/v1/embed/session/token"
                 ]
               },
               {
                 "group": "Embed Tenants",
                 "openapi": "/api-reference/api.yaml",
                 "pages": [
-                  "GET /v1/embed-tenants/{embedTenantName}/groups",
-                  "DELETE /v1/embed-tenants/{embedTenantName}/groups/{id}",
-                  "GET /v1/embed-tenants/{embedTenantName}/user-attributes",
-                  "DELETE /v1/embed-tenants/{embedTenantName}/user-attributes/{id}"
+                  "GET /api/v1/embed-tenants",
+                  "DELETE /api/v1/embed-tenants/{embedTenantName}",
+                  "GET /api/v1/embed-tenants/{embedTenantName}/groups",
+                  "POST /api/v1/embed-tenants/{embedTenantName}/groups",
+                  "GET /api/v1/embed-tenants/{embedTenantName}/groups/{id}",
+                  "PATCH /api/v1/embed-tenants/{embedTenantName}/groups/{id}",
+                  "DELETE /api/v1/embed-tenants/{embedTenantName}/groups/{id}",
+                  "GET /api/v1/embed-tenants/{embedTenantName}/groups/{id}/users",
+                  "POST /api/v1/embed-tenants/{embedTenantName}/groups/{id}/users",
+                  "DELETE /api/v1/embed-tenants/{embedTenantName}/groups/{id}/users",
+                  "POST /api/v1/embed-tenants/{embedTenantName}/user",
+                  "GET /api/v1/embed-tenants/{embedTenantName}/users",
+                  "POST /api/v1/embed-tenants/{embedTenantName}/users"
                 ]
               },
               {
-                "group": "Users",
+                "group": "Dashboard Embed Access",
+                "openapi": "/api-reference/api.yaml",
+                "pages": [
+                  "GET /api/v1/deployments/{deploymentId}/embed-tenants/{embedTenantName}/workbooks",
+                  "GET /api/v1/deployments/{deploymentId}/workbooks/{workbookId}/embed-access",
+                  "PUT /api/v1/deployments/{deploymentId}/workbooks/{workbookId}/embed-access"
+                ]
+              },
+              {
+                "group": "Usage Analytics",
+                "openapi": "/api-reference/api.yaml",
+                "pages": [
+                  "POST /api/v1/usage-analytics/token"
+                ]
+              },
+              {
+                "group": "OpenAPI Spec",
+                "openapi": "/api-reference/api.yaml",
+                "pages": [
+                  "GET /api/v1/spec"
+                ]
+              },
+              {
+                "group": "Users (SCIM)",
                 "openapi": "/api-reference/scim.yaml",
                 "pages": [
                   "GET /scim/v2/Users",
@@ -821,7 +1176,7 @@
                 ]
               },
               {
-                "group": "Groups",
+                "group": "Groups (SCIM)",
                 "openapi": "/api-reference/scim.yaml",
                 "pages": [
                   "GET /scim/v2/Groups",
@@ -886,6 +1241,10 @@
     }
   },
   "redirects": [
+    {
+      "source": "/docs/workspace/saved-reports",
+      "destination": "/docs/explore-analyze/explore#saving-explorations"
+    },
     {
       "source": "/admin/ai/agent-rules",
       "destination": "/admin/ai/rules"
@@ -956,7 +1315,11 @@
     },
     {
       "source": "/admin/deployment/vpc/aws/vpc-peering",
-      "destination": "/admin/deployment/dedicated/aws/vpc-peering"
+      "destination": "/admin/deployment/dedicated/aws"
+    },
+    {
+      "source": "/admin/deployment/dedicated/aws/vpc-peering",
+      "destination": "/admin/deployment/dedicated/aws"
     },
     {
       "source": "/admin/deployment/vpc/aws/private-api-connectivity",
@@ -976,7 +1339,11 @@
     },
     {
       "source": "/admin/deployment/vpc/azure/vpc-peering",
-      "destination": "/admin/deployment/dedicated/azure/vpc-peering"
+      "destination": "/admin/deployment/dedicated/azure"
+    },
+    {
+      "source": "/admin/deployment/dedicated/azure/vpc-peering",
+      "destination": "/admin/deployment/dedicated/azure"
     },
     {
       "source": "/admin/deployment/vpc/azure/byoc",
@@ -992,7 +1359,11 @@
     },
     {
       "source": "/admin/deployment/vpc/gcp/vpc-peering",
-      "destination": "/admin/deployment/dedicated/gcp/vpc-peering"
+      "destination": "/admin/deployment/dedicated/gcp"
+    },
+    {
+      "source": "/admin/deployment/dedicated/gcp/vpc-peering",
+      "destination": "/admin/deployment/dedicated/gcp"
     },
     {
       "source": "/admin/deployment/vpc/gcp/byoc",
@@ -1013,6 +1384,18 @@
     {
       "source": "/docs/deployment/cloud/scalability",
       "destination": "/admin/deployment/scalability"
+    },
+    {
+      "source": "/docs/integrations/power-bi/kerberos",
+      "destination": "/reference/core-data-apis/dax-api/kerberos"
+    },
+    {
+      "source": "/docs/integrations/power-bi/ntlm",
+      "destination": "/reference/core-data-apis/dax-api/ntlm"
+    },
+    {
+      "source": "/api-reference/workbooks/update-published-dashboard-ai-widget-thread",
+      "destination": "/api-reference/workbooks/update-workbook-dashboard"
     }
   ]
 }

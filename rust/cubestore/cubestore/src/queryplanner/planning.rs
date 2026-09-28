@@ -32,7 +32,7 @@ use itertools::{EitherOrBoth, Itertools};
 use std::any::Any;
 use std::fmt::Formatter;
 
-use crate::cluster::{Cluster, WorkerPlanningParams};
+use crate::cluster::{Cluster, PlanningFlags};
 use crate::metastore::multi_index::MultiPartition;
 use crate::metastore::table::{Table, TablePath};
 use crate::metastore::{
@@ -85,7 +85,10 @@ pub async fn choose_index(
     p: LogicalPlan,
     metastore: &dyn PlanIndexStore,
 ) -> Result<(LogicalPlan, PlanningMeta), DataFusionError> {
-    choose_index_ext(p, metastore, true).await
+    choose_index_ext(
+        p, metastore, /* enable_topk */ true, /* limit_pushdown */ true,
+    )
+    .await
 }
 
 /// Information required to distribute the logical plan into multiple workers.
@@ -123,6 +126,7 @@ pub async fn choose_index_ext(
     p: LogicalPlan,
     metastore: &dyn PlanIndexStore,
     enable_topk: bool,
+    limit_pushdown: bool,
 ) -> Result<(LogicalPlan, PlanningMeta), DataFusionError> {
     // Prepare information to choose the index.
     let mut collector = CollectConstraints::default();
@@ -238,7 +242,7 @@ pub async fn choose_index_ext(
         chosen_indices: &indices,
         next_index: 0,
         enable_topk,
-        can_pushdown_limit: true,
+        can_pushdown_limit: limit_pushdown,
         cluster_send_next_id: 1,
     };
 
@@ -618,7 +622,7 @@ impl PlanRewriter for CollectConstraints {
                 })
             }
             LogicalPlan::Sort(Sort { expr, input, .. }) => {
-                let (names, _) = sort_to_column_names(expr, input);
+                let (names, _, _) = sort_to_column_names(expr, input);
 
                 if !names.is_empty() {
                     Some(current_context.update_order_col_names(names))
@@ -740,13 +744,26 @@ fn get_original_name(may_be_alias: &String, input: &LogicalPlan) -> String {
     }
 }
 
-fn sort_to_column_names(sort_exprs: &Vec<SortExpr>, input: &LogicalPlan) -> (Vec<String>, bool) {
+/// Returns the ORDER BY column names, whether the (uniform) direction is ascending, and the
+/// per-column `nulls_first` (parallel to the names). Empty names signals an unusable sort (a
+/// non-column expr or mixed asc/desc). The real `nulls_first` is carried through so the worker
+/// top-k cut honors the query's explicit `NULLS FIRST/LAST` instead of re-deriving it from the
+/// sort direction (which would disagree with the router select and drop groups at the limit).
+fn sort_to_column_names(
+    sort_exprs: &Vec<SortExpr>,
+    input: &LogicalPlan,
+) -> (Vec<String>, bool, Vec<bool>) {
     let mut res = Vec::new();
+    let mut nulls_first = Vec::new();
     let mut has_desc = false;
     let mut has_asc = false;
     for sexpr in sort_exprs.iter() {
         match sexpr {
-            SortExpr { expr, asc, .. } => {
+            SortExpr {
+                expr,
+                asc,
+                nulls_first: nf,
+            } => {
                 if *asc {
                     has_asc = true;
                 } else {
@@ -755,18 +772,19 @@ fn sort_to_column_names(sort_exprs: &Vec<SortExpr>, input: &LogicalPlan) -> (Vec
                 match expr {
                     Expr::Column(c) => {
                         res.push(get_original_name(&c.name, input));
+                        nulls_first.push(*nf);
                     }
                     _ => {
-                        return (Vec::new(), true);
+                        return (Vec::new(), true, Vec::new());
                     }
                 }
             }
         }
     }
     if has_asc && has_desc {
-        (Vec::new(), true)
+        (Vec::new(), true, Vec::new())
     } else {
-        (res, has_asc)
+        (res, has_asc, nulls_first)
     }
 }
 
@@ -840,6 +858,9 @@ struct ChooseIndexContext {
     limit: Option<usize>,
     sort: Option<Vec<String>>,
     sort_is_asc: bool,
+    /// Per-column `nulls_first` for the ORDER BY, parallel to [sort]. Carries the query's explicit
+    /// (or default) NULL placement so the worker top-k cut matches the router select.
+    sort_nulls_first: Vec<bool>,
     single_value_filtered_cols: HashSet<String>,
     /// Group-by key column names of the nearest aggregate above the scan, when all of them are
     /// plain columns. Lets a `GROUP BY ... LIMIT` without `ORDER BY` push the limit to workers.
@@ -855,19 +876,32 @@ struct ChooseIndexContext {
     /// into [group_by_has_having] at the next aggregate. A `WHERE` below the aggregate is fine, so
     /// this is reset when entering an aggregate.
     filter_above: bool,
+    /// Set once an aggregate has claimed the enclosing `LIMIT`/`ORDER BY`. Everything below that
+    /// aggregate is its input, not the query's output: the pushdown lands on the aggregate nearest
+    /// the scan, so for a deeper one it would truncate the input of the aggregate that actually
+    /// owns the limit.
+    limit_claimed: bool,
 }
 
 impl ChooseIndexContext {
+    /// A limit entering the context starts a new scope, so nothing but the limit itself carries
+    /// over. See [Self::for_unrelated_relation].
     fn update_limit(&self, limit: Option<usize>) -> Self {
         Self {
             limit,
-            ..self.clone()
+            ..Self::default()
         }
     }
-    fn update_sort(&self, names: Vec<String>, sort_is_asc: bool) -> Self {
+    fn update_sort(
+        &self,
+        names: Vec<String>,
+        sort_is_asc: bool,
+        sort_nulls_first: Vec<bool>,
+    ) -> Self {
         Self {
             sort: Some(names),
             sort_is_asc,
+            sort_nulls_first,
             ..self.clone()
         }
     }
@@ -877,16 +911,26 @@ impl ChooseIndexContext {
             ..self.clone()
         }
     }
-    /// Enter an aggregate: record its group-by keys, fold any filter seen above it into
-    /// [group_by_has_having], and reset [filter_above] so a `WHERE` below counts only towards a
-    /// deeper aggregate.
-    fn enter_aggregate(&self, names: Vec<String>) -> Self {
+    /// Enter an aggregate: record its group-by keys (`None` when they are not all plain columns, so
+    /// an outer aggregate's keys are never inherited in their place), fold any filter seen above it
+    /// into [group_by_has_having], and reset [filter_above] so a `WHERE` below counts only towards a
+    /// deeper aggregate. Claims the limit for this aggregate.
+    fn enter_aggregate(&self, names: Option<Vec<String>>) -> Self {
         Self {
-            group_by: Some(names),
+            group_by: names,
             group_by_has_having: self.filter_above,
             filter_above: false,
+            limit_claimed: true,
             ..self.clone()
         }
+    }
+
+    /// The context for a relation the enclosing query's `LIMIT` does not count the rows of. Nothing
+    /// describing that query's output survives, [single_value_filtered_cols] included: a predicate
+    /// above the boundary does not constrain the relation below it, and that set drops columns from
+    /// both sides of the index-prefix check.
+    fn for_unrelated_relation() -> Self {
+        Self::default()
     }
     fn mark_filter_above(&self) -> Self {
         Self {
@@ -978,20 +1022,49 @@ impl PlanRewriter for ChooseIndex<'_> {
             LogicalPlan::Sort(Sort {
                 expr, input, fetch, ..
             }) => {
-                let base = fetch.as_ref().map(|f| context.update_limit(Some(*f)));
-                let (names, sort_is_asc) = sort_to_column_names(expr, input);
-                let base = base.as_ref().unwrap_or(context);
+                let base = match fetch.as_ref() {
+                    Some(f) => context.update_limit(Some(*f)),
+                    // A sort with no fetch below the aggregate that owns the limit orders that
+                    // aggregate's input, not the query's output -- reading it as the query's order
+                    // would flip `reverse` and keep the wrong end of the index. DataFusion drops
+                    // such a sort before we see it (pinned in `test_limit_pushdown_scope`), so this
+                    // makes the invariant structural instead of resting on that.
+                    None if context.limit_claimed => ChooseIndexContext::for_unrelated_relation(),
+                    None => context.clone(),
+                };
+                let (names, sort_is_asc, sort_nulls_first) = sort_to_column_names(expr, input);
+                let base = &base;
                 Some(if !names.is_empty() {
-                    base.update_sort(names, sort_is_asc)
+                    base.update_sort(names, sort_is_asc, sort_nulls_first)
                 } else {
                     base.mark_unusable_sort()
                 })
             }
             LogicalPlan::Aggregate(Aggregate {
                 group_expr, input, ..
-            }) => group_expr_to_column_names(group_expr, input)
-                .map(|names| context.enter_aggregate(names)),
-            _ => None,
+            }) => {
+                // Only the first aggregate below the limit owns it. A deeper one is the input of
+                // that aggregate, and bounding an input drops rows the owner still needs.
+                let context = if context.limit_claimed {
+                    ChooseIndexContext::for_unrelated_relation()
+                } else {
+                    context.clone()
+                };
+                Some(context.enter_aggregate(group_expr_to_column_names(group_expr, input)))
+            }
+            // Row-preserving: the limit still describes the relation below. `TableScan` is here
+            // because `enter_node`'s result is also what [Self::rewrite] sees for this very node,
+            // so clearing it here would kill every pushdown. `Union` is safe because
+            // `pull_up_cluster_send` rejects a union whose branches are not uniformly cluster
+            // sends, so a branch that skipped this scope cannot reach a worker.
+            LogicalPlan::Projection(_)
+            | LogicalPlan::SubqueryAlias(_)
+            | LogicalPlan::Union(_)
+            | LogicalPlan::TableScan(_) => None,
+            // Anything else is a different relation. This covers both sides of a join:
+            // `rewrite_plan_impl` enters the `Join` node before it splits and hands each side the
+            // context produced here.
+            _ => Some(ChooseIndexContext::for_unrelated_relation()),
         }
     }
 
@@ -1143,24 +1216,37 @@ impl ChooseIndex<'_> {
             return None;
         }
         let limit = ctx.limit?;
-        let sort = ctx.sort.as_ref().filter(|s| !s.is_empty())?;
         let group_by = ctx.group_by.as_ref().filter(|g| !g.is_empty())?;
 
-        // Every ORDER BY column must be a group-by column; map it to its group-key position.
+        // Every ORDER BY column must be a group-by column; map it to its group-key position. A bare
+        // LIMIT (no ORDER BY) leaves the prefix empty, so the total order is the full group key in
+        // group-by order -- "any n groups" becomes "the n smallest by group key", still valid.
         let mut cols: Vec<(usize, bool, bool)> = Vec::with_capacity(group_by.len());
         let mut used = vec![false; group_by.len()];
-        for name in sort {
-            let idx = group_by.iter().position(|g| g == name)?;
-            if used[idx] {
-                continue;
+        if let Some(sort) = ctx.sort.as_ref().filter(|s| !s.is_empty()) {
+            for (i, name) in sort.iter().enumerate() {
+                let idx = group_by.iter().position(|g| g == name)?;
+                if used[idx] {
+                    continue;
+                }
+                used[idx] = true;
+                // Honor the query's explicit NULL placement; fall back to the asc-derived default
+                // only if it wasn't captured (it always is, alongside the name).
+                let nulls_first = ctx
+                    .sort_nulls_first
+                    .get(i)
+                    .copied()
+                    .unwrap_or(!ctx.sort_is_asc);
+                cols.push((idx, ctx.sort_is_asc, nulls_first));
             }
-            used[idx] = true;
-            cols.push((idx, ctx.sort_is_asc, !ctx.sort_is_asc));
         }
-        // Extend with the remaining group keys to make it a total order on the full group key.
+        // Extend with the remaining group keys to make it a total order on the full group key. Their
+        // NULL placement is arbitrary (these columns are not in the query's ORDER BY); use ascending
+        // nulls-first for a deterministic order. The worker cut and the router select both derive
+        // from this one descriptor, so they agree on the total order by construction.
         for (idx, is_used) in used.iter().enumerate() {
             if !is_used {
-                cols.push((idx, true, false));
+                cols.push((idx, true, true));
             }
         }
         Some((cols, limit))
@@ -1171,8 +1257,11 @@ impl ChooseIndex<'_> {
         index_sort_on: Option<&Vec<String>>,
         ctx: &ChooseIndexContext,
     ) -> Option<usize> {
+        // A HAVING drops groups on the router after the workers already truncated to their first
+        // `limit` groups, so the result would be short of `limit` rows.
         if ctx.limit.is_none()
             || !self.can_pushdown_limit
+            || ctx.group_by_has_having
             || index_sort_on.is_none()
             || index_sort_on.unwrap().is_empty()
         {
@@ -1206,18 +1295,15 @@ impl ChooseIndex<'_> {
             // No ORDER BY: a grouped aggregate whose group-by keys are a prefix of the index sort
             // key emits complete groups in sort order, so the per-partition limit may descend to
             // the workers' sorted partial aggregate (see add_limit_to_workers). Skipped when an
-            // ORDER BY is present but unusable (it still constrains the output order), or when a
-            // HAVING above the aggregate would drop groups after the workers already truncated.
-            None if !ctx.unusable_sort && !ctx.group_by_has_having => {
-                match ctx.group_by.as_ref().filter(|g| !g.is_empty()) {
-                    Some(group_by) => group_by_is_index_sort_prefix(
-                        group_by,
-                        index_sort_on,
-                        &ctx.single_value_filtered_cols,
-                    ),
-                    None => false,
-                }
-            }
+            // ORDER BY is present but unusable (it still constrains the output order).
+            None if !ctx.unusable_sort => match ctx.group_by.as_ref().filter(|g| !g.is_empty()) {
+                Some(group_by) => group_by_is_index_sort_prefix(
+                    group_by,
+                    index_sort_on,
+                    &ctx.single_value_filtered_cols,
+                ),
+                None => false,
+            },
             None => false,
         };
 
@@ -1464,15 +1550,21 @@ fn pick_index(
 
     let schema = Arc::new(schema);
     let create_snapshot = |index: &IdRow<Index>| {
-        let index_sort_on = sort_on.map(|sc| {
-            index
-                .get_row()
-                .columns()
-                .iter()
-                .take(sc.0.len())
-                .map(|c| c.get_name().clone())
-                .collect::<Vec<_>>()
-        });
+        // An empty join `on` (a cross/range join, as rolling-window queries produce) yields an
+        // empty `sort_on`. Normalize it to `None` here so every consumer of `IndexSnapshot::sort_on`
+        // (scan construction and `required_input_ordering`) consistently falls back to the index
+        // sort key instead of describing an empty ordering.
+        let index_sort_on = sort_on
+            .map(|sc| {
+                index
+                    .get_row()
+                    .columns()
+                    .iter()
+                    .take(sc.0.len())
+                    .map(|c| c.get_name().clone())
+                    .collect::<Vec<_>>()
+            })
+            .filter(|cols| !cols.is_empty());
         IndexSnapshot {
             index: index.clone(),
             partitions: Vec::new(), // filled with results of `pick_partitions` later.
@@ -1833,6 +1925,7 @@ fn pull_up_cluster_send(mut p: LogicalPlan) -> Result<LogicalPlan, DataFusionErr
             }
             let mut union_snapshots = Vec::new();
             let mut limits = Vec::new();
+            let mut worker_sort_and_limits = Vec::new();
             let mut id = 0;
             for i in inputs.into_iter() {
                 let send;
@@ -1848,6 +1941,7 @@ fn pull_up_cluster_send(mut p: LogicalPlan) -> Result<LogicalPlan, DataFusionErr
                 }
                 union_snapshots.extend(send.snapshots.concat());
                 limits.push(send.limit_and_reverse);
+                worker_sort_and_limits.push(send.worker_sort_and_limit.clone());
                 *i = send.input.clone();
             }
             let limit = if limits.is_empty() || limits.iter().any(|l| l.is_none()) {
@@ -1857,8 +1951,23 @@ fn pull_up_cluster_send(mut p: LogicalPlan) -> Result<LogicalPlan, DataFusionErr
             } else {
                 limits[0]
             };
+            // The same group-by/limit context descends to every UNION branch, so the per-branch
+            // descriptors are identical and stay valid over the union (same schema, group columns by
+            // position). Keep it only when all branches agree; otherwise drop the pushdown.
+            let worker_sort_and_limit = if worker_sort_and_limits.is_empty()
+                || worker_sort_and_limits.iter().any(|w| w.is_none())
+                || worker_sort_and_limits
+                    .iter()
+                    .any(|w| w != &worker_sort_and_limits[0])
+            {
+                None
+            } else {
+                worker_sort_and_limits[0].clone()
+            };
             snapshots = vec![union_snapshots];
-            return Ok(ClusterSendNode::new(id, Arc::new(p), snapshots, limit).into_plan());
+            let mut new_send = ClusterSendNode::new(id, Arc::new(p), snapshots, limit);
+            new_send.worker_sort_and_limit = worker_sort_and_limit;
+            return Ok(new_send.into_plan());
         }
         LogicalPlan::Join(Join { left, right, .. }) => {
             let lsend;
@@ -1909,8 +2018,10 @@ fn pull_up_cluster_send(mut p: LogicalPlan) -> Result<LogicalPlan, DataFusionErr
 pub struct CubeExtensionPlanner {
     pub cluster: Option<Arc<dyn Cluster>>,
     // Set on the workers.
-    pub worker_planning_params: Option<WorkerPlanningParams>,
+    pub worker_partition_count: Option<usize>,
     pub serialized_plan: Arc<PreSerializedPlan>,
+    /// On the router, this node's own configuration; on a worker, what the router sent.
+    pub planning_flags: PlanningFlags,
 }
 
 #[async_trait]
@@ -2055,16 +2166,19 @@ impl CubeExtensionPlanner {
                 limit_and_reverse,
                 worker_sort_and_limit,
                 required_input_ordering,
+                self.planning_flags,
             )?))
         } else {
-            let worker_planning_params = self.worker_planning_params.expect("cluster_send_partition_count must be set when CubeExtensionPlanner::cluster is None");
+            let worker_partition_count = self.worker_partition_count.expect(
+                "worker_partition_count must be set when CubeExtensionPlanner::cluster is None",
+            );
             Ok(Arc::new(WorkerExec::new(
                 input,
                 max_batch_rows,
                 limit_and_reverse,
                 required_input_ordering,
                 worker_sort_and_limit,
-                worker_planning_params,
+                worker_partition_count,
             )))
         }
     }
@@ -2089,13 +2203,11 @@ impl WorkerExec {
         limit_and_reverse: Option<(usize, bool)>,
         required_input_ordering: Option<LexRequirement>,
         worker_sort_and_limit: Option<WorkerSortAndLimit>,
-        worker_planning_params: WorkerPlanningParams,
+        worker_partition_count: usize,
     ) -> WorkerExec {
         // This, importantly, gives us the same PlanProperties as ClusterSendExec.
-        let properties = ClusterSendExec::compute_properties(
-            input.properties(),
-            worker_planning_params.worker_partition_count,
-        );
+        let properties =
+            ClusterSendExec::compute_properties(input.properties(), worker_partition_count);
         WorkerExec {
             input,
             max_batch_rows,
@@ -2210,7 +2322,7 @@ pub mod tests {
     use crate::metastore::table::{Table, TablePath};
     use crate::metastore::{Chunk, Column, ColumnType, IdRow, Index, Partition, Schema};
     use crate::queryplanner::planning::{
-        choose_index, try_extract_cluster_send, PlanIndexStore, Snapshot,
+        choose_index, choose_index_ext, try_extract_cluster_send, PlanIndexStore, Snapshot,
     };
     use crate::queryplanner::pretty_printers::PPOptions;
     use crate::queryplanner::query_executor::ClusterSendExec;
@@ -2821,6 +2933,234 @@ pub mod tests {
             total_partition_entries, 9,
             "Expected 2 batches with 5+4=9 partitions, got {}. Assigned: {:?}",
             total_partition_entries, assigned
+        );
+    }
+
+    /// The limit-pushdown descriptors every `ClusterSend` in the chosen plan carries, as printed
+    /// lines. One line per `ClusterSend`, so a plan with several of them (a nested aggregate, a
+    /// join) shows what each one got.
+    async fn limit_pushdown_of(sql: &str, indices: &TestIndices) -> Vec<String> {
+        limit_pushdown_of_ext(sql, indices, true).await
+    }
+
+    async fn limit_pushdown_of_ext(
+        sql: &str,
+        indices: &TestIndices,
+        limit_pushdown: bool,
+    ) -> Vec<String> {
+        let plan = initial_plan(sql, indices);
+        let plan = choose_index_ext(plan, indices, /* enable_topk */ true, limit_pushdown)
+            .await
+            .unwrap()
+            .0;
+        let mut opts = PPOptions::none();
+        opts.show_limit_pushdown = true;
+        pretty_printers::pp_plan_ext(&plan, &opts)
+            .lines()
+            .map(|l| l.trim().to_string())
+            .filter(|l| l.starts_with("ClusterSend"))
+            .collect()
+    }
+
+    /// A `LIMIT` bounds the rows of the relation it sits on. The worker pushdown lands on the
+    /// aggregate nearest the scan, so it is sound only while that aggregate is the one the limit
+    /// counts the rows of. These are the shapes where it is and is not.
+    #[tokio::test]
+    pub async fn test_limit_pushdown_scope() {
+        let indices = default_indices();
+
+        // Owning aggregate, ORDER BY on the index sort prefix: the limit rides the index.
+        assert_eq!(
+            limit_pushdown_of(
+                "SELECT order_id, sum(order_amount) FROM s.Orders \
+                 GROUP BY 1 ORDER BY 1 LIMIT 10",
+                &indices
+            )
+            .await,
+            vec!["ClusterSend, indices: [[2]], limit: 10, reverse: false"]
+        );
+
+        // Owning aggregate, ORDER BY on a group column that is not an index prefix: the bounded
+        // worker sort takes over, ordered by the ORDER BY column first then the rest of the key.
+        assert_eq!(
+            limit_pushdown_of(
+                "SELECT order_id, order_customer, sum(order_amount) FROM s.Orders \
+                 GROUP BY 1, 2 ORDER BY 2 LIMIT 10",
+                &indices
+            )
+            .await,
+            vec![
+                "ClusterSend, indices: [[2]], worker_sort: [1 asc nulls last, 0 asc nulls first], worker_fetch: 10"
+            ]
+        );
+
+        // Owning aggregate, bare LIMIT: the total order is the group key in group-by order.
+        assert_eq!(
+            limit_pushdown_of(
+                "SELECT order_id, sum(order_amount) FROM s.Orders GROUP BY 1 LIMIT 10",
+                &indices
+            )
+            .await,
+            vec!["ClusterSend, indices: [[2]], limit: 10, reverse: false"]
+        );
+
+        // A UNION below the owning aggregate keeps the pushdown: the union of the branches' first
+        // `limit` groups contains the global first `limit`, and the router re-cuts.
+        assert_eq!(
+            limit_pushdown_of(
+                "SELECT order_id, sum(order_amount) FROM \
+                 (SELECT order_id, order_amount FROM s.Orders \
+                  UNION ALL SELECT order_id, order_amount FROM s.Orders) u \
+                 GROUP BY 1 ORDER BY 1 LIMIT 10",
+                &indices
+            )
+            .await,
+            vec!["ClusterSend, indices: [[2, 2]], limit: 10, reverse: false"]
+        );
+
+        // Nested aggregate: the limit counts the OUTER aggregate's groups, so bounding the inner
+        // one drops rows the outer one still needs.
+        assert_eq!(
+            limit_pushdown_of(
+                "SELECT order_id, sum(v) FROM \
+                 (SELECT order_id, order_customer, sum(order_amount) v FROM s.Orders \
+                  GROUP BY 1, 2) i \
+                 GROUP BY 1 ORDER BY 1 LIMIT 10",
+                &indices
+            )
+            .await,
+            vec!["ClusterSend, indices: [[2]]"]
+        );
+
+        // Same with an expression in the inner group key. `group_expr_to_column_names` fails on it,
+        // and the outer aggregate's keys must not be inherited in its place -- the descriptor would
+        // then index the inner aggregate's key by the outer one's positions.
+        assert_eq!(
+            limit_pushdown_of(
+                "SELECT k, sum(v) FROM \
+                 (SELECT order_id + 1 k, order_customer, sum(order_amount) v FROM s.Orders \
+                  GROUP BY 1, 2) i \
+                 GROUP BY 1 ORDER BY 1 LIMIT 10",
+                &indices
+            )
+            .await,
+            vec!["ClusterSend, indices: [[2]]"]
+        );
+
+        // An aggregate inside a join branch: the join drops and multiplies rows, so the query's
+        // limit does not bound either input.
+        assert_eq!(
+            limit_pushdown_of(
+                "SELECT x.order_id, sum(x.v) FROM \
+                 (SELECT order_id, sum(order_amount) v FROM s.Orders GROUP BY 1) x \
+                 JOIN s.Customers c ON x.order_id = c.customer_id \
+                 GROUP BY 1 ORDER BY 1 LIMIT 10",
+                &indices
+            )
+            .await,
+            vec!["ClusterSend, indices: [[2]]", "ClusterSend, indices: [[0]]",]
+        );
+
+        // An inner LIMIT starts a new scope: the aggregate nearest below it owns that limit, even
+        // though an outer aggregate already claimed an outer one. Bounding the inner aggregate to
+        // its own 5 is sound, so the pushdown stays.
+        assert_eq!(
+            limit_pushdown_of(
+                "SELECT order_id, sum(v) FROM \
+                 (SELECT order_id, sum(order_amount) v FROM s.Orders \
+                  GROUP BY 1 ORDER BY 1 LIMIT 5) i \
+                 GROUP BY 1",
+                &indices
+            )
+            .await,
+            vec!["ClusterSend, indices: [[2]], limit: 5, reverse: false"]
+        );
+
+        // No aggregate at all: no group key to bound, so no descriptor today either. Pinned so the
+        // scoping change is not mistaken for having removed one.
+        assert_eq!(
+            limit_pushdown_of(
+                "SELECT order_id FROM s.Orders ORDER BY 1 LIMIT 10",
+                &indices
+            )
+            .await,
+            vec!["ClusterSend, indices: [[2]]"]
+        );
+
+        // DataFusion drops an ORDER BY inside the aggregate's input before we ever see it, so
+        // there is no inner sort to mistake for the query's order. Pinned so a DataFusion upgrade
+        // that starts keeping it fails here instead of silently flipping `reverse`.
+        for sql in [
+            "SELECT order_id, sum(order_amount) FROM \
+             (SELECT order_id, order_amount FROM s.Orders ORDER BY order_id DESC) i \
+             GROUP BY 1 ORDER BY 1 ASC LIMIT 10",
+            "SELECT order_id, sum(order_amount) FROM \
+             (SELECT order_id, order_amount FROM s.Orders ORDER BY order_id ASC) i \
+             GROUP BY 1 ORDER BY 1 ASC LIMIT 10",
+            "SELECT order_id, sum(order_amount) FROM \
+             (SELECT order_id, order_amount FROM s.Orders) i \
+             GROUP BY 1 ORDER BY 1 ASC LIMIT 10",
+        ] {
+            assert_eq!(
+                limit_pushdown_of(sql, &indices).await,
+                vec!["ClusterSend, indices: [[2]], limit: 10, reverse: false"],
+                "{}",
+                sql
+            );
+        }
+
+        // An inner LIMIT starts a new scope, so the outer ORDER BY DESC does not reach the inner
+        // relation -- reading its index from the tail on account of an order that describes a
+        // different relation.
+        assert_eq!(
+            limit_pushdown_of(
+                "SELECT order_id, sum(v) FROM \
+                 (SELECT order_id, order_customer, sum(order_amount) v FROM s.Orders \
+                  GROUP BY 1, 2 LIMIT 5) i \
+                 GROUP BY 1 ORDER BY order_id DESC LIMIT 10",
+                &indices
+            )
+            .await,
+            vec!["ClusterSend, indices: [[2]], limit: 5, reverse: false"]
+        );
+
+        // The toggle has to actually remove the descriptor. Comparing results with it on and off
+        // cannot show that: they stay equal when the flag is ignored entirely, which is exactly how
+        // a newly threaded parameter fails.
+        assert_eq!(
+            limit_pushdown_of_ext(
+                "SELECT order_id, sum(order_amount) FROM s.Orders \
+                 GROUP BY 1 ORDER BY 1 LIMIT 10",
+                &indices,
+                false
+            )
+            .await,
+            vec!["ClusterSend, indices: [[2]]"]
+        );
+        assert_eq!(
+            limit_pushdown_of_ext(
+                "SELECT order_id, order_customer, sum(order_amount) FROM s.Orders \
+                 GROUP BY 1, 2 ORDER BY 2 LIMIT 10",
+                &indices,
+                false
+            )
+            .await,
+            vec!["ClusterSend, indices: [[2]]"]
+        );
+
+        // DISTINCT over a UNION feeding an outer aggregate -- the CORE-815 key-grid shape. Already
+        // clean here; pinned so it stays clean.
+        assert_eq!(
+            limit_pushdown_of(
+                "SELECT m, count(*) FROM \
+                 (SELECT DISTINCT order_id, order_customer m FROM \
+                  (SELECT order_id, order_customer FROM s.Orders \
+                   UNION ALL SELECT order_id, order_customer FROM s.Orders) u) d \
+                 GROUP BY 1 ORDER BY 1 LIMIT 10",
+                &indices
+            )
+            .await,
+            vec!["ClusterSend, indices: [[2, 2]]"]
         );
     }
 

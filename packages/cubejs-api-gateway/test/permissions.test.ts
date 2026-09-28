@@ -49,6 +49,15 @@ describe('Gateway Api Scopes', () => {
       .toStrictEqual('API scope is missing: graphql');
 
     res = await request(app)
+      .post('/cubejs-api/v1/graphql-to-json')
+      .set('Content-type', 'application/json')
+      .set('Authorization', AUTH_TOKEN)
+      .send({ query: 'query { cube { Foo { bar } } }' })
+      .expect(403);
+    expect(res.body && res.body.error)
+      .toStrictEqual('API scope is missing: meta');
+
+    res = await request(app)
       .get('/cubejs-api/v1/meta')
       .set('Authorization', AUTH_TOKEN)
       .expect(403);
@@ -114,6 +123,44 @@ describe('Gateway Api Scopes', () => {
     apiGateway.release();
   });
 
+  // `/v1/graphql-to-json` only reads the data model metadata, so it is guarded
+  // by the `meta` scope - not `graphql`, which gates the GraphQL API itself.
+  test('GraphQL to JSON declined without meta scope', async () => {
+    const { app, apiGateway } = createApiGateway({
+      contextToApiScopes: async () => ['graphql', 'data', 'jobs'],
+    });
+
+    const res = await request(app)
+      .post('/cubejs-api/v1/graphql-to-json')
+      .set('Content-type', 'application/json')
+      .set('Authorization', AUTH_TOKEN)
+      .send({ query: 'query { cube { Foo { bar } } }' })
+      .expect(403);
+
+    expect(res.body && res.body.error)
+      .toStrictEqual('API scope is missing: meta');
+
+    apiGateway.release();
+  });
+
+  test('GraphQL to JSON allowed with meta scope but no graphql scope', async () => {
+    const { app, apiGateway } = createApiGateway({
+      contextToApiScopes: async () => ['meta', 'data', 'jobs'],
+    });
+
+    const res = await request(app)
+      .post('/cubejs-api/v1/graphql-to-json')
+      .set('Content-type', 'application/json')
+      .set('Authorization', AUTH_TOKEN)
+      .send({ query: 'query { cube { Foo { bar } } }' })
+      .expect(200);
+
+    expect(res.body && res.body.jsonQuery)
+      .toStrictEqual({ measures: ['Foo.bar'] });
+
+    apiGateway.release();
+  });
+
   test('Meta declined', async () => {
     const { app, apiGateway } = createApiGateway({
       contextToApiScopes: async () => ['graphql', 'data', 'jobs'],
@@ -133,6 +180,16 @@ describe('Gateway Api Scopes', () => {
       .expect(403);
 
     expect(res2.body && res2.body.error)
+      .toStrictEqual('API scope is missing: meta');
+
+    const res3 = await request(app)
+      .post('/cubejs-api/v1/graphql-to-json')
+      .set('Content-type', 'application/json')
+      .set('Authorization', AUTH_TOKEN)
+      .send({ query: 'query { cube { Foo { bar } } }' })
+      .expect(403);
+
+    expect(res3.body && res3.body.error)
       .toStrictEqual('API scope is missing: meta');
 
     apiGateway.release();

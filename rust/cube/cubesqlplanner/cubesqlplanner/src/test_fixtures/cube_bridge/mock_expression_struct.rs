@@ -1,6 +1,5 @@
 use crate::cube_bridge::member_expression::{ExpressionStruct, ExpressionStructStatic};
 use crate::cube_bridge::struct_with_sql_member::StructWithSqlMember;
-use crate::impl_static_data;
 use crate::test_fixtures::cube_bridge::MockStructWithSqlMember;
 use cubenativeutils::CubeError;
 use std::any::Any;

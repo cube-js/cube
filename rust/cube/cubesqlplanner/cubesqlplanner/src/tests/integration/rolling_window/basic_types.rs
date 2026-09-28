@@ -63,13 +63,19 @@ async fn test_leading_unbounded_no_granularity() {
         .build_sql(query)
         .expect("Should generate SQL for leading unbounded");
 
+    // Default offset is 'end', so the window anchors at the range end: everything
+    // strictly after `to`.
     assert!(
-        sql.contains(r#""orders".created_at >= $_0_$::timestamptz"#),
-        "Leading unbounded should have lower time bound (>=), got: {sql}"
+        sql.contains(r#""orders".created_at > $_0_$::timestamptz"#),
+        "Leading unbounded should have strict lower time bound (> to), got: {sql}"
     );
     assert!(
-        !sql.contains(r#"created_at <= $_"#),
-        "Leading unbounded should not have an upper time bound (<=), got: {sql}"
+        !sql.contains("created_at >= "),
+        "Leading unbounded (offset end) should not use inclusive lower bound, got: {sql}"
+    );
+    assert!(
+        !sql.contains("created_at <"),
+        "Leading unbounded should not have an upper time bound, got: {sql}"
     );
 
     if let Some(result) = ctx.try_execute_pg(query, SEED).await {
@@ -142,15 +148,6 @@ async fn test_trailing_unbounded_with_granularity() {
     }
 }
 
-// FIXME: Bounded rolling window (trailing: 3 day, leading: 1 day) without granularity
-// currently ignores the trailing/leading intervals entirely and uses the raw dateRange
-// as a plain WHERE filter: created_at >= Jan 10 AND created_at <= Jan 20, producing 830.
-// Expected behavior: the intervals should expand the date range, so the effective window
-// becomes [Jan 10 - 3d .. Jan 20 + 1d] = [Jan 7 .. Jan 21], which would include
-// order ID4 (200, Jan 8) and produce a larger result.
-// The correct expected value depends on the chosen anchor semantics (start-of-range vs
-// end-of-range), but the current behavior of silently discarding the intervals is wrong.
-#[ignore]
 #[tokio::test(flavor = "multi_thread")]
 async fn test_bounded_no_granularity() {
     let ctx = create_context();
@@ -165,18 +162,37 @@ async fn test_bounded_no_granularity() {
               - "2024-01-20"
     "#};
 
-    let sql = ctx
-        .build_sql(query)
+    let (sql, params) = ctx
+        .build_sql_and_params(query)
         .expect("Should generate SQL for bounded rolling window");
 
+    // Default offset 'end' anchors at the range end: the trailing interval shifts
+    // the (strict) lower bound back, the leading interval shifts the (inclusive)
+    // upper bound forward. Both are folded into the bound rather than applied
+    // around it, so the evidence is the shifted dates.
     assert!(
         !sql.contains("time_series"),
         "Without granularity should not reference time_series CTE, got: {sql}"
     );
+    let bounds = params
+        .iter()
+        .filter_map(|value| value.to_param_string())
+        .collect::<Vec<_>>();
     assert!(
-        sql.contains(r#"created_at >= $_0_$::timestamptz"#)
-            && sql.contains(r#"created_at <= $_1_$::timestamptz"#),
-        "Should use parameterized date range on created_at, got: {sql}"
+        bounds.iter().any(|bound| bound.starts_with("2024-01-17")),
+        "Should subtract trailing interval '3 day', got {bounds:?} in: {sql}"
+    );
+    assert!(
+        bounds.iter().any(|bound| bound.starts_with("2024-01-21")),
+        "Should add leading interval '1 day', got {bounds:?} in: {sql}"
+    );
+    assert!(
+        sql.contains("created_at > ") && !sql.contains("created_at >= "),
+        "Should have strict lower bound (> to - trailing), got: {sql}"
+    );
+    assert!(
+        sql.contains("created_at <= "),
+        "Should have inclusive upper bound (<= to + leading), got: {sql}"
     );
 
     if let Some(result) = ctx.try_execute_pg(query, SEED).await {
@@ -221,15 +237,6 @@ async fn test_bounded_with_granularity() {
     }
 }
 
-// FIXME: Trailing bounded rolling window (trailing: 7 day) without granularity currently
-// ignores the trailing interval and uses the raw dateRange as a plain WHERE filter:
-// created_at >= Jan 10 AND created_at <= Jan 20, producing 830 (sum of orders in
-// [Jan 10..Jan 20]).
-// Expected behavior: the trailing interval should expand the lower bound of the date
-// range, so the effective window becomes [Jan 10 - 7d .. Jan 20] = [Jan 3 .. Jan 20],
-// which would include orders ID2 (45, Jan 3), ID3 (75, Jan 4), ID4 (200, Jan 8) and
-// produce 1150 (830 + 45 + 75 + 200).
-#[ignore]
 #[tokio::test(flavor = "multi_thread")]
 async fn test_trailing_bounded_no_granularity() {
     let ctx = create_context();
@@ -244,22 +251,40 @@ async fn test_trailing_bounded_no_granularity() {
               - "2024-01-20"
     "#};
 
-    let sql = ctx
-        .build_sql(query)
+    let (sql, params) = ctx
+        .build_sql_and_params(query)
         .expect("Should generate SQL for trailing bounded rolling window");
 
+    // Default offset 'end' anchors at the range end: trailing shifts the (strict)
+    // lower bound back; with no leading the upper bound is the inclusive range
+    // end. The shift is folded into the bound rather than applied around it.
+    let bounds = params
+        .iter()
+        .filter_map(|value| value.to_param_string())
+        .collect::<Vec<_>>();
     assert!(
-        sql.contains(r#"created_at >= $_0_$::timestamptz"#)
-            && sql.contains(r#"created_at <= $_1_$::timestamptz"#),
-        "Should use parameterized date range on created_at, got: {sql}"
+        bounds.iter().any(|bound| bound.starts_with("2024-01-13")),
+        "Should subtract trailing interval '7 day', got {bounds:?} in: {sql}"
+    );
+    assert!(
+        bounds.iter().any(|bound| bound.starts_with("2024-01-20")),
+        "Upper bound should be the inclusive range end, got {bounds:?} in: {sql}"
+    );
+    assert!(
+        !sql.contains("interval"),
+        "The frame should be folded into the bound, got: {sql}"
+    );
+    assert!(
+        sql.contains("created_at > ") && !sql.contains("created_at >= "),
+        "Should have strict lower bound (> to - trailing), got: {sql}"
+    );
+    assert!(
+        sql.contains("created_at <= "),
+        "Should have inclusive upper bound (<= to), got: {sql}"
     );
     assert!(
         !sql.contains("time_series"),
         "Without granularity should not reference time_series CTE, got: {sql}"
-    );
-    assert!(
-        !sql.contains("interval"),
-        "Without granularity should not have interval arithmetic, got: {sql}"
     );
 
     if let Some(result) = ctx.try_execute_pg(query, SEED).await {

@@ -6,12 +6,16 @@
     "benchmarks"
   ],
   "exclude": [
-    "test/snapshotResolver.js"
+    "test/snapshotResolver.js",
+    "test/globalSetup.js"
   ],
   "compilerOptions": {
+    "types": ["node", "jest"],
     "outDir": "dist",
     "rootDir": ".",
-    "baseUrl": ".",
     "allowJs": true,
-  }
+  },
+  "references": [
+    { "path": "../cubejs-backend-shared" }
+  ]
 }

@@ -1,0 +1,65 @@
+{
+  "schemaName": "ecommerce_pinot",
+  "dimensionFieldSpecs": [
+    {
+      "name": "order_id",
+      "dataType": "STRING"
+    },
+    {
+      "name": "customer_id",
+      "dataType": "STRING"
+    },
+    {
+      "name": "city",
+      "dataType": "STRING"
+    },
+    {
+      "name": "category",
+      "dataType": "STRING"
+    },
+    {
+      "name": "sub_category",
+      "dataType": "STRING"
+    },
+    {
+      "name": "product_name",
+      "dataType": "STRING"
+    },
+    {
+      "name": "row_id",
+      "dataType": "INT"
+    }
+  ],
+  "metricFieldSpecs": [
+    {
+      "name": "quantity",
+      "dataType": "LONG"
+    },
+    {
+      "name": "sales",
+      "dataType": "DOUBLE"
+    },
+    {
+      "name": "discount",
+      "dataType": "DOUBLE"
+    },
+    {
+      "name": "profit",
+      "dataType": "DOUBLE"
+    }
+  ],
+  "dateTimeFieldSpecs": [
+    {
+      "name": "order_date",
+      "dataType": "TIMESTAMP",
+      "format": "1:MILLISECONDS:EPOCH",
+      "granularity": "1:MILLISECONDS"
+    },
+    {
+      "name": "completed_date",
+      "dataType": "TIMESTAMP",
+      "format": "1:MILLISECONDS:EPOCH",
+      "granularity": "1:MILLISECONDS"
+    }
+  ]
+}

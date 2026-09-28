@@ -1,0 +1,8 @@
+---
+source: cubesqlplanner/src/tests/integration/member_expressions.rs
+expression: result
+---
+orders_view__amount_share | total_count
+--------------------------+------------
+1.1956521739130435        | 8          
+6.1111111111111111        | 8

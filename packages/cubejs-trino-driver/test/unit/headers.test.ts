@@ -1,4 +1,4 @@
-import { TrinoDriver } from '../../src/TrinoDriver';
+import { TrinoDriver } from '../../src';
 
 const mockFetch: jest.Mock = jest.fn();
 const mockExecute: jest.Mock = jest.fn();

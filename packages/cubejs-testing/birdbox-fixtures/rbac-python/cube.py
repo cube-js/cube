@@ -1,11 +1,11 @@
-# Cube configuration options: https://cube.dev/docs/config
+# Cube configuration options: https://docs.cube.dev/reference/configuration/config
 
 from cube import config
 
 
-@config('context_to_roles')
-def context_to_roles(context):
-    return context.get("securityContext", {}).get("auth", {}).get("roles", [])
+@config('context_to_groups')
+def context_to_groups(context):
+    return context.get("securityContext", {}).get("auth", {}).get("groups", [])
 
 
 def extract_matching_dicts(data):
@@ -55,7 +55,7 @@ def check_sql_auth(query: dict, username: str, password: str) -> dict:
                         'canHaveAdmin': True,
                         'city': 'New York'
                     },
-                    'roles': ['admin']
+                    'groups': ['admin']
                 }
             }
         }

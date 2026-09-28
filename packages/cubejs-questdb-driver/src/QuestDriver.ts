@@ -7,6 +7,7 @@
 import {
   getEnv,
   assertDataSource,
+  escapeStringLiteral,
 } from '@cubejs-backend/shared';
 import { types, Pool, PoolConfig, FieldDef } from 'pg';
 // eslint-disable-next-line import/no-extraneous-dependencies
@@ -217,7 +218,7 @@ export class QuestDriver<Config extends QuestDriverConfiguration = QuestDriverCo
   }
 
   public async tableColumnTypes(table: string): Promise<TableStructure> {
-    const response: any[] = await this.query(`SHOW COLUMNS FROM '${table}'`, []);
+    const response: any[] = await this.query(`SHOW COLUMNS FROM ${escapeStringLiteral(table)}`, []);
 
     return response.map((row) => ({ name: row.column, type: this.toGenericType(row.type) }));
   }
@@ -237,7 +238,7 @@ export class QuestDriver<Config extends QuestDriverConfiguration = QuestDriverCo
     try {
       for (let i = 0; i < tableData.rows.length; i++) {
         await this.query(
-          `INSERT INTO '${table}'
+          `INSERT INTO ${escapeStringLiteral(table)}
         (${columns.map(c => this.quoteIdentifier(c.name)).join(', ')})
         VALUES (${columns.map((c, paramIndex) => this.param(paramIndex)).join(', ')})`,
           columns.map(c => this.toColumnValue(tableData.rows[i][c.name] as string, c.type))

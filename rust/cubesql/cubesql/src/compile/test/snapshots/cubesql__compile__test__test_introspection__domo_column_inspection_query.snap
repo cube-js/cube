@@ -1,0 +1,25 @@
+---
+source: cubesql/src/compile/test/test_introspection.rs
+expression: "execute_query(r#\"\n            SELECT\n              a.attname AS column_name,\n              format_type(a.atttypid, NULL) AS data_type,\n              a.atttypid = ANY ('{int8,numeric,bool}'::regtype[]) AS is_matched,\n              a.atttypid::regtype = ANY ('{int8,numeric,bool}'::regtype[]) AS is_matched_as_regtype,\n              CASE\n                WHEN a.atttypid = ANY ('{int,int8,int2}'::regtype[]) THEN NULL\n                ELSE CASE\n                  WHEN a.atttypmod = -1 THEN NULL\n                  ELSE (a.atttypmod - 4) >> 16\n                END\n              END AS numeric_precision,\n              CASE\n                WHEN a.atttypid = ANY ('{int,int8,int2}'::regtype[]) THEN NULL\n                ELSE CASE\n                  WHEN a.atttypmod = -1 THEN NULL\n                  ELSE (a.atttypmod - 4) & 65535\n                END\n              END AS numeric_scale\n            FROM pg_catalog.pg_attribute a\n              JOIN pg_catalog.pg_class c ON a.attrelid = c.oid\n              JOIN pg_catalog.pg_namespace n ON c.relnamespace = n.oid\n            WHERE c.relname = 'KibanaSampleDataEcommerce'\n              AND n.nspname = 'public'\n              AND a.attnum > 0\n              AND NOT a.attisdropped\n              AND c.relkind IN ('r', 'v', 'm')\n            ORDER BY a.attnum\n            \"#.to_string(),\nDatabaseProtocol::PostgreSQL).await?"
+---
++--------------------+-----------------------------+------------+-----------------------+-------------------+---------------+
+| column_name        | data_type                   | is_matched | is_matched_as_regtype | numeric_precision | numeric_scale |
++--------------------+-----------------------------+------------+-----------------------+-------------------+---------------+
+| count              | bigint                      | true       | true                  | NULL              | NULL          |
+| maxPrice           | numeric                     | true       | true                  | NULL              | NULL          |
+| sumPrice           | numeric                     | true       | true                  | NULL              | NULL          |
+| minPrice           | numeric                     | true       | true                  | NULL              | NULL          |
+| avgPrice           | numeric                     | true       | true                  | NULL              | NULL          |
+| countDistinct      | bigint                      | true       | true                  | NULL              | NULL          |
+| id                 | numeric                     | true       | true                  | NULL              | NULL          |
+| order_date         | timestamp without time zone | false      | false                 | NULL              | NULL          |
+| last_mod           | timestamp without time zone | false      | false                 | NULL              | NULL          |
+| customer_gender    | text                        | false      | false                 | NULL              | NULL          |
+| notes              | text                        | false      | false                 | NULL              | NULL          |
+| taxful_total_price | numeric                     | true       | true                  | NULL              | NULL          |
+| has_subscription   | boolean                     | true       | true                  | NULL              | NULL          |
+| is_male            | boolean                     | true       | true                  | NULL              | NULL          |
+| is_female          | boolean                     | true       | true                  | NULL              | NULL          |
+| __user             | text                        | false      | false                 | NULL              | NULL          |
+| __cubeJoinField    | text                        | false      | false                 | NULL              | NULL          |
++--------------------+-----------------------------+------------+-----------------------+-------------------+---------------+

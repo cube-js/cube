@@ -505,9 +505,9 @@ describe('QueryBuilder.vue', () => {
     it('filters with boolean logical operators without explicit set', async () => {
       const cube = createCubeApi();
       jest
-          .spyOn(cube, 'request')
-          .mockImplementation(fetchMock(load))
-          .mockImplementationOnce(fetchMock(meta));
+        .spyOn(cube, 'request')
+        .mockImplementation(fetchMock(load))
+        .mockImplementationOnce(fetchMock(meta));
 
       const filter = {
         or: [
@@ -746,34 +746,6 @@ describe('QueryBuilder.vue', () => {
       expect(wrapper.vm.offset).toBe(10);
     });
 
-    it('sets renewQuery', async () => {
-      const cube = createCubeApi();
-      jest
-        .spyOn(cube, 'request')
-        .mockImplementation(fetchMock(load))
-        .mockImplementationOnce(fetchMock(meta));
-
-      const filter = {
-        member: 'Orders.status',
-        operator: 'equals',
-        values: ['invalid'],
-      };
-
-      const wrapper = shallowMount(QueryBuilder, {
-        props: {
-          cubeApi: cube,
-          query: {
-            filters: [filter],
-            renewQuery: true,
-          },
-        },
-      });
-
-      await flushPromises();
-
-      expect(wrapper.vm.renewQuery).toBe(true);
-    });
-
     it('ignore order if empty', async () => {
       const cube = createCubeApi();
       jest
@@ -900,9 +872,9 @@ describe('QueryBuilder.vue', () => {
 
         const cube = createCubeApi();
         jest
-            .spyOn(cube, 'request')
-            .mockImplementation(fetchMock(load))
-            .mockImplementationOnce(fetchMock(meta));
+          .spyOn(cube, 'request')
+          .mockImplementation(fetchMock(load))
+          .mockImplementationOnce(fetchMock(meta));
 
         const wrapper = shallowMount(QueryBuilder, {
           propsData: {
@@ -1056,9 +1028,9 @@ describe('QueryBuilder.vue', () => {
       it('does not contain time dimension if granularity is set to none', async () => {
         const cube = createCubeApi();
         jest
-            .spyOn(cube, 'request')
-            .mockImplementation(fetchMock(load))
-            .mockImplementationOnce(fetchMock(meta));
+          .spyOn(cube, 'request')
+          .mockImplementation(fetchMock(load))
+          .mockImplementationOnce(fetchMock(meta));
 
         const wrapper = shallowMount(QueryBuilder, {
           props: {
@@ -1076,22 +1048,22 @@ describe('QueryBuilder.vue', () => {
 
         expect(wrapper.vm.orderMembers.length).toBe(1);
         expect(wrapper.vm.orderMembers).toEqual(
-            expect.arrayContaining([
-              expect.objectContaining({
-                id: 'Orders.count',
-                title: 'Orders Count',
-                order: 'none',
-              }),
-            ])
+          expect.arrayContaining([
+            expect.objectContaining({
+              id: 'Orders.count',
+              title: 'Orders Count',
+              order: 'none',
+            }),
+          ])
         );
       });
 
       it('contains time dimension if granularity is not none', async () => {
         const cube = createCubeApi();
         jest
-            .spyOn(cube, 'request')
-            .mockImplementation(fetchMock(load))
-            .mockImplementationOnce(fetchMock(meta));
+          .spyOn(cube, 'request')
+          .mockImplementation(fetchMock(load))
+          .mockImplementationOnce(fetchMock(meta));
 
         const wrapper = shallowMount(QueryBuilder, {
           props: {
@@ -1110,18 +1082,18 @@ describe('QueryBuilder.vue', () => {
 
         expect(wrapper.vm.orderMembers.length).toBe(2);
         expect(wrapper.vm.orderMembers).toEqual(
-            expect.arrayContaining([
-              expect.objectContaining({
-                id: 'Orders.createdAt',
-                title: 'Orders Created at',
-                order: 'none'
-              }),
-              expect.objectContaining({
-                id: 'Orders.count',
-                title: 'Orders Count',
-                order: 'none',
-              })
-            ])
+          expect.arrayContaining([
+            expect.objectContaining({
+              id: 'Orders.createdAt',
+              title: 'Orders Created at',
+              order: 'none'
+            }),
+            expect.objectContaining({
+              id: 'Orders.count',
+              title: 'Orders Count',
+              order: 'none',
+            })
+          ])
         );
       });
       it('calls copyQueryFromProps if query is changed', async () => {

@@ -4,7 +4,6 @@ use crate::cube_bridge::geo_item::GeoItem;
 use crate::cube_bridge::member_sql::MemberSql;
 use crate::cube_bridge::multi_stage_filter::MultiStageFilterReferences;
 use crate::cube_bridge::timeshift_definition::TimeShiftDefinition;
-use crate::impl_static_data;
 use crate::test_fixtures::cube_bridge::yaml::dimension::YamlDimensionDefinition;
 use crate::test_fixtures::cube_bridge::{
     MockGeoItem, MockMemberSql, MockMultiStageFilterReferences, MockTimeShiftDefinition,

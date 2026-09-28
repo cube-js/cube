@@ -1,5 +1,5 @@
 use crate::cluster::{
-    pick_worker_by_ids, pick_worker_by_partitions, Cluster, WorkerPlanningParams,
+    pick_worker_by_ids, pick_worker_by_partitions, Cluster, PlanningFlags, WorkerPlanningParams,
 };
 use crate::config::injection::DIService;
 use crate::config::ConfigObj;
@@ -226,7 +226,7 @@ pub struct QueryExecutorImpl {
     metadata_cache_factory: Arc<dyn MetadataCacheFactory>,
     parquet_metadata_cache: Arc<dyn CubestoreParquetMetadataCache>,
     memory_handler: Arc<dyn MemoryHandler>,
-    push_partial_aggregate_below_merge: bool,
+    config: Arc<dyn ConfigObj>,
 }
 
 crate::di_service!(QueryExecutorImpl, [QueryExecutor]);
@@ -469,6 +469,7 @@ impl QueryExecutor for QueryExecutorImpl {
             HashMap::new(),
             HashMap::new(),
             NoopParquetMetadataCache::new(),
+            self.config.max_query_plan_depth(),
         )?;
         let pre_serialized_plan = Arc::new(pre_serialized_plan);
         let ctx = self.router_context(cluster.clone(), pre_serialized_plan.clone())?;
@@ -495,6 +496,7 @@ impl QueryExecutor for QueryExecutorImpl {
             remote_to_local_names,
             chunk_id_to_record_batches,
             self.parquet_metadata_cache.cache().clone(),
+            self.config.max_query_plan_depth(),
         )?;
         let pre_serialized_plan = Arc::new(pre_serialized_plan);
         let ctx = self.worker_context(
@@ -547,13 +549,13 @@ impl QueryExecutorImpl {
         metadata_cache_factory: Arc<dyn MetadataCacheFactory>,
         parquet_metadata_cache: Arc<dyn CubestoreParquetMetadataCache>,
         memory_handler: Arc<dyn MemoryHandler>,
-        push_partial_aggregate_below_merge: bool,
+        config: Arc<dyn ConfigObj>,
     ) -> Arc<Self> {
         Arc::new(QueryExecutorImpl {
             metadata_cache_factory,
             parquet_metadata_cache,
             memory_handler,
-            push_partial_aggregate_below_merge,
+            config,
         })
     }
 
@@ -567,6 +569,8 @@ impl QueryExecutorImpl {
             cluster,
             serialized_plan,
             self.memory_handler.clone(),
+            PlanningFlags::from_config(self.config.as_ref()),
+            self.config.group_by_limit_per_partition(),
         ))
     }
 
@@ -577,11 +581,23 @@ impl QueryExecutorImpl {
         worker_planning_params: WorkerPlanningParams,
         data_loaded_size: Option<Arc<DataLoadedSize>>,
     ) -> Result<Arc<SessionContext>, CubeError> {
+        // A sender that does not send the flags planned from its own configuration, and this
+        // node's configuration reproduces it when the value is set on every node, or when it is
+        // unset and both binaries default to the same one. The defaults changed once since the
+        // flags were introduced, so an upgrade that reaches this binary from one older than the
+        // flags -- skipping the release that introduced them -- must pin CUBESTORE_TOPK_STRATEGY
+        // and CUBESTORE_GROUP_BY_LIMIT_FACTOR cluster-wide for the duration, or the two halves of
+        // a split plan get planned from different values and the query returns wrong rows.
+        let planning_flags = worker_planning_params
+            .flags
+            .unwrap_or_else(|| PlanningFlags::from_config(self.config.as_ref()));
         self.make_context(CubeQueryPlanner::new_on_worker(
             serialized_plan,
-            worker_planning_params,
+            worker_planning_params.worker_partition_count,
             self.memory_handler.clone(),
             data_loaded_size.clone(),
+            planning_flags,
+            self.config.group_by_limit_per_partition(),
         ))
     }
 
@@ -603,7 +619,8 @@ impl QueryExecutorImpl {
         vec![
             // Cube rules
             Arc::new(PreOptimizeRule::new(
-                self.push_partial_aggregate_below_merge,
+                self.config.push_partial_aggregate_below_merge_enabled(),
+                self.config.coalesce_under_hash_aggregate(),
             )),
             // DF rules without EnforceDistribution.  We do need to keep EnforceSorting.
             Arc::new(OutputRequirements::new_add_mode()),
@@ -1475,6 +1492,8 @@ pub struct ClusterSendExec {
     pub required_input_ordering: Option<LexRequirement>,
     /// Not used in execution, only stored to allow consistent optimization on router and worker.
     pub worker_sort_and_limit: Option<(Vec<(usize, bool, bool)>, usize)>,
+    /// The flags this node planned with, sent to the worker so it plans its half the same way.
+    pub planning_flags: PlanningFlags,
 }
 
 pub type PartitionWithFilters = (u64, RowRange);
@@ -1499,6 +1518,7 @@ impl ClusterSendExec {
         limit_and_reverse: Option<(usize, bool)>,
         worker_sort_and_limit: Option<(Vec<(usize, bool, bool)>, usize)>,
         required_input_ordering: Option<LexRequirement>,
+        planning_flags: PlanningFlags,
     ) -> Result<Self, CubeError> {
         let partitions = Self::distribute_to_workers(
             cluster.config().as_ref(),
@@ -1518,6 +1538,7 @@ impl ClusterSendExec {
             limit_and_reverse,
             required_input_ordering,
             worker_sort_and_limit,
+            planning_flags,
         })
     }
 
@@ -1544,6 +1565,7 @@ impl ClusterSendExec {
         WorkerPlanningParams {
             // Or, self.partitions.len().
             worker_partition_count: self.properties().output_partitioning().partition_count(),
+            flags: Some(self.planning_flags),
         }
     }
 
@@ -1840,6 +1862,7 @@ impl ClusterSendExec {
             limit_and_reverse: self.limit_and_reverse,
             worker_sort_and_limit: self.worker_sort_and_limit.clone(),
             required_input_ordering: new_required_input_ordering,
+            planning_flags: self.planning_flags,
         }
     }
 
@@ -1908,6 +1931,7 @@ impl ExecutionPlan for ClusterSendExec {
             limit_and_reverse: self.limit_and_reverse,
             worker_sort_and_limit: self.worker_sort_and_limit.clone(),
             required_input_ordering: self.required_input_ordering.clone(),
+            planning_flags: self.planning_flags,
         }))
     }
 
@@ -2523,7 +2547,54 @@ fn slice_copy(a: &dyn Array, start: usize, len: usize) -> ArrayRef {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::cluster::MockCluster;
+    use crate::config::TopKAggregateStrategy;
+    use crate::queryplanner::planning::PlanningMeta;
     use datafusion::arrow::datatypes::Field;
+    use datafusion::common::DFSchema;
+    use datafusion::logical_expr::EmptyRelation;
+    use std::collections::HashMap;
+
+    /// The flags the router stamped must reach the worker, not silently decay to the absent case
+    /// that makes the worker plan from its own configuration.
+    #[test]
+    fn cluster_send_exec_sends_its_planning_flags() -> Result<(), CubeError> {
+        let flags = PlanningFlags {
+            group_by_limit_factor: 3,
+            topk_strategy: TopKAggregateStrategy::FullMerge,
+        };
+        let input: Arc<dyn ExecutionPlan> = Arc::new(EmptyExec::new(Arc::new(Schema::empty())));
+        let plan = PreSerializedPlan::try_new(
+            LogicalPlan::EmptyRelation(EmptyRelation {
+                produce_one_row: false,
+                schema: Arc::new(DFSchema::empty()),
+            }),
+            PlanningMeta {
+                indices: Vec::new(),
+                multi_part_subtree: HashMap::new(),
+                pushable_chunk_filters: Vec::new(),
+            },
+            None,
+            crate::config::DEFAULT_MAX_QUERY_PLAN_DEPTH,
+        )?;
+        let exec = ClusterSendExec {
+            properties: ClusterSendExec::compute_properties(input.properties(), 2),
+            partitions: Vec::new(),
+            cluster: Arc::new(MockCluster::new()),
+            serialized_plan: Arc::new(plan),
+            input_for_optimizations: input,
+            use_streaming: false,
+            limit_and_reverse: None,
+            required_input_ordering: None,
+            worker_sort_and_limit: None,
+            planning_flags: flags,
+        };
+
+        let params = exec.worker_planning_params();
+        assert_eq!(params.worker_partition_count, 2);
+        assert_eq!(params.flags, Some(flags));
+        Ok(())
+    }
 
     #[test]
     fn test_batch_to_dataframe() -> Result<(), CubeError> {

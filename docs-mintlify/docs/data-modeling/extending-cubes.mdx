@@ -1,6 +1,6 @@
 ---
-title: Extending cubes
-description: Use extends on cubes to inherit and merge members from a parent so shared measures, dimensions, and joins stay defined once.
+title: Extending cubes and views
+description: Use extends on cubes and views to inherit and merge members from a parent so shared measures, dimensions, joins, and includes stay defined once.
 ---
 
 The `extends` parameter, supported for [cubes][ref-cube-extends] and
@@ -132,6 +132,95 @@ cube(`page_views`, {
 
 </CodeGroup>
 
+## Extending views
+
+A child view that extends a parent view gets these items from the parent view:
+
+- The [`cubes`][ref-view-cubes] includes. The child view's own `cubes` items are
+  added to them.
+- The view's own [measures][ref-view-measures] and
+  [dimensions][ref-view-dimensions], defined on the parent view.
+- The [folders][ref-view-folders]. The child view's own folders are added to
+  them.
+- The [access policies][ref-view-access-policy]. The child view's own policies
+  are added to them; they do not replace the parent's.
+- Each other parameter that the child view does not set, such as `public` and
+  `description`.
+
+In the example below, `sales_overview` gets `orders_total_amount`,
+`orders_count` and `average_order_value` from `orders_base`, and adds
+`orders_status`:
+
+<CodeGroup>
+
+```yaml title="YAML"
+views:
+  - name: orders_base
+    public: false
+
+    cubes:
+      - join_path: orders
+        prefix: true
+        includes:
+          - total_amount
+          - count
+
+    measures:
+      - name: average_order_value
+        type: number
+        sql: "{CUBE.orders_total_amount} / NULLIF({CUBE.orders_count}, 0)"
+
+  - name: sales_overview
+    extends: orders_base
+    public: true
+
+    cubes:
+      - join_path: orders
+        prefix: true
+        includes:
+          - status
+```
+
+```javascript title="JavaScript"
+view(`orders_base`, {
+  public: false,
+
+  cubes: [
+    {
+      join_path: orders,
+      prefix: true,
+      includes: [`total_amount`, `count`]
+    }
+  ],
+
+  measures: {
+    average_order_value: {
+      type: `number`,
+      sql: `${CUBE.orders_total_amount} / NULLIF(${CUBE.orders_count}, 0)`
+    }
+  }
+})
+
+view(`sales_overview`, {
+  extends: orders_base,
+  public: true,
+
+  cubes: [
+    {
+      join_path: orders,
+      prefix: true,
+      includes: [`status`]
+    }
+  ]
+})
+```
+
+</CodeGroup>
+
+A child view cannot remove an inherited member. To reuse a multi-fact measure
+that only a view defines, and for the limits of view inheritance, see [Reusing a
+view measure across views][ref-recipe-reuse-view-measures].
+
 ## Usage with `FILTER_PARAMS`
 
 If the parent cube is using [`FILTER_PARAMS`][ref-schema-ref-cube-filter-params]
@@ -206,5 +295,11 @@ cube(`base_events`, {
 
 [ref-cube-extends]: /reference/data-modeling/cube#extends
 [ref-view-extends]: /reference/data-modeling/view#extends
+[ref-view-cubes]: /reference/data-modeling/view#cubes
+[ref-view-measures]: /reference/data-modeling/view#measures
+[ref-view-dimensions]: /reference/data-modeling/view#dimensions
+[ref-view-folders]: /reference/data-modeling/view#folders
+[ref-view-access-policy]: /reference/data-modeling/view#access_policy
+[ref-recipe-reuse-view-measures]: /recipes/data-modeling/reusing-view-measures
 [ref-schema-ref-cube-filter-params]: /reference/data-modeling/context-variables#filter_params
-[ref-cube-variable]: /docs/data-modeling/syntax#cube-variable
+[ref-cube-variable]: /docs/data-modeling/concepts/syntax#cube-variable

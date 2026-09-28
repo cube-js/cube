@@ -1,3 +1,5 @@
+import Joi from 'joi';
+
 import { CubeValidator, functionFieldsPatterns } from '../../src/compiler/CubeValidator';
 import {
   CubeRefreshKey,
@@ -1719,7 +1721,7 @@ describe('Cube Validation', () => {
   describe('Access Policy group/groups support:', () => {
     const cubeValidator = new CubeValidator(new CubeSymbols());
 
-    it('should allow group instead of role', () => {
+    it('should allow group', () => {
       const cube = {
         name: 'TestCube',
         fileName: 'test.js',
@@ -1749,21 +1751,6 @@ describe('Cube Validation', () => {
       expect(result.error).toBeFalsy();
     });
 
-    it('should allow role as single string (existing behavior)', () => {
-      const cube = {
-        name: 'TestCube',
-        fileName: 'test.js',
-        sql: () => 'SELECT * FROM test',
-        accessPolicy: [{
-          role: 'admin',
-          rowLevel: { allowAll: true }
-        }]
-      };
-
-      const result = cubeValidator.validate(cube, new ConsoleErrorReporter());
-      expect(result.error).toBeFalsy();
-    });
-
     it('should allow group: "*" syntax', () => {
       const cube = {
         name: 'TestCube',
@@ -1777,38 +1764,6 @@ describe('Cube Validation', () => {
 
       const result = cubeValidator.validate(cube, new ConsoleErrorReporter());
       expect(result.error).toBeFalsy();
-    });
-
-    it('should reject role and group together', () => {
-      const cube = {
-        name: 'TestCube',
-        fileName: 'test.js',
-        sql: () => 'SELECT * FROM test',
-        accessPolicy: [{
-          role: 'admin',
-          group: 'admin',
-          rowLevel: { allowAll: true }
-        }]
-      };
-
-      const result = cubeValidator.validate(cube, new ConsoleErrorReporter());
-      expect(result.error).toBeTruthy();
-    });
-
-    it('should reject role and groups together', () => {
-      const cube = {
-        name: 'TestCube',
-        fileName: 'test.js',
-        sql: () => 'SELECT * FROM test',
-        accessPolicy: [{
-          role: 'admin',
-          groups: ['user'],
-          rowLevel: { allowAll: true }
-        }]
-      };
-
-      const result = cubeValidator.validate(cube, new ConsoleErrorReporter());
-      expect(result.error).toBeTruthy();
     });
 
     it('should reject group and groups together', () => {
@@ -1827,7 +1782,7 @@ describe('Cube Validation', () => {
       expect(result.error).toBeTruthy();
     });
 
-    it('should reject access policy without role/group/groups', () => {
+    it('should reject access policy without group/groups', () => {
       const cube = {
         name: 'TestCube',
         fileName: 'test.js',
@@ -2764,5 +2719,95 @@ describe('Cube Validation', () => {
 
       expect(validationResult.error).toBeFalsy();
     });
+  });
+});
+
+describe('Cube Validation cache', () => {
+  class CollectingErrorReporter extends ErrorReporter {
+    public readonly messages: string[] = [];
+
+    public error(message: any) {
+      this.messages.push(String(message));
+    }
+  }
+
+  // Every schema's validate() comes from Joi's shared base prototype
+  const joiValidate = () => jest.spyOn(Object.getPrototypeOf(Joi.object()), 'validate');
+
+  const cube = (name: string, measureType: string) => ({
+    name,
+    sql: () => 'SELECT * FROM public.orders',
+    measures: {
+      count: { type: measureType },
+    },
+    dimensions: {
+      id: { sql: () => 'id', type: 'number', primaryKey: true },
+    },
+    fileName: 'orders.js',
+  });
+
+  afterEach(() => jest.restoreAllMocks());
+
+  it('skips the schema for an identical definition that already passed', () => {
+    const spy = joiValidate();
+
+    const first = new CubeValidator(new CubeSymbols()).validate(cube('cache_hit', 'count'), new CollectingErrorReporter());
+    const callsAfterFirst = spy.mock.calls.length;
+    const second = new CubeValidator(new CubeSymbols()).validate(cube('cache_hit', 'count'), new CollectingErrorReporter());
+
+    expect(first.error).toBeFalsy();
+    expect(second.error).toBeFalsy();
+    expect(callsAfterFirst).toBeGreaterThan(0);
+    expect(spy.mock.calls.length).toBe(callsAfterFirst);
+  });
+
+  it('matches a definition whose keys come in a different order', () => {
+    const reordered = {
+      fileName: 'orders.js',
+      dimensions: {
+        id: { primaryKey: true, type: 'number', sql: () => 'id' },
+      },
+      measures: {
+        count: { type: 'count' },
+      },
+      sql: () => 'SELECT * FROM public.orders',
+      name: 'cache_order',
+    };
+    new CubeValidator(new CubeSymbols()).validate(cube('cache_order', 'count'), new CollectingErrorReporter());
+
+    const spy = joiValidate();
+    expect(new CubeValidator(new CubeSymbols()).validate(reordered, new CollectingErrorReporter()).error).toBeFalsy();
+    expect(spy).not.toHaveBeenCalled();
+  });
+
+  it('validates a failing definition again and reports its errors every time', () => {
+    for (let i = 0; i < 2; i++) {
+      const reporter = new CollectingErrorReporter();
+      const result = new CubeValidator(new CubeSymbols()).validate(cube('cache_invalid', 'not_a_type'), reporter);
+
+      expect(result.error).toBeTruthy();
+      expect(reporter.messages.join('\n')).toMatch(/measures\.count/);
+    }
+  });
+
+  it('validates a definition again when anything in it changed', () => {
+    const validator = new CubeValidator(new CubeSymbols());
+    expect(validator.validate(cube('cache_changed', 'count'), new CollectingErrorReporter()).error).toBeFalsy();
+
+    const reporter = new CollectingErrorReporter();
+    expect(validator.validate(cube('cache_changed', 'not_a_type'), reporter).error).toBeTruthy();
+    expect(reporter.messages).not.toHaveLength(0);
+  });
+
+  it('sees inherited members of an extending cube', () => {
+    const parent = cube('cache_parent', 'count');
+    const child = Object.setPrototypeOf({ name: 'cache_child', fileName: 'child.js' }, parent);
+    expect(new CubeValidator(new CubeSymbols()).validate(child, new CollectingErrorReporter()).error).toBeFalsy();
+
+    const brokenParent = cube('cache_parent', 'not_a_type');
+    const brokenChild = Object.setPrototypeOf({ name: 'cache_child', fileName: 'child.js' }, brokenParent);
+    const joiResult = new CubeValidator(new CubeSymbols()).validate(brokenChild, new CollectingErrorReporter());
+
+    expect(joiResult.error).toBeTruthy();
   });
 });

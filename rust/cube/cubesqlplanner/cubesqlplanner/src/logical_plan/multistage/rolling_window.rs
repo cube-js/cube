@@ -7,6 +7,7 @@ use std::rc::Rc;
 
 /// Regular rolling window: trailing and/or leading bounds, plus a
 /// time-series offset.
+#[derive(Clone)]
 pub struct MultiStageRegularRollingWindow {
     pub trailing: Option<String>,
     pub leading: Option<String>,
@@ -29,6 +30,7 @@ impl PrettyPrint for MultiStageRegularRollingWindow {
 
 /// `to_date` rolling window — bounded by the start of the
 /// specified granularity (month-to-date, year-to-date, …).
+#[derive(Clone)]
 pub struct MultiStageToDateRollingWindow {
     pub granularity_obj: Rc<Granularity>,
 }
@@ -45,11 +47,11 @@ impl PrettyPrint for MultiStageToDateRollingWindow {
 }
 
 /// Flavour of rolling-window calculation: regular trailing/leading
-/// window, `to_date` window, or a running-total accumulation.
+/// window or a `to_date` window.
+#[derive(Clone)]
 pub enum MultiStageRollingWindowType {
     Regular(MultiStageRegularRollingWindow),
     ToDate(MultiStageToDateRollingWindow),
-    RunningTotal,
 }
 
 impl PrettyPrint for MultiStageRollingWindowType {
@@ -57,9 +59,6 @@ impl PrettyPrint for MultiStageRollingWindowType {
         match self {
             MultiStageRollingWindowType::Regular(window) => window.pretty_print(result, state),
             MultiStageRollingWindowType::ToDate(window) => window.pretty_print(result, state),
-            MultiStageRollingWindowType::RunningTotal => {
-                result.println("Running Total Rolling Window", state)
-            }
         }
     }
 }

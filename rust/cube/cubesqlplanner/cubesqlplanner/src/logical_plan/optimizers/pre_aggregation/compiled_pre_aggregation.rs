@@ -3,12 +3,25 @@ use crate::planner::{MemberSymbol, SqlCall};
 use std::fmt::Debug;
 use std::rc::Rc;
 
+/// One side of a join key, paired with the column the rollup on that
+/// side stores it in. A key kept as the rollup's time dimension lives
+/// in a granularity-suffixed column, so the ON clause cannot be
+/// rendered from the symbol alone.
+#[derive(Clone, Debug)]
+pub struct PreAggregationJoinMember {
+    pub symbol: Rc<MemberSymbol>,
+    pub column: String,
+    /// Granularity the column is truncated to, `None` for a key stored
+    /// as a plain dimension.
+    pub granularity: Option<String>,
+}
+
 #[derive(Clone, Debug)]
 pub struct PreAggregationJoinItem {
     pub from: Rc<PreAggregationSource>,
     pub to: Rc<PreAggregationSource>,
-    pub from_members: Vec<Rc<MemberSymbol>>,
-    pub to_members: Vec<Rc<MemberSymbol>>,
+    pub from_members: Vec<PreAggregationJoinMember>,
+    pub to_members: Vec<PreAggregationJoinMember>,
     pub on_sql: Rc<SqlCall>,
 }
 
@@ -20,7 +33,21 @@ pub struct PreAggregationJoin {
 
 #[derive(Clone, Debug)]
 pub struct PreAggregationUnion {
-    pub items: Vec<Rc<PreAggregationTable>>,
+    pub items: Vec<PreAggregationUnionItem>,
+}
+
+/// A single member rollup of a `rollupLambda` union, paired with the
+/// member symbols of *that* rollup. The lambda exposes the first member
+/// rollup's symbols, but each branch stores its columns under its own
+/// cube aliases (e.g. `requests_stream__tenant_id` vs `requests__tenant_id`),
+/// so the physical builder needs each branch's own symbols to read the
+/// right column while projecting the lambda's unified alias.
+#[derive(Clone, Debug)]
+pub struct PreAggregationUnionItem {
+    pub table: Rc<PreAggregationTable>,
+    pub measures: Vec<Rc<MemberSymbol>>,
+    pub dimensions: Vec<Rc<MemberSymbol>>,
+    pub time_dimensions: Vec<Rc<MemberSymbol>>,
 }
 
 #[derive(Clone, Debug)]

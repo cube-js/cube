@@ -1,4 +1,5 @@
 use async_trait::async_trait;
+use chrono::{DateTime, SecondsFormat, Utc};
 use cubeclient::apis::{
     configuration::Configuration as ClientConfiguration, default_api as cube_api,
 };
@@ -82,8 +83,15 @@ pub struct SqlResponse {
 pub struct SpanId {
     pub span_id: String,
     pub query_key: serde_json::Value,
+    /// The query key with its string literals redacted, when log redaction is on.
+    /// Logged beside `query_key` as `redactedQuery`: the log sink swaps it in, APM
+    /// events keep the statement as sent.
+    pub redacted_query_key: Option<serde_json::Value>,
     span_start: SystemTime,
     is_data_query: RWLockAsync<bool>,
+    last_refresh_time: RWLockAsync<Option<DateTime<Utc>>>,
+    external: RWLockAsync<Option<bool>>,
+    used_pre_aggregations: RWLockAsync<serde_json::Map<String, serde_json::Value>>,
 }
 
 impl SpanId {
@@ -91,9 +99,21 @@ impl SpanId {
         Self {
             span_id,
             query_key,
+            redacted_query_key: None,
             span_start: SystemTime::now(),
             is_data_query: tokio::sync::RwLock::new(false),
+            last_refresh_time: tokio::sync::RwLock::new(None),
+            external: tokio::sync::RwLock::new(None),
+            used_pre_aggregations: tokio::sync::RwLock::new(serde_json::Map::new()),
         }
+    }
+
+    pub fn with_redacted_query_key(
+        mut self,
+        redacted_query_key: Option<serde_json::Value>,
+    ) -> Self {
+        self.redacted_query_key = redacted_query_key;
+        self
     }
 
     pub async fn set_is_data_query(&self, is_data_query: bool) {
@@ -104,6 +124,73 @@ impl SpanId {
     pub async fn is_data_query(&self) -> bool {
         let read = self.is_data_query.read().await;
         *read
+    }
+
+    /// Records the refresh time of a load result contributing to this span.
+    /// A span may cover several load requests (e.g. a join of cube scans);
+    /// the oldest value wins, matching `lastRefreshTime` semantics elsewhere.
+    pub async fn set_last_refresh_time(&self, last_refresh_time: DateTime<Utc>) {
+        let mut write = self.last_refresh_time.write().await;
+        *write = Some(match *write {
+            Some(current) => current.min(last_refresh_time),
+            None => last_refresh_time,
+        });
+    }
+
+    pub async fn last_refresh_time(&self) -> Option<String> {
+        let read = self.last_refresh_time.read().await;
+        read.map(|t| t.to_rfc3339_opts(SecondsFormat::Millis, true))
+    }
+
+    /// Records whether a load result contributing to this span was served from
+    /// an external (CubeStore) pre-aggregation. A span may cover several load
+    /// requests (e.g. a join of cube scans); the span counts as external only
+    /// when *every* one of them was, matching how the flag is folded elsewhere
+    /// (`usages.iter().all(..)` in cubesqlplanner's `base_query`). Otherwise a
+    /// join of one pre-aggregated and one live scan would claim the whole result
+    /// came from a pre-aggregation, while `last_refresh_time` above reports the
+    /// oldest of the two — the two would disagree on the same result.
+    ///
+    /// `None` means no load has reported yet, which is distinct from a load
+    /// having reported `false`.
+    pub async fn set_external(&self, external: bool) {
+        let mut write = self.external.write().await;
+        *write = Some(write.unwrap_or(true) && external);
+    }
+
+    /// `None` when no load has reported yet, so callers can tell a span that
+    /// is silent from one that deliberately folded to `false`.
+    pub async fn external(&self) -> Option<bool> {
+        *self.external.read().await
+    }
+
+    /// Records the pre-aggregations a load result contributing to this span was
+    /// served from. A span may cover several load requests (e.g. a join of cube
+    /// scans), and the entries are keyed by pre-aggregation table name, so they
+    /// merge: the span reports the union of every pre-aggregation read. Two
+    /// loads reporting the same table report the same identity for it, so a
+    /// later entry overwriting an earlier one is a no-op.
+    ///
+    /// Anything but a JSON object is ignored - the value is passed through from
+    /// the API gateway, and only an object can be merged.
+    pub async fn merge_used_pre_aggregations(&self, used_pre_aggregations: serde_json::Value) {
+        if let serde_json::Value::Object(entries) = used_pre_aggregations {
+            let mut write = self.used_pre_aggregations.write().await;
+            for (table_name, usage) in entries {
+                write.insert(table_name, usage);
+            }
+        }
+    }
+
+    /// `None` when no load has reported a pre-aggregation, so callers can fall
+    /// back to another source instead of reporting an empty object.
+    pub async fn used_pre_aggregations(&self) -> Option<serde_json::Value> {
+        let read = self.used_pre_aggregations.read().await;
+        if read.is_empty() {
+            None
+        } else {
+            Some(serde_json::Value::Object(read.clone()))
+        }
     }
 
     pub fn duration(&self) -> u64 {
@@ -282,7 +369,7 @@ impl TransportService for HttpTransport {
     async fn load(
         &self,
         _span_id: Option<Arc<SpanId>>,
-        query: TransportLoadRequestQuery,
+        mut query: TransportLoadRequestQuery,
         _sql_query: Option<SqlQuery>,
         ctx: AuthContextRef,
         meta: LoadRequestMeta,
@@ -309,6 +396,9 @@ impl TransportService for HttpTransport {
                 CacheMode::NoCache => Some(TransportLoadRequestCacheMode::NoCache),
             },
         };
+
+        query.response_format =
+            Some(cubeclient::models::v1_load_request_query::ResponseFormat::Columnar);
 
         // TODO: support meta_fields for HTTP
         let request = TransportLoadRequest {
@@ -743,6 +833,13 @@ impl SqlTemplates {
         )
     }
 
+    pub fn int_division_expr(&self, left: String, right: String) -> Result<String, CubeError> {
+        self.render_template(
+            "expressions/int_division",
+            context! { left => left, right => right },
+        )
+    }
+
     pub fn is_null_expr(&self, expr: String, negate: bool) -> Result<String, CubeError> {
         self.render_template(
             "expressions/is_null",
@@ -774,6 +871,20 @@ impl SqlTemplates {
         self.render_template(
             "expressions/extract",
             context! { date_part => date_part, expr => expr },
+        )
+    }
+
+    /// Renders the epoch (in seconds) of a timestamp difference `left - right`.
+    /// Used for dialects (e.g. Snowflake) where `EXTRACT(EPOCH FROM (left - right))`
+    /// is invalid because EPOCH can't be extracted from an interval.
+    pub fn extract_epoch_diff_expr(
+        &self,
+        left: String,
+        right: String,
+    ) -> Result<String, CubeError> {
+        self.render_template(
+            "expressions/extract_epoch_diff",
+            context! { left => left, right => right },
         )
     }
 
@@ -952,39 +1063,61 @@ impl SqlTemplates {
         self.render_template("params/param", context! { param_index => param_index })
     }
 
-    pub fn sql_type(&self, data_type: DataType) -> Result<String, CubeError> {
-        let data_type = match data_type {
-            DataType::Decimal(precision, scale) => {
-                return self.render_template(
-                    "types/decimal",
-                    context! {
-                        precision => precision,
-                        scale => scale,
-                    },
-                )
-            }
+    /// The type a cast has to name to produce a NULL of `sql_type`.
+    pub fn nullable_type(&self, sql_type: String) -> Result<String, CubeError> {
+        if !self.contains_template("types/nullable") {
+            return Ok(sql_type);
+        }
+
+        self.render_template("types/nullable", context! { data_type => sql_type })
+    }
+
+    /// The `types/*` template a data type renders with, `None` for a type without one.
+    fn sql_type_template(data_type: &DataType) -> Option<&'static str> {
+        Some(match data_type {
+            DataType::Decimal(_, _) => "types/decimal",
             // NULL is not a type in databases. In PostgreSQL, untyped NULL is TEXT
-            DataType::Utf8 | DataType::LargeUtf8 | DataType::Null => "string",
-            DataType::Boolean => "boolean",
-            DataType::Int8 | DataType::UInt8 => "tinyint",
-            DataType::Int16 | DataType::UInt16 => "smallint",
-            DataType::Int32 | DataType::UInt32 => "integer",
-            DataType::Int64 | DataType::UInt64 => "bigint",
-            DataType::Float16 | DataType::Float32 => "float",
-            DataType::Float64 => "double",
-            DataType::Timestamp(_, _) => "timestamp",
-            DataType::Date32 | DataType::Date64 => "date",
-            DataType::Time32(_) | DataType::Time64(_) => "time",
-            DataType::Duration(_) | DataType::Interval(_) => "interval",
-            DataType::Binary | DataType::FixedSizeBinary(_) | DataType::LargeBinary => "binary",
-            dt => {
-                return Err(CubeError::unsupported(format!(
-                    "Can't generate SQL for type {:?}: not supported",
-                    dt
-                )))
+            DataType::Utf8 | DataType::LargeUtf8 | DataType::Null => "types/string",
+            DataType::Boolean => "types/boolean",
+            DataType::Int8 | DataType::UInt8 => "types/tinyint",
+            DataType::Int16 | DataType::UInt16 => "types/smallint",
+            DataType::Int32 | DataType::UInt32 => "types/integer",
+            DataType::Int64 | DataType::UInt64 => "types/bigint",
+            DataType::Float16 | DataType::Float32 => "types/float",
+            DataType::Float64 => "types/double",
+            DataType::Timestamp(_, _) => "types/timestamp",
+            DataType::Date32 | DataType::Date64 => "types/date",
+            DataType::Time32(_) | DataType::Time64(_) => "types/time",
+            DataType::Duration(_) | DataType::Interval(_) => "types/interval",
+            DataType::Binary | DataType::FixedSizeBinary(_) | DataType::LargeBinary => {
+                "types/binary"
             }
+            _ => return None,
+        })
+    }
+
+    /// Whether `sql_type` can render the data type: a lookup, no template is rendered.
+    pub fn contains_sql_type(&self, data_type: &DataType) -> bool {
+        Self::sql_type_template(data_type)
+            .map(|template| self.contains_template(template))
+            .unwrap_or(false)
+    }
+
+    pub fn sql_type(&self, data_type: DataType) -> Result<String, CubeError> {
+        let Some(template) = Self::sql_type_template(&data_type) else {
+            return Err(CubeError::unsupported(format!(
+                "Can't generate SQL for type {:?}: not supported",
+                data_type
+            )));
         };
-        self.render_template(&format!("types/{}", data_type), context! {})
+        let ctx = match data_type {
+            DataType::Decimal(precision, scale) => context! {
+                precision => precision,
+                scale => scale,
+            },
+            _ => context! {},
+        };
+        self.render_template(template, ctx)
     }
 
     pub fn left_join(&self) -> Result<String, CubeError> {
@@ -1022,5 +1155,149 @@ impl SqlTemplates {
             "statements/join",
             context! { join_type => join_type, source => source, condition => condition },
         )
+    }
+
+    /// Renders `queries` as a single set operation: `UNION` when `distinct`, `UNION ALL`
+    /// otherwise. `limit` bounds the result of the whole operation, not of any one query.
+    pub fn union(
+        &self,
+        queries: Vec<String>,
+        distinct: bool,
+        limit: Option<usize>,
+    ) -> Result<String, CubeError> {
+        self.render_template(
+            "statements/union",
+            context! { queries => queries, distinct => distinct, limit => limit },
+        )
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use chrono::TimeZone;
+
+    fn sql_templates_with(entries: Vec<(&str, &str)>) -> SqlTemplates {
+        let templates = entries
+            .into_iter()
+            .map(|(name, template)| (name.to_string(), template.to_string()))
+            .collect();
+        SqlTemplates::new(templates, false).unwrap()
+    }
+
+    #[test]
+    fn nullable_type_is_the_type_itself_where_the_dialect_names_nothing() {
+        let templates = sql_templates_with(vec![("types/string", "TEXT")]);
+
+        assert_eq!(templates.nullable_type("TEXT".to_string()).unwrap(), "TEXT");
+    }
+
+    #[test]
+    fn nullable_type_is_the_form_the_dialect_names() {
+        let templates = sql_templates_with(vec![
+            ("types/string", "String"),
+            ("types/nullable", "Nullable({{ data_type }})"),
+        ]);
+
+        assert_eq!(
+            templates.nullable_type("String".to_string()).unwrap(),
+            "Nullable(String)"
+        );
+    }
+
+    #[tokio::test]
+    async fn span_id_last_refresh_time_keeps_oldest() {
+        let span_id = SpanId::new("test".to_string(), serde_json::json!({}));
+        assert_eq!(span_id.last_refresh_time().await, None);
+
+        let newer = Utc.with_ymd_and_hms(2024, 6, 1, 12, 0, 0).unwrap();
+        let older = Utc.with_ymd_and_hms(2024, 1, 1, 0, 0, 0).unwrap();
+
+        span_id.set_last_refresh_time(newer).await;
+        assert_eq!(
+            span_id.last_refresh_time().await,
+            Some("2024-06-01T12:00:00.000Z".to_string())
+        );
+
+        span_id.set_last_refresh_time(older).await;
+        assert_eq!(
+            span_id.last_refresh_time().await,
+            Some("2024-01-01T00:00:00.000Z".to_string())
+        );
+
+        // A newer value must not override the recorded oldest one
+        span_id.set_last_refresh_time(newer).await;
+        assert_eq!(
+            span_id.last_refresh_time().await,
+            Some("2024-01-01T00:00:00.000Z".to_string())
+        );
+    }
+
+    #[tokio::test]
+    async fn span_id_external_only_when_every_load_is_external() {
+        // No load has reported yet — distinct from a load reporting `false`,
+        // so that consumers can fall back to another source when silent
+        let span_id = SpanId::new("test".to_string(), serde_json::json!({}));
+        assert_eq!(span_id.external().await, None);
+
+        // A single external load makes the whole span external
+        span_id.set_external(true).await;
+        assert_eq!(span_id.external().await, Some(true));
+
+        // ...but one live load anywhere in the span clears it, and a later
+        // external load must not bring it back
+        span_id.set_external(false).await;
+        assert_eq!(span_id.external().await, Some(false));
+        span_id.set_external(true).await;
+        assert_eq!(span_id.external().await, Some(false));
+    }
+
+    #[tokio::test]
+    async fn span_id_external_reports_false_for_a_single_live_load() {
+        let span_id = SpanId::new("test".to_string(), serde_json::json!({}));
+
+        span_id.set_external(false).await;
+        assert_eq!(span_id.external().await, Some(false));
+    }
+
+    #[tokio::test]
+    async fn span_id_used_pre_aggregations_merge_across_loads() {
+        // Silent span — consumers fall back to the stream schema, so an empty
+        // union must not be reported as an empty object
+        let span_id = SpanId::new("test".to_string(), serde_json::json!({}));
+        assert_eq!(span_id.used_pre_aggregations().await, None);
+
+        span_id
+            .merge_used_pre_aggregations(serde_json::json!({
+                "schema.orders_main": { "preAggregationId": "Orders.main" }
+            }))
+            .await;
+        span_id
+            .merge_used_pre_aggregations(serde_json::json!({
+                "schema.users_main": { "preAggregationId": "Users.main" }
+            }))
+            .await;
+
+        // A join of two cube scans reports both pre-aggregations, not the last
+        // one to arrive
+        assert_eq!(
+            span_id.used_pre_aggregations().await,
+            Some(serde_json::json!({
+                "schema.orders_main": { "preAggregationId": "Orders.main" },
+                "schema.users_main": { "preAggregationId": "Users.main" }
+            }))
+        );
+
+        // Anything but an object has nothing mergeable in it and is dropped
+        span_id
+            .merge_used_pre_aggregations(serde_json::json!("nonsense"))
+            .await;
+        assert_eq!(
+            span_id
+                .used_pre_aggregations()
+                .await
+                .and_then(|v| v.as_object().map(|o| o.len())),
+            Some(2)
+        );
     }
 }

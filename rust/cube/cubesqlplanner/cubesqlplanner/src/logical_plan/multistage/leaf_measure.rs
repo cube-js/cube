@@ -5,8 +5,9 @@ use cubenativeutils::CubeError;
 use std::rc::Rc;
 
 /// Leaf CTE of a multi-stage chain — a base query that produces the
-/// raw aggregated values feeding the rest of the chain. Optional
-/// state rendering and time shifts come from `evaluation_context`.
+/// raw aggregated values feeding the rest of the chain. The measures
+/// carry their own render form; time shifts and row-grain evaluation
+/// come from `evaluation_context`.
 pub struct MultiStageLeafMeasure {
     pub measures: Vec<Rc<MemberSymbol>>,
     pub evaluation_context: EvaluationContext,
@@ -20,16 +21,18 @@ impl PrettyPrint for MultiStageLeafMeasure {
         for measure in self.measures.iter() {
             result.println(&format!("measure: {}", measure.full_name()), &state);
         }
-        if self.evaluation_context.measure_as_state {
-            result.println("render_measure_as_state: true", &state);
-        }
         if self.evaluation_context.measure_for_ungrouped {
             result.println("render_measure_for_ungrouped: true", &state);
         }
         if !self.evaluation_context.time_shifts.is_empty() {
             result.println("time_shifts:", &state);
             let details_state = state.new_level();
-            for (_, time_shift) in self.evaluation_context.time_shifts.dimensions_shifts.iter() {
+            for time_shift in self
+                .evaluation_context
+                .time_shifts
+                .dimensions_shifts
+                .values()
+            {
                 result.println(
                     &format!(
                         "- {}: {}",

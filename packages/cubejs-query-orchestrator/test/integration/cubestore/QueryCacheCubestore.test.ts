@@ -41,6 +41,7 @@ QueryCacheTest(
   'CubeStore Cache Driver',
   {
     cacheAndQueueDriver: 'cubestore',
+    backgroundRenew: false,
     cubeStoreDriverFactory,
     beforeAll,
     afterAll

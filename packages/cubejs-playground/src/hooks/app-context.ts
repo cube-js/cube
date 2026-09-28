@@ -6,7 +6,7 @@ export function useAppContext() {
 }
 
 export function usePlaygroundContext() {
-  const { playgroundContext } =  useAppContext();
+  const { playgroundContext } = useAppContext();
 
   return playgroundContext;
 }

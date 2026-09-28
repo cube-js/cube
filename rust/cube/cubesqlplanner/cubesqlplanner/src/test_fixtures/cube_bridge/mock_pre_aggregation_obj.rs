@@ -1,5 +1,4 @@
 use crate::cube_bridge::pre_aggregation_obj::{PreAggregationObj, PreAggregationObjStatic};
-use crate::impl_static_data;
 use std::any::Any;
 use std::rc::Rc;
 use typed_builder::TypedBuilder;

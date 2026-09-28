@@ -6,6 +6,7 @@ pub mod expression;
 pub mod filter;
 pub mod from;
 pub mod join;
+pub mod optimizers;
 pub mod order;
 pub mod query_plan;
 pub mod references_builder;
@@ -24,15 +25,14 @@ pub use cte::Cte;
 pub use cube_ref_evaluator::CubeRefEvaluator;
 pub use expression::{Expr, MemberExpression};
 pub use from::{From, FromSource, SingleAliasedSource, SingleSource};
-pub use join::{
-    Join, JoinCondition, JoinItem, RegularRollingWindowJoinCondition, RollingTotalJoinCondition,
-};
+pub use join::{Join, JoinCondition, JoinItem, RegularRollingWindowJoinCondition};
+pub use optimizers::collapse_trivial_subqueries;
 pub use order::OrderBy;
 pub use query_plan::QueryPlan;
 pub use references_builder::ReferencesBuilder;
 pub use schema::{QualifiedColumnName, Schema, SchemaColumn};
 pub use select::{AliasedExpr, Select};
 pub use sql_visitor::SqlEvaluatorVisitor;
-pub use time_series::{TimeSeries, TimeSeriesDateRange};
+pub use time_series::{CalendarPeriodSource, TimeSeries, TimeSeriesDateRange, TimeSeriesSource};
 pub use union::Union;
 pub use visitor_context::{evaluate_sql_call_with_context, evaluate_with_context, VisitorContext};

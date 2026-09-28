@@ -1,12 +1,14 @@
 import { GenericContainer } from 'testcontainers';
 
 import { DbRunnerAbstract, DBRunnerContainerOptions } from './db-runner.abstract';
+import { startContainerWithRetry } from './start-with-retry';
 
 export class ClickhouseDBRunner extends DbRunnerAbstract {
   public static startContainer(options: DBRunnerContainerOptions) {
     const version = process.env.TEST_CLICKHOUSE_VERSION || options.version || '23.11';
 
     const container = new GenericContainer(`clickhouse/clickhouse-server:${version}`)
+      .withEnvironment({ CLICKHOUSE_SKIP_USER_SETUP: '1' })
       .withExposedPorts(8123)
       .withStartupTimeout(10 * 1000);
 
@@ -15,6 +17,6 @@ export class ClickhouseDBRunner extends DbRunnerAbstract {
       container.withBindMounts(binds);
     }
 
-    return container.start();
+    return startContainerWithRetry(container);
   }
 }

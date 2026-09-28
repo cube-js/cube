@@ -1,0 +1,9 @@
+---
+source: cubesqlplanner/cubesqlplanner/src/tests/integration/multi_stage/filter_directive.rs
+expression: result
+---
+orders__category | orders__created_at_month | orders__total_amount | orders__rolling_amount_no_date_bound
+-----------------+--------------------------+----------------------+-------------------------------------
+books            | 2024-01-01 00:00:00      | 230.00               | 230.00                              
+clothing         | 2024-01-01 00:00:00      | 120.00               | 120.00                              
+electronics      | 2024-01-01 00:00:00      | 150.00               | 150.00

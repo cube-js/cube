@@ -26,14 +26,16 @@ pub fn create_datediff_udf() -> ScalarUDF {
             DataType::Timestamp(TimeUnit::Nanosecond, None) => Arc::clone(&args[1]),
             DataType::Timestamp(TimeUnit::Microsecond, None)
             | DataType::Timestamp(TimeUnit::Millisecond, None)
-            | DataType::Timestamp(TimeUnit::Second, None) => cast_with_options(
+            | DataType::Timestamp(TimeUnit::Second, None)
+            | DataType::Date32
+            | DataType::Date64 => cast_with_options(
                 &args[1],
                 &DataType::Timestamp(TimeUnit::Nanosecond, None),
                 &CastOptions { safe: false },
             )?,
             t => {
                 return Err(DataFusionError::Execution(format!(
-                    "second datediff argument must be of type Timestamp actual: {}",
+                    "second datediff argument must be of type Timestamp or Date actual: {}",
                     t
                 )))
             }
@@ -43,14 +45,16 @@ pub fn create_datediff_udf() -> ScalarUDF {
             DataType::Timestamp(TimeUnit::Nanosecond, None) => Arc::clone(&args[2]),
             DataType::Timestamp(TimeUnit::Microsecond, None)
             | DataType::Timestamp(TimeUnit::Millisecond, None)
-            | DataType::Timestamp(TimeUnit::Second, None) => cast_with_options(
+            | DataType::Timestamp(TimeUnit::Second, None)
+            | DataType::Date32
+            | DataType::Date64 => cast_with_options(
                 &args[2],
                 &DataType::Timestamp(TimeUnit::Nanosecond, None),
                 &CastOptions { safe: false },
             )?,
             t => {
                 return Err(DataFusionError::Execution(format!(
-                    "third datediff argument must be of type Timestamp actual: {}",
+                    "third datediff argument must be of type Timestamp or Date actual: {}",
                     t
                 )))
             }

@@ -19,14 +19,14 @@ use crate::cluster::worker_services::{
     WorkerProcessing,
 };
 
-use crate::ack_error;
+use crate::app_metrics;
 use crate::cluster::message::NetworkMessage;
 use crate::cluster::rate_limiter::{ProcessRateLimiter, TaskType, TraceIndex};
 use crate::cluster::transport::{ClusterTransport, MetaStoreTransport, WorkerConnection};
 use crate::config::injection::{DIService, Injector};
 use crate::config::is_router;
 #[allow(unused_imports)]
-use crate::config::{Config, ConfigObj};
+use crate::config::{Config, ConfigObj, RepartitionStrategy, TopKAggregateStrategy};
 use crate::metastore::chunks::chunk_file_name;
 use crate::metastore::job::{Job, JobRunnerPool, JobStatus, JobType};
 use crate::metastore::{
@@ -231,12 +231,36 @@ pub struct ClusterImpl {
 
 crate::di_service!(ClusterImpl, [Cluster]);
 
+/// Planning decisions the sending node takes from its own configuration and that the receiving node
+/// must reproduce. Each of these shapes both the worker subtree and the node that combines it, so a
+/// receiver planning its half from a different value returns wrong rows instead of failing. They
+/// travel with the query so that the sender's configuration decides for the whole plan.
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct PlanningFlags {
+    pub group_by_limit_factor: usize,
+    pub topk_strategy: TopKAggregateStrategy,
+}
+
+impl PlanningFlags {
+    pub fn from_config(config: &dyn ConfigObj) -> PlanningFlags {
+        PlanningFlags {
+            group_by_limit_factor: config.group_by_limit_factor(),
+            topk_strategy: config.topk_aggregate_strategy(),
+        }
+    }
+}
+
 /// Parameters that the worker node uses to plan queries.  Generally, it needs to construct the same
 /// query plans as the router node (or if there are multiple levels of cluster send, the node from
 /// which it received the query).  We include the necessary information here.
 #[derive(Copy, Clone, Debug, Serialize, Deserialize)]
 pub struct WorkerPlanningParams {
     pub worker_partition_count: usize,
+    /// Absent from a sender that predates the flags. Such a sender planned its half from its own
+    /// configuration, so the receiver falls back to its own -- the same value, as long as the two
+    /// binaries still agree on the defaults.
+    #[serde(default)]
+    pub flags: Option<PlanningFlags>,
 }
 
 impl WorkerPlanningParams {
@@ -244,6 +268,7 @@ impl WorkerPlanningParams {
     pub fn no_worker() -> WorkerPlanningParams {
         WorkerPlanningParams {
             worker_partition_count: 1,
+            flags: None,
         }
     }
 }
@@ -945,17 +970,71 @@ impl Cluster for ClusterImpl {
             .filter(|c| !c.get_row().in_memory())
             .collect::<Vec<_>>();
 
-        if self.config_obj.batch_repartition_enabled() {
-            // FIXME: one job per partition that batches all persisted chunks, but
-            // keyed on a chunk (RepartitionChunk), not the partition. We reuse the
-            // existing job type instead of a dedicated per-partition JobType so an
-            // older binary stays able to deserialize it across `latest`/`release`
-            // channel switches (a new variant would make its whole job shard
-            // unreadable). The anchor is the smallest persisted chunk id so add_job
-            // dedups to a single job per partition; the worker resolves the
-            // partition from it and processes the anchor last (see
-            // repartition_partition_chunks). An old binary just repartitions this
-            // one chunk and drains the rest via its own per-chunk path.
+        if self.config_obj.repartition_strategy() == RepartitionStrategy::Range {
+            // Slice the parent's persisted chunks into RepartitionRange jobs. Walk ALL
+            // chunks (active and inactive) sorted by id so the [start, end] boundaries
+            // stay pinned to chunk ids and don't shift when chunks deactivate; cut a
+            // range once its rows reach max_rows or its chunk count reaches the fan-in
+            // cap, so a range never merges an unbounded number of chunks at once. A
+            // range is only scheduled when it still has an active chunk; the end is
+            // carried as the job's data, not its dedup key, so a tail that extends the
+            // trailing range dedups on the start.
+            // Clamp to >= 1 so a misconfigured 0 cap doesn't break the inner loop before
+            // adding any chunk. Even 1 degrades to one chunk per range (no merge gain);
+            // the sane range is >= 2.
+            let max_rows = self.config_obj.repartition_merge_max_rows().max(1);
+            let max_files = self.config_obj.repartition_merge_max_input_files().max(1);
+            let mut all = self
+                .meta_store
+                .get_chunks_by_partition(p.get_id(), true)
+                .await?
+                .into_iter()
+                .filter(|c| !c.get_row().in_memory())
+                .collect::<Vec<_>>();
+            all.sort_by_key(|c| c.get_id());
+
+            let mut i = 0;
+            while i < all.len() {
+                let start = all[i].get_id();
+                let mut rows = 0u64;
+                let mut count = 0usize;
+                let mut end = start;
+                let mut has_active = false;
+                while i < all.len() {
+                    let c = &all[i];
+                    rows += c.get_row().get_row_count();
+                    count += 1;
+                    end = c.get_id();
+                    has_active |= c.get_row().active();
+                    i += 1;
+                    if rows >= max_rows || count >= max_files {
+                        break;
+                    }
+                }
+                if has_active {
+                    let node =
+                        pick_worker_by_ids(self.config_obj.as_ref(), [start, end]).to_string();
+                    let job = self
+                        .meta_store
+                        .add_job(Job::new(
+                            RowKey::Table(TableId::Chunks, start),
+                            JobType::RepartitionRange(end),
+                            node.clone(),
+                        ))
+                        .await?;
+                    if job.is_some() {
+                        self.notify_job_runner(node).await?;
+                    }
+                }
+            }
+        } else if self.config_obj.repartition_strategy() == RepartitionStrategy::PerPartition {
+            // One job per partition, keyed on a chunk (RepartitionChunk) rather than a
+            // dedicated per-partition JobType so an older binary can still deserialize it
+            // across `latest`/`release` channel switches. The anchor is the smallest
+            // persisted chunk id so add_job dedups to a single job per partition; the
+            // worker resolves the partition from it and merges all its chunks (see
+            // repartition_partition_chunks). An old binary just repartitions this one
+            // chunk and drains the rest via its own per-chunk path.
             if let Some(anchor_chunk_id) = chunks.iter().map(|c| c.get_id()).min() {
                 let node = self.node_name_by_partition(p);
                 let job = self
@@ -2064,13 +2143,11 @@ impl ClusterImpl {
                     log::debug!("Startup warmup cancelled");
                     return;
                 }
-                // TODO: propagate 'not found' and log in debug mode. Compaction might remove files,
-                //       so they are not errors most of the time.
-                ack_error!(
-                    self.remote_fs
-                        .download_file(file, p.get_row().file_size())
-                        .await
-                );
+                let result = self
+                    .remote_fs
+                    .download_file(file.clone(), p.get_row().file_size())
+                    .await;
+                self.report_warmup_download(result, &file);
             }
             for c in chunks {
                 if self.stop_token.is_cancelled() {
@@ -2080,20 +2157,32 @@ impl ClusterImpl {
                 if c.get_row().in_memory() {
                     continue;
                 }
+                let file = chunk_file_name(c.get_id(), c.get_row().suffix());
                 let result = self
                     .remote_fs
-                    .download_file(
-                        chunk_file_name(c.get_id(), c.get_row().suffix()),
-                        c.get_row().file_size(),
-                    )
+                    .download_file(file.clone(), c.get_row().file_size())
                     .await;
-                // TODO: propagate 'not found' and log in debug mode. Compaction might remove files,
-                //       so they are not errors most of the time.
-                ack_error!(result);
+                self.report_warmup_download(result, &file);
             }
         }
         log::debug!("Startup warmup finished");
         return;
+    }
+
+    /// A file that is gone by the time the pass reaches it is the normal case: the walk takes as
+    /// long as it takes and compaction removes what it replaces meanwhile, so its absence says how
+    /// far behind the snapshot the pass ran rather than that anything is wrong. A file that is
+    /// really missing is reported by the query that needs it, which is also the one that can tell,
+    /// since by then the metastore either still names the file or does not.
+    fn report_warmup_download(&self, result: Result<String, CubeError>, remote_path: &str) {
+        match result {
+            Ok(_) => {}
+            Err(e) if e.is_file_not_found() => {
+                app_metrics::WARMUP_MISSING.increment();
+                log::debug!("Skipping warmup of {}: {}", remote_path, e.message);
+            }
+            Err(e) => log::error!("Warmup of {} failed: {:?}", remote_path, e),
+        }
     }
 }
 
@@ -2261,6 +2350,106 @@ mod tests {
     use super::*;
     use crate::config::Config;
     use std::fs;
+
+    /// The wire shape a node that predates the planning flags writes.
+    #[derive(Serialize, Deserialize)]
+    struct WorkerPlanningParamsWithoutFlags {
+        worker_partition_count: usize,
+    }
+
+    fn to_flexbuffers<T: Serialize>(value: &T) -> Vec<u8> {
+        let mut ser = flexbuffers::FlexbufferSerializer::new();
+        value.serialize(&mut ser).unwrap();
+        ser.take_buffer()
+    }
+
+    fn from_flexbuffers<'de, T: Deserialize<'de>>(buffer: &'de [u8]) -> T {
+        T::deserialize(flexbuffers::Reader::get_root(buffer).unwrap()).unwrap()
+    }
+
+    #[test]
+    fn planning_flags_absent_from_a_sender_that_omits_them() {
+        // A message from a node that predates the flags must still be read, and must leave the
+        // flags absent so that the receiver falls back to its own configuration -- which is what
+        // that sender planned its half from.
+        let buffer = to_flexbuffers(&WorkerPlanningParamsWithoutFlags {
+            worker_partition_count: 3,
+        });
+        let params: WorkerPlanningParams = from_flexbuffers(&buffer);
+        assert_eq!(params.worker_partition_count, 3);
+        assert!(params.flags.is_none());
+    }
+
+    #[test]
+    fn planning_flags_are_ignored_by_a_receiver_that_does_not_know_them() {
+        // The reverse direction: a peer that predates the flags must still read the rest of the
+        // message rather than fail on the field it does not know.
+        let buffer = to_flexbuffers(&WorkerPlanningParams {
+            worker_partition_count: 3,
+            flags: Some(PlanningFlags {
+                group_by_limit_factor: 2,
+                topk_strategy: TopKAggregateStrategy::FullMerge,
+            }),
+        });
+        let params: WorkerPlanningParamsWithoutFlags = from_flexbuffers(&buffer);
+        assert_eq!(params.worker_partition_count, 3);
+    }
+
+    #[test]
+    fn planning_flags_round_trip() {
+        let flags = PlanningFlags {
+            group_by_limit_factor: 5,
+            topk_strategy: TopKAggregateStrategy::VectorizedStreaming,
+        };
+        let params: WorkerPlanningParams =
+            from_flexbuffers(&to_flexbuffers(&WorkerPlanningParams {
+                worker_partition_count: 7,
+                flags: Some(flags),
+            }));
+        assert_eq!(params.worker_partition_count, 7);
+        assert_eq!(params.flags, Some(flags));
+    }
+
+    #[test]
+    fn planning_flags_strategy_wire_names() {
+        // The names are the cross-node contract, so a renamed variant must not change them.
+        #[derive(Serialize)]
+        struct FlagsWithStrategyAsString {
+            group_by_limit_factor: usize,
+            topk_strategy: &'static str,
+        }
+
+        for (name, strategy) in [
+            ("streaming", TopKAggregateStrategy::Streaming),
+            (
+                "vectorized_streaming",
+                TopKAggregateStrategy::VectorizedStreaming,
+            ),
+            ("full_merge", TopKAggregateStrategy::FullMerge),
+        ] {
+            let buffer = to_flexbuffers(&FlagsWithStrategyAsString {
+                group_by_limit_factor: 1,
+                topk_strategy: name,
+            });
+            let flags: PlanningFlags = from_flexbuffers(&buffer);
+            assert_eq!(flags.topk_strategy, strategy, "wire name {}", name);
+        }
+    }
+
+    /// The values a receiver falls back to when the sender sends no flags.
+    #[test]
+    fn planning_flags_from_config() {
+        let config = Config::test("planning_flags_from_config")
+            .update_config(|mut c| {
+                c.group_by_limit_factor = 4;
+                c.topk_aggregate_strategy = TopKAggregateStrategy::FullMerge;
+                c
+            })
+            .config_obj();
+        let flags = PlanningFlags::from_config(config.as_ref());
+        assert_eq!(flags.group_by_limit_factor, 4);
+        assert_eq!(flags.topk_strategy, TopKAggregateStrategy::FullMerge);
+    }
 
     fn config_with_workers(name: &str, workers: Vec<String>) -> Arc<dyn ConfigObj> {
         Config::test(name)

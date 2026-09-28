@@ -110,7 +110,7 @@ export class BaseFilter extends BaseDimension {
 
   // noinspection JSMethodCanBeStatic
   public escapeWildcardChars(param) {
-    return typeof param === 'string' ? param.replace(/([_%])/gi, '\\$1') : param;
+    return typeof param === 'string' ? param.replace(/([\\_%])/gi, '\\$1') : param;
   }
 
   public isWildcardOperator() {

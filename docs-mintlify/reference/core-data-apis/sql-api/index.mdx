@@ -3,6 +3,8 @@ title: Cube Core
 description: "Connect any Postgres-compatible client or BI tool to Cube using the Postgres-protocol SQL API."
 ---
 
+import DevModeWarningShort from '/snippets/dev-mode-warning-short.mdx';
+
  SQL API
 
 The SQL API enables Cube to deliver data over the [Postgres-compatible
@@ -178,6 +180,8 @@ services:
 After running it with `docker compose up`, you can finally connect and execute
 an [example request](#transport).
 
+<DevModeWarningShort />
+
 ### Cube Cloud
 
 **SQL API is enabled by default.** To find your SQL API endpoint and credentials
@@ -214,6 +218,11 @@ explicit `LIMIT`, increase `CUBEJS_DB_QUERY_DEFAULT_LIMIT` as needed.
 
 </Info>
 
+Queries that are not streamed are capped by
+[`CUBESQL_NON_STREAMING_QUERY_MAX_ROW_LIMIT`](/reference/configuration/environment-variables#cubesql_non_streaming_query_max_row_limit),
+which defaults to the value of `CUBEJS_DB_QUERY_LIMIT`. It also acts as the threshold
+above which a query is streamed rather than loaded in a single batch.
+
 ### Session limit
 
 Each concurrent connection to the SQL API consumes some resources and attempting
@@ -244,9 +253,7 @@ Use the following environment variables to allocate more resources for query pla
 
 
 [link-postgres]: https://www.postgresql.org
-[ref-dax-api]: /reference/dax-api
-[ref-mdx-api]: /reference/mdx-api
-[ref-sls]: /docs/integrations/semantic-layer-sync
+[ref-mdx-api]: /reference/core-data-apis/mdx-api
 [ref-sql-api-auth]: /reference/core-data-apis/sql-api/security
 [ref-config-checksqlauth]: /reference/configuration/config#checksqlauth
 [ref-config-canswitchsqluser]: /reference/configuration/config#canswitchsqluser
@@ -261,7 +268,7 @@ Use the following environment variables to allocate more resources for query pla
 [ref-deepnote]: /admin/connect-to-data/visualization-tools/deepnote
 [ref-sql-query-format]: /reference/core-data-apis/sql-api/query-format
 [ref-ref-sql-api]: /reference/core-data-apis/sql-api/reference
-[ref-data-model-concepts]: /docs/data-modeling/concepts
+[ref-data-model-concepts]: /docs/data-modeling/overview
 [ref-regular-queries]: /reference/core-data-apis/queries#regular-query
 [ref-queries-wpp]: /reference/core-data-apis/queries#query-with-post-processing
 [ref-queries-wpd]: /reference/core-data-apis/queries#query-with-pushdown

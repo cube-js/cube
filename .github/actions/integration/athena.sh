@@ -14,5 +14,4 @@ export CUBEJS_DB_EXPORT_BUCKET=s3://cubejs-opensource/testing/export/
 yarn lerna run --concurrency 1 --stream --no-prefix integration:athena
 export CUBEJS_DB_EXPORT_BUCKET=cubejs-opensource
 yarn lerna run --concurrency 1 --stream --no-prefix integration:athena
-# yarn lerna run --concurrency 1 --stream --no-prefix smoke:athena
 echo "::endgroup::"

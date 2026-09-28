@@ -88,6 +88,10 @@ impl PlanSqlTemplates {
         self.driver_tools.timestamp_precision()
     }
 
+    pub fn should_reuse_params(&self) -> Result<bool, CubeError> {
+        self.driver_tools.should_reuse_params()
+    }
+
     pub fn time_stamp_cast(&self, field: String) -> Result<String, CubeError> {
         self.driver_tools.time_stamp_cast(field)
     }
@@ -239,8 +243,41 @@ impl PlanSqlTemplates {
         )
     }
 
+    pub fn window_function(
+        &self,
+        fun_call: &str,
+        partition_by_concat: &str,
+        order_by_concat: &str,
+        window_frame: &str,
+    ) -> Result<String, CubeError> {
+        self.render.render_template(
+            "expressions/window_function",
+            context! {
+                fun_call => fun_call,
+                partition_by_concat => partition_by_concat,
+                order_by_concat => order_by_concat,
+                window_frame => window_frame,
+            },
+        )
+    }
+
     pub fn query_aliased(&self, query: &str, alias: &str) -> Result<String, CubeError> {
         let quoted_alias = self.quote_identifier(alias)?;
+        self.render.render_template(
+            "expressions/query_aliased",
+            context! { query => query, quoted_alias => quoted_alias },
+        )
+    }
+
+    /// Like [`Self::query_aliased`] but takes an alias that is already a final,
+    /// quote-ready identifier and must not be re-quoted. Used for SQL-API
+    /// sub-query joins, whose alias the SQL API emits pre-quoted and references
+    /// verbatim in the ON condition.
+    pub fn query_aliased_prequoted(
+        &self,
+        query: &str,
+        quoted_alias: &str,
+    ) -> Result<String, CubeError> {
         self.render.render_template(
             "expressions/query_aliased",
             context! { query => query, quoted_alias => quoted_alias },
@@ -273,8 +310,21 @@ impl PlanSqlTemplates {
         )
     }
 
+    /// The type a cast has to name to produce a NULL of `sql_type`.
+    pub fn nullable_type(&self, sql_type: &str) -> Result<String, CubeError> {
+        if !self.render.contains_template("types/nullable") {
+            return Ok(sql_type.to_string());
+        }
+
+        self.render
+            .render_template("types/nullable", context! { data_type => sql_type })
+    }
+
     pub fn cast_to_string(&self, expr: &str) -> Result<String, CubeError> {
         let string_type = self.render.render_template("types/string", context! {})?;
+        // The keys this counts may hold NULLs, and a dialect whose types reject one would
+        // fail the whole query over a key it should simply not count
+        let string_type = self.nullable_type(&string_type)?;
         self.cast(expr, &string_type)
     }
 
@@ -421,6 +471,7 @@ impl PlanSqlTemplates {
         limit: Option<usize>,
         offset: Option<usize>,
         distinct: bool,
+        recursive: bool,
     ) -> Result<String, CubeError> {
         self.render.render_template(
             "statements/select",
@@ -436,6 +487,7 @@ impl PlanSqlTemplates {
                 offset => offset,
                 distinct => distinct,
                 ctes => ctes,
+                recursive => recursive,
             },
         )
     }
@@ -524,6 +576,15 @@ impl PlanSqlTemplates {
                 || self
                     .driver_tools()
                     .support_generated_series_for_custom_td()?))
+    }
+
+    /// Whether the dialect's generated time series is a self-referencing
+    /// recursive CTE that must be wrapped in `WITH RECURSIVE` (e.g. MySQL).
+    /// MSSQL also uses a recursive CTE but relies on implicit recursion (plain
+    /// `WITH`), so it does not set this marker.
+    pub fn generated_time_series_is_recursive(&self) -> bool {
+        self.render
+            .contains_template("statements/generated_time_series_recursive")
     }
 
     pub fn generated_time_series_select(
@@ -782,6 +843,23 @@ impl PlanSqlTemplates {
             .render_template(&"tesseract/number_param_cast", context! { expr => expr })
     }
 
+    pub fn like_escape_char(&self) -> Result<Option<char>, CubeError> {
+        const TEMPLATE_NAME: &str = "filters/like_escape_char";
+
+        if !self.render.contains_template(TEMPLATE_NAME) {
+            return Ok(None);
+        }
+
+        let rendered = self.render.render_template(TEMPLATE_NAME, context! {})?;
+        let mut characters = rendered.chars();
+        match (characters.next(), characters.next()) {
+            (Some(character), None) => Ok(Some(character)),
+            _ => Err(CubeError::internal(format!(
+                "{TEMPLATE_NAME} must render exactly one character"
+            ))),
+        }
+    }
+
     pub fn additional_null_check(&self, need: bool, column: &String) -> Result<String, CubeError> {
         if need {
             self.or_is_null_check(column.clone())
@@ -853,6 +931,23 @@ mod tests {
         let render = MockSqlTemplatesRender::try_new(t).unwrap();
         let driver_tools = Rc::new(MockDriverTools::with_sql_templates(render));
         PlanSqlTemplates::try_new(driver_tools, false).unwrap()
+    }
+
+    #[test]
+    fn test_nullable_type_is_the_type_itself_where_the_dialect_names_nothing() {
+        let templates = plan_templates_with(vec![]);
+
+        assert_eq!(templates.nullable_type("integer").unwrap(), "integer");
+    }
+
+    #[test]
+    fn test_nullable_type_is_the_form_the_dialect_names() {
+        let templates = plan_templates_with(vec![("types/nullable", "Nullable({{ data_type }})")]);
+
+        assert_eq!(
+            templates.nullable_type("integer").unwrap(),
+            "Nullable(integer)"
+        );
     }
 
     #[test]

@@ -1,5 +1,5 @@
 /*
-stale-if-slow (default) — equivalent to previously used renewQuery: false
+stale-if-slow (default)
   If refresh keys are up-to-date, returns the value from cache
   If refresh keys are expired, tries to return the value from the database
     Returns fresh value from the database if the query executed in the database until the first “Continue wait” interval is reached
@@ -10,7 +10,7 @@ stale-while-revalidate — AKA “backgroundRefresh”
   If refresh keys are expired, returns stale data from cache
   Updates the cache in background
 
-must-revalidate — equivalent to previously used renewQuery: true
+must-revalidate
   If refresh keys are up-to-date, returns the value from cache
   If refresh keys are expired, tries to return the value from the database
     Returns fresh value from the database even if it takes minutes and many “Continue wait” intervals

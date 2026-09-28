@@ -5,19 +5,19 @@ authors = ["Cube Dev, Inc."]
 edition = "2018"
 license = "Apache-2.0"
 description = "SQL API for Cube as proxy over PostgreSQL protocol"
-documentation = "https://cube.dev/docs"
+documentation = "https://docs.cube.dev"
 homepage = "https://cube.dev"
 
 [dependencies]
 arc-swap = "1"
-datafusion = { git = 'https://github.com/cube-js/arrow-datafusion.git', rev = "1a75802e3ccaf7f4f3a518dd71e1043615e68e0c", default-features = false, features = [
+datafusion = { git = 'https://github.com/cube-js/arrow-datafusion.git', rev = "2ba1ea01df982a7d5334e146d70c6a39bb657f5e", default-features = false, features = [
     "regex_expressions",
     "unicode_expressions",
 ] }
 thiserror = "2"
 cubeclient = { path = "../cubeclient" }
 pg-srv = { path = "../pg-srv" }
-sqlparser = { git = 'https://github.com/cube-js/sqlparser-rs.git', rev = "33cf41ae4ddd0c409f52fd72fb5101ae000aad53" }
+sqlparser = { git = 'https://github.com/cube-js/sqlparser-rs.git', rev = "33cf41ae4ddd0c409f52fd72fb5101ae000aad53", features = ["visitor"] }
 base64 = "0.13.0"
 tokio = { version = "^1.35", features = ["full", "rt", "tracing"] }
 serde = { version = "^1.0", features = ["derive"] }
@@ -52,7 +52,7 @@ tracing = { version = "0.1.40", features = ["async-await"] }
 async-stream = "0.3.3"
 sha1_smol = "1.0.0"
 minijinja = { version = "1", features = ["json", "loader"] }
-lru = "0.13.0"
+lru = "0.18.4"
 moka = { version = "0.12", features = ["future"] }
 sha2 = "0.10.8"
 bigdecimal = "0.4.2"

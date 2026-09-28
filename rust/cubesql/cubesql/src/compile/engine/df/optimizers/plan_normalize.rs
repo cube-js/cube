@@ -1,7 +1,7 @@
 use std::{collections::HashMap, sync::Arc};
 
 use datafusion::{
-    arrow::datatypes::DataType,
+    arrow::datatypes::{DataType, TimeUnit},
     error::{DataFusionError, Result},
     logical_expr::{BuiltinScalarFunction, Expr, GroupingSet, Like},
     logical_plan::{
@@ -22,7 +22,9 @@ use datafusion::{
     sql::planner::ContextProvider,
 };
 
-use crate::compile::{engine::CubeContext, rewrite::rules::utils::DatePartToken};
+use crate::compile::{
+    date_parser::parse_date_str, engine::CubeContext, rewrite::rules::utils::DatePartToken,
+};
 
 /// PlanNormalize optimizer rule walks through the query and applies transformations
 /// to normalize the logical plan structure and expressions.
@@ -34,6 +36,8 @@ use crate::compile::{engine::CubeContext, rewrite::rules::utils::DatePartToken};
 /// - binary operations between a literal string and an expression
 ///   of a different type to a string casted to that type
 /// - binary operations between a timestamp and a date to a timestamp and timestamp operation
+/// - comparisons of a timestamp with `DATE +/- INTERVAL` arithmetic to an explicit
+///   `TIMESTAMP` cast of that arithmetic
 /// - IN list expressions where expression being tested is `TIMESTAMP`
 ///   and values might be `DATE` to values casted to `TIMESTAMP`
 /// - BETWEEN expressions where expression being tested is `TIMESTAMP`
@@ -1340,6 +1344,8 @@ fn grouping_set_normalize(
 /// - binary operations between a literal string and an expression
 ///   of a different type to a string casted to that type
 /// - binary operations between a timestamp and a date to a timestamp and timestamp operation
+/// - comparisons of a timestamp with `DATE +/- INTERVAL` arithmetic to an explicit
+///   `TIMESTAMP` cast of that arithmetic
 #[inline(never)]
 fn binary_expr_normalize(
     optimizer: &PlanNormalize,
@@ -1378,6 +1384,37 @@ fn binary_expr_normalize(
         return Ok(Box::new(Expr::ScalarUDF { fun, args }));
     }
 
+    // DataFusion types `DATE +/- INTERVAL` as `TIMESTAMP` with no cast node. Strict dialects
+    // (BigQuery) type that arithmetic as `DATETIME` and reject comparing it to a `TIMESTAMP`,
+    // so the implicit cast is made explicit here. Unlike a BETWEEN bound it is not folded:
+    // the arithmetic may hold `now()`-like placeholders that only the rewrite rules resolve.
+    if matches!(
+        op,
+        Operator::Eq
+            | Operator::NotEq
+            | Operator::Lt
+            | Operator::LtEq
+            | Operator::Gt
+            | Operator::GtEq
+            | Operator::IsDistinctFrom
+            | Operator::IsNotDistinctFrom
+    ) {
+        let target_type = match (&left_type, &right_type) {
+            (DataType::Timestamp(_, _), DataType::Timestamp(_, _) | DataType::Date32) => {
+                Some(&left_type)
+            }
+            (DataType::Date32, DataType::Timestamp(_, _)) => Some(&right_type),
+            _ => None,
+        };
+        if let Some(target_type) = target_type {
+            let left =
+                normalize_temporal_operand(optimizer, left, &left_type, target_type, schema)?;
+            let right =
+                normalize_temporal_operand(optimizer, right, &right_type, target_type, schema)?;
+            return Ok(Box::new(Expr::BinaryExpr { left, op, right }));
+        }
+    }
+
     // Check if the expression is `TIMESTAMP <op> DATE` or `DATE <op> TIMESTAMP`
     // and cast the `DATE` to `TIMESTAMP` to match the types.
     match (&left_type, &right_type) {
@@ -1412,18 +1449,98 @@ fn binary_expr_normalize(
     };
 
     if literal_on_the_left {
-        Ok(Box::new(Expr::BinaryExpr {
-            left: evaluate_expr(optimizer, left.cast_to(&cast_type, schema)?)?,
-            op,
-            right,
-        }))
-    } else {
-        Ok(Box::new(Expr::BinaryExpr {
-            left,
-            op,
-            right: evaluate_expr(optimizer, right.cast_to(&cast_type, schema)?)?,
-        }))
+        if let Some(left) = cast_string_literal_expr(optimizer, &left, &cast_type, schema) {
+            return Ok(Box::new(Expr::BinaryExpr { left, op, right }));
+        }
+    } else if let Some(right) = cast_string_literal_expr(optimizer, &right, &cast_type, schema) {
+        return Ok(Box::new(Expr::BinaryExpr { left, op, right }));
     }
+
+    // The literal can't be casted to the target type; keep the expression as is
+    // instead of failing the whole plan normalization.
+    Ok(Box::new(Expr::BinaryExpr { left, op, right }))
+}
+
+/// Normalizes one side of a temporal comparison to the `TIMESTAMP` type of the other side:
+/// `DATE +/- INTERVAL` arithmetic gets an explicit cast, a `DATE` side is casted and folded.
+fn normalize_temporal_operand(
+    optimizer: &PlanNormalize,
+    expr: Box<Expr>,
+    expr_type: &DataType,
+    target_type: &DataType,
+    schema: &DFSchema,
+) -> Result<Box<Expr>> {
+    if is_date_interval_arithmetic(&expr, schema)? {
+        return Ok(Box::new(Expr::Cast {
+            expr,
+            data_type: target_type.clone(),
+        }));
+    }
+    if matches!(expr_type, DataType::Date32) {
+        return evaluate_expr(optimizer, expr.cast_to(target_type, schema)?);
+    }
+    Ok(expr)
+}
+
+/// Checks if the expression is `DATE +/- INTERVAL` arithmetic, possibly offset by more
+/// intervals (`CURRENT_DATE - INTERVAL '1 month' + INTERVAL '1 day'`). DataFusion types
+/// such an expression as `TIMESTAMP` without an explicit cast.
+fn is_date_interval_arithmetic(expr: &Expr, schema: &DFSchema) -> Result<bool> {
+    let is_interval = |data_type: &DataType| matches!(data_type, DataType::Interval(_));
+    // Walk down the chain of interval offsets to the expression they apply to.
+    let mut expr = expr;
+    loop {
+        let Expr::BinaryExpr { left, op, right } = expr else {
+            return Ok(false);
+        };
+        if !matches!(op, Operator::Plus | Operator::Minus) {
+            return Ok(false);
+        }
+        let base = if is_interval(&right.get_type(schema)?) {
+            left
+        } else if *op == Operator::Plus && is_interval(&left.get_type(schema)?) {
+            right
+        } else {
+            return Ok(false);
+        };
+        if base.get_type(schema)? == DataType::Date32 {
+            return Ok(true);
+        }
+        expr = base;
+    }
+}
+
+/// Casts a string literal expression to the given type, evaluating it to a constant.
+/// Timestamp targets are parsed with Cube's date parser, which accepts date-only
+/// strings (e.g. `'2026-06-01'`) that the Arrow cast kernel rejects.
+/// Returns `None` when the literal can't be casted.
+fn cast_string_literal_expr(
+    optimizer: &PlanNormalize,
+    expr: &Expr,
+    cast_type: &DataType,
+    schema: &DFSchema,
+) -> Option<Box<Expr>> {
+    if let (Expr::Literal(ScalarValue::Utf8(Some(value))), DataType::Timestamp(unit, tz)) =
+        (expr, cast_type)
+    {
+        let parsed = parse_date_str(value).ok()?.and_utc();
+        let scalar = match unit {
+            TimeUnit::Second => ScalarValue::TimestampSecond(Some(parsed.timestamp()), tz.clone()),
+            TimeUnit::Millisecond => {
+                ScalarValue::TimestampMillisecond(Some(parsed.timestamp_millis()), tz.clone())
+            }
+            TimeUnit::Microsecond => {
+                ScalarValue::TimestampMicrosecond(Some(parsed.timestamp_micros()), tz.clone())
+            }
+            TimeUnit::Nanosecond => {
+                ScalarValue::TimestampNanosecond(Some(parsed.timestamp_nanos_opt()?), tz.clone())
+            }
+        };
+        return Some(Box::new(Expr::Literal(scalar)));
+    }
+
+    let casted = expr.clone().cast_to(cast_type, schema).ok()?;
+    evaluate_expr(optimizer, casted).ok()
 }
 
 /// Returns the type a literal string should be casted to based on the operator
@@ -1694,6 +1811,144 @@ mod tests {
 
             let optimizer = PlanNormalize::new(&cube_ctx);
             optimizer.optimize(&plan, &OptimizerConfig::new()).unwrap();
+        });
+
+        Ok(())
+    }
+
+    // Date-only strings (e.g. '2026-06-01') are rejected by the Arrow cast kernel,
+    // so they must be parsed with Cube's date parser instead.
+    #[test]
+    fn test_binary_expr_date_only_string_to_timestamp() -> Result<()> {
+        run_async_test(async move {
+            let meta = get_test_tenant_ctx();
+            let cube_ctx = create_test_postgresql_cube_context(meta)
+                .await
+                .expect("Failed to create cube context");
+
+            let schema = Schema::new(vec![Field::new(
+                "ts",
+                DataType::Timestamp(TimeUnit::Nanosecond, None),
+                true,
+            )]);
+
+            let table_scan = LogicalPlanBuilder::scan_empty(Some("test_table"), &schema, None)
+                .expect("Failed to create table scan")
+                .build()
+                .expect("Failed to build plan");
+
+            let plan = LogicalPlanBuilder::from(table_scan)
+                .filter(col("ts").gt_eq(lit("2026-06-01")))
+                .expect("Failed to add filter")
+                .build()
+                .expect("Failed to build plan");
+
+            let optimizer = PlanNormalize::new(&cube_ctx);
+            let optimized = optimizer.optimize(&plan, &OptimizerConfig::new()).unwrap();
+
+            let LogicalPlan::Filter(Filter { predicate, .. }) = &optimized else {
+                panic!("Expected Filter plan, got: {:?}", optimized);
+            };
+            let expected_nanos = parse_date_str("2026-06-01")
+                .unwrap()
+                .and_utc()
+                .timestamp_nanos_opt()
+                .unwrap();
+            assert_eq!(
+                *predicate,
+                col("test_table.ts").gt_eq(Expr::Literal(ScalarValue::TimestampNanosecond(
+                    Some(expected_nanos),
+                    None
+                )))
+            );
+        });
+
+        Ok(())
+    }
+
+    // `DATE - INTERVAL` is typed as TIMESTAMP by DataFusion without a cast; strict dialects
+    // produce a DATETIME there, so the implicit cast is made explicit when compared against
+    // a TIMESTAMP.
+    #[test]
+    fn test_binary_expr_timestamp_computed_date_bound() -> Result<()> {
+        run_async_test(async move {
+            let meta = get_test_tenant_ctx();
+            let cube_ctx = create_test_postgresql_cube_context(meta)
+                .await
+                .expect("Failed to create cube context");
+
+            let schema = Schema::new(vec![Field::new(
+                "ts",
+                DataType::Timestamp(TimeUnit::Nanosecond, None),
+                true,
+            )]);
+
+            let table_scan = LogicalPlanBuilder::scan_empty(Some("test_table"), &schema, None)
+                .expect("Failed to create table scan")
+                .build()
+                .expect("Failed to build plan");
+
+            // 2026-06-01 minus 28 days
+            let date = Expr::Literal(ScalarValue::Date32(Some(20605)));
+            let interval = Expr::Literal(ScalarValue::IntervalDayTime(Some(28i64 << 32)));
+            let plan = LogicalPlanBuilder::from(table_scan)
+                .filter(col("ts").gt_eq(date.clone() - interval.clone()))
+                .expect("Failed to add filter")
+                .build()
+                .expect("Failed to build plan");
+
+            let optimizer = PlanNormalize::new(&cube_ctx);
+            let optimized = optimizer.optimize(&plan, &OptimizerConfig::new()).unwrap();
+
+            let LogicalPlan::Filter(Filter { predicate, .. }) = &optimized else {
+                panic!("Expected Filter plan, got: {:?}", optimized);
+            };
+            assert_eq!(
+                *predicate,
+                col("test_table.ts").gt_eq(Expr::Cast {
+                    expr: Box::new(date - interval),
+                    data_type: DataType::Timestamp(TimeUnit::Nanosecond, None),
+                })
+            );
+        });
+
+        Ok(())
+    }
+
+    // A string literal that can't be casted must not fail the whole plan
+    // normalization; the expression is kept as is.
+    #[test]
+    fn test_binary_expr_uncastable_string_keeps_plan() -> Result<()> {
+        run_async_test(async move {
+            let meta = get_test_tenant_ctx();
+            let cube_ctx = create_test_postgresql_cube_context(meta)
+                .await
+                .expect("Failed to create cube context");
+
+            let schema = Schema::new(vec![Field::new(
+                "ts",
+                DataType::Timestamp(TimeUnit::Nanosecond, None),
+                true,
+            )]);
+
+            let table_scan = LogicalPlanBuilder::scan_empty(Some("test_table"), &schema, None)
+                .expect("Failed to create table scan")
+                .build()
+                .expect("Failed to build plan");
+
+            let plan = LogicalPlanBuilder::from(table_scan)
+                .filter(col("ts").gt_eq(lit("not-a-date")))
+                .expect("Failed to add filter")
+                .build()
+                .expect("Failed to build plan");
+
+            let optimizer = PlanNormalize::new(&cube_ctx);
+            let optimized = optimizer.optimize(&plan, &OptimizerConfig::new()).unwrap();
+
+            let LogicalPlan::Filter(Filter { predicate, .. }) = &optimized else {
+                panic!("Expected Filter plan, got: {:?}", optimized);
+            };
+            assert_eq!(*predicate, col("test_table.ts").gt_eq(lit("not-a-date")));
         });
 
         Ok(())

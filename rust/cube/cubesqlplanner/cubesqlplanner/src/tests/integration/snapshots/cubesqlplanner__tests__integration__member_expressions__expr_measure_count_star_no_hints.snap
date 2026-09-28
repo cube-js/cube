@@ -1,0 +1,7 @@
+---
+source: cubesqlplanner/src/tests/integration/member_expressions.rs
+expression: result
+---
+total_count
+-----------
+9

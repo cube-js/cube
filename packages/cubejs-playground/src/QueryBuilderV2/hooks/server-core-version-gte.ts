@@ -6,11 +6,10 @@ export function useServerCoreVersionGte(version: string, currentVersion: string)
       const [major, minor, patch] = currentVersion.split('.').map(Number);
       const [major1, minor1, patch1] = version.split('.').map(Number);
 
-      gt =
-        major > major1 ||
-        (major === major1 && minor > minor1) ||
-        (major === major1 && minor === minor1 && patch >= patch1);
-    } catch (_) {
+      gt = major > major1
+        || (major === major1 && minor > minor1)
+        || (major === major1 && minor === minor1 && patch >= patch1);
+    } catch {
       //
     }
 

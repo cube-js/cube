@@ -15,6 +15,11 @@ cubes:
           - name: full_location
             type: string
             sql: "CONCAT({CUBE}.name, ' from ', {CUBE}.city)"
+          # Top-level OR over a nullable column, so the whole expression can be
+          # NULL while neither operand's own IS NULL is true.
+          - name: is_ny_or_alice
+            type: boolean
+            sql: "{CUBE}.city = 'New York' OR {CUBE}.name LIKE 'Alice%'"
       measures:
           - name: count
             type: count
@@ -51,12 +56,26 @@ cubes:
           - name: customer_id
             type: number
             sql: customer_id
+          # Top-level AND — binds weaker than the filter's own operator. The
+          # second operand carries its own parentheses so the mis-parse stays
+          # valid SQL and shows up as wrong rows rather than a syntax error.
+          - name: is_big_completed
+            type: boolean
+            sql: "{CUBE}.amount > 100 AND ({CUBE}.status = 'completed')"
+          # Top-level comparison — a second one next to it is a syntax error.
+          - name: is_big
+            type: boolean
+            sql: "{CUBE}.amount > 100"
       measures:
           - name: count
             type: count
           - name: total_amount
             type: sum
             sql: amount
+          # The reported model's shape: a calculated boolean over a measure.
+          - name: total_amount_is_set
+            type: boolean
+            sql: "{total_amount} IS NOT NULL"
           - name: avg_amount
             type: avg
             sql: amount
