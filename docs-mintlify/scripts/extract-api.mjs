@@ -142,6 +142,11 @@ function commonPathPrefix(pathList) {
   return prefix;
 }
 
+// A shared parent can be too broad when a tag spans sibling collections.
+const RESOURCE_PATH_OVERRIDES = {
+  'Snowflake Semantic View Sync': '/api/v1/deployments/{deploymentId}/snowflake-semantic-view-{pulls,syncs}',
+};
+
 // The v1 REST API, on both path families it is served under: /api/v1/… on the
 // main console-server pods, and /build/api/v1/… routed to the build pods (which
 // own the data-model / dev-mode / upload surface). Same host, same Bearer token.
@@ -300,6 +305,7 @@ const src = yaml.load(fs.readFileSync(SRC, 'utf8'));
 //    trailing slash — a trailing slash breaks Mintlify dev), and clean tags +
 //    operationIds.
 const paths = {};
+const operationIds = new Map();
 const matchedExcludes = new Set();
 let autoExcludedCount = 0;
 for (const [key, val] of Object.entries(src.paths)) {
@@ -338,6 +344,15 @@ for (const [key, val] of Object.entries(src.paths)) {
     // strip "XxxController." prefix from operationId for clean page slugs
     if (typeof val[m].operationId === 'string') {
       val[m].operationId = val[m].operationId.replace(/^[^.]*\./, '');
+      const prior = operationIds.get(val[m].operationId);
+      if (prior) {
+        console.error(
+          `Aborting: operationId collision after normalization: ${val[m].operationId} ` +
+            `(${prior} and ${m.toUpperCase()} ${newKey}).`
+        );
+        process.exit(1);
+      }
+      operationIds.set(val[m].operationId, `${m.toUpperCase()} ${newKey}`);
     }
   }
   if (!kept) continue; // every operation on this path was excluded
@@ -640,7 +655,7 @@ const rows = groups
   .map(
     (g) =>
       `| [${g.group}](/api-reference/${kebab(g.group)}/${kebab(linkSummaryForTag(g.group))}) ` +
-      `| \`${commonPathPrefix(pathsForTag[g.group])}\` | v1 |`
+      `| \`${RESOURCE_PATH_OVERRIDES[g.group] ?? commonPathPrefix(pathsForTag[g.group])}\` | v1 |`
   )
   .join('\n');
 const table = [INTRO_TABLE_HEAD, rows, INTRO_SCIM_ROWS].join('\n');

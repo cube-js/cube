@@ -2786,7 +2786,7 @@ paths:
           are surfaced as navigation, but their unshared siblings stay hidden.
   /api/v1/deployments/{deploymentId}/snowflake-semantic-view-pulls:
     post:
-      operationId: startPull
+      operationId: startSnowflakeSemanticViewPull
       parameters:
         - in: path
           name: deploymentId
@@ -2817,7 +2817,7 @@ paths:
           SQL runner access, and preview enablement.
   /api/v1/deployments/{deploymentId}/snowflake-semantic-view-pulls/{syncJobId}:
     get:
-      operationId: getPullStatus
+      operationId: getSnowflakeSemanticViewPullStatus
       parameters:
         - in: path
           name: deploymentId
@@ -2845,7 +2845,7 @@ paths:
           a 404 means the job is not visible to this deployment.
   /api/v1/deployments/{deploymentId}/snowflake-semantic-view-pulls/{syncJobId}/result:
     get:
-      operationId: getPullResult
+      operationId: getSnowflakeSemanticViewPullResult
       parameters:
         - in: path
           name: deploymentId
@@ -2873,7 +2873,7 @@ paths:
           Poll status first; this endpoint returns 404 until the pull completes.
   /api/v1/deployments/{deploymentId}/snowflake-semantic-view-syncs:
     post:
-      operationId: startSync
+      operationId: startSnowflakeSemanticViewPush
       parameters:
         - in: path
           name: deploymentId
@@ -2904,7 +2904,7 @@ paths:
           and preview enablement.
   /api/v1/deployments/{deploymentId}/snowflake-semantic-view-syncs/{syncJobId}:
     get:
-      operationId: getPushStatus
+      operationId: getSnowflakeSemanticViewPushStatus
       parameters:
         - in: path
           name: deploymentId
@@ -2932,7 +2932,7 @@ paths:
           a 404 means the job is not visible to this deployment.
   /api/v1/deployments/{deploymentId}/snowflake-semantic-view-syncs/{syncJobId}/result:
     get:
-      operationId: getPushResult
+      operationId: getSnowflakeSemanticViewPushResult
       parameters:
         - in: path
           name: deploymentId
