@@ -983,7 +983,9 @@ Query parameters:
 | `offset` | Pagination offset. Defaults to `0` | No |
 | `limit` | Maximum number of items to return. Defaults to all items | No |
 
-If neither `cubes` nor `views` is provided, all cubes and views are returned.
+If neither `cubes` nor `views` is provided, all cubes and views are returned,
+including private cubes returned as [lineage stubs](#private-cubes-and-members).
+A stub cube can also be requested by name in `cubes`.
 
 Example request:
 
