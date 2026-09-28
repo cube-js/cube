@@ -1149,19 +1149,23 @@ entities before `offset` and `limit` are applied:
 Cubes, views, and members that aren't [public][ref-cubes-public] are not
 returned with their definitions. To keep lineage complete, a private cube or
 member that a public member references directly is returned as a _lineage stub_,
-with `public` set to `false`. A stub has:
+with `public` set to `false`:
 
-- only the members that public members reference, each with its `name`, `type`,
-  and `column_references`
-- `title` set to its name and an empty `description`
-- empty `member_references` and `cube_references`, and no `sql` or
-  `is_primary_key`
+- A stub cube has only the members that public members reference, its own
+  `table_references`, and empty `cube_references`.
+- A stub member has its `name`, `type`, and `column_references`, and empty
+  `member_references`. It has no `sql` or `is_primary_key`.
+- Both have `title` set to their name and an empty `description`.
 
-Every entry in `member_references` and `cube_references` resolves to a cube,
-view, or member in the response, and a view's `table_references` include the
-tables it reads through private cubes. For a private cube that no public member
-references, `/v1/entities/{name}` returns `404`. To list only public cubes and
-views, filter on `public`.
+A private member of a public cube is returned as a stub member in that cube's
+`measures` or `dimensions`. Private views are never returned.
+
+Every entry in `member_references` and `cube_references` names a cube, view, or
+member that the Metadata API returns, though not necessarily in the same
+response. A view's `table_references` include the tables it reads through
+private cubes. For a private view, or a private cube that no public member
+references, `/v1/entities/{name}` returns `404`. To keep only public cubes and
+views, filter the results on the `public` field.
 
 For example, a public view whose `customer_id` dimension is an alias of
 `customers.id` in a private `customers` cube returns this stub:
