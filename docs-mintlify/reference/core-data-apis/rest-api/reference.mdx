@@ -1146,10 +1146,12 @@ entities before `offset` and `limit` are applied:
 
 ### Private cubes and members
 
-Cubes, views, and members that aren't [public][ref-cubes-public] are not
-returned with their definitions. To keep lineage complete, a private cube or
-member that a public member references directly is returned as a _lineage stub_,
-with `public` set to `false`:
+Cubes, views, and members that aren't public are not returned with their
+definitions (see `public` for [cubes][ref-cubes-public],
+[views][ref-views-public], [measures][ref-measures-public], and
+[dimensions][ref-dimensions-public]). To keep lineage complete, a private cube
+or member that a public member references directly is returned as a _lineage
+stub_, with `public` set to `false`:
 
 - A stub cube has only the members that public members reference, its own
   `table_references`, and empty `cube_references`.
@@ -1159,6 +1161,12 @@ with `public` set to `false`:
 
 A private member of a public cube is returned as a stub member in that cube's
 `measures` or `dimensions`. Private views are never returned.
+
+Setting `public` to `false` doesn't hide the name, tables, or columns of a cube
+or member that a public member references. To hide them, use
+[data access policies][ref-dap]: members hidden in a cube that has data access
+policies are never returned as stubs or used for lineage, and references to
+them are omitted.
 
 Every entry in `member_references` and `cube_references` names a cube, view, or
 member that the Metadata API returns, though not necessarily in the same
@@ -1202,9 +1210,6 @@ For example, a public view whose `customer_id` dimension is an alias of
   ]
 }
 ```
-
-Members hidden in a cube that has [data access policies][ref-dap] are never
-returned as stubs or used for lineage. References to them are omitted instead.
 
 ## Health checks
 
@@ -1304,4 +1309,7 @@ Keep-Alive: timeout=5
 [ref-control-plane-api]: /reference/control-plane-api
 [self-metadata-api]: #metadata-api
 [ref-cubes-public]: /reference/data-modeling/cube#public
+[ref-views-public]: /reference/data-modeling/view#public
+[ref-measures-public]: /reference/data-modeling/measures#public
+[ref-dimensions-public]: /reference/data-modeling/dimensions#public
 [ref-dap]: /docs/data-modeling/data-access-policies
