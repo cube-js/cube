@@ -203,17 +203,20 @@ export class PreAggregationPartitionRangeLoader {
     }];
   }
 
+  private loadRangeEnd(range: QueryDateRange, buildRangeEnd: string): string {
+    const partitionInvalidateKeyQueries = this.preAggregation.partitionInvalidateKeyQueries || this.preAggregation.invalidateKeyQueries;
+    // `partitionInvalidateKeyQueries = []` in case of real time
+    if ((!partitionInvalidateKeyQueries || partitionInvalidateKeyQueries.length > 0) && buildRangeEnd < range[1]) {
+      return buildRangeEnd;
+    }
+    return range[1];
+  }
+
   protected partitionPreAggregationDescription(range: QueryDateRange, buildRange: QueryDateRange): PreAggregationDescription {
     const partitionTableName = PreAggregationPartitionRangeLoader.partitionTableName(
       this.preAggregation.tableName, this.preAggregation.partitionGranularity, range
     );
-    const [_, buildRangeEnd] = buildRange;
-    const loadRange: [string, string] = [...range];
-    const partitionInvalidateKeyQueries = this.preAggregation.partitionInvalidateKeyQueries || this.preAggregation.invalidateKeyQueries;
-    // `partitionInvalidateKeyQueries = []` in case of real time
-    if ((!partitionInvalidateKeyQueries || partitionInvalidateKeyQueries.length > 0) && buildRangeEnd < range[1]) {
-      loadRange[1] = buildRangeEnd;
-    }
+    const loadRange: [string, string] = [range[0], this.loadRangeEnd(range, buildRange[1])];
     const clipped = loadRange[1] !== range[1];
     const partitionRange = this.resolvePartitionRange(range);
     const partitionLoadRange = clipped ? this.resolvePartitionRange(loadRange) : partitionRange;
@@ -448,12 +451,11 @@ export class PreAggregationPartitionRangeLoader {
       const cachedPlan = this.compilerCacheFn<{ rangeKey: string | null; descriptions: PreAggregationDescription[] }>(
         ['partitionPlan', JSON.stringify(identity)], () => ({ rangeKey: null, descriptions: [] })
       );
-      // Descriptions depend on the build range only through its end, and only while it falls inside the last partition.
+      // Only the last partition can end past the build range, so its load range end is all the build range contributes.
       const [, lastPartition] = timeSeriesBoundaries(
         partitionGranularity, dateRange, { timestampPrecision }
       );
-      const clipEnd = lastPartition && buildRange[1] < lastPartition[1] ? buildRange[1] : null;
-      const rangeKey = JSON.stringify([dateRange, clipEnd]);
+      const rangeKey = JSON.stringify([dateRange, lastPartition && this.loadRangeEnd(lastPartition, buildRange[1])]);
       if (cachedPlan.rangeKey === rangeKey) {
         this.checkMaxPartitions(cachedPlan.descriptions.length);
         return cachedPlan.descriptions;
