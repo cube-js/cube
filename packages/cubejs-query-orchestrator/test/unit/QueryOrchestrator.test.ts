@@ -914,17 +914,17 @@ describe('QueryOrchestrator', () => {
     await queryOrchestrator.fetchQuery(query);
     await queryOrchestrator.fetchQuery(query);
     expect(
-      queryOrchestrator.getQueryCache()['memoryCache'].has(
+      queryOrchestrator.getQueryCache().hasMemoryCacheEntry(
         queryOrchestrator.getQueryCache().refreshKeyCacheKey(query.cacheKeyQueries.queries[0], 'default')
       )
     ).toBe(true);
     expect(
-      queryOrchestrator.getQueryCache()['memoryCache'].has(
+      queryOrchestrator.getQueryCache().hasMemoryCacheEntry(
         queryOrchestrator.getQueryCache().refreshKeyCacheKey(query.cacheKeyQueries.queries[1], 'default')
       )
     ).toBe(false);
     expect(
-      queryOrchestrator.getQueryCache()['memoryCache'].has(
+      queryOrchestrator.getQueryCache().hasMemoryCacheEntry(
         queryOrchestrator.getQueryCache().refreshKeyCacheKey(query.preAggregations[0].invalidateKeyQueries[0], 'default')
       )
     ).toBe(true);
@@ -2002,10 +2002,6 @@ describe('QueryOrchestrator', () => {
       );
 
       jest.clearAllMocks();
-
-      if (metadataOrchestrator && metadataOrchestrator.queryCache && metadataOrchestrator.queryCache.memoryCache) {
-        metadataOrchestrator.queryCache.memoryCache.clear();
-      }
 
       if (metadataOrchestrator && metadataOrchestrator.queryCache && metadataOrchestrator.queryCache.getCacheDriver()) {
         const cacheDriver = metadataOrchestrator.queryCache.getCacheDriver();
