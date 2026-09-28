@@ -134,7 +134,12 @@ You can start a push or pull through the [Platform API](/api-reference/introduct
 | Check progress | `GET /api/v1/deployments/{deploymentId}/snowflake-semantic-view-syncs/{syncJobId}` | `GET /api/v1/deployments/{deploymentId}/snowflake-semantic-view-pulls/{syncJobId}` |
 | Get result | `GET /api/v1/deployments/{deploymentId}/snowflake-semantic-view-syncs/{syncJobId}/result` | `GET /api/v1/deployments/{deploymentId}/snowflake-semantic-view-pulls/{syncJobId}/result` |
 
-For a push, send `schema`, a `prefix` for the Snowflake semantic view names, and an array of Cube `viewNames`. For a pull, send `schema` and a repository-relative `outputPath`; optionally specify Snowflake semantic `viewNames` (including `*` patterns), or omit them to pull every view in the schema. Both start requests accept `branchName`, which otherwise defaults to the deployment's deploy branch. A pull commits generated files to that branch, so use an existing review branch when you want to inspect the changes first. Both also accept an optional UUID `idempotencyKey`: retry with the same key and inputs to get the original job, and use a new key when the inputs change.
+Set the start-request fields for the direction you need:
+
+- **Push:** Send `schema`, a `prefix` for the Snowflake semantic view names, and an array of Cube `viewNames`.
+- **Pull:** Send `schema` and a repository-relative `outputPath`. Optionally specify Snowflake semantic `viewNames` (including `*` patterns), or omit them to pull every view in the schema.
+- **Branch:** Either request accepts `branchName`, which defaults to the deployment's deploy branch. A pull commits generated files to that branch, so use an existing review branch to inspect the changes first.
+- **Retries:** Either request accepts an optional UUID `idempotencyKey`. Retry with the same key and inputs to get the original job; use a new key when the inputs change.
 
 For example, start a push with:
 
