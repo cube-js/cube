@@ -11,7 +11,16 @@ use std::rc::Rc;
 
 #[derive(Serialize, Deserialize, Debug, nativebridge::NativeBridgeStatic)]
 pub struct JoinItemDefinitionStatic {
+    pub name: String,
+    pub alias: Option<String>,
     pub relationship: String,
+}
+
+impl JoinItemDefinitionStatic {
+    /// The name the declaring cube knows the join by: its alias, or the joined cube.
+    pub fn effective_name(&self) -> &String {
+        self.alias.as_ref().unwrap_or(&self.name)
+    }
 }
 
 #[nativebridge::native_bridge(JoinItemDefinitionStatic, with_static_meta)]
