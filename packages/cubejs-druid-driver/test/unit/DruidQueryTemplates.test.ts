@@ -1,14 +1,12 @@
 import { prepareCompiler as originalPrepareCompiler } from '@cubejs-backend/schema-compiler';
-import { PinotQuery } from '../../src/PinotQuery';
+import { DruidQuery } from '../../src/DruidQuery';
 
 const prepareCompiler = (content: string) => originalPrepareCompiler({
   localPath: () => __dirname,
-  dataSchemaFiles: () => Promise.resolve([
-    { fileName: 'main.js', content }
-  ])
+  dataSchemaFiles: () => Promise.resolve([{ fileName: 'main.js', content }]),
 }, { adapter: 'postgres' });
 
-const FILTER_MODEL = `
+const MODEL = `
   cube('orders', {
     sql_table: 'orders',
 
@@ -33,11 +31,11 @@ const FILTER_MODEL = `
 `;
 
 const buildQuery = async (query: Record<string, unknown> = {}) => {
-  const { compiler, joinGraph, cubeEvaluator } = prepareCompiler(FILTER_MODEL);
+  const { compiler, joinGraph, cubeEvaluator } = prepareCompiler(MODEL);
 
   await compiler.compile();
 
-  return new PinotQuery({ joinGraph, cubeEvaluator, compiler }, {
+  return new DruidQuery({ joinGraph, cubeEvaluator, compiler }, {
     measures: ['orders.count'],
     ...query,
   });
@@ -54,7 +52,7 @@ const buildFilter = async (operator: string) => {
   return { sql: sql.replace(/\s+/g, ' '), params };
 };
 
-// Pinot has no default LIKE escape character, so escaping the value is only
+// Druid's LIKE has no default escape character, so escaping the value is only
 // meaningful if the clause that interprets it is attached to the predicate -
 // which is why these pin the whole predicate.
 /* eslint-disable quotes -- double quotes keep the expected SQL readable */
@@ -70,48 +68,7 @@ const PREDICATES: [string, string][] = [
 // starts one right after installing - takes longer than jest's default budget.
 const COLD_START_TIMEOUT = 60 * 1000;
 
-describe('PinotQuery SQL templates', () => {
-  it('renders Tesseract sql_table queries with a prepared FROM source', async () => {
-    const { compiler, joinGraph, cubeEvaluator } = prepareCompiler(`
-      cube('orders', {
-        sql_table: 'orders',
-
-        measures: {
-          count: {
-            type: 'count',
-          },
-        },
-
-        dimensions: {
-          id: {
-            sql: 'id',
-            type: 'number',
-            primary_key: true,
-          },
-        },
-      });
-    `);
-
-    await compiler.compile();
-
-    const query = new PinotQuery({ joinGraph, cubeEvaluator, compiler }, {
-      measures: ['orders.count'],
-      timeDimensions: [],
-      filters: [],
-      rowLimit: 10,
-      offset: 5,
-      useNativeSqlPlanner: true,
-    });
-
-    const [sql] = query.buildSqlAndParams();
-
-    expect(sql).toMatch(/FROM\s+orders\b/);
-    expect(sql).not.toMatch(/FROM\s*\(\s*\)\s+AS\b/);
-    expect(sql.indexOf('LIMIT 10')).toBeGreaterThan(-1);
-    // Pinot expects LIMIT before OFFSET.
-    expect(sql.indexOf('LIMIT 10')).toBeLessThan(sql.indexOf('OFFSET 5'));
-  });
-
+describe('DruidQuery SQL templates', () => {
   it.each(PREDICATES)(
     'escapes and interprets LIKE wildcards for %s',
     async (operator, predicate) => {

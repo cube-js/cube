@@ -245,9 +245,14 @@ export class PinotQuery extends BaseQuery {
     templates.expressions.timestamp_literal = 'fromDateTime(\'{{ value }}\', \'yyyy-MM-dd\'\'T\'\'HH:mm:ss.SSS\'\'Z\'\'\')';
     // NOTE: this template contains a comma; two order expressions are being generated
     templates.expressions.sort = '{{ expr }} IS NULL {% if nulls_first %}DESC{% else %}ASC{% endif %}, {{ expr }} {% if asc %}ASC{% else %}DESC{% endif %}';
-    templates.expressions.ilike = 'LOWER({{ expr }}) {% if negated %}NOT {% endif %}LIKE LOWER({{ pattern }})';
+    // `default_escape` means the pushed-down LIKE carried no ESCAPE of its own, so it keeps
+    // Postgres' backslash - which Pinot does not default to and has to be told.
+    templates.expressions.like = '{{ expr }} {% if negated %}NOT {% endif %}LIKE {{ pattern }}{% if default_escape %} ESCAPE \'\\\'{% endif %}';
+    templates.expressions.ilike = 'LOWER({{ expr }}) {% if negated %}NOT {% endif %}LIKE LOWER({{ pattern }}){% if default_escape %} ESCAPE \'\\\'{% endif %}';
     templates.filters.like_pattern = 'CONCAT({% if start_wild %}\'%\'{% else %}\'\'{% endif %}, LOWER({{ value }}), {% if end_wild %}\'%\'{% else %}\'\'{% endif %})';
-    templates.tesseract.ilike = 'LOWER({{ expr }}) {% if negated %}NOT {% endif %} LIKE {{ pattern }}';
+    // Pinot has no default LIKE escape character. The clause cannot go inside
+    // `like_pattern` because the pattern is wrapped in CONCAT(...) here.
+    templates.tesseract.ilike = 'LOWER({{ expr }}) {% if negated %}NOT {% endif %}LIKE {{ pattern }} ESCAPE \'\\\'';
     templates.tesseract.series_bounds_cast = 'CAST({{ expr }} AS TIMESTAMP)';
     templates.expressions.rolling_window_expr_timestamp_cast = 'CAST({{ value }} AS TIMESTAMP)';
     templates.statements.time_series_select = 'SELECT CAST(f AS TIMESTAMP) date_from, CAST(t AS TIMESTAMP) date_to \n' +
