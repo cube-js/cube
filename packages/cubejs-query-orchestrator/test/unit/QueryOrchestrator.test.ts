@@ -1,28 +1,75 @@
-/* globals jest, describe, beforeEach, afterEach, test, expect */
 import { Readable } from 'stream';
+import type { BaseDriver } from '@cubejs-backend/base-driver';
 import { QueryOrchestrator } from '../../src/orchestrator/QueryOrchestrator';
+import type { QueryBody } from '../../src/orchestrator/QueryCache';
+import type { PreAggregationDescription, QueryDateRange } from '../../src/orchestrator/PreAggregations';
+
+// Fixtures spell out only the pre-aggregation fields a test exercises.
+type TestQueryBody = Omit<QueryBody, 'cacheMode' | 'preAggregations'> & {
+  cacheMode?: string;
+  preAggregations?: (Partial<PreAggregationDescription> & { streamOffset?: string, readOnly?: boolean })[];
+};
+
+class TestQueryOrchestrator extends QueryOrchestrator {
+  public fetchQuery(queryBody: TestQueryBody) {
+    return super.fetchQuery(queryBody as QueryBody);
+  }
+}
+
+type MockTable = {
+  tableName: string;
+  buildRangeEnd?: string;
+  sealAt?: string;
+};
+
+type MockQuery = string | [string, string[]?];
+
+type CancelableQuery<T> = Promise<T> & { cancel?: () => void };
 
 class MockDriver {
-  constructor({ csvImport, schemaData } = {}) {
-    this.tablesObj = [];
-    this.tablesReady = [];
-    this.executedQueries = [];
-    this.cancelledQueries = [];
-    this.droppedTables = [];
+  public tablesObj: MockTable[] = [];
+
+  public tablesReady: string[] = [];
+
+  public executedQueries: MockQuery[] = [];
+
+  public cancelledQueries: MockQuery[] = [];
+
+  public droppedTables: string[] = [];
+
+  public csvImport: string | undefined;
+
+  public now: number = new Date().getTime();
+
+  public schemaData: Record<string, unknown> | undefined;
+
+  public schema: string | undefined;
+
+  public tablesQueryDelay: number | undefined;
+
+  public tablesDropDelay: number | undefined;
+
+  // Metadata operations are mocked per test with jest.fn().
+  public getSchemas?: () => Promise<any[]>;
+
+  public getTablesForSpecificSchemas?: (schemas: unknown[]) => Promise<any[]>;
+
+  public getColumnsForSpecificTables?: (tables: unknown[]) => Promise<any[]>;
+
+  public constructor({ csvImport, schemaData }: { csvImport?: string, schemaData?: Record<string, unknown> } = {}) {
     this.csvImport = csvImport;
-    this.now = new Date().getTime();
     this.schemaData = schemaData;
   }
 
-  get tables() {
-    return this.tablesObj.map(t => t.tableName || t);
+  public get tables() {
+    return this.tablesObj.map(t => t.tableName);
   }
 
-  resetTables() {
+  public resetTables() {
     this.tablesObj = [];
   }
 
-  query(query) {
+  public query(query: MockQuery, _values?: unknown[]): CancelableQuery<any[]> {
     this.executedQueries.push(query);
 
     // Handle metadata operations - check if query is an array with metadata operation
@@ -32,7 +79,7 @@ class MockDriver {
         return this.getSchemas();
       } else if (operation === 'METADATA:GET_TABLES_FOR_SCHEMAS') {
         // Parse parameters from the query array
-        let params = {};
+        let params: { schemas?: unknown[], tables?: unknown[] } = {};
 
         try {
           params = query[1] && query[1].length > 0 ? JSON.parse(query[1][0]) : {};
@@ -42,7 +89,7 @@ class MockDriver {
         return this.getTablesForSpecificSchemas(params.schemas || []);
       } else if (operation === 'METADATA:GET_COLUMNS_FOR_TABLES') {
         // Parse parameters from the query array
-        let params = {};
+        let params: { schemas?: unknown[], tables?: unknown[] } = {};
 
         try {
           params = query[1] && query[1].length > 0 ? JSON.parse(query[1][0]) : {};
@@ -58,13 +105,13 @@ class MockDriver {
       return Promise.resolve([]);
     }
 
-    let promise = Promise.resolve([query]);
+    let promise: CancelableQuery<any[]> = Promise.resolve([query]);
     if (query.match('orders_too_big')) {
-      promise = promise.then((res) => new Promise(resolve => setTimeout(() => resolve(res), 3000)));
+      promise = promise.then((res) => new Promise<any[]>(resolve => setTimeout(() => resolve(res), 3000)));
     }
 
     if (query.match('orders_delay')) {
-      promise = promise.then((res) => new Promise(resolve => setTimeout(() => resolve(res), 800)));
+      promise = promise.then((res) => new Promise<any[]>(resolve => setTimeout(() => resolve(res), 800)));
     }
 
     if (query.match(/^SELECT NOW\(\)$/)) {
@@ -101,92 +148,100 @@ class MockDriver {
     return promise;
   }
 
-  async getTablesQuery(schema) {
+  public async getTablesQuery(schema: string) {
     if (this.tablesQueryDelay) {
       await this.delay(this.tablesQueryDelay);
     }
-    return this.tablesObj.filter(t => (t.tableName || t).split('.')[0] === schema)
+    return this.tablesObj.filter(t => t.tableName.split('.')[0] === schema)
       .map(t => ({
-        table_name: (t.tableName || t).replace(`${schema}.`, ''),
+        table_name: t.tableName.replace(`${schema}.`, ''),
         build_range_end: t.buildRangeEnd
       }));
   }
 
-  delay(timeout) {
-    return new Promise(resolve => setTimeout(() => resolve(), timeout));
+  public delay(timeout: number) {
+    return new Promise<void>(resolve => setTimeout(() => resolve(), timeout));
   }
 
-  async createSchemaIfNotExists(schema) {
+  public async createSchemaIfNotExists(schema: string) {
     this.schema = schema;
     return null;
   }
 
-  loadPreAggregationIntoTable(preAggregationTableName, loadSql) {
+  public loadPreAggregationIntoTable(preAggregationTableName: string, loadSql: string, _params?: unknown[], _options?: unknown) {
     this.tablesObj.push({ tableName: preAggregationTableName.substring(0, 100) });
     const promise = this.query(loadSql);
-    const resPromise = promise.then(() => this.tablesReady.push(preAggregationTableName.substring(0, 100)));
+    const resPromise: CancelableQuery<number> = promise.then(() => this.tablesReady.push(preAggregationTableName.substring(0, 100)));
     resPromise.cancel = promise.cancel;
     return resPromise;
   }
 
-  async dropTable(tableName) {
+  public async dropTable(tableName: string) {
     if (this.droppedTables.indexOf(tableName) !== -1) {
       throw new Error(`Can't drop table twice: ${tableName}`);
     }
     this.droppedTables.push(tableName);
     console.log(`Driver drops ${tableName}`);
-    if (!this.tablesObj.find(t => (t.tableName || t) === tableName)) {
+    if (!this.tablesObj.find(t => t.tableName === tableName)) {
       throw new Error(`Can't drop missing table: ${tableName}`);
     }
     await this.query(`DROP TABLE ${tableName}`);
     if (this.tablesDropDelay) {
       await this.delay(this.tablesDropDelay);
     }
-    if (!this.tablesObj.find(t => (t.tableName || t) === tableName)) {
+    if (!this.tablesObj.find(t => t.tableName === tableName)) {
       throw new Error(`Can't drop missing table: ${tableName}`);
     }
-    this.tablesObj = this.tablesObj.filter(t => (t.tableName || t) !== tableName);
+    this.tablesObj = this.tablesObj.filter(t => t.tableName !== tableName);
   }
 
-  async downloadTable(table, { csvImport } = {}) {
+  public async downloadTable(table: string, { csvImport }: { csvImport?: boolean } = {}) {
     if (this.csvImport && csvImport) {
       return { csvFile: `${table}.csv` };
     }
     return { rows: await this.query(`SELECT * FROM ${table}`) };
   }
 
-  async tableColumnTypes() {
+  public async tableColumnTypes() {
     return [{ name: 'foo', type: 'int' }];
   }
 
-  nowTimestamp() {
+  public nowTimestamp() {
     return this.now;
   }
 
-  capabilities() {
+  public capabilities(): Record<string, boolean> {
     return {};
   }
 
-  async stream(sql) {
+  public async stream(sql: string) {
     return {
       rowStream: Readable.from((await this.query(sql)).map(r => (typeof r === 'string' ? { query: r } : r)))
     };
   }
 }
 
-class ExternalMockDriver extends MockDriver {
-  constructor() {
-    super();
-    this.indexes = [];
-    this.csvFiles = [];
-  }
+type MockIndex = { sql: [string, unknown[]], indexName: string };
 
-  async uploadTable(table) {
+class ExternalMockDriver extends MockDriver {
+  public indexes: MockIndex[] = [];
+
+  public csvFiles: string[] = [];
+
+  public async uploadTable(table: string) {
     this.tablesObj.push({ tableName: table.substring(0, 100) });
     throw new Error('uploadTable has been called instead of uploadTableWithIndexes');
   }
 
-  async uploadTableWithIndexes(table, columns, tableData, indexesSql, uniqueKeyColumns, queryTracingObj, externalOptions) {
+  public async uploadTableWithIndexes(
+    table: string,
+    _columns: unknown,
+    tableData: { csvFile?: string },
+    indexesSql: MockIndex[],
+    _uniqueKeyColumns: unknown,
+    queryTracingObj?: { buildRangeEnd?: string },
+    externalOptions?: { sealAt?: string },
+  ) {
     this.tablesObj.push({
       tableName: table.substring(0, 100),
       buildRangeEnd: queryTracingObj?.buildRangeEnd,
@@ -203,37 +258,43 @@ class ExternalMockDriver extends MockDriver {
     this.indexes = this.indexes.concat(indexesSql);
   }
 
-  capabilities() {
+  public capabilities() {
     return { csvImport: true };
   }
 }
 
 class MockDriverUnloadWithoutTempTableSupport extends MockDriver {
-  capabilities() {
+  public capabilities() {
     return { unloadWithoutTempTable: true };
   }
 
-  queryColumnTypes() {
+  public queryColumnTypes() {
     return [];
   }
 }
 
+type StreamOffsetOptions = { streamOffset?: string };
+
 class StreamingSourceMockDriver extends MockDriver {
-  capabilities() {
+  public loadPreAggregationIntoTableStreamOffset: string | undefined;
+
+  public downloadTableStreamOffset: string | undefined;
+
+  public capabilities() {
     return { streamingSource: true };
   }
 
-  loadPreAggregationIntoTable(preAggregationTableName, loadSql, params, options) {
+  public loadPreAggregationIntoTable(preAggregationTableName: string, loadSql: string, params: unknown[], options: StreamOffsetOptions) {
     this.loadPreAggregationIntoTableStreamOffset = options.streamOffset;
-    return super.loadPreAggregationIntoTable(preAggregationTableName, loadSql, options);
+    return super.loadPreAggregationIntoTable(preAggregationTableName, loadSql, params, options);
   }
 
-  async downloadTable(table, { csvImport, streamOffset } = {}) {
+  public async downloadTable(table: string, { csvImport, streamOffset }: { csvImport?: boolean } & StreamOffsetOptions = {}) {
     this.downloadTableStreamOffset = streamOffset;
     return super.downloadTable(table, { csvImport });
   }
 
-  async downloadQueryResults(query, params, options) {
+  public async downloadQueryResults(query: string, _params: unknown[], options: StreamOffsetOptions) {
     this.downloadTableStreamOffset = options.streamOffset;
     return super.downloadTable(query);
   }
@@ -241,20 +302,20 @@ class StreamingSourceMockDriver extends MockDriver {
 
 describe('QueryOrchestrator', () => {
   jest.setTimeout(15000);
-  let mockDriver = null;
-  let fooMockDriver = null;
-  let barMockDriver = null;
-  let mockDriverUnloadWithoutTempTableSupport = null;
-  let streamingSourceMockDriver = null;
-  let externalMockDriver = null;
-  let queryOrchestrator = null;
-  let queryOrchestrator2 = null;
-  let queryOrchestratorExternalRefresh = null;
-  let queryOrchestratorDropWithoutTouch = null;
+  let mockDriver: MockDriver;
+  let fooMockDriver: MockDriver;
+  let barMockDriver: MockDriver;
+  let mockDriverUnloadWithoutTempTableSupport: MockDriverUnloadWithoutTempTableSupport;
+  let streamingSourceMockDriver: StreamingSourceMockDriver;
+  let externalMockDriver: ExternalMockDriver;
+  let queryOrchestrator: TestQueryOrchestrator;
+  let queryOrchestrator2: TestQueryOrchestrator;
+  let queryOrchestratorExternalRefresh: TestQueryOrchestrator;
+  let queryOrchestratorDropWithoutTouch: TestQueryOrchestrator;
   let testCount = 1;
   // Clients poll on `Continue wait`. The memory queue hands out a finished result only once, so a
   // query awaited by several concurrent partitions can answer one of them with `Continue wait`.
-  const fetchLongPolling = (orchestrator, q) => orchestrator.fetchQuery(q).catch(e => {
+  const fetchLongPolling = (orchestrator: TestQueryOrchestrator, q: TestQueryBody) => orchestrator.fetchQuery(q).catch(e => {
     if (e.toString().match(/Continue wait/)) {
       return fetchLongPolling(orchestrator, q);
     }
@@ -282,7 +343,7 @@ describe('QueryOrchestrator', () => {
     const externalMockDriverLocal = new ExternalMockDriver();
 
     const redisPrefix = `ORCHESTRATOR_TEST_${testCount++}`;
-    const driverFactory = (dataSource) => {
+    const mockDriverFor = (dataSource: string): MockDriver => {
       if (dataSource === 'foo') {
         return fooMockDriverLocal;
       } else if (dataSource === 'bar') {
@@ -297,10 +358,12 @@ describe('QueryOrchestrator', () => {
         return mockDriverLocal;
       }
     };
+    // The mocks implement only the part of BaseDriver the orchestrator touches.
+    const driverFactory = (dataSource: string) => mockDriverFor(dataSource) as unknown as BaseDriver;
     const logger =
       (msg, params) => console.log(new Date().toJSON(), msg, params);
     const options = (processUid) => ({
-      externalDriverFactory: () => externalMockDriverLocal,
+      externalDriverFactory: () => externalMockDriverLocal as unknown as BaseDriver,
       queryCacheOptions: {
         queueOptions: () => ({
           concurrency: 2,
@@ -319,11 +382,11 @@ describe('QueryOrchestrator', () => {
     });
 
     queryOrchestrator =
-      new QueryOrchestrator(redisPrefix, driverFactory, logger, options('p1'));
+      new TestQueryOrchestrator(redisPrefix, driverFactory, logger, options('p1'));
     queryOrchestrator2 =
-      new QueryOrchestrator(redisPrefix, driverFactory, logger, options('p2'));
+      new TestQueryOrchestrator(redisPrefix, driverFactory, logger, options('p2'));
     queryOrchestratorExternalRefresh =
-      new QueryOrchestrator(redisPrefix, driverFactory, logger, {
+      new TestQueryOrchestrator(redisPrefix, driverFactory, logger, {
         ...options('p1'),
         preAggregationsOptions: {
           ...options('p1').preAggregationsOptions,
@@ -331,7 +394,7 @@ describe('QueryOrchestrator', () => {
         },
       });
     queryOrchestratorDropWithoutTouch =
-      new QueryOrchestrator(redisPrefix, driverFactory, logger, {
+      new TestQueryOrchestrator(redisPrefix, driverFactory, logger, {
         ...options('p1'),
         preAggregationsOptions: {
           ...options('p1').preAggregationsOptions,
@@ -355,7 +418,7 @@ describe('QueryOrchestrator', () => {
 
   test('basic', async () => {
     mockDriver.now = 12345000;
-    const query = {
+    const query: TestQueryBody = {
       query: 'SELECT "orders__created_at_week" "orders__created_at_week", sum("orders__count") "orders__count" FROM (SELECT * FROM stb_pre_aggregations.orders_number_and_count20191101) as partition_union  WHERE ("orders__created_at_week" >= ($1::timestamptz::timestamptz AT TIME ZONE \'UTC\') AND "orders__created_at_week" <= ($2::timestamptz::timestamptz AT TIME ZONE \'UTC\')) GROUP BY 1 ORDER BY 1 ASC LIMIT 10000',
       values: ['2019-11-01T00:00:00Z', '2019-11-30T23:59:59Z'],
       cacheKeyQueries: {
@@ -380,7 +443,7 @@ describe('QueryOrchestrator', () => {
   });
 
   test('indexes', async () => {
-    const query = {
+    const query: TestQueryBody = {
       query: 'SELECT "orders__created_at_week" "orders__created_at_week", sum("orders__count") "orders__count" FROM (SELECT * FROM stb_pre_aggregations.orders_number_and_count20191101) as partition_union  WHERE ("orders__created_at_week" >= ($1::timestamptz::timestamptz AT TIME ZONE \'UTC\') AND "orders__created_at_week" <= ($2::timestamptz::timestamptz AT TIME ZONE \'UTC\')) GROUP BY 1 ORDER BY 1 ASC LIMIT 10000',
       values: ['2019-11-01T00:00:00Z', '2019-11-30T23:59:59Z'],
       cacheKeyQueries: {
@@ -427,7 +490,7 @@ describe('QueryOrchestrator', () => {
       cacheMode: 'must-revalidate',
       requestId: 'index is part of query key'
     });
-    await new Promise(resolve => setTimeout(() => resolve(), 400));
+    await new Promise<void>(resolve => setTimeout(() => resolve(), 400));
     const result = await queryOrchestrator.fetchQuery({
       query: 'SELECT "orders__created_at_week" "orders__created_at_week", sum("orders__count") "orders__count" FROM (SELECT * FROM stb_pre_aggregations.orders_number_and_count20191102) as partition_union  WHERE ("orders__created_at_week" >= ($1::timestamptz::timestamptz AT TIME ZONE \'UTC\') AND "orders__created_at_week" <= ($2::timestamptz::timestamptz AT TIME ZONE \'UTC\')) GROUP BY 1 ORDER BY 1 ASC LIMIT 10000',
       values: ['2019-11-01T00:00:00Z', '2019-11-30T23:59:59Z'],
@@ -450,7 +513,7 @@ describe('QueryOrchestrator', () => {
   });
 
   test('external indexes', async () => {
-    const query = {
+    const query: TestQueryBody = {
       query: 'SELECT "orders__created_at_week" "orders__created_at_week", sum("orders__count") "orders__count" FROM (SELECT * FROM stb_pre_aggregations.orders_number_and_count20191101) as partition_union  WHERE ("orders__created_at_week" >= ($1::timestamptz::timestamptz AT TIME ZONE \'UTC\') AND "orders__created_at_week" <= ($2::timestamptz::timestamptz AT TIME ZONE \'UTC\')) GROUP BY 1 ORDER BY 1 ASC LIMIT 10000',
       values: ['2019-11-01T00:00:00Z', '2019-11-30T23:59:59Z'],
       cacheKeyQueries: {
@@ -478,7 +541,7 @@ describe('QueryOrchestrator', () => {
   });
 
   test('external join', async () => {
-    const query = {
+    const query: TestQueryBody = {
       query: 'SELECT * FROM stb_pre_aggregations.orders, stb_pre_aggregations.customers',
       values: [],
       cacheKeyQueries: {
@@ -515,7 +578,7 @@ describe('QueryOrchestrator', () => {
   });
 
   test('csv import', async () => {
-    const query = {
+    const query: TestQueryBody = {
       query: 'SELECT "orders__created_at_week" "orders__created_at_week", sum("orders__count") "orders__count" FROM (SELECT * FROM stb_pre_aggregations.orders_number_and_count20191101) as partition_union  WHERE ("orders__created_at_week" >= ($1::timestamptz::timestamptz AT TIME ZONE \'UTC\') AND "orders__created_at_week" <= ($2::timestamptz::timestamptz AT TIME ZONE \'UTC\')) GROUP BY 1 ORDER BY 1 ASC LIMIT 10000',
       values: ['2019-11-01T00:00:00Z', '2019-11-30T23:59:59Z'],
       cacheKeyQueries: {
@@ -543,7 +606,7 @@ describe('QueryOrchestrator', () => {
   });
 
   test('non default data source pre-aggregation', async () => {
-    const query = {
+    const query: TestQueryBody = {
       query: 'SELECT * FROM stb_pre_aggregations.orders, stb_pre_aggregations.customers',
       values: [],
       cacheKeyQueries: {
@@ -568,7 +631,7 @@ describe('QueryOrchestrator', () => {
   });
 
   test('non default data source query', async () => {
-    const query = {
+    const query: TestQueryBody = {
       query: 'SELECT * FROM orders',
       values: [],
       cacheKeyQueries: {
@@ -586,7 +649,7 @@ describe('QueryOrchestrator', () => {
   });
 
   test('silent truncate', async () => {
-    const query = {
+    const query: TestQueryBody = {
       query: 'SELECT "orders__created_at_week" "orders__created_at_week", sum("orders__count") "orders__count" FROM (SELECT * FROM stb_pre_aggregations.orders_number_and_count_and_very_very_very_very_very_very_long20191101) as partition_union  WHERE ("orders__created_at_week" >= ($1::timestamptz::timestamptz AT TIME ZONE \'UTC\') AND "orders__created_at_week" <= ($2::timestamptz::timestamptz AT TIME ZONE \'UTC\')) GROUP BY 1 ORDER BY 1 ASC LIMIT 10000',
       values: ['2019-11-01T00:00:00Z', '2019-11-30T23:59:59Z'],
       cacheKeyQueries: {
@@ -607,14 +670,14 @@ describe('QueryOrchestrator', () => {
     try {
       await queryOrchestrator.fetchQuery(query);
       thrown = false;
-    } catch (e) {
+    } catch (e: any) {
       expect(e.message).toMatch(/Pre-aggregation table is not found/);
     }
     expect(thrown).toBe(true);
   });
 
   test('cancel pre-aggregation', async () => {
-    const query = {
+    const query: TestQueryBody = {
       query: 'SELECT "orders__created_at_week" "orders__created_at_week", sum("orders__count") "orders__count" FROM (SELECT * FROM stb_pre_aggregations.orders_number_and_count20181101) as partition_union  WHERE ("orders__created_at_week" >= ($1::timestamptz::timestamptz AT TIME ZONE \'UTC\') AND "orders__created_at_week" <= ($2::timestamptz::timestamptz AT TIME ZONE \'UTC\')) GROUP BY 1 ORDER BY 1 ASC LIMIT 10000',
       values: ['2018-11-01T00:00:00Z', '2018-11-30T23:59:59Z'],
       cacheKeyQueries: {
@@ -675,7 +738,7 @@ describe('QueryOrchestrator', () => {
       requestId: 'save structure versions'
     });
 
-    await new Promise(resolve => setTimeout(() => resolve(), 1000));
+    await new Promise<void>(resolve => setTimeout(() => resolve(), 1000));
 
     for (let i = 0; i < 5; i++) {
       await queryOrchestrator.fetchQuery({
@@ -764,7 +827,7 @@ describe('QueryOrchestrator', () => {
   test('continue serve old tables cache without resetting it', async () => {
     mockDriver.tablesQueryDelay = 600;
     const requestId = 'continue serve old tables cache without resetting it';
-    const baseQuery = {
+    const baseQuery: TestQueryBody = {
       query: 'SELECT * FROM stb_pre_aggregations.orders_d20181103',
       values: [],
       cacheKeyQueries: {
@@ -824,7 +887,7 @@ describe('QueryOrchestrator', () => {
   });
 
   test('in memory cache', async () => {
-    const query = {
+    const query: TestQueryBody = {
       query: 'SELECT * FROM orders',
       values: [],
       cacheKeyQueries: {
@@ -851,24 +914,24 @@ describe('QueryOrchestrator', () => {
     await queryOrchestrator.fetchQuery(query);
     await queryOrchestrator.fetchQuery(query);
     expect(
-      queryOrchestrator.queryCache.memoryCache.has(
-        queryOrchestrator.queryCache.refreshKeyCacheKey(query.cacheKeyQueries.queries[0], 'default')
+      queryOrchestrator.getQueryCache()['memoryCache'].has(
+        queryOrchestrator.getQueryCache().refreshKeyCacheKey(query.cacheKeyQueries.queries[0], 'default')
       )
     ).toBe(true);
     expect(
-      queryOrchestrator.queryCache.memoryCache.has(
-        queryOrchestrator.queryCache.refreshKeyCacheKey(query.cacheKeyQueries.queries[1], 'default')
+      queryOrchestrator.getQueryCache()['memoryCache'].has(
+        queryOrchestrator.getQueryCache().refreshKeyCacheKey(query.cacheKeyQueries.queries[1], 'default')
       )
     ).toBe(false);
     expect(
-      queryOrchestrator.queryCache.memoryCache.has(
-        queryOrchestrator.queryCache.refreshKeyCacheKey(query.preAggregations[0].invalidateKeyQueries[0], 'default')
+      queryOrchestrator.getQueryCache()['memoryCache'].has(
+        queryOrchestrator.getQueryCache().refreshKeyCacheKey(query.preAggregations[0].invalidateKeyQueries[0], 'default')
       )
     ).toBe(true);
   });
 
   test('in memory expire', async () => {
-    const query = (id) => ({
+    const query = (id: number): TestQueryBody => ({
       query: 'SELECT * FROM orders',
       values: [],
       cacheKeyQueries: {
@@ -897,13 +960,13 @@ describe('QueryOrchestrator', () => {
     await mockDriver.delay(2000);
     await queryOrchestrator.fetchQuery(query(2));
     expect(
-      mockDriver.executedQueries.filter(q => q.match(/timestamptz/)).length
+      mockDriver.executedQueries.filter(q => typeof q === 'string' && q.match(/timestamptz/)).length
     ).toBe(2);
   });
 
   test('load cache should respect external flag', async () => {
     const preAggregationsLoadCacheByDataSource = {};
-    const externalPreAggregation = {
+    const externalPreAggregation: TestQueryBody = {
       preAggregationsLoadCacheByDataSource,
       query: 'SELECT "orders__created_at_week" "orders__created_at_week", sum("orders__count") "orders__count" FROM (SELECT * FROM stb_pre_aggregations.orders_number_and_count20191101) as partition_union  WHERE ("orders__created_at_week" >= ($1::timestamptz::timestamptz AT TIME ZONE \'UTC\') AND "orders__created_at_week" <= ($2::timestamptz::timestamptz AT TIME ZONE \'UTC\')) GROUP BY 1 ORDER BY 1 ASC LIMIT 10000',
       values: ['2019-11-01T00:00:00Z', '2019-11-30T23:59:59Z'],
@@ -921,7 +984,7 @@ describe('QueryOrchestrator', () => {
       cacheMode: 'must-revalidate',
       requestId: 'load cache should respect external flag'
     };
-    const internalPreAggregation = {
+    const internalPreAggregation: TestQueryBody = {
       preAggregationsLoadCacheByDataSource,
       query: 'SELECT "orders__created_at_week" "orders__created_at_week", sum("orders__count") "orders__count" FROM (SELECT * FROM stb_pre_aggregations.orders_number_and_count20191101) as partition_union  WHERE ("orders__created_at_week" >= ($1::timestamptz::timestamptz AT TIME ZONE \'UTC\') AND "orders__created_at_week" <= ($2::timestamptz::timestamptz AT TIME ZONE \'UTC\')) GROUP BY 1 ORDER BY 1 ASC LIMIT 10000',
       values: ['2019-11-01T00:00:00Z', '2019-11-30T23:59:59Z'],
@@ -1079,7 +1142,7 @@ describe('QueryOrchestrator', () => {
   });
 
   test('range partitions', async () => {
-    const query = {
+    const query: TestQueryBody = {
       query: 'SELECT * FROM stb_pre_aggregations.orders_d',
       values: [],
       cacheKeyQueries: {
@@ -1114,15 +1177,15 @@ describe('QueryOrchestrator', () => {
     };
     await fetchLongPolling(queryOrchestrator, query);
     console.log(JSON.stringify(mockDriver.executedQueries));
-    const nowQueries = mockDriver.executedQueries.filter(q => q.match(/NOW/)).length;
+    const nowQueries = mockDriver.executedQueries.filter(q => typeof q === 'string' && q.match(/NOW/)).length;
     await mockDriver.delay(2000);
     await fetchLongPolling(queryOrchestrator, query);
     console.log(JSON.stringify(mockDriver.executedQueries));
-    expect(mockDriver.executedQueries.filter(q => q.match(/NOW/)).length).toEqual(nowQueries);
+    expect(mockDriver.executedQueries.filter(q => typeof q === 'string' && q.match(/NOW/)).length).toEqual(nowQueries);
   });
 
   test('range partitions exceed maximum number', async () => {
-    const query = {
+    const query: TestQueryBody = {
       query: 'SELECT * FROM stb_pre_aggregations.orders_d',
       values: [],
       cacheKeyQueries: {
@@ -1163,7 +1226,7 @@ describe('QueryOrchestrator', () => {
   });
 
   test('empty partitions', async () => {
-    const query = {
+    const query: TestQueryBody = {
       query: 'SELECT * FROM stb_pre_aggregations.orders_d',
       values: [],
       cacheKeyQueries: {
@@ -1202,7 +1265,11 @@ describe('QueryOrchestrator', () => {
   });
 
   test('empty partitions with externalRefresh', async () => {
-    const query = ({ startQuery, endQuery, matchedTimeDimensionDateRange }) => ({
+    const query = ({ startQuery, endQuery, matchedTimeDimensionDateRange }: {
+      startQuery?: string,
+      endQuery?: string,
+      matchedTimeDimensionDateRange?: QueryDateRange,
+    }): TestQueryBody => ({
       query: 'SELECT * FROM stb_pre_aggregations.orders_empty',
       values: [],
       cacheKeyQueries: {
@@ -1252,7 +1319,7 @@ describe('QueryOrchestrator', () => {
   });
 
   test('empty intersection', async () => {
-    const query = {
+    const query: TestQueryBody = {
       query: 'SELECT * FROM stb_pre_aggregations.orders_d',
       values: [],
       cacheKeyQueries: {
@@ -1291,7 +1358,7 @@ describe('QueryOrchestrator', () => {
   });
 
   test('lambda partitions', async () => {
-    const query = (requestId, matchedTimeDimensionDateRange) => ({
+    const query = (requestId: string, matchedTimeDimensionDateRange?: QueryDateRange): TestQueryBody => ({
       query: 'SELECT * FROM stb_pre_aggregations.orders_d UNION ALL SELECT * FROM stb_pre_aggregations.orders_h',
       values: [],
       cacheKeyQueries: {
@@ -1368,7 +1435,7 @@ describe('QueryOrchestrator', () => {
   });
 
   test('lambda partitions week', async () => {
-    const query = (matchedTimeDimensionDateRange) => ({
+    const query = (matchedTimeDimensionDateRange?: QueryDateRange): TestQueryBody => ({
       query: 'SELECT * FROM stb_pre_aggregations.orders_w UNION ALL SELECT * FROM stb_pre_aggregations.orders_d UNION ALL SELECT * FROM stb_pre_aggregations.orders_h',
       values: [],
       cacheKeyQueries: {
@@ -1456,7 +1523,7 @@ describe('QueryOrchestrator', () => {
   });
 
   test('real-time sealing partitions', async () => {
-    const query = (matchedTimeDimensionDateRange) => ({
+    const query = (matchedTimeDimensionDateRange?: QueryDateRange): TestQueryBody => ({
       query: 'SELECT * FROM stb_pre_aggregations.orders_d',
       values: [],
       cacheKeyQueries: {
@@ -1496,7 +1563,7 @@ describe('QueryOrchestrator', () => {
 
   test('loadRefreshKeys', async () => {
     const preAggregationsLoadCacheByDataSource = {};
-    const preAggregationExternalRefreshKey = {
+    const preAggregationExternalRefreshKey: TestQueryBody = {
       preAggregationsLoadCacheByDataSource,
       cacheKeyQueries: {
         renewalThreshold: 21600,
@@ -1563,7 +1630,7 @@ describe('QueryOrchestrator', () => {
 
   test('preaggregation without temp table', async () => {
     mockDriverUnloadWithoutTempTableSupport.now = 12345000;
-    const query = {
+    const query: TestQueryBody = {
       query: 'SELECT "orders__created_at_week" "orders__created_at_week", sum("orders__count") "orders__count" FROM (SELECT * FROM stb_pre_aggregations.orders_number_and_count20191101) as partition_union  WHERE ("orders__created_at_week" >= ($1::timestamptz::timestamptz AT TIME ZONE \'UTC\') AND "orders__created_at_week" <= ($2::timestamptz::timestamptz AT TIME ZONE \'UTC\')) GROUP BY 1 ORDER BY 1 ASC LIMIT 10000',
       values: ['2019-11-01T00:00:00Z', '2019-11-30T23:59:59Z'],
       cacheKeyQueries: {
@@ -1590,7 +1657,7 @@ describe('QueryOrchestrator', () => {
 
   test('streaming source tables are not dropped', async () => {
     streamingSourceMockDriver.now = 12345000;
-    const query = {
+    const query: TestQueryBody = {
       query: 'SELECT "orders__created_at_week" "orders__created_at_week", sum("orders__count") "orders__count" FROM (SELECT * FROM stb_pre_aggregations.orders_number_and_count20191101) as partition_union  WHERE ("orders__created_at_week" >= ($1::timestamptz::timestamptz AT TIME ZONE \'UTC\') AND "orders__created_at_week" <= ($2::timestamptz::timestamptz AT TIME ZONE \'UTC\')) GROUP BY 1 ORDER BY 1 ASC LIMIT 10000',
       values: ['2019-11-01T00:00:00Z', '2019-11-30T23:59:59Z'],
       cacheKeyQueries: {
@@ -1616,7 +1683,7 @@ describe('QueryOrchestrator', () => {
 
   test('streaming receives stream offset', async () => {
     streamingSourceMockDriver.now = 12345000;
-    const query = {
+    const query: TestQueryBody = {
       query: 'SELECT "orders__created_at_week" "orders__created_at_week", sum("orders__count") "orders__count" FROM (SELECT * FROM stb_pre_aggregations.orders_number_and_count20191101) as partition_union  WHERE ("orders__created_at_week" >= ($1::timestamptz::timestamptz AT TIME ZONE \'UTC\') AND "orders__created_at_week" <= ($2::timestamptz::timestamptz AT TIME ZONE \'UTC\')) GROUP BY 1 ORDER BY 1 ASC LIMIT 10000',
       values: ['2019-11-01T00:00:00Z', '2019-11-30T23:59:59Z'],
       cacheKeyQueries: {
@@ -1645,7 +1712,7 @@ describe('QueryOrchestrator', () => {
 
   test('streaming receives stream offset readOnly', async () => {
     streamingSourceMockDriver.now = 12345000;
-    const query = {
+    const query: TestQueryBody = {
       query: 'SELECT "orders__created_at_week" "orders__created_at_week", sum("orders__count") "orders__count" FROM (SELECT * FROM stb_pre_aggregations.orders_number_and_count20191101) as partition_union  WHERE ("orders__created_at_week" >= ($1::timestamptz::timestamptz AT TIME ZONE \'UTC\') AND "orders__created_at_week" <= ($2::timestamptz::timestamptz AT TIME ZONE \'UTC\')) GROUP BY 1 ORDER BY 1 ASC LIMIT 10000',
       values: ['2019-11-01T00:00:00Z', '2019-11-30T23:59:59Z'],
       cacheKeyQueries: {
@@ -1712,7 +1779,7 @@ describe('QueryOrchestrator', () => {
   });
 
   test('streaming simple', async () => {
-    const query = (id) => ({
+    const query = (id: number): TestQueryBody => ({
       query: `SELECT * FROM stb_pre_aggregations.orders_d WHERE id = ${id}`,
       values: [],
       cacheKeyQueries: {
@@ -1745,7 +1812,7 @@ describe('QueryOrchestrator', () => {
   });
 
   test('streaming two nodes', async () => {
-    const query = (id) => ({
+    const query = (id: number): TestQueryBody => ({
       query: `SELECT * FROM stb_pre_aggregations.orders_d WHERE id = ${id}`,
       values: [],
       cacheKeyQueries: {
@@ -1912,7 +1979,7 @@ describe('QueryOrchestrator', () => {
 
       const driverFactory = () => metadataMockDriver;
 
-      metadataOrchestrator = new QueryOrchestrator(
+      metadataOrchestrator = new TestQueryOrchestrator(
         'ORCHESTRATOR_TEST_METADATA',
         driverFactory,
         console.log,

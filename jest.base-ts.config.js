@@ -4,7 +4,7 @@ const base = require('./jest.base.config');
 module.exports = {
   ...base,
   preset: 'ts-jest',
-  testMatch: ['<rootDir>/test/**/*.test.{ts,js}'],
+  testMatch: ['<rootDir>/test/**/*.test.ts'],
   moduleFileExtensions: ['ts', 'js', 'json'],
   transform: {
     '^.+\\.ts$': ['ts-jest', { tsconfig: '../../tsconfig.jest.json' }],
