@@ -312,8 +312,6 @@ describe('QueryOrchestrator', () => {
   let streamingSourceMockDriver: StreamingSourceMockDriver;
   let externalMockDriver: ExternalMockDriver;
   let queryOrchestrator: TestQueryOrchestrator;
-  let streamingNode1: TestQueryOrchestrator;
-  let streamingNode2: TestQueryOrchestrator;
   let queryOrchestratorExternalRefresh: TestQueryOrchestrator;
   let queryOrchestratorDropWithoutTouch: TestQueryOrchestrator;
   let testCount = 1;
@@ -387,14 +385,6 @@ describe('QueryOrchestrator', () => {
 
     queryOrchestrator =
       new TestQueryOrchestrator(redisPrefix, driverFactory, logger, options('p1'));
-    // A persistent stream on a node which didn't free the slot starts on its `Continue wait` retry,
-    // so a short timeout keeps the test fast.
-    const streamingNode = (processUid) => new TestQueryOrchestrator(redisPrefix, driverFactory, logger, {
-      ...options(processUid),
-      continueWaitTimeout: 1,
-    });
-    streamingNode1 = streamingNode('streaming-p1');
-    streamingNode2 = streamingNode('streaming-p2');
     queryOrchestratorExternalRefresh =
       new TestQueryOrchestrator(redisPrefix, driverFactory, logger, {
         ...options('p1'),
@@ -1822,6 +1812,25 @@ describe('QueryOrchestrator', () => {
   });
 
   test('streaming two nodes', async () => {
+    // A persistent stream on a node which didn't free the slot starts on its `Continue wait` retry,
+    // so a short timeout keeps the test fast.
+    const redisPrefix = `ORCHESTRATOR_TEST_${testCount++}`;
+    const streamingNode = (processUid: string) => new TestQueryOrchestrator(
+      redisPrefix,
+      () => mockDriver as unknown as BaseDriver,
+      (msg, params) => console.log(new Date().toJSON(), msg, params),
+      {
+        continueWaitTimeout: 1,
+        queryCacheOptions: {
+          queueOptions: () => ({
+            concurrency: 2,
+            processUid,
+          }),
+        },
+      }
+    );
+    const streamingNode1 = streamingNode('p1');
+    const streamingNode2 = streamingNode('p2');
     const query = (id: number): TestQueryBody => ({
       query: `SELECT * FROM stb_pre_aggregations.orders_d WHERE id = ${id}`,
       values: [],
