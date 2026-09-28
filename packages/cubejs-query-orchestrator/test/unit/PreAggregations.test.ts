@@ -1554,6 +1554,7 @@ describe('PreAggregations', () => {
   describe('partitionPreAggregations', () => {
     const rangeA: [string, string] = ['2024-01-01T00:00:00.000', '2024-01-02T12:00:00.000'];
     const rangeB: [string, string] = ['2024-01-01T00:00:00.000', '2024-01-02T12:00:01.000'];
+    const nonRealTime = { partitionInvalidateKeyQueries: [['SELECT 1', []]] };
     const cache = () => {
       const entries = new Map<string, unknown>();
       const compilerCacheFn = <T>(key: string[], fn: () => T): T => {
@@ -1584,7 +1585,7 @@ describe('PreAggregations', () => {
 
     test('replaces A → B → A, updates second-level bounds and preserves old arrays', async () => {
       const { compilerCacheFn, entries } = cache();
-      const loader = createLoader({ partitionInvalidateKeyQueries: [['SELECT 1', []]] }, { compilerCacheFn });
+      const loader = createLoader(nonRealTime, { compilerCacheFn });
       const bounds = jest.spyOn(loader, 'loadBuildRange').mockResolvedValue(rangeA);
       const first = await loader.partitionPreAggregations();
       const original = JSON.stringify(first);
@@ -1664,7 +1665,7 @@ describe('PreAggregations', () => {
     // https://github.com/cube-js/cube/issues/11317
     test('does not clip the load range of a partition to the query range', async () => {
       const matchedTimeDimensionDateRange = ['2024-01-01T00:00:00.000', '2024-01-02T11:59:59.999'];
-      const loader = createLoader({ matchedTimeDimensionDateRange, partitionInvalidateKeyQueries: [['SELECT 1', []]] });
+      const loader = createLoader({ matchedTimeDimensionDateRange, ...nonRealTime });
       const { buildRange, partitionRanges } = await loader.partitionRanges();
       expect(buildRange).toEqual(['2024-01-01T00:00:00.000', '2024-01-03T23:59:59.999']);
       expect(partitionRanges).toHaveLength(2);
@@ -1679,7 +1680,7 @@ describe('PreAggregations', () => {
       const { compilerCacheFn } = cache();
       // The query range is unchanged and ends before the build range, so only the build range end moves.
       const matchedTimeDimensionDateRange = ['2024-01-01T00:00:00.000', '2024-01-02T06:00:00.000'];
-      const loader = createLoader({ matchedTimeDimensionDateRange, partitionInvalidateKeyQueries: [['SELECT 1', []]] }, { compilerCacheFn });
+      const loader = createLoader({ matchedTimeDimensionDateRange, ...nonRealTime }, { compilerCacheFn });
       const bounds = jest.spyOn(loader, 'loadBuildRange').mockResolvedValue(['2024-01-01T00:00:00.000', '2024-01-02T12:00:00.000']);
       const first = await loader.partitionPreAggregations();
       expect(first.map(p => p.buildRangeEnd)).toEqual(['2024-01-01T23:59:59.999', '2024-01-02T12:00:00.000']);
@@ -1693,7 +1694,7 @@ describe('PreAggregations', () => {
     test('keeps the plan when the build range end moves past the last selected partition', async () => {
       const { compilerCacheFn } = cache();
       const matchedTimeDimensionDateRange = ['2024-01-01T00:00:00.000', '2024-01-02T06:00:00.000'];
-      const loader = createLoader({ matchedTimeDimensionDateRange, partitionInvalidateKeyQueries: [['SELECT 1', []]] }, { compilerCacheFn });
+      const loader = createLoader({ matchedTimeDimensionDateRange, ...nonRealTime }, { compilerCacheFn });
       const bounds = jest.spyOn(loader, 'loadBuildRange').mockResolvedValue(['2024-01-01T00:00:00.000', '2024-01-05T10:00:00.000']);
       const first = await loader.partitionPreAggregations();
       expect(first.map(p => p.buildRangeEnd)).toEqual(['2024-01-01T23:59:59.999', '2024-01-02T23:59:59.999']);
@@ -1719,7 +1720,7 @@ describe('PreAggregations', () => {
           rollupLambdaId: 'orders.lambda',
           lastRollupLambda: false,
           matchedTimeDimensionDateRange: ['2024-01-01T00:00:00.000', '2024-01-02T11:59:59.999'],
-          partitionInvalidateKeyQueries: [['SELECT 1', []]],
+          ...nonRealTime,
         });
 
         const result = await loader.loadPreAggregations();

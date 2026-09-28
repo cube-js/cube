@@ -445,7 +445,7 @@ export class PreAggregationPartitionRangeLoader {
 
   public async partitionPreAggregations(): Promise<PreAggregationDescription[]> {
     if (this.preAggregation.partitionGranularity && !this.preAggregation.expandedPartition) {
-      const { buildRange, dateRange } = await this.effectiveDateRange();
+      const { buildRange, dateRange } = await this.resolveDateRanges();
       const { preAggregationId, tableName, dataSource, timezone, partitionGranularity, timestampFormat, timestampPrecision } = this.preAggregation;
       const identity = { preAggregationId, tableName, dataSource, timezone, partitionGranularity, timestampFormat, timestampPrecision };
       const cachedPlan = this.compilerCacheFn<{ rangeKey: string | null; descriptions: PreAggregationDescription[] }>(
@@ -476,7 +476,7 @@ export class PreAggregationPartitionRangeLoader {
    * load range to the query range would build it partially under the same table name, and the
    * next query would reuse that table as if it were complete.
    */
-  private async effectiveDateRange(
+  private async resolveDateRanges(
     ignoreMatchedDateRange?: boolean
   ): Promise<{ buildRange: QueryDateRange, dateRange: QueryDateRange }> {
     const buildRange = await this.loadBuildRange();
@@ -515,7 +515,7 @@ export class PreAggregationPartitionRangeLoader {
   }
 
   protected async partitionRanges(ignoreMatchedDateRange?: boolean): Promise<PartitionRanges> {
-    const { buildRange, dateRange } = await this.effectiveDateRange(ignoreMatchedDateRange);
+    const { buildRange, dateRange } = await this.resolveDateRanges(ignoreMatchedDateRange);
     return { buildRange, partitionRanges: this.partitionRangesForDateRange(dateRange) };
   }
 
