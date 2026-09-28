@@ -108,6 +108,7 @@ export type PreAggregationDefinition = PreAggregationDefinitionRollup;
 
 export type JoinDefinition = {
   name: string,
+  alias?: string,
   relationship: string,
   sql: (...args: any[]) => string,
 };

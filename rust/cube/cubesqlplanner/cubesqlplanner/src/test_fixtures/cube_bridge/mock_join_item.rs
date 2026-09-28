@@ -48,6 +48,7 @@ mod tests {
     fn test_basic_join_item() {
         let join_def = Rc::new(
             MockJoinItemDefinition::builder()
+                .name("users".to_string())
                 .relationship("many_to_one".to_string())
                 .sql("{orders.user_id} = {users.id}".to_string())
                 .build(),
@@ -75,6 +76,7 @@ mod tests {
     fn test_join_item_with_aliases() {
         let join_def = Rc::new(
             MockJoinItemDefinition::builder()
+                .name("orders".to_string())
                 .relationship("one_to_many".to_string())
                 .sql("{u.id} = {o.user_id}".to_string())
                 .build(),
