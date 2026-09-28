@@ -312,7 +312,8 @@ describe('QueryOrchestrator', () => {
   let streamingSourceMockDriver: StreamingSourceMockDriver;
   let externalMockDriver: ExternalMockDriver;
   let queryOrchestrator: TestQueryOrchestrator;
-  let queryOrchestrator2: TestQueryOrchestrator;
+  let streamingNode1: TestQueryOrchestrator;
+  let streamingNode2: TestQueryOrchestrator;
   let queryOrchestratorExternalRefresh: TestQueryOrchestrator;
   let queryOrchestratorDropWithoutTouch: TestQueryOrchestrator;
   let testCount = 1;
@@ -386,8 +387,14 @@ describe('QueryOrchestrator', () => {
 
     queryOrchestrator =
       new TestQueryOrchestrator(redisPrefix, driverFactory, logger, options('p1'));
-    queryOrchestrator2 =
-      new TestQueryOrchestrator(redisPrefix, driverFactory, logger, options('p2'));
+    // A persistent stream on a node which didn't free the slot starts on its `Continue wait` retry,
+    // so a short timeout keeps the test fast.
+    const streamingNode = (processUid) => new TestQueryOrchestrator(redisPrefix, driverFactory, logger, {
+      ...options(processUid),
+      continueWaitTimeout: 1,
+    });
+    streamingNode1 = streamingNode('streaming-p1');
+    streamingNode2 = streamingNode('streaming-p2');
     queryOrchestratorExternalRefresh =
       new TestQueryOrchestrator(redisPrefix, driverFactory, logger, {
         ...options('p1'),
@@ -1829,10 +1836,10 @@ describe('QueryOrchestrator', () => {
       }
     });
     await Promise.all([
-      fetchLongPolling(queryOrchestrator, query(1)),
-      fetchLongPolling(queryOrchestrator, query(2)),
-      fetchLongPolling(queryOrchestrator2, query(3)),
-      fetchLongPolling(queryOrchestrator2, query(4)),
+      fetchLongPolling(streamingNode1, query(1)),
+      fetchLongPolling(streamingNode1, query(2)),
+      fetchLongPolling(streamingNode2, query(3)),
+      fetchLongPolling(streamingNode2, query(4)),
     ].map(async streamPromise => {
       const stream = await streamPromise;
       const data = await new Promise((resolve, reject) => {
@@ -1845,7 +1852,7 @@ describe('QueryOrchestrator', () => {
       });
       expect(data['Foo.query']).toMatch(/orders_d/);
     }));
-  });
+  }, 5000);
 
   test('drop lock', async () => {
     mockDriver.tablesDropDelay = 300;
