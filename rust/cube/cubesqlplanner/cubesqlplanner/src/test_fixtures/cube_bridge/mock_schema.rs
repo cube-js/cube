@@ -340,6 +340,7 @@ impl MockSchemaBuilder {
             measures: HashMap::new(),
             dimensions: HashMap::new(),
             segments: HashMap::new(),
+            pre_aggregations: Vec::new(),
             default_filters: Vec::new(),
         }
     }
@@ -469,6 +470,7 @@ pub struct MockViewBuilder {
     measures: HashMap<String, Rc<MockMeasureDefinition>>,
     dimensions: HashMap<String, Rc<MockDimensionDefinition>>,
     segments: HashMap<String, Rc<MockSegmentDefinition>>,
+    pre_aggregations: Vec<(String, Rc<MockPreAggregationDescription>)>,
     default_filters: Vec<MockViewFilterDefinition>,
 }
 
@@ -524,6 +526,16 @@ impl MockViewBuilder {
         self
     }
 
+    pub fn add_pre_aggregation(
+        mut self,
+        name: impl Into<String>,
+        definition: MockPreAggregationDescription,
+    ) -> Self {
+        self.pre_aggregations
+            .push((name.into(), Rc::new(definition)));
+        self
+    }
+
     pub fn add_default_filter(mut self, filter: MockViewFilterDefinition) -> Self {
         self.default_filters.push(filter);
         self
@@ -533,6 +545,7 @@ impl MockViewBuilder {
         let mut all_dimensions = self.dimensions;
         let mut all_measures = self.measures;
         let mut all_segments = self.segments;
+        let mut all_granularities = HashMap::new();
 
         for view_cube in &self.view_cubes {
             let join_path_parts: Vec<&str> = view_cube.join_path.split('.').collect();
@@ -570,12 +583,18 @@ impl MockViewBuilder {
                             );
                         }
 
+                        // Like the schema compiler, a view dimension re-exports
+                        // the source's type, mask and granularities only.
+                        if let Some(granularities) = source_cube.granularities.get(member_name) {
+                            all_granularities.insert(view_name.clone(), granularities.clone());
+                        }
                         all_dimensions.insert(
                             view_name,
                             Rc::new(
                                 MockDimensionDefinition::builder()
                                     .dimension_type(dimension.static_data().dimension_type.clone())
                                     .sql(view_member_sql)
+                                    .resolved_mask_sql_opt(dimension.raw_mask_sql())
                                     .build(),
                             ),
                         );
@@ -613,6 +632,7 @@ impl MockViewBuilder {
                                     .sql(view_member_sql)
                                     .multi_stage(measure.static_data().multi_stage)
                                     .order_by(measure.raw_order_by())
+                                    .resolved_mask_sql_opt(measure.raw_mask_sql())
                                     .build(),
                             ),
                         );
@@ -685,8 +705,8 @@ impl MockViewBuilder {
             measures: all_measures,
             dimensions: all_dimensions,
             segments: all_segments,
-            pre_aggregations: Vec::new(),
-            granularities: HashMap::new(),
+            pre_aggregations: self.pre_aggregations,
+            granularities: all_granularities,
         };
 
         self.schema_builder.cubes.insert(self.view_name, view_cube);

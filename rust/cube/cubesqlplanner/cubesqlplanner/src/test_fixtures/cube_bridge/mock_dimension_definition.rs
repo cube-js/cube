@@ -62,6 +62,10 @@ impl_static_data!(
 );
 
 impl MockDimensionDefinition {
+    pub fn raw_mask_sql(&self) -> Option<String> {
+        self.resolved_mask_sql.clone()
+    }
+
     pub fn from_yaml(yaml: &str) -> Result<Rc<Self>, CubeError> {
         let yaml_def: YamlDimensionDefinition = serde_yaml::from_str(yaml)
             .map_err(|e| CubeError::user(format!("Failed to parse YAML: {}", e)))?;

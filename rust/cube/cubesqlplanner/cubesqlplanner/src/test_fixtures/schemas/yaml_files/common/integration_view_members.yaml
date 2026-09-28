@@ -1,0 +1,161 @@
+# View members over the multi-fact seed: masks, geo, custom granularities,
+# members declared by the view itself and pre-aggregations declared in the view.
+# A view re-exports the source's type, mask and granularities, as the schema
+# compiler does.
+cubes:
+    - name: customers
+      sql: "SELECT * FROM customers"
+      joins:
+          - name: orders
+            relationship: one_to_many
+            sql: "{customers}.id = {orders.customer_id}"
+      dimensions:
+          - name: id
+            type: number
+            sql: id
+            primary_key: true
+          - name: name
+            type: string
+            sql: name
+          - name: city
+            type: string
+            sql: city
+            mask: "***"
+          - name: location
+            type: geo
+            latitude: "{CUBE}.region_id"
+            longitude: "{CUBE}.id"
+      measures:
+          - name: count
+            type: count
+          - name: amount_per_customer
+            type: number
+            sql: "{orders.total_amount} / {CUBE.count}"
+
+    - name: orders
+      sql: "SELECT * FROM orders"
+      joins:
+          - name: customers
+            relationship: many_to_one
+            sql: "{orders}.customer_id = {customers.id}"
+      dimensions:
+          - name: id
+            type: number
+            sql: id
+            primary_key: true
+          - name: status
+            type: string
+            sql: status
+          - name: customer_id
+            type: number
+            sql: customer_id
+          - name: amount
+            type: number
+            sql: amount
+          - name: masked_status
+            type: string
+            sql: status
+            mask: "hidden"
+          # Mask whose SQL references another member.
+          - name: masked_status_dep
+            type: string
+            sql: status
+            mask:
+                sql: "'#' || {CUBE.id}"
+          - name: created_at
+            type: time
+            sql: created_at
+            granularities:
+              - name: bi_weekly
+                interval: "2 weeks"
+                origin: "2025-03-04"
+              - name: fiscal_year
+                interval: "1 year"
+                offset: "1 month"
+      measures:
+          - name: count
+            type: count
+          - name: total_amount
+            type: sum
+            sql: amount
+          # Mask whose SQL references another member.
+          - name: masked_total
+            type: sum
+            sql: amount
+            mask:
+                sql: "{CUBE.amount} * 0 - 1"
+          - name: masked_total_const
+            type: sum
+            sql: amount
+            mask: -1
+
+views:
+    - name: orders_view
+      # Members of the view's own: a calculated dimension reading a sibling view
+      # member, a direct reference to a sibling, and a direct reference to a
+      # cube member written by hand.
+      dimensions:
+          - name: status_label
+            type: string
+            sql: "{orders.status} || ':' || {CUBE.name}"
+          - name: status_ref
+            type: string
+            sql: "{CUBE.status}"
+      measures:
+          - name: amount_per_order
+            type: number
+            sql: "{CUBE.total_amount} / {CUBE.count}"
+          - name: total_amount_ref
+            type: number
+            sql: "{orders.total_amount}"
+      cubes:
+          - join_path: orders
+            includes:
+                - id
+                - status
+                - masked_status
+                - masked_status_dep
+                - created_at
+                - count
+                - total_amount
+                - masked_total
+                - masked_total_const
+          - join_path: orders.customers
+            includes:
+                - name
+                - city
+                - location
+      pre_aggregations:
+          - name: by_status
+            type: rollup
+            measures:
+                - count
+                - total_amount
+            dimensions:
+                - status
+            time_dimension: created_at
+            granularity: day
+          # Covers the primary key, so an ungrouped view query may read it.
+          - name: by_id
+            type: rollup
+            measures:
+                - total_amount
+            dimensions:
+                - id
+                - status
+
+    # Rooted at customers, so customers.count is multiplied by the orders join.
+    - name: customers_view
+      measures:
+          - name: amount_per_customer
+            type: number
+            sql: "{CUBE.total_amount} / {CUBE.count}"
+      cubes:
+          - join_path: customers
+            includes:
+                - name
+                - count
+          - join_path: customers.orders
+            includes:
+                - status
+                - total_amount

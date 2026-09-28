@@ -8,3 +8,4 @@ mod query_join_hints;
 mod rollup_join_keys;
 mod sql_generation;
 mod ungrouped_gate;
+mod views;
