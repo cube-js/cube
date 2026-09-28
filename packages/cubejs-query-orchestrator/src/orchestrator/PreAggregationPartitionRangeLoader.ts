@@ -442,19 +442,20 @@ export class PreAggregationPartitionRangeLoader {
 
   public async partitionPreAggregations(): Promise<PreAggregationDescription[]> {
     if (this.preAggregation.partitionGranularity && !this.preAggregation.expandedPartition) {
-      const buildRange = await this.effectiveDateRange();
+      const { buildRange, dateRange } = await this.effectiveDateRange();
       const { preAggregationId, tableName, dataSource, timezone, partitionGranularity, timestampFormat, timestampPrecision } = this.preAggregation;
       const identity = { preAggregationId, tableName, dataSource, timezone, partitionGranularity, timestampFormat, timestampPrecision };
       const cachedPlan = this.compilerCacheFn<{ rangeKey: string | null; descriptions: PreAggregationDescription[] }>(
         ['partitionPlan', JSON.stringify(identity)], () => ({ rangeKey: null, descriptions: [] })
       );
-      const rangeKey = JSON.stringify(buildRange);
+      // Descriptions depend on the build range only through its end, which clips the last partition.
+      const rangeKey = JSON.stringify([dateRange, buildRange[1]]);
       if (cachedPlan.rangeKey === rangeKey) {
         this.checkMaxPartitions(cachedPlan.descriptions.length);
         return cachedPlan.descriptions;
       }
 
-      const descriptions = this.partitionRangesForDateRange(buildRange)
+      const descriptions = this.partitionRangesForDateRange(dateRange)
         .map(range => this.partitionPreAggregationDescription(range, buildRange));
       // Replace only after successful expansion; in-flight requests may still use the old array.
       Object.assign(cachedPlan, { rangeKey, descriptions });
@@ -464,7 +465,14 @@ export class PreAggregationPartitionRangeLoader {
     }
   }
 
-  private async effectiveDateRange(ignoreMatchedDateRange?: boolean): Promise<QueryDateRange> {
+  /**
+   * `dateRange` selects the partitions, `buildRange` bounds what they load. Clipping a partition's
+   * load range to the query range would build it partially under the same table name, and the
+   * next query would reuse that table as if it were complete.
+   */
+  private async effectiveDateRange(
+    ignoreMatchedDateRange?: boolean
+  ): Promise<{ buildRange: QueryDateRange, dateRange: QueryDateRange }> {
     const buildRange = await this.loadBuildRange();
 
     // buildRange was localized in loadBuildRange()
@@ -481,7 +489,7 @@ export class PreAggregationPartitionRangeLoader {
       dateRange = [buildRange[1], buildRange[1]];
     }
 
-    return dateRange;
+    return { buildRange, dateRange };
   }
 
   private checkMaxPartitions(count: number): void {
@@ -501,8 +509,8 @@ export class PreAggregationPartitionRangeLoader {
   }
 
   protected async partitionRanges(ignoreMatchedDateRange?: boolean): Promise<PartitionRanges> {
-    const buildRange = await this.effectiveDateRange(ignoreMatchedDateRange);
-    return { buildRange, partitionRanges: this.partitionRangesForDateRange(buildRange) };
+    const { buildRange, dateRange } = await this.effectiveDateRange(ignoreMatchedDateRange);
+    return { buildRange, partitionRanges: this.partitionRangesForDateRange(dateRange) };
   }
 
   public async loadBuildRange(timestampFormat: string = DEFAULT_TS_FORMAT): Promise<QueryDateRange> {

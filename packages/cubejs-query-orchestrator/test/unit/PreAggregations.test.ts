@@ -1600,7 +1600,7 @@ describe('PreAggregations', () => {
       expect(third).not.toBe(first);
       expect(third).toEqual(first);
       expect(entries.size).toBe(1);
-      expect([...entries.values()]).toEqual([{ rangeKey: JSON.stringify(rangeA), descriptions: third }]);
+      expect([...entries.values()]).toEqual([{ rangeKey: JSON.stringify([rangeA, rangeA[1]]), descriptions: third }]);
     });
 
     test('checks the current limit on hits and keeps the previous plan after failures', async () => {
@@ -1659,6 +1659,20 @@ describe('PreAggregations', () => {
       const full = await loader.partitionRanges(true);
       expect(full.partitionRanges).toHaveLength(2);
       expect(full.buildRange).toEqual(['2024-01-04T00:00:00.000', '2024-01-05T12:00:00.000']);
+    });
+
+    // https://github.com/cube-js/cube/issues/11317
+    test('does not clip the load range of a partition to the query range', async () => {
+      const matchedTimeDimensionDateRange = ['2024-01-01T00:00:00.000', '2024-01-02T11:59:59.999'];
+      const loader = createLoader({ matchedTimeDimensionDateRange, partitionInvalidateKeyQueries: [['SELECT 1', []]] });
+      const { buildRange, partitionRanges } = await loader.partitionRanges();
+      expect(buildRange).toEqual(['2024-01-01T00:00:00.000', '2024-01-03T23:59:59.999']);
+      expect(partitionRanges).toHaveLength(2);
+
+      const partitions = await loader.partitionPreAggregations();
+      expect(partitions.map(p => p.tableName)).toEqual(['test_table20240101', 'test_table20240102']);
+      expect(partitions[1].buildRangeEnd).toBe('2024-01-02T23:59:59.999');
+      expect(partitions[1].loadSql).toBe(partitions[1].structureVersionLoadSql);
     });
 
     test.each([{ partitionGranularity: undefined }, { expandedPartition: true }])('passes through unpartitioned or expanded descriptions: %j', async overrides => {
