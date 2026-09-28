@@ -37,11 +37,15 @@ export interface QueryDefObject {
 }
 
 export interface QueueResult {
+  queryKeyHash: QueryKeyHash;
+  queueId: QueueId;
   promise: Promise<any>;
   resolve: (value: any) => void;
   resolved: boolean;
   // Set once any reader got the result, `getResult` no longer serves it after that
   consumed: boolean;
+  // Set on the ack, a pending result lives until its run is acknowledged or removed
+  expireAt?: number;
 }
 
 export class LocalQueueDriverConnectionState {
@@ -50,6 +54,8 @@ export class LocalQueueDriverConnectionState {
 
   // The run which acknowledged the last result of a query key, for the lookup by key of `getResult`
   public lastResultQueueId: Record<QueryKeyHash, QueueId> = {};
+
+  public cleanupTimer: ReturnType<typeof setInterval> | null = null;
 
   public queryDef: Record<QueryKeyHash, QueryDefObject> = {};
 
@@ -118,7 +124,7 @@ export class LocalQueueDriverConnection implements QueueDriverConnectionInterfac
       const promise = new Promise(r => {
         resolve = r;
       });
-      this.state.results[key] = { promise, resolve: resolve!, resolved: false, consumed: false };
+      this.state.results[key] = { queryKeyHash, queueId, promise, resolve: resolve!, resolved: false, consumed: false };
     }
 
     return this.state.results[key];
@@ -263,7 +269,6 @@ export class LocalQueueDriverConnection implements QueueDriverConnectionInterfac
     }
 
     const result = this.getOrCreateResult(queryKeyHash, queueId);
-    const key = this.resultKey(queryKeyHash, queueId);
 
     delete this.state.active[queryKeyHash];
     delete this.state.heartBeat[queryKeyHash];
@@ -272,20 +277,45 @@ export class LocalQueueDriverConnection implements QueueDriverConnectionInterfac
     delete this.state.queryDef[queryKeyHash];
 
     result.resolved = true;
+    // A waiter which saw the query in flight re-polls within `continueWaitTimeout`
+    result.expireAt = new Date().getTime() + this.continueWaitTimeout * 1000;
     result.resolve(executionResult);
     this.state.lastResultQueueId[queryKeyHash] = queueId;
 
-    // A waiter which saw the query in flight re-polls within `continueWaitTimeout`
-    setTimeout(() => {
-      if (this.state.results[key] === result) {
-        delete this.state.results[key];
-      }
-      if (this.state.lastResultQueueId[queryKeyHash] === queueId) {
-        delete this.state.lastResultQueueId[queryKeyHash];
-      }
-    }, this.continueWaitTimeout * 1000).unref();
+    this.scheduleCleanup();
 
     return true;
+  }
+
+  /**
+   * The only timer of the state, it removes every expired result and stops once no result is left to expire.
+   */
+  protected scheduleCleanup(): void {
+    if (this.state.cleanupTimer) {
+      return;
+    }
+
+    this.state.cleanupTimer = setInterval(() => {
+      const now = new Date().getTime();
+      let expiresLater = false;
+
+      for (const [key, result] of Object.entries(this.state.results)) {
+        if (result.expireAt !== undefined && result.expireAt <= now) {
+          delete this.state.results[key];
+          if (this.state.lastResultQueueId[result.queryKeyHash] === result.queueId) {
+            delete this.state.lastResultQueueId[result.queryKeyHash];
+          }
+        } else if (result.expireAt !== undefined) {
+          expiresLater = true;
+        }
+      }
+
+      if (!expiresLater && this.state.cleanupTimer) {
+        clearInterval(this.state.cleanupTimer);
+        this.state.cleanupTimer = null;
+      }
+    }, this.continueWaitTimeout * 1000);
+    this.state.cleanupTimer.unref();
   }
 
   public async getOrphanedQueries(): Promise<QueryKeysTuple[]> {
