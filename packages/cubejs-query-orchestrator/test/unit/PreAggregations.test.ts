@@ -1675,6 +1675,44 @@ describe('PreAggregations', () => {
       expect(partitions[1].loadSql).toBe(partitions[1].structureVersionLoadSql);
     });
 
+    test('replans when the build range end moves inside the last selected partition', async () => {
+      const { compilerCacheFn } = cache();
+      // The query range is unchanged and ends before the build range, so only the build range end moves.
+      const matchedTimeDimensionDateRange = ['2024-01-01T00:00:00.000', '2024-01-02T06:00:00.000'];
+      const loader = createLoader({ matchedTimeDimensionDateRange, partitionInvalidateKeyQueries: [['SELECT 1', []]] }, { compilerCacheFn });
+      const bounds = jest.spyOn(loader, 'loadBuildRange').mockResolvedValue(['2024-01-01T00:00:00.000', '2024-01-02T12:00:00.000']);
+      const first = await loader.partitionPreAggregations();
+      expect(first.map(p => p.buildRangeEnd)).toEqual(['2024-01-01T23:59:59.999', '2024-01-02T12:00:00.000']);
+
+      bounds.mockResolvedValue(['2024-01-01T00:00:00.000', '2024-01-02T18:00:00.000']);
+      const second = await loader.partitionPreAggregations();
+      expect(second).not.toBe(first);
+      expect(second.map(p => p.buildRangeEnd)).toEqual(['2024-01-01T23:59:59.999', '2024-01-02T18:00:00.000']);
+    });
+
+    // https://github.com/cube-js/cube/issues/11317
+    test('keeps the partition a query ends in for a rollupLambda member', async () => {
+      // A fresh build reports the partition's own load range end.
+      jest.spyOn(PreAggregationLoader.prototype, 'loadPreAggregation').mockImplementation(async function loadPreAggregation(this: any) {
+        return {
+          targetTableName: this.preAggregation.tableName,
+          refreshKeyValues: [],
+          lastUpdatedAt: 1,
+          buildRangeEnd: this.preAggregation.buildRangeEnd,
+        };
+      });
+      const loader = createLoader({
+        rollupLambdaId: 'orders.lambda',
+        lastRollupLambda: false,
+        matchedTimeDimensionDateRange: ['2024-01-01T00:00:00.000', '2024-01-02T11:59:59.999'],
+        partitionInvalidateKeyQueries: [['SELECT 1', []]],
+      });
+
+      const result = await loader.loadPreAggregations();
+      expect(result.targetTableName).toBe('(SELECT * FROM test_table20240101 UNION ALL SELECT * FROM test_table20240102)');
+      expect(result.buildRangeEnd).toBe('2024-01-02T23:59:59.999');
+    });
+
     test.each([{ partitionGranularity: undefined }, { expandedPartition: true }])('passes through unpartitioned or expanded descriptions: %j', async overrides => {
       const compilerCacheFn = jest.fn((_key, fn) => fn());
       const loader = createLoader(overrides, { compilerCacheFn });
