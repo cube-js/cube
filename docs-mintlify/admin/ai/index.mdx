@@ -142,8 +142,8 @@ See [Memories](/admin/ai/memory-isolation) for details on how memories are store
 ## Suggestions
 
 The `suggestions` property lists starter prompts shown as buttons on the agent's
-empty chat screen. Pressing one puts that text into the chat input, so write each
-entry as a whole question rather than a title:
+empty chat screen. Pressing one puts that text in the chat input ready to send,
+so write each entry as a whole question rather than a title:
 
 ```yaml
 # agents/config.yml
@@ -151,10 +151,6 @@ suggestions:
   - What were the top 5 products last quarter?
   - How many orders shipped yesterday?
 ```
-
-<Note>
-  Suggestions are optional — omit the property and the chat screen shows none.
-</Note>
 
 ## Customize the agent
 
