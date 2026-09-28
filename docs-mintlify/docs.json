@@ -682,6 +682,7 @@
                   "recipes/data-modeling/dynamic-union-tables",
                   "recipes/data-modeling/cross-data-source-queries",
                   "recipes/data-modeling/polymorphic-cubes",
+                  "recipes/data-modeling/reusing-view-measures",
                   "recipes/data-modeling/custom-order"
                 ]
               },
