@@ -780,11 +780,29 @@ Example response:
         "type": "postgres",
         "database": "analytics",
         "schema": "public"
+      },
+      {
+        "name": "warehouse",
+        "type": "bigquery",
+        "project_id": "acme-analytics-123"
       }
     ]
   }
 }
 ```
+
+Each item under `data_sources` has the following properties:
+
+| Property, type | Description |
+| --- | --- |
+| `name`, `string` | The name of the [data source][ref-datasources] |
+| `type`, `string` | The database type, e.g., `postgres` or `bigquery` |
+| `database`, `string` | The database name from [`CUBEJS_DB_NAME`][ref-env-db-name]. Omitted if not set |
+| `schema`, `string` | The schema from [`CUBEJS_DB_SCHEMA`][ref-env-db-schema]. Omitted if not set |
+| `project_id`, `string` | The Google Cloud project ID from [`CUBEJS_DB_BQ_PROJECT_ID`][ref-env-bq-project-id]. Only returned for BigQuery data sources. Omitted if not set |
+
+For a named data source, values are read from the variables with its prefix,
+e.g., `CUBEJS_DS_WAREHOUSE_DB_BQ_PROJECT_ID` for the `warehouse` data source.
 
 ### `{base_path}/v1/entities`
 
@@ -1224,3 +1242,6 @@ Keep-Alive: timeout=5
 [link-tzdb]: https://en.wikipedia.org/wiki/Tz_database
 [ref-control-plane-api]: /reference/control-plane-api
 [self-metadata-api]: #metadata-api
+[ref-env-db-name]: /reference/configuration/environment-variables#cubejs_db_name
+[ref-env-db-schema]: /reference/configuration/environment-variables#cubejs_db_schema
+[ref-env-bq-project-id]: /reference/configuration/environment-variables#cubejs_db_bq_project_id
