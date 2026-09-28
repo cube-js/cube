@@ -137,7 +137,7 @@ Use conventional commits with these prefixes:
 - `feat:` — new user-facing features
 - `fix:` — bug fixes users can observe
 - `docs:` — documentation changes
-- `refactor:` — code refactoring
+- `refactor:` — refactoring of shipped code (refactors of tests, CI or tooling are `chore:`)
 - `perf:` — performance improvements
 - `chore:` — internal changes: tests, CI, build/tooling, dependency bumps
 
