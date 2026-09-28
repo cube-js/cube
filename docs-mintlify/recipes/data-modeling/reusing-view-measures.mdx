@@ -219,9 +219,9 @@ include and every measure, dimension and folder of the base view:
   a member that the base view includes or defines, the member stays in the
   child view. Cube does not show an error.
 - **A redefined member overrides the inherited one only in the child view.** If
-  a child view defines a measure or dimension with the same name as a measure
-  or dimension of the base view, the child's definition applies in the child
-  view. The base view keeps its own definition.
+  a child view defines a measure with the same name as a measure of the base
+  view, or a dimension with the same name as a dimension, the child's
+  definition applies in the child view. The base view keeps its own definition.
 - **A child member cannot use the name of an inherited included member.** For
   example, a child view that defines its own `orders_total_amount` measure
   fails to compile with `Included member 'orders_total_amount' conflicts with
