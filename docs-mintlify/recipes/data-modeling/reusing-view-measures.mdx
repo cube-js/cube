@@ -201,7 +201,7 @@ Query `refund_rate` through a child view, for example `sales_overview.refund_rat
 grouped by `sales_overview.city`. Cube plans it the same way as
 `customer_metrics.refund_rate`:
 
-```sql
+```text
 -- one aggregating subquery per fact, at the query's grain
 SUM(orders.amount)          GROUP BY city
 SUM(returns.refund_amount)  GROUP BY city
