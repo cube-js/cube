@@ -1826,7 +1826,12 @@ describe('QueryOrchestrator', () => {
         query: 'Foo.query'
       }
     });
-    const readFirstRow = async (streamPromise) => {
+    await Promise.all([
+      fetchLongPolling(queryOrchestrator, query(1)),
+      fetchLongPolling(queryOrchestrator, query(2)),
+      fetchLongPolling(queryOrchestrator2, query(3)),
+      fetchLongPolling(queryOrchestrator2, query(4)),
+    ].map(async streamPromise => {
       const stream = await streamPromise;
       const data = await new Promise((resolve, reject) => {
         stream.on('data', (row) => {
@@ -1837,17 +1842,7 @@ describe('QueryOrchestrator', () => {
         });
       });
       expect(data['Foo.query']).toMatch(/orders_d/);
-    };
-    // A persistent stream is only picked up by the reconcile of its own node, and nothing wakes a node
-    // up when another one frees a concurrency slot. So each round stays within the queue concurrency.
-    await Promise.all([
-      fetchLongPolling(queryOrchestrator, query(1)),
-      fetchLongPolling(queryOrchestrator2, query(3)),
-    ].map(readFirstRow));
-    await Promise.all([
-      fetchLongPolling(queryOrchestrator, query(2)),
-      fetchLongPolling(queryOrchestrator2, query(4)),
-    ].map(readFirstRow));
+    }));
   });
 
   test('drop lock', async () => {
