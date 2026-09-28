@@ -143,8 +143,12 @@ function commonPathPrefix(pathList) {
 }
 
 // A shared parent can be too broad when a tag spans sibling collections.
+const SNOWFLAKE_RESOURCE_ROOT = '/api/v1/deployments/{deploymentId}/snowflake-semantic-view-';
 const RESOURCE_PATH_OVERRIDES = {
-  'Snowflake Semantic View Sync': '/api/v1/deployments/{deploymentId}/snowflake-semantic-view-{pulls,syncs}',
+  'Snowflake Semantic View Sync': {
+    display: `${SNOWFLAKE_RESOURCE_ROOT}{pulls,syncs}`,
+    prefixes: [`${SNOWFLAKE_RESOURCE_ROOT}pulls`, `${SNOWFLAKE_RESOURCE_ROOT}syncs`],
+  },
 };
 
 // The v1 REST API, on both path families it is served under: /api/v1/… on the
@@ -579,12 +583,6 @@ if (leakedLegacyLinks.length) {
   process.exit(1);
 }
 
-writeOrCheck(OUT, yaml.dump(out, { lineWidth: 100, noRefs: true }));
-console.log('paths:', Object.keys(paths).length, '| schemas:', Object.keys(schemas).length, '| tags:', orderedTags.length);
-if (autoExcludedCount) {
-  console.log(`(${autoExcludedCount} Cube-staff-only operation(s) auto-excluded via SUPER_ADMIN_ONLY_MARKER)`);
-}
-
 // 5. Group operations by tag (pages in source order within a tag) and capture,
 //    per tag, its paths + the first operation's summary — used to build both the
 //    docs.json nav and the intro-table rows.
@@ -599,6 +597,25 @@ for (const [p, val] of Object.entries(paths)) {
     if (!(pathsForTag[tag] || []).includes(p)) (pathsForTag[tag] = pathsForTag[tag] || []).push(p);
     (summariesForTag[tag] = summariesForTag[tag] || []).push(val[m].summary || '');
   }
+}
+
+for (const [tag, { prefixes }] of Object.entries(RESOURCE_PATH_OVERRIDES)) {
+  const tagPaths = pathsForTag[tag];
+  const covered = (prefix, path) => path === prefix || path.startsWith(`${prefix}/`);
+  if (
+    !tagPaths?.length ||
+    !tagPaths.every((path) => prefixes.some((prefix) => covered(prefix, path))) ||
+    !prefixes.every((prefix) => tagPaths.some((path) => covered(prefix, path)))
+  ) {
+    console.error(`Aborting: RESOURCE_PATH_OVERRIDES entry for ${tag} does not match its paths.`);
+    process.exit(1);
+  }
+}
+
+writeOrCheck(OUT, yaml.dump(out, { lineWidth: 100, noRefs: true }));
+console.log('paths:', Object.keys(paths).length, '| schemas:', Object.keys(schemas).length, '| tags:', orderedTags.length);
+if (autoExcludedCount) {
+  console.log(`(${autoExcludedCount} Cube-staff-only operation(s) auto-excluded via SUPER_ADMIN_ONLY_MARKER)`);
 }
 
 // The tag's representative page for the intro table: its first operation, unless
@@ -655,7 +672,7 @@ const rows = groups
   .map(
     (g) =>
       `| [${g.group}](/api-reference/${kebab(g.group)}/${kebab(linkSummaryForTag(g.group))}) ` +
-      `| \`${RESOURCE_PATH_OVERRIDES[g.group] ?? commonPathPrefix(pathsForTag[g.group])}\` | v1 |`
+      `| \`${RESOURCE_PATH_OVERRIDES[g.group]?.display ?? commonPathPrefix(pathsForTag[g.group])}\` | v1 |`
   )
   .join('\n');
 const table = [INTRO_TABLE_HEAD, rows, INTRO_SCIM_ROWS].join('\n');
