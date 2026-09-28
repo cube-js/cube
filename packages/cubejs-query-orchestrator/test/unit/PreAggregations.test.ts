@@ -1706,7 +1706,7 @@ describe('PreAggregations', () => {
     // https://github.com/cube-js/cube/issues/11317
     test('keeps the partition a query ends in for a rollupLambda member', async () => {
       // A fresh build reports the partition's own load range end.
-      const loadSpy = jest.spyOn(PreAggregationLoader.prototype, 'loadPreAggregation').mockImplementation(async function loadPreAggregation(this: any) {
+      const loadSpy = jest.spyOn(PreAggregationLoader.prototype, 'loadPreAggregation').mockImplementation(async function loadPreAggregation(this: PreAggregationLoader) {
         return {
           targetTableName: this.preAggregation.tableName,
           refreshKeyValues: [],
