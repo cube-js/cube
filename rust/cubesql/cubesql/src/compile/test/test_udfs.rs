@@ -375,6 +375,22 @@ async fn test_to_char_udf() -> Result<(), CubeError> {
         .await?
     );
 
+    insta::assert_snapshot!(
+        "to_char_4",
+        execute_query(
+            "
+                SELECT TO_CHAR(CAST('2021-08-31 11:05:00' AS TIMESTAMP), 'YYYY-MM-DD HH24:MI:SS.US')
+                UNION ALL
+                SELECT TO_CHAR(CAST('2021-08-31 11:05:00.123' AS TIMESTAMP), 'YYYY-MM-DD HH24:MI:SS.US')
+                UNION ALL
+                SELECT TO_CHAR(CAST('2021-08-31 11:05:00.123456' AS TIMESTAMP), 'YYYY-MM-DD HH24:MI:SS.US')
+                "
+            .to_string(),
+            DatabaseProtocol::PostgreSQL
+        )
+        .await?
+    );
+
     Ok(())
 }
 
