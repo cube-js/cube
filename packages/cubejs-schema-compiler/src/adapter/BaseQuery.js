@@ -4775,9 +4775,9 @@ export class BaseQuery {
         lt: '{{ column }} < {{ param }}',
         lte: '{{ column }} <= {{ param }}',
         like_pattern: '{% if start_wild %}\'%\' || {% endif %}{{ value }}{% if end_wild %}|| \'%\'{% endif %}',
-        // Escapes `%`, `_` and itself in LIKE values (as BaseFilter.escapeWildcardChars does).
-        // Stays bare - Cube Store rejects ESCAPE; dialects with no default escape char add
-        // the clause in `like_pattern` or `tesseract.ilike`. Wrong for ksqlDB (no ESCAPE).
+        // Stays bare - Cube Store rejects ESCAPE. Dialects with no default escape char add the
+        // clause in `like_pattern`/`tesseract.ilike`, some in driver packages (Pinot, Dremio,
+        // Druid, DuckDB) - a sweep of this directory misses them. Wrong for ksqlDB (no ESCAPE).
         like_escape_char: '\\',
         always_true: '1 = 1'
 
