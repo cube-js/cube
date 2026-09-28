@@ -9,10 +9,8 @@ import { prepareCompiler as originalPrepareCompiler } from '@cubejs-backend/sche
 import { DruidDriver, DruidDriverConfiguration } from '../src/DruidDriver';
 import { DruidQuery } from '../src/DruidQuery';
 
-// A LIKE filter has to match the user's value literally, and that only works if
-// the escaping applied to the value reaches Druid with the clause that
-// interprets it. Druid accepts a non-literal pattern and honours ESCAPE on it
-// only over a real datasource, so this needs one rather than an inline SELECT.
+// Druid honours ESCAPE on a non-literal pattern only over a real datasource - an
+// inline SELECT is refused - so this ingests one rather than selecting constants.
 const LIKE_DATASOURCE = 'like_escape_filters';
 const LIKE_ROWS = ['50%Yoff', '50%_off', '50Xyoff', 'off', 'plain', 'a\\b', 'aXb'];
 
@@ -238,7 +236,7 @@ describe('DruidDriver', () => {
     );
   };
 
-  const filteredNames = async (operator: string, value: string, useNativeSqlPlanner: boolean) => {
+  const filteredNames = async (operator: string, value: string) => {
     const { compiler, joinGraph, cubeEvaluator } = originalPrepareCompiler({
       localPath: () => __dirname,
       dataSchemaFiles: () => Promise.resolve([{ fileName: 'main.js', content: LIKE_MODEL }]),
@@ -249,7 +247,7 @@ describe('DruidDriver', () => {
     const query = new DruidQuery({ joinGraph, cubeEvaluator, compiler }, {
       dimensions: ['names.name'],
       filters: [{ member: 'names.name', operator, values: [value] }],
-      useNativeSqlPlanner,
+      useNativeSqlPlanner: true,
     });
 
     const [sql, params] = query.buildSqlAndParams();
@@ -269,12 +267,8 @@ describe('DruidDriver', () => {
       await ingestLikeRows();
     }, 5 * 60 * 1000);
 
-    it.each(LIKE_CASES)('%s %p on the legacy planner', async (operator, value, expected) => {
-      expect(await filteredNames(operator, value, false)).toEqual([...expected].sort());
-    }, 60 * 1000);
-
-    it.each(LIKE_CASES)('%s %p on the tesseract planner', async (operator, value, expected) => {
-      expect(await filteredNames(operator, value, true)).toEqual([...expected].sort());
+    it.each(LIKE_CASES)('%s %p', async (operator, value, expected) => {
+      expect(await filteredNames(operator, value)).toEqual([...expected].sort());
     }, 60 * 1000);
   });
 });

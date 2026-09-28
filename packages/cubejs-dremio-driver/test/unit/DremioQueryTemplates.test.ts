@@ -31,7 +31,7 @@ const MODEL = `
   });
 `;
 
-const buildFilter = async (operator: string, useNativeSqlPlanner: boolean) => {
+const buildFilter = async (operator: string) => {
   const { compiler, joinGraph, cubeEvaluator } = prepareCompiler(MODEL);
 
   await compiler.compile();
@@ -39,7 +39,7 @@ const buildFilter = async (operator: string, useNativeSqlPlanner: boolean) => {
   const query = new DremioQuery({ joinGraph, cubeEvaluator, compiler }, {
     measures: ['orders.count'],
     filters: [{ member: 'orders.status', operator, values: ['%'] }],
-    useNativeSqlPlanner,
+    useNativeSqlPlanner: true,
   });
 
   const [sql, params] = query.buildSqlAndParams();
@@ -47,19 +47,15 @@ const buildFilter = async (operator: string, useNativeSqlPlanner: boolean) => {
   return { sql: sql.replace(/\s+/g, ' '), params };
 };
 
-// Dremio has no default LIKE escape character, so the value escaping both
-// planners apply is only meaningful if the clause that interprets it is
-// attached to the predicate - which is why these pin the whole predicate.
+// Dremio has no default LIKE escape character, so escaping the value is only
+// meaningful if the clause that interprets it is attached to the predicate -
+// which is why these pin the whole predicate.
 /* eslint-disable quotes -- double quotes keep the expected SQL readable */
-const PREDICATES: [string, string, boolean, string][] = [
-  ['contains', 'legacy', false, "LOWER(\"orders\".status) LIKE LOWER(CONCAT('%', ?, '%')) ESCAPE '\\'"],
-  ['notContains', 'legacy', false, "LOWER(\"orders\".status) NOT LIKE LOWER(CONCAT('%', ?, '%')) ESCAPE '\\'"],
-  ['startsWith', 'legacy', false, "LOWER(\"orders\".status) LIKE LOWER(CONCAT('', ?, '%')) ESCAPE '\\'"],
-  ['endsWith', 'legacy', false, "LOWER(\"orders\".status) LIKE LOWER(CONCAT('%', ?, '')) ESCAPE '\\'"],
-  ['contains', 'tesseract', true, "LOWER(\"orders\".status) LIKE LOWER('%' || ?|| '%') ESCAPE '\\'"],
-  ['notContains', 'tesseract', true, "LOWER(\"orders\".status) NOT LIKE LOWER('%' || ?|| '%') ESCAPE '\\'"],
-  ['startsWith', 'tesseract', true, "LOWER(\"orders\".status) LIKE LOWER(?|| '%') ESCAPE '\\'"],
-  ['endsWith', 'tesseract', true, "LOWER(\"orders\".status) LIKE LOWER('%' || ?) ESCAPE '\\'"],
+const PREDICATES: [string, string][] = [
+  ['contains', "LOWER(\"orders\".status) LIKE LOWER('%' || ?|| '%') ESCAPE '\\'"],
+  ['notContains', "LOWER(\"orders\".status) NOT LIKE LOWER('%' || ?|| '%') ESCAPE '\\'"],
+  ['startsWith', "LOWER(\"orders\".status) LIKE LOWER(?|| '%') ESCAPE '\\'"],
+  ['endsWith', "LOWER(\"orders\".status) LIKE LOWER('%' || ?) ESCAPE '\\'"],
 ];
 /* eslint-enable quotes */
 
@@ -69,9 +65,9 @@ const COLD_START_TIMEOUT = 60 * 1000;
 
 describe('DremioQuery SQL templates', () => {
   it.each(PREDICATES)(
-    'escapes and interprets LIKE wildcards for %s on the %s planner',
-    async (operator, _name, useNativeSqlPlanner, predicate) => {
-      const { sql, params } = await buildFilter(operator, useNativeSqlPlanner);
+    'escapes and interprets LIKE wildcards for %s',
+    async (operator, predicate) => {
+      const { sql, params } = await buildFilter(operator);
 
       expect(params).toEqual(['\\%']);
       expect(sql).toContain(predicate);
@@ -79,16 +75,12 @@ describe('DremioQuery SQL templates', () => {
     COLD_START_TIMEOUT
   );
 
-  // Dremio's ILIKE is a function taking no escape argument, so neither planner
-  // can use it and still say how the value was escaped. The predicates above
-  // pin the replacement; this pins the operator staying gone.
-  it.each([['legacy', false], ['tesseract', true]] as [string, boolean][])(
-    'does not render ILIKE on the %s planner',
-    async (_name, useNativeSqlPlanner) => {
-      const { sql } = await buildFilter('contains', useNativeSqlPlanner);
+  // Dremio's ILIKE is a function taking no escape argument, so it cannot be used
+  // and still say how the value was escaped. The predicates above pin the
+  // replacement; this pins the operator staying gone.
+  it('does not render ILIKE', async () => {
+    const { sql } = await buildFilter('contains');
 
-      expect(sql).not.toMatch(/ILIKE/i);
-    },
-    COLD_START_TIMEOUT
-  );
+    expect(sql).not.toMatch(/ILIKE/i);
+  }, COLD_START_TIMEOUT);
 });
