@@ -284,6 +284,8 @@ export class ClickHouseQuery extends BaseQuery {
 
   public sqlTemplates() {
     const templates = super.sqlTemplates();
+    // Must match ClickHouseParamAllocator: Tesseract and SQL API pushdown render params from this template
+    templates.params.param = '___ClickHouseParam_{{ param_index }}___';
     templates.functions.DATETRUNC = 'DATE_TRUNC({{ args_concat }})';
     templates.functions.UTCTIMESTAMP = 'now(\'UTC\')';
     templates.functions.STRING_AGG = 'arrayStringConcat(group{% if distinct %}Uniq{% endif %}Array({{ args[0] }}), {{ args[1] }})';

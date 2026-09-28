@@ -2,8 +2,8 @@ import { createClient } from '@clickhouse/client';
 import type { ClickHouseClient, ResponseJSON } from '@clickhouse/client';
 import { GenericContainer } from 'testcontainers';
 import type { StartedTestContainer } from 'testcontainers';
-import { escape } from 'sqlstring';
 import { v4 as uuidv4 } from 'uuid';
+import { formatMySql } from '@cubejs-backend/shared';
 import moment from 'moment';
 
 import { ClickHouseQuery } from '../../../src/adapter/ClickHouseQuery';
@@ -159,7 +159,13 @@ export class ClickHouseDbRunner extends BaseDbRunner {
     const requests = queries
       .map(async ([query, params]) => {
         const resultSet = await clickHouse.query({
-          query: query.replace(/___ClickHouseParam_(\d+)___/g, (_, idx) => escape(params[idx])),
+          query: query.replace(/___ClickHouseParam_(\d+)___/g, (_, idx) => {
+            if (Number(idx) >= params.length) {
+              throw new Error(`Missing value for ClickHouse query parameter ${idx} (${params.length} provided)`);
+            }
+
+            return formatMySql('?', [params[idx]]);
+          }),
           format: 'JSON',
           clickhouse_settings: {
             join_use_nulls: 1,

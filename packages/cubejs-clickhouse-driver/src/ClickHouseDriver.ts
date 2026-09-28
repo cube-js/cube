@@ -38,7 +38,7 @@ import { version } from '../package.json';
 
 import { ClickHouseRowStream } from './RowStream';
 import { buildTransformFromMeta, transformRow } from './Transform';
-import { formatError } from './utils';
+import { formatError, formatParams, paramToken } from './utils';
 
 const SUPPORTED_BUCKET_TYPES = ['s3'];
 
@@ -336,7 +336,7 @@ export class ClickHouseDriver extends BaseDriver implements DriverInterface {
   }
 
   protected queryResponse(query: string, values: unknown[], options?: QueryOptions): Promise<ResponseJSON<Array<unknown>>> {
-    const formattedQuery = query.replace(/___ClickHouseParam_(\d+)___/g, (_, idx) => formatMySql('?', [values[idx]]));
+    const formattedQuery = formatParams(query, values);
 
     return this.withCancel(async (connection, queryId, signal) => {
       try {
@@ -401,7 +401,7 @@ export class ClickHouseDriver extends BaseDriver implements DriverInterface {
   }
 
   public param(paramIndex: number): string {
-    return `___ClickHouseParam_${paramIndex}___`;
+    return paramToken(paramIndex);
   }
 
   public informationSchemaQuery() {
@@ -459,7 +459,7 @@ export class ClickHouseDriver extends BaseDriver implements DriverInterface {
     const queryId = this.buildQueryId(requestId);
 
     try {
-      const formattedQuery = query.replace(/___ClickHouseParam_(\d+)___/g, (_, idx) => formatMySql('?', [values[idx]]));
+      const formattedQuery = formatParams(query, values);
 
       const format = 'JSONCompactEachRowWithNamesAndTypes';
 
@@ -576,7 +576,7 @@ export class ClickHouseDriver extends BaseDriver implements DriverInterface {
   }
 
   public getTablesQuery(schemaName: string): Promise<TableQueryResult[]> {
-    return this.query('SELECT name as table_name FROM system.tables WHERE database = ___ClickHouseParam_0___', [schemaName]);
+    return this.query(`SELECT name as table_name FROM system.tables WHERE database = ${this.param(0)}`, [schemaName]);
   }
 
   public override async dropTable(tableName: string, options?: QueryOptions): Promise<void> {
@@ -690,7 +690,7 @@ export class ClickHouseDriver extends BaseDriver implements DriverInterface {
     const { bucketName, path } = this.parseBucketUrl(this.config.exportBucket.bucketName);
     const exportPrefix = path ? `${path}/${uuidv4()}` : uuidv4();
 
-    const formattedQuery = `
+    const formattedQuery = formatParams(`
       INSERT INTO FUNCTION
          s3(
              'https://${bucketName}.s3.${this.config.exportBucket.region}.amazonaws.com/${exportPrefix}/export.csv.gz',
@@ -699,7 +699,7 @@ export class ClickHouseDriver extends BaseDriver implements DriverInterface {
              'CSV'
           )
       ${sql}
-    `.replace(/___ClickHouseParam_(\d+)___/g, (_, idx) => formatMySql('?', [params[idx]]));
+    `, params);
 
     await this.command(formattedQuery, { requestId: options.requestId });
 
