@@ -6,7 +6,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { formatMySql } from '@cubejs-backend/shared';
 import moment from 'moment';
 
-import { ClickHouseQuery } from '../../../src/adapter/ClickHouseQuery';
+import { ClickHouseQuery, paramToken } from '../../../src/adapter/ClickHouseQuery';
 import { BaseDbRunner } from '../utils/BaseDbRunner';
 
 process.env.TZ = 'GMT';
@@ -159,7 +159,7 @@ export class ClickHouseDbRunner extends BaseDbRunner {
     const requests = queries
       .map(async ([query, params]) => {
         const resultSet = await clickHouse.query({
-          query: query.replace(/___ClickHouseParam_(\d+)___/g, (_, idx) => {
+          query: query.replace(new RegExp(paramToken('(\\d+)'), 'g'), (_, idx) => {
             if (Number(idx) >= params.length) {
               throw new Error(`Missing value for ClickHouse query parameter ${idx} (${params.length} provided)`);
             }

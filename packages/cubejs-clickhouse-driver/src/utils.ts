@@ -10,11 +10,11 @@ export function formatError(e: unknown): string {
   return `${e}`;
 }
 
-export function paramToken(paramIndex: number): string {
-  return `___ClickHouseParam_${paramIndex}___`;
+export function paramToken(index: number | string): string {
+  return `___ClickHouseParam_${index}___`;
 }
 
-const PARAM_TOKEN_RE = /___ClickHouseParam_(\d+)___/g;
+const PARAM_TOKEN_RE = new RegExp(paramToken('(\\d+)'), 'g');
 
 // Placeholders are explicit tokens instead of `?`: a `?` also appears in string literals
 // (e.g. regexes) and in the ternary operator, so it cannot be substituted positionally.

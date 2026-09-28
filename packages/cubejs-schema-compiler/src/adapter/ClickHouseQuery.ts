@@ -31,9 +31,14 @@ class ClickHouseFilter extends BaseFilter {
   }
 }
 
+// Params are bound by token, not `?`, so literal question marks in SQL survive
+export function paramToken(index: number | string): string {
+  return `___ClickHouseParam_${index}___`;
+}
+
 class ClickHouseParamAllocator extends ParamAllocator {
   public paramPlaceHolder(paramIndex) {
-    return `___ClickHouseParam_${paramIndex}___`;
+    return paramToken(paramIndex);
   }
 }
 
@@ -284,8 +289,8 @@ export class ClickHouseQuery extends BaseQuery {
 
   public sqlTemplates() {
     const templates = super.sqlTemplates();
-    // Must match ClickHouseParamAllocator: Tesseract and SQL API pushdown render params from this template
-    templates.params.param = '___ClickHouseParam_{{ param_index }}___';
+    // Tesseract and SQL API pushdown render params from this template, the legacy planner via ClickHouseParamAllocator
+    templates.params.param = paramToken('{{ param_index }}');
     templates.functions.DATETRUNC = 'DATE_TRUNC({{ args_concat }})';
     templates.functions.UTCTIMESTAMP = 'now(\'UTC\')';
     templates.functions.STRING_AGG = 'arrayStringConcat(group{% if distinct %}Uniq{% endif %}Array({{ args[0] }}), {{ args[1] }})';
