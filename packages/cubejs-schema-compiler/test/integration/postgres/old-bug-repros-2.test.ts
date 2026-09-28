@@ -4,7 +4,7 @@ import { dbRunner } from './PostgresDBRunner';
 
 // Repros for old open GitHub issues, run against Postgres. Each test asserts
 // the correct behavior, so it fails until its bug is fixed. Tests for issues
-// that no longer reproduce (#7730, #9549) are kept as regression guards.
+// that no longer reproduce are kept as regression guards.
 describe('old bug repros (postgres)', () => {
   jest.setTimeout(200000);
 
@@ -58,6 +58,14 @@ describe('old bug repros (postgres)', () => {
             offset: 'start',
           },
         },
+        weeklyDistinct: {
+          sql: 'id',
+          type: 'count_distinct',
+          rollingWindow: {
+            leading: '1 week',
+            offset: 'start',
+          },
+        },
       },
       dimensions: {
         id: { sql: 'id', type: 'number', primaryKey: true },
@@ -66,6 +74,11 @@ describe('old bug repros (postgres)', () => {
       preAggregations: {
         main: {
           measures: [CUBE.weeklyCount],
+          timeDimension: CUBE.created_at,
+          granularity: 'day',
+        },
+        distinct: {
+          measures: [CUBE.weeklyDistinct],
           timeDimension: CUBE.created_at,
           granularity: 'day',
         },
@@ -161,8 +174,31 @@ describe('old bug repros (postgres)', () => {
     });
   });
 
+  describe('issue #7730 rolling window count_distinct with leading + offset: start in a pre-aggregation', () => {
+    it('builds the pre-aggregation and serves the same result as the source', async () => {
+      await compiler.compile();
+      const q = {
+        measures: ['sessions.weeklyDistinct'],
+        timeDimensions: [{
+          dimension: 'sessions.created_at',
+          granularity: 'day',
+          dateRange: ['2024-01-01', '2024-01-03'],
+        }],
+        order: [{ id: 'sessions.created_at' }],
+      };
+      // Distinct ids in [day, day + 1 week): 01-01 -> {1, 2}, 01-02 -> {2, 3}, 01-03 -> {2, 3, 4}
+      const expected = ['2', '2', '3'];
+
+      const query = buildQuery(q);
+      const preAggregationsDescription: any = query.preAggregations?.preAggregationsDescription();
+      expect(preAggregationsDescription.map((d: any) => d.tableName)).toEqual(['sessions_distinct']);
+      const res = await dbRunner.evaluateQueryWithPreAggregations(query);
+      expect(res.map((r: any) => r.sessions__weekly_distinct)).toEqual(expected);
+    });
+  });
+
   describe('issue #9549 time_shift by 1 year with weekly granularity', () => {
-    it('`1 year` shifts by calendar year, `52 week` lines up weeks', async () => {
+    it('prior-year value of a week equals the matching week a year earlier', async () => {
       await compiler.compile();
       const query = buildQuery({
         measures: ['revenue.revenue', 'revenue.revenue_prior_year', 'revenue.revenue_prior_52w'],
@@ -173,13 +209,14 @@ describe('old bug repros (postgres)', () => {
         }],
       });
       const res = await dbRunner.testQuery(query.buildSqlAndParams());
-      // `1 year` shifts by the calendar year, so the week of 2024-12-30 compares
-      // against 2023-12-30..2024-01-05 (110). `52 week` lines up with the week of
-      // 2024-01-01 (100).
+      // The week of 2024-12-30 (ISO week 1 of 2025) should compare against the week
+      // of 2024-01-01 (ISO week 1 of 2024): 100. Today `1 year` shifts the raw
+      // timestamp and then truncates, so it sums 2023-12-30..2024-01-05 (110).
+      // `52 week` already lines up and is kept as a control.
       expect(res).toEqual([{
         revenue__date_week: '2024-12-30T00:00:00.000Z',
         revenue__revenue: '1000',
-        revenue__revenue_prior_year: '110',
+        revenue__revenue_prior_year: '100',
         revenue__revenue_prior_52w: '100',
       }]);
     });

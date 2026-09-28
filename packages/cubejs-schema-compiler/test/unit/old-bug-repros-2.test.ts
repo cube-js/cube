@@ -1,4 +1,3 @@
-import { PostgresQuery } from '../../src/adapter/PostgresQuery';
 import { prepareJsCompiler, prepareYamlCompiler } from './PrepareCompiler';
 
 // Repros for old open GitHub issues. Each test asserts the correct behavior,
@@ -71,101 +70,6 @@ views:
         });
       `);
       await expect(compiler.compile()).rejects.toThrow(/status/);
-    });
-  });
-
-  // Does not reproduce with Tesseract when the join uses member references, as the
-  // rollup_join docs require. Kept as a regression guard.
-  describe('issue #11124 rollup_join with a measure from the secondary cube', () => {
-    const model = `
-      cube('SecondaryCube', {
-        data_source: 'secondary',
-        sql: \`
-          select 1 as id, 'loc_1' as location_id, 500 as contract_value
-          UNION ALL
-          select 2 as id, 'loc_2' as location_id, 300 as contract_value
-        \`,
-        dimensions: {
-          id: { sql: 'id', type: 'string', primary_key: true },
-          location_id: { sql: 'location_id', type: 'string' },
-        },
-        measures: {
-          total_contract_value: { sql: 'contract_value', type: 'sum' },
-        },
-        preAggregations: {
-          main: {
-            type: 'rollup',
-            external: true,
-            measures: [CUBE.total_contract_value],
-            dimensions: [CUBE.id, CUBE.location_id],
-          },
-        },
-      });
-
-      cube('PrimaryCube', {
-        sql: \`
-          select 1 as id, 1 as secondary_id, 'SUCCESS' as action_status
-          UNION ALL
-          select 2 as id, 2 as secondary_id, 'SUCCESS' as action_status
-          UNION ALL
-          select 3 as id, 1 as secondary_id, 'FAILURE' as action_status
-        \`,
-        joins: {
-          SecondaryCube: {
-            sql: \`\${CUBE.secondary_id} = \${SecondaryCube.id}\`,
-            relationship: 'many_to_one',
-          },
-        },
-        dimensions: {
-          id: { sql: 'id', type: 'string', primary_key: true },
-          secondary_id: { sql: 'secondary_id', type: 'string' },
-          action_status: { sql: 'action_status', type: 'string' },
-        },
-        measures: {
-          total_count: {
-            type: 'count',
-            filters: [{ sql: \`\${CUBE}.action_status = 'SUCCESS'\` }],
-          },
-        },
-        preAggregations: {
-          primary_rollup: {
-            type: 'rollup',
-            external: true,
-            measures: [CUBE.total_count],
-            dimensions: [CUBE.secondary_id, CUBE.action_status],
-          },
-          joined_rollup: {
-            type: 'rollup_join',
-            rollups: [PrimaryCube.primary_rollup, SecondaryCube.main],
-            measures: [PrimaryCube.total_count, SecondaryCube.total_contract_value],
-            dimensions: [PrimaryCube.secondary_id, SecondaryCube.location_id],
-          },
-        },
-      });
-    `;
-
-    const build = async (measures: string[]) => {
-      const compilers = prepareJsCompiler(model);
-      await compilers.compiler.compile();
-      const query = new PostgresQuery(compilers, {
-        timezone: 'UTC',
-        measures,
-        dimensions: ['SecondaryCube.location_id'],
-      });
-      const [sql] = query.buildSqlAndParams();
-      return sql;
-    };
-
-    it('serves a query with only primary measures from the rollup_join', async () => {
-      const sql = await build(['PrimaryCube.total_count']);
-      expect(sql).toContain('primary_cube_primary_rollup');
-      expect(sql).toContain('secondary_cube_main');
-    });
-
-    it('serves a query that adds a secondary measure from the rollup_join', async () => {
-      const sql = await build(['PrimaryCube.total_count', 'SecondaryCube.total_contract_value']);
-      expect(sql).toContain('primary_cube_primary_rollup');
-      expect(sql).toContain('secondary_cube_main');
     });
   });
 });

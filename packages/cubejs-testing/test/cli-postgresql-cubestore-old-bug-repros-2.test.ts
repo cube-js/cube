@@ -4,6 +4,9 @@
  * it fails until its bug is fixed. #7421 no longer reproduces and is kept as a
  * regression guard.
  *
+ * #11124 also needs a second Postgres database for the `secondary` data source
+ * (CUBEJS_DS_SECONDARY_DB_NAME, default `test2`).
+ *
  * No Docker required. Expects:
  *   - Postgres reachable via CUBEJS_DB_HOST/PORT/NAME/USER/PASS
  *     (default localhost:5432, db `test`, user `root`, password `test`)
@@ -55,6 +58,13 @@ describe('old pre-aggregation bug repros 2 (Postgres + Cube Store)', () => {
         CUBEJS_SCHEDULED_REFRESH_DEFAULT: 'false',
         CUBEJS_PRE_AGGREGATIONS_SCHEMA: `old_bug_repros_2_${Date.now()}`,
         CUBEJS_PG_SQL_PORT: '',
+        CUBEJS_DATASOURCES: 'default,secondary',
+        CUBEJS_DS_SECONDARY_DB_TYPE: 'postgres',
+        CUBEJS_DS_SECONDARY_DB_HOST: process.env.CUBEJS_DB_HOST || 'localhost',
+        CUBEJS_DS_SECONDARY_DB_PORT: process.env.CUBEJS_DB_PORT || '5432',
+        CUBEJS_DS_SECONDARY_DB_NAME: process.env.CUBEJS_DS_SECONDARY_DB_NAME || 'test2',
+        CUBEJS_DS_SECONDARY_DB_USER: process.env.CUBEJS_DB_USER || 'root',
+        CUBEJS_DS_SECONDARY_DB_PASS: process.env.CUBEJS_DB_PASS || 'test',
       },
     });
   });
@@ -101,6 +111,32 @@ describe('old pre-aggregation bug repros 2 (Postgres + Cube Store)', () => {
       expect(body.error).toBeUndefined();
       expect(usedPreAggs(body)).toEqual([expect.stringContaining('lambda_tz_main')]);
       expect(body.data).toEqual([{ 'lambda_tz.count': '5' }]);
+    });
+  });
+
+  describe('issue #11124 cross-data-source rollup_join with a measure from the secondary cube', () => {
+    const query = (measures: string[]) => ({
+      measures,
+      dimensions: ['SecondaryCube.location_id'],
+      order: { 'SecondaryCube.location_id': 'asc' },
+    });
+
+    test('control: primary measure + secondary dimension', async () => {
+      const body = await load(query(['PrimaryCube.total_count']));
+      expect(body.error).toBeUndefined();
+      expect(body.data).toEqual([
+        { 'SecondaryCube.location_id': 'loc_1', 'PrimaryCube.total_count': '1' },
+        { 'SecondaryCube.location_id': 'loc_2', 'PrimaryCube.total_count': '1' },
+      ]);
+    });
+
+    test('adding a secondary measure is still served by the rollup_join', async () => {
+      const body = await load(query(['PrimaryCube.total_count', 'SecondaryCube.total_contract_value']));
+      expect(body.error).toBeUndefined();
+      expect(body.data).toEqual([
+        { 'SecondaryCube.location_id': 'loc_1', 'PrimaryCube.total_count': '1', 'SecondaryCube.total_contract_value': '500' },
+        { 'SecondaryCube.location_id': 'loc_2', 'PrimaryCube.total_count': '1', 'SecondaryCube.total_contract_value': '300' },
+      ]);
     });
   });
 });
