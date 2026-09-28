@@ -252,6 +252,14 @@ describe('QueryOrchestrator', () => {
   let queryOrchestratorExternalRefresh = null;
   let queryOrchestratorDropWithoutTouch = null;
   let testCount = 1;
+  // Clients poll on `Continue wait`. The memory queue hands out a finished result only once, so a
+  // query awaited by several concurrent partitions can answer one of them with `Continue wait`.
+  const fetchLongPolling = (orchestrator, q) => orchestrator.fetchQuery(q).catch(e => {
+    if (e.toString().match(/Continue wait/)) {
+      return fetchLongPolling(orchestrator, q);
+    }
+    throw e;
+  });
   const schemaData = {
     public: {
       orders: [
@@ -435,7 +443,7 @@ describe('QueryOrchestrator', () => {
         indexesSql: [],
       }],
       cacheMode: 'must-revalidate',
-      requestId: 'index is part of query key'
+      requestId: 'index is part of query key 2'
     });
     console.log(result.data[0]);
     expect(result.data[0]).toMatch(/orders_number_and_count20191102_c2mipl2c_n0ns2o1y/);
@@ -1104,11 +1112,11 @@ describe('QueryOrchestrator', () => {
       }],
       requestId: 'range partitions',
     };
-    await queryOrchestrator.fetchQuery(query);
+    await fetchLongPolling(queryOrchestrator, query);
     console.log(JSON.stringify(mockDriver.executedQueries));
     const nowQueries = mockDriver.executedQueries.filter(q => q.match(/NOW/)).length;
     await mockDriver.delay(2000);
-    await queryOrchestrator.fetchQuery(query);
+    await fetchLongPolling(queryOrchestrator, query);
     console.log(JSON.stringify(mockDriver.executedQueries));
     expect(mockDriver.executedQueries.filter(q => q.match(/NOW/)).length).toEqual(nowQueries);
   });
@@ -1233,8 +1241,8 @@ describe('QueryOrchestrator', () => {
     }).rejects.toThrow(
       /refresh worker/
     );
-    await queryOrchestrator.fetchQuery(query({ startQuery: 'SELECT \'2021-05-01\'', endQuery: 'SELECT \'2021-05-15\'' }));
-    const result = await queryOrchestratorExternalRefresh.fetchQuery(query({
+    await fetchLongPolling(queryOrchestrator, query({ startQuery: 'SELECT \'2021-05-01\'', endQuery: 'SELECT \'2021-05-15\'' }));
+    const result = await fetchLongPolling(queryOrchestratorExternalRefresh, query({
       startQuery: 'SELECT \'2021-05-01\'',
       endQuery: 'SELECT \'2021-05-15\'',
       matchedTimeDimensionDateRange: ['2021-05-31T00:00:00.000', '2021-05-31T23:59:59.999']
@@ -1283,7 +1291,7 @@ describe('QueryOrchestrator', () => {
   });
 
   test('lambda partitions', async () => {
-    const query = (matchedTimeDimensionDateRange) => ({
+    const query = (requestId, matchedTimeDimensionDateRange) => ({
       query: 'SELECT * FROM stb_pre_aggregations.orders_d UNION ALL SELECT * FROM stb_pre_aggregations.orders_h',
       values: [],
       cacheKeyQueries: {
@@ -1337,21 +1345,21 @@ describe('QueryOrchestrator', () => {
         lastRollupLambda: true,
         matchedTimeDimensionDateRange
       }],
-      requestId: 'lambda partitions',
+      requestId,
       external: true,
     });
-    let result = await queryOrchestrator.fetchQuery(query());
+    let result = await queryOrchestrator.fetchQuery(query('lambda partitions 1'));
     console.log(JSON.stringify(result, null, 2));
     expect(result.data[0]).toMatch(/orders_d20210501/);
     expect(result.data[0]).not.toMatch(/orders_h2021053000/);
     expect(result.data[0]).toMatch(/orders_h2021053100/);
     expect(result.data[0]).toMatch(/orders_h2021060100_uozkyaur_d004iq51/);
 
-    result = await queryOrchestrator.fetchQuery(query(['2021-05-31T00:00:00.000', '2021-05-31T23:59:59.999']));
+    result = await queryOrchestrator.fetchQuery(query('lambda partitions 2', ['2021-05-31T00:00:00.000', '2021-05-31T23:59:59.999']));
     console.log(JSON.stringify(result, null, 2));
     expect(result.data[0]).toMatch(/orders_h2021053100/);
 
-    result = await queryOrchestratorExternalRefresh.fetchQuery(query());
+    result = await queryOrchestratorExternalRefresh.fetchQuery(query('lambda partitions 3'));
     console.log(JSON.stringify(result, null, 2));
     expect(result.data[0]).toMatch(/orders_d20210501/);
     expect(result.data[0]).not.toMatch(/orders_h2021053000/);
@@ -1440,7 +1448,7 @@ describe('QueryOrchestrator', () => {
       requestId: 'lambda partitions',
       external: true,
     });
-    const result = await queryOrchestrator.fetchQuery(query());
+    const result = await fetchLongPolling(queryOrchestrator, query());
     console.log(JSON.stringify(result, null, 2));
     expect(result.data[0]).not.toMatch(/orders_h2021053000/);
     expect(result.data[0]).toMatch(/orders_h2021053100/);
@@ -1750,19 +1758,7 @@ describe('QueryOrchestrator', () => {
         query: 'Foo.query'
       }
     });
-    const fetchLongPolling = (orchestrator, q) => orchestrator.fetchQuery(q).catch(e => {
-      console.log(e.toString());
-      if (e.toString().match(/Continue wait/)) {
-        return fetchLongPolling(orchestrator, q);
-      }
-      throw e;
-    });
-    await Promise.all([
-      fetchLongPolling(queryOrchestrator, query(1)),
-      fetchLongPolling(queryOrchestrator, query(2)),
-      fetchLongPolling(queryOrchestrator2, query(3)),
-      fetchLongPolling(queryOrchestrator2, query(4)),
-    ].map(async streamPromise => {
+    const readFirstRow = async (streamPromise) => {
       const stream = await streamPromise;
       const data = await new Promise((resolve, reject) => {
         stream.on('data', (row) => {
@@ -1773,7 +1769,17 @@ describe('QueryOrchestrator', () => {
         });
       });
       expect(data['Foo.query']).toMatch(/orders_d/);
-    }));
+    };
+    // A persistent stream is only picked up by the reconcile of its own node, and nothing wakes a node
+    // up when another one frees a concurrency slot. So each round stays within the queue concurrency.
+    await Promise.all([
+      fetchLongPolling(queryOrchestrator, query(1)),
+      fetchLongPolling(queryOrchestrator2, query(3)),
+    ].map(readFirstRow));
+    await Promise.all([
+      fetchLongPolling(queryOrchestrator, query(2)),
+      fetchLongPolling(queryOrchestrator2, query(4)),
+    ].map(readFirstRow));
   });
 
   test('drop lock', async () => {
