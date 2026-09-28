@@ -1,6 +1,7 @@
 import { Readable } from 'stream';
 import type { BaseDriver } from '@cubejs-backend/base-driver';
 import { QueryOrchestrator } from '../../src/orchestrator/QueryOrchestrator';
+import { LocalCacheDriver } from '../../src/orchestrator/LocalCacheDriver';
 import type { QueryBody } from '../../src/orchestrator/QueryCache';
 import type { PreAggregationDescription, QueryDateRange } from '../../src/orchestrator/PreAggregations';
 
@@ -1888,8 +1889,8 @@ describe('QueryOrchestrator', () => {
   });
 
   describe('Data Source Metadata Methods', () => {
-    let metadataOrchestrator;
-    let metadataMockDriver;
+    let metadataOrchestrator: TestQueryOrchestrator;
+    let metadataMockDriver: MockDriver;
 
     beforeEach(() => {
       metadataMockDriver = new MockDriver();
@@ -1977,7 +1978,7 @@ describe('QueryOrchestrator', () => {
         return Promise.resolve(columns);
       });
 
-      const driverFactory = () => metadataMockDriver;
+      const driverFactory = () => metadataMockDriver as unknown as BaseDriver;
 
       metadataOrchestrator = new TestQueryOrchestrator(
         'ORCHESTRATOR_TEST_METADATA',
@@ -2003,12 +2004,12 @@ describe('QueryOrchestrator', () => {
 
       jest.clearAllMocks();
 
-      if (metadataOrchestrator && metadataOrchestrator.queryCache && metadataOrchestrator.queryCache.getCacheDriver()) {
-        const cacheDriver = metadataOrchestrator.queryCache.getCacheDriver();
-        if (cacheDriver.store) {
-          Object.keys(cacheDriver.store).forEach(key => delete cacheDriver.store[key]);
-        }
+      // The memory cache store is module-level, so it outlives the orchestrator.
+      const cacheDriver = metadataOrchestrator.getQueryCache().getCacheDriver();
+      if (!(cacheDriver instanceof LocalCacheDriver)) {
+        throw new Error('Expected the memory cache driver');
       }
+      cacheDriver.reset();
     });
 
     afterEach(async () => {
@@ -2041,7 +2042,7 @@ describe('QueryOrchestrator', () => {
         await metadataOrchestrator.queryDataSourceSchemas('default', { syncJobId: 'job-123' });
 
         // Clear the mock calls
-        metadataMockDriver.getSchemas.mockClear();
+        jest.mocked(metadataMockDriver.getSchemas).mockClear();
 
         // Second call with same syncJobId should use cache
         const result = await metadataOrchestrator.queryDataSourceSchemas('default', { syncJobId: 'job-123' });
@@ -2103,7 +2104,7 @@ describe('QueryOrchestrator', () => {
         await new Promise(resolve => setTimeout(resolve, 100));
 
         // Clear the mock calls
-        metadataMockDriver.getTablesForSpecificSchemas.mockClear();
+        jest.mocked(metadataMockDriver.getTablesForSpecificSchemas).mockClear();
 
         // Create equivalent but different object instance
         // Our hash function should handle this correctly
@@ -2206,7 +2207,7 @@ describe('QueryOrchestrator', () => {
         await new Promise(resolve => setTimeout(resolve, 100));
 
         // Clear the mock calls
-        metadataMockDriver.getColumnsForSpecificTables.mockClear();
+        jest.mocked(metadataMockDriver.getColumnsForSpecificTables).mockClear();
 
         // Create equivalent but different object instance
         // Our hash function should handle this correctly
@@ -2300,12 +2301,12 @@ describe('QueryOrchestrator', () => {
 
       test('should handle error scenarios gracefully', async () => {
         // Mock driver error
-        metadataMockDriver.getSchemas.mockRejectedValueOnce(new Error('Database connection failed'));
+        jest.mocked(metadataMockDriver.getSchemas).mockRejectedValueOnce(new Error('Database connection failed'));
 
         await expect(metadataOrchestrator.queryDataSourceSchemas()).rejects.toThrow('Database connection failed');
 
         // Should retry on next call
-        metadataMockDriver.getSchemas.mockResolvedValueOnce([{ schema_name: 'recovered' }]);
+        jest.mocked(metadataMockDriver.getSchemas).mockResolvedValueOnce([{ schema_name: 'recovered' }]);
         const result = await metadataOrchestrator.queryDataSourceSchemas();
         expect(result).toEqual([{ schema_name: 'recovered' }]);
       });
