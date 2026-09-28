@@ -397,23 +397,17 @@ development mode changes [here][link-cubejs-dev-vs-prod].
 
 <Info>
 
-`CUBEJS_DEV_MODE` defaults to `false`, and the official Docker images already set
-`NODE_ENV=production` — as does `cubejs server` itself — so on a Docker deployment
-leaving the flag unset is enough. Setting `NODE_ENV` below as well is belt-and-braces;
-it matters only if you embed `@cubejs-backend/server-core` directly, where an unset
-`NODE_ENV` puts the instance in development mode whatever the flag says.
+`CUBEJS_DEV_MODE` defaults to `false`, and the official Docker images run `cubejs server`,
+so leaving the flag unset is enough there. Set it to `false` explicitly if you start Cube
+with `cubejs dev-server` or the `cubejs-dev-server` bin, which turn development mode on
+for themselves when the variable is unset. `NODE_ENV` no longer has any say in it.
 
 </Info>
 
 ```dotenv
-# Keep development mode off. Under the `cubejs` CLI and the official images,
-# setting this to `true` also forces NODE_ENV=development, switching off JWT
+# Keep development mode off. Setting this to `true` switches off JWT
 # verification on the data APIs
 CUBEJS_DEV_MODE=false
-
-# Already set by the official images and by `cubejs server`; set it explicitly if
-# you start Cube some other way
-NODE_ENV=production
 ```
 
 ### Set up Refresh Worker

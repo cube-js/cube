@@ -1,10 +1,9 @@
 <Warning>
 
 **Development mode is an authentication bypass.** Cube is in development mode when
-`CUBEJS_DEV_MODE=true`, and also whenever `NODE_ENV` is not `production`. When Cube
-is started through the `cubejs` CLI — which is what the official Docker images run —
-setting `CUBEJS_DEV_MODE=true` additionally forces `NODE_ENV=development`, which
-switches off JWT verification on the
+`CUBEJS_DEV_MODE=true`, and also under `cubejs dev-server`, the `cubejs-dev-server` bin
+or the `devServer` option, which turn it on with the variable unset. It switches off
+JWT verification on the
 [REST (JSON)](/reference/core-data-apis/rest-api) and
 [GraphQL](/reference/core-data-apis/graphql-api) APIs: they then accept requests with
 no token at all.
@@ -28,10 +27,11 @@ never expose it to the internet, and never use it in production. Using developme
 mode in the Cube cloud platform is highly discouraged — it bypasses the platform's
 security model.
 
-To keep it off: `cubejs server` and the official Docker images already set
-`NODE_ENV=production`, so leaving `CUBEJS_DEV_MODE` unset — its default — is enough
-there. If you embed `@cubejs-backend/server-core` directly rather than starting Cube
-through the `cubejs` CLI, set `NODE_ENV=production` yourself, since an unset `NODE_ENV`
-puts the instance in development mode whatever the flag says.
+To keep it off, set `CUBEJS_DEV_MODE=false`. Leaving it unset is not enough on its own:
+`cubejs dev-server` and the `cubejs-dev-server` bin turn development mode on for
+themselves exactly when the variable is unset, and code that embeds
+`@cubejs-backend/server-core` directly can do the same with the `devServer` option it
+passes to `CubejsServerCore`. An explicit `false` overrides the two commands; for an
+embedder, leave `devServer` unset as well. `NODE_ENV` has no effect either way.
 
 </Warning>

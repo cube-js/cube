@@ -31,6 +31,8 @@ export type SQLServerOptions = {
 
 export type SQLServerConstructorOptions = {
   gatewayPort?: number,
+  /** Resolved by the gateway, so the native logger matches the Node one */
+  devServer?: boolean,
 };
 
 export type SqlAuthServiceAuthenticateRequest = {
@@ -43,14 +45,21 @@ export class SQLServer {
 
   protected readonly gatewayPort: number | undefined;
 
+  // The native side can only read CUBEJS_DEV_MODE, and CreateOptions.devServer beats it,
+  // so the resolved value is kept here and handed to registerInterface below. Without it
+  // the SQL API would redact query logs in a process the Node side logs in full
+  protected readonly devServer: boolean;
+
   public constructor(
     protected readonly apiGateway: ApiGateway,
     options: SQLServerConstructorOptions,
   ) {
+    this.devServer = options.devServer ?? getEnv('devMode');
+
     setupLogger(
       ({ event }) => apiGateway.log(event),
       process.env.CUBEJS_LOG_LEVEL === 'trace' ? 'trace' : 'warn',
-      process.env.NODE_ENV === 'production'
+      !this.devServer
     );
 
     // Actually, proxy is enabled in gateway
@@ -131,6 +140,7 @@ export class SQLServer {
     this.sqlInterfaceInstance = await registerInterface({
       gatewayPort: this.gatewayPort,
       pgPort: options.pgSqlPort,
+      devServer: this.devServer,
       contextToApiScopes: async ({ securityContext }) => this.apiGateway.contextToApiScopesFn(
         securityContext,
         getEnv('defaultApiScope') || await this.apiGateway.contextToApiScopesDefFn()
@@ -342,6 +352,8 @@ export class SQLServer {
     let allowedUser: string | null = options.sqlUser || getEnv('sqlUser');
     let allowedPassword: string | null = options.sqlPassword || getEnv('sqlPassword');
 
+    // Deliberately the env var, not the gateway's resolved devServer: `pgSqlPort` keys
+    // the SQL API's default port off the same variable, so the two stay in step
     if (!getEnv('devMode')) {
       if (!allowedUser) {
         allowedUser = 'cube';

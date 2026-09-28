@@ -318,3 +318,395 @@ describe('getEnv(compilerCacheSize)', () => {
     );
   });
 });
+
+const restoreNodeEnv = (value: string | undefined) => {
+  if (value === undefined) {
+    delete process.env.NODE_ENV;
+  } else {
+    process.env.NODE_ENV = value;
+  }
+};
+
+describe('getEnv(devMode)', () => {
+  const nodeEnv = process.env.NODE_ENV;
+
+  beforeEach(() => {
+    delete process.env.CUBEJS_DEV_MODE;
+    delete process.env.NODE_ENV;
+  });
+
+  afterAll(() => {
+    delete process.env.CUBEJS_DEV_MODE;
+    restoreNodeEnv(nodeEnv);
+  });
+
+  test('is off when neither CUBEJS_DEV_MODE nor NODE_ENV is set', () => {
+    expect(getEnv('devMode')).toBe(false);
+  });
+
+  test('ignores NODE_ENV, which is deprecated for this decision', () => {
+    process.env.NODE_ENV = 'development';
+    expect(getEnv('devMode')).toBe(false);
+
+    process.env.NODE_ENV = 'test';
+    expect(getEnv('devMode')).toBe(false);
+
+    process.env.NODE_ENV = 'production';
+    expect(getEnv('devMode')).toBe(false);
+  });
+
+  test('follows CUBEJS_DEV_MODE whatever NODE_ENV says', () => {
+    process.env.CUBEJS_DEV_MODE = 'true';
+    expect(getEnv('devMode')).toBe(true);
+
+    process.env.NODE_ENV = 'production';
+    expect(getEnv('devMode')).toBe(true);
+
+    process.env.CUBEJS_DEV_MODE = 'false';
+    expect(getEnv('devMode')).toBe(false);
+
+    process.env.NODE_ENV = 'development';
+    expect(getEnv('devMode')).toBe(false);
+  });
+});
+
+describe('pinPreAggregationsSchema', () => {
+  const saved = process.env.CUBEJS_PRE_AGGREGATIONS_SCHEMA;
+  let logSpy: jest.SpyInstance;
+
+  // Both the pin and displayCLIWarningOnce latch for the life of the module registry,
+  // so each case needs a fresh one
+  beforeEach(() => {
+    jest.resetModules();
+    delete process.env.CUBEJS_PRE_AGGREGATIONS_SCHEMA;
+    logSpy = jest.spyOn(console, 'log').mockImplementation(() => {
+      // swallow
+    });
+  });
+
+  afterEach(() => {
+    logSpy.mockRestore();
+
+    if (saved === undefined) {
+      delete process.env.CUBEJS_PRE_AGGREGATIONS_SCHEMA;
+    } else {
+      process.env.CUBEJS_PRE_AGGREGATIONS_SCHEMA = saved;
+    }
+  });
+
+  const pinWarnings = () => logSpy.mock.calls
+    .map(([message]) => String(message))
+    .filter((message) => message.includes('is already set for this process'));
+
+  // eslint-disable-next-line global-require
+  const freshEnv = () => require('../src/env');
+
+  test('warns when a second instance needs a different schema', () => {
+    const env = freshEnv();
+
+    env.pinPreAggregationsSchema('dev_pre_aggregations');
+    env.pinPreAggregationsSchema('prod_pre_aggregations');
+
+    // One variable cannot answer for two instances and a driver reads it directly, so
+    // the second instance's driver is on the first's schema whatever is done here
+    expect(process.env.CUBEJS_PRE_AGGREGATIONS_SCHEMA).toEqual('dev_pre_aggregations');
+    expect(pinWarnings()).toHaveLength(1);
+    expect(pinWarnings()[0]).toContain('prod_pre_aggregations');
+    // Two instances, so dropping a setting is not it - neither of them set the variable
+    expect(pinWarnings()[0]).toContain('one Cube instance per process');
+    expect(pinWarnings()[0]).not.toContain('Drop either');
+  });
+
+  test('pins over an empty value, which every consumer reads as absent', () => {
+    // `CUBEJS_PRE_AGGREGATIONS_SCHEMA=` in a .env produces this. Skipping the pin here
+    // would leave server-core and a driver each falling back to their own answer
+    process.env.CUBEJS_PRE_AGGREGATIONS_SCHEMA = '';
+
+    const env = freshEnv();
+
+    env.pinPreAggregationsSchema('dev_pre_aggregations');
+
+    expect(process.env.CUBEJS_PRE_AGGREGATIONS_SCHEMA).toEqual('dev_pre_aggregations');
+    expect(env.userPreAggregationsSchema()).toBeUndefined();
+  });
+
+  test('stays quiet when the second instance needs the same schema', () => {
+    const env = freshEnv();
+
+    env.pinPreAggregationsSchema('prod_pre_aggregations');
+    env.pinPreAggregationsSchema('prod_pre_aggregations');
+
+    expect(pinWarnings()).toHaveLength(0);
+  });
+
+  test('releasing lets a reload pin the schema its new config resolved', () => {
+    const env = freshEnv();
+
+    env.pinPreAggregationsSchema('dev_pre_aggregations');
+    env.dropPreAggregationsSchemaPin();
+
+    // Without the release the second pin is refused and the drivers stay on `dev_`,
+    // while the reloaded instance names `analytics_preaggs` in the statement
+    expect(process.env.CUBEJS_PRE_AGGREGATIONS_SCHEMA).toBeUndefined();
+
+    env.pinPreAggregationsSchema('analytics_preaggs');
+
+    expect(process.env.CUBEJS_PRE_AGGREGATIONS_SCHEMA).toEqual('analytics_preaggs');
+    expect(pinWarnings()).toHaveLength(0);
+  });
+
+  test('keeps the pin while another instance that resolved it is still up', () => {
+    const env = freshEnv();
+
+    const first = env.pinPreAggregationsSchema('dev_pre_aggregations');
+    const second = env.pinPreAggregationsSchema('dev_pre_aggregations');
+
+    // The second pin is a no-op on the variable, so without tracking holders nothing
+    // records that a second instance is relying on it
+    env.releasePreAggregationsSchemaPin(first);
+
+    expect(process.env.CUBEJS_PRE_AGGREGATIONS_SCHEMA).toEqual('dev_pre_aggregations');
+
+    env.releasePreAggregationsSchemaPin(second);
+
+    expect(process.env.CUBEJS_PRE_AGGREGATIONS_SCHEMA).toBeUndefined();
+  });
+
+  test('a share a reload dropped cannot be spent against the next pin', () => {
+    const env = freshEnv();
+
+    const a = env.pinPreAggregationsSchema('dev_pre_aggregations');
+    const b = env.pinPreAggregationsSchema('dev_pre_aggregations');
+
+    env.releasePreAggregationsSchemaPin(a);
+    // A reload while B is still up: it drops the pin from under B, whose share is now
+    // stale. B's shutdown must not spend it against the pin the reload's own instance
+    // takes next, or C's drivers fall back while C's plans still name the schema
+    env.dropPreAggregationsSchemaPin();
+
+    const c = env.pinPreAggregationsSchema('dev_pre_aggregations');
+
+    env.releasePreAggregationsSchemaPin(b);
+
+    expect(process.env.CUBEJS_PRE_AGGREGATIONS_SCHEMA).toEqual('dev_pre_aggregations');
+
+    env.releasePreAggregationsSchemaPin(c);
+
+    expect(process.env.CUBEJS_PRE_AGGREGATIONS_SCHEMA).toBeUndefined();
+  });
+
+  test('takes no share for an instance whose schema lost', () => {
+    const env = freshEnv();
+
+    const held = env.pinPreAggregationsSchema('dev_pre_aggregations');
+    // Refused, so there is no share to give up later - and releasing nothing must not
+    // drop the pin the instance that did take one is still serving on
+    const refused = env.pinPreAggregationsSchema('prod_pre_aggregations');
+
+    expect(refused).toBeUndefined();
+
+    env.releasePreAggregationsSchemaPin(<symbol>refused);
+
+    expect(process.env.CUBEJS_PRE_AGGREGATIONS_SCHEMA).toEqual('dev_pre_aggregations');
+
+    env.releasePreAggregationsSchemaPin(held);
+
+    expect(process.env.CUBEJS_PRE_AGGREGATIONS_SCHEMA).toBeUndefined();
+  });
+
+  test('a reload drops the pin whatever the count', () => {
+    const env = freshEnv();
+
+    env.pinPreAggregationsSchema('dev_pre_aggregations');
+    env.pinPreAggregationsSchema('dev_pre_aggregations');
+
+    // The whole process is re-reading its configuration, so nothing it pinned earlier
+    // survives to be shared, however many instances were holding it
+    env.dropPreAggregationsSchemaPin();
+
+    expect(process.env.CUBEJS_PRE_AGGREGATIONS_SCHEMA).toBeUndefined();
+  });
+
+  test('releasing a share the pin never issued leaves it alone', () => {
+    const env = freshEnv();
+
+    const held = env.pinPreAggregationsSchema('dev_pre_aggregations');
+    // An instance that never held the pin shutting down, so it is not its to drop
+    env.releasePreAggregationsSchemaPin(Symbol('someone else'));
+
+    expect(process.env.CUBEJS_PRE_AGGREGATIONS_SCHEMA).toEqual('dev_pre_aggregations');
+
+    env.releasePreAggregationsSchemaPin(held);
+
+    expect(process.env.CUBEJS_PRE_AGGREGATIONS_SCHEMA).toBeUndefined();
+  });
+
+  test('releasing leaves a value the user set in place', () => {
+    process.env.CUBEJS_PRE_AGGREGATIONS_SCHEMA = 'my_schema';
+
+    const env = freshEnv();
+
+    env.dropPreAggregationsSchemaPin();
+
+    // A reload re-reads `.env`, but the user's own choice outlives it
+    expect(process.env.CUBEJS_PRE_AGGREGATIONS_SCHEMA).toEqual('my_schema');
+    expect(env.userPreAggregationsSchema()).toEqual('my_schema');
+  });
+
+  test('stays quiet when the user set the variable and the instance agrees', () => {
+    process.env.CUBEJS_PRE_AGGREGATIONS_SCHEMA = 'my_schema';
+
+    const env = freshEnv();
+
+    // What OptsHandler resolves from a user-set variable, absent a CreateOptions override
+    env.pinPreAggregationsSchema('my_schema');
+
+    expect(process.env.CUBEJS_PRE_AGGREGATIONS_SCHEMA).toEqual('my_schema');
+    expect(pinWarnings()).toHaveLength(0);
+    expect(env.userPreAggregationsSchema()).toEqual('my_schema');
+  });
+
+  test('warns when a user-set variable disagrees with the resolved schema', () => {
+    process.env.CUBEJS_PRE_AGGREGATIONS_SCHEMA = 'my_schema';
+
+    const env = freshEnv();
+
+    // CreateOptions.preAggregationsSchema overrules the variable through `...opts`, so
+    // server-core names one schema and a driver reading the variable names the other
+    env.pinPreAggregationsSchema('analytics_preaggs');
+
+    expect(process.env.CUBEJS_PRE_AGGREGATIONS_SCHEMA).toEqual('my_schema');
+    expect(pinWarnings()).toHaveLength(1);
+    expect(pinWarnings()[0]).toContain('my_schema');
+    expect(pinWarnings()[0]).toContain('analytics_preaggs');
+    // One instance, so telling them to run one per process is advice they cannot take
+    expect(pinWarnings()[0]).toContain('Drop either CUBEJS_PRE_AGGREGATIONS_SCHEMA');
+    expect(pinWarnings()[0]).not.toContain('one Cube instance per process');
+  });
+
+  test('names each instance whose schema loses, not only the first', () => {
+    const env = freshEnv();
+
+    env.pinPreAggregationsSchema('dev_pre_aggregations');
+    env.pinPreAggregationsSchema('prod_pre_aggregations');
+    env.pinPreAggregationsSchema('analytics_preaggs');
+
+    // displayCLIWarningOnce is keyed per message, so a constant key would let the
+    // second instance silence the third - which is the one left guessing why its
+    // Databricks driver is qualifying queries with a schema it never named
+    expect(pinWarnings()).toHaveLength(2);
+    expect(pinWarnings()[0]).toContain('prod_pre_aggregations');
+    expect(pinWarnings()[1]).toContain('analytics_preaggs');
+  });
+
+  test('names the one driver that actually follows the variable', () => {
+    const env = freshEnv();
+
+    env.pinPreAggregationsSchema('dev_pre_aggregations');
+    env.pinPreAggregationsSchema('prod_pre_aggregations');
+
+    // Every other driver takes the schema off the descriptor server-core resolved, so
+    // a warning saying "drivers will use it" sends those deployments hunting a
+    // table-location bug they do not have
+    expect(pinWarnings()[0]).toContain('Databricks');
+    expect(pinWarnings()[0]).toContain('catalog');
+  });
+});
+
+describe('the NODE_ENV deprecation warning', () => {
+  const nodeEnv = process.env.NODE_ENV;
+  let logSpy: jest.SpyInstance;
+
+  // The warning is printed at most once per process, so each case needs a fresh
+  // module registry to reset displayCLIWarningOnce's bookkeeping
+  beforeEach(() => {
+    jest.resetModules();
+    delete process.env.CUBEJS_DEV_MODE;
+    delete process.env.NODE_ENV;
+    logSpy = jest.spyOn(console, 'log').mockImplementation(() => {
+      // swallow
+    });
+  });
+
+  afterEach(() => {
+    logSpy.mockRestore();
+    delete process.env.CUBEJS_DEV_MODE;
+    restoreNodeEnv(nodeEnv);
+  });
+
+  const nodeEnvWarnings = () => logSpy.mock.calls
+    .map(([message]) => String(message))
+    .filter((message) => message.includes('NODE_ENV'));
+
+  // eslint-disable-next-line global-require
+  const freshGetEnv = () => require('../src/env').getEnv;
+
+  test('is printed once when NODE_ENV is non-production and CUBEJS_DEV_MODE is unset', () => {
+    process.env.NODE_ENV = 'development';
+
+    const getEnvFresh = freshGetEnv();
+    expect(getEnvFresh('devMode')).toBe(false);
+    expect(getEnvFresh('devMode')).toBe(false);
+
+    expect(nodeEnvWarnings()).toHaveLength(1);
+    expect(nodeEnvWarnings()[0]).toContain('no longer taken into account');
+  });
+
+  test('does not tell an instance that wants development mode off to switch it on', () => {
+    process.env.NODE_ENV = 'staging';
+
+    expect(freshGetEnv()('devMode')).toBe(false);
+
+    expect(nodeEnvWarnings()[0]).toContain('otherwise no action is needed');
+  });
+
+  test('is suppressed once CUBEJS_DEV_MODE is set, whatever its value', () => {
+    process.env.NODE_ENV = 'development';
+    process.env.CUBEJS_DEV_MODE = 'false';
+
+    expect(freshGetEnv()('devMode')).toBe(false);
+
+    expect(nodeEnvWarnings()).toHaveLength(0);
+  });
+
+  test('is not printed for NODE_ENV=production', () => {
+    process.env.NODE_ENV = 'production';
+
+    expect(freshGetEnv()('devMode')).toBe(false);
+
+    expect(nodeEnvWarnings()).toHaveLength(0);
+  });
+
+  // An unset NODE_ENV used to mean development mode, so this instance is one the
+  // change affects and must not be left without a signal
+  test('is printed when NODE_ENV is unset, the case this change flips', () => {
+    expect(freshGetEnv()('devMode')).toBe(false);
+
+    expect(nodeEnvWarnings()).toHaveLength(1);
+    expect(nodeEnvWarnings()[0]).toContain('including when NODE_ENV was unset');
+  });
+
+  // Both dev server paths leave CUBEJS_DEV_MODE unset, and the warning fires on any
+  // non-production NODE_ENV including none at all — so without this it would greet
+  // every `cubejs dev-server` run telling a dev server to enable development mode
+  test('is silenced by markDevModeResolvedByCaller', () => {
+    process.env.NODE_ENV = 'development';
+
+    // eslint-disable-next-line global-require
+    const env = require('../src/env');
+    env.markDevModeResolvedByCaller();
+
+    expect(env.getEnv('devMode')).toBe(false);
+
+    expect(nodeEnvWarnings()).toHaveLength(0);
+  });
+
+  test('is not silenced for a process that never called it', () => {
+    process.env.NODE_ENV = 'development';
+
+    // A fresh registry, so the latch the case above set cannot leak into this one
+    expect(freshGetEnv()('devMode')).toBe(false);
+
+    expect(nodeEnvWarnings()).toHaveLength(1);
+  });
+});

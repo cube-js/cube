@@ -52,6 +52,9 @@ function detectQueueAndCacheDriver(options: QueryOrchestratorOptions): CacheAndQ
     return 'redis';
   }
 
+  // Deliberately NOT the dev mode decision: 'cubestore' throws without a
+  // cubeStoreDriverFactory, so aligning this on getEnv('devMode') would fail startup
+  // for instances that have no Cube Store configured
   if (getEnv('nodeEnv') === 'production') {
     return 'cubestore';
   }
