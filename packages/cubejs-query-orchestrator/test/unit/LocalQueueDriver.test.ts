@@ -43,13 +43,13 @@ describe('LocalQueueDriverConnection', () => {
 
     // The first tick removes only the result which has expired
     jest.advanceTimersByTime(500);
-    expect(Object.keys(state.results)).toStrictEqual([`${connection.resultListKey(second)}_2`]);
-    expect(state.lastResultQueueId).toStrictEqual({ [second]: 2 });
+    expect(Object.keys(state.resultsById)).toStrictEqual([`${connection.resultListKey(second)}_2`]);
+    expect(Object.keys(state.resultsByPath)).toStrictEqual([second]);
     expect(state.cleanupTimer).not.toBeNull();
 
     jest.advanceTimersByTime(1000);
-    expect(state.results).toStrictEqual({});
-    expect(state.lastResultQueueId).toStrictEqual({});
+    expect(state.resultsById).toStrictEqual({});
+    expect(state.resultsByPath).toStrictEqual({});
     expect(state.cleanupTimer).toBeNull();
     expect(await connection.getResult('first' as QueryKey)).toBeNull();
 
@@ -58,6 +58,17 @@ describe('LocalQueueDriverConnection', () => {
     expect(setIntervalSpy).toHaveBeenCalledTimes(2);
     jest.advanceTimersByTime(1000);
     expect(state.cleanupTimer).toBeNull();
+  });
+
+  test('a run of another queue with the same id removes the result from both indexes', async () => {
+    const queryKey = 'same-id' as QueryKey;
+    const key = await run(queryKey, 1);
+    expect(state.resultsByPath[key]).toBe(state.resultsById[`${connection.resultListKey(key)}_1`]);
+
+    await connection.addToQueue(queryKey, 'handler', <any>['q'], 10, { queueId: 1, stageQueryKey: key, requestId: 'other' });
+
+    expect(state.resultsById).toStrictEqual({});
+    expect(state.resultsByPath).toStrictEqual({});
   });
 
   test('a pending result is kept until its run is acknowledged', async () => {
@@ -72,7 +83,7 @@ describe('LocalQueueDriverConnection', () => {
     jest.advanceTimersByTime(1000);
     await expect(waiting).resolves.toBeNull();
 
-    expect(Object.keys(state.results)).toStrictEqual([`${connection.resultListKey(key)}_1`]);
+    expect(Object.keys(state.resultsById)).toStrictEqual([`${connection.resultListKey(key)}_1`]);
     expect(state.cleanupTimer).toBeNull();
 
     await connection.setResultAndRemoveQuery(key, { result: 'pending' }, 1);
