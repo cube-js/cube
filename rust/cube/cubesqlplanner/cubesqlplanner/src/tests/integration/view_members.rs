@@ -406,3 +406,50 @@ async fn test_view_member_in_arithmetic_keeps_its_parentheses() {
         insta::assert_snapshot!(result);
     }
 }
+
+fn table_rows(result: &str) -> Vec<Vec<String>> {
+    result
+        .lines()
+        .skip(2)
+        .filter(|line| !line.trim().is_empty())
+        .map(|line| {
+            line.split('|')
+                .map(|cell| cell.trim().to_string())
+                .collect()
+        })
+        .collect()
+}
+
+fn ungrouped_conditional_mask_query(prefix: &str, dimensions: &[&str]) -> String {
+    let dimensions = dimensions
+        .iter()
+        .map(|d| format!("  - {prefix}.{d}\n"))
+        .collect::<String>();
+    format!(
+        "measures:\n  - {prefix}.masked_total_const\ndimensions:\n{dimensions}order:\n  - id: {prefix}.id\nungrouped: true\nmaskedMembers:\n  - member: {prefix}.masked_total_const\n    filter:\n      member: {prefix}.status\n      operator: equals\n      values: ['completed']\n"
+    )
+}
+
+// A conditionally masked view measure in an ungrouped query masks exactly as the
+// cube measure it references, whether or not the filter member is selected.
+#[tokio::test(flavor = "multi_thread")]
+async fn test_view_conditional_measure_mask_ungrouped_matches_the_cube() {
+    let ctx = create_context();
+
+    for dimensions in [&["id", "status"][..], &["id"][..]] {
+        let view_query = ungrouped_conditional_mask_query("orders_view", dimensions);
+        let cube_query = ungrouped_conditional_mask_query("orders", dimensions);
+        ctx.build_sql(&view_query).unwrap();
+        ctx.build_sql(&cube_query).unwrap();
+
+        let (Some(view), Some(cube)) = (
+            ctx.try_execute_pg(&view_query, SEED).await,
+            ctx.try_execute_pg(&cube_query, SEED).await,
+        ) else {
+            continue;
+        };
+        let view_rows = table_rows(&view);
+        assert_eq!(view_rows.len(), 8, "{view}");
+        assert_eq!(view_rows, table_rows(&cube), "view:\n{view}\ncube:\n{cube}");
+    }
+}
