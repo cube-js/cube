@@ -3651,9 +3651,14 @@ paths:
               schema:
                 $ref: '#/components/schemas/Dashboard'
           description: ''
-      summary: Publish dashboard
+      summary: Publish a dashboard
       tags:
         - Workbooks
+      x-mint:
+        content: >-
+          Publishes the saved dashboard draft when config is omitted. Save layout or app changes to
+          the workbook draft before publishing; the request only needs workbookId. An explicit
+          config remains supported for existing clients.
   /api/v1/deployments/{deploymentId}/workspace:
     get:
       operationId: workspaceObjects
