@@ -11,7 +11,7 @@ use crate::compile::rewrite::{
     rules::utils::{DecomposedDayTime, DecomposedMonthDayNano},
     wrapper_replacer_context,
 };
-use crate::transport::{DataSource, MetaContext};
+use crate::transport::{DataSource, MetaContext, SqlTemplates};
 use datafusion::{arrow::datatypes::DataType, scalar::ScalarValue};
 use egg::Subst;
 use std::ops::ControlFlow;
