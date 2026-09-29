@@ -285,3 +285,52 @@ LIMIT 5000
         }
     );
 }
+
+/// Filter over a literal column projected on top of a cube goes through the rewriter
+/// rather than DataFusion filter push down, and must not be lost either.
+#[tokio::test]
+async fn test_filter_over_literal_column_of_cube() {
+    init_testing_logger();
+
+    let query_plan = convert_select_to_query_plan(
+        // language=PostgreSQL
+        r#"
+        SELECT c, customer_gender
+        FROM (SELECT 'a' AS c, customer_gender FROM KibanaSampleDataEcommerce) AS t
+        WHERE c = 'b'
+        "#
+        .to_string(),
+        DatabaseProtocol::PostgreSQL,
+    )
+    .await;
+
+    let physical_plan = query_plan.as_physical_plan().await.unwrap();
+    println!(
+        "Physical plan: {}",
+        displayable(physical_plan.as_ref()).indent()
+    );
+
+    if !Rewriter::sql_push_down_enabled() {
+        assert!(displayable(physical_plan.as_ref())
+            .indent()
+            .to_string()
+            .contains("FilterExec: c@0 = b"));
+        return;
+    }
+
+    let wrapped_sql = query_plan.as_logical_plan().find_cube_scan_wrapped_sql();
+    assert_eq!(
+        wrapped_sql.request.segments,
+        Some(vec![
+            r#"{"cubeName":"KibanaSampleDataEcommerce","alias":"t_c___utf8__b__","expr":{"type":"SqlFunction","cubeParams":[],"sql":"($0$ = $1$)"},"groupingSet":null}"#.to_string(),
+        ])
+    );
+    assert_eq!(
+        wrapped_sql.wrapped_sql.values,
+        vec![
+            Some("a".to_string()),
+            Some("a".to_string()),
+            Some("b".to_string())
+        ]
+    );
+}
