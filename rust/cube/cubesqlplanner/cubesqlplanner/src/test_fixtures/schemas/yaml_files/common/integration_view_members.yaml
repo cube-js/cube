@@ -88,6 +88,19 @@ cubes:
             type: sum
             sql: amount
             mask: -1
+          - name: customers_count
+            type: count_distinct
+            sql: customer_id
+      # A cube rollup naming view members instead of its own.
+      pre_aggregations:
+          - name: by_view_status
+            type: rollup
+            measures:
+                - orders_view.count
+                - orders_view.total_amount
+                - orders_view.customers_count
+            dimensions:
+                - orders_view.status
 
 views:
     - name: orders_view
@@ -120,6 +133,7 @@ views:
                 - total_amount
                 - masked_total
                 - masked_total_const
+                - customers_count
           - join_path: orders.customers
             includes:
                 - name
