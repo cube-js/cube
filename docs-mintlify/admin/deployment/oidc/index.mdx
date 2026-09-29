@@ -98,7 +98,7 @@ deployments in the tenant.
 | ------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
 | **Audience type**         | One of `AWS`, `GCP`, `Azure`, or `Custom`. `AWS` and `Azure` pre-fill the audience value.                               |
 | **Audience**              | The JWT `aud` claim value. Pre-set for `AWS` (`sts.amazonaws.com`) and `Azure` (`api://AzureADTokenExchange`). For `GCP` you supply the **Workload Identity Federation provider resource path** (`//iam.googleapis.com/projects/.../providers/...`) — there is no global GCP audience. User-supplied for `Custom`. |
-| **Name**                  | A short, filesystem-safe slug that becomes part of the token file name (`cube_cloud_token_<name>`).                     |
+| **Name**                  | A short, filesystem-safe slug that becomes part of the token file name (`cube_cloud_token_<name>`), or the `oidcTokens` key for [per-user](#per-user-tokens) configs. |
 | **Subject Claim Format**  | Template for the JWT `sub` claim. Defaults to `cube:deployment:{deployment_id}` if left empty.                          |
 | **Custom Claims**         | Optional extra JWT claims emitted verbatim in every minted token — see [Custom claims](#custom-claims) below.            |
 | **Per-user token**        | Mint a token per Cube user, delivered in the security context instead of as a file — see [Per-user tokens](#per-user-tokens) below. |
@@ -125,7 +125,8 @@ templates** the dialog offers:
 - `cube:deployment:{deployment_id}:component:{component}`
 - `cube:deployment:{deployment_id}:component:{component}:region:{region}`
 
-Three placeholders are supported anywhere in the template:
+Three placeholders are supported anywhere in the template, plus `{user_id}`
+and `{user_name}` on [per-user](#per-user-tokens) configs:
 
 | Placeholder       | What it resolves to                                                 |
 | ----------------- | ------------------------------------------------------------------- |
@@ -216,8 +217,8 @@ Turn on **Per-user token** to mint a token for each Cube user instead
 of one per deployment, so the data source sees the querying user rather
 than a service identity. The token is not written to a file: it travels
 with the user's [security context][ref-security-context] through the Cube
-auth flow, as `securityContext.cubeCloud.oidcTokens.<config name>`
-(`{ token, expiresAt, audience }`).
+auth flow, as `securityContext.cubeCloud.oidcTokens.<name>`
+(`{ token, expiresAt, audience }`), where `<name>` is the config's **Name**.
 
 Per-user configs add two placeholders to the **Subject Claim Format** and to
 **Custom Claims** values:
@@ -225,13 +226,18 @@ Per-user configs add two placeholders to the **Subject Claim Format** and to
 | Placeholder   | What it resolves to                                                    |
 | ------------- | ---------------------------------------------------------------------- |
 | `{user_id}`   | The user's numeric Cube user ID.                                      |
-| `{user_name}` | The user's Cube username, usually their email. May also contain `.`, `@` and `+`. |
+| `{user_name}` | The user's Cube username, usually their email. The resolved value may contain `.`, `@` and `+`; the literal template text is still limited to `[A-Za-z0-9:_-]`. A user whose username has other characters gets no token for the config. |
 
 The default subject is `cube:user:{user_id}`. For Snowflake, set it to
 `{user_name}` so Snowflake maps it onto the user's `LOGIN_NAME`, and hand
-the token to the driver from `driverFactory`. As with [per-user OAuth
-credentials][ref-oauth-authentication], give each user their own
-orchestrator so one user's connections are never reused for another:
+the token to the driver from `driverFactory`. The example below assumes a
+config named `snowflake`.
+
+A driver keeps the token it was built with, and Cube builds one driver per
+orchestrator. So key the orchestrator on the user and on the token's
+`expiresAt`: each user gets their own connections, as with [per-user OAuth
+credentials][ref-oauth-authentication], and a refreshed token gets a new
+driver before the old one expires.
 
 ```javascript
 module.exports = {
@@ -240,8 +246,11 @@ module.exports = {
     authenticator: "OAUTH",
     oauthToken: securityContext?.cubeCloud?.oidcTokens?.snowflake?.token,
   }),
-  contextToOrchestratorId: ({ securityContext }) =>
-    `user_${securityContext?.cubeCloud?.username ?? "default"}`,
+  contextToOrchestratorId: ({ securityContext }) => {
+    const cubeCloud = securityContext?.cubeCloud;
+    const expiresAt = cubeCloud?.oidcTokens?.snowflake?.expiresAt ?? "";
+    return `user_${cubeCloud?.username ?? "default"}_${expiresAt}`;
+  },
 };
 ```
 
