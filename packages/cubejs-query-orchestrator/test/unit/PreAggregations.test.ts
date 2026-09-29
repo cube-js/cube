@@ -1075,12 +1075,20 @@ describe('PreAggregations', () => {
       jest.restoreAllMocks();
     });
 
-    const createLambdaLoader = (matchedTimeDimensionDateRange?: [string, string]) => {
+    // Passing `sourceRows` runs the real downloadLambdaTable against a stubbed query cache
+    // instead of mocking it out, so the row limit guard is exercised end to end.
+    const createLambdaLoader = (
+      matchedTimeDimensionDateRange?: [string, string],
+      { sourceRows, maxSourceRowLimit }: { sourceRows?: number, maxSourceRowLimit?: number } = {},
+    ) => {
       const loader = new PreAggregationPartitionRangeLoader(
         {} as any, // driverFactory
         // eslint-disable-next-line @typescript-eslint/no-empty-function
         () => {}, // logger
-        { options: {} } as any, // queryCache
+        {
+          options: {},
+          renewQuery: jest.fn().mockResolvedValue({ data: { rowCount: sourceRows, types: [], csvRows: '' } }),
+        } as any, // queryCache
         {} as any, // preAggregations
         mockPreAggregation({
           preAggregationId: 'Orders.d',
@@ -1095,6 +1103,7 @@ describe('PreAggregations', () => {
           lambdaQuery: {
             sqlAndParams: ['SELECT * FROM public.orders WHERE ts > ?', [FROM_PARTITION_RANGE]],
             cacheKeyQueries: [],
+            maxSourceRowLimit,
           },
         } as any,
       );
@@ -1109,11 +1118,13 @@ describe('PreAggregations', () => {
         lastUpdatedAt: 1,
         buildRangeEnd,
       } as any);
-      const downloadLambdaTable = jest.spyOn(loader as any, 'downloadLambdaTable').mockResolvedValue({
-        name: 'lambda_stb_pre_aggregations_orders_d',
-        columns: [],
-        csvRows: '',
-      });
+      const downloadLambdaTable = sourceRows === undefined
+        ? jest.spyOn(loader as any, 'downloadLambdaTable').mockResolvedValue({
+          name: 'lambda_stb_pre_aggregations_orders_d',
+          columns: [],
+          csvRows: '',
+        })
+        : jest.spyOn(loader as any, 'downloadLambdaTable');
 
       return { loader, downloadLambdaTable };
     };
@@ -1136,6 +1147,32 @@ describe('PreAggregations', () => {
       expect(downloadLambdaTable).toHaveBeenCalledWith(buildRangeEnd, [{ name: 'ts', type: 'timestamp' }]);
       expect(result.lambdaTable?.name).toEqual('lambda_stb_pre_aggregations_orders_d');
       expect(result.targetTableName).toMatch(/UNION ALL SELECT \* FROM lambda_stb_pre_aggregations_orders_d/);
+    });
+
+    describe.each([
+      ['over', 12],
+      ['exactly at', 10],
+    ])('a source query returning %s the limit', (_name, sourceRows) => {
+      test('fails closed instead of returning truncated data', async () => {
+        const { loader } = createLambdaLoader(
+          ['2024-01-01T00:00:00.000', '2024-01-05T23:59:59.999'],
+          { sourceRows, maxSourceRowLimit: 10 },
+        );
+
+        await expect(loader.loadPreAggregations())
+          .rejects.toThrow('The maximum number of source rows 10 was reached for Orders.d');
+      });
+    });
+
+    test('a source query returning fewer rows than the limit is unioned in', async () => {
+      const { loader } = createLambdaLoader(
+        ['2024-01-01T00:00:00.000', '2024-01-05T23:59:59.999'],
+        { sourceRows: 9, maxSourceRowLimit: 10 },
+      );
+
+      const result: any = await loader.loadPreAggregations();
+
+      expect(result.lambdaTable?.name).toEqual('lambda_test_table');
     });
 
     test('runs the source query when no date range was requested', async () => {
