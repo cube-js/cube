@@ -195,6 +195,14 @@ const EXCLUDE_OPERATIONS = new Set([
   'POST /api/v1/deployments/{deploymentId}/evaluations',
   'GET /api/v1/deployments/{deploymentId}/evaluations/{evaluationId}',
   'GET /api/v1/deployments/{deploymentId}/evaluations/{evaluationId}/results',
+  // Report deliveries are gated behind a tenant feature flag, not generally
+  // available. Remove once they ship.
+  'GET /api/v1/deployments/{deploymentId}/report-deliveries',
+  'POST /api/v1/deployments/{deploymentId}/report-deliveries',
+  'GET /api/v1/deployments/{deploymentId}/report-deliveries/{id}',
+  'PUT /api/v1/deployments/{deploymentId}/report-deliveries/{id}',
+  'DELETE /api/v1/deployments/{deploymentId}/report-deliveries/{id}',
+  'POST /api/v1/deployments/{deploymentId}/report-deliveries/{id}/runs',
 ]);
 
 // Cube-staff-only operations (provisioning real cloud infrastructure — Regions,
