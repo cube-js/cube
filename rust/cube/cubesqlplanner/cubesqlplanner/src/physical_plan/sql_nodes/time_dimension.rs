@@ -41,7 +41,12 @@ impl SqlNode for TimeDimensionNode {
                     // Propagate the outer visitor: the calendar SQL is the
                     // expression itself, not wrapped further here.
                     if let Some(calendar_sql) = granularity_obj.calendar_sql() {
-                        if self.substituted.contains_key(&ev.base_symbol().full_name()) {
+                        // Stored columns are keyed by the member a view member
+                        // references, not by the view member.
+                        if self
+                            .substituted
+                            .contains_key(&ev.base_symbol().peel_refs().full_name())
+                        {
                             return self.input.to_sql(
                                 visitor,
                                 node,
@@ -114,13 +119,15 @@ impl SqlNode for TimeDimensionNode {
                     )
                 }
             }
-            MemberSymbol::Measure(_) | MemberSymbol::MemberExpression(_) => self.input.to_sql(
-                visitor,
-                node,
-                query_tools.clone(),
-                node_processor.clone(),
-                templates,
-            ),
+            MemberSymbol::Measure(_) | MemberSymbol::MemberExpression(_) | MemberSymbol::Ref(_) => {
+                self.input.to_sql(
+                    visitor,
+                    node,
+                    query_tools.clone(),
+                    node_processor.clone(),
+                    templates,
+                )
+            }
         }
     }
 

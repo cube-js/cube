@@ -26,5 +26,10 @@ pub fn strip_join_prefix(symbol: &Rc<MemberSymbol>) -> Rc<MemberSymbol> {
             new.compiled_path = new.compiled_path.strip_join_prefix();
             Rc::new(MemberSymbol::MemberExpression(Rc::new(new)))
         }
+        MemberSymbol::Ref(r) => {
+            let mut new = (**r).clone();
+            new.compiled_path = new.compiled_path.strip_join_prefix();
+            Rc::new(MemberSymbol::Ref(Rc::new(new)))
+        }
     }
 }

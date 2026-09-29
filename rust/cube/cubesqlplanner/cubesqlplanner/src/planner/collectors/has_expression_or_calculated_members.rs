@@ -34,7 +34,7 @@ impl TraversalVisitor for HasExpressionOrCalculatedMembersCollector {
                     self.found = true;
                 }
             }
-            MemberSymbol::Dimension(_) | MemberSymbol::TimeDimension(_) => {}
+            MemberSymbol::Dimension(_) | MemberSymbol::TimeDimension(_) | MemberSymbol::Ref(_) => {}
         };
         if self.found {
             Ok(None)

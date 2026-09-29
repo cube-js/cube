@@ -4,5 +4,5 @@ expression: result
 ---
 orders__status | orders__count | orders__total_amount
 ---------------+---------------+---------------------
-completed      | 5             | 1150.00             
-pending        | 3             | 225.00
+completed      | 5             | 1150                
+pending        | 3             | 225

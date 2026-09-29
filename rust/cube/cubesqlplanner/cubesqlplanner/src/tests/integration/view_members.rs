@@ -249,10 +249,10 @@ async fn test_view_custom_granularity_with_offset() {
     }
 }
 
-// A view re-exports a geo dimension without its latitude and longitude, so the
-// view member has no coordinates to render.
-#[test]
-fn test_view_geo_dimension_is_rejected() {
+// A view re-exports a geo dimension without its latitude and longitude; the
+// view member renders the coordinates of the dimension it references.
+#[tokio::test(flavor = "multi_thread")]
+async fn test_view_geo_dimension() {
     let ctx = create_context();
 
     let query = indoc! {"
@@ -260,16 +260,15 @@ fn test_view_geo_dimension_is_rejected() {
           - orders_view.count
         dimensions:
           - orders_view.location
+        order:
+          - id: orders_view.location
     "};
 
-    let error = ctx.build_sql(query).unwrap_err();
-    assert!(
-        error
-            .message
-            .contains("Geo dimension 'orders_view.location' must have latitude and longitude"),
-        "unexpected error: {}",
-        error.message
-    );
+    ctx.build_sql(query).unwrap();
+
+    if let Some(result) = ctx.try_execute_pg(query, SEED).await {
+        insta::assert_snapshot!(result);
+    }
 }
 
 // Members declared by the view itself: a calculated dimension over a cube
@@ -319,7 +318,6 @@ async fn test_view_sibling_reference() {
 // A calculated view measure over a measure the join multiplies: each customer
 // is counted once, however many orders it has, as on the cube.
 #[tokio::test(flavor = "multi_thread")]
-#[ignore = "the calculated view measure is computed over the multiplied join"]
 async fn test_view_calculated_measure_over_multiplied_measure() {
     let ctx = create_context();
 
@@ -355,6 +353,29 @@ async fn test_cube_calculated_measure_over_multiplied_measure() {
           - customers.name
         order:
           - id: customers.name
+    "};
+
+    ctx.build_sql(query).unwrap();
+
+    if let Some(result) = ctx.try_execute_pg(query, SEED).await {
+        insta::assert_snapshot!(result);
+    }
+}
+
+// A view's own aggregation over a dimension it names aggregates like a cube
+// measure would.
+#[tokio::test(flavor = "multi_thread")]
+async fn test_view_own_aggregations_over_a_dimension() {
+    let ctx = create_context();
+
+    let query = indoc! {"
+        measures:
+          - orders_view.distinct_customers
+          - orders_view.amount_sum
+        dimensions:
+          - orders_view.status
+        order:
+          - id: orders_view.status
     "};
 
     ctx.build_sql(query).unwrap();

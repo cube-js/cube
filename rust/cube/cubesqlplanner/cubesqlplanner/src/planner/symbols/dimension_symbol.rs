@@ -6,7 +6,7 @@ use super::dimension_kinds::{
     CaseDimension, DimensionKind, GeoDimension, RegularDimension, SwitchDimension,
 };
 use super::SymbolPath;
-use super::{DimensionType, MemberSymbol, SymbolFactory};
+use super::{DimensionType, MemberSymbol, RefSymbol, SymbolFactory};
 use crate::cube_bridge::dimension_definition::DimensionDefinition;
 use crate::cube_bridge::evaluator::CubeEvaluator;
 use crate::cube_bridge::member_sql::MemberSql;
@@ -227,10 +227,10 @@ impl DimensionSymbol {
     }
 
     /// SQL calls inside the kind body. `mask_sql` is intentionally
-    /// excluded: it is compiled against the cube that owns the
-    /// dimension, which differs from the symbol's own `cube_name` when
-    /// the dimension is exposed through a view. Including it in
-    /// cube-ref validation would produce false foreign-cube errors.
+    /// excluded: for a view member it is compiled against the cube that
+    /// owns the member it references, which differs from the symbol's
+    /// own `cube_name`. Including it in cube-ref validation would
+    /// produce false foreign-cube errors.
     pub fn iter_sql_calls(&self) -> Box<dyn Iterator<Item = &Rc<SqlCall>> + '_> {
         self.kind.iter_sql_calls()
     }
@@ -365,6 +365,38 @@ impl SymbolFactory for DimensionSymbolFactory {
             None
         };
 
+        let cube = cube_evaluator.cube_from_path(path.cube_name().clone())?;
+        let alias = compiler
+            .alias_for_member(path.full_name())
+            .unwrap_or_else(|| {
+                PlanSqlTemplates::member_alias_name(
+                    cube.static_data().resolved_alias(),
+                    path.symbol_name(),
+                    &None,
+                )
+            });
+        let is_view = cube.static_data().is_view.unwrap_or(false);
+
+        // A view member re-exporting another member is a reference to it: its
+        // sql names the member, and it is not a subquery of its own.
+        let is_plain_reexport = is_view && !definition.static_data().sub_query.unwrap_or(false);
+        if let Some(sql) = sql
+            .as_ref()
+            .filter(|s| is_plain_reexport && s.is_direct_reference())
+        {
+            let cube_symbol =
+                compiler.add_cube_table_evaluator(path.cube_name().clone(), vec![])?;
+            let compiled_path = CompiledMemberPath::new(
+                cube_symbol,
+                path.full_name().clone(),
+                path.symbol_name().clone(),
+                alias,
+                path.path().clone(),
+            );
+            let symbol = MemberSymbol::new_ref(RefSymbol::try_new(compiled_path, sql, mask_sql)?);
+            return with_granularity(symbol, &path, cube_evaluator, compiler);
+        }
+
         let case = if let Some(native_case) = definition.case()? {
             Some(Case::try_new(path.cube_name(), native_case, compiler)?)
         } else {
@@ -403,17 +435,6 @@ impl SymbolFactory for DimensionSymbolFactory {
             vec![]
         };
 
-        let cube = cube_evaluator.cube_from_path(path.cube_name().clone())?;
-        let alias = compiler
-            .alias_for_member(path.full_name())
-            .unwrap_or_else(|| {
-                PlanSqlTemplates::member_alias_name(
-                    cube.static_data().resolved_alias(),
-                    path.symbol_name(),
-                    &None,
-                )
-            });
-        let is_view = cube.static_data().is_view.unwrap_or(false);
         let is_calendar = cube.static_data().is_calendar.unwrap_or(false);
         let mut is_self_time_shift_pk = false;
 
@@ -491,13 +512,12 @@ impl SymbolFactory for DimensionSymbolFactory {
         } else {
             kind.is_owned_by_cube()
         };
-        let is_reference = (is_view && is_sql_direct_ref)
-            || (!owned_by_cube
-                && !is_sub_query
-                && is_sql_direct_ref
-                && !kind.is_case()
-                && !kind.is_geo()
-                && !is_multi_stage);
+        let is_reference = !owned_by_cube
+            && !is_sub_query
+            && is_sql_direct_ref
+            && !kind.is_case()
+            && !kind.is_geo()
+            && !is_multi_stage;
 
         let propagate_filters_to_sub_query = definition
             .static_data()
@@ -528,31 +548,39 @@ impl SymbolFactory for DimensionSymbolFactory {
             mask_sql,
         ));
 
-        if let Some(granularity) = path.granularity() {
-            if let Some(granularity_obj) = GranularityHelper::make_granularity_obj(
-                cube_evaluator.clone(),
-                compiler,
-                path.cube_name(),
-                path.symbol_name(),
-                Some(granularity.clone()),
-            )? {
-                let time_dim_symbol = MemberSymbol::new_time_dimension(TimeDimensionSymbol::new(
-                    symbol,
-                    Some(granularity.clone()),
-                    Some(granularity_obj),
-                    None,
-                ));
-                return Ok(time_dim_symbol);
-            } else {
-                return Err(CubeError::user(format!(
-                    "Undefined granularity {} for time dimension {}",
-                    granularity,
-                    symbol.full_name()
-                )));
-            }
-        }
+        with_granularity(symbol, &path, cube_evaluator, compiler)
+    }
+}
 
-        Ok(symbol)
+/// Wraps the dimension in a `TimeDimensionSymbol` when the requested path
+/// names a granularity.
+fn with_granularity(
+    symbol: Rc<MemberSymbol>,
+    path: &SymbolPath,
+    cube_evaluator: Rc<dyn CubeEvaluator>,
+    compiler: &mut Compiler,
+) -> Result<Rc<MemberSymbol>, CubeError> {
+    let Some(granularity) = path.granularity() else {
+        return Ok(symbol);
+    };
+    match GranularityHelper::make_granularity_obj(
+        cube_evaluator,
+        compiler,
+        path.cube_name(),
+        path.symbol_name(),
+        Some(granularity.clone()),
+    )? {
+        Some(granularity_obj) => Ok(MemberSymbol::new_time_dimension(TimeDimensionSymbol::new(
+            symbol,
+            Some(granularity.clone()),
+            Some(granularity_obj),
+            None,
+        ))),
+        None => Err(CubeError::user(format!(
+            "Undefined granularity {} for time dimension {}",
+            granularity,
+            symbol.full_name()
+        ))),
     }
 }
 

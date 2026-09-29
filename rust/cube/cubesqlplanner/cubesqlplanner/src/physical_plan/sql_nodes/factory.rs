@@ -219,10 +219,25 @@ impl SqlNodesFactory {
             };
         let default_processor: Rc<dyn SqlNode> = ParenthesizeSqlNode::new(default_processor);
 
+        // A reference renders its target; of its own it only parenthesizes
+        // the target for its context and applies its own mask — on the
+        // measure side also with row-level semantics, as a measure's does.
+        let reference_dimension_processor: Rc<dyn SqlNode> =
+            ParenthesizeSqlNode::new(evaluate_sql_processor.clone());
+        let reference_measure_processor: Rc<dyn SqlNode> = MaskedSqlNode::new(
+            ParenthesizeSqlNode::new(evaluate_sql_processor.clone()),
+            true,
+            self.group_by_members.clone(),
+            skip_masking,
+            unmasked_root.clone(),
+        );
+
         let root_node = RootSqlNode::new(
             self.dimension_processor(evaluate_sql_processor.clone()),
             self.time_dimension_processor(ParenthesizeSqlNode::new(evaluate_sql_processor.clone())),
             measure_processor.clone(),
+            reference_dimension_processor,
+            reference_measure_processor,
             default_processor,
         );
         RenderReferencesSqlNode::new(root_node, self.render_references.clone())

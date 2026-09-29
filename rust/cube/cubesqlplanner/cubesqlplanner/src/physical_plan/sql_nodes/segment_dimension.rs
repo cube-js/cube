@@ -47,7 +47,8 @@ impl SqlNode for SegmentDimensionSqlNode {
             MemberSymbol::Dimension(_)
             | MemberSymbol::TimeDimension(_)
             | MemberSymbol::Measure(_)
-            | MemberSymbol::MemberExpression(_) => Ok(input),
+            | MemberSymbol::MemberExpression(_)
+            | MemberSymbol::Ref(_) => Ok(input),
         }
     }
 

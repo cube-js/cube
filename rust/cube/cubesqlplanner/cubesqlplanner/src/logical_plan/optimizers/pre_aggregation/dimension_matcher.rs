@@ -181,6 +181,20 @@ impl<'a> DimensionMatcher<'a> {
                     }
                 }
             }
+            MemberSymbol::Ref(_) => {
+                if symbol.is_measure() || symbol.is_multi_stage() {
+                    return Ok(MatchState::NotMatched);
+                }
+                let mut result = MatchState::Full;
+                for dep in symbol.get_dependencies() {
+                    let dep_match = self.try_match_symbol(&dep, add_to_matched_dimension)?;
+                    if dep_match == MatchState::NotMatched {
+                        return Ok(MatchState::NotMatched);
+                    }
+                    result = result.combine(&dep_match);
+                }
+                Ok(result)
+            }
             MemberSymbol::Measure(_) => Ok(MatchState::NotMatched),
         }
     }
@@ -259,7 +273,9 @@ impl<'a> DimensionMatcher<'a> {
             return Ok(MatchState::NotMatched);
         }
 
-        let base_symbol_name = time_dimension.base_symbol().full_name();
+        // Stored time dimensions are keyed by the member a view member
+        // references.
+        let base_symbol_name = time_dimension.base_symbol().peel_refs().full_name();
 
         if let Some(entries) = self
             .pre_aggregation_time_dimensions

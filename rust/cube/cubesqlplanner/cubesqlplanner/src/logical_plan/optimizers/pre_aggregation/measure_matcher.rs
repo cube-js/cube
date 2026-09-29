@@ -43,8 +43,8 @@ impl MeasureMatcher {
                     self.matched_measures.insert(measure.full_name());
                     return Ok(true);
                 }
-                // A reference not stored under its own name, such as a view
-                // member, is the member it names, multi-stage or not.
+                // A reference not stored under its own name is the member it
+                // names, multi-stage or not.
                 if let Some(target) = measure.reference_member() {
                     return self.try_match(&target);
                 }
@@ -59,6 +59,12 @@ impl MeasureMatcher {
             }
             MemberSymbol::MemberExpression(_) => {
                 return Ok(false); //TODO We not allow to use pre-aggregations with member expressions before sqlapi ready for it
+            }
+            MemberSymbol::Ref(ref_symbol) => {
+                return match ref_symbol.target_member() {
+                    Some(target) if symbol.is_measure() => self.try_match(target),
+                    _ => Ok(false),
+                };
             }
             MemberSymbol::Dimension(_) | MemberSymbol::TimeDimension(_) => return Ok(false),
         }

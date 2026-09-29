@@ -108,7 +108,9 @@ impl SqlNode for AutoPrefixSqlNode {
                 let cube_alias = self.resolve_cube_alias(&ev.cube_name());
                 self.auto_prefix_with_cube_name(&cube_alias, &input, templates)?
             }
-            MemberSymbol::TimeDimension(_) | MemberSymbol::MemberExpression(_) => input,
+            MemberSymbol::TimeDimension(_)
+            | MemberSymbol::MemberExpression(_)
+            | MemberSymbol::Ref(_) => input,
         };
         Ok(res)
     }

@@ -40,7 +40,7 @@ impl TraversalVisitor for MemberChildsCollector {
             Ok(Some(new_state))
         } else {
             match node.as_ref() {
-                MemberSymbol::Measure(_) | MemberSymbol::Dimension(_) => {
+                MemberSymbol::Measure(_) | MemberSymbol::Dimension(_) | MemberSymbol::Ref(_) => {
                     self.childs.push(node.clone());
                     Ok(None)
                 }

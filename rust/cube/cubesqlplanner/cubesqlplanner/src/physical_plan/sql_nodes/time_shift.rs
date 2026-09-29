@@ -111,7 +111,8 @@ impl SqlNode for TimeShiftSqlNode {
             }
             MemberSymbol::TimeDimension(_)
             | MemberSymbol::Measure(_)
-            | MemberSymbol::MemberExpression(_) => self.input.to_sql(
+            | MemberSymbol::MemberExpression(_)
+            | MemberSymbol::Ref(_) => self.input.to_sql(
                 visitor,
                 node,
                 query_tools.clone(),

@@ -236,6 +236,23 @@ impl TimeDimensionSymbol {
                         s.clone()
                     }
                 }
+                MemberSymbol::Ref(_) => {
+                    let is_time = s
+                        .peel_refs()
+                        .as_dimension()
+                        .is_ok_and(|dimension| dimension.is_time());
+                    if is_time {
+                        MemberSymbol::new_time_dimension(Self::new_with_alias(
+                            s.clone(),
+                            self.granularity.clone(),
+                            self.granularity_obj.clone(),
+                            self.date_range.clone(),
+                            self.alias_override.clone(),
+                        ))
+                    } else {
+                        s.clone()
+                    }
+                }
                 MemberSymbol::TimeDimension(_)
                 | MemberSymbol::Measure(_)
                 | MemberSymbol::MemberExpression(_) => s.clone(),

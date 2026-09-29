@@ -847,7 +847,9 @@ impl PreAggregationsCompiler {
                     return Err(Self::reference_not_found_error(&rendered, name))
                 }
             };
-            result.push(symbol);
+            // A view member names the member it references: that is what the
+            // rollup stores and what queries through the view match on.
+            result.push(symbol.peel_refs());
         }
         Ok(result)
     }

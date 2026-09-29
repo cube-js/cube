@@ -45,7 +45,8 @@ impl MeasureFilterOp {
             }
             MemberSymbol::Dimension(_)
             | MemberSymbol::TimeDimension(_)
-            | MemberSymbol::MemberExpression(_) => plan_templates.always_true(),
+            | MemberSymbol::MemberExpression(_)
+            | MemberSymbol::Ref(_) => plan_templates.always_true(),
         }
     }
 }

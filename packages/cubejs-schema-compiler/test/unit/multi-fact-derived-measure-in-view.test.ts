@@ -523,13 +523,14 @@ views:
     return sql;
   };
 
-  // Current behaviour, pinned: `sum` runs over the multiplied rows of the join,
-  // so the numerator is larger than the same measure queried on its own.
-  it('inlines a plain calculated measure into the multiplied join', () => {
+  // A plain calculated view measure is split like one declared on a cube:
+  // `sum` is taken where the join to line_items cannot multiply it, and the
+  // division runs over the two aggregated columns.
+  it('aggregates each side before dividing a plain calculated measure', () => {
     const sql = buildFanOutSql('orders_overview.average_line_value');
 
-    expect(sql).toMatch(/sum\("orders"\.amount\) \/ NULLIF\(count\("line_items"\.id\), 0\)/);
-    expect(sql).toContain('"orders".id = "line_items".order_id');
+    expect(sql).not.toMatch(/sum\("orders"\.amount\) \/ NULLIF/);
+    expect(sql).toMatch(/"orders__total_amount" \/ NULLIF\("[^"]+"\."line_items__count", 0\)/);
   });
 
   it('aggregates each side before dividing when the measure is multi_stage', () => {

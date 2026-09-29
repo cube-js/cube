@@ -171,10 +171,10 @@ async fn test_cube_rollup_naming_view_members_count_distinct_at_its_grain() -> R
     Ok(())
 }
 
-// The rollup stores the view measures, which are of type `number`, so it only
-// serves the grain it was built at.
+// The rollup stores the members the view members reference, so an additive
+// measure rolls up to a coarser grain.
 #[tokio::test(flavor = "multi_thread")]
-async fn test_cube_rollup_naming_view_members_only_serves_its_grain() -> Result<(), CubeError> {
+async fn test_cube_rollup_naming_view_members_rolls_up() -> Result<(), CubeError> {
     let ctx = create_cube_rollup_context()?;
 
     let query = indoc! {"
@@ -182,18 +182,21 @@ async fn test_cube_rollup_naming_view_members_only_serves_its_grain() -> Result<
           - orders_view.count
     "};
 
-    assert_no_pre_aggregation(&ctx, query)?;
+    assert_uses_cube_rollup(&ctx, query)?;
 
-    if let Some(result) = ctx.try_execute_pg(query, SEED).await {
-        insta::assert_snapshot!(result);
+    if let Some(result) = ctx.try_execute(query, SEED).await {
+        insta::assert_snapshot!(
+            "cube_rollup_naming_view_members_rolls_up_cubestore_result",
+            result
+        );
     }
     Ok(())
 }
 
-// The rollup is keyed by the view members it names, so a query over the cube
-// members they reference does not read it.
+// The same rollup serves a query over the cube members the view members
+// reference.
 #[tokio::test(flavor = "multi_thread")]
-async fn test_cube_rollup_naming_view_members_does_not_serve_cube_query() -> Result<(), CubeError> {
+async fn test_cube_rollup_naming_view_members_serves_cube_query() -> Result<(), CubeError> {
     let ctx = create_cube_rollup_context()?;
 
     let query = indoc! {"
@@ -206,10 +209,13 @@ async fn test_cube_rollup_naming_view_members_does_not_serve_cube_query() -> Res
           - id: orders.status
     "};
 
-    assert_no_pre_aggregation(&ctx, query)?;
+    assert_uses_cube_rollup(&ctx, query)?;
 
-    if let Some(result) = ctx.try_execute_pg(query, SEED).await {
-        insta::assert_snapshot!(result);
+    if let Some(result) = ctx.try_execute(query, SEED).await {
+        insta::assert_snapshot!(
+            "cube_rollup_naming_view_members_serves_cube_query_cubestore_result",
+            result
+        );
     }
     Ok(())
 }

@@ -49,7 +49,7 @@ impl TraversalVisitor for CompositeMeasuresCollector {
                 Some(new_state)
             }
             MemberSymbol::Dimension(_) => None,
-            MemberSymbol::MemberExpression(_) => Some(state.clone()),
+            MemberSymbol::MemberExpression(_) | MemberSymbol::Ref(_) => Some(state.clone()),
             MemberSymbol::TimeDimension(_) => None,
         };
         Ok(res)
@@ -109,7 +109,7 @@ impl TraversalVisitor for MultipliedMeasuresCollector {
                     None
                 }
             }
-            MemberSymbol::MemberExpression(_) => Some(()),
+            MemberSymbol::MemberExpression(_) | MemberSymbol::Ref(_) => Some(()),
             MemberSymbol::Dimension(_) => None,
             MemberSymbol::TimeDimension(_) => None,
         };

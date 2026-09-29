@@ -19,7 +19,7 @@ pub fn find_value_restriction(
 }
 
 pub fn get_filtered_values(symbol: &Rc<MemberSymbol>, filter: &Option<Filter>) -> Vec<String> {
-    if let Ok(dim) = symbol.as_dimension() {
+    if let Ok(dim) = symbol.peel_refs().as_dimension() {
         if dim.is_switch() {
             if let Some(filter) = filter {
                 if let Some(values) = find_value_restriction(&filter.items, symbol) {
@@ -63,7 +63,9 @@ pub fn apply_static_filter_to_symbol(
                     }
                 }
             }
-            MemberSymbol::TimeDimension(_) | MemberSymbol::MemberExpression(_) => {}
+            MemberSymbol::TimeDimension(_)
+            | MemberSymbol::MemberExpression(_)
+            | MemberSymbol::Ref(_) => {}
         }
         Ok(symbol.clone())
     })

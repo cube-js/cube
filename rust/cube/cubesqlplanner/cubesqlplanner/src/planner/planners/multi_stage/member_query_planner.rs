@@ -674,6 +674,13 @@ fn add_member_by_kind(
             }
         }
         MemberSymbol::Measure(_) => measures.push(member.clone()),
+        MemberSymbol::Ref(_) => {
+            if member.is_measure() {
+                measures.push(member.clone())
+            } else if member.is_dimension() && !dimensions.iter().any(same_chain) {
+                dimensions.push(member.clone())
+            }
+        }
         MemberSymbol::MemberExpression(_) => {}
     }
 }

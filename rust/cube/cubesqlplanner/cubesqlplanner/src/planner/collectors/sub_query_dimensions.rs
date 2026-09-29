@@ -23,7 +23,7 @@ impl SubQueryDimensionsCollector {
 
     fn check_dim_has_measures(&self, dim: &DimensionSymbol) -> bool {
         for dep in dim.get_dependencies().iter() {
-            if let MemberSymbol::Measure(_) = dep.as_ref() {
+            if dep.is_measure() {
                 return true;
             }
         }
@@ -52,7 +52,9 @@ impl TraversalVisitor for SubQueryDimensionsCollector {
                 Ok(Some(()))
             }
             MemberSymbol::TimeDimension(dim) => self.on_node_traverse(dim.base_symbol(), &()),
-            MemberSymbol::Measure(_) | MemberSymbol::MemberExpression(_) => Ok(Some(())),
+            MemberSymbol::Measure(_) | MemberSymbol::MemberExpression(_) | MemberSymbol::Ref(_) => {
+                Ok(Some(()))
+            }
         }
     }
 }

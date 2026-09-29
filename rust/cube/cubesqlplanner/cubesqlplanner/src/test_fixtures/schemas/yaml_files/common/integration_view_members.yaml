@@ -121,6 +121,13 @@ views:
           - name: total_amount_ref
             type: number
             sql: "{orders.total_amount}"
+          # Aggregations of the view's own over a dimension it names.
+          - name: distinct_customers
+            type: count_distinct
+            sql: "{orders.customer_id}"
+          - name: amount_sum
+            type: sum
+            sql: "{orders.amount}"
       cubes:
           - join_path: orders
             includes:
@@ -160,6 +167,12 @@ views:
 
     # Rooted at customers, so customers.count is multiplied by the orders join.
     - name: customers_view
+      dimensions:
+          # A subquery of the view's own over a measure it names.
+          - name: orders_count
+            type: number
+            sub_query: true
+            sql: "{orders.count}"
       measures:
           - name: amount_per_customer
             type: number

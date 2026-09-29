@@ -73,23 +73,20 @@ impl MaskedSqlNode {
         // A measure with an ungrouped render modifier is emitted at row
         // grain, which changes both mask decisions below.
         let ungrouped = self.row_level_semantics
-            && match node.as_ref() {
+            && match node.peel_refs().as_ref() {
                 MemberSymbol::Measure(m) => matches!(
                     m.render_modifier(),
                     Some(MeasureRenderModifier::RawValue | MeasureRenderModifier::UngroupedFinal)
                 ),
                 MemberSymbol::Dimension(_)
                 | MemberSymbol::TimeDimension(_)
-                | MemberSymbol::MemberExpression(_) => false,
+                | MemberSymbol::MemberExpression(_)
+                | MemberSymbol::Ref(_) => false,
             };
 
         let masked_sql = if let Some(mask_call) = node.mask_sql() {
-            if ungrouped {
-                if let MemberSymbol::Measure(_) = node.as_ref() {
-                    if mask_call.dependencies_count() > 0 {
-                        return Ok(None);
-                    }
-                }
+            if ungrouped && node.is_measure() && mask_call.dependencies_count() > 0 {
+                return Ok(None);
             }
             mask_call.eval(
                 visitor,
@@ -113,16 +110,14 @@ impl MaskedSqlNode {
         // WHERE clause, so we render the mask value directly for such measures. In
         // ungrouped queries the measure is rendered at row grain, so the CASE WHEN
         // is valid and is kept.
-        if !ungrouped {
-            if let MemberSymbol::Measure(_) = node.as_ref() {
-                let filter_members = filter_item.all_member_evaluators();
-                let all_in_group_by = !filter_members.is_empty()
-                    && filter_members
-                        .iter()
-                        .all(|m| self.group_by_members.contains(&m.full_name()));
-                if !all_in_group_by {
-                    return Ok(Some(masked_sql));
-                }
+        if !ungrouped && node.is_measure() {
+            let filter_members = filter_item.all_member_evaluators();
+            let all_in_group_by = !filter_members.is_empty()
+                && filter_members
+                    .iter()
+                    .all(|m| self.group_by_members.contains(&m.full_name()));
+            if !all_in_group_by {
+                return Ok(Some(masked_sql));
             }
         }
 

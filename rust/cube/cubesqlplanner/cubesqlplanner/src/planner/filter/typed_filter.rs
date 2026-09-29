@@ -170,6 +170,7 @@ impl TypedFilterBuilder {
                 "string" | "time" => None,
                 _ => Some("number".to_string()),
             },
+            MemberSymbol::Ref(r) => r.target_member().and_then(Self::resolve_member_type),
             MemberSymbol::TimeDimension(_) | MemberSymbol::MemberExpression(_) => None,
         }
     }
