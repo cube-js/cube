@@ -384,3 +384,25 @@ async fn test_view_own_aggregations_over_a_dimension() {
         insta::assert_snapshot!(result);
     }
 }
+
+// A view member whose target renders a compound expression keeps it
+// parenthesized when an arithmetic expression uses it.
+#[tokio::test(flavor = "multi_thread")]
+async fn test_view_member_in_arithmetic_keeps_its_parentheses() {
+    let ctx = create_context();
+
+    let query = indoc! {"
+        measures:
+          - orders_view.half_amount_plus_100
+        dimensions:
+          - orders_view.status
+        order:
+          - id: orders_view.status
+    "};
+
+    ctx.build_sql(query).unwrap();
+
+    if let Some(result) = ctx.try_execute_pg(query, SEED).await {
+        insta::assert_snapshot!(result);
+    }
+}

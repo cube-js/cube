@@ -73,7 +73,7 @@ impl MaskedSqlNode {
         // A measure with an ungrouped render modifier is emitted at row
         // grain, which changes both mask decisions below.
         let ungrouped = self.row_level_semantics
-            && match node.peel_refs().as_ref() {
+            && match node.as_ref() {
                 MemberSymbol::Measure(m) => matches!(
                     m.render_modifier(),
                     Some(MeasureRenderModifier::RawValue | MeasureRenderModifier::UngroupedFinal)

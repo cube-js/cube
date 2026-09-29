@@ -91,6 +91,10 @@ cubes:
           - name: customers_count
             type: count_distinct
             sql: customer_id
+          # A calculated measure whose SQL is compound at the top level.
+          - name: amount_plus_100
+            type: number
+            sql: "{CUBE.total_amount} + 100"
       # A cube rollup naming view members instead of its own.
       pre_aggregations:
           - name: by_view_status
@@ -121,6 +125,11 @@ views:
           - name: total_amount_ref
             type: number
             sql: "{orders.total_amount}"
+          # Divides a view member whose SQL is compound, so the view member
+          # must render parenthesized.
+          - name: half_amount_plus_100
+            type: number
+            sql: "{CUBE.amount_plus_100} / 2"
           # Aggregations of the view's own over a dimension it names.
           - name: distinct_customers
             type: count_distinct
@@ -141,6 +150,7 @@ views:
                 - masked_total
                 - masked_total_const
                 - customers_count
+                - amount_plus_100
           - join_path: orders.customers
             includes:
                 - name
