@@ -49,7 +49,8 @@ the folder inherits those permissions. See
 ### Dashboard comments
 
 [Comments][ref-comments] on a dashboard use the access level of the
-dashboard's workbook. Comments have no separate permissions.
+dashboard's workbook. Sharing a dashboard shares its workbook.
+Comments have no separate permissions.
 
 | Action | Can view | Can edit | Full access |
 | --- | :---: | :---: | :---: |
@@ -61,9 +62,8 @@ dashboard's workbook. Comments have no separate permissions.
 | Resolve or re-open any thread | ❌ | ✅ | ✅ |
 | Edit or delete another person's comment | ❌ | ❌ | ❌ |
 
-Only the author of a comment can edit or delete it, at every access level.
-A thread is shared by everyone in it, so people who can edit the workbook can
-resolve any thread. A thread's author can resolve it with **Can view** access.
+A **Can view** user can have a thread of their own only if they started it
+with edit access that was later lowered. They can still resolve it.
 Deleting a thread also deletes its replies, including other people's. See
 [Editing and deleting][ref-comments-delete].
 
