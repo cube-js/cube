@@ -533,12 +533,9 @@ impl SymbolFactory for MeasureSymbolFactory {
                 )
             });
 
-        // A view member re-exporting another member is a reference to it: its
-        // sql names the member, and it adds no aggregation, filters, window or
-        // case of its own. Its mask is authored in the context of the cube that
-        // owns the target and may reference members the view does not
-        // re-export, so it compiles against that cube, as it does on the
-        // owning cube.
+        // A view member that only re-exports another member is a `Ref`. Its
+        // mask may reference members the view does not re-export, so it
+        // compiles against the target's cube.
         let is_plain_reexport = is_view
             && CalculatedMeasureType::from_str(&definition.static_data().measure_type).is_some()
             && measure_filters.is_empty()

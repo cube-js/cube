@@ -42,13 +42,13 @@ impl<'a> DimensionMatcher<'a> {
         let pre_aggregation_dimensions = pre_aggregation
             .dimensions
             .iter()
-            .map(|d| (d.full_name(), false))
+            .map(|d| (d.peel_refs().full_name(), false))
             .collect();
         let mut pre_aggregation_time_dimensions =
             HashMap::<String, Vec<(Rc<TimeDimensionSymbol>, bool)>>::new();
         for dim in pre_aggregation.time_dimensions.iter() {
             if let Ok(td) = dim.as_time_dimension() {
-                let key = td.base_symbol().full_name();
+                let key = td.base_symbol().peel_refs().full_name();
                 pre_aggregation_time_dimensions
                     .entry(key)
                     .or_default()

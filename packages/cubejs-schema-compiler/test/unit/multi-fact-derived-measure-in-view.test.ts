@@ -442,10 +442,10 @@ describe('Multi-fact derived measure defined on a cube', () => {
   });
 });
 
-// The other reason a view measure spanning cubes wants `multi_stage`: even when
-// the cubes DO join, a plain calculated measure is evaluated inside the single
-// joined scan, so a `sum` on the one side is taken over rows the join has
-// multiplied. `multi_stage` aggregates each side first, then divides.
+// A view measure spanning cubes that DO join: whether plain or `multi_stage`,
+// each side is aggregated before the division, so the join cannot multiply the
+// `sum` on the one side. `multi_stage` is still what makes it plannable when
+// the cubes do not join (see above).
 describe('Derived view measure over a fanned-out join', () => {
   const fanOutModel = `
 cubes:

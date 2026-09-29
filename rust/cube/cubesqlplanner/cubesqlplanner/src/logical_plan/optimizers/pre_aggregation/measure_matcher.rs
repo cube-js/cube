@@ -15,7 +15,7 @@ impl MeasureMatcher {
         let pre_aggregation_measures = pre_aggregation
             .measures
             .iter()
-            .map(|m| m.full_name())
+            .map(|m| m.peel_refs().full_name())
             .collect();
         Self {
             only_additive,

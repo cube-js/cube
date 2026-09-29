@@ -466,7 +466,7 @@ impl PreAggregationOptimizer {
         let filtered_measures: Vec<Rc<MemberSymbol>> = pre_aggregation
             .measures
             .iter()
-            .filter(|m| matched_measures.contains(&m.full_name()))
+            .filter(|m| matched_measures.contains(&m.peel_refs().full_name()))
             .cloned()
             .collect();
         let schema = LogicalSchema {
@@ -626,7 +626,7 @@ impl PreAggregationOptimizer {
             && pre_aggregation
                 .measures
                 .iter()
-                .filter(|measure| matched_measures.contains(&measure.full_name()))
+                .filter(|measure| matched_measures.contains(&measure.peel_refs().full_name()))
                 .all(|measure| !time_shifts.has_shift_under(measure))
     }
 
@@ -661,11 +661,11 @@ impl PreAggregationOptimizer {
         for stored in pre_aggregation
             .measures
             .iter()
-            .filter(|m| matched_measures.contains(&m.full_name()))
+            .filter(|m| matched_measures.contains(&m.peel_refs().full_name()))
         {
             let mut on_every_member = false;
             let mut targets = HashSet::new();
-            let mut measure = stored.as_measure()?;
+            let mut measure = stored.peel_refs().as_measure()?;
             loop {
                 match measure.time_shift() {
                     Some(MeasureTimeShifts::Dimensions(shifts)) => {
@@ -791,10 +791,15 @@ impl PreAggregationOptimizer {
         // reach the client as the sketch instead of a number.
         if matches!(row_grain, RowGrain::RawRows(_)) {
             for symbol in pre_aggregation.measures.iter() {
-                if !matched_measures.contains(symbol.full_name().as_str()) {
+                if !matched_measures.contains(symbol.peel_refs().full_name().as_str()) {
                     continue;
                 }
-                if symbol.as_measure()?.rollup_kind().is_stored_as_state() {
+                if symbol
+                    .peel_refs()
+                    .as_measure()?
+                    .rollup_kind()
+                    .is_stored_as_state()
+                {
                     return Ok(None);
                 }
             }

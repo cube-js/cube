@@ -765,7 +765,7 @@ impl PreAggregationsCompiler {
         Ok(res)
     }
 
-    fn symbols_from_ref<F: Fn(&MemberSymbol) -> Result<(), CubeError>>(
+    fn symbols_from_ref<F: Fn(&Rc<MemberSymbol>) -> Result<(), CubeError>>(
         query_tools: Rc<State>,
         name: &PreAggregationFullName,
         ref_func: Rc<dyn MemberSql>,
@@ -847,9 +847,7 @@ impl PreAggregationsCompiler {
                     return Err(Self::reference_not_found_error(&rendered, name))
                 }
             };
-            // A view member names the member it references: that is what the
-            // rollup stores and what queries through the view match on.
-            result.push(symbol.peel_refs());
+            result.push(symbol);
         }
         Ok(result)
     }
@@ -862,22 +860,23 @@ impl PreAggregationsCompiler {
         ))
     }
 
-    fn check_is_measure(symbol: &MemberSymbol) -> Result<(), CubeError> {
+    fn check_is_measure(symbol: &Rc<MemberSymbol>) -> Result<(), CubeError> {
         symbol
+            .peel_refs()
             .as_measure()
             .map_err(|_| CubeError::user(format!("Pre-aggregation measure must be a measure")))?;
         Ok(())
     }
 
-    fn check_is_dimension(symbol: &MemberSymbol) -> Result<(), CubeError> {
-        symbol.as_dimension().map_err(|_| {
+    fn check_is_dimension(symbol: &Rc<MemberSymbol>) -> Result<(), CubeError> {
+        symbol.peel_refs().as_dimension().map_err(|_| {
             CubeError::user(format!("Pre-aggregation dimension must be a dimension"))
         })?;
         Ok(())
     }
 
-    fn check_is_time_dimension(symbol: &MemberSymbol) -> Result<(), CubeError> {
-        let dimension = symbol.as_dimension().map_err(|_| {
+    fn check_is_time_dimension(symbol: &Rc<MemberSymbol>) -> Result<(), CubeError> {
+        let dimension = symbol.peel_refs().as_dimension().map_err(|_| {
             CubeError::user(format!(
                 "Pre-aggregation time dimension must be a dimension"
             ))
@@ -890,7 +889,7 @@ impl PreAggregationsCompiler {
         Ok(())
     }
 
-    fn check_is_segment(symbol: &MemberSymbol) -> Result<(), CubeError> {
+    fn check_is_segment(symbol: &Rc<MemberSymbol>) -> Result<(), CubeError> {
         symbol.as_member_expression().map_err(|_| {
             CubeError::user(
                 "Pre-aggregation segment reference must be a member expression".to_string(),
