@@ -46,6 +46,31 @@ the folder inherits those permissions. See
 
 </Info>
 
+### Dashboard comments
+
+[Comments][ref-comments] on a dashboard use the access level of the
+dashboard's workbook. Comments have no separate permissions.
+
+| Action | Can view | Can edit | Full access |
+| --- | :---: | :---: | :---: |
+| Read threads and reactions | ✅ | ✅ | ✅ |
+| Add a reaction | ✅ | ✅ | ✅ |
+| Resolve or re-open a thread you started | ✅ | ✅ | ✅ |
+| Start a thread or reply | ❌ | ✅ | ✅ |
+| Edit or delete your own comment | ❌ | ✅ | ✅ |
+| Resolve or re-open any thread | ❌ | ✅ | ✅ |
+| Edit or delete another person's comment | ❌ | ❌ | ❌ |
+
+Only the author of a comment can edit or delete it, at every access level.
+A thread is shared by everyone in it, so people who can edit the workbook can
+resolve any thread. A thread's author can resolve it with **Can view** access.
+Deleting a thread also deletes its replies, including other people's. See
+[Editing and deleting][ref-comments-delete].
+
+The account-wide [**Allow comments on dashboards**][ref-comments-toggle]
+setting always wins. When it is off, comments are hidden, and nobody can
+add, edit, or delete comments, react, or resolve threads, at any access level.
+
 ## Sharing with users and groups
 
 To share content with specific people or groups:
@@ -193,3 +218,6 @@ interface.
 [ref-google-sheets]: /docs/integrations/google-sheets
 [ref-excel]: /docs/integrations/microsoft-excel
 [ref-signed-embedding]: /embedding/iframe/auth/signed
+[ref-comments]: /docs/explore-analyze/dashboards/comments
+[ref-comments-delete]: /docs/explore-analyze/dashboards/comments#editing-and-deleting
+[ref-comments-toggle]: /docs/explore-analyze/dashboards/comments#turn-it-on
