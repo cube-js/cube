@@ -112,6 +112,8 @@ A saved value is fixed when you pick it, so it goes stale as the dimension's val
 
 Rows where the dimension, or the measure you pick, is empty (`null`) are left out, so a default never resolves to an empty value while the dimension has others.
 
+When several values tie on the measure, **Max value by measure** and **Min value by measure** both take the one that comes first in the dimension's own order: alphabetical for a string, lowest for a number, earliest for a time dimension. The filter then opens on the same value in the dashboard builder, on the published dashboard and on every load.
+
 The first and last value are offered on string, number and time dimensions. Picking either shows a sentence — *The first value of Status, according to the selected sort order.* — and a sort order dropdown beneath it:
 
 - **Natural**, the default, is the dimension's own order: alphabetical for a string, numeric for a number, chronological for a time dimension. The first value is the lowest, and the last value is the highest.
