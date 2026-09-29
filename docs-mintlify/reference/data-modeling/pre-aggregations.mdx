@@ -1372,6 +1372,9 @@ The actual value to be added depends on how frequently `refresh_key` is updated.
 On the other hand, if the current timestamp is used as `build_range_end`, it can trigger
 updates of the first and last partitions more frequently than the [`refresh_key`][self-refreshkey] does,
 since the build range boundaries change with each evaluation.
+For `build_range_start`, prefer expressions that change as rarely as your
+partitioning allows, e.g., `CURRENT_DATE` instead of `NOW()` for daily or
+coarser partitions.
 
 </Warning>
 
@@ -1392,7 +1395,7 @@ cubes:
         build_range_start:
           sql: SELECT CURRENT_DATE - INTERVAL '300 day'
         build_range_end:
-          sql: SELECT CURRENT_DATE
+          sql: SELECT NOW()
 
     # ...
 ```
@@ -1411,7 +1414,7 @@ cube(`orders`, {
         sql: `SELECT CURRENT_DATE - INTERVAL '300 day'`
       },
       build_range_end: {
-        sql: `SELECT CURRENT_DATE`
+        sql: `SELECT NOW()`
       }
     }
   },
@@ -1428,7 +1431,7 @@ which your data can change and `build_range_start` to the earliest point of time
 when history should be available.
 
 In the following example, `refresh_key.update_window` is `1 week` and
-`build_range_start` is `SELECT NOW() - INTERVAL '365 day'`, so the scheduled
+`build_range_start` is `SELECT CURRENT_DATE - INTERVAL '365 day'`, so the scheduled
 refresh will build historical partitions for 365 days in the past and will only
 refresh last week's data.
 
@@ -1447,7 +1450,7 @@ cubes:
         granularity: day
         partition_granularity: month
         build_range_start:
-          sql: SELECT NOW() - INTERVAL '365 day'
+          sql: SELECT CURRENT_DATE - INTERVAL '365 day'
         build_range_end:
           sql: SELECT NOW()
         refresh_key:
@@ -1465,7 +1468,7 @@ cube(`orders`, {
       granularity: `day`,
       partition_granularity: `month`,
       build_range_start: {
-        sql: `SELECT NOW() - INTERVAL '365 day'`
+        sql: `SELECT CURRENT_DATE - INTERVAL '365 day'`
       },
       build_range_end: {
         sql: `SELECT NOW()`
