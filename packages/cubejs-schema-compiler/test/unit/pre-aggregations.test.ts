@@ -273,14 +273,14 @@ describe('pre-aggregations', () => {
       `
     );
 
-    const lambdaQueryFor = async (timeDimensions: any[]) => {
+    const lambdaQueryFor = async (timeDimensions: any[], timezone: string = 'UTC') => {
       const { compiler, cubeEvaluator, joinGraph } = compileEvents();
       await compiler.compile();
 
       const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
         measures: ['Events.count'],
         timeDimensions,
-        timezone: 'UTC',
+        timezone,
       });
 
       const lambdaQueries: any = query.buildLambdaQuery();
@@ -300,6 +300,18 @@ describe('pre-aggregations', () => {
       expect(lambdaParams).toContain('2024-02-29T23:59:59.999Z');
       expect(lambdaParams).toContain('2024-02-01T00:00:00.000Z');
       expect(lambdaSql).toMatch(/<=/);
+    });
+
+    it('converts the bound out of the query timezone', async () => {
+      const { sqlAndParams: [, lambdaParams] } = await lambdaQueryFor([{
+        dimension: 'Events.ts',
+        dateRange: ['2024-02-01', '2024-02-29'],
+      }], 'America/Los_Angeles');
+
+      // matchedTimeDimensionDateRange is local and offset-free, so an unconverted bound would
+      // cut the source query off 8 hours early. February is still PST, DST starts March 10.
+      expect(lambdaParams).toContain('2024-03-01T07:59:59.999Z');
+      expect(lambdaParams).toContain('2024-02-01T08:00:00.000Z');
     });
 
     it('stays unbounded above without a requested date range', async () => {
