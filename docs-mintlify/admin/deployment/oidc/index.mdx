@@ -92,7 +92,8 @@ Cube-issued tokens.
 A **token config** is a tenant-level entry that tells Cube which audience to
 mint tokens for and how to format the `sub` claim each token carries. Each
 token config produces one audience-scoped JWT that is delivered to all
-deployments in the tenant.
+deployments in the tenant, or, for a [per-user](#per-user-tokens) config, one
+JWT per user.
 
 | Field                     | What it controls                                                                                                       |
 | ------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
@@ -100,7 +101,7 @@ deployments in the tenant.
 | **Audience**              | The JWT `aud` claim value. Pre-set for `AWS` (`sts.amazonaws.com`) and `Azure` (`api://AzureADTokenExchange`). For `GCP` you supply the **Workload Identity Federation provider resource path** (`//iam.googleapis.com/projects/.../providers/...`) — there is no global GCP audience. User-supplied for `Custom`. |
 | **Name**                  | A short, filesystem-safe slug that becomes part of the token file name (`cube_cloud_token_<name>`), or the `oidcTokens` key for [per-user](#per-user-tokens) configs. |
 | **Subject Claim Format**  | Template for the JWT `sub` claim. Defaults to `cube:deployment:{deployment_id}` if left empty.                          |
-| **Custom Claims**         | Optional extra JWT claims emitted verbatim in every minted token — see [Custom claims](#custom-claims) below.            |
+| **Custom Claims**         | Optional extra JWT claims added to every minted token (per-user configs resolve `{user_id}` / `{user_name}` in values) — see [Custom claims](#custom-claims) below. |
 | **Per-user token**        | Mint a token per Cube user, delivered in the security context instead of as a file — see [Per-user tokens](#per-user-tokens) below. |
 | **Target Env Var**        | Custom audience type only: env var Cube populates with the token file path in every execution context — see [Custom token configs](#custom-token-configs) below. |
 
@@ -237,7 +238,9 @@ A driver keeps the token it was built with, and Cube builds one driver per
 orchestrator. So key the orchestrator on the user and on the token's
 `expiresAt`: each user gets their own connections, as with [per-user OAuth
 credentials][ref-oauth-authentication], and a refreshed token gets a new
-driver before the old one expires.
+driver before the old one expires. The trade-off: each refresh starts the user on a new
+orchestrator with an empty cache, and superseded orchestrators keep their
+connections until they are evicted from the orchestrator cache.
 
 ```javascript
 module.exports = {
@@ -255,9 +258,20 @@ module.exports = {
 ```
 
 Per-user tokens are not delivered to deployments as token files, so a
-per-user config has no **Target Env Var** — keep a separate config for
-work that runs without a user, such as pre-aggregation refreshes. Embedded
-users do not receive per-user tokens.
+per-user config has no **Target Env Var**. Keep a separate deployment config
+with **Target Env Var** `CUBEJS_DB_SNOWFLAKE_OAUTH_TOKEN_PATH` for work that
+runs without a user, such as pre-aggregation refreshes.
+
+<Warning>
+
+When a request has no per-user token, `oauthToken` in the example is
+`undefined` and the Snowflake driver falls back to that token file, so the
+query runs as the deployment's identity. This applies to the refresh worker,
+embedded users (who never receive per-user tokens), and users whose username
+can't be rendered. If every query must run as its user, throw in
+`driverFactory` when a user is present but their token is missing.
+
+</Warning>
 
 ## Trust mechanism
 
