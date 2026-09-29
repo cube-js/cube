@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.7.47](https://github.com/cube-js/cube/compare/v1.7.46...v1.7.47) (2026-09-29)
+
+### Bug Fixes
+
+- **query-orchestrator:** Don't clip partition builds to the query date range ([#12027](https://github.com/cube-js/cube/issues/12027)) ([52d4712](https://github.com/cube-js/cube/commit/52d4712d5d71bfbee9abeb7d4055a92a6b2b33d6)), closes [#11317](https://github.com/cube-js/cube/issues/11317)
+- **query-orchestrator:** Wait continueWaitTimeout seconds for a queued stream, not 10x ([#12029](https://github.com/cube-js/cube/issues/12029)) ([ec35e19](https://github.com/cube-js/cube/commit/ec35e195aac3fa2d4a87795d9d9ff87ecef00439)), closes [#7501](https://github.com/cube-js/cube/issues/7501)
+
+### Features
+
+- **server-core:** make dev mode opt-in and stop respecting NODE_ENV ([#11959](https://github.com/cube-js/cube/issues/11959)) ([4034a90](https://github.com/cube-js/cube/commit/4034a90bb1c59a815e0558daffa1d0625c40b7aa))
+
 ## [1.7.46](https://github.com/cube-js/cube/compare/v1.7.45...v1.7.46) (2026-09-26)
 
 ### Features
