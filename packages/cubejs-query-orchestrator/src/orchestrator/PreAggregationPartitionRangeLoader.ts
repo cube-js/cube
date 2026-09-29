@@ -457,7 +457,7 @@ export class PreAggregationPartitionRangeLoader {
       }
     );
     const appliedRowLimit = this.lambdaQuery.maxSourceRowLimit ?? this.options.maxSourceRowLimit;
-    if (data.rowCount === appliedRowLimit) {
+    if (data.rowCount >= appliedRowLimit) {
       throw new Error(`The maximum number of source rows ${appliedRowLimit} was reached for ${this.preAggregation.preAggregationId}`);
     }
     return {

@@ -315,12 +315,7 @@ export class PreAggregations {
     return [];
   }
 
-  /**
-   * Requested time dimension range this pre-aggregation was matched by, as local
-   * (timezone naked) ISO strings, e.g. ['2024-02-01T00:00:00.000', '2024-02-29T23:59:59.999'].
-   * Drives partition selection, and bounds the rollupLambda source query so both halves of
-   * the union agree.
-   */
+  /** Shared by partition selection and the rollupLambda source bound so both halves of the union agree. */
   public matchedTimeDimensionDateRangeFor(foundPreAggregation: PreAggregationForQuery): [string, string] | undefined {
     const { preAggregation } = foundPreAggregation;
 
