@@ -6,6 +6,23 @@ import { prepareCompiler } from './PrepareCompiler';
 
 type Files = { fileName: string, content: string }[];
 
+// Every compile starts its own transpiler worker pool (CPU count - 1 threads by default), and the
+// tests below run several compiles at once: keep them to one thread each, so this file doesn't
+// starve suites that run next to it.
+const previousWorkerThreads = process.env.CUBEJS_TRANSPILATION_WORKER_THREADS_COUNT;
+
+beforeAll(() => {
+  process.env.CUBEJS_TRANSPILATION_WORKER_THREADS_COUNT = '1';
+});
+
+afterAll(() => {
+  if (previousWorkerThreads === undefined) {
+    delete process.env.CUBEJS_TRANSPILATION_WORKER_THREADS_COUNT;
+  } else {
+    process.env.CUBEJS_TRANSPILATION_WORKER_THREADS_COUNT = previousWorkerThreads;
+  }
+});
+
 const tenantFiles = (): Files => [
   {
     fileName: 'helpers.js',
