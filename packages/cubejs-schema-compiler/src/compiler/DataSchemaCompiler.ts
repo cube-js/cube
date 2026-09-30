@@ -526,6 +526,12 @@ export class DataSchemaCompiler {
         cleanup();
         transpiledFiles = [];
         toCompile = [];
+        // The functions put into the compile context (cube, view, require, ...) close over
+        // this scope, and member functions keep that context alive as long as the compiled
+        // model lives: drop the model files' contents here, or they stay retained with it.
+        originalJsFiles.length = 0;
+        jinjaTemplatedFiles.length = 0;
+        yamlFiles.length = 0;
 
         if (transpilationNative) {
           // Clean up cache
