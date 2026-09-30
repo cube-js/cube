@@ -1,11 +1,10 @@
-import booleanFixture from '../../fixtures/mssql-boolean-contexts.json';
+import booleanFixture from '../../fixtures/mssql-boolean-contexts';
 import { MssqlQuery } from '../../../src/adapter/MssqlQuery';
 import { prepareJsCompiler } from '../../unit/PrepareCompiler';
 import { dbRunner } from './MSSqlDbRunner';
 
-// Rust asserts these SQL strings against its actual expression renderer, and the
-// adapter unit test checks the fixture's templates against MssqlQuery. Expected
-// values are also checked against independent three-valued truth tables in Rust.
+// The adapter unit test checks these templates against MssqlQuery. These cases
+// verify SQL Server behavior across true, false, and NULL inputs.
 describe('MSSQL SQL API boolean contexts', () => {
   jest.setTimeout(200000);
   const inputs = [true, false, null];

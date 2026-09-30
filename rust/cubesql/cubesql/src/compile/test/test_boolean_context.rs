@@ -1,14 +1,17 @@
-use super::*;
+use crate::compile::engine::df::wrapper::{SqlQuery, WrappedSelectNode};
 use crate::compile::test::{mssql_boolean_fixture, mssql_boolean_templates, sql_generator};
 use datafusion::{
     arrow::{
         array::{Array, BooleanArray},
-        datatypes::{Field, Schema},
+        datatypes::{DataType, Field, Schema},
         record_batch::RecordBatch,
     },
     datasource::MemTable,
     execution::context::SessionContext,
+    logical_plan::{Expr, LogicalPlan},
+    physical_plan::{aggregates::AggregateFunction, functions::BuiltinScalarFunction},
 };
+use std::{collections::HashMap, sync::Arc};
 
 fn render(expr: Expr, predicate: bool, mssql: bool) -> String {
     WrappedSelectNode::generate_sql_for_expr_context(

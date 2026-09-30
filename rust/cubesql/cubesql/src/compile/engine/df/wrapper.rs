@@ -56,10 +56,6 @@ use std::{
     sync::{Arc, LazyLock},
 };
 
-#[cfg(test)]
-#[path = "wrapper/boolean_context_tests.rs"]
-mod boolean_context_tests;
-
 struct RejectRepeatedBoolean<'a> {
     subqueries: &'a HashMap<String, String>,
 }
@@ -2459,7 +2455,7 @@ impl WrappedSelectNode {
         }
     }
 
-    fn generate_sql_for_expr_context<'ctx>(
+    pub(in crate::compile) fn generate_sql_for_expr_context<'ctx>(
         sql_query: SqlQuery,
         sql_generator: Arc<dyn SqlGenerator>,
         mut expr: Expr,
