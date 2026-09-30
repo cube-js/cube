@@ -1,6 +1,6 @@
 ---
 title: Inbox
-description: Get in-app notifications about comment mentions, alerts, suspended deployments, new Cube versions, and the changelog.
+description: Get in-app notifications about comment mentions, alerts, scheduled task runs, suspended deployments, new Cube versions, and the changelog.
 ---
 
 The inbox collects notifications about events in Cube that concern you: a
@@ -40,9 +40,16 @@ New notifications appear as they arrive. You don't need to reload the page.
 | --- | --- | --- | --- |
 | Mention | Someone mentions you in a [dashboard comment][ref-comments], or edits a comment to add a mention of you | Each mentioned user, except the author | The comment on the dashboard |
 | Alert | An [alert][ref-alerts] or a [budget][ref-budgets] alert fires or resolves | Recipients of the alert who are Cube users | The deployment's **Status** page. Budget alerts have no **Open** button. |
+| Scheduled task run | A run of a [scheduled task][ref-scheduled-tasks] finishes or fails, if the task has [notifications][ref-scheduled-task-notifications] on | The task's creator | The run's chat thread. If the run failed before it started a thread, the task's page. |
 | Deployment suspended | A deployment [suspends][ref-auto-suspension], automatically or manually | Users who can resume the deployment, except users who work on it in development mode on their own branch | The deployment |
 | New Cube version | A deployment runs an older version than the latest one on its [update channel][ref-update-channels] | Admins | The deployment's **Settings** page |
 | Changelog | Cube publishes a new changelog entry | All users | No **Open** button. The entry shows in the right pane. An older entry opens the Cube changelog instead. |
+
+A scheduled task run notification has the task name in the title, for
+example **Daily signups finished** or **Daily signups failed**. For a finished
+run, it shows the start of the agent's answer. If the answer has no text, for
+example when the run only built a chart, it shows how the run started and how
+long it took. For a failed run, it shows the error.
 
 The inbox does not send notifications by email or Slack. Alerts send their own
 email, as set up on the alert.
@@ -75,5 +82,7 @@ Cube asks you to confirm both actions. You can't undo a delete.
 [ref-comments]: /docs/explore-analyze/dashboards/comments#mentions
 [ref-alerts]: /admin/monitoring/alerts
 [ref-budgets]: /admin/account-billing/budgets
+[ref-scheduled-tasks]: /docs/explore-analyze/scheduled-tasks
+[ref-scheduled-task-notifications]: /docs/explore-analyze/scheduled-tasks#getting-notified-when-a-run-finishes
 [ref-auto-suspension]: /admin/deployment/auto-suspension
 [ref-update-channels]: /admin/deployment#update-channels

@@ -39,6 +39,9 @@ A task has:
   each execution.
 - **Schedule** — how often the task runs (see below).
 - **Enabled** — a toggle to activate or pause a scheduled task.
+- **Notify me when a run finishes** — a toggle to get an
+  [inbox](/docs/inbox) notification after each run (see
+  [Getting notified when a run finishes](#getting-notified-when-a-run-finishes)).
 
 ## Schedule options
 
@@ -144,6 +147,22 @@ run.
 
 The task runs headlessly under the security context of the user who created
 it, so it sees exactly the data that user can access.
+
+### Getting notified when a run finishes
+
+Turn on **Notify me when a run finishes** in the task's create or edit dialog
+to get an [inbox](/docs/inbox) notification when a run finishes or fails. The
+toggle is on by default for a task that you create in the dialog. It applies
+to both scheduled runs and **Run now**.
+
+The notification goes to the task's creator, also when an admin edits or runs
+the task. It shows the start of the agent's answer, or the error for a failed
+run, and links to the run's chat thread.
+
+A task that you create with the agent or the Platform API has notifications
+off, unless you ask for them: for example, *"schedule a daily summary of
+yesterday's signups at 9am and notify me when it runs."* With the Platform
+API, set `notificationEnabled` to `true`.
 
 ### What the agent can do in a scheduled run
 
