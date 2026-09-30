@@ -252,13 +252,13 @@ impl MemberSymbol {
     /// True if `member` is this symbol or any symbol reachable via
     /// `reference_member`. Self is included.
     pub fn has_member_in_reference_chain(&self, member: &Rc<MemberSymbol>) -> bool {
-        if self.full_name() == member.full_name() {
+        if self.id() == member.id() {
             return true;
         }
 
         let mut current = self.reference_member();
         while let Some(reference) = current {
-            if reference.full_name() == member.full_name() {
+            if reference.id() == member.id() {
                 return true;
             }
             current = reference.reference_member();

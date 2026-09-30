@@ -9,7 +9,7 @@ use crate::planner::planners::JoinTreeBuilder;
 use crate::planner::query_tools::JoinKey;
 use crate::planner::state::State;
 use crate::planner::MemberSymbol;
-use crate::planner::{CubeId, JoinTree};
+use crate::planner::{CubeId, JoinTree, MemberId};
 use cubenativeutils::CubeError;
 use itertools::Itertools;
 use std::collections::{HashMap, HashSet};
@@ -171,7 +171,7 @@ impl MeasuresJoinHints {
     pub fn hints_for_measure(&self, measure: &MemberSymbol) -> Option<JoinHints> {
         self.measure_hints
             .iter()
-            .find(|mh| mh.measure.full_name() == measure.full_name())
+            .find(|mh| mh.measure.id() == measure.id())
             .map(|mh| mh.hints.clone())
     }
 }
@@ -204,7 +204,7 @@ pub struct MultiFactJoinGroups {
     /// cube_name → join path from root, computed from the first group (shared for dimensions).
     dimension_paths: HashMap<CubeId, Vec<CubeId>>,
     /// measure full_name → join path from root, computed per group.
-    measure_paths: HashMap<String, Vec<CubeId>>,
+    measure_paths: HashMap<MemberId, Vec<CubeId>>,
 }
 
 impl MultiFactJoinGroups {
@@ -637,18 +637,18 @@ impl MultiFactJoinGroups {
         Ok(false)
     }
 
-    /// Full names of the (leaf) measures that are multiplied — i.e. sit below a
+    /// Ids of the (leaf) measures that are multiplied — i.e. sit below a
     /// one-to-many join — in these join groups. Like `has_multiplied_measures`,
     /// but returns the concrete measures so callers can compare the
     /// multiplicativity of a measure between two different groupings (e.g. the
     /// query vs a pre-aggregation).
-    pub fn multiplied_measures(&self) -> Result<HashSet<String>, CubeError> {
+    pub fn multiplied_measures(&self) -> Result<HashSet<MemberId>, CubeError> {
         let mut result = HashSet::new();
         for (join, measures) in self.groups.iter() {
             for measure in measures.iter() {
                 for item in collect_multiplied_measures(measure, join)? {
                     if item.multiplied {
-                        result.insert(item.measure.full_name());
+                        result.insert(item.measure.id().clone());
                     }
                 }
             }
@@ -681,12 +681,12 @@ impl MultiFactJoinGroups {
         measure: &Rc<MemberSymbol>,
     ) -> Option<&Vec<CubeId>> {
         self.measure_paths
-            .get(&measure.clone().resolve_reference_chain().full_name())
+            .get(measure.clone().resolve_reference_chain().id())
     }
 
     fn precompute_paths(
         groups: &[(Rc<JoinTree>, Vec<Rc<MemberSymbol>>)],
-    ) -> (HashMap<CubeId, Vec<CubeId>>, HashMap<String, Vec<CubeId>>) {
+    ) -> (HashMap<CubeId, Vec<CubeId>>, HashMap<MemberId, Vec<CubeId>>) {
         let dimension_paths = if groups.is_empty() {
             HashMap::new()
         } else {
@@ -701,7 +701,7 @@ impl MultiFactJoinGroups {
             let cube_paths = Self::build_cube_paths(join);
             for m in measures {
                 if let Some(path) = cube_paths.get(&m.cube_name()) {
-                    measure_paths.insert(m.full_name(), path.clone());
+                    measure_paths.insert(m.id().clone(), path.clone());
                 }
             }
         }
@@ -757,7 +757,7 @@ mod tests {
     use super::*;
     use crate::planner::{MemberExpressionExpression, MemberExpressionSymbol};
     use crate::test_fixtures::cube_bridge::{MockMemberSql, MockSchema};
-    use crate::test_fixtures::test_utils::TestContext;
+    use crate::test_fixtures::test_utils::{member_id, TestContext};
 
     #[test]
     fn test_single_fact_one_group() {
@@ -839,7 +839,7 @@ mod tests {
 
         assert_eq!(
             groups.multiplied_measures()?,
-            HashSet::from(["customers.count".to_string()])
+            HashSet::from([member_id("customers.count")])
         );
         Ok(())
     }
@@ -887,7 +887,7 @@ mod tests {
         assert!(groups.has_multiplied_measures()?);
         assert_eq!(
             groups.multiplied_measures()?,
-            HashSet::from(["customers.count".to_string()])
+            HashSet::from([member_id("customers.count")])
         );
         Ok(())
     }

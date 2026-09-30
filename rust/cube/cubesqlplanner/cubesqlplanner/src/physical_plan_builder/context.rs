@@ -3,7 +3,8 @@ use cubenativeutils::CubeError;
 use crate::physical_plan::sql_nodes::SqlNodesFactory;
 use crate::physical_plan::Schema;
 use crate::planner::planners::multi_stage::{EvaluationContext, TimeShiftState};
-use crate::planner::{CubeId, MemberSymbol};
+use crate::planner::{CubeId, MemberId, MemberSymbol};
+use itertools::Itertools;
 use std::collections::HashMap;
 use std::rc::Rc;
 
@@ -24,8 +25,8 @@ pub(super) struct PushDownBuilderContext {
     pub dimensions_query: bool,
     pub measure_subquery: bool,
     pub multi_stage_schemas: HashMap<String, Rc<Schema>>,
-    pub multi_stage_dimension_schemas: HashMap<Vec<String>, Rc<MultiStageDimensionContext>>,
-    pub multi_stage_dimensions: Vec<String>,
+    pub multi_stage_dimension_schemas: HashMap<Vec<MemberId>, Rc<MultiStageDimensionContext>>,
+    pub multi_stage_dimensions: Vec<MemberId>,
 }
 
 impl PushDownBuilderContext {
@@ -59,8 +60,8 @@ impl PushDownBuilderContext {
         self.multi_stage_dimensions = Vec::new();
     }
 
-    pub fn add_multi_stage_dimension(&mut self, name: String) {
-        self.multi_stage_dimensions.push(name);
+    pub fn add_multi_stage_dimension(&mut self, id: MemberId) {
+        self.multi_stage_dimensions.push(id);
     }
 
     pub fn get_multi_stage_dimensions(
@@ -79,14 +80,14 @@ impl PushDownBuilderContext {
         } else {
             Err(CubeError::internal(format!(
                 "Cannot find source for resolve multi stage dimensions {}",
-                dimensions_to_resolve.join(", ")
+                dimensions_to_resolve.iter().join(", ")
             )))
         }
     }
 
     pub fn add_multi_stage_dimension_schema(
         &mut self,
-        resolved_dimensions: Vec<String>,
+        resolved_dimensions: Vec<MemberId>,
         cte_name: String,
         join_dimensions: Vec<Rc<MemberSymbol>>,
         schema: Rc<Schema>,

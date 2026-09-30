@@ -12,7 +12,7 @@ use crate::physical_plan::sql_nodes::RenderReferences;
 use crate::planner::planners::multi_stage::{FilterParamsTimeShifts, TimeShiftState};
 use crate::planner::query_tools::QueryTools;
 use crate::planner::symbols::CalendarDimensionTimeShift;
-use crate::planner::CubeId;
+use crate::planner::{CubeId, MemberId};
 use std::collections::{HashMap, HashSet};
 use std::rc::Rc;
 
@@ -23,7 +23,7 @@ use std::rc::Rc;
 #[derive(Clone, Default)]
 pub struct SqlNodesFactory {
     time_shifts: TimeShiftState,
-    calendar_time_shifts: HashMap<String, CalendarDimensionTimeShift>,
+    calendar_time_shifts: HashMap<MemberId, CalendarDimensionTimeShift>,
     filter_params_time_shifts: FilterParamsTimeShifts,
     render_references: RenderReferences,
     pre_aggregation_dimensions_references: RenderReferences,
@@ -35,7 +35,7 @@ pub struct SqlNodesFactory {
     // Full names of the members present in the query GROUP BY. Used by
     // MaskedSqlNode to decide whether conditional masking can be applied to an
     // aggregate measure.
-    group_by_members: HashSet<String>,
+    group_by_members: HashSet<MemberId>,
 }
 
 impl SqlNodesFactory {
@@ -61,7 +61,7 @@ impl SqlNodesFactory {
 
     pub fn set_calendar_time_shifts(
         &mut self,
-        calendar_time_shifts: HashMap<String, CalendarDimensionTimeShift>,
+        calendar_time_shifts: HashMap<MemberId, CalendarDimensionTimeShift>,
     ) {
         self.calendar_time_shifts = calendar_time_shifts;
     }
@@ -70,7 +70,7 @@ impl SqlNodesFactory {
         self.use_local_tz_in_date_range = value;
     }
 
-    pub fn set_group_by_members(&mut self, value: HashSet<String>) {
+    pub fn set_group_by_members(&mut self, value: HashSet<MemberId>) {
         self.group_by_members = value;
     }
 

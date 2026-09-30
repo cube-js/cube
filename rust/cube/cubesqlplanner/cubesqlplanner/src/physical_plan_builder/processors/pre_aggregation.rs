@@ -83,10 +83,7 @@ impl PreAggregationProcessor<'_> {
         branch_members: &[Rc<MemberSymbol>],
         branch_cube_name: &str,
     ) -> Result<Rc<MemberSymbol>, CubeError> {
-        if let Some(member) = branch_members
-            .iter()
-            .find(|m| m.full_name() == lambda_member.full_name())
-        {
+        if let Some(member) = branch_members.iter().find(|m| m.id() == lambda_member.id()) {
             return Ok(member.clone());
         }
         let short_name = lambda_member.name();

@@ -20,7 +20,7 @@ use crate::planner::SqlCallReference;
 use crate::planner::SymbolPath;
 use crate::planner::SymbolPathType;
 use crate::planner::TimeDimensionSymbol;
-use crate::planner::{Compiler, CubeId};
+use crate::planner::{Compiler, CubeId, MemberId};
 use crate::utils::debug::DebugSql;
 use cubenativeutils::CubeError;
 use cubenativeutils::CubeErrorCauseType;
@@ -486,21 +486,21 @@ impl PreAggregationsCompiler {
         items: &[PreAggregationJoinItem],
         rollup_join_name: &PreAggregationFullName,
     ) -> Result<(), CubeError> {
-        let mut columns: HashMap<String, String> = HashMap::new();
+        let mut columns: HashMap<MemberId, String> = HashMap::new();
         for member in items
             .iter()
             .flat_map(|item| item.from_members.iter().chain(item.to_members.iter()))
         {
-            let name = member.symbol.full_name();
-            if let Some(seen) = columns.get(&name) {
+            let id = member.symbol.id();
+            if let Some(seen) = columns.get(id) {
                 if seen != &member.column {
                     return Err(CubeError::user(format!(
                         "The \"{}\" pre-aggregation joins on {} through rollups storing it in different columns ({} and {}), so one of the joins would read a column that isn't there",
-                        rollup_join_name.name, name, seen, member.column,
+                        rollup_join_name.name, id, seen, member.column,
                     )));
                 }
             } else {
-                columns.insert(name, member.column.clone());
+                columns.insert(id.clone(), member.column.clone());
             }
         }
         Ok(())

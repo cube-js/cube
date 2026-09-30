@@ -3,8 +3,8 @@ use crate::planner::filter::{BaseFilter, FilterGroupOperator, FilterItem};
 use crate::planner::query_tools::QueryTools;
 use crate::planner::DimensionSymbol;
 use crate::planner::GranularityHelper;
-use crate::planner::MemberSymbol;
 use crate::planner::TimeDimensionSymbol;
+use crate::planner::{MemberId, MemberSymbol};
 use cubenativeutils::CubeError;
 use std::collections::HashMap;
 use std::rc::Rc;
@@ -31,9 +31,9 @@ impl MatchState {
 pub struct DimensionMatcher<'a> {
     query_tools: Rc<QueryTools>,
     pre_aggregation: &'a CompiledPreAggregation,
-    pre_aggregation_dimensions: HashMap<String, bool>,
-    pre_aggregation_time_dimensions: HashMap<String, Vec<(Rc<TimeDimensionSymbol>, bool)>>,
-    pre_aggregation_segments: HashMap<String, bool>,
+    pre_aggregation_dimensions: HashMap<MemberId, bool>,
+    pre_aggregation_time_dimensions: HashMap<MemberId, Vec<(Rc<TimeDimensionSymbol>, bool)>>,
+    pre_aggregation_segments: HashMap<MemberId, bool>,
     result: MatchState,
 }
 
@@ -42,13 +42,13 @@ impl<'a> DimensionMatcher<'a> {
         let pre_aggregation_dimensions = pre_aggregation
             .dimensions
             .iter()
-            .map(|d| (d.peel_refs().full_name(), false))
+            .map(|d| (d.peel_refs().id().clone(), false))
             .collect();
         let mut pre_aggregation_time_dimensions =
-            HashMap::<String, Vec<(Rc<TimeDimensionSymbol>, bool)>>::new();
+            HashMap::<MemberId, Vec<(Rc<TimeDimensionSymbol>, bool)>>::new();
         for dim in pre_aggregation.time_dimensions.iter() {
             if let Ok(td) = dim.as_time_dimension() {
-                let key = td.base_symbol().peel_refs().full_name();
+                let key = td.base_symbol().peel_refs().id().clone();
                 pre_aggregation_time_dimensions
                     .entry(key)
                     .or_default()
@@ -58,7 +58,7 @@ impl<'a> DimensionMatcher<'a> {
         let pre_aggregation_segments = pre_aggregation
             .segments
             .iter()
-            .map(|s| (s.full_name(), false))
+            .map(|s| (s.id().clone(), false))
             .collect();
         Self {
             query_tools,
@@ -158,7 +158,7 @@ impl<'a> DimensionMatcher<'a> {
                 self.try_match_time_dimension(time_dimension, add_to_matched_dimension)
             }
             MemberSymbol::MemberExpression(me) => {
-                if let Some(found) = self.pre_aggregation_segments.get_mut(&me.full_name()) {
+                if let Some(found) = self.pre_aggregation_segments.get_mut(me.id()) {
                     if add_to_matched_dimension {
                         *found = true;
                     }
@@ -204,10 +204,7 @@ impl<'a> DimensionMatcher<'a> {
         dimension: &DimensionSymbol,
         add_to_matched_dimension: bool,
     ) -> Result<MatchState, CubeError> {
-        if let Some(found) = self
-            .pre_aggregation_dimensions
-            .get_mut(&dimension.full_name())
-        {
+        if let Some(found) = self.pre_aggregation_dimensions.get_mut(dimension.id()) {
             if add_to_matched_dimension {
                 *found = true;
             }
@@ -275,11 +272,11 @@ impl<'a> DimensionMatcher<'a> {
 
         // Stored time dimensions are keyed by the member a view member
         // references.
-        let base_symbol_name = time_dimension.base_symbol().peel_refs().full_name();
+        let base_symbol_id = time_dimension.base_symbol().peel_refs().id().clone();
 
         if let Some(entries) = self
             .pre_aggregation_time_dimensions
-            .get_mut(&base_symbol_name)
+            .get_mut(&base_symbol_id)
         {
             // Stored columns are addressed by the member alone, so several
             // granularities of one dimension are indistinguishable here, and

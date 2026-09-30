@@ -15,7 +15,7 @@ use std::rc::Rc;
 /// applied to each dimension across nested multi-stage scopes.
 #[derive(Clone, Default, Debug, PartialEq)]
 pub struct TimeShiftState {
-    pub dimensions_shifts: HashMap<String, DimensionTimeShift>,
+    pub dimensions_shifts: HashMap<MemberId, DimensionTimeShift>,
 }
 
 impl TimeShiftState {
@@ -30,11 +30,11 @@ impl TimeShiftState {
     /// dimension wraps, so both forms are probed.
     pub fn get_for_symbol(&self, symbol: &Rc<MemberSymbol>) -> Option<&DimensionTimeShift> {
         let resolved = resolve_base_symbol(symbol).resolve_reference_chain();
-        if let Some(shift) = self.dimensions_shifts.get(&resolved.full_name()) {
+        if let Some(shift) = self.dimensions_shifts.get(resolved.id()) {
             return Some(shift);
         }
         let owned = find_owned_by_cube_child(&resolved).ok()?;
-        self.dimensions_shifts.get(&owned.full_name())
+        self.dimensions_shifts.get(owned.id())
     }
 
     /// The shift a stored column standing for this member can carry.
@@ -68,7 +68,7 @@ impl TimeShiftState {
     /// involved at all, not whether one can be attributed to the symbol.
     pub fn has_shift_under(&self, symbol: &Rc<MemberSymbol>) -> bool {
         let symbol = resolve_base_symbol(symbol);
-        if self.dimensions_shifts.contains_key(&symbol.full_name()) {
+        if self.dimensions_shifts.contains_key(symbol.id()) {
             return true;
         }
         symbol
@@ -101,9 +101,7 @@ impl TimeShiftState {
                         dimension.calendar_time_shift_for_named_interval(dim_shift_name)
                     {
                         extracted.add_calendar_shift(&dimension, &dim_key, Some(dim_shift_name));
-                        extracted
-                            .calendar_shifts
-                            .insert(dim_key.full_name().clone(), cts);
+                        extracted.calendar_shifts.insert(dim_key, cts);
                     } else if dimension.time_shift_pk().is_some() {
                         return Err(CubeError::user(format!(
                             "Time shift with name {} not found for dimension {}",
@@ -116,9 +114,7 @@ impl TimeShiftState {
                         dimension.calendar_time_shift_for_interval(dim_shift_interval)
                     {
                         extracted.add_calendar_shift(&dimension, &dim_key, cts.name.as_ref());
-                        extracted
-                            .calendar_shifts
-                            .insert(dim_key.full_name().clone(), cts);
+                        extracted.calendar_shifts.insert(dim_key, cts);
                     } else if let Some(calendar_pk) = dimension.time_shift_pk() {
                         // Interval arithmetic straight on the calendar's primary
                         // key, bypassing its mapping. The rows still arrive
@@ -127,9 +123,7 @@ impl TimeShiftState {
                         extracted.add_calendar_shift(&dimension, calendar_pk, None);
                         let mut shift = shift.clone();
                         shift.interval = Some(dim_shift_interval.inverse());
-                        extracted
-                            .interval_shifts
-                            .insert(calendar_pk.full_name().clone(), shift);
+                        extracted.interval_shifts.insert(calendar_pk.clone(), shift);
                     } else {
                         extracted
                             .filter_params_shifts
@@ -156,10 +150,10 @@ impl TimeShiftState {
 #[derive(Default)]
 pub struct ExtractedTimeShifts {
     /// Shifts applied by offsetting the member's expression by an interval.
-    pub interval_shifts: HashMap<String, DimensionTimeShift>,
+    pub interval_shifts: HashMap<MemberId, DimensionTimeShift>,
     /// Shifts that render a calendar cube's own time-shift declaration,
     /// keyed by the calendar's primary-key full name.
-    pub calendar_shifts: HashMap<String, CalendarDimensionTimeShift>,
+    pub calendar_shifts: HashMap<MemberId, CalendarDimensionTimeShift>,
     /// What a `FILTER_PARAMS` binding may restate under the stage's shifts.
     pub filter_params_shifts: FilterParamsTimeShifts,
 }
@@ -216,12 +210,12 @@ pub struct CalendarShift {
 /// The stage's time shifts as `FILTER_PARAMS` rendering sees them.
 #[derive(Clone, Default, Debug, PartialEq)]
 pub struct FilterParamsTimeShifts {
-    interval_shifts: HashMap<String, SqlInterval>,
+    interval_shifts: HashMap<MemberId, SqlInterval>,
     calendar_cubes: HashMap<CubeId, CalendarShift>,
 }
 
 impl FilterParamsTimeShifts {
-    fn add_interval(&mut self, key: String, interval: SqlInterval) {
+    fn add_interval(&mut self, key: MemberId, interval: SqlInterval) {
         self.interval_shifts.insert(key, interval);
     }
 
@@ -235,12 +229,12 @@ impl FilterParamsTimeShifts {
         if let Some(shift) = self.calendar_cubes.get(&resolved.cube_name()) {
             return Some(FilterParamsTimeShift::Calendar(shift.clone()));
         }
-        if let Some(interval) = self.interval_shifts.get(&resolved.full_name()) {
+        if let Some(interval) = self.interval_shifts.get(resolved.id()) {
             return Some(FilterParamsTimeShift::Interval(interval.clone()));
         }
         let owned = find_owned_by_cube_child(&resolved).ok()?;
         self.interval_shifts
-            .get(&owned.full_name())
+            .get(owned.id())
             .map(|interval| FilterParamsTimeShift::Interval(interval.clone()))
     }
 }

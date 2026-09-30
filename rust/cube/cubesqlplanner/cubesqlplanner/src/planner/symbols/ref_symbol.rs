@@ -75,6 +75,10 @@ impl RefSymbol {
         self.compiled_path.full_name().clone()
     }
 
+    pub fn id(&self) -> &crate::planner::MemberId {
+        self.compiled_path.id()
+    }
+
     pub fn target(&self) -> &RefTarget {
         &self.target
     }

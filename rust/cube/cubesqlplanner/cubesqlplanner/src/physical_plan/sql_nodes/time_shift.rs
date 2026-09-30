@@ -58,17 +58,13 @@ impl SqlNode for TimeShiftSqlNode {
                     // it here as well would add the interval twice. Only a
                     // substituted dimension, which is never expanded, resolves
                     // through the chain.
-                    let shift = self
-                        .shifts
-                        .dimensions_shifts
-                        .get(&ev.full_name())
-                        .or_else(|| {
-                            if self.substituted.contains_key(&ev.full_name()) {
-                                self.shifts.shift_for_substituted_column(node)
-                            } else {
-                                None
-                            }
-                        });
+                    let shift = self.shifts.dimensions_shifts.get(ev.id()).or_else(|| {
+                        if self.substituted.contains_key(&ev.full_name()) {
+                            self.shifts.shift_for_substituted_column(node)
+                        } else {
+                            None
+                        }
+                    });
                     if let Some(shift) = shift {
                         let shift = shift
                             .interval

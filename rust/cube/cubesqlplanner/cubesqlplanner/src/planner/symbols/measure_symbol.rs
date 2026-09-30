@@ -231,6 +231,10 @@ impl MeasureSymbol {
         self.compiled_path.full_name().clone()
     }
 
+    pub fn id(&self) -> &crate::planner::MemberId {
+        self.compiled_path.id()
+    }
+
     /// Default alias of the measure, derived from the compiled member
     /// path.
     pub fn alias(&self) -> String {

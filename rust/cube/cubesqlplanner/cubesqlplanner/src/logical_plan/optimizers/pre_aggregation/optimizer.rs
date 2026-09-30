@@ -13,7 +13,7 @@ use crate::planner::planners::CommonUtils;
 use crate::planner::state::State;
 use crate::planner::symbols::MeasureTimeShifts;
 use crate::planner::time_dimension::QueryDateTime;
-use crate::planner::{CubeId, MemberSymbol};
+use crate::planner::{CubeId, MemberId, MemberSymbol};
 use cubenativeutils::CubeError;
 use std::cell::RefCell;
 use std::collections::{HashMap, HashSet};
@@ -71,7 +71,7 @@ pub struct PreAggregationOptimizer {
     usage_counter: usize,
     /// Resolved primary-key names per cube. Every candidate pre-aggregation asks
     /// for the same cubes, and resolving them crosses the JS bridge.
-    primary_keys_cache: RefCell<HashMap<CubeId, Vec<String>>>,
+    primary_keys_cache: RefCell<HashMap<CubeId, Vec<MemberId>>>,
 }
 
 impl PreAggregationOptimizer {
@@ -457,7 +457,7 @@ impl PreAggregationOptimizer {
     fn make_pre_aggregation_source(
         &mut self,
         pre_aggregation: &Rc<CompiledPreAggregation>,
-        matched_measures: &HashSet<String>,
+        matched_measures: &HashSet<MemberId>,
         date_range: Option<(String, String)>,
     ) -> Result<Rc<PreAggregation>, CubeError> {
         let usage_index = self.usage_counter;
@@ -466,7 +466,7 @@ impl PreAggregationOptimizer {
         let filtered_measures: Vec<Rc<MemberSymbol>> = pre_aggregation
             .measures
             .iter()
-            .filter(|m| matched_measures.contains(&m.peel_refs().full_name()))
+            .filter(|m| matched_measures.contains(m.peel_refs().id()))
             .cloned()
             .collect();
         let schema = LogicalSchema {
@@ -570,7 +570,7 @@ impl PreAggregationOptimizer {
     // matching consumed are examined, since the rest are never read.
     // Resolved names of every member the query reads, so a stored member no
     // one reads cannot decide anything.
-    fn read_member_names(schema: &LogicalSchema, filter: &LogicalFilter) -> HashSet<String> {
+    fn read_member_names(schema: &LogicalSchema, filter: &LogicalFilter) -> HashSet<MemberId> {
         let mut symbols: Vec<Rc<MemberSymbol>> = schema
             .dimensions
             .iter()
@@ -591,26 +591,23 @@ impl PreAggregationOptimizer {
             .map(|symbol| {
                 resolve_base_symbol(&symbol)
                     .resolve_reference_chain()
-                    .full_name()
+                    .id()
+                    .clone()
             })
             .collect()
     }
 
     fn can_carry_time_shifts(
         pre_aggregation: &CompiledPreAggregation,
-        matched_measures: &HashSet<String>,
-        read_members: &HashSet<String>,
+        matched_measures: &HashSet<MemberId>,
+        read_members: &HashSet<MemberId>,
         time_shifts: &TimeShiftState,
     ) -> bool {
         if time_shifts.is_empty() {
             return true;
         }
         let is_read = |member: &Rc<MemberSymbol>| {
-            read_members.contains(
-                &resolve_base_symbol(member)
-                    .resolve_reference_chain()
-                    .full_name(),
-            )
+            read_members.contains(resolve_base_symbol(member).resolve_reference_chain().id())
         };
         let grouping_members_carry_shift = pre_aggregation
             .time_dimensions
@@ -626,7 +623,7 @@ impl PreAggregationOptimizer {
             && pre_aggregation
                 .measures
                 .iter()
-                .filter(|measure| matched_measures.contains(&measure.peel_refs().full_name()))
+                .filter(|measure| matched_measures.contains(measure.peel_refs().id()))
                 .all(|measure| !time_shifts.has_shift_under(measure))
     }
 
@@ -635,16 +632,17 @@ impl PreAggregationOptimizer {
     // stored member the build shifted would drop part of the stored shift.
     fn stored_shifts_carry_over(
         pre_aggregation: &CompiledPreAggregation,
-        matched_measures: &HashSet<String>,
+        matched_measures: &HashSet<MemberId>,
         schema: &LogicalSchema,
         filter: &LogicalFilter,
     ) -> Result<bool, CubeError> {
         let base_name = |member: &Rc<MemberSymbol>| {
             resolve_base_symbol(member)
                 .resolve_reference_chain()
-                .full_name()
+                .id()
+                .clone()
         };
-        let stored_time_members: Vec<String> = pre_aggregation
+        let stored_time_members: Vec<MemberId> = pre_aggregation
             .time_dimensions
             .iter()
             .chain(pre_aggregation.dimensions.iter())
@@ -661,7 +659,7 @@ impl PreAggregationOptimizer {
         for stored in pre_aggregation
             .measures
             .iter()
-            .filter(|m| matched_measures.contains(&m.peel_refs().full_name()))
+            .filter(|m| matched_measures.contains(m.peel_refs().id()))
         {
             let mut on_every_member = false;
             let mut targets = HashSet::new();
@@ -738,7 +736,7 @@ impl PreAggregationOptimizer {
         filters: &Rc<LogicalFilter>,
         pre_aggregation: &CompiledPreAggregation,
         row_grain: RowGrain,
-    ) -> Result<Option<HashSet<String>>, CubeError> {
+    ) -> Result<Option<HashSet<MemberId>>, CubeError> {
         let helper = OptimizerHelper::new();
 
         let match_state = self.match_dimensions(
@@ -791,7 +789,7 @@ impl PreAggregationOptimizer {
         // reach the client as the sketch instead of a number.
         if matches!(row_grain, RowGrain::RawRows(_)) {
             for symbol in pre_aggregation.measures.iter() {
-                if !matched_measures.contains(symbol.peel_refs().full_name().as_str()) {
+                if !matched_measures.contains(symbol.peel_refs().id()) {
                     continue;
                 }
                 if symbol
@@ -894,10 +892,10 @@ impl PreAggregationOptimizer {
             return Ok(false);
         };
 
-        let stored_dimensions: HashSet<String> = pre_aggregation
+        let stored_dimensions: HashSet<MemberId> = pre_aggregation
             .dimensions
             .iter()
-            .map(|d| d.clone().resolve_reference_chain().full_name())
+            .map(|d| d.clone().resolve_reference_chain().id().clone())
             .collect();
 
         let joined_cubes: HashSet<CubeId> = std::iter::once(root.name().clone())
@@ -958,14 +956,14 @@ impl PreAggregationOptimizer {
         collect_cube_names_from_symbols(&members)
     }
 
-    fn resolved_primary_keys(&self, cube_name: &CubeId) -> Result<Vec<String>, CubeError> {
+    fn resolved_primary_keys(&self, cube_name: &CubeId) -> Result<Vec<MemberId>, CubeError> {
         if let Some(cached) = self.primary_keys_cache.borrow().get(cube_name) {
             return Ok(cached.clone());
         }
         let keys = CommonUtils::new(self.query_tools.clone())
             .primary_keys_dimensions(cube_name)?
             .into_iter()
-            .map(|key| key.resolve_reference_chain().full_name())
+            .map(|key| key.resolve_reference_chain().id().clone())
             .collect::<Vec<_>>();
         self.primary_keys_cache
             .borrow_mut()
@@ -1024,7 +1022,7 @@ impl PreAggregationOptimizer {
         measures: &Vec<Rc<MemberSymbol>>,
         pre_aggregation: &CompiledPreAggregation,
         only_additive: bool,
-    ) -> Result<Option<HashSet<String>>, CubeError> {
+    ) -> Result<Option<HashSet<MemberId>>, CubeError> {
         let mut matcher = MeasureMatcher::new(pre_aggregation, only_additive);
         for measure in measures.iter() {
             if !matcher.try_match(measure)? {

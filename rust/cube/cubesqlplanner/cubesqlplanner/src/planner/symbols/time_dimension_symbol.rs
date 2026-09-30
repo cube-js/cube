@@ -191,6 +191,10 @@ impl TimeDimensionSymbol {
         self.compiled_path.full_name().clone()
     }
 
+    pub fn id(&self) -> &crate::planner::MemberId {
+        self.compiled_path.id()
+    }
+
     /// Granularity name appended to the base symbol's alias and full
     /// name (e.g. `day`, `month`). Defaults to `day` when no
     /// granularity is set.

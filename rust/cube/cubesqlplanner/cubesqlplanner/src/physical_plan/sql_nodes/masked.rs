@@ -4,7 +4,7 @@ use crate::physical_plan::SqlEvaluatorVisitor;
 use crate::planner::query_tools::QueryTools;
 use crate::planner::sql_templates::PlanSqlTemplates;
 use crate::planner::FiltersContext;
-use crate::planner::{MeasureRenderModifier, MemberSymbol};
+use crate::planner::{MeasureRenderModifier, MemberId, MemberSymbol};
 use cubenativeutils::CubeError;
 use std::any::Any;
 use std::collections::HashSet;
@@ -24,7 +24,7 @@ pub struct MaskedSqlNode {
     row_level_semantics: bool,
     // Full names of the members present in the query GROUP BY. Used to decide
     // whether conditional masking can be applied to an aggregate measure.
-    group_by_members: HashSet<String>,
+    group_by_members: HashSet<MemberId>,
     // When true this node never applies masking and just delegates to `input`.
     // Used to build an "unmasked" copy of the whole processor tree that still
     // dispatches by member kind (see `unmasked_root`).
@@ -42,7 +42,7 @@ impl MaskedSqlNode {
     pub fn new(
         input: Rc<dyn SqlNode>,
         row_level_semantics: bool,
-        group_by_members: HashSet<String>,
+        group_by_members: HashSet<MemberId>,
         skip_masking: bool,
         unmasked_root: Option<Rc<dyn SqlNode>>,
     ) -> Rc<Self> {
@@ -115,7 +115,7 @@ impl MaskedSqlNode {
             let all_in_group_by = !filter_members.is_empty()
                 && filter_members
                     .iter()
-                    .all(|m| self.group_by_members.contains(&m.full_name()));
+                    .all(|m| self.group_by_members.contains(m.id()));
             if !all_in_group_by {
                 return Ok(Some(masked_sql));
             }
