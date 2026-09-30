@@ -11,6 +11,7 @@ import {
 } from './CubeSymbols';
 import { UserError } from './UserError';
 import { memoizeString } from './utils';
+import { internCompiledStrings } from './StringInterning';
 import { BaseMeasure } from '../adapter';
 import type { CubeDefinitionExtended } from './CubeSymbols';
 import type { CubeValidator } from './CubeValidator';
@@ -230,6 +231,7 @@ export class CubeToMetaTransformer implements CompilerInterface {
     this.cubes = this.cubeSymbols.cubeList
       .filter(this.cubeValidator.isCubeValid.bind(this.cubeValidator))
       .map((v) => this.transform(v, errorReporter.inContext(`${v.name} cube`)));
+    internCompiledStrings(this.cubes);
 
     this.queries = this.cubes;
   }

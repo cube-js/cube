@@ -23,6 +23,71 @@ import { CompilerCache } from './CompilerCache';
 
 const ctxFileStorage = new AsyncLocalStorage<FileContent>();
 
+/**
+ * CUBEJS_COMPILER_MULTI_TENANT_SHARING: instead of one vm.Context (V8 realm) per
+ * compile, every compile evaluates its files in ONE module-level realm. Each file
+ * is wrapped as `with (<getter>()) { ... }`; the getter returns the running
+ * compile's scope (cube, view, COMPILE_CONTEXT, view group names, ...), so the
+ * closures a file creates bind that scope lexically and keep resolving it after
+ * the compile has finished (lazy `sql` functions reading COMPILE_CONTEXT).
+ */
+const SHARED_SCOPE_GETTER = '__cubejsCompileScope';
+const SHARED_SCRIPT_PREFIX = `with (${SHARED_SCOPE_GETTER}()) {`;
+const sharedScopeStorage = new AsyncLocalStorage<object>();
+let sharedVmContext: vm.Context | null = null;
+// The realm's own global object (the contextified sandbox does not carry the builtins).
+let sharedGlobalThis: object | null = null;
+
+const getSharedVmContext = (): vm.Context => {
+  if (!sharedVmContext) {
+    sharedVmContext = vm.createContext({});
+    sharedGlobalThis = vm.runInContext('globalThis', sharedVmContext);
+    Object.defineProperty(sharedVmContext, SHARED_SCOPE_GETTER, {
+      value: () => {
+        const scope = sharedScopeStorage.getStore();
+        if (!scope) {
+          throw new Error('No compile scope stored in context');
+        }
+        return scope;
+      },
+      writable: false,
+      enumerable: false,
+      configurable: false,
+    });
+  }
+  return sharedVmContext;
+};
+
+/**
+ * Per-compile scope used as the `with` object. It claims every name that is not
+ * a global of the shared realm, so that sloppy-mode implicit globals (`foo = 1`)
+ * and `view_group` names land here and never leak into other tenants' compiles.
+ * Reading a name that was never set throws a ReferenceError, as it would for a
+ * global; the one difference is that `typeof undeclaredName` throws too.
+ */
+const createSharedCompileScope = (globals: Record<string, any>): Record<string, any> => {
+  const target: Record<string, any> = Object.assign(Object.create(null), globals);
+  getSharedVmContext();
+  const sharedGlobal = sharedGlobalThis!;
+  return new Proxy(target, {
+    has: (t, key) => {
+      if (typeof key === 'symbol') {
+        return false;
+      }
+      return key in t || key === SHARED_SCOPE_GETTER || !(key in sharedGlobal);
+    },
+    get: (t, key) => {
+      if (key in t) {
+        return t[key as string];
+      }
+      if (typeof key === 'symbol') {
+        return undefined;
+      }
+      throw new ReferenceError(`${key} is not defined`);
+    },
+  });
+};
+
 const NATIVE_IS_SUPPORTED = isNativeSupported();
 
 const moduleFileCache = {};
@@ -92,6 +157,11 @@ export type DataSchemaCompilerOptions = {
   compiledScriptCache: LRUCache<string, vm.Script>;
   compiledYamlCache: LRUCache<string, string>;
   compiledJinjaCache: LRUCache<string, string>;
+  /**
+   * Evaluate data model files in a realm shared by all compiles instead of a
+   * new vm.Context per compile. Defaults to CUBEJS_COMPILER_MULTI_TENANT_SHARING.
+   */
+  sharedVmContext?: boolean;
 };
 
 export type TranspileOptions = {
@@ -183,6 +253,11 @@ export class DataSchemaCompiler {
 
   private compileV8ContextCache: vm.Context | null = null;
 
+  private readonly sharedVmContext: boolean;
+
+  // Flag on: per-compile `with` scope evaluated inside the shared realm.
+  private compileScope: Record<string, any> | null = null;
+
   // FIXME: Is public only because of tests, should be private
   public compilePromise: any;
 
@@ -219,6 +294,7 @@ export class DataSchemaCompiler {
     this.compiledScriptCache = options.compiledScriptCache;
     this.compiledYamlCache = options.compiledYamlCache;
     this.compiledJinjaCache = options.compiledJinjaCache;
+    this.sharedVmContext = options.sharedVmContext ?? getEnv('compilerMultiTenantSharing');
   }
 
   public compileObjects(compileServices: CompilerInterface[], objects, errorsReport: ErrorReporter) {
@@ -395,7 +471,7 @@ export class DataSchemaCompiler {
       asyncModules = [];
     };
 
-    this.compileV8ContextCache = vm.createContext({
+    const compileGlobals = {
       view: (name, cube) => {
         const file = ctxFileStorage.getStore();
         if (!file) {
@@ -427,7 +503,11 @@ export class DataSchemaCompiler {
           throw new Error('No file stored in context');
         }
         viewGroups.push({ ...viewGroup, name, fileName: file.fileName });
-        this.compileV8ContextCache![name] = name;
+        if (this.sharedVmContext) {
+          this.compileScope![name] = name;
+        } else {
+          this.compileV8ContextCache![name] = name;
+        }
         return name;
       },
       addExport: (obj) => {
@@ -487,7 +567,13 @@ export class DataSchemaCompiler {
         }
       },
       COMPILE_CONTEXT: this.standalone ? this.standaloneCompileContextProxy() : this.cloneCompileContextWithGetterAlias(this.compileContext || {}),
-    });
+    };
+
+    if (this.sharedVmContext) {
+      this.compileScope = createSharedCompileScope(compileGlobals);
+    } else {
+      this.compileV8ContextCache = vm.createContext(compileGlobals);
+    }
 
     const compilePhaseFirst = async (compilers: CompileCubeFilesCompilers, stage: 0 | 1 | 2 | 3) => {
       // clear the objects for the next phase
@@ -560,6 +646,7 @@ export class DataSchemaCompiler {
 
         // Free unneeded resources
         this.compileV8ContextCache = null;
+        this.compileScope = null;
         this.cubeDictionary.free();
         this.cubeOnlySymbols.free();
         this.cubeAndViewSymbols.free();
@@ -843,6 +930,8 @@ export class DataSchemaCompiler {
     errorsReport: ErrorReporter,
     { cubeNames, cubeSymbols, compilerId, jinjaUsed }: TranspileOptions
   ): Promise<(FileContent | undefined)> {
+    // The YAML to JS output only depends on the content: YAML is transpiled once, in the
+    // first phase, before any cube symbols are known. So the key is safe to share between apps.
     const cacheKey = crypto.createHash('md5').update(file.content).digest('hex');
 
     if (this.compiledYamlCache.has(cacheKey)) {
@@ -866,7 +955,10 @@ export class DataSchemaCompiler {
       errorsReport.addWarnings(res[0].warnings as unknown as SyntaxErrorInterface[]);
       errorsReport.exitFile();
 
-      this.compiledYamlCache.set(cacheKey, res[0].code);
+      // A hit doesn't replay errors, so a failed transpilation must not be cached
+      if (!res[0].errors?.length) {
+        this.compiledYamlCache.set(cacheKey, res[0].code);
+      }
 
       return { ...file, content: res[0].code };
     } else {
@@ -883,7 +975,9 @@ export class DataSchemaCompiler {
       errorsReport.addErrors(res.errors, file.fileName);
       errorsReport.addWarnings(res.warnings);
 
-      this.compiledYamlCache.set(cacheKey, res.content);
+      if (!res.errors?.length) {
+        this.compiledYamlCache.set(cacheKey, res.content);
+      }
 
       return { ...file, content: res.content };
     }
@@ -994,6 +1088,29 @@ export class DataSchemaCompiler {
     return script;
   }
 
+  private getSharedJsScript(file: FileContent): vm.Script {
+    // Different source (the `with` wrapper) than getJsScript's script for the same file, hence
+    // the prefix. The script carries its file name into stack traces, and this cache is shared
+    // between apps: equal content under another name must not hand out that name.
+    const cacheKey = `shared:${crypto.createHash('md5')
+      .update(file.fileName)
+      .update('\0')
+      .update(file.content)
+      .digest('hex')}`;
+
+    if (this.compiledScriptCache.has(cacheKey)) {
+      return this.compiledScriptCache.get(cacheKey)!;
+    }
+
+    // The prefix is on line 1, so a negative column offset keeps positions in stack traces intact.
+    const script = new vm.Script(`${SHARED_SCRIPT_PREFIX}${file.content}\n}`, {
+      filename: file.fileName,
+      columnOffset: -SHARED_SCRIPT_PREFIX.length,
+    });
+    this.compiledScriptCache.set(cacheKey, script);
+    return script;
+  }
+
   public compileJsFile(
     file: FileContent,
     errorsReport: ErrorReporter,
@@ -1010,6 +1127,17 @@ export class DataSchemaCompiler {
     }
 
     try {
+      if (this.sharedVmContext) {
+        const script = this.getSharedJsScript(file);
+        const scope = this.compileScope!;
+        ctxFileStorage.run(file, () => {
+          sharedScopeStorage.run(scope, () => {
+            script.runInContext(getSharedVmContext(), { timeout: 15000 });
+          });
+        });
+        return;
+      }
+
       const script = this.getJsScript(file);
 
       // We use AsyncLocalStorage to store the current file context

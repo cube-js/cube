@@ -187,6 +187,20 @@ which takes precedence over this environment variable. The SQL API compiler
 cache reads this environment variable only, so the configuration option does not
 affect it.
 
+## `CUBEJS_COMPILER_MULTI_TENANT_SHARING`
+
+If `true`, data models of different tenants in one process share what they
+can: model files are evaluated in one shared JavaScript context, the caches of
+compiled JavaScript and transpiled YAML files are shared (tenants with
+identical model files reuse each other's entries), and identical strings of
+compiled data models are kept once. Reduces memory in multi-tenant
+deployments. The Jinja render cache stays per data model, because rendered
+templates depend on the security context.
+
+| Possible Values  | Default in Development | Default in Production |
+| ---------------- | ---------------------- | --------------------- |
+| `true`, `false`  | `false`                | `false`               |
+
 ## `CUBEJS_CONCURRENCY`
 
 The number of concurrent connections each query queue has to the database.

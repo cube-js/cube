@@ -23,11 +23,12 @@ import { GraphQLSchema } from 'graphql';
 import { parse as uuidParse, v4 as uuidv4 } from 'uuid';
 import { LRUCache } from 'lru-cache';
 import { NativeInstance } from '@cubejs-backend/native';
-import { disposedProxy } from '@cubejs-backend/shared';
+import { disposedProxy, getEnv } from '@cubejs-backend/shared';
 import type { SchemaFileRepository } from '@cubejs-backend/shared';
 import { NormalizedQuery, MemberExpression } from '@cubejs-backend/api-gateway';
 import { DriverCapabilities } from '@cubejs-backend/base-driver';
 import { DbTypeInternalFn, DialectClassFn, LoggerFn } from './types';
+import { getSharedCompilerCaches } from './SharedCompilerCaches';
 
 type Context = any;
 
@@ -47,6 +48,10 @@ export interface CompilerApiOptions {
   compilerCacheSize?: number;
   maxCompilerCacheKeepAlive?: number;
   updateCompilerCacheKeepAlive?: boolean;
+  /**
+   * Use the process-wide script and YAML caches. Defaults to CUBEJS_COMPILER_MULTI_TENANT_SHARING.
+   */
+  sharedCompilerCaches?: boolean;
   externalDialectClass?: BaseQuery;
   externalDbType?: string;
   devServer?: boolean;
@@ -130,6 +135,11 @@ export class CompilerApi {
 
   protected compiledScriptCacheInterval?: NodeJS.Timeout;
 
+  /**
+   * The script and YAML caches are the process-wide ones (CUBEJS_COMPILER_MULTI_TENANT_SHARING)
+   */
+  protected readonly sharedCompilerCaches: boolean;
+
   protected graphqlSchema?: GraphQLSchema;
 
   protected compilers?: Promise<Compiler>;
@@ -159,28 +169,33 @@ export class CompilerApi {
     this.nativeInstance = this.createNativeInstance();
 
     // Caching stuff
-    this.compiledScriptCache = new LRUCache({
+    const cacheOptions = {
       max: options.compilerCacheSize || 250,
       ttl: options.maxCompilerCacheKeepAlive,
       updateAgeOnGet: options.updateCompilerCacheKeepAlive
-    });
-    this.compiledYamlCache = new LRUCache({
-      max: options.compilerCacheSize || 250,
-      ttl: options.maxCompilerCacheKeepAlive,
-      updateAgeOnGet: options.updateCompilerCacheKeepAlive
-    });
-    this.compiledJinjaCache = new LRUCache({
-      max: options.compilerCacheSize || 250,
-      ttl: options.maxCompilerCacheKeepAlive,
-      updateAgeOnGet: options.updateCompilerCacheKeepAlive
-    });
+    };
+    this.sharedCompilerCaches = options.sharedCompilerCaches ?? getEnv('compilerMultiTenantSharing');
+    if (this.sharedCompilerCaches) {
+      // Owned by the process (and purged by it), not by this app: dispose() leaves them alone
+      ({ compiledScriptCache: this.compiledScriptCache, compiledYamlCache: this.compiledYamlCache } = getSharedCompilerCaches({
+        ttl: options.maxCompilerCacheKeepAlive,
+        updateAgeOnGet: options.updateCompilerCacheKeepAlive,
+      }));
+    } else {
+      this.compiledScriptCache = new LRUCache(cacheOptions);
+      this.compiledYamlCache = new LRUCache(cacheOptions);
+    }
+    // Always per app: rendered Jinja depends on this app's COMPILE_CONTEXT and Python globals
+    this.compiledJinjaCache = new LRUCache(cacheOptions);
 
     // proactively free up old cache values occasionally
     if (this.options.maxCompilerCacheKeepAlive) {
       this.compiledScriptCacheInterval = setInterval(
         () => {
-          this.compiledScriptCache.purgeStale();
-          this.compiledYamlCache.purgeStale();
+          if (!this.sharedCompilerCaches) {
+            this.compiledScriptCache.purgeStale();
+            this.compiledYamlCache.purgeStale();
+          }
           this.compiledJinjaCache.purgeStale();
         },
         this.options.maxCompilerCacheKeepAlive

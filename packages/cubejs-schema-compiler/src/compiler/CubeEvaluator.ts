@@ -22,6 +22,7 @@ import { BaseQuery, PreAggregationDefinitionExtended } from '../adapter';
 import type { CubeValidator } from './CubeValidator';
 import type { ErrorReporter } from './ErrorReporter';
 import { FinishedJoinTree } from './JoinGraph';
+import { internCompiledStrings } from './StringInterning';
 
 export type SegmentDefinition = {
   type: string;
@@ -203,6 +204,8 @@ export type EvaluatedCube = {
   refreshKey?: CubeRefreshKey;
 };
 
+const INTERNED_CUBE_COLLECTIONS = ['measures', 'dimensions', 'segments', 'hierarchies', 'preAggregations', 'joins'] as const;
+
 export class CubeEvaluator extends CubeSymbols {
   public evaluatedCubes: Record<string, EvaluatedCube> = {};
 
@@ -234,6 +237,12 @@ export class CubeEvaluator extends CubeSymbols {
       this.evaluatedCubes[cube.name] = this.prepareCube(cube, errorReporter);
     }
 
+    for (const cube of validCubes) {
+      this.internCubeStrings(cube);
+    }
+    // Member definitions resolved for references, a second copy of the members' strings
+    internCompiledStrings(this.symbols);
+
     this.byFileName = R.groupBy(v => v.fileName || v.name, validCubes);
     this.primaryKeys = R.fromPairs(
       validCubes.map((v) => {
@@ -245,6 +254,18 @@ export class CubeEvaluator extends CubeSymbols {
         return [v.name, primaryKeyNamesToSymbols];
       })
     );
+  }
+
+  /**
+   * CUBEJS_COMPILER_MULTI_TENANT_SHARING: the cube's own data properties, then the member maps its
+   * memoizing getters return (the walk itself never calls accessors).
+   */
+  private internCubeStrings(cube: CubeDefinitionExtended) {
+    internCompiledStrings(cube);
+
+    for (const collection of INTERNED_CUBE_COLLECTIONS) {
+      internCompiledStrings(cube[collection]);
+    }
   }
 
   protected prepareCube(cube, errorReporter: ErrorReporter): EvaluatedCube {
