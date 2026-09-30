@@ -253,6 +253,39 @@ describe.each([
     expect(sqlOf(e, 'e')).toContain(real);
   });
 
+  it('reflects on globalThis as on an ordinary global', async () => {
+    const reflect = (tenant: string, write: boolean) => compileTenant(tenant, [{
+      fileName: 'model.js',
+      content: `
+        ${write ? `
+        globalThis.reflected = 1;
+        Object.defineProperty(globalThis, 'fixed', { value: 2, configurable: false, enumerable: false });
+        ` : ''}
+        const names = Object.getOwnPropertyNames(globalThis);
+        const info = [
+          Object.keys(globalThis).includes('reflected'),
+          names.includes('fixed'),
+          Object.prototype.hasOwnProperty.call(globalThis, 'reflected'),
+          JSON.stringify(Object.getOwnPropertyDescriptor(globalThis, 'reflected')),
+          names.includes('JSON'),
+          typeof Object.getOwnPropertyDescriptor(globalThis, 'JSON'),
+          'fixed' in globalThis ? typeof fixed : 'none',
+          Object.keys(globalThis).includes('globalThis'),
+          globalThis.globalThis === globalThis,
+        ].join('|');
+        cube('Orders', { sql: 'select 1', description: info, measures: { count: { type: 'count' } } });
+      `,
+    }], options);
+
+    const writer = await reflect('a', true);
+    expect(writer.metaTransformer.cubes[0].config.description)
+      .toBe('true|true|true|{"value":1,"writable":true,"enumerable":true,"configurable":true}|true|object|number|false|true');
+
+    // Another tenant doesn't see them
+    const other = await reflect('b', false);
+    expect(other.metaTransformer.cubes[0].config.description).toBe('false|false|false||true|object|none|false|true');
+  });
+
   it('gives UMD typeof checks their usual result', async () => {
     const { metaTransformer } = await compileTenant('a', [{
       fileName: 'model.js',

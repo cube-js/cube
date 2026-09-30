@@ -24,9 +24,8 @@ import { CompilerCache } from './CompilerCache';
 const ctxFileStorage = new AsyncLocalStorage<FileContent>();
 
 // Shared realm: closures bind the running compile's scope lexically through `with`, so lazy reads
-// (sql reading COMPILE_CONTEXT) keep resolving it after the compile. The function inside keeps
-// top-level var and function declarations off the shared global, and gets the compile's own
-// global object as `this`.
+// (sql reading COMPILE_CONTEXT) keep resolving it after the compile; the inner function keeps
+// top-level declarations off the shared global and gets the compile's own global as `this`.
 const SHARED_SCOPE_GETTER = '__cubejsCompileScope';
 const SHARED_SCRIPT_PREFIX = `with (${SHARED_SCOPE_GETTER}()) { (function () {`;
 const SHARED_SCRIPT_SUFFIX = '\n}).call(globalThis); }';
@@ -98,17 +97,25 @@ const createSharedCompileScope = (globals: Record<string, any>): SharedCompileSc
     throw new ReferenceError(`${key} is not defined`);
   };
 
-  // The compile's `globalThis` and top-level `this`
-  vars.globalThis = new Proxy(Object.create(null), {
-    get: (_t, key) => (key in vars || key in realm ? read(key) : undefined),
-    set: (_t, key, value) => {
-      vars[key] = value;
-      return true;
+  // The compile's `globalThis` and top-level `this`: its own properties are `vars` (the target, so
+  // defining, deleting and reflecting on them behave as on an ordinary object), then the built-ins
+  const realmOwn = (key: PropertyKey) => key !== SHARED_SCOPE_GETTER && Object.prototype.hasOwnProperty.call(realm, key);
+  const compileGlobal = new Proxy(vars, {
+    get: (t, key) => (key in t || key in realm ? read(key) : undefined),
+    has: (t, key) => key in t || key in realm,
+    ownKeys: (t) => [...new Set([
+      ...Reflect.ownKeys(t),
+      ...Reflect.ownKeys(realm).filter((key) => key !== SHARED_SCOPE_GETTER),
+    ])],
+    getOwnPropertyDescriptor: (t, key) => {
+      if (Object.prototype.hasOwnProperty.call(t, key) || !realmOwn(key)) {
+        return Reflect.getOwnPropertyDescriptor(t, key);
+      }
+      // A built-in the compile hasn't shadowed: reported configurable, as the target lacks it
+      return { ...Reflect.getOwnPropertyDescriptor(realm, key), configurable: true };
     },
-    has: (_t, key) => key in vars || key in realm,
-    defineProperty: (_t, key, descriptor) => Reflect.defineProperty(vars, key, descriptor),
-    deleteProperty: (_t, key) => Reflect.deleteProperty(vars, key),
   });
+  Object.defineProperty(vars, 'globalThis', { value: compileGlobal, writable: true, configurable: true, enumerable: false });
 
   const scope = new Proxy(vars, {
     has: (_t, key) => typeof key === 'string' && key !== SHARED_SCOPE_GETTER,
