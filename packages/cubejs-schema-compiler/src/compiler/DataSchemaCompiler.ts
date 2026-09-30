@@ -25,32 +25,24 @@ const ctxFileStorage = new AsyncLocalStorage<FileContent>();
 
 // Shared realm: closures bind the running compile's scope lexically through `with`, so lazy reads
 // (sql reading COMPILE_CONTEXT) keep resolving it after the compile. The function inside keeps
-// top-level var and function declarations off the shared global.
+// top-level var and function declarations off the shared global, and gets the compile's own
+// global object as `this`.
 const SHARED_SCOPE_GETTER = '__cubejsCompileScope';
 const SHARED_SCRIPT_PREFIX = `with (${SHARED_SCOPE_GETTER}()) { (function () {`;
-const SHARED_SCRIPT_SUFFIX = '\n}).call(this); }';
+const SHARED_SCRIPT_SUFFIX = '\n}).call(globalThis); }';
+
+// UMD wrappers probe these with `typeof`: read as undefined, not as a ReferenceError
+const PROBED_GLOBALS = new Set(['module', 'exports', 'define']);
 
 type SharedCompileScope = {
-  // The `with` object: resolves the names `vars` holds, the rest falls through to the realm
+  // The `with` object: claims every name, so model code never reaches the realm global
   scope: object;
   vars: Record<PropertyKey, any>;
 };
 
 const sharedScopeStorage = new AsyncLocalStorage<SharedCompileScope>();
 let sharedVmContext: vm.Context | null = null;
-
-const currentCompileVars = (key: PropertyKey): Record<PropertyKey, any> => {
-  const compile = sharedScopeStorage.getStore();
-  if (!compile) {
-    throw new TypeError(`Cannot create global '${String(key)}' outside of a data model compile`);
-  }
-  return compile.vars;
-};
-
-// Names model code created as globals (`x = 1`, `this.x = 1`, `globalThis.x = 1`). The realm
-// global gets an accessor for each, reading and writing the running compile's own value.
-const routedGlobals = new Set<PropertyKey>();
-let routing = false;
+let sharedRealmGlobal: Record<PropertyKey, any> | null = null;
 
 const getSharedVmContext = (): vm.Context => {
   if (!sharedVmContext) {
@@ -68,66 +60,61 @@ const getSharedVmContext = (): vm.Context => {
       configurable: false,
     });
 
-    let realmGlobal: object;
-    const route = (key: PropertyKey) => {
-      if (routedGlobals.has(key)) {
-        return;
-      }
-      routedGlobals.add(key);
-      routing = true;
-
-      try {
-        Reflect.defineProperty(realmGlobal, key, {
-          configurable: true,
-          enumerable: false,
-          get: () => {
-            const compile = sharedScopeStorage.getStore();
-            if (compile && key in compile.vars) {
-              return compile.vars[key];
-            }
-            // Another compile's global: missing here, as it would be in a realm of its own
-            throw new ReferenceError(`${String(key)} is not defined`);
-          },
-          set: (value) => {
-            currentCompileVars(key)[key] = value;
-          },
-        });
-      } finally {
-        routing = false;
-      }
+    const refuse = (key: PropertyKey): never => {
+      throw new TypeError(
+        `Cannot set global '${String(key)}': data models share one realm with CUBEJS_COMPILER_MULTI_TENANT_SHARING`
+      );
     };
-
-    // Writes to the shared global never store a value on it: node's vm would copy it onto the
-    // realm global too, where every tenant would read it.
+    // What still reaches the real global (`this` of a nested sloppy function) fails loudly: a
+    // value stored there would be every tenant's.
     sharedVmContext = vm.createContext(new Proxy(sandbox, {
-      set: (_t, key, value) => {
-        currentCompileVars(key)[key] = value;
-        route(key);
-        return true;
-      },
-      defineProperty: (t, key, descriptor) => {
-        if (routing) {
-          return Reflect.defineProperty(t, key, descriptor);
-        }
-        const defined = Reflect.defineProperty(currentCompileVars(key), key, descriptor);
-        route(key);
-        return defined;
-      },
-      deleteProperty: (_t, key) => Reflect.deleteProperty(currentCompileVars(key), key),
+      set: (_t, key) => refuse(key),
+      defineProperty: (_t, key) => refuse(key),
+      deleteProperty: (_t, key) => refuse(key),
     }));
-    realmGlobal = vm.runInContext('globalThis', sharedVmContext);
+    sharedRealmGlobal = vm.runInContext('globalThis', sharedVmContext);
   }
   return sharedVmContext;
 };
 
-// Only the compile's own names are claimed, so an unknown name reads like a missing global
-// (ReferenceError; `typeof` gives 'undefined').
+// Names the compile assigns (implicit globals, `globalThis.x`, `this.x`, even `JSON = ...`) land
+// in `vars`; reads fall back to the realm's built-ins. Unknown names throw a ReferenceError, also
+// under `typeof` (except PROBED_GLOBALS).
 const createSharedCompileScope = (globals: Record<string, any>): SharedCompileScope => {
-  const vars: Record<string, any> = Object.assign(Object.create(null), globals);
-  const scope = new Proxy(vars, {
-    has: (t, key) => typeof key === 'string' && key in t,
-  });
   getSharedVmContext();
+  const realm = sharedRealmGlobal!;
+  const vars: Record<PropertyKey, any> = Object.assign(Object.create(null), globals);
+
+  const read = (key: PropertyKey) => {
+    if (key in vars) {
+      return vars[key];
+    }
+    if (key in realm) {
+      return realm[key];
+    }
+    if (typeof key !== 'string' || PROBED_GLOBALS.has(key)) {
+      return undefined;
+    }
+    throw new ReferenceError(`${key} is not defined`);
+  };
+
+  // The compile's `globalThis` and top-level `this`
+  vars.globalThis = new Proxy(Object.create(null), {
+    get: (_t, key) => (key in vars || key in realm ? read(key) : undefined),
+    set: (_t, key, value) => {
+      vars[key] = value;
+      return true;
+    },
+    has: (_t, key) => key in vars || key in realm,
+    defineProperty: (_t, key, descriptor) => Reflect.defineProperty(vars, key, descriptor),
+    deleteProperty: (_t, key) => Reflect.deleteProperty(vars, key),
+  });
+
+  const scope = new Proxy(vars, {
+    has: (_t, key) => typeof key === 'string' && key !== SHARED_SCOPE_GETTER,
+    get: (_t, key) => read(key),
+  });
+
   return { scope, vars };
 };
 

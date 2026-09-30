@@ -80,6 +80,26 @@ const globalWriterFilesForRealm = (): Files => [{
   `,
 }];
 
+const builtInFiles = (reassign: boolean): Files => [{
+  fileName: 'model.js',
+  content: `
+    ${reassign ? `
+    JSON = { stringify: () => 'fakejson' };
+    this.Math = { max: () => -1 };
+    escape = () => 'fakeescape';
+    ` : ''}
+    const atCompile = [JSON.stringify({ a: 1 }), Math.max(1, 2), escape('a b')].join('|');
+    cube(\`orders_\${COMPILE_CONTEXT.securityContext.tenant}\`, {
+      sql_table: 'orders',
+      measures: { count: { type: 'count' } },
+      dimensions: {
+        id: { sql: 'id', type: 'number', primary_key: true },
+        tenant: { sql: () => \`'\${atCompile}#\${[JSON.stringify({ b: 2 }), Math.max(3, 4), escape('c d')].join('|')}'\`, type: 'string' },
+      },
+    });
+  `,
+}];
+
 const compileTenant = async (tenant: string, files: Files, options: Record<string, any>) => {
   const prepared = prepareCompiler(files, {
     compileContext: { securityContext: { tenant } },
@@ -208,13 +228,38 @@ describe.each([
     }
   });
 
-  it('gives typeof of undeclared names and UMD checks their usual result', async () => {
+  it('keeps a reassigned built-in to the compile that reassigned it', async () => {
+    const sqlOf = (c, tenant: string) => new PostgresQuery(c, {
+      measures: [`orders_${tenant}.count`],
+      dimensions: [`orders_${tenant}.tenant`],
+    }).buildSqlAndParams()[0];
+
+    const a = await compileTenant('a', builtInFiles(true), options);
+    const b = await compileTenant('b', builtInFiles(false), options);
+    const [c, d] = await Promise.all([
+      compileTenant('c', builtInFiles(true), options),
+      compileTenant('d', builtInFiles(false), options),
+    ]);
+
+    const fake = `'fakejson|-1|fakeescape#fakejson|-1|fakeescape'`;
+    const real = `'{"a":1}|2|a%20b#{"b":2}|4|c%20d'`;
+    // Read lazily, at query time, after every compile has finished
+    expect(sqlOf(a, 'a')).toContain(fake);
+    expect(sqlOf(b, 'b')).toContain(real);
+    expect(sqlOf(c, 'c')).toContain(fake);
+    expect(sqlOf(d, 'd')).toContain(real);
+
+    const e = await compileTenant('e', builtInFiles(false), options);
+    expect(sqlOf(e, 'e')).toContain(real);
+  });
+
+  it('gives UMD typeof checks their usual result', async () => {
     const { metaTransformer } = await compileTenant('a', [{
       fileName: 'model.js',
       content: `
         const umd = (typeof module === 'object' && module.exports) ? 'cjs'
           : (typeof define === 'function' ? 'amd' : 'global');
-        const kinds = [typeof neverDeclared, typeof exports, umd, typeof JSON, typeof COMPILE_CONTEXT].join(',');
+        const kinds = [typeof module, typeof exports, umd, typeof JSON, typeof COMPILE_CONTEXT].join(',');
         cube('Orders', {
           sql: 'select * from orders',
           measures: { count: { type: 'count' } },
@@ -225,6 +270,20 @@ describe.each([
     }], options);
 
     expect(metaTransformer.cubes[0].config.description).toBe('undefined,undefined,global,object,object');
+
+    const undeclared = prepareCompiler([{
+      fileName: 'model.js',
+      content: `
+        cube('Orders', { sql: 'select 1', description: typeof neverDeclared, measures: { count: { type: 'count' } } });
+      `,
+    }], options);
+    if (sharedVmContext) {
+      // The documented difference: the scope can't tell `typeof x` from reading `x`
+      await expect(undeclared.compiler.compile()).rejects.toThrow(/neverDeclared is not defined/);
+    } else {
+      await undeclared.compiler.compile();
+      expect(undeclared.metaTransformer.cubes[0].config.description).toBe('undefined');
+    }
   });
 
   it('resolves a bare view_group reference', async () => {
@@ -372,12 +431,29 @@ describe('Shared VM context realm', () => {
     const sharedGlobal = realmFunction('return globalThis')();
 
     for (const key of ['tableSuffix', 'otherSuffix']) {
-      const descriptor = Object.getOwnPropertyDescriptor(sharedGlobal, key);
-      expect(descriptor && 'value' in descriptor).toBeFalsy();
-      // Outside of a compile no tenant's value is readable through it
-      expect(() => sharedGlobal[key]).toThrow(ReferenceError);
+      expect(Object.getOwnPropertyDescriptor(sharedGlobal, key)).toBeUndefined();
+      expect(sharedGlobal[key]).toBeUndefined();
     }
-    expect(() => realmFunction('newGlobal = 1')()).toThrow(/outside of a data model compile/);
+    // Whatever still reaches the real global fails loudly
+    expect(() => realmFunction('newGlobal = 1')()).toThrow(/Cannot set global 'newGlobal'/);
+    expect(() => realmFunction('globalThis.newGlobal = 1')()).toThrow(/Cannot set global 'newGlobal'/);
+
+    await compileTenant('b', builtInFiles(true), { sharedVmContext: true });
+    // Outside of a compile the realm keeps its built-ins
+    expect(realmFunction('return [JSON.stringify({}), Math.max(1, 2), escape(" ")].join()')()).toBe('{},2,%20');
+  });
+
+  it('fails loudly on a write that would reach the shared global', async () => {
+    const nested = prepareCompiler([{
+      fileName: 'model.js',
+      content: `
+        function setGlobal() { this.nested = COMPILE_CONTEXT.securityContext.tenant; }
+        setGlobal();
+        cube('Orders', { sql: 'select 1', measures: { count: { type: 'count' } } });
+      `,
+    }], { sharedVmContext: true, compileContext: { securityContext: { tenant: 'a' } } });
+
+    await expect(nested.compiler.compile()).rejects.toThrow(/Cannot set global 'nested'/);
   });
 
   it('reuses one realm across compiles when on', async () => {

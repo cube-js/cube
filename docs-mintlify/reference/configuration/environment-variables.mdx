@@ -202,14 +202,14 @@ templates depend on the security context.
 | `true`, `false`  | `false`                | `false`               |
 
 <Warning>
-Built-in objects (`Object`, `Array`, `JSON`, ...) are shared by all tenants, so
-a data model that changes them, e.g., by adding to `Array.prototype`, affects
-every tenant. Globals a data model creates (`x = 1`, `this.x = 1`,
-`globalThis.x = 1`) stay per tenant, with two differences: they can only be
-created, and read through `this` or `globalThis`, while the data model
-compiles, not later in a `sql` function; and in other tenants' data models
-`typeof` of such a name throws a `ReferenceError` instead of returning
-`'undefined'`.
+Data models run in one JavaScript realm, which differs from a realm per data
+model in three ways. Built-in objects (`Object`, `Array`, `JSON`, ...) are
+shared, so a data model that changes them, e.g., by adding to
+`Array.prototype`, affects every tenant; assigning a global, even `JSON = ...`,
+stays per tenant. `typeof` of an undeclared name throws a `ReferenceError`
+instead of returning `'undefined'` (except for `module`, `exports` and
+`define`). Setting a property on `this` in a non-strict function called
+without a receiver, which is the shared global object, throws a `TypeError`.
 </Warning>
 
 ## `CUBEJS_CONCURRENCY`
