@@ -453,3 +453,30 @@ async fn test_view_conditional_measure_mask_ungrouped_matches_the_cube() {
         assert_eq!(view_rows, table_rows(&cube), "view:\n{view}\ncube:\n{cube}");
     }
 }
+
+// A multi-stage measure the view declares over a member it re-exports applies
+// its own time shift.
+#[tokio::test(flavor = "multi_thread")]
+async fn test_view_own_time_shifted_measure() {
+    let ctx = create_context();
+
+    let query = indoc! {"
+        measures:
+          - orders_view.total_amount
+          - orders_view.total_amount_prior_year
+        time_dimensions:
+          - dimension: orders_view.created_at
+            granularity: year
+            dateRange:
+              - \"2025-01-01\"
+              - \"2026-12-31\"
+        order:
+          - id: orders_view.created_at
+    "};
+
+    ctx.build_sql(query).unwrap();
+
+    if let Some(result) = ctx.try_execute_pg(query, SEED).await {
+        insta::assert_snapshot!(result);
+    }
+}

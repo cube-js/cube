@@ -595,6 +595,7 @@ impl MockViewBuilder {
                                     .dimension_type(dimension.static_data().dimension_type.clone())
                                     .sql(view_member_sql)
                                     .resolved_mask_sql_opt(dimension.raw_mask_sql())
+                                    .included(Some(true))
                                     .build(),
                             ),
                         );
@@ -633,6 +634,7 @@ impl MockViewBuilder {
                                     .multi_stage(measure.static_data().multi_stage)
                                     .order_by(measure.raw_order_by())
                                     .resolved_mask_sql_opt(measure.raw_mask_sql())
+                                    .included(Some(true))
                                     .build(),
                             ),
                         );

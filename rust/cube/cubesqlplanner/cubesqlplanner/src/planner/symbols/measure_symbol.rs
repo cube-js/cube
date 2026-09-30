@@ -1,6 +1,6 @@
 use super::common::{Case, CompiledMemberPath, MultiStageProperties};
 use super::deps::{self, symbol_deps};
-use super::measure_kinds::{CalculatedMeasureType, MeasureKind};
+use super::measure_kinds::MeasureKind;
 use super::AggregationType;
 use super::SymbolPath;
 use super::{MemberSymbol, RefSymbol, SymbolFactory};
@@ -533,18 +533,12 @@ impl SymbolFactory for MeasureSymbolFactory {
                 )
             });
 
-        // A view member that only re-exports another member is a `Ref`. Its
-        // mask may reference members the view does not re-export, so it
-        // compiles against the target's cube.
-        let is_plain_reexport = is_view
-            && CalculatedMeasureType::from_str(&definition.static_data().measure_type).is_some()
-            && measure_filters.is_empty()
-            && definition.static_data().rolling_window.is_none()
-            && definition.case()?.is_none();
-        if let Some(sql) = sql
-            .as_ref()
-            .filter(|s| is_plain_reexport && s.is_direct_reference())
-        {
+        // A member a view re-exports from its `includes` is a `Ref`; one the
+        // view declares itself keeps its own definition. The mask of a `Ref`
+        // may reference members the view does not re-export, so it compiles
+        // against the target's cube.
+        let included = definition.static_data().included.unwrap_or(false);
+        if let Some(sql) = sql.as_ref().filter(|_| included) {
             let owning_cube_name = sql
                 .resolve_direct_reference()
                 .map(|dep| dep.cube_name())

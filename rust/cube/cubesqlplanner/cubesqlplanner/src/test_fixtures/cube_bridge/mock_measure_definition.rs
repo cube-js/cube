@@ -51,6 +51,8 @@ pub struct MockMeasureDefinition {
     order_by: Option<Vec<Rc<MockMemberOrderBy>>>,
     #[builder(default, setter(strip_option(fallback = resolved_mask_sql_opt)))]
     resolved_mask_sql: Option<String>,
+    #[builder(default)]
+    included: Option<bool>,
 }
 
 impl_static_data!(
@@ -63,7 +65,8 @@ impl_static_data!(
     add_group_by_references,
     group_by_references,
     time_shift_references,
-    rolling_window
+    rolling_window,
+    included
 );
 
 impl MockMeasureDefinition {

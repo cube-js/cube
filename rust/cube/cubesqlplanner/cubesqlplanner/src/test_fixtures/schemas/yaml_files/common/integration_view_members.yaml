@@ -125,6 +125,15 @@ views:
           - name: total_amount_ref
             type: number
             sql: "{orders.total_amount}"
+          # A multi-stage measure of the view's own over a member it names:
+          # the shift is its own, not the member's.
+          - name: total_amount_prior_year
+            type: number
+            multi_stage: true
+            sql: "{CUBE.total_amount}"
+            time_shift:
+              - interval: 1 year
+                type: prior
           # Divides a view member whose SQL is compound, so the view member
           # must render parenthesized.
           - name: half_amount_plus_100

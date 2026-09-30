@@ -377,13 +377,10 @@ impl SymbolFactory for DimensionSymbolFactory {
             });
         let is_view = cube.static_data().is_view.unwrap_or(false);
 
-        // A view member re-exporting another member is a reference to it: its
-        // sql names the member, and it is not a subquery of its own.
-        let is_plain_reexport = is_view && !definition.static_data().sub_query.unwrap_or(false);
-        if let Some(sql) = sql
-            .as_ref()
-            .filter(|s| is_plain_reexport && s.is_direct_reference())
-        {
+        // A member a view re-exports from its `includes` is a `Ref`; one the
+        // view declares itself keeps its own definition.
+        let included = definition.static_data().included.unwrap_or(false);
+        if let Some(sql) = sql.as_ref().filter(|_| included) {
             let cube_symbol =
                 compiler.add_cube_table_evaluator(path.cube_name().clone(), vec![])?;
             let compiled_path = CompiledMemberPath::new(

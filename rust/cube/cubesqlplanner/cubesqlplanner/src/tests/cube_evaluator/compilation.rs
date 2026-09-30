@@ -883,8 +883,9 @@ fn test_view_calculated_measure_is_not_a_reference() {
     assert!(measure.is_calculated());
 }
 
-// A view member referencing a sibling view member resolves through both to the
-// cube member.
+// A member the view declares itself keeps its own definition even when its sql
+// is a direct reference; it references a re-exported sibling, which resolves to
+// the cube member.
 #[test]
 fn test_view_sibling_reference_resolves_to_cube_member() {
     let mut test_compiler = view_members_compiler();
@@ -894,11 +895,11 @@ fn test_view_sibling_reference_resolves_to_cube_member() {
         .add_dimension_evaluator("orders_view.status_ref".to_string())
         .unwrap();
 
-    assert!(symbol.as_ref_symbol().is_ok());
+    assert!(symbol.as_dimension().unwrap().is_view());
+    assert!(symbol.is_reference());
     let target = symbol.reference_member().unwrap();
     assert_eq!(target.full_name(), "orders_view.status");
     assert!(target.as_ref_symbol().is_ok());
-    assert_eq!(symbol.peel_refs().full_name(), "orders.status");
     assert_eq!(
         symbol.clone().resolve_reference_chain().full_name(),
         "orders.status"
@@ -914,7 +915,8 @@ fn test_view_hand_written_reference_resolves_to_cube_member() {
         .add_measure_evaluator("orders_view.total_amount_ref".to_string())
         .unwrap();
 
-    assert!(symbol.as_ref_symbol().is_ok());
+    assert!(symbol.as_measure().unwrap().is_view());
+    assert!(symbol.is_reference());
     assert_eq!(
         symbol.clone().resolve_reference_chain().full_name(),
         "orders.total_amount"
