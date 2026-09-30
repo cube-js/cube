@@ -11,7 +11,6 @@ use crate::planner::join_hints::JoinHints;
 use crate::planner::sql_templates::PlanSqlTemplates;
 use chrono_tz::Tz;
 use cubenativeutils::CubeError;
-use itertools::Itertools;
 use std::cell::RefCell;
 use std::collections::{HashMap, HashSet};
 use std::rc::Rc;
@@ -171,18 +170,6 @@ impl QueryTools {
             self.alias_name(&format!("{}__{}", prefix, self.alias_name(name)))
         } else {
             self.alias_name(name)
-        }
-    }
-
-    pub fn parse_member_path(&self, name: &str) -> Result<(String, String), CubeError> {
-        let path = name.split('.').collect_vec();
-        if path.len() == 2 {
-            Ok((path[0].to_string(), path[1].to_string()))
-        } else {
-            Err(CubeError::internal(format!(
-                "Invalid member name: '{}'",
-                name
-            )))
         }
     }
 

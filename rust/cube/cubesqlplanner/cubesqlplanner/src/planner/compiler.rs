@@ -170,6 +170,14 @@ impl Compiler {
         dimension: String,
     ) -> Result<Rc<MemberSymbol>, CubeError> {
         let path = SymbolPath::parse(self.cube_evaluator.clone(), &dimension)?;
+        self.add_dimension_or_segment_by_path(path)
+    }
+
+    /// Like `add_dimension_evaluator`, for an already resolved path.
+    pub fn add_dimension_or_segment_by_path(
+        &mut self,
+        path: SymbolPath,
+    ) -> Result<Rc<MemberSymbol>, CubeError> {
         match path.path_type() {
             SymbolPathType::Segment => {
                 // A segment used as a dimension (a pre-aggregation projects its
