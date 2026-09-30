@@ -317,6 +317,76 @@ describe.each([
     expect(buildSql(other, 'b')).toContain(`'legacy_b_b'`);
   });
 
+  const functionFiles = (): Files => [{
+    fileName: 'model.js',
+    content: `
+      const viaNew = new Function('return COMPILE_CONTEXT.securityContext.tenant')();
+      const viaCall = Function('a', 'return a + "_" + COMPILE_CONTEXT.securityContext.tenant')('x');
+      implicitGlobal = 'ig';
+      const readsImplicit = new Function('return implicitGlobal')();
+      const fnCheck = [
+        new Function('') instanceof Function,
+        Object.getPrototypeOf(new Function('')) === Function.prototype,
+        Function.prototype === Object.getPrototypeOf(function () {}),
+      ].join(',');
+      const directEval = eval('COMPILE_CONTEXT.securityContext.tenant');
+      // Built outside of cube(), as generated members are: parameter names are references, and the
+      // body reads COMPILE_CONTEXT lazily
+      const generated = () => ({
+        tenant: {
+          sql: new Function('CUBE', 'return CUBE ? "\\'" + COMPILE_CONTEXT.securityContext.tenant + "_lazy\\'" : ""'),
+          type: 'string',
+        },
+      });
+      cube(\`orders_\${COMPILE_CONTEXT.securityContext.tenant}\`, {
+        sql_table: 'orders',
+        description: [viaNew, viaCall, readsImplicit, fnCheck, directEval].join('|'),
+        measures: { count: { type: 'count' } },
+        dimensions: {
+          id: { sql: 'id', type: 'number', primary_key: true },
+          ...generated(),
+        },
+      });
+    `,
+  }];
+
+  it('compiles new Function bodies and direct eval in the compile scope', async () => {
+    const [a, b] = await Promise.all(['a', 'b'].map(t => compileTenant(t, functionFiles(), options)));
+
+    for (const [tenant, compiled] of [['a', a], ['b', b]] as const) {
+      expect(compiled.metaTransformer.cubes[0].config.description).toBe(`${tenant}|x_${tenant}|ig|true,true,true|${tenant}`);
+      const sql = new PostgresQuery(compiled, {
+        measures: [`orders_${tenant}.count`],
+        dimensions: [`orders_${tenant}.tenant`],
+      }).buildSqlAndParams()[0];
+      expect(sql).toContain(`'${tenant}_lazy'`);
+    }
+  });
+
+  it('throws for an undeclared name assigned in strict code', async () => {
+    const strict = prepareCompiler([
+      { fileName: 'sloppy.js', content: `sharedImplicit = 'si';` },
+      {
+        fileName: 'model.js',
+        content: `'use strict';
+          const seen = [typeof neverDeclared, sharedImplicit].join('|');
+          cube('Orders', { sql: 'select 1', description: seen, measures: { count: { type: 'count' } } });
+        `,
+      },
+    ], options);
+    await strict.compiler.compile();
+    expect(strict.metaTransformer.cubes[0].config.description).toBe('undefined|si');
+
+    const typo = prepareCompiler([{
+      fileName: 'model.js',
+      content: `'use strict';
+        typo = 1;
+        cube('Orders', { sql: 'select 1', measures: { count: { type: 'count' } } });
+      `,
+    }], options);
+    await expect(typo.compiler.compile()).rejects.toThrow(/typo is not defined/);
+  });
+
   it('gives UMD typeof checks their usual result', async () => {
     const { metaTransformer } = await compileTenant('a', [{
       fileName: 'model.js',
@@ -533,6 +603,24 @@ describe('Shared VM context realm', () => {
       `,
     }], { sharedVmContext: true });
     expect(caught.metaTransformer.cubes[0].config.description).toBe('true');
+  });
+
+  it('runs indirect eval and Function via a prototype in the shared global scope', async () => {
+    const compileWith = async (sharedVmContext: boolean) => {
+      const { metaTransformer } = await compileTenant('a', [{
+        fileName: 'model.js',
+        content: `
+          const indirect = (0, eval)('typeof COMPILE_CONTEXT');
+          const viaPrototype = (function () {}).constructor('return typeof COMPILE_CONTEXT')();
+          cube('Orders', { sql: 'select 1', description: [indirect, viaPrototype].join('|'), measures: { count: { type: 'count' } } });
+        `,
+      }], { sharedVmContext });
+      return metaTransformer.cubes[0].config.description;
+    };
+
+    expect(await compileWith(false)).toBe('object|object');
+    // The documented difference: these reach the realm's own eval and Function
+    expect(await compileWith(true)).toBe('undefined|undefined');
   });
 
   it('reuses one realm across compiles when on', async () => {

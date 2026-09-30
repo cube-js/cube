@@ -27,8 +27,10 @@ const ctxFileStorage = new AsyncLocalStorage<FileContent>();
 // (sql reading COMPILE_CONTEXT) keep resolving it after the compile; the inner function keeps
 // top-level declarations off the shared global and gets the compile's own global as `this`.
 const SHARED_SCOPE_GETTER = '__cubejsCompileScope';
-const SHARED_SCRIPT_PREFIX = `with (${SHARED_SCOPE_GETTER}()) { (function () {`;
+const sharedScriptPrefix = (strict: boolean) => `with (${SHARED_SCOPE_GETTER}(${strict})) { (function () {`;
 const SHARED_SCRIPT_SUFFIX = '\n}).call(globalThis); }';
+// A leading 'use strict' directive, after comments
+const USE_STRICT = /^\s*(?:(?:\/\/[^\n]*\n|\/\*[\s\S]*?\*\/)\s*)*(['"])use strict\1/;
 
 // UMD wrappers probe these with `typeof`: read as undefined, not as a ReferenceError
 const PROBED_GLOBALS = new Set(['module', 'exports', 'define']);
@@ -36,6 +38,9 @@ const PROBED_GLOBALS = new Set(['module', 'exports', 'define']);
 type SharedCompileScope = {
   // The `with` object: claims every name, so model code never reaches the realm global
   scope: object;
+  // For strict code: claims only names the compile or the realm has, so assigning an undeclared
+  // name throws a ReferenceError as it does at global scope
+  strictScope: object;
   vars: Record<PropertyKey, any>;
 };
 
@@ -47,12 +52,12 @@ const getSharedVmContext = (): vm.Context => {
   if (!sharedVmContext) {
     const sandbox = {};
     Object.defineProperty(sandbox, SHARED_SCOPE_GETTER, {
-      value: () => {
+      value: (strict: boolean) => {
         const compile = sharedScopeStorage.getStore();
         if (!compile) {
           throw new Error('No compile scope stored in context');
         }
-        return compile.scope;
+        return strict ? compile.strictScope : compile.scope;
       },
       writable: false,
       enumerable: false,
@@ -148,8 +153,7 @@ const createSharedCompileScope = (globals: Record<string, any>): SharedCompileSc
   });
   Object.defineProperty(vars, 'globalThis', { value: compileGlobal, writable: true, configurable: true, enumerable: false });
 
-  const scope = new Proxy(vars, {
-    has: (_t, key) => typeof key === 'string' && key !== SHARED_SCOPE_GETTER,
+  const scopeTraps = {
     get: (_t, key) => read(key),
     set: (t, key, value) => {
       t[key] = value;
@@ -157,9 +161,29 @@ const createSharedCompileScope = (globals: Record<string, any>): SharedCompileSc
       return true;
     },
     deleteProperty: (_t, key) => remove(key),
+  };
+  const scope = new Proxy(vars, {
+    ...scopeTraps,
+    has: (_t, key) => typeof key === 'string' && key !== SHARED_SCOPE_GETTER,
+  });
+  const strictScope = new Proxy(vars, {
+    ...scopeTraps,
+    has: (t, key) => typeof key === 'string' && (key in t || builtIn(key)),
   });
 
-  return { scope, vars };
+  // `new Function(...)` / `Function(...)` compile their body in this compile's scope, as they would
+  // at the global scope of a realm of its own. The result is an ordinary function of the realm.
+  const RealmFunction = realm.Function;
+  const compileFunction = function Function(...args: unknown[]) {
+    const body = args.length > 0 ? String(args[args.length - 1]) : '';
+    const params = args.slice(0, -1).map(String).join(',');
+    const factory = RealmFunction('scope', `with (scope) { return function anonymous(${params}\n) {\n${body}\n}; }`);
+    return factory(USE_STRICT.test(body) ? strictScope : scope);
+  };
+  compileFunction.prototype = RealmFunction.prototype;
+  Object.defineProperty(vars, 'Function', { value: compileFunction, writable: true, configurable: true, enumerable: false });
+
+  return { scope, strictScope, vars };
 };
 
 const NATIVE_IS_SUPPORTED = isNativeSupported();
@@ -1182,9 +1206,10 @@ export class DataSchemaCompiler {
     }
 
     // The prefix is on line 1, so a negative column offset keeps positions in stack traces intact.
-    const script = new vm.Script(`${SHARED_SCRIPT_PREFIX}${file.content}${SHARED_SCRIPT_SUFFIX}`, {
+    const prefix = sharedScriptPrefix(USE_STRICT.test(file.content));
+    const script = new vm.Script(`${prefix}${file.content}${SHARED_SCRIPT_SUFFIX}`, {
       filename: file.fileName,
-      columnOffset: -SHARED_SCRIPT_PREFIX.length,
+      columnOffset: -prefix.length,
     });
     this.compiledScriptCache.set(cacheKey, script);
     return script;

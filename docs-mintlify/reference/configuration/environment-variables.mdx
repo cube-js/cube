@@ -203,13 +203,22 @@ templates depend on the security context.
 
 <Warning>
 Data models run in one JavaScript realm, which differs from a realm per data
-model in three ways. Built-in objects (`Object`, `Array`, `JSON`, ...) are
-shared, so a data model that changes them, e.g., by adding to
-`Array.prototype`, affects every tenant; assigning a global, even `JSON = ...`,
-stays per tenant. `typeof` of an undeclared name throws a `ReferenceError`
-instead of returning `'undefined'` (except for `module`, `exports` and
-`define`). Setting a property on `this` in a non-strict function called
-without a receiver, which is the shared global object, throws a `TypeError`.
+model in these ways:
+
+- Built-in objects (`Object`, `Array`, `JSON`, ...) are shared, so a data model
+  that changes them, e.g., by adding to `Array.prototype`, affects every
+  tenant. Assigning or deleting a global, even `JSON`, stays per tenant.
+- In a non-strict file, `typeof` of an undeclared name throws a
+  `ReferenceError` instead of returning `'undefined'` (except for `module`,
+  `exports` and `define`), and a strict function in it that assigns to an
+  undeclared name creates a global instead of throwing a `ReferenceError`.
+  Files that start with `'use strict'` behave as usual.
+- Setting a property on `this` in a non-strict function called without a
+  receiver, which is the shared global object, throws a `TypeError`.
+- `new Function(...)` and direct `eval` see the data model's globals, but
+  indirect eval (`(0, eval)(...)`) and a function constructor reached through a
+  prototype (`(function () {}).constructor`) run in the shared global scope,
+  where they don't.
 </Warning>
 
 ## `CUBEJS_CONCURRENCY`
