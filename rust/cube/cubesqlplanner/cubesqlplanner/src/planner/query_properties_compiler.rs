@@ -433,12 +433,7 @@ impl QueryPropertiesCompiler {
         let expression_evaluator =
             evaluator_compiler.compile_sql_call(&cube_name, definition.sql()?)?;
         let cube_symbol = evaluator_compiler.add_cube_table_evaluator(cube_name, vec![])?;
-        BaseSegment::try_new(
-            expression_evaluator,
-            cube_symbol,
-            name,
-            Some(member_name.to_string()),
-        )
+        BaseSegment::try_new(expression_evaluator, cube_symbol, name, false)
     }
 
     fn compile_member_expression_segment(
@@ -468,7 +463,7 @@ impl QueryPropertiesCompiler {
             }
         };
         let cube_symbol = evaluator_compiler.add_cube_table_evaluator(cube_name, vec![])?;
-        BaseSegment::try_new(expression_evaluator, cube_symbol, name, None)
+        BaseSegment::try_new(expression_evaluator, cube_symbol, name, true)
     }
 
     // Returns `(dimension_filters, time_dimension_filters, measure_filters)`.

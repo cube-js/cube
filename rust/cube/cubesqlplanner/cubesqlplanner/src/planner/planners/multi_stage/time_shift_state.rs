@@ -4,7 +4,7 @@ use crate::planner::symbols::CalendarDimensionTimeShift;
 use crate::planner::symbols::DimensionSymbol;
 use crate::planner::symbols::MemberSymbol;
 use crate::planner::SqlInterval;
-use crate::planner::{CubeId, DimensionTimeShift};
+use crate::planner::{CubeId, DimensionTimeShift, MemberId};
 use cubenativeutils::CubeError;
 use itertools::Itertools;
 use std::collections::HashMap;
@@ -57,7 +57,7 @@ impl TimeShiftState {
         if dimension.is_reference() || !dimension.is_time() {
             return None;
         }
-        if dimension.time_shift_pk_full_name().is_some() {
+        if dimension.time_shift_pk().is_some() {
             return None;
         }
         self.get_for_symbol(symbol)
@@ -101,8 +101,10 @@ impl TimeShiftState {
                         dimension.calendar_time_shift_for_named_interval(dim_shift_name)
                     {
                         extracted.add_calendar_shift(&dimension, &dim_key, Some(dim_shift_name));
-                        extracted.calendar_shifts.insert(dim_key, cts);
-                    } else if let Some(_calendar_pk) = dimension.time_shift_pk_full_name() {
+                        extracted
+                            .calendar_shifts
+                            .insert(dim_key.full_name().clone(), cts);
+                    } else if dimension.time_shift_pk().is_some() {
                         return Err(CubeError::user(format!(
                             "Time shift with name {} not found for dimension {}",
                             dim_shift_name,
@@ -114,16 +116,20 @@ impl TimeShiftState {
                         dimension.calendar_time_shift_for_interval(dim_shift_interval)
                     {
                         extracted.add_calendar_shift(&dimension, &dim_key, cts.name.as_ref());
-                        extracted.calendar_shifts.insert(dim_key, cts);
-                    } else if let Some(calendar_pk) = dimension.time_shift_pk_full_name() {
+                        extracted
+                            .calendar_shifts
+                            .insert(dim_key.full_name().clone(), cts);
+                    } else if let Some(calendar_pk) = dimension.time_shift_pk() {
                         // Interval arithmetic straight on the calendar's primary
                         // key, bypassing its mapping. The rows still arrive
                         // through the shifted join, so a binding restating the
                         // reporting bounds would cut them off.
-                        extracted.add_calendar_shift(&dimension, &calendar_pk, None);
+                        extracted.add_calendar_shift(&dimension, calendar_pk, None);
                         let mut shift = shift.clone();
                         shift.interval = Some(dim_shift_interval.inverse());
-                        extracted.interval_shifts.insert(calendar_pk, shift);
+                        extracted
+                            .interval_shifts
+                            .insert(calendar_pk.full_name().clone(), shift);
                     } else {
                         extracted
                             .filter_params_shifts
@@ -166,7 +172,7 @@ impl ExtractedTimeShifts {
     fn add_calendar_shift(
         &mut self,
         dimension: &Rc<DimensionSymbol>,
-        pk_full_name: &str,
+        pk: &MemberId,
         name: Option<&String>,
     ) {
         let shift = CalendarShift {
@@ -179,10 +185,8 @@ impl ExtractedTimeShifts {
         };
         self.filter_params_shifts
             .add_calendar_cube(dimension.cube_name().clone(), shift.clone());
-        if let Some((pk_cube, _)) = pk_full_name.split_once('.') {
-            self.filter_params_shifts
-                .add_calendar_cube(CubeId::cube(pk_cube), shift);
-        }
+        self.filter_params_shifts
+            .add_calendar_cube(pk.cube().clone(), shift);
     }
 }
 

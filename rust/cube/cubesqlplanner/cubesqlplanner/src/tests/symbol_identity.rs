@@ -1,5 +1,7 @@
 use crate::planner::sql_templates::PlanSqlTemplates;
 use crate::planner::{CubeId, MemberId};
+use crate::test_fixtures::cube_bridge::MockSchema;
+use crate::test_fixtures::test_utils::TestContext;
 use std::collections::HashSet;
 
 #[test]
@@ -98,4 +100,44 @@ fn member_id_orders_like_its_full_name() {
     let mut expected = names.clone();
     expected.sort();
     assert_eq!(names, expected);
+}
+
+fn visitors_ctx() -> TestContext {
+    TestContext::new(MockSchema::from_yaml_file("common/visitors.yaml")).unwrap()
+}
+
+#[test]
+fn symbol_ids_render_as_their_full_names() {
+    let ctx = visitors_ctx();
+
+    let dim = ctx.create_dimension("visitors.source").unwrap();
+    assert_eq!(
+        dim.id(),
+        &MemberId::member(CubeId::cube("visitors"), "source")
+    );
+    assert_eq!(dim.full_name(), "visitors.source");
+
+    let measure = ctx.create_measure("visitors.count").unwrap();
+    assert_eq!(measure.full_name(), "visitors.count");
+
+    let td = ctx
+        .create_time_dimension("visitors.created_at", Some("month"))
+        .unwrap();
+    assert_eq!(td.full_name(), "visitors.created_at_month");
+    assert_eq!(
+        td.id().base(),
+        &MemberId::member(CubeId::cube("visitors"), "created_at")
+    );
+
+    let view_member = ctx
+        .create_dimension("visitors_visitors_checkins.id")
+        .unwrap();
+    assert_eq!(view_member.full_name(), "visitors_visitors_checkins.id");
+
+    let segment = ctx.create_segment("visitors.google").unwrap();
+    assert_eq!(segment.full_name(), "visitors.google");
+    assert_eq!(
+        segment.member_evaluator().full_name(),
+        "expr:visitors.google"
+    );
 }

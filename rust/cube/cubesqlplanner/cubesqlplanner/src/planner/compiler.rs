@@ -216,7 +216,9 @@ impl Compiler {
             return Ok(exists.clone());
         }
         let full_name = path.full_name().clone();
-        let definition = self.cube_evaluator.segment_by_path(full_name.clone())?;
+        let definition = self
+            .cube_evaluator
+            .segment_by_path(path.member_id().target_path())?;
         let sql_call = self.resolve_nested(&path, |compiler| {
             compiler.compile_sql_call(path.cube_name(), definition.sql()?)
         })?;

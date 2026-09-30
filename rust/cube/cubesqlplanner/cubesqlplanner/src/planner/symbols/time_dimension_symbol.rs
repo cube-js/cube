@@ -4,7 +4,7 @@ use super::MemberSymbol;
 use crate::planner::query_tools::QueryTools;
 use crate::planner::state::State;
 use crate::planner::time_dimension::Granularity;
-use crate::planner::{CubeId, GranularityHelper, QueryDateTime, QueryDateTimeHelper};
+use crate::planner::{CubeId, GranularityHelper, MemberId, QueryDateTime, QueryDateTimeHelper};
 use chrono::Duration;
 use chrono_tz::Tz;
 use cubenativeutils::CubeError;
@@ -76,11 +76,11 @@ impl TimeDimensionSymbol {
         let alias = alias_override
             .clone()
             .unwrap_or_else(|| format!("{}_{}", base_symbol.alias(), name_suffix));
-        let full_name = format!("{}_{}", base_symbol.full_name(), name_suffix);
+        let id = MemberId::time_dimension(base_symbol.id().clone(), granularity.as_deref());
 
         let compiled_path = CompiledMemberPath::new(
             base_symbol.compiled_path().cube().clone(),
-            full_name,
+            id,
             base_symbol.name().clone(),
             alias,
             base_symbol.path().clone(),

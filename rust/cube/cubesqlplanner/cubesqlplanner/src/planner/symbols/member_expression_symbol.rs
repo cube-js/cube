@@ -3,7 +3,7 @@ use super::deps::{self, symbol_deps, DepVisitor, DepVisitorMut, SymbolDeps};
 use super::MemberSymbol;
 use crate::planner::collectors::member_childs;
 use crate::planner::sql_templates::PlanSqlTemplates;
-use crate::planner::{CubeId, CubeTableSymbol, SqlCall};
+use crate::planner::{CubeId, CubeTableSymbol, MemberId, SqlCall};
 use crate::utils::debug::DebugSql;
 use cubenativeutils::CubeError;
 use itertools::Itertools;
@@ -75,13 +75,13 @@ impl MemberExpressionSymbol {
         alias: Option<String>,
         path: Vec<CubeId>,
     ) -> Result<Rc<Self>, CubeError> {
-        let full_name = format!("expr:{}.{}", cube.cube_name(), name);
+        let id = MemberId::expression(cube.cube_name().clone(), name.clone());
         let alias = alias.unwrap_or_else(|| PlanSqlTemplates::alias_name(&name));
         let is_reference = match &expression {
             MemberExpressionExpression::SqlCall(sql_call) => sql_call.is_direct_reference(),
             MemberExpressionExpression::PatchedSymbol(_symbol) => false,
         };
-        let compiled_path = CompiledMemberPath::new(cube, full_name, name, alias, path);
+        let compiled_path = CompiledMemberPath::new(cube, id, name, alias, path);
         Ok(Rc::new(Self {
             compiled_path,
             expression,

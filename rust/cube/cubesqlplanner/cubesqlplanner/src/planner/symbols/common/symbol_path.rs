@@ -4,7 +4,7 @@ use std::rc::Rc;
 use cubenativeutils::CubeError;
 
 use crate::cube_bridge::evaluator::CubeEvaluator;
-use crate::planner::CubeId;
+use crate::planner::{CubeId, MemberId};
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum SymbolPathType {
@@ -213,6 +213,11 @@ impl SymbolPath {
 
     pub fn full_name(&self) -> &String {
         &self.full_name
+    }
+
+    /// Identity of the member this path resolves to.
+    pub fn member_id(&self) -> MemberId {
+        MemberId::member(self.cube_name.clone(), self.symbol_name.clone())
     }
 
     pub fn cache_name(&self) -> String {

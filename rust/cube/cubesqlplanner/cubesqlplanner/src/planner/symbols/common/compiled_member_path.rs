@@ -1,10 +1,10 @@
-use crate::planner::{CubeId, CubeNameSymbol, CubeTableSymbol};
+use crate::planner::{CubeId, CubeNameSymbol, CubeTableSymbol, MemberId};
 use std::rc::Rc;
 
 #[derive(Clone, Debug)]
 pub struct CompiledMemberPath {
     cube: Rc<CubeTableSymbol>,
-    full_name: String,
+    id: MemberId,
     name: String,
     alias: String,
     path: Vec<CubeId>,
@@ -13,7 +13,7 @@ pub struct CompiledMemberPath {
 impl CompiledMemberPath {
     pub fn new(
         cube: Rc<CubeTableSymbol>,
-        full_name: String,
+        id: MemberId,
         name: String,
         alias: String,
         path: Vec<CubeId>,
@@ -21,15 +21,19 @@ impl CompiledMemberPath {
         let path = CubeNameSymbol::normalize_path(path, cube.cube_name());
         Self {
             cube,
-            full_name,
+            id,
             name,
             alias,
             path,
         }
     }
 
+    pub fn id(&self) -> &MemberId {
+        &self.id
+    }
+
     pub fn full_name(&self) -> &String {
-        &self.full_name
+        self.id.full_name()
     }
 
     pub fn cube_name(&self) -> &CubeId {
@@ -61,7 +65,7 @@ impl CompiledMemberPath {
     pub fn strip_join_prefix(&self) -> Self {
         Self {
             cube: self.cube.clone(),
-            full_name: self.full_name.clone(),
+            id: self.id.clone(),
             name: self.name.clone(),
             alias: self.alias.clone(),
             path: vec![self.cube_name().clone()],

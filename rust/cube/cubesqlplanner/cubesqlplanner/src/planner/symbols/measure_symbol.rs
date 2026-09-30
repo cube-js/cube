@@ -10,7 +10,7 @@ use crate::cube_bridge::member_sql::MemberSql;
 use crate::planner::collectors::find_owned_by_cube_child;
 use crate::planner::sql_templates::PlanSqlTemplates;
 use crate::planner::SqlInterval;
-use crate::planner::{Compiler, CubeId, SqlCall};
+use crate::planner::{Compiler, CubeId, MemberId, SqlCall};
 use cubenativeutils::CubeError;
 use itertools::Itertools;
 use std::cmp::{Eq, PartialEq};
@@ -61,7 +61,7 @@ pub struct DimensionTimeShift {
 impl PartialEq for DimensionTimeShift {
     fn eq(&self, other: &Self) -> bool {
         self.interval == other.interval
-            && self.dimension.full_name() == other.dimension.full_name()
+            && self.dimension.id() == other.dimension.id()
             && self.name == other.name
     }
 }
@@ -447,7 +447,7 @@ impl MeasureSymbolFactory {
         path: SymbolPath,
         cube_evaluator: Rc<dyn CubeEvaluator>,
     ) -> Result<Self, CubeError> {
-        let definition = cube_evaluator.measure_by_path(path.full_name().clone())?;
+        let definition = cube_evaluator.measure_by_path(path.member_id().target_path())?;
         let sql = definition.sql()?;
         let mask_sql = definition.mask_sql()?;
         Ok(Self {
@@ -479,9 +479,10 @@ impl SymbolFactory for MeasureSymbolFactory {
                 .unwrap_or_else(|| vec![])
                 .into_iter()
                 .map(|primary_key| -> Result<_, CubeError> {
-                    let key_dimension_name = format!("{}.{}", path.cube_name(), primary_key);
+                    let key_dimension_id = MemberId::member(path.cube_name().clone(), primary_key);
+                    let key_dimension_name = key_dimension_id.full_name().clone();
                     let key_dimension =
-                        cube_evaluator.dimension_by_path(key_dimension_name.clone())?;
+                        cube_evaluator.dimension_by_path(key_dimension_id.target_path())?;
                     let key_dimension_sql = if let Some(key_dimension_sql) = key_dimension.sql()? {
                         Ok(key_dimension_sql)
                     } else {
@@ -551,7 +552,7 @@ impl SymbolFactory for MeasureSymbolFactory {
                 compiler.add_cube_table_evaluator(path.cube_name().clone(), vec![])?;
             let compiled_path = CompiledMemberPath::new(
                 cube_symbol,
-                path.full_name().clone(),
+                path.member_id(),
                 path.symbol_name().clone(),
                 alias,
                 path.path().clone(),
@@ -580,7 +581,7 @@ impl SymbolFactory for MeasureSymbolFactory {
         let time_shifts = if let Some(time_shift_references) =
             &definition.static_data().time_shift_references
         {
-            let mut shifts: HashMap<String, DimensionTimeShift> = HashMap::new();
+            let mut shifts: HashMap<MemberId, DimensionTimeShift> = HashMap::new();
             let mut common_shift = None;
             let mut named_shift = None;
             for shift_ref in time_shift_references.iter() {
@@ -599,17 +600,16 @@ impl SymbolFactory for MeasureSymbolFactory {
                 if let Some(time_dimension) = &shift_ref.time_dimension {
                     let dimension = compiler.add_dimension_evaluator(time_dimension.clone())?;
                     let dimension = find_owned_by_cube_child(&dimension)?;
-                    let dimension_name = dimension.full_name();
-                    if let Some(exists) = shifts.get(&dimension_name) {
+                    if let Some(exists) = shifts.get(dimension.id()) {
                         if exists.interval != interval || exists.name != name {
                             return Err(CubeError::user(format!(
                                 "Different time shifts for one dimension {} not allowed",
-                                dimension_name
+                                dimension.full_name()
                             )));
                         }
                     } else {
                         shifts.insert(
-                            dimension_name.clone(),
+                            dimension.id().clone(),
                             DimensionTimeShift {
                                 interval: interval.clone(),
                                 name: name.clone(),
@@ -710,7 +710,7 @@ impl SymbolFactory for MeasureSymbolFactory {
 
         let compiled_path = CompiledMemberPath::new(
             cube_symbol,
-            path.full_name().clone(),
+            path.member_id(),
             path.symbol_name().clone(),
             alias,
             path.path().clone(),

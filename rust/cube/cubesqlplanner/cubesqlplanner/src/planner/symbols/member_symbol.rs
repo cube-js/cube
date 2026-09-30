@@ -1,7 +1,7 @@
 use cubenativeutils::CubeError;
 use itertools::Itertools;
 
-use crate::planner::{Case, CubeId, CubeRef, SqlCall};
+use crate::planner::{Case, CubeId, CubeRef, MemberId, SqlCall};
 
 use super::common::CompiledMemberPath;
 use super::deps::{self, DepVisitor, DepVisitorMut, SymbolDeps};
@@ -67,8 +67,7 @@ impl Debug for MemberSymbol {
 /// forms; it answers "the same member?", not "the same symbol?".
 impl PartialEq for MemberSymbol {
     fn eq(&self, other: &Self) -> bool {
-        self.full_name() == other.full_name()
-            && std::mem::discriminant(self) == std::mem::discriminant(other)
+        self.id() == other.id() && std::mem::discriminant(self) == std::mem::discriminant(other)
     }
 }
 
@@ -107,6 +106,10 @@ impl MemberSymbol {
     /// and any suffix that distinguishes one symbol from another.
     pub fn full_name(&self) -> String {
         self.compiled_path().full_name().clone()
+    }
+
+    pub fn id(&self) -> &MemberId {
+        self.compiled_path().id()
     }
 
     /// Optional SQL expression that wraps the rendered member output to
