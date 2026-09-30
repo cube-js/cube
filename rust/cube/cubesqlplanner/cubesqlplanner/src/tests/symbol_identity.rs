@@ -16,7 +16,7 @@ fn cube_id_renders_and_targets_the_cube_name() {
 
 #[test]
 fn cube_id_orders_like_its_name() {
-    let mut ids = vec![
+    let mut ids = [
         CubeId::cube("visitors"),
         CubeId::cube("Orders"),
         CubeId::cube("orders"),
@@ -88,7 +88,7 @@ fn member_id_equality_follows_the_full_name() {
 fn member_id_orders_like_its_full_name() {
     let orders = CubeId::cube("orders");
     let created_at = MemberId::member(orders.clone(), "created_at");
-    let mut ids = vec![
+    let mut ids = [
         MemberId::member(orders.clone(), "status"),
         MemberId::time_dimension(created_at.clone(), Some("month")),
         MemberId::expression(orders.clone(), "completed"),
