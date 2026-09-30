@@ -266,10 +266,13 @@ const token = (sc) => sc?.cubeCloud?.oidcTokens?.["snowflake-user"];
 module.exports = {
   // Marks the refresh worker's context: the only one that may use the deployment's identity.
   scheduledRefreshContexts: () => [{ securityContext: { refreshWorker: true } }],
+  // Separate orchestrators: Cube builds drivers from the first context it sees.
   contextToOrchestratorId: ({ securityContext: sc }) =>
-    sc?.cubeCloud?.username
-      ? `user_${sc.cubeCloud.username}_${token(sc)?.issuedAt}`
-      : "default",
+    sc?.refreshWorker
+      ? "refresh_worker"
+      : sc?.cubeCloud?.username
+        ? `user_${sc.cubeCloud.username}_${token(sc)?.issuedAt}`
+        : "no_user",
   driverFactory: ({ securityContext: sc }) => {
     if (sc?.refreshWorker) {
       return { type: "snowflake" };
