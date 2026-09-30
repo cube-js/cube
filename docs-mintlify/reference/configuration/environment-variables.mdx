@@ -201,6 +201,17 @@ templates depend on the security context.
 | ---------------- | ---------------------- | --------------------- |
 | `true`, `false`  | `false`                | `false`               |
 
+<Warning>
+Built-in objects (`Object`, `Array`, `JSON`, ...) are shared by all tenants, so
+a data model that changes them, e.g., by adding to `Array.prototype`, affects
+every tenant. Globals a data model creates (`x = 1`, `this.x = 1`,
+`globalThis.x = 1`) stay per tenant, with two differences: they can only be
+created, and read through `this` or `globalThis`, while the data model
+compiles, not later in a `sql` function; and in other tenants' data models
+`typeof` of such a name throws a `ReferenceError` instead of returning
+`'undefined'`.
+</Warning>
+
 ## `CUBEJS_CONCURRENCY`
 
 The number of concurrent connections each query queue has to the database.

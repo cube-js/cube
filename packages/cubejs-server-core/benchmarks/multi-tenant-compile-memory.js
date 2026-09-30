@@ -11,6 +11,8 @@
 // --sharing sets CUBEJS_COMPILER_MULTI_TENANT_SHARING (shared VM realm, process-wide compile
 // caches and string interning).
 //
+// --queries=N then times N SQL generations (CompilerApi.getSql) on the first tenant.
+//
 // All compiled CompilerApis stay referenced until the measurement is taken. Per-tenant numbers
 // include fixed costs spread over the tenants: run --tenants=6 and 12 and difference the totals
 // for the marginal cost of one more tenant. Summarize a snapshot with
@@ -284,6 +286,49 @@ const sample = () => {
     // eslint-disable-next-line global-require
     const { internedStringsStats } = require('@cubejs-backend/schema-compiler');
     result.internPool = internedStringsStats();
+  }
+
+  // SQL generation through the compiled model (member functions run at planning time): the cost
+  // of the shared realm's `with` scope shows up here, not in the compile.
+  const queries = parseInt(args.queries || '0', 10);
+  if (queries > 0) {
+    const api = retained[0];
+    const { cubeEvaluator } = await api.getCompilers();
+    const names = cubeEvaluator.cubeNames().filter((n) => n !== 'c0');
+    const pickQuery = (q) => {
+      const name = names[(q * 7919) % names.length];
+      const cube = cubeEvaluator.cubeFromPath(name);
+      const target = `c${joinTarget(parseInt(name.slice(1), 10))}`;
+      const targetCube = cubeEvaluator.cubeFromPath(target);
+      const measures = Object.keys(cube.measures).slice(0, 4).map((m) => `${name}.${m}`);
+      const calculated = Object.keys(cube.measures).filter((m) => !m.startsWith('amount') && m !== 'count').slice(0, 2);
+      const dims = Object.entries(cube.dimensions).filter(([, d]) => d.type === 'string').slice(0, 2).map(([d]) => `${name}.${d}`);
+      const timeDim = Object.entries(cube.dimensions).find(([, d]) => d.type === 'time');
+      const targetDim = Object.entries(targetCube.dimensions).find(([, d]) => d.type === 'string');
+      return {
+        measures: [...measures, ...calculated.map((m) => `${name}.${m}`)],
+        dimensions: [...dims, ...(targetDim ? [`${target}.${targetDim[0]}`] : [])],
+        timeDimensions: timeDim ? [{ dimension: `${name}.${timeDim[0]}`, granularity: 'day', dateRange: ['2024-01-01', '2024-03-31'] }] : [],
+        order: measures.length ? [[measures[0], 'desc']] : [],
+        limit: 1000,
+        timezone: 'UTC',
+      };
+    };
+    for (let q = 0; q < 50; q++) {
+      await api.getSql(pickQuery(q));
+    }
+    const times = [];
+    for (let q = 0; q < queries; q++) {
+      const query = pickQuery(q + 50);
+      const started = process.hrtime.bigint();
+      await api.getSql(query);
+      times.push(Number(process.hrtime.bigint() - started) / 1e6);
+    }
+    times.sort((a, b) => a - b);
+    result.sqlQueries = queries;
+    result.sqlMsMedian = +times[Math.floor(queries / 2)].toFixed(2);
+    result.sqlMsP95 = +times[Math.floor(queries * 0.95)].toFixed(2);
+    result.sqlMsMean = +(times.reduce((a, b) => a + b, 0) / queries).toFixed(2);
   }
 
   if (args.snapshot) {

@@ -67,6 +67,19 @@ const tenantFiles = (): Files => [
   },
 ];
 
+const globalWriterFilesForRealm = (): Files => [{
+  fileName: 'model.js',
+  content: `
+    this.tableSuffix = COMPILE_CONTEXT.securityContext.tenant;
+    globalThis.otherSuffix = COMPILE_CONTEXT.securityContext.tenant;
+    cube(\`orders_\${tableSuffix}\`, {
+      sql_table: 'orders',
+      measures: { count: { type: 'count' } },
+      dimensions: { tenant: { sql: () => \`'\${tableSuffix}_\${otherSuffix}'\`, type: 'string' } },
+    });
+  `,
+}];
+
 const compileTenant = async (tenant: string, files: Files, options: Record<string, any>) => {
   const prepared = prepareCompiler(files, {
     compileContext: { securityContext: { tenant } },
@@ -151,6 +164,67 @@ describe.each([
 
     const concurrent = await Promise.all(['c', 'd', 'e'].map(t => compileTenant(t, tenantFiles(), options)));
     ['c', 'd', 'e'].forEach((t, i) => expect(buildSql(concurrent[i], t)).toContain(`'legacy_${t}_${t}'`));
+  });
+
+  const globalWriterFiles = (): Files => [{
+    fileName: 'model.js',
+    content: `
+      this.tableSuffix = COMPILE_CONTEXT.securityContext.tenant;
+      globalThis.otherSuffix = COMPILE_CONTEXT.securityContext.tenant;
+      cube(\`orders_\${tableSuffix}\`, {
+        sql_table: 'orders',
+        measures: { count: { type: 'count' } },
+        dimensions: {
+          id: { sql: 'id', type: 'number', primary_key: true },
+          tenant: { sql: () => \`'\${tableSuffix}_\${otherSuffix}'\`, type: 'string' },
+        },
+      });
+    `,
+  }];
+
+  it('keeps globals written through this and globalThis per compile', async () => {
+    const a = await compileTenant('a', globalWriterFiles(), options);
+    const b = await compileTenant('b', globalWriterFiles(), options);
+    const concurrent = await Promise.all(['c', 'd'].map(t => compileTenant(t, globalWriterFiles(), options)));
+
+    const sqlOf = (c, tenant: string) => new PostgresQuery(c, {
+      measures: [`orders_${tenant}.count`],
+      dimensions: [`orders_${tenant}.tenant`],
+    }).buildSqlAndParams()[0];
+    expect(sqlOf(a, 'a')).toContain(`'a_a'`);
+    expect(sqlOf(b, 'b')).toContain(`'b_b'`);
+    ['c', 'd'].forEach((t, i) => expect(sqlOf(concurrent[i], t)).toContain(`'${t}_${t}'`));
+
+    // A tenant that doesn't write them doesn't see them, as with a realm of its own
+    for (const read of ['tableSuffix', 'otherSuffix']) {
+      const reader = prepareCompiler([{
+        fileName: 'model.js',
+        content: `
+          const seen = ${read};
+          cube('Orders', { sql: \`select '\${seen}' from orders\`, measures: { count: { type: 'count' } } });
+        `,
+      }], { ...options, compileContext: { securityContext: { tenant: 'e' } } });
+      await expect(reader.compiler.compile()).rejects.toThrow(/tableSuffix|otherSuffix/);
+    }
+  });
+
+  it('gives typeof of undeclared names and UMD checks their usual result', async () => {
+    const { metaTransformer } = await compileTenant('a', [{
+      fileName: 'model.js',
+      content: `
+        const umd = (typeof module === 'object' && module.exports) ? 'cjs'
+          : (typeof define === 'function' ? 'amd' : 'global');
+        const kinds = [typeof neverDeclared, typeof exports, umd, typeof JSON, typeof COMPILE_CONTEXT].join(',');
+        cube('Orders', {
+          sql: 'select * from orders',
+          measures: { count: { type: 'count' } },
+          dimensions: { id: { sql: 'id', type: 'number', primary_key: true } },
+          description: kinds,
+        });
+      `,
+    }], options);
+
+    expect(metaTransformer.cubes[0].config.description).toBe('undefined,undefined,global,object,object');
   });
 
   it('resolves a bare view_group reference', async () => {
@@ -290,6 +364,20 @@ describe('Shared VM context realm', () => {
     ['c', 'd'].forEach((t, i) => expect(buildSql(concurrent[i], t)).toContain(`'legacy_${t}_${t}'`));
 
     expect(Reflect.ownKeys(realmFunction('return globalThis')())).toEqual(before);
+  });
+
+  it('stores no tenant value on the shared realm global', async () => {
+    const { cubeEvaluator } = await compileTenant('a', globalWriterFilesForRealm(), { sharedVmContext: true });
+    const realmFunction = cubeEvaluator.cubeFromPath('orders_a').dimensions.tenant.sql.constructor;
+    const sharedGlobal = realmFunction('return globalThis')();
+
+    for (const key of ['tableSuffix', 'otherSuffix']) {
+      const descriptor = Object.getOwnPropertyDescriptor(sharedGlobal, key);
+      expect(descriptor && 'value' in descriptor).toBeFalsy();
+      // Outside of a compile no tenant's value is readable through it
+      expect(() => sharedGlobal[key]).toThrow(ReferenceError);
+    }
+    expect(() => realmFunction('newGlobal = 1')()).toThrow(/outside of a data model compile/);
   });
 
   it('reuses one realm across compiles when on', async () => {
