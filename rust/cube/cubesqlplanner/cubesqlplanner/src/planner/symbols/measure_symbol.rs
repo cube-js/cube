@@ -533,10 +533,9 @@ impl SymbolFactory for MeasureSymbolFactory {
                 )
             });
 
-        // A member a view re-exports from its `includes` is a `Ref`; one the
-        // view declares itself keeps its own definition. The mask of a `Ref`
-        // may reference members the view does not re-export, so it compiles
-        // against the target's cube.
+        // A member re-exported from the view's `includes` is a `Ref`. Its mask may
+        // reference members the view does not re-export, so it compiles against
+        // the target's cube.
         let included = definition.static_data().included.unwrap_or(false);
         if let Some(sql) = sql.as_ref().filter(|_| included) {
             let owning_cube_name = sql

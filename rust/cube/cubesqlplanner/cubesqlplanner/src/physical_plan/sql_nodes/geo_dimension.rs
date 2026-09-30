@@ -35,33 +35,30 @@ impl SqlNode for GeoDimensionSqlNode {
         templates: &PlanSqlTemplates,
     ) -> Result<String, CubeError> {
         let ev = node.as_dimension()?;
-        let res = {
-            if let DimensionKind::Geo(geo) = ev.kind() {
-                let inner_visitor = visitor.with_arg_needs_paren_safe(false);
-                let latitude_str = geo.latitude().eval(
-                    &inner_visitor,
-                    node_processor.clone(),
-                    query_tools.clone(),
-                    templates,
-                )?;
-                let longitude_str = geo.longitude().eval(
-                    &inner_visitor,
-                    node_processor.clone(),
-                    query_tools.clone(),
-                    templates,
-                )?;
-                templates.concat_strings(&vec![latitude_str, format!("','"), longitude_str])?
-            } else {
-                self.input.to_sql(
-                    visitor,
-                    node,
-                    query_tools.clone(),
-                    node_processor.clone(),
-                    templates,
-                )?
-            }
-        };
-        Ok(res)
+        Ok(if let DimensionKind::Geo(geo) = ev.kind() {
+            let inner_visitor = visitor.with_arg_needs_paren_safe(false);
+            let latitude_str = geo.latitude().eval(
+                &inner_visitor,
+                node_processor.clone(),
+                query_tools.clone(),
+                templates,
+            )?;
+            let longitude_str = geo.longitude().eval(
+                &inner_visitor,
+                node_processor.clone(),
+                query_tools.clone(),
+                templates,
+            )?;
+            templates.concat_strings(&vec![latitude_str, format!("','"), longitude_str])?
+        } else {
+            self.input.to_sql(
+                visitor,
+                node,
+                query_tools.clone(),
+                node_processor.clone(),
+                templates,
+            )?
+        })
     }
 
     fn as_any(self: Rc<Self>) -> Rc<dyn Any> {

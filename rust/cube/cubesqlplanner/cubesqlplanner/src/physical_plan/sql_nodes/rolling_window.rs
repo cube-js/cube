@@ -39,53 +39,48 @@ impl SqlNode for RollingWindowNode {
         templates: &PlanSqlTemplates,
     ) -> Result<String, CubeError> {
         let m = node.as_measure()?;
-        let res = {
-            let delegate = || {
-                self.default_processor.to_sql(
-                    visitor,
-                    node,
-                    query_tools.clone(),
-                    node_processor.clone(),
-                    templates,
-                )
-            };
-            let render_input = || -> Result<String, CubeError> {
-                let inner_visitor = visitor.with_arg_needs_paren_safe(false);
-                self.input.to_sql(
-                    &inner_visitor,
-                    node,
-                    query_tools.clone(),
-                    node_processor.clone(),
-                    templates,
-                )
-            };
-            match m.kind() {
-                MeasureKind::Count(_) => format!("sum({})", render_input()?),
-                // A state form holds the same aggregation as its
-                // plain counterpart, stored unmerged, so it merges
-                // the same way.
-                MeasureKind::Aggregated(a) | MeasureKind::AggregatedState(a) => {
-                    match a.agg_type() {
-                        AggregationType::CountDistinctApprox => {
-                            templates.hll_cardinality_merge(render_input()?)?
-                        }
-                        AggregationType::Sum => {
-                            format!("sum({})", render_input()?)
-                        }
-                        AggregationType::Min | AggregationType::Max => {
-                            format!("{}({})", a.agg_type().as_str(), render_input()?)
-                        }
-                        AggregationType::Avg
-                        | AggregationType::CountDistinct
-                        | AggregationType::NumberAgg => delegate()?,
-                    }
-                }
-                MeasureKind::MultipliedCount(_)
-                | MeasureKind::Calculated(_)
-                | MeasureKind::Rank => delegate()?,
-            }
+        let delegate = || {
+            self.default_processor.to_sql(
+                visitor,
+                node,
+                query_tools.clone(),
+                node_processor.clone(),
+                templates,
+            )
         };
-        Ok(res)
+        let render_input = || -> Result<String, CubeError> {
+            let inner_visitor = visitor.with_arg_needs_paren_safe(false);
+            self.input.to_sql(
+                &inner_visitor,
+                node,
+                query_tools.clone(),
+                node_processor.clone(),
+                templates,
+            )
+        };
+        Ok(match m.kind() {
+            MeasureKind::Count(_) => format!("sum({})", render_input()?),
+            // A state form holds the same aggregation as its
+            // plain counterpart, stored unmerged, so it merges
+            // the same way.
+            MeasureKind::Aggregated(a) | MeasureKind::AggregatedState(a) => match a.agg_type() {
+                AggregationType::CountDistinctApprox => {
+                    templates.hll_cardinality_merge(render_input()?)?
+                }
+                AggregationType::Sum => {
+                    format!("sum({})", render_input()?)
+                }
+                AggregationType::Min | AggregationType::Max => {
+                    format!("{}({})", a.agg_type().as_str(), render_input()?)
+                }
+                AggregationType::Avg
+                | AggregationType::CountDistinct
+                | AggregationType::NumberAgg => delegate()?,
+            },
+            MeasureKind::MultipliedCount(_) | MeasureKind::Calculated(_) | MeasureKind::Rank => {
+                delegate()?
+            }
+        })
     }
 
     fn as_any(self: Rc<Self>) -> Rc<dyn Any> {

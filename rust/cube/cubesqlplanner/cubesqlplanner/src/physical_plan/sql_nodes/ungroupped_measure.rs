@@ -34,22 +34,15 @@ impl SqlNode for UngroupedMeasureSqlNode {
         templates: &PlanSqlTemplates,
     ) -> Result<String, CubeError> {
         node.as_measure()?;
-        let res = {
-            let input = self.input.to_sql(
-                visitor,
-                node,
-                query_tools.clone(),
-                node_processor.clone(),
-                templates,
-            )?;
+        let input = self.input.to_sql(
+            visitor,
+            node,
+            query_tools.clone(),
+            node_processor.clone(),
+            templates,
+        )?;
 
-            if input == "*" {
-                "1".to_string()
-            } else {
-                input
-            }
-        };
-        Ok(res)
+        Ok(if input == "*" { "1".to_string() } else { input })
     }
 
     fn as_any(self: Rc<Self>) -> Rc<dyn Any> {

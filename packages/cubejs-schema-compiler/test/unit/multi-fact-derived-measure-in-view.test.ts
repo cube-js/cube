@@ -442,10 +442,9 @@ describe('Multi-fact derived measure defined on a cube', () => {
   });
 });
 
-// A view measure spanning cubes that DO join: whether plain or `multi_stage`,
-// each side is aggregated before the division, so the join cannot multiply the
-// `sum` on the one side. `multi_stage` is still what makes it plannable when
-// the cubes do not join (see above).
+// A view measure over cubes that DO join: plain or `multi_stage`, each side is
+// aggregated before the division, so the join cannot multiply the `sum`.
+// `multi_stage` is still needed when the cubes do not join (see above).
 describe('Derived view measure over a fanned-out join', () => {
   const fanOutModel = `
 cubes:

@@ -40,7 +40,7 @@ impl SqlNode for FinalPreAggregationMeasureSqlNode {
         templates: &PlanSqlTemplates,
     ) -> Result<String, CubeError> {
         let ev = node.as_measure()?;
-        let res = {
+        Ok(
             if let Some(reference) = self.references.get(&node.full_name()) {
                 match reference {
                     RenderReferencesType::QualifiedColumnName(column_name) => {
@@ -86,9 +86,8 @@ impl SqlNode for FinalPreAggregationMeasureSqlNode {
                     node_processor.clone(),
                     templates,
                 )?
-            }
-        };
-        Ok(res)
+            },
+        )
     }
 
     fn as_any(self: Rc<Self>) -> Rc<dyn Any> {

@@ -35,7 +35,7 @@ impl SqlNode for MultiStageRankNode {
         templates: &PlanSqlTemplates,
     ) -> Result<String, CubeError> {
         let m = node.as_measure()?;
-        let res = {
+        Ok(
             if let Some(modifier @ MeasureRenderModifier::MultiStageRank { partition }) =
                 m.render_modifier()
             {
@@ -75,9 +75,8 @@ impl SqlNode for MultiStageRankNode {
                     node_processor.clone(),
                     templates,
                 )?
-            }
-        };
-        Ok(res)
+            },
+        )
     }
 
     fn as_any(self: Rc<Self>) -> Rc<dyn Any> {

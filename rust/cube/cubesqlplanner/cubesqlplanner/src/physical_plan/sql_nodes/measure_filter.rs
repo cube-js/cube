@@ -34,50 +34,47 @@ impl SqlNode for MeasureFilterSqlNode {
         templates: &PlanSqlTemplates,
     ) -> Result<String, CubeError> {
         let ev = node.as_measure()?;
-        let res = {
-            let measure_filters = ev.measure_filters();
-            if !measure_filters.is_empty() {
-                let inner_visitor = visitor.with_arg_needs_paren_safe(false);
-                let input = self.input.to_sql(
-                    &inner_visitor,
-                    node,
-                    query_tools.clone(),
-                    node_processor.clone(),
-                    templates,
-                )?;
-                let filters = measure_filters
-                    .iter()
-                    .map(|filter| -> Result<String, CubeError> {
-                        Ok(format!(
-                            "({})",
-                            filter.eval(
-                                &inner_visitor,
-                                node_processor.clone(),
-                                query_tools.clone(),
-                                templates
-                            )?
-                        ))
-                    })
-                    .collect::<Result<Vec<_>, _>>()?
-                    .join(" AND ");
-                let result = if input.as_str() == "*" {
-                    "1".to_string()
-                } else {
-                    input
-                };
-                format!("CASE WHEN {} THEN {} END", filters, result)
+        let measure_filters = ev.measure_filters();
+        Ok(if !measure_filters.is_empty() {
+            let inner_visitor = visitor.with_arg_needs_paren_safe(false);
+            let input = self.input.to_sql(
+                &inner_visitor,
+                node,
+                query_tools.clone(),
+                node_processor.clone(),
+                templates,
+            )?;
+            let filters = measure_filters
+                .iter()
+                .map(|filter| -> Result<String, CubeError> {
+                    Ok(format!(
+                        "({})",
+                        filter.eval(
+                            &inner_visitor,
+                            node_processor.clone(),
+                            query_tools.clone(),
+                            templates
+                        )?
+                    ))
+                })
+                .collect::<Result<Vec<_>, _>>()?
+                .join(" AND ");
+            let result = if input.as_str() == "*" {
+                "1".to_string()
             } else {
-                // Passthrough — propagate visitor unchanged.
-                self.input.to_sql(
-                    visitor,
-                    node,
-                    query_tools.clone(),
-                    node_processor.clone(),
-                    templates,
-                )?
-            }
-        };
-        Ok(res)
+                input
+            };
+            format!("CASE WHEN {} THEN {} END", filters, result)
+        } else {
+            // Passthrough — propagate visitor unchanged.
+            self.input.to_sql(
+                visitor,
+                node,
+                query_tools.clone(),
+                node_processor.clone(),
+                templates,
+            )?
+        })
     }
 
     fn as_any(self: Rc<Self>) -> Rc<dyn Any> {

@@ -43,7 +43,7 @@ impl SqlNode for MultiStageWindowNode {
         templates: &PlanSqlTemplates,
     ) -> Result<String, CubeError> {
         let m = node.as_measure()?;
-        let res = {
+        Ok(
             if let Some(modifier @ MeasureRenderModifier::MultiStageWindow { partition }) =
                 m.render_modifier()
             {
@@ -73,9 +73,8 @@ impl SqlNode for MultiStageWindowNode {
                     node_processor.clone(),
                     templates,
                 )?
-            }
-        };
-        Ok(res)
+            },
+        )
     }
 
     fn as_any(self: Rc<Self>) -> Rc<dyn Any> {

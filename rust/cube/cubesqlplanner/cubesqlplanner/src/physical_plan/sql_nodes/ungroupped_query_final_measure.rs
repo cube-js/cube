@@ -35,39 +35,36 @@ impl SqlNode for UngroupedQueryFinalMeasureSqlNode {
         templates: &PlanSqlTemplates,
     ) -> Result<String, CubeError> {
         let ev = node.as_measure()?;
-        let res = {
-            let is_count_like = match ev.kind() {
-                MeasureKind::Count(_) | MeasureKind::MultipliedCount(_) => true,
-                MeasureKind::Aggregated(a) | MeasureKind::AggregatedState(a) => matches!(
-                    a.agg_type(),
-                    AggregationType::CountDistinct | AggregationType::CountDistinctApprox
-                ),
-                MeasureKind::Calculated(_) | MeasureKind::Rank => false,
-            };
-            // Count-likes wrap the child in `CASE WHEN … IS NOT NULL THEN 1 END`
-            // (safe), other kinds pass through and must propagate the flag.
-            let child_visitor = if is_count_like {
-                visitor.with_arg_needs_paren_safe(false)
-            } else {
-                visitor.clone()
-            };
-            let input = self.input.to_sql(
-                &child_visitor,
-                node,
-                query_tools.clone(),
-                node_processor.clone(),
-                templates,
-            )?;
-
-            if input == "*" {
-                "1".to_string()
-            } else if is_count_like {
-                format!("CASE WHEN ({}) IS NOT NULL THEN 1 END", input) //TODO templates!!
-            } else {
-                input
-            }
+        let is_count_like = match ev.kind() {
+            MeasureKind::Count(_) | MeasureKind::MultipliedCount(_) => true,
+            MeasureKind::Aggregated(a) | MeasureKind::AggregatedState(a) => matches!(
+                a.agg_type(),
+                AggregationType::CountDistinct | AggregationType::CountDistinctApprox
+            ),
+            MeasureKind::Calculated(_) | MeasureKind::Rank => false,
         };
-        Ok(res)
+        // Count-likes wrap the child in `CASE WHEN … IS NOT NULL THEN 1 END`
+        // (safe), other kinds pass through and must propagate the flag.
+        let child_visitor = if is_count_like {
+            visitor.with_arg_needs_paren_safe(false)
+        } else {
+            visitor.clone()
+        };
+        let input = self.input.to_sql(
+            &child_visitor,
+            node,
+            query_tools.clone(),
+            node_processor.clone(),
+            templates,
+        )?;
+
+        Ok(if input == "*" {
+            "1".to_string()
+        } else if is_count_like {
+            format!("CASE WHEN ({}) IS NOT NULL THEN 1 END", input) //TODO templates!!
+        } else {
+            input
+        })
     }
 
     fn as_any(self: Rc<Self>) -> Rc<dyn Any> {
