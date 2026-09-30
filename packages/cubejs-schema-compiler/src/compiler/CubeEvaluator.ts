@@ -22,7 +22,7 @@ import { BaseQuery, PreAggregationDefinitionExtended } from '../adapter';
 import type { CubeValidator } from './CubeValidator';
 import type { ErrorReporter } from './ErrorReporter';
 import { FinishedJoinTree } from './JoinGraph';
-import { internCompiledStrings } from './StringInterning';
+import { internStringsDeep } from './StringInterning';
 
 export type SegmentDefinition = {
   type: string;
@@ -216,7 +216,8 @@ export class CubeEvaluator extends CubeSymbols {
   private isRbacEnabledCache: boolean | null = null;
 
   public constructor(
-    protected readonly cubeValidator: CubeValidator
+    protected readonly cubeValidator: CubeValidator,
+    protected readonly options: { internStrings?: boolean } = {},
   ) {
     super(true);
   }
@@ -237,11 +238,13 @@ export class CubeEvaluator extends CubeSymbols {
       this.evaluatedCubes[cube.name] = this.prepareCube(cube, errorReporter);
     }
 
-    for (const cube of validCubes) {
-      this.internCubeStrings(cube);
+    if (this.options.internStrings) {
+      for (const cube of validCubes) {
+        this.internCubeStrings(cube);
+      }
+      // Member definitions resolved for references, a second copy of the members' strings
+      internStringsDeep(this.symbols);
     }
-    // Member definitions resolved for references, a second copy of the members' strings
-    internCompiledStrings(this.symbols);
 
     this.byFileName = R.groupBy(v => v.fileName || v.name, validCubes);
     this.primaryKeys = R.fromPairs(
@@ -256,15 +259,12 @@ export class CubeEvaluator extends CubeSymbols {
     );
   }
 
-  /**
-   * CUBEJS_COMPILER_MULTI_TENANT_SHARING: the cube's own data properties, then the member maps its
-   * memoizing getters return (the walk itself never calls accessors).
-   */
   private internCubeStrings(cube: CubeDefinitionExtended) {
-    internCompiledStrings(cube);
+    internStringsDeep(cube);
 
+    // The walk skips accessors: read the memoized member maps here
     for (const collection of INTERNED_CUBE_COLLECTIONS) {
-      internCompiledStrings(cube[collection]);
+      internStringsDeep(cube[collection]);
     }
   }
 

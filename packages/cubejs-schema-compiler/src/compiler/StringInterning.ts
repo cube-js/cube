@@ -1,14 +1,5 @@
-import { getEnv } from '@cubejs-backend/shared';
-
-/**
- * String interning for compiled data models (CUBEJS_COMPILER_MULTI_TENANT_SHARING).
- *
- * A process that keeps many compiled apps holds the same member names, titles and descriptions
- * once per app, and strings built with `+` or template literals stay as trees of ConsString
- * nodes. Using a string as a key of a dictionary-mode object makes V8 internalize it: the key
- * is a flat copy in V8's string table, and every equal string maps to the same one. The string
- * table is weak, so the "pool" costs nothing to keep and never outlives the models using it.
- */
+// A dictionary-mode object's key is internalized: flattened into V8's (weak) string table, where
+// equal strings are one object. So the "pool" needs no bookkeeping and can't outlive its users.
 
 const stats = {
   calls: 0,
@@ -45,10 +36,8 @@ const isPlainObject = (value: object): boolean => {
 };
 
 /**
- * Replaces, in place, every string held by the plain objects and arrays reachable from `root`
- * with its interned copy. Equal values are replaced by equal values, so nothing a reader sees
- * changes. Only own data properties are touched: accessors (and whatever they would compute),
- * functions, class instances, non-writable properties and frozen objects are left alone.
+ * Replaces, in place, the strings of own data properties of plain objects and arrays reachable
+ * from `root` with equal interned ones; accessors, class instances and frozen objects are skipped.
  */
 export function internStringsDeep<T>(root: T): T {
   if (root === null || typeof root !== 'object') {
@@ -114,13 +103,6 @@ export function internStringsDeep<T>(root: T): T {
 
   stats.nanos += process.hrtime.bigint() - started;
   return root;
-}
-
-/**
- * `internStringsDeep` when CUBEJS_COMPILER_MULTI_TENANT_SHARING is on, a no-op otherwise.
- */
-export function internCompiledStrings<T>(root: T): T {
-  return getEnv('compilerMultiTenantSharing') ? internStringsDeep(root) : root;
 }
 
 /**

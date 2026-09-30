@@ -1,6 +1,7 @@
 import vm from 'vm';
 import { LRUCache } from 'lru-cache';
 import { PostgresQuery } from '../../src/adapter/PostgresQuery';
+import { CubePropContextTranspiler, ImportExportTranspiler, ValidationTranspiler } from '../../src/compiler/transpilers';
 import { prepareCompiler } from './PrepareCompiler';
 
 type Files = { fileName: string, content: string }[];
@@ -20,8 +21,10 @@ const tenantFiles = (): Files => [
       // The same top-level names in every tenant and every recompile.
       const TENANT = COMPILE_CONTEXT.securityContext.tenant;
       let counter = 0;
-      var legacy = 1;
+      // Hoisted declarations: in a shared realm these must not become its globals.
+      var LEGACY_TENANT = COMPILE_CONTEXT.securityContext.tenant;
       function helper() { return TENANT; }
+      function legacyTenant() { return LEGACY_TENANT; }
 
       asyncModule(async () => {
         // Let concurrent compiles interleave.
@@ -39,6 +42,7 @@ const tenantFiles = (): Files => [
             id: { sql: 'id', type: 'number', primary_key: true },
             // Evaluated lazily, when SQL is generated after the compile has finished.
             tenant: { sql: \`'\${COMPILE_CONTEXT.securityContext.tenant}'\`, type: 'string' },
+            legacy: { sql: () => \`'legacy_\${LEGACY_TENANT}_\${legacyTenant()}'\`, type: 'string' },
           },
         });
       });
@@ -59,7 +63,7 @@ const buildSql = ({ joinGraph, cubeEvaluator, compiler }, tenant: string) => new
   { joinGraph, cubeEvaluator, compiler },
   {
     measures: [`orders_${tenant}.count`],
-    dimensions: [`orders_${tenant}.tenant`],
+    dimensions: [`orders_${tenant}.tenant`, `orders_${tenant}.legacy`],
   }
 ).buildSqlAndParams()[0];
 
@@ -117,6 +121,19 @@ describe.each([
     await compileTenant('e', tenantFiles(), { ...options, ...shared });
     // Byte-identical files: the fifth tenant adds no script
     expect(shared.compiledScriptCache.size).toBe(entries);
+  });
+
+  it('keeps top-level var and function declarations per compile', async () => {
+    const a = await compileTenant('a', tenantFiles(), options);
+    const b = await compileTenant('b', tenantFiles(), options);
+
+    // Read lazily, after the other tenant's compile ran the same declarations
+    expect(buildSql(a, 'a')).toContain(`'legacy_a_a'`);
+    expect(buildSql(b, 'b')).toContain(`'legacy_b_b'`);
+    expect(buildSql(a, 'a')).not.toContain('legacy_b');
+
+    const concurrent = await Promise.all(['c', 'd', 'e'].map(t => compileTenant(t, tenantFiles(), options)));
+    ['c', 'd', 'e'].forEach((t, i) => expect(buildSql(concurrent[i], t)).toContain(`'legacy_${t}_${t}'`));
   });
 
   it('resolves a bare view_group reference', async () => {
@@ -219,6 +236,43 @@ describe('Shared VM context realm', () => {
         process.env.CUBEJS_COMPILER_MULTI_TENANT_SHARING = previous;
       }
     }
+  });
+
+  it('leaves no declarations or compile scope on the shared realm global', async () => {
+    const { cubeEvaluator } = await compileTenant('warmup', tenantFiles(), { sharedVmContext: true });
+    const realmFunction = cubeEvaluator.cubeFromPath('orders_warmup').dimensions.tenant.sql.constructor;
+    const sharedGlobal = realmFunction('return globalThis')();
+    const before = Reflect.ownKeys(sharedGlobal);
+
+    await compileTenant('a', tenantFiles(), { sharedVmContext: true });
+    await Promise.all(['b', 'c'].map(t => compileTenant(t, tenantFiles(), { sharedVmContext: true })));
+
+    expect(Reflect.ownKeys(sharedGlobal)).toEqual(before);
+    expect(before).not.toEqual(expect.arrayContaining(['LEGACY_TENANT', 'helper', 'legacyTenant', 'TENANT']));
+  });
+
+  it('keeps declarations per compile without the IIFE transpiler', async () => {
+    // The shared-realm wrapper must scope declarations by itself, not rely on IIFETranspiler.
+    // Only the names reach the transpiler workers.
+    const transpilers = [
+      new ValidationTranspiler(),
+      new ImportExportTranspiler(),
+      Object.create(CubePropContextTranspiler.prototype),
+    ];
+    const withoutIife = { sharedVmContext: true, transpilers };
+    const { cubeEvaluator } = await compileTenant('warmup', tenantFiles(), withoutIife);
+    const realmFunction = cubeEvaluator.cubeFromPath('orders_warmup').dimensions.tenant.sql.constructor;
+    const before = Reflect.ownKeys(realmFunction('return globalThis')());
+
+    const a = await compileTenant('a', tenantFiles(), withoutIife);
+    const b = await compileTenant('b', tenantFiles(), withoutIife);
+    expect(buildSql(a, 'a')).toContain(`'legacy_a_a'`);
+    expect(buildSql(b, 'b')).toContain(`'legacy_b_b'`);
+
+    const concurrent = await Promise.all(['c', 'd'].map(t => compileTenant(t, tenantFiles(), withoutIife)));
+    ['c', 'd'].forEach((t, i) => expect(buildSql(concurrent[i], t)).toContain(`'legacy_${t}_${t}'`));
+
+    expect(Reflect.ownKeys(realmFunction('return globalThis')())).toEqual(before);
   });
 
   it('reuses one realm across compiles when on', async () => {

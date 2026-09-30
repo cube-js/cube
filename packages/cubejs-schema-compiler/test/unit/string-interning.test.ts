@@ -73,22 +73,10 @@ views:
   },
 ];
 
-// The flag also turns on the shared VM context: the equality below covers both
-const compileModel = async (sharing: boolean) => {
-  const previous = process.env.CUBEJS_COMPILER_MULTI_TENANT_SHARING;
-  process.env.CUBEJS_COMPILER_MULTI_TENANT_SHARING = String(sharing);
-
-  try {
-    const compilers = prepareCompiler(files.map((f) => ({ ...f })));
-    await compilers.compiler.compile();
-    return compilers;
-  } finally {
-    if (previous === undefined) {
-      delete process.env.CUBEJS_COMPILER_MULTI_TENANT_SHARING;
-    } else {
-      process.env.CUBEJS_COMPILER_MULTI_TENANT_SHARING = previous;
-    }
-  }
+const compileModel = async (options: { multiTenantSharing?: boolean, internStrings?: boolean }) => {
+  const compilers = prepareCompiler(files.map((f) => ({ ...f })), options);
+  await compilers.compiler.compile();
+  return compilers;
 };
 
 // Builds a string at runtime (a ConsString), not a literal the parser already internalized
@@ -96,7 +84,7 @@ const cat = (...parts: string[]) => parts.join('');
 
 const querySql = (compilers, query) => new PostgresQuery(compilers, query).buildSqlAndParams();
 
-describe('String interning (CUBEJS_COMPILER_MULTI_TENANT_SHARING)', () => {
+describe('String interning', () => {
   test('internString keeps the value', () => {
     const built = cat('Filtered count ', String(Math.random()));
     expect(internString(built)).toBe(built);
@@ -160,9 +148,12 @@ describe('String interning (CUBEJS_COMPILER_MULTI_TENANT_SHARING)', () => {
     expect(foreign.title).toBe('Foreign');
   });
 
-  test('compiled model is the same with and without interning', async () => {
-    const plain = await compileModel(false);
-    const interned = await compileModel(true);
+  test.each([
+    ['interning only', { multiTenantSharing: false, internStrings: true }],
+    ['multi-tenant sharing', { multiTenantSharing: true }],
+  ])('compiled model is the same with and without interning (%s)', async (_name, options) => {
+    const plain = await compileModel({ multiTenantSharing: false });
+    const interned = await compileModel(options);
 
     expect(interned.metaTransformer.cubes).toEqual(plain.metaTransformer.cubes);
     expect(JSON.stringify(interned.metaTransformer.cubes)).toEqual(JSON.stringify(plain.metaTransformer.cubes));
@@ -196,12 +187,34 @@ describe('String interning (CUBEJS_COMPILER_MULTI_TENANT_SHARING)', () => {
     }
   });
 
-  test('interning walks the compiled model only when the flag is on', async () => {
+  test('interning walks the compiled model only when enabled', async () => {
     const before = internedStringsStats().calls;
-    await compileModel(false);
+    await compileModel({ multiTenantSharing: false });
     expect(internedStringsStats().calls).toBe(before);
 
-    await compileModel(true);
+    await compileModel({ multiTenantSharing: true });
     expect(internedStringsStats().calls).toBeGreaterThan(before);
+  });
+
+  test('defaults to CUBEJS_COMPILER_MULTI_TENANT_SHARING', async () => {
+    const previous = process.env.CUBEJS_COMPILER_MULTI_TENANT_SHARING;
+
+    try {
+      process.env.CUBEJS_COMPILER_MULTI_TENANT_SHARING = 'true';
+      const before = internedStringsStats().calls;
+      await compileModel({});
+      expect(internedStringsStats().calls).toBeGreaterThan(before);
+
+      process.env.CUBEJS_COMPILER_MULTI_TENANT_SHARING = 'false';
+      const after = internedStringsStats().calls;
+      await compileModel({});
+      expect(internedStringsStats().calls).toBe(after);
+    } finally {
+      if (previous === undefined) {
+        delete process.env.CUBEJS_COMPILER_MULTI_TENANT_SHARING;
+      } else {
+        process.env.CUBEJS_COMPILER_MULTI_TENANT_SHARING = previous;
+      }
+    }
   });
 });

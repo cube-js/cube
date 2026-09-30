@@ -23,16 +23,12 @@ import { CompilerCache } from './CompilerCache';
 
 const ctxFileStorage = new AsyncLocalStorage<FileContent>();
 
-/**
- * CUBEJS_COMPILER_MULTI_TENANT_SHARING: instead of one vm.Context (V8 realm) per
- * compile, every compile evaluates its files in ONE module-level realm. Each file
- * is wrapped as `with (<getter>()) { ... }`; the getter returns the running
- * compile's scope (cube, view, COMPILE_CONTEXT, view group names, ...), so the
- * closures a file creates bind that scope lexically and keep resolving it after
- * the compile has finished (lazy `sql` functions reading COMPILE_CONTEXT).
- */
+// Shared realm: closures bind the running compile's scope lexically through `with`, so lazy reads
+// (sql reading COMPILE_CONTEXT) keep resolving it after the compile. The function inside keeps
+// top-level var and function declarations off the shared global.
 const SHARED_SCOPE_GETTER = '__cubejsCompileScope';
-const SHARED_SCRIPT_PREFIX = `with (${SHARED_SCOPE_GETTER}()) {`;
+const SHARED_SCRIPT_PREFIX = `with (${SHARED_SCOPE_GETTER}()) { (function () {`;
+const SHARED_SCRIPT_SUFFIX = '\n}).call(this); }';
 const sharedScopeStorage = new AsyncLocalStorage<object>();
 let sharedVmContext: vm.Context | null = null;
 // The realm's own global object (the contextified sandbox does not carry the builtins).
@@ -58,13 +54,8 @@ const getSharedVmContext = (): vm.Context => {
   return sharedVmContext;
 };
 
-/**
- * Per-compile scope used as the `with` object. It claims every name that is not
- * a global of the shared realm, so that sloppy-mode implicit globals (`foo = 1`)
- * and `view_group` names land here and never leak into other tenants' compiles.
- * Reading a name that was never set throws a ReferenceError, as it would for a
- * global; the one difference is that `typeof undeclaredName` throws too.
- */
+// Claims every name that isn't a shared-realm global, so implicit globals and view_group names
+// stay per compile. Unlike a global, `typeof undeclaredName` throws.
 const createSharedCompileScope = (globals: Record<string, any>): Record<string, any> => {
   const target: Record<string, any> = Object.assign(Object.create(null), globals);
   getSharedVmContext();
@@ -158,8 +149,7 @@ export type DataSchemaCompilerOptions = {
   compiledYamlCache: LRUCache<string, string>;
   compiledJinjaCache: LRUCache<string, string>;
   /**
-   * Evaluate data model files in a realm shared by all compiles instead of a
-   * new vm.Context per compile. Defaults to CUBEJS_COMPILER_MULTI_TENANT_SHARING.
+   * Evaluate data model files in one realm shared by all compiles (prepareCompiler resolves it)
    */
   sharedVmContext?: boolean;
 };
@@ -294,7 +284,7 @@ export class DataSchemaCompiler {
     this.compiledScriptCache = options.compiledScriptCache;
     this.compiledYamlCache = options.compiledYamlCache;
     this.compiledJinjaCache = options.compiledJinjaCache;
-    this.sharedVmContext = options.sharedVmContext ?? getEnv('compilerMultiTenantSharing');
+    this.sharedVmContext = !!options.sharedVmContext;
   }
 
   public compileObjects(compileServices: CompilerInterface[], objects, errorsReport: ErrorReporter) {
@@ -1077,7 +1067,12 @@ export class DataSchemaCompiler {
   }
 
   private getJsScript(file: FileContent): vm.Script {
-    const cacheKey = crypto.createHash('md5').update(file.content).digest('hex');
+    // The script carries its file name (stack traces), and the cache may be shared between apps
+    const cacheKey = crypto.createHash('md5')
+      .update(file.fileName)
+      .update('\0')
+      .update(file.content)
+      .digest('hex');
 
     if (this.compiledScriptCache.has(cacheKey)) {
       return this.compiledScriptCache.get(cacheKey)!;
@@ -1089,9 +1084,7 @@ export class DataSchemaCompiler {
   }
 
   private getSharedJsScript(file: FileContent): vm.Script {
-    // Different source (the `with` wrapper) than getJsScript's script for the same file, hence
-    // the prefix. The script carries its file name into stack traces, and this cache is shared
-    // between apps: equal content under another name must not hand out that name.
+    // Not the source getJsScript compiles (the wrapper), hence the prefix
     const cacheKey = `shared:${crypto.createHash('md5')
       .update(file.fileName)
       .update('\0')
@@ -1103,7 +1096,7 @@ export class DataSchemaCompiler {
     }
 
     // The prefix is on line 1, so a negative column offset keeps positions in stack traces intact.
-    const script = new vm.Script(`${SHARED_SCRIPT_PREFIX}${file.content}\n}`, {
+    const script = new vm.Script(`${SHARED_SCRIPT_PREFIX}${file.content}${SHARED_SCRIPT_SUFFIX}`, {
       filename: file.fileName,
       columnOffset: -SHARED_SCRIPT_PREFIX.length,
     });

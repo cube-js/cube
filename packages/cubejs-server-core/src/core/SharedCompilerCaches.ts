@@ -2,19 +2,8 @@ import type vm from 'vm';
 import { LRUCache } from 'lru-cache';
 
 /**
- * Process-wide compile caches (CUBEJS_COMPILER_MULTI_TENANT_SHARING), handed to every CompilerApi
- * instead of one set per app.
- *
- * Only caches whose value is a function of the key alone are shared:
- * - compiledScriptCache: key = file name + transpiled JS source (the shared-realm scripts, with
- *   their `with` wrapper, under their own prefix); a vm.Script doesn't depend on the context
- *   it later runs in.
- * - compiledYamlCache: key = YAML (or rendered Jinja) content; YAML is transpiled before any
- *   cube symbols exist, so the output depends on the content only.
- *
- * The Jinja render cache is NOT shared: its key is the template (and macros), but the output
- * depends on the app's COMPILE_CONTEXT (security context) and its Python globals, so sharing
- * it would hand one tenant's rendered model to another.
+ * Process-wide script and YAML caches, whose values depend on their key alone. The Jinja render
+ * cache is not shared: its output depends on the app's COMPILE_CONTEXT and Python globals.
  */
 export type SharedCompilerCaches = {
   compiledScriptCache: LRUCache<string, vm.Script>;
@@ -27,10 +16,7 @@ export type SharedCompilerCachesOptions = {
   updateAgeOnGet?: boolean;
 };
 
-/**
- * Entries of each shared cache: sized for the distinct files of all apps, as a JS model file
- * takes up to one compiled-script entry per compile phase.
- */
+// Sized for the distinct files of all apps: a JS file takes an entry per compile phase
 export const SHARED_COMPILER_CACHES_MAX = 10000;
 
 let sharedCaches: SharedCompilerCaches | null = null;

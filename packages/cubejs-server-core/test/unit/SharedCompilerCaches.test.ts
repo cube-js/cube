@@ -152,8 +152,21 @@ describe('Shared compiler caches (CUBEJS_COMPILER_MULTI_TENANT_SHARING)', () => 
     expect(a.scriptCache.size).toBe(b.scriptCache.size);
   });
 
-  test('the sharedCompilerCaches option overrides the flag', () => {
-    const a = track(createApi(files, { sharedCompilerCaches: false }));
+  test('the option drives the caches and the compiler alike', async () => {
+    delete process.env.CUBEJS_COMPILER_MULTI_TENANT_SHARING;
+    const a = track(createApi(files, { multiTenantSharing: true, compilerCacheSize: 20000 }));
+    const b = track(createApi(files, { multiTenantSharing: true }));
+
+    expect(a.scriptCache).toBe(b.scriptCache);
+    // compilerCacheSize raises the shared caches above their default, never lowers them
+    expect(a.scriptCache.max).toBe(20000);
+    await a.getCompilers();
+    // Compiled for the shared realm although the env flag is off
+    expect([...a.scriptCache.keys()].every((k) => k.startsWith('shared:'))).toBe(true);
+  });
+
+  test('the multiTenantSharing option overrides the flag', () => {
+    const a = track(createApi(files, { multiTenantSharing: false }));
     const b = track(createApi(files));
     const c = track(createApi(files));
     expect(a.scriptCache).not.toBe(b.scriptCache);

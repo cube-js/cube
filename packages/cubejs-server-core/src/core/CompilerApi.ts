@@ -28,7 +28,7 @@ import type { SchemaFileRepository } from '@cubejs-backend/shared';
 import { NormalizedQuery, MemberExpression } from '@cubejs-backend/api-gateway';
 import { DriverCapabilities } from '@cubejs-backend/base-driver';
 import { DbTypeInternalFn, DialectClassFn, LoggerFn } from './types';
-import { getSharedCompilerCaches } from './SharedCompilerCaches';
+import { getSharedCompilerCaches, SHARED_COMPILER_CACHES_MAX } from './SharedCompilerCaches';
 
 type Context = any;
 
@@ -49,9 +49,10 @@ export interface CompilerApiOptions {
   maxCompilerCacheKeepAlive?: number;
   updateCompilerCacheKeepAlive?: boolean;
   /**
-   * Use the process-wide script and YAML caches. Defaults to CUBEJS_COMPILER_MULTI_TENANT_SHARING.
+   * Process-wide script and YAML caches, shared VM realm and string interning, resolved once here
+   * for the caches and the compiler alike. Defaults to CUBEJS_COMPILER_MULTI_TENANT_SHARING.
    */
-  sharedCompilerCaches?: boolean;
+  multiTenantSharing?: boolean;
   externalDialectClass?: BaseQuery;
   externalDbType?: string;
   devServer?: boolean;
@@ -135,10 +136,7 @@ export class CompilerApi {
 
   protected compiledScriptCacheInterval?: NodeJS.Timeout;
 
-  /**
-   * The script and YAML caches are the process-wide ones (CUBEJS_COMPILER_MULTI_TENANT_SHARING)
-   */
-  protected readonly sharedCompilerCaches: boolean;
+  protected readonly multiTenantSharing: boolean;
 
   protected graphqlSchema?: GraphQLSchema;
 
@@ -174,10 +172,11 @@ export class CompilerApi {
       ttl: options.maxCompilerCacheKeepAlive,
       updateAgeOnGet: options.updateCompilerCacheKeepAlive
     };
-    this.sharedCompilerCaches = options.sharedCompilerCaches ?? getEnv('compilerMultiTenantSharing');
-    if (this.sharedCompilerCaches) {
+    this.multiTenantSharing = options.multiTenantSharing ?? getEnv('compilerMultiTenantSharing');
+    if (this.multiTenantSharing) {
       // Owned by the process (and purged by it), not by this app: dispose() leaves them alone
       ({ compiledScriptCache: this.compiledScriptCache, compiledYamlCache: this.compiledYamlCache } = getSharedCompilerCaches({
+        max: Math.max(options.compilerCacheSize || 0, SHARED_COMPILER_CACHES_MAX),
         ttl: options.maxCompilerCacheKeepAlive,
         updateAgeOnGet: options.updateCompilerCacheKeepAlive,
       }));
@@ -192,7 +191,7 @@ export class CompilerApi {
     if (this.options.maxCompilerCacheKeepAlive) {
       this.compiledScriptCacheInterval = setInterval(
         () => {
-          if (!this.sharedCompilerCaches) {
+          if (!this.multiTenantSharing) {
             this.compiledScriptCache.purgeStale();
             this.compiledYamlCache.purgeStale();
           }
@@ -266,6 +265,7 @@ export class CompilerApi {
       standalone: this.standalone,
       nativeInstance: this.nativeInstance,
       compiledScriptCache: this.compiledScriptCache,
+      multiTenantSharing: this.multiTenantSharing,
     });
   }
 
@@ -285,6 +285,7 @@ export class CompilerApi {
         standalone: this.standalone,
         nativeInstance: this.nativeInstance,
         compiledScriptCache: this.compiledScriptCache,
+        multiTenantSharing: this.multiTenantSharing,
         compiledJinjaCache: this.compiledJinjaCache,
         compiledYamlCache: this.compiledYamlCache,
       });

@@ -477,10 +477,7 @@ const variables: Record<string, (...args: any) => any> = {
     return size;
   },
   /**
-   * Multi-tenant memory sharing for compiled data models (experimental): evaluate every
-   * compile in one shared V8 realm, keep the compiled-script and transpiled-YAML caches
-   * process-wide (content-keyed, so apps with byte-identical model files share entries),
-   * and intern the compiled models' strings so equal strings of different apps are one copy.
+   * Experimental: compiled apps share one VM realm, process-wide script/YAML caches and interned strings.
    */
   compilerMultiTenantSharing: () => get('CUBEJS_COMPILER_MULTI_TENANT_SHARING')
     .default('false')
