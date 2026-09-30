@@ -7698,6 +7698,13 @@ components:
           maxLength: 255
           minLength: 1
           type: string
+        notificationEnabled:
+          oneOf:
+            - type: boolean
+            - type: 'null'
+          description: >-
+            Notify the creator in Cube's notification inbox when a run finishes, whether it succeeds
+            or fails. Defaults to `false`.
         prompt:
           description: >-
             What the agent is asked on every run, shown as the task's Instructions in Cube. Each run
@@ -13287,6 +13294,9 @@ components:
             - type: string
             - type: 'null'
           description: When the schedule next fires (ISO 8601, UTC); null for a Manual or paused task.
+        notificationEnabled:
+          description: Whether a finished run notifies the creator in Cube's notification inbox.
+          type: boolean
         prompt:
           description: >-
             What the agent is asked on every run, shown as the task's Instructions in Cube. Each run
@@ -13307,6 +13317,7 @@ components:
         - prompt
         - timezone
         - isEnabled
+        - notificationEnabled
         - userId
       type: object
     ScheduledTaskRunResponse:
@@ -14335,6 +14346,13 @@ components:
               minLength: 1
             - type: 'null'
           description: Omit to leave unchanged. Explicit null answers `400`.
+        notificationEnabled:
+          oneOf:
+            - type: boolean
+            - type: 'null'
+          description: >-
+            Turn the inbox notification for finished runs on or off. Omit to leave unchanged.
+            Explicit null answers `400`.
         prompt:
           oneOf:
             - minLength: 1
