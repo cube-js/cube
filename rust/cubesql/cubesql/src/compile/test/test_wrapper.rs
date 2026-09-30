@@ -4983,3 +4983,290 @@ async fn boolean_context_segment_members() {
         assert_eq!(expressions, vec![case["sql"].clone()]);
     }
 }
+
+/// Filter, Sort or Aggregate above a limited CubeScan must stay above it: merging them into
+/// the same Cube request would apply them before the limit and offset, not after.
+fn assert_limited_scan_request(
+    logical_plan: &LogicalPlan,
+    order: Vec<Vec<&str>>,
+    limit: Option<i32>,
+    offset: Option<i32>,
+) {
+    let request = logical_plan.find_cube_scan().request;
+    assert_eq!(
+        request.order,
+        Some(
+            order
+                .into_iter()
+                .map(|o| o.into_iter().map(|s| s.to_string()).collect())
+                .collect()
+        )
+    );
+    assert_eq!(request.limit, limit);
+    assert_eq!(request.offset, offset);
+    assert_eq!(request.filters, None);
+    assert_eq!(request.segments, Some(vec![]));
+}
+
+/// Returns the position of the outer WHERE when the filter ends up in the wrapped SQL.
+fn assert_filter_above_limited_scan(
+    logical_plan: &LogicalPlan,
+    filter: &str,
+    wrapped_filter: &str,
+) -> Option<usize> {
+    let plan = logical_plan.display_indent().to_string();
+    if plan.contains(&format!("Filter: {filter}")) {
+        assert_eq!(logical_plan.find_cube_scan().request.filters, None);
+        return None;
+    }
+    let sql = logical_plan
+        .find_cube_scan_wrapped_sql_deep()
+        .wrapped_sql
+        .sql;
+    let where_pos = sql.find(&format!("WHERE ({wrapped_filter}"));
+    assert!(
+        where_pos.is_some(),
+        "filter must stay above the limited scan, plan:\n{}\nsql:\n{}",
+        plan,
+        sql
+    );
+    where_pos
+}
+
+#[tokio::test]
+async fn test_filter_over_limited_offset_scan() {
+    init_testing_logger();
+
+    let query_plan = convert_select_to_query_plan(
+        // language=PostgreSQL
+        r#"
+        SELECT customer_gender, amount
+        FROM (
+            SELECT customer_gender, taxful_total_price AS amount
+            FROM KibanaSampleDataEcommerce
+            ORDER BY amount DESC
+            LIMIT 10
+            OFFSET 5
+        ) t
+        WHERE customer_gender = 'female'
+        "#
+        .to_string(),
+        DatabaseProtocol::PostgreSQL,
+    )
+    .await;
+
+    let logical_plan = query_plan.as_logical_plan();
+    println!("{}", logical_plan.display_indent());
+    assert_limited_scan_request(
+        &logical_plan,
+        vec![vec!["KibanaSampleDataEcommerce.taxful_total_price", "desc"]],
+        Some(10),
+        Some(5),
+    );
+    assert_filter_above_limited_scan(
+        &logical_plan,
+        "#t.customer_gender = Utf8(\"female\")",
+        "\"t\".\"customer_gender\" = $",
+    );
+}
+
+#[tokio::test]
+async fn test_filter_over_limited_grouped_scan() {
+    init_testing_logger();
+
+    let query_plan = convert_select_to_query_plan(
+        // language=PostgreSQL
+        r#"
+        SELECT customer_gender, cnt
+        FROM (
+            SELECT customer_gender, COUNT(*) AS cnt
+            FROM KibanaSampleDataEcommerce
+            GROUP BY 1
+            ORDER BY cnt DESC
+            LIMIT 10
+        ) t
+        WHERE customer_gender = 'female'
+        "#
+        .to_string(),
+        DatabaseProtocol::PostgreSQL,
+    )
+    .await;
+
+    let logical_plan = query_plan.as_logical_plan();
+    println!("{}", logical_plan.display_indent());
+    assert_limited_scan_request(
+        &logical_plan,
+        vec![vec!["KibanaSampleDataEcommerce.count", "desc"]],
+        Some(10),
+        None,
+    );
+    assert_filter_above_limited_scan(
+        &logical_plan,
+        "#t.customer_gender = Utf8(\"female\")",
+        "\"t\".\"customer_gender\" = $",
+    );
+}
+
+#[tokio::test]
+async fn test_filter_over_offset_scan() {
+    init_testing_logger();
+
+    let query_plan = convert_select_to_query_plan(
+        // language=PostgreSQL
+        r#"
+        SELECT customer_gender, amount
+        FROM (
+            SELECT customer_gender, taxful_total_price AS amount
+            FROM KibanaSampleDataEcommerce
+            ORDER BY amount DESC
+            OFFSET 5
+        ) t
+        WHERE customer_gender = 'female'
+        "#
+        .to_string(),
+        DatabaseProtocol::PostgreSQL,
+    )
+    .await;
+
+    let logical_plan = query_plan.as_logical_plan();
+    println!("{}", logical_plan.display_indent());
+    assert_limited_scan_request(
+        &logical_plan,
+        vec![vec!["KibanaSampleDataEcommerce.taxful_total_price", "desc"]],
+        None,
+        Some(5),
+    );
+    assert_filter_above_limited_scan(
+        &logical_plan,
+        "#t.customer_gender = Utf8(\"female\")",
+        "\"t\".\"customer_gender\" = $",
+    );
+}
+
+#[tokio::test]
+async fn test_filter_over_limited_wrapped_scan() {
+    if !Rewriter::sql_push_down_enabled() {
+        return;
+    }
+    init_testing_logger();
+
+    let query_plan = convert_select_to_query_plan(
+        // language=PostgreSQL
+        r#"
+        SELECT customer_gender, amount
+        FROM (
+            SELECT customer_gender, taxful_total_price AS amount
+            FROM KibanaSampleDataEcommerce
+            WHERE LOWER(customer_gender) = 'x'
+            ORDER BY amount DESC
+            LIMIT 10
+            OFFSET 5
+        ) t
+        WHERE customer_gender = 'female'
+        "#
+        .to_string(),
+        DatabaseProtocol::PostgreSQL,
+    )
+    .await;
+
+    let logical_plan = query_plan.as_logical_plan();
+    let wrapped_sql = logical_plan.find_cube_scan_wrapped_sql_deep().wrapped_sql;
+    println!("{}", wrapped_sql.sql);
+    let where_pos = assert_filter_above_limited_scan(
+        &logical_plan,
+        "#t.customer_gender = Utf8(\"female\")",
+        "\"t\".\"customer_gender\" = $2",
+    )
+    .expect("outer WHERE must stay above the limited request");
+    // Limit and offset stay in the inner Cube request, the outer WHERE comes after them
+    let sql = &wrapped_sql.sql;
+    let offset_pos = sql
+        .find("\"offset\": 5")
+        .expect("inner request must keep offset");
+    assert!(sql.contains("\"limit\": 10"), "sql:\n{}", sql);
+    assert!(offset_pos < where_pos, "sql:\n{}", sql);
+    assert_eq!(
+        wrapped_sql.values,
+        vec![Some("x".to_string()), Some("female".to_string())]
+    );
+}
+
+#[tokio::test]
+async fn test_sort_over_limited_scan() {
+    init_testing_logger();
+
+    let query_plan = convert_select_to_query_plan(
+        // language=PostgreSQL
+        r#"
+        SELECT customer_gender, amount
+        FROM (
+            SELECT customer_gender, taxful_total_price AS amount
+            FROM KibanaSampleDataEcommerce
+            ORDER BY amount DESC
+            LIMIT 10
+            OFFSET 5
+        ) t
+        ORDER BY customer_gender
+        "#
+        .to_string(),
+        DatabaseProtocol::PostgreSQL,
+    )
+    .await;
+
+    let logical_plan = query_plan.as_logical_plan();
+    println!("{}", logical_plan.display_indent());
+    assert_limited_scan_request(
+        &logical_plan,
+        vec![vec!["KibanaSampleDataEcommerce.taxful_total_price", "desc"]],
+        Some(10),
+        Some(5),
+    );
+    let plan = logical_plan.display_indent().to_string();
+    assert!(
+        plan.contains("Sort: #t.customer_gender ASC NULLS LAST"),
+        "outer sort must stay above the limited scan, plan:\n{}",
+        plan
+    );
+}
+
+#[tokio::test]
+async fn test_aggregate_over_limited_ungrouped_scan() {
+    init_testing_logger();
+
+    let query_plan = convert_select_to_query_plan(
+        // language=PostgreSQL
+        r#"
+        SELECT customer_gender, SUM(amount)
+        FROM (
+            SELECT customer_gender, taxful_total_price AS amount
+            FROM KibanaSampleDataEcommerce
+            ORDER BY amount DESC
+            LIMIT 10
+            OFFSET 5
+        ) t
+        GROUP BY 1
+        "#
+        .to_string(),
+        DatabaseProtocol::PostgreSQL,
+    )
+    .await;
+
+    let logical_plan = query_plan.as_logical_plan();
+    println!("{}", logical_plan.display_indent());
+    assert_limited_scan_request(
+        &logical_plan,
+        vec![vec!["KibanaSampleDataEcommerce.taxful_total_price", "desc"]],
+        Some(10),
+        Some(5),
+    );
+    // The aggregation runs over the limited rows, it is not merged into the request
+    let request = logical_plan.find_cube_scan().request;
+    assert_eq!(request.measures, Some(vec![]));
+    assert_eq!(
+        request.dimensions,
+        Some(vec![
+            "KibanaSampleDataEcommerce.customer_gender".to_string(),
+            "KibanaSampleDataEcommerce.taxful_total_price".to_string(),
+        ])
+    );
+}
