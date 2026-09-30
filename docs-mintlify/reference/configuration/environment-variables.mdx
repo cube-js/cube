@@ -187,6 +187,40 @@ which takes precedence over this environment variable. The SQL API compiler
 cache reads this environment variable only, so the configuration option does not
 affect it.
 
+## `CUBEJS_COMPILER_MULTI_TENANT_SHARING`
+
+If `true`, data models of different tenants in one process share what they
+can: model files are evaluated in one shared JavaScript context, the caches of
+compiled JavaScript and transpiled YAML files are shared (tenants with
+identical model files reuse each other's entries), and identical strings of
+compiled data models are kept once. Reduces memory in multi-tenant
+deployments. The Jinja render cache stays per data model, because rendered
+templates depend on the security context.
+
+| Possible Values  | Default in Development | Default in Production |
+| ---------------- | ---------------------- | --------------------- |
+| `true`, `false`  | `false`                | `false`               |
+
+<Warning>
+Data models run in one JavaScript realm, which differs from a realm per data
+model in these ways:
+
+- Built-in objects (`Object`, `Array`, `JSON`, ...) are shared, so a data model
+  that changes them, e.g., by adding to `Array.prototype`, affects every
+  tenant. Assigning or deleting a global, even `JSON`, stays per tenant.
+- In a non-strict file, `typeof` of an undeclared name throws a
+  `ReferenceError` instead of returning `'undefined'` (except for `module`,
+  `exports` and `define`), and a strict function in it that assigns to an
+  undeclared name creates a global instead of throwing a `ReferenceError`.
+  Files that start with `'use strict'` behave as usual.
+- Setting a property on `this` in a non-strict function called without a
+  receiver, which is the shared global object, throws a `TypeError`.
+- `new Function(...)` and direct `eval` see the data model's globals, but
+  indirect eval (`(0, eval)(...)`) and a function constructor reached through a
+  prototype (`(function () {}).constructor`) run in the shared global scope,
+  where they don't.
+</Warning>
+
 ## `CUBEJS_CONCURRENCY`
 
 The number of concurrent connections each query queue has to the database.

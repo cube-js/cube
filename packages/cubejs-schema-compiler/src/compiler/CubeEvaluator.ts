@@ -22,6 +22,7 @@ import { BaseQuery, PreAggregationDefinitionExtended } from '../adapter';
 import type { CubeValidator } from './CubeValidator';
 import type { ErrorReporter } from './ErrorReporter';
 import { FinishedJoinTree } from './JoinGraph';
+import { internStringsDeep } from './StringInterning';
 
 export type SegmentDefinition = {
   type: string;
@@ -203,6 +204,8 @@ export type EvaluatedCube = {
   refreshKey?: CubeRefreshKey;
 };
 
+const INTERNED_CUBE_COLLECTIONS = ['measures', 'dimensions', 'segments', 'hierarchies', 'preAggregations', 'joins'] as const;
+
 export class CubeEvaluator extends CubeSymbols {
   public evaluatedCubes: Record<string, EvaluatedCube> = {};
 
@@ -213,7 +216,8 @@ export class CubeEvaluator extends CubeSymbols {
   private isRbacEnabledCache: boolean | null = null;
 
   public constructor(
-    protected readonly cubeValidator: CubeValidator
+    protected readonly cubeValidator: CubeValidator,
+    protected readonly options: { internStrings?: boolean } = {},
   ) {
     super(true);
   }
@@ -234,6 +238,14 @@ export class CubeEvaluator extends CubeSymbols {
       this.evaluatedCubes[cube.name] = this.prepareCube(cube, errorReporter);
     }
 
+    if (this.options.internStrings) {
+      for (const cube of validCubes) {
+        this.internCubeStrings(cube);
+      }
+      // Member definitions resolved for references, a second copy of the members' strings
+      internStringsDeep(this.symbols);
+    }
+
     this.byFileName = R.groupBy(v => v.fileName || v.name, validCubes);
     this.primaryKeys = R.fromPairs(
       validCubes.map((v) => {
@@ -245,6 +257,15 @@ export class CubeEvaluator extends CubeSymbols {
         return [v.name, primaryKeyNamesToSymbols];
       })
     );
+  }
+
+  private internCubeStrings(cube: CubeDefinitionExtended) {
+    internStringsDeep(cube);
+
+    // The walk skips accessors: read the memoized member maps here
+    for (const collection of INTERNED_CUBE_COLLECTIONS) {
+      internStringsDeep(cube[collection]);
+    }
   }
 
   protected prepareCube(cube, errorReporter: ErrorReporter): EvaluatedCube {

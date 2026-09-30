@@ -476,6 +476,12 @@ const variables: Record<string, (...args: any) => any> = {
 
     return size;
   },
+  /**
+   * Experimental: compiled apps share one VM realm, process-wide script/YAML caches and interned strings.
+   */
+  compilerMultiTenantSharing: () => get('CUBEJS_COMPILER_MULTI_TENANT_SHARING')
+    .default('false')
+    .asBoolStrict(),
   nativeSqlPlanner: () => {
     const explicitlySet = process.env.CUBEJS_TESSERACT_SQL_PLANNER !== undefined;
     const enabled = get('CUBEJS_TESSERACT_SQL_PLANNER').default('true').asBool();
