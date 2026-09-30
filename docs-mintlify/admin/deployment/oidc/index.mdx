@@ -92,15 +92,17 @@ Cube-issued tokens.
 A **token config** is a tenant-level entry that tells Cube which audience to
 mint tokens for and how to format the `sub` claim each token carries. Each
 token config produces one audience-scoped JWT that is delivered to all
-deployments in the tenant.
+deployments in the tenant, or, for a [per-user](#per-user-tokens) config, one
+JWT per user.
 
 | Field                     | What it controls                                                                                                       |
 | ------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
 | **Audience type**         | One of `AWS`, `GCP`, `Azure`, or `Custom`. `AWS` and `Azure` pre-fill the audience value.                               |
 | **Audience**              | The JWT `aud` claim value. Pre-set for `AWS` (`sts.amazonaws.com`) and `Azure` (`api://AzureADTokenExchange`). For `GCP` you supply the **Workload Identity Federation provider resource path** (`//iam.googleapis.com/projects/.../providers/...`) — there is no global GCP audience. User-supplied for `Custom`. |
-| **Name**                  | A short, filesystem-safe slug that becomes part of the token file name (`cube_cloud_token_<name>`).                     |
+| **Name**                  | A short, filesystem-safe slug that becomes part of the token file name (`cube_cloud_token_<name>`), or the `oidcTokens` key for [per-user](#per-user-tokens) configs. |
 | **Subject Claim Format**  | Template for the JWT `sub` claim. Defaults to `cube:deployment:{deployment_id}` if left empty.                          |
-| **Custom Claims**         | Optional extra JWT claims emitted verbatim in every minted token — see [Custom claims](#custom-claims) below.            |
+| **Custom Claims**         | Optional extra JWT claims added to every minted token (per-user configs can template values from the user) — see [Custom claims](#custom-claims) below. |
+| **Token subject**         | `Deployment` (default) or `Signed-in user`. Set when the config is created. A signed-in-user config mints a token per user, delivered in the security context instead of as a file — see [Per-user tokens](#per-user-tokens) below. |
 | **Target Env Var**        | Custom audience type only: env var Cube populates with the token file path in every execution context — see [Custom token configs](#custom-token-configs) below. |
 
 You can have one config per well-known audience type (AWS, GCP, Azure) plus
@@ -124,7 +126,8 @@ templates** the dialog offers:
 - `cube:deployment:{deployment_id}:component:{component}`
 - `cube:deployment:{deployment_id}:component:{component}:region:{region}`
 
-Three placeholders are supported anywhere in the template:
+Three placeholders are supported anywhere in the template (per-user configs
+add [their own](#per-user-tokens)):
 
 | Placeholder       | What it resolves to                                                 |
 | ----------------- | ------------------------------------------------------------------- |
@@ -208,6 +211,114 @@ The [Snowflake data source page][ref-oidc-snowflake] walks through the full setu
 <Frame>
   <img src="/images/admin/deployment/oidc/snowflake-token-config-dialog.png" alt="Edit OIDC Token Config dialog in Cube Cloud for a custom Snowflake audience: Custom audience type, the Snowflake account URL as the custom audience, a Target Env Var of CUBEJS_DB_SNOWFLAKE_OAUTH_TOKEN_PATH, and a custom claim scp set to session:role-any." />
 </Frame>
+
+### Per-user tokens
+
+<Warning>
+
+Per-user tokens are currently in preview. Reach out to the
+[Cube support team](/admin/account-billing/support) to activate them for your
+account.
+
+</Warning>
+
+Set **Token subject** to `Signed-in user` to mint a token for each Cube user
+instead of one per deployment, so the data source sees the querying user
+rather than a service identity. Per-user configs use the `Custom` audience
+type, and have no **Target Env Var**: the token is not written to a file.
+Instead, Cube adds it to the user's [security context][ref-security-context]
+whenever it resolves that user for a query — Playground, the REST (JSON) and
+SQL APIs, and Analytics Chat — as
+`securityContext.cubeCloud.oidcTokens.<name>`, where `<name>` is the config's
+**Name**:
+
+- `{ status: "active", token, expiresAt, issuedAt }` — a valid token. It lives
+  one hour and is re-minted, with a new `issuedAt`, after half of that.
+- `{ status: "error", error }` — no token could be minted for this user, for
+  example because a placeholder has no value.
+
+The **Subject Claim Format** of a per-user config must contain at least one of
+these placeholders, and may also contain `.`, `@` and `+`. It defaults to
+`{user_email}`:
+
+| Placeholder    | What it resolves to                    |
+| -------------- | -------------------------------------- |
+| `{user_email}` | The user's email.                      |
+| `{username}`   | The user's Cube username.              |
+| `{user_id}`    | The user's numeric Cube user ID.       |
+
+**Custom Claims** values may use the same placeholders, plus
+`{user_attribute:<name>}` for a [user attribute][ref-user-attributes] — for
+example, `scp` = `session:role:{user_attribute:snowflake_role}`. Substituted
+values may only contain `[A-Za-z0-9_.@+-]`, so an attribute cannot add a
+second scope. Every per-user token also carries a `cube:user_id` claim.
+
+To query as the user, hand the token to the driver from `driverFactory`, and
+key the orchestrator on the user and the token's `issuedAt`. A driver keeps
+the credentials it was built with, so each user needs their own orchestrator,
+and a re-minted token needs a new one. This example is for Snowflake, with a
+config named `snowflake-user` whose subject is `{user_email}`, mapped to each
+Snowflake user's `LOGIN_NAME`:
+
+```javascript
+const token = (sc) => sc?.cubeCloud?.oidcTokens?.["snowflake-user"];
+
+module.exports = {
+  // Marks the refresh worker's context: the only one that may use the deployment's identity.
+  scheduledRefreshContexts: () => [{ securityContext: { refreshWorker: true } }],
+  contextToOrchestratorId: ({ securityContext: sc }) =>
+    sc?.cubeCloud?.username
+      ? `user_${sc.cubeCloud.username}_${token(sc)?.issuedAt}`
+      : "default",
+  driverFactory: ({ securityContext: sc }) => {
+    if (sc?.refreshWorker) {
+      return { type: "snowflake" };
+    }
+    // Fail closed: anyone without a token gets a credential Snowflake rejects.
+    const t = token(sc);
+    return {
+      type: "snowflake",
+      authenticator: "OAUTH",
+      oauthToken: t?.status === "active" ? t.token : "no-per-user-token",
+    };
+  },
+};
+```
+
+The trade-off: each re-mint (about every 30 minutes) starts the user on a new
+orchestrator with an empty cache and new connections, and superseded
+orchestrators keep theirs until they are evicted from the orchestrator cache.
+
+For BigQuery, return `{ type: "bigquery", authClient }` instead, where
+`authClient` is a `google-auth-library` `IdentityPoolClient` with the Workload
+Identity Federation provider as its `audience` and a `subject_token_supplier`
+that returns the user's token. Google exchanges it for the principal
+`principal://iam.googleapis.com/projects/<number>/locations/global/workloadIdentityPools/<pool>/subject/<sub>`,
+which BigQuery [row access policies][link-bq-rls] accept as a grantee.
+
+<Warning>
+
+- Don't throw from `driverFactory`. Cube also calls it to learn the data source
+  type, with the context of an earlier request, and an exception there fails
+  queries for every user.
+- Never pass an empty `oauthToken`. The Snowflake driver then reads the
+  deployment's token file, and the query runs as the deployment instead of
+  the user.
+- Don't fall back on a missing `cubeCloud.username`. Requests authenticated
+  with your own JWT or `checkAuth` have no Cube user either, and would run
+  with the deployment's grants. In the example they are refused. Anyone who
+  can sign tokens with the deployment's API secret can still set
+  `refreshWorker`, just as they can set `cubeCloud.username`.
+
+</Warning>
+
+Work without a user, such as [pre-aggregation][ref-pre-aggs] builds, runs
+under the deployment's identity: keep a separate deployment config (e.g. with
+**Target Env Var** `CUBEJS_DB_SNOWFLAKE_OAUTH_TOKEN_PATH`) for it. Queries
+served from pre-aggregations don't reach the data source, so its per-user
+policies don't apply to them; protect those data with
+[access policies][ref-access-policies]. Embedded users do not receive
+per-user tokens, so the example refuses their queries.
 
 ## Trust mechanism
 
@@ -373,5 +484,10 @@ which resource and when, without ever issuing a long-lived credential.
 [ref-data-sources]: /admin/connect-to-data/data-sources
 [ref-sub-editor]: /admin/deployment/oidc#subject-claim-format
 [ref-cube-cloud-region]: /admin/deployment/infrastructure#what-is-a-cube-cloud-region
+[ref-security-context]: /docs/data-modeling/access-control/context
+[ref-user-attributes]: /admin/users-and-permissions/user-attributes
+[ref-pre-aggs]: /docs/pre-aggregations/using-pre-aggregations
+[ref-access-policies]: /docs/data-modeling/data-access-policies
+[link-bq-rls]: https://cloud.google.com/bigquery/docs/row-level-security-intro
 [link-oidc-spec]: https://openid.net/specs/openid-connect-core-1_0.html
 [link-oidc-primer]: https://www.oauth.com/oauth2-servers/openid-connect/
