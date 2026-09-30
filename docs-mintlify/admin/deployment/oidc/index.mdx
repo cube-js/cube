@@ -209,6 +209,46 @@ The [Snowflake data source page][ref-oidc-snowflake] walks through the full setu
   <img src="/images/admin/deployment/oidc/snowflake-token-config-dialog.png" alt="Edit OIDC Token Config dialog in Cube Cloud for a custom Snowflake audience: Custom audience type, the Snowflake account URL as the custom audience, a Target Env Var of CUBEJS_DB_SNOWFLAKE_OAUTH_TOKEN_PATH, and a custom claim scp set to session:role-any." />
 </Frame>
 
+### Per-user tokens
+
+<Warning>
+
+Per-user OIDC tokens are currently in preview. Reach out to the [Cube support
+team](/admin/account-billing/support) to activate this feature for your account.
+
+</Warning>
+
+By default a token identifies the deployment. To have the data source apply its
+own access controls per person — for example, Snowflake External OAuth mapping
+each user to a role — set a config's **Token subject** to **User**. Cube then
+mints a token for the signed-in user and passes it to your data model in
+`securityContext.cubeCloud.oidcTokens`, keyed by the config name, so a
+`driverFactory` can build a per-user driver:
+
+```javascript
+module.exports = {
+  driverFactory: ({ securityContext }) => {
+    const oidc = securityContext.cubeCloud.oidcTokens?.snowflake_user;
+    if (oidc?.status !== "active") {
+      throw new Error(oidc?.error ?? "No user token available");
+    }
+    return new SnowflakeDriver({
+      authenticator: "OAUTH",
+      token: oidc.token,
+    });
+  },
+};
+```
+
+User configs must use the `Custom` audience type and don't support **Target Env
+Var**. In addition to the [placeholders above](#subject-claim-format), the
+subject format and custom claim values accept `{user_email}`, `{username}` and
+`{user_id}`, and claim values also accept `{user_attribute:<name>}` — for
+example, claim `scp` with value `session:role:{user_attribute:snowflake_role}`.
+The subject format must include one of the user placeholders. If a config
+can't be rendered for a user, its entry has `status: "error"` and an `error`
+message instead of a token.
+
 ## Trust mechanism
 
 The receiving system trusts Cube tokens by referencing two things:
