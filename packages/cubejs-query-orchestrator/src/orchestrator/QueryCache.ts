@@ -26,6 +26,7 @@ import { ContinueWaitError } from './ContinueWaitError';
 import { LocalCacheDriver } from './LocalCacheDriver';
 import { DriverFactory, DriverFactoryByDataSource } from './DriverFactory';
 import { LambdaQuery, LoadPreAggregationResult, PreAggregationDescription } from './PreAggregations';
+import type { PreAggregationLoadCache } from './PreAggregationLoadCache';
 import {
   getCacheHash,
   evaluateLocalRefreshKey,
@@ -97,10 +98,10 @@ export type LoadRefreshKeyOptions = {
 
 export type Query = {
   requestId?: string;
-  dataSource: string;
+  dataSource?: string;
   preAggregations?: PreAggregationDescription[];
   groupedPartitionPreAggregations?: PreAggregationDescription[][];
-  preAggregationsLoadCacheByDataSource?: any;
+  preAggregationsLoadCacheByDataSource?: Record<string, PreAggregationLoadCache>;
   cacheMode?: CacheMode;
   compilerCacheFn?: <T>(subKey: string[], cacheFn: () => T) => T;
 };
@@ -118,13 +119,11 @@ export type QueryBody = {
   isJob?: boolean;
   forceNoCache?: boolean;
   preAggregations?: PreAggregationDescription[];
-  groupedPartitionPreAggregations?: PreAggregationDescription[][];
+  /** `null` streams rows with the SQL aliases as keys. */
   aliasNameToMember?: {
     [alias: string]: string;
-  };
-  preAggregationsLoadCacheByDataSource?: {
-    [key: string]: any;
-  };
+  } | null;
+  preAggregationsLoadCacheByDataSource?: Record<string, PreAggregationLoadCache>;
   queuePriority?: number;
   cacheKeyQueries?: QueryWithParams[] | {
     queries?: QueryWithParams[];
@@ -137,8 +136,7 @@ export type QueryBody = {
   lambdaQueries?: Record<string, LambdaQuery>;
   forceBuildPreAggregations?: boolean;
   orphanedTimeout?: number;
-  metadata?: any;
-  compilerCacheFn?: <T>(subKey: string[], cacheFn: () => T) => T;
+  metadata?: unknown;
   timezone?: string;
   context?: unknown;
 };
@@ -636,7 +634,7 @@ export class QueryCache {
       useCsvQuery?: boolean,
       lambdaTypes?: TableStructure,
       persistent?: boolean,
-      aliasNameToMember?: { [alias: string]: string },
+      aliasNameToMember?: { [alias: string]: string } | null,
     }
   ) {
     const queue = external
@@ -1311,7 +1309,7 @@ export class QueryCache {
     return cachedValue && new Date(cachedValue.time);
   }
 
-  public async resultFromCacheIfExists(queryBody) {
+  public async resultFromCacheIfExists(queryBody: QueryBody) {
     const cacheKey = QueryCache.queryCacheKey(queryBody);
     const cachedValue = await this.cacheDriver.get(this.queryCacheKey(cacheKey));
     if (cachedValue) {

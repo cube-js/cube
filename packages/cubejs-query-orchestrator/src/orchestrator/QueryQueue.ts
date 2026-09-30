@@ -169,7 +169,7 @@ export class QueryQueue {
     return this.streams.get(queryKeyHash);
   }
 
-  public createQueryStream(key: QueryKeyHash, aliasNameToMember: Record<string, string>): QueryStream {
+  public createQueryStream(key: QueryKeyHash, aliasNameToMember: Record<string, string> | null): QueryStream {
     const stream = new QueryStream({
       key,
       streams: this.streams,
