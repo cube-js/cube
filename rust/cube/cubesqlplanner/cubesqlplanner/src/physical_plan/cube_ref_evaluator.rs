@@ -34,11 +34,11 @@ impl CubeRefEvaluator {
     ) -> Result<String, CubeError> {
         match cube_ref {
             CubeRef::Name(symbol) => {
-                let alias = self.resolve_cube_alias(symbol.cube_name());
+                let alias = self.resolve_cube_alias(symbol.cube_id());
                 templates.quote_identifier(&alias)
             }
             CubeRef::Table(symbol) => {
-                if let Some(pre_agg) = self.original_sql_pre_aggregations.get(symbol.cube_name()) {
+                if let Some(pre_agg) = self.original_sql_pre_aggregations.get(symbol.cube_id()) {
                     return Ok(pre_agg.clone());
                 }
                 symbol.evaluate_sql(visitor, node_processor, query_tools, templates)

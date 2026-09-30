@@ -101,11 +101,11 @@ impl SqlNode for AutoPrefixSqlNode {
         )?;
         let res = match node.as_ref() {
             MemberSymbol::Dimension(ev) => {
-                let cube_alias = self.resolve_cube_alias(&ev.cube_name());
+                let cube_alias = self.resolve_cube_alias(&ev.cube_id());
                 self.auto_prefix_with_cube_name(&cube_alias, &input, templates)?
             }
             MemberSymbol::Measure(ev) => {
-                let cube_alias = self.resolve_cube_alias(&ev.cube_name());
+                let cube_alias = self.resolve_cube_alias(&ev.cube_id());
                 self.auto_prefix_with_cube_name(&cube_alias, &input, templates)?
             }
             MemberSymbol::TimeDimension(_)

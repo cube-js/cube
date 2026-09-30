@@ -137,11 +137,11 @@ symbol_deps! {
 
 impl CaseSwitchDefinition {
     pub fn try_new(
-        cube_name: &CubeId,
+        cube_id: &CubeId,
         definition: Rc<dyn NativeCaseSwitchDefinition>,
         compiler: &mut Compiler,
     ) -> Result<Self, CubeError> {
-        let switch_sql = compiler.compile_sql_call(&cube_name, definition.switch()?)?;
+        let switch_sql = compiler.compile_sql_call(&cube_id, definition.switch()?)?;
         let switch = if let Some(member) = switch_sql.resolve_direct_reference() {
             CaseSwitchItem::Member(member)
         } else {
@@ -152,12 +152,12 @@ impl CaseSwitchDefinition {
             .when()?
             .iter()
             .map(|item| -> Result<_, CubeError> {
-                let sql = compiler.compile_sql_call(&cube_name, item.sql()?)?;
+                let sql = compiler.compile_sql_call(&cube_id, item.sql()?)?;
                 let value = item.static_data().value.clone();
                 Ok(CaseSwitchWhenItem { sql, value })
             })
             .collect::<Result<Vec<_>, _>>()?;
-        let else_sql = compiler.compile_sql_call(&cube_name, definition.else_sql()?.sql()?)?;
+        let else_sql = compiler.compile_sql_call(&cube_id, definition.else_sql()?.sql()?)?;
         let mut res = CaseSwitchDefinition {
             switch,
             items,
@@ -283,7 +283,7 @@ pub enum Case {
 
 impl Case {
     pub fn try_new(
-        cube_name: &CubeId,
+        cube_id: &CubeId,
         definition: CaseVariant,
         compiler: &mut Compiler,
     ) -> Result<Self, CubeError> {
@@ -293,12 +293,11 @@ impl Case {
                     .when()?
                     .iter()
                     .map(|item| -> Result<_, CubeError> {
-                        let sql = compiler.compile_sql_call(&cube_name, item.sql()?)?;
+                        let sql = compiler.compile_sql_call(&cube_id, item.sql()?)?;
                         let label = match item.label()? {
                             StringOrSql::String(s) => CaseLabel::String(s.clone()),
                             StringOrSql::MemberSql(sql_struct) => {
-                                let sql =
-                                    compiler.compile_sql_call(&cube_name, sql_struct.sql()?)?;
+                                let sql = compiler.compile_sql_call(&cube_id, sql_struct.sql()?)?;
                                 CaseLabel::Sql(sql)
                             }
                         };
@@ -309,14 +308,14 @@ impl Case {
                 let else_label = match case_definition.else_label()?.label()? {
                     StringOrSql::String(s) => CaseLabel::String(s.clone()),
                     StringOrSql::MemberSql(sql_struct) => {
-                        let sql = compiler.compile_sql_call(&cube_name, sql_struct.sql()?)?;
+                        let sql = compiler.compile_sql_call(&cube_id, sql_struct.sql()?)?;
                         CaseLabel::Sql(sql)
                     }
                 };
                 Case::Case(CaseDefinition { items, else_label })
             }
             CaseVariant::CaseSwitch(case_definition) => Case::CaseSwitch(
-                CaseSwitchDefinition::try_new(cube_name, case_definition.clone(), compiler)?,
+                CaseSwitchDefinition::try_new(cube_id, case_definition.clone(), compiler)?,
             ),
         };
         Ok(res)

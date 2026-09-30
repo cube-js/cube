@@ -258,7 +258,7 @@ impl QueryPropertiesCompiler {
                 let granularity_obj = GranularityHelper::make_granularity_obj(
                     self.query_tools.cube_evaluator().clone(),
                     evaluator_compiler,
-                    &base_symbol.cube_name(),
+                    &base_symbol.cube_id(),
                     &base_symbol.name(),
                     d.granularity.clone(),
                 )?;
@@ -531,7 +531,7 @@ impl QueryPropertiesCompiler {
             .chain(measures)
             .chain(filter_members.iter())
         {
-            let cube_name = sym.compiled_path().cube_name();
+            let cube_name = sym.compiled_path().cube_id();
             if !visited_cubes.insert(cube_name.clone()) {
                 continue;
             }

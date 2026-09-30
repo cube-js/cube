@@ -28,7 +28,7 @@ impl<'a> LogicalNodeProcessor<'a, KeysSubQuery> for KeysSubQueryProcessor<'a> {
         let query_tools = self.builder.query_tools();
         let alias_prefix = Some(format!(
             "{}_key",
-            query_tools.alias_for_cube(keys_subquery.pk_cube().cube().name())?
+            query_tools.alias_for_cube(keys_subquery.pk_cube().cube().cube_id())?
         ));
 
         let mut context = context.clone();

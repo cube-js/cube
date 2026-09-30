@@ -239,8 +239,8 @@ impl DimensionSymbol {
         self.kind.iter_sql_calls()
     }
 
-    pub fn cube_name(&self) -> CubeId {
-        self.compiled_path.cube_name().clone()
+    pub fn cube_id(&self) -> CubeId {
+        self.compiled_path.cube_id().clone()
     }
 
     pub fn join_map(&self) -> &Option<Vec<Vec<String>>> {
@@ -343,7 +343,7 @@ impl SymbolFactory for DimensionSymbolFactory {
         let dimension_type = definition.static_data().dimension_type.clone();
 
         let sql = if let Some(sql) = sql {
-            Some(compiler.compile_sql_call(path.cube_name(), sql)?)
+            Some(compiler.compile_sql_call(path.cube_id(), sql)?)
         } else {
             None
         };
@@ -361,15 +361,15 @@ impl SymbolFactory for DimensionSymbolFactory {
         let mask_sql_cube_name = sql
             .as_ref()
             .and_then(|s| s.resolve_direct_reference())
-            .map(|dep| dep.cube_name())
-            .unwrap_or_else(|| path.cube_name().clone());
+            .map(|dep| dep.cube_id())
+            .unwrap_or_else(|| path.cube_id().clone());
         let mask_sql = if let Some(mask_sql) = mask_sql {
             Some(compiler.compile_sql_call(&mask_sql_cube_name, mask_sql)?)
         } else {
             None
         };
 
-        let cube = cube_evaluator.cube_from_path(path.cube_name().target().to_string())?;
+        let cube = cube_evaluator.cube_from_path(path.cube_id().target().to_string())?;
         let alias = compiler
             .alias_for_member(path.full_name())
             .unwrap_or_else(|| {
@@ -385,8 +385,7 @@ impl SymbolFactory for DimensionSymbolFactory {
         // view declares itself keeps its own definition.
         let included = definition.static_data().included.unwrap_or(false);
         if let Some(sql) = sql.as_ref().filter(|_| included) {
-            let cube_symbol =
-                compiler.add_cube_table_evaluator(path.cube_name().clone(), vec![])?;
+            let cube_symbol = compiler.add_cube_table_evaluator(path.cube_id().clone(), vec![])?;
             let compiled_path = CompiledMemberPath::new(
                 cube_symbol,
                 path.member_id(),
@@ -399,7 +398,7 @@ impl SymbolFactory for DimensionSymbolFactory {
         }
 
         let case = if let Some(native_case) = definition.case()? {
-            Some(Case::try_new(path.cube_name(), native_case, compiler)?)
+            Some(Case::try_new(path.cube_id(), native_case, compiler)?)
         } else {
             None
         };
@@ -421,7 +420,7 @@ impl SymbolFactory for DimensionSymbolFactory {
                     };
                     let name = item.static_data().name.clone();
                     let sql = if let Some(sql) = item.sql()? {
-                        Some(compiler.compile_sql_call(path.cube_name(), sql)?)
+                        Some(compiler.compile_sql_call(path.cube_id(), sql)?)
                     } else {
                         None
                     };
@@ -445,7 +444,7 @@ impl SymbolFactory for DimensionSymbolFactory {
             let pk_members = cube_evaluator
                 .static_data()
                 .primary_keys
-                .get(path.cube_name().target())
+                .get(path.cube_id().target())
                 .cloned()
                 .unwrap_or_else(|| vec![]);
 
@@ -456,22 +455,19 @@ impl SymbolFactory for DimensionSymbolFactory {
             if pk_members.len() > 1 {
                 return Err(CubeError::user(format!(
                     "Cube '{}' has multiple primary keys, but only one is allowed for calendar cubes",
-                    path.cube_name()
+                    path.cube_id()
                 )));
             }
 
             pk_members
                 .first()
-                .map(|pk| MemberId::member(path.cube_name().clone(), pk))
+                .map(|pk| MemberId::member(path.cube_id().clone(), pk))
         } else {
             None
         };
 
-        let multi_stage = MultiStageProperties::from_dimension_definition(
-            path.cube_name(),
-            &definition,
-            compiler,
-        )?;
+        let multi_stage =
+            MultiStageProperties::from_dimension_definition(path.cube_id(), &definition, compiler)?;
 
         let is_sub_query = definition.static_data().sub_query.unwrap_or(false);
         let is_multi_stage = multi_stage.is_some();
@@ -483,8 +479,8 @@ impl SymbolFactory for DimensionSymbolFactory {
             if let (Some(lat_item), Some(lon_item)) =
                 (definition.latitude()?, definition.longitude()?)
             {
-                let latitude = compiler.compile_sql_call(path.cube_name(), lat_item.sql()?)?;
-                let longitude = compiler.compile_sql_call(path.cube_name(), lon_item.sql()?)?;
+                let latitude = compiler.compile_sql_call(path.cube_id(), lat_item.sql()?)?;
+                let longitude = compiler.compile_sql_call(path.cube_id(), lon_item.sql()?)?;
                 DimensionKind::Geo(GeoDimension::new(latitude, longitude))
             } else {
                 return Err(CubeError::user(format!(
@@ -525,7 +521,7 @@ impl SymbolFactory for DimensionSymbolFactory {
             .propagate_filters_to_sub_query
             .unwrap_or(false);
 
-        let cube_symbol = compiler.add_cube_table_evaluator(path.cube_name().clone(), vec![])?;
+        let cube_symbol = compiler.add_cube_table_evaluator(path.cube_id().clone(), vec![])?;
 
         let compiled_path = CompiledMemberPath::new(
             cube_symbol,
@@ -567,7 +563,7 @@ fn with_granularity(
     match GranularityHelper::make_granularity_obj(
         cube_evaluator,
         compiler,
-        path.cube_name(),
+        path.cube_id(),
         path.symbol_name(),
         Some(granularity.clone()),
     )? {

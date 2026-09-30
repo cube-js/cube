@@ -84,10 +84,10 @@ impl JoinTree {
         &self.joins
     }
 
-    /// Whether joining `cube_name` into this tree multiplies its rows.
-    pub fn is_multiplied(&self, cube_name: &CubeId) -> bool {
+    /// Whether joining `cube_id` into this tree multiplies its rows.
+    pub fn is_multiplied(&self, cube_id: &CubeId) -> bool {
         self.multiplication_factor
-            .get(cube_name)
+            .get(cube_id)
             .copied()
             .unwrap_or(false)
     }

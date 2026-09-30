@@ -73,20 +73,20 @@ pub fn member_chain_eq(a: &Rc<MemberSymbol>, b: &Rc<MemberSymbol>) -> bool {
 #[derive(Debug, Clone)]
 pub struct MultipliedMeasure {
     measure: Rc<MemberSymbol>,
-    cube_name: CubeId,
+    cube_id: CubeId,
 }
 
 impl MultipliedMeasure {
-    pub fn new(measure: Rc<MemberSymbol>, cube_name: CubeId) -> Rc<Self> {
-        Rc::new(Self { measure, cube_name })
+    pub fn new(measure: Rc<MemberSymbol>, cube_id: CubeId) -> Rc<Self> {
+        Rc::new(Self { measure, cube_id })
     }
 
     pub fn measure(&self) -> &Rc<MemberSymbol> {
         &self.measure
     }
 
-    pub fn cube_name(&self) -> &CubeId {
-        &self.cube_name
+    pub fn cube_id(&self) -> &CubeId {
+        &self.cube_id
     }
 }
 
@@ -632,7 +632,7 @@ impl QueryProperties {
                                 .unwrap_or_else(|| item.measure.clone());
                             result
                                 .multiplied_measures
-                                .push(MultipliedMeasure::new(rendered.clone(), item.cube_name));
+                                .push(MultipliedMeasure::new(rendered.clone(), item.cube_id));
                             rendered
                         }
                     };

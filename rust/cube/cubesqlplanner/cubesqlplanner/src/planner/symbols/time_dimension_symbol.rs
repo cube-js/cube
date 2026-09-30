@@ -143,7 +143,7 @@ impl TimeDimensionSymbol {
         let new_granularity_obj = GranularityHelper::make_granularity_obj(
             state.cube_evaluator().clone(),
             &mut evaluator_compiler,
-            &&self.base_symbol.cube_name(),
+            &&self.base_symbol.cube_id(),
             &self.base_symbol.name(),
             new_granularity.clone(),
         )?;
@@ -264,8 +264,8 @@ impl TimeDimensionSymbol {
             .collect()
     }
 
-    pub fn cube_name(&self) -> CubeId {
-        self.compiled_path.cube_name().clone()
+    pub fn cube_id(&self) -> CubeId {
+        self.compiled_path.cube_id().clone()
     }
 
     pub fn path(&self) -> &Vec<CubeId> {

@@ -35,7 +35,7 @@ impl TraversalVisitor for CubeNamesCollector {
                             self.names.insert(p.clone());
                         }
                     } else {
-                        self.names.insert(e.cube_name().clone());
+                        self.names.insert(e.cube_id().clone());
                     }
                 }
                 if e.is_sub_query() {
@@ -51,7 +51,7 @@ impl TraversalVisitor for CubeNamesCollector {
                             self.names.insert(p.clone());
                         }
                     } else {
-                        self.names.insert(e.cube_name().clone());
+                        self.names.insert(e.cube_id().clone());
                     }
                 }
             }

@@ -173,14 +173,14 @@ impl QueryTools {
         }
     }
 
-    pub fn alias_for_cube(&self, cube_name: &CubeId) -> Result<String, CubeError> {
+    pub fn alias_for_cube(&self, cube_id: &CubeId) -> Result<String, CubeError> {
         let cube_definition = self
             .cube_evaluator()
-            .cube_from_path(cube_name.target().to_string())?;
+            .cube_from_path(cube_id.target().to_string())?;
         let res = if let Some(sql_alias) = &cube_definition.static_data().sql_alias {
             sql_alias.clone()
         } else {
-            cube_name.to_string()
+            cube_id.to_string()
         };
         Ok(res)
     }

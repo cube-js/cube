@@ -135,7 +135,7 @@ impl MeasuresJoinHints {
             let own_hints = collect_join_hints(m)?;
             if !inherited {
                 hints_by_cube
-                    .entry(m.cube_name())
+                    .entry(m.cube_id())
                     .or_insert_with(JoinHints::new)
                     .extend(&own_hints);
             }
@@ -291,8 +291,8 @@ impl MultiFactJoinGroups {
                              members of '{}', and neither the rest of the query nor the join map \
                              of '{}' gives a cube to join from",
                             mh.measure.full_name(),
-                            mh.measure.cube_name(),
-                            mh.measure.cube_name()
+                            mh.measure.cube_id(),
+                            mh.measure.cube_id()
                         )));
                     }
                     let (key, join_tree) = resolve(&measure_hints)?;
@@ -365,12 +365,12 @@ impl MultiFactJoinGroups {
     ) -> Result<bool, CubeError> {
         let mut seen = HashSet::new();
         for group in groups.iter() {
-            let cubes = std::iter::once(group.tree.root().name().clone()).chain(
+            let cubes = std::iter::once(group.tree.root().cube_id().clone()).chain(
                 group
                     .tree
                     .joins()
                     .iter()
-                    .map(|item| item.cube().name().clone()),
+                    .map(|item| item.cube().cube_id().clone()),
             );
             for cube_name in cubes {
                 if !seen.insert(cube_name.clone()) {
@@ -540,7 +540,7 @@ impl MultiFactJoinGroups {
         measure: &Rc<MemberSymbol>,
         all_hints: &MeasuresJoinHints,
     ) -> Result<JoinHints, CubeError> {
-        let cube_name = measure.cube_name();
+        let cube_name = measure.cube_id();
         let cube_definition = query_tools
             .cube_evaluator()
             .cube_from_path(cube_name.target().to_string())
@@ -671,7 +671,7 @@ impl MultiFactJoinGroups {
         dimension: &Rc<MemberSymbol>,
     ) -> Option<&Vec<CubeId>> {
         self.dimension_paths
-            .get(&dimension.clone().resolve_reference_chain().cube_name())
+            .get(&dimension.clone().resolve_reference_chain().cube_id())
     }
 
     /// Returns the join path from root to the measure's cube.
@@ -700,7 +700,7 @@ impl MultiFactJoinGroups {
             }
             let cube_paths = Self::build_cube_paths(join);
             for m in measures {
-                if let Some(path) = cube_paths.get(&m.cube_name()) {
+                if let Some(path) = cube_paths.get(&m.cube_id()) {
                     measure_paths.insert(m.id().clone(), path.clone());
                 }
             }
@@ -710,13 +710,13 @@ impl MultiFactJoinGroups {
     }
 
     fn build_cube_paths(join: &JoinTree) -> HashMap<CubeId, Vec<CubeId>> {
-        let root = join.root().name().clone();
+        let root = join.root().cube_id().clone();
         let mut paths: HashMap<CubeId, Vec<CubeId>> = HashMap::new();
         paths.insert(root.clone(), vec![root]);
 
         for join_item in join.joins() {
             let original_from = join_item.original_from().clone();
-            let original_to = join_item.cube().name().clone();
+            let original_to = join_item.cube().cube_id().clone();
             let parent_path = paths
                 .get(&original_from)
                 .cloned()
@@ -929,7 +929,7 @@ mod tests {
         let converted_value = ctx.create_symbol("payments.converted_value").unwrap();
         let meta_value = ctx.create_symbol("payment_meta.value").unwrap();
 
-        assert_eq!(total_amount.cube_name(), converted_value.cube_name());
+        assert_eq!(total_amount.cube_id(), converted_value.cube_id());
 
         let hints = MeasuresJoinHints::builder(&JoinHints::new())
             .add_dimensions(&[meta_value])

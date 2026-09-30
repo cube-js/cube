@@ -36,10 +36,10 @@ pub enum CubeRef {
 }
 
 impl CubeRef {
-    pub fn cube_name(&self) -> &CubeId {
+    pub fn cube_id(&self) -> &CubeId {
         match self {
-            CubeRef::Name(symbol) => symbol.cube_name(),
-            CubeRef::Table(symbol) => symbol.cube_name(),
+            CubeRef::Name(symbol) => symbol.cube_id(),
+            CubeRef::Table(symbol) => symbol.cube_id(),
         }
     }
 
@@ -682,7 +682,7 @@ impl SqlCall {
             .iter()
             .map(|dep| match dep {
                 SqlDependency::Symbol(symbol) => symbol.full_name(),
-                SqlDependency::CubeRef(cube_ref) => cube_ref.cube_name().to_string(),
+                SqlDependency::CubeRef(cube_ref) => cube_ref.cube_id().to_string(),
             })
             .collect_vec();
         Self::substitute_template(element, &deps, &[], &[], &[], &[])
@@ -733,7 +733,7 @@ impl SqlCall {
                 .all(|(a, b)| match (a, b) {
                     (SqlDependency::Symbol(x), SqlDependency::Symbol(y)) => x == y,
                     (SqlDependency::CubeRef(x), SqlDependency::CubeRef(y)) => {
-                        x.cube_name() == y.cube_name() && x.path() == y.path()
+                        x.cube_id() == y.cube_id() && x.path() == y.path()
                     }
                     _ => false,
                 })
@@ -804,9 +804,9 @@ impl crate::utils::debug::DebugSql for SqlCall {
                 }
                 SqlDependency::CubeRef(cr) => {
                     if expand_deps {
-                        cr.cube_name().to_string()
+                        cr.cube_id().to_string()
                     } else {
-                        format!("{{{}}}", cr.cube_name())
+                        format!("{{{}}}", cr.cube_id())
                     }
                 }
             })

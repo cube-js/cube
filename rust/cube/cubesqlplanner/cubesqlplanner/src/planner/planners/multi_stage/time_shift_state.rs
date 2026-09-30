@@ -178,7 +178,7 @@ impl ExtractedTimeShifts {
                 .collect(),
         };
         self.filter_params_shifts
-            .add_calendar_cube(dimension.cube_name().clone(), shift.clone());
+            .add_calendar_cube(dimension.cube_id().clone(), shift.clone());
         self.filter_params_shifts
             .add_calendar_cube(pk.cube().clone(), shift);
     }
@@ -219,14 +219,14 @@ impl FilterParamsTimeShifts {
         self.interval_shifts.insert(key, interval);
     }
 
-    fn add_calendar_cube(&mut self, cube_name: CubeId, shift: CalendarShift) {
-        self.calendar_cubes.insert(cube_name, shift);
+    fn add_calendar_cube(&mut self, cube_id: CubeId, shift: CalendarShift) {
+        self.calendar_cubes.insert(cube_id, shift);
     }
 
     /// The shift a `FILTER_PARAMS` binding on this member has to account for.
     pub fn get_for_symbol(&self, symbol: &Rc<MemberSymbol>) -> Option<FilterParamsTimeShift> {
         let resolved = resolve_base_symbol(symbol).resolve_reference_chain();
-        if let Some(shift) = self.calendar_cubes.get(&resolved.cube_name()) {
+        if let Some(shift) = self.calendar_cubes.get(&resolved.cube_id()) {
             return Some(FilterParamsTimeShift::Calendar(shift.clone()));
         }
         if let Some(interval) = self.interval_shifts.get(resolved.id()) {

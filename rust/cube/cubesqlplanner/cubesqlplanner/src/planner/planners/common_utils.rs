@@ -44,11 +44,11 @@ impl CommonUtils {
         )
     }
 
-    /// Primary-key dimensions of `cube_name` as planner
+    /// Primary-key dimensions of `cube_id` as planner
     /// `MemberSymbol`s.
     pub fn primary_keys_dimensions(
         &self,
-        cube_name: &CubeId,
+        cube_id: &CubeId,
     ) -> Result<Vec<Rc<MemberSymbol>>, CubeError> {
         let evaluator_compiler_cell = self.query_tools.compiler().clone();
         let mut evaluator_compiler = evaluator_compiler_cell.borrow_mut();
@@ -57,14 +57,14 @@ impl CommonUtils {
             .cube_evaluator()
             .static_data()
             .primary_keys
-            .get(cube_name.target())
+            .get(cube_id.target())
             .cloned()
             .unwrap_or_else(|| vec![]);
 
         let dims = primary_keys
             .iter()
             .map(|d| -> Result<_, CubeError> {
-                let full_name = format!("{}.{}", cube_name, d);
+                let full_name = format!("{}.{}", cube_id, d);
                 let symbol = evaluator_compiler.add_dimension_evaluator(full_name.clone())?;
                 Ok(symbol)
             })

@@ -150,7 +150,7 @@ impl PreAggregationsCompiler {
                 let granularity_obj = GranularityHelper::make_granularity_obj(
                     self.query_tools.cube_evaluator().clone(),
                     &mut evaluator_compiler,
-                    &base_symbol.cube_name(),
+                    &base_symbol.cube_id(),
                     &base_symbol.name(),
                     Some(granularity.clone()),
                 )?;
@@ -174,7 +174,7 @@ impl PreAggregationsCompiler {
                 let granularity_obj = GranularityHelper::make_granularity_obj(
                     self.query_tools.cube_evaluator().clone(),
                     &mut evaluator_compiler,
-                    &base_symbol.cube_name(),
+                    &base_symbol.cube_id(),
                     &base_symbol.name(),
                     static_data.granularity.clone(),
                 )?;
@@ -754,10 +754,10 @@ impl PreAggregationsCompiler {
 
     pub fn compile_origin_sql_pre_aggregation(
         &mut self,
-        cube_name: &CubeId,
+        cube_id: &CubeId,
     ) -> Result<Option<Rc<CompiledPreAggregation>>, CubeError> {
         let res = if let Some((name, _)) = self.descriptions.clone().iter().find(|(name, descr)| {
-            &CubeId::cube(name.cube_name.clone()) == cube_name
+            &CubeId::cube(name.cube_name.clone()) == cube_id
                 && &descr.static_data().pre_aggregation_type == "originalSql"
         }) {
             Some(self.compile_pre_aggregation(name)?)

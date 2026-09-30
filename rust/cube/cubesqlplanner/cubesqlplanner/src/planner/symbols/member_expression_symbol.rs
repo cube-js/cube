@@ -75,7 +75,7 @@ impl MemberExpressionSymbol {
         alias: Option<String>,
         path: Vec<CubeId>,
     ) -> Result<Rc<Self>, CubeError> {
-        let id = MemberId::expression(cube.cube_name().clone(), name.clone());
+        let id = MemberId::expression(cube.cube_id().clone(), name.clone());
         let alias = alias.unwrap_or_else(|| PlanSqlTemplates::alias_name(&name));
         let is_reference = match &expression {
             MemberExpressionExpression::SqlCall(sql_call) => sql_call.is_direct_reference(),
@@ -173,15 +173,15 @@ impl MemberExpressionSymbol {
             // the same cube
             let cube_names = childs
                 .into_iter()
-                .map(|child| child.cube_name())
+                .map(|child| child.cube_id())
                 .unique()
                 .collect_vec();
             Ok(Some(cube_names))
         }
     }
 
-    pub fn cube_name(&self) -> CubeId {
-        self.compiled_path.cube_name().clone()
+    pub fn cube_id(&self) -> CubeId {
+        self.compiled_path.cube_id().clone()
     }
 
     pub fn name(&self) -> String {

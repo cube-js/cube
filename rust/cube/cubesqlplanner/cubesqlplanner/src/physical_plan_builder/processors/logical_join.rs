@@ -54,7 +54,7 @@ impl<'a> LogicalNodeProcessor<'a, LogicalJoin> for LogicalJoinProcessor<'a> {
             for dimension_subquery in logical_join
                 .dimension_subqueries() //TODO move dimension_subquery to
                 .iter()
-                .filter(|d| &d.subquery_dimension.cube_name() == root.name())
+                .filter(|d| &d.subquery_dimension.cube_id() == root.cube_id())
             {
                 self.builder.add_subquery_join(
                     dimension_subquery.clone(),
@@ -76,7 +76,7 @@ impl<'a> LogicalNodeProcessor<'a, LogicalJoin> for LogicalJoinProcessor<'a> {
                 for dimension_subquery in logical_join
                     .dimension_subqueries()
                     .iter()
-                    .filter(|d| &d.subquery_dimension.cube_name() == join.cube().cube().name())
+                    .filter(|d| &d.subquery_dimension.cube_id() == join.cube().cube().cube_id())
                 {
                     self.builder.add_subquery_join(
                         dimension_subquery.clone(),

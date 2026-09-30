@@ -72,7 +72,7 @@ pub struct MultiStageProperties {
 
 impl MultiStageProperties {
     pub fn from_measure_definition(
-        cube_name: &CubeId,
+        cube_id: &CubeId,
         definition: &Rc<dyn MeasureDefinition>,
         time_shift: Option<MeasureTimeShifts>,
         compiler: &mut Compiler,
@@ -86,7 +86,7 @@ impl MultiStageProperties {
             None => build_grain_from_legacy(&definition.static_data(), compiler)?,
         };
 
-        let filter = build_filter(cube_name, definition.filter()?, compiler)?;
+        let filter = build_filter(cube_id, definition.filter()?, compiler)?;
 
         Ok(Some(Self {
             grain,
@@ -96,7 +96,7 @@ impl MultiStageProperties {
     }
 
     pub fn from_dimension_definition(
-        cube_name: &CubeId,
+        cube_id: &CubeId,
         definition: &Rc<dyn DimensionDefinition>,
         compiler: &mut Compiler,
     ) -> Result<Option<Self>, CubeError> {
@@ -106,7 +106,7 @@ impl MultiStageProperties {
 
         let include =
             resolve_reference_paths(&definition.static_data().add_group_by_references, compiler)?;
-        let filter = build_filter(cube_name, definition.filter()?, compiler)?;
+        let filter = build_filter(cube_id, definition.filter()?, compiler)?;
 
         Ok(Some(Self {
             grain: MultiStageGrain {
@@ -164,7 +164,7 @@ fn build_grain_from_legacy(
 }
 
 fn build_filter(
-    _cube_name: &CubeId,
+    _cube_id: &CubeId,
     filter: Option<Rc<dyn crate::cube_bridge::multi_stage_filter::MultiStageFilterReferences>>,
     compiler: &mut Compiler,
 ) -> Result<Option<MultiStageFilter>, CubeError> {

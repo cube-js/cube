@@ -898,12 +898,12 @@ impl PreAggregationOptimizer {
             .map(|d| d.clone().resolve_reference_chain().id().clone())
             .collect();
 
-        let joined_cubes: HashSet<CubeId> = std::iter::once(root.name().clone())
+        let joined_cubes: HashSet<CubeId> = std::iter::once(root.cube_id().clone())
             .chain(
                 node_join
                     .joins()
                     .iter()
-                    .map(|item| item.cube().name().clone()),
+                    .map(|item| item.cube().cube_id().clone()),
             )
             .collect();
 
@@ -916,12 +916,12 @@ impl PreAggregationOptimizer {
             }
         }
 
-        let identifying_cubes = std::iter::once(root.name().clone()).chain(
+        let identifying_cubes = std::iter::once(root.cube_id().clone()).chain(
             node_join
                 .joins()
                 .iter()
                 .filter(|item| item.splits_rows())
-                .map(|item| item.cube().name().clone()),
+                .map(|item| item.cube().cube_id().clone()),
         );
 
         for cube_name in identifying_cubes {
@@ -956,18 +956,18 @@ impl PreAggregationOptimizer {
         collect_cube_names_from_symbols(&members)
     }
 
-    fn resolved_primary_keys(&self, cube_name: &CubeId) -> Result<Vec<MemberId>, CubeError> {
-        if let Some(cached) = self.primary_keys_cache.borrow().get(cube_name) {
+    fn resolved_primary_keys(&self, cube_id: &CubeId) -> Result<Vec<MemberId>, CubeError> {
+        if let Some(cached) = self.primary_keys_cache.borrow().get(cube_id) {
             return Ok(cached.clone());
         }
         let keys = CommonUtils::new(self.query_tools.clone())
-            .primary_keys_dimensions(cube_name)?
+            .primary_keys_dimensions(cube_id)?
             .into_iter()
             .map(|key| key.resolve_reference_chain().id().clone())
             .collect::<Vec<_>>();
         self.primary_keys_cache
             .borrow_mut()
-            .insert(cube_name.clone(), keys.clone());
+            .insert(cube_id.clone(), keys.clone());
         Ok(keys)
     }
 

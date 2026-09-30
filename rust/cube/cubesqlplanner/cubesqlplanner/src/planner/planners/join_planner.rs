@@ -135,9 +135,9 @@ impl JoinPlanner {
         let mut from_members = vec![];
         let mut to_members = vec![];
         for member in on_sql.get_dependencies().into_iter() {
-            if member.cube_name() == original_from {
+            if member.cube_id() == original_from {
                 from_members.push(member);
-            } else if member.cube_name() == original_to {
+            } else if member.cube_id() == original_to {
                 to_members.push(member);
             } else {
                 return Err(CubeError::user(format!(

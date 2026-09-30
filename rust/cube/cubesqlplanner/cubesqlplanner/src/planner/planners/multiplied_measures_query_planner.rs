@@ -104,7 +104,7 @@ impl MultipliedMeasuresQueryPlanner {
             .multiplied_measures
             .clone()
             .into_iter()
-            .into_group_map_by(|m| m.cube_name().clone())
+            .into_group_map_by(|m| m.cube_id().clone())
             .into_iter()
             .sorted_by(|(a, _), (b, _)| a.cmp(b))
         {
@@ -166,12 +166,12 @@ impl MultipliedMeasuresQueryPlanner {
 
     fn aggregate_subquery_plan(
         &self,
-        key_cube_name: &CubeId,
+        key_cube: &CubeId,
         measures: &Vec<Rc<MemberSymbol>>,
         key_join: Rc<JoinTree>,
         scope: &mut PlanningScope,
     ) -> Result<Rc<AggregateMultipliedSubquery>, CubeError> {
-        let pk_cube = self.common_utils.cube_from_path(key_cube_name)?;
+        let pk_cube = self.common_utils.cube_from_path(key_cube)?;
         let pk_cube = Cube::new(pk_cube);
         let subquery_dimensions = collect_sub_query_dimensions_from_symbols(&measures, &key_join)?;
 
@@ -183,7 +183,7 @@ impl MultipliedMeasuresQueryPlanner {
         let subquery_dimension_queries =
             dimension_subquery_planner.plan_queries(&subquery_dimensions, scope)?;
 
-        let primary_keys_dimensions = self.common_utils.primary_keys_dimensions(key_cube_name)?;
+        let primary_keys_dimensions = self.common_utils.primary_keys_dimensions(key_cube)?;
         let keys_subquery = self.key_query(
             &primary_keys_dimensions,
             key_join.clone(),
@@ -197,7 +197,7 @@ impl MultipliedMeasuresQueryPlanner {
             .set_measures(measures.clone())
             .into_rc();
         let should_build_join_for_measure_select =
-            self.check_should_build_join_for_measure_select(measures, key_cube_name)?;
+            self.check_should_build_join_for_measure_select(measures, key_cube)?;
         let source = if should_build_join_for_measure_select {
             let measure_subquery = self.aggregate_subquery_measure(
                 key_join.clone(),
@@ -233,7 +233,7 @@ impl MultipliedMeasuresQueryPlanner {
     fn check_should_build_join_for_measure_select(
         &self,
         measures: &Vec<Rc<MemberSymbol>>,
-        key_cube_name: &CubeId,
+        key_cube: &CubeId,
     ) -> Result<bool, CubeError> {
         for measure in measures.iter() {
             let owned_measure = transforms::strip_join_prefix(measure);
@@ -249,7 +249,7 @@ impl MultipliedMeasuresQueryPlanner {
                 collect_cube_names(&owned_measure)?
             };
             let join_hints = collect_join_hints(&owned_measure)?;
-            if cubes.iter().any(|cube| cube != key_cube_name) {
+            if cubes.iter().any(|cube| cube != key_cube) {
                 let measures_join = self
                     .query_tools
                     .join_graph()
@@ -257,7 +257,7 @@ impl MultipliedMeasuresQueryPlanner {
                 if *measures_join
                     .static_data()
                     .multiplication_factor
-                    .get(key_cube_name.target())
+                    .get(key_cube.target())
                     .unwrap_or(&false)
                 {
                     return Err(CubeError::user(format!("{} references cubes ({}) that lead to row multiplication. Please rewrite it using sub query.", measure.full_name(), cubes.iter().join(", "))));

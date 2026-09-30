@@ -13,7 +13,7 @@ use std::rc::Rc;
 pub struct BaseSegment {
     id: MemberId,
     member_evaluator: Rc<MemberSymbol>,
-    cube_name: CubeId,
+    cube_id: CubeId,
     name: String,
     /// True when this segment is an ad-hoc query-level member expression (no
     /// registered `segments:` path), as opposed to a named cube segment.
@@ -33,26 +33,26 @@ impl BaseSegment {
         name: String,
         is_member_expression: bool,
     ) -> Result<Rc<Self>, CubeError> {
-        let cube_name = cube_symbol.cube_name().clone();
+        let cube_id = cube_symbol.cube_id().clone();
         let member_expression_symbol = MemberExpressionSymbol::try_new(
             cube_symbol,
             name.clone(),
             MemberExpressionExpression::SqlCall(expression),
             None,
             None,
-            vec![cube_name.clone()],
+            vec![cube_id.clone()],
         )?;
         let id = if is_member_expression {
             member_expression_symbol.compiled_path().id().clone()
         } else {
-            MemberId::member(cube_name.clone(), name.clone())
+            MemberId::member(cube_id.clone(), name.clone())
         };
         let member_evaluator = MemberSymbol::new_member_expression(member_expression_symbol);
 
         Ok(Rc::new(Self {
             id,
             member_evaluator,
-            cube_name,
+            cube_id,
             name,
             is_member_expression,
         }))
@@ -83,7 +83,7 @@ impl BaseSegment {
             }
             // A segment symbol lives in the `expr:` namespace, so the path is
             // reassembled from the cube and member names it was compiled under.
-            if format!("{}.{}", symbol.cube_name(), symbol.name()) == member {
+            if format!("{}.{}", symbol.cube_id(), symbol.name()) == member {
                 return true;
             }
             current = symbol.reference_member();
@@ -109,8 +109,8 @@ impl BaseSegment {
         Rc::new(result)
     }
 
-    pub fn cube_name(&self) -> &CubeId {
-        &self.cube_name
+    pub fn cube_id(&self) -> &CubeId {
+        &self.cube_id
     }
 
     pub fn name(&self) -> &String {

@@ -15,51 +15,51 @@ use std::rc::Rc;
 /// `{TABLE}`); renders to the cube's quoted name or alias.
 #[derive(Debug)]
 pub struct CubeNameSymbol {
-    cube_name: CubeId,
+    cube_id: CubeId,
     path: Vec<CubeId>,
 }
 
 impl CubeNameSymbol {
-    pub fn new(cube_name: CubeId, path: Vec<CubeId>) -> Rc<Self> {
-        let path = Self::normalize_path(path, &cube_name);
-        Rc::new(Self { cube_name, path })
+    pub fn new(cube_id: CubeId, path: Vec<CubeId>) -> Rc<Self> {
+        let path = Self::normalize_path(path, &cube_id);
+        Rc::new(Self { cube_id, path })
     }
 
-    pub(crate) fn normalize_path(mut path: Vec<CubeId>, cube_name: &CubeId) -> Vec<CubeId> {
-        if path.last() != Some(cube_name) {
-            path.push(cube_name.clone());
+    pub(crate) fn normalize_path(mut path: Vec<CubeId>, cube_id: &CubeId) -> Vec<CubeId> {
+        if path.last() != Some(cube_id) {
+            path.push(cube_id.clone());
         }
         path
     }
 
     pub fn evaluate_sql(&self) -> Result<String, CubeError> {
-        Ok(self.cube_name.to_string())
+        Ok(self.cube_id.to_string())
     }
-    pub fn cube_name(&self) -> &CubeId {
-        &self.cube_name
+    pub fn cube_id(&self) -> &CubeId {
+        &self.cube_id
     }
     pub fn path(&self) -> &Vec<CubeId> {
         &self.path
     }
     pub fn alias(&self) -> String {
-        PlanSqlTemplates::alias_name(&self.cube_name.to_string())
+        PlanSqlTemplates::alias_name(&self.cube_id.to_string())
     }
 }
 
 pub struct CubeNameSymbolFactory {
-    cube_name: CubeId,
+    cube_id: CubeId,
     path: Vec<CubeId>,
 }
 
 impl CubeNameSymbolFactory {
     pub fn try_new(
-        full_name: &CubeId,
+        cube_id: &CubeId,
         _cube_evaluator: Rc<dyn CubeEvaluator>,
         path: Vec<CubeId>,
     ) -> Result<Self, CubeError> {
         //TODO check that cube exists
         Ok(Self {
-            cube_name: full_name.clone(),
+            cube_id: cube_id.clone(),
             path,
         })
     }
@@ -67,8 +67,8 @@ impl CubeNameSymbolFactory {
 
 impl CubeNameSymbolFactory {
     pub fn build(self, _compiler: &mut Compiler) -> Result<Rc<CubeNameSymbol>, CubeError> {
-        let Self { cube_name, path } = self;
-        Ok(CubeNameSymbol::new(cube_name, path))
+        let Self { cube_id, path } = self;
+        Ok(CubeNameSymbol::new(cube_id, path))
     }
 }
 
@@ -77,7 +77,7 @@ impl CubeNameSymbolFactory {
 /// function or its raw `sql_table:` value.
 #[derive(Debug)]
 pub struct CubeTableSymbol {
-    cube_name: CubeId,
+    cube_id: CubeId,
     path: Vec<CubeId>,
     member_sql: Option<Rc<SqlCall>>,
     alias: String,
@@ -87,16 +87,16 @@ pub struct CubeTableSymbol {
 
 impl CubeTableSymbol {
     pub fn new(
-        cube_name: CubeId,
+        cube_id: CubeId,
         path: Vec<CubeId>,
         member_sql: Option<Rc<SqlCall>>,
         alias: String,
         is_table_sql: bool,
         join_map: Option<Vec<Vec<String>>>,
     ) -> Rc<Self> {
-        let path = CubeNameSymbol::normalize_path(path, &cube_name);
+        let path = CubeNameSymbol::normalize_path(path, &cube_id);
         Rc::new(Self {
-            cube_name,
+            cube_id,
             path,
             member_sql,
             alias,
@@ -136,12 +136,12 @@ impl CubeTableSymbol {
         } else {
             Err(CubeError::internal(format!(
                 "Cube {} doesn't have sql evaluator",
-                self.cube_name
+                self.cube_id
             )))
         }
     }
-    pub fn cube_name(&self) -> &CubeId {
-        &self.cube_name
+    pub fn cube_id(&self) -> &CubeId {
+        &self.cube_id
     }
 
     pub fn path(&self) -> &Vec<CubeId> {
@@ -158,7 +158,7 @@ impl CubeTableSymbol {
 }
 
 pub struct CubeTableSymbolFactory {
-    cube_name: CubeId,
+    cube_id: CubeId,
     path: Vec<CubeId>,
     sql: Option<Rc<dyn MemberSql>>,
     definition: Rc<dyn CubeDefinition>,
@@ -167,17 +167,17 @@ pub struct CubeTableSymbolFactory {
 
 impl CubeTableSymbolFactory {
     pub fn try_new(
-        cube_name: &CubeId,
+        cube_id: &CubeId,
         cube_evaluator: Rc<dyn CubeEvaluator>,
         path: Vec<CubeId>,
     ) -> Result<Self, CubeError> {
-        let definition = cube_evaluator.cube_from_path(cube_name.target().to_string())?;
+        let definition = cube_evaluator.cube_from_path(cube_id.target().to_string())?;
         let table_sql = definition.sql_table()?;
         let is_table_sql = table_sql.is_some();
         let sql = definition.sql()?;
         let sql = table_sql.or(sql);
         Ok(Self {
-            cube_name: cube_name.clone(),
+            cube_id: cube_id.clone(),
             path,
             sql,
             definition,
@@ -187,24 +187,24 @@ impl CubeTableSymbolFactory {
 
     pub fn build(self, compiler: &mut Compiler) -> Result<Rc<CubeTableSymbol>, CubeError> {
         let Self {
-            cube_name,
+            cube_id,
             path,
             sql,
             definition,
             is_table_sql,
         } = self;
         let sql = if let Some(sql) = sql {
-            Some(compiler.compile_cube_sql_call(&cube_name, sql)?)
+            Some(compiler.compile_cube_sql_call(&cube_id, sql)?)
         } else {
             None
         };
         let alias = if let Some(alias) = definition.static_data().sql_alias.clone() {
             alias.clone()
         } else {
-            PlanSqlTemplates::alias_name(&cube_name.to_string())
+            PlanSqlTemplates::alias_name(&cube_id.to_string())
         };
         Ok(CubeTableSymbol::new(
-            cube_name,
+            cube_id,
             path,
             sql,
             alias,
@@ -216,7 +216,7 @@ impl CubeTableSymbolFactory {
 
 impl crate::utils::debug::DebugSql for CubeNameSymbol {
     fn debug_sql(&self, _expand_deps: bool) -> String {
-        self.cube_name().to_string()
+        self.cube_id().to_string()
     }
 }
 
@@ -227,6 +227,6 @@ impl crate::utils::debug::DebugSql for CubeTableSymbol {
         } else {
             "NULL".to_string()
         };
-        format!("{}({})", self.cube_name(), sql_debug)
+        format!("{}({})", self.cube_id(), sql_debug)
     }
 }

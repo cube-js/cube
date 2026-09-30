@@ -90,7 +90,7 @@ impl PreAggregationProcessor<'_> {
         let branch_cube = CubeId::cube(branch_cube_name);
         if let Some(member) = branch_members
             .iter()
-            .find(|m| m.name() == short_name && m.cube_name() == branch_cube)
+            .find(|m| m.name() == short_name && m.cube_id() == branch_cube)
         {
             return Ok(member.clone());
         }

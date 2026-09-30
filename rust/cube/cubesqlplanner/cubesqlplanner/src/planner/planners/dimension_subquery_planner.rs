@@ -45,7 +45,7 @@ impl DimensionSubqueryPlanner {
     ) -> Result<Self, CubeError> {
         let mut sub_query_dims: HashMap<CubeId, Vec<Rc<MemberSymbol>>> = HashMap::new();
         for subquery_dimension in dimensions.iter() {
-            let cube_name = subquery_dimension.cube_name().clone();
+            let cube_name = subquery_dimension.cube_id().clone();
             sub_query_dims
                 .entry(cube_name.clone())
                 .or_default()
@@ -83,7 +83,7 @@ impl DimensionSubqueryPlanner {
         scope: &mut PlanningScope,
     ) -> Result<Rc<DimensionSubQuery>, CubeError> {
         let dim_name = subquery_dimension.name();
-        let cube_name = subquery_dimension.cube_name().clone();
+        let cube_name = subquery_dimension.cube_id().clone();
         let dimension_symbol = subquery_dimension.as_dimension()?;
 
         let primary_keys_dimensions = self.utils.primary_keys_dimensions(&cube_name)?;

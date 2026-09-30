@@ -18,7 +18,7 @@ impl CompiledMemberPath {
         alias: String,
         path: Vec<CubeId>,
     ) -> Self {
-        let path = CubeNameSymbol::normalize_path(path, cube.cube_name());
+        let path = CubeNameSymbol::normalize_path(path, cube.cube_id());
         Self {
             cube,
             id,
@@ -36,8 +36,8 @@ impl CompiledMemberPath {
         self.id.full_name()
     }
 
-    pub fn cube_name(&self) -> &CubeId {
-        self.cube.cube_name()
+    pub fn cube_id(&self) -> &CubeId {
+        self.cube.cube_id()
     }
 
     pub fn cube(&self) -> &Rc<CubeTableSymbol> {
@@ -68,7 +68,7 @@ impl CompiledMemberPath {
             id: self.id.clone(),
             name: self.name.clone(),
             alias: self.alias.clone(),
-            path: vec![self.cube_name().clone()],
+            path: vec![self.cube_id().clone()],
         }
     }
 }

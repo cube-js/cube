@@ -350,7 +350,7 @@ impl TestContext {
         let granularity_obj = GranularityHelper::make_granularity_obj(
             self.query_tools.cube_evaluator().clone(),
             &mut compiler,
-            &base_symbol.cube_name(),
+            &base_symbol.cube_id(),
             &base_symbol.name(),
             granularity.clone(),
         )?;

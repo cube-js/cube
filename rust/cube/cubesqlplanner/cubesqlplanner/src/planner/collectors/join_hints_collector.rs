@@ -56,7 +56,7 @@ impl TraversalVisitor for JoinHintsCollector {
         match node.as_ref() {
             MemberSymbol::Dimension(e) => {
                 if !e.is_view() {
-                    self.hints.push(join_hint(node.path(), &e.cube_name()));
+                    self.hints.push(join_hint(node.path(), &e.cube_id()));
                 }
                 if e.is_sub_query() {
                     return Ok(None);
@@ -65,7 +65,7 @@ impl TraversalVisitor for JoinHintsCollector {
             MemberSymbol::TimeDimension(e) => return self.on_node_traverse(e.base_symbol(), &()),
             MemberSymbol::Measure(e) => {
                 if !e.is_view() {
-                    self.hints.push(join_hint(node.path(), &e.cube_name()));
+                    self.hints.push(join_hint(node.path(), &e.cube_id()));
                 }
             }
             MemberSymbol::MemberExpression(_) | MemberSymbol::Ref(_) => {}
@@ -75,8 +75,7 @@ impl TraversalVisitor for JoinHintsCollector {
 
     fn on_cube_ref(&mut self, cube_ref: &CubeRef, _state: &Self::State) -> Result<(), CubeError> {
         if let CubeRef::Name(symbol) = cube_ref {
-            self.hints
-                .push(join_hint(symbol.path(), symbol.cube_name()));
+            self.hints.push(join_hint(symbol.path(), symbol.cube_id()));
         }
         Ok(())
     }

@@ -302,7 +302,7 @@ impl SelectBuilder {
         refs: &mut HashMap<CubeId, String>,
     ) {
         if let SingleSource::Cube(cube) = &source.source {
-            refs.insert(cube.name().clone(), source.alias.clone());
+            refs.insert(cube.cube_id().clone(), source.alias.clone());
         }
     }
 

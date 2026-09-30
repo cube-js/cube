@@ -132,8 +132,8 @@ impl MemberSymbol {
         self.compiled_path().name().clone()
     }
 
-    pub fn cube_name(&self) -> CubeId {
-        self.compiled_path().cube_name().clone()
+    pub fn cube_id(&self) -> CubeId {
+        self.compiled_path().cube_id().clone()
     }
 
     pub fn path(&self) -> &Vec<CubeId> {
@@ -396,7 +396,7 @@ impl MemberSymbol {
         if !sql_cube_deps.is_empty() {
             Err(CubeError::user(format!(
                 "Multi stage member '{}' references cubes {}. Multi stage members can only reference other members.",
-                self.full_name(), sql_cube_deps.iter().map(|dep| dep.cube_name()).join(", ")
+                self.full_name(), sql_cube_deps.iter().map(|dep| dep.cube_id()).join(", ")
             )))
         } else if sql_call.dependencies_count() == 0 {
             Err(CubeError::user(format!(
@@ -408,17 +408,14 @@ impl MemberSymbol {
         }
     }
     fn validate_regular_member_cube_refs(&self, sql_call: &Rc<SqlCall>) -> Result<(), CubeError> {
-        let cube_name = self.cube_name();
+        let cube_name = self.cube_id();
         let sql_cube_deps = sql_call.cube_name_deps();
-        if sql_cube_deps
-            .iter()
-            .any(|dep| dep.cube_name() != &cube_name)
-        {
+        if sql_cube_deps.iter().any(|dep| dep.cube_id() != &cube_name) {
             Err(CubeError::user(format!(
                 "Member '{}' references foreign cubes: {}. Please split and move this definition to corresponding cubes.",
                 self.full_name(), sql_cube_deps.iter().filter_map(|dep|
-                    if dep.cube_name() != &cube_name {
-                        Some(dep.cube_name())
+                    if dep.cube_id() != &cube_name {
+                        Some(dep.cube_id())
                     } else {
                         None
                     }

@@ -953,7 +953,7 @@ impl MultiStageQueryPlanner {
                 }
                 let uniq_time_dimensions = time_dimensions
                     .iter()
-                    .unique_by(|a| (a.cube_name(), a.name(), a.date_range_vec()))
+                    .unique_by(|a| (a.cube_id(), a.name(), a.date_range_vec()))
                     .collect_vec();
                 if uniq_time_dimensions.len() != 1 {
                     return Err(CubeError::internal(
@@ -1311,7 +1311,7 @@ impl MultiStageQueryPlanner {
         GranularityHelper::make_granularity_obj(
             self.query_tools.cube_evaluator().clone(),
             &mut compiler,
-            &time_dimension.cube_name(),
+            &time_dimension.cube_id(),
             &time_dimension.name(),
             Some(granularity.to_string()),
         )

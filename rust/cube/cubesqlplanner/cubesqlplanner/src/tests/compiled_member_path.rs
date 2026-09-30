@@ -36,7 +36,7 @@ fn test_simple_dimension_path() {
     let ctx = simple_ctx();
     let dim = ctx.create_dimension("orders.status").unwrap();
     assert_eq!(names(dim.path()), vec!["orders".to_string()]);
-    assert_eq!(dim.cube_name().to_string(), "orders");
+    assert_eq!(dim.cube_id().to_string(), "orders");
 }
 
 #[test]
@@ -44,7 +44,7 @@ fn test_simple_measure_path() {
     let ctx = simple_ctx();
     let m = ctx.create_measure("orders.count").unwrap();
     assert_eq!(names(m.path()), vec!["orders".to_string()]);
-    assert_eq!(m.cube_name().to_string(), "orders");
+    assert_eq!(m.cube_id().to_string(), "orders");
 }
 
 // --- View paths ---
@@ -201,7 +201,7 @@ fn test_segment_compiled_path() {
     let ctx = visitors_ctx();
     let seg = ctx.create_symbol("visitors.google").unwrap();
     assert_eq!(names(seg.path()), vec!["visitors".to_string()]);
-    assert_eq!(seg.cube_name().to_string(), "visitors");
+    assert_eq!(seg.cube_id().to_string(), "visitors");
 
     let deps = dep_paths(&seg);
     assert_eq!(deps.len(), 1);
@@ -216,5 +216,5 @@ fn test_time_dimension_path() {
     let ctx = simple_ctx();
     let td = ctx.create_dimension("orders.created_at.day").unwrap();
     assert_eq!(names(td.path()), vec!["orders".to_string()]);
-    assert_eq!(td.cube_name().to_string(), "orders");
+    assert_eq!(td.cube_id().to_string(), "orders");
 }
