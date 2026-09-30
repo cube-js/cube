@@ -2,7 +2,7 @@ import {
   ScaffoldingTemplate,
   SchemaFormat,
 } from '../../src/scaffolding/ScaffoldingTemplate';
-import { MemberType } from '../../src/scaffolding/ScaffoldingSchema';
+import { MemberType, ScaffoldingSchema } from '../../src/scaffolding/ScaffoldingSchema';
 
 const driver = {
   quoteIdentifier: (name) => `"${name}"`,
@@ -706,7 +706,7 @@ describe('ScaffoldingTemplate', () => {
       );
     });
 
-    it('drills into non-scalar columns, which the type filter treats as strings', () => {
+    it('leaves non-scalar columns out of the drill set but keeps them as dimensions', () => {
       const { content } = new ScaffoldingTemplate(
         {
           public: {
@@ -715,7 +715,10 @@ describe('ScaffoldingTemplate', () => {
               { name: 'payload', type: 'jsonb', attributes: [] },
               { name: 'blob_data', type: 'bytea', attributes: [] },
               { name: 'tags', type: 'text[]', attributes: [] },
+              { name: 'area', type: 'geography', attributes: [] },
+              { name: 'status', type: 'character varying', attributes: [] },
               { name: 'created_at', type: 'timestamp', attributes: [] },
+              { name: 'retried_at', type: 'Array(DateTime)', attributes: [] },
             ],
           },
         },
@@ -723,13 +726,84 @@ describe('ScaffoldingTemplate', () => {
         { format: SchemaFormat.Yaml, snakeCase: true }
       ).generateFilesByTableNames(['public.events'])[0];
 
-      // `columnType` recognises numbers, booleans and times and calls everything else a
-      // string, so JSON and binary columns are dimensions — and therefore drill members.
-      // Documented rather than special-cased: excluding them means deciding a JSON column
-      // can't be worth drilling into, which is the same guess as reading its name.
-      expect(content).toContain(
-        'drill_members: [id, payload, blob_data, tags, created_at]'
+      // Excluded by the raw warehouse type, not by the column name.
+      expect(content).toContain('drill_members: [id, status, created_at]');
+
+      for (const name of ['payload', 'blob_data', 'tags', 'area', 'retried_at']) {
+        expect(content).toContain(`- name: ${name}`);
+      }
+    });
+
+    it('keeps a non-scalar primary key in the drill set', () => {
+      const { content } = new ScaffoldingTemplate(
+        {
+          public: {
+            events: [
+              { name: 'uuid', type: 'binary(16)', attributes: ['primaryKey'] },
+              { name: 'status', type: 'character varying', attributes: [] },
+            ],
+          },
+        },
+        driver,
+        { format: SchemaFormat.Yaml, snakeCase: true }
+      ).generateFilesByTableNames(['public.events'])[0];
+
+      expect(content).toContain('drill_members: [uuid, status]');
+    });
+
+    it('excludes non-scalar columns on the cube-descriptor path too', () => {
+      const template = new ScaffoldingTemplate(
+        {
+          public: {
+            events: [
+              { name: 'id', type: 'integer', attributes: ['primaryKey'] },
+              { name: 'payload', type: 'jsonb', attributes: [] },
+              { name: 'status', type: 'character varying', attributes: [] },
+            ],
+          },
+        },
+        driver,
+        { format: SchemaFormat.Yaml, snakeCase: true }
       );
+      const schemaForDescriptors = new ScaffoldingSchema({
+        public: {
+          events: [
+            { name: 'id', type: 'integer', attributes: ['primaryKey'] },
+            { name: 'payload', type: 'jsonb', attributes: [] },
+            { name: 'status', type: 'character varying', attributes: [] },
+          ],
+        },
+      }, { snakeCase: true });
+      // Descriptors round-trip through the caller without the raw type.
+      const descriptors = schemaForDescriptors.cubeDescriptors(['public.events']);
+      expect(JSON.stringify(descriptors)).not.toContain('jsonb');
+
+      const { content } = template.generateFilesByCubeDescriptors(descriptors)[0];
+
+      expect(content).toContain('drill_members: [id, status]');
+      expect(content).toContain('- name: payload');
+    });
+
+    it('finds the raw type for a descriptor that names its table without a schema', () => {
+      const eventsSchema = {
+        public: {
+          events: [
+            { name: 'id', type: 'integer', attributes: ['primaryKey'] },
+            { name: 'payload', type: 'jsonb', attributes: [] },
+            { name: 'status', type: 'character varying', attributes: [] },
+          ],
+        },
+      };
+      const [descriptor] = new ScaffoldingSchema(eventsSchema, { snakeCase: true })
+        .cubeDescriptors(['public.events']);
+
+      const { content } = new ScaffoldingTemplate(
+        eventsSchema,
+        driver,
+        { format: SchemaFormat.Yaml, snakeCase: true }
+      ).generateFilesByCubeDescriptors([{ ...descriptor, tableName: 'events' }])[0];
+
+      expect(content).toContain('drill_members: [id, status]');
     });
 
     it('lists a member once when two columns render to the same name', () => {

@@ -11,7 +11,7 @@ import {
 } from '../ScaffoldingSchema';
 import { MemberReference } from '../descriptors/MemberReference';
 import { ValueWithComments } from '../descriptors/ValueWithComments';
-import { toSnakeCase } from '../utils';
+import { isNonScalarColumnType, toSnakeCase } from '../utils';
 
 const JOIN_RELATIONSHIP_MAP = {
   hasOne: 'one_to_one',
@@ -130,25 +130,32 @@ export abstract class BaseSchemaFormatter {
    * The members that identify one source row: every dimension the cube defines, with the
    * primary key first and the time dimensions last.
    *
-   * Every dimension, deliberately. Which columns are meaningful to drill into is not
-   * recoverable from a warehouse schema — the generator would have to guess from column
-   * names, and a name is not evidence of meaning. So the set isn't narrowed at all: a
-   * member the user doesn't want is one they delete from generated output they were
-   * going to review anyway, whereas one that was never emitted is one they must know to
-   * add. Ordering is the only editorial judgement here, and it costs nothing to be wrong
-   * about — key first because it identifies the row, time last because it reads as
-   * "when".
+   * Every dimension, except non-scalar ones. Which columns are meaningful to drill into
+   * is not recoverable from a warehouse schema — the generator would have to guess from
+   * column names, and a name is not evidence of meaning. So the set is narrowed only by
+   * the raw column type: a JSON document, an array, binary data or a geometry doesn't
+   * read as a value in a drill-down table. The primary key stays whatever its type,
+   * since it is what identifies the row. Ordering is the only other judgement, and it
+   * costs nothing to be wrong about — key first because it identifies the row, time last
+   * because it reads as "when".
    *
    * Derived from the dimensions actually being rendered rather than from the ones
    * ScaffoldingSchema computed: the cube-descriptor path lets the caller drop members,
    * and a drill member the cube doesn't define dead-ends at click time.
    */
-  protected drillMembers(dimensions: Dimension[]): Dimension[] {
+  protected drillMembers(tableSchema: TableSchema, dimensions: Dimension[]): Dimension[] {
     const isTime = (d: Dimension) => (d.type ?? d.types?.[0]) === 'time';
+    // Read from the table definition, since cube descriptors don't carry the raw type.
+    const dbTypes = new Map(
+      this.scaffoldingSchema
+        .resolveTableDefinition(this.scaffoldingSchema.resolveTableName(tableSchema.tableName))
+        .map((column) => [column.name, column.type])
+    );
 
     // Deduped because dimensions render into an object keyed by member name: two columns
     // that collapse to one name must not repeat in the drill list.
-    const candidates = this.dedupeByMemberName(dimensions);
+    const candidates = this.dedupeByMemberName(dimensions)
+      .filter((d) => d.isPrimaryKey || !isNonScalarColumnType(dbTypes.get(d.name)));
 
     const primaryKeys = candidates.filter((d) => d.isPrimaryKey);
     const attributes = candidates.filter((d) => !d.isPrimaryKey && !isTime(d));
@@ -232,7 +239,7 @@ export abstract class BaseSchemaFormatter {
 
     const sortedDimensions = tableSchema.dimensions.sort((a) => (a.isPrimaryKey ? -1 : 0));
 
-    const drillMembers = this.drillMembers(sortedDimensions);
+    const drillMembers = this.drillMembers(tableSchema, sortedDimensions);
     const drillMembersProp = drillMembers.length
       ? {
         [this.options.snakeCase ? 'drill_members' : 'drillMembers']: drillMembers.map(
