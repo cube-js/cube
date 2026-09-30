@@ -11,7 +11,7 @@ use crate::physical_plan_builder::context::MultiStageDimensionContext;
 use crate::planner::query_properties::OrderByItem;
 use crate::planner::query_tools::QueryTools;
 use crate::planner::sql_templates::PlanSqlTemplates;
-use crate::planner::MemberSymbol;
+use crate::planner::{CubeId, MemberSymbol};
 use cubenativeutils::CubeError;
 use itertools::Itertools;
 use std::collections::HashMap;
@@ -58,7 +58,7 @@ impl PhysicalPlanBuilder {
     pub fn build(
         &self,
         logical_plan: Rc<RootQuery>,
-        original_sql_pre_aggregations: HashMap<String, String>,
+        original_sql_pre_aggregations: HashMap<CubeId, String>,
         total_query: bool,
     ) -> Result<Rc<Select>, CubeError> {
         let mut context = PushDownBuilderContext::default();

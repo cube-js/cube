@@ -3,8 +3,8 @@ use crate::planner::filter::typed_filter::resolve_base_symbol;
 use crate::planner::symbols::CalendarDimensionTimeShift;
 use crate::planner::symbols::DimensionSymbol;
 use crate::planner::symbols::MemberSymbol;
-use crate::planner::DimensionTimeShift;
 use crate::planner::SqlInterval;
+use crate::planner::{CubeId, DimensionTimeShift};
 use cubenativeutils::CubeError;
 use itertools::Itertools;
 use std::collections::HashMap;
@@ -181,7 +181,7 @@ impl ExtractedTimeShifts {
             .add_calendar_cube(dimension.cube_name().clone(), shift.clone());
         if let Some((pk_cube, _)) = pk_full_name.split_once('.') {
             self.filter_params_shifts
-                .add_calendar_cube(pk_cube.to_string(), shift);
+                .add_calendar_cube(CubeId::cube(pk_cube), shift);
         }
     }
 }
@@ -213,7 +213,7 @@ pub struct CalendarShift {
 #[derive(Clone, Default, Debug, PartialEq)]
 pub struct FilterParamsTimeShifts {
     interval_shifts: HashMap<String, SqlInterval>,
-    calendar_cubes: HashMap<String, CalendarShift>,
+    calendar_cubes: HashMap<CubeId, CalendarShift>,
 }
 
 impl FilterParamsTimeShifts {
@@ -221,7 +221,7 @@ impl FilterParamsTimeShifts {
         self.interval_shifts.insert(key, interval);
     }
 
-    fn add_calendar_cube(&mut self, cube_name: String, shift: CalendarShift) {
+    fn add_calendar_cube(&mut self, cube_name: CubeId, shift: CalendarShift) {
         self.calendar_cubes.insert(cube_name, shift);
     }
 

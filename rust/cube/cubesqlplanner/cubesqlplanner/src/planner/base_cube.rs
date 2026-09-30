@@ -1,5 +1,5 @@
 use super::query_tools::QueryTools;
-use super::{CubeRef, CubeTableSymbol};
+use super::{CubeId, CubeRef, CubeTableSymbol};
 use crate::cube_bridge::cube_definition::CubeDefinition;
 use crate::physical_plan::VisitorContext;
 use crate::planner::sql_templates::PlanSqlTemplates;
@@ -8,7 +8,7 @@ use std::collections::HashSet;
 use std::rc::Rc;
 
 pub struct BaseCube {
-    cube_name: String,
+    cube_name: CubeId,
     members: HashSet<String>,
     cube_table_symbol: Rc<CubeTableSymbol>,
     definition: Rc<dyn CubeDefinition>,
@@ -16,16 +16,16 @@ pub struct BaseCube {
 }
 impl BaseCube {
     pub fn try_new(
-        cube_name: String,
+        cube_name: CubeId,
         query_tools: Rc<QueryTools>,
         cube_table_symbol: Rc<CubeTableSymbol>,
     ) -> Result<Rc<Self>, CubeError> {
         let definition = query_tools
             .cube_evaluator()
-            .cube_from_path(cube_name.clone())?;
+            .cube_from_path(cube_name.target().to_string())?;
         let members = query_tools
             .base_tools()
-            .all_cube_members(cube_name.clone())?
+            .all_cube_members(cube_name.target().to_string())?
             .into_iter()
             .collect::<HashSet<_>>();
 
@@ -49,7 +49,7 @@ impl BaseCube {
         visitor.evaluate_cube_ref(&cube_ref, node_processor, templates)
     }
 
-    pub fn name(&self) -> &String {
+    pub fn name(&self) -> &CubeId {
         &self.cube_name
     }
 
@@ -65,7 +65,7 @@ impl BaseCube {
         if let Some(alias) = self.sql_alias() {
             alias.clone()
         } else {
-            self.query_tools.alias_name(&self.cube_name)
+            self.query_tools.alias_name(&self.cube_name.to_string())
         }
     }
 

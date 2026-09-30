@@ -1,7 +1,7 @@
 use cubenativeutils::CubeError;
 use itertools::Itertools;
 
-use crate::planner::{Case, CubeRef, SqlCall};
+use crate::planner::{Case, CubeId, CubeRef, SqlCall};
 
 use super::common::CompiledMemberPath;
 use super::deps::{self, DepVisitor, DepVisitorMut, SymbolDeps};
@@ -129,11 +129,11 @@ impl MemberSymbol {
         self.compiled_path().name().clone()
     }
 
-    pub fn cube_name(&self) -> String {
+    pub fn cube_name(&self) -> CubeId {
         self.compiled_path().cube_name().clone()
     }
 
-    pub fn path(&self) -> &Vec<String> {
+    pub fn path(&self) -> &Vec<CubeId> {
         self.compiled_path().path()
     }
 

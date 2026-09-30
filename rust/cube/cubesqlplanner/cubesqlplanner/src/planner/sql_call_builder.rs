@@ -1,4 +1,4 @@
-use super::Compiler;
+use super::{Compiler, CubeId};
 use super::{
     CubeRef, SqlCall, SqlCallFilterGroupItem, SqlCallFilterParamsItem, SqlDependency, SymbolPath,
     SymbolPathType,
@@ -49,7 +49,7 @@ impl<'a> SqlCallBuilder<'a> {
 
     pub fn build(
         mut self,
-        cube_name: &String,
+        cube_name: &CubeId,
         member_sql: Rc<dyn MemberSql>,
     ) -> Result<SqlCall, CubeError> {
         let compiled = self.base_tools.compile_member_sql(
@@ -66,7 +66,7 @@ impl<'a> SqlCallBuilder<'a> {
     // dependency list.
     fn build_from_template(
         &mut self,
-        cube_name: &String,
+        cube_name: &CubeId,
         template: SqlTemplate,
         args: &SqlTemplateArgs,
     ) -> Result<SqlCall, CubeError> {
@@ -99,7 +99,7 @@ impl<'a> SqlCallBuilder<'a> {
 
     fn build_filter_params_item(
         &mut self,
-        cube_name: &String,
+        cube_name: &CubeId,
         item: &FilterParamsItem,
     ) -> Result<SqlCallFilterParamsItem, CubeError> {
         let compiled_call = match &item.column {
@@ -125,7 +125,7 @@ impl<'a> SqlCallBuilder<'a> {
 
     fn build_filter_group_item(
         &mut self,
-        cube_name: &String,
+        cube_name: &CubeId,
         item: &FilterGroupItem,
     ) -> Result<SqlCallFilterGroupItem, CubeError> {
         let filter_params = item
@@ -138,7 +138,7 @@ impl<'a> SqlCallBuilder<'a> {
 
     fn build_dependency(
         &mut self,
-        current_cube_name: &String,
+        current_cube_name: &CubeId,
         dep_path: &Vec<String>,
     ) -> Result<SqlDependency, CubeError> {
         assert!(!dep_path.is_empty());

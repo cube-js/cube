@@ -8,7 +8,7 @@ use crate::physical_plan::expression::FunctionExpression;
 use crate::physical_plan::sql_nodes::SqlNodesFactory;
 use crate::physical_plan::VisitorContext;
 use crate::planner::query_tools::QueryTools;
-use crate::planner::MemberSymbol;
+use crate::planner::{CubeId, MemberSymbol};
 use cubenativeutils::CubeError;
 use std::collections::HashMap;
 use std::rc::Rc;
@@ -279,7 +279,7 @@ impl SelectBuilder {
         &self.from
     }
 
-    pub fn make_cube_references(from: Rc<From>) -> HashMap<String, String> {
+    pub fn make_cube_references(from: Rc<From>) -> HashMap<CubeId, String> {
         let mut refs = HashMap::new();
         match &from.source {
             FromSource::Single(source) => Self::add_cube_reference_if_needed(source, &mut refs),
@@ -299,7 +299,7 @@ impl SelectBuilder {
 
     fn add_cube_reference_if_needed(
         source: &SingleAliasedSource,
-        refs: &mut HashMap<String, String>,
+        refs: &mut HashMap<CubeId, String>,
     ) {
         if let SingleSource::Cube(cube) = &source.source {
             refs.insert(cube.name().clone(), source.alias.clone());

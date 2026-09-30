@@ -1,5 +1,5 @@
 use super::*;
-use crate::planner::BaseCube;
+use crate::planner::{BaseCube, CubeId};
 use cubenativeutils::CubeError;
 use std::rc::Rc;
 use typed_builder::TypedBuilder;
@@ -38,8 +38,8 @@ pub struct Cube {
 }
 
 impl Cube {
-    pub fn name(&self) -> &String {
-        &self.cube.name()
+    pub fn name(&self) -> &CubeId {
+        self.cube.name()
     }
 
     pub fn cube(&self) -> &Rc<BaseCube> {

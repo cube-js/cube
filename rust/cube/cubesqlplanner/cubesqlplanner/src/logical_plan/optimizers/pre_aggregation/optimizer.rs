@@ -13,7 +13,7 @@ use crate::planner::planners::CommonUtils;
 use crate::planner::state::State;
 use crate::planner::symbols::MeasureTimeShifts;
 use crate::planner::time_dimension::QueryDateTime;
-use crate::planner::MemberSymbol;
+use crate::planner::{CubeId, MemberSymbol};
 use cubenativeutils::CubeError;
 use std::cell::RefCell;
 use std::collections::{HashMap, HashSet};
@@ -71,7 +71,7 @@ pub struct PreAggregationOptimizer {
     usage_counter: usize,
     /// Resolved primary-key names per cube. Every candidate pre-aggregation asks
     /// for the same cubes, and resolving them crosses the JS bridge.
-    primary_keys_cache: RefCell<HashMap<String, Vec<String>>>,
+    primary_keys_cache: RefCell<HashMap<CubeId, Vec<String>>>,
 }
 
 impl PreAggregationOptimizer {
@@ -900,7 +900,7 @@ impl PreAggregationOptimizer {
             .map(|d| d.clone().resolve_reference_chain().full_name())
             .collect();
 
-        let joined_cubes: HashSet<String> = std::iter::once(root.name().clone())
+        let joined_cubes: HashSet<CubeId> = std::iter::once(root.name().clone())
             .chain(
                 node_join
                     .joins()
@@ -947,7 +947,7 @@ impl PreAggregationOptimizer {
     /// the rollup and leaves its row count untouched.
     fn pre_aggregation_grain_cubes(
         pre_aggregation: &CompiledPreAggregation,
-    ) -> Result<Vec<String>, CubeError> {
+    ) -> Result<Vec<CubeId>, CubeError> {
         let members = pre_aggregation
             .dimensions
             .iter()
@@ -958,7 +958,7 @@ impl PreAggregationOptimizer {
         collect_cube_names_from_symbols(&members)
     }
 
-    fn resolved_primary_keys(&self, cube_name: &String) -> Result<Vec<String>, CubeError> {
+    fn resolved_primary_keys(&self, cube_name: &CubeId) -> Result<Vec<String>, CubeError> {
         if let Some(cached) = self.primary_keys_cache.borrow().get(cube_name) {
             return Ok(cached.clone());
         }

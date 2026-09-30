@@ -1,4 +1,4 @@
-use crate::planner::{JoinTree, MemberSymbol, TraversalVisitor};
+use crate::planner::{CubeId, JoinTree, MemberSymbol, TraversalVisitor};
 use cubenativeutils::CubeError;
 use std::collections::HashSet;
 use std::rc::Rc;
@@ -60,7 +60,7 @@ impl TraversalVisitor for CompositeMeasuresCollector {
 pub struct MeasureResult {
     pub multiplied: bool,
     pub measure: Rc<MemberSymbol>,
-    pub cube_name: String,
+    pub cube_name: CubeId,
 }
 
 pub struct MultipliedMeasuresCollector {

@@ -1,5 +1,6 @@
 use crate::planner::{
-    CubeTableSymbol, MemberExpressionExpression, MemberExpressionSymbol, MemberSymbol, SqlCall,
+    CubeId, CubeTableSymbol, MemberExpressionExpression, MemberExpressionSymbol, MemberSymbol,
+    SqlCall,
 };
 use cubenativeutils::CubeError;
 use std::rc::Rc;
@@ -12,7 +13,7 @@ use std::rc::Rc;
 pub struct BaseSegment {
     full_name: String,
     member_evaluator: Rc<MemberSymbol>,
-    cube_name: String,
+    cube_name: CubeId,
     name: String,
     /// True when this segment is an ad-hoc query-level member expression (no
     /// registered `segments:` path), as opposed to a named cube segment.
@@ -101,7 +102,7 @@ impl BaseSegment {
         Rc::new(result)
     }
 
-    pub fn cube_name(&self) -> &String {
+    pub fn cube_name(&self) -> &CubeId {
         &self.cube_name
     }
 

@@ -1,6 +1,6 @@
 use crate::cube_bridge::evaluator::CubeEvaluator;
-use crate::planner::Compiler;
 use crate::planner::TimeDimensionSymbol;
+use crate::planner::{Compiler, CubeId};
 use crate::planner::{Granularity, QueryDateTimeHelper};
 use chrono::prelude::*;
 use chrono_tz::Tz;
@@ -213,14 +213,14 @@ impl GranularityHelper {
     pub fn make_granularity_obj(
         cube_evaluator: Rc<dyn CubeEvaluator>,
         compiler: &mut Compiler,
-        cube_name: &String,
+        cube_name: &CubeId,
         name: &String,
         granularity: Option<String>,
     ) -> Result<Option<Granularity>, CubeError> {
         let timezone = compiler.timezone();
         let granularity_obj = if let Some(granularity) = &granularity {
             let path = vec![
-                cube_name.clone(),
+                cube_name.target().to_string(),
                 name.clone(),
                 "granularities".to_string(),
                 granularity.clone(),

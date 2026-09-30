@@ -4,6 +4,7 @@ use std::rc::Rc;
 use cubenativeutils::CubeError;
 
 use crate::cube_bridge::evaluator::CubeEvaluator;
+use crate::planner::CubeId;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum SymbolPathType {
@@ -21,8 +22,8 @@ pub enum SymbolPathType {
 #[derive(Debug, Clone)]
 pub struct SymbolPath {
     path_type: SymbolPathType,
-    path: Vec<String>,
-    cube_name: String,
+    path: Vec<CubeId>,
+    cube_name: CubeId,
     symbol_name: String,
     full_name: String,
     granularity: Option<String>,
@@ -31,13 +32,13 @@ pub struct SymbolPath {
 impl SymbolPath {
     fn new(
         path_type: SymbolPathType,
-        path: Vec<String>,
-        cube_name: String,
+        path: Vec<CubeId>,
+        cube_name: CubeId,
         symbol_name: String,
         granularity: Option<String>,
     ) -> Self {
         let full_name = if symbol_name.is_empty() {
-            cube_name.clone()
+            cube_name.to_string()
         } else {
             format!("{}.{}", cube_name, symbol_name)
         };
@@ -63,7 +64,7 @@ impl SymbolPath {
     /// of `current_cube` directly.
     pub fn parse_parts(
         cube_evaluator: Rc<dyn CubeEvaluator>,
-        current_cube: Option<&str>,
+        current_cube: Option<&CubeId>,
         parts: &[String],
     ) -> Result<Self, CubeError> {
         Self::resolve_parts(cube_evaluator, current_cube, parts, vec![])
@@ -71,9 +72,9 @@ impl SymbolPath {
 
     fn resolve_parts(
         cube_evaluator: Rc<dyn CubeEvaluator>,
-        current_cube: Option<&str>,
+        current_cube: Option<&CubeId>,
         parts: &[String],
-        path: Vec<String>,
+        path: Vec<CubeId>,
     ) -> Result<Self, CubeError> {
         if parts.is_empty() {
             return Err(CubeError::user("Empty path".to_string()));
@@ -121,29 +122,30 @@ impl SymbolPath {
 
     fn try_resolve_as_member(
         evaluator: Rc<dyn CubeEvaluator>,
-        cube_name: &str,
+        cube_name: &CubeId,
         parts: &[String],
-        path: &[String],
+        path: &[CubeId],
     ) -> Result<Option<Self>, CubeError> {
-        let check_path = vec![cube_name.to_string(), parts[0].clone()];
+        let check_path = vec![cube_name.target().to_string(), parts[0].clone()];
 
         if evaluator.is_dimension(check_path.clone())? {
             if parts.len() == 1 {
                 return Ok(Some(Self::new(
                     SymbolPathType::Dimension,
                     path.to_vec(),
-                    cube_name.to_string(),
+                    cube_name.clone(),
                     parts[0].clone(),
                     None,
                 )));
             }
             if parts.len() == 2 {
-                let dim = evaluator.dimension_by_path(format!("{}.{}", cube_name, parts[0]))?;
+                let dim =
+                    evaluator.dimension_by_path(format!("{}.{}", cube_name.target(), parts[0]))?;
                 if dim.static_data().dimension_type == "time" {
                     return Ok(Some(Self::new(
                         SymbolPathType::Dimension,
                         path.to_vec(),
-                        cube_name.to_string(),
+                        cube_name.clone(),
                         parts[0].clone(),
                         Some(parts[1].clone()),
                     )));
@@ -162,7 +164,7 @@ impl SymbolPath {
             return Ok(Some(Self::new(
                 SymbolPathType::Measure,
                 path.to_vec(),
-                cube_name.to_string(),
+                cube_name.clone(),
                 parts[0].clone(),
                 None,
             )));
@@ -171,7 +173,7 @@ impl SymbolPath {
             return Ok(Some(Self::new(
                 SymbolPathType::Segment,
                 path.to_vec(),
-                cube_name.to_string(),
+                cube_name.clone(),
                 parts[0].clone(),
                 None,
             )));
@@ -181,14 +183,14 @@ impl SymbolPath {
 
     fn resolve_cube_name(
         evaluator: Rc<dyn CubeEvaluator>,
-        current_cube: Option<&str>,
+        current_cube: Option<&CubeId>,
         name: &str,
-    ) -> Result<Option<String>, CubeError> {
+    ) -> Result<Option<CubeId>, CubeError> {
         if matches!(name, "CUBE" | "TABLE") {
-            return Ok(current_cube.map(|s| s.to_string()));
+            return Ok(current_cube.cloned());
         }
         if evaluator.cube_exists(name.to_string())? {
-            return Ok(Some(name.to_string()));
+            return Ok(Some(CubeId::cube(name)));
         }
         Ok(None)
     }
@@ -197,11 +199,11 @@ impl SymbolPath {
         &self.path_type
     }
 
-    pub fn path(&self) -> &Vec<String> {
+    pub fn path(&self) -> &Vec<CubeId> {
         &self.path
     }
 
-    pub fn cube_name(&self) -> &String {
+    pub fn cube_name(&self) -> &CubeId {
         &self.cube_name
     }
 
@@ -292,10 +294,10 @@ mod tests {
     fn test_parse_simple_dimension() {
         let evaluator = create_test_evaluator();
         let result = SymbolPath::parse(evaluator.clone(), "users.created_at").unwrap();
-        assert_eq!(result.cube_name(), "users");
+        assert_eq!(result.cube_name(), &CubeId::cube("users"));
         assert_eq!(result.symbol_name(), "created_at");
         assert_eq!(result.full_name(), "users.created_at");
-        assert_eq!(result.path(), &vec!["users".to_string()]);
+        assert_eq!(result.path(), &vec![CubeId::cube("users")]);
         assert_eq!(result.granularity(), &None);
         assert_eq!(result.path_type(), &SymbolPathType::Dimension);
     }
@@ -304,12 +306,12 @@ mod tests {
     fn test_parse_cross_cube_dimension() {
         let evaluator = create_test_evaluator();
         let result = SymbolPath::parse(evaluator.clone(), "orders.users.created_at").unwrap();
-        assert_eq!(result.cube_name(), "users");
+        assert_eq!(result.cube_name(), &CubeId::cube("users"));
         assert_eq!(result.symbol_name(), "created_at");
         assert_eq!(result.full_name(), "users.created_at");
         assert_eq!(
             result.path(),
-            &vec!["orders".to_string(), "users".to_string()]
+            &vec![CubeId::cube("orders"), CubeId::cube("users")]
         );
         assert_eq!(result.granularity(), &None);
         assert_eq!(result.path_type(), &SymbolPathType::Dimension);
@@ -319,10 +321,10 @@ mod tests {
     fn test_parse_time_dimension_with_granularity() {
         let evaluator = create_test_evaluator();
         let result = SymbolPath::parse(evaluator.clone(), "users.created_at.day").unwrap();
-        assert_eq!(result.cube_name(), "users");
+        assert_eq!(result.cube_name(), &CubeId::cube("users"));
         assert_eq!(result.symbol_name(), "created_at");
         assert_eq!(result.full_name(), "users.created_at");
-        assert_eq!(result.path(), &vec!["users".to_string()]);
+        assert_eq!(result.path(), &vec![CubeId::cube("users")]);
         assert_eq!(result.granularity(), &Some("day".to_string()));
         assert_eq!(result.path_type(), &SymbolPathType::Dimension);
     }
@@ -331,12 +333,12 @@ mod tests {
     fn test_parse_cross_cube_time_dimension_with_granularity() {
         let evaluator = create_test_evaluator();
         let result = SymbolPath::parse(evaluator.clone(), "orders.users.created_at.day").unwrap();
-        assert_eq!(result.cube_name(), "users");
+        assert_eq!(result.cube_name(), &CubeId::cube("users"));
         assert_eq!(result.symbol_name(), "created_at");
         assert_eq!(result.full_name(), "users.created_at");
         assert_eq!(
             result.path(),
-            &vec!["orders".to_string(), "users".to_string()]
+            &vec![CubeId::cube("orders"), CubeId::cube("users")]
         );
         assert_eq!(result.granularity(), &Some("day".to_string()));
         assert_eq!(result.path_type(), &SymbolPathType::Dimension);
@@ -346,10 +348,10 @@ mod tests {
     fn test_parse_measure() {
         let evaluator = create_test_evaluator();
         let result = SymbolPath::parse(evaluator.clone(), "users.count").unwrap();
-        assert_eq!(result.cube_name(), "users");
+        assert_eq!(result.cube_name(), &CubeId::cube("users"));
         assert_eq!(result.symbol_name(), "count");
         assert_eq!(result.full_name(), "users.count");
-        assert_eq!(result.path(), &vec!["users".to_string()]);
+        assert_eq!(result.path(), &vec![CubeId::cube("users")]);
         assert_eq!(result.granularity(), &None);
         assert_eq!(result.path_type(), &SymbolPathType::Measure);
     }
@@ -358,12 +360,12 @@ mod tests {
     fn test_parse_cross_cube_measure() {
         let evaluator = create_test_evaluator();
         let result = SymbolPath::parse(evaluator.clone(), "users.orders.total").unwrap();
-        assert_eq!(result.cube_name(), "orders");
+        assert_eq!(result.cube_name(), &CubeId::cube("orders"));
         assert_eq!(result.symbol_name(), "total");
         assert_eq!(result.full_name(), "orders.total");
         assert_eq!(
             result.path(),
-            &vec!["users".to_string(), "orders".to_string()]
+            &vec![CubeId::cube("users"), CubeId::cube("orders")]
         );
         assert_eq!(result.granularity(), &None);
         assert_eq!(result.path_type(), &SymbolPathType::Measure);
@@ -373,86 +375,102 @@ mod tests {
     fn test_parse_parts_cube_alias() {
         let evaluator = create_test_evaluator();
         let parts = vec!["CUBE".to_string()];
-        let result = SymbolPath::parse_parts(evaluator.clone(), Some("users"), &parts).unwrap();
+        let result =
+            SymbolPath::parse_parts(evaluator.clone(), Some(&CubeId::cube("users")), &parts)
+                .unwrap();
         assert_eq!(result.path_type(), &SymbolPathType::CubeName);
-        assert_eq!(result.cube_name(), "users");
-        assert_eq!(result.path(), &vec!["users".to_string()]);
+        assert_eq!(result.cube_name(), &CubeId::cube("users"));
+        assert_eq!(result.path(), &vec![CubeId::cube("users")]);
     }
 
     #[test]
     fn test_parse_parts_table_alias() {
         let evaluator = create_test_evaluator();
         let parts = vec!["TABLE".to_string()];
-        let result = SymbolPath::parse_parts(evaluator.clone(), Some("users"), &parts).unwrap();
+        let result =
+            SymbolPath::parse_parts(evaluator.clone(), Some(&CubeId::cube("users")), &parts)
+                .unwrap();
         assert_eq!(result.path_type(), &SymbolPathType::CubeName);
-        assert_eq!(result.cube_name(), "users");
-        assert_eq!(result.path(), &vec!["users".to_string()]);
+        assert_eq!(result.cube_name(), &CubeId::cube("users"));
+        assert_eq!(result.path(), &vec![CubeId::cube("users")]);
     }
 
     #[test]
     fn test_parse_parts_cube_table() {
         let evaluator = create_test_evaluator();
         let parts = vec!["CUBE".to_string(), "__sql_fn".to_string()];
-        let result = SymbolPath::parse_parts(evaluator.clone(), Some("users"), &parts).unwrap();
+        let result =
+            SymbolPath::parse_parts(evaluator.clone(), Some(&CubeId::cube("users")), &parts)
+                .unwrap();
         assert_eq!(result.path_type(), &SymbolPathType::CubeTable);
-        assert_eq!(result.cube_name(), "users");
-        assert_eq!(result.path(), &vec!["users".to_string()]);
+        assert_eq!(result.cube_name(), &CubeId::cube("users"));
+        assert_eq!(result.path(), &vec![CubeId::cube("users")]);
     }
 
     #[test]
     fn test_parse_parts_simple_member() {
         let evaluator = create_test_evaluator();
         let parts = vec!["source".to_string()];
-        let result = SymbolPath::parse_parts(evaluator.clone(), Some("users"), &parts).unwrap();
+        let result =
+            SymbolPath::parse_parts(evaluator.clone(), Some(&CubeId::cube("users")), &parts)
+                .unwrap();
         assert_eq!(result.path_type(), &SymbolPathType::Dimension);
-        assert_eq!(result.cube_name(), "users");
+        assert_eq!(result.cube_name(), &CubeId::cube("users"));
         assert_eq!(result.symbol_name(), "source");
-        assert_eq!(result.path(), &Vec::<String>::new());
+        assert_eq!(result.path(), &Vec::<CubeId>::new());
     }
 
     #[test]
     fn test_parse_parts_time_dimension_with_granularity() {
         let evaluator = create_test_evaluator();
         let parts = vec!["created_at".to_string(), "day".to_string()];
-        let result = SymbolPath::parse_parts(evaluator.clone(), Some("users"), &parts).unwrap();
+        let result =
+            SymbolPath::parse_parts(evaluator.clone(), Some(&CubeId::cube("users")), &parts)
+                .unwrap();
         assert_eq!(result.path_type(), &SymbolPathType::Dimension);
-        assert_eq!(result.cube_name(), "users");
+        assert_eq!(result.cube_name(), &CubeId::cube("users"));
         assert_eq!(result.symbol_name(), "created_at");
         assert_eq!(result.granularity(), &Some("day".to_string()));
-        assert_eq!(result.path(), &Vec::<String>::new());
+        assert_eq!(result.path(), &Vec::<CubeId>::new());
     }
 
     #[test]
     fn test_parse_parts_cross_cube_member() {
         let evaluator = create_test_evaluator();
         let parts = vec!["orders".to_string(), "total".to_string()];
-        let result = SymbolPath::parse_parts(evaluator.clone(), Some("users"), &parts).unwrap();
+        let result =
+            SymbolPath::parse_parts(evaluator.clone(), Some(&CubeId::cube("users")), &parts)
+                .unwrap();
         assert_eq!(result.path_type(), &SymbolPathType::Measure);
-        assert_eq!(result.cube_name(), "orders");
+        assert_eq!(result.cube_name(), &CubeId::cube("orders"));
         assert_eq!(result.symbol_name(), "total");
-        assert_eq!(result.path(), &vec!["orders".to_string()]);
+        assert_eq!(result.path(), &vec![CubeId::cube("orders")]);
     }
 
     #[test]
     fn test_parse_parts_measure() {
         let evaluator = create_test_evaluator();
         let parts = vec!["count".to_string()];
-        let result = SymbolPath::parse_parts(evaluator.clone(), Some("users"), &parts).unwrap();
+        let result =
+            SymbolPath::parse_parts(evaluator.clone(), Some(&CubeId::cube("users")), &parts)
+                .unwrap();
         assert_eq!(result.path_type(), &SymbolPathType::Measure);
-        assert_eq!(result.cube_name(), "users");
+        assert_eq!(result.cube_name(), &CubeId::cube("users"));
         assert_eq!(result.symbol_name(), "count");
-        assert_eq!(result.path(), &Vec::<String>::new());
+        assert_eq!(result.path(), &Vec::<CubeId>::new());
     }
 
     #[test]
     fn test_parse_parts_segment() {
         let evaluator = create_test_evaluator();
         let parts = vec!["google".to_string()];
-        let result = SymbolPath::parse_parts(evaluator.clone(), Some("users"), &parts).unwrap();
+        let result =
+            SymbolPath::parse_parts(evaluator.clone(), Some(&CubeId::cube("users")), &parts)
+                .unwrap();
         assert_eq!(result.path_type(), &SymbolPathType::Segment);
-        assert_eq!(result.cube_name(), "users");
+        assert_eq!(result.cube_name(), &CubeId::cube("users"));
         assert_eq!(result.symbol_name(), "google");
-        assert_eq!(result.path(), &Vec::<String>::new());
+        assert_eq!(result.path(), &Vec::<CubeId>::new());
     }
 
     #[test]

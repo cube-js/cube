@@ -3,7 +3,7 @@ use super::deps::{self, symbol_deps, DepVisitor, DepVisitorMut, SymbolDeps};
 use super::MemberSymbol;
 use crate::planner::collectors::member_childs;
 use crate::planner::sql_templates::PlanSqlTemplates;
-use crate::planner::{CubeTableSymbol, SqlCall};
+use crate::planner::{CubeId, CubeTableSymbol, SqlCall};
 use crate::utils::debug::DebugSql;
 use cubenativeutils::CubeError;
 use itertools::Itertools;
@@ -73,7 +73,7 @@ impl MemberExpressionSymbol {
         expression: MemberExpressionExpression,
         definition: Option<String>,
         alias: Option<String>,
-        path: Vec<String>,
+        path: Vec<CubeId>,
     ) -> Result<Rc<Self>, CubeError> {
         let full_name = format!("expr:{}.{}", cube.cube_name(), name);
         let alias = alias.unwrap_or_else(|| PlanSqlTemplates::alias_name(&name));
@@ -160,7 +160,7 @@ impl MemberExpressionSymbol {
     /// non-dimension member.
     pub fn cube_names_if_dimension_only_expression(
         self: Rc<Self>,
-    ) -> Result<Option<Vec<String>>, CubeError> {
+    ) -> Result<Option<Vec<CubeId>>, CubeError> {
         let childs = member_childs(&MemberSymbol::new_member_expression(self), true)?;
         if childs.iter().any(|s| !s.is_dimension()) {
             Ok(None)
@@ -176,7 +176,7 @@ impl MemberExpressionSymbol {
         }
     }
 
-    pub fn cube_name(&self) -> String {
+    pub fn cube_name(&self) -> CubeId {
         self.compiled_path.cube_name().clone()
     }
 
@@ -184,7 +184,7 @@ impl MemberExpressionSymbol {
         self.compiled_path.name().clone()
     }
 
-    pub fn path(&self) -> &Vec<String> {
+    pub fn path(&self) -> &Vec<CubeId> {
         self.compiled_path.path()
     }
 

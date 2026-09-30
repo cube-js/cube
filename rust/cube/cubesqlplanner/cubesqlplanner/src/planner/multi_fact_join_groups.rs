@@ -8,8 +8,8 @@ use crate::planner::join_hints::JoinHints;
 use crate::planner::planners::JoinTreeBuilder;
 use crate::planner::query_tools::JoinKey;
 use crate::planner::state::State;
-use crate::planner::JoinTree;
 use crate::planner::MemberSymbol;
+use crate::planner::{CubeId, JoinTree};
 use cubenativeutils::CubeError;
 use itertools::Itertools;
 use std::collections::{HashMap, HashSet};
@@ -87,7 +87,7 @@ impl MeasuresJoinHintsBuilder {
 pub struct MeasuresJoinHints {
     base_hints: JoinHints,
     measure_hints: Vec<MeasureJoinHints>,
-    hints_by_cube: HashMap<String, JoinHints>,
+    hints_by_cube: HashMap<CubeId, JoinHints>,
 }
 
 impl MeasuresJoinHints {
@@ -117,7 +117,7 @@ impl MeasuresJoinHints {
     fn from_base_hints(
         base_hints: JoinHints,
         measures: &[Rc<MemberSymbol>],
-        inherited_hints_by_cube: Option<HashMap<String, JoinHints>>,
+        inherited_hints_by_cube: Option<HashMap<CubeId, JoinHints>>,
     ) -> Result<Self, CubeError> {
         let inherited = inherited_hints_by_cube.is_some();
         let mut hints_by_cube = inherited_hints_by_cube.unwrap_or_default();
@@ -202,9 +202,9 @@ pub struct MultiFactJoinGroups {
     measures_join_hints: MeasuresJoinHints,
     groups: Vec<(Rc<JoinTree>, Vec<Rc<MemberSymbol>>)>,
     /// cube_name → join path from root, computed from the first group (shared for dimensions).
-    dimension_paths: HashMap<String, Vec<String>>,
+    dimension_paths: HashMap<CubeId, Vec<CubeId>>,
     /// measure full_name → join path from root, computed per group.
-    measure_paths: HashMap<String, Vec<String>>,
+    measure_paths: HashMap<String, Vec<CubeId>>,
 }
 
 impl MultiFactJoinGroups {
@@ -378,7 +378,7 @@ impl MultiFactJoinGroups {
                 }
                 let pre_aggregations = query_tools
                     .cube_evaluator()
-                    .pre_aggregations_for_cube_as_array(cube_name)?;
+                    .pre_aggregations_for_cube_as_array(cube_name.target().to_string())?;
                 if !pre_aggregations.is_empty() {
                     return Ok(true);
                 }
@@ -543,14 +543,16 @@ impl MultiFactJoinGroups {
         let cube_name = measure.cube_name();
         let cube_definition = query_tools
             .cube_evaluator()
-            .cube_from_path(cube_name.clone())
+            .cube_from_path(cube_name.target().to_string())
             .ok();
         let is_view = cube_definition
             .as_ref()
             .and_then(|cube| cube.static_data().is_view)
             .unwrap_or(false);
         if !is_view {
-            return Ok(JoinHints::from_items(vec![JoinHintItem::Single(cube_name)]));
+            return Ok(JoinHints::from_items(vec![JoinHintItem::Single(
+                cube_name.target().to_string(),
+            )]));
         }
 
         match all_hints.hints_by_cube.get(&cube_name) {
@@ -667,7 +669,7 @@ impl MultiFactJoinGroups {
     pub fn resolve_join_path_for_dimension(
         &self,
         dimension: &Rc<MemberSymbol>,
-    ) -> Option<&Vec<String>> {
+    ) -> Option<&Vec<CubeId>> {
         self.dimension_paths
             .get(&dimension.clone().resolve_reference_chain().cube_name())
     }
@@ -677,14 +679,14 @@ impl MultiFactJoinGroups {
     pub fn resolve_join_path_for_measure(
         &self,
         measure: &Rc<MemberSymbol>,
-    ) -> Option<&Vec<String>> {
+    ) -> Option<&Vec<CubeId>> {
         self.measure_paths
             .get(&measure.clone().resolve_reference_chain().full_name())
     }
 
     fn precompute_paths(
         groups: &[(Rc<JoinTree>, Vec<Rc<MemberSymbol>>)],
-    ) -> (HashMap<String, Vec<String>>, HashMap<String, Vec<String>>) {
+    ) -> (HashMap<CubeId, Vec<CubeId>>, HashMap<String, Vec<CubeId>>) {
         let dimension_paths = if groups.is_empty() {
             HashMap::new()
         } else {
@@ -707,13 +709,13 @@ impl MultiFactJoinGroups {
         (dimension_paths, measure_paths)
     }
 
-    fn build_cube_paths(join: &JoinTree) -> HashMap<String, Vec<String>> {
+    fn build_cube_paths(join: &JoinTree) -> HashMap<CubeId, Vec<CubeId>> {
         let root = join.root().name().clone();
-        let mut paths: HashMap<String, Vec<String>> = HashMap::new();
+        let mut paths: HashMap<CubeId, Vec<CubeId>> = HashMap::new();
         paths.insert(root.clone(), vec![root]);
 
         for join_item in join.joins() {
-            let original_from = join_item.original_from().to_string();
+            let original_from = join_item.original_from().clone();
             let original_to = join_item.cube().name().clone();
             let parent_path = paths
                 .get(&original_from)
@@ -971,7 +973,7 @@ mod tests {
 
         assert_eq!(
             groups.resolve_join_path_for_measure(&orders_count),
-            Some(&vec!["customers".to_string(), "orders".to_string()])
+            Some(&vec![CubeId::cube("customers"), CubeId::cube("orders")])
         );
     }
 
@@ -992,7 +994,7 @@ mod tests {
 
         assert_eq!(
             groups.resolve_join_path_for_dimension(&customers_name),
-            Some(&vec!["customers".to_string()])
+            Some(&vec![CubeId::cube("customers")])
         );
     }
 
@@ -1014,15 +1016,15 @@ mod tests {
 
         assert_eq!(
             groups.resolve_join_path_for_measure(&orders_count),
-            Some(&vec!["customers".to_string(), "orders".to_string()])
+            Some(&vec![CubeId::cube("customers"), CubeId::cube("orders")])
         );
         assert_eq!(
             groups.resolve_join_path_for_measure(&returns_count),
-            Some(&vec!["customers".to_string(), "returns".to_string()])
+            Some(&vec![CubeId::cube("customers"), CubeId::cube("returns")])
         );
         assert_eq!(
             groups.resolve_join_path_for_dimension(&customers_name),
-            Some(&vec!["customers".to_string()])
+            Some(&vec![CubeId::cube("customers")])
         );
         // Unknown measure
         let unknown = ctx.create_symbol("customers.count").unwrap();
@@ -1118,10 +1120,10 @@ mod tests {
         let member_sql = Rc::new(MockMemberSql::new(sql).unwrap());
         let mut compiler = ctx.query_tools().compiler().borrow_mut();
         let sql_call = compiler
-            .compile_sql_call(&cube_name.to_string(), member_sql)
+            .compile_sql_call(&CubeId::cube(cube_name), member_sql)
             .unwrap();
         let cube_symbol = compiler
-            .add_cube_table_evaluator(cube_name.to_string(), vec![])
+            .add_cube_table_evaluator(CubeId::cube(cube_name), vec![])
             .unwrap();
         drop(compiler);
         let symbol = MemberExpressionSymbol::try_new(
@@ -1130,7 +1132,7 @@ mod tests {
             MemberExpressionExpression::SqlCall(sql_call),
             None,
             None,
-            vec![cube_name.to_string()],
+            vec![CubeId::cube(cube_name)],
         )
         .unwrap();
         MemberSymbol::new_member_expression(symbol)

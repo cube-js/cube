@@ -4,9 +4,9 @@ use crate::cube_bridge::join_item::JoinItem;
 use crate::logical_plan::*;
 use crate::planner::join_hints::JoinHints;
 use crate::planner::state::State;
-use crate::planner::JoinTree;
 use crate::planner::MemberSymbol;
 use crate::planner::SqlCall;
+use crate::planner::{CubeId, JoinTree};
 use cubenativeutils::CubeError;
 use std::rc::Rc;
 
@@ -16,8 +16,8 @@ use std::rc::Rc;
 /// without re-parsing the JS-side ON clause.
 #[derive(Clone, Debug)]
 pub struct ResolvedJoinItem {
-    pub original_from: String,
-    pub original_to: String,
+    pub original_from: CubeId,
+    pub original_to: CubeId,
     pub from_members: Vec<Rc<MemberSymbol>>,
     pub to_members: Vec<Rc<MemberSymbol>>,
     pub on_sql: Rc<SqlCall>,
@@ -129,8 +129,8 @@ impl JoinPlanner {
         &self,
         join_item: Rc<dyn JoinItem>,
     ) -> Result<ResolvedJoinItem, CubeError> {
-        let original_from = join_item.static_data().original_from.clone();
-        let original_to = join_item.static_data().original_to.clone();
+        let original_from = CubeId::cube(join_item.static_data().original_from.clone());
+        let original_to = CubeId::cube(join_item.static_data().original_to.clone());
         let on_sql = self.utils.compile_join_condition(join_item.clone())?;
         let mut from_members = vec![];
         let mut to_members = vec![];

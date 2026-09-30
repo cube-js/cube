@@ -18,7 +18,7 @@ use crate::planner::multi_fact_join_groups::{MeasuresJoinHints, MultiFactJoinGro
 use crate::planner::planners::multi_stage::{TimeShiftState, DEFAULT_MAX_MULTI_STAGE_DEPTH};
 use crate::planner::symbols::transforms;
 use crate::planner::time_dimension::SeriesSpan;
-use crate::planner::{DimensionTimeShift, JoinTree, MeasureTimeShifts};
+use crate::planner::{CubeId, DimensionTimeShift, JoinTree, MeasureTimeShifts};
 use cubenativeutils::CubeError;
 use itertools::Itertools;
 use std::cell::OnceCell;
@@ -74,11 +74,11 @@ pub fn member_chain_eq(a: &Rc<MemberSymbol>, b: &Rc<MemberSymbol>) -> bool {
 #[derive(Debug, Clone)]
 pub struct MultipliedMeasure {
     measure: Rc<MemberSymbol>,
-    cube_name: String,
+    cube_name: CubeId,
 }
 
 impl MultipliedMeasure {
-    pub fn new(measure: Rc<MemberSymbol>, cube_name: String) -> Rc<Self> {
+    pub fn new(measure: Rc<MemberSymbol>, cube_name: CubeId) -> Rc<Self> {
         Rc::new(Self { measure, cube_name })
     }
 
@@ -86,7 +86,7 @@ impl MultipliedMeasure {
         &self.measure
     }
 
-    pub fn cube_name(&self) -> &String {
+    pub fn cube_name(&self) -> &CubeId {
         &self.cube_name
     }
 }

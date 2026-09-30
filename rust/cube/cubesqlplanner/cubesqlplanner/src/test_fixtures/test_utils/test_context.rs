@@ -12,8 +12,8 @@ use crate::planner::filter::Filter;
 use crate::planner::sql_templates::PlanSqlTemplates;
 use crate::planner::state::State;
 use crate::planner::top_level_planner::TopLevelPlanner;
+use crate::planner::{CubeId, MemberSymbol, TimeDimensionSymbol};
 use crate::planner::{GranularityHelper, QueryProperties, QueryPropertiesCompiler};
-use crate::planner::{MemberSymbol, TimeDimensionSymbol};
 use crate::test_fixtures::cube_bridge::yaml::YamlBaseQueryOptions;
 use crate::test_fixtures::cube_bridge::{
     members_from_strings, MockBaseQueryOptions, MockBaseTools, MockSchema, MockSecurityContext,
@@ -325,7 +325,7 @@ impl TestContext {
             .cube_evaluator()
             .parse_path("segments".to_string(), path.to_string())?
             .into_iter();
-        let cube_name = iter.next().unwrap();
+        let cube_name = CubeId::cube(iter.next().unwrap());
         let name = iter.next().unwrap();
         let definition = self
             .query_tools

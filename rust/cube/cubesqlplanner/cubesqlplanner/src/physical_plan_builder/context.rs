@@ -3,7 +3,7 @@ use cubenativeutils::CubeError;
 use crate::physical_plan::sql_nodes::SqlNodesFactory;
 use crate::physical_plan::Schema;
 use crate::planner::planners::multi_stage::{EvaluationContext, TimeShiftState};
-use crate::planner::MemberSymbol;
+use crate::planner::{CubeId, MemberSymbol};
 use std::collections::HashMap;
 use std::rc::Rc;
 
@@ -19,7 +19,7 @@ pub(super) struct PushDownBuilderContext {
     pub alias_prefix: Option<String>,
     pub render_measure_for_ungrouped: bool,
     pub time_shifts: TimeShiftState,
-    pub original_sql_pre_aggregations: HashMap<String, String>,
+    pub original_sql_pre_aggregations: HashMap<CubeId, String>,
     pub required_measures: Option<Vec<Rc<MemberSymbol>>>,
     pub dimensions_query: bool,
     pub measure_subquery: bool,

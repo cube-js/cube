@@ -4,7 +4,7 @@ use super::MemberSymbol;
 use crate::planner::query_tools::QueryTools;
 use crate::planner::state::State;
 use crate::planner::time_dimension::Granularity;
-use crate::planner::{GranularityHelper, QueryDateTime, QueryDateTimeHelper};
+use crate::planner::{CubeId, GranularityHelper, QueryDateTime, QueryDateTimeHelper};
 use chrono::Duration;
 use chrono_tz::Tz;
 use cubenativeutils::CubeError;
@@ -260,11 +260,11 @@ impl TimeDimensionSymbol {
             .collect()
     }
 
-    pub fn cube_name(&self) -> String {
+    pub fn cube_name(&self) -> CubeId {
         self.compiled_path.cube_name().clone()
     }
 
-    pub fn path(&self) -> &Vec<String> {
+    pub fn path(&self) -> &Vec<CubeId> {
         self.compiled_path.path()
     }
 

@@ -5,7 +5,9 @@ use crate::{
         case_switch_definition::CaseSwitchDefinition as NativeCaseSwitchDefinition,
         case_variant::CaseVariant, string_or_sql::StringOrSql,
     },
-    planner::{symbols::transforms::find_value_restriction, Compiler, MemberSymbol, SqlCall},
+    planner::{
+        symbols::transforms::find_value_restriction, Compiler, CubeId, MemberSymbol, SqlCall,
+    },
 };
 use cubenativeutils::CubeError;
 use itertools::Itertools;
@@ -135,7 +137,7 @@ symbol_deps! {
 
 impl CaseSwitchDefinition {
     pub fn try_new(
-        cube_name: &String,
+        cube_name: &CubeId,
         definition: Rc<dyn NativeCaseSwitchDefinition>,
         compiler: &mut Compiler,
     ) -> Result<Self, CubeError> {
@@ -281,7 +283,7 @@ pub enum Case {
 
 impl Case {
     pub fn try_new(
-        cube_name: &String,
+        cube_name: &CubeId,
         definition: CaseVariant,
         compiler: &mut Compiler,
     ) -> Result<Self, CubeError> {

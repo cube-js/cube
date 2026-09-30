@@ -10,7 +10,7 @@ use crate::cube_bridge::member_sql::MemberSql;
 use crate::planner::collectors::find_owned_by_cube_child;
 use crate::planner::sql_templates::PlanSqlTemplates;
 use crate::planner::SqlInterval;
-use crate::planner::{Compiler, SqlCall};
+use crate::planner::{Compiler, CubeId, SqlCall};
 use cubenativeutils::CubeError;
 use itertools::Itertools;
 use std::cmp::{Eq, PartialEq};
@@ -415,7 +415,7 @@ impl MeasureSymbol {
         self.multi_stage.is_some()
     }
 
-    pub fn cube_name(&self) -> String {
+    pub fn cube_name(&self) -> CubeId {
         self.compiled_path.cube_name().clone()
     }
 
@@ -427,7 +427,7 @@ impl MeasureSymbol {
         self.compiled_path.name().clone()
     }
 
-    pub fn path(&self) -> &Vec<String> {
+    pub fn path(&self) -> &Vec<CubeId> {
         self.compiled_path.path()
     }
 }
@@ -474,7 +474,7 @@ impl SymbolFactory for MeasureSymbolFactory {
             cube_evaluator
                 .static_data()
                 .primary_keys
-                .get(path.cube_name())
+                .get(path.cube_name().target())
                 .cloned()
                 .unwrap_or_else(|| vec![])
                 .into_iter()
@@ -521,7 +521,7 @@ impl SymbolFactory for MeasureSymbolFactory {
 
         let is_sql_is_direct_ref = sql.as_ref().is_some_and(|s| s.is_direct_reference());
 
-        let cube = cube_evaluator.cube_from_path(path.cube_name().clone())?;
+        let cube = cube_evaluator.cube_from_path(path.cube_name().target().to_string())?;
         let is_view = cube.static_data().is_view.unwrap_or(false);
         let alias = compiler
             .alias_for_member(path.full_name())

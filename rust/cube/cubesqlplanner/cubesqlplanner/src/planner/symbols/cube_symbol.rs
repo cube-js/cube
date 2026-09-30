@@ -5,7 +5,7 @@ use crate::physical_plan::sql_nodes::SqlNode;
 use crate::physical_plan::SqlEvaluatorVisitor;
 use crate::planner::query_tools::QueryTools;
 use crate::planner::sql_templates::PlanSqlTemplates;
-use crate::planner::{Compiler, SqlCall};
+use crate::planner::{Compiler, CubeId, SqlCall};
 use cubenativeutils::CubeError;
 use lazy_static::lazy_static;
 use regex::Regex;
@@ -15,47 +15,47 @@ use std::rc::Rc;
 /// `{TABLE}`); renders to the cube's quoted name or alias.
 #[derive(Debug)]
 pub struct CubeNameSymbol {
-    cube_name: String,
-    path: Vec<String>,
+    cube_name: CubeId,
+    path: Vec<CubeId>,
 }
 
 impl CubeNameSymbol {
-    pub fn new(cube_name: String, path: Vec<String>) -> Rc<Self> {
+    pub fn new(cube_name: CubeId, path: Vec<CubeId>) -> Rc<Self> {
         let path = Self::normalize_path(path, &cube_name);
         Rc::new(Self { cube_name, path })
     }
 
-    pub(crate) fn normalize_path(mut path: Vec<String>, cube_name: &str) -> Vec<String> {
-        if path.is_empty() || path.last().map(|s| s.as_str()) != Some(cube_name) {
-            path.push(cube_name.to_string());
+    pub(crate) fn normalize_path(mut path: Vec<CubeId>, cube_name: &CubeId) -> Vec<CubeId> {
+        if path.last() != Some(cube_name) {
+            path.push(cube_name.clone());
         }
         path
     }
 
     pub fn evaluate_sql(&self) -> Result<String, CubeError> {
-        Ok(self.cube_name.clone())
+        Ok(self.cube_name.to_string())
     }
-    pub fn cube_name(&self) -> &String {
+    pub fn cube_name(&self) -> &CubeId {
         &self.cube_name
     }
-    pub fn path(&self) -> &Vec<String> {
+    pub fn path(&self) -> &Vec<CubeId> {
         &self.path
     }
     pub fn alias(&self) -> String {
-        PlanSqlTemplates::alias_name(&self.cube_name)
+        PlanSqlTemplates::alias_name(&self.cube_name.to_string())
     }
 }
 
 pub struct CubeNameSymbolFactory {
-    cube_name: String,
-    path: Vec<String>,
+    cube_name: CubeId,
+    path: Vec<CubeId>,
 }
 
 impl CubeNameSymbolFactory {
     pub fn try_new(
-        full_name: &String,
+        full_name: &CubeId,
         _cube_evaluator: Rc<dyn CubeEvaluator>,
-        path: Vec<String>,
+        path: Vec<CubeId>,
     ) -> Result<Self, CubeError> {
         //TODO check that cube exists
         Ok(Self {
@@ -77,8 +77,8 @@ impl CubeNameSymbolFactory {
 /// function or its raw `sql_table:` value.
 #[derive(Debug)]
 pub struct CubeTableSymbol {
-    cube_name: String,
-    path: Vec<String>,
+    cube_name: CubeId,
+    path: Vec<CubeId>,
     member_sql: Option<Rc<SqlCall>>,
     alias: String,
     is_table_sql: bool,
@@ -87,8 +87,8 @@ pub struct CubeTableSymbol {
 
 impl CubeTableSymbol {
     pub fn new(
-        cube_name: String,
-        path: Vec<String>,
+        cube_name: CubeId,
+        path: Vec<CubeId>,
         member_sql: Option<Rc<SqlCall>>,
         alias: String,
         is_table_sql: bool,
@@ -140,11 +140,11 @@ impl CubeTableSymbol {
             )))
         }
     }
-    pub fn cube_name(&self) -> &String {
+    pub fn cube_name(&self) -> &CubeId {
         &self.cube_name
     }
 
-    pub fn path(&self) -> &Vec<String> {
+    pub fn path(&self) -> &Vec<CubeId> {
         &self.path
     }
 
@@ -158,8 +158,8 @@ impl CubeTableSymbol {
 }
 
 pub struct CubeTableSymbolFactory {
-    cube_name: String,
-    path: Vec<String>,
+    cube_name: CubeId,
+    path: Vec<CubeId>,
     sql: Option<Rc<dyn MemberSql>>,
     definition: Rc<dyn CubeDefinition>,
     is_table_sql: bool,
@@ -167,11 +167,11 @@ pub struct CubeTableSymbolFactory {
 
 impl CubeTableSymbolFactory {
     pub fn try_new(
-        cube_name: &String,
+        cube_name: &CubeId,
         cube_evaluator: Rc<dyn CubeEvaluator>,
-        path: Vec<String>,
+        path: Vec<CubeId>,
     ) -> Result<Self, CubeError> {
-        let definition = cube_evaluator.cube_from_path(cube_name.clone())?;
+        let definition = cube_evaluator.cube_from_path(cube_name.target().to_string())?;
         let table_sql = definition.sql_table()?;
         let is_table_sql = table_sql.is_some();
         let sql = definition.sql()?;
@@ -201,7 +201,7 @@ impl CubeTableSymbolFactory {
         let alias = if let Some(alias) = definition.static_data().sql_alias.clone() {
             alias.clone()
         } else {
-            PlanSqlTemplates::alias_name(&cube_name)
+            PlanSqlTemplates::alias_name(&cube_name.to_string())
         };
         Ok(CubeTableSymbol::new(
             cube_name,
@@ -216,7 +216,7 @@ impl CubeTableSymbolFactory {
 
 impl crate::utils::debug::DebugSql for CubeNameSymbol {
     fn debug_sql(&self, _expand_deps: bool) -> String {
-        self.cube_name().clone()
+        self.cube_name().to_string()
     }
 }
 

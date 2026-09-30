@@ -408,6 +408,7 @@ mod tests {
     use crate::logical_plan::optimizers::pre_aggregation::{
         PreAggregationFullName, PreAggregationsCompiler,
     };
+    use crate::planner::CubeId;
     use crate::test_fixtures::cube_bridge::{
         MockMemberExpressionDefinition, MockMemberSql, MockSchema,
     };
@@ -442,7 +443,7 @@ mod tests {
         query_yaml: &str,
         extra_segments: Vec<OptionsMember>,
     ) -> MatchState {
-        let cube_names = vec!["orders".to_string()];
+        let cube_names = vec![CubeId::cube("orders")];
         let mut compiler =
             PreAggregationsCompiler::try_new(ctx.query_tools().clone(), &cube_names).unwrap();
         let name = PreAggregationFullName::new("orders".to_string(), pre_agg_name.to_string());

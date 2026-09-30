@@ -14,7 +14,7 @@ use crate::planner::sql_templates::PlanSqlTemplates;
 use crate::planner::GranularityHelper;
 use crate::planner::SqlInterval;
 use crate::planner::TimeDimensionSymbol;
-use crate::planner::{Compiler, SqlCall};
+use crate::planner::{Compiler, CubeId, SqlCall};
 use cubenativeutils::CubeError;
 use std::rc::Rc;
 
@@ -235,7 +235,7 @@ impl DimensionSymbol {
         self.kind.iter_sql_calls()
     }
 
-    pub fn cube_name(&self) -> String {
+    pub fn cube_name(&self) -> CubeId {
         self.compiled_path.cube_name().clone()
     }
 
@@ -247,7 +247,7 @@ impl DimensionSymbol {
         self.compiled_path.name().clone()
     }
 
-    pub fn path(&self) -> &Vec<String> {
+    pub fn path(&self) -> &Vec<CubeId> {
         self.compiled_path.path()
     }
 
@@ -365,7 +365,7 @@ impl SymbolFactory for DimensionSymbolFactory {
             None
         };
 
-        let cube = cube_evaluator.cube_from_path(path.cube_name().clone())?;
+        let cube = cube_evaluator.cube_from_path(path.cube_name().target().to_string())?;
         let alias = compiler
             .alias_for_member(path.full_name())
             .unwrap_or_else(|| {
@@ -441,7 +441,7 @@ impl SymbolFactory for DimensionSymbolFactory {
             let pk_members = cube_evaluator
                 .static_data()
                 .primary_keys
-                .get(path.cube_name())
+                .get(path.cube_name().target())
                 .cloned()
                 .unwrap_or_else(|| vec![]);
 

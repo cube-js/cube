@@ -2,7 +2,7 @@
 
 use crate::planner::symbols::dimension_kinds::DimensionKind;
 use crate::planner::symbols::DimensionType;
-use crate::planner::{AggregationType, CalculatedMeasureType, MeasureKind};
+use crate::planner::{AggregationType, CalculatedMeasureType, CubeId, MeasureKind};
 use crate::test_fixtures::cube_bridge::MockSchema;
 use crate::test_fixtures::schemas::TestCompiler;
 use crate::test_fixtures::test_utils::TestContext;
@@ -21,7 +21,7 @@ fn test_add_dimension_evaluator_number_dimension() {
     assert!(symbol.is_dimension());
     assert!(!symbol.is_measure());
     assert_eq!(symbol.full_name(), "visitors.id");
-    assert_eq!(symbol.cube_name(), "visitors");
+    assert_eq!(symbol.cube_name().to_string(), "visitors");
     assert_eq!(symbol.name(), "id");
     assert_eq!(symbol.get_dependencies().len(), 0);
     assert!(
@@ -43,7 +43,7 @@ fn test_add_dimension_evaluator_string_dimension() {
     assert!(symbol.is_dimension());
     assert!(!symbol.is_measure());
     assert_eq!(symbol.full_name(), "visitors.source");
-    assert_eq!(symbol.cube_name(), "visitors");
+    assert_eq!(symbol.cube_name().to_string(), "visitors");
     assert_eq!(symbol.name(), "source");
     assert_eq!(symbol.get_dependencies().len(), 0);
     assert!(
@@ -132,7 +132,7 @@ fn test_add_measure_evaluator_count_measure() {
     assert!(symbol.is_measure());
     assert!(!symbol.is_dimension());
     assert_eq!(symbol.full_name(), "visitor_checkins.count");
-    assert_eq!(symbol.cube_name(), "visitor_checkins");
+    assert_eq!(symbol.cube_name().to_string(), "visitor_checkins");
     assert_eq!(symbol.name(), "count");
     assert_eq!(symbol.get_dependencies().len(), 0);
     assert!(matches!(
@@ -155,7 +155,7 @@ fn test_add_measure_evaluator_sum_measure() {
     assert!(symbol.is_measure());
     assert!(!symbol.is_dimension());
     assert_eq!(symbol.full_name(), "visitors.total_revenue");
-    assert_eq!(symbol.cube_name(), "visitors");
+    assert_eq!(symbol.cube_name().to_string(), "visitors");
     assert_eq!(symbol.name(), "total_revenue");
     assert_eq!(symbol.get_dependencies().len(), 0);
     assert!(matches!(
@@ -238,7 +238,7 @@ fn test_add_auto_resolved_member_evaluator_dimension() {
     assert!(symbol.is_dimension());
     assert!(!symbol.is_measure());
     assert_eq!(symbol.full_name(), "visitors.source");
-    assert_eq!(symbol.cube_name(), "visitors");
+    assert_eq!(symbol.cube_name().to_string(), "visitors");
     assert_eq!(symbol.name(), "source");
     assert_eq!(symbol.get_dependencies().len(), 0);
     assert!(
@@ -260,7 +260,7 @@ fn test_add_auto_resolved_member_evaluator_measure() {
     assert!(symbol.is_measure());
     assert!(!symbol.is_dimension());
     assert_eq!(symbol.full_name(), "visitors.total_revenue");
-    assert_eq!(symbol.cube_name(), "visitors");
+    assert_eq!(symbol.cube_name().to_string(), "visitors");
     assert_eq!(symbol.name(), "total_revenue");
     assert_eq!(symbol.get_dependencies().len(), 0);
     assert!(matches!(
@@ -277,10 +277,10 @@ fn test_add_cube_table_evaluator() {
 
     let symbol = test_compiler
         .compiler
-        .add_cube_table_evaluator("visitors".to_string(), vec![])
+        .add_cube_table_evaluator(CubeId::cube("visitors"), vec![])
         .unwrap();
 
-    assert_eq!(symbol.cube_name(), "visitors");
+    assert_eq!(symbol.cube_name().to_string(), "visitors");
 }
 
 #[test]
@@ -291,10 +291,10 @@ fn test_add_cube_name_evaluator() {
 
     let symbol = test_compiler
         .compiler
-        .add_cube_name_evaluator("visitors".to_string(), vec![])
+        .add_cube_name_evaluator(CubeId::cube("visitors"), vec![])
         .unwrap();
 
-    assert_eq!(symbol.cube_name(), "visitors");
+    assert_eq!(symbol.cube_name().to_string(), "visitors");
 }
 
 #[test]
@@ -310,7 +310,7 @@ fn test_dimension_with_cube_table_dependency() {
 
     assert!(symbol.is_dimension());
     assert_eq!(symbol.full_name(), "visitors.visitor_id");
-    assert_eq!(symbol.cube_name(), "visitors");
+    assert_eq!(symbol.cube_name().to_string(), "visitors");
     assert!(
         matches!(symbol.as_dimension().unwrap().kind(), DimensionKind::Regular(r) if *r.dimension_type() == DimensionType::Number)
     );
@@ -320,7 +320,7 @@ fn test_dimension_with_cube_table_dependency() {
 
     let cube_refs = symbol.get_cube_refs();
     assert_eq!(cube_refs.len(), 1, "Should have 1 cube ref dependency");
-    assert_eq!(cube_refs[0].cube_name(), "visitors");
+    assert_eq!(cube_refs[0].cube_name().to_string(), "visitors");
 }
 
 #[test]
@@ -336,7 +336,7 @@ fn test_dimension_with_member_dependency_no_prefix() {
 
     assert!(symbol.is_dimension());
     assert_eq!(symbol.full_name(), "visitors.visitor_id_twice");
-    assert_eq!(symbol.cube_name(), "visitors");
+    assert_eq!(symbol.cube_name().to_string(), "visitors");
     assert!(
         matches!(symbol.as_dimension().unwrap().kind(), DimensionKind::Regular(r) if *r.dimension_type() == DimensionType::Number)
     );
@@ -351,7 +351,7 @@ fn test_dimension_with_member_dependency_no_prefix() {
     let dep = &dependencies[0];
     assert!(dep.is_dimension(), "Dependency should be a dimension");
     assert_eq!(dep.full_name(), "visitors.visitor_id");
-    assert_eq!(dep.cube_name(), "visitors");
+    assert_eq!(dep.cube_name().to_string(), "visitors");
 }
 
 #[test]
@@ -367,7 +367,7 @@ fn test_dimension_with_mixed_dependencies() {
 
     assert!(symbol.is_dimension());
     assert_eq!(symbol.full_name(), "visitors.source_concat_id");
-    assert_eq!(symbol.cube_name(), "visitors");
+    assert_eq!(symbol.cube_name().to_string(), "visitors");
     assert!(
         matches!(symbol.as_dimension().unwrap().kind(), DimensionKind::Regular(r) if *r.dimension_type() == DimensionType::String)
     );
@@ -381,7 +381,7 @@ fn test_dimension_with_mixed_dependencies() {
 
     for dep in &dependencies {
         assert!(dep.is_dimension(), "All dependencies should be dimensions");
-        assert_eq!(dep.cube_name(), "visitors");
+        assert_eq!(dep.cube_name().to_string(), "visitors");
     }
 
     let dep_names: Vec<String> = dependencies.iter().map(|d| d.full_name()).collect();
@@ -408,7 +408,7 @@ fn test_measure_with_cube_table_dependency() {
 
     assert!(symbol.is_measure());
     assert_eq!(symbol.full_name(), "visitors.revenue");
-    assert_eq!(symbol.cube_name(), "visitors");
+    assert_eq!(symbol.cube_name().to_string(), "visitors");
     assert!(matches!(
         symbol.as_measure().unwrap().kind(),
         MeasureKind::Aggregated(a) if a.agg_type() == AggregationType::Sum
@@ -419,7 +419,7 @@ fn test_measure_with_cube_table_dependency() {
 
     let cube_refs = symbol.get_cube_refs();
     assert_eq!(cube_refs.len(), 1, "Should have 1 cube ref dependency");
-    assert_eq!(cube_refs[0].cube_name(), "visitors");
+    assert_eq!(cube_refs[0].cube_name().to_string(), "visitors");
 }
 
 #[test]
@@ -435,7 +435,7 @@ fn test_measure_with_explicit_cube_and_member_dependencies() {
 
     assert!(symbol.is_measure());
     assert_eq!(symbol.full_name(), "visitors.total_revenue_per_count");
-    assert_eq!(symbol.cube_name(), "visitors");
+    assert_eq!(symbol.cube_name().to_string(), "visitors");
     assert!(matches!(
         symbol.as_measure().unwrap().kind(),
         MeasureKind::Calculated(c) if c.calc_type() == CalculatedMeasureType::Number
@@ -446,7 +446,7 @@ fn test_measure_with_explicit_cube_and_member_dependencies() {
 
     for dep in &dependencies {
         assert!(dep.is_measure(), "All dependencies should be measures");
-        assert_eq!(dep.cube_name(), "visitors");
+        assert_eq!(dep.cube_name().to_string(), "visitors");
     }
 
     let dep_names: Vec<String> = dependencies.iter().map(|d| d.full_name()).collect();
@@ -473,7 +473,10 @@ fn test_view_dimension_compilation() {
 
     assert!(id_symbol.is_dimension());
     assert_eq!(id_symbol.full_name(), "visitors_visitors_checkins.id");
-    assert_eq!(id_symbol.cube_name(), "visitors_visitors_checkins");
+    assert_eq!(
+        id_symbol.cube_name().to_string(),
+        "visitors_visitors_checkins"
+    );
     assert_eq!(id_symbol.name(), "id");
 
     let reference = id_symbol.as_ref_symbol().unwrap();
@@ -534,7 +537,10 @@ fn test_view_measure_compilation() {
 
     assert!(count_symbol.is_measure());
     assert_eq!(count_symbol.full_name(), "visitors_visitors_checkins.count");
-    assert_eq!(count_symbol.cube_name(), "visitors_visitors_checkins");
+    assert_eq!(
+        count_symbol.cube_name().to_string(),
+        "visitors_visitors_checkins"
+    );
     assert_eq!(count_symbol.name(), "count");
 
     let reference = count_symbol.as_ref_symbol().unwrap();
@@ -570,7 +576,7 @@ fn test_proxy_dimension_compilation() {
 
     assert!(proxy_symbol.is_dimension());
     assert_eq!(proxy_symbol.full_name(), "visitors.visitor_id_proxy");
-    assert_eq!(proxy_symbol.cube_name(), "visitors");
+    assert_eq!(proxy_symbol.cube_name().to_string(), "visitors");
     assert_eq!(proxy_symbol.name(), "visitor_id_proxy");
 
     let dimension = proxy_symbol.as_dimension().unwrap();
@@ -613,7 +619,7 @@ fn test_proxy_measure_compilation() {
 
     assert!(proxy_symbol.is_measure());
     assert_eq!(proxy_symbol.full_name(), "visitors.total_revenue_proxy");
-    assert_eq!(proxy_symbol.cube_name(), "visitors");
+    assert_eq!(proxy_symbol.cube_name().to_string(), "visitors");
     assert_eq!(proxy_symbol.name(), "total_revenue_proxy");
 
     let measure = proxy_symbol.as_measure().unwrap();
@@ -666,7 +672,7 @@ fn test_time_dimension_with_granularity_compilation() {
         "visitors.created_at_month",
         "Full name should be visitors.created_at_month"
     );
-    assert_eq!(time_symbol.cube_name(), "visitors");
+    assert_eq!(time_symbol.cube_name().to_string(), "visitors");
     assert_eq!(time_symbol.name(), "created_at");
 
     let time_dim = time_symbol.as_time_dimension().unwrap();
@@ -719,7 +725,7 @@ fn test_sql_deps_validation() {
         "visitors.created_at_month",
         "Full name should be visitors.created_at_month"
     );
-    assert_eq!(time_symbol.cube_name(), "visitors");
+    assert_eq!(time_symbol.cube_name().to_string(), "visitors");
     assert_eq!(time_symbol.name(), "created_at");
 
     let time_dim = time_symbol.as_time_dimension().unwrap();

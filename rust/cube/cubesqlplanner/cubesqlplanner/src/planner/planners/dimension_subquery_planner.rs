@@ -5,7 +5,7 @@ use crate::planner::collectors::collect_sub_query_dimensions;
 use crate::planner::filter::FilterItem;
 use crate::planner::planners::multi_stage::PlanningScope;
 use crate::planner::state::State;
-use crate::planner::QueryProperties;
+use crate::planner::{CubeId, QueryProperties};
 use crate::planner::{MemberExpressionExpression, MemberExpressionSymbol, MemberSymbol};
 use cubenativeutils::CubeError;
 use std::cell::{Ref, RefCell};
@@ -20,7 +20,7 @@ pub struct DimensionSubqueryPlanner {
     utils: CommonUtils,
     query_tools: Rc<State>,
     query_properties: Rc<QueryProperties>,
-    sub_query_dims: HashMap<String, Vec<Rc<MemberSymbol>>>,
+    sub_query_dims: HashMap<CubeId, Vec<Rc<MemberSymbol>>>,
     dimensions_refs: RefCell<HashMap<String, QualifiedColumnName>>,
 }
 
@@ -43,7 +43,7 @@ impl DimensionSubqueryPlanner {
         query_tools: Rc<State>,
         query_properties: Rc<QueryProperties>,
     ) -> Result<Self, CubeError> {
-        let mut sub_query_dims: HashMap<String, Vec<Rc<MemberSymbol>>> = HashMap::new();
+        let mut sub_query_dims: HashMap<CubeId, Vec<Rc<MemberSymbol>>> = HashMap::new();
         for subquery_dimension in dimensions.iter() {
             let cube_name = subquery_dimension.cube_name().clone();
             sub_query_dims

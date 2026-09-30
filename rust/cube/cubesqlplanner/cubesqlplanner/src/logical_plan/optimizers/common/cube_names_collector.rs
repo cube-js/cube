@@ -1,11 +1,12 @@
 use crate::logical_plan::visitor::*;
 use crate::logical_plan::*;
+use crate::planner::CubeId;
 use cubenativeutils::CubeError;
 use itertools::Itertools;
 use std::rc::Rc;
 
 struct CubeNamesCollector {
-    cube_names: Vec<String>,
+    cube_names: Vec<CubeId>,
 }
 
 impl LogicalNodeVisitor for CubeNamesCollector {
@@ -19,7 +20,7 @@ impl LogicalNodeVisitor for CubeNamesCollector {
 
 pub fn collect_cube_names_from_node<T: LogicalNode>(
     node: &Rc<T>,
-) -> Result<Vec<String>, CubeError> {
+) -> Result<Vec<CubeId>, CubeError> {
     let mut collector = CubeNamesCollector {
         cube_names: Vec::new(),
     };

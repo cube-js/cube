@@ -1,4 +1,4 @@
-use crate::planner::{CubeNameSymbol, CubeTableSymbol};
+use crate::planner::{CubeId, CubeNameSymbol, CubeTableSymbol};
 use std::rc::Rc;
 
 #[derive(Clone, Debug)]
@@ -7,7 +7,7 @@ pub struct CompiledMemberPath {
     full_name: String,
     name: String,
     alias: String,
-    path: Vec<String>,
+    path: Vec<CubeId>,
 }
 
 impl CompiledMemberPath {
@@ -16,7 +16,7 @@ impl CompiledMemberPath {
         full_name: String,
         name: String,
         alias: String,
-        path: Vec<String>,
+        path: Vec<CubeId>,
     ) -> Self {
         let path = CubeNameSymbol::normalize_path(path, cube.cube_name());
         Self {
@@ -32,7 +32,7 @@ impl CompiledMemberPath {
         &self.full_name
     }
 
-    pub fn cube_name(&self) -> &String {
+    pub fn cube_name(&self) -> &CubeId {
         self.cube.cube_name()
     }
 
@@ -52,7 +52,7 @@ impl CompiledMemberPath {
         &self.alias
     }
 
-    pub fn path(&self) -> &Vec<String> {
+    pub fn path(&self) -> &Vec<CubeId> {
         &self.path
     }
 

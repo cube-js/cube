@@ -2,7 +2,7 @@ use super::symbols::{MemberExpressionExpression, MemberExpressionSymbol, MemberS
 use super::SymbolPath;
 use super::SymbolPathType;
 use super::{
-    CubeNameSymbol, CubeNameSymbolFactory, CubeTableSymbol, CubeTableSymbolFactory,
+    CubeId, CubeNameSymbol, CubeNameSymbolFactory, CubeTableSymbol, CubeTableSymbolFactory,
     DimensionSymbolFactory, MeasureSymbolFactory, SqlCall, SymbolFactory,
 };
 use crate::cube_bridge::base_tools::BaseTools;
@@ -34,8 +34,8 @@ pub struct Compiler {
     timezone: Tz,
     member_to_alias: Option<HashMap<String, String>>,
     members: HashMap<SymbolPath, Rc<MemberSymbol>>,
-    cube_names: HashMap<Vec<String>, Rc<CubeNameSymbol>>,
-    cube_tables: HashMap<Vec<String>, Rc<CubeTableSymbol>>,
+    cube_names: HashMap<Vec<CubeId>, Rc<CubeNameSymbol>>,
+    cube_tables: HashMap<Vec<CubeId>, Rc<CubeTableSymbol>>,
     /// Members being resolved right now, outermost first: each one waits on the next.
     resolving: Vec<String>,
     max_resolution_depth: usize,
@@ -221,7 +221,11 @@ impl Compiler {
             compiler.compile_sql_call(path.cube_name(), definition.sql()?)
         })?;
         let alias = self.alias_for_member(&full_name).unwrap_or_else(|| {
-            PlanSqlTemplates::member_alias_name(path.cube_name(), path.symbol_name(), &None)
+            PlanSqlTemplates::member_alias_name(
+                &path.cube_name().to_string(),
+                path.symbol_name(),
+                &None,
+            )
         });
         let cube_symbol = self.add_cube_table_evaluator(path.cube_name().clone(), vec![])?;
         let symbol = MemberExpressionSymbol::try_new(
@@ -241,8 +245,8 @@ impl Compiler {
     /// placeholders. Cached by the normalised path.
     pub fn add_cube_name_evaluator(
         &mut self,
-        cube_name: String,
-        path: Vec<String>,
+        cube_name: CubeId,
+        path: Vec<CubeId>,
     ) -> Result<Rc<CubeNameSymbol>, CubeError> {
         let cache_key = CubeNameSymbol::normalize_path(path.clone(), &cube_name);
         if let Some(exists) = self.cube_names.get(&cache_key) {
@@ -260,8 +264,8 @@ impl Compiler {
     /// placeholders. Cached by the normalised path.
     pub fn add_cube_table_evaluator(
         &mut self,
-        cube_name: String,
-        path: Vec<String>,
+        cube_name: CubeId,
+        path: Vec<CubeId>,
     ) -> Result<Rc<CubeTableSymbol>, CubeError> {
         let cache_key = CubeNameSymbol::normalize_path(path.clone(), &cube_name);
         if let Some(exists) = self.cube_tables.get(&cache_key) {
@@ -291,7 +295,7 @@ impl Compiler {
     /// to the given owning cube, via `SqlCallBuilder`.
     pub fn compile_sql_call(
         &mut self,
-        cube_name: &String,
+        cube_name: &CubeId,
         member_sql: Rc<dyn MemberSql>,
     ) -> Result<Rc<SqlCall>, CubeError> {
         self.compile_sql_call_impl(cube_name, member_sql, false)
@@ -301,7 +305,7 @@ impl Compiler {
     /// rather than resolved.
     pub fn compile_cube_sql_call(
         &mut self,
-        cube_name: &String,
+        cube_name: &CubeId,
         member_sql: Rc<dyn MemberSql>,
     ) -> Result<Rc<SqlCall>, CubeError> {
         self.compile_sql_call_impl(cube_name, member_sql, true)
@@ -309,7 +313,7 @@ impl Compiler {
 
     fn compile_sql_call_impl(
         &mut self,
-        cube_name: &String,
+        cube_name: &CubeId,
         member_sql: Rc<dyn MemberSql>,
         is_cube_sql: bool,
     ) -> Result<Rc<SqlCall>, CubeError> {
@@ -324,7 +328,7 @@ impl Compiler {
         } else {
             call_builder
         };
-        let sql_call = call_builder.build(&cube_name, member_sql.clone())?;
+        let sql_call = call_builder.build(cube_name, member_sql.clone())?;
         Ok(Rc::new(sql_call))
     }
 

@@ -88,6 +88,7 @@ mod tests {
     use crate::logical_plan::optimizers::pre_aggregation::{
         PreAggregationFullName, PreAggregationsCompiler,
     };
+    use crate::planner::CubeId;
     use crate::test_fixtures::cube_bridge::MockSchema;
     use crate::test_fixtures::test_utils::TestContext;
 
@@ -97,7 +98,7 @@ mod tests {
     }
 
     fn compile_pre_agg(ctx: &TestContext, pre_agg_name: &str) -> Rc<CompiledPreAggregation> {
-        let cube_names = vec!["orders".to_string()];
+        let cube_names = vec![CubeId::cube("orders")];
         let mut compiler =
             PreAggregationsCompiler::try_new(ctx.query_tools().clone(), &cube_names).unwrap();
         let name = PreAggregationFullName::new("orders".to_string(), pre_agg_name.to_string());

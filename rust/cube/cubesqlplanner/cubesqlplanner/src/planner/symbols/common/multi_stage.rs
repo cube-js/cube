@@ -5,7 +5,7 @@ use crate::cube_bridge::measure_definition::{MeasureDefinition, MeasureDefinitio
 use crate::cube_bridge::multi_stage_grain::MultiStageGrainReferences;
 use crate::planner::filter::compiler::FilterCompiler;
 use crate::planner::filter::FilterItem;
-use crate::planner::Compiler;
+use crate::planner::{Compiler, CubeId};
 use cubenativeutils::CubeError;
 use std::rc::Rc;
 
@@ -72,7 +72,7 @@ pub struct MultiStageProperties {
 
 impl MultiStageProperties {
     pub fn from_measure_definition(
-        cube_name: &String,
+        cube_name: &CubeId,
         definition: &Rc<dyn MeasureDefinition>,
         time_shift: Option<MeasureTimeShifts>,
         compiler: &mut Compiler,
@@ -96,7 +96,7 @@ impl MultiStageProperties {
     }
 
     pub fn from_dimension_definition(
-        cube_name: &String,
+        cube_name: &CubeId,
         definition: &Rc<dyn DimensionDefinition>,
         compiler: &mut Compiler,
     ) -> Result<Option<Self>, CubeError> {
@@ -164,7 +164,7 @@ fn build_grain_from_legacy(
 }
 
 fn build_filter(
-    _cube_name: &String,
+    _cube_name: &CubeId,
     filter: Option<Rc<dyn crate::cube_bridge::multi_stage_filter::MultiStageFilterReferences>>,
     compiler: &mut Compiler,
 ) -> Result<Option<MultiStageFilter>, CubeError> {

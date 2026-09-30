@@ -7,8 +7,8 @@ use crate::planner::collectors::{
 use crate::planner::planners::multi_stage::{EvaluationContext, PlanningScope};
 use crate::planner::state::State;
 use crate::planner::symbols::transforms;
-use crate::planner::JoinTree;
 use crate::planner::MemberSymbol;
+use crate::planner::{CubeId, JoinTree};
 use crate::planner::{FullKeyAggregateMeasures, QueryProperties};
 use cubenativeutils::CubeError;
 use itertools::Itertools;
@@ -166,12 +166,12 @@ impl MultipliedMeasuresQueryPlanner {
 
     fn aggregate_subquery_plan(
         &self,
-        key_cube_name: &String,
+        key_cube_name: &CubeId,
         measures: &Vec<Rc<MemberSymbol>>,
         key_join: Rc<JoinTree>,
         scope: &mut PlanningScope,
     ) -> Result<Rc<AggregateMultipliedSubquery>, CubeError> {
-        let pk_cube = self.common_utils.cube_from_path(key_cube_name.clone())?;
+        let pk_cube = self.common_utils.cube_from_path(key_cube_name)?;
         let pk_cube = Cube::new(pk_cube);
         let subquery_dimensions = collect_sub_query_dimensions_from_symbols(&measures, &key_join)?;
 
@@ -233,7 +233,7 @@ impl MultipliedMeasuresQueryPlanner {
     fn check_should_build_join_for_measure_select(
         &self,
         measures: &Vec<Rc<MemberSymbol>>,
-        key_cube_name: &String,
+        key_cube_name: &CubeId,
     ) -> Result<bool, CubeError> {
         for measure in measures.iter() {
             let owned_measure = transforms::strip_join_prefix(measure);
@@ -257,10 +257,10 @@ impl MultipliedMeasuresQueryPlanner {
                 if *measures_join
                     .static_data()
                     .multiplication_factor
-                    .get(key_cube_name)
+                    .get(key_cube_name.target())
                     .unwrap_or(&false)
                 {
-                    return Err(CubeError::user(format!("{} references cubes ({}) that lead to row multiplication. Please rewrite it using sub query.", measure.full_name(), cubes.join(", "))));
+                    return Err(CubeError::user(format!("{} references cubes ({}) that lead to row multiplication. Please rewrite it using sub query.", measure.full_name(), cubes.iter().join(", "))));
                 }
                 return Ok(true);
             }
