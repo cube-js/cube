@@ -1,0 +1,79 @@
+---
+title: Inbox
+description: Get in-app notifications about comment mentions, alerts, suspended deployments, new Cube versions, and the changelog.
+---
+
+The inbox collects notifications about events in Cube that concern you: a
+teammate mentions you in a comment, an alert fires, a deployment suspends, and
+more. Each user has their own inbox. It is the same in every deployment of the
+account.
+
+<Info>
+
+To send a dashboard by email or Slack after a scheduled refresh, see
+[Notifications][ref-notifications].
+
+</Info>
+
+{/* TODO: screenshot — the Inbox page with rows under Today and Yesterday, one row selected and shown in the right pane */}
+
+## Opening the inbox
+
+Click **Inbox** at the bottom of the sidebar. When you have unread
+notifications, its icon turns purple and a badge shows how many. The badge
+shows **9+** for ten or more.
+
+The inbox has two panes. The left pane lists your notifications, newest first,
+under **Today**, **Yesterday**, or a date. Its header shows your name, for
+example **Ada's inbox**, and the number of unread notifications. When you have
+read everything, it shows **You're all caught up**.
+
+Click a notification to see it in full in the right pane. Until you select one,
+the pane shows **No notification selected**. Click **Open** to go to what the
+notification is about.
+
+New notifications appear as they arrive. You don't need to reload the page.
+
+## Notification types
+
+| Notification | When you get it | Who gets it | **Open** goes to |
+| --- | --- | --- | --- |
+| Mention | Someone mentions you in a [dashboard comment][ref-comments], or edits a comment to add a mention of you | Each mentioned user, except the author | The comment on the dashboard |
+| Alert | An [alert][ref-alerts] or a [budget][ref-budgets] alert fires or resolves | Recipients of the alert who are Cube users | The deployment's **Status** page. Budget alerts have no **Open** button. |
+| Deployment suspended | A deployment [suspends][ref-auto-suspension], automatically or manually | Users who can resume the deployment, except users who work on it in development mode on their own branch | The deployment |
+| New Cube version | A deployment runs an older version than the latest one on its [update channel][ref-update-channels] | Admins | The deployment's **Settings** page |
+| Changelog | Cube publishes a new changelog entry | All users | No **Open** button. The entry shows in the right pane. An older entry opens the Cube changelog instead. |
+
+The inbox does not send notifications by email or Slack. Alerts send their own
+email, as set up on the alert.
+
+## Read and unread
+
+A new notification is unread. It has a purple dot and a bold title. When you
+select a notification, it becomes read. Opening the inbox does not mark
+anything read.
+
+To change the state of one notification without selecting it, right-click it
+and choose **Mark read** or **Mark unread**. To mark all notifications read,
+open the `⋯` menu in the header and choose **Mark all read**.
+
+{/* TODO: screenshot — the right-click menu on a row with Mark read and Delete */}
+
+## Deleting notifications
+
+To delete one notification, right-click it and choose **Delete**. Cube deletes
+it immediately, without a confirmation.
+
+To delete many notifications at once, open the `⋯` menu in the header:
+
+- **Delete read notifications** deletes every notification that you have read.
+- **Delete all notifications** deletes every notification, read or unread.
+
+Cube asks you to confirm both actions. You can't undo a delete.
+
+[ref-notifications]: /docs/explore-analyze/notifications
+[ref-comments]: /docs/explore-analyze/dashboards/comments#mentions
+[ref-alerts]: /admin/monitoring/alerts
+[ref-budgets]: /admin/account-billing/budgets
+[ref-auto-suspension]: /admin/deployment/auto-suspension
+[ref-update-channels]: /admin/deployment#update-channels
