@@ -27,7 +27,7 @@ import {
 } from '@cubejs-backend/shared';
 
 import { CubeSymbols } from '../compiler/CubeSymbols';
-import { UserError } from '../compiler/UserError';
+import { JoinPathNotFoundError, UserError } from '../compiler/UserError';
 import { SqlParser } from '../parser/SqlParser';
 import { BaseDimension } from './BaseDimension';
 import { BaseFilter } from './BaseFilter';
@@ -409,6 +409,25 @@ export class BaseQuery {
       } else {
         throw e;
       }
+    }
+  }
+
+  /**
+   * Same as joinTreeForHints(), but returns an empty list instead of throwing when the join graph
+   * has no path covering the hints, and a single-element list otherwise. An exception thrown into
+   * the native planner stays pending there, so it can't probe hint sets by catching.
+   * @public
+   * @param {Array<(Array<string> | string)>} hints
+   * @return {Array<import('../compiler/JoinGraph').FinishedJoinTree>}
+   */
+  tryJoinTreeForHints(hints) {
+    try {
+      return [this.joinTreeForHints(hints)];
+    } catch (e) {
+      if (e instanceof JoinPathNotFoundError) {
+        return [];
+      }
+      throw e;
     }
   }
 

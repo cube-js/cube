@@ -38,4 +38,23 @@ impl JoinTreeCache {
             .insert(hints.clone(), built.clone());
         Ok(built)
     }
+
+    /// Like `get_or_build`, for a `build` that may find no join. A miss that
+    /// builds nothing is not cached.
+    pub fn get_or_try_build(
+        &self,
+        hints: &JoinHints,
+        build: impl FnOnce() -> Result<Option<(JoinKey, Rc<JoinTree>)>, CubeError>,
+    ) -> Result<Option<(JoinKey, Rc<JoinTree>)>, CubeError> {
+        if let Some(cached) = self.by_hints.borrow().get(hints) {
+            return Ok(Some(cached.clone()));
+        }
+        let Some(built) = build()? else {
+            return Ok(None);
+        };
+        self.by_hints
+            .borrow_mut()
+            .insert(hints.clone(), built.clone());
+        Ok(Some(built))
+    }
 }

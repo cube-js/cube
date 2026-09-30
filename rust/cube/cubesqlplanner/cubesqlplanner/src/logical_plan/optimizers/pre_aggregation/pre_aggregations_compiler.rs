@@ -25,7 +25,7 @@ use crate::utils::debug::DebugSql;
 use cubenativeutils::CubeError;
 use cubenativeutils::CubeErrorCauseType;
 use itertools::Itertools;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::fmt::Debug;
 use std::rc::Rc;
 
@@ -60,6 +60,13 @@ pub struct PreAggregationsCompiler {
     query_tools: Rc<State>,
     descriptions: Rc<Vec<(PreAggregationFullName, Rc<dyn PreAggregationDescription>)>>,
     compiled_cache: HashMap<PreAggregationFullName, Rc<CompiledPreAggregation>>,
+    /// Why a pre-aggregation couldn't be compiled, so a later request for it -
+    /// as a leg of a rollup join, say - fails the same way without recompiling.
+    failed_cache: HashMap<PreAggregationFullName, String>,
+    /// Pre-aggregations whose members the join graph has no path for, directly
+    /// or through a rollup they are built from. No query can use one of them.
+    unjoinable: HashSet<PreAggregationFullName>,
+    skipped: Vec<(PreAggregationFullName, String)>,
 }
 
 impl PreAggregationsCompiler {
@@ -81,6 +88,9 @@ impl PreAggregationsCompiler {
             query_tools,
             descriptions: Rc::new(descriptions),
             compiled_cache: HashMap::new(),
+            failed_cache: HashMap::new(),
+            unjoinable: HashSet::new(),
+            skipped: Vec::new(),
         })
     }
 
@@ -91,7 +101,38 @@ impl PreAggregationsCompiler {
         if let Some(compiled) = self.compiled_cache.get(&name) {
             return Ok(compiled.clone());
         }
+        if let Some(reason) = self.failed_cache.get(name) {
+            return Err(CubeError::user(reason.clone()));
+        }
+        let result = self.compile_uncached_pre_aggregation(name);
+        // Only a failure raised on this side is kept: an exception thrown by the
+        // JS side stays pending there, and nothing may call into JS after it.
+        if let Err(err) = &result {
+            if matches!(err.cause, CubeErrorCauseType::User) {
+                self.failed_cache.insert(name.clone(), err.message.clone());
+            }
+        }
+        result
+    }
 
+    /// A rollup `referencing` is built from; one that can't be joined makes
+    /// `referencing` unjoinable too.
+    fn compile_referenced_pre_aggregation(
+        &mut self,
+        referencing: &PreAggregationFullName,
+        name: &PreAggregationFullName,
+    ) -> Result<Rc<CompiledPreAggregation>, CubeError> {
+        let result = self.compile_pre_aggregation(name);
+        if result.is_err() && self.unjoinable.contains(name) {
+            self.unjoinable.insert(referencing.clone());
+        }
+        result
+    }
+
+    fn compile_uncached_pre_aggregation(
+        &mut self,
+        name: &PreAggregationFullName,
+    ) -> Result<Rc<CompiledPreAggregation>, CubeError> {
         let description = if let Some((_, description)) =
             self.descriptions.clone().iter().find(|(n, _)| n == name)
         {
@@ -206,8 +247,16 @@ impl PreAggregationsCompiler {
             .add_dimensions(&dimensions)
             .add_dimensions(&time_dimensions)
             .build(&measures)?;
-        let multi_fact_join_groups =
-            MultiFactJoinGroups::try_new(self.query_tools.clone(), measures_join_hints)?;
+        let multi_fact_join_groups = match MultiFactJoinGroups::try_new_if_joinable(
+            self.query_tools.clone(),
+            measures_join_hints,
+        )? {
+            Ok(groups) => groups,
+            Err(err) => {
+                self.unjoinable.insert(name.clone());
+                return Err(err);
+            }
+        };
 
         let rollups = if let Some(refs) = description.rollup_references()? {
             let r = self
@@ -292,7 +341,10 @@ impl PreAggregationsCompiler {
         let pre_aggrs_for_lambda = rollups
             .iter()
             .map(|item| -> Result<_, CubeError> {
-                self.compile_pre_aggregation(&PreAggregationFullName::from_string(item)?)
+                self.compile_referenced_pre_aggregation(
+                    name,
+                    &PreAggregationFullName::from_string(item)?,
+                )
             })
             .collect::<Result<Vec<_>, _>>()?;
 
@@ -429,7 +481,10 @@ impl PreAggregationsCompiler {
         let pre_aggrs_for_join = rollups
             .iter()
             .map(|item| -> Result<_, CubeError> {
-                self.compile_pre_aggregation(&PreAggregationFullName::from_string(item)?)
+                self.compile_referenced_pre_aggregation(
+                    rollup_join_name,
+                    &PreAggregationFullName::from_string(item)?,
+                )
             })
             .collect::<Result<Vec<_>, _>>()?;
 
@@ -738,18 +793,54 @@ impl PreAggregationsCompiler {
         members.iter().map(|m| m.full_name()).join(", ")
     }
 
+    /// Every pre-aggregation of the cubes. One whose members can't be joined can't
+    /// serve any query, so it is skipped rather than failing the query - see
+    /// `skipped_pre_aggregations` for why. Any other failure is a mistake in its
+    /// definition and is reported.
     pub fn compile_all_pre_aggregations(
         &mut self,
         disable_external_pre_aggregations: bool,
     ) -> Result<Vec<Rc<CompiledPreAggregation>>, CubeError> {
         let mut result = Vec::new();
         for (name, _) in self.descriptions.clone().iter() {
-            let pre_aggregation = self.compile_pre_aggregation(name)?;
+            let pre_aggregation = match self.compile_pre_aggregation(name) {
+                Ok(pre_aggregation) => pre_aggregation,
+                Err(err) if self.unjoinable.contains(name) => {
+                    self.skipped.push((name.clone(), err.message));
+                    continue;
+                }
+                Err(err) => return Err(err),
+            };
             if !(disable_external_pre_aggregations && pre_aggregation.external == Some(true)) {
                 result.push(pre_aggregation);
             }
         }
         Ok(result)
+    }
+
+    /// Only the pre-aggregation named by `id`, when it belongs to the cubes. It
+    /// was asked for by name, so failing to compile it is an error.
+    pub fn compile_requested_pre_aggregation(
+        &mut self,
+        id: &str,
+        disable_external_pre_aggregations: bool,
+    ) -> Result<Vec<Rc<CompiledPreAggregation>>, CubeError> {
+        let Ok(name) = PreAggregationFullName::from_string(id) else {
+            return Ok(Vec::new());
+        };
+        if !self.descriptions.iter().any(|(n, _)| n == &name) {
+            return Ok(Vec::new());
+        }
+        let pre_aggregation = self.compile_pre_aggregation(&name)?;
+        if disable_external_pre_aggregations && pre_aggregation.external == Some(true) {
+            return Ok(Vec::new());
+        }
+        Ok(vec![pre_aggregation])
+    }
+
+    /// Pre-aggregations `compile_all_pre_aggregations` left out, with the reason.
+    pub fn skipped_pre_aggregations(&self) -> &[(PreAggregationFullName, String)] {
+        &self.skipped
     }
 
     pub fn compile_origin_sql_pre_aggregation(

@@ -150,15 +150,35 @@ impl QueryTools {
         let join = self
             .base_tools
             .join_tree_for_hints(hints.items().to_vec())?;
-        let join_key = JoinKey {
+        Ok((Self::join_key(&join)?, join))
+    }
+
+    /// Like `join_for_hints`, but `None` when the join graph has no path
+    /// covering `hints`.
+    pub fn try_join_for_hints(
+        &self,
+        hints: &JoinHints,
+    ) -> Result<Option<(JoinKey, Rc<dyn JoinDefinition>)>, CubeError> {
+        let Some(join) = self
+            .base_tools
+            .try_join_tree_for_hints(hints.items().to_vec())?
+            .into_iter()
+            .next()
+        else {
+            return Ok(None);
+        };
+        Ok(Some((Self::join_key(&join)?, join)))
+    }
+
+    fn join_key(join: &Rc<dyn JoinDefinition>) -> Result<JoinKey, CubeError> {
+        Ok(JoinKey {
             root: join.static_data().root.to_string(),
             joins: join
                 .joins()?
                 .iter()
                 .map(|i| i.static_data().clone())
                 .collect(),
-        };
-        Ok((join_key, join))
+        })
     }
 
     pub fn alias_name(&self, name: &str) -> String {

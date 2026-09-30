@@ -1420,4 +1420,161 @@ cubes:
       }
     });
   });
+
+  describe('cubes joined only through a hub', () => {
+    // `entities` is reachable only through `hub`, so the members of `ledger`, `categories` and
+    // `entities` have no join root on their own.
+    const { compiler, joinGraph, cubeEvaluator } = prepareYamlCompiler(`
+cubes:
+  - name: hub
+    sql: "SELECT 1 AS id, 'o1' AS org_id, 'e1' AS entity_id, 'm1' AS management_id"
+    joins:
+      - name: ledger
+        relationship: one_to_many
+        sql: "{CUBE.management_id} = {ledger.management_id}"
+      - name: entities
+        relationship: many_to_one
+        sql: "{CUBE.entity_id} = {entities.id}"
+    dimensions:
+      - name: id
+        sql: id
+        type: number
+        primary_key: true
+      - name: org_id
+        sql: org_id
+        type: string
+      - name: entity_id
+        sql: entity_id
+        type: string
+      - name: management_id
+        sql: management_id
+        type: string
+    measures:
+      - name: count
+        type: count
+    pre_aggregations:
+      - name: hub_rollup
+        dimensions:
+          - id
+          - org_id
+          - entity_id
+          - management_id
+      - name: income_by_category
+        measures:
+          - count
+          - ledger.amount
+        dimensions:
+          - ledger.category_id
+          - categories.name
+          - entities.name
+      - name: spoke_only_join
+        type: rollup_join
+        measures:
+          - ledger.amount
+        dimensions:
+          - ledger.category_id
+          - categories.name
+          - entities.name
+        rollups:
+          - hub.hub_rollup
+          - ledger.ledger_rollup
+          - categories.categories_rollup
+          - entities.entities_rollup
+
+  - name: ledger
+    sql: "SELECT 1 AS id, 'm1' AS management_id, 'c1' AS category_id, 10 AS amount"
+    joins:
+      - name: categories
+        relationship: many_to_one
+        sql: "{CUBE.category_id} = {categories.id}"
+    dimensions:
+      - name: id
+        sql: id
+        type: number
+        primary_key: true
+      - name: management_id
+        sql: management_id
+        type: string
+      - name: category_id
+        sql: category_id
+        type: string
+    measures:
+      - name: amount
+        sql: amount
+        type: sum
+    pre_aggregations:
+      - name: ledger_rollup
+        measures:
+          - amount
+        dimensions:
+          - management_id
+          - category_id
+
+  - name: categories
+    sql: "SELECT 'c1' AS id, 'Fees' AS name"
+    dimensions:
+      - name: id
+        sql: id
+        type: string
+        primary_key: true
+      - name: name
+        sql: name
+        type: string
+    pre_aggregations:
+      - name: categories_rollup
+        dimensions:
+          - id
+          - name
+
+  - name: entities
+    sql: "SELECT 'e1' AS id, 'Entity' AS name"
+    dimensions:
+      - name: id
+        sql: id
+        type: string
+        primary_key: true
+      - name: name
+        sql: name
+        type: string
+    pre_aggregations:
+      - name: entities_rollup
+        dimensions:
+          - id
+          - name
+`);
+
+    beforeAll(async () => {
+      await compiler.compile();
+    });
+
+    const sqlFor = (useNativeSqlPlanner: boolean, query: Record<string, unknown>) => new PostgresQuery(
+      { joinGraph, cubeEvaluator, compiler },
+      { ...query, timezone: 'UTC', preAggregationsSchema: '', useNativeSqlPlanner } as any
+    ).buildSqlAndParams()[0];
+
+    for (const useNativeSqlPlanner of [true, false]) {
+      const planner = useNativeSqlPlanner ? 'tesseract' : 'legacy';
+
+      it(`[${planner}] serves a rollup whose only hub member is a measure`, () => {
+        const sql = sqlFor(useNativeSqlPlanner, {
+          measures: ['hub.count', 'ledger.amount'],
+          dimensions: ['ledger.category_id', 'categories.name', 'entities.name'],
+        });
+        expect(sql).toMatch(/hub_income_by_category/);
+      });
+
+      it(`[${planner}] is not failed by a pre-aggregation whose members can't be joined`, () => {
+        const sql = sqlFor(useNativeSqlPlanner, { dimensions: ['hub.org_id'] });
+        expect(sql).toMatch(/hub_hub_rollup/);
+      });
+    }
+
+    it('[tesseract] reports a pre-aggregation that can\'t be joined when it is asked for by id', () => {
+      expect(() => sqlFor(true, {
+        measures: ['ledger.amount'],
+        dimensions: ['ledger.category_id', 'categories.name', 'entities.name'],
+        preAggregationId: 'hub.spoke_only_join',
+      })).toThrow(/Can't find join path to join 'ledger', 'categories', 'entities'/);
+    });
+  });
 });

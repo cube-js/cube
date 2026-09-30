@@ -1,6 +1,6 @@
 import R from 'ramda';
 import Graph from 'node-dijkstra';
-import { UserError } from './UserError';
+import { JoinPathNotFoundError } from './UserError';
 
 import type { CubeValidator } from './CubeValidator';
 import type { CubeEvaluator, MeasureDefinition } from './CubeEvaluator';
@@ -242,7 +242,7 @@ export class JoinGraph implements CompilerInterface {
       )(cubesToJoin)[0];
 
       if (!join) {
-        throw new UserError(`Can't find join path to join ${cubesToJoin.map(v => `'${v}'`).join(', ')}`);
+        throw new JoinPathNotFoundError(`Can't find join path to join ${cubesToJoin.map(v => `'${v}'`).join(', ')}`);
       }
 
       this.builtJoins[key] = Object.assign(join, {
