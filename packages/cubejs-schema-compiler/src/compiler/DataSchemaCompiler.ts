@@ -60,7 +60,8 @@ const getSharedVmContext = (): vm.Context => {
     });
 
     const refuse = (key: PropertyKey): never => {
-      throw new TypeError(
+      // The realm's own TypeError, as model code would catch it
+      throw new sharedRealmGlobal!.TypeError(
         `Cannot set global '${String(key)}': data models share one realm with CUBEJS_COMPILER_MULTI_TENANT_SHARING`
       );
     };
@@ -83,29 +84,59 @@ const createSharedCompileScope = (globals: Record<string, any>): SharedCompileSc
   getSharedVmContext();
   const realm = sharedRealmGlobal!;
   const vars: Record<PropertyKey, any> = Object.assign(Object.create(null), globals);
+  // Built-ins this compile deleted from its global
+  const deleted = new Set<PropertyKey>();
+  const builtIn = (key: PropertyKey) => key !== SHARED_SCOPE_GETTER && !deleted.has(key) && key in realm;
 
   const read = (key: PropertyKey) => {
     if (key in vars) {
       return vars[key];
     }
-    if (key in realm) {
+    if (builtIn(key)) {
       return realm[key];
     }
     if (typeof key !== 'string' || PROBED_GLOBALS.has(key)) {
       return undefined;
     }
-    throw new ReferenceError(`${key} is not defined`);
+    throw new realm.ReferenceError(`${key} is not defined`);
+  };
+
+  const remove = (key: PropertyKey) => {
+    const removed = Reflect.deleteProperty(vars, key);
+    if (removed && builtIn(key)) {
+      deleted.add(key);
+    }
+    return removed;
   };
 
   // The compile's `globalThis` and top-level `this`: its own properties are `vars` (the target, so
   // defining, deleting and reflecting on them behave as on an ordinary object), then the built-ins
-  const realmOwn = (key: PropertyKey) => key !== SHARED_SCOPE_GETTER && Object.prototype.hasOwnProperty.call(realm, key);
+  const realmOwn = (key: PropertyKey) => builtIn(key) && Object.prototype.hasOwnProperty.call(realm, key);
   const compileGlobal = new Proxy(vars, {
-    get: (t, key) => (key in t || key in realm ? read(key) : undefined),
-    has: (t, key) => key in t || key in realm,
+    get: (t, key) => (key in t || builtIn(key) ? read(key) : undefined),
+    has: (t, key) => key in t || builtIn(key),
+    // Without it, OrdinarySet would copy the built-in's attributes through getOwnPropertyDescriptor
+    set: (t, key, value) => {
+      t[key] = value;
+      deleted.delete(key);
+      return true;
+    },
+    defineProperty: (t, key, descriptor) => {
+      // Redefining a built-in keeps the attributes the descriptor leaves out, as on a global
+      const base: PropertyDescriptor = !Object.prototype.hasOwnProperty.call(t, key) && realmOwn(key)
+        ? { ...Reflect.getOwnPropertyDescriptor(realm, key), configurable: true }
+        : {};
+      const accessor = 'get' in descriptor || 'set' in descriptor;
+      const merged = accessor || 'get' in base
+        ? { enumerable: base.enumerable, configurable: base.configurable, ...descriptor }
+        : { ...base, ...descriptor };
+      deleted.delete(key);
+      return Reflect.defineProperty(t, key, merged);
+    },
+    deleteProperty: (_t, key) => remove(key),
     ownKeys: (t) => [...new Set([
       ...Reflect.ownKeys(t),
-      ...Reflect.ownKeys(realm).filter((key) => key !== SHARED_SCOPE_GETTER),
+      ...Reflect.ownKeys(realm).filter((key) => realmOwn(key)),
     ])],
     getOwnPropertyDescriptor: (t, key) => {
       if (Object.prototype.hasOwnProperty.call(t, key) || !realmOwn(key)) {
@@ -120,6 +151,12 @@ const createSharedCompileScope = (globals: Record<string, any>): SharedCompileSc
   const scope = new Proxy(vars, {
     has: (_t, key) => typeof key === 'string' && key !== SHARED_SCOPE_GETTER,
     get: (_t, key) => read(key),
+    set: (t, key, value) => {
+      t[key] = value;
+      deleted.delete(key);
+      return true;
+    },
+    deleteProperty: (_t, key) => remove(key),
   });
 
   return { scope, vars };

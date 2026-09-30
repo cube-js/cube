@@ -286,6 +286,37 @@ describe.each([
     expect(other.metaTransformer.cubes[0].config.description).toBe('false|false|false||true|object|none|false|true');
   });
 
+  it('lets a compile reassign, redefine and delete a built-in like on its own global', async () => {
+    const { metaTransformer } = await compileTenant('a', [{
+      fileName: 'model.js',
+      content: `
+        this.Math = { v: 1 };
+        this.Math = { v: 2 };
+        const afterTwo = Math.v;
+        Math = { v: 3 };
+        const afterBare = Math.v;
+        Object.defineProperty(globalThis, 'escape', { value: { v: 4 }, writable: true, configurable: true });
+        escape = { v: 5 };
+        const afterDefine = escape.v;
+        const deleted = delete globalThis.Math;
+        const gone = !('Math' in globalThis);
+        let caught;
+        try {
+          neverDeclaredName;
+        } catch (e) {
+          caught = e instanceof ReferenceError;
+        }
+        const info = [afterTwo, afterBare, afterDefine, deleted, gone, caught].join('|');
+        cube('Orders', { sql: 'select 1', description: info, measures: { count: { type: 'count' } } });
+      `,
+    }], options);
+
+    expect(metaTransformer.cubes[0].config.description).toBe('2|3|5|true|true|true');
+    // The realm's own built-ins are untouched
+    const other = await compileTenant('b', tenantFiles(), options);
+    expect(buildSql(other, 'b')).toContain(`'legacy_b_b'`);
+  });
+
   it('gives UMD typeof checks their usual result', async () => {
     const { metaTransformer } = await compileTenant('a', [{
       fileName: 'model.js',
@@ -487,6 +518,21 @@ describe('Shared VM context realm', () => {
     }], { sharedVmContext: true, compileContext: { securityContext: { tenant: 'a' } } });
 
     await expect(nested.compiler.compile()).rejects.toThrow(/Cannot set global 'nested'/);
+
+    // Model code sees errors of its own realm
+    const caught = await compileTenant('a', [{
+      fileName: 'model.js',
+      content: `
+        let kind;
+        try {
+          (function () { this.nestedWrite = 1; })();
+        } catch (e) {
+          kind = e instanceof TypeError;
+        }
+        cube('Orders', { sql: 'select 1', description: String(kind), measures: { count: { type: 'count' } } });
+      `,
+    }], { sharedVmContext: true });
+    expect(caught.metaTransformer.cubes[0].config.description).toBe('true');
   });
 
   it('reuses one realm across compiles when on', async () => {
