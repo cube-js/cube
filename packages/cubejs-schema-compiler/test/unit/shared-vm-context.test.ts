@@ -328,6 +328,9 @@ describe.each([
         new Function('') instanceof Function,
         Object.getPrototypeOf(new Function('')) === Function.prototype,
         Function.prototype === Object.getPrototypeOf(function () {}),
+        Function instanceof Function,
+        Function.length === 1,
+        (() => { try { new Function('}; x(); {'); return 'parsed'; } catch (e) { return e instanceof SyntaxError; } })(),
       ].join(',');
       const directEval = eval('COMPILE_CONTEXT.securityContext.tenant');
       // Built outside of cube(), as generated members are: parameter names are references, and the
@@ -354,7 +357,7 @@ describe.each([
     const [a, b] = await Promise.all(['a', 'b'].map(t => compileTenant(t, functionFiles(), options)));
 
     for (const [tenant, compiled] of [['a', a], ['b', b]] as const) {
-      expect(compiled.metaTransformer.cubes[0].config.description).toBe(`${tenant}|x_${tenant}|ig|true,true,true|${tenant}`);
+      expect(compiled.metaTransformer.cubes[0].config.description).toBe(`${tenant}|x_${tenant}|ig|true,true,true,true,true,true|${tenant}`);
       const sql = new PostgresQuery(compiled, {
         measures: [`orders_${tenant}.count`],
         dimensions: [`orders_${tenant}.tenant`],

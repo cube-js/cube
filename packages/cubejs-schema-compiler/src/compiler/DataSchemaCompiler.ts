@@ -196,10 +196,15 @@ const createSharedCompileScope = (globals: Record<string, any>): SharedCompileSc
   const compileFunction = function Function(...args: unknown[]) {
     const body = args.length > 0 ? String(args[args.length - 1]) : '';
     const params = args.slice(0, -1).map(String).join(',');
+    // Parse params and body on their own first, so malformed input throws the realm's SyntaxError
+    // instead of closing the wrapper below early.
+    RealmFunction(...args);
     const factory = RealmFunction('scope', `with (scope) { return function anonymous(${params}\n) {\n${body}\n}; }`);
     return factory(hasUseStrictDirective(body) ? strictScope : scope);
   };
   compileFunction.prototype = RealmFunction.prototype;
+  Object.setPrototypeOf(compileFunction, RealmFunction.prototype);
+  Object.defineProperty(compileFunction, 'length', { value: 1 });
   Object.defineProperty(vars, 'Function', { value: compileFunction, writable: true, configurable: true, enumerable: false });
 
   return { scope, strictScope, vars };
