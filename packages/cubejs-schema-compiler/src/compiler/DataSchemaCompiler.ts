@@ -29,8 +29,27 @@ const ctxFileStorage = new AsyncLocalStorage<FileContent>();
 const SHARED_SCOPE_GETTER = '__cubejsCompileScope';
 const sharedScriptPrefix = (strict: boolean) => `with (${SHARED_SCOPE_GETTER}(${strict})) { (function () {`;
 const SHARED_SCRIPT_SUFFIX = '\n}).call(globalThis); }';
-// A leading 'use strict' directive, after comments
-const USE_STRICT = /^\s*(?:(?:\/\/[^\n]*\n|\/\*[\s\S]*?\*\/)\s*)*(['"])use strict\1/;
+// Whether the source opens with a 'use strict' directive, after whitespace and comments.
+// A linear scan: a regex over repeated comments can backtrack exponentially.
+function hasUseStrictDirective(source: string): boolean {
+  let i = 0;
+  while (i < source.length) {
+    if (/\s/.test(source[i])) {
+      i++;
+    } else if (source.startsWith('//', i)) {
+      const end = source.indexOf('\n', i);
+      if (end === -1) return false;
+      i = end + 1;
+    } else if (source.startsWith('/*', i)) {
+      const end = source.indexOf('*/', i + 2);
+      if (end === -1) return false;
+      i = end + 2;
+    } else {
+      break;
+    }
+  }
+  return source.startsWith("'use strict'", i) || source.startsWith('"use strict"', i);
+}
 
 // UMD wrappers probe these with `typeof`: read as undefined, not as a ReferenceError
 const PROBED_GLOBALS = new Set(['module', 'exports', 'define']);
@@ -178,7 +197,7 @@ const createSharedCompileScope = (globals: Record<string, any>): SharedCompileSc
     const body = args.length > 0 ? String(args[args.length - 1]) : '';
     const params = args.slice(0, -1).map(String).join(',');
     const factory = RealmFunction('scope', `with (scope) { return function anonymous(${params}\n) {\n${body}\n}; }`);
-    return factory(USE_STRICT.test(body) ? strictScope : scope);
+    return factory(hasUseStrictDirective(body) ? strictScope : scope);
   };
   compileFunction.prototype = RealmFunction.prototype;
   Object.defineProperty(vars, 'Function', { value: compileFunction, writable: true, configurable: true, enumerable: false });
@@ -1206,7 +1225,7 @@ export class DataSchemaCompiler {
     }
 
     // The prefix is on line 1, so a negative column offset keeps positions in stack traces intact.
-    const prefix = sharedScriptPrefix(USE_STRICT.test(file.content));
+    const prefix = sharedScriptPrefix(hasUseStrictDirective(file.content));
     const script = new vm.Script(`${prefix}${file.content}${SHARED_SCRIPT_SUFFIX}`, {
       filename: file.fileName,
       columnOffset: -prefix.length,
