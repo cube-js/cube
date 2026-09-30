@@ -48,7 +48,7 @@ jobs:
       # are spent.
       - name: Debounce pushes
         if: github.event.action == 'synchronize'
-        run: sleep 120
+        run: sleep 90
 
       - name: React to trigger comment
         # Quick ACK so the user who typed /bot-review or /bot-deep-review sees
