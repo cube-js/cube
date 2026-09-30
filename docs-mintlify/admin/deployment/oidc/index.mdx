@@ -284,6 +284,10 @@ module.exports = {
 };
 ```
 
+The trade-off: each re-mint (about every 30 minutes) starts the user on a new
+orchestrator with an empty cache and new connections, and superseded
+orchestrators keep theirs until they are evicted from the orchestrator cache.
+
 For BigQuery, return `{ type: "bigquery", authClient }` instead, where
 `authClient` is a `google-auth-library` `IdentityPoolClient` with the Workload
 Identity Federation provider as its `audience` and a `subject_token_supplier`
