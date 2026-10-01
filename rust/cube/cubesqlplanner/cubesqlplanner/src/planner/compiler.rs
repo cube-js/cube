@@ -17,13 +17,9 @@ use cubenativeutils::CubeError;
 use std::collections::HashMap;
 use std::rc::{Rc, Weak};
 
-/// Used when the query carries no limit of its own.
-///
-/// Resolving a member resolves the members it references before returning, calling into JS at
-/// every level, so the depth of that nesting is paid for in the JS caller's stack. Past V8's limit
-/// the next call fails with a bare `RangeError` that names neither the member nor depth; this
-/// refuses well before that point. Above the multi-stage default so that a multi-stage chain is
-/// still reported by the stage guard.
+/// Default for queries without `maxMemberResolutionDepth`. Must stay above
+/// `DEFAULT_MAX_MULTI_STAGE_DEPTH` (so multi-stage chains get the stage error) and below the
+/// ~190 levels where nested `compileMemberSql` calls overflow V8's stack.
 pub const DEFAULT_MAX_MEMBER_RESOLUTION_DEPTH: usize = 160;
 
 /// Compilation context for the planner. Resolves data-model
