@@ -227,11 +227,7 @@ export class PrestoDriver extends BaseDriver implements DriverInterface {
   }
 
   public queryPromised(query: string, streaming: boolean, requestId?: string): Promise<any[] | StreamTableData> {
-    // Trino/Presto record the trace token when the query is created, so only the
-    // initial `POST /v1/statement` needs it, not the `nextUri` polls.
     const traceToken = requestId && extractRequestUUID(requestId);
-    // Best-effort: ids from scheduledRefreshContexts are only warned about, and an
-    // invalid header value would make Node fail the query
     const headers = traceToken && isValidRequestId(traceToken)
       ? { ...this.config.headers, [this.traceTokenHeader]: traceToken }
       : this.config.headers;
