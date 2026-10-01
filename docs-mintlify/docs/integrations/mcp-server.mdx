@@ -146,17 +146,17 @@ An admin can get the OAuth client details for the selected MCP endpoint from
    For **Restrict usage by org**, choose **My organization only** for one Microsoft 365
    organization or **Any Microsoft 365 organization** for cross-organization use.
 3. Save the registration. In your Microsoft 365 Copilot plugin manifest, set the MCP
-   server URL to the same endpoint, use `OAuthPluginVault` as the runtime authentication
-   type, and set `reference_id` to the OAuth client registration ID from the portal.
+   server `url` to the **MCP Endpoint** you entered as **Base URL**, use `OAuthPluginVault`
+   as the runtime authentication type, and set `reference_id` to the OAuth client
+   registration ID from the portal.
    Follow [Microsoft's OAuth setup
    guide](https://learn.microsoft.com/en-us/microsoft-365/copilot/extensibility/plugin-authentication-oauth)
    for the remaining plugin configuration.
 
 Cube registers the Teams redirect URI
 `https://teams.microsoft.com/api/platform/v1.0/oAuthRedirect` for this client. The client
-secret is the same for every Cube account and cannot be rotated per account, so keep it in
-the Teams registration, not the plugin manifest. Each user still signs in to Cube to grant
-access.
+secret is shared by every Cube account and cannot be rotated per account. Access is still
+granted per user: each user signs in to Cube to authorize Copilot.
 
 ## Connect to Cursor
 
