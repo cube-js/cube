@@ -129,4 +129,63 @@ describe('PrestoDriver custom headers', () => {
     expect(poll!.headers['X-Custom-Header']).toBe('custom-value');
     expect(poll!.headers['Proxy-Authorization']).toBe('Basic dGVzdA==');
   });
+
+  describe('requestId trace token', () => {
+    const createDriver = (config: Record<string, unknown> = {}) => new PrestoDriver({
+      host: 'coordinator.local',
+      port: '8080',
+      catalog: 'test',
+      schema: 'default',
+      dataSource: 'default',
+      checkInterval: 1,
+      ...config,
+    } as any);
+
+    it('tags the initial POST of query() with the request UUID', async () => {
+      const driver = createDriver({ headers: { 'X-Custom-Header': 'custom-value' } });
+
+      await driver.query('SELECT 1', [], { requestId: 'abc-123-span-2' });
+
+      const post = mockRecorded.find((r) => r.method === 'POST');
+      const poll = mockRecorded.find((r) => r.method === 'GET');
+
+      expect(post!.headers['X-Presto-Trace-Token']).toBe('abc-123');
+      expect(post!.headers['X-Custom-Header']).toBe('custom-value');
+      expect(poll!.headers['X-Presto-Trace-Token']).toBeUndefined();
+      expect(poll!.headers['X-Custom-Header']).toBe('custom-value');
+    });
+
+    it('tags the initial POST of stream()', async () => {
+      const driver = createDriver();
+
+      const { rowStream } = await driver.stream('SELECT 1', [], { highWaterMark: 1, requestId: 'stream-req-span-1' });
+
+      for await (const _row of rowStream) {
+        // drain
+      }
+
+      const post = mockRecorded.find((r) => r.method === 'POST');
+      expect(post!.headers['X-Presto-Trace-Token']).toBe('stream-req');
+    });
+
+    it('uses the Trino header name for the trino engine', async () => {
+      const driver = createDriver({ engine: 'trino' });
+
+      await driver.query('SELECT 1', [], { requestId: 'trino-req' });
+
+      const post = mockRecorded.find((r) => r.method === 'POST');
+      expect(post!.headers['X-Trino-Trace-Token']).toBe('trino-req');
+      expect(post!.headers['X-Presto-Trace-Token']).toBeUndefined();
+    });
+
+    it('sends no trace token without a requestId', async () => {
+      const driver = createDriver();
+
+      await driver.query('SELECT 1', []);
+
+      const post = mockRecorded.find((r) => r.method === 'POST');
+      expect(post!.headers['X-Presto-Trace-Token']).toBeUndefined();
+      expect(post!.headers['X-Trino-Trace-Token']).toBeUndefined();
+    });
+  });
 });
