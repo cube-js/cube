@@ -67,18 +67,57 @@ export interface PromiseWithResolve<T = any> extends Promise<T> {
   resolved?: boolean;
 }
 
-export class LocalQueueDriverConnectionState {
-  public resultPromises: Record<string, PromiseWithResolve> = {};
-
+/**
+ * Queue items indexed by key and by id, both indexes are only ever updated together.
+ */
+export class LocalQueueItems {
   /**
    * A Map because insertion order matches id order, which is the order active items are
    * reported in. A plain object would reorder them.
    */
-  public items: Map<QueryKeyHash, LocalQueueItem> = new Map();
+  protected readonly byKey: Map<QueryKeyHash, LocalQueueItem> = new Map();
 
-  public byId: Map<number, LocalQueueItem> = new Map();
+  protected readonly byId: Map<number, LocalQueueItem> = new Map();
 
-  public idSequence: number = 0;
+  protected idSequence: number = 0;
+
+  public nextId(): number {
+    this.idSequence += 1;
+
+    return this.idSequence;
+  }
+
+  public getByKey(key: QueryKeyHash): LocalQueueItem | null {
+    return this.byKey.get(key) || null;
+  }
+
+  public getById(id: number): LocalQueueItem | null {
+    return this.byId.get(id) || null;
+  }
+
+  public has(key: QueryKeyHash): boolean {
+    return this.byKey.has(key);
+  }
+
+  public add(item: LocalQueueItem): void {
+    this.byKey.set(item.key, item);
+    this.byId.set(item.id, item);
+  }
+
+  public remove(item: LocalQueueItem): void {
+    this.byKey.delete(item.key);
+    this.byId.delete(item.id);
+  }
+
+  public values(): IterableIterator<LocalQueueItem> {
+    return this.byKey.values();
+  }
+}
+
+export class LocalQueueDriverConnectionState {
+  public resultPromises: Record<string, PromiseWithResolve> = {};
+
+  public items: LocalQueueItems = new LocalQueueItems();
 }
 
 export class LocalQueueDriverConnection implements QueueDriverConnectionInterface {
@@ -113,17 +152,12 @@ export class LocalQueueDriverConnection implements QueueDriverConnectionInterfac
    */
   protected resolveItem(queryKeyHash: QueryKeyHash, queueId?: QueueId | null): LocalQueueItem | null {
     if (queueId) {
-      const item = this.state.byId.get(Number(queueId));
+      const item = this.state.items.getById(Number(queueId));
       // QueryQueue.generateQueueId hands out ids from the same small integer range
       return item?.key === queryKeyHash ? item : null;
     }
 
-    return this.state.items.get(queryKeyHash) || null;
-  }
-
-  protected removeItem(item: LocalQueueItem): void {
-    this.state.items.delete(item.key);
-    this.state.byId.delete(item.id);
+    return this.state.items.getByKey(queryKeyHash);
   }
 
   protected mergeDef(item: LocalQueueItem): QueryDef {
@@ -250,7 +284,7 @@ export class LocalQueueDriverConnection implements QueueDriverConnectionInterfac
 
     // Returning the existing id rather than a fresh one is what makes the caller wait on the
     // query that is already queued instead of on an id that will never be acked.
-    const existing = this.state.items.get(key);
+    const existing = this.state.items.getByKey(key);
     if (existing) {
       return [
         0,
@@ -262,7 +296,7 @@ export class LocalQueueDriverConnection implements QueueDriverConnectionInterfac
     }
 
     const created = Date.now();
-    const id = ++this.state.idSequence;
+    const id = this.state.items.nextId();
 
     const item: LocalQueueItem = {
       id,
@@ -286,8 +320,7 @@ export class LocalQueueDriverConnection implements QueueDriverConnectionInterfac
       extra: null,
     };
 
-    this.state.items.set(key, item);
-    this.state.byId.set(id, item);
+    this.state.items.add(item);
 
     return [
       1,
@@ -313,7 +346,7 @@ export class LocalQueueDriverConnection implements QueueDriverConnectionInterfac
       return [null];
     }
 
-    this.removeItem(item);
+    this.state.items.remove(item);
 
     return [this.mergeDef(item)];
   }
@@ -330,7 +363,7 @@ export class LocalQueueDriverConnection implements QueueDriverConnectionInterfac
       return false;
     }
 
-    this.removeItem(item);
+    this.state.items.remove(item);
 
     const promise = this.getResultPromise(this.resultListKey(item.key));
 
