@@ -164,6 +164,21 @@ describe('SubscriptionServer', () => {
       expect(mockApiGateway.handleError).toHaveBeenCalled();
     });
 
+    it('should reject a messageId with forbidden characters when requestId is omitted', async () => {
+      const { mockApiGateway, mockSubscriptionStore, mockSendMessage, mockContextAcceptor } = createMocks();
+      const server = new SubscriptionServer(mockApiGateway, mockSendMessage, mockSubscriptionStore, mockContextAcceptor);
+
+      await server.processMessage('conn-1', JSON.stringify({
+        method: 'load',
+        messageId: "x' OR 1;--",
+        params: { query: { measures: ['Orders.count'] } },
+      }));
+
+      expect(mockApiGateway.contextByReq).not.toHaveBeenCalled();
+      expect(mockApiGateway.load).not.toHaveBeenCalled();
+      expect(mockApiGateway.handleError).toHaveBeenCalled();
+    });
+
     it('should pass a valid requestId through', async () => {
       const { mockApiGateway, mockSubscriptionStore, mockSendMessage, mockContextAcceptor } = createMocks();
       const server = new SubscriptionServer(mockApiGateway, mockSendMessage, mockSubscriptionStore, mockContextAcceptor);
