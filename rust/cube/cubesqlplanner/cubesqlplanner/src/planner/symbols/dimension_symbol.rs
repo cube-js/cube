@@ -256,7 +256,7 @@ impl DimensionSymbol {
     }
 
     /// Finds the calendar time-shift defined for the exact `interval`
-    /// and returns it together with the primary-key full name. `None`
+    /// and returns it together with the primary key. `None`
     /// when either the matching shift or the primary key is missing.
     pub fn calendar_time_shift_for_interval(
         &self,
@@ -277,9 +277,8 @@ impl DimensionSymbol {
     }
 
     /// Finds the named calendar time-shift and returns it together
-    /// with the primary-key full name. Falls back to this dimension's
-    /// own full name when the dimension is itself the calendar primary
-    /// key.
+    /// with the primary key. Falls back to this dimension's own id when
+    /// the dimension is itself the calendar primary key.
     pub fn calendar_time_shift_for_named_interval(
         &self,
         interval_name: &String,

@@ -10,7 +10,7 @@ use std::any::Any;
 use std::rc::Rc;
 
 /// Applies a per-dimension time shift to time dimensions whose
-/// full name is in `shifts`, by rendering the dimension expression
+/// id is in `shifts`, by rendering the dimension expression
 /// shifted by the configured interval.
 ///
 /// `substituted` names the dimensions rendered as a stored column instead

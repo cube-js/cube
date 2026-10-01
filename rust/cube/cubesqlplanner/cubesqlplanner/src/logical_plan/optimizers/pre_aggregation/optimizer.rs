@@ -204,7 +204,7 @@ impl PreAggregationOptimizer {
             if !Self::can_carry_time_shifts(
                 pre_aggregation,
                 &matched_measures,
-                &Self::read_member_names(&query.schema(), &query.filter()),
+                &Self::read_member_ids(&query.schema(), &query.filter()),
                 time_shifts,
             ) {
                 return Ok(None);
@@ -568,9 +568,9 @@ impl PreAggregationOptimizer {
     // stored measure reading a shifted member is therefore always unusable,
     // however cleanly the shift could be attributed to it. Only the measures
     // matching consumed are examined, since the rest are never read.
-    // Resolved names of every member the query reads, so a stored member no
+    // Resolved ids of every member the query reads, so a stored member no
     // one reads cannot decide anything.
-    fn read_member_names(schema: &LogicalSchema, filter: &LogicalFilter) -> HashSet<MemberId> {
+    fn read_member_ids(schema: &LogicalSchema, filter: &LogicalFilter) -> HashSet<MemberId> {
         let mut symbols: Vec<Rc<MemberSymbol>> = schema
             .dimensions
             .iter()
@@ -654,7 +654,7 @@ impl PreAggregationOptimizer {
             })
             .map(base_name)
             .collect();
-        let read = Self::read_member_names(schema, filter);
+        let read = Self::read_member_ids(schema, filter);
 
         for stored in pre_aggregation
             .measures

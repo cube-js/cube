@@ -11,7 +11,7 @@ use std::collections::HashMap;
 use std::rc::Rc;
 
 /// Per-dimension time-shift accumulator used during multi-stage
-/// planning. Keyed by dimension full name; aggregates the shifts
+/// planning. Keyed by dimension id; aggregates the shifts
 /// applied to each dimension across nested multi-stage scopes.
 #[derive(Clone, Default, Debug, PartialEq)]
 pub struct TimeShiftState {
@@ -152,7 +152,7 @@ pub struct ExtractedTimeShifts {
     /// Shifts applied by offsetting the member's expression by an interval.
     pub interval_shifts: HashMap<MemberId, DimensionTimeShift>,
     /// Shifts that render a calendar cube's own time-shift declaration,
-    /// keyed by the calendar's primary-key full name.
+    /// keyed by the calendar's primary key.
     pub calendar_shifts: HashMap<MemberId, CalendarDimensionTimeShift>,
     /// What a `FILTER_PARAMS` binding may restate under the stage's shifts.
     pub filter_params_shifts: FilterParamsTimeShifts,

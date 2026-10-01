@@ -213,8 +213,10 @@ impl SymbolPath {
         }
     }
 
-    /// Identity of the member this path resolves to.
+    /// Identity of the member this path resolves to. Only a dimension,
+    /// measure or segment path names a member.
     pub fn member_id(&self) -> MemberId {
+        debug_assert!(!self.symbol_name.is_empty(), "a cube path names no member");
         MemberId::member(self.cube_id.clone(), self.symbol_name.clone())
     }
 

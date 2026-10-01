@@ -201,9 +201,9 @@ pub struct MultiFactJoinGroups {
     query_tools: Rc<State>,
     measures_join_hints: MeasuresJoinHints,
     groups: Vec<(Rc<JoinTree>, Vec<Rc<MemberSymbol>>)>,
-    /// cube_name → join path from root, computed from the first group (shared for dimensions).
+    /// cube → join path from root, computed from the first group (shared for dimensions).
     dimension_paths: HashMap<CubeId, Vec<CubeId>>,
-    /// measure full_name → join path from root, computed per group.
+    /// measure → join path from root, computed per group.
     measure_paths: HashMap<MemberId, Vec<CubeId>>,
 }
 
