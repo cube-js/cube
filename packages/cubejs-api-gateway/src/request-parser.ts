@@ -14,12 +14,10 @@ interface RequestParserResult {
   contentType?: string
 }
 
-export function getRequestIdFromRequest(req: Request): string {
-  const requestId = req.get('x-request-id') || req.get('traceparent');
-  if (!requestId) {
-    return `${uuidv4()}-span-1`;
-  }
-
+function parseRequestIdHeader(value: string): string {
+  // A repeated header (e.g. one more added by a proxy) arrives joined with ", ";
+  // commas are never valid in an id, so the first value is the client's
+  const requestId = value.split(',')[0].trim();
   if (!isValidRequestId(requestId)) {
     throw new UserError(
       `Request id must be at most ${REQUEST_ID_MAX_LENGTH} characters from A-Z, a-z, 0-9, '+', '/', '=', '.', '_', ':' and '-'`
@@ -27,6 +25,20 @@ export function getRequestIdFromRequest(req: Request): string {
   }
 
   return requestId;
+}
+
+export function getRequestIdFromRequest(req: Request): string {
+  const xRequestId = req.get('x-request-id');
+  if (xRequestId) {
+    return parseRequestIdHeader(xRequestId);
+  }
+
+  const traceparent = req.get('traceparent');
+  if (traceparent) {
+    return parseRequestIdHeader(traceparent);
+  }
+
+  return `${uuidv4()}-span-1`;
 }
 
 export function requestParser(req: Request, res: Response) {

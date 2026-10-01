@@ -11,6 +11,10 @@ describe('getRequestIdFromRequest', () => {
     expect(getRequestIdFromRequest(requestWithHeaders({ traceparent: 'tp-1' }))).toBe('tp-1');
   });
 
+  it('uses the first value of a repeated header', () => {
+    expect(getRequestIdFromRequest(requestWithHeaders({ 'x-request-id': 'req-1, req-2' }))).toBe('req-1');
+  });
+
   it('rejects an id with forbidden characters', () => {
     expect(() => getRequestIdFromRequest(requestWithHeaders({ 'x-request-id': 'my req' }))).toThrow(UserError);
     expect(() => getRequestIdFromRequest(requestWithHeaders({ traceparent: 'café' }))).toThrow(UserError);

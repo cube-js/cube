@@ -1145,7 +1145,7 @@ describe('Refresh Scheduler', () => {
       await refreshScheduler.runScheduledRefresh({
         securityContext: undefined,
         authInfo: null,
-        requestId: 'Empty security context'
+        requestId: 'empty-security-context'
       }, {
         concurrency: 1,
         workerIndices: [0],
@@ -1154,12 +1154,25 @@ describe('Refresh Scheduler', () => {
     await refreshScheduler.runScheduledRefresh({
       securityContext: undefined,
       authInfo: null,
-      requestId: 'Empty security context'
+      requestId: 'empty-security-context'
     }, {
       concurrency: 1,
       workerIndices: [0],
       throwErrors: true
     });
+  });
+
+  test('Invalid requestId in context', async () => {
+    const { refreshScheduler } = setupScheduler({
+      repository: repositoryWithoutPreAggregations,
+      skipAssertSecurityContext: true,
+    });
+    const ctx = { securityContext: {}, authInfo: null, requestId: 'tenant 1' };
+
+    await expect(refreshScheduler.runScheduledRefresh(ctx, { concurrency: 1, workerIndices: [0] }))
+      .resolves.toEqual({ finished: false });
+    await expect(refreshScheduler.runScheduledRefresh(ctx, { concurrency: 1, workerIndices: [0], throwErrors: true }))
+      .rejects.toThrow('Invalid requestId in scheduled refresh context');
   });
 
   test('rollupJoin scheduledRefresh', async () => {
@@ -1289,7 +1302,7 @@ describe('Refresh Scheduler', () => {
   });
 
   describe('Local refresh key', () => {
-    const ctx = { authInfo: { tenantId: 'tenant1' }, securityContext: { tenantId: 'tenant1' }, requestId: 'local refresh key' };
+    const ctx = { authInfo: { tenantId: 'tenant1' }, securityContext: { tenantId: 'tenant1' }, requestId: 'local-refresh-key' };
 
     const runRefresh = async (refreshKeyRenewalThreshold?: number) => {
       const { refreshScheduler, mockDriver, serverCore, compilerApi } = setupScheduler({
