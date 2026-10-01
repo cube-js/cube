@@ -119,14 +119,17 @@ An admin can get the OAuth client details for the selected MCP endpoint from
 **Admin → MCP Server → Microsoft 365 Copilot setup**. If this section is not visible,
 contact the [Cube support team](/admin/account-billing/support) to enable it.
 
-1. Select the central or region-specific MCP endpoint on the MCP Server page, then click
+1. Select the single or region-specific MCP endpoint on the MCP Server page, then click
    **Get OAuth client details**. The credentials and OAuth URLs correspond to the
    displayed **MCP Endpoint**.
 2. In the [Teams developer portal](https://dev.teams.microsoft.com/), open
-   **Tools → OAuth client registration** and create a registration. Enter the displayed
-   **Client ID**, **Client secret**, **Authorization URL**, **Token URL**, **Refresh URL**
-   (same as Token URL), and **Scope**. Use the MCP endpoint as the registration's
-   **Base URL**. Set **Restrict usage by app** to **Any Teams app** and leave PKCE enabled.
+   **Tools → OAuth client registration** and create a registration. Copy Cube's **Client ID**,
+   **Client secret**, and **Scope** into the matching fields. Copy **Authorization URL**
+   into **Authorization endpoint**, and **Token URL** into both **Token endpoint** and
+   **Refresh endpoint**. Use the MCP endpoint as the registration's **Base URL**. Set
+   **Restrict usage by app** to **Any Teams app** and leave PKCE enabled. For
+   **Restrict usage by org**, choose **My organization only** for one Microsoft 365
+   organization or **Any Microsoft 365 organization** for cross-organization use.
 3. Save the registration. In your Microsoft 365 Copilot plugin manifest, set the MCP
    server URL to the same endpoint, use `OAuthPluginVault` as the runtime authentication
    type, and set `reference_id` to the OAuth client registration ID from the portal.
@@ -136,8 +139,9 @@ contact the [Cube support team](/admin/account-billing/support) to enable it.
 
 Cube registers the Teams redirect URI
 `https://teams.microsoft.com/api/platform/v1.0/oAuthRedirect` for this client. The
-client secret is shared across Cube MCP connections; each user still signs in to Cube
-to grant access. Keep the secret in the Teams registration rather than the plugin manifest.
+same client secret is returned for every Cube account; Admin does not offer per-account
+rotation. Each user still signs in to Cube to grant access. Keep the secret in the Teams
+registration rather than the plugin manifest.
 
 ## Connect to Cursor
 
