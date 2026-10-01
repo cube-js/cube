@@ -1467,6 +1467,21 @@ statements can be read from the console.
 | --------------- | ---------------------- | --------------------- |
 | `true`, `false` | `false`                | `true`                |
 
+## `CUBEJS_MAX_MULTI_STAGE_DEPTH`
+
+The maximum number of chained [multi-stage][ref-multi-stage-calculations] members
+Cube will plan along a single dependency path. A query whose multi-stage members
+chain deeper than this is refused with an error naming the member and the limit,
+rather than failing with an internal error. Only enforced when [Tesseract][link-tesseract]
+plans the query; it has no effect with `CUBEJS_TESSERACT_SQL_PLANNER=false`. For a
+query served from a pre-aggregation,
+[`CUBESTORE_MAX_QUERY_PLAN_DEPTH`](#cubestore_max_query_plan_depth) binds first: it
+counts about two Cube Store plan levels per multi-stage member.
+
+| Possible Values | Default in Development | Default in Production |
+| --------------- | ---------------------- | --------------------- |
+| A valid number  | `150`                  | `150`                 |
+
 ## `CUBEJS_MAX_PARTITIONS_PER_CUBE`
 
 The maximum number of partitions each pre-aggregation in a cube can use.
@@ -2163,6 +2178,32 @@ The logging level for Cube Store.
 
 See also [`CUBEJS_LOG_LEVEL`](/reference/configuration/environment-variables#cubejs_log_level).
 
+## `CUBESTORE_MAIN_STACK_SIZE`
+
+The stack size, in bytes, of Cube Store's main runtime threads, where SQL is parsed.
+Raise it together with
+[`CUBESTORE_SQL_PARSER_RECURSION_LIMIT`](#cubestore_sql_parser_recursion_limit): that
+limit is a budget on this stack. Values below 2 MiB (`2097152`) are raised to that
+floor.
+
+| Possible Values | Default in Development | Default in Production |
+| --------------- | ----------------------- | ----------------------- |
+| A valid number  | `8388608` (8 MiB)       | `8388608` (8 MiB)       |
+
+## `CUBESTORE_MAX_QUERY_PLAN_DEPTH`
+
+The maximum nesting depth of a Cube Store query plan, counting plan nodes,
+expression nodes, and nested subquery plans. A query whose plan exceeds this depth —
+for example, many chained multi-stage subqueries, or a deeply nested measure
+expression — fails with a "Query plan is nested too deeply to execute" error naming
+the limit, instead of crashing. Raise it only together with
+[`CUBESTORE_SELECT_WORKER_STACK_SIZE`](#cubestore_select_worker_stack_size), the
+stack the plan is decoded on.
+
+| Possible Values | Default in Development | Default in Production |
+| --------------- | ---------------------- | --------------------- |
+| A valid number  | `150`                  | `150`                 |
+
 ## `CUBESTORE_MAX_WS_CONNECTIONS_PER_USER`
 
 The maximum number of concurrent WebSocket connections a single authenticated
@@ -2346,6 +2387,17 @@ The number of Cube Store sub-processes that handle `SELECT` queries.
 | --------------- | ---------------------- | --------------------- |
 | A valid number  | `4`                    | `4`                   |
 
+## `CUBESTORE_SELECT_WORKER_STACK_SIZE`
+
+The stack size, in bytes, of the runtime threads that decode and execute a query
+plan on each Cube Store select worker. Raise it together with
+[`CUBESTORE_MAX_QUERY_PLAN_DEPTH`](#cubestore_max_query_plan_depth): a deeper plan
+needs more of this stack to decode without crashing.
+
+| Possible Values | Default in Development | Default in Production |
+| --------------- | ---------------------- | --------------------- |
+| A valid number  | `4194304` (4 MiB)      | `4194304` (4 MiB)      |
+
 ## `CUBESTORE_SERVER_NAME`
 
 The full name and port number of the Cube Store node (either the router
@@ -2356,6 +2408,17 @@ Should be passed to the Cube Store router and to each Cube Store worker.
 | Possible Values           | Default in Development | Default in Production |
 | ------------------------- | ---------------------- | --------------------- |
 | A valid address/port pair | `localhost`            | `localhost`           |
+
+## `CUBESTORE_SQL_PARSER_RECURSION_LIMIT`
+
+The maximum nesting depth Cube Store's SQL parser will accept before rejecting a
+query as too deep, rather than failing internally. Raise it together with
+[`CUBESTORE_MAIN_STACK_SIZE`](#cubestore_main_stack_size), the stack the parser
+runs on.
+
+| Possible Values | Default in Development | Default in Production |
+| --------------- | ---------------------- | --------------------- |
+| A valid number  | `128`                  | `128`                 |
 
 ## `CUBESTORE_TELEMETRY`
 
