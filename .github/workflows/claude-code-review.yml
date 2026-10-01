@@ -177,6 +177,27 @@ jobs:
           ' "$EXECUTION_FILE")
           if [ -n "$annotation" ]; then printf '%s\n' "$annotation"; fi
 
+      # Artifacts of a public repo are downloadable by any GitHub user, so the
+      # transcript is encrypted to an age key held by the Cube team. Decrypt with
+      # `age -d -i <key> claude-execution.json.gz.age | gunzip`.
+      - name: Encrypt execution log
+        if: always() && steps.review.outputs.execution_file != ''
+        env:
+          EXECUTION_FILE: ${{ steps.review.outputs.execution_file }}
+          AGE_RECIPIENT: age1qffmjdq624j4admp7h3svuxtnd8fqm354hfzqr0zfnthct55752qer4g80
+        run: |
+          sudo apt-get update -qq && sudo apt-get install -y -qq age > /dev/null
+          gzip -c "$EXECUTION_FILE" | age -r "$AGE_RECIPIENT" -o "$RUNNER_TEMP/claude-execution.json.gz.age"
+
+      - name: Upload execution log
+        if: always() && steps.review.outputs.execution_file != ''
+        uses: actions/upload-artifact@v7
+        with:
+          name: claude-review-execution-log
+          path: ${{ runner.temp }}/claude-execution.json.gz.age
+          retention-days: 14
+          if-no-files-found: ignore
+
       - name: React to trigger comment (completion)
         if: always() && github.event_name == 'issue_comment'
         env:
