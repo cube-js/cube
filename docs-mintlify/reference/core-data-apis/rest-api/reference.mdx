@@ -788,9 +788,8 @@ Example response:
 
 ### `{base_path}/v1/entities`
 
-Send a `GET` request to list the cubes and views in the data model, including
-private cubes returned as [lineage stubs](#private-cubes-and-members). Results
-are sorted by type (cubes first), then by name. Each item contains only `type`,
+Send a `GET` request to list all cubes and views in the data model. Results are
+sorted by type (cubes first), then by name. Each item contains only `type`,
 `name`, and `public`; use [`/v1/entities/{name}`](#base_path/v1/entities/name) or
 [`/v1/entities/all`](#base_path/v1/entities/all) for detailed metadata.
 
@@ -800,6 +799,7 @@ Query parameters:
 | --- | --- | --- |
 | `offset` | Pagination offset. Defaults to `0` | No |
 | `limit` | Maximum number of items to return. Defaults to all items | No |
+| `include_private` | Set to `true` to include [private cubes, views, and members](#private-cubes-and-members). Requires the `meta-private` scope. Defaults to `false` | No |
 
 Example request:
 
@@ -844,12 +844,18 @@ Path parameters:
 | --- | --- |
 | `name` | The cube or view name |
 
+Query parameters:
+
+| Parameter | Description | Required |
+| --- | --- | --- |
+| `include_private` | Set to `true` to include [private cubes, views, and members](#private-cubes-and-members). Requires the `meta-private` scope. Defaults to `false` | No |
+
 Response includes:
 
 - `type` - Either `cube` or `view`
 - `name` - The cube or view name
-- `public` - Whether the cube or view is public; `false` for a
-  [lineage stub](#private-cubes-and-members)
+- `public` - Whether the cube or view is public. Can only be `false` when
+  [private cubes and members](#private-cubes-and-members) are included
 - `title` - Human-readable title
 - `description` - Description from the data model, or an empty string
 - `table_references` - Data lineage to source tables, each with `data_source`,
@@ -863,12 +869,12 @@ Each member includes:
 | Field | Description |
 | --- | --- |
 | `name` | The member name, without the cube prefix |
-| `public` | Whether the member is public; `false` for a [lineage stub](#private-cubes-and-members) |
+| `public` | Whether the member is public. Can only be `false` when [private cubes and members](#private-cubes-and-members) are included |
 | `title` | Human-readable title |
 | `description` | Description from the data model, or an empty string |
 | `type` | The member type, e.g. `count`, `sum`, or `string` |
-| `sql` | The member's SQL definition (see below). Omitted when it can't be resolved, and on lineage stubs |
-| `is_primary_key` | Whether the dimension is a primary key. Dimensions only; omitted on lineage stubs |
+| `sql` | The member's SQL definition (see below). Omitted when it can't be resolved |
+| `is_primary_key` | Whether the dimension is a primary key. Dimensions only |
 | `member_references` | Upstream members the member is derived from, each with `cube` and `member` |
 | `column_references` | Source columns, each with `data_source`, `table`, `column`, and, if the table is qualified, `schema` |
 
@@ -975,6 +981,7 @@ Request body:
 | --- | --- | --- | --- |
 | `cubes` | `array` | Array of cube names to retrieve | No |
 | `views` | `array` | Array of view names to retrieve | No |
+| `include_private` | `boolean` | Set to `true` to include [private cubes, views, and members](#private-cubes-and-members). Requires the `meta-private` scope. Can also be passed as a query parameter. Defaults to `false` | No |
 
 Query parameters:
 
@@ -983,9 +990,7 @@ Query parameters:
 | `offset` | Pagination offset. Defaults to `0` | No |
 | `limit` | Maximum number of items to return. Defaults to all items | No |
 
-If neither `cubes` nor `views` is provided, all cubes and views are returned,
-including private cubes returned as [lineage stubs](#private-cubes-and-members).
-A stub cube can also be requested by name in `cubes`.
+If neither `cubes` nor `views` is provided, all cubes and views are returned.
 
 Example request:
 
@@ -1148,69 +1153,30 @@ entities before `offset` and `limit` are applied:
 
 ### Private cubes and members
 
-Cubes, views, and members that aren't public are not returned with their
-definitions (see `public` for [cubes][ref-cubes-public],
-[views][ref-views-public], [measures][ref-measures-public], and
-[dimensions][ref-dimensions-public]). To keep lineage complete, a private cube
-or member that a public member references directly is returned as a _lineage
-stub_, with `public` set to `false`:
+By default, the Metadata API returns only the cubes, views, and members that are
+public (see `public` for [cubes][ref-cubes-public], [views][ref-views-public],
+[measures][ref-measures-public], and [dimensions][ref-dimensions-public]).
+References to anything it doesn't return are omitted: every entry in
+`member_references` and `cube_references` names a cube, view, or member that the
+Metadata API returns, though not necessarily in the same response.
 
-- A stub cube has only the members that public members reference, its own
-  `table_references`, and empty `cube_references`.
-- A stub member has its `name`, `type`, and `column_references`, and empty
-  `member_references`. It has no `sql` or `is_primary_key`.
-- Both have `title` set to their name and an empty `description`.
+Data catalogs and lineage tools that need the complete data model can set
+`include_private` to `true`. This requires a token with the `meta-private` scope
+as well as `meta`; without it, the request fails with `403`. Private cubes,
+views, and members are then returned with their full definitions and `public`
+set to `false`, and a view's `table_references` and `column_references` include
+the tables and columns it reads through private cubes.
 
-A private member of a public cube is returned as a stub member in that cube's
-`measures` or `dimensions`. Private views are never returned.
+`include_private` doesn't bypass [data access policies][ref-dap]. Whatever a data
+access policy hides from the token's security context is never returned, even
+with `include_private`, and lineage is never read through it.
 
-Setting `public` to `false` doesn't hide the name, tables, or columns of a cube
-or member that a public member references. To hide them, use
-[data access policies][ref-dap]: members hidden in a cube that has data access
-policies are never returned as stubs or used for lineage, and references to
-them are omitted.
+Example request:
 
-Every entry in `member_references` and `cube_references` names a cube, view, or
-member that the Metadata API returns, though not necessarily in the same
-response. A view's `table_references` include the tables it reads through
-private cubes. For a private view, or a private cube that no public member
-references, `/v1/entities/{name}` returns `404`. To keep only public cubes and
-views, filter the results on the `public` field.
-
-For example, a public view whose `customer_id` dimension is an alias of
-`customers.id` in a private `customers` cube returns this stub:
-
-```json
-{
-  "type": "cube",
-  "name": "customers",
-  "public": false,
-  "title": "customers",
-  "description": "",
-  "table_references": [
-    { "data_source": "default", "schema": "public", "table": "customers" }
-  ],
-  "cube_references": [],
-  "measures": [],
-  "dimensions": [
-    {
-      "name": "id",
-      "public": false,
-      "title": "id",
-      "description": "",
-      "type": "number",
-      "member_references": [],
-      "column_references": [
-        {
-          "data_source": "default",
-          "schema": "public",
-          "table": "customers",
-          "column": "id"
-        }
-      ]
-    }
-  ]
-}
+```bash
+curl \
+  -H "Authorization: Bearer TOKEN" \
+  "https://example.cubecloud.dev/cubejs-api/v1/entities/customers?include_private=true"
 ```
 
 ## Health checks
