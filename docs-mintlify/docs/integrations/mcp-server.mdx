@@ -115,19 +115,19 @@ which bundles this server with Cube agent skills.
 
 ## Connect to Microsoft 365 Copilot
 
-<Note>
+<Warning>
 
-If **Microsoft 365 Copilot setup** is not visible in Admin, contact the
-[Cube support team](/admin/account-billing/support) to enable it for your account.
+Microsoft 365 Copilot setup is currently in preview. Reach out to the
+[Cube support team](/admin/account-billing/support) to activate it for your account.
 
-</Note>
+</Warning>
 
 An admin can get the OAuth client details for the selected MCP endpoint from
 **Admin → MCP Server → Microsoft 365 Copilot setup**.
 
-1. Select the single or region-specific MCP endpoint on the MCP Server page, then click
-   **Get OAuth client details**. The credentials and OAuth URLs correspond to the
-   displayed **MCP Endpoint**.
+1. On the MCP Server page, select the [single endpoint or a region-specific
+   endpoint](#one-endpoint-for-everyone), then click **Get OAuth client details**.
+   The credentials and OAuth URLs correspond to the displayed **MCP Endpoint**.
 2. In the [Teams developer portal](https://dev.teams.microsoft.com/), open
    **Tools → OAuth client registration** and create a registration with these values:
 
@@ -156,7 +156,9 @@ Cube registers the Teams redirect URI
 `https://teams.microsoft.com/api/platform/v1.0/oAuthRedirect` for this client. The
 same client secret is returned for every Cube account; Admin does not offer per-account
 rotation. Each user still signs in to Cube to grant access. Keep the secret in the Teams
-registration rather than the plugin manifest.
+registration rather than the plugin manifest. Contact the
+[Cube support team](/admin/account-billing/support) if you have concerns about the shared
+credential.
 
 ## Connect to Cursor
 
