@@ -121,6 +121,13 @@ To enable SSL-encrypted connections between Cube and Presto, set the
 configure custom certificates, please check out [Enable SSL Connections to the
 Database][ref-recipe-enable-ssl].
 
+## Query attribution
+
+Cube sends the identifier shown for the query in Query History as the
+`X-Presto-Trace-Token` header of every statement it runs, so all statements of one Cube
+query share it. Presto records it as the session's trace token, returned as
+`session.traceToken` by the query info endpoint (`GET /v1/query/<query-id>`).
+
 ## Custom headers
 
 The Presto driver supports forwarding custom HTTP headers on every request to

@@ -121,6 +121,15 @@ To enable SSL-encrypted connections between Cube and Trino, set the
 configure custom certificates, please check out [Enable SSL Connections to the
 Database][ref-recipe-enable-ssl].
 
+## Query attribution
+
+Cube sends the identifier shown for the query in Query History as the
+`X-Trino-Trace-Token` header of every statement it runs, so all statements of one Cube
+query share it. Trino records it as the session's trace token, returned as
+`session.traceToken` by the query info endpoint (`GET /v1/query/<query-id>`).
+It is also passed to [event listeners][trino-docs-event-listener] as the query context's
+`traceToken`.
+
 ## Custom headers
 
 The Trino driver supports forwarding custom HTTP headers (e.g., `X-Trino-Source`,
@@ -210,3 +219,4 @@ module.exports = {
   https://trino.io/docs/current/functions/aggregate.html#approximate-aggregate-functions
 [ref-recipe-enable-ssl]: /recipes/configuration/using-ssl-connections-to-data-source
 [ref-schema-ref-types-formats-countdistinctapprox]: /reference/data-modeling/measures#type
+[trino-docs-event-listener]: https://trino.io/docs/current/develop/event-listener.html
