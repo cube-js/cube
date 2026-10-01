@@ -153,12 +153,10 @@ An admin can get the OAuth client details for the selected MCP endpoint from
    for the remaining plugin configuration.
 
 Cube registers the Teams redirect URI
-`https://teams.microsoft.com/api/platform/v1.0/oAuthRedirect` for this client. The
-same client secret is returned for every Cube account; Admin does not offer per-account
-rotation. Each user still signs in to Cube to grant access. Keep the secret in the Teams
-registration rather than the plugin manifest. Contact the
-[Cube support team](/admin/account-billing/support) if you have concerns about the shared
-credential.
+`https://teams.microsoft.com/api/platform/v1.0/oAuthRedirect` for this client. The client
+secret is the same for every Cube account and cannot be rotated per account, so keep it in
+the Teams registration, not the plugin manifest. Each user still signs in to Cube to grant
+access.
 
 ## Connect to Cursor
 
