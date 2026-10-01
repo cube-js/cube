@@ -2097,6 +2097,13 @@ const variables: Record<string, (...args: any) => any> = {
    */
   maxMultiStageDepth: () => get('CUBEJS_MAX_MULTI_STAGE_DEPTH')
     .asIntPositive(),
+  /**
+   * How deep members may reference members. The planner resolves each referenced member inside
+   * the one that references it, calling into JS at every level, so a long enough chain runs the
+   * JS stack out with a bare RangeError. Unset leaves the planner's own default.
+   */
+  maxMemberResolutionDepth: () => get('CUBEJS_MAX_MEMBER_RESOLUTION_DEPTH')
+    .asIntPositive(),
   allowUngroupedWithoutPrimaryKey: () => get('CUBEJS_ALLOW_UNGROUPED_WITHOUT_PRIMARY_KEY')
     .default(get('CUBESQL_SQL_PUSH_DOWN').default('true').asString())
     .asBoolStrict(),
