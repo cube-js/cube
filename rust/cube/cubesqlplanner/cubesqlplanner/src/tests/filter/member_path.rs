@@ -1,4 +1,5 @@
 use crate::planner::filter::FilterItem;
+use crate::planner::MemberId;
 use crate::test_fixtures::cube_bridge::MockSchema;
 use crate::test_fixtures::test_utils::{member_id, TestContext};
 use indoc::indoc;
@@ -7,11 +8,11 @@ fn ctx() -> TestContext {
     TestContext::new(MockSchema::from_yaml_file("common/simple.yaml")).unwrap()
 }
 
-fn filter_member_ids(filters: &[FilterItem]) -> Vec<String> {
+fn filter_member_ids(filters: &[FilterItem]) -> Vec<MemberId> {
     filters
         .iter()
         .filter_map(|item| match item {
-            FilterItem::Item(filter) => Some(filter.member_id().to_string()),
+            FilterItem::Item(filter) => Some(filter.member_id()),
             _ => None,
         })
         .collect()
@@ -33,7 +34,7 @@ fn filter_on_a_measure_through_a_join_path_is_a_measure_filter() {
 
     assert_eq!(
         filter_member_ids(props.measures_filters()),
-        vec![member_id("customers.max_age").to_string()]
+        vec![member_id("customers.max_age")]
     );
     assert!(props.dimensions_filters().is_empty());
 }
@@ -54,7 +55,7 @@ fn filter_on_a_dimension_through_a_join_path_is_a_dimension_filter() {
 
     assert_eq!(
         filter_member_ids(props.dimensions_filters()),
-        vec![member_id("customers.name").to_string()]
+        vec![member_id("customers.name")]
     );
     assert!(props.measures_filters().is_empty());
 }
