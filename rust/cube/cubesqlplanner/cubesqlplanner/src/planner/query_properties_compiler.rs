@@ -2,7 +2,6 @@
 //! resolves member/segment/filter/order references against the cube
 //! evaluator and folds them into the typed builder.
 
-use crate::planner::compiler::DEFAULT_MAX_MEMBER_RESOLUTION_DEPTH;
 use crate::planner::planners::multi_stage::DEFAULT_MAX_MULTI_STAGE_DEPTH;
 use std::collections::HashSet;
 use std::rc::Rc;
@@ -49,12 +48,6 @@ impl QueryPropertiesCompiler {
         let options = options.as_ref();
         let evaluator_compiler_cell = self.query_tools.compiler().clone();
         let mut evaluator_compiler = evaluator_compiler_cell.borrow_mut();
-        evaluator_compiler.set_max_resolution_depth(
-            options
-                .static_data()
-                .max_member_resolution_depth
-                .unwrap_or(DEFAULT_MAX_MEMBER_RESOLUTION_DEPTH),
-        );
 
         let dimensions = self.compile_dimensions(&mut evaluator_compiler, options)?;
         let time_dimensions_raw = self.compile_time_dimensions(&mut evaluator_compiler, options)?;

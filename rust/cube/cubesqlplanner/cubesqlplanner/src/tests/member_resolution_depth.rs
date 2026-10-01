@@ -196,3 +196,43 @@ fn the_query_carries_the_limit() {
         message
     );
 }
+
+/// Masked-member filters are compiled while the query's state is built, before its members are, so
+/// they must already run under the query's limit rather than the default.
+#[test]
+fn a_mask_filter_runs_under_the_query_limit() {
+    let levels = DEFAULT_LIMIT + 5;
+    let query = |limit: usize| {
+        format!(
+            indoc! {r#"
+                measures:
+                  - orders.amount
+                dimensions:
+                  - orders.category
+                max_member_resolution_depth: {limit}
+                maskedMembers:
+                  - member: orders.amount
+                    filter:
+                      member: orders.level_{levels}
+                      operator: equals
+                      values:
+                        - "1"
+            "#},
+            limit = limit,
+            levels = levels
+        )
+    };
+    build(dimension_chain(levels), query(levels + 1))
+        .expect("a mask filter as deep as the query's limit must resolve");
+    let message = build(dimension_chain(levels), query(levels))
+        .map(|_| ())
+        .expect_err("the same filter must be refused one level under it");
+    assert!(
+        message.contains(&format!(
+            "references members more than {} levels deep",
+            levels
+        )),
+        "got: {}",
+        message
+    );
+}

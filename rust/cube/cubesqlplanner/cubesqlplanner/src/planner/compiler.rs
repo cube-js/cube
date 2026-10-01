@@ -58,6 +58,7 @@ impl Compiler {
         security_context: Rc<dyn SecurityContext>,
         timezone: Tz,
         member_to_alias: Option<HashMap<String, String>>,
+        max_resolution_depth: Option<usize>,
     ) -> Self {
         Self {
             cube_evaluator,
@@ -69,13 +70,10 @@ impl Compiler {
             cube_names: HashMap::new(),
             cube_tables: HashMap::new(),
             resolving: Vec::new(),
-            max_resolution_depth: DEFAULT_MAX_MEMBER_RESOLUTION_DEPTH,
+            max_resolution_depth: max_resolution_depth
+                .unwrap_or(DEFAULT_MAX_MEMBER_RESOLUTION_DEPTH),
             query_tools: Weak::new(),
         }
-    }
-
-    pub fn set_max_resolution_depth(&mut self, limit: usize) {
-        self.max_resolution_depth = limit;
     }
 
     /// Runs `resolve` for `path` one level deeper, refusing first if that level is past the
