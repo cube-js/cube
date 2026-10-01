@@ -1,0 +1,67 @@
+# Star schema: orders joins customers and dates, which are not joined to each
+# other. A query of multi-stage measures only leaves a logical node that carries
+# the dimensions of both leaf cubes and no measures (issue #12086).
+cubes:
+  - name: orders
+    sql: "SELECT * FROM orders"
+    joins:
+      - name: customers
+        relationship: many_to_one
+        sql: "{CUBE.customer_id} = {customers.id}"
+      - name: dates
+        relationship: many_to_one
+        sql: "{CUBE.date_id} = {dates.id}"
+    dimensions:
+      - name: id
+        type: number
+        sql: id
+        primary_key: true
+      - name: customer_id
+        type: number
+        sql: customer_id
+      - name: date_id
+        type: number
+        sql: date_id
+    measures:
+      - name: amount
+        type: sum
+        sql: amount
+      - name: amount_prior_year
+        type: number
+        sql: "{CUBE.amount}"
+        multi_stage: true
+        time_shift:
+          - interval: "1 year"
+            type: prior
+            timeDimension: dates.date
+    pre_aggregations:
+      - name: by_customer
+        type: rollup
+        measures:
+          - amount
+        dimensions:
+          - customers.name
+        time_dimension: dates.date
+        granularity: day
+
+  - name: customers
+    sql: "SELECT * FROM customers"
+    dimensions:
+      - name: id
+        type: number
+        sql: id
+        primary_key: true
+      - name: name
+        type: string
+        sql: name
+
+  - name: dates
+    sql: "SELECT * FROM dates"
+    dimensions:
+      - name: id
+        type: number
+        sql: id
+        primary_key: true
+      - name: date
+        type: time
+        sql: date
