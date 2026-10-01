@@ -43,6 +43,10 @@ jobs:
       - name: Run Claude Code
         id: claude
         uses: anthropics/claude-code-action@v1
+        env:
+          # The action stops at the first `result`, which a background subagent
+          # makes arrive mid-run (anthropics/claude-code-action#1499).
+          CLAUDE_CODE_DISABLE_BACKGROUND_TASKS: "1"
         with:
           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
 
