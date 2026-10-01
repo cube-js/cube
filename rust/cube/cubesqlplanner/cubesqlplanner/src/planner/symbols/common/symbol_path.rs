@@ -25,7 +25,6 @@ pub struct SymbolPath {
     path: Vec<CubeId>,
     cube_id: CubeId,
     symbol_name: String,
-    full_name: String,
     granularity: Option<String>,
 }
 
@@ -37,17 +36,11 @@ impl SymbolPath {
         symbol_name: String,
         granularity: Option<String>,
     ) -> Self {
-        let full_name = if symbol_name.is_empty() {
-            cube_id.to_string()
-        } else {
-            format!("{}.{}", cube_id, symbol_name)
-        };
         Self {
             path_type,
             path,
             cube_id,
             symbol_name,
-            full_name,
             granularity,
         }
     }
@@ -211,8 +204,13 @@ impl SymbolPath {
         &self.symbol_name
     }
 
-    pub fn full_name(&self) -> &String {
-        &self.full_name
+    /// The rendered name: the member's full name, or the cube's for a cube path.
+    pub fn full_name(&self) -> String {
+        if self.symbol_name.is_empty() {
+            self.cube_id.to_string()
+        } else {
+            self.member_id().full_name().clone()
+        }
     }
 
     /// Identity of the member this path resolves to.
@@ -222,9 +220,9 @@ impl SymbolPath {
 
     pub fn cache_name(&self) -> String {
         if let Some(granularity) = &self.granularity {
-            format!("{}.{}", self.full_name, granularity)
+            format!("{}.{}", self.full_name(), granularity)
         } else {
-            self.full_name.clone()
+            self.full_name()
         }
     }
 
@@ -236,7 +234,8 @@ impl SymbolPath {
 impl PartialEq for SymbolPath {
     fn eq(&self, other: &Self) -> bool {
         self.path_type == other.path_type
-            && self.full_name == other.full_name
+            && self.cube_id == other.cube_id
+            && self.symbol_name == other.symbol_name
             && self.granularity == other.granularity
             && self.path == other.path
     }
@@ -247,7 +246,8 @@ impl Eq for SymbolPath {}
 impl Hash for SymbolPath {
     fn hash<H: Hasher>(&self, state: &mut H) {
         self.path_type.hash(state);
-        self.full_name.hash(state);
+        self.cube_id.hash(state);
+        self.symbol_name.hash(state);
         self.granularity.hash(state);
         self.path.hash(state);
     }

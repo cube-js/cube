@@ -223,7 +223,7 @@ impl Compiler {
         if let Some(exists) = self.members.get(&path) {
             return Ok(exists.clone());
         }
-        let full_name = path.full_name().clone();
+        let full_name = path.full_name();
         let definition = self
             .cube_evaluator
             .segment_by_path(path.member_id().target_path())?;

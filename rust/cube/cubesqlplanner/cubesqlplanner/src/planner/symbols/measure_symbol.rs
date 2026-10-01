@@ -529,7 +529,7 @@ impl SymbolFactory for MeasureSymbolFactory {
         let cube = cube_evaluator.cube_from_path(path.cube_id().target().to_string())?;
         let is_view = cube.static_data().is_view.unwrap_or(false);
         let alias = compiler
-            .alias_for_member(path.full_name())
+            .alias_for_member(&path.full_name())
             .unwrap_or_else(|| {
                 PlanSqlTemplates::member_alias_name(
                     cube.static_data().resolved_alias(),
