@@ -74,7 +74,7 @@ fn member_id_time_dimension_without_granularity_is_its_day_form() {
 }
 
 #[test]
-fn member_id_equality_follows_the_full_name() {
+fn member_id_equality_follows_the_kind() {
     let a = MemberId::member(CubeId::cube("orders"), "status");
     let b = MemberId::member(CubeId::cube("orders"), "status".to_string());
     assert_eq!(a, b);
@@ -82,6 +82,16 @@ fn member_id_equality_follows_the_full_name() {
     assert_eq!(set.len(), 1);
     assert_ne!(a, MemberId::member(CubeId::cube("users"), "status"));
     assert_ne!(a, MemberId::expression(CubeId::cube("orders"), "status"));
+}
+
+#[test]
+fn member_id_tells_a_time_dimension_from_a_member_with_the_same_full_name() {
+    let created_at = MemberId::member(CubeId::cube("orders"), "created_at");
+    let plain = MemberId::member(CubeId::cube("orders"), "created_at_day");
+    let time_dimension = MemberId::time_dimension(created_at, Some("day"));
+    assert_eq!(plain.full_name(), time_dimension.full_name());
+    assert_ne!(plain, time_dimension);
+    assert!(plain < time_dimension);
 }
 
 #[test]

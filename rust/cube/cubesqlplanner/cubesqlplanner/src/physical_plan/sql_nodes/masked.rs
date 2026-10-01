@@ -22,7 +22,7 @@ pub struct MaskedSqlNode {
     // row-level measure whose mask has dependencies — deferred by the
     // final-chain node — is still masked when its raw SQL is rendered.
     row_level_semantics: bool,
-    // Full names of the members present in the query GROUP BY. Used to decide
+    // Ids of the members present in the query GROUP BY. Used to decide
     // whether conditional masking can be applied to an aggregate measure.
     group_by_members: HashSet<MemberId>,
     // When true this node never applies masking and just delegates to `input`.

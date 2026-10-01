@@ -59,3 +59,23 @@ fn filter_on_a_dimension_through_a_join_path_is_a_dimension_filter() {
     );
     assert!(props.measures_filters().is_empty());
 }
+
+#[test]
+fn filter_on_a_cube_is_an_error() {
+    let error = ctx()
+        .create_query_properties(indoc! {"
+            measures:
+              - orders.count
+            filters:
+              - member: orders.__sql_fn
+                operator: set
+        "})
+        .err()
+        .expect("a filter on a cube must not compile");
+
+    assert!(
+        error.message.contains("is not a member"),
+        "{}",
+        error.message
+    );
+}

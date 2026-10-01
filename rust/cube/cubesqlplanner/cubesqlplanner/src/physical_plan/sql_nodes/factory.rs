@@ -32,7 +32,7 @@ pub struct SqlNodesFactory {
     cube_name_references: HashMap<CubeId, String>,
     use_local_tz_in_date_range: bool,
     original_sql_pre_aggregations: HashMap<CubeId, String>,
-    // Full names of the members present in the query GROUP BY. Used by
+    // Ids of the members present in the query GROUP BY. Used by
     // MaskedSqlNode to decide whether conditional masking can be applied to an
     // aggregate measure.
     group_by_members: HashSet<MemberId>,

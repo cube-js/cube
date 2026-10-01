@@ -1679,10 +1679,8 @@ fn multi_stage_filter_directive(member: &Rc<MemberSymbol>) -> Option<MultiStageF
 //    restricts the switch dimension, case branches are pruned at symbol
 //    level; the subsequent `mode: fixed` reset cannot un-prune them.
 //
-// `add_dimension_evaluator` wraps segment references into a `MemberExpression`
-// with an expression id (`expr:orders.completed`), while a `BaseSegment` carries
-// the plain member id (`orders.completed`). To make `exclude`/`keep_only` match
-// both forms, return the symbol's id alongside the member it is named after.
+// Segment references compile to an `expr:` id while a `BaseSegment` keeps the
+// plain member id; `exclude`/`keep_only` must match both.
 fn filter_directive_match_ids(symbol: &Rc<MemberSymbol>) -> Vec<MemberId> {
     let id = symbol.id().clone();
     if let Some(named) = id.named_member() {

@@ -451,7 +451,7 @@ impl MeasureSymbolFactory {
         path: SymbolPath,
         cube_evaluator: Rc<dyn CubeEvaluator>,
     ) -> Result<Self, CubeError> {
-        let definition = cube_evaluator.measure_by_path(path.member_id().target_path())?;
+        let definition = cube_evaluator.measure_by_path(path.member_id()?.target_path())?;
         let sql = definition.sql()?;
         let mask_sql = definition.mask_sql()?;
         Ok(Self {
@@ -555,7 +555,7 @@ impl SymbolFactory for MeasureSymbolFactory {
             let cube_symbol = compiler.add_cube_table_evaluator(path.cube_id().clone(), vec![])?;
             let compiled_path = CompiledMemberPath::new(
                 cube_symbol,
-                path.member_id(),
+                path.member_id()?,
                 path.symbol_name().clone(),
                 alias,
                 path.path().clone(),
@@ -713,7 +713,7 @@ impl SymbolFactory for MeasureSymbolFactory {
 
         let compiled_path = CompiledMemberPath::new(
             cube_symbol,
-            path.member_id(),
+            path.member_id()?,
             path.symbol_name().clone(),
             alias,
             path.path().clone(),

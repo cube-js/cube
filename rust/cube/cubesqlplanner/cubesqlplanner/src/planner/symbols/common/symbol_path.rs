@@ -209,15 +209,23 @@ impl SymbolPath {
         if self.symbol_name.is_empty() {
             self.cube_id.to_string()
         } else {
-            self.member_id().full_name().clone()
+            format!("{}.{}", self.cube_id, self.symbol_name)
         }
     }
 
     /// Identity of the member this path resolves to. Only a dimension,
     /// measure or segment path names a member.
-    pub fn member_id(&self) -> MemberId {
-        debug_assert!(!self.symbol_name.is_empty(), "a cube path names no member");
-        MemberId::member(self.cube_id.clone(), self.symbol_name.clone())
+    pub fn member_id(&self) -> Result<MemberId, CubeError> {
+        if self.symbol_name.is_empty() {
+            return Err(CubeError::user(format!(
+                "Cube `{}` is not a member",
+                self.cube_id
+            )));
+        }
+        Ok(MemberId::member(
+            self.cube_id.clone(),
+            self.symbol_name.clone(),
+        ))
     }
 
     pub fn cache_name(&self) -> String {

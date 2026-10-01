@@ -226,7 +226,7 @@ impl Compiler {
         let full_name = path.full_name();
         let definition = self
             .cube_evaluator
-            .segment_by_path(path.member_id().target_path())?;
+            .segment_by_path(path.member_id()?.target_path())?;
         let sql_call = self.resolve_nested(&path, |compiler| {
             compiler.compile_sql_call(path.cube_id(), definition.sql()?)
         })?;
