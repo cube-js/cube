@@ -3,6 +3,22 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.7.48](https://github.com/cube-js/cube/compare/v1.7.47...v1.7.48) (2026-10-01)
+
+### Bug Fixes
+
+- **cubesql:** Keep date filters past 2262-04-11 from aborting the planner ([#11978](https://github.com/cube-js/cube/issues/11978)) ([fd07cc2](https://github.com/cube-js/cube/commit/fd07cc24df08794b5f8b79898005f0d3c21f75f6))
+- **cubesql:** render MSSQL booleans in scalar and predicate contexts ([#11827](https://github.com/cube-js/cube/issues/11827)) ([227cbe2](https://github.com/cube-js/cube/commit/227cbe26ba8e203cb1059cb097dc812fb76d3259)), closes [#11826](https://github.com/cube-js/cube/issues/11826)
+- **tesseract:** Keep query-level join hints while matching pre-aggregations ([#11858](https://github.com/cube-js/cube/issues/11858)) ([8088554](https://github.com/cube-js/cube/commit/8088554d3a53b3331ae97767b2ffe8482e0d4836))
+
+### Features
+
+- **schema-compiler:** require includes or excludes in accessPolicy memberLevel ([#11934](https://github.com/cube-js/cube/issues/11934)) ([b42a9c2](https://github.com/cube-js/cube/commit/b42a9c2a2a4e0014226d88355af313f533220336)), closes [#11629](https://github.com/cube-js/cube/issues/11629)
+
+### Performance Improvements
+
+- **schema-compiler:** Share compile state across tenants with CUBEJS_COMPILER_MULTI_TENANT_SHARING ([#12049](https://github.com/cube-js/cube/issues/12049)) ([a62e704](https://github.com/cube-js/cube/commit/a62e70488b3a67cbec204fa58711cc7e938ad9d9))
+
 ## [1.7.47](https://github.com/cube-js/cube/compare/v1.7.46...v1.7.47) (2026-09-29)
 
 ### Bug Fixes

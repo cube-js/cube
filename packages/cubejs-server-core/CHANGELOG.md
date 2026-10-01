@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.7.48](https://github.com/cube-js/cube/compare/v1.7.47...v1.7.48) (2026-10-01)
+
+### Performance Improvements
+
+- **schema-compiler:** Share compile state across tenants with CUBEJS_COMPILER_MULTI_TENANT_SHARING ([#12049](https://github.com/cube-js/cube/issues/12049)) ([a62e704](https://github.com/cube-js/cube/commit/a62e70488b3a67cbec204fa58711cc7e938ad9d9))
+
 ## [1.7.47](https://github.com/cube-js/cube/compare/v1.7.46...v1.7.47) (2026-09-29)
 
 ### Features

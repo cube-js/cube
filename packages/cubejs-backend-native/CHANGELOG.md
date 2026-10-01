@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.7.48](https://github.com/cube-js/cube/compare/v1.7.47...v1.7.48) (2026-10-01)
+
+### Bug Fixes
+
+- **cubesql:** Keep date filters past 2262-04-11 from aborting the planner ([#11978](https://github.com/cube-js/cube/issues/11978)) ([fd07cc2](https://github.com/cube-js/cube/commit/fd07cc24df08794b5f8b79898005f0d3c21f75f6))
+
 ## [1.7.47](https://github.com/cube-js/cube/compare/v1.7.46...v1.7.47) (2026-09-29)
 
 ### Bug Fixes
