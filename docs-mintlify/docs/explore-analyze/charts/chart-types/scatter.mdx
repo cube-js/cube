@@ -5,6 +5,8 @@ description: Plot two measures against each other to find correlations, clusters
 
 Scatter charts plot individual data points using two measures as X and Y coordinates. Use them to explore relationships between measures, identify clusters, and spot outliers across a population of entities.
 
+A scatter chart uses the same Fields and Style tabs as bar, line, and area charts. It is a point chart with a measure on the X axis.
+
 ## Variants
 
 ### Basic scatter
@@ -15,21 +17,53 @@ Two measures on the X and Y axes. Each row in your result set becomes one point.
 
 ### With color grouping
 
-Map a dimension to the **Color** channel to assign each point a color by category. Use this to compare how different groups distribute across the same two measures.
+Pick a dimension in **Break down by** for a measure to assign each point a color by category. Use this to compare how different groups distribute across the same two measures.
 
 {/* Screenshot: scatter chart — same axes, points colored by traffic source (4–5 colors). Place directly below this heading, full-width. (hidden — replace this comment with <Frame><img src="..." /></Frame> when image is ready) */}
 
 ### With size encoding
 
-Map a third numeric measure to the **Size** channel to scale each point's radius by value. Use this to encode a third variable without adding a new axis.
+Pick a third measure in the **Size** section to scale each point's radius by value. Use this to encode a third variable without adding a new axis.
 
 {/* Screenshot: scatter chart with sized and colored points — average order value (X), return rate (Y), total revenue as size, colored by category. Place directly below this heading, full-width. (hidden — replace this comment with <Frame><img src="..." /></Frame> when image is ready) */}
 
-## Size encoding
+### Multiple measures
 
-Assign a measure to the **Size** channel in the Fields tab. Points scale proportionally to the measure value. Configure the minimum and maximum radius in the Style tab.
+Add more measures to plot several point clouds against one shared X axis. Each measure gets its own color and shape. Put a measure on the **Left** or **Right** Y axis to plot it on its own scale.
 
-{/* Screenshot: Fields tab with Size channel assigned — showing the size field token. Place inline, 50% width, right-aligned. (hidden — replace this comment with <Frame><img src="..." /></Frame> when image is ready) */}
+## Fields tab
+
+To build a scatter chart, pick a measure in the **Other member** section. This section holds the X axis on bar, line, and area charts too. Then pick the Y measures in the **Measure** sections.
+
+With a measure on X, the Fields tab changes:
+
+- The **Mark** dropdown of each measure is fixed at **Point**. Bar, line, and area marks are not available.
+- Orientation, **Sort**, and **Time unit** are hidden.
+- The **Points** and **Size** sections appear.
+
+If you put a dimension back on X, the measures stay as points. You can change their mark again.
+
+{/* Screenshot: Fields tab with a measure in Other member — Measure section with the Mark dropdown disabled at Point, Points and Size sections. Place inline, 50% width, right-aligned. (hidden — replace this comment with <Frame><img src="..." /></Frame> when image is ready) */}
+
+### Points
+
+**One point per** sets what each point stands for. The default is **Each row**: the chart draws one point per row of the query result. To draw one point per value of a dimension instead, pick one or more dimensions. The chart then aggregates the measures for each combination of the picked values.
+
+### Size
+
+Pick a measure in the **Size** section to scale each point's radius by its value. The size measure is added to the tooltip automatically. Clear the selection to draw all points at one size.
+
+## Style tab
+
+| Section | Settings |
+|---|---|
+| **X-Axis** | With a measure on X, the same settings as the Y axis: log scale, **Min / Max**, and label format. See [Axes](/docs/explore-analyze/charts/configuration/axes). |
+| Per-measure chip row | **Shape** of the points (circle, square, triangle, or **Auto**) and **Trend line**. |
+| **Size** | Appears only when a size measure is picked. Toggle the size legend and set **Radius min** and **Radius max** in pixels. The smallest value is drawn at **Radius min**, the largest at **Radius max**. |
+
+{/* Screenshot: Style tab Size section — legend toggle, Radius min and Radius max inputs. Place inline, 50% width, right-aligned. (hidden — replace this comment with <Frame><img src="..." /></Frame> when image is ready) */}
+
+A log scale is not available on an axis that has a zero or a negative value.
 
 ## Tooltips
 
