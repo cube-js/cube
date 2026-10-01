@@ -1,5 +1,5 @@
 import { v4 as uuidv4 } from 'uuid';
-import { isValidRequestId, REQUEST_ID_MAX_LENGTH } from '@cubejs-backend/shared';
+import { isValidRequestId, INVALID_REQUEST_ID_MESSAGE } from '@cubejs-backend/shared';
 
 import { UserError } from './user-error';
 import type { Request, Response } from 'express';
@@ -19,9 +19,7 @@ function parseRequestIdHeader(value: string): string {
   // commas are never valid in an id, so the first value is the client's
   const requestId = value.split(',')[0].trim();
   if (!isValidRequestId(requestId)) {
-    throw new UserError(
-      `Request id must be at most ${REQUEST_ID_MAX_LENGTH} characters from A-Z, a-z, 0-9, '+', '/', '=', '.', '_', ':' and '-'`
-    );
+    throw new UserError(INVALID_REQUEST_ID_MESSAGE);
   }
 
   return requestId;
