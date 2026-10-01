@@ -42,6 +42,14 @@ jobs:
       # the payload is the caller's issue_comment, whose issue is the PR.
       ADDITIONAL_ALLOWED_TOOLS: ${{ contains(fromJSON('["OWNER", "MEMBER", "COLLABORATOR"]'), github.event.pull_request.author_association || github.event.issue.author_association) && ',Bash(docker:*),Bash(psql:*)' || '' }}
     steps:
+      # Cube is public OSS, so runner time is free for us, but Anthropic models
+      # are too expensive to spend on a review that gets cancelled halfway.
+      # Sleeping first lets a follow-up push cancel this run before any tokens
+      # are spent.
+      - name: Debounce pushes
+        if: github.event.action == 'synchronize'
+        run: sleep 90
+
       - name: React to trigger comment
         # Quick ACK so the user who typed /bot-review or /bot-deep-review sees
         # the bot picked up the command — actual review takes a few minutes.
