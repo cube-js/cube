@@ -163,11 +163,22 @@ Please [track this issue](https://github.com/cube-js/cube/issues/6373).
 If you have created a [user-defined function][link-sql-udf] (UDF) in your data
 source, you can use it in the `sql` parameter as well.
 
-### Case sensitivity
+### Case sensitivity and reserved keywords
 
-If your database uses case-sensitive identifiers, make sure to properly
-quote table and column names. For example, here's how you can reference
-a Postgres table that contains uppercase letters in its name:
+Quote a table or column name in your SQL snippets when your database would
+otherwise misread it:
+
+- **Case-sensitive identifiers:** many databases fold unquoted names to lower
+  case (Postgres) or upper case (Snowflake), so a name with mixed case must be
+  quoted to keep it.
+- **Reserved keywords:** a column named like a SQL keyword, such as `order`,
+  `user`, `group` or `date`, fails to parse unquoted.
+- **Special characters:** names with spaces, dashes or other punctuation.
+
+Use your database's quoting syntax: double quotes in most databases (Postgres,
+Snowflake, Redshift, Oracle), backticks in MySQL, BigQuery and Databricks, and
+square brackets in SQL Server. For example, here's how you can reference a
+Postgres table that contains uppercase letters in its name:
 
 <CodeGroup>
 
@@ -180,6 +191,36 @@ cubes:
 ```javascript title="JavaScript"
 cube(`orders`, {
   sql_table: `public."Orders"`
+})
+```
+
+</CodeGroup>
+
+And here's a dimension over a column named `order`, a reserved keyword:
+
+<CodeGroup>
+
+```yaml title="YAML"
+cubes:
+  - name: orders
+    sql_table: 'public."Orders"'
+
+    dimensions:
+      - name: order_number
+        sql: '"order"'
+        type: number
+```
+
+```javascript title="JavaScript"
+cube(`orders`, {
+  sql_table: `public."Orders"`,
+
+  dimensions: {
+    order_number: {
+      sql: `"order"`,
+      type: `number`
+    }
+  }
 })
 ```
 

@@ -420,12 +420,24 @@ measures:
 <Warning>
 
 `grain` fixes the inner grain of the measure it's declared on and does not
-expose the added dimension to a measure built on top of it. If each input
-measure declares the same `grain.include` (rather than the combining measure),
-the inputs no longer carry a shared grouping key, so they are combined with a
-cross join instead of being joined on that key — producing incorrect results.
-Declare `grain` on the combining measure so its inputs are joined on the shared
-grain.
+expose the added dimension to a measure built on top of it. If two or more
+inputs of a combining measure declare the same `grain.include` and the
+combining measure doesn't, the inputs no longer carry a shared grouping key, so
+they are combined with a cross join instead of being joined on that key —
+producing incorrect results without an error. Declare `grain` on the combining
+measure so its inputs are joined on the shared grain.
+
+Declaring `grain` on an input is still right when:
+
+- **The inputs are meant to differ in grain**, e.g., a percent of total, where
+  the denominator keeps only a coarser dimension (see
+  [Percent of total](#percent-of-total-fixed-dimension)).
+- **The measure has a single input**, like `avg_customer_order_value` above.
+- **Nesting goes one level finer**, e.g., an average per month of a per-day
+  aggregate: each level declares its own grain.
+- **The input is also queried on its own** and needs its grain there. If it's
+  also combined with another input of the same grain, declare that grain on the
+  combining measure too.
 
 </Warning>
 
