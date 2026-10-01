@@ -19,6 +19,8 @@ import {
   getRealType,
   hasPreAggregationsEnvVars,
   internalExceptions,
+  INVALID_REQUEST_ID_MESSAGE,
+  isValidRequestId,
   pinPreAggregationsSchema,
   releasePreAggregationsSchemaPin,
   track,
@@ -911,6 +913,13 @@ export class CubejsServerCore {
           this.warningBackgroundContextShow = false;
         }
       }
+    }
+
+    // Comes from server config, so only warn: rejecting it would stop the tenant's refresh
+    if (result?.requestId && !isValidRequestId(result.requestId)) {
+      this.logger('Refresh Scheduler Warning', {
+        warning: `Invalid requestId ${JSON.stringify(result.requestId)} in scheduled refresh context. ${INVALID_REQUEST_ID_MESSAGE}`,
+      });
     }
 
     return result;

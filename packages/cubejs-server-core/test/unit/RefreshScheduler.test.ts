@@ -1145,7 +1145,7 @@ describe('Refresh Scheduler', () => {
       await refreshScheduler.runScheduledRefresh({
         securityContext: undefined,
         authInfo: null,
-        requestId: 'Empty security context'
+        requestId: 'empty-security-context'
       }, {
         concurrency: 1,
         workerIndices: [0],
@@ -1154,12 +1154,31 @@ describe('Refresh Scheduler', () => {
     await refreshScheduler.runScheduledRefresh({
       securityContext: undefined,
       authInfo: null,
-      requestId: 'Empty security context'
+      requestId: 'empty-security-context'
     }, {
       concurrency: 1,
       workerIndices: [0],
       throwErrors: true
     });
+  });
+
+  test('Invalid requestId in context only warns', async () => {
+    const { serverCore } = setupScheduler({
+      repository: repositoryWithoutPreAggregations,
+      skipAssertSecurityContext: true,
+    });
+    const logger = jest.spyOn(serverCore, 'logger');
+    // Not in UserBackgroundContext, but JS configs pass it and it reaches the scheduler
+    const ctx = { securityContext: {}, requestId: 'tenant 1' };
+
+    await serverCore.runScheduledRefresh(ctx, { concurrency: 1, workerIndices: [0], throwErrors: true });
+
+    expect(logger).toHaveBeenCalledWith('Refresh Scheduler Warning', expect.objectContaining({
+      warning: expect.stringContaining('"tenant 1"'),
+    }));
+    expect(logger).toHaveBeenCalledWith('Refresh Scheduler Run', expect.objectContaining({
+      requestId: 'scheduler-tenant 1',
+    }));
   });
 
   test('rollupJoin scheduledRefresh', async () => {
@@ -1289,7 +1308,7 @@ describe('Refresh Scheduler', () => {
   });
 
   describe('Local refresh key', () => {
-    const ctx = { authInfo: { tenantId: 'tenant1' }, securityContext: { tenantId: 'tenant1' }, requestId: 'local refresh key' };
+    const ctx = { authInfo: { tenantId: 'tenant1' }, securityContext: { tenantId: 'tenant1' }, requestId: 'local-refresh-key' };
 
     const runRefresh = async (refreshKeyRenewalThreshold?: number) => {
       const { refreshScheduler, mockDriver, serverCore, compilerApi } = setupScheduler({
