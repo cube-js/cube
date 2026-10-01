@@ -78,7 +78,8 @@ What happens after connecting depends on the deploy mode:
 authenticate with an API key rather than the deploy token — set `CUBE_API_URL`
 and `CUBE_API_KEY` (or run `cube login --api-key <KEY> --url <URL>`), then run
 `cube deploy <deployment-id> --directory .` (find the id with
-`cube deployments list`).
+`cube deployments list`). To silence the deprecation warning `cubejs-cli`
+prints to stderr, set `CUBEJS_CLI_NO_DEPRECATION_WARNING=true`.
 
 </Warning>
 
