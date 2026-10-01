@@ -169,10 +169,11 @@ Quote a table or column name in your SQL snippets when your database would
 otherwise misread it:
 
 - **Case-sensitive identifiers:** many databases fold unquoted names to lower
-  case (Postgres) or upper case (Snowflake), so a name with mixed case must be
-  quoted to keep it.
-- **Reserved keywords:** a column named like a SQL keyword, such as `order`,
-  `user`, `group` or `date`, fails to parse unquoted.
+  case (Postgres) or upper case (Snowflake), so a name stored in a different
+  case must be quoted to keep it.
+- **Reserved keywords:** a column named like a SQL keyword, such as `order` or
+  `group`, fails to parse unquoted. Some, like `user` in Postgres, parse but
+  silently return something else (the current user).
 - **Special characters:** names with spaces, dashes or other punctuation.
 
 Use your database's quoting syntax: double quotes in most databases (Postgres,

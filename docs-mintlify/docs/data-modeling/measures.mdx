@@ -432,7 +432,8 @@ Declaring `grain` on an input is still right when:
 - **The inputs are meant to differ in grain**, e.g., a percent of total, where
   the denominator keeps only a coarser dimension (see
   [Percent of total](#percent-of-total-fixed-dimension)).
-- **The measure has a single input**, like `avg_customer_order_value` above.
+- **The combining measure has a single input**: `grain` on that one input can't
+  cause a cross join.
 - **Nesting goes one level finer**, e.g., an average per month of a per-day
   aggregate: each level declares its own grain.
 - **The input is also queried on its own** and needs its grain there. If it's
