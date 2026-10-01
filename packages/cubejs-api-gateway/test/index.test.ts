@@ -167,6 +167,17 @@ describe('API Gateway', () => {
     expect(res.body && res.body.error).toStrictEqual('Invalid token');
   });
 
+  test('rejects x-request-id with forbidden characters', async () => {
+    const { app } = await createApiGateway();
+
+    const res = await request(app)
+      .get('/cubejs-api/v1/load?query={"measures":["Foo.bar"]}')
+      .set('Authorization', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.e30.t-IDcSemACt8x4iTMCda8Yhe3iZaWbvV5XKSTbuAn0M')
+      .set('x-request-id', 'my request')
+      .expect(400);
+    expect(res.body.error).toContain('Request id must be');
+  });
+
   test('query field is empty', async () => {
     const { app } = await createApiGateway();
 

@@ -1,4 +1,7 @@
 import { v4 as uuidv4 } from 'uuid';
+import { isValidRequestId, REQUEST_ID_MAX_LENGTH } from '@cubejs-backend/shared';
+
+import { UserError } from './user-error';
 import type { Request, Response } from 'express';
 
 interface RequestParserResult {
@@ -12,7 +15,18 @@ interface RequestParserResult {
 }
 
 export function getRequestIdFromRequest(req: Request): string {
-  return req.get('x-request-id') || req.get('traceparent') || `${uuidv4()}-span-1`;
+  const requestId = req.get('x-request-id') || req.get('traceparent');
+  if (!requestId) {
+    return `${uuidv4()}-span-1`;
+  }
+
+  if (!isValidRequestId(requestId)) {
+    throw new UserError(
+      `Request id must be at most ${REQUEST_ID_MAX_LENGTH} characters from A-Z, a-z, 0-9, '+', '/', '=', '.', '_', ':' and '-'`
+    );
+  }
+
+  return requestId;
 }
 
 export function requestParser(req: Request, res: Response) {

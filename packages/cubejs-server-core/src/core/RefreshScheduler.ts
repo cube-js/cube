@@ -2,7 +2,7 @@ import R from 'ramda';
 import pLimit from 'p-limit';
 import { v4 as uuidv4 } from 'uuid';
 import crypto from 'crypto';
-import { Required } from '@cubejs-backend/shared';
+import { Required, isValidRequestId } from '@cubejs-backend/shared';
 import {
   PreAggregationDescription,
   PreAggregationPartitionRangeLoader,
@@ -256,6 +256,10 @@ export class RefreshScheduler {
   }
 
   public async runScheduledRefresh(ctx: RequestContext | null, options: Readonly<ScheduledRefreshOptions>) {
+    if (ctx?.requestId && !isValidRequestId(ctx.requestId)) {
+      throw new Error(`Invalid requestId in scheduled refresh context: ${JSON.stringify(ctx.requestId)}`);
+    }
+
     const context: RequestContext = {
       authInfo: null,
       ...ctx,
