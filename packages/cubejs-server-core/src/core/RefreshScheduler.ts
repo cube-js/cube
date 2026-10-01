@@ -2,7 +2,7 @@ import R from 'ramda';
 import pLimit from 'p-limit';
 import { v4 as uuidv4 } from 'uuid';
 import crypto from 'crypto';
-import { Required, isValidRequestId } from '@cubejs-backend/shared';
+import { Required } from '@cubejs-backend/shared';
 import {
   PreAggregationDescription,
   PreAggregationPartitionRangeLoader,
@@ -256,21 +256,6 @@ export class RefreshScheduler {
   }
 
   public async runScheduledRefresh(ctx: RequestContext | null, options: Readonly<ScheduledRefreshOptions>) {
-    if (ctx?.requestId && !isValidRequestId(ctx.requestId)) {
-      const error = new Error(`Invalid requestId in scheduled refresh context: ${JSON.stringify(ctx.requestId)}`);
-      // Thrown from the refresh timer, this would be an unhandled rejection that kills the process
-      this.serverCore.logger('Refresh Scheduler Error', {
-        error: error.toString(),
-        securityContext: ctx.securityContext,
-      });
-
-      if (options.throwErrors) {
-        throw error;
-      }
-
-      return { finished: false };
-    }
-
     const context: RequestContext = {
       authInfo: null,
       ...ctx,

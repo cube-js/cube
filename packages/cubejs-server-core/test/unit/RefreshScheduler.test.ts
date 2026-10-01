@@ -1162,17 +1162,23 @@ describe('Refresh Scheduler', () => {
     });
   });
 
-  test('Invalid requestId in context', async () => {
-    const { refreshScheduler } = setupScheduler({
+  test('Invalid requestId in context only warns', async () => {
+    const { serverCore } = setupScheduler({
       repository: repositoryWithoutPreAggregations,
       skipAssertSecurityContext: true,
     });
-    const ctx = { securityContext: {}, authInfo: null, requestId: 'tenant 1' };
+    const logger = jest.spyOn(serverCore, 'logger');
+    // Not in UserBackgroundContext, but JS configs pass it and it reaches the scheduler
+    const ctx = { securityContext: {}, requestId: 'tenant 1' };
 
-    await expect(refreshScheduler.runScheduledRefresh(ctx, { concurrency: 1, workerIndices: [0] }))
-      .resolves.toEqual({ finished: false });
-    await expect(refreshScheduler.runScheduledRefresh(ctx, { concurrency: 1, workerIndices: [0], throwErrors: true }))
-      .rejects.toThrow('Invalid requestId in scheduled refresh context');
+    await serverCore.runScheduledRefresh(ctx, { concurrency: 1, workerIndices: [0], throwErrors: true });
+
+    expect(logger).toHaveBeenCalledWith('Refresh Scheduler Warning', expect.objectContaining({
+      warning: expect.stringContaining('"tenant 1"'),
+    }));
+    expect(logger).toHaveBeenCalledWith('Refresh Scheduler Run', expect.objectContaining({
+      requestId: 'scheduler-tenant 1',
+    }));
   });
 
   test('rollupJoin scheduledRefresh', async () => {
