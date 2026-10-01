@@ -434,8 +434,9 @@ Declaring `grain` on an input is still right when:
   [Percent of total](#percent-of-total-fixed-dimension)).
 - **The combining measure has a single input**: `grain` on that one input can't
   cause a cross join.
-- **Nesting goes one level finer**, e.g., an average per month of a per-day
-  aggregate: each level declares its own grain.
+- **Each nesting level adds its own grain**, e.g., an average per month of a
+  per-day aggregate: the inner measure declares the finer grain (day) and the
+  outer one the coarser grain (month).
 - **The input is also queried on its own** and needs its grain there. If it's
   also combined with another input of the same grain, declare that grain on the
   combining measure too.
