@@ -42,7 +42,7 @@ export interface PromiseWithResolve<T = any> extends Promise<T> {
 }
 
 export class LocalQueueDriverConnectionState {
-  public resultPromises: Record<string, PromiseWithResolve> = {};
+  public resultPromises: Record<QueryKeyHash, PromiseWithResolve> = {};
 
   public queryDef: Record<QueryKeyHash, QueryDefObject> = {};
 
@@ -99,40 +99,39 @@ export class LocalQueueDriverConnection implements QueueDriverConnectionInterfac
     ];
   }
 
-  public getResultPromise(resultListKey: string): PromiseWithResolve {
-    if (!this.state.resultPromises[resultListKey]) {
+  public getResultPromise(queryKeyHash: QueryKeyHash): PromiseWithResolve {
+    if (!this.state.resultPromises[queryKeyHash]) {
       let resolveMethod: ((value: any) => void) | undefined;
-      this.state.resultPromises[resultListKey] = new Promise(resolve => {
+      this.state.resultPromises[queryKeyHash] = new Promise(resolve => {
         resolveMethod = resolve;
       }) as PromiseWithResolve;
-      this.state.resultPromises[resultListKey].resolve = resolveMethod;
+      this.state.resultPromises[queryKeyHash].resolve = resolveMethod;
     }
 
-    return this.state.resultPromises[resultListKey];
+    return this.state.resultPromises[queryKeyHash];
   }
 
   public async getResultBlocking(queryKeyHash: QueryKeyHash, _queueId?: QueueId): Promise<any> {
-    const resultListKey = this.resultListKey(queryKeyHash);
-    if (!this.state.queryDef[queryKeyHash] && !this.state.resultPromises[resultListKey]) {
+    if (!this.state.queryDef[queryKeyHash] && !this.state.resultPromises[queryKeyHash]) {
       return null;
     }
     const timeoutPromise = (timeout: number) => new Promise((resolve) => setTimeout(() => resolve(null), timeout));
 
     const res = await Promise.race([
-      this.getResultPromise(resultListKey),
+      this.getResultPromise(queryKeyHash),
       timeoutPromise(this.continueWaitTimeout * 1000),
     ]);
 
     if (res) {
-      delete this.state.resultPromises[resultListKey];
+      delete this.state.resultPromises[queryKeyHash];
     }
     return res;
   }
 
   public async getResult(queryKey: QueryKey, _externalId?: string): Promise<any> {
-    const resultListKey = this.resultListKey(queryKey);
-    if (this.state.resultPromises[resultListKey] && this.state.resultPromises[resultListKey].resolved) {
-      return this.getResultBlocking(this.redisHash(queryKey));
+    const queryKeyHash = this.redisHash(queryKey);
+    if (this.state.resultPromises[queryKeyHash] && this.state.resultPromises[queryKeyHash].resolved) {
+      return this.getResultBlocking(queryKeyHash);
     }
 
     return null;
@@ -230,7 +229,7 @@ export class LocalQueueDriverConnection implements QueueDriverConnectionInterfac
       return false;
     }
 
-    const promise = this.getResultPromise(this.resultListKey(queryKeyHash));
+    const promise = this.getResultPromise(queryKeyHash);
 
     delete this.state.active[queryKeyHash];
     delete this.state.heartBeat[queryKeyHash];
@@ -309,10 +308,6 @@ export class LocalQueueDriverConnection implements QueueDriverConnectionInterfac
 
   public queryRedisKey(queryKey: QueryKey, suffix: string): string {
     return `${this.redisQueuePrefix}_${this.redisHash(queryKey)}_${suffix}`;
-  }
-
-  public resultListKey(queryKey: QueryKey | QueryKeyHash): string {
-    return this.queryRedisKey(queryKey, 'RESULT');
   }
 
   public redisHash(queryKey: QueryKey): QueryKeyHash {
