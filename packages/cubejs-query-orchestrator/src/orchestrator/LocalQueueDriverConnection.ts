@@ -438,7 +438,6 @@ export class LocalQueueDriverConnection implements QueueDriverConnectionInterfac
 
   public async updateHeartBeat(queryKeyHash: QueryKeyHash, queueId?: QueueId | null): Promise<void> {
     const item = this.resolveItem(queryKeyHash, queueId);
-    // Succeeds silently for an unknown key
     if (item) {
       item.heartbeat = Date.now();
     }
