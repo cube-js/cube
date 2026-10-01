@@ -50,7 +50,9 @@ jobs:
         with:
           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
 
-      # Same encrypted upload as in claude-code-review.yml.
+      # Artifacts of a public repo are downloadable by any GitHub user, so the
+      # transcript is encrypted to an age key held by the Cube team. Decrypt with
+      # `age -d -i <key> claude-execution.json.gz.age | gunzip`.
       - name: Encrypt execution log
         if: always() && steps.claude.outputs.execution_file != ''
         env:
