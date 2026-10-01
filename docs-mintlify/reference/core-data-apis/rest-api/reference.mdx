@@ -1008,7 +1008,7 @@ Request body:
 | --- | --- | --- | --- |
 | `cubes` | `array` | Array of cube names to retrieve | No |
 | `views` | `array` | Array of view names to retrieve | No |
-| `include_private` | `boolean` | Set to `true` to include [private cubes, views, and members](#private-cubes-and-members). Requires the `meta-private` scope. Can also be passed as a query parameter. Defaults to `false` | No |
+| `include_private` | `boolean` | Set to `true` to include [private cubes, views, and members](#private-cubes-and-members). Requires the `meta-private` scope. Defaults to `false` | No |
 
 Query parameters:
 
@@ -1016,6 +1016,7 @@ Query parameters:
 | --- | --- | --- |
 | `offset` | Pagination offset. Defaults to `0` | No |
 | `limit` | Maximum number of items to return. Defaults to all items | No |
+| `include_private` | Same as the `include_private` request body property, which takes precedence when both are set | No |
 
 If neither `cubes` nor `views` is provided, all cubes and views are returned.
 
@@ -1189,7 +1190,11 @@ Metadata API returns, though not necessarily in the same response.
 
 Data catalogs and lineage tools that need the complete data model can set
 `include_private` to `true`. This requires a token with the `meta-private` scope
-as well as `meta`; without it, the request fails with `403`. Private cubes,
+as well as `meta`; without it, the request fails with `403`. To get such a token,
+call the Control Plane API's [token endpoint][ref-cpa-create-token] with
+`"scopes": ["meta", "meta-private"]`. The scope is granted only to callers who can
+edit the deployment and have the `SchemaRead` ([View data model][ref-custom-roles])
+permission on it; tokens from `tokens-for-meta-sync` carry only `meta`. Private cubes,
 views, and members are then returned with their full definitions and `public`
 set to `false`, and a view's `table_references` and `column_references` include
 the tables and columns it reads through private cubes.
@@ -1308,6 +1313,8 @@ Keep-Alive: timeout=5
 [ref-measures-public]: /reference/data-modeling/measures#public
 [ref-dimensions-public]: /reference/data-modeling/dimensions#public
 [ref-dap]: /docs/data-modeling/data-access-policies
+[ref-cpa-create-token]: /api-reference/environments/create-deployment-environment-token
+[ref-custom-roles]: /admin/users-and-permissions/custom-roles
 [ref-env-db-name]: /reference/configuration/environment-variables#cubejs_db_name
 [ref-env-db-schema]: /reference/configuration/environment-variables#cubejs_db_schema
 [ref-env-bq-project-id]: /reference/configuration/environment-variables#cubejs_db_bq_project_id
