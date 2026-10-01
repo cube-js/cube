@@ -50,10 +50,10 @@ export interface LocalQueueItem {
   created: number;
   heartbeat: number | null;
   /**
-   * Absolute deadline in ms, not a duration. Overrides the driver level orphanedTimeout
-   * option, which is what null falls back to.
+   * Absolute deadline in ms, not a duration. Pushed forward by every addToQueue of the same
+   * key, so a query somebody is still waiting for doesn't get orphaned behind a long backlog.
    */
-  orphaned: number | null;
+  orphaned: number;
   payload: QueryDefObject;
   /**
    * Written only by optimisticQueryUpdate, kept out of the payload so that a concurrent
@@ -286,6 +286,8 @@ export class LocalQueueDriverConnection implements QueueDriverConnectionInterfac
     // query that is already queued instead of on an id that will never be acked.
     const existing = this.state.items.getByKey(key);
     if (existing) {
+      existing.orphaned = this.orphanedDeadline(Date.now(), options);
+
       return [
         0,
         existing.id,
@@ -305,8 +307,7 @@ export class LocalQueueDriverConnection implements QueueDriverConnectionInterfac
       priority,
       created,
       heartbeat: null,
-      // options.orphanedTimeout is in seconds
-      orphaned: options.orphanedTimeout ? created + options.orphanedTimeout * 1000 : null,
+      orphaned: this.orphanedDeadline(created, options),
       payload: {
         queueId: id,
         queryHandler,
@@ -379,11 +380,14 @@ export class LocalQueueDriverConnection implements QueueDriverConnectionInterfac
    * The orphaned timeout only ever applies to pending items, never to ones being executed.
    */
   protected isOrphaned(item: LocalQueueItem, now: number): boolean {
-    if (item.orphaned !== null) {
-      return item.orphaned < now;
-    }
+    return item.orphaned < now;
+  }
 
-    return now - item.created > this.orphanedTimeout * 1000;
+  /**
+   * options.orphanedTimeout is in seconds and overrides the driver level one.
+   */
+  protected orphanedDeadline(now: number, options: AddToQueueOptions): number {
+    return now + (options.orphanedTimeout ?? this.orphanedTimeout) * 1000;
   }
 
   /**

@@ -916,6 +916,25 @@ export const QueryQueueTest = (name: string, options: QueryQueueTestOptions) => 
         });
       });
 
+      // Cube Store keeps the deadline of the first add
+      onlyLocalTest('re-adding a pending query extends its orphaned deadline', async () => {
+        await withConnections(1, async (connection) => {
+          const key: QueryKey = ['orphaned-extended', []];
+          const hash = connection.redisHash(key);
+
+          await addQuery(connection, key, 'orphaned-extended-1', 1);
+          await pausePromise(700);
+          await addQuery(connection, key, 'orphaned-extended-2', 1);
+          await pausePromise(700);
+          expect(await connection.getOrphanedQueries()).toEqual([]);
+
+          await pausePromise(500);
+          expect(await connection.getOrphanedQueries()).toEqual([[hash, expect.any(Number)]]);
+
+          return [key];
+        });
+      });
+
       test('getQueriesToCancel reports each item once', async () => {
         await withConnections(1, async (connection) => {
           const key: QueryKey = ['cancel-once', []];
