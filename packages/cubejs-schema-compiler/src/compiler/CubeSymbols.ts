@@ -1115,9 +1115,12 @@ export class CubeSymbols implements TranspilerSymbolResolver, CompilerInterface 
       const sql = new Function(path[0], `return \`\${${memberRef.member}}\`;`);
       let memberDefinition;
       const propagatedCurrency = memberRef.override?.currency || resolvedMember.currency;
+      // `included` marks a member the view re-exports from `includes`, as opposed
+      // to one declared in the view's own `measures` / `dimensions`.
       if (type === 'measures') {
         memberDefinition = {
           sql,
+          included: true,
           type: CubeSymbols.toMemberDataType(resolvedMember.type),
           aggType: resolvedMember.type,
           meta: memberRef.override?.meta || resolvedMember.meta,
@@ -1135,6 +1138,7 @@ export class CubeSymbols implements TranspilerSymbolResolver, CompilerInterface 
       } else if (type === 'dimensions') {
         memberDefinition = {
           sql,
+          included: true,
           type: resolvedMember.type,
           meta: memberRef.override?.meta || resolvedMember.meta,
           title: memberRef.override?.title || resolvedMember.title,

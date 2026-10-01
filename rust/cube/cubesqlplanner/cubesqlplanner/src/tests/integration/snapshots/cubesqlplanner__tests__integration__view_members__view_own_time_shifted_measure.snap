@@ -1,0 +1,8 @@
+---
+source: cubesqlplanner/cubesqlplanner/src/tests/integration/view_members.rs
+expression: result
+---
+orders_view__created_at_year | orders_view__total_amount | orders_view__total_amount_prior_year
+-----------------------------+---------------------------+-------------------------------------
+2025-01-01 00:00:00          | 1375.00                   | NULL                                
+2026-01-01 00:00:00          | NULL                      | 1375.00

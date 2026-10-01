@@ -38,7 +38,7 @@ impl TraversalVisitor for CalcGroupDimsCollector {
             }
             MemberSymbol::TimeDimension(e) => return self.on_node_traverse(e.base_symbol(), &()),
             MemberSymbol::Measure(_) => {}
-            MemberSymbol::MemberExpression(_) => {}
+            MemberSymbol::MemberExpression(_) | MemberSymbol::Ref(_) => {}
         };
         Ok(Some(()))
     }

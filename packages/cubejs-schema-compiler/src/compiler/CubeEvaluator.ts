@@ -82,6 +82,7 @@ export type DimensionDefinition = {
   sql(): string;
   primaryKey?: true;
   ownedByCube: boolean;
+  included?: boolean;
   fieldType?: string;
   multiStage?: boolean;
   shiftInterval?: string;
@@ -113,6 +114,7 @@ export type MeasureDefinition = {
   aggType?: string,
   sql(): string;
   ownedByCube: boolean;
+  included?: boolean;
   rollingWindow?: any
   filters?: any
   filter?: MultiStageFilterDirective;

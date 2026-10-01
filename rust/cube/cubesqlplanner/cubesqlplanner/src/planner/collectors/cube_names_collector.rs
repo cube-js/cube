@@ -55,7 +55,7 @@ impl TraversalVisitor for CubeNamesCollector {
                     }
                 }
             }
-            MemberSymbol::MemberExpression(_) => {}
+            MemberSymbol::MemberExpression(_) | MemberSymbol::Ref(_) => {}
         };
         Ok(Some(()))
     }

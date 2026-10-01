@@ -19,6 +19,7 @@ mod member_expressions_on_views;
 mod multi_stage_depth;
 mod no_query_tools_leak;
 mod positional_params;
+mod ref_symbol;
 mod string_measures;
 mod subquery_dimensions;
 mod symbol_transforms;

@@ -51,7 +51,7 @@ fn test_view_dimension_has_underlying_path() {
 
     // orders_with_customer.name → join_path: orders.customers
     let dim = ctx.create_dimension("orders_with_customer.name").unwrap();
-    assert!(dim.as_dimension().unwrap().is_view());
+    assert!(dim.as_ref_symbol().is_ok());
     assert_eq!(dim.path(), &vec!["orders_with_customer".to_string()]);
 
     let deps = dep_paths(&dim);
@@ -69,7 +69,7 @@ fn test_many_to_one_view_child_has_underlying_path() {
 
     // many_to_one_view.child_dim → join_path: many_to_one_root.many_to_one_child
     let dim = ctx.create_dimension("many_to_one_view.child_dim").unwrap();
-    assert!(dim.as_dimension().unwrap().is_view());
+    assert!(dim.as_ref_symbol().is_ok());
     assert_eq!(dim.path(), &vec!["many_to_one_view".to_string()]);
 
     let deps = dep_paths(&dim);

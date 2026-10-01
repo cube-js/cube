@@ -219,10 +219,16 @@ impl SqlNodesFactory {
             };
         let default_processor: Rc<dyn SqlNode> = ParenthesizeSqlNode::new(default_processor);
 
+        // A reference renders its target; of its own it only applies its own
+        // mask and parenthesizes the target for its context.
+        let reference_processor: Rc<dyn SqlNode> =
+            ParenthesizeSqlNode::new(evaluate_sql_processor.clone());
+
         let root_node = RootSqlNode::new(
             self.dimension_processor(evaluate_sql_processor.clone()),
             self.time_dimension_processor(ParenthesizeSqlNode::new(evaluate_sql_processor.clone())),
             measure_processor.clone(),
+            reference_processor,
             default_processor,
         );
         RenderReferencesSqlNode::new(root_node, self.render_references.clone())
