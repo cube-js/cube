@@ -17,7 +17,7 @@ Cube comes with [default roles][ref-default-roles] (Admin, Developer, Explorer, 
 
 Each custom role is built around three concepts:
 
-1. **Base Role** (required) — Viewer, Explorer, or Developer. Determines the user's license tier and the inherited level of access.
+1. **Base Role** (required in the role builder) — Viewer, Explorer, or Developer. Sets that role's license tier — the kind of work it licenses the holder for.
 2. **Global permissions** — org-wide capabilities such as billing, customization, integrations, and account-wide deployment management.
 3. **Deployment permissions** — one or more policies, each targeting "All deployments" or specific deployments.
 
@@ -37,26 +37,25 @@ The role builder uses a two-column layout. The left column (sticky as you scroll
 
 ### Name and description
 
-- **Name** is required and must be unique within the account. The names `Admin`, `Guest`, `Developer`, `None`, and `All` are reserved.
+- **Name** is required and must be unique within the account. The role builder reserves `Admin`, `Guest`, `Developer`, `None`, and `All` — the API reserves a different set, see [Validation](#validation).
 - **Description** is optional but recommended — it shows up alongside the role on the Custom Roles list and on user profile pages.
 
 ### Base Role
 
-Every custom role has exactly one **Base Role**. It determines:
+In the role builder, every custom role has exactly one **Base Role**. It sets that role's **license tier**; the user's tier is the highest Base Role across all of their roles.
 
-- The user's **license tier** — Cube infers the tier from the highest Base Role across all of the user's roles.
-- The **inherited** capabilities the role grants out of the box.
-
-| Base Role  | Description                                                  |
+| Base Role  | What the tier licenses                                       |
 | ---------- | ------------------------------------------------------------ |
-| Viewer     | Read-only access to dashboards and chats.                    |
-| Explorer   | Viewer + create/edit workbooks, run queries.                 |
-| Developer  | Explorer + edit data model, manage deployments.              |
+| Viewer     | Viewing dashboards and chats.                                |
+| Explorer   | Viewer's work, plus creating and editing workbooks and running queries. |
+| Developer  | Explorer's work, plus editing the data model.                |
 
-Inheritance is hierarchical:
+The built-in roles of the same names carry deployment policies of their own. Viewer and Explorer get `DeploymentRead`, `DeploymentAgentRead` and `DownloadData` over every deployment; Developer gets every deployment action, data-model ones included, except **Access chat history**, plus account-wide deployment management as a [Global permission](#global-permissions). A custom role starts with none of it. A role with Base Role **Viewer** and no deployment policy is licensed for viewer-level work and reaches no deployment; a role meant to work like Developer has to grant the deployment actions itself. **Full access** (`All`) is the bulk shortcut, and unlike the built-in Developer it takes chat history as well.
 
-- **Explorer** automatically grants Viewer access.
-- **Developer** automatically grants Explorer and Viewer access.
+The tier is hierarchical, so a higher one satisfies a requirement for a lower:
+
+- **Explorer** meets any Viewer requirement.
+- **Developer** meets any Explorer or Viewer requirement.
 
 {/* TODO: Upload screenshot of Base Role section with all three options visible */}
 
@@ -68,11 +67,11 @@ The Base Role is required. Save is disabled until one is selected.
 
 #### Auto-bump to Developer
 
-If you check any deployment-scoped action stronger than **Access deployment** (`DeploymentRead`) — for example, **Edit deployment** or **Edit data model** — the Base Role is automatically forced to **Developer**, and the Viewer and Explorer options are disabled with a tooltip:
+Four deployment-scoped actions can be checked at every tier: **Access deployment** (`DeploymentRead`), **Access AI agents** (`DeploymentAgentRead`), **Download data** (`DownloadData`) and **Access chat history** (`ChatHistoryRead`). Check any other action — for example **Edit deployment** or **Edit data model** — and the Base Role is automatically forced to **Developer**, with the Viewer and Explorer options disabled behind a tooltip:
 
 > Selected actions require Developer role
 
-Removing the elevated action re-enables the lower tiers. This mirrors the server-side rule that any deployment write or data-model write requires the Developer license tier.
+Removing the elevated action re-enables the lower tiers. This is a rule of the builder, not of the server: nothing rejects a role whose tier is lower than its deployment actions, so a role written [through the API](#managing-roles-through-the-api) keeps whatever tier it was sent with.
 
 {/* TODO: Upload screenshot of the auto-bump state — Viewer originally selected, "Edit deployment" checked, Base Role bumped to Developer with tooltip */}
 
@@ -111,32 +110,29 @@ Either grant **Full access** (a shortcut that enables every current and future d
 
 | Group       | Permission                          | What it grants                                                                                                                                                            |
 | ----------- | ----------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| General     | Access deployment                   | Foundation permission required to access the deployment at all. A Viewer needs this just to open it.                                                                      |
+| General     | Access deployment                   | Foundation permission required to access the deployment at all.                                                                      |
 | General     | Edit deployment                     | Modify general deployment settings (name, Build & Deploy, Configuration flags, etc.). Does **not** include environment variables, data sources, or other configuration secrets — see **Manage secrets**. |
 | General     | Delete deployment                   | Remove the deployment.                                                                                                                                                    |
 | Configuration & Secrets | Manage secrets          | View and edit environment variables, manage data sources (add/edit database connections, including the test-connection step), the Model Configuration card on **Settings → Configuration**, Power BI (XMLA) settings, and restarting dev mode to apply saved environment variable changes. |
 | Data Model  | View data model                     | Read data model files and dev branches.                                                                                                                                   |
 | Data Model  | Edit data model                     | Edit the data model on any branch, including the main/deploy branch. Allows committing and merging to main, force-syncing main, and starting dev mode against main.       |
 | Data Model  | Edit data model on dev branches     | Edit the data model only on non-default branches. Blocks any write that targets the main/deploy branch (including merging to main).                                       |
+| Data Model  | Access SQL Runner                   | Open the SQL Runner and execute queries in it.                                                                                                                            |
+| AI          | Access AI agents                    | Use the AI agent in Analytics Chat, workbooks, the IDE, and dashboards.                                                                                                   |
+| Pre-aggregations | Build pre-aggregations         | Trigger pre-aggregation builds (**Build All** and bulk build actions). Withholding it prevents accidental large builds that put Cube Store under pressure.                |
 | Monitoring  | Access query history                | View deployment query history, performance, and traces.                                                                                                                   |
-| Monitoring  | Access chat history                 | View other users' chat conversations for the deployment, including Analytics Chat and the Excel/Google Sheets add-in panes (**Admin → Chats History**).                  |
-| Data Export | Download data                       | Download query results as CSV from workbooks, Analytics Chat, and published dashboards. Granted by default to the built-in Viewer, Explorer, and Developer roles. See [Data download controls][ref-data-download-controls]. |
+| Monitoring  | Access chat history                 | View other users' chat conversations for the deployment, including Analytics Chat and the Excel/Google Sheets add-in panes (**Admin → Chats History**). |
+| Data Export | Download data                       | Download query results as CSV from workbooks, Analytics Chat, and published dashboards. See [Data download controls][ref-data-download-controls]. |
 
 When **Full access** is checked, the granular checkboxes appear checked and disabled — granting Full access today also covers any deployment-scoped permissions added in the future.
 
 {/* TODO: Upload screenshot of a deployment policy card with "Full access" checked, granular checkboxes shown checked + disabled */}
 
-<Tip>
-
-**Access deployment** (`DeploymentRead`) and **Download data** (`DownloadData`) are special. They are the only deployment actions that do **not** auto-bump the Base Role to Developer, because Viewers also need them just to open a deployment and download data from it.
-
-</Tip>
-
 [ref-data-download-controls]: /admin/users-and-permissions/roles-and-permissions#restricting-data-downloads
 
 ## Walkthroughs
 
-### Create a Viewer with read access to all deployments
+### Create a Viewer for all deployments
 
 A common pattern: someone who consumes dashboards and chats but never edits anything.
 
@@ -151,12 +147,14 @@ A common pattern: someone who consumes dashboards and chats but never edits anyt
     Select **Viewer**.
   </Step>
   <Step title="Add a deployment policy">
-    Click **Add deployment policy**, leave **Scope** on **All deployments**, and check **Access deployment** under General.
+    Click **Add deployment policy**, leave **Scope** on **All deployments**, and check **Access deployment**, **Access AI agents** for Analytics Chat, and **Download data** if they should be able to export query results. None of them [forces the Base Role to Developer](#auto-bump-to-developer), so the role stays a Viewer.
   </Step>
   <Step title="Save">
     Click **Create**.
   </Step>
 </Steps>
+
+With all three actions checked, `Org Viewer` gives the same tier and the same deployment access as the built-in Viewer. What makes it worth writing as a custom role is what you change from here: narrow **Scope** to specific deployments, or add a [Global permission](#global-permissions) the built-in does not carry.
 
 ### Create an Explorer for a single deployment
 
@@ -170,7 +168,7 @@ For an analyst who works in one deployment.
     Add a deployment policy, switch **Scope** to **Specific deployments**, and pick the relevant deployment(s) from the picker.
   </Step>
   <Step title="Pick actions">
-    Check **Access deployment** so the user can open the deployment, and add **Access query history** if they should see query performance.
+    Check **Access deployment** so the user can open the deployment, **Access AI agents** for Analytics Chat, and **Download data** if they should be able to export query results — none of them [forces the Base Role to Developer](#auto-bump-to-developer). **Access chat history** does not either, but it shows other users' conversations, so leave it off unless the role should see them. Leave the rest alone — **Access query history**, for instance, does force the bump, and that costs you the Explorer this walkthrough is for.
   </Step>
   <Step title="Save">
     Click **Create**.
@@ -210,26 +208,83 @@ See [Manage users][ref-manage-users] for more.
 
 ## Validation
 
-The role builder enforces a few rules client-side:
+These are the **role builder's** rules, enforced client-side before it submits; the API validates differently — see [Managing roles through the API](#managing-roles-through-the-api) below:
 
-- **Name** is required and must be unique. Reserved names (`Admin`, `Guest`, `Developer`, `None`, `All`) are rejected.
+- **Name** is required and must be unique. Reserved names (`Admin`, `Guest`, `Developer`, `None`, `All`) are rejected. The API reserves a different set — every built-in role name, which includes `AIBIDeveloper`, `AIBIUser`, `AIBIViewer`, `D3User` and `EmbedUser`, but not `None` or `All`; see [`POST /api/v1/roles`][ref-api-create-role].
 - **Base Role** is required — Save is disabled until one is picked, and an inline error appears if you try to submit without one.
 - A deployment policy with **no actions selected** is silently dropped on save (treated as a no-op).
 - A deployment policy with **Specific deployments** scope but no deployments selected is also dropped on save.
 
+## Managing roles through the API
+
+Custom roles can also be created, updated and assigned over the [REST API][ref-api-roles], so a team that provisions deployments from CI can grant access in the same pipeline instead of finishing in the console. The `/api/v1/roles` calls need a token that [authenticates][ref-api-auth] as a user with the admin role. The API takes the wire format — a flat list of policies — rather than the builder's cards: the **Base Role** is a `Global` policy naming the tier, and each deployment policy card is one `Deployment` policy.
+
+<Steps>
+  <Step title="Create the deployment">
+    [`POST /build/api/v1/deployments`][ref-api-create-deployment] returns the new deployment, including its numeric `id`.
+  </Step>
+  <Step title="Create a role scoped to it">
+    `POST /api/v1/roles`, with that id **as a string** in the `Deployment` policy's `resources`:
+
+    ```json
+    {
+      "name": "team-analytics",
+      "policies": [
+        {
+          "resourceType": "Global",
+          "actions": ["AIBIDevelop"],
+          "resources": ["All"]
+        },
+        {
+          "resourceType": "Deployment",
+          "actions": ["DeploymentRead", "SchemaRead"],
+          "resources": ["1734"]
+        }
+      ]
+    }
+    ```
+
+    `"resources": ["All"]` covers every deployment and `"actions": ["All"]` is the Full access shortcut, as in the builder. Deployment ids are checked for shape, not existence: a slug or a name is rejected, but an id whose deployment has since been deleted is kept and simply grants nothing. The response carries the role's `id`.
+
+    Unlike the builder, which drops an incomplete policy on save, the API rejects one with `400` if it has no actions or names no resources. (An empty `policies` list is fine — that is a role granting nothing yet.) Nothing here checks the tier against the actions, so a tier below the one the builder's [auto-bump](#auto-bump-to-developer) would have forced yields a role the builder would not have let you save — pick the covering tier anyway if you want the role to round-trip through the console.
+
+    Role names are unique, so re-running this step for a role that already exists answers `409` rather than creating a second one. The list endpoint has no lookup by name, so a pipeline treating `409` as "already provisioned" has to page `GET /api/v1/roles` and match on `name` to recover the `id` before it can `PUT`.
+  </Step>
+  <Step title="Assign it">
+    `PUT /api/v1/roles/{roleId}/users/{userId}`. It is idempotent, and `DELETE` on the same path takes the role away again.
+  </Step>
+</Steps>
+
+<Warning>
+
+**The Base Role is required in the builder, but the API neither requires nor infers it.** A role sent without a `Global` tier policy is accepted with no error, and a user whose only role is that one holds the deployment grants yet has no license tier — nothing surfaces it until they sign in and cannot use the product. This is deliberate: permissions stack, so a role that only adds a deployment scope beside another role carrying the tier is valid. Omit the `Global` policy only when you know another of the user's roles supplies it.
+
+</Warning>
+
+`GET`, `PUT` and `DELETE /api/v1/roles/{roleId}` read, update and remove a role; `PUT` updates only the fields present in the body, and sending `policies` replaces them outright rather than merging — so read the role first if you mean to add a policy, omit `policies` to leave them untouched, and send `[]` to clear them. Renaming to a name another role already holds answers `409`, so omit `name` too unless you mean to change it. `DELETE` also drops every assignment of the role, from users and from groups, so everyone holding it loses what it granted. These three endpoints cover your custom roles only: a built-in role's id answers `404` on all three.
+
+Assignment is the exception — `PUT /api/v1/roles/{roleId}/users/{userId}` resolves built-in roles as well as custom ones, though their ids are neither published nor returned by `GET /api/v1/roles`, so in practice it is the roles you created that you assign. Cube's **Admin** role is not among the ones it resolves: its id returns `404`, so assignment cannot hand out the built-in Admin role. That is a property of assignment alone — `POST /api/v1/roles` accepts a `Global` policy carrying account-wide actions such as `DeploymentsManage` or `AuditLogManage`, so a custom role can grant much of what Admin does. Only an administrator can call any of this.
+
+[ref-api-roles]: /api-reference/roles/list-custom-roles
+[ref-api-auth]: /api-reference/authentication
+[ref-api-create-role]: /api-reference/roles/create-a-custom-role
+[ref-api-create-deployment]: /api-reference/deployment-creation/create-a-deployment-with-an-empty-starter-project-and-trigger-its-first-build
+
 ## Reference: action catalog
 
-This section lists every action a custom role can grant. The internal action names match the names shown in the [audit log][ref-audit-log].
+This section lists every action the role builder exposes. The internal action names match the names shown in the [audit log][ref-audit-log]. The API is wider in two ways: it accepts actions the builder does not render, and policies over resource types it has no card for — `Report`, `Workbook`, `Agent` and `ChatThread` among them. See the `actions` and `resourceType` enums on [`POST /api/v1/roles`][ref-api-create-role] for both full lists.
 
 [ref-audit-log]: /admin/monitoring/audit-log
 
 ### Base Role actions (Global)
 
-| Internal name   | Label     | Description                                                |
-| --------------- | --------- | ---------------------------------------------------------- |
-| `AIBIView`      | Viewer    | Read-only access to dashboards and chats.                  |
-| `AIBIExplore`   | Explorer  | Viewer + create/edit workbooks, run queries.               |
-| `AIBIDevelop`   | Developer | Explorer + edit data model, manage deployments.            |
+As a custom role's Base Role, the action sets the license tier — see [Base Role](#base-role) for what each tier licenses.
+
+| Internal name   | Label     |
+| --------------- | --------- |
+| `AIBIView`      | Viewer    |
+| `AIBIExplore`   | Explorer  |
+| `AIBIDevelop`   | Developer |
 
 ### Global actions
 
@@ -255,6 +310,9 @@ This section lists every action a custom role can grant. The internal action nam
 | `SchemaRead`              | View data model                                             |
 | `SchemaUpdate`            | Edit data model                                             |
 | `SchemaUpdateDevBranches` | Edit data model on dev branches                             |
+| `SqlRunnerRead`           | Access SQL Runner                                           |
+| `DeploymentAgentRead`     | Access AI agents                                            |
+| `PreAggregationBuild`     | Build pre-aggregations                                      |
 | `APMRead`                 | Access query history                                        |
 | `ChatHistoryRead`         | Access chat history                                         |
 | `DownloadData`            | Download data                                               |
