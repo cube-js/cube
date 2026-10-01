@@ -42,8 +42,7 @@ export enum QueuePriority {
 
 export interface AddToQueueQuery {
   isJob: boolean,
-  // Read only by QueryQueue.executeInQueue, which copies it into AddToQueueOptions
-  orphanedTimeout?: unknown
+  readonly orphanedTimeout?: unknown
 }
 
 export interface AddToQueueOptions {
