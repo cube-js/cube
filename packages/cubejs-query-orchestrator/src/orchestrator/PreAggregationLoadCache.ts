@@ -1,5 +1,6 @@
-import { QueuePriority, TableStructure } from '@cubejs-backend/base-driver';
+import { QueryKey, QueuePriority, TableStructure } from '@cubejs-backend/base-driver';
 import { DriverFactory } from './DriverFactory';
+import { QueryQueue } from './QueryQueue';
 import { QueryCache, QueryWithParams, REFRESH_KEY_CACHE_TTL_SECONDS } from './QueryCache';
 import {
   PreAggregationDescription,
@@ -46,8 +47,8 @@ export class PreAggregationLoadCache {
 
   public constructor(
     clientFactory: DriverFactory,
-    queryCache,
-    preAggregations,
+    queryCache: QueryCache,
+    preAggregations: PreAggregations,
     options: PreAggregationLoadCacheOptions = { dataSource: 'default' }
   ) {
     this.dataSource = options.dataSource;
@@ -63,7 +64,7 @@ export class PreAggregationLoadCache {
     this.tableColumnTypes = {};
   }
 
-  protected async tablesFromCache(preAggregation, forceRenew: boolean = false) {
+  protected async tablesFromCache(preAggregation: PreAggregationDescription, forceRenew: boolean = false) {
     let tables = forceRenew ? null : await this.queryCache.getCacheDriver().get(this.tablesCachePrefixKey(preAggregation));
     if (!tables) {
       tables = await this.preAggregations.getLoadCacheQueue(this.dataSource).executeInQueue(
@@ -109,7 +110,7 @@ export class PreAggregationLoadCache {
     return this.queryCache.getKey('SQL_PRE_AGGREGATIONS_TABLES', `${preAggregation.dataSource}${preAggregation.preAggregationsSchema}${preAggregation.external ? '_EXT' : ''}`);
   }
 
-  protected async getTablesQuery(preAggregation) {
+  protected async getTablesQuery(preAggregation: PreAggregationDescription) {
     const redisKey = this.tablesCachePrefixKey(preAggregation);
     if (!this.tables[redisKey]) {
       const tables = this.preAggregations.options.skipExternalCacheAndQueue && preAggregation.external ?
@@ -139,7 +140,7 @@ export class PreAggregationLoadCache {
     return this.tableColumnTypes[prefixKey][tableName];
   }
 
-  private async calculateVersionEntries(preAggregation): Promise<VersionEntriesObj> {
+  private async calculateVersionEntries(preAggregation: PreAggregationDescription): Promise<VersionEntriesObj> {
     let versionEntries = tablesToVersionEntries(
       preAggregation.preAggregationsSchema,
       await this.getTablesQuery(preAggregation)
@@ -176,7 +177,7 @@ export class PreAggregationLoadCache {
     return { versionEntries, byContent, byStructure, byTableName };
   }
 
-  public async getVersionEntries(preAggregation): Promise<VersionEntriesObj> {
+  public async getVersionEntries(preAggregation: PreAggregationDescription): Promise<VersionEntriesObj> {
     if (this.tablePrefixes && !this.tablePrefixes.find(p => preAggregation.tableName.split('.')[1].startsWith(p))) {
       throw new Error(`Load cache tries to load table ${preAggregation.tableName} outside of tablePrefixes filter: ${this.tablePrefixes.join(', ')}`);
     }
@@ -212,13 +213,13 @@ export class PreAggregationLoadCache {
     return !!this.queryResults[this.queryCache.refreshKeyCacheKey(keyQuery, this.dataSource)];
   }
 
-  public async getQueryStage(stageQueryKey) {
+  public async getQueryStage(stageQueryKey: QueryKey) {
     const queue = await this.preAggregations.getQueue(this.dataSource);
     await this.fetchQueryStageState(queue);
     return queue.getQueryStage(stageQueryKey, undefined, this.queryStageState);
   }
 
-  protected async fetchQueryStageState(queue?) {
+  protected async fetchQueryStageState(queue?: QueryQueue) {
     queue = queue || await this.preAggregations.getQueue(this.dataSource);
     if (!this.queryStageState) {
       this.queryStageState = await queue.fetchQueryStageState();
@@ -226,7 +227,7 @@ export class PreAggregationLoadCache {
     return this.queryStageState;
   }
 
-  public async reset(preAggregation) {
+  public async reset(preAggregation: PreAggregationDescription) {
     await this.tablesFromCache(preAggregation, true);
     this.tables = {};
     this.tableColumnTypes = {};

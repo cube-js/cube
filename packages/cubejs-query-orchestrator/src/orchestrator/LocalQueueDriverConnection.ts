@@ -42,7 +42,7 @@ export interface PromiseWithResolve<T = any> extends Promise<T> {
 }
 
 export class LocalQueueDriverConnectionState {
-  public resultPromises: Record<QueryKeyHash, PromiseWithResolve> = {};
+  public resultPromises: Record<string, PromiseWithResolve> = {};
 
   public queryDef: Record<QueryKeyHash, QueryDefObject> = {};
 

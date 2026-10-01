@@ -2,7 +2,7 @@ import crypto from 'crypto';
 import { CacheMode, createCancelablePromise, pausePromise } from '@cubejs-backend/shared';
 import { QueuePriority } from '@cubejs-backend/base-driver';
 
-import { CacheKey, CacheKeyItem, ContinueWaitError, QueryCache, QueryCacheOptions, QueryWithParams } from '../../src';
+import { CacheEntry, CacheKey, ContinueWaitError, QueryCache, QueryCacheOptions, QueryWithParams } from '../../src';
 import { evaluateLocalRefreshKey } from '../../src/orchestrator/utils';
 
 export type QueryCacheTestOptions = QueryCacheOptions & {
@@ -204,17 +204,17 @@ export const QueryCacheTest = (name: string, options: QueryCacheTestOptions) => 
       const renewalKeyOld = QueryCache.queryCacheKey({ query: 'key-old', values: [] });
       const renewalKeyNew = QueryCache.queryCacheKey({ query: 'key-new', values: [] });
 
-      const seedCache = async (cacheKey: CacheKey, entry: CacheKeyItem) => {
+      const seedCache = async (cacheKey: CacheKey, entry: CacheEntry) => {
         const redisKey = cache.queryCacheKey(cacheKey);
         await cache.getCacheDriver().set(redisKey, entry, 3600);
       };
 
       const callCacheQueryResult = async (
-        cacheKey,
-        cacheEntry,
+        cacheKey: CacheKey,
+        cacheEntry: Omit<CacheEntry, 'renewalKey'> & { renewalKey?: CacheKey },
         opts: {
           renewalThreshold?: number;
-          renewalKey?;
+          renewalKey?: CacheKey;
           waitForRenew?: boolean;
           requestId?: string;
           renewCycle?: boolean;
@@ -226,7 +226,7 @@ export const QueryCacheTest = (name: string, options: QueryCacheTestOptions) => 
           ...cacheEntry,
           renewalKey: cacheEntry.renewalKey
             ? cache.queryCacheKey(cacheEntry.renewalKey)
-            : cacheEntry.renewalKey,
+            : undefined,
         };
         await seedCache(cacheKey, seededEntry);
 
@@ -515,7 +515,7 @@ export const QueryCacheTest = (name: string, options: QueryCacheTestOptions) => 
           expect(queryCallCount(mainQuery)).toBe(1);
           expect(renewCycleSpy).toHaveBeenCalledTimes(1);
         } finally {
-          await renewCyclePromise?.catch(() => undefined);
+          await renewCyclePromise?.catch((): undefined => undefined);
           renewCycleSpy.mockRestore();
           renewQuerySpy.mockRestore();
           querySpy.mockRestore();

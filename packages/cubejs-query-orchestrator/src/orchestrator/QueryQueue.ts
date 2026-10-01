@@ -9,9 +9,11 @@ import {
   QueryStageStateResponse,
   AddToQueueOptions,
   QueuePriority,
+  QueueDriverOptions,
+  QueryKeysTuple,
   RetrieveForProcessingSuccess
 } from '@cubejs-backend/base-driver';
-import { CubeStoreQueueDriver } from '@cubejs-backend/cubestore-driver';
+import { CubeStoreDriver, CubeStoreQueueDriver } from '@cubejs-backend/cubestore-driver';
 
 import { TimeoutError } from './TimeoutError';
 import { ContinueWaitError } from './ContinueWaitError';
@@ -42,7 +44,7 @@ export type QueryStreamWait = {
 
 export type QueryQueueOptions = {
   cacheAndQueueDriver: CacheAndQueryDriverType;
-  logger: (message, event) => void;
+  logger: LoggerFn;
   sendCancelMessageFn?: SendCancelMessageFn;
   sendProcessMessageFn?: SendProcessMessageFn;
   cancelHandlers: Record<string, CancelHandlerFn>;
@@ -56,11 +58,16 @@ export type QueryQueueOptions = {
   heartBeatInterval?: number,
   redisPool?: any,
   cubeStoreDriverFactory?: any,
-  queueDriverFactory?: (cacheAndQueueDriver: string, queueDriverOptions: any) => QueueDriverInterface,
+  queueDriverFactory?: (cacheAndQueueDriver: string, queueDriverOptions: QueryQueueDriverOptions) => QueueDriverInterface,
   skipQueue?: boolean,
 };
 
-function factoryQueueDriver(cacheAndQueueDriver: string, queueDriverOptions): QueueDriverInterface {
+type QueryQueueDriverOptions = QueueDriverOptions & {
+  redisPool?: any,
+  cubeStoreDriverFactory?: () => Promise<CubeStoreDriver>,
+};
+
+function factoryQueueDriver(cacheAndQueueDriver: string, queueDriverOptions: QueryQueueDriverOptions): QueueDriverInterface {
   switch (cacheAndQueueDriver || 'memory') {
     case 'memory':
       return new LocalQueueDriver(queueDriverOptions);
@@ -137,7 +144,7 @@ export class QueryQueue {
     this.logger = options.logger || ((message, event) => console.log(`${message} ${JSON.stringify(event)}`));
     this.processUid = options.processUid || getProcessUid();
 
-    const queueDriverOptions = {
+    const queueDriverOptions: QueryQueueDriverOptions = {
       redisQueuePrefix: this.redisQueuePrefix,
       concurrency: this.concurrency,
       continueWaitTimeout: this.continueWaitTimeout,
@@ -492,10 +499,7 @@ export class QueryQueue {
         queueConnection.getToProcessQueries()
       ]);
 
-      /**
-       * @param {QueryKeysTuple[]} arr
-       */
-      const mapWithDefinition = (arr) => Promise.all(arr.map(async ([queryKey, queueId]) => ({
+      const mapWithDefinition = (arr: QueryKeysTuple[]) => Promise.all(arr.map(async ([queryKey, queueId]) => ({
         ...(await queueConnection.getQueryDef(queryKey, queueId)),
         queryKey
       })));
@@ -504,7 +508,7 @@ export class QueryQueue {
         [stalledQueries, orphanedQueries, activeQueries, toProcessQueries].map(arr => mapWithDefinition(arr))
       );
 
-      const result = {
+      const result: Record<string, QueryDef[]> = {
         orphaned,
         stalled,
         active,
@@ -523,7 +527,7 @@ export class QueryQueue {
           obj[query.queryKey].status.push(status);
         });
         return obj;
-      }, {}));
+      }, {} as Record<string, QueryDef & { status: string[] }>));
     } finally {
       this.queueDriver.release(queueConnection);
     }
@@ -646,7 +650,7 @@ export class QueryQueue {
    * @throw {TimeoutError}
    */
   protected queryTimeout<T>(promise: Promise<T>): Promise<T> {
-    let timeout;
+    let timeout: NodeJS.Timeout | undefined;
     const { executionTimeout } = this;
 
     return Promise.race<T>([
@@ -725,7 +729,7 @@ export class QueryQueue {
       timeInQueue: 0
     });
     let executionResult;
-    let handler;
+    let handler: CancelHandlerFn | undefined;
 
     try {
       // TODO handle streams

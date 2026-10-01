@@ -2,7 +2,7 @@ import { CubeStoreDevDriver, CubeStoreDriver, CubeStoreHandler } from '@cubejs-b
 import { QueryCacheTest } from '../../unit/QueryCache.abstract';
 
 let beforeAll;
-let cubeStoreDriver;
+let cubeStoreDriver: CubeStoreDriver | undefined;
 let afterAll = async () => {
   if (cubeStoreDriver) {
     await cubeStoreDriver.release();

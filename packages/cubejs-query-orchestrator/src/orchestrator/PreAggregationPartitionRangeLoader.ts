@@ -117,7 +117,7 @@ export class PreAggregationPartitionRangeLoader {
     );
   }
 
-  protected getInvalidationKeyValues(range) {
+  protected getInvalidationKeyValues(range: QueryDateRange) {
     const { invalidateKeyQueries } = this.preAggregation;
     if (!invalidateKeyQueries?.length) {
       return Promise.resolve([]);
@@ -137,7 +137,7 @@ export class PreAggregationPartitionRangeLoader {
     );
   }
 
-  protected priority(defaultValue) {
+  protected priority(defaultValue: number): number {
     return this.preAggregation.priority ?? defaultValue;
   }
 

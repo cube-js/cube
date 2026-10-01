@@ -1,5 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { QueryOrchestrator } from '../../src/orchestrator/QueryOrchestrator';
+import type { QueryWithParams } from '../../src/orchestrator/QueryCache';
+import type { PreAggregationDescription } from '../../src/orchestrator/PreAggregations';
 
 class MockDriver {
   public tablesObj: any[] = [];
@@ -29,7 +31,7 @@ class MockDriver {
       promise = promise.then(() => [{ now: new Date().toJSON() }]);
     }
 
-    promise.cancel = () => undefined;
+    promise.cancel = (): undefined => undefined;
     return promise;
   }
 
@@ -39,7 +41,7 @@ class MockDriver {
       .map(t => ({ table_name: (t.tableName || t).replace(`${schema}.`, '') }));
   }
 
-  public async createSchemaIfNotExists(schema: string) {
+  public async createSchemaIfNotExists(schema: string): Promise<null> {
     this.schema = schema;
     return null;
   }
@@ -133,7 +135,7 @@ class ExternalMockDriver extends MockDriver {
   }
 }
 
-const PRE_AGGREGATION = {
+const PRE_AGGREGATION: Partial<PreAggregationDescription> = {
   preAggregationsSchema: 'stb_pre_aggregations',
   tableName: 'stb_pre_aggregations.orders_month',
   preAggregationId: 'orders.month',
@@ -154,8 +156,8 @@ const PRE_AGGREGATION = {
 
 const jobQuery = (requestId: string) => ({
   // The jobs API posts a build query without `query`
-  values: [],
-  cacheKeyQueries: { queries: [] },
+  values: [] as string[],
+  cacheKeyQueries: { queries: [] as QueryWithParams[] },
   preAggregations: [PRE_AGGREGATION],
   continueWait: true,
   renewQuery: true,
@@ -194,7 +196,7 @@ describe('pre-aggregation build jobs', () => {
 
     const prefix = `PRE_AGG_JOBS_TEST_${testCount++}`;
     const driverFactory = () => mockDriver;
-    const logger = () => undefined;
+    const logger = (): undefined => undefined;
 
     const options = {
       externalDriverFactory: () => externalMockDriver,
@@ -296,7 +298,7 @@ describe('pre-aggregation build jobs', () => {
       preAggregations: [PRE_AGGREGATION],
       requestId: 'regular query build',
       external: true,
-    } as any).catch(() => undefined);
+    } as any).catch((): undefined => undefined);
 
     await externalMockDriver.importStarted;
     const [targetTableName] = externalMockDriver.tables;

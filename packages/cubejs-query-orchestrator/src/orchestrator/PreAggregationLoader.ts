@@ -3,6 +3,7 @@ import crypto from 'crypto';
 import { getEnv, MaybeCancelablePromise, LoggerFn } from '@cubejs-backend/shared';
 import {
   cancelCombinator,
+  CreateTableIndex,
   DownloadQueryResultsResult,
   DownloadTableData,
   DriverCapabilities,
@@ -19,6 +20,7 @@ import { ContinueWaitError } from './ContinueWaitError';
 import { LargeStreamWarning } from './StreamObjectsCounter';
 import {
   getStructureVersion,
+  IndexDescription,
   InvalidationKeys,
   LoadPreAggregationResult,
   PreAggregationBuildStatus,
@@ -72,6 +74,12 @@ function queryKeyMd5(queryKey: QueryKey): string {
   return crypto.createHash('md5').update(jsonStr).digest('hex');
 }
 
+// Drivers may expose read-only mode via a config flag or a readOnly() method.
+type RefreshClient = DriverInterface & {
+  config?: { readOnly?: boolean },
+  readOnly?: boolean | (() => boolean),
+};
+
 export class PreAggregationLoader {
   private preAggregations: PreAggregations;
 
@@ -109,7 +117,7 @@ export class PreAggregationLoader {
     private readonly logger: LoggerFn,
     private readonly queryCache: QueryCache,
     preAggregations: PreAggregations,
-    preAggregation,
+    preAggregation: any,
     preAggregationsTablesToTempTables: PreAggregationTableToTempTable[],
     private readonly loadCache: PreAggregationLoadCache,
     options: any = {}
@@ -138,7 +146,7 @@ export class PreAggregationLoader {
     // A thunk: hashing a cache key per invalidation key is wasted whenever the cheaper terms of
     // the condition below already decide it.
     const invalidationKeysLoaded = () => (this.preAggregation.invalidateKeyQueries || [])
-      .every(keyQuery => this.loadCache.hasKeyQueryResult(keyQuery));
+      .every((keyQuery: QueryWithParams) => this.loadCache.hasKeyQueryResult(keyQuery));
 
     // Outside of a build job, `externalRefresh` must reach the branch below: it owns the "partition
     // is not built yet" handling and may not enqueue a build here.
@@ -398,7 +406,7 @@ export class PreAggregationLoader {
   protected getInvalidationKeyValues() {
     return Promise.all(
       (this.preAggregation.invalidateKeyQueries || []).map(
-        (sqlQuery) => this.loadCache.keyQueryResult(sqlQuery, this.waitForRenew, this.priority(QueuePriority.Interactive))
+        (sqlQuery: QueryWithParams) => this.loadCache.keyQueryResult(sqlQuery, this.waitForRenew, this.priority(QueuePriority.Interactive))
       )
     );
   }
@@ -407,7 +415,7 @@ export class PreAggregationLoader {
     if (this.preAggregation.partitionInvalidateKeyQueries) {
       return Promise.all(
         (this.preAggregation.partitionInvalidateKeyQueries || []).map(
-          (sqlQuery) => this.loadCache.keyQueryResult(sqlQuery, this.waitForRenew, this.priority(QueuePriority.Interactive))
+          (sqlQuery: QueryWithParams) => this.loadCache.keyQueryResult(sqlQuery, this.waitForRenew, this.priority(QueuePriority.Interactive))
         )
       );
     } else {
@@ -466,7 +474,7 @@ export class PreAggregationLoader {
     return PreAggregations.targetTableName(versionEntry);
   }
 
-  public refresh(newVersionEntry: VersionEntry, invalidationKeys: InvalidationKeys, client) {
+  public refresh(newVersionEntry: VersionEntry, invalidationKeys: InvalidationKeys, client: RefreshClient) {
     const targetTableName = this.targetTableName(newVersionEntry);
     this.updateLastTouch(targetTableName);
 
@@ -489,7 +497,7 @@ export class PreAggregationLoader {
     }
 
     return cancelCombinator(
-      async saveCancelFn => {
+      async (saveCancelFn: SaveCancelFn) => {
         await this.reportBuildStatus(targetTableName, {
           status: 'building',
           startedAt: new Date().getTime(),
@@ -573,7 +581,7 @@ export class PreAggregationLoader {
     }
   }
 
-  protected logExecutingSql(payload) {
+  protected logExecutingSql(payload: Record<string, unknown>) {
     this.logger(
       'Executing Load Pre Aggregation SQL',
       payload
@@ -1050,7 +1058,7 @@ export class PreAggregationLoader {
     if (!this.preAggregation.indexesSql || !this.preAggregation.indexesSql.length) {
       return [];
     }
-    return this.preAggregation.indexesSql.map(({ sql, indexName }) => {
+    return this.preAggregation.indexesSql.map(({ sql, indexName }: IndexDescription) => {
       const [query, params] = sql;
       const indexVersionEntry = {
         ...newVersionEntry,
@@ -1073,7 +1081,7 @@ export class PreAggregationLoader {
     if (!this.preAggregation.createTableIndexes || !this.preAggregation.createTableIndexes.length) {
       return [];
     }
-    return this.preAggregation.createTableIndexes.map(({ indexName, type, columns }) => {
+    return this.preAggregation.createTableIndexes.map(({ indexName, type, columns }: CreateTableIndex) => {
       const indexVersionEntry = {
         ...newVersionEntry,
         table_name: indexName

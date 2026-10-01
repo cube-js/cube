@@ -9,7 +9,7 @@ describe('QueryOrchestrator jobed build', () => {
     tableName,
     {
       targetTableName: `${tableName}_kjypcoio_5yftl5il_1593709044209`,
-      refreshKeyValues: [],
+      refreshKeyValues: [] as unknown[],
       lastUpdatedAt: 1593709044209,
       ...overrides,
     },
@@ -21,7 +21,7 @@ describe('QueryOrchestrator jobed build', () => {
     orchestrator.preAggregations = {
       loadAllPreAggregationsIfNeeded: async () => ({
         preAggregationsTablesToTempTables,
-        values: null,
+        values: null as string[] | null,
       }),
     };
 
