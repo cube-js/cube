@@ -215,26 +215,18 @@ async fn prior_year_over_a_date_range_matches_source() {
     }
 }
 
-/// A multi-stage measure is not additive, so it is served only at the grain
-/// it was stored at: summing it over a stored dimension is refused.
+/// A time-shift proxy of an additive measure is additive: each stored row holds
+/// the prior-year sum of its reporting days, so summing rows over a stored
+/// dimension sums those days.
 #[tokio::test(flavor = "multi_thread")]
-async fn stored_prior_year_is_not_rolled_up_over_a_dimension() {
-    let query = indoc! {r#"
-        measures:
-          - sales.amount
-          - sales.amount_ly
-        time_dimensions:
-          - dimension: retail_calendar.retail_date
-            granularity: week
-        order:
-          - id: retail_calendar.retail_date
-    "#};
-    if let Some((rollup, source)) = fallback_vs_source(query, "sales_ly_by_week").await {
+async fn stored_prior_year_is_rolled_up_over_a_dimension() {
+    if let Some((rollup, source)) = served_vs_source(BY_WEEK_ALL_STORES, "sales_ly_by_week").await {
         assert_eq!(rollup, source);
     }
 }
 
-/// Nor is it rolled up to a coarser granularity.
+/// A retail week does not nest in the `sql`-defined retail year as far as the
+/// granularity hierarchy knows, so the rollup is not rolled up to it.
 #[tokio::test(flavor = "multi_thread")]
 async fn stored_prior_year_is_not_rolled_up_to_a_coarser_grain() {
     let query = indoc! {r#"
@@ -252,6 +244,351 @@ async fn stored_prior_year_is_not_rolled_up_to_a_coarser_grain() {
     "#};
     if let Some((rollup, source)) = fallback_vs_source(query, "sales_ly_by_week").await {
         assert_eq!(rollup, source);
+    }
+}
+
+const BY_WEEK_ALL_STORES: &str = indoc! {r#"
+        measures:
+          - sales.amount
+          - sales.amount_ly
+        time_dimensions:
+          - dimension: retail_calendar.retail_date
+            granularity: week
+        order:
+          - id: retail_calendar.retail_date
+"#};
+
+const NAMED_BY_WEEK_ALL_STORES: &str = indoc! {r#"
+        measures:
+          - sales.amount
+          - sales.amount_ly_named
+        time_dimensions:
+          - dimension: retail_calendar.retail_date
+            granularity: week
+        order:
+          - id: retail_calendar.retail_date
+"#};
+
+/// A named shift resolves to the same calendar declaration as the interval one
+/// and rolls up the same way.
+#[tokio::test(flavor = "multi_thread")]
+async fn stored_named_prior_year_is_rolled_up_over_a_dimension() {
+    if let Some((rollup, source)) =
+        served_vs_source(NAMED_BY_WEEK_ALL_STORES, "sales_ly_named_by_week").await
+    {
+        assert_eq!(rollup, source);
+    }
+}
+
+/// The build also landed the named shift on `retail_date_alt`, whose
+/// declaration maps the calendar differently from `retail_date`'s, so the
+/// stored value is not the one a query reading only `retail_date` computes.
+#[tokio::test(flavor = "multi_thread")]
+async fn stored_named_shift_resolved_differently_by_a_stored_member_falls_back() {
+    if let Some((rollup, source)) =
+        fallback_vs_source(NAMED_BY_WEEK_ALL_STORES, "sales_ly_named_by_week_with_alt").await
+    {
+        assert_eq!(rollup, source);
+    }
+}
+
+/// Reading none of the shifted time members, the query applies no shift at
+/// all, while the build shifted every stored row, so the stored shifted
+/// column must not be read. The unshifted leaves still are.
+#[tokio::test(flavor = "multi_thread")]
+async fn stored_shift_without_its_time_member_is_not_read() {
+    for (measure, pre_agg) in [
+        ("amount_ly", "sales_ly_by_week"),
+        ("amount_ly_named", "sales_ly_named_by_week"),
+        ("amount_prev_year", "sales_prev_year_by_day"),
+        ("max_amount_prev_month", "sales_prev_year_by_day"),
+    ] {
+        let query = format!(
+            indoc! {r#"
+                measures:
+                  - sales.amount
+                  - sales.{}
+                dimensions:
+                  - sales.store
+                order:
+                  - id: sales.store
+            "#},
+            measure
+        );
+        let with_rollup = ctx_with(&[pre_agg]);
+        let (sql, _) = with_rollup
+            .build_sql_with_used_pre_aggregations(&query)
+            .unwrap();
+        let reads_stored_column =
+            regex::Regex::new(&format!(r#"\w+\("sales__{}"\)"#, measure)).unwrap();
+        assert!(
+            !reads_stored_column.is_match(&sql),
+            "expected the stored shifted column to stay unread; SQL:\n{}",
+            sql
+        );
+        let Some(rollup) = with_rollup.try_execute_pg(&query, SEED).await else {
+            return;
+        };
+        let source = ctx_with(&[]).try_execute_pg(&query, SEED).await.unwrap();
+        assert_eq!(rollup, source);
+    }
+}
+
+/// A rollup built for a range holds the prior year of the labels in it,
+/// which is not the range's own amount. A query reading no `sale_date`
+/// applies no shift, so over that rollup the prior year must equal the
+/// amount it reads alongside, both limited to the built range.
+#[tokio::test(flavor = "multi_thread")]
+async fn stored_interval_shift_without_its_time_member_over_a_build_range() {
+    let query = indoc! {r#"
+        measures:
+          - sales.amount
+          - sales.amount_prev_year
+        dimensions:
+          - sales.store
+        order:
+          - id: sales.store
+    "#};
+    let with_rollup = ctx_with(&["sales_prev_year_by_day_ranged"]);
+    let Some(rollup) = with_rollup.try_execute_pg(query, SEED).await else {
+        return;
+    };
+    let source = ctx_with(&[]).try_execute_pg(query, SEED).await.unwrap();
+    for store in ["north", "south"] {
+        let amount = cell(&rollup, &[("sales__store", store)], "sales__amount");
+        assert_eq!(
+            cell(
+                &rollup,
+                &[("sales__store", store)],
+                "sales__amount_prev_year"
+            ),
+            amount
+        );
+        // The range did cut the rollup, or the check above proves nothing.
+        assert_ne!(
+            amount,
+            cell(&source, &[("sales__store", store)], "sales__amount")
+        );
+    }
+}
+
+/// A proxy of a rolling window stores one window per row, and windows of
+/// neighbouring days overlap, so it is served only at the stored grain.
+#[tokio::test(flavor = "multi_thread")]
+async fn stored_proxy_of_a_rolling_window_is_not_rolled_up() {
+    let at_stored_grain = indoc! {r#"
+        measures:
+          - sales.amount_7d_prev_year
+        dimensions:
+          - sales.store
+        time_dimensions:
+          - dimension: sales.sale_date
+            granularity: day
+            dateRange:
+              - "2007-03-01"
+              - "2007-03-14"
+        order:
+          - id: sales.sale_date
+          - id: sales.store
+    "#};
+    if let Some((rollup, source)) =
+        served_vs_source(at_stored_grain, "sales_rolling_prev_year_by_day").await
+    {
+        assert_eq!(rollup, source);
+    }
+    let by_month = indoc! {r#"
+        measures:
+          - sales.amount_7d_prev_year
+        time_dimensions:
+          - dimension: sales.sale_date
+            granularity: month
+            dateRange:
+              - "2007-01-01"
+              - "2007-06-30"
+        order:
+          - id: sales.sale_date
+    "#};
+    let with_rollup = ctx_with(&["sales_rolling_prev_year_by_day"]);
+    let (sql, _) = with_rollup
+        .build_sql_with_used_pre_aggregations(by_month)
+        .unwrap();
+    assert!(
+        !sql.contains("\"sales__amount_7d_prev_year\")"),
+        "expected the stored windows to stay unread; SQL:\n{}",
+        sql
+    );
+    if let Some(rollup) = with_rollup.try_execute_pg(by_month, SEED).await {
+        let source = ctx_with(&[]).try_execute_pg(by_month, SEED).await.unwrap();
+        assert_eq!(rollup, source);
+    }
+}
+
+/// The two proxies land a two-year shift together, which `retail_date_alt2`
+/// declares differently from `retail_date`, although both agree on one year.
+#[tokio::test(flavor = "multi_thread")]
+async fn composed_shift_resolved_differently_by_a_stored_member_falls_back() {
+    let query = indoc! {r#"
+        measures:
+          - sales.amount
+          - sales.amount_2ly
+        time_dimensions:
+          - dimension: retail_calendar.retail_date
+            granularity: week
+        order:
+          - id: retail_calendar.retail_date
+    "#};
+    if let Some((rollup, source)) = fallback_vs_source(query, "sales_2ly_by_week_with_alt2").await {
+        assert_eq!(rollup, source);
+    }
+}
+
+/// An expression over the shifted measure is not a proxy of it, so it is
+/// served only at the grain it was stored at.
+#[tokio::test(flavor = "multi_thread")]
+async fn stored_shifted_expression_is_not_rolled_up() {
+    let rolled_up = indoc! {r#"
+        measures:
+          - sales.amount
+          - sales.amount_ly_doubled
+        time_dimensions:
+          - dimension: retail_calendar.retail_date
+            granularity: week
+        order:
+          - id: retail_calendar.retail_date
+    "#};
+    if let Some((rollup, source)) = fallback_vs_source(rolled_up, "sales_ly_doubled_by_week").await
+    {
+        assert_eq!(rollup, source);
+    }
+    let exact = indoc! {r#"
+        measures:
+          - sales.amount
+          - sales.amount_ly_doubled
+        dimensions:
+          - sales.store
+        time_dimensions:
+          - dimension: retail_calendar.retail_date
+            granularity: week
+        order:
+          - id: retail_calendar.retail_date
+          - id: sales.store
+    "#};
+    if let Some((rollup, source)) = served_vs_source(exact, "sales_ly_doubled_by_week").await {
+        assert_eq!(rollup, source);
+    }
+}
+
+/// Interval shifts over the fact's own time dimension, stored by day and read
+/// by month across all stores: the sum rolls up by `sum`, the maximum by `max`.
+#[tokio::test(flavor = "multi_thread")]
+async fn stored_interval_shifts_are_rolled_up_to_a_coarser_grain() {
+    let query = indoc! {r#"
+        measures:
+          - sales.amount
+          - sales.amount_prev_year
+          - sales.max_amount
+          - sales.max_amount_prev_month
+        time_dimensions:
+          - dimension: sales.sale_date
+            granularity: month
+            dateRange:
+              - "2006-01-01"
+              - "2007-12-31"
+        order:
+          - id: sales.sale_date
+    "#};
+    if let Some((rollup, source)) = served_vs_source(query, "sales_prev_year_by_day").await {
+        assert_eq!(rollup, source);
+        let march_2007 = |column: &str| {
+            cell(
+                &rollup,
+                &[("sales__sale_date_month", "2007-03-01 00:00:00")],
+                column,
+            )
+        };
+        assert_ne!(
+            march_2007("sales__amount_prev_year"),
+            march_2007("sales__amount")
+        );
+        assert_ne!(
+            march_2007("sales__max_amount_prev_month"),
+            march_2007("sales__max_amount")
+        );
+    }
+}
+
+/// A `type: number` proxy of a maximum rolls up by `max`, the kind of the
+/// measure it reads, not by the `sum` its own type would pick.
+#[tokio::test(flavor = "multi_thread")]
+async fn stored_number_proxy_of_a_maximum_rolls_up_by_max() {
+    let query = indoc! {r#"
+        measures:
+          - sales.max_amount
+          - sales.max_amount_prev_year
+        time_dimensions:
+          - dimension: sales.sale_date
+            granularity: month
+            dateRange:
+              - "2006-01-01"
+              - "2007-12-31"
+        order:
+          - id: sales.sale_date
+    "#};
+    if let Some((rollup, source)) = served_vs_source(query, "sales_prev_year_by_day").await {
+        assert_eq!(rollup, source);
+    }
+}
+
+/// The build stores the HLL state of the measure the proxy reads, so the
+/// stored column is merged, both at the stored grain and rolled up.
+#[tokio::test(flavor = "multi_thread")]
+async fn stored_proxy_of_an_approximate_distinct_count_merges_its_state() {
+    let at_stored_grain = indoc! {r#"
+        measures:
+          - sales.approx_stores
+          - sales.approx_stores_prev_year
+        dimensions:
+          - sales.store
+        time_dimensions:
+          - dimension: sales.sale_date
+            granularity: day
+            dateRange:
+              - "2007-03-01"
+              - "2007-03-07"
+        order:
+          - id: sales.sale_date
+          - id: sales.store
+    "#};
+    let rolled_up = indoc! {r#"
+        measures:
+          - sales.approx_stores
+          - sales.approx_stores_prev_year
+        time_dimensions:
+          - dimension: sales.sale_date
+            granularity: month
+            dateRange:
+              - "2006-01-01"
+              - "2007-12-31"
+        order:
+          - id: sales.sale_date
+    "#};
+    // The HLL merge is CubeStore's, so the rollup is read there.
+    for query in [at_stored_grain, rolled_up] {
+        let schema =
+            MockSchema::from_yaml_file(YAML).only_pre_aggregations(&["sales_prev_year_by_day"]);
+        let ctx = TestContext::new_with_external_cubestore(schema).unwrap();
+        let (sql, usages) = ctx.build_sql_with_used_pre_aggregations(query).unwrap();
+        assert!(
+            usages.len() == 1 && !SOURCE_TABLES.iter().any(|table| sql.contains(table)),
+            "expected the query to be served by the rollup alone; SQL:\n{}",
+            sql
+        );
+        let Some(cubestore) = ctx.try_execute_cubestore(query, SEED).await else {
+            return;
+        };
+        let source = ctx_with(&[]).try_execute_pg(query, SEED).await.unwrap();
+        assert!(!rows(&source).is_empty());
+        assert_eq!(rows(&cubestore), rows(&source));
     }
 }
 

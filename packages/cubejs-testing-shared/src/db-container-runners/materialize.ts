@@ -1,4 +1,4 @@
-import { GenericContainer } from 'testcontainers';
+import { GenericContainer, Wait } from 'testcontainers';
 
 import { DbRunnerAbstract, DBRunnerContainerOptions } from './db-runner.abstract';
 import { startContainerWithRetry } from './start-with-retry';
@@ -9,8 +9,9 @@ export class MaterializeDBRunner extends DbRunnerAbstract {
 
     const container = new GenericContainer(`materialize/materialized:${version}`)
       .withExposedPorts(6875)
-      // Postgresql do fast shutdown on start for db applying
-      .withStartupTimeout(10 * 1000);
+      // The image boots CockroachDB and then environmentd before it serves SQL
+      .withWaitStrategy(Wait.forSuccessfulCommand('psql -h localhost -p 6875 -U materialize -d materialize -c "SELECT 1"'))
+      .withStartupTimeout(60 * 1000);
 
     if (options.volumes) {
       const binds = options.volumes.map(v => ({ source: v.source, target: v.target, mode: v.bindMode }));

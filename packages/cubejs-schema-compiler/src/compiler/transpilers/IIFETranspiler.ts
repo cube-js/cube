@@ -18,14 +18,17 @@ export class IIFETranspiler implements TranspilerInterface {
 
         if (body.length > 0) {
           // Create an IIFE that wraps all the existing statements
-          const iife = t.callExpression(
-            t.functionExpression(
-              null, // anonymous function
-              [],
-              t.blockStatement(body)
-            ),
-            []
+          const fn = t.functionExpression(
+            null, // anonymous function
+            [],
+            t.blockStatement(body)
           );
+          // Sloppy code keeps the file's `this` (the global, or the compile's own global object in
+          // a shared realm) instead of the realm global a plain call would give it
+          const strict = path.node.directives.some((d) => d.value.value === 'use strict');
+          const iife = strict
+            ? t.callExpression(fn, [])
+            : t.callExpression(t.memberExpression(fn, t.identifier('call')), [t.thisExpression()]);
 
           // Replace the program body with the IIFE
           path.node.body = [t.expressionStatement(iife)];

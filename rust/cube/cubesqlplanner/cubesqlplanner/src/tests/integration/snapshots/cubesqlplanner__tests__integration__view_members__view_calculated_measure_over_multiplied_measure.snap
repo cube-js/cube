@@ -1,0 +1,10 @@
+---
+source: cubesqlplanner/cubesqlplanner/src/tests/integration/view_members.rs
+expression: result
+---
+customers_view__name | customers_view__count | customers_view__total_amount | customers_view__amount_per_customer
+---------------------+-----------------------+------------------------------+------------------------------------
+Alice                | 1                     | 425.00                       | 425.0000000000000000               
+Bob                  | 1                     | 550.00                       | 550.0000000000000000               
+Charlie              | 1                     | NULL                         | NULL                               
+Diana                | 1                     | 400.00                       | 400.0000000000000000

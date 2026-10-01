@@ -80,6 +80,12 @@ struct YamlView {
     cubes: Vec<YamlViewCube>,
     #[serde(default)]
     default_filters: Vec<YamlViewDefaultFilter>,
+    #[serde(default)]
+    pre_aggregations: Vec<YamlPreAggregationEntry>,
+    #[serde(default)]
+    dimensions: Vec<YamlDimensionEntry>,
+    #[serde(default)]
+    measures: Vec<YamlMeasureEntry>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -172,7 +178,21 @@ impl YamlSchema {
         }
 
         for view in self.views {
+            let view_name = view.name.clone();
             let mut view_builder = builder.add_view(view.name);
+
+            for dim_entry in view.dimensions {
+                view_builder = view_builder
+                    .add_dimension(dim_entry.name, dim_entry.definition.build().definition);
+            }
+
+            for meas_entry in view.measures {
+                let meas_rc = meas_entry.definition.build_with_cube_name(Some(&view_name));
+                let meas_def = Rc::try_unwrap(meas_rc)
+                    .ok()
+                    .expect("Rc should have single owner");
+                view_builder = view_builder.add_measure(meas_entry.name, meas_def);
+            }
 
             for view_cube in view.cubes {
                 let includes = match view_cube.includes {
@@ -193,6 +213,14 @@ impl YamlSchema {
                     .unless_references(filter.unless)
                     .build();
                 view_builder = view_builder.add_default_filter(mock_filter);
+            }
+
+            for pre_agg_entry in view.pre_aggregations {
+                let pre_agg_rc = pre_agg_entry.definition.build(pre_agg_entry.name.clone());
+                let pre_agg_def = Rc::try_unwrap(pre_agg_rc)
+                    .ok()
+                    .expect("Rc should have single owner");
+                view_builder = view_builder.add_pre_aggregation(pre_agg_entry.name, pre_agg_def);
             }
 
             builder = view_builder.finish_view();

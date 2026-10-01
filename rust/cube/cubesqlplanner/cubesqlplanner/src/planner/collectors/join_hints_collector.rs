@@ -26,6 +26,15 @@ impl TraversalVisitor for JoinHintsCollector {
         node: &Rc<MemberSymbol>,
         _: &Self::State,
     ) -> Result<Option<Self::State>, CubeError> {
+        if let MemberSymbol::Ref(ref_symbol) = node.as_ref() {
+            if !node.is_multi_stage() {
+                return Ok(Some(()));
+            }
+            if let Some(target) = ref_symbol.target_member() {
+                self.on_node_traverse(target, &())?;
+            }
+            return Ok(None);
+        }
         if node.is_multi_stage() {
             if let Ok(dim) = node.as_dimension() {
                 if let Some(include) = dim.multi_stage().and_then(|m| m.grain.include.as_ref()) {
@@ -77,7 +86,7 @@ impl TraversalVisitor for JoinHintsCollector {
                     }
                 }
             }
-            MemberSymbol::MemberExpression(_) => {}
+            MemberSymbol::MemberExpression(_) | MemberSymbol::Ref(_) => {}
         };
         Ok(Some(()))
     }

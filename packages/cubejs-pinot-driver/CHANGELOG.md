@@ -3,6 +3,20 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.7.48](https://github.com/cube-js/cube/compare/v1.7.47...v1.7.48) (2026-10-01)
+
+**Note:** Version bump only for package @cubejs-backend/pinot-driver
+
+## [1.7.47](https://github.com/cube-js/cube/compare/v1.7.46...v1.7.47) (2026-09-29)
+
+### Bug Fixes
+
+- **pinot-driver,dremio-driver,druid-driver:** interpret LIKE wildcard escaping ([#11811](https://github.com/cube-js/cube/issues/11811)) ([b608adc](https://github.com/cube-js/cube/commit/b608adcb64d2eb608809c32e472276a96e2af7ad))
+
+## [1.7.46](https://github.com/cube-js/cube/compare/v1.7.45...v1.7.46) (2026-09-26)
+
+**Note:** Version bump only for package @cubejs-backend/pinot-driver
+
 ## [1.7.45](https://github.com/cube-js/cube/compare/v1.7.44...v1.7.45) (2026-09-25)
 
 **Note:** Version bump only for package @cubejs-backend/pinot-driver

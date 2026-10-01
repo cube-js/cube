@@ -350,3 +350,27 @@ async fn default_week_from_a_range_is_not_served_by_a_sql_week() {
         assert_eq!(rollup, source);
     }
 }
+
+/// The same `sql` week queried through a view. The rollup stores the week under
+/// the member the view member references, and the view member reads that
+/// stored column rather than recomputing the week from the source's columns.
+#[tokio::test(flavor = "multi_thread")]
+async fn sql_granularity_through_a_view_reads_the_stored_column() {
+    let query = indoc! {r#"
+        measures:
+          - demand_view.net_demand_a
+        time_dimensions:
+          - dimension: demand_view.plain_date
+            granularity: week
+            dateRange:
+              - "2025-02-02"
+              - "2025-02-15"
+        order:
+          - id: demand_view.plain_date
+    "#};
+    if let Some((rollup, source)) =
+        rollup_vs_source(query, &["demand_by_plain_week_non_strict"]).await
+    {
+        assert_eq!(rollup, source);
+    }
+}

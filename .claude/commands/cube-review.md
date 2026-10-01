@@ -70,6 +70,11 @@ the completed review). While work is still in progress — todos partially check
 "working…" spinner, intermediate status updates — keep everything visible so the
 reader can watch progress without expanding anything.
 
+Subagents run in the foreground, so the comment cannot change while one is
+working. Update it before every `Task` launch, naming the step now in progress,
+and again as each todo completes. Launch independent subagents in a single
+message, so they run in parallel rather than one after another.
+
 On the final update, hide EVERYTHING — including the todo checklist itself —
 inside a single collapsed `<details>` block. The completed checklist is just
 stale progress signal at that point; it belongs behind the spoiler alongside the

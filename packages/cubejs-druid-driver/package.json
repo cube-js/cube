@@ -2,7 +2,7 @@
   "name": "@cubejs-backend/druid-driver",
   "description": "Cube Druid database driver",
   "author": "Cube Dev, Inc.",
-  "version": "1.7.45",
+  "version": "1.7.48",
   "license": "Apache-2.0",
   "repository": {
     "type": "git",
@@ -18,6 +18,7 @@
     "build": "rm -rf dist && npm run tsc",
     "tsc": "tsc",
     "watch": "tsc -w",
+    "unit": "jest --verbose dist/test/unit",
     "integration": "NODE_OPTIONS=--experimental-vm-modules jest dist/test/*.js",
     "integration:druid": "NODE_OPTIONS=--experimental-vm-modules jest dist/test/*.js"
   },
@@ -26,13 +27,13 @@
     "dist/src/*"
   ],
   "dependencies": {
-    "@cubejs-backend/base-driver": "1.7.45",
-    "@cubejs-backend/schema-compiler": "1.7.45",
-    "@cubejs-backend/shared": "1.7.45",
+    "@cubejs-backend/base-driver": "1.7.48",
+    "@cubejs-backend/schema-compiler": "1.7.48",
+    "@cubejs-backend/shared": "1.7.48",
     "axios": "^1.8.3"
   },
   "devDependencies": {
-    "@cubejs-backend/linter": "1.7.45",
+    "@cubejs-backend/linter": "1.7.48",
     "@types/jest": "^29",
     "@types/node": "^22",
     "jest": "^29",

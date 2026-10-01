@@ -24,6 +24,9 @@ paths:
       #     description: When set to "true", only views (entries with type="view") and their viewGroups are returned, excluding cubes
       description: ""
       operationId: "metaV1"
+      parameters:
+        - $ref: "#/components/parameters/RequestId"
+        - $ref: "#/components/parameters/Traceparent"
       responses:
         "200":
           description: "successful operation"
@@ -47,6 +50,9 @@ paths:
     post:
       summary: "Load data via Cube JSON Query"
       operationId: "loadV1"
+      parameters:
+        - $ref: "#/components/parameters/RequestId"
+        - $ref: "#/components/parameters/Traceparent"
       requestBody:
         content:
           'application/json':
@@ -74,6 +80,27 @@ paths:
 security:
   - bearerAuth: []
 components:
+  parameters:
+    RequestId:
+      in: header
+      name: x-request-id
+      required: false
+      description: Request id for tracing; a request with an invalid id is rejected with 400. Generated when neither this header nor traceparent is sent.
+      schema:
+        type: string
+        minLength: 1
+        maxLength: 128
+        pattern: "^[A-Za-z0-9+/=._:@~-]+$"
+    Traceparent:
+      in: header
+      name: traceparent
+      required: false
+      description: W3C trace context header, used as the request id when x-request-id is absent. Same rules as x-request-id.
+      schema:
+        type: string
+        minLength: 1
+        maxLength: 128
+        pattern: "^[A-Za-z0-9+/=._:@~-]+$"
   securitySchemes:
     bearerAuth:
       type: http

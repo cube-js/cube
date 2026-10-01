@@ -3,6 +3,28 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.7.48](https://github.com/cube-js/cube/compare/v1.7.47...v1.7.48) (2026-10-01)
+
+### Bug Fixes
+
+- **cubesql:** Keep date filters past 2262-04-11 from aborting the planner ([#11978](https://github.com/cube-js/cube/issues/11978)) ([fd07cc2](https://github.com/cube-js/cube/commit/fd07cc24df08794b5f8b79898005f0d3c21f75f6))
+- **cubesql:** render MSSQL booleans in scalar and predicate contexts ([#11827](https://github.com/cube-js/cube/issues/11827)) ([227cbe2](https://github.com/cube-js/cube/commit/227cbe26ba8e203cb1059cb097dc812fb76d3259)), closes [#11826](https://github.com/cube-js/cube/issues/11826)
+
+## [1.7.47](https://github.com/cube-js/cube/compare/v1.7.46...v1.7.47) (2026-09-29)
+
+### Bug Fixes
+
+- **cubesql:** Always output 6 fractional digits for `.US` in `TO_CHAR` ([#12038](https://github.com/cube-js/cube/issues/12038)) ([c9565a1](https://github.com/cube-js/cube/commit/c9565a188a0f65142e5f771a9830bd1d91c73bd8))
+- **cubesql:** Don't drop filters over literal subqueries ([#12039](https://github.com/cube-js/cube/issues/12039)) ([ead9b41](https://github.com/cube-js/cube/commit/ead9b41861034e9a7007b1d8407ce34c00a6860e))
+
+### Features
+
+- **server-core:** make dev mode opt-in and stop respecting NODE_ENV ([#11959](https://github.com/cube-js/cube/issues/11959)) ([4034a90](https://github.com/cube-js/cube/commit/4034a90bb1c59a815e0558daffa1d0625c40b7aa))
+
+## [1.7.46](https://github.com/cube-js/cube/compare/v1.7.45...v1.7.46) (2026-09-26)
+
+**Note:** Version bump only for package @cubejs-backend/cubesql
+
 ## [1.7.45](https://github.com/cube-js/cube/compare/v1.7.44...v1.7.45) (2026-09-25)
 
 **Note:** Version bump only for package @cubejs-backend/cubesql

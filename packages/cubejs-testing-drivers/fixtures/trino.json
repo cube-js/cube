@@ -258,7 +258,11 @@
     "querying BigECommerce with Retail Calendar: totalCountRetailWeekAgo",
     "Tesseract: querying BigECommerce with Retail Calendar: totalCountRetailWeekAgo",
     "querying custom granularities ECommerce: count by three_months_by_march + no dimension",
-    "querying custom granularities ECommerce: count by three_months_by_march + dimension"
+    "querying custom granularities ECommerce: count by three_months_by_march + dimension",
+    "---- Time-shifted measure rolled up from a rollup: native planner, Postgres and BigQuery only ----",
+    "querying RetailOrders: named prior month by category for one day (pre-aggregation in CubeStore)",
+    "querying RetailOrders: named prior month by category over two months (pre-aggregation in CubeStore)",
+    "SQL API: named prior month by category for one day"
   ],
   "tesseractSkip": [
     "---------------------------------------",
@@ -293,6 +297,10 @@
     "SQL API: Nested Rollup with aliases",
     "---- Calendar-shifted measure stored in a rollup: covered on Postgres only for now ----",
     "querying BigECommerce with Retail Calendar: prior year and month by week (no pre-aggregation)",
-    "querying BigECommerce with Retail Calendar: prior year and month by week (pre-aggregation in CubeStore)"
+    "querying BigECommerce with Retail Calendar: prior year and month by week (pre-aggregation in CubeStore)",
+    "---- Time-shifted measure rolled up from a rollup: native planner, Postgres and BigQuery only ----",
+    "querying RetailOrders: named prior month by category for one day (pre-aggregation in CubeStore)",
+    "querying RetailOrders: named prior month by category over two months (pre-aggregation in CubeStore)",
+    "SQL API: named prior month by category for one day"
   ]
 }

@@ -25,6 +25,13 @@ use std::future::Future;
 use std::{collections::HashMap, env, ops::Deref, sync::Arc};
 use uuid::Uuid;
 
+#[cfg(test)]
+mod mssql_boolean_contexts;
+#[cfg(test)]
+pub(crate) use mssql_boolean_contexts::{mssql_boolean_fixture, mssql_boolean_templates};
+#[cfg(test)]
+mod test_boolean_context;
+
 pub mod rewrite_engine;
 #[cfg(test)]
 pub mod test_bi_workarounds;

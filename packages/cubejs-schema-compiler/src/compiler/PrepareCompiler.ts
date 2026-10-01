@@ -1,4 +1,4 @@
-import { SchemaFileRepository } from '@cubejs-backend/shared';
+import { getEnv, SchemaFileRepository } from '@cubejs-backend/shared';
 import { NativeInstance } from '@cubejs-backend/native';
 import { v4 as uuidv4 } from 'uuid';
 import { LRUCache } from 'lru-cache';
@@ -40,6 +40,13 @@ export type PrepareCompilerOptions = {
   compiledScriptCache?: LRUCache<string, vm.Script>;
   compiledYamlCache?: LRUCache<string, string>;
   compiledJinjaCache?: LRUCache<string, string>;
+  /**
+   * Shared VM realm and string interning together. Defaults to CUBEJS_COMPILER_MULTI_TENANT_SHARING.
+   */
+  multiTenantSharing?: boolean;
+  // Per-feature overrides of multiTenantSharing, for tests
+  sharedVmContext?: boolean;
+  internStrings?: boolean;
 };
 
 export interface CompilerInterface {
@@ -60,16 +67,25 @@ export type Compiler = {
 
 export const prepareCompiler = (repo: SchemaFileRepository, options: PrepareCompilerOptions = {}): Compiler => {
   const nativeInstance = options.nativeInstance || new NativeInstance();
+  const multiTenantSharing = options.multiTenantSharing ?? getEnv('compilerMultiTenantSharing');
+  const internStrings = options.internStrings ?? multiTenantSharing;
   const cubeDictionary = new CubeDictionary();
   const cubeSymbols = new CubeSymbols();
   const viewCompiler = new CubeSymbols(true);
   const viewCompilationGate = new ViewCompilationGate();
   const cubeValidator = new CubeValidator(cubeSymbols);
-  const cubeEvaluator = new CubeEvaluator(cubeValidator);
+  const cubeEvaluator = new CubeEvaluator(cubeValidator, { internStrings });
   const contextEvaluator = new ContextEvaluator(cubeEvaluator);
   const viewGroupEvaluator = new ViewGroupEvaluator(cubeEvaluator, cubeValidator);
   const joinGraph = new JoinGraph(cubeValidator, cubeEvaluator);
-  const metaTransformer = new CubeToMetaTransformer(cubeValidator, cubeEvaluator, contextEvaluator, viewGroupEvaluator, joinGraph);
+  const metaTransformer = new CubeToMetaTransformer(
+    cubeValidator,
+    cubeEvaluator,
+    contextEvaluator,
+    viewGroupEvaluator,
+    joinGraph,
+    { internStrings },
+  );
   const { maxQueryCacheSize, maxQueryCacheAge } = options;
   const compilerCache = new CompilerCache({ maxQueryCacheSize, maxQueryCacheAge });
   const yamlCompiler = new YamlCompiler(cubeSymbols, cubeDictionary, nativeInstance, viewCompiler);
@@ -119,7 +135,8 @@ export const prepareCompiler = (repo: SchemaFileRepository, options: PrepareComp
     nativeInstance,
     yamlCompiler,
     compilerId,
-    ...options
+    ...options,
+    sharedVmContext: options.sharedVmContext ?? multiTenantSharing,
   });
 
   return {

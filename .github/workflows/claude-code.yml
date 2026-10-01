@@ -28,6 +28,7 @@ jobs:
         )
       )
     runs-on: ubuntu-latest
+    timeout-minutes: 60
     permissions:
       contents: read
       pull-requests: write
@@ -43,8 +44,33 @@ jobs:
       - name: Run Claude Code
         id: claude
         uses: anthropics/claude-code-action@v1
+        env:
+          # The action stops at the first `result`, which a background subagent
+          # makes arrive mid-run (anthropics/claude-code-action#1499).
+          CLAUDE_CODE_DISABLE_BACKGROUND_TASKS: "1"
         with:
           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+
+      # Artifacts of a public repo are downloadable by any GitHub user, so the
+      # transcript is encrypted to an age key held by the Cube team. Decrypt with
+      # `age -d -i <key> claude-execution.json.gz.age | gunzip`.
+      - name: Encrypt execution log
+        if: always() && steps.claude.outputs.execution_file != ''
+        env:
+          EXECUTION_FILE: ${{ steps.claude.outputs.execution_file }}
+          AGE_RECIPIENT: age1qffmjdq624j4admp7h3svuxtnd8fqm354hfzqr0zfnthct55752qer4g80
+        run: |
+          sudo apt-get update -qq && sudo apt-get install -y -qq age > /dev/null
+          gzip -c "$EXECUTION_FILE" | age -r "$AGE_RECIPIENT" -o "$RUNNER_TEMP/claude-execution.json.gz.age"
+
+      - name: Upload execution log
+        if: always() && steps.claude.outputs.execution_file != ''
+        uses: actions/upload-artifact@v7
+        with:
+          name: claude-execution-log
+          path: ${{ runner.temp }}/claude-execution.json.gz.age
+          retention-days: 14
+          if-no-files-found: ignore
 
   # `/bot-review` command in a PR comment
   # Only Cube team can trigger review for now

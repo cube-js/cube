@@ -187,6 +187,40 @@ which takes precedence over this environment variable. The SQL API compiler
 cache reads this environment variable only, so the configuration option does not
 affect it.
 
+## `CUBEJS_COMPILER_MULTI_TENANT_SHARING`
+
+If `true`, data models of different tenants in one process share what they
+can: model files are evaluated in one shared JavaScript context, the caches of
+compiled JavaScript and transpiled YAML files are shared (tenants with
+identical model files reuse each other's entries), and identical strings of
+compiled data models are kept once. Reduces memory in multi-tenant
+deployments. The Jinja render cache stays per data model, because rendered
+templates depend on the security context.
+
+| Possible Values  | Default in Development | Default in Production |
+| ---------------- | ---------------------- | --------------------- |
+| `true`, `false`  | `false`                | `false`               |
+
+<Warning>
+Data models run in one JavaScript realm, which differs from a realm per data
+model in these ways:
+
+- Built-in objects (`Object`, `Array`, `JSON`, ...) are shared, so a data model
+  that changes them, e.g., by adding to `Array.prototype`, affects every
+  tenant. Assigning or deleting a global, even `JSON`, stays per tenant.
+- In a non-strict file, `typeof` of an undeclared name throws a
+  `ReferenceError` instead of returning `'undefined'` (except for `module`,
+  `exports` and `define`), and a strict function in it that assigns to an
+  undeclared name creates a global instead of throwing a `ReferenceError`.
+  Files that start with `'use strict'` behave as usual.
+- Setting a property on `this` in a non-strict function called without a
+  receiver, which is the shared global object, throws a `TypeError`.
+- `new Function(...)` and direct `eval` see the data model's globals, but
+  indirect eval (`(0, eval)(...)`) and a function constructor reached through a
+  prototype (`(function () {}).constructor`) run in the shared global scope,
+  where they don't.
+</Warning>
+
 ## `CUBEJS_CONCURRENCY`
 
 The number of concurrent connections each query queue has to the database.
@@ -1219,11 +1253,25 @@ option](/reference/configuration/config#context_to_api_scopes).
 
 ## `CUBEJS_DEV_MODE`
 
-If `true`, enables [development mode](/docs/data-modeling/dev-mode).
+If `true`, enables [development mode](/docs/data-modeling/dev-mode). Otherwise
+development mode is off, and `NODE_ENV` is ignored — except that the `cubejs dev-server`
+command and the `cubejs-dev-server` bin turn it on for themselves when this variable is
+unset, and code that embeds `@cubejs-backend/server-core` directly can do the same with
+the `devServer` option it passes to `CubejsServerCore`. Setting this variable to `false`
+overrides both commands; the `devServer` option takes precedence over it.
 
-| Possible Values | Default in Development | Default in Production |
-| --------------- | ---------------------- | --------------------- |
-| `true`, `false` | `true`                 | `false`               |
+| Possible Values | Default   |
+| --------------- | --------- |
+| `true`, `false` | `false`   |
+
+<Note>
+
+`NODE_ENV` used to enable development mode whenever it was anything but `production`,
+which put an instance with no `NODE_ENV` at all into development mode. That is
+deprecated and no longer happens; Cube prints a warning if it sees a non-production
+`NODE_ENV` with `CUBEJS_DEV_MODE` unset. Set `CUBEJS_DEV_MODE=true` instead.
+
+</Note>
 
 <DevModeWarning />
 
@@ -1410,9 +1458,10 @@ original spacing are not kept. Every string argument is redacted, a granularity 
 as it was received. A statement Cube could not redact at all, such as a malformed request
 body or a SQL API error raised before the statement was read, is logged as `redacted`.
 
-It is off by default in development mode, that is when `NODE_ENV` is not `production` or
-[`CUBEJS_DEV_MODE`](#cubejs_dev_mode) is `true`, so runnable SQL statements can be read
-from the console.
+It is off by default in development mode — whether that comes from
+[`CUBEJS_DEV_MODE`](#cubejs_dev_mode), from a dev server command, or from the
+`devServer` option an embedder passes to `CubejsServerCore` — so runnable SQL
+statements can be read from the console.
 
 | Possible Values | Default in Development | Default in Production |
 | --------------- | ---------------------- | --------------------- |
@@ -1459,6 +1508,10 @@ to use for storing pre-aggregations.
 | Possible Values | Default in Development | Default in Production   |
 | --------------- | ---------------------- | ----------------------- |
 | A valid string  | `dev_pre_aggregations` | `prod_pre_aggregations` |
+
+When this variable is unset, Cube writes the schema it resolved into it at startup, so
+that drivers reading the variable directly use the same schema as the rest of the
+instance. A value you set yourself is never overwritten.
 
 It can be also set using the [`pre_aggregations_schema` configuration
 option](/reference/configuration/config#pre_aggregations_schema).
@@ -1522,7 +1575,7 @@ this variable.
 
 To check an `every`-based [`refresh_key`](/reference/data-modeling/cube#refresh_key), Cube
 asks the database what time it is. If `true`, it uses its own clock instead and those
-queries stop entirely, including the ones scheduled refresh issues to warm them.
+SQL queries stop entirely, including the ones issued by scheduled refresh.
 
 | Possible Values | Default in Development | Default in Production |
 | --------------- | ---------------------- | --------------------- |
@@ -1534,10 +1587,12 @@ tenant, and timezone in the deployment.
 
 Refresh keys written with `sql` or marked
 [`incremental`](/reference/data-modeling/pre-aggregations#incremental) keep querying the
-database, since their values depend on your data and not just on the time. So do all
-refresh keys if you have set
-[`queryCacheOptions.refreshKeyRenewalThreshold`][ref-config-query-cache-options], which
-works by caching the query result.
+database, since their values depend on your data and not just on the time.
+
+[`queryCacheOptions.refreshKeyRenewalThreshold`][ref-config-query-cache-options] is still
+honoured: when set, the locally computed value is cached and renewed exactly like the SQL
+result, and scheduled refresh warms it without querying the database. Without an
+override, local keys are computed from the current time on every check.
 
 <Warning>
 
@@ -1979,7 +2034,9 @@ The Secret Access Key for AWS. Required when using AWS S3.
 ## `CUBESTORE_AWS_CREDS_REFRESH_EVERY_MINS`
 
 The number of minutes after which Cube Store should refresh AWS credentials.
-Required when using an AWS instance role.
+Required when using an AWS instance role. In web identity mode, the default is a
+30-second poll, any override is capped at 5 minutes, and `0` disables the refresh
+(STS credentials then expire after one session).
 
 | Possible Values           | Default in Development | Default in Production |
 | ------------------------- | ---------------------- | --------------------- |
@@ -1992,7 +2049,7 @@ not set and this variable is present, Cube Store authenticates to S3 using AWS W
 Identity (for example, [IRSA](https://docs.aws.amazon.com/eks/latest/userguide/iam-roles-for-service-accounts.html)
 on Amazon EKS): it exchanges the token for
 temporary credentials via STS `AssumeRoleWithWebIdentity` and re-exchanges them
-when the token file changes.
+before they expire or when the token file changes.
 
 | Possible Values | Default in Development | Default in Production |
 | --------------- | ---------------------- | --------------------- |

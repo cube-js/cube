@@ -3,6 +3,32 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.7.48](https://github.com/cube-js/cube/compare/v1.7.47...v1.7.48) (2026-10-01)
+
+### Bug Fixes
+
+- **cubesql:** render MSSQL booleans in scalar and predicate contexts ([#11827](https://github.com/cube-js/cube/issues/11827)) ([227cbe2](https://github.com/cube-js/cube/commit/227cbe26ba8e203cb1059cb097dc812fb76d3259)), closes [#11826](https://github.com/cube-js/cube/issues/11826)
+- **tesseract:** Keep query-level join hints while matching pre-aggregations ([#11858](https://github.com/cube-js/cube/issues/11858)) ([8088554](https://github.com/cube-js/cube/commit/8088554d3a53b3331ae97767b2ffe8482e0d4836))
+
+### Features
+
+- **schema-compiler:** require includes or excludes in accessPolicy memberLevel ([#11934](https://github.com/cube-js/cube/issues/11934)) ([b42a9c2](https://github.com/cube-js/cube/commit/b42a9c2a2a4e0014226d88355af313f533220336)), closes [#11629](https://github.com/cube-js/cube/issues/11629)
+
+### Performance Improvements
+
+- **schema-compiler:** Share compile state across tenants with CUBEJS_COMPILER_MULTI_TENANT_SHARING ([#12049](https://github.com/cube-js/cube/issues/12049)) ([a62e704](https://github.com/cube-js/cube/commit/a62e70488b3a67cbec204fa58711cc7e938ad9d9))
+
+## [1.7.47](https://github.com/cube-js/cube/compare/v1.7.46...v1.7.47) (2026-09-29)
+
+### Bug Fixes
+
+- **pinot-driver,dremio-driver,druid-driver:** interpret LIKE wildcard escaping ([#11811](https://github.com/cube-js/cube/issues/11811)) ([b608adc](https://github.com/cube-js/cube/commit/b608adcb64d2eb608809c32e472276a96e2af7ad))
+- **query-orchestrator:** Don't clip partition builds to the query date range ([#12027](https://github.com/cube-js/cube/issues/12027)) ([52d4712](https://github.com/cube-js/cube/commit/52d4712d5d71bfbee9abeb7d4055a92a6b2b33d6)), closes [#11317](https://github.com/cube-js/cube/issues/11317)
+
+## [1.7.46](https://github.com/cube-js/cube/compare/v1.7.45...v1.7.46) (2026-09-26)
+
+**Note:** Version bump only for package @cubejs-backend/schema-compiler
+
 ## [1.7.45](https://github.com/cube-js/cube/compare/v1.7.44...v1.7.45) (2026-09-25)
 
 ### Bug Fixes

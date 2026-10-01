@@ -1,0 +1,9 @@
+---
+source: cubesqlplanner/cubesqlplanner/src/tests/integration/view_members.rs
+expression: result
+---
+orders_view__city | orders_view__name | orders_view__count
+------------------+-------------------+-------------------
+***               | Alice             | 4                 
+***               | Bob               | 3                 
+***               | Diana             | 1

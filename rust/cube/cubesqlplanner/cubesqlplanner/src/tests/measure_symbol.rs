@@ -180,6 +180,81 @@ fn measure_rolling_window_properties() {
     assert!(measure.is_cumulative());
 }
 
+#[test]
+fn time_shift_proxy_of_additive_measure_is_additive() {
+    let ctx = ctx();
+    for name in [
+        "shifted_total",
+        "shifted_total_as_number",
+        "shifted_count_as_number",
+        "shifted_shifted_total",
+        "shifted_maximum",
+        "shifted_maximum_as_number",
+        "shifted_approx_count",
+        "shifted_total_as_average",
+    ] {
+        let m = ctx
+            .create_measure(&format!("test_measures.{}", name))
+            .unwrap();
+        assert!(m.as_measure().unwrap().is_additive(), "{}", name);
+    }
+}
+
+#[test]
+fn time_shift_proxy_rolls_up_by_the_kind_of_the_measure_it_reads() {
+    let ctx = ctx();
+    let rollup_agg_type = |name: &str| {
+        let m = ctx
+            .create_measure(&format!("test_measures.{}", name))
+            .unwrap();
+        match m.as_measure().unwrap().rollup_kind() {
+            MeasureKind::Aggregated(a) => Some(a.agg_type()),
+            _ => None,
+        }
+    };
+    assert_eq!(
+        rollup_agg_type("shifted_maximum_as_number"),
+        Some(AggregationType::Max)
+    );
+    assert_eq!(
+        rollup_agg_type("shifted_shifted_total"),
+        Some(AggregationType::Sum)
+    );
+    assert_eq!(
+        rollup_agg_type("shifted_approx_count"),
+        Some(AggregationType::CountDistinctApprox)
+    );
+    // Not a proxy: rolls up by its own kind.
+    let m = ctx
+        .create_measure("test_measures.shifted_total_expression")
+        .unwrap();
+    assert!(matches!(
+        m.as_measure().unwrap().rollup_kind(),
+        MeasureKind::Calculated(_)
+    ));
+}
+
+#[test]
+fn multi_stage_measure_beyond_a_time_shift_proxy_is_not_additive() {
+    let ctx = ctx();
+    for name in [
+        "multi_stage_total",
+        "multi_stage_calculated",
+        "multi_stage_rank",
+        "shifted_distinct_count",
+        "shifted_rolling_sum",
+        "shifted_total_expression",
+        "shifted_average",
+        "shifted_total_reduced",
+        "shifted_total_filtered",
+    ] {
+        let m = ctx
+            .create_measure(&format!("test_measures.{}", name))
+            .unwrap();
+        assert!(!m.as_measure().unwrap().is_additive(), "{}", name);
+    }
+}
+
 // ─── patch_measure: valid type replacements ───────────────────────────────────
 
 #[test]

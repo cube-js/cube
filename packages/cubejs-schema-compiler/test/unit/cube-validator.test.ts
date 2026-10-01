@@ -1797,6 +1797,111 @@ describe('Cube Validation', () => {
     });
   });
 
+  describe('Access Policy memberLevel includes/excludes:', () => {
+    const cubeValidator = new CubeValidator(new CubeSymbols());
+
+    const newCube = (memberLevel: any, rest: any = {}) => ({
+      name: 'TestCube',
+      fileName: 'test.js',
+      sql: () => 'SELECT * FROM test',
+      accessPolicy: [{
+        group: 'admin',
+        memberLevel,
+        ...rest,
+      }]
+    });
+
+    it('should allow memberLevel with includes', () => {
+      const result = cubeValidator.validate(newCube({ includes: ['status'] }), new ConsoleErrorReporter());
+      expect(result.error).toBeFalsy();
+    });
+
+    it('should allow memberLevel with an empty includes list', () => {
+      const result = cubeValidator.validate(newCube({ includes: [] }), new ConsoleErrorReporter());
+      expect(result.error).toBeFalsy();
+    });
+
+    it('should allow memberLevel with includes: "*"', () => {
+      const result = cubeValidator.validate(newCube({ includes: '*' }), new ConsoleErrorReporter());
+      expect(result.error).toBeFalsy();
+    });
+
+    it('should allow memberLevel with excludes', () => {
+      const result = cubeValidator.validate(newCube({ excludes: ['ssn'] }), new ConsoleErrorReporter());
+      expect(result.error).toBeFalsy();
+    });
+
+    it('should allow memberLevel with both includes and excludes', () => {
+      const result = cubeValidator.validate(
+        newCube({ includes: '*', excludes: ['ssn'] }),
+        new ConsoleErrorReporter()
+      );
+      expect(result.error).toBeFalsy();
+    });
+
+    it('should reject an empty memberLevel', () => {
+      const result = cubeValidator.validate(newCube({}), new ConsoleErrorReporter());
+      expect(result.error).toBeTruthy();
+      expect(result.error?.message).toContain('must define either includes or excludes');
+    });
+
+    // The motivating shape. The rule reads only memberLevel, so memberMasking is
+    // inert here: this pins that the combination stays rejected, not the masking
+    // no-op itself, which lives in applyRowLevelSecurity (server-core).
+    it('should reject an empty memberLevel paired with memberMasking', () => {
+      const result = cubeValidator.validate(
+        newCube({}, { memberMasking: { includes: ['ssn'] } }),
+        new ConsoleErrorReporter()
+      );
+      expect(result.error).toBeTruthy();
+      expect(result.error?.message).toContain('must define either includes or excludes');
+    });
+
+    // The wording has to stay true for a policy with rowLevel filters, where a
+    // granted member is still masked outside the granted rows.
+    it('should point at excludes for members that must always be masked', () => {
+      const result = cubeValidator.validate(newCube({}), new ConsoleErrorReporter());
+      expect(result.error?.message).toContain('unmasked on every row the policy grants');
+      expect(result.error?.message).toContain('must always be masked belongs in excludes');
+    });
+
+    // The message keeps Joi's label: errors are deduped by message text, so
+    // without it two broken policies in one cube collapse into a single line
+    // naming neither.
+    it('should name each offending policy when several are empty', () => {
+      const cube = {
+        name: 'TestCube',
+        fileName: 'test.js',
+        sql: () => 'SELECT * FROM test',
+        accessPolicy: [
+          { group: 'admin', memberLevel: {} },
+          { group: 'analyst', memberLevel: {} },
+        ]
+      };
+
+      const result = cubeValidator.validate(cube, new ConsoleErrorReporter());
+      expect(result.error).toBeTruthy();
+      expect(result.error?.message).toContain('accessPolicy[0].memberLevel');
+      expect(result.error?.message).toContain('accessPolicy[1].memberLevel');
+      expect(result.error?.message.match(/must define either includes or excludes/g)).toHaveLength(2);
+    });
+
+    it('should still allow a policy that omits memberLevel entirely', () => {
+      const cube = {
+        name: 'TestCube',
+        fileName: 'test.js',
+        sql: () => 'SELECT * FROM test',
+        accessPolicy: [{
+          group: 'admin',
+          rowLevel: { allowAll: true }
+        }]
+      };
+
+      const result = cubeValidator.validate(cube, new ConsoleErrorReporter());
+      expect(result.error).toBeFalsy();
+    });
+  });
+
   describe('Custom time format for time dimensions (strptime)', () => {
     it('time dimension with valid strptime format - correct', async () => {
       const cubeValidator = new CubeValidator(new CubeSymbols());

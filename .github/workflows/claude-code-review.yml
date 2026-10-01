@@ -28,6 +28,7 @@ jobs:
     # auth gates.
     if: ${{ github.event_name != 'pull_request' || github.event.pull_request.draft == false }}
     runs-on: ubuntu-latest
+    timeout-minutes: 60
     permissions:
       contents: read
       pull-requests: write
@@ -42,6 +43,14 @@ jobs:
       # the payload is the caller's issue_comment, whose issue is the PR.
       ADDITIONAL_ALLOWED_TOOLS: ${{ contains(fromJSON('["OWNER", "MEMBER", "COLLABORATOR"]'), github.event.pull_request.author_association || github.event.issue.author_association) && ',Bash(docker:*),Bash(psql:*)' || '' }}
     steps:
+      # Cube is public OSS, so runner time is free for us, but Anthropic models
+      # are too expensive to spend on a review that gets cancelled halfway.
+      # Sleeping first lets a follow-up push cancel this run before any tokens
+      # are spent.
+      - name: Debounce pushes
+        if: github.event.action == 'synchronize'
+        run: sleep 90
+
       - name: React to trigger comment
         # Quick ACK so the user who typed /bot-review or /bot-deep-review sees
         # the bot picked up the command — actual review takes a few minutes.
@@ -90,6 +99,10 @@ jobs:
       - name: Review
         id: review
         uses: anthropics/claude-code-action@v1
+        env:
+          # The action stops at the first `result`, which a background subagent
+          # makes arrive mid-review (anthropics/claude-code-action#1499).
+          CLAUDE_CODE_DISABLE_BACKGROUND_TASKS: "1"
         with:
           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
           track_progress: true
@@ -164,6 +177,27 @@ jobs:
             else empty end)
           ' "$EXECUTION_FILE")
           if [ -n "$annotation" ]; then printf '%s\n' "$annotation"; fi
+
+      # Artifacts of a public repo are downloadable by any GitHub user, so the
+      # transcript is encrypted to an age key held by the Cube team. Decrypt with
+      # `age -d -i <key> claude-execution.json.gz.age | gunzip`.
+      - name: Encrypt execution log
+        if: always() && steps.review.outputs.execution_file != ''
+        env:
+          EXECUTION_FILE: ${{ steps.review.outputs.execution_file }}
+          AGE_RECIPIENT: age1qffmjdq624j4admp7h3svuxtnd8fqm354hfzqr0zfnthct55752qer4g80
+        run: |
+          sudo apt-get update -qq && sudo apt-get install -y -qq age > /dev/null
+          gzip -c "$EXECUTION_FILE" | age -r "$AGE_RECIPIENT" -o "$RUNNER_TEMP/claude-execution.json.gz.age"
+
+      - name: Upload execution log
+        if: always() && steps.review.outputs.execution_file != ''
+        uses: actions/upload-artifact@v7
+        with:
+          name: claude-review-execution-log
+          path: ${{ runner.temp }}/claude-execution.json.gz.age
+          retention-days: 14
+          if-no-files-found: ignore
 
       - name: React to trigger comment (completion)
         if: always() && github.event_name == 'issue_comment'

@@ -312,11 +312,12 @@ with `NULL` values for the missing fact table.
 
 Putting measures from two facts side by side is often not the goal — you want a
 single metric derived from both, such as revenue per order where revenue and
-order count come from different fact tables. Neither cube can define it, because
-neither can reference the other's measures.
+order count come from different fact tables.
 
-Define it as a [measure of the view][ref-view-measures] instead, and mark it
-[`multi_stage`][ref-multi-stage]:
+Define it as a [measure of the view][ref-view-measures], and mark it
+[`multi_stage`][ref-multi-stage]. One of the fact cubes can also own it instead;
+the [average order value recipe][ref-recipe-aov-placement] compares the two
+placements.
 
 <CodeGroup>
 
@@ -403,6 +404,10 @@ on a measure that spans facts, `multi_stage` is what's missing.
 
 The measure is queried like any other, on its own or next to its components, and
 grouped by any of the shared dimensions.
+
+To reuse this view measure in other views, make them extend the view that
+defines it. See [Reusing a view measure across
+views][ref-recipe-reuse-view-measures].
 
 ## Joining views in the SQL API
 
@@ -655,5 +660,7 @@ measures:
 [ref-measure-filters]: /reference/data-modeling/measures#filters
 [ref-multi-stage]: /reference/data-modeling/measures#multi_stage
 [ref-view-measures]: /reference/data-modeling/view#measures
+[ref-recipe-aov-placement]: /recipes/data-modeling/average-order-value#where-to-put-the-measure
+[ref-recipe-reuse-view-measures]: /recipes/data-modeling/reusing-view-measures
 [ref-sql-api]: /reference/core-data-apis/sql-api
 [link-tesseract]: https://cube.dev/blog/introducing-tesseract

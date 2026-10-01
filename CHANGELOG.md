@@ -3,6 +3,49 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.7.48](https://github.com/cube-js/cube/compare/v1.7.47...v1.7.48) (2026-10-01)
+
+### Bug Fixes
+
+- **cubesql:** Keep date filters past 2262-04-11 from aborting the planner ([#11978](https://github.com/cube-js/cube/issues/11978)) ([fd07cc2](https://github.com/cube-js/cube/commit/fd07cc24df08794b5f8b79898005f0d3c21f75f6))
+- **cubesql:** render MSSQL booleans in scalar and predicate contexts ([#11827](https://github.com/cube-js/cube/issues/11827)) ([227cbe2](https://github.com/cube-js/cube/commit/227cbe26ba8e203cb1059cb097dc812fb76d3259)), closes [#11826](https://github.com/cube-js/cube/issues/11826)
+- **tesseract:** Keep query-level join hints while matching pre-aggregations ([#11858](https://github.com/cube-js/cube/issues/11858)) ([8088554](https://github.com/cube-js/cube/commit/8088554d3a53b3331ae97767b2ffe8482e0d4836))
+
+### Features
+
+- **schema-compiler:** require includes or excludes in accessPolicy memberLevel ([#11934](https://github.com/cube-js/cube/issues/11934)) ([b42a9c2](https://github.com/cube-js/cube/commit/b42a9c2a2a4e0014226d88355af313f533220336)), closes [#11629](https://github.com/cube-js/cube/issues/11629)
+
+### Performance Improvements
+
+- **schema-compiler:** Share compile state across tenants with CUBEJS_COMPILER_MULTI_TENANT_SHARING ([#12049](https://github.com/cube-js/cube/issues/12049)) ([a62e704](https://github.com/cube-js/cube/commit/a62e70488b3a67cbec204fa58711cc7e938ad9d9))
+
+## [1.7.47](https://github.com/cube-js/cube/compare/v1.7.46...v1.7.47) (2026-09-29)
+
+### Bug Fixes
+
+- **cubesql:** Always output 6 fractional digits for `.US` in `TO_CHAR` ([#12038](https://github.com/cube-js/cube/issues/12038)) ([c9565a1](https://github.com/cube-js/cube/commit/c9565a188a0f65142e5f771a9830bd1d91c73bd8))
+- **cubesql:** Don't drop filters over literal subqueries ([#12039](https://github.com/cube-js/cube/issues/12039)) ([ead9b41](https://github.com/cube-js/cube/commit/ead9b41861034e9a7007b1d8407ce34c00a6860e))
+- **pinot-driver,dremio-driver,druid-driver:** interpret LIKE wildcard escaping ([#11811](https://github.com/cube-js/cube/issues/11811)) ([b608adc](https://github.com/cube-js/cube/commit/b608adcb64d2eb608809c32e472276a96e2af7ad))
+- **query-orchestrator:** Don't clip partition builds to the query date range ([#12027](https://github.com/cube-js/cube/issues/12027)) ([52d4712](https://github.com/cube-js/cube/commit/52d4712d5d71bfbee9abeb7d4055a92a6b2b33d6)), closes [#11317](https://github.com/cube-js/cube/issues/11317)
+- **query-orchestrator:** Wait continueWaitTimeout seconds for a queued stream, not 10x ([#12029](https://github.com/cube-js/cube/issues/12029)) ([ec35e19](https://github.com/cube-js/cube/commit/ec35e195aac3fa2d4a87795d9d9ff87ecef00439)), closes [#7501](https://github.com/cube-js/cube/issues/7501)
+
+### Features
+
+- **server-core:** make dev mode opt-in and stop respecting NODE_ENV ([#11959](https://github.com/cube-js/cube/issues/11959)) ([4034a90](https://github.com/cube-js/cube/commit/4034a90bb1c59a815e0558daffa1d0625c40b7aa))
+
+## [1.7.46](https://github.com/cube-js/cube/compare/v1.7.45...v1.7.46) (2026-09-26)
+
+### Bug Fixes
+
+- **cubeorchestrator:** Render Arrow binary columns as hex strings ([#12006](https://github.com/cube-js/cube/issues/12006)) ([0aa1a28](https://github.com/cube-js/cube/commit/0aa1a28779ce4ab2b906840ba5aaeae03a374f53))
+- **cubestore:** refresh S3 web identity credentials before STS expiry ([#11808](https://github.com/cube-js/cube/issues/11808)) ([64185da](https://github.com/cube-js/cube/commit/64185dad7a3965a772c356d3848cb6da4ca5e7e9)), closes [#11622](https://github.com/cube-js/cube/issues/11622)
+- **docker-jdbc:** Use bundled Node headers for JDBC builds ([#12002](https://github.com/cube-js/cube/issues/12002)) ([5dd3e2f](https://github.com/cube-js/cube/commit/5dd3e2f08f9763d9464d43859a63b01593a525a3))
+
+### Features
+
+- **query-orchestrator:** honour refreshKeyRenewalThreshold on locally evaluated refresh keys ([#11720](https://github.com/cube-js/cube/issues/11720)) ([935e094](https://github.com/cube-js/cube/commit/935e0948104476631bbe15aa787065aa7ee45ba2))
+- **tesseract:** roll up stored time-shifted measures from pre-aggregations ([#12010](https://github.com/cube-js/cube/issues/12010)) ([3d602b2](https://github.com/cube-js/cube/commit/3d602b29207548a2da8b8f8a4d5dc7863e53e4e7))
+
 ## [1.7.45](https://github.com/cube-js/cube/compare/v1.7.44...v1.7.45) (2026-09-25)
 
 ### Bug Fixes

@@ -11,6 +11,7 @@ use crate::planner::multi_fact_join_groups::{MeasuresJoinHints, MultiFactJoinGro
 use crate::planner::planners::multi_stage::TimeShiftState;
 use crate::planner::planners::CommonUtils;
 use crate::planner::state::State;
+use crate::planner::symbols::MeasureTimeShifts;
 use crate::planner::time_dimension::QueryDateTime;
 use crate::planner::MemberSymbol;
 use cubenativeutils::CubeError;
@@ -61,6 +62,10 @@ enum MultiStageMatch {
 
 pub struct PreAggregationOptimizer {
     query_tools: Rc<State>,
+    // The join hints the query was planned with. A query whose members alone don't
+    // determine a join root resolves only with these, so the query-side hint sets
+    // rebuilt here have to start from them.
+    query_join_hints: Rc<JoinHints>,
     allow_multi_stage: bool,
     usages: Vec<PreAggregationUsage>,
     usage_counter: usize,
@@ -70,9 +75,14 @@ pub struct PreAggregationOptimizer {
 }
 
 impl PreAggregationOptimizer {
-    pub fn new(query_tools: Rc<State>, allow_multi_stage: bool) -> Self {
+    pub fn new(
+        query_tools: Rc<State>,
+        query_join_hints: Rc<JoinHints>,
+        allow_multi_stage: bool,
+    ) -> Self {
         Self {
             query_tools,
+            query_join_hints,
             allow_multi_stage,
             usages: Vec::new(),
             usage_counter: 0,
@@ -456,7 +466,7 @@ impl PreAggregationOptimizer {
         let filtered_measures: Vec<Rc<MemberSymbol>> = pre_aggregation
             .measures
             .iter()
-            .filter(|m| matched_measures.contains(&m.full_name()))
+            .filter(|m| matched_measures.contains(&m.peel_refs().full_name()))
             .cloned()
             .collect();
         let schema = LogicalSchema {
@@ -616,8 +626,68 @@ impl PreAggregationOptimizer {
             && pre_aggregation
                 .measures
                 .iter()
-                .filter(|measure| matched_measures.contains(&measure.full_name()))
+                .filter(|measure| matched_measures.contains(&measure.peel_refs().full_name()))
                 .all(|measure| !time_shifts.has_shift_under(measure))
+    }
+
+    // A shift lands only on the time members a query reads: named and common
+    // shifts on all of them, a dimension shift on those it lists. Dropping a
+    // stored member the build shifted would drop part of the stored shift.
+    fn stored_shifts_carry_over(
+        pre_aggregation: &CompiledPreAggregation,
+        matched_measures: &HashSet<String>,
+        schema: &LogicalSchema,
+        filter: &LogicalFilter,
+    ) -> Result<bool, CubeError> {
+        let base_name = |member: &Rc<MemberSymbol>| {
+            resolve_base_symbol(member)
+                .resolve_reference_chain()
+                .full_name()
+        };
+        let stored_time_members: Vec<String> = pre_aggregation
+            .time_dimensions
+            .iter()
+            .chain(pre_aggregation.dimensions.iter())
+            .filter(|member| {
+                resolve_base_symbol(member)
+                    .resolve_reference_chain()
+                    .as_dimension()
+                    .is_ok_and(|dimension| dimension.is_time())
+            })
+            .map(base_name)
+            .collect();
+        let read = Self::read_member_names(schema, filter);
+
+        for stored in pre_aggregation
+            .measures
+            .iter()
+            .filter(|m| matched_measures.contains(&m.peel_refs().full_name()))
+        {
+            let mut on_every_member = false;
+            let mut targets = HashSet::new();
+            let mut measure = stored.peel_refs().as_measure()?;
+            loop {
+                match measure.time_shift() {
+                    Some(MeasureTimeShifts::Dimensions(shifts)) => {
+                        targets.extend(shifts.iter().map(|shift| base_name(&shift.dimension)))
+                    }
+                    Some(_) => on_every_member = true,
+                    None => {}
+                }
+                match measure.time_shift_proxy_target() {
+                    Some(target) => measure = target.as_measure()?,
+                    None => break,
+                }
+            }
+            if stored_time_members
+                .iter()
+                .filter(|name| on_every_member || targets.contains(*name))
+                .any(|name| !read.contains(name))
+            {
+                return Ok(false);
+            }
+        }
+        Ok(true)
     }
 
     fn extract_date_range(
@@ -710,15 +780,26 @@ impl PreAggregationOptimizer {
             return Ok(None);
         };
 
+        if match_state == MatchState::Partial
+            && !Self::stored_shifts_carry_over(pre_aggregation, &matched_measures, schema, filters)?
+        {
+            return Ok(None);
+        }
+
         // An ungrouped read projects stored columns as they are, with no
         // aggregate around them, so a measure kept as a mergeable sketch would
         // reach the client as the sketch instead of a number.
         if matches!(row_grain, RowGrain::RawRows(_)) {
             for symbol in pre_aggregation.measures.iter() {
-                if !matched_measures.contains(symbol.full_name().as_str()) {
+                if !matched_measures.contains(symbol.peel_refs().full_name().as_str()) {
                     continue;
                 }
-                if symbol.as_measure()?.kind().is_stored_as_state() {
+                if symbol
+                    .peel_refs()
+                    .as_measure()?
+                    .rollup_kind()
+                    .is_stored_as_state()
+                {
                     return Ok(None);
                 }
             }
@@ -748,7 +829,7 @@ impl PreAggregationOptimizer {
                 let query_has_multiplied = if has_filters {
                     MultiFactJoinGroups::try_new(
                         self.query_tools.clone(),
-                        MeasuresJoinHints::builder(&JoinHints::new())
+                        MeasuresJoinHints::builder(&self.query_join_hints)
                             .add_dimensions(&schema.dimensions)
                             .add_dimensions(&schema.time_dimensions)
                             .add_filters(&filters.dimensions_filters)
@@ -897,7 +978,7 @@ impl PreAggregationOptimizer {
         schema: &Rc<LogicalSchema>,
         measures: &[Rc<MemberSymbol>],
     ) -> Result<MultiFactJoinGroups, CubeError> {
-        let hints = MeasuresJoinHints::builder(&JoinHints::new())
+        let hints = MeasuresJoinHints::builder(&self.query_join_hints)
             .add_dimensions(&schema.dimensions)
             .add_dimensions(&schema.time_dimensions)
             .build(measures)?;

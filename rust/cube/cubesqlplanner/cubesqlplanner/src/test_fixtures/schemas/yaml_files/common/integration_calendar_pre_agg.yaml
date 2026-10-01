@@ -248,3 +248,18 @@ cubes:
             granularity: day
           - dimension: plain_dates.plain_date
             granularity: week
+
+views:
+  # The fact and its `sql`-week date re-exported together. The view also names
+  # the column the week is defined over, since the granularity it re-exports is
+  # read in the view's own context.
+  - name: demand_view
+    cubes:
+      - join_path: demand
+        includes:
+          - net_demand_a
+          - item_dept
+      - join_path: demand.plain_dates
+        includes:
+          - plain_date
+          - retail_week_begin

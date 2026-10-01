@@ -365,7 +365,7 @@ impl QueryProperties {
             .iter()
             .flatten()
             .filter_map(|order| {
-                if order.member_evaluator.as_dimension().is_ok() {
+                if order.member_evaluator.peel_refs().as_dimension().is_ok() {
                     Some(order.member_evaluator.clone())
                 } else {
                     None
@@ -675,11 +675,9 @@ impl QueryProperties {
             self.fill_missed_measures_from_filter(item, &mut measures)?;
         }
         for item in self.order_by.iter().flatten() {
-            if let Ok(measure) = item.member_evaluator.as_measure() {
-                if !measures
-                    .iter()
-                    .any(|m| m.full_name() == measure.full_name())
-                {
+            if item.member_evaluator.peel_refs().as_measure().is_ok() {
+                let name = item.member_evaluator.full_name();
+                if !measures.iter().any(|m| m.full_name() == name) {
                     measures.push(item.member_evaluator.clone());
                 }
             }

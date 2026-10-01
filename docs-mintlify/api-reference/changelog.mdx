@@ -7,6 +7,12 @@ rss: true
 {/* GENERATED FILE — do not edit by hand. */}
 {/* Run scripts/extract-changelog.mjs against the platform client CHANGELOG.md. */}
 
+<Update label="2026-09-29" description="v0.16.0" tags={["Changed"]}>
+  ### Changed
+
+  - `POST /api/v1/deployments/{deploymentId}/workbooks/{workbookId}/publish` (`WorkbooksPublicController.publishDashboard`) publishes the saved dashboard draft when `config` is omitted, so the request only needs `workbookId`. An explicit `config` remains supported for existing clients.
+</Update>
+
 <Update label="2026-09-25" description="v0.15.0" tags={["Added"]}>
   ### Added
 

@@ -3,6 +3,24 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.7.48](https://github.com/cube-js/cube/compare/v1.7.47...v1.7.48) (2026-10-01)
+
+### Performance Improvements
+
+- **schema-compiler:** Share compile state across tenants with CUBEJS_COMPILER_MULTI_TENANT_SHARING ([#12049](https://github.com/cube-js/cube/issues/12049)) ([a62e704](https://github.com/cube-js/cube/commit/a62e70488b3a67cbec204fa58711cc7e938ad9d9))
+
+## [1.7.47](https://github.com/cube-js/cube/compare/v1.7.46...v1.7.47) (2026-09-29)
+
+### Features
+
+- **server-core:** make dev mode opt-in and stop respecting NODE_ENV ([#11959](https://github.com/cube-js/cube/issues/11959)) ([4034a90](https://github.com/cube-js/cube/commit/4034a90bb1c59a815e0558daffa1d0625c40b7aa))
+
+## [1.7.46](https://github.com/cube-js/cube/compare/v1.7.45...v1.7.46) (2026-09-26)
+
+### Features
+
+- **query-orchestrator:** honour refreshKeyRenewalThreshold on locally evaluated refresh keys ([#11720](https://github.com/cube-js/cube/issues/11720)) ([935e094](https://github.com/cube-js/cube/commit/935e0948104476631bbe15aa787065aa7ee45ba2))
+
 ## [1.7.45](https://github.com/cube-js/cube/compare/v1.7.44...v1.7.45) (2026-09-25)
 
 **Note:** Version bump only for package @cubejs-backend/server-core

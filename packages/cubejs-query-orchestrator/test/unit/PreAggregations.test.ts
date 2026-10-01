@@ -9,7 +9,8 @@ import {
 } from '@cubejs-backend/shared';
 import crypto from 'crypto';
 
-import { PreAggregationLoadCache, PreAggregationLoader, PreAggregationPartitionRangeLoader, PreAggregations, QueryCache, LocalCacheDriver, version, type QueryWithParams } from '../../src';
+import { PreAggregationLoadCache, PreAggregationLoader, PreAggregationPartitionRangeLoader, PreAggregations, QueryCache, QueryCacheOptions, LocalCacheDriver, version, type QueryWithParams } from '../../src';
+import { evaluateLocalRefreshKey } from '../../src/orchestrator/utils';
 
 class MockDriver {
   public tables: string[] = [];
@@ -615,20 +616,20 @@ describe('PreAggregations', () => {
     const REFRESH_KEY_SQL = 'SELECT FLOOR((UNIX_TIMESTAMP()) / 600) as refresh_key';
     const descriptor = { interval: 600, utcOffset: 0, dayOffset: 0, cron: false };
 
-    const newQueryCache = (localRefreshKey?: boolean) => new QueryCache(
+    const newQueryCache = (additional: Partial<QueryCacheOptions> = {}) => new QueryCache(
       'TEST',
       mockDriverFactory as any,
       // eslint-disable-next-line @typescript-eslint/no-empty-function
       () => {},
       {
         cacheAndQueueDriver: 'memory',
-        localRefreshKey,
         queueOptions: async () => ({ executionTimeout: 1, concurrency: 2 }),
+        ...additional,
       },
     );
 
-    const newLoadCache = (localRefreshKey?: boolean) => {
-      const cache = newQueryCache(localRefreshKey);
+    const newLoadCache = (additional: Partial<QueryCacheOptions> = {}) => {
+      const cache = newQueryCache(additional);
       (cache.getCacheDriver() as LocalCacheDriver).reset();
 
       const preAggregations = new PreAggregations(
@@ -649,7 +650,7 @@ describe('PreAggregations', () => {
     };
 
     test('keyQueryResult evaluates locally without querying the datasource', async () => {
-      const loadCache = newLoadCache(true);
+      const loadCache = newLoadCache({ localRefreshKey: true });
 
       const result = await loadCache.keyQueryResult(
         [REFRESH_KEY_SQL, [], { external: true, renewalThreshold: 60, localRefreshKey: descriptor }],
@@ -661,8 +662,28 @@ describe('PreAggregations', () => {
       expect(mockDriver!.executedQueries).toEqual([]);
     });
 
+    test('keyQueryResult evaluates locally under a refreshKeyRenewalThreshold', async () => {
+      const day = 24 * 60 * 60;
+      const loadCache = newLoadCache({ localRefreshKey: true, refreshKeyRenewalThreshold: day });
+      const now = 86_400_000 + 600_000;
+
+      const nowSpy = jest.spyOn(Date, 'now').mockReturnValue(now);
+      try {
+        const result = await loadCache.keyQueryResult(
+          [REFRESH_KEY_SQL, [], { external: true, renewalThreshold: 60, localRefreshKey: descriptor }],
+          false,
+          10,
+        );
+
+        expect(result).toEqual(evaluateLocalRefreshKey(descriptor, now));
+        expect(mockDriver!.executedQueries).toEqual([]);
+      } finally {
+        nowSpy.mockRestore();
+      }
+    });
+
     test('keyQueryResult still queries when the flag is off', async () => {
-      const loadCache = newLoadCache(false);
+      const loadCache = newLoadCache({ localRefreshKey: false });
 
       await loadCache.keyQueryResult(
         [REFRESH_KEY_SQL, [], { external: false, renewalThreshold: 60, localRefreshKey: descriptor }],
@@ -674,7 +695,7 @@ describe('PreAggregations', () => {
     });
 
     test('keyQueryResult still queries an incremental key that carries no descriptor', async () => {
-      const loadCache = newLoadCache(true);
+      const loadCache = newLoadCache({ localRefreshKey: true });
       const incrementalSql = 'SELECT CASE WHEN NOW() < $1 THEN FLOOR((UNIX_TIMESTAMP()) / 3600) END as refresh_key';
 
       await loadCache.keyQueryResult(
@@ -696,7 +717,7 @@ describe('PreAggregations', () => {
     // interval boundary would look a table up under one content version and enqueue it under
     // another.
     test('keyQueryResult is stable across an interval boundary within one load cache', async () => {
-      const loadCache = newLoadCache(true);
+      const loadCache = newLoadCache({ localRefreshKey: true });
       const key: [string, any[], Record<string, any>] =
         [REFRESH_KEY_SQL, [], { external: true, renewalThreshold: 60, localRefreshKey: descriptor }];
 
@@ -1533,6 +1554,7 @@ describe('PreAggregations', () => {
   describe('partitionPreAggregations', () => {
     const rangeA: [string, string] = ['2024-01-01T00:00:00.000', '2024-01-02T12:00:00.000'];
     const rangeB: [string, string] = ['2024-01-01T00:00:00.000', '2024-01-02T12:00:01.000'];
+    const nonRealTime = { partitionInvalidateKeyQueries: [['SELECT 1', []]] };
     const cache = () => {
       const entries = new Map<string, unknown>();
       const compilerCacheFn = <T>(key: string[], fn: () => T): T => {
@@ -1563,7 +1585,7 @@ describe('PreAggregations', () => {
 
     test('replaces A → B → A, updates second-level bounds and preserves old arrays', async () => {
       const { compilerCacheFn, entries } = cache();
-      const loader = createLoader({ partitionInvalidateKeyQueries: [['SELECT 1', []]] }, { compilerCacheFn });
+      const loader = createLoader(nonRealTime, { compilerCacheFn });
       const bounds = jest.spyOn(loader, 'loadBuildRange').mockResolvedValue(rangeA);
       const first = await loader.partitionPreAggregations();
       const original = JSON.stringify(first);
@@ -1579,7 +1601,7 @@ describe('PreAggregations', () => {
       expect(third).not.toBe(first);
       expect(third).toEqual(first);
       expect(entries.size).toBe(1);
-      expect([...entries.values()]).toEqual([{ rangeKey: JSON.stringify(rangeA), descriptions: third }]);
+      expect([...entries.values()]).toEqual([{ rangeKey: JSON.stringify([rangeA, rangeA[1]]), descriptions: third }]);
     });
 
     test('checks the current limit on hits and keeps the previous plan after failures', async () => {
@@ -1638,6 +1660,75 @@ describe('PreAggregations', () => {
       const full = await loader.partitionRanges(true);
       expect(full.partitionRanges).toHaveLength(2);
       expect(full.buildRange).toEqual(['2024-01-04T00:00:00.000', '2024-01-05T12:00:00.000']);
+    });
+
+    // https://github.com/cube-js/cube/issues/11317
+    test('does not clip the load range of a partition to the query range', async () => {
+      const matchedTimeDimensionDateRange = ['2024-01-01T00:00:00.000', '2024-01-02T11:59:59.999'];
+      const loader = createLoader({ matchedTimeDimensionDateRange, ...nonRealTime });
+      const { buildRange, partitionRanges } = await loader.partitionRanges();
+      expect(buildRange).toEqual(['2024-01-01T00:00:00.000', '2024-01-03T23:59:59.999']);
+      expect(partitionRanges).toHaveLength(2);
+
+      const partitions = await loader.partitionPreAggregations();
+      expect(partitions.map(p => p.tableName)).toEqual(['test_table20240101', 'test_table20240102']);
+      expect(partitions[1].buildRangeEnd).toBe('2024-01-02T23:59:59.999');
+      expect(partitions[1].loadSql).toBe(partitions[1].structureVersionLoadSql);
+    });
+
+    test('replans when the build range end moves inside the last selected partition', async () => {
+      const { compilerCacheFn } = cache();
+      // The query range is unchanged and ends before the build range, so only the build range end moves.
+      const matchedTimeDimensionDateRange = ['2024-01-01T00:00:00.000', '2024-01-02T06:00:00.000'];
+      const loader = createLoader({ matchedTimeDimensionDateRange, ...nonRealTime }, { compilerCacheFn });
+      const bounds = jest.spyOn(loader, 'loadBuildRange').mockResolvedValue(['2024-01-01T00:00:00.000', '2024-01-02T12:00:00.000']);
+      const first = await loader.partitionPreAggregations();
+      expect(first.map(p => p.buildRangeEnd)).toEqual(['2024-01-01T23:59:59.999', '2024-01-02T12:00:00.000']);
+
+      bounds.mockResolvedValue(['2024-01-01T00:00:00.000', '2024-01-02T18:00:00.000']);
+      const second = await loader.partitionPreAggregations();
+      expect(second).not.toBe(first);
+      expect(second.map(p => p.buildRangeEnd)).toEqual(['2024-01-01T23:59:59.999', '2024-01-02T18:00:00.000']);
+    });
+
+    test('keeps the plan when the build range end moves past the last selected partition', async () => {
+      const { compilerCacheFn } = cache();
+      const matchedTimeDimensionDateRange = ['2024-01-01T00:00:00.000', '2024-01-02T06:00:00.000'];
+      const loader = createLoader({ matchedTimeDimensionDateRange, ...nonRealTime }, { compilerCacheFn });
+      const bounds = jest.spyOn(loader, 'loadBuildRange').mockResolvedValue(['2024-01-01T00:00:00.000', '2024-01-05T10:00:00.000']);
+      const first = await loader.partitionPreAggregations();
+      expect(first.map(p => p.buildRangeEnd)).toEqual(['2024-01-01T23:59:59.999', '2024-01-02T23:59:59.999']);
+
+      bounds.mockResolvedValue(['2024-01-01T00:00:00.000', '2024-01-05T10:10:00.000']);
+      expect(await loader.partitionPreAggregations()).toBe(first);
+    });
+
+    // https://github.com/cube-js/cube/issues/11317
+    test('keeps the partition a query ends in for a rollupLambda member', async () => {
+      // A fresh build reports the partition's own load range end.
+      const loadSpy = jest.spyOn(PreAggregationLoader.prototype, 'loadPreAggregation').mockImplementation(async function loadPreAggregation(this: PreAggregationLoader) {
+        return {
+          targetTableName: this.preAggregation.tableName,
+          refreshKeyValues: [],
+          lastUpdatedAt: 1,
+          buildRangeEnd: this.preAggregation.buildRangeEnd,
+        };
+      });
+
+      try {
+        const loader = createLoader({
+          rollupLambdaId: 'orders.lambda',
+          lastRollupLambda: false,
+          matchedTimeDimensionDateRange: ['2024-01-01T00:00:00.000', '2024-01-02T11:59:59.999'],
+          ...nonRealTime,
+        });
+
+        const result = await loader.loadPreAggregations();
+        expect(result.targetTableName).toBe('(SELECT * FROM test_table20240101 UNION ALL SELECT * FROM test_table20240102)');
+        expect(result.buildRangeEnd).toBe('2024-01-02T23:59:59.999');
+      } finally {
+        loadSpy.mockRestore();
+      }
     });
 
     test.each([{ partitionGranularity: undefined }, { expandedPartition: true }])('passes through unpartitioned or expanded descriptions: %j', async overrides => {

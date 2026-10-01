@@ -1,8 +1,9 @@
 use super::common::{Case, CompiledMemberPath, MultiStageProperties};
 use super::deps::{self, symbol_deps};
 use super::measure_kinds::MeasureKind;
+use super::AggregationType;
 use super::SymbolPath;
-use super::{MemberSymbol, SymbolFactory};
+use super::{MemberSymbol, RefSymbol, SymbolFactory};
 use crate::cube_bridge::evaluator::CubeEvaluator;
 use crate::cube_bridge::measure_definition::{MeasureDefinition, RollingWindow};
 use crate::cube_bridge::member_sql::MemberSql;
@@ -257,20 +258,69 @@ impl MeasureSymbol {
     }
 
     /// True when the measure's aggregation distributes over row union
-    /// (sum-like). Multi-stage measures are never additive — their
-    /// value depends on the windowed stage, not on a plain sum.
+    /// (sum-like). A time-shift proxy is additive when the plain measure it
+    /// reads is; a rolling window stores overlapping windows, which are not.
     pub fn is_additive(&self) -> bool {
-        if self.is_multi_stage() {
-            false
-        } else {
-            self.kind.is_additive()
+        match self.rollup_target() {
+            Some(target) => {
+                !target.is_multi_stage() && !target.is_cumulative() && target.kind.is_additive()
+            }
+            None => !self.is_multi_stage() && self.kind.is_additive(),
         }
     }
 
+    /// The kind whose roll-up rules a stored column of this measure follows.
+    /// A time-shift proxy stores the value of the measure it reads, so it
+    /// rolls up by that measure's kind, an HLL state included.
+    pub fn rollup_kind(&self) -> MeasureKind {
+        match self.rollup_target() {
+            Some(target) => target.kind.clone(),
+            None => self.kind.clone(),
+        }
+    }
+
+    fn rollup_target(&self) -> Option<Rc<MeasureSymbol>> {
+        let target = self.time_shift_proxy_target()?.as_measure().ok()?;
+        Some(target.rollup_target().unwrap_or(target))
+    }
+
+    /// The measure a multi-stage measure reads unchanged under its time
+    /// shift: `sql` is a bare reference, the shift is the only modifier, and
+    /// the measure's own aggregation returns a single value as it is.
+    pub fn time_shift_proxy_target(&self) -> Option<Rc<MemberSymbol>> {
+        let multi_stage = self.multi_stage.as_ref()?;
+        multi_stage.time_shift.as_ref()?;
+        let grain = &multi_stage.grain;
+        let keeps_single_value = match &self.kind {
+            MeasureKind::Calculated(_) => true,
+            MeasureKind::Aggregated(a) => matches!(
+                a.agg_type(),
+                AggregationType::Sum
+                    | AggregationType::Min
+                    | AggregationType::Max
+                    | AggregationType::Avg
+            ),
+            _ => false,
+        };
+        if grain.exclude.is_some()
+            || grain.keep_only.is_some()
+            || grain.include.is_some()
+            || multi_stage.filter.is_some()
+            || self.rolling_window.is_some()
+            || self.case.is_some()
+            || !self.measure_filters.is_empty()
+            || !keeps_single_value
+        {
+            return None;
+        }
+        self.kind
+            .member_sql()?
+            .resolve_direct_reference()
+            .map(|target| target.resolve_reference_chain())
+    }
+
     /// SQL calls inside the measure's kind and `case` body.
-    /// `mask_sql` is intentionally excluded: it is compiled against
-    /// the cube that owns the measure, which differs from the symbol's
-    /// own `cube_name` when the measure is exposed through a view.
+    /// `mask_sql` is excluded, as it is for dimensions.
     /// `measure_filters` and `measure_order_by` are also skipped here
     /// — the legacy BaseQuery validator does not check them, and we
     /// preserve that behaviour for compatibility.
@@ -471,34 +521,58 @@ impl SymbolFactory for MeasureSymbolFactory {
 
         let is_sql_is_direct_ref = sql.as_ref().is_some_and(|s| s.is_direct_reference());
 
-        // order_by and mask.sql are authored in the context of the cube that
-        // owns the measure and may reference members the exposing view does not
-        // re-export. When a measure is exposed through a view, its sql is a
-        // direct reference to the underlying cube member; resolve these
-        // templates against that referenced member's cube so CUBE / member
-        // references inside them resolve as they do on the owning cube. On a
-        // plain cube the owning cube is the measure's own cube.
         let cube = cube_evaluator.cube_from_path(path.cube_name().clone())?;
         let is_view = cube.static_data().is_view.unwrap_or(false);
-        let owning_cube_name = if is_view {
-            sql.as_ref()
-                .and_then(|s| s.resolve_direct_reference())
+        let alias = compiler
+            .alias_for_member(path.full_name())
+            .unwrap_or_else(|| {
+                PlanSqlTemplates::member_alias_name(
+                    cube.static_data().resolved_alias(),
+                    path.symbol_name(),
+                    &None,
+                )
+            });
+
+        // A member re-exported from the view's `includes` is a `Ref`. Its mask may
+        // reference members the view does not re-export, so it compiles against
+        // the target's cube.
+        let included = definition.static_data().included.unwrap_or(false);
+        if let Some(sql) = sql.as_ref().filter(|_| included) {
+            let owning_cube_name = sql
+                .resolve_direct_reference()
                 .map(|dep| dep.cube_name())
-                .unwrap_or_else(|| path.cube_name().clone())
-        } else {
-            path.cube_name().clone()
-        };
+                .unwrap_or_else(|| path.cube_name().clone());
+            let mask_sql = if let Some(mask_sql) = mask_sql {
+                Some(compiler.compile_sql_call(&owning_cube_name, mask_sql)?)
+            } else {
+                None
+            };
+            let cube_symbol =
+                compiler.add_cube_table_evaluator(path.cube_name().clone(), vec![])?;
+            let compiled_path = CompiledMemberPath::new(
+                cube_symbol,
+                path.full_name().clone(),
+                path.symbol_name().clone(),
+                alias,
+                path.path().clone(),
+            );
+            return Ok(MemberSymbol::new_ref(RefSymbol::try_new(
+                compiled_path,
+                sql,
+                mask_sql,
+            )?));
+        }
 
         let mut measure_order_by = vec![];
         if let Some(group_by) = definition.order_by()? {
             for item in group_by.iter() {
-                let node = compiler.compile_sql_call(&owning_cube_name, item.sql()?)?;
+                let node = compiler.compile_sql_call(path.cube_name(), item.sql()?)?;
                 measure_order_by.push(MeasureOrderBy::new(node, item.dir()?));
             }
         }
 
         let mask_sql = if let Some(mask_sql) = mask_sql {
-            Some(compiler.compile_sql_call(&owning_cube_name, mask_sql)?)
+            Some(compiler.compile_sql_call(path.cube_name(), mask_sql)?)
         } else {
             None
         };
@@ -623,25 +697,14 @@ impl SymbolFactory for MeasureSymbolFactory {
             owned
         };
 
-        let alias = compiler
-            .alias_for_member(path.full_name())
-            .unwrap_or_else(|| {
-                PlanSqlTemplates::member_alias_name(
-                    cube.static_data().resolved_alias(),
-                    path.symbol_name(),
-                    &None,
-                )
-            });
-
-        let is_reference = (is_view && is_sql_is_direct_ref)
-            || (!owned_by_cube
-                && is_sql_is_direct_ref
-                && is_calculated
-                && !is_multi_stage
-                && case.is_none()
-                && measure_filters.is_empty()
-                && measure_drill_filters.is_empty()
-                && measure_order_by.is_empty());
+        let is_reference = !owned_by_cube
+            && is_sql_is_direct_ref
+            && is_calculated
+            && !is_multi_stage
+            && case.is_none()
+            && measure_filters.is_empty()
+            && measure_drill_filters.is_empty()
+            && measure_order_by.is_empty();
 
         let cube_symbol = compiler.add_cube_table_evaluator(path.cube_name().clone(), vec![])?;
 

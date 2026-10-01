@@ -122,7 +122,8 @@
                   },
                   "docs/explore-analyze/dashboards/styling",
                   "docs/explore-analyze/dashboards/dashboards-as-code",
-                  "docs/explore-analyze/dashboards/dashboard-agent"
+                  "docs/explore-analyze/dashboards/dashboard-agent",
+                  "docs/explore-analyze/dashboards/comments"
                 ]
               },
               "docs/explore-analyze/apps",
@@ -682,6 +683,7 @@
                   "recipes/data-modeling/dynamic-union-tables",
                   "recipes/data-modeling/cross-data-source-queries",
                   "recipes/data-modeling/polymorphic-cubes",
+                  "recipes/data-modeling/reusing-view-measures",
                   "recipes/data-modeling/custom-order"
                 ]
               },
@@ -890,6 +892,18 @@
                   "POST /api/v1/deployments/{deploymentId}/databricks-metric-view-integrations/{dataSourceName}/syncs",
                   "GET /api/v1/deployments/{deploymentId}/databricks-metric-view-integrations/{dataSourceName}/syncs/{runId}",
                   "DELETE /api/v1/deployments/{deploymentId}/databricks-metric-view-integrations/{dataSourceName}/syncs/{runId}"
+                ]
+              },
+              {
+                "group": "Snowflake Semantic View Sync",
+                "openapi": "/api-reference/api.yaml",
+                "pages": [
+                  "POST /api/v1/deployments/{deploymentId}/snowflake-semantic-view-pulls",
+                  "GET /api/v1/deployments/{deploymentId}/snowflake-semantic-view-pulls/{syncJobId}",
+                  "GET /api/v1/deployments/{deploymentId}/snowflake-semantic-view-pulls/{syncJobId}/result",
+                  "POST /api/v1/deployments/{deploymentId}/snowflake-semantic-view-syncs",
+                  "GET /api/v1/deployments/{deploymentId}/snowflake-semantic-view-syncs/{syncJobId}",
+                  "GET /api/v1/deployments/{deploymentId}/snowflake-semantic-view-syncs/{syncJobId}/result"
                 ]
               },
               {

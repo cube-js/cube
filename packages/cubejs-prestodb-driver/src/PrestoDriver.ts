@@ -7,6 +7,7 @@
 import {
   DownloadQueryResultsOptions, DownloadQueryResultsResult,
   DriverCapabilities, DriverInterface,
+  QueryOptions,
   StreamOptions,
   StreamTableData,
   TableStructure,
@@ -17,6 +18,8 @@ import {
   getEnv,
   assertDataSource,
   formatAnsi,
+  extractRequestUUID,
+  isValidRequestId,
 } from '@cubejs-backend/shared';
 
 import { Transform, TransformCallback } from 'stream';
@@ -82,6 +85,8 @@ export class PrestoDriver extends BaseDriver implements DriverInterface {
 
   protected useSelectTestConnection: boolean;
 
+  private readonly traceTokenHeader: string;
+
   /**
    * Class constructor.
    */
@@ -127,6 +132,7 @@ export class PrestoDriver extends BaseDriver implements DriverInterface {
       ...config
     };
     this.catalog = this.config.catalog;
+    this.traceTokenHeader = this.config.engine === 'trino' ? 'X-Trino-Trace-Token' : 'X-Presto-Trace-Token';
     this.client = new presto.Client({
       timeout: this.config.queryTimeout,
       engine: 'presto',
@@ -212,15 +218,19 @@ export class PrestoDriver extends BaseDriver implements DriverInterface {
     await this.queryPromised('SELECT 1', false);
   }
 
-  public query(query: string, values: unknown[]): Promise<any[]> {
-    return <Promise<any[]>> this.queryPromised(this.prepareQueryWithParams(query, values), false);
+  public query(query: string, values: unknown[], options?: QueryOptions): Promise<any[]> {
+    return <Promise<any[]>> this.queryPromised(this.prepareQueryWithParams(query, values), false, options?.requestId);
   }
 
   protected prepareQueryWithParams(query: string, values: unknown[]) {
     return formatAnsi(query, values || []);
   }
 
-  public queryPromised(query: string, streaming: boolean): Promise<any[] | StreamTableData> {
+  public queryPromised(query: string, streaming: boolean, requestId?: string): Promise<any[] | StreamTableData> {
+    const traceToken = requestId && extractRequestUUID(requestId);
+    const headers = traceToken && isValidRequestId(traceToken)
+      ? { ...this.config.headers, [this.traceTokenHeader]: traceToken }
+      : this.config.headers;
     const toError = (error: any) => new Error(error.error ? `${error.message}\n${error.error}` : error.message);
     if (streaming) {
       const rowStream = new Transform({
@@ -236,7 +246,7 @@ export class PrestoDriver extends BaseDriver implements DriverInterface {
         this.client.execute({
           query,
           schema: this.config.schema || 'default',
-          headers: this.config.headers,
+          headers,
           session: this.config.queryTimeout ? `query_max_run_time=${this.config.queryTimeout}s` : undefined,
           columns: (error: any, columns: TableStructure) => {
             resolve({
@@ -266,7 +276,7 @@ export class PrestoDriver extends BaseDriver implements DriverInterface {
         this.client.execute({
           query,
           schema: this.config.schema || 'default',
-          headers: this.config.headers,
+          headers,
           data: (error: any, data: any[], columns: TableStructure) => {
             const normalData = this.normalizeResultOverColumns(data, columns);
             fullData = concat(normalData, fullData);
@@ -347,10 +357,10 @@ export class PrestoDriver extends BaseDriver implements DriverInterface {
     return map(arrayToObject, data || []);
   }
 
-  public stream(query: string, values: unknown[], _options: StreamOptions): Promise<StreamTableData> {
+  public stream(query: string, values: unknown[], options: StreamOptions): Promise<StreamTableData> {
     const queryWithParams = this.prepareQueryWithParams(query, values);
 
-    return <Promise<StreamTableData>> this.queryPromised(queryWithParams, true);
+    return <Promise<StreamTableData>> this.queryPromised(queryWithParams, true, options?.requestId);
   }
 
   public capabilities(): DriverCapabilities {
@@ -381,8 +391,8 @@ export class PrestoDriver extends BaseDriver implements DriverInterface {
     }
 
     const types = options.query
-      ? await this.unloadWithSql(tableName, options.query.sql, options.query.params)
-      : await this.unloadWithTable(tableName);
+      ? await this.unloadWithSql(tableName, options.query.sql, options.query.params, options.requestId)
+      : await this.unloadWithTable(tableName, options.requestId);
 
     const csvFile = await this.getCsvFiles(tableName);
 
@@ -403,33 +413,36 @@ export class PrestoDriver extends BaseDriver implements DriverInterface {
     return types.map((c) => `CAST(${c.name} AS varchar) ${c.name}`).join(', ');
   }
 
-  private async unloadWithSql(tableFullName: string, sql: string, params: any[]) {
+  private async unloadWithSql(tableFullName: string, sql: string, params: any[], requestId?: string) {
     return this.unloadGeneric({
       tableFullName,
       typeSql: sql,
       typeParams: params,
       fromSql: sql,
-      fromParams: params
+      fromParams: params,
+      requestId,
     });
   }
 
-  private async unloadWithTable(tableFullName: string) {
+  private async unloadWithTable(tableFullName: string, requestId?: string) {
     return this.unloadGeneric({
       tableFullName,
       typeSql: `SELECT * FROM ${tableFullName}`,
       typeParams: [],
       fromSql: tableFullName,
-      fromParams: []
+      fromParams: [],
+      requestId,
     });
   }
 
-  private async unloadGeneric(params: { tableFullName: string, typeSql: string, typeParams: any[], fromSql: string, fromParams: any[] }) {
+  private async unloadGeneric(params: { tableFullName: string, typeSql: string, typeParams: any[], fromSql: string, fromParams: any[], requestId?: string }) {
     if (!this.config.exportBucket) {
       throw new Error('Export bucket is not configured.');
     }
 
     const { bucketType, exportBucket } = this.config;
-    const types = await this.queryColumnTypes(params.typeSql, params.typeParams);
+    const { requestId } = params;
+    const types = await this.queryColumnTypes(params.typeSql, params.typeParams, { requestId });
 
     const { schema, tableName } = this.splitTableFullName(params.tableFullName);
     const tableWithCatalogAndSchema = `${this.config.catalog}.${schema}.${tableName}`;
@@ -448,16 +461,17 @@ export class PrestoDriver extends BaseDriver implements DriverInterface {
       await this.query(
         createTableQuery,
         params.fromParams,
+        { requestId },
       );
     } finally {
-      await this.query(`DROP TABLE IF EXISTS ${tableWithCatalogAndSchema}`, []);
+      await this.query(`DROP TABLE IF EXISTS ${tableWithCatalogAndSchema}`, [], { requestId });
     }
 
     return types;
   }
 
-  public async queryColumnTypes(sql: string, params: unknown[]): Promise<{ name: string; type: string; }[]> {
-    const response = await this.stream(`${sql} LIMIT 0`, params || [], { highWaterMark: 1 });
+  public async queryColumnTypes(sql: string, params: unknown[], options?: QueryOptions): Promise<{ name: string; type: string; }[]> {
+    const response = await this.stream(`${sql} LIMIT 0`, params || [], { highWaterMark: 1, requestId: options?.requestId });
     const result = [];
 
     for (const column of response.types || []) {

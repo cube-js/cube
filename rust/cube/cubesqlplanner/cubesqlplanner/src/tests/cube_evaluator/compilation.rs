@@ -476,13 +476,13 @@ fn test_view_dimension_compilation() {
     assert_eq!(id_symbol.cube_name(), "visitors_visitors_checkins");
     assert_eq!(id_symbol.name(), "id");
 
-    let dimension = id_symbol.as_dimension().unwrap();
-    assert!(dimension.is_view(), "Should be a view member");
-
-    assert!(
-        dimension.is_reference(),
-        "Should be a reference to original member"
+    let reference = id_symbol.as_ref_symbol().unwrap();
+    assert!(id_symbol.is_reference());
+    assert_eq!(
+        reference.target_member().unwrap().full_name(),
+        "visitors.id"
     );
+    assert!(id_symbol.as_dimension().is_err());
 
     let resolved = id_symbol.clone().resolve_reference_chain();
     assert_eq!(
@@ -506,9 +506,8 @@ fn test_view_dimension_compilation() {
         "visitors_visitors_checkins.visitor_id"
     );
 
-    let visitor_id_dim = visitor_id_symbol.as_dimension().unwrap();
-    assert!(visitor_id_dim.is_view(), "Should be a view member");
-    assert!(visitor_id_dim.is_reference(), "Should be a reference");
+    assert!(visitor_id_symbol.as_ref_symbol().is_ok());
+    assert!(visitor_id_symbol.is_reference(), "Should be a reference");
 
     let resolved = visitor_id_symbol.clone().resolve_reference_chain();
     assert_eq!(
@@ -538,13 +537,13 @@ fn test_view_measure_compilation() {
     assert_eq!(count_symbol.cube_name(), "visitors_visitors_checkins");
     assert_eq!(count_symbol.name(), "count");
 
-    let measure = count_symbol.as_measure().unwrap();
-    assert!(measure.is_view(), "Should be a view member");
-
-    assert!(
-        measure.is_reference(),
-        "Should be a reference to original member"
+    let reference = count_symbol.as_ref_symbol().unwrap();
+    assert!(count_symbol.is_reference());
+    assert_eq!(
+        reference.target_member().unwrap().full_name(),
+        "visitor_checkins.count"
     );
+    assert!(count_symbol.as_measure().is_err());
 
     let resolved = count_symbol.clone().resolve_reference_chain();
     assert_eq!(
@@ -842,4 +841,166 @@ fn test_sql_multi_stage_measures() {
             dim
         );
     }
+}
+
+fn view_members_compiler() -> TestCompiler {
+    let schema = MockSchema::from_yaml_file("common/integration_view_members.yaml");
+    TestCompiler::new(schema.create_evaluator())
+}
+
+#[test]
+fn test_view_calculated_dimension_is_not_a_reference() {
+    let mut test_compiler = view_members_compiler();
+
+    let symbol = test_compiler
+        .compiler
+        .add_dimension_evaluator("orders_view.status_label".to_string())
+        .unwrap();
+
+    let dimension = symbol.as_dimension().unwrap();
+    assert!(dimension.is_view());
+    assert!(!dimension.is_reference());
+    let deps = symbol
+        .get_dependencies()
+        .iter()
+        .map(|dep| dep.full_name())
+        .collect::<Vec<_>>();
+    assert_eq!(deps, vec!["orders.status", "orders_view.name"]);
+}
+
+#[test]
+fn test_view_calculated_measure_is_not_a_reference() {
+    let mut test_compiler = view_members_compiler();
+
+    let symbol = test_compiler
+        .compiler
+        .add_measure_evaluator("orders_view.amount_per_order".to_string())
+        .unwrap();
+
+    let measure = symbol.as_measure().unwrap();
+    assert!(measure.is_view());
+    assert!(!measure.is_reference());
+    assert!(measure.is_calculated());
+}
+
+// A member the view declares itself keeps its own definition even when its sql
+// is a direct reference; it references a re-exported sibling, which resolves to
+// the cube member.
+#[test]
+fn test_view_sibling_reference_resolves_to_cube_member() {
+    let mut test_compiler = view_members_compiler();
+
+    let symbol = test_compiler
+        .compiler
+        .add_dimension_evaluator("orders_view.status_ref".to_string())
+        .unwrap();
+
+    assert!(symbol.as_dimension().unwrap().is_view());
+    assert!(symbol.is_reference());
+    let target = symbol.reference_member().unwrap();
+    assert_eq!(target.full_name(), "orders_view.status");
+    assert!(target.as_ref_symbol().is_ok());
+    assert_eq!(
+        symbol.clone().resolve_reference_chain().full_name(),
+        "orders.status"
+    );
+}
+
+#[test]
+fn test_view_hand_written_reference_resolves_to_cube_member() {
+    let mut test_compiler = view_members_compiler();
+
+    let symbol = test_compiler
+        .compiler
+        .add_measure_evaluator("orders_view.total_amount_ref".to_string())
+        .unwrap();
+
+    assert!(symbol.as_measure().unwrap().is_view());
+    assert!(symbol.is_reference());
+    assert_eq!(
+        symbol.clone().resolve_reference_chain().full_name(),
+        "orders.total_amount"
+    );
+}
+
+// A view member's mask is compiled against the cube that owns the target, and
+// its dependencies follow the target.
+#[test]
+fn test_view_member_mask_depends_on_target_cube_members() {
+    let mut test_compiler = view_members_compiler();
+
+    let symbol = test_compiler
+        .compiler
+        .add_dimension_evaluator("orders_view.masked_status_dep".to_string())
+        .unwrap();
+
+    assert!(symbol.as_ref_symbol().unwrap().mask_sql().is_some());
+    let deps = symbol
+        .get_dependencies()
+        .iter()
+        .map(|dep| dep.full_name())
+        .collect::<Vec<_>>();
+    assert_eq!(deps, vec!["orders.masked_status_dep", "orders.id"]);
+    assert_eq!(
+        symbol.reference_member().unwrap().full_name(),
+        "orders.masked_status_dep"
+    );
+}
+
+#[test]
+fn test_view_custom_granularity_time_dimension() {
+    let mut test_compiler = view_members_compiler();
+
+    let symbol = test_compiler
+        .compiler
+        .add_dimension_evaluator("orders_view.created_at.bi_weekly".to_string())
+        .unwrap();
+
+    let time_dimension = symbol.as_time_dimension().unwrap();
+    assert_eq!(time_dimension.granularity().as_deref(), Some("bi_weekly"));
+    assert!(time_dimension.granularity_obj().is_some());
+    assert_eq!(
+        time_dimension.base_symbol().full_name(),
+        "orders_view.created_at"
+    );
+    assert!(time_dimension.base_symbol().as_ref_symbol().is_ok());
+    assert_eq!(
+        symbol.reference_member().unwrap().full_name(),
+        "orders.created_at_bi_weekly"
+    );
+}
+
+// A view member that aggregates the member it names computes something of its
+// own, so it is not a reference.
+#[test]
+fn test_view_own_aggregation_is_not_a_reference() {
+    let mut test_compiler = view_members_compiler();
+
+    let symbol = test_compiler
+        .compiler
+        .add_measure_evaluator("orders_view.distinct_customers".to_string())
+        .unwrap();
+
+    let measure = symbol.as_measure().unwrap();
+    assert!(measure.is_view());
+    assert!(!symbol.is_reference());
+    assert!(matches!(
+        measure.kind(),
+        MeasureKind::Aggregated(a) if a.agg_type() == AggregationType::CountDistinct
+    ));
+}
+
+#[test]
+fn test_view_own_sub_query_dimension_is_not_a_reference() {
+    let mut test_compiler = view_members_compiler();
+
+    let symbol = test_compiler
+        .compiler
+        .add_dimension_evaluator("customers_view.orders_count".to_string())
+        .unwrap();
+
+    let dimension = symbol.as_dimension().unwrap();
+    assert!(dimension.is_view());
+    assert!(dimension.is_sub_query());
+    assert!(!symbol.is_reference());
 }

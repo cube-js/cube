@@ -501,7 +501,10 @@ impl MultiStageQueryPlanner {
                 ),
                 None => member.full_name(),
             },
-            _ => member.full_name(),
+            MemberSymbol::Dimension(_)
+            | MemberSymbol::Measure(_)
+            | MemberSymbol::MemberExpression(_)
+            | MemberSymbol::Ref(_) => member.full_name(),
         }
     }
 
@@ -516,7 +519,10 @@ impl MultiStageQueryPlanner {
                         .full_name()
                 })
             }
-            _ => None,
+            MemberSymbol::Dimension(_)
+            | MemberSymbol::Measure(_)
+            | MemberSymbol::MemberExpression(_)
+            | MemberSymbol::Ref(_) => None,
         }
     }
 
@@ -1617,6 +1623,8 @@ fn visit_rendered_slots(
         // whatever the base renders, so both contribute.
         visit(time_dimension.granularity_obj());
         visit_rendered_slots(time_dimension.base_symbol(), is_masked, visit);
+    } else if let Ok(ref_symbol) = member.as_ref_symbol() {
+        visit(ref_symbol.target());
     } else {
         visit(member.as_ref());
     }

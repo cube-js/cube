@@ -84,6 +84,68 @@ async function createApiGateway(
   };
 }
 
+describe('enforceSecurityChecks resolution', () => {
+  class ApiGatewayExposed extends ApiGateway {
+    public get securityChecksEnforced(): boolean {
+      return this.enforceSecurityChecks;
+    }
+  }
+
+  const build = (options: Partial<ApiGatewayOptions>) => new ApiGatewayExposed(
+    API_SECRET,
+    compilerApi,
+    async () => new AdapterApiMock(),
+    logger,
+    {
+      standalone: true,
+      dataSourceStorage: new DataSourceStorageMock(),
+      basePath: '/cubejs-api',
+      refreshScheduler: {},
+      ...options,
+    } as ApiGatewayOptions,
+  );
+
+  const devMode = process.env.CUBEJS_DEV_MODE;
+
+  afterEach(() => {
+    if (devMode === undefined) {
+      delete process.env.CUBEJS_DEV_MODE;
+    } else {
+      process.env.CUBEJS_DEV_MODE = devMode;
+    }
+  });
+
+  test('follows the devServer option server-core resolved, not CUBEJS_DEV_MODE', () => {
+    // An embedder asking for a dev server through CreateOptions rather than the env
+    // var: the playground is mounted, so its own requests must not be rejected
+    delete process.env.CUBEJS_DEV_MODE;
+
+    expect(build({ devServer: true }).securityChecksEnforced).toBe(false);
+    expect(build({ devServer: false }).securityChecksEnforced).toBe(true);
+  });
+
+  test('falls back to CUBEJS_DEV_MODE when devServer is not supplied', () => {
+    delete process.env.CUBEJS_DEV_MODE;
+    expect(build({}).securityChecksEnforced).toBe(true);
+
+    process.env.CUBEJS_DEV_MODE = 'true';
+    expect(build({}).securityChecksEnforced).toBe(false);
+  });
+
+  test('lets an explicit `true` enable checks in dev mode', () => {
+    delete process.env.CUBEJS_DEV_MODE;
+
+    expect(build({ devServer: true, enforceSecurityChecks: true }).securityChecksEnforced).toBe(true);
+  });
+
+  test('does not let an explicit `false` disable checks outside dev mode', () => {
+    // `||`, as on master: opting out of auth on a non-dev instance is not offered
+    delete process.env.CUBEJS_DEV_MODE;
+
+    expect(build({ devServer: false, enforceSecurityChecks: false }).securityChecksEnforced).toBe(true);
+  });
+});
+
 describe('API Gateway', () => {
   test('bad token', async () => {
     const { app } = await createApiGateway();
@@ -103,6 +165,17 @@ describe('API Gateway', () => {
       .set('Authorization', 'Bearer foo')
       .expect(403);
     expect(res.body && res.body.error).toStrictEqual('Invalid token');
+  });
+
+  test('rejects x-request-id with forbidden characters', async () => {
+    const { app } = await createApiGateway();
+
+    const res = await request(app)
+      .get('/cubejs-api/v1/load?query={"measures":["Foo.bar"]}')
+      .set('Authorization', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.e30.t-IDcSemACt8x4iTMCda8Yhe3iZaWbvV5XKSTbuAn0M')
+      .set('x-request-id', 'my request')
+      .expect(400);
+    expect(res.body.error).toContain('Request id must be');
   });
 
   test('query field is empty', async () => {

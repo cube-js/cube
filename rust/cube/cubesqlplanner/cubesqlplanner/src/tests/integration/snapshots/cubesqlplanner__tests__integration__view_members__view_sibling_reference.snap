@@ -1,0 +1,8 @@
+---
+source: cubesqlplanner/cubesqlplanner/src/tests/integration/view_members.rs
+expression: result
+---
+orders_view__status_ref | orders_view__count
+------------------------+-------------------
+completed               | 5                 
+pending                 | 3

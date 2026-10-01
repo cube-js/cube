@@ -1041,10 +1041,11 @@ impl PostgresIntegrationTestSuite {
     }
 
     async fn test_df_panic_handle(&self) -> RunResult<()> {
-        // This test only stream call with panic on the Portal
+        // This test only stream call with panic on the Portal. `testing_panic` exists in debug
+        // builds only and panics when its scan is planned inside the Portal's stream.
         let err = self
             .test_simple_query(
-                "SELECT TIMESTAMP '9999-12-31 00:00:00';".to_string(),
+                "SELECT * FROM information_schema.testing_panic;".to_string(),
                 |_| {},
             )
             .await
@@ -1052,7 +1053,7 @@ impl PostgresIntegrationTestSuite {
 
         assert_eq!(
             pg_tokio_error_to_string(&err),
-            "db error: ERROR: Internal Error: Unexpected panic. Reason: value can not be represented in a timestamp with nanosecond precision."
+            "db error: ERROR: Internal Error: Unexpected panic. Reason: testing_panic"
         );
 
         Ok(())
