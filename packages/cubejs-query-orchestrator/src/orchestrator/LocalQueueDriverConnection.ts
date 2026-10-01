@@ -19,7 +19,7 @@ import {
 } from './LocalQueueDriver';
 
 /**
- * A queue item goes `Pending -> Active -> deleted`. There is no terminal state: `Active` is the
+ * A queue item goes `Pending -> Active -> Deleted`. There is no terminal state: `Active` is the
  * only lock there is, it's set atomically by retrieveForProcessing and released by an ack or a
  * cancel, both of which delete the item outright.
  */
