@@ -100,7 +100,7 @@ export type LoadRefreshKeyOptions = {
 
 export type Query = {
   requestId?: string;
-  dataSource: string;
+  dataSource?: string;
   preAggregations?: PreAggregationDescription[];
   groupedPartitionPreAggregations?: PreAggregationDescription[][];
   preAggregationsLoadCacheByDataSource?: any;

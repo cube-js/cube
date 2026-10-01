@@ -31,7 +31,7 @@ function createRealApi(driverError: Error) {
     }
   );
 
-  (api as any).orchestrator = { cleanup: async () => undefined };
+  (api as any).orchestrator = { cleanup: async (): Promise<void> => undefined };
 
   // A data source the orchestrator has touched, so the release has a driver to
   // close -- and this one fails to close.

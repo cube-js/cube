@@ -22,11 +22,11 @@ class WebSocketTransport implements AgentTransport {
 
   public readonly wsClient: WebSocket;
 
-  private readonly callbacks = {};
+  private readonly callbacks: Record<string, (result: unknown) => void> = {};
 
   public constructor(
     private endpointUrl: string,
-    private logger,
+    private logger: LoggerFn,
     private onClose: Function
   ) {
     let connectionPromiseResolve: Function;
@@ -75,7 +75,7 @@ class WebSocketTransport implements AgentTransport {
     return this?.wsClient?.readyState === WebSocket.OPEN;
   }
 
-  public async send(data) {
+  public async send(data: any[]) {
     await this.connectionPromise;
 
     const callbackId = crypto.randomBytes(16).toString('hex');
@@ -165,7 +165,7 @@ class HttpTransport implements AgentTransport {
   }
 }
 
-const trackEvents = [];
+const trackEvents: Record<string, unknown>[] = [];
 let agentInterval: NodeJS.Timeout = null;
 let lastEvent: Date;
 let transport: AgentTransport = null;

@@ -646,7 +646,11 @@ describe('index.test', () => {
       .not.toThrow();
   });
 
-  const expectRefreshTimerOption = (input, output, setProduction: boolean = false) => {
+  const expectRefreshTimerOption = (
+    input: CreateOptions['scheduledRefreshTimer'],
+    output: number | false,
+    setProduction: boolean = false,
+  ) => {
     test(`scheduledRefreshTimer option ${input}`, async () => {
       if (setProduction) {
         process.env.NODE_ENV = 'production';
