@@ -120,17 +120,17 @@ An admin can get the OAuth client details for the selected MCP endpoint from
 contact the [Cube support team](/admin/account-billing/support) to enable it.
 
 1. Select the central or region-specific MCP endpoint on the MCP Server page, then click
-   **Get OAuth client details**. Use the displayed **MCP Endpoint** as the plugin's base
-   URL. The credentials and OAuth URLs correspond to that endpoint.
+   **Get OAuth client details**. The credentials and OAuth URLs correspond to the
+   displayed **MCP Endpoint**.
 2. In the [Teams developer portal](https://dev.teams.microsoft.com/), open
    **Tools → OAuth client registration** and create a registration. Enter the displayed
-   **Client ID**, **Client secret**, **Authorization URL**, **Token URL**, **Refresh URL**,
-   and **Scope**. Use the MCP endpoint as **Base URL**. Set **Restrict usage by app** to
-   **Any Teams app** and leave PKCE enabled. Cube uses the same URL for token refresh
-   and token exchange.
-3. Save the registration. In your Microsoft 365 Copilot plugin manifest, use
-   `OAuthPluginVault` as the runtime authentication type and set `reference_id` to the
-   OAuth client registration ID from the portal. Follow [Microsoft's OAuth setup
+   **Client ID**, **Client secret**, **Authorization URL**, **Token URL**, **Refresh URL**
+   (same as Token URL), and **Scope**. Use the MCP endpoint as the registration's
+   **Base URL**. Set **Restrict usage by app** to **Any Teams app** and leave PKCE enabled.
+3. Save the registration. In your Microsoft 365 Copilot plugin manifest, set the MCP
+   server URL to the same endpoint, use `OAuthPluginVault` as the runtime authentication
+   type, and set `reference_id` to the OAuth client registration ID from the portal.
+   Follow [Microsoft's OAuth setup
    guide](https://learn.microsoft.com/en-us/microsoft-365/copilot/extensibility/plugin-authentication-oauth)
    for the remaining plugin configuration.
 
