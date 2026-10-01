@@ -115,20 +115,35 @@ which bundles this server with Cube agent skills.
 
 ## Connect to Microsoft 365 Copilot
 
+<Note>
+
+If **Microsoft 365 Copilot setup** is not visible in Admin, contact the
+[Cube support team](/admin/account-billing/support) to enable it for your account.
+
+</Note>
+
 An admin can get the OAuth client details for the selected MCP endpoint from
-**Admin → MCP Server → Microsoft 365 Copilot setup**. If this section is not visible,
-contact the [Cube support team](/admin/account-billing/support) to enable it.
+**Admin → MCP Server → Microsoft 365 Copilot setup**.
 
 1. Select the single or region-specific MCP endpoint on the MCP Server page, then click
    **Get OAuth client details**. The credentials and OAuth URLs correspond to the
    displayed **MCP Endpoint**.
 2. In the [Teams developer portal](https://dev.teams.microsoft.com/), open
-   **Tools → OAuth client registration** and create a registration. Copy Cube's **Client ID**,
-   **Client secret**, and **Scope** into the matching fields. Copy **Authorization URL**
-   into **Authorization endpoint**, and **Token URL** into both **Token endpoint** and
-   **Refresh endpoint**. Use the MCP endpoint as the registration's **Base URL**. Set
-   **Restrict usage by app** to **Any Teams app** and leave PKCE enabled. For
-   **Restrict usage by org**, choose **My organization only** for one Microsoft 365
+   **Tools → OAuth client registration** and create a registration with these values:
+
+   | Cube Admin | Teams OAuth client registration |
+   | --- | --- |
+   | Client ID, Client secret, Scope | Same-named fields |
+   | Authorization URL | Authorization endpoint |
+   | Token URL | Token endpoint and Refresh endpoint |
+   | MCP Endpoint | Base URL |
+
+   Set **Restrict usage by app** to **Any Teams app** and leave PKCE enabled.
+   [Microsoft warns](https://learn.microsoft.com/en-us/microsoft-365/copilot/extensibility/plugin-authentication-oauth#use-the-teams-developer-portal)
+   that binding an MCP registration to an existing Teams app ID causes Copilot tool calls
+   to return `404`.
+
+   For **Restrict usage by org**, choose **My organization only** for one Microsoft 365
    organization or **Any Microsoft 365 organization** for cross-organization use.
 3. Save the registration. In your Microsoft 365 Copilot plugin manifest, set the MCP
    server URL to the same endpoint, use `OAuthPluginVault` as the runtime authentication
