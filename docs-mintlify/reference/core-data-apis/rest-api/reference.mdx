@@ -1191,13 +1191,14 @@ Metadata API returns, though not necessarily in the same response.
 Data catalogs and lineage tools that need the complete data model can set
 `include_private` to `true`. This requires a token with the `meta-private` scope
 as well as `meta`; without it, the request fails with `403`. To get such a token,
-call the Control Plane API's [token endpoint][ref-cpa-create-token] with
-`"scopes": ["meta", "meta-private"]`. The scope is granted only to callers who can
-edit the deployment and have the `SchemaRead` ([View data model][ref-custom-roles])
-permission on it; tokens from `tokens-for-meta-sync` carry only `meta`. Private cubes,
-views, and members are then returned with their full definitions and `public`
-set to `false`, and a view's `table_references` and `column_references` include
-the tables and columns it reads through private cubes.
+call the Control Plane API's [token endpoint][ref-cpa-create-token] with a
+`security_context` and `"scopes": ["meta", "meta-private"]`. The scope is granted
+only to callers who can edit the deployment and have the `SchemaRead`
+([View data model][ref-custom-roles]) permission on it; tokens from
+`tokens-for-meta-sync` carry only `meta`. Private cubes, views, and members are
+then returned with their full definitions and `public` set to `false`, and a
+view's `table_references` and `column_references` include the tables and columns
+it reads through private cubes.
 
 `include_private` doesn't bypass [data access policies][ref-dap]. Whatever a data
 access policy hides from the token's security context is never returned, even
