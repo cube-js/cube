@@ -293,6 +293,8 @@ export class MssqlQuery extends BaseQuery {
 
   public sqlTemplates() {
     const templates = super.sqlTemplates();
+    // SQL Server's remainder operator does not accept floating-point operands.
+    delete templates.operators.float_modulo;
     templates.functions.LEAST = 'LEAST({{ args_concat }})';
     templates.functions.GREATEST = 'GREATEST({{ args_concat }})';
     templates.functions.UTCTIMESTAMP = 'GETUTCDATE()';

@@ -100,6 +100,89 @@ async fn test_float_literal_pushdown_fallback() {
 }
 
 #[tokio::test]
+async fn test_unary_round_pushdown_fallback() {
+    if !Rewriter::sql_push_down_enabled() {
+        return;
+    }
+    for expression in ["ROUND(2.5 * COUNT(*))", "ROUND(2.5 * COUNT(*), 1)"] {
+        for supported in [false, true] {
+            let mut templates = vec![(
+                "functions/ROUND".to_string(),
+                "ROUND({{ args_concat }})".to_string(),
+            )];
+            if !supported {
+                templates.push(("operators/round_single_arg".to_string(), String::new()));
+            }
+            let plan = convert_select_to_query_plan_customized(
+                format!("SELECT {expression} AS value FROM KibanaSampleDataEcommerce WHERE LOWER(customer_gender) = 'test'"),
+                DatabaseProtocol::PostgreSQL,
+                templates,
+            ).await;
+            let logical = plan.as_logical_plan();
+            if supported || expression.ends_with(", 1)") {
+                assert!(logical
+                    .find_cube_scan_wrapped_sql()
+                    .wrapped_sql
+                    .sql
+                    .contains("ROUND("));
+            } else {
+                assert!(
+                    matches!(logical, LogicalPlan::Projection(_)),
+                    "{:?}",
+                    logical
+                );
+                assert!(!logical
+                    .find_cube_scan_wrapped_sql_deep()
+                    .wrapped_sql
+                    .sql
+                    .contains("ROUND("));
+            }
+            plan.as_physical_plan().await.unwrap();
+        }
+    }
+}
+
+#[tokio::test]
+async fn test_float_modulo_pushdown_fallback() {
+    if !Rewriter::sql_push_down_enabled() {
+        return;
+    }
+    for expression in [
+        "COUNT(*) % 2.0",
+        "CAST(COUNT(*) AS REAL) % CAST(2 AS REAL)",
+        "CAST(COUNT(*) AS BIGINT) % 2",
+    ] {
+        for supported in [false, true] {
+            let plan = convert_select_to_query_plan_customized(
+                format!("SELECT {expression} AS value FROM KibanaSampleDataEcommerce WHERE LOWER(customer_gender) = 'test'"),
+                DatabaseProtocol::PostgreSQL,
+                if supported { vec![] } else { vec![("operators/float_modulo".to_string(), String::new())] },
+            ).await;
+            let logical = plan.as_logical_plan();
+            if supported || expression == "CAST(COUNT(*) AS BIGINT) % 2" {
+                assert!(logical
+                    .find_cube_scan_wrapped_sql()
+                    .wrapped_sql
+                    .sql
+                    .contains('%'));
+            } else {
+                assert!(
+                    matches!(logical, LogicalPlan::Projection(_)),
+                    "{:?}",
+                    logical
+                );
+                assert!(!logical
+                    .find_cube_scan_wrapped_sql_deep()
+                    .wrapped_sql
+                    .sql
+                    .contains('%'));
+            }
+            plan.as_physical_plan().await.unwrap();
+        }
+    }
+}
+
+#[tokio::test]
 async fn test_float_literal_member_pushdown_fallback() {
     if !Rewriter::sql_push_down_enabled() {
         return;

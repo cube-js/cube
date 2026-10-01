@@ -83,6 +83,9 @@ export class RedshiftQuery extends PostgresQuery {
 
   public sqlTemplates() {
     const templates = super.sqlTemplates();
+    templates.functions.ROUND = 'ROUND({{ args_concat }})';
+    templates.operators.float_modulo = '%';
+    templates.operators.round_single_arg = 'ROUND';
     templates.functions.DLOG10 = 'LOG(10, {{ args_concat }})';
     // Redshift clusters always run in UTC and GETDATE() is supported on compute
     // nodes, unlike NOW(), which is a leader node–only function.

@@ -1,5 +1,6 @@
 use crate::{
     compile::rewrite::{
+        analysis::OriginalExpr,
         fun_expr_var_arg, list_rewrite, list_rewrite_with_vars, rewrite,
         rewriter::{CubeEGraph, CubeRewrite},
         rules::wrapper::WrapperRules,
@@ -9,7 +10,9 @@ use crate::{
     },
     var, var_iter,
 };
+use datafusion::physical_plan::functions::BuiltinScalarFunction;
 use egg::Subst;
+use std::ops::ControlFlow;
 
 impl WrapperRules {
     pub fn scalar_function_rules(&self, rules: &mut Vec<CubeRewrite>) {
@@ -48,7 +51,7 @@ impl WrapperRules {
                         "?input_data_source",
                     ),
                 ),
-                self.transform_fun_expr("?fun", "?input_data_source"),
+                self.transform_fun_expr("?fun", "?args", "?input_data_source"),
             ),
             rewrite(
                 "wrapper-push-down-scalar-function-empty-tail",
@@ -120,9 +123,11 @@ impl WrapperRules {
     fn transform_fun_expr(
         &self,
         fun_var: &'static str,
+        args_var: &'static str,
         input_data_source_var: &'static str,
     ) -> impl Fn(&mut CubeEGraph, &mut Subst) -> bool {
         let fun_var = var!(fun_var);
+        let args_var = var!(args_var);
         let input_data_source_var = var!(input_data_source_var);
         let meta = self.meta_context.clone();
         move |egraph, subst| {
@@ -132,6 +137,31 @@ impl WrapperRules {
             };
 
             for fun in var_iter!(egraph[subst[fun_var]], ScalarFunctionExprFun).cloned() {
+                if fun == BuiltinScalarFunction::Round {
+                    let Some(OriginalExpr::List(args)) =
+                        &egraph[subst[args_var]].data.original_expr
+                    else {
+                        return false;
+                    };
+                    if args.len() == 1 {
+                        let template = "operators/round_single_arg";
+                        let supported = match Self::template_sql_generator(&data_source, &meta) {
+                            ControlFlow::Continue(generator) => {
+                                generator.get_sql_templates().contains_template(template)
+                            }
+                            ControlFlow::Break(true) => {
+                                !meta.data_source_to_sql_generator.is_empty()
+                                    && meta.data_source_to_sql_generator.values().all(|generator| {
+                                        generator.get_sql_templates().contains_template(template)
+                                    })
+                            }
+                            ControlFlow::Break(false) => false,
+                        };
+                        if !supported {
+                            return false;
+                        }
+                    }
+                }
                 if Self::can_rewrite_template(
                     &data_source,
                     &meta,

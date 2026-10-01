@@ -4791,7 +4791,11 @@ export class BaseQuery {
         always_true: '1 = 1'
 
       },
-      operators: {},
+      operators: {
+        // Presence permits floating-point modulo pushdown through expressions.binary.
+        float_modulo: '%',
+        round_single_arg: 'ROUND',
+      },
       quotes: {
         identifiers: '"',
         escape: '""'

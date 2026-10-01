@@ -2840,6 +2840,8 @@ from
           CAST(100 AS REAL) * COUNT(*) / (200 * COUNT(*)) AS "float32_ratio",
           100.1 * COUNT(*) / (200 * COUNT(*)) AS "fractional_ratio",
           -100.0 * COUNT(*) / (200 * COUNT(*)) AS "negative_ratio",
+          ROUND(100.0 * COUNT(*) / (200 * COUNT(*)), 2) AS "rounded_ratio",
+          ROUND(123.456 * COUNT(*) / COUNT(*), 2) AS "rounded_fraction",
           COUNT(*) / (2 * COUNT(*)) AS "integer_ratio",
           CAST(NULL AS DOUBLE) AS "float64_null",
           CAST(NULL AS REAL) AS "float32_null"
@@ -2877,6 +2879,48 @@ from
       expect(Number(rows[0].integer_ratio)).toBe(0);
       expect(rows[0].float64_null).toBeNull();
       expect(rows[0].float32_null).toBeNull();
+
+      expect(Number(rows[0].rounded_ratio)).toBeCloseTo(0.5, 10);
+      expect(Number(rows[0].rounded_fraction)).toBeCloseTo(123.46, 10);
+      expect(pushedSql).toMatch(/ROUND\(/i);
+
+      if (type === 'postgres') {
+        const roundQuery = `
+          SELECT ROUND(2.5 * COUNT(*) / COUNT(*)) AS "positive_tie",
+            ROUND(-2.5 * COUNT(*) / COUNT(*)) AS "negative_tie",
+            ROUND(2.4999999999999996 + (COUNT(*) - COUNT(*))) AS "below_tie",
+            ROUND(1000000000000001.0 + (COUNT(*) - COUNT(*))) AS "large_integer"
+          FROM "Customers" WHERE LOWER("customerName") <> '__float_literal_test__'
+        `;
+        const roundPlan = (await connection.query(`EXPLAIN ${roundQuery}`)).rows
+          .map(row => Object.values(row).join('\n')).join('\n');
+        expect(roundPlan).toContain('CubeScanWrappedSql');
+        expect(roundPlan).toMatch(/Projection:[^\n]*round\(/i);
+        const roundRows = (await connection.query(roundQuery)).rows;
+        expect(Number(roundRows[0].positive_tie)).toBe(3);
+        expect(Number(roundRows[0].negative_tie)).toBe(-3);
+        expect(Number(roundRows[0].below_tie)).toBe(2);
+        expect(Number(roundRows[0].large_integer)).toBe(1000000000000001);
+      }
+
+      if (['postgres', 'mssql', 'bigquery'].includes(type)) {
+        // These sources must evaluate floating remainder locally and preserve integer results.
+        const moduloQuery = `
+          SELECT (3 * COUNT(*)) % (2.0 * COUNT(*)) / COUNT(*) AS "remainder",
+            (3 * CAST(COUNT(*) AS BIGINT)) % (2 * CAST(COUNT(*) AS BIGINT)) AS "integer_remainder"
+          FROM "Customers" WHERE LOWER("customerName") <> '__float_literal_test__'
+        `;
+        const moduloPlan = (await connection.query(`EXPLAIN ${moduloQuery}`)).rows
+          .map(row => Object.values(row).join('\n')).join('\n');
+        expect(moduloPlan).toContain('CubeScanWrappedSql');
+        expect(moduloPlan).toMatch(/Projection:[^\n]*%/);
+        const moduloSql = moduloPlan.match(/CubeScanExecutionPlan, SQL:\s*([\s\S]*)/)?.[1];
+        expect(moduloSql).toBeDefined();
+        expect(moduloSql).not.toContain('%');
+        const moduloRows = (await connection.query(moduloQuery)).rows;
+        expect(Number(moduloRows[0].remainder)).toBeCloseTo(1, 10);
+        expect(Number(moduloRows[0].integer_remainder)).toBeGreaterThan(0);
+      }
     });
 
     executePg('SQL API: metabase count cast to float32 from push down', async (connection) => {

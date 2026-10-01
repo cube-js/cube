@@ -6,6 +6,25 @@ function templates(name: string) {
 }
 
 describe('floating-point literal templates', () => {
+  it('limits PostgreSQL numeric-only function handling to PostgreSQL', () => {
+    const base = templates('BaseQuery');
+    const postgres = templates('PostgresQuery');
+    expect(postgres.functions.ROUND).toContain('ROUND(CAST({{ args[0] }} AS NUMERIC), {{ args[1] }})');
+    expect(postgres.functions.ROUND).toContain('{% else %}ROUND({{ args_concat }})');
+    expect(postgres.operators.float_modulo).toBeUndefined();
+    expect(postgres.operators.round_single_arg).toBeUndefined();
+    expect(templates('MssqlQuery').operators.float_modulo).toBeUndefined();
+    expect(templates('BigqueryQuery').operators.float_modulo).toBeUndefined();
+    expect(postgres.expressions.binary).toBe(base.expressions.binary);
+
+    for (const name of ['RedshiftQuery', 'CrateQuery']) {
+      const result = templates(name);
+      expect(result.functions.ROUND).toBe(base.functions.ROUND);
+      expect(result.operators.float_modulo).toBe(base.operators.float_modulo);
+      expect(result.operators.round_single_arg).toBe(base.operators.round_single_arg);
+    }
+  });
+
   it.each(['MysqlQuery', 'MongoBiQuery'])('%s supports literals without FLOAT/DOUBLE casts', (name) => {
     const { expressions } = templates(name);
     // The SQL API supplies a round-trippable exponent literal, or none for NULL.

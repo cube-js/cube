@@ -16,6 +16,9 @@ export class CrateQuery extends PostgresQuery {
 
   public sqlTemplates() {
     const templates = super.sqlTemplates();
+    templates.functions.ROUND = 'ROUND({{ args_concat }})';
+    templates.operators.float_modulo = '%';
+    templates.operators.round_single_arg = 'ROUND';
     delete templates.functions.WIDTH_BUCKET;
     return templates;
   }

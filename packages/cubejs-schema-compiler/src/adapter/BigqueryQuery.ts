@@ -335,6 +335,8 @@ export class BigqueryQuery extends BaseQuery {
 
   public sqlTemplates() {
     const templates = super.sqlTemplates();
+    // BigQuery MOD accepts integer/decimal operands, not FLOAT64.
+    delete templates.operators.float_modulo;
     templates.quotes.identifiers = '`';
     templates.quotes.escape = '\\`';
     templates.functions.DATETRUNC = 'TIMESTAMP(DATETIME_TRUNC(CAST({{ args[1] }} AS DATETIME), {% if date_part|upper == \'WEEK\' %}{{ \'WEEK(MONDAY)\' }}{% else %}{{ date_part }}{% endif %}))';
