@@ -260,6 +260,14 @@ def memo(func):
     lock = threading.RLock()
 
     if inspect.iscoroutinefunction(func):
+        async def call(*args, **kwargs):
+            # The task returns the exception instead of raising it: re-raising it from the task
+            # would extend its traceback with every call before Python 3.11
+            try:
+                return True, await func(*args, **kwargs)
+            except Exception as e:
+                return False, (e, e.__traceback__)
+
         @functools.wraps(func)
         async def async_wrapper(*args, **kwargs):
             key = _memo_key(args, kwargs)
@@ -268,11 +276,15 @@ def memo(func):
                 entry = results.get(key)
                 if entry is None or entry[1].cancelled() or (entry[0] is not loop and not entry[1].done()):
                     # A task, so concurrent calls on the loop share one invocation
-                    entry = (loop, asyncio.ensure_future(func(*args, **kwargs)))
+                    entry = (loop, asyncio.ensure_future(call(*args, **kwargs)))
                     results[key] = entry
             task = entry[1]
             # Shielded: cancelling one caller mustn't cancel the task the others share
-            return task.result() if task.done() else await asyncio.shield(task)
+            ok, value = task.result() if task.done() else await asyncio.shield(task)
+            if not ok:
+                error, tb = value
+                raise error.with_traceback(tb)
+            return value
 
         return async_wrapper
 
