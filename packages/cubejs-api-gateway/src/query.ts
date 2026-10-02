@@ -7,7 +7,7 @@ import { UserError } from './user-error';
 import { dateParser } from './date-parser';
 import { QueryType as QueryTypeEnum } from './types/enums';
 import type { QueryType } from './types/strings';
-import type { InputMemberExpression, NormalizedQuery, Query } from './types/query';
+import type { InputMemberExpression, NormalizedQuery, NormalizedQueryFilter, Query } from './types/query';
 
 const getQueryGranularity = (queries: NormalizedQuery[]): string[] => R.pipe(
   R.map(({ timeDimensions }: NormalizedQuery) => timeDimensions![0]?.granularity),
@@ -220,13 +220,17 @@ export const cubeSqlRequestSchema = Joi.object().keys({
   throwContinueWait: Joi.boolean(),
 });
 
-const normalizeQueryOrder = (order: any): [string, string][] => {
+// Joi accepts either `{ member: direction }` or `[[member, direction], ...]`
+type QueryOrderInput = Record<string, string> | [string, string][];
+
+const normalizeQueryOrder = (order: unknown): [string, string][] => {
   let result: [string, string][] = [];
   const normalizeOrderItem = (k: string, direction: string): [string, string] => ([k, direction]);
   if (order) {
-    result = Array.isArray(order) ?
-      order.map(([k, direction]: [string, string]) => normalizeOrderItem(k, direction)) :
-      Object.keys(order).map(k => normalizeOrderItem(k, order[k]));
+    const input = order as QueryOrderInput;
+    result = Array.isArray(input) ?
+      input.map(([k, direction]) => normalizeOrderItem(k, direction)) :
+      Object.keys(input).map(k => normalizeOrderItem(k, input[k]));
   }
   return result;
 };
@@ -278,7 +282,9 @@ const AbsoluteDateTimeRegex = /^\d{4}-\d{2}-\d{2}([T ]\d{2}:\d{2}(:\d{2}(\.\d{1,
 // Resolve a dateRange input — a relative string ("last 2 weeks"), a single
 // absolute date, or a 2-element array — to a normalized [startISO, endISO]
 // pair.
-export const resolveDateRange = (input: any, timezone: string): any => {
+export function resolveDateRange(input: string | string[], timezone: string): string[];
+export function resolveDateRange(input: unknown, timezone: string): unknown;
+export function resolveDateRange(input: unknown, timezone: string): unknown {
   let dateRange: string[];
   if (typeof input === 'string') {
     dateRange = dateParser(input, timezone);
@@ -289,13 +295,13 @@ export const resolveDateRange = (input: any, timezone: string): any => {
   }
 
   return dateRange && dateRange.map(
-    (d: string, i: number) => (
+    (d, i) => (
       i === 0 ?
         moment.utc(d).format(d.match(DateRegex) ? 'YYYY-MM-DDT00:00:00.000' : moment.HTML5_FMT.DATETIME_LOCAL_MS) :
         moment.utc(d).format(d.match(DateRegex) ? 'YYYY-MM-DDT23:59:59.999' : moment.HTML5_FMT.DATETIME_LOCAL_MS)
     )
   );
-};
+}
 
 // Resolve relative date strings inside a filter leaf's `values` so that
 // date-range filters can appear inside OR/AND groups (and at the top level)
@@ -355,7 +361,16 @@ export const normalizeDateFilterValues = <T extends { operator?: string, values?
   return filter;
 };
 
-const normalizeQueryFilters = (filter: any[], timezone: string): any[] => (
+type FilterInput = {
+  or?: FilterInput[],
+  and?: FilterInput[],
+  dimension?: string,
+  member?: string,
+  operator?: string,
+  values?: unknown[],
+};
+
+const normalizeQueryFilters = (filter: FilterInput[], timezone: string): FilterInput[] => (
   filter.map(f => {
     const res = { ...f };
     if (f.or) {
@@ -380,7 +395,7 @@ const normalizeQueryFilters = (filter: any[], timezone: string): any[] => (
     }
 
     if (f.values) {
-      res.values = f.values.map(v => (v != null ? v.toString() : v));
+      res.values = f.values.map(v => (v != null ? (v as { toString(): string }).toString() : v));
     }
 
     if (f.dimension) {
@@ -469,7 +484,8 @@ const normalizeQuery = (query: Query, persistent?: boolean, cacheMode?: CacheMod
     ...(query.order ? { order: normalizeQueryOrder(query.order) } : {}),
     limit: newLimit,
     timezone,
-    filters: normalizeQueryFilters(query.filters || [], timezone),
+    // NormalizedQueryFilter does not model and/or groups
+    filters: normalizeQueryFilters(query.filters || [], timezone) as NormalizedQueryFilter[],
     dimensions: (query.dimensions || []).filter(d => typeof d !== 'string' || d.split('.').length !== 3),
     // compareDateRange becomes an array of ranges here, which QueryTimeDimension does not model
     timeDimensions: (query.timeDimensions || []).map((td): any => {
@@ -484,16 +500,17 @@ const normalizeQuery = (query: Query, persistent?: boolean, cacheMode?: CacheMod
   };
 };
 
-const remapQueryOrder = (order: any): { id: string, desc: boolean }[] => {
+const remapQueryOrder = (order: unknown): { id: string, desc: boolean }[] => {
   let result: { id: string, desc: boolean }[] = [];
   const normalizeOrderItem = (k: string, direction: string) => ({
     id: k,
     desc: direction === 'desc'
   });
   if (order) {
-    result = Array.isArray(order) ?
-      order.map(([k, direction]: [string, string]) => normalizeOrderItem(k, direction)) :
-      Object.keys(order).map(k => normalizeOrderItem(k, order[k]));
+    const input = order as QueryOrderInput;
+    result = Array.isArray(input) ?
+      input.map(([k, direction]) => normalizeOrderItem(k, direction)) :
+      Object.keys(input).map(k => normalizeOrderItem(k, input[k]));
   }
   return result;
 };
@@ -518,17 +535,35 @@ const queryPreAggregationsSchema = Joi.object().keys({
   }))
 });
 
-const normalizeQueryPreAggregations = (query: any, defaultValues?: { timezones?: string[] }) => {
+type PreAggregationsQuery = {
+  expand?: string[],
+  metadata?: Record<string, unknown>,
+  timezone?: string,
+  timezones?: string[],
+  preAggregations?: {
+    id: string,
+    cacheOnly?: boolean,
+    metaOnly?: boolean,
+    partitions?: string[],
+    refreshRange?: [string, string],
+  }[],
+};
+
+const normalizeQueryPreAggregations = (query: unknown, defaultValues?: { timezones?: string[] }) => {
   const { error, value } = queryPreAggregationsSchema.validate(query);
   if (error) {
     throw new UserError(`Invalid query format: ${error.message || error.toString()}`);
   }
 
+  // Only timezones take Joi's converted value (canonical names); the rest passes through as sent
+  const validated = query as PreAggregationsQuery;
+  const converted = value as PreAggregationsQuery;
+
   return {
-    metadata: query.metadata,
-    timezones: value.timezones || (value.timezone && [value.timezone]) || defaultValues?.timezones || ['UTC'],
-    preAggregations: query.preAggregations,
-    expand: query.expand
+    metadata: validated.metadata,
+    timezones: converted.timezones || (converted.timezone && [converted.timezone]) || defaultValues?.timezones || ['UTC'],
+    preAggregations: validated.preAggregations,
+    expand: validated.expand
   };
 };
 
@@ -545,13 +580,26 @@ const queryPreAggregationPreviewSchema = Joi.object().keys({
   })
 });
 
-const normalizeQueryPreAggregationPreview = (query: any) => {
+type PreAggregationPreviewQuery = {
+  preAggregationId: string,
+  timezone: string,
+  versionEntry: {
+    content_version?: string,
+    last_updated_at?: number,
+    naming_version?: number,
+    structure_version?: string,
+    table_name?: string,
+    build_range_end?: string,
+  },
+};
+
+const normalizeQueryPreAggregationPreview = (query: unknown): PreAggregationPreviewQuery => {
   const { error, value } = queryPreAggregationPreviewSchema.validate(query);
   if (error) {
     throw new UserError(`Invalid query format: ${error.message || error.toString()}`);
   }
 
-  return { ...query, timezone: value.timezone };
+  return { ...(query as PreAggregationPreviewQuery), timezone: (value as PreAggregationPreviewQuery).timezone };
 };
 
 const queryCancelPreAggregationPreviewSchema = Joi.object().keys({
@@ -559,13 +607,18 @@ const queryCancelPreAggregationPreviewSchema = Joi.object().keys({
   queryKeys: Joi.array().items(Joi.string())
 });
 
-const normalizeQueryCancelPreAggregations = (query: any) => {
+type CancelPreAggregationsQuery = {
+  dataSource?: string,
+  queryKeys?: string[],
+};
+
+const normalizeQueryCancelPreAggregations = (query: unknown): CancelPreAggregationsQuery => {
   const { error } = queryCancelPreAggregationPreviewSchema.validate(query);
   if (error) {
     throw new UserError(`Invalid query format: ${error.message || error.toString()}`);
   }
 
-  return query;
+  return query as CancelPreAggregationsQuery;
 };
 
 export {
