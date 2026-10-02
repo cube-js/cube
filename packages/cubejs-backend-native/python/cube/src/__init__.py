@@ -254,21 +254,17 @@ def _memo_key(args, kwargs):
 
 
 def memo(func):
-    """Calls `func` once per set of arguments and returns that result to every later call. Calls made
-    while a template function runs share a cache per `TemplateContext`, which each data model
-    compilation creates anew by loading `globals.py`; other calls share one of `func`'s own."""
+    """Calls `func` once per set of arguments and returns that result to every later call made while a
+    template function runs, with a cache per `TemplateContext`: each data model compilation creates
+    one anew by loading `globals.py`. Other calls, with no compilation to cache for, just call `func`."""
     if not callable(func):
         raise TemplateException("memo must be used with functions, actual: '%s'" % type(func).__name__)
 
     # Exceptions are stored too: every template sees the same outcome
     per_context = weakref.WeakKeyDictionary()
-    outside_templates = {}
     lock = threading.RLock()
 
-    def results():
-        context = _template_context.get()
-        if context is None:
-            return outside_templates
+    def results(context):
         stored = per_context.get(context)
         if stored is None:
             stored = per_context[context] = {}
@@ -285,10 +281,13 @@ def memo(func):
 
         @functools.wraps(func)
         async def async_wrapper(*args, **kwargs):
+            context = _template_context.get()
+            if context is None:
+                return await func(*args, **kwargs)
             key = _memo_key(args, kwargs)
             loop = asyncio.get_running_loop()
             with lock:
-                stored = results()
+                stored = results(context)
                 entry = stored.get(key)
                 if entry is None or entry[1].cancelled() or (entry[0] is not loop and not entry[1].done()):
                     # A task, so concurrent calls on the loop share one invocation
@@ -306,9 +305,12 @@ def memo(func):
 
     @functools.wraps(func)
     def wrapper(*args, **kwargs):
+        context = _template_context.get()
+        if context is None:
+            return func(*args, **kwargs)
         key = _memo_key(args, kwargs)
         with lock:
-            stored = results()
+            stored = results(context)
             if key not in stored:
                 try:
                     stored[key] = (True, func(*args, **kwargs))

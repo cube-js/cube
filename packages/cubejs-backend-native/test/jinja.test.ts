@@ -236,10 +236,11 @@ suite('Python memo', () => {
     };
 
     // memo_helper.py is imported once, so its call counter is shared, and compilations overlap
+    // A method called on a returned object runs every time, so no compilation gets another one's result
     const renderA = await load();
-    expect(await renderA()).toEqual('imported: 1 1 1');
+    expect(await renderA()).toEqual('imported: 1 1 1\nmethod: 1');
     const renderB = await load();
-    expect(await renderA()).toEqual('imported: 1 1 1');
-    expect(await renderB()).toEqual('imported: 2 2 2');
+    expect(await renderA()).toEqual('imported: 1 1 1\nmethod: 2');
+    expect(await renderB()).toEqual('imported: 2 2 2\nmethod: 3');
   });
 });
