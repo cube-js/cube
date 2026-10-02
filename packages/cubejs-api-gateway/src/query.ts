@@ -551,14 +551,14 @@ const normalizeQueryPreAggregations = (query: unknown, defaultValues?: { timezon
   }
 
   // Only timezones take Joi's converted value (canonical names); the rest passes through as sent
-  const validated = query as PreAggregationsQuery;
+  const raw = query as PreAggregationsQuery;
   const converted = value as PreAggregationsQuery;
 
   return {
-    metadata: validated.metadata,
+    metadata: raw.metadata,
     timezones: converted.timezones || (converted.timezone && [converted.timezone]) || defaultValues?.timezones || ['UTC'],
-    preAggregations: validated.preAggregations,
-    expand: validated.expand
+    preAggregations: raw.preAggregations,
+    expand: raw.expand
   };
 };
 
