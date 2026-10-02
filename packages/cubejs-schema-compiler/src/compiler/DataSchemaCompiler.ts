@@ -859,7 +859,7 @@ export class DataSchemaCompiler {
         memoStage = -1;
         memoResults.clear();
         memoCallSiteStages.clear();
-        // Python @memo caches live on the globals.py functions these hold (filters in the Jinja engine)
+        // These hold the globals.py TemplateContext, where the Python @memo caches live
         this.pythonContext = null;
         this.yamlCompiler.free();
       });
