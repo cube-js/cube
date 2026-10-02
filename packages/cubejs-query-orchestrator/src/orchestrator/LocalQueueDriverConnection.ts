@@ -386,11 +386,12 @@ export class LocalQueueDriverConnection implements QueueDriverConnectionInterfac
   }
 
   /**
-   * The heartbeat timeout only ever applies to active items. retrieveForProcessing always sets
-   * a heartbeat, so `created` is only a fallback.
+   * The heartbeat timeout only ever applies to active items.
    */
   protected isStalled(item: LocalQueueItem, now: number): boolean {
-    return item.status === LocalQueueItemStatus.Active && now - (item.heartbeat ?? item.created) > this.heartBeatTimeout * 1000;
+    return item.status === LocalQueueItemStatus.Active
+      && item.heartbeat !== null
+      && now - item.heartbeat > this.heartBeatTimeout * 1000;
   }
 
   public async getOrphanedQueries(): Promise<QueryKeysTuple[]> {
