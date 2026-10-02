@@ -216,6 +216,8 @@ pub struct BaseQueryOptionsStatic {
     pub cubestore_support_multistage: Option<bool>,
     #[serde(rename = "maxMultiStageDepth")]
     pub max_multi_stage_depth: Option<usize>,
+    #[serde(rename = "maxMemberResolutionDepth")]
+    pub max_member_resolution_depth: Option<usize>,
     #[serde(rename = "disableExternalPreAggregations")]
     pub disable_external_pre_aggregations: bool,
     #[serde(rename = "preAggregationId")]

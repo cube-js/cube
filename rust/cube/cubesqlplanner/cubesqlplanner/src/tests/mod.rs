@@ -16,6 +16,7 @@ mod filter_params_time_shifts;
 mod join_hints_collector;
 mod measure_symbol;
 mod member_expressions_on_views;
+mod member_resolution_depth;
 mod multi_stage_depth;
 mod no_query_tools_leak;
 mod positional_params;

@@ -980,6 +980,7 @@ export class BaseQuery {
       joinHints: this.options.joinHints,
       cubestoreSupportMultistage: this.options.cubestoreSupportMultistage ?? getEnv('cubeStoreRollingWindowJoin'),
       maxMultiStageDepth: this.options.maxMultiStageDepth ?? getEnv('maxMultiStageDepth'),
+      maxMemberResolutionDepth: this.options.maxMemberResolutionDepth ?? getEnv('maxMemberResolutionDepth'),
       disableExternalPreAggregations: !!this.options.disableExternalPreAggregations,
       convertTzForRawTimeDimension: !!this.options.convertTzForRawTimeDimension,
       maskedMembers: this.options.maskedMembers,
@@ -1044,6 +1045,7 @@ export class BaseQuery {
       joinHints: this.options.joinHints,
       cubestoreSupportMultistage: this.options.cubestoreSupportMultistage ?? getEnv('cubeStoreRollingWindowJoin'),
       maxMultiStageDepth: this.options.maxMultiStageDepth ?? getEnv('maxMultiStageDepth'),
+      maxMemberResolutionDepth: this.options.maxMemberResolutionDepth ?? getEnv('maxMemberResolutionDepth'),
       disableExternalPreAggregations: !!this.options.disableExternalPreAggregations,
       subqueryJoins: this.options.subqueryJoins,
     };

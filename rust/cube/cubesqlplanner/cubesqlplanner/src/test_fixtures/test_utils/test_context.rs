@@ -68,6 +68,7 @@ impl TestContext {
             self.custom_sql_templates.clone(),
             true,
             self.should_reuse_params,
+            None,
         )
     }
 
@@ -93,6 +94,7 @@ impl TestContext {
             Some(Tz::UTC.to_string()),
             false,
             false,
+            None,
             None,
             None,
         )?;
@@ -144,6 +146,7 @@ impl TestContext {
             Some(sql_templates),
             false,
             should_reuse_params,
+            None,
         )
     }
 
@@ -193,6 +196,7 @@ impl TestContext {
             self.custom_sql_templates.clone(),
             self.external_cubestore,
             self.should_reuse_params,
+            static_data.max_member_resolution_depth,
         )
     }
 
@@ -214,6 +218,7 @@ impl TestContext {
             None,
             false,
             true,
+            None,
         )
     }
 
@@ -228,6 +233,7 @@ impl TestContext {
         custom_sql_templates: Option<crate::test_fixtures::cube_bridge::MockSqlTemplatesRender>,
         external_cubestore: bool,
         should_reuse_params: bool,
+        max_member_resolution_depth: Option<usize>,
     ) -> Result<Self, CubeError> {
         use crate::test_fixtures::cube_bridge::MockDriverTools;
         let mut driver_tools = match custom_sql_templates.clone() {
@@ -266,6 +272,7 @@ impl TestContext {
             convert_tz_for_raw_time_dimension,
             masked_members,
             member_to_alias,
+            max_member_resolution_depth,
         )?;
 
         Ok(Self {
@@ -535,6 +542,7 @@ impl TestContext {
                 .total_query(yaml_options.total_query)
                 .cubestore_support_multistage(yaml_options.cubestore_support_multistage)
                 .max_multi_stage_depth(yaml_options.max_multi_stage_depth)
+                .max_member_resolution_depth(yaml_options.max_member_resolution_depth)
                 .disable_external_pre_aggregations(
                     yaml_options
                         .disable_external_pre_aggregations

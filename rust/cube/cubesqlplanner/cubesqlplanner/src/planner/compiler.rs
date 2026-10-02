@@ -17,6 +17,11 @@ use cubenativeutils::CubeError;
 use std::collections::HashMap;
 use std::rc::{Rc, Weak};
 
+/// Default for queries without `maxMemberResolutionDepth`. Must stay above
+/// `DEFAULT_MAX_MULTI_STAGE_DEPTH` (so multi-stage chains get the stage error) and below the
+/// ~190 levels where nested `compileMemberSql` calls overflow V8's stack.
+pub const DEFAULT_MAX_MEMBER_RESOLUTION_DEPTH: usize = 160;
+
 /// Compilation context for the planner. Resolves data-model
 /// declarations into `MemberSymbol`s, caches them by `SymbolPath`,
 /// and holds the JS-side interfaces (cube evaluator, base tools,
@@ -31,6 +36,9 @@ pub struct Compiler {
     members: HashMap<SymbolPath, Rc<MemberSymbol>>,
     cube_names: HashMap<Vec<String>, Rc<CubeNameSymbol>>,
     cube_tables: HashMap<Vec<String>, Rc<CubeTableSymbol>>,
+    /// Members being resolved right now, outermost first: each one waits on the next.
+    resolving: Vec<String>,
+    max_resolution_depth: usize,
     /// Back-reference to the owning `QueryTools`. Set by `set_query_tools`
     /// at the end of `QueryTools::try_new`, after the `Rc<QueryTools>` is
     /// available. Held as `Weak` to avoid an `Rc` cycle: `QueryTools` owns
@@ -46,6 +54,7 @@ impl Compiler {
         security_context: Rc<dyn SecurityContext>,
         timezone: Tz,
         member_to_alias: Option<HashMap<String, String>>,
+        max_resolution_depth: Option<usize>,
     ) -> Self {
         Self {
             cube_evaluator,
@@ -56,8 +65,39 @@ impl Compiler {
             members: HashMap::new(),
             cube_names: HashMap::new(),
             cube_tables: HashMap::new(),
+            resolving: Vec::new(),
+            max_resolution_depth: max_resolution_depth
+                .unwrap_or(DEFAULT_MAX_MEMBER_RESOLUTION_DEPTH),
             query_tools: Weak::new(),
         }
+    }
+
+    /// Runs `resolve` for `path` one level deeper, refusing first if that level is past the
+    /// budget: the check has to come before the next call into JS, which is what overflows.
+    fn resolve_nested<T>(
+        &mut self,
+        path: &SymbolPath,
+        resolve: impl FnOnce(&mut Self) -> Result<T, CubeError>,
+    ) -> Result<T, CubeError> {
+        if self.resolving.len() >= self.max_resolution_depth {
+            return Err(CubeError::user(format!(
+                "Member '{}' references members more than {} levels deep (through '{}'), \
+                 against a limit of {}. Each level is resolved inside the one that references \
+                 it, and this many cannot be resolved. Reference fewer members in a chain, or \
+                 raise CUBEJS_MAX_MEMBER_RESOLUTION_DEPTH.",
+                self.resolving
+                    .first()
+                    .map(String::as_str)
+                    .unwrap_or(path.full_name().as_str()),
+                self.max_resolution_depth,
+                path.full_name(),
+                self.max_resolution_depth
+            )));
+        }
+        self.resolving.push(path.full_name().clone());
+        let result = resolve(self);
+        self.resolving.pop();
+        result
     }
 
     /// Wire the owning `QueryTools` into this compiler. Called once by
@@ -115,8 +155,8 @@ impl Compiler {
         if let Some(exists) = self.members.get(&path) {
             Ok(exists.clone())
         } else {
-            let result = MeasureSymbolFactory::try_new(path.clone(), self.cube_evaluator.clone())?
-                .build(self)?;
+            let factory = MeasureSymbolFactory::try_new(path.clone(), self.cube_evaluator.clone())?;
+            let result = self.resolve_nested(&path, |compiler| factory.build(compiler))?;
             self.validate_and_cache_result(path, result.clone())?;
             Ok(result)
         }
@@ -152,9 +192,9 @@ impl Compiler {
         if let Some(exists) = self.members.get(&path) {
             Ok(exists.clone())
         } else {
-            let result =
-                DimensionSymbolFactory::try_new(path.clone(), self.cube_evaluator.clone())?
-                    .build(self)?;
+            let factory =
+                DimensionSymbolFactory::try_new(path.clone(), self.cube_evaluator.clone())?;
+            let result = self.resolve_nested(&path, |compiler| factory.build(compiler))?;
             self.validate_and_cache_result(path, result.clone())?;
             Ok(result)
         }
@@ -177,7 +217,9 @@ impl Compiler {
         }
         let full_name = path.full_name().clone();
         let definition = self.cube_evaluator.segment_by_path(full_name.clone())?;
-        let sql_call = self.compile_sql_call(path.cube_name(), definition.sql()?)?;
+        let sql_call = self.resolve_nested(&path, |compiler| {
+            compiler.compile_sql_call(path.cube_name(), definition.sql()?)
+        })?;
         let alias = self.alias_for_member(&full_name).unwrap_or_else(|| {
             PlanSqlTemplates::member_alias_name(path.cube_name(), path.symbol_name(), &None)
         });
