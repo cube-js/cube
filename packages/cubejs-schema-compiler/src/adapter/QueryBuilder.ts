@@ -15,8 +15,10 @@ import { SqliteQuery } from './SqliteQuery';
 import { CubeStoreQuery } from './CubeStoreQuery';
 import { AthenaQuery } from './AthenaQuery';
 import { TrinoQuery } from './TrinoQuery';
+import type { BaseQuery } from './BaseQuery';
+import type { Compiler } from '../compiler/PrepareCompiler';
 
-const ADAPTERS = {
+const ADAPTERS: Record<string, typeof BaseQuery> = {
   postgres: PostgresQuery,
   redshift: RedshiftQuery,
   mysql: MysqlQuery,
@@ -39,9 +41,9 @@ const ADAPTERS = {
   cubestore: CubeStoreQuery,
 };
 
-export const queryClass = (dbType: string, dialectClass) => dialectClass || ADAPTERS[dbType];
+export const queryClass = (dbType: string, dialectClass: any) => dialectClass || ADAPTERS[dbType];
 
-export const createQuery = (compilers, dbType: string, queryOptions: any) => {
+export const createQuery = (compilers: Compiler, dbType: string, queryOptions: any) => {
   if (!queryOptions.dialectClass && !ADAPTERS[dbType]) {
     return null;
   }

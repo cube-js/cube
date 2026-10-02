@@ -1,10 +1,31 @@
 import inflection from 'inflection';
 import { AbstractExtension } from './extension.abstract';
 
+type FunnelSql = {
+  sql: (...args: any[]) => string;
+};
+
+type FunnelStep = {
+  name: string;
+  eventsCube?: FunnelSql;
+  eventsView?: FunnelSql;
+  eventsTable?: FunnelSql;
+  userId?: FunnelSql;
+  time?: FunnelSql;
+  nextStepUserId?: FunnelSql;
+  timeToConvert?: string;
+};
+
+type FunnelDefinition = {
+  userId: FunnelSql;
+  time: FunnelSql;
+  steps: FunnelStep[];
+};
+
 export class Funnels extends AbstractExtension {
   // TODO check timeToConvert is absent on first step
   // TODO name can be a title
-  public eventFunnel(funnelDefinition) {
+  public eventFunnel(funnelDefinition: FunnelDefinition) {
     if (!funnelDefinition.userId || !funnelDefinition.userId.sql) {
       throw new Error('userId.sql is not defined'); // TODO schema check
     }
@@ -20,9 +41,9 @@ export class Funnels extends AbstractExtension {
     return this.cubeFactory({
       sql: () => {
         const eventJoin =
-          funnelDefinition.steps.map((s, i) => this.eventCubeJoin(funnelDefinition, s, funnelDefinition.steps[i - 1]));
+          funnelDefinition.steps.map((s: FunnelStep, i: number) => this.eventCubeJoin(funnelDefinition, s, funnelDefinition.steps[i - 1]));
         const userIdColumnsAndTime =
-          funnelDefinition.steps.map(s => `${this.eventsTableName(s)}.user_id ${this.stepUserIdColumnName(s)}`)
+          funnelDefinition.steps.map((s: FunnelStep) => `${this.eventsTableName(s)}.user_id ${this.stepUserIdColumnName(s)}`)
             .concat([`${this.eventsTableName(funnelDefinition.steps[0])}.t`]).join(',\n');
         return `WITH joined_events AS (
     select
@@ -31,7 +52,7 @@ export class Funnels extends AbstractExtension {
 ${eventJoin.join('\nLEFT JOIN\n')}
   )
   select user_id, first_step_user_id, step, max(t) t from (
-    ${funnelDefinition.steps.map(s => this.stepSegmentSelect(funnelDefinition, s)).join('\nUNION ALL\n')}
+    ${funnelDefinition.steps.map((s: FunnelStep) => this.stepSegmentSelect(funnelDefinition, s)).join('\nUNION ALL\n')}
   ) as event_steps GROUP BY 1, 2, 3`;
       },
       measures: {
@@ -45,7 +66,7 @@ ${eventJoin.join('\nLEFT JOIN\n')}
           shown: false
         },
         conversionsPercent: {
-          sql: (conversions, firstStepConversions) => `CASE WHEN ${firstStepConversions} > 0 THEN 1.0 * ${conversions} / ${firstStepConversions} ELSE NULL END`,
+          sql: (conversions: string, firstStepConversions: string) => `CASE WHEN ${firstStepConversions} > 0 THEN 1.0 * ${conversions} / ${firstStepConversions} ELSE NULL END`,
           type: 'number',
           format: 'percent'
         }
@@ -53,7 +74,7 @@ ${eventJoin.join('\nLEFT JOIN\n')}
 
       dimensions: {
         id: {
-          sql: (time, step) => `first_step_user_id || ${time} || ${step}`,
+          sql: (time: string, step: string) => `first_step_user_id || ${time} || ${step}`,
           type: 'string',
           primaryKey: true
         },
@@ -79,15 +100,15 @@ ${eventJoin.join('\nLEFT JOIN\n')}
     });
   }
 
-  protected eventCubeJoin(funnelDefinition, step, prevStep) {
+  protected eventCubeJoin(funnelDefinition: FunnelDefinition, step: FunnelStep, prevStep: FunnelStep | undefined) {
     const sql = this.compiler.contextQuery().evaluateSql(
       null,
-      (step.eventsCube || step.eventsView || step.eventsTable).sql
+      (step.eventsCube || step.eventsView || step.eventsTable)!.sql
     );
     const fromSql = (sql.toLowerCase().trim().startsWith('select') ? `(${sql}) e` : sql);
     const timeToConvertCondition =
       step.timeToConvert ?
-        ` AND ${this.compiler.contextQuery().convertTz(`${this.eventsTableName(step)}.t`)} <= ${this.compiler.contextQuery().addInterval(this.compiler.contextQuery().convertTz(`${this.eventsTableName(prevStep)}.t`), step.timeToConvert)}` :
+        ` AND ${this.compiler.contextQuery().convertTz(`${this.eventsTableName(step)}.t`)} <= ${this.compiler.contextQuery().addInterval(this.compiler.contextQuery().convertTz(`${this.eventsTableName(prevStep!)}.t`), step.timeToConvert)}` :
         '';
     const joinSql =
       prevStep ?
@@ -98,19 +119,19 @@ ${eventJoin.join('\nLEFT JOIN\n')}
     return `(select ${this.compiler.contextQuery().evaluateSql(null, (step.userId || funnelDefinition.userId).sql)} user_id${nextJoin}, ${this.compiler.contextQuery().evaluateSql(null, (step.time || funnelDefinition.time).sql)} t from ${fromSql}) ${this.eventsTableName(step)}${joinSql}`;
   }
 
-  protected eventsTableName(step) {
+  protected eventsTableName(step: FunnelStep) {
     return `${this.inflect(step)}_events`;
   }
 
-  protected stepUserIdColumnName(step) {
+  protected stepUserIdColumnName(step: FunnelStep) {
     return `${this.inflect(step)}_user_id`;
   }
 
-  protected inflect(step) {
+  protected inflect(step: FunnelStep) {
     return inflection.underscore(inflection.camelize(step.name.replace(/[^A-Za-z0-9]+/g, '_')));
   }
 
-  protected stepSegmentSelect(funnelDefinition, step) {
+  protected stepSegmentSelect(funnelDefinition: FunnelDefinition, step: FunnelStep) {
     return `SELECT ${this.stepUserIdColumnName(step)} user_id, ${this.stepUserIdColumnName(funnelDefinition.steps[0])} first_step_user_id, t, '${inflection.titleize(step.name)}' step FROM joined_events`;
   }
 }

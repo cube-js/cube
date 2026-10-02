@@ -11,11 +11,11 @@ export class LightweightSymbolResolver implements TranspilerSymbolResolver {
     this.symbols = symbols;
   }
 
-  public isCurrentCube(name): boolean {
+  public isCurrentCube(name: string): boolean {
     return CURRENT_CUBE_CONSTANTS.indexOf(name) >= 0;
   }
 
-  public resolveSymbol(cubeName, name): any {
+  public resolveSymbol(cubeName: string | null | undefined, name: string): any {
     if (name === 'USER_CONTEXT') {
       throw new Error('Support for USER_CONTEXT was removed, please migrate to SECURITY_CONTEXT.');
     }
@@ -24,7 +24,9 @@ export class LightweightSymbolResolver implements TranspilerSymbolResolver {
       return true;
     }
 
-    const cube = this.symbols[this.isCurrentCube(name) ? cubeName : name];
-    return cube || (this.symbols[cubeName] && this.symbols[cubeName][name]);
+    // A missing cube name is coerced to a string key, which matches no cube
+    const currentCubeName = cubeName as string;
+    const cube = this.symbols[this.isCurrentCube(name) ? currentCubeName : name];
+    return cube || (this.symbols[currentCubeName] && this.symbols[currentCubeName][name]);
   }
 }

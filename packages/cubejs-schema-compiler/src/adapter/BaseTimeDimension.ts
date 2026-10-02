@@ -97,7 +97,7 @@ export class BaseTimeDimension extends BaseFilter {
     return `${dateSeriesAliasName || this.dateSeriesAliasName()}.${this.query.escapeColumnName('date_from')} ${this.aliasName()}`;
   }
 
-  public dimensionSql() {
+  public dimensionSql(): string {
     const context = this.query.safeEvaluateSymbolContext();
     const granularityName = context.granularityOverride || this.granularityObj?.granularity;
     const path = granularityName ? `${this.expressionPath()}.${granularityName}` : this.expressionPath();
@@ -133,11 +133,11 @@ export class BaseTimeDimension extends BaseFilter {
     return super.dimensionDefinition();
   }
 
-  public convertTzForRawTimeDimensionIfNeeded(sql) {
+  public convertTzForRawTimeDimensionIfNeeded(sql: () => string): string {
     return sql();
   }
 
-  public convertedToTz() {
+  public convertedToTz(): string {
     return this.query.convertTz(this.query.dimensionSql(this));
   }
 
@@ -283,7 +283,7 @@ export class BaseTimeDimension extends BaseFilter {
     return this.granularityObj ? this.granularityObj.granularity : null;
   }
 
-  public wildcardRange() {
+  public wildcardRange(): [string, string] {
     return [FROM_PARTITION_RANGE, TO_PARTITION_RANGE];
   }
 

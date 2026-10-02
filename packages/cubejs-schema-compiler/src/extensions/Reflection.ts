@@ -3,7 +3,7 @@ import { DynamicReference } from '../compiler/DynamicReference';
 import { AbstractExtension } from './extension.abstract';
 
 export class Reflection extends AbstractExtension {
-  public dynRef = (...args) => {
+  public dynRef = (...args: any[]) => {
     if (args.length < 2) {
       throw new Error('List of references and a function are expected in form: dynRef(\'ref\', (r) => (...))');
     }

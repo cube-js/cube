@@ -11,7 +11,7 @@ describe('MSSQL SQL API boolean contexts', () => {
   const rows = inputs.flatMap((b, i) => inputs.map((c, j) => ({ id: i * 3 + j, b, c })));
   const bit = (value: boolean | null) => `CAST(${value === null ? 'NULL' : Number(value)} AS BIT)`;
   const fixture = `(VALUES ${rows.map(row => `(${row.id}, ${bit(row.b)}, ${bit(row.c)})`).join(', ')}) AS fixture(id, b, c)`;
-  const query = (sql: string) => dbRunner.testQuery([sql, []]);
+  const query = (sql: string): Promise<Record<string, unknown>[]> => dbRunner.testQuery([sql, []]);
 
   it('expands segment predicates in rendered member expressions', async () => {
     const compilers = prepareJsCompiler(`

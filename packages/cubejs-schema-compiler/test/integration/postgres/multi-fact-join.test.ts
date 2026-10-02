@@ -95,7 +95,7 @@ cube(\`city\`, {
 });
     `);
 
-  async function runQueryTest(q, expectedResult) {
+  async function runQueryTest(q: unknown, expectedResult: unknown) {
     if (!getEnv('nativeSqlPlanner')) {
       return;
     }

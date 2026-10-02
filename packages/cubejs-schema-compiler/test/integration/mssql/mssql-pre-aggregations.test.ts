@@ -3,6 +3,7 @@ import { MssqlQuery } from '../../../src/adapter/MssqlQuery';
 import { prepareJsCompiler } from '../../unit/PrepareCompiler';
 import { dbRunner } from './MSSqlDbRunner';
 import { createJoinedCubesSchema } from '../../unit/utils';
+import type { TestPreAggregationDescription, TestQueryWithParams } from '../utils/BaseDbRunner';
 
 describe('MSSqlPreAggregations', () => {
   jest.setTimeout(200000);
@@ -165,20 +166,24 @@ describe('MSSqlPreAggregations', () => {
 
   const joinedSchemaCompilers = prepareJsCompiler(createJoinedCubesSchema());
 
-  function replaceTableName(query, preAggregation, suffix) {
+  function replaceTableName(
+    query: TestQueryWithParams,
+    preAggregation: TestPreAggregationDescription | TestPreAggregationDescription[],
+    suffix: string | number
+  ): TestQueryWithParams {
     const [toReplace, params] = query;
     console.log(toReplace);
-    preAggregation = Array.isArray(preAggregation) ? preAggregation : [preAggregation];
+    const preAggregations = Array.isArray(preAggregation) ? preAggregation : [preAggregation];
     return [
-      preAggregation.reduce(
-        (replacedQuery, desc) => replacedQuery.replace(new RegExp(desc.tableName, 'g'), `##${desc.tableName}_${suffix}`),
+      preAggregations.reduce(
+        (replacedQuery: string, desc) => replacedQuery.replace(new RegExp(desc.tableName, 'g'), `##${desc.tableName}_${suffix}`),
         toReplace
       ),
       params,
     ];
   }
 
-  function tempTablePreAggregations(preAggregationsDescriptions) {
+  function tempTablePreAggregations(preAggregationsDescriptions: TestPreAggregationDescription[]): TestQueryWithParams[] {
     return R.unnest(
       preAggregationsDescriptions.map((desc) => desc.invalidateKeyQueries.concat([[desc.loadSql[0], desc.loadSql[1]]]))
     );

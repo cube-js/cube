@@ -5,6 +5,8 @@ import { BaseFilter } from './BaseFilter';
 import { BaseMeasure } from './BaseMeasure';
 import { BaseSegment } from './BaseSegment';
 import { BaseGroupFilter } from './BaseGroupFilter';
+import { BaseTimeDimension } from './BaseTimeDimension';
+import { PreAggregationForQuery } from './PreAggregations';
 
 const GRANULARITY_TO_INTERVAL: Record<string, string> = {
   day: 'day',
@@ -18,7 +20,7 @@ const GRANULARITY_TO_INTERVAL: Record<string, string> = {
 };
 
 class CubeStoreFilter extends BaseFilter {
-  public likeIgnoreCase(column, not, param, type: string) {
+  public likeIgnoreCase(column: string, not: boolean, param: unknown, type: string) {
     const p = (!type || type === 'contains' || type === 'ends') ? '%' : '';
     const s = (!type || type === 'contains' || type === 'starts') ? '%' : '';
     return `${column}${not ? ' NOT' : ''} ILIKE CONCAT('${p}', ${this.allocateParam(param)}, '${s}')`;
@@ -34,16 +36,16 @@ type RollingWindow = {
 export class CubeStoreQuery extends BaseQuery {
   private readonly cubeStoreRollingWindowJoin: boolean;
 
-  public constructor(compilers, options) {
+  public constructor(compilers: any, options: any) {
     super(compilers, options);
     this.cubeStoreRollingWindowJoin = getEnv('cubeStoreRollingWindowJoin');
   }
 
-  public newFilter(filter) {
+  public newFilter(filter: any) {
     return new CubeStoreFilter(this, filter);
   }
 
-  public convertTz(field) {
+  public convertTz(field: string) {
     return `CONVERT_TZ(${field}, '${moment().tz(this.timezone).format('Z')}')`;
   }
 
@@ -51,7 +53,7 @@ export class CubeStoreQuery extends BaseQuery {
     return 'to_timestamp(?)';
   }
 
-  public timeStampCast(value) {
+  public timeStampCast(value: string) {
     return `CAST(${value} as TIMESTAMP)`;
   }
 
@@ -59,7 +61,7 @@ export class CubeStoreQuery extends BaseQuery {
     return 'YYYY-MM-DDTHH:mm:ss.SSS';
   }
 
-  public dateTimeCast(value) {
+  public dateTimeCast(value: string) {
     return `to_timestamp(${value})`;
   }
 
@@ -123,11 +125,11 @@ export class CubeStoreQuery extends BaseQuery {
     return `'${parts.join(' ')}'`;
   }
 
-  public escapeColumnName(name) {
+  public escapeColumnName(name: string) {
     return `\`${name}\``;
   }
 
-  public seriesSql(timeDimension) {
+  public seriesSql(timeDimension: BaseTimeDimension) {
     return timeDimension.timeSeries().map(
       ([from, to]) => `select to_timestamp('${from}') date_from, to_timestamp('${to}') date_to`
     ).join(' UNION ALL ');
@@ -145,7 +147,7 @@ export class CubeStoreQuery extends BaseQuery {
     return `IF(${sql}, 1, 0)`;
   }
 
-  public hllMerge(sql) {
+  public hllMerge(sql: string) {
     return `merge(${sql})`;
   }
 
@@ -216,18 +218,25 @@ export class CubeStoreQuery extends BaseQuery {
     );
   }
 
-  public overTimeSeriesSelectRollup(cumulativeMeasures, otherMeasures, baseQuery, baseQueryAlias, timeDimension, preAggregationForQuery) {
+  public overTimeSeriesSelectRollup(
+    cumulativeMeasures: BaseMeasure[],
+    otherMeasures: BaseMeasure[],
+    baseQuery: string,
+    baseQueryAlias: string,
+    timeDimension: BaseTimeDimension | null,
+    preAggregationForQuery: PreAggregationForQuery
+  ) {
     const cumulativeDimensions = this.dimensions.map(s => s.cumulativeSelectColumns()).filter(c => !!c).join(', ');
     const partitionByClause = this.dimensions.length ? `PARTITION BY ${cumulativeDimensions}` : '';
     const groupByDimensionClause = otherMeasures.length && timeDimension ? ` GROUP BY DIMENSION ${timeDimension.dimensionSql()}` : '';
     const rollingWindowOrGroupByClause = timeDimension ?
-      ` ROLLING_WINDOW DIMENSION ${timeDimension.aliasName()}${partitionByClause}${groupByDimensionClause} FROM ${this.timeGroupedColumn(timeDimension.granularity, timeDimension.localDateTimeFromOrBuildRangeParam())} TO ${this.timeGroupedColumn(timeDimension.granularity, timeDimension.localDateTimeToOrBuildRangeParam())} EVERY INTERVAL '1 ${timeDimension.granularity}'` :
+      ` ROLLING_WINDOW DIMENSION ${timeDimension.aliasName()}${partitionByClause}${groupByDimensionClause} FROM ${this.timeGroupedColumn(timeDimension.granularity!, timeDimension.localDateTimeFromOrBuildRangeParam())} TO ${this.timeGroupedColumn(timeDimension.granularity!, timeDimension.localDateTimeToOrBuildRangeParam())} EVERY INTERVAL '1 ${timeDimension.granularity}'` :
       this.groupByClause();
     const forSelect = this.overTimeSeriesForSelectRollup(cumulativeMeasures, otherMeasures, timeDimension, preAggregationForQuery);
     return `SELECT ${forSelect} FROM (${baseQuery}) ${baseQueryAlias}${rollingWindowOrGroupByClause}`;
   }
 
-  public toInterval(interval) {
+  public toInterval(interval: string) {
     if (interval === 'unbounded') {
       return 'UNBOUNDED';
     } else {
@@ -276,7 +285,12 @@ export class CubeStoreQuery extends BaseQuery {
     };
   }
 
-  public overTimeSeriesForSelectRollup(cumulativeMeasures, otherMeasures, timeDimension, preAggregationForQuery) {
+  public overTimeSeriesForSelectRollup(
+    cumulativeMeasures: BaseMeasure[],
+    otherMeasures: BaseMeasure[],
+    timeDimension: BaseTimeDimension | null,
+    preAggregationForQuery: PreAggregationForQuery
+  ) {
     const rollupMeasures = this.preAggregations.rollupMeasures(preAggregationForQuery);
     const renderedReference = rollupMeasures.map(measure => {
       const m = this.newMeasure(measure);

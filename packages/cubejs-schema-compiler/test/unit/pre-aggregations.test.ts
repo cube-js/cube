@@ -1,6 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import { prepareJsCompiler, prepareYamlCompiler } from './PrepareCompiler';
+import { Compiler } from '../../src/compiler/PrepareCompiler';
 import { createECommerceSchema, createSchemaYaml } from './utils';
 import { PostgresQuery, queryClass, QueryFactory } from '../../src';
 import { RedshiftQuery } from '../../src/adapter/RedshiftQuery';
@@ -736,9 +737,9 @@ describe('pre-aggregations', () => {
   });
 
   describe('rollup with multiplied measure', () => {
-    let compiler;
-    let cubeEvaluator;
-    let joinGraph;
+    let compiler: Compiler['compiler'];
+    let cubeEvaluator: Compiler['cubeEvaluator'];
+    let joinGraph: Compiler['joinGraph'];
 
     beforeAll(async () => {
       const modelContent = fs.readFileSync(

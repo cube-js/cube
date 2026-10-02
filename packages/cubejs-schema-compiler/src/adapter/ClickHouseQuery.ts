@@ -3,8 +3,9 @@ import { BaseQuery } from './BaseQuery';
 import { BaseFilter } from './BaseFilter';
 import { UserError } from '../compiler/UserError';
 import { BaseTimeDimension } from './BaseTimeDimension';
+import type { PreAggregationDefinitionExtended } from './PreAggregations';
 
-const GRANULARITY_TO_INTERVAL = {
+const GRANULARITY_TO_INTERVAL: Record<string, string> = {
   day: 'Day',
   hour: 'Hour',
   minute: 'Minute',
@@ -15,7 +16,7 @@ const GRANULARITY_TO_INTERVAL = {
 };
 
 class ClickHouseFilter extends BaseFilter {
-  public likeIgnoreCase(column, not, param, type) {
+  public likeIgnoreCase(column: string, not: boolean, param: unknown, type: string) {
     const p = (!type || type === 'contains' || type === 'ends') ? '%' : '';
     const s = (!type || type === 'contains' || type === 'starts') ? '%' : '';
     return `${column} ${not ? 'NOT' : ''} ILIKE CONCAT('${p}', ${this.allocateParam(param)}, '${s}')`;
@@ -31,15 +32,15 @@ class ClickHouseFilter extends BaseFilter {
 }
 
 export class ClickHouseQuery extends BaseQuery {
-  public newFilter(filter) {
+  public newFilter(filter: any) {
     return new ClickHouseFilter(this, filter);
   }
 
-  public escapeColumnName(name) {
+  public escapeColumnName(name: string) {
     return `\`${name}\``;
   }
 
-  public convertTz(field) {
+  public convertTz(field: string) {
     //
     // field yields a Date or a DateTime so add in the extra toDateTime64 to support the Date case
     //
@@ -50,7 +51,7 @@ export class ClickHouseQuery extends BaseQuery {
     return `toTimeZone(toDateTime64(${field}, 0), '${this.timezone}')`;
   }
 
-  public timeGroupedColumn(granularity, dimension) {
+  public timeGroupedColumn(granularity: string, dimension: string): string {
     if (granularity === 'week') {
       return `toDateTime64(toMonday(${dimension}, '${this.timezone}'), 0, '${this.timezone}')`;
     } else {
@@ -133,7 +134,7 @@ export class ClickHouseQuery extends BaseQuery {
     return `parseDateTimeBestEffort(${value})`;
   }
 
-  public dimensionsJoinCondition(leftAlias, rightAlias) {
+  public dimensionsJoinCondition(leftAlias: string, rightAlias: string) {
     const dimensionAliases = this.dimensionAliasNames();
     if (!dimensionAliases.length) {
       return '1 = 1';
@@ -174,10 +175,10 @@ export class ClickHouseQuery extends BaseQuery {
     return names.length ? ` GROUP BY ${names.join(', ')}` : '';
   }
 
-  public primaryKeyCount(cubeName, distinct) {
+  public primaryKeyCount(cubeName: string, distinct: boolean) {
     const primaryKeys = this.cubeEvaluator.primaryKeys[cubeName];
     const primaryKeySql = primaryKeys.length > 1 ?
-      this.concatStringsSql(primaryKeys.map((pk) => this.castToString(this.primaryKeySql(pk, cubeName)))) :
+      this.concatStringsSql(primaryKeys.map((pk) => this.castToString(this.primaryKeySql(pk, cubeName) as string))) :
       this.primaryKeySql(primaryKeys[0], cubeName);
     if (distinct) {
       return `uniqExact(${primaryKeySql})`;
@@ -186,7 +187,7 @@ export class ClickHouseQuery extends BaseQuery {
     }
   }
 
-  public castToString(sql) {
+  public castToString(sql: string) {
     return `CAST(${sql} as Nullable(String))`;
   }
 
@@ -233,7 +234,7 @@ export class ClickHouseQuery extends BaseQuery {
     return `SELECT parseDateTimeBestEffort(arrayJoin(['${datesFrom.join('\',\'')}'])) as date_from, parseDateTimeBestEffort(arrayJoin(['${datesTo.join('\',\'')}'])) as date_to`;
   }
 
-  public concatStringsSql(strings) {
+  public concatStringsSql(strings: string[]) {
     // eslint-disable-next-line prefer-template
     return 'toString(' + strings.join(') || toString(') + ')';
   }
@@ -242,7 +243,7 @@ export class ClickHouseQuery extends BaseQuery {
     return `toUnixTimestamp(${this.nowTimestampSql()})`;
   }
 
-  public preAggregationLoadSql(cube, preAggregation, tableName) {
+  public preAggregationLoadSql(cube: string, preAggregation: PreAggregationDefinitionExtended, tableName: string) {
     const sqlAndParams = this.preAggregationSql(cube, preAggregation);
     if (!preAggregation.indexes) {
       throw new UserError('ClickHouse doesn\'t support pre-aggregations without indexes');
@@ -256,11 +257,11 @@ export class ClickHouseQuery extends BaseQuery {
     return `uniq(${sql})`;
   }
 
-  public createIndexSql(indexName, tableName, escapedColumns) {
+  public createIndexSql(indexName: string, tableName: string, escapedColumns: string[]) {
     return `ALTER TABLE ${tableName} ADD INDEX ${indexName} (${escapedColumns.join(', ')}) TYPE minmax GRANULARITY 1`;
   }
 
-  public dimensionColumns(cubeAlias) {
+  public dimensionColumns(cubeAlias: string) {
     // For the top-level SELECT statement, explicitly set the column alias.
     // Clickhouse sometimes includes the "q_0" prefix in the column name, and this
     // leads to errors during the result mapping.

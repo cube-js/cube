@@ -2,7 +2,7 @@ import { parseSqlInterval } from '@cubejs-backend/shared';
 import { BaseQuery } from './BaseQuery';
 import { ParamAllocator } from './ParamAllocator';
 
-const GRANULARITY_TO_INTERVAL = {
+const GRANULARITY_TO_INTERVAL: Record<string, string> = {
   day: 'day',
   week: 'week',
   hour: 'hour',
@@ -14,13 +14,13 @@ const GRANULARITY_TO_INTERVAL = {
 };
 
 class PostgresParamAllocator extends ParamAllocator {
-  public paramPlaceHolder(paramIndex) {
+  public paramPlaceHolder(paramIndex: number) {
     return `$${paramIndex + 1}`;
   }
 }
 
 export class PostgresQuery extends BaseQuery {
-  public newParamAllocator(expressionParams) {
+  public newParamAllocator(expressionParams?: unknown[]) {
     return new PostgresParamAllocator(expressionParams);
   }
 
@@ -59,15 +59,15 @@ export class PostgresQuery extends BaseQuery {
     return `'${normalized}'`;
   }
 
-  public hllInit(sql) {
+  public hllInit(sql: string) {
     return `hll_add_agg(hll_hash_any(${sql}))`;
   }
 
-  public hllMerge(sql) {
+  public hllMerge(sql: string) {
     return `round(hll_cardinality(hll_union_agg(${sql})))`;
   }
 
-  public countDistinctApprox(sql) {
+  public countDistinctApprox(sql: string) {
     return `round(hll_cardinality(hll_add_agg(hll_hash_any(${sql}))))`;
   }
 

@@ -3,6 +3,7 @@ import * as t from '@babel/types';
 import { parse } from '@babel/parser';
 import babelGenerator from '@babel/generator';
 import babelTraverse from '@babel/traverse';
+import type { NodePath } from '@babel/traverse';
 import { JinjaEngine, NativeInstance, PythonCtx } from '@cubejs-backend/native';
 
 import type { FileContent } from '@cubejs-backend/shared';
@@ -98,21 +99,21 @@ export class YamlCompiler {
       if (key === 'cubes') {
         this.checkDuplicateNames(yamlObj.cubes || [], errorsReport, (name) => `Found duplicate cube name '${name}'.`);
 
-        (yamlObj.cubes || []).forEach(({ name, ...cube }) => {
+        (yamlObj.cubes || []).forEach(({ name, ...cube }: any) => {
           const transpiledCube = this.transpileAndPrepareJsFile('cube', { name, ...cube }, errorsReport);
           transpiledFilesContent.push(transpiledCube);
         });
       } else if (key === 'views') {
         this.checkDuplicateNames(yamlObj.views || [], errorsReport, (name) => `Found duplicate view name '${name}'.`);
 
-        (yamlObj.views || []).forEach(({ name, ...cube }) => {
+        (yamlObj.views || []).forEach(({ name, ...cube }: any) => {
           const transpiledView = this.transpileAndPrepareJsFile('view', { name, ...cube }, errorsReport);
           transpiledFilesContent.push(transpiledView);
         });
       } else if (key === 'view_groups') {
         this.checkDuplicateNames(yamlObj.view_groups || [], errorsReport, (name) => `Found duplicate view group name '${name}'.`);
 
-        (yamlObj.view_groups || []).forEach(({ name, ...viewGroup }) => {
+        (yamlObj.view_groups || []).forEach(({ name, ...viewGroup }: any) => {
           const transpiledViewGroup = this.transpileViewGroup({ name, ...viewGroup });
           transpiledFilesContent.push(transpiledViewGroup);
         });
@@ -128,7 +129,7 @@ export class YamlCompiler {
     } as FileContent;
   }
 
-  private transpileViewGroup(viewGroupObj): string {
+  private transpileViewGroup(viewGroupObj: any): string {
     const viewGroupCall = t.callExpression(
       t.identifier('view_group'),
       [t.stringLiteral(viewGroupObj.name), this.viewGroupBodyAst(viewGroupObj)]
@@ -143,7 +144,7 @@ export class YamlCompiler {
    * nested view groups as object literals, so no reference resolution is needed
    * at evaluation time (YAML uses string view names, not bare identifiers).
    */
-  private viewGroupBodyAst(viewGroupObj, nested = false): t.ObjectExpression {
+  private viewGroupBodyAst(viewGroupObj: any, nested = false): t.ObjectExpression {
     const properties: t.ObjectProperty[] = [];
 
     if (nested && viewGroupObj.name) {
@@ -162,7 +163,7 @@ export class YamlCompiler {
       properties.push(
         t.objectProperty(
           t.stringLiteral('includes'),
-          t.arrayExpression(viewGroupObj.includes.map((item) => this.viewGroupIncludeAst(item)))
+          t.arrayExpression(viewGroupObj.includes.map((item: string | object) => this.viewGroupIncludeAst(item)))
         )
       );
     }
@@ -179,7 +180,7 @@ export class YamlCompiler {
     return t.objectExpression(properties);
   }
 
-  private viewGroupIncludeAst(item): t.Expression {
+  private viewGroupIncludeAst(item: string | object): t.Expression {
     if (item && typeof item === 'object') {
       // A nested view group definition: keep its `name` inside the body so the
       // evaluator can recognise it as a nested group.
@@ -188,7 +189,7 @@ export class YamlCompiler {
     return t.stringLiteral(item);
   }
 
-  private transpileAndPrepareJsFile(methodFn: ('cube' | 'view'), cubeObj, errorsReport: ErrorReporter): string {
+  private transpileAndPrepareJsFile(methodFn: ('cube' | 'view'), cubeObj: any, errorsReport: ErrorReporter): string {
     const yamlAst = this.transformYamlCubeObj(cubeObj, errorsReport);
 
     const cubeOrViewCall = t.callExpression(t.identifier(methodFn), [t.stringLiteral(cubeObj.name), yamlAst]);
@@ -196,7 +197,7 @@ export class YamlCompiler {
     return babelGenerator(cubeOrViewCall, {}, '').code;
   }
 
-  private transformYamlCubeObj(cubeObj, errorsReport: ErrorReporter) {
+  private transformYamlCubeObj(cubeObj: any, errorsReport: ErrorReporter) {
     camelizeCube(cubeObj);
 
     const ctx = { cubeName: cubeObj.name };
@@ -216,7 +217,7 @@ export class YamlCompiler {
     return this.transpileYaml(cubeObj, [], cubeObj.name, errorsReport);
   }
 
-  private transpileYaml(obj, propertyPath, cubeName, errorsReport: ErrorReporter) {
+  private transpileYaml(obj: any, propertyPath: string[], cubeName: string, errorsReport: ErrorReporter): t.Expression {
     if (transpiledFields.has(propertyPath[propertyPath.length - 1])) {
       const fullPath = propertyPath.join('.');
 
@@ -354,7 +355,7 @@ export class YamlCompiler {
     return result.join('');
   }
 
-  private parsePythonIntoArrowFunction(codeString: string, cubeName, originalObj, errorsReport: ErrorReporter) {
+  private parsePythonIntoArrowFunction(codeString: string, cubeName: string, originalObj: unknown, errorsReport: ErrorReporter) {
     const ast = this.parsePythonAndTranspileToJs(codeString, errorsReport);
     return this.astIntoArrowFunction(ast as any, codeString, cubeName);
   }
@@ -379,7 +380,7 @@ export class YamlCompiler {
     return t.nullLiteral();
   }
 
-  private astIntoArrowFunction(input: t.Program | t.NullLiteral, codeString: string, cubeName, resolveSymbol?: (string) => any) {
+  private astIntoArrowFunction(input: t.Program | t.NullLiteral, codeString: string, cubeName: string, resolveSymbol?: (name: string) => any) {
     const initialJs = babelGenerator(input, {}, codeString).code;
 
     // Re-parse generated JS to set all necessary parent paths
@@ -396,8 +397,8 @@ export class YamlCompiler {
       this.cubeSymbols.isCurrentCube(n));
 
     const traverseObj = {
-      Program: (babelPath) => {
-        CubePropContextTranspiler.replaceValueWithArrowFunction(<(string) => any>resolveSymbol, babelPath.get('body')[0].get('expression'));
+      Program: (babelPath: NodePath<t.Program>) => {
+        CubePropContextTranspiler.replaceValueWithArrowFunction(<(name: string) => any>resolveSymbol, (babelPath.get('body')[0] as NodePath<t.ExpressionStatement>).get('expression'));
       },
     };
 
@@ -423,7 +424,7 @@ export class YamlCompiler {
   }
 
   private yamlArrayToObj(
-    yamlArray,
+    yamlArray: unknown,
     memberType: string,
     errorsReport: ErrorReporter,
     ctx: { cubeName: string; parent?: { type: string; name: string } }

@@ -318,7 +318,7 @@ describe('MSSqlUngrouped', () => {
 
     `);
 
-  async function runQueryTest(q, expectedResult) {
+  async function runQueryTest(q: unknown, expectedResult: unknown) {
     await compiler.compile();
     const query = new MssqlQuery({ joinGraph, cubeEvaluator, compiler }, q);
 

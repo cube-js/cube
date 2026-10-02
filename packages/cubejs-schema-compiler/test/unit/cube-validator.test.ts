@@ -4,6 +4,7 @@ import { CubeValidator, functionFieldsPatterns } from '../../src/compiler/CubeVa
 import {
   CubeRefreshKey,
   CubeSymbols,
+  GranularityDefinition,
   PreAggregationDefinitionOriginalSql
 } from '../../src/compiler/CubeSymbols';
 import { ErrorReporter } from '../../src/compiler/ErrorReporter';
@@ -1283,7 +1284,7 @@ describe('Cube Validation', () => {
   });
 
   describe('Custom dimension granularities: ', () => {
-    const newCube = (granularities) => ({
+    const newCube = (granularities: Record<string, GranularityDefinition>) => ({
       name: 'Orders',
       fileName: 'fileName',
       sql: () => 'select * from tbl',

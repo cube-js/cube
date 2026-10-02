@@ -270,7 +270,7 @@ export class CubeEvaluator extends CubeSymbols {
     }
   }
 
-  protected prepareCube(cube, errorReporter: ErrorReporter): EvaluatedCube {
+  protected prepareCube(cube: any, errorReporter: ErrorReporter): EvaluatedCube {
     this.prepareJoins(cube, errorReporter);
     this.preparePreAggregations(cube, errorReporter);
     this.prepareMembers(cube.measures, cube, errorReporter);
@@ -579,15 +579,15 @@ export class CubeEvaluator extends CubeSymbols {
     }
 
     if (cube.isView && (cube.includedMembers || []).length) {
-      const includedMemberPaths: string[] = R.uniq(cube.includedMembers.map(it => it.memberPath));
+      const includedMemberPaths: string[] = R.uniq(cube.includedMembers.map((it: ViewIncludedMember) => it.memberPath));
       const includedCubeNames: string[] = R.uniq(includedMemberPaths.map(it => it.split('.')[0]));
 
       // Path to name (which can be prefixed or aliased) map for hierarchy
-      const hierarchyPathToName = cube.includedMembers.filter(it => it.type === 'hierarchies').reduce((acc, it) => ({
+      const hierarchyPathToName: Record<string, string> = cube.includedMembers.filter((it: ViewIncludedMember) => it.type === 'hierarchies').reduce((acc: Record<string, string>, it: ViewIncludedMember) => ({
         ...acc,
         [it.memberPath]: it.name
       }), {});
-      const includedHierarchyNames = cube.includedMembers.filter(it => it.type === 'hierarchies').map(it => it.memberPath.split('.')[1]);
+      const includedHierarchyNames: string[] = cube.includedMembers.filter((it: ViewIncludedMember) => it.type === 'hierarchies').map((it: ViewIncludedMember) => it.memberPath.split('.')[1]);
 
       for (const cubeName of includedCubeNames) {
         // As views come after cubes in the list, we can safely assume that cube is already evaluated
@@ -598,7 +598,7 @@ export class CubeEvaluator extends CubeSymbols {
             .filter(it => includedHierarchyNames.includes(it.name))
             .map(it => {
               const levels = it.levels.filter(level => {
-                const member = cube.includedMembers.find(m => m.memberPath === level);
+                const member = cube.includedMembers.find((m: ViewIncludedMember) => m.memberPath === level);
                 if (member && member.type !== 'dimensions') {
                   const memberName = level.split('.')[1] || level;
                   errorReporter.error(`Only dimensions can be part of a hierarchy. Please remove the '${memberName}' member from the '${it.name}' hierarchy.`);
@@ -632,10 +632,10 @@ export class CubeEvaluator extends CubeSymbols {
         }
       }
 
-      cube.evaluatedHierarchies = (cube.evaluatedHierarchies || []).map((hierarchy) => ({
+      cube.evaluatedHierarchies = (cube.evaluatedHierarchies || []).map((hierarchy: EvaluatedHierarchy) => ({
         ...hierarchy,
         levels: hierarchy.levels.map((level) => {
-          const member = cube.includedMembers.find(m => m.memberPath === level);
+          const member = cube.includedMembers.find((m: ViewIncludedMember) => m.memberPath === level);
 
           if (!member) {
             return null;
@@ -815,7 +815,7 @@ export class CubeEvaluator extends CubeSymbols {
         if (preAggregation.outputColumnTypes) {
           cube.preAggregations[preAggregationName] = {
             ...preAggregation,
-            outputColumnTypes: preAggregation.outputColumnTypes.map(column => ({
+            outputColumnTypes: preAggregation.outputColumnTypes.map((column: { member: () => ToString; type: string }) => ({
               ...column,
               name: this.evaluateReferences(cube.name, column.member, { originalSorting: true }),
             })),
@@ -895,7 +895,7 @@ export class CubeEvaluator extends CubeSymbols {
     }
   }
 
-  public cubesByFileName(fileName): CubeDefinitionExtended[] {
+  public cubesByFileName(fileName: string): CubeDefinitionExtended[] {
     return this.byFileName[fileName] || [];
   }
 
@@ -952,7 +952,7 @@ export class CubeEvaluator extends CubeSymbols {
    */
   public preAggregations(filter: PreAggregationFilters): Array<PreAggregationInfo> {
     const { scheduled, dataSources, cubes, preAggregationIds } = filter || {};
-    const idFactory = ({ cube, preAggregationName }) => `${cube}.${preAggregationName}`;
+    const idFactory = ({ cube, preAggregationName }: { cube: string; preAggregationName: string }) => `${cube}.${preAggregationName}`;
 
     return Object.keys(this.evaluatedCubes)
       .filter((cube) => (
@@ -1003,7 +1003,7 @@ export class CubeEvaluator extends CubeSymbols {
                   type: indexes[indexName].type
                 };
                 return obj;
-              }, {})
+              }, {} as Record<string, { columns: string | string[]; type: string }>)
             };
           });
       });

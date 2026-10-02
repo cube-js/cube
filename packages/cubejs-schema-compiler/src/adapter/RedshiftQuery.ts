@@ -1,8 +1,9 @@
 import { parseSqlInterval } from '@cubejs-backend/shared';
 import { PostgresQuery } from './PostgresQuery';
+import type { BaseTimeDimension } from './BaseTimeDimension';
 
 export class RedshiftQuery extends PostgresQuery {
-  public seriesSql(timeDimension) {
+  public seriesSql(timeDimension: BaseTimeDimension) {
     const values = timeDimension.timeSeries().map(
       ([from, to]) => `select '${from}' f, '${to}' t`
     ).join(' UNION ALL ');

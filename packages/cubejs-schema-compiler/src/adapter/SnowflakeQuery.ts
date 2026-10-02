@@ -1,7 +1,7 @@
 import { BaseQuery } from './BaseQuery';
 import { BaseFilter } from './BaseFilter';
 
-const GRANULARITY_TO_INTERVAL = {
+const GRANULARITY_TO_INTERVAL: Record<string, string> = {
   day: 'DAY',
   week: 'WEEK',
   hour: 'HOUR',
@@ -16,7 +16,7 @@ const GRANULARITY_TO_INTERVAL = {
 const INTERVAL_UNITS = ['second', 'minute', 'hour', 'day', 'week', 'month', 'quarter', 'year'];
 
 class SnowflakeFilter extends BaseFilter {
-  public likeIgnoreCase(column: string, not: boolean, param: any, type: string) {
+  public likeIgnoreCase(column: string, not: boolean, param: unknown, type: string) {
     const p = (!type || type === 'contains' || type === 'ends') ? '\'%\' || ' : '';
     const s = (!type || type === 'contains' || type === 'starts') ? ' || \'%\'' : '';
     // From Snowflake docs:
@@ -33,15 +33,15 @@ class SnowflakeFilter extends BaseFilter {
 }
 
 export class SnowflakeQuery extends BaseQuery {
-  public newFilter(filter) {
+  public newFilter(filter: any) {
     return new SnowflakeFilter(this, filter);
   }
 
-  public convertTz(field) {
+  public convertTz(field: string) {
     return `CONVERT_TIMEZONE('${this.timezone}', ${field}::timestamp_tz)::timestamp_ntz`;
   }
 
-  public timeGroupedColumn(granularity, dimension) {
+  public timeGroupedColumn(granularity: string, dimension: string): string {
     return `date_trunc('${GRANULARITY_TO_INTERVAL[granularity]}', ${dimension})`;
   }
 
@@ -83,7 +83,7 @@ export class SnowflakeQuery extends BaseQuery {
     }).join(' ');
   }
 
-  public timeStampCast(value) {
+  public timeStampCast(value: string) {
     return `${value}::timestamp_tz`;
   }
 
@@ -118,15 +118,15 @@ export class SnowflakeQuery extends BaseQuery {
     return 'CURRENT_TIMESTAMP';
   }
 
-  public hllInit(sql) {
+  public hllInit(sql: string) {
     return `HLL_EXPORT(HLL_ACCUMULATE(${sql}))`;
   }
 
-  public hllMerge(sql) {
+  public hllMerge(sql: string) {
     return `HLL_ESTIMATE(HLL_COMBINE(HLL_IMPORT(${sql})))`;
   }
 
-  public countDistinctApprox(sql) {
+  public countDistinctApprox(sql: string) {
     return `APPROX_COUNT_DISTINCT(${sql})`;
   }
 

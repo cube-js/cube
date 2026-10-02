@@ -59,7 +59,7 @@ describe('Transpilers', () => {
         cubeSymbols: {},
       }]);
 
-      expect(res.map((r) => r.errors.length)).toEqual([0, 1, 0]);
+      expect(res.map((r: { errors: unknown[] }) => r.errors.length)).toEqual([0, 1, 0]);
       expect(res[1].errors[0].message).toMatch(/Duplicate property parsing id/);
 
       // The per-file call on the same worker, whose reporter now holds the error above

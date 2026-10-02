@@ -13,7 +13,7 @@ export async function testWithPreAggregation(
     .replace(/CREATE TABLE (.+) AS\s+(SELECT|WITH)/, 'CREATE TEMP TABLE $1 ON COMMIT DROP AS $2');
   const preAggParams = preAggregationsDescription.loadSql[1];
 
-  const queries = [
+  const queries: QueryWithParams[] = [
     ...preAggregationsDescription.invalidateKeyQueries,
     [preAggSql, preAggParams],
     query.buildSqlAndParams(),

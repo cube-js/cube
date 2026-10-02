@@ -1,6 +1,14 @@
 import R from 'ramda';
 import { PreAggregationPartitionRangeLoader } from '@cubejs-backend/query-orchestrator';
+import type { PreAggregationDescription, QueryDateRange } from '@cubejs-backend/query-orchestrator';
 import { BaseQuery } from '../../../src';
+import type { Compiler } from '../../../src/compiler/PrepareCompiler';
+
+export type TestQueryWithParams = [sql: string, params: unknown[], options?: unknown];
+
+export type TestPreAggregationDescription = PreAggregationDescription & {
+  dateRange?: QueryDateRange | null;
+};
 
 export class BaseDbRunner {
   protected containerLazyInitPromise: any = null;
@@ -13,7 +21,7 @@ export class BaseDbRunner {
 
   protected nextSeed: number = 1;
 
-  public testQuery(query, fixture: any = null) {
+  public testQuery(query: TestQueryWithParams, fixture: any = null) {
     return this.testQueries([query], fixture);
   }
 
@@ -21,7 +29,7 @@ export class BaseDbRunner {
     throw new Error('newTestQuery not implemented');
   }
 
-  public async runQueryTest(q, expectedResult, { compiler, joinGraph, cubeEvaluator }) {
+  public async runQueryTest(q: unknown, expectedResult: unknown, { compiler, joinGraph, cubeEvaluator }: Pick<Compiler, 'compiler' | 'joinGraph' | 'cubeEvaluator'>) {
     await compiler.compile();
     const query = this.newTestQuery({ joinGraph, cubeEvaluator, compiler }, q);
 
@@ -37,7 +45,7 @@ export class BaseDbRunner {
     return sqlAndParams;
   }
 
-  public async testQueries(queries, fixture: any = null) {
+  public async testQueries(queries: TestQueryWithParams[], fixture: any = null) {
     queries.forEach(q => {
       console.log(q[0]);
       console.log(q[1]);
@@ -81,12 +89,16 @@ export class BaseDbRunner {
     return this.connection.testQueries(queries, fixture);
   }
 
-  public replaceTableName(query, preAggregation, suffix) {
+  public replaceTableName(
+    query: TestQueryWithParams,
+    preAggregation: TestPreAggregationDescription | TestPreAggregationDescription[],
+    suffix: string | number
+  ): TestQueryWithParams {
     const [toReplace, params] = query;
-    preAggregation = Array.isArray(preAggregation) ? preAggregation : [preAggregation];
+    const preAggregations = Array.isArray(preAggregation) ? preAggregation : [preAggregation];
     return [
-      preAggregation.reduce(
-        (replacedQuery, desc) => {
+      preAggregations.reduce(
+        (replacedQuery: string, desc) => {
           const partitionUnion = desc.dateRange && PreAggregationPartitionRangeLoader.timeSeries(
             desc.partitionGranularity,
             PreAggregationPartitionRangeLoader.intersectDateRanges(desc.dateRange, desc.matchedTimeDimensionDateRange),
@@ -117,12 +129,12 @@ export class BaseDbRunner {
   }
 
   public replacePartitionName(
-    query,
-    desc,
-    suffix,
+    query: TestQueryWithParams,
+    desc: TestPreAggregationDescription,
+    suffix: string | number,
     partitionGranularity: string | null = null,
     dateRange: [string, string] | null = null
-  ) {
+  ): TestQueryWithParams {
     const [toReplace, params] = query;
     const tableName = partitionGranularity && dateRange ? PreAggregationPartitionRangeLoader.partitionTableName(
       desc.tableName, partitionGranularity, dateRange
@@ -147,7 +159,7 @@ export class BaseDbRunner {
     ];
   }
 
-  public tempTablePreAggregations(preAggregationsDescriptions, seed = this.nextSeed++) {
+  public tempTablePreAggregations(preAggregationsDescriptions: TestPreAggregationDescription[], seed = this.nextSeed++) {
     return R.unnest(preAggregationsDescriptions.map(
       desc => {
         const loadSql = this.tempTableSql(desc);
@@ -177,11 +189,11 @@ export class BaseDbRunner {
     ));
   }
 
-  protected tempTableSql(desc) {
+  protected tempTableSql(desc: TestPreAggregationDescription): string {
     return desc.loadSql[0].replace('CREATE TABLE', 'CREATE TEMP TABLE');
   }
 
-  public async evaluateQueryWithPreAggregations(query, seed = this.nextSeed++) {
+  public async evaluateQueryWithPreAggregations(query: BaseQuery, seed = this.nextSeed++) {
     const preAggregationsDescription = query.preAggregations?.preAggregationsDescription();
     await Promise.all(preAggregationsDescription.map(
       async desc => {
@@ -247,15 +259,15 @@ export class BaseDbRunner {
   }
 
   // eslint-disable-next-line no-unused-vars,@typescript-eslint/no-unused-vars
-  public async connectionLazyInit(port) {
+  public async connectionLazyInit(port: number): Promise<any> {
     throw new Error('Not implemented connectionLazyInit');
   }
 
-  public async containerLazyInit() {
+  public async containerLazyInit(): Promise<any> {
     throw new Error('Not implemented containerLazyInit');
   }
 
-  public port() {
+  public port(): number {
     throw new Error('Not implemented port');
   }
 }
