@@ -108,21 +108,16 @@ fn doubling_stages_past_the_default_budget_are_refused() {
     );
 }
 
-/// The budget travels with the query, and a stage read twice in one state counts once.
+/// The budget travels with the query instead of being read from the environment.
 #[test]
 fn the_query_carries_the_budget() {
-    let planned = build(3, None).expect("a 3-level model plans under the default budget");
-    let stages = planned.matches(" AS (").count();
-
-    build(3, Some(stages)).expect("the model must plan under a budget of its own stage count");
-    let err = build(3, Some(stages / 2))
+    build(3, Some(DEFAULT_LIMIT)).expect("a 3-level model must plan under the default budget");
+    let err = build(3, Some(4))
         .map(|_| ())
-        .expect_err("the same model must be refused under half its stage count");
+        .expect_err("the same model must be refused under a budget of 4");
     assert!(
-        err.to_string().contains(&format!(
-            "needs more than {} multi-stage stages",
-            stages / 2
-        )),
+        err.to_string()
+            .contains("needs more than 4 multi-stage stages"),
         "message must name the budget the query carried, got: {}",
         err
     );

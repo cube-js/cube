@@ -1467,6 +1467,26 @@ statements can be read from the console.
 | --------------- | ---------------------- | --------------------- |
 | `true`, `false` | `false`                | `true`                |
 
+## `CUBEJS_MAX_MULTI_STAGE_DEPTH`
+
+The maximum number of [multi-stage][ref-multi-stage] members one query may chain,
+one on top of another. Past it, the query is refused with an error instead of
+being planned.
+
+| Possible Values | Default in Development | Default in Production |
+| --------------- | ---------------------- | --------------------- |
+| A valid number  | `150`                  | `150`                 |
+
+## `CUBEJS_MAX_MULTI_STAGE_STAGES`
+
+The maximum number of [multi-stage][ref-multi-stage] stages one query may plan in
+total. A member that reads another in several states, e.g., with different time
+shifts, adds a stage for each, so stages can grow much faster than depth.
+
+| Possible Values | Default in Development | Default in Production |
+| --------------- | ---------------------- | --------------------- |
+| A valid number  | `1000`                 | `1000`                |
+
 ## `CUBEJS_MAX_PARTITIONS_PER_CUBE`
 
 The maximum number of partitions each pre-aggregation in a cube can use.
@@ -2546,3 +2566,4 @@ The port for a Cube deployment to listen to API connections on.
 [link-tzdb]: https://en.wikipedia.org/wiki/Tz_database
 [nodejs-docs-tls-options]: https://nodejs.org/docs/latest/api/tls.html#tls_tls_createsecurecontext_options
 [ref-sls]: /docs/integrations/semantic-layer-sync
+[ref-multi-stage]: /docs/data-modeling/measures#multi-stage-measures
