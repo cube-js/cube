@@ -884,6 +884,37 @@ export const QueryQueueTest = (name: string, options: QueryQueueTestOptions) => 
         });
       });
 
+      // With concurrency: 1 the second retrieval is rejected by the full slot alone, so this
+      // needs a free slot to show that the status is what rejects it
+      onlyLocalTest('retrieveForProcessing does not activate an already active item with a free slot', async () => {
+        const driver = createQueueDriver({
+          redisQueuePrefix: `${crypto.randomBytes(6).toString('hex')}#already-active`,
+          concurrency: 2,
+          continueWaitTimeout: 1,
+          orphanedTimeout: 60,
+          heartBeatTimeout: 60,
+        });
+
+        const connection: any = await driver.createConnection();
+        const connection2: any = await driver.createConnection();
+        const key: QueryKey = ['already-active-free-slot', []];
+        const hash = connection.redisHash(key);
+
+        try {
+          const [, queueId] = await addQuery(connection, key, 'already-active-free-slot');
+
+          expect(await connection.retrieveForProcessing(hash, queueId)).toMatchObject({
+            active: [hash],
+          });
+          expect(await connection2.retrieveForProcessing(hash, queueId)).toBeNull();
+          expect(await connection.getActiveQueries()).toEqual([[hash, queueId]]);
+        } finally {
+          await connection.getQueryAndRemove(hash, null);
+          driver.release(connection);
+          driver.release(connection2);
+        }
+      });
+
       test('retrieveForProcessing on an unknown key creates nothing', async () => {
         await withConnections(1, async (connection) => {
           const hash = connection.redisHash(['never-added', []]);
