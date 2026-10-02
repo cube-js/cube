@@ -816,8 +816,8 @@ For data sources other than `default`, values are read from the
 ### `{base_path}/v1/entities`
 
 Send a `GET` request to list all cubes and views in the data model. Results are
-sorted by type (cubes first), then by name. Each item contains only `type` and
-`name`; use [`/v1/entities/{name}`](#base_path/v1/entities/name) or
+sorted by type (cubes first), then by name. Each item contains only `type`,
+`name`, and `public`; use [`/v1/entities/{name}`](#base_path/v1/entities/name) or
 [`/v1/entities/all`](#base_path/v1/entities/all) for detailed metadata.
 
 Query parameters:
@@ -826,6 +826,7 @@ Query parameters:
 | --- | --- | --- |
 | `offset` | Pagination offset. Defaults to `0` | No |
 | `limit` | Maximum number of items to return. Defaults to all items | No |
+| `include_private` | Set to `true` to include [private cubes, views, and members](#private-cubes-and-members). Requires the `meta-private` scope. Defaults to `false` | No |
 
 Example request:
 
@@ -843,11 +844,13 @@ total number of entities before `offset` and `limit` are applied:
   "data": [
     {
       "type": "cube",
-      "name": "orders"
+      "name": "orders",
+      "public": true
     },
     {
       "type": "view",
-      "name": "orders_view"
+      "name": "orders_view",
+      "public": true
     }
   ],
   "pagination": {
@@ -868,10 +871,18 @@ Path parameters:
 | --- | --- |
 | `name` | The cube or view name |
 
+Query parameters:
+
+| Parameter | Description | Required |
+| --- | --- | --- |
+| `include_private` | Set to `true` to include [private cubes, views, and members](#private-cubes-and-members). Requires the `meta-private` scope. Defaults to `false` | No |
+
 Response includes:
 
 - `type` - Either `cube` or `view`
 - `name` - The cube or view name
+- `public` - Whether the cube or view is public. Can only be `false` when
+  [private cubes and members](#private-cubes-and-members) are included
 - `title` - Human-readable title
 - `description` - Description from the data model, or an empty string
 - `table_references` - Data lineage to source tables, each with `data_source`,
@@ -885,6 +896,7 @@ Each member includes:
 | Field | Description |
 | --- | --- |
 | `name` | The member name, without the cube prefix |
+| `public` | Whether the member is public. Can only be `false` when [private cubes and members](#private-cubes-and-members) are included |
 | `title` | Human-readable title |
 | `description` | Description from the data model, or an empty string |
 | `type` | The member type, e.g. `count`, `sum`, or `string` |
@@ -914,6 +926,7 @@ Example response:
   "data": {
     "type": "cube",
     "name": "orders",
+    "public": true,
     "title": "Orders",
     "description": "Order transactions",
     "table_references": [
@@ -927,6 +940,7 @@ Example response:
     "measures": [
       {
         "name": "total_amount",
+        "public": true,
         "title": "Total Amount",
         "description": "",
         "type": "sum",
@@ -945,6 +959,7 @@ Example response:
     "dimensions": [
       {
         "name": "id",
+        "public": true,
         "title": "Id",
         "description": "",
         "type": "number",
@@ -962,6 +977,7 @@ Example response:
       },
       {
         "name": "status",
+        "public": true,
         "title": "Status",
         "description": "",
         "type": "string",
@@ -992,6 +1008,7 @@ Request body:
 | --- | --- | --- | --- |
 | `cubes` | `array` | Array of cube names to retrieve | No |
 | `views` | `array` | Array of view names to retrieve | No |
+| `include_private` | `boolean` | Set to `true` to include [private cubes, views, and members](#private-cubes-and-members). Requires the `meta-private` scope. Defaults to `false` | No |
 
 Query parameters:
 
@@ -999,6 +1016,7 @@ Query parameters:
 | --- | --- | --- |
 | `offset` | Pagination offset. Defaults to `0` | No |
 | `limit` | Maximum number of items to return. Defaults to all items | No |
+| `include_private` | Same as the `include_private` request body property, which takes precedence when both are set | No |
 
 If neither `cubes` nor `views` is provided, all cubes and views are returned.
 
@@ -1023,6 +1041,7 @@ entities before `offset` and `limit` are applied:
     {
       "type": "cube",
       "name": "orders",
+      "public": true,
       "title": "Orders",
       "description": "Order transactions",
       "table_references": [
@@ -1036,6 +1055,7 @@ entities before `offset` and `limit` are applied:
       "measures": [
         {
           "name": "total_amount",
+          "public": true,
           "title": "Total Amount",
           "description": "",
           "type": "sum",
@@ -1054,6 +1074,7 @@ entities before `offset` and `limit` are applied:
       "dimensions": [
         {
           "name": "id",
+          "public": true,
           "title": "Id",
           "description": "",
           "type": "number",
@@ -1071,6 +1092,7 @@ entities before `offset` and `limit` are applied:
         },
         {
           "name": "status",
+          "public": true,
           "title": "Status",
           "description": "",
           "type": "string",
@@ -1091,6 +1113,7 @@ entities before `offset` and `limit` are applied:
     {
       "type": "view",
       "name": "orders_view",
+      "public": true,
       "title": "Orders View",
       "description": "",
       "table_references": [
@@ -1106,6 +1129,7 @@ entities before `offset` and `limit` are applied:
       "measures": [
         {
           "name": "total_amount",
+          "public": true,
           "title": "Total Amount",
           "description": "",
           "type": "sum",
@@ -1126,6 +1150,7 @@ entities before `offset` and `limit` are applied:
       "dimensions": [
         {
           "name": "status",
+          "public": true,
           "title": "Status",
           "description": "",
           "type": "string",
@@ -1152,6 +1177,45 @@ entities before `offset` and `limit` are applied:
     "total": 2
   }
 }
+```
+
+### Private cubes and members
+
+By default, the Metadata API returns only the cubes, views, and members that are
+public (see `public` for [cubes][ref-cubes-public], [views][ref-views-public],
+[measures][ref-measures-public], and [dimensions][ref-dimensions-public]).
+References to anything it doesn't return are omitted: every entry in
+`member_references` and `cube_references` names a cube, view, or member that the
+Metadata API returns, though not necessarily in the same response.
+
+Data catalogs and lineage tools that need the complete data model can set
+`include_private` to `true`. Private cubes, views, and members are then returned
+with their full definitions and `public` set to `false`. A view's
+`table_references`, and the `column_references` of its members, then include the
+tables and columns it reads through private cubes; by default, these are left out.
+
+This requires a token with the `meta-private` scope as well as `meta`; without
+it, the request fails with `403`. To get such a token, call the Control Plane
+API's [`tokens-for-meta-sync`][ref-cpa-meta-sync-token] endpoint, which data
+catalog integrations use, with a `security_context` and
+`"scopes": ["meta-private"]`; it always adds `meta`. The scope is
+[granted only to some callers][ref-cpa-meta-sync-token] and is left out of the
+token for anyone else rather than refused; the `scopes` property of the response
+shows whether it was granted. Tokens from the general-purpose
+[token endpoint][ref-cpa-create-token] never carry `meta-private`.
+
+`include_private` doesn't bypass [data access policies][ref-dap]. Whatever a data
+access policy hides from the token's security context is never returned, even
+with `include_private`. It never appears in `member_references` or
+`cube_references`, and `table_references` and `column_references` are never
+traced through it.
+
+Example request:
+
+```bash
+curl \
+  -H "Authorization: Bearer TOKEN" \
+  "https://example.cubecloud.dev/cubejs-api/v1/entities/customers?include_private=true"
 ```
 
 ## Health checks
@@ -1251,6 +1315,13 @@ Keep-Alive: timeout=5
 [link-tzdb]: https://en.wikipedia.org/wiki/Tz_database
 [ref-control-plane-api]: /reference/control-plane-api
 [self-metadata-api]: #metadata-api
+[ref-cubes-public]: /reference/data-modeling/cube#public
+[ref-views-public]: /reference/data-modeling/view#public
+[ref-measures-public]: /reference/data-modeling/measures#public
+[ref-dimensions-public]: /reference/data-modeling/dimensions#public
+[ref-dap]: /docs/data-modeling/data-access-policies
+[ref-cpa-create-token]: /api-reference/environments/create-deployment-environment-token
+[ref-cpa-meta-sync-token]: /reference/control-plane-api#apiv1deploymentsdeployment_idenvironmentsenvironment_idtokens-for-meta-sync
 [ref-env-db-name]: /reference/configuration/environment-variables#cubejs_db_name
 [ref-env-db-schema]: /reference/configuration/environment-variables#cubejs_db_schema
 [ref-env-bq-project-id]: /reference/configuration/environment-variables#cubejs_db_bq_project_id

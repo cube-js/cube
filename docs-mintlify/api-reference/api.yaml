@@ -7730,6 +7730,28 @@ components:
             - type: string
             - type: 'null'
       type: object
+    CreatedDeploymentEnvironmentToken:
+      properties:
+        created_at:
+          type: string
+        expires_at:
+          type: string
+        scopes:
+          items:
+            type: string
+          type: array
+        security_context:
+          additionalProperties: true
+          type: object
+        token:
+          type: string
+      required:
+        - scopes
+        - token
+        - security_context
+        - created_at
+        - expires_at
+      type: object
     CreationStep:
       enum:
         - project
@@ -9980,7 +10002,7 @@ components:
     DeploymentEnvironmentTokenResponse:
       properties:
         data:
-          $ref: '#/components/schemas/DeploymentEnvironmentToken'
+          $ref: '#/components/schemas/CreatedDeploymentEnvironmentToken'
       required:
         - data
       type: object

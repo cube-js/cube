@@ -171,6 +171,24 @@ The [security context][ref-security-context] you provide is embedded in the
 token and controls which parts of the data model are visible, following the
 same multi-tenancy rules as regular API tokens.
 
+The token always carries the `meta` scope. To also read
+[private cubes, views, and members][ref-metadata-api-private], request the
+`meta-private` scope. It is added only for an admin or, on an account that
+enforces [roles and permissions][ref-roles-and-permissions], for a user with the
+`SchemaRead` ([View data model][ref-custom-roles]) permission on the deployment;
+otherwise it is left out rather than refused. Any other scope you request is
+ignored. The `scopes` property of the response lists the scopes the token
+carries, so check it to see whether `meta-private` was granted.
+
+Data catalog integrations call this endpoint with an [API key][ref-api-keys],
+which acts as its owner. So an admin's key gets `meta-private`, and a
+[personal key][ref-personal-api-keys] gets it only if its owner has `SchemaRead`
+on the deployment. The key must be scoped to that deployment or to all
+deployments. The token is issued for the key's owner, so
+[data access policies][ref-dap] hide from it whatever they hide from that user.
+A dedicated user for the integration keeps what the catalog sees independent of
+any one person's access.
+
 Path parameters:
 
 | Parameter | Description |
@@ -183,7 +201,8 @@ Request body:
 | Property | Type | Description | Required |
 | --- | --- | --- | --- |
 | `security_context` | `object` | [Security context][ref-security-context] to embed in the token. Controls data model visibility based on your multi-tenancy configuration. | Yes |
-| `expires_in` | `number` | Token expiration time in seconds. Default: `86400` (24 hours) | No |
+| `scopes` | `string[]` | Additional scopes. Only `meta-private` is honored; see above | No |
+| `expires_in` | `number` | Token expiration time in seconds, at most `3600`. Default: `3600` (1 hour) | No |
 
 Example request:
 
@@ -206,7 +225,8 @@ Example response:
   "data": {
     "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
     "created_at": "2024-01-15T10:30:00.000Z",
-    "expires_at": "2024-01-15T11:30:00.000Z"
+    "expires_at": "2024-01-15T11:30:00.000Z",
+    "scopes": ["meta"]
   }
 }
 ```
@@ -435,11 +455,16 @@ schema.
 [ref-core-data-apis]: /reference/core-data-apis
 [ref-rest-api]: /reference/core-data-apis/rest-api
 [ref-metadata-api]: /reference/core-data-apis/rest-api/reference#metadata-api
+[ref-metadata-api-private]: /reference/core-data-apis/rest-api/reference#private-cubes-and-members
+[ref-custom-roles]: /admin/users-and-permissions/custom-roles
 [ref-deployments]: /admin/deployment
 [ref-environments]: /admin/deployment/environments
 [ref-environments-staging]: /admin/deployment/environments#staging-environments
 [ref-cli]: /reference/cli
 [ref-api-keys]: /admin/account-billing/api-keys
+[ref-personal-api-keys]: /admin/account-billing/api-keys#personal-api-keys
+[ref-roles-and-permissions]: /admin/users-and-permissions/roles-and-permissions
+[ref-dap]: /docs/data-modeling/data-access-policies
 [ref-security-context]: /docs/data-modeling/access-control/context
 [ref-audit-log]: /admin/monitoring/audit-log
 [ref-update-channels]: /admin/deployment#update-channels
