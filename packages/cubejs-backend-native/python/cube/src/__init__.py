@@ -1,4 +1,9 @@
+import asyncio
+import functools
+import inspect
+import json
 import os
+import threading
 from typing import Union, Callable, Dict, Any
 
 
@@ -233,6 +238,55 @@ class TemplateFilterRef:
         self.context.add_filter(self.attribute, func)
         return func
 
+def _memo_key(args, kwargs):
+    # Arguments come from Jinja as plain data; anything else is keyed by its repr
+    return json.dumps([args, kwargs], sort_keys=True, default=repr)
+
+
+def memo(func):
+    """Calls `func` once per set of arguments and returns that result to every later call. The cache
+    lives as long as the decorated function: `globals.py` is loaded again for each data model
+    compilation, so each compilation gets its own."""
+    if not callable(func):
+        raise TemplateException("memo must be used with functions, actual: '%s'" % type(func).__name__)
+
+    # Exceptions are stored too: every template sees the same outcome
+    results = {}
+    lock = threading.RLock()
+
+    if inspect.iscoroutinefunction(func):
+        @functools.wraps(func)
+        async def async_wrapper(*args, **kwargs):
+            key = _memo_key(args, kwargs)
+            loop = asyncio.get_running_loop()
+            with lock:
+                entry = results.get(key)
+                if entry is None or (entry[0] is not loop and not entry[1].done()):
+                    # A task, so concurrent calls on the loop share one invocation
+                    entry = (loop, asyncio.ensure_future(func(*args, **kwargs)))
+                    results[key] = entry
+            task = entry[1]
+            return task.result() if task.done() else await task
+
+        return async_wrapper
+
+    @functools.wraps(func)
+    def wrapper(*args, **kwargs):
+        key = _memo_key(args, kwargs)
+        with lock:
+            if key not in results:
+                try:
+                    results[key] = (True, func(*args, **kwargs))
+                except Exception as e:
+                    results[key] = (False, e)
+            ok, value = results[key]
+        if not ok:
+            raise value
+        return value
+
+    return wrapper
+
+
 def context_func(func):
     func.cube_context_func = True
     return func
@@ -245,6 +299,7 @@ class SafeString(str):
 
 __all__ = [
     'context_func',
+    'memo',
     'TemplateContext',
     'SafeString',
 ]

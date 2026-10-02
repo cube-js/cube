@@ -142,6 +142,25 @@ def wrap_2(data):
   return f"<<< {data} >>>"
 ```
 
+### `memo` decorator
+
+The `memo` decorator calls a function once per set of arguments during a data
+model compilation, then returns the stored result, or raises the stored
+exception, on every later call from any template. It works with sync and async
+functions. Apply it below `template.function`:
+
+```python
+from cube import TemplateContext, memo
+
+template = TemplateContext()
+
+# Fetched once per compilation, however many templates call it
+@template.function('load_tables')
+@memo
+def load_tables(schema):
+  return MyApiClient().tables(schema)
+```
+
 
 [link-cube-repo-issues]: https://github.com/cube-js/cube/issues
 [link-jinja-filters]: https://jinja.palletsprojects.com/en/3.1.x/templates/#filters

@@ -193,3 +193,35 @@ suite('Jinja (new api)', () => {
     testTemplateBySnapshot(initJinjaEngine, `0${i}.yml.jinja`, {});
   }
 });
+
+suite('Python memo', () => {
+  // globals.py is loaded once per data model compilation, so is memo.py here
+  const compile = async () => {
+    const pyCtx = await loadPythonCtxFromUtils('memo.py');
+    const jinjaEngine = nativeInstance.newJinjaEngine({
+      debugInfo: true,
+      filters: pyCtx.filters,
+      workers: 1,
+    });
+    loadTemplateFile(jinjaEngine, 'memo.yml.jinja');
+
+    const render = () => jinjaEngine.renderTemplate('memo.yml.jinja', {}, {
+      ...pyCtx.variables,
+      ...pyCtx.functions,
+    });
+
+    // Two model files using the same functions
+    return Promise.all([render(), render()]);
+  };
+
+  it('calls a memoized function once per arguments within a compilation', async () => {
+    const expected = 'sync: a_1 a_1 b_2\nasync: a_1 a_1 b_2';
+
+    const first = await compile();
+    expect(first.map((r) => r.trim())).toEqual([expected, expected]);
+
+    // A new compilation calls the functions again
+    const second = await compile();
+    expect(second.map((r) => r.trim())).toEqual([expected, expected]);
+  });
+});
