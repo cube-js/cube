@@ -69,8 +69,8 @@ export interface GetSqlOptions {
   // Avoids building a rolling-window time series that would require a date range the
   // refresh path doesn't provide.
   preAggregationsOnly?: boolean;
-  // `canUseTransformedQuery` walks every multi-stage member, so it's skipped when
-  // the caller won't return it. Defaults to true.
+  // `canUseTransformedQuery` walks every multi-stage member, so only callers that
+  // return it ask for it.
   includeTransformedQuery?: boolean;
 }
 
@@ -372,7 +372,7 @@ export class CompilerApi {
   }
 
   public async getSql(query: NormalizedQuery, options: GetSqlOptions = {}): Promise<SqlResult> {
-    const { includeDebugInfo, exportAnnotatedSql, preAggregationsOnly, includeTransformedQuery = true } = options;
+    const { includeDebugInfo, exportAnnotatedSql, preAggregationsOnly, includeTransformedQuery = false } = options;
     const { sqlGenerator, compilers } = await this.getSqlGenerator(query);
 
     const getSqlFn = () => compilers.compiler.withQuery(sqlGenerator, () => ({

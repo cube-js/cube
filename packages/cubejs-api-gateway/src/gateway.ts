@@ -1589,6 +1589,7 @@ class ApiGateway {
           {
             includeDebugInfo: this.devServer || context.signedWithPlaygroundAuthSecret,
             exportAnnotatedSql,
+            includeTransformedQuery: true,
           }
         ))
       );
@@ -1838,7 +1839,8 @@ class ApiGateway {
         normalizedQueries.map(async (normalizedQuery) => (await this.getCompilerApi(context)).getSql(
           this.coerceForSqlQuery(normalizedQuery, context),
           {
-            includeDebugInfo: this.devServer || context.signedWithPlaygroundAuthSecret
+            includeDebugInfo: this.devServer || context.signedWithPlaygroundAuthSecret,
+            includeTransformedQuery: true,
           }
         ))
       );

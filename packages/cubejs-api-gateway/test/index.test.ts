@@ -1014,11 +1014,11 @@ describe('API Gateway', () => {
     });
   });
 
-  describe('transformed query on /v1/load', () => {
+  describe('transformed query', () => {
     const PLAYGROUND_SECRET = 'playgroundSecret';
     const DEFAULT_TOKEN = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.e30.t-IDcSemACt8x4iTMCda8Yhe3iZaWbvV5XKSTbuAn0M';
 
-    const loadWithRecordedSqlOptions = async (devServer: boolean, token: string = DEFAULT_TOKEN) => {
+    const recordSqlOptions = async (devServer: boolean, token: string = DEFAULT_TOKEN, endpoint: string = 'load') => {
       const sqlOptions: any[] = [];
       const recordingCompilerApi = async (ctx: any) => {
         const api = await compilerApi(ctx);
@@ -1043,25 +1043,30 @@ describe('API Gateway', () => {
       apiGateway.initApp(app);
 
       await request(app)
-        .get(`/cubejs-api/v1/load?query=${encodeURIComponent(JSON.stringify({ measures: ['Foo.bar'] }))}`)
+        .get(`/cubejs-api/v1/${endpoint}?query=${encodeURIComponent(JSON.stringify({ measures: ['Foo.bar'] }))}`)
         .set('Authorization', token)
         .expect(200);
       return sqlOptions;
     };
 
     // The pre-aggregation matcher behind it walks every multi-stage member, and
-    // only the dev/Playground response returns it.
-    test('is not computed outside dev mode', async () => {
-      expect(await loadWithRecordedSqlOptions(false)).toEqual([{ includeTransformedQuery: false }]);
+    // only the dev/Playground `/load`, `/sql` and `/dry-run` responses return it.
+    test('is not computed for /load outside dev mode', async () => {
+      expect(await recordSqlOptions(false)).toEqual([{ includeTransformedQuery: false }]);
     });
 
     test('is computed in dev mode', async () => {
-      expect(await loadWithRecordedSqlOptions(true)).toEqual([{ includeTransformedQuery: true }]);
+      expect(await recordSqlOptions(true)).toEqual([{ includeTransformedQuery: true }]);
     });
 
     test('is computed for a Playground token outside dev mode', async () => {
       const playgroundToken = generateAuthToken({ uid: 5, scope: ['dev-token'] }, {}, PLAYGROUND_SECRET);
-      expect(await loadWithRecordedSqlOptions(false, playgroundToken)).toEqual([{ includeTransformedQuery: true }]);
+      expect(await recordSqlOptions(false, playgroundToken)).toEqual([{ includeTransformedQuery: true }]);
+    });
+
+    test.each(['sql', 'dry-run'])('is computed for /%s', async (endpoint) => {
+      expect(await recordSqlOptions(false, DEFAULT_TOKEN, endpoint))
+        .toEqual([expect.objectContaining({ includeTransformedQuery: true })]);
     });
   });
 
