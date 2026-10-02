@@ -12,6 +12,7 @@ import { ErrorReporter } from '../ErrorReporter';
 import { LightweightSymbolResolver } from './LightweightSymbolResolver';
 import { LightweightNodeCubeDictionary } from './LightweightNodeCubeDictionary';
 import { IIFETranspiler } from './IIFETranspiler';
+import { MemoKeyTranspiler } from './MemoKeyTranspiler';
 import { YamlCompiler } from '../YamlCompiler';
 
 type TransferContent = {
@@ -32,6 +33,7 @@ const transpilers = {
   ImportExportTranspiler: new ImportExportTranspiler(),
   CubeCheckDuplicatePropTranspiler: new CubeCheckDuplicatePropTranspiler(),
   CubePropContextTranspiler: new CubePropContextTranspiler(cubeSymbols, cubeDictionary, cubeSymbols),
+  MemoKeyTranspiler: new MemoKeyTranspiler(),
   IIFETranspiler: new IIFETranspiler(),
 };
 

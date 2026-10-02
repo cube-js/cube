@@ -5,7 +5,7 @@ import path from 'path';
 import workerpool from 'workerpool';
 
 import { prepareJsCompiler } from './PrepareCompiler';
-import { ImportExportTranspiler } from '../../src/compiler/transpilers';
+import { ImportExportTranspiler, MemoKeyTranspiler } from '../../src/compiler/transpilers';
 import { ErrorReporter } from '../../src/compiler/ErrorReporter';
 import { PostgresQuery } from '../../src';
 
@@ -38,6 +38,33 @@ describe('Transpilers', () => {
     } catch (e: any) {
       expect(e.message).toMatch(/Duplicate property parsing test1/);
     }
+  });
+
+  it('MemoKeyTranspiler', () => {
+    const content = [
+      'memo(() => fetchColumns());',
+      'memo(async () => 1, 2);',
+      "memo('key', () => 1);",
+      'memo(fetchTable);',
+      'function local() { const memo = (fn) => fn(); return memo(() => 1); }',
+    ].join('\n');
+    const ast = parse(content, { sourceFilename: 'orders.js', sourceType: 'module' });
+    babelTraverse(ast, new MemoKeyTranspiler().traverseObject(new ErrorReporter()));
+
+    expect(babelGenerator(ast, {}, content).code.split('\n')).toEqual([
+      'memo({',
+      '  $memoCallSite: "orders.js:1:0"',
+      '}, () => fetchColumns());',
+      'memo(async () => 1, 2);',
+      "memo('key', () => 1);",
+      'memo({',
+      '  $memoCallSite: "orders.js:4:0"',
+      '}, fetchTable);',
+      'function local() {',
+      '  const memo = fn => fn();',
+      '  return memo(() => 1);',
+      '}',
+    ]);
   });
 
   it('worker transpilation returns each file only the errors it caused', async () => {

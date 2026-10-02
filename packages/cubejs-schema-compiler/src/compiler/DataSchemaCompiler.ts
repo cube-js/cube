@@ -15,13 +15,27 @@ import { UserError } from './UserError';
 import { ErrorReporter, ErrorReporterOptions, SyntaxErrorInterface } from './ErrorReporter';
 import { CONTEXT_SYMBOLS, CubeDefinition, CubeSymbols } from './CubeSymbols';
 import { ViewCompilationGate } from './ViewCompilationGate';
-import { TranspilerInterface } from './transpilers';
+import { MemoKeyTranspiler, TranspilerInterface } from './transpilers';
 import { CompilerInterface } from './PrepareCompiler';
 import { YamlCompiler } from './YamlCompiler';
 import { CubeDictionary } from './CubeDictionary';
 import { CompilerCache } from './CompilerCache';
 
 const ctxFileStorage = new AsyncLocalStorage<FileContent>();
+// Set while the function passed to `memo` runs, including its async continuations
+const memoFnStorage = new AsyncLocalStorage<string>();
+
+// For memo() keys: objects compare by their keys whatever the property order, and NaN and
+// Infinity don't encode as null
+const memoKeyReplacer = (_key: string, value: unknown) => {
+  if (typeof value === 'number' && !Number.isFinite(value)) {
+    return { $memoNumber: String(value) };
+  }
+  if (value && typeof value === 'object' && !Array.isArray(value)) {
+    return Object.fromEntries(Object.keys(value).sort().map((k) => [k, value[k]]));
+  }
+  return value;
+};
 
 // Shared realm: closures bind the running compile's scope lexically through `with`, so lazy reads
 // (sql reading COMPILE_CONTEXT) keep resolving it after the compile; the inner function keeps
@@ -582,6 +596,25 @@ export class DataSchemaCompiler {
     let compiledFiles: Record<string, boolean> = {};
     let asyncModules: CallableFunction[] = [];
     let transpiledFiles: FileContent[] = [];
+    // Results of `memo` calls. Unlike the objects above it survives between the compile stages:
+    // the model is evaluated once per stage, and `memo` makes it do a costly call (an API request
+    // from an `asyncModule`, say) only once per compile.
+    const memoResults = new Map<string, { value: unknown } | { error: unknown }>();
+    // Stage that last looked up each key MemoKeyTranspiler generated
+    const memoCallSiteStages = new Map<string, number>();
+    let memoStage = -1;
+
+    // Model objects go to the current stage only, while a memoized function runs in the first stage
+    // that asks for its key: objects defined from there would be missing from all later stages.
+    const assertOutsideMemo = (globalName: string) => {
+      const memoCall = memoFnStorage.getStore();
+      if (memoCall !== undefined) {
+        throw new UserError(
+          `${globalName}() can't be called from the function passed to ${memoCall}: ` +
+          'return the data from memo() and define model objects outside of it'
+        );
+      }
+    };
 
     const cleanup = () => {
       cubes = [];
@@ -598,6 +631,9 @@ export class DataSchemaCompiler {
         if (!file) {
           throw new Error('No file stored in context');
         }
+        if (cube) {
+          assertOutsideMemo('view');
+        }
         return !cube ?
           this.cubeFactory({ ...name, fileName: file.fileName, isView: true }) :
           cubes.push({ ...cube, name, fileName: file.fileName, isView: true });
@@ -606,6 +642,9 @@ export class DataSchemaCompiler {
         const file = ctxFileStorage.getStore();
         if (!file) {
           throw new Error('No file stored in context');
+        }
+        if (cube) {
+          assertOutsideMemo('cube');
         }
         return !cube ?
           this.cubeFactory({ ...name, fileName: file.fileName }) :
@@ -616,6 +655,7 @@ export class DataSchemaCompiler {
         if (!file) {
           throw new Error('No file stored in context');
         }
+        assertOutsideMemo('context');
         return contexts.push({ ...context, name, fileName: file.fileName });
       },
       view_group: (name: string, viewGroup) => {
@@ -623,6 +663,7 @@ export class DataSchemaCompiler {
         if (!file) {
           throw new Error('No file stored in context');
         }
+        assertOutsideMemo('view_group');
         viewGroups.push({ ...viewGroup, name, fileName: file.fileName });
         if (this.sharedVmContext) {
           this.compileScope!.vars[name] = name;
@@ -651,10 +692,65 @@ export class DataSchemaCompiler {
         if (!file) {
           throw new Error('No file stored in context');
         }
+        assertOutsideMemo('asyncModule');
         // We need to run async module code in the context of the original data model file
         // where it was defined. So we pass the same file to the async context.
         // @see https://nodejs.org/api/async_context.html#class-asynclocalstorage
         asyncModules.push(async () => ctxFileStorage.run(file, () => fn()));
+      },
+      memo: (key: unknown, fn: () => unknown) => {
+        if (typeof key === 'function' && fn === undefined) {
+          // MemoKeyTranspiler gives `memo(fn)` its key: this call didn't go through it
+          throw new Error('memo() expects a key as its first argument: memo(key, fn)');
+        }
+        if (typeof fn !== 'function') {
+          throw new Error('memo() expects a function as its second argument');
+        }
+        // Strings are encoded too, or `memo('1', ...)` would share the result of `memo(1, ...)`
+        let cacheKey: string | undefined;
+
+        try {
+          cacheKey = JSON.stringify(key, memoKeyReplacer);
+        } catch {
+          // BigInt or a cyclic structure
+        }
+        if (typeof cacheKey !== 'string') {
+          throw new Error('memo() expects a string or a JSON-serializable key as its first argument');
+        }
+        const callSite = MemoKeyTranspiler.callSiteOf(key);
+        // For errors: the key as the code would write it
+        const label = callSite !== undefined ? `memo() at ${callSite}` : `memo(${cacheKey})`;
+        if (memoStage < 0 || !ctxFileStorage.getStore()) {
+          // Called from a member (`sql: () => memo(...)`) evaluated by a compiler or a query, not
+          // from a model file: it may run any number of times, so there's no stage to cache for
+          return memoFnStorage.run(label, fn);
+        }
+        if (callSite !== undefined) {
+          // A top-level call site runs once per stage: twice means it's in a function or a loop,
+          // where the one key would give every call the result of the first one
+          if (memoCallSiteStages.get(cacheKey) === memoStage) {
+            throw new UserError(
+              `memo() at ${callSite} is called more than once per compile stage: as it's in a function or a loop, ` +
+              'its result may depend on the arguments: pass a key that does, e.g. memo([\'table\', name], fn)'
+            );
+          }
+          memoCallSiteStages.set(cacheKey, memoStage);
+        }
+        let result = memoResults.get(cacheKey);
+        if (!result) {
+          // A promise is stored as is, so concurrent and later calls share one invocation.
+          // A throw is stored too: every stage has to see the same outcome.
+          try {
+            result = { value: memoFnStorage.run(label, fn) };
+          } catch (error) {
+            result = { error };
+          }
+          memoResults.set(cacheKey, result);
+        }
+        if ('error' in result) {
+          throw result.error;
+        }
+        return result.value;
       },
       require: (extensionName: string) => {
         const file = ctxFileStorage.getStore();
@@ -699,6 +795,7 @@ export class DataSchemaCompiler {
     const compilePhaseFirst = async (compilers: CompileCubeFilesCompilers, stage: 0 | 1 | 2 | 3) => {
       // clear the objects for the next phase
       cleanup();
+      memoStage = stage;
       transpiledFiles = await transpilePhaseFirst(stage);
 
       // We render jinja and transpile yaml only once on first phase and then use resulting JS for these files
@@ -712,6 +809,7 @@ export class DataSchemaCompiler {
     const compilePhase = async (compilers: CompileCubeFilesCompilers, stage: 0 | 1 | 2 | 3) => {
       // clear the objects for the next phase
       cleanup();
+      memoStage = stage;
       transpiledFiles = await transpilePhase(stage);
 
       return this.compileCubeFiles(cubes, contexts, viewGroups, compiledFiles, asyncModules, compilers, transpiledFiles, errorsReport);
@@ -755,6 +853,15 @@ export class DataSchemaCompiler {
         } else if (this.workerPool) {
           this.workerPool.terminate();
         }
+      })
+      // A failed compile mustn't keep the fetched data either
+      .finally(() => {
+        memoStage = -1;
+        memoResults.clear();
+        memoCallSiteStages.clear();
+        // These hold the globals.py TemplateContext, where the Python @memo caches live
+        this.pythonContext = null;
+        this.yamlCompiler.free();
       });
 
     // Every continuation of the compile (asyncModule callbacks included) sees its scope

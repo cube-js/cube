@@ -11,6 +11,7 @@ import {
   CubePropContextTranspiler,
   IIFETranspiler,
   ImportExportTranspiler,
+  MemoKeyTranspiler,
   TranspilerInterface,
   ValidationTranspiler,
 } from './transpilers';
@@ -98,6 +99,7 @@ export const prepareCompiler = (repo: SchemaFileRepository, options: PrepareComp
     new ValidationTranspiler(),
     new ImportExportTranspiler(),
     new CubePropContextTranspiler(cubeSymbols, cubeDictionary, viewCompiler),
+    new MemoKeyTranspiler(),
     new IIFETranspiler(),
   ];
 

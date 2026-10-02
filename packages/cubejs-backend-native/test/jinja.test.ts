@@ -193,3 +193,79 @@ suite('Jinja (new api)', () => {
     testTemplateBySnapshot(initJinjaEngine, `0${i}.yml.jinja`, {});
   }
 });
+
+suite('Python memo', () => {
+  // globals.py is loaded once per data model compilation, so is memo.py here
+  const compile = async () => {
+    const pyCtx = await loadPythonCtxFromUtils('memo.py');
+    const jinjaEngine = nativeInstance.newJinjaEngine({
+      debugInfo: true,
+      filters: pyCtx.filters,
+      workers: 1,
+    });
+    loadTemplateFile(jinjaEngine, 'memo.yml.jinja');
+
+    const render = () => jinjaEngine.renderTemplate('memo.yml.jinja', {}, {
+      ...pyCtx.variables,
+      ...pyCtx.functions,
+    });
+
+    // Two model files using the same functions
+    return Promise.all([render(), render()]);
+  };
+
+  it('calls a memoized function once per arguments within a compilation', async () => {
+    const expected = 'sync: 1 1 2\nasync: 1 1 2';
+
+    const first = await compile();
+    expect(first.map((r) => r.trim())).toEqual([expected, expected]);
+
+    // A new compilation calls the functions again
+    const second = await compile();
+    expect(second.map((r) => r.trim())).toEqual([expected, expected]);
+  });
+
+  it('drops a compilation\'s cached results with its TemplateContext', async () => {
+    const fileName = path.join(process.cwd(), 'test', 'templates', 'memo_leak.py');
+    const pyCtx = await nativeInstance.loadPythonContext(fileName, fs.readFileSync(fileName, 'utf8'));
+    const jinjaEngine = nativeInstance.newJinjaEngine({ debugInfo: true, filters: pyCtx.filters, workers: 1 });
+    loadTemplateFile(jinjaEngine, 'memo_leak.yml.jinja');
+
+    expect((await jinjaEngine.renderTemplate('memo_leak.yml.jinja', {}, { ...pyCtx.functions })).trim()).toEqual('kept: 0');
+  });
+
+  it('keeps the cache of a call running while another compilation loads', async () => {
+    const fileName = path.join(process.cwd(), 'test', 'templates', 'memo_reload.py');
+    const content = fs.readFileSync(fileName, 'utf8');
+    const pyCtx = await nativeInstance.loadPythonContext(fileName, content);
+    const jinjaEngine = nativeInstance.newJinjaEngine({ debugInfo: true, filters: pyCtx.filters, workers: 1 });
+    loadTemplateFile(jinjaEngine, 'memo_reload.yml.jinja');
+
+    const rendering = jinjaEngine.renderTemplate('memo_reload.yml.jinja', {}, { ...pyCtx.functions });
+    // load_twice() is waiting between its two calls by now
+    await new Promise((resolve) => setTimeout(resolve, 200));
+    await nativeInstance.loadPythonContext(fileName, content);
+
+    // One call, its result cached for the second
+    expect((await rendering).trim()).toEqual('reload: 11');
+  });
+
+  it('gives each compilation its own cache for functions in imported modules', async () => {
+    const load = async () => {
+      const fileName = path.join(process.cwd(), 'test', 'templates', 'memo_imported.py');
+      const pyCtx = await nativeInstance.loadPythonContext(fileName, fs.readFileSync(fileName, 'utf8'));
+      const jinjaEngine = nativeInstance.newJinjaEngine({ debugInfo: true, filters: pyCtx.filters, workers: 1 });
+      loadTemplateFile(jinjaEngine, 'memo_imported.yml.jinja');
+
+      return async () => (await jinjaEngine.renderTemplate('memo_imported.yml.jinja', {}, { ...pyCtx.functions })).trim();
+    };
+
+    // memo_helper.py is imported once, so its call counter is shared, and compilations overlap
+    // A method called on a returned object runs every time, so no compilation gets another one's result
+    const renderA = await load();
+    expect(await renderA()).toEqual('imported: 1 1 1\nmethod: 1\nclients: 11 22 2\nday: 1 1\ncfg: 2 2\ntree: 33');
+    const renderB = await load();
+    expect(await renderA()).toEqual('imported: 1 1 1\nmethod: 2\nclients: 11 22 4\nday: 1 1\ncfg: 2 2\ntree: 44');
+    expect(await renderB()).toEqual('imported: 2 2 2\nmethod: 3\nclients: 11 22 6\nday: 5 5\ncfg: 6 6\ntree: 77');
+  });
+});
