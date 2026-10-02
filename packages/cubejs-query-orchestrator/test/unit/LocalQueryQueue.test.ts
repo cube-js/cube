@@ -57,6 +57,66 @@ describe('LocalQueueDriver', () => {
     expect(await connection.getActiveQueries()).toEqual([[hash, queueId]]);
   });
 
+  describe('results', () => {
+    const start = 97_800_000;
+
+    beforeEach(() => jest.useFakeTimers({ now: start }));
+    afterEach(() => jest.useRealTimers());
+
+    const run = async (connection: QueueDriverConnectionInterface, queryKey: QueryKey, requestId: string) => {
+      const hash = connection.redisHash(queryKey);
+      const [, queueId] = await addQuery(connection, queryKey, requestId);
+      await connection.retrieveForProcessing(hash, queueId);
+      await connection.setResultAndRemoveQuery(hash, { result: requestId }, queueId);
+
+      return queueId;
+    };
+
+    test('a result expires after continueWaitTimeout', async () => {
+      const connection = await createDriver().createConnection();
+      const key: QueryKey = ['result-expires', []];
+      const hash = connection.redisHash(key);
+
+      const queueId = await run(connection, key, 'result-expires');
+
+      jest.setSystemTime(start + 1000);
+      expect(await connection.getResultBlocking(hash, queueId)).toMatchObject({ result: 'result-expires' });
+
+      jest.setSystemTime(start + 1001);
+      expect(await connection.getResultBlocking(hash, queueId)).toBeNull();
+      expect(await connection.getResult(key)).toBeNull();
+    });
+
+    test('a result read by queue id is not served by key to another request', async () => {
+      const connection = await createDriver().createConnection();
+      const key: QueryKey = ['result-read-by-id', []];
+      const hash = connection.redisHash(key);
+
+      const queueId = await run(connection, key, 'result-read-by-id');
+
+      expect(await connection.getResultBlocking(hash, queueId)).toMatchObject({ result: 'result-read-by-id' });
+      expect(await connection.getResult(key)).toBeNull();
+      expect(await connection.getResultBlocking(hash, queueId)).toMatchObject({ result: 'result-read-by-id' });
+    });
+
+    test('a waiter of a run which is never acknowledged times out', async () => {
+      const connection = await createDriver().createConnection();
+      const key: QueryKey = ['result-never-acked', []];
+      const hash = connection.redisHash(key);
+
+      const [, queueId] = await addQuery(connection, key, 'result-never-acked');
+      await connection.retrieveForProcessing(hash, queueId);
+
+      const waiting = connection.getResultBlocking(hash, queueId);
+      await connection.getQueryAndRemove(hash, queueId);
+      jest.advanceTimersByTime(1000);
+
+      await expect(waiting).resolves.toBeNull();
+      // Nothing left that could ever resolve, so there is no wait at all
+      await expect(connection.getResultBlocking(hash, queueId)).resolves.toBeNull();
+    });
+  });
+
   // Cube Store keeps the deadline of the first add
   describe('orphaned deadline on re-add', () => {
     const start = 97_800_000;

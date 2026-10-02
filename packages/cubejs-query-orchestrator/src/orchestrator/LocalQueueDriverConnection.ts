@@ -61,10 +61,70 @@ export interface LocalQueueItem {
   extra: Record<string, any> | null;
 }
 
-export interface PromiseWithResolve<T = any> extends Promise<T> {
-  resolve?: (value: T) => void;
-  resolved?: boolean;
+/**
+ * Mirrors Cube Store's QueueResult: written by the ack under the id of the run it belongs to.
+ */
+export interface LocalQueueResult {
+  id: number;
+  key: QueryKeyHash;
+  value: any;
+  /**
+   * Set once anybody took the result, after that only a lookup by id still serves it.
+   * Cube Store's `deleted` flag.
+   */
+  deleted: boolean;
+  /**
+   * Absolute deadline in ms
+   */
+  expire: number;
 }
+
+/**
+ * Results indexed by run id and by key, both indexes are only ever updated together.
+ */
+export class LocalQueueResults {
+  /**
+   * Insertion order is ack order, so the expired results are always at the front.
+   */
+  protected readonly byId: Map<number, LocalQueueResult> = new Map();
+
+  /**
+   * The last acknowledged run of every key.
+   */
+  protected readonly byKey: Map<QueryKeyHash, LocalQueueResult> = new Map();
+
+  public getById(id: number, now: number): LocalQueueResult | null {
+    const result = this.byId.get(id);
+
+    return result && result.expire >= now ? result : null;
+  }
+
+  public getByKey(key: QueryKeyHash, now: number): LocalQueueResult | null {
+    const result = this.byKey.get(key);
+
+    return result && result.expire >= now ? result : null;
+  }
+
+  public add(result: LocalQueueResult): void {
+    this.byId.set(result.id, result);
+    this.byKey.set(result.key, result);
+  }
+
+  public removeExpired(now: number): void {
+    for (const result of this.byId.values()) {
+      if (result.expire >= now) {
+        return;
+      }
+
+      this.byId.delete(result.id);
+      if (this.byKey.get(result.key) === result) {
+        this.byKey.delete(result.key);
+      }
+    }
+  }
+}
+
+type LocalQueueResultWaiter = (value: any) => void;
 
 /**
  * Queue items indexed by key and by id, both indexes are only ever updated together.
@@ -114,14 +174,17 @@ export class LocalQueueItems {
 }
 
 export class LocalQueueDriverConnectionState {
-  public readonly resultPromises: Record<string, PromiseWithResolve> = {};
-
   public readonly items: LocalQueueItems = new LocalQueueItems();
+
+  public readonly results: LocalQueueResults = new LocalQueueResults();
+
+  /**
+   * getResultBlocking calls parked on a run id until its ack, Cube Store's ack listener.
+   */
+  public readonly waiters: Map<number, Set<LocalQueueResultWaiter>> = new Map();
 }
 
 export class LocalQueueDriverConnection implements QueueDriverConnectionInterface {
-  private readonly redisQueuePrefix: string;
-
   private readonly continueWaitTimeout: number;
 
   private readonly orphanedTimeout: number;
@@ -135,7 +198,6 @@ export class LocalQueueDriverConnection implements QueueDriverConnectionInterfac
   private readonly state: LocalQueueDriverConnectionState;
 
   public constructor(driver: LocalQueueDriver, state: LocalQueueDriverConnectionState, options: QueueDriverOptions) {
-    this.redisQueuePrefix = options.redisQueuePrefix;
     this.continueWaitTimeout = options.continueWaitTimeout;
     this.orphanedTimeout = options.orphanedTimeout;
     this.heartBeatTimeout = options.heartBeatTimeout;
@@ -226,45 +288,91 @@ export class LocalQueueDriverConnection implements QueueDriverConnectionInterfac
     ];
   }
 
-  public getResultPromise(resultListKey: string): PromiseWithResolve {
-    if (!this.state.resultPromises[resultListKey]) {
-      let resolveMethod: ((value: any) => void) | undefined;
-      this.state.resultPromises[resultListKey] = new Promise(resolve => {
-        resolveMethod = resolve;
-      }) as PromiseWithResolve;
-      this.state.resultPromises[resultListKey].resolve = resolveMethod;
-    }
-
-    return this.state.resultPromises[resultListKey];
+  /**
+   * A result outlives its first reader: other waiters of the same run, e.g. a joiner that deduped
+   * onto it in addToQueue, read it after the ack too. They come back within one
+   * continueWaitTimeout of polling, so that's how long it is kept.
+   */
+  protected resultExpire(now: number): number {
+    return now + this.continueWaitTimeout * 1000;
   }
 
-  public async getResultBlocking(queryKeyHash: QueryKeyHash, _queueId?: QueueId): Promise<any> {
-    const resultListKey = this.resultListKey(queryKeyHash);
+  protected waitForResult(id: number): Promise<any> {
+    return new Promise((resolve) => {
+      let waiters = this.state.waiters.get(id);
+      if (!waiters) {
+        waiters = new Set();
+        this.state.waiters.set(id, waiters);
+      }
+
+      let timeout: ReturnType<typeof setTimeout> | undefined;
+
+      const waiter: LocalQueueResultWaiter = (value) => {
+        clearTimeout(timeout);
+        resolve(value);
+      };
+
+      timeout = setTimeout(() => {
+        waiters.delete(waiter);
+        if (!waiters.size && this.state.waiters.get(id) === waiters) {
+          this.state.waiters.delete(id);
+        }
+
+        resolve(null);
+      }, this.continueWaitTimeout * 1000);
+
+      waiters.add(waiter);
+    });
+  }
+
+  /**
+   * By id the result is served to every caller until it expires. Without an id it falls back to
+   * the key, which, like Cube Store's queue v1, serves the result only once.
+   */
+  public async getResultBlocking(queryKeyHash: QueryKeyHash, queueId?: QueueId | null): Promise<any> {
+    const now = Date.now();
+
+    if (queueId) {
+      const result = this.state.results.getById(Number(queueId), now);
+      if (result) {
+        if (result.key !== queryKeyHash) {
+          return null;
+        }
+
+        // Unlike Cube Store, which leaves it to the expiry here: a key lookup of a later request
+        // must not be answered with the result of a run that was already consumed
+        result.deleted = true;
+        return result.value;
+      }
+    } else {
+      const result = this.state.results.getByKey(queryKeyHash, now);
+      if (result && !result.deleted) {
+        result.deleted = true;
+        return result.value;
+      }
+    }
+
     // With neither an item nor a result there is nothing that could ever resolve, so don't
     // make the caller wait out the timeout
-    if (!this.state.items.has(queryKeyHash) && !this.state.resultPromises[resultListKey]) {
+    const item = this.resolveItem(queryKeyHash, queueId);
+    if (!item) {
       return null;
     }
-    const timeoutPromise = (timeout: number) => new Promise((resolve) => setTimeout(() => resolve(null), timeout));
 
-    const res = await Promise.race([
-      this.getResultPromise(resultListKey),
-      timeoutPromise(this.continueWaitTimeout * 1000),
-    ]);
-
-    if (res) {
-      delete this.state.resultPromises[resultListKey];
-    }
-    return res;
+    return this.waitForResult(item.id);
   }
 
+  /**
+   * Cube Store without CUBEJS_QUEUE_EXTERNAL_ID: a result is served by key only once.
+   */
   public async getResult(queryKey: QueryKey, _externalId?: string): Promise<any> {
-    const resultListKey = this.resultListKey(queryKey);
-    if (this.state.resultPromises[resultListKey] && this.state.resultPromises[resultListKey].resolved) {
-      return this.getResultBlocking(this.redisHash(queryKey));
+    const result = this.state.results.getByKey(this.redisHash(queryKey), Date.now());
+    if (!result || result.deleted) {
+      return null;
     }
 
-    return null;
+    result.deleted = true;
+    return result.value;
   }
 
   public async addToQueue(
@@ -293,6 +401,8 @@ export class LocalQueueDriverConnection implements QueueDriverConnectionInterfac
     }
 
     const created = Date.now();
+    this.state.results.removeExpired(created);
+
     const id = this.state.items.nextId();
 
     const item: LocalQueueItem = {
@@ -361,11 +471,27 @@ export class LocalQueueDriverConnection implements QueueDriverConnectionInterfac
 
     this.state.items.remove(item);
 
-    const promise = this.getResultPromise(this.resultListKey(item.key));
+    const now = Date.now();
+    this.state.results.removeExpired(now);
 
-    promise.resolved = true;
-    if (promise.resolve) {
-      promise.resolve(executionResult);
+    const result: LocalQueueResult = {
+      id: item.id,
+      key: item.key,
+      value: executionResult,
+      deleted: false,
+      expire: this.resultExpire(now),
+    };
+    this.state.results.add(result);
+
+    const waiters = this.state.waiters.get(item.id);
+    if (waiters) {
+      this.state.waiters.delete(item.id);
+      // Handed over to a waiter, so like in Cube Store a key lookup doesn't serve it again
+      result.deleted = true;
+
+      for (const waiter of waiters) {
+        waiter(executionResult);
+      }
     }
 
     return true;
@@ -475,14 +601,6 @@ export class LocalQueueDriverConnection implements QueueDriverConnectionInterfac
 
   public release(): void {
     // nothing to release
-  }
-
-  public queryRedisKey(queryKey: QueryKey, suffix: string): string {
-    return `${this.redisQueuePrefix}_${this.redisHash(queryKey)}_${suffix}`;
-  }
-
-  public resultListKey(queryKey: QueryKey | QueryKeyHash): string {
-    return this.queryRedisKey(queryKey, 'RESULT');
   }
 
   public redisHash(queryKey: QueryKey): QueryKeyHash {
