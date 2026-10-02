@@ -37,22 +37,6 @@ describe('LocalQueueDriver', () => {
     ]);
   });
 
-  test('an active query cannot be retrieved twice', async () => {
-    const driver = createDriver();
-    const connection = await driver.createConnection();
-    const connection2 = await driver.createConnection();
-    const key = 'active-retrieval' as any;
-
-    const [, queueId] = await addQuery(connection, key, '1');
-
-    expect(await connection.retrieveForProcessing(key, queueId)).toMatchObject({
-      active: [key],
-      queueSize: 0,
-      def: { queryKey: key },
-    });
-    expect(await connection2.retrieveForProcessing(key, queueId)).toBeNull();
-  });
-
   // With concurrency: 1 the second retrieval is rejected by the full slot alone, so this
   // needs a free slot to show that the status is what rejects it
   test('retrieveForProcessing does not activate an already active item with a free slot', async () => {
@@ -66,6 +50,8 @@ describe('LocalQueueDriver', () => {
 
     expect(await connection.retrieveForProcessing(hash, queueId)).toMatchObject({
       active: [hash],
+      queueSize: 0,
+      def: { queryKey: key },
     });
     expect(await connection2.retrieveForProcessing(hash, queueId)).toBeNull();
     expect(await connection.getActiveQueries()).toEqual([[hash, queueId]]);
