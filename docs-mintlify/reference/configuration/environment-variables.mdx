@@ -1471,7 +1471,7 @@ statements can be read from the console.
 
 The maximum number of [multi-stage][ref-multi-stage] members one query may chain,
 one on top of another. Past it, the query is refused with an error instead of
-being planned.
+being planned. Applies to the Tesseract SQL planner only.
 
 | Possible Values | Default in Development | Default in Production |
 | --------------- | ---------------------- | --------------------- |
@@ -1482,6 +1482,7 @@ being planned.
 The maximum number of [multi-stage][ref-multi-stage] stages one query may plan in
 total. A member that reads another in several states, e.g., with different time
 shifts, adds a stage for each, so stages can grow much faster than depth.
+Applies to the Tesseract SQL planner only.
 
 | Possible Values | Default in Development | Default in Production |
 | --------------- | ---------------------- | --------------------- |
