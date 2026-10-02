@@ -33,8 +33,9 @@ line.
 To reply, type in the **Reply…** box under a thread and click **Reply**.
 Replies are one level deep: you reply to a thread, not to another reply.
 
-The newest thread is at the top. Replies inside a thread are in the order they
-were posted, oldest first. A new reply does not move its thread to the top.
+The oldest thread is at the top, and new threads appear at the bottom, next to
+the box. Replies inside a thread are in the order they were posted, oldest
+first. A new reply does not move its thread.
 
 Comments are plain text. Markdown and other formatting are shown as typed.
 
@@ -78,6 +79,26 @@ To delete a reply, choose **Delete**. To delete a whole thread, choose **Delete
 thread** on its first comment. This also deletes all the replies in the thread.
 Cube asks you to confirm, and you can't undo a delete.
 
+## Moving a comment to another thread
+
+If you posted a reply as a new thread by mistake, open its **More actions**
+(`⋯`) menu and choose **Move to the previous thread**. The comment becomes the
+last reply of the thread above it. This item appears only when all of these
+are true:
+
+- You wrote the comment.
+- The comment has no replies.
+- Nothing in the thread above was posted after your comment.
+- Neither thread is resolved.
+
+To undo the move, or to turn a reply into a thread of its own, choose **Move to
+a new thread** on the reply. This item appears only on your own reply, only when
+it is the newest reply in the thread, and only when the thread is not resolved.
+The new thread takes its place in the list by the time the comment was posted.
+
+A moved comment keeps its text, its reactions, and its **edited** mark. Moving
+a comment does not send notifications.
+
 ## Reactions
 
 To react to a comment, click **Add reaction** and choose one of six reactions:
@@ -116,9 +137,9 @@ highlights it for a short time.
 
 ## Permissions
 
-Only the author of a comment can edit or delete it. People who can edit the
-workbook can resolve any thread, and the author of a thread can resolve it too.
-To learn what each access level allows, see
+Only the author of a comment can edit, move, or delete it. People who can edit
+the workbook can resolve any thread, and the author of a thread can resolve it
+too. To learn what each access level allows, see
 [Dashboard comments][ref-sharing].
 
 ## Turn it on
