@@ -389,7 +389,9 @@ cubes:
 When several templates call a function that loads data from an API, decorate it
 with `@memo` so it runs only once per set of arguments during a data model
 compilation. Every later call, from any template, gets the stored result back.
-Async functions are supported too. Each compilation starts with an empty cache:
+Async functions are supported too. Each compilation starts with an empty cache,
+though a template whose content hasn't changed is reused as already rendered,
+without calling any functions:
 
 ```python
 from cube import TemplateContext, memo
