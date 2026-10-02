@@ -1,2 +1,3 @@
 imported: {{ load_imported('a') }} {{ load_imported('a') }} {{ via_python('a') }}
 method: {{ get_api().tables('a') }}
+clients: {{ client_tables('a') }} {{ client_tables('b') }} {{ client_calls() }}

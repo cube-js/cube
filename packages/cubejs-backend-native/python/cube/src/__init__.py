@@ -245,13 +245,23 @@ _template_context = globals().get('_template_context') or contextvars.ContextVar
 
 
 def _memo_key(args, kwargs):
-    # Arguments come from Jinja as plain data; anything else is keyed by its repr
-    call = [args, sorted(kwargs.items())]
-    try:
-        return json.dumps(call, sort_keys=True, default=repr)
-    except TypeError:
-        # Dict keys json can't sort or encode, e.g. {1: 'a', 'b': 2}
-        return repr(call)
+    """The key of a call and the arguments it identifies by object. Those are kept with the entry:
+    a freed object's id can be reused by another."""
+    pinned = []
+
+    def plain(value):
+        if value is None or isinstance(value, (bool, int, float, str)):
+            return value
+        if isinstance(value, (list, tuple)):
+            return ['list', [plain(item) for item in value]]
+        if isinstance(value, dict):
+            items = [[json.dumps(plain(k)), plain(v)] for k, v in value.items()]
+            return ['dict', sorted(items, key=lambda item: item[0])]
+        # Any other object, e.g. the `self` of a memoized method, is the same argument only as itself
+        pinned.append(value)
+        return ['object', id(value)]
+
+    return json.dumps([plain(args), sorted([name, plain(value)] for name, value in kwargs.items())]), pinned
 
 
 def memo(func):
@@ -261,7 +271,6 @@ def memo(func):
     if not callable(func):
         raise TemplateException("memo must be used with functions, actual: '%s'" % type(func).__name__)
 
-    # Exceptions are stored too: every template sees the same outcome
     # The cache of each compilation lives on its TemplateContext: what the results reference (a
     # traceback's frames, a task's copied contextvars) leads back to it, which makes a cycle the
     # GC frees with the context rather than a reference keeping the context alive
@@ -277,12 +286,12 @@ def memo(func):
             stored = caches[owner] = {}
         return stored
 
-    def key_lock(context, key):
+    def key_lock(context, key, pinned):
         with lock:
             stored = results(context)
             entry = stored.get(key)
             if entry is None:
-                entry = stored[key] = {'lock': threading.RLock()}
+                entry = stored[key] = {'lock': threading.RLock(), 'pinned': pinned}
             return entry
 
     def settle(stored, key, entry, task):
@@ -292,7 +301,7 @@ def memo(func):
                 if task.cancelled():
                     del stored[key]
                 else:
-                    stored[key] = (None, task.result())
+                    stored[key] = (None, task.result(), entry[2])
 
     if inspect.iscoroutinefunction(func):
         async def call(*args, **kwargs):
@@ -308,7 +317,7 @@ def memo(func):
             context = _template_context.get()
             if context is None:
                 return await func(*args, **kwargs)
-            key = _memo_key(args, kwargs)
+            key, pinned = _memo_key(args, kwargs)
             loop = asyncio.get_running_loop()
             with lock:
                 stored = results(context)
@@ -316,7 +325,7 @@ def memo(func):
                 if entry is None or (entry[0] is not None and entry[0] is not loop and not entry[1].done()):
                     # A task, so concurrent calls on the loop share one invocation
                     task = asyncio.ensure_future(call(*args, **kwargs))
-                    entry = stored[key] = (loop, task)
+                    entry = stored[key] = (loop, task, pinned)
                     task.add_done_callback(functools.partial(settle, stored, key, entry))
             if entry[0] is None:
                 ok, value = entry[1]
@@ -336,8 +345,8 @@ def memo(func):
         context = _template_context.get()
         if context is None:
             return func(*args, **kwargs)
-        key = _memo_key(args, kwargs)
-        entry = key_lock(context, key)
+        key, pinned = _memo_key(args, kwargs)
+        entry = key_lock(context, key, pinned)
         with entry['lock']:
             if 'result' not in entry:
                 try:

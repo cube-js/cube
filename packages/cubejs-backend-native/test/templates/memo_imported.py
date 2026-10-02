@@ -1,5 +1,5 @@
 from cube import TemplateContext
-from memo_helper import api, load_imported
+from memo_helper import Client, api, load_imported
 
 template = TemplateContext()
 template.add_function('load_imported', load_imported)
@@ -14,3 +14,14 @@ def via_python(name):
 @template.function
 def get_api():
     return api
+
+
+@template.function
+def client_tables(schema):
+    client = Client(schema)
+    return client.tables() * 10 + client.tables()
+
+
+@template.function
+def client_calls():
+    return len(Client.calls)
