@@ -262,13 +262,23 @@ def memo(func):
 
     # Exceptions are stored too: every template sees the same outcome
     per_context = weakref.WeakKeyDictionary()
-    lock = threading.RLock()
+    # Held only to look entries up: a call runs under the lock of its own key and context, so
+    # other compilations and other arguments don't wait for it
+    lock = threading.Lock()
 
     def results(context):
         stored = per_context.get(context)
         if stored is None:
             stored = per_context[context] = {}
         return stored
+
+    def key_lock(context, key):
+        with lock:
+            stored = results(context)
+            entry = stored.get(key)
+            if entry is None:
+                entry = stored[key] = {'lock': threading.RLock()}
+            return entry
 
     if inspect.iscoroutinefunction(func):
         async def call(*args, **kwargs):
@@ -309,15 +319,15 @@ def memo(func):
         if context is None:
             return func(*args, **kwargs)
         key = _memo_key(args, kwargs)
-        with lock:
-            stored = results(context)
-            if key not in stored:
+        entry = key_lock(context, key)
+        with entry['lock']:
+            if 'result' not in entry:
                 try:
-                    stored[key] = (True, func(*args, **kwargs))
+                    entry['result'] = (True, func(*args, **kwargs))
                 except Exception as e:
                     # With its own traceback: raising the instance again would extend it each time
-                    stored[key] = (False, (e, e.__traceback__))
-            ok, value = stored[key]
+                    entry['result'] = (False, (e, e.__traceback__))
+            ok, value = entry['result']
         if not ok:
             error, tb = value
             raise error.with_traceback(tb)
