@@ -240,7 +240,12 @@ class TemplateFilterRef:
 
 def _memo_key(args, kwargs):
     # Arguments come from Jinja as plain data; anything else is keyed by its repr
-    return json.dumps([args, kwargs], sort_keys=True, default=repr)
+    call = [args, sorted(kwargs.items())]
+    try:
+        return json.dumps(call, sort_keys=True, default=repr)
+    except TypeError:
+        # Dict keys json can't sort or encode, e.g. {1: 'a', 'b': 2}
+        return repr(call)
 
 
 def memo(func):
