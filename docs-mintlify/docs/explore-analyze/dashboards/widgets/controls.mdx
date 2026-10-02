@@ -522,6 +522,8 @@ This section applies to filters, time granularity switchers and field switchers.
 
 When a control is added to a dashboard, it's automatically wired up to every [chart][ref-charts] whose query already uses the same member. Charts that don't reference that member are left alone, so a dashboard can mix scoped and unscoped views by default. Filters and time granularity switchers always target a dimension; a [field switcher](#field-switcher) targets a dimension or a measure depending on its **Field Type**, and scopes on whichever it is set to. You can override this default per chart from its [Controls mapping](#controls-mapping) — disable the control for that chart, or remap it onto a different member.
 
+Adding a chart built on a different semantic view is the case where this needs attention. If at least one control has a same-name, same-type match on the new chart's view, a prompt appears with **Review…**, which opens the chart's [Controls mapping](#controls-mapping) with the matches pre-selected, and **Dismiss**, which leaves the mappings as they are. If no control has a match, no prompt appears, and you map controls to the chart by hand.
+
 ### Incompatible controls
 
 If controls of a certain type are incompatible with a particular chart's query, the chart skips all controls of that type and renders the data without them. Each type is skipped independently — if filters fail but a time granularity switcher works, the chart shows the granularity-adjusted data without filtering, and vice versa. A [field switcher](#field-switcher) that can't be applied says so [on the chart itself](#when-a-chart-cant-take-the-switch) rather than through the icons below.
@@ -544,13 +546,16 @@ Open **Controls mapping** from a chart's settings menu to inspect or override th
 - **Toggle the control on or off** for the chart, even when a mapping exists
 - **Pick a different member** from the chart's semantic view to remap the control to
 
-Three states show up in the mapping sidebar:
+Four states show up in the mapping sidebar:
 
 | Status | What it means |
 |---|---|
 | **Mapped automatically** | The control's member exists on the chart's semantic view, so it's wired up without configuration. |
 | **Manually mapped** | You (or an AI agent) picked a specific member for this chart. **Reset** restores the automatic mapping. |
-| **Can't map automatically** | The control targets a member that doesn't exist on the chart's semantic view. The chart is unaffected by the control until you map it manually. |
+| **Mapping suggestion** | The control's member isn't on the chart's semantic view, but a different member there has the same name and type. The suggestion is pre-selected in the picker, so saving maps the control, along with any other pending suggestions. Pick a different member, or clear it, to override. |
+| **Can't map automatically** | The control targets a member that doesn't exist on the chart's semantic view, and nothing there could be suggested. The chart is unaffected by the control until you map it manually. |
+
+Two semantic views can share a member name and mean different things by it, so a suggestion reaches a chart only once the mapping is saved. Among members of the control's type, an exact name match wins. Failing that, names are compared ignoring case, and a suggestion is made only when exactly one member matches. Controls you turned off for the chart are not suggested.
 
 Each control's picker offers only the members it can actually be resolved against, so a mapping you can stage is a mapping that will work:
 
