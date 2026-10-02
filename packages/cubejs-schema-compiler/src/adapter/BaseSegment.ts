@@ -1,5 +1,4 @@
 import type { BaseQuery } from './BaseQuery';
-import { CubeSymbols } from '../compiler/CubeSymbols';
 
 export class BaseSegment {
   public readonly expression: any;
@@ -11,6 +10,9 @@ export class BaseSegment {
   public readonly isMemberExpression: boolean = false;
 
   public readonly joinHint: Array<string> = [];
+
+  // The path the member was requested by, when it goes through a join alias
+  public readonly aliasPath: string | undefined;
 
   public constructor(
     protected readonly query: BaseQuery,
@@ -25,9 +27,10 @@ export class BaseSegment {
     } else {
       // TODO move this `as` to static types
       const segmentPath = segment as string;
-      const { path, joinHint } = CubeSymbols.joinHintFromPath(segmentPath);
+      const { path, joinHint, aliasPath } = this.query.memberPathForModel(segmentPath);
       this.segment = path;
       this.joinHint = joinHint;
+      this.aliasPath = aliasPath;
     }
   }
 

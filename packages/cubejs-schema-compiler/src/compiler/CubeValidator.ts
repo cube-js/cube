@@ -1584,9 +1584,18 @@ export class CubeValidator implements CompilerInterface {
 
         const cubesJoinPaths = rootCubePaths.get(rootCube)!;
 
+        // A cube reached through a join alias, or below one, is an instance of
+        // its own: its path identifies it, so two aliases may reach one cube
+        let current = rootCube;
+        let aliased = false;
         for (let i = 0; i < split.length; i++) {
-          const cubeName = split[i];
           const path = split.slice(0, i + 1).join('.');
+          if (i > 0) {
+            const aliasTarget = this.cubeSymbols.joinAliasTarget(current, split[i]);
+            aliased = aliased || aliasTarget !== undefined;
+            current = aliasTarget ?? split[i];
+          }
+          const cubeName = aliased ? path : split[i];
 
           if (!cubesJoinPaths.has(cubeName)) {
             cubesJoinPaths.set(cubeName, new Set<string>());

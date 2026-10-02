@@ -206,6 +206,21 @@ export class JoinGraph implements CompilerInterface {
 
     const declarations = (indexes: number[]) => indexes.map(index => `joins[${index}]`).join(', ');
 
+    const memberNames = new Set<string>(
+      ['measures', 'dimensions', 'segments', 'preAggregations']
+        .flatMap(type => Object.keys(cube[type] || {}))
+    );
+    ownJoins.forEach((join, index) => {
+      // A path segment naming the alias must not be readable as a member too
+      if (join?.alias && (memberNames.has(join.alias) || join.alias === 'CUBE' || join.alias === 'TABLE')) {
+        conflicting.add(join.alias);
+        errorReporter.error(
+          `Cube '${cube.name}' declares a join to '${join.name}' (joins[${index}]) with the alias '${join.alias}', which is the name of a member of '${cube.name}' or a reserved name. Pick a different alias`,
+          cube.fileName
+        );
+      }
+    });
+
     ownJoins.forEach((join, index) => {
       // Would read as unaliased while being dropped from the graph as aliased
       if (join?.alias && join.alias === join.name) {
