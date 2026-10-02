@@ -1,4 +1,4 @@
-use super::{CommonUtils, DimensionSubqueryPlanner, JoinPlanner};
+use super::{CommonUtils, DimensionSubqueryPlanner, JoinPlanner, JoinSource, JoinTreeBuilder};
 use crate::logical_plan::*;
 use crate::planner::collectors::{
     collect_cube_names, collect_join_hints, collect_join_hints_for_measures,
@@ -250,16 +250,9 @@ impl MultipliedMeasuresQueryPlanner {
             };
             let join_hints = collect_join_hints(&owned_measure)?;
             if cubes.iter().any(|cube| cube != key_cube) {
-                let measures_join = self
-                    .query_tools
-                    .join_graph()
-                    .build_join(join_hints.into_items())?;
-                if *measures_join
-                    .static_data()
-                    .multiplication_factor
-                    .get(key_cube.target())
-                    .unwrap_or(&false)
-                {
+                let (_, measures_join) = JoinTreeBuilder::new(self.query_tools.clone())
+                    .build_for_hints(&join_hints, JoinSource::Graph)?;
+                if measures_join.is_multiplied(key_cube) {
                     return Err(CubeError::user(format!("{} references cubes ({}) that lead to row multiplication. Please rewrite it using sub query.", measure.full_name(), cubes.iter().join(", "))));
                 }
                 return Ok(true);

@@ -1,0 +1,8 @@
+---
+source: cubesqlplanner/cubesqlplanner/src/tests/integration/join_aliases.rs
+assertion_line: 269
+expression: result
+---
+orders__calendar_created__retail_date_year | orders__count | orders__count_prev_year
+-------------------------------------------+---------------+------------------------
+2025-01-01 00:00:00                        | 3             | 1

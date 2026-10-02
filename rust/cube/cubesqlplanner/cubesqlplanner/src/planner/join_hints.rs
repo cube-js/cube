@@ -1,4 +1,30 @@
 use crate::cube_bridge::join_hints::JoinHintItem;
+use crate::planner::CubeId;
+
+/// A cube a query needs joined, or a path of cubes to join it through.
+#[derive(Debug, Clone, Eq, PartialEq, Hash)]
+pub enum JoinHint {
+    Single(CubeId),
+    Vector(Vec<CubeId>),
+}
+
+impl JoinHint {
+    pub fn from_bridge(item: &JoinHintItem) -> Self {
+        match item {
+            JoinHintItem::Single(name) => Self::Single(CubeId::cube(name.clone())),
+            JoinHintItem::Vector(path) => {
+                Self::Vector(path.iter().map(|name| CubeId::cube(name.clone())).collect())
+            }
+        }
+    }
+
+    pub fn cubes(&self) -> &[CubeId] {
+        match self {
+            Self::Single(cube) => std::slice::from_ref(cube),
+            Self::Vector(path) => path,
+        }
+    }
+}
 
 /// Ordered list of cube-join hints. `push` / `extend` drop an entry that
 /// is redundant against the one before it — an item repeating the previous
@@ -14,7 +40,7 @@ use crate::cube_bridge::join_hints::JoinHintItem;
 /// different trees.
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub struct JoinHints {
-    items: Vec<JoinHintItem>,
+    items: Vec<JoinHint>,
 }
 
 impl JoinHints {
@@ -22,16 +48,20 @@ impl JoinHints {
         Self { items: Vec::new() }
     }
 
-    pub fn from_items(items: Vec<JoinHintItem>) -> Self {
+    pub fn from_items(items: Vec<JoinHint>) -> Self {
         Self { items }
     }
 
-    pub fn push(&mut self, item: JoinHintItem) {
+    pub fn from_bridge(items: &[JoinHintItem]) -> Self {
+        Self::from_items(items.iter().map(JoinHint::from_bridge).collect())
+    }
+
+    pub fn push(&mut self, item: JoinHint) {
         if let Some(last) = self.items.last() {
             if last == &item {
                 return;
             }
-            if let (JoinHintItem::Single(name), JoinHintItem::Vector(v)) = (&item, last) {
+            if let (JoinHint::Single(name), JoinHint::Vector(v)) = (&item, last) {
                 if v.last() == Some(name) {
                     return;
                 }
@@ -54,22 +84,75 @@ impl JoinHints {
         self.items.len()
     }
 
-    pub fn items(&self) -> &[JoinHintItem] {
+    pub fn items(&self) -> &[JoinHint] {
         &self.items
     }
 
-    pub fn iter(&self) -> std::slice::Iter<'_, JoinHintItem> {
+    pub fn iter(&self) -> std::slice::Iter<'_, JoinHint> {
         self.items.iter()
     }
 
-    pub fn into_items(self) -> Vec<JoinHintItem> {
+    pub fn into_items(self) -> Vec<JoinHint> {
         self.items
+    }
+
+    /// Splits the hints into what the data model's join graph resolves and
+    /// the joined cube instances it knows nothing about, which the planner
+    /// joins on its own. An instance is replaced in the graph's hints by the
+    /// cube its chain of joins starts from, so that cube is in the tree the
+    /// instance is attached to. Instances come ancestors first, each once.
+    pub fn split_joined(&self) -> (Vec<JoinHintItem>, Vec<CubeId>) {
+        let mut graph_hints = Vec::new();
+        let mut joined: Vec<CubeId> = Vec::new();
+        let add_joined = |cube: &CubeId, joined: &mut Vec<CubeId>| {
+            for instance in cube.joined_chain() {
+                if !joined.contains(&instance) {
+                    joined.push(instance);
+                }
+            }
+        };
+        for item in &self.items {
+            match item {
+                JoinHint::Single(cube) => {
+                    add_joined(cube, &mut joined);
+                    graph_hints.push(JoinHintItem::Single(cube.root().target().to_string()));
+                }
+                JoinHint::Vector(path) => {
+                    let prefix_len = path.iter().take_while(|c| !c.is_joined()).count();
+                    if prefix_len == path.len() {
+                        graph_hints.push(JoinHintItem::Vector(
+                            path.iter().map(|c| c.target().to_string()).collect(),
+                        ));
+                        continue;
+                    }
+                    match prefix_len {
+                        0 => graph_hints
+                            .push(JoinHintItem::Single(path[0].root().target().to_string())),
+                        1 => graph_hints.push(JoinHintItem::Single(path[0].target().to_string())),
+                        _ => graph_hints.push(JoinHintItem::Vector(
+                            path[..prefix_len]
+                                .iter()
+                                .map(|c| c.target().to_string())
+                                .collect(),
+                        )),
+                    }
+                    for cube in &path[prefix_len..] {
+                        if cube.is_joined() {
+                            add_joined(cube, &mut joined);
+                        } else {
+                            graph_hints.push(JoinHintItem::Single(cube.target().to_string()));
+                        }
+                    }
+                }
+            }
+        }
+        (graph_hints, joined)
     }
 }
 
 impl IntoIterator for JoinHints {
-    type Item = JoinHintItem;
-    type IntoIter = std::vec::IntoIter<JoinHintItem>;
+    type Item = JoinHint;
+    type IntoIter = std::vec::IntoIter<JoinHint>;
 
     fn into_iter(self) -> Self::IntoIter {
         self.items.into_iter()
@@ -77,8 +160,8 @@ impl IntoIterator for JoinHints {
 }
 
 impl<'a> IntoIterator for &'a JoinHints {
-    type Item = &'a JoinHintItem;
-    type IntoIter = std::slice::Iter<'a, JoinHintItem>;
+    type Item = &'a JoinHint;
+    type IntoIter = std::slice::Iter<'a, JoinHint>;
 
     fn into_iter(self) -> Self::IntoIter {
         self.items.iter()
@@ -89,12 +172,12 @@ impl<'a> IntoIterator for &'a JoinHints {
 mod tests {
     use super::*;
 
-    fn s(name: &str) -> JoinHintItem {
-        JoinHintItem::Single(name.to_string())
+    fn s(name: &str) -> JoinHint {
+        JoinHint::Single(CubeId::cube(name))
     }
 
-    fn v(names: &[&str]) -> JoinHintItem {
-        JoinHintItem::Vector(names.iter().map(|n| n.to_string()).collect())
+    fn v(names: &[&str]) -> JoinHint {
+        JoinHint::Vector(names.iter().map(|n| CubeId::cube(*n)).collect())
     }
 
     #[test]
@@ -202,5 +285,45 @@ mod tests {
         assert_eq!(items.len(), 3);
         assert_eq!(items[0], s("b"));
         assert_eq!(items[1], s("a"));
+    }
+
+    #[test]
+    fn test_split_joined_without_instances_keeps_hints() {
+        let hints = JoinHints::from_items(vec![s("orders"), v(&["users", "orders"])]);
+        let (graph, joined) = hints.split_joined();
+        assert_eq!(
+            graph,
+            vec![
+                JoinHintItem::Single("orders".to_string()),
+                JoinHintItem::Vector(vec!["users".to_string(), "orders".to_string()]),
+            ]
+        );
+        assert!(joined.is_empty());
+    }
+
+    #[test]
+    fn test_split_joined_cuts_instances() {
+        let orders = CubeId::cube("orders");
+        let customer = CubeId::joined(orders.clone(), "customer", "users");
+        let departments = CubeId::joined(customer.clone(), "departments", "departments");
+        let manager = CubeId::joined(orders.clone(), "manager", "users");
+        let hints = JoinHints::from_items(vec![
+            JoinHint::Vector(vec![
+                CubeId::cube("view_root"),
+                orders.clone(),
+                customer.clone(),
+                departments.clone(),
+            ]),
+            JoinHint::Single(manager.clone()),
+        ]);
+        let (graph, joined) = hints.split_joined();
+        assert_eq!(
+            graph,
+            vec![
+                JoinHintItem::Vector(vec!["view_root".to_string(), "orders".to_string()]),
+                JoinHintItem::Single("orders".to_string()),
+            ]
+        );
+        assert_eq!(joined, vec![customer, departments, manager]);
     }
 }

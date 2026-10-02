@@ -11,6 +11,7 @@ pub struct JoinTreeItem {
     cube: Rc<BaseCube>,
     original_from: CubeId,
     on_sql: Rc<SqlCall>,
+    relationship: String,
     splits_rows: bool,
 }
 
@@ -19,14 +20,20 @@ impl JoinTreeItem {
         cube: Rc<BaseCube>,
         original_from: CubeId,
         on_sql: Rc<SqlCall>,
+        relationship: String,
         splits_rows: bool,
     ) -> Self {
         Self {
             cube,
             original_from,
             on_sql,
+            relationship,
             splits_rows,
         }
+    }
+
+    pub fn relationship(&self) -> &String {
+        &self.relationship
     }
 
     pub fn cube(&self) -> &Rc<BaseCube> {

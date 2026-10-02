@@ -643,7 +643,7 @@ impl SqlCall {
         let mut path = cube_ref
             .path()
             .iter()
-            .map(|cube| cube.to_string())
+            .map(|cube| cube.segment().to_string())
             .collect::<Vec<_>>();
         path.extend(
             captures

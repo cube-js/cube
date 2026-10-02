@@ -1,6 +1,5 @@
 use super::CompiledPreAggregation;
 use super::PreAggregationSource;
-use crate::cube_bridge::join_hints::JoinHintItem;
 use crate::cube_bridge::member_sql::MemberSql;
 use crate::cube_bridge::pre_aggregation_description::PreAggregationDescription;
 use crate::logical_plan::PreAggregationJoin;
@@ -8,7 +7,7 @@ use crate::logical_plan::PreAggregationTable;
 use crate::logical_plan::PreAggregationUnion;
 use crate::logical_plan::PreAggregationUnionItem;
 use crate::logical_plan::{PreAggregationJoinItem, PreAggregationJoinMember};
-use crate::planner::join_hints::JoinHints;
+use crate::planner::join_hints::{JoinHint, JoinHints};
 use crate::planner::multi_fact_join_groups::{MeasuresJoinHints, MultiFactJoinGroups};
 use crate::planner::planners::JoinPlanner;
 use crate::planner::planners::ResolvedJoinItem;
@@ -71,7 +70,9 @@ pub struct PreAggregationsCompiler {
 impl PreAggregationsCompiler {
     pub fn try_new(query_tools: Rc<State>, cube_names: &Vec<CubeId>) -> Result<Self, CubeError> {
         let mut descriptions = Vec::new();
-        for cube_name in cube_names.iter() {
+        // A joined cube instance shares its cube's pre-aggregations, which
+        // were built over that cube reached its own way, not through the join.
+        for cube_name in cube_names.iter().filter(|cube| !cube.is_joined()) {
             let pre_aggregations = query_tools
                 .cube_evaluator()
                 .pre_aggregations_for_cube_as_array(cube_name.target().to_string())?;
@@ -452,11 +453,9 @@ impl PreAggregationsCompiler {
         for symbol in symbols {
             let path = symbol.path();
             if path.len() == 1 {
-                result.push(JoinHintItem::Single(path[0].target().to_string()));
+                result.push(JoinHint::Single(path[0].clone()));
             } else {
-                result.push(JoinHintItem::Vector(
-                    path.iter().map(|cube| cube.target().to_string()).collect(),
-                ));
+                result.push(JoinHint::Vector(path.clone()));
             }
         }
         result
@@ -902,17 +901,16 @@ impl PreAggregationsCompiler {
                 SqlCallReference::Symbol(symbol) => symbol,
                 SqlCallReference::Path(path) => {
                     let full_name = path.join(".");
-                    let symbol_path =
-                        SymbolPath::parse(query_tools.cube_evaluator().clone(), &full_name)
-                            // A path the data model doesn't know is reported with the
-                            // pre-aggregation it came from; anything else (a failure
-                            // reaching the model at all) is passed through as it is.
-                            .map_err(|e| match e.cause {
-                                CubeErrorCauseType::User => {
-                                    Self::reference_not_found_error(&full_name, name)
-                                }
-                                _ => e,
-                            })?;
+                    let symbol_path = SymbolPath::parse(query_tools.model_cubes(), &full_name)
+                        // A path the data model doesn't know is reported with the
+                        // pre-aggregation it came from; anything else (a failure
+                        // reaching the model at all) is passed through as it is.
+                        .map_err(|e| match e.cause {
+                            CubeErrorCauseType::User => {
+                                Self::reference_not_found_error(&full_name, name)
+                            }
+                            _ => e,
+                        })?;
                     match symbol_path.path_type() {
                         SymbolPathType::Dimension => {
                             evaluator_compiler.add_dimension_evaluator_by_path(symbol_path)?

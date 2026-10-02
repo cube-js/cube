@@ -1,4 +1,4 @@
-use super::{CommonUtils, JoinTreeBuilder};
+use super::{CommonUtils, JoinSource, JoinTreeBuilder};
 use crate::cube_bridge::join_definition::JoinDefinition;
 use crate::cube_bridge::join_item::JoinItem;
 use crate::logical_plan::*;
@@ -57,11 +57,8 @@ impl JoinPlanner {
         join_hints: JoinHints,
         dimension_subqueries: Vec<Rc<DimensionSubQuery>>,
     ) -> Result<Rc<LogicalJoin>, CubeError> {
-        let join = self
-            .query_tools
-            .join_graph()
-            .build_join(join_hints.into_items())?;
-        let join_tree = JoinTreeBuilder::new(self.query_tools.clone()).build(join)?;
+        let (_, join_tree) = JoinTreeBuilder::new(self.query_tools.clone())
+            .build_for_hints(&join_hints, JoinSource::Graph)?;
         Ok(self.make_join_logical_plan(&join_tree, dimension_subqueries))
     }
 
@@ -107,10 +104,14 @@ impl JoinPlanner {
         &self,
         join_hints: &JoinHints,
     ) -> Result<Vec<ResolvedJoinItem>, CubeError> {
-        let join = self
-            .query_tools
-            .join_graph()
-            .build_join(join_hints.items().to_vec())?;
+        let (graph_hints, joined) = join_hints.split_joined();
+        if let Some(instance) = joined.first() {
+            return Err(CubeError::user(format!(
+                "A rollup join can't reach `{}`: joins through an alias are not supported there",
+                instance
+            )));
+        }
+        let join = self.query_tools.join_graph().build_join(graph_hints)?;
         self.resolve_join_members(join)
     }
     /// Resolves the members each ON clause references for an
