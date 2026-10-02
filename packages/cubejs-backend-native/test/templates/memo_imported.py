@@ -1,7 +1,7 @@
 from datetime import date
 
 from cube import TemplateContext
-from memo_helper import Cfg, Client, Node, api, load_day, load_imported
+from memo_helper import Cfg, Client, api, load_day, load_imported
 
 template = TemplateContext()
 template.add_function('load_imported', load_imported)
@@ -43,7 +43,7 @@ def cfg():
 
 @template.function
 def tree():
-    # Refers back to itself, so it matches only itself
-    root = Node('root')
-    root.children.append(Node('child', parent=root))
+    # A list that contains itself is walked, so the walk has to stop at the cycle
+    root = []
+    root.append(root)
     return load_day(root) * 10 + load_day(root)

@@ -1,5 +1,4 @@
-from dataclasses import dataclass, field
-from typing import List, Optional
+from dataclasses import dataclass
 
 from cube import memo
 
@@ -52,10 +51,3 @@ def load_day(day):
 @dataclass(frozen=True)
 class Cfg:
     name: str
-
-
-@dataclass
-class Node:
-    name: str
-    parent: Optional['Node'] = None
-    children: List['Node'] = field(default_factory=list)
