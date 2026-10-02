@@ -216,11 +216,7 @@ export class LocalQueueDriverConnection implements QueueDriverConnectionInterfac
     const now = Date.now();
 
     return this.asTuple(
-      Array.from(this.state.items.values()).filter((item) => (
-        item.status === LocalQueueItemStatus.Pending
-          ? this.isOrphaned(item, now)
-          : this.isStalled(item, now)
-      ))
+      Array.from(this.state.items.values()).filter((item) => this.isOrphaned(item, now) || this.isStalled(item, now))
     );
   }
 
@@ -286,7 +282,7 @@ export class LocalQueueDriverConnection implements QueueDriverConnectionInterfac
     // query that is already queued instead of on an id that will never be acked.
     const existing = this.state.items.getByKey(key);
     if (existing) {
-      existing.orphaned = this.orphanedDeadline(Date.now(), options);
+      existing.orphaned = Math.max(existing.orphaned, this.orphanedDeadline(Date.now(), options));
 
       return [
         0,
@@ -380,7 +376,7 @@ export class LocalQueueDriverConnection implements QueueDriverConnectionInterfac
    * The orphaned timeout only ever applies to pending items, never to ones being executed.
    */
   protected isOrphaned(item: LocalQueueItem, now: number): boolean {
-    return item.orphaned < now;
+    return item.status === LocalQueueItemStatus.Pending && item.orphaned < now;
   }
 
   /**
@@ -395,7 +391,7 @@ export class LocalQueueDriverConnection implements QueueDriverConnectionInterfac
    * a heartbeat, so `created` is only a fallback.
    */
   protected isStalled(item: LocalQueueItem, now: number): boolean {
-    return now - (item.heartbeat ?? item.created) > this.heartBeatTimeout * 1000;
+    return item.status === LocalQueueItemStatus.Active && now - (item.heartbeat ?? item.created) > this.heartBeatTimeout * 1000;
   }
 
   public async getOrphanedQueries(): Promise<QueryKeysTuple[]> {
@@ -411,23 +407,19 @@ export class LocalQueueDriverConnection implements QueueDriverConnectionInterfac
   }
 
   public async getQueryStageState(onlyKeys: boolean): Promise<QueryStageStateResponse> {
-    const active: string[] = [];
-    const toProcess: string[] = [];
     const defs: Record<string, QueryDef> = {};
 
-    for (const item of this.sortedItems()) {
-      if (!onlyKeys) {
+    if (!onlyKeys) {
+      for (const item of this.state.items.values()) {
         defs[item.key] = this.mergeDef(item);
-      }
-
-      if (item.status === LocalQueueItemStatus.Active) {
-        active.push(item.key);
-      } else {
-        toProcess.push(item.key);
       }
     }
 
-    return [active, toProcess, defs];
+    return [
+      this.activeItems().map((item) => item.key),
+      this.pendingItems().map((item) => item.key),
+      defs,
+    ];
   }
 
   public async getQueryDef(queryKeyHash: QueryKeyHash, queueId?: QueueId | null): Promise<QueryDef | null> {
@@ -460,7 +452,6 @@ export class LocalQueueDriverConnection implements QueueDriverConnectionInterfac
     }
 
     item.status = LocalQueueItemStatus.Active;
-    // Without a heartbeat the creation time would be used for stalled filtering
     item.heartbeat = Date.now();
     active.push(item.key);
 

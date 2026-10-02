@@ -31,7 +31,6 @@ export const QueryQueueTest = (name: string, options: QueryQueueTestOptions) => 
   describe(`QueryQueue${name}`, () => {
     jest.setTimeout(10 * 1000);
 
-    // For tests that need driver options the shared queue instance cannot provide
     const createQueueDriver = (driverOptions: QueueDriverOptions): QueueDriverInterface => factoryQueueDriver(
       options.cacheAndQueueDriver,
       { ...driverOptions, cubeStoreDriverFactory: options.cubeStoreDriverFactory }
@@ -811,31 +810,43 @@ export const QueryQueueTest = (name: string, options: QueryQueueTestOptions) => 
     describe('queue driver semantics', () => {
       const priority = 10;
 
-      const addQuery = (connection: any, queryKey: QueryKey, requestId: string, orphanedTimeout = 60) => connection.addToQueue(
-        queryKey,
-        'delay',
-        { isJob: true },
-        priority,
-        { queueId: queue.generateQueueId(), stageQueryKey: queryKey, requestId, orphanedTimeout }
-      );
+      // Recorded on add rather than at the end of a test, so that a failed assertion cannot leave
+      // an active item behind to saturate the queue for every test after it
+      let addedKeys: QueryKey[] = [];
 
-      // Cleanup is best-effort: keys come from fn's resolved value, so a failed assertion leaves
-      // its items in the queue. That is fine because the queue prefix is randomized per run
-      // (see tenantPrefix), so nothing can bleed into another run sharing the same Cube Store.
-      const withConnections = async (count: number, fn: (...connections: any[]) => Promise<QueryKey[]>) => {
+      afterEach(async () => {
+        const connection = await queue.queueDriver.createConnection();
+
+        try {
+          for (const key of addedKeys) {
+            await connection.getQueryAndRemove(connection.redisHash(key), null);
+          }
+        } finally {
+          addedKeys = [];
+          queue.queueDriver.release(connection);
+        }
+      });
+
+      const addQuery = (connection: any, queryKey: QueryKey, requestId: string, orphanedTimeout = 60) => {
+        addedKeys.push(queryKey);
+
+        return connection.addToQueue(
+          queryKey,
+          'delay',
+          { isJob: true },
+          priority,
+          { queueId: queue.generateQueueId(), stageQueryKey: queryKey, requestId, orphanedTimeout }
+        );
+      };
+
+      const withConnections = async (count: number, fn: (...connections: any[]) => Promise<void>) => {
         const connections = await Promise.all(
           Array.from({ length: count }, () => queue.queueDriver.createConnection())
         );
 
-        let keys: QueryKey[] = [];
-
         try {
-          keys = await fn(...connections);
+          await fn(...connections);
         } finally {
-          for (const key of keys) {
-            await connections[0].getQueryAndRemove(connections[0].redisHash(key), null);
-          }
-
           connections.forEach(connection => queue.queueDriver.release(connection));
         }
       };
@@ -854,8 +865,6 @@ export const QueryQueueTest = (name: string, options: QueryQueueTestOptions) => 
           // The first add wins outright: the second one must not overwrite the payload
           const def = await connection.getQueryDef(connection.redisHash(key), queueId);
           expect(def.requestId).toBe('dedupe-1');
-
-          return [key];
         });
       });
 
@@ -872,8 +881,6 @@ export const QueryQueueTest = (name: string, options: QueryQueueTestOptions) => 
           });
           expect(await connection2.retrieveForProcessing(hash, queueId)).toBeNull();
           expect(await connection.getActiveQueries()).toEqual([[hash, queueId]]);
-
-          return [key];
         });
       });
 
@@ -887,8 +894,6 @@ export const QueryQueueTest = (name: string, options: QueryQueueTestOptions) => 
           expect(active).not.toContain(hash);
           expect(toProcess).not.toContain(hash);
           expect(await connection.getQueryDef(hash, null)).toBe(null);
-
-          return [];
         });
       });
 
@@ -909,8 +914,6 @@ export const QueryQueueTest = (name: string, options: QueryQueueTestOptions) => 
 
           // Once it is being executed the heartbeat takes over from the orphaned deadline
           expect(await connection.getOrphanedQueries()).toEqual([]);
-
-          return [key];
         });
       });
 
@@ -928,8 +931,18 @@ export const QueryQueueTest = (name: string, options: QueryQueueTestOptions) => 
 
           await pausePromise(500);
           expect(await connection.getOrphanedQueries()).toEqual([[hash, expect.any(Number)]]);
+        });
+      });
 
-          return [key];
+      onlyLocalTest('re-adding with a shorter orphaned timeout keeps the later deadline', async () => {
+        await withConnections(1, async (connection) => {
+          const key: QueryKey = ['orphaned-kept', []];
+
+          await addQuery(connection, key, 'orphaned-kept-1', 60);
+          await addQuery(connection, key, 'orphaned-kept-2', 1);
+
+          await pausePromise(1000 + 500 /* additional timeout on CI */);
+          expect(await connection.getOrphanedQueries()).toEqual([]);
         });
       });
 
@@ -943,8 +956,6 @@ export const QueryQueueTest = (name: string, options: QueryQueueTestOptions) => 
 
           const toCancel = await connection.getQueriesToCancel();
           expect(toCancel.filter(([queryKey]) => queryKey === hash)).toHaveLength(1);
-
-          return [key];
         });
       });
 
@@ -961,8 +972,6 @@ export const QueryQueueTest = (name: string, options: QueryQueueTestOptions) => 
           expect(removed).toBeTruthy();
 
           expect(await connection.setResultAndRemoveQuery(hash, { result: 'late' }, queueId)).toBe(false);
-
-          return [];
         });
       });
 
