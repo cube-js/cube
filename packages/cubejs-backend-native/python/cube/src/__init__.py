@@ -3,6 +3,7 @@ import functools
 import inspect
 import json
 import os
+import sys
 import threading
 from typing import Union, Callable, Dict, Any
 
@@ -238,6 +239,16 @@ class TemplateFilterRef:
         self.context.add_filter(self.attribute, func)
         return func
 
+# The runtime runs this module again before each data model compilation, which gives each
+# compilation a token of its own
+_compilation = object()
+
+
+def _compilation_token():
+    module = sys.modules.get('cube')
+    return getattr(module, '_compilation', None) if module is not None else None
+
+
 def _memo_key(args, kwargs):
     # Arguments come from Jinja as plain data; anything else is keyed by its repr
     call = [args, sorted(kwargs.items())]
@@ -249,15 +260,22 @@ def _memo_key(args, kwargs):
 
 
 def memo(func):
-    """Calls `func` once per set of arguments and returns that result to every later call. The cache
-    lives as long as the decorated function: `globals.py` is loaded again for each data model
-    compilation, so each compilation gets its own."""
+    """Calls `func` once per set of arguments and returns that result to every later call during a
+    data model compilation. Each compilation starts with an empty cache, also for functions in
+    modules that `globals.py` imports, which are loaded only once."""
     if not callable(func):
         raise TemplateException("memo must be used with functions, actual: '%s'" % type(func).__name__)
 
     # Exceptions are stored too: every template sees the same outcome
-    results = {}
+    cache = {'compilation': None, 'results': {}}
     lock = threading.RLock()
+
+    def results():
+        token = _compilation_token()
+        if cache['compilation'] is not token:
+            cache['compilation'] = token
+            cache['results'] = {}
+        return cache['results']
 
     if inspect.iscoroutinefunction(func):
         async def call(*args, **kwargs):
@@ -273,11 +291,12 @@ def memo(func):
             key = _memo_key(args, kwargs)
             loop = asyncio.get_running_loop()
             with lock:
-                entry = results.get(key)
+                stored = results()
+                entry = stored.get(key)
                 if entry is None or entry[1].cancelled() or (entry[0] is not loop and not entry[1].done()):
                     # A task, so concurrent calls on the loop share one invocation
                     entry = (loop, asyncio.ensure_future(call(*args, **kwargs)))
-                    results[key] = entry
+                    stored[key] = entry
             task = entry[1]
             # Shielded: cancelling one caller mustn't cancel the task the others share
             ok, value = task.result() if task.done() else await asyncio.shield(task)
@@ -292,13 +311,14 @@ def memo(func):
     def wrapper(*args, **kwargs):
         key = _memo_key(args, kwargs)
         with lock:
-            if key not in results:
+            stored = results()
+            if key not in stored:
                 try:
-                    results[key] = (True, func(*args, **kwargs))
+                    stored[key] = (True, func(*args, **kwargs))
                 except Exception as e:
                     # With its own traceback: raising the instance again would extend it each time
-                    results[key] = (False, (e, e.__traceback__))
-            ok, value = results[key]
+                    stored[key] = (False, (e, e.__traceback__))
+            ok, value = stored[key]
         if not ok:
             error, tb = value
             raise error.with_traceback(tb)
