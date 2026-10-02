@@ -96,6 +96,7 @@ const BRIDGES: BridgeSpec[] = [
       'is_calendar',
       'is_view',
       'join_map',
+      'joins',
       'name',
       'sql',
       'sql_alias',
@@ -178,7 +179,7 @@ const BRIDGES: BridgeSpec[] = [
   { name: 'joinDefinition', expected: ['joins', 'multiplication_factor', 'root'] },
   { name: 'joinGraph', expected: ['build_join'] },
   { name: 'joinItem', expected: ['from', 'join', 'original_from', 'original_to', 'to'] },
-  { name: 'joinItemDefinition', expected: ['relationship', 'sql'] },
+  { name: 'joinItemDefinition', expected: ['alias', 'name', 'relationship', 'sql'] },
   {
     name: 'measureDefinition',
     expected: [
