@@ -771,16 +771,44 @@ export const QueryQueueTest = (name: string, options: QueryQueueTestOptions) => 
         }
       });
 
+      const addToQueue = (connection: QueueDriverConnectionInterface, queryKey: QueryKey, requestId: string, orphanedTimeout = 60) => connection.addToQueue(
+        queryKey,
+        'delay',
+        { isJob: true },
+        priority,
+        { queueId: queue.generateQueueId(), stageQueryKey: queryKey, requestId, orphanedTimeout }
+      );
+
       const addQuery = (connection: QueueDriverConnectionInterface, queryKey: QueryKey, requestId: string, orphanedTimeout = 60) => {
         addedKeys.push(queryKey);
 
-        return connection.addToQueue(
-          queryKey,
-          'delay',
-          { isJob: true },
-          priority,
-          { queueId: queue.generateQueueId(), stageQueryKey: queryKey, requestId, orphanedTimeout }
-        );
+        return addToQueue(connection, queryKey, requestId, orphanedTimeout);
+      };
+
+      // heartBeatTimeout is derived from heartBeatInterval * 4, which is way too long for the
+      // tests that need an item to stall, so they get a driver of their own. Its prefix is
+      // theirs alone, so cleanup drops everything in it instead of tracking keys.
+      const withShortHeartbeat = async (fn: (connection: QueueDriverConnectionInterface) => Promise<void>) => {
+        const driver = createQueueDriver({
+          redisQueuePrefix: `${crypto.randomBytes(6).toString('hex')}#short_heartbeat`,
+          concurrency: 1,
+          continueWaitTimeout: 1,
+          orphanedTimeout: 60,
+          heartBeatTimeout: 1,
+        });
+        const connection = await driver.createConnection();
+
+        try {
+          await fn(connection);
+        } finally {
+          const [active, toProcess] = await connection.getQueryStageState(true);
+
+          for (const hash of [...active, ...toProcess]) {
+            await connection.getQueryAndRemove(hash as QueryKeyHash, null);
+          }
+
+          driver.release(connection);
+        }
       };
 
       const withConnections = async (count: number, fn: (...connections: QueueDriverConnectionInterface[]) => Promise<void>) => {
@@ -861,12 +889,16 @@ export const QueryQueueTest = (name: string, options: QueryQueueTestOptions) => 
         });
       });
 
+      // An active item past both its heartbeat and its orphaned deadline is the one which used to
+      // be reported twice, as stalled and as orphaned
       test('getQueriesToCancel reports each item once', async () => {
-        await withConnections(1, async (connection) => {
+        await withShortHeartbeat(async (connection) => {
           const key: QueryKey = ['cancel-once', []];
           const hash = connection.redisHash(key);
 
-          await addQuery(connection, key, 'cancel-once', 1);
+          const [, queueId] = await addToQueue(connection, key, 'cancel-once', 1);
+          expect(await connection.retrieveForProcessing(hash, queueId)).not.toBeNull();
+
           await pausePromise(1000 + 500 /* additional timeout on CI */);
 
           const toCancel = await connection.getQueriesToCancel();
@@ -891,22 +923,11 @@ export const QueryQueueTest = (name: string, options: QueryQueueTestOptions) => 
       });
 
       test('stalled queries only cover active items with an old heartbeat', async () => {
-        // heartBeatTimeout is derived from heartBeatInterval * 4, which is way too long here,
-        // so this needs its own driver instance
-        const driver = createQueueDriver({
-          redisQueuePrefix: `${crypto.randomBytes(6).toString('hex')}#stalled`,
-          concurrency: 1,
-          continueWaitTimeout: 1,
-          orphanedTimeout: 60,
-          heartBeatTimeout: 1,
-        });
+        await withShortHeartbeat(async (connection) => {
+          const key: QueryKey = ['stalled', []];
+          const hash = connection.redisHash(key);
 
-        const connection = await driver.createConnection();
-        const key: QueryKey = ['stalled', []];
-        const hash = connection.redisHash(key);
-
-        try {
-          const [, queueId] = await addQuery(connection, key, 'stalled');
+          const [, queueId] = await addToQueue(connection, key, 'stalled');
 
           // Pending items are never stalled, no matter how long they sit there
           await pausePromise(1500);
@@ -920,10 +941,7 @@ export const QueryQueueTest = (name: string, options: QueryQueueTestOptions) => 
 
           await connection.updateHeartBeat(hash, queueId);
           expect(await connection.getStalledQueries()).toEqual([]);
-        } finally {
-          await connection.getQueryAndRemove(hash, null);
-          driver.release(connection);
-        }
+        });
       });
     });
 

@@ -371,9 +371,6 @@ export class LocalQueueDriverConnection implements QueueDriverConnectionInterfac
     return true;
   }
 
-  /**
-   * The orphaned timeout only ever applies to pending items, never to ones being executed.
-   */
   protected isOrphaned(item: LocalQueueItem, now: number): boolean {
     return item.status === LocalQueueItemStatus.Pending && item.orphaned < now;
   }
@@ -385,9 +382,6 @@ export class LocalQueueDriverConnection implements QueueDriverConnectionInterfac
     return now + (options.orphanedTimeout ?? this.orphanedTimeout) * 1000;
   }
 
-  /**
-   * The heartbeat timeout only ever applies to active items.
-   */
   protected isStalled(item: LocalQueueItem, now: number): boolean {
     if (item.status !== LocalQueueItemStatus.Active) {
       return false;
