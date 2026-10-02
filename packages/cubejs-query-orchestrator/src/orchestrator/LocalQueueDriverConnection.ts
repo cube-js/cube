@@ -389,9 +389,15 @@ export class LocalQueueDriverConnection implements QueueDriverConnectionInterfac
    * The heartbeat timeout only ever applies to active items.
    */
   protected isStalled(item: LocalQueueItem, now: number): boolean {
-    return item.status === LocalQueueItemStatus.Active
-      && item.heartbeat !== null
-      && now - item.heartbeat > this.heartBeatTimeout * 1000;
+    if (item.status !== LocalQueueItemStatus.Active) {
+      return false;
+    }
+
+    if (item.heartbeat === null) {
+      return false;
+    }
+
+    return now - item.heartbeat > this.heartBeatTimeout * 1000;
   }
 
   public async getOrphanedQueries(): Promise<QueryKeysTuple[]> {
