@@ -277,8 +277,8 @@ export class LocalQueueDriverConnection implements QueueDriverConnectionInterfac
     const key = this.redisHash(queryKey);
     const pending = this.countPending();
 
-    // Returning the existing id rather than a fresh one is what makes the caller wait on the
-    // query that is already queued instead of on an id that will never be acked.
+    // A dedupe has to hand back the existing id: lookups by id have no key fallback, so a
+    // fresh one would miss the queued item (e.g. getQueryDef right after a dedupe in QueryQueue).
     const existing = this.state.items.getByKey(key);
     if (existing) {
       existing.orphaned = Math.max(existing.orphaned, this.orphanedDeadline(Date.now(), options));
