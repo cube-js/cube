@@ -147,10 +147,10 @@ def wrap_2(data):
 The `memo` decorator calls a function once per set of arguments during a data
 model compilation, then returns the stored result, or raises the stored
 exception, on every later call from any template. It works with sync and async
-functions. Apply it below `template.function`. Each compilation's templates get a
-cache of their own, also for memoized functions imported from other modules.
-Python code that calls a memoized function from an imported module directly
-shares one cache with every compilation:
+functions. Apply it below `template.function`. Calls made while a template function runs,
+including calls between your own Python functions and to memoized functions
+imported from other modules, are cached per compilation. Calls outside of
+templates, e.g., while `globals.py` loads, use a cache of the function's own:
 
 ```python
 from cube import TemplateContext, memo

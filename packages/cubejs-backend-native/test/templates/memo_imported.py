@@ -3,3 +3,9 @@ from memo_helper import load_imported
 
 template = TemplateContext()
 template.add_function('load_imported', load_imported)
+
+
+@template.function
+def via_python(name):
+    # Calls the memoized helper directly, not through the template
+    return load_imported(name)
