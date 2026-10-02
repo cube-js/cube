@@ -582,6 +582,10 @@ export class DataSchemaCompiler {
     let compiledFiles: Record<string, boolean> = {};
     let asyncModules: CallableFunction[] = [];
     let transpiledFiles: FileContent[] = [];
+    // Results of `memo` calls. Unlike the objects above it survives between the compile stages:
+    // the model is evaluated once per stage, and `memo` makes it do a costly call (an API request
+    // from an `asyncModule`, say) only once per compile.
+    const memoResults = new Map<string, unknown>();
 
     const cleanup = () => {
       cubes = [];
@@ -655,6 +659,20 @@ export class DataSchemaCompiler {
         // where it was defined. So we pass the same file to the async context.
         // @see https://nodejs.org/api/async_context.html#class-asynclocalstorage
         asyncModules.push(async () => ctxFileStorage.run(file, () => fn()));
+      },
+      memo: (key: unknown, fn: () => unknown) => {
+        if (typeof fn !== 'function') {
+          throw new Error('memo() expects a function as its second argument');
+        }
+        const cacheKey = typeof key === 'string' ? key : JSON.stringify(key);
+        if (typeof cacheKey !== 'string') {
+          throw new Error('memo() expects a string or a JSON-serializable key as its first argument');
+        }
+        if (!memoResults.has(cacheKey)) {
+          // A promise is stored as is, so concurrent and later calls share one invocation
+          memoResults.set(cacheKey, fn());
+        }
+        return memoResults.get(cacheKey);
       },
       require: (extensionName: string) => {
         const file = ctxFileStorage.getStore();
@@ -731,6 +749,7 @@ export class DataSchemaCompiler {
       .then(() => {
         // Free unneeded resources
         cleanup();
+        memoResults.clear();
         transpiledFiles = [];
         toCompile = [];
         // The functions put into the compile context (cube, view, require, ...) close over

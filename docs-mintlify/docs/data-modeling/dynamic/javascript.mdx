@@ -20,7 +20,10 @@ data model properties can be dynamically updated through an API, for example.
 
 <Warning>
 
-Each `asyncModule` call will be invoked only once per data model compilation.
+A data model is compiled in several stages, and the data model files are
+evaluated, with their `asyncModule` callbacks, once per stage. Wrap API calls
+and other costly operations in [`memo()`](#caching-with-memo) so they run only
+once per compilation.
 
 </Warning>
 
@@ -138,6 +141,30 @@ asyncModule(async () => {
         },
       },
     });
+  });
+});
+```
+
+## Caching with `memo`
+
+`memo(key, fn)` calls `fn` only the first time a `key` is seen during a data
+model compilation and returns its result, the same promise for an async `fn`,
+on every later call, in every stage and from every data model file. `key` is a
+string or a JSON-serializable value, such as an array. Results are not shared
+between compilations, so each recompilation, e.g., after a
+[`schema_version`](#usage-with-schema_version) change, fetches fresh data:
+
+```javascript
+// model/cubes/DynamicDataModel.js
+const fetch = require("node-fetch");
+
+asyncModule(async () => {
+  const dynamicCubes = await memo("dynamicCubes", async () =>
+    (await fetch("http://your-api-endpoint/dynamicCubes")).json()
+  );
+
+  dynamicCubes.forEach((dynamicCube) => {
+    // ...
   });
 });
 ```
