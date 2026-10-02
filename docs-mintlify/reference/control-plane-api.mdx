@@ -173,12 +173,21 @@ same multi-tenancy rules as regular API tokens.
 
 The token always carries the `meta` scope. To also read
 [private cubes, views, and members][ref-metadata-api-private], request the
-`meta-private` scope. It is added only if you have the `SchemaRead`
-([View data model][ref-custom-roles]) permission on the deployment, or are an
-admin on an account without role-based access control; otherwise it is left
-out rather than refused. Any other scope you request is ignored. The `scopes`
-property of the response lists the scopes the token carries, so check it to
-see whether `meta-private` was granted.
+`meta-private` scope. It is added only for an admin or, on an account that
+enforces [roles and permissions][ref-roles-and-permissions], for a user with the
+`SchemaRead` ([View data model][ref-custom-roles]) permission on the deployment;
+otherwise it is left out rather than refused. Any other scope you request is
+ignored. The `scopes` property of the response lists the scopes the token
+carries, so check it to see whether `meta-private` was granted.
+
+Data catalog integrations call this endpoint with an [API key][ref-api-keys],
+which acts as its owner. So an admin's key gets `meta-private`, and a
+[personal key][ref-personal-api-keys] gets it only if its owner has `SchemaRead`
+on the deployment. The key must be scoped to that deployment or to all
+deployments. The token is issued for the key's owner, so
+[data access policies][ref-dap] hide from it whatever they hide from that user.
+A dedicated user for the integration keeps what the catalog sees independent of
+any one person's access.
 
 Path parameters:
 
@@ -453,6 +462,9 @@ schema.
 [ref-environments-staging]: /admin/deployment/environments#staging-environments
 [ref-cli]: /reference/cli
 [ref-api-keys]: /admin/account-billing/api-keys
+[ref-personal-api-keys]: /admin/account-billing/api-keys#personal-api-keys
+[ref-roles-and-permissions]: /admin/users-and-permissions/roles-and-permissions
+[ref-dap]: /docs/data-modeling/data-access-policies
 [ref-security-context]: /docs/data-modeling/access-control/context
 [ref-audit-log]: /admin/monitoring/audit-log
 [ref-update-channels]: /admin/deployment#update-channels
