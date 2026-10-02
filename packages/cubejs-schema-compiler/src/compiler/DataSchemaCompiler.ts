@@ -22,6 +22,8 @@ import { CubeDictionary } from './CubeDictionary';
 import { CompilerCache } from './CompilerCache';
 
 const ctxFileStorage = new AsyncLocalStorage<FileContent>();
+// Set while the function passed to `memo` runs, including its async continuations
+const memoFnStorage = new AsyncLocalStorage<string>();
 
 // Shared realm: closures bind the running compile's scope lexically through `with`, so lazy reads
 // (sql reading COMPILE_CONTEXT) keep resolving it after the compile; the inner function keeps
@@ -585,7 +587,19 @@ export class DataSchemaCompiler {
     // Results of `memo` calls. Unlike the objects above it survives between the compile stages:
     // the model is evaluated once per stage, and `memo` makes it do a costly call (an API request
     // from an `asyncModule`, say) only once per compile.
-    const memoResults = new Map<string, unknown>();
+    const memoResults = new Map<string, { value: unknown } | { error: unknown }>();
+
+    // Model objects go to the current stage only, while a memoized function runs in the first stage
+    // that asks for its key: objects defined from there would be missing from all later stages.
+    const assertOutsideMemo = (globalName: string) => {
+      const key = memoFnStorage.getStore();
+      if (key !== undefined) {
+        throw new UserError(
+          `${globalName}() can't be called from the function passed to memo('${key}'): ` +
+          'return the data from memo() and define model objects outside of it'
+        );
+      }
+    };
 
     const cleanup = () => {
       cubes = [];
@@ -602,6 +616,9 @@ export class DataSchemaCompiler {
         if (!file) {
           throw new Error('No file stored in context');
         }
+        if (cube) {
+          assertOutsideMemo('view');
+        }
         return !cube ?
           this.cubeFactory({ ...name, fileName: file.fileName, isView: true }) :
           cubes.push({ ...cube, name, fileName: file.fileName, isView: true });
@@ -610,6 +627,9 @@ export class DataSchemaCompiler {
         const file = ctxFileStorage.getStore();
         if (!file) {
           throw new Error('No file stored in context');
+        }
+        if (cube) {
+          assertOutsideMemo('cube');
         }
         return !cube ?
           this.cubeFactory({ ...name, fileName: file.fileName }) :
@@ -620,6 +640,7 @@ export class DataSchemaCompiler {
         if (!file) {
           throw new Error('No file stored in context');
         }
+        assertOutsideMemo('context');
         return contexts.push({ ...context, name, fileName: file.fileName });
       },
       view_group: (name: string, viewGroup) => {
@@ -627,6 +648,7 @@ export class DataSchemaCompiler {
         if (!file) {
           throw new Error('No file stored in context');
         }
+        assertOutsideMemo('view_group');
         viewGroups.push({ ...viewGroup, name, fileName: file.fileName });
         if (this.sharedVmContext) {
           this.compileScope!.vars[name] = name;
@@ -655,12 +677,17 @@ export class DataSchemaCompiler {
         if (!file) {
           throw new Error('No file stored in context');
         }
+        assertOutsideMemo('asyncModule');
         // We need to run async module code in the context of the original data model file
         // where it was defined. So we pass the same file to the async context.
         // @see https://nodejs.org/api/async_context.html#class-asynclocalstorage
         asyncModules.push(async () => ctxFileStorage.run(file, () => fn()));
       },
       memo: (key: unknown, fn: () => unknown) => {
+        if (typeof key === 'function' && fn === undefined) {
+          // MemoKeyTranspiler gives `memo(fn)` its key: this call didn't go through it
+          throw new Error('memo() expects a key as its first argument: memo(key, fn)');
+        }
         if (typeof fn !== 'function') {
           throw new Error('memo() expects a function as its second argument');
         }
@@ -668,11 +695,21 @@ export class DataSchemaCompiler {
         if (typeof cacheKey !== 'string') {
           throw new Error('memo() expects a string or a JSON-serializable key as its first argument');
         }
-        if (!memoResults.has(cacheKey)) {
-          // A promise is stored as is, so concurrent and later calls share one invocation
-          memoResults.set(cacheKey, fn());
+        let result = memoResults.get(cacheKey);
+        if (!result) {
+          // A promise is stored as is, so concurrent and later calls share one invocation.
+          // A throw is stored too: every stage has to see the same outcome.
+          try {
+            result = { value: memoFnStorage.run(cacheKey, fn) };
+          } catch (error) {
+            result = { error };
+          }
+          memoResults.set(cacheKey, result);
         }
-        return memoResults.get(cacheKey);
+        if ('error' in result) {
+          throw result.error;
+        }
+        return result.value;
       },
       require: (extensionName: string) => {
         const file = ctxFileStorage.getStore();

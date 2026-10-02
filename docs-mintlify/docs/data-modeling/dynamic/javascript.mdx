@@ -169,6 +169,22 @@ asyncModule(async () => {
 });
 ```
 
+The key can be omitted: `memo(fn)` gets a key made of the file name and the
+position of the call, so each call site is cached on its own:
+
+```javascript
+const dynamicCubes = await memo(async () =>
+  (await fetch("http://your-api-endpoint/dynamicCubes")).json()
+);
+```
+
+Pass a key explicitly to share one result between several call sites or files.
+
+The function passed to `memo()` should only fetch and return data. Calling
+`cube()`, `view()`, `context()` or `asyncModule()` from it is an error, as the
+function doesn't run again in later compilation stages. Define the model objects
+from the returned data outside of `memo()`, as in the example above.
+
 ## Usage with `schema_version`
 
 It is also useful to be able to recompile the data model when there are changes

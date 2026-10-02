@@ -112,7 +112,8 @@ data model creation][ref-dynamic-schemas].
 ## memo
 
 `memo(key, fn)` caches the result of `fn` by `key` for the whole data model
-compilation, across all of its stages. Use it for API calls made from
+compilation, across all of its stages. With the key omitted, `memo(fn)` caches
+it by its call site. Use it for API calls made from
 `asyncModule()`. For more information, consult [caching with
 `memo`][ref-memo].
 
