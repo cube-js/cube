@@ -68,6 +68,12 @@ export interface LocalQueueItem {
 }
 
 /**
+ * Cube Store's QueueResult lifetime. A result is written to the query cache only by a caller
+ * that reads it from the queue, so it has to outlive the polling interval of any client.
+ */
+const RESULT_TTL_MS = 5 * 60 * 1000;
+
+/**
  * Mirrors Cube Store's QueueResult: written by the ack under the id of the run it belongs to.
  */
 export interface LocalQueueResult {
@@ -287,15 +293,6 @@ export class LocalQueueDriverConnection implements QueueDriverConnectionInterfac
     ];
   }
 
-  /**
-   * A result outlives its first reader: other waiters of the same run, e.g. a joiner that deduped
-   * onto it in addToQueue, read it after the ack too. They come back within one
-   * continueWaitTimeout of polling, so that's how long it is kept.
-   */
-  protected resultExpire(now: number): number {
-    return now + this.continueWaitTimeout * 1000;
-  }
-
   protected async waitForResult(item: LocalQueueItem): Promise<any> {
     let timer: ReturnType<typeof setTimeout> | undefined;
     const timeout = new Promise((resolve) => {
@@ -324,6 +321,7 @@ export class LocalQueueDriverConnection implements QueueDriverConnectionInterfac
    */
   public async getResultBlocking(queryKeyHash: QueryKeyHash, queueId?: QueueId | null): Promise<any> {
     const now = Date.now();
+    this.state.results.removeExpired(now);
 
     if (queueId) {
       const result = this.state.results.getById(Number(queueId), now);
@@ -357,7 +355,10 @@ export class LocalQueueDriverConnection implements QueueDriverConnectionInterfac
    * Cube Store without CUBEJS_QUEUE_EXTERNAL_ID: a result is served by key only once.
    */
   public async getResult(queryKey: QueryKey, _externalId?: string): Promise<any> {
-    const result = this.state.results.getByKey(this.redisHash(queryKey), Date.now());
+    const now = Date.now();
+    this.state.results.removeExpired(now);
+
+    const result = this.state.results.getByKey(this.redisHash(queryKey), now);
     if (!result || result.deleted) {
       return null;
     }
@@ -476,7 +477,7 @@ export class LocalQueueDriverConnection implements QueueDriverConnectionInterfac
       key: item.key,
       value: executionResult,
       deleted: false,
-      expire: this.resultExpire(now),
+      expire: now + RESULT_TTL_MS,
     });
     item.resolveResult(executionResult);
 

@@ -72,17 +72,17 @@ describe('LocalQueueDriver', () => {
       return queueId;
     };
 
-    test('a result expires after continueWaitTimeout', async () => {
+    test('a result expires after 5 minutes like in Cube Store', async () => {
       const connection = await createDriver().createConnection();
       const key: QueryKey = ['result-expires', []];
       const hash = connection.redisHash(key);
 
       const queueId = await run(connection, key, 'result-expires');
 
-      jest.setSystemTime(start + 1000);
+      jest.setSystemTime(start + 5 * 60 * 1000);
       expect(await connection.getResultBlocking(hash, queueId)).toMatchObject({ result: 'result-expires' });
 
-      jest.setSystemTime(start + 1001);
+      jest.setSystemTime(start + 5 * 60 * 1000 + 1);
       expect(await connection.getResultBlocking(hash, queueId)).toBeNull();
       expect(await connection.getResult(key)).toBeNull();
     });
