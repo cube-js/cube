@@ -284,10 +284,12 @@ def memo(func):
                 try:
                     results[key] = (True, func(*args, **kwargs))
                 except Exception as e:
-                    results[key] = (False, e)
+                    # With its own traceback: raising the instance again would extend it each time
+                    results[key] = (False, (e, e.__traceback__))
             ok, value = results[key]
         if not ok:
-            raise value
+            error, tb = value
+            raise error.with_traceback(tb)
         return value
 
     return wrapper
