@@ -15,7 +15,7 @@ class DruidFilter extends BaseFilter {
   // Druid's LIKE has no default escape character, so the clause is what makes
   // the wildcard escaping applied to the value mean anything. It honours the
   // clause on a CONCAT(...) pattern, which druid-driver.test.ts checks by values.
-  public likeIgnoreCase(column, not, param, type: string) {
+  public likeIgnoreCase(column: string, not: boolean, param: unknown, type: string) {
     const p = (!type || type === 'contains' || type === 'ends') ? '%' : '';
     const s = (!type || type === 'contains' || type === 'starts') ? '%' : '';
     return `LOWER(${column})${not ? ' NOT' : ''} LIKE CONCAT('${p}', LOWER(${this.allocateParam(param)}), '${s}') ESCAPE '\\'`;
@@ -23,7 +23,7 @@ class DruidFilter extends BaseFilter {
 }
 
 export class DruidQuery extends BaseQuery {
-  public newFilter(filter) {
+  public newFilter(filter: any) {
     return new DruidFilter(this, filter);
   }
 
