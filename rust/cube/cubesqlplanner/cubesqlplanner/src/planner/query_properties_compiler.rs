@@ -2,7 +2,9 @@
 //! resolves member/segment/filter/order references against the cube
 //! evaluator and folds them into the typed builder.
 
-use crate::planner::planners::multi_stage::DEFAULT_MAX_MULTI_STAGE_DEPTH;
+use crate::planner::planners::multi_stage::{
+    DEFAULT_MAX_MULTI_STAGE_DEPTH, DEFAULT_MAX_MULTI_STAGE_STAGES,
+};
 use std::collections::HashSet;
 use std::rc::Rc;
 
@@ -98,6 +100,10 @@ impl QueryPropertiesCompiler {
             .static_data()
             .max_multi_stage_depth
             .unwrap_or(DEFAULT_MAX_MULTI_STAGE_DEPTH);
+        let max_multi_stage_stages = options
+            .static_data()
+            .max_multi_stage_stages
+            .unwrap_or(DEFAULT_MAX_MULTI_STAGE_STAGES);
         let total_query = options.static_data().total_query.unwrap_or(false);
         let disable_external_pre_aggregations =
             options.static_data().disable_external_pre_aggregations;
@@ -129,6 +135,7 @@ impl QueryPropertiesCompiler {
             )
             .total_query(total_query)
             .max_multi_stage_depth(max_multi_stage_depth)
+            .max_multi_stage_stages(max_multi_stage_stages)
             .query_join_hints(query_join_hints)
             .disable_external_pre_aggregations(disable_external_pre_aggregations)
             .pre_aggregation_id(pre_aggregation_id)

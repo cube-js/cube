@@ -50,6 +50,7 @@ const BRIDGES: BridgeSpec[] = [
       'masked_members',
       'max_member_resolution_depth',
       'max_multi_stage_depth',
+      'max_multi_stage_stages',
       'measures',
       'member_to_alias',
       'offset',

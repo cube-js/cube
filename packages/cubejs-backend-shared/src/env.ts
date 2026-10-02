@@ -2098,6 +2098,13 @@ const variables: Record<string, (...args: any) => any> = {
   maxMultiStageDepth: () => get('CUBEJS_MAX_MULTI_STAGE_DEPTH')
     .asIntPositive(),
   /**
+   * How many multi-stage stages one query may plan in total. Depth does not bound it: a member
+   * reading its child in two states doubles the stages per level. Unset leaves the planner's
+   * own default.
+   */
+  maxMultiStageStages: () => get('CUBEJS_MAX_MULTI_STAGE_STAGES')
+    .asIntPositive(),
+  /**
    * How deep members may reference members. The planner resolves each referenced member inside
    * the one that references it, calling into JS at every level, so a long enough chain runs the
    * JS stack out with a bare RangeError. Unset leaves the planner's own default.
