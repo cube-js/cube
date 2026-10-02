@@ -321,6 +321,6 @@ If a rollup uses a coarser `partition_granularity` than the next one, the next
 rollup has to start before the beginning of the previous rollup's last partition,
 because that whole partition is skipped until it's complete. For example, with
 `month` partitions on `batch` and `day` partitions on `hot`, start `hot` at
-`date_trunc('month', CURRENT_DATE - INTERVAL '14 days') - INTERVAL '2 days'`.
+`date_trunc('month', CURRENT_DATE - INTERVAL '16 days')`.
 
 [streaming-pre-agg]: /docs/pre-aggregations/using-pre-aggregations#streaming-pre-aggregations
