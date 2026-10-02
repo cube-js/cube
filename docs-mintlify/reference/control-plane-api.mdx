@@ -171,6 +171,13 @@ The [security context][ref-security-context] you provide is embedded in the
 token and controls which parts of the data model are visible, following the
 same multi-tenancy rules as regular API tokens.
 
+The token always carries the `meta` scope. To also read
+[private cubes, views, and members][ref-metadata-api-private], request the
+`meta-private` scope. It is added only if you have the `SchemaRead`
+([View data model][ref-custom-roles]) permission on the deployment, or are an
+admin on an account without role-based access control; otherwise it is
+silently left out. Any other scope you request is ignored.
+
 Path parameters:
 
 | Parameter | Description |
@@ -183,7 +190,8 @@ Request body:
 | Property | Type | Description | Required |
 | --- | --- | --- | --- |
 | `security_context` | `object` | [Security context][ref-security-context] to embed in the token. Controls data model visibility based on your multi-tenancy configuration. | Yes |
-| `expires_in` | `number` | Token expiration time in seconds. Default: `86400` (24 hours) | No |
+| `scopes` | `string[]` | Additional scopes. Only `meta-private` is honored; see above | No |
+| `expires_in` | `number` | Token expiration time in seconds, at most `3600`. Default: `3600` (1 hour) | No |
 
 Example request:
 
@@ -194,6 +202,7 @@ curl \
   -H "Content-Type: application/json" \
   -d '{
     "security_context": {"tenant_id": "acme"},
+    "scopes": ["meta-private"],
     "expires_in": 3600
   }' \
   "https://YOUR_CUBE_CLOUD_HOST/api/v1/deployments/123/environments/456/tokens-for-meta-sync"
@@ -435,6 +444,8 @@ schema.
 [ref-core-data-apis]: /reference/core-data-apis
 [ref-rest-api]: /reference/core-data-apis/rest-api
 [ref-metadata-api]: /reference/core-data-apis/rest-api/reference#metadata-api
+[ref-metadata-api-private]: /reference/core-data-apis/rest-api/reference#private-cubes-and-members
+[ref-custom-roles]: /admin/users-and-permissions/custom-roles
 [ref-deployments]: /admin/deployment
 [ref-environments]: /admin/deployment/environments
 [ref-environments-staging]: /admin/deployment/environments#staging-environments

@@ -1195,13 +1195,20 @@ with their full definitions and `public` set to `false`. A view's
 tables and columns it reads through private cubes; by default, these are left out.
 
 This requires a token with the `meta-private` scope as well as `meta`; without
-it, the request fails with `403`. To get such a token, call the Control Plane
-API's [token endpoint][ref-cpa-create-token] with a `security_context` and
-`"scopes": ["meta", "meta-private"]`. The scope is granted only to callers who
-can edit the deployment and have the `SchemaRead`
-([View data model][ref-custom-roles]) permission on it. For anyone else it is
-silently left out of the token rather than rejected, so the problem only shows
-up as a `403` later. Tokens from `tokens-for-meta-sync` carry only `meta`.
+it, the request fails with `403`. You can get such a token from either of two
+Control Plane API endpoints, both of which take a `security_context`:
+
+- [`tokens-for-meta-sync`][ref-cpa-meta-sync-token], the endpoint data catalog
+  integrations use: pass `"scopes": ["meta-private"]`. It always adds `meta`.
+  The caller needs the `SchemaRead` ([View data model][ref-custom-roles])
+  permission on the deployment.
+- The [token endpoint][ref-cpa-create-token]: pass
+  `"scopes": ["meta", "meta-private"]`. The caller needs to be able to edit the
+  deployment and have the `SchemaRead` permission on it.
+
+On accounts without role-based access control, only admins can get the scope.
+For anyone without the required permissions, the scope is silently left out of
+the token rather than rejected, so the problem only shows up as a `403` later.
 
 `include_private` doesn't bypass [data access policies][ref-dap]. Whatever a data
 access policy hides from the token's security context is never returned, even
@@ -1320,6 +1327,7 @@ Keep-Alive: timeout=5
 [ref-dimensions-public]: /reference/data-modeling/dimensions#public
 [ref-dap]: /docs/data-modeling/data-access-policies
 [ref-cpa-create-token]: /api-reference/environments/create-deployment-environment-token
+[ref-cpa-meta-sync-token]: /reference/control-plane-api#apiv1deploymentsdeployment_idenvironmentsenvironment_idtokens-for-meta-sync
 [ref-custom-roles]: /admin/users-and-permissions/custom-roles
 [ref-env-db-name]: /reference/configuration/environment-variables#cubejs_db_name
 [ref-env-db-schema]: /reference/configuration/environment-variables#cubejs_db_schema
