@@ -69,6 +69,7 @@ import {
 import {
   Query,
   NormalizedQuery,
+  QueryTimeDimension,
   MemberExpression,
   ParsedMemberExpression,
 } from './types/query';
@@ -210,6 +211,16 @@ type PreparedCheckAuthFn = (ctx: any, authorization?: string) => Promise<{
   securityContext: any;
 }>;
 
+type PreAggregationPartitionsResult = {
+  errors: string[],
+  preAggregation: any,
+  partitions: any[],
+  invalidateKeyQueries: any,
+  timezones: string[],
+};
+
+type SqlQueryOrder = { id: string, desc: boolean };
+
 class ApiGateway {
   protected readonly refreshScheduler: any;
 
@@ -337,7 +348,7 @@ class ApiGateway {
 
     // @todo Should we pass requestLoggerMiddleware?
 
-    const guestMiddlewares = [];
+    const guestMiddlewares: RequestHandler[] = [];
 
     app.get('/readyz', guestMiddlewares, cachedHandler(this.readiness));
     app.get('/livez', guestMiddlewares, cachedHandler(this.liveness));
@@ -724,13 +735,13 @@ class ApiGateway {
     return new SubscriptionServer(this, sendMessage, this.subscriptionStore, this.wsContextAcceptor);
   }
 
-  protected duration(requestStarted) {
+  protected duration(requestStarted?: Date) {
     return requestStarted && (new Date().getTime() - requestStarted.getTime());
   }
 
   private filterVisibleItemsInMeta(context: RequestContext, cubes: any[]) {
     const isDevMode = this.devServer;
-    function visibilityFilter(item) {
+    function visibilityFilter(item: { isVisible?: boolean }) {
       return isDevMode || context.signedWithPlaygroundAuthSecret || item.isVisible;
     }
 
@@ -809,8 +820,8 @@ class ApiGateway {
       const cubes = this.filterVisibleItemsInMeta(context, cubesConfig).map(cube => cube.config);
       const visibleCubeNames = new Set(cubes.map(c => c.name));
       const viewGroups = (metaConfig.viewGroups || [])
-        .map(group => this.filterVisibleViewGroup(group, visibleCubeNames))
-        .filter(group => group !== null);
+        .map((group: any) => this.filterVisibleViewGroup(group, visibleCubeNames))
+        .filter((group: any) => group !== null);
       const response: { cubes: any[], viewGroups?: any[], compilerId?: string } = { cubes };
       if (viewGroups.length > 0) {
         response.viewGroups = viewGroups;
@@ -852,13 +863,13 @@ class ApiGateway {
         .map((meta) => meta.config)
         .map((cube) => ({
           ...transformCube(cube, cubeDefinitions),
-          measures: cube.measures?.map((measure) => ({
+          measures: cube.measures?.map((measure: any) => ({
             ...transformMeasure(measure, cubeDefinitions),
           })),
-          dimensions: cube.dimensions?.map((dimension) => ({
+          dimensions: cube.dimensions?.map((dimension: any) => ({
             ...transformDimension(dimension, cubeDefinitions),
           })),
-          segments: cube.segments?.map((segment) => ({
+          segments: cube.segments?.map((segment: any) => ({
             ...transformSegment(segment, cubeDefinitions),
           })),
           joins: transformJoins(cubeDefinitions[cube.name]?.joins),
@@ -890,7 +901,7 @@ class ApiGateway {
           normalizeQueryPreAggregations(
             {
               timezones: refreshTimezones.length > 0 ? refreshTimezones : undefined,
-              preAggregations: preAggregations.map(p => ({
+              preAggregations: preAggregations.map((p: { id: string }) => ({
                 id: p.id,
                 cacheOnly,
                 metaOnly
@@ -899,7 +910,7 @@ class ApiGateway {
           )
         );
 
-      res({ preAggregations: preAggregationPartitions.map(({ preAggregation }) => preAggregation) });
+      res({ preAggregations: preAggregationPartitions.map(({ preAggregation }: PreAggregationPartitionsResult) => preAggregation) });
     } catch (e: any) {
       this.handleError({
         e, context, res, requestStarted
@@ -927,7 +938,7 @@ class ApiGateway {
           query
         );
 
-      const preAggregationPartitionsWithoutError = preAggregationPartitions.filter(p => !p?.errors?.length);
+      const preAggregationPartitionsWithoutError = preAggregationPartitions.filter((p: PreAggregationPartitionsResult) => !p?.errors?.length);
 
       const versionEntriesResult = preAggregationPartitions &&
         await orchestratorApi.getPreAggregationVersionEntries(
@@ -941,12 +952,12 @@ class ApiGateway {
           ? query.expand.some((p: string) => path.test(p))
           : query.expand.includes(path));
 
-      const mergePartitionsAndVersionEntries = () => ({ errors, preAggregation, partitions, invalidateKeyQueries, timezones }) => ({
+      const mergePartitionsAndVersionEntries = () => ({ errors, preAggregation, partitions, invalidateKeyQueries, timezones }: PreAggregationPartitionsResult) => ({
         errors,
         invalidateKeyQueries,
         preAggregation,
         timezones,
-        partitions: partitions.map(partition => ({
+        partitions: partitions.map((partition: any) => ({
           ...(checkExpand('partitions.details') ? partition : {}),
           ...(checkExpand('partitions.meta') ? {
             dataSource: partition.dataSource,
@@ -991,7 +1002,7 @@ class ApiGateway {
           }
         );
       const { partitions } = (preAggregationPartitions?.[0] || {});
-      const preAggregationPartition = partitions?.find(p => p?.tableName === versionEntry.table_name);
+      const preAggregationPartition = partitions?.find((p: { tableName?: string }) => p?.tableName === versionEntry.table_name);
 
       await res({
         preview: preAggregationPartition && await orchestratorApi.getPreAggregationPreview(
@@ -1186,7 +1197,7 @@ class ApiGateway {
             metadata: undefined,
             timezones,
             dateRange,
-            preAggregations: preaggs.map(p => ({
+            preAggregations: preaggs.map((p: { id: string }) => ({
               id: p.id,
               cacheOnly: false,
               partitions: undefined, // string[]
@@ -1225,7 +1236,7 @@ class ApiGateway {
         const compiler = await this.getCompilerApi(ctx);
         // TODO(1.8): drop the fallback, no job posted by 1.7 can still be in the cache.
         const dataSource = job.dataSource || (await compiler.preAggregations())
-          .find(pa => pa.id === job.preagg)?.dataSource;
+          .find((pa: { id: string, dataSource: string }) => pa.id === job.preagg)?.dataSource;
         const selector: PreAggsSelector = {
           cubes: [job.preagg.split('.')[0]],
           preAggregations: [job.preagg],
@@ -1305,7 +1316,7 @@ class ApiGateway {
     let inQueue = false;
     let status: string = 'n/a';
     const queuedList = await orchestrator.getPreAggregationQueueStates(dataSource);
-    queuedList.forEach((item) => {
+    queuedList.forEach((item: any) => {
       if (
         item.queryHandler &&
         item.queryHandler === 'query' &&
@@ -1345,7 +1356,7 @@ class ApiGateway {
     token: string,
   ): Promise<string> {
     const preaggs = await compiler.preAggregations();
-    const preagg = preaggs.find(pa => pa.id === job.preagg);
+    const preagg = preaggs.find((pa: { id: string }) => pa.id === job.preagg);
     if (preagg) {
       const [, status]: [boolean, string] =
         await orchestrator.isPartitionExist(
@@ -1593,9 +1604,9 @@ class ApiGateway {
         ))
       );
 
-      const toQuery = (sqlQuery) => ({
+      const toQuery = (sqlQuery: any) => ({
         ...sqlQuery,
-        order: R.fromPairs(sqlQuery.order.map(({ id: key, desc }) => [key, desc ? 'desc' : 'asc']))
+        order: R.fromPairs(sqlQuery.order.map(({ id: key, desc }: SqlQueryOrder) => [key, desc ? 'desc' : 'asc']))
       });
 
       await res(queryType === QueryTypeEnum.REGULAR_QUERY ?
@@ -1786,7 +1797,10 @@ class ApiGateway {
     };
   }
 
-  protected coerceForSqlQuery(query, context: Readonly<RequestContext>) {
+  protected coerceForSqlQuery(
+    query: NormalizedQuery & { memberToAlias?: Record<string, string>, expressionParams?: string[], disableExternalPreAggregations?: boolean },
+    context: Readonly<RequestContext>,
+  ) {
     return {
       ...query,
       timeDimensions: query.timeDimensions || [],
@@ -1847,7 +1861,7 @@ class ApiGateway {
         queryType,
         normalizedQueries,
         queryOrder: sqlQueries.map((sqlQuery) => R.fromPairs(
-          sqlQuery.order.map(({ id: member, desc }) => [member, desc ? 'desc' : 'asc'])
+          sqlQuery.order.map(({ id: member, desc }: SqlQueryOrder) => [member, desc ? 'desc' : 'asc'])
         )),
         transformedQueries: sqlQueries.map((sqlQuery) => sqlQuery.canUseTransformedQuery),
         pivotQuery: getPivotQuery(queryType, normalizedQueries)
@@ -1895,7 +1909,7 @@ class ApiGateway {
   private sanitizeSqlQuery(sqlQuery: any): any {
     if (sqlQuery.canUseTransformedQuery) {
       // Keep only granularityHierarchies related to the query time dimensions
-      const tdArr = sqlQuery.canUseTransformedQuery.timeDimensions.map(([m, _g]) => m);
+      const tdArr = sqlQuery.canUseTransformedQuery.timeDimensions.map(([m, _g]: [string, string]) => m);
       if (tdArr.length > 0) {
         sqlQuery.canUseTransformedQuery.granularityHierarchies =
           Object.fromEntries(
@@ -2273,7 +2287,7 @@ class ApiGateway {
 
       let slowQuery = false;
 
-      const streamResponse = async (sqlQuery) => {
+      const streamResponse = async (sqlQuery: any) => {
         const q: QueryBody = {
           ...sqlQuery,
           query: sqlQuery.query || sqlQuery.sql[0],
@@ -2400,6 +2414,9 @@ class ApiGateway {
 
   public async subscribe({
     query, context, res, subscribe, subscriptionState, queryType, apiType
+  }: QueryRequest & {
+    subscribe: (state: { error: unknown, result: unknown }) => Promise<void>,
+    subscriptionState: () => Promise<{ result?: unknown } | undefined>,
   }) {
     const requestStarted = new Date();
 
@@ -2450,7 +2467,7 @@ class ApiGateway {
   }
 
   protected resToResultFn(res: ExpressResponse) {
-    return async (message, { status }: { status?: number } = {}) => {
+    return async (message: Record<string, any>, { status }: { status?: number } = {}) => {
       if (status) {
         res.status(status);
       }
@@ -2488,7 +2505,7 @@ class ApiGateway {
     return this.adapterApi(context);
   }
 
-  public async contextByReq(req: Request, securityContext, requestId: string): Promise<ExtendedRequestContext> {
+  public async contextByReq(req: Request, securityContext: any, requestId: string): Promise<ExtendedRequestContext> {
     req.securityContext = securityContext;
 
     const extensions = typeof this.extendContext === 'function' ? await this.extendContext(req) : {};
@@ -2648,7 +2665,8 @@ class ApiGateway {
   protected createDefaultCheckAuth(options?: JWTOptions, internalOptions?: CheckAuthInternalOptions): PreparedCheckAuthFn {
     type VerifyTokenFn = (auth: string) => Promise<object | string> | object | string;
 
-    const verifyToken = (auth, secret) => jwt.verify(auth, secret, {
+    // `undefined` is passed on purpose when no secret is configured, so jsonwebtoken raises its own error
+    const verifyToken = (auth: string, secret: jwt.Secret | undefined) => jwt.verify(auth, secret as jwt.Secret, {
       algorithms: <JWTAlgorithm[] | undefined>options?.algorithms,
       issuer: options?.issuer,
       audience: options?.audience,
@@ -2884,7 +2902,7 @@ class ApiGateway {
     return undefined;
   }
 
-  protected async checkAuthWrapper(checkAuthFn: PreparedCheckAuthFn, req: Request, res: ExpressResponse, next) {
+  protected async checkAuthWrapper(checkAuthFn: PreparedCheckAuthFn, req: Request, res: ExpressResponse, next: NextFunction) {
     const token = this.extractAuthorizationHeaderWithSchema(req);
 
     try {
@@ -2974,11 +2992,11 @@ class ApiGateway {
     }
   };
 
-  protected compareDateRangeTransformer(query) {
-    let queryCompareDateRange;
-    let compareDateRangeTDIndex;
+  protected compareDateRangeTransformer(query: Query) {
+    let queryCompareDateRange: QueryTimeDimension['compareDateRange'];
+    let compareDateRangeTDIndex: number | undefined;
 
-    (query.timeDimensions || []).forEach((td, index) => {
+    for (const [index, td] of (query.timeDimensions || []).entries()) {
       if (td.compareDateRange != null) {
         if (queryCompareDateRange != null) {
           throw new UserError('compareDateRange can only exist for one timeDimension');
@@ -2987,7 +3005,7 @@ class ApiGateway {
         queryCompareDateRange = td.compareDateRange;
         compareDateRangeTDIndex = index;
       }
-    });
+    }
 
     if (queryCompareDateRange == null) {
       return query;
@@ -2995,7 +3013,7 @@ class ApiGateway {
 
     return queryCompareDateRange.map((dateRange) => ({
       ...R.clone(query),
-      timeDimensions: query.timeDimensions.map((td, index) => {
+      timeDimensions: query.timeDimensions!.map((td, index) => {
         if (compareDateRangeTDIndex === index) {
           // eslint-disable-next-line @typescript-eslint/no-unused-vars
           const { compareDateRange, ...timeDimension } = td;

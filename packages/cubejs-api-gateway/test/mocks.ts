@@ -80,7 +80,7 @@ export const compilerApi = jest.fn().mockImplementation(async () => ({
     return { query, denied: false };
   },
 
-  async metaConfig(_ctx, options: any = {}) {
+  async metaConfig(_ctx: unknown, options: any = {}) {
     const cubes = [
       {
         config: {
@@ -309,7 +309,7 @@ export class AdapterApiMock {
     return [];
   }
 
-  public async executeQuery(query) {
+  public async executeQuery(query: { query: string }) {
     if (query?.query.includes('SELECT * FROM sql-runner')) {
       return {
         data: [

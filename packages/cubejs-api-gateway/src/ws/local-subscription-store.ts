@@ -32,7 +32,7 @@ export class LocalSubscriptionStore {
     return connection.subscriptions.get(subscriptionId);
   }
 
-  public async subscribe(connectionId: string, subscriptionId: string, subscription) {
+  public async subscribe(connectionId: string, subscriptionId: string, subscription: Omit<LocalSubscriptionStoreSubscription, 'timestamp'>) {
     const connection = this.getConnectionOrCreate(connectionId);
     connection.subscriptions.set(subscriptionId, {
       ...subscription,
@@ -81,7 +81,7 @@ export class LocalSubscriptionStore {
     return this.getConnectionOrCreate(connectionId).authContext;
   }
 
-  public async setAuthContext(connectionId: string, authContext) {
+  public async setAuthContext(connectionId: string, authContext: LocalSubscriptionStoreConnection['authContext']) {
     this.getConnectionOrCreate(connectionId).authContext = authContext;
   }
 

@@ -1,6 +1,6 @@
 import { cachedHandler } from '../src/cached-handler';
 
-const createAsyncLock = (timeout) => new Promise(
+const createAsyncLock = (timeout: number) => new Promise(
   (resolve) => {
     setTimeout(
       resolve,
@@ -30,12 +30,12 @@ describe('cachedHandler', () => {
     const req: any = {};
 
     const res: any = {
-      status: (code) => {
+      status: (code: number) => {
         expect(code).toEqual(200);
 
         return res;
       },
-      json: (content) => {
+      json: (content: unknown) => {
         resPassed++;
 
         expect(content).toEqual('heh');

@@ -8,6 +8,7 @@ import {
   SqlInterfaceInstance,
   Request as NativeRequest,
   LoadRequestMeta,
+  SessionContext,
   Sql4SqlResponse,
   QueryConvertResponse,
 } from '@cubejs-backend/native';
@@ -112,7 +113,7 @@ export class SQLServer {
     const canSwitchSqlUser: CanSwitchSQLUserFn = options.canSwitchSqlUser
       || this.createDefaultCanSwitchSqlUserFn(options);
 
-    const contextByRequest = async (request, session) => {
+    const contextByRequest = async (request: NativeRequest<LoadRequestMeta>, session: SessionContext) => {
       let userForContext = session.user;
       let { securityContext } = session;
 
@@ -135,7 +136,7 @@ export class SQLServer {
       return this.contextByNativeReq(request, securityContext, request.id);
     };
 
-    const canSwitchUserForSession = async (session, user) => session.superuser || canSwitchSqlUser(session.user, user);
+    const canSwitchUserForSession = async (session: SessionContext, user: string) => session.superuser || canSwitchSqlUser(session.user, user);
 
     this.sqlInterfaceInstance = await registerInterface({
       gatewayPort: this.gatewayPort,
@@ -385,7 +386,7 @@ export class SQLServer {
     };
   }
 
-  protected async contextByNativeReq(req: NativeRequest<LoadRequestMeta>, securityContext, requestId: string): Promise<ExtendedRequestContext> {
+  protected async contextByNativeReq(req: NativeRequest<LoadRequestMeta>, securityContext: any, requestId: string): Promise<ExtendedRequestContext> {
     const context = await this.apiGateway.contextByReq(<any> req, securityContext, requestId);
 
     return {

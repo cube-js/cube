@@ -126,7 +126,7 @@ export const TimeDimension = objectType({
   },
 });
 
-function mapType(type: string, isInputType?: boolean) {
+function mapType(type: string | undefined, isInputType?: boolean) {
   switch (type) {
     case 'time':
       return isInputType ? 'DateTime' : 'TimeDimension';
@@ -207,6 +207,22 @@ function applyDirectives(
   }, true);
 }
 
+type GraphQLMetaMember = {
+  name: string,
+  type?: string,
+  description?: string,
+  isVisible?: boolean,
+};
+
+type GraphQLMetaCube = {
+  public?: boolean,
+  config: {
+    name: string,
+    measures: GraphQLMetaMember[],
+    dimensions: GraphQLMetaMember[],
+  },
+};
+
 function getFieldNodeChildren(node: FieldNode, infos: GraphQLResolveInfo) {
   return (node.selectionSet?.selections.filter((childNode) => (
     childNode.kind === 'Field' &&
@@ -215,7 +231,7 @@ function getFieldNodeChildren(node: FieldNode, infos: GraphQLResolveInfo) {
   )) || []) as FieldNode[];
 }
 
-function parseArgumentValue(value: ValueNode, variables?: Record<string, any>) {
+function parseArgumentValue(value: ValueNode, variables?: Record<string, any>): any {
   switch (value.kind) {
     case 'BooleanValue':
     case 'IntValue':
@@ -255,11 +271,11 @@ function getArgumentValue(node: FieldNode, argName: string, variables: Record<st
   return argument ? parseArgumentValue(argument, variables) : argument;
 }
 
-function getMemberType(metaConfig: any, cubeName: string, memberName: string) {
+function getMemberType(metaConfig: GraphQLMetaCube[], cubeName: string, memberName: string) {
   const cubeConfig = metaConfig.find(cube => (cube.config.name === cubeName) || cube.config.name === capitalize(cubeName));
   if (!cubeConfig) return undefined;
 
-  return [MemberType.MEASURES, MemberType.DIMENSIONS].find((memberType) => (cubeConfig.config[memberType]
+  return ([MemberType.MEASURES, MemberType.DIMENSIONS] as const).find((memberType) => (cubeConfig.config[memberType]
     .findIndex(entry => entry.name === `${cubeName}.${memberName}` || entry.name === `${capitalize(cubeName)}.${memberName}`) !== -1
   ));
 }
@@ -267,7 +283,7 @@ function getMemberType(metaConfig: any, cubeName: string, memberName: string) {
 function whereArgToQueryFilters(
   whereArg: Record<string, any>,
   prefix?: string,
-  metaConfig: any[] = []
+  metaConfig: GraphQLMetaCube[] = []
 ) {
   const queryFilters: any[] = [];
 
@@ -278,7 +294,7 @@ function whereArgToQueryFilters(
     if (['OR', 'AND'].includes(key)) {
       queryFilters.push({
         [key.toLowerCase()]: whereArg[key].reduce(
-          (filters, whereBooleanArg) => [
+          (filters: any[], whereBooleanArg: Record<string, any>) => [
             ...filters,
             ...whereArgToQueryFilters(whereBooleanArg, prefix, metaConfig),
           ],
@@ -352,7 +368,7 @@ function parseDates(result: any) {
     ...result.annotation.timeDimensions,
   }).reduce((res, [key, value]) => (value.type === 'time' ? [...res, key] : res), [] as any);
 
-  result.data.forEach(row => {
+  result.data.forEach((row: Record<string, any>) => {
     Object.keys(row).forEach(key => {
       if (dateKeys.includes(key)) {
         row[key] = moment.tz(row[key], timezone).toISOString();
@@ -362,7 +378,7 @@ function parseDates(result: any) {
   });
 }
 
-export function getJsonQuery(metaConfig: any, args: Record<string, any>, infos: GraphQLResolveInfo) {
+export function getJsonQuery(metaConfig: GraphQLMetaCube[], args: Record<string, any>, infos: GraphQLResolveInfo) {
   const { where, limit, offset, timezone, orderBy, ungrouped, cache } = args;
 
   const measures: string[] = [];
@@ -401,7 +417,7 @@ export function getJsonQuery(metaConfig: any, args: Record<string, any>, infos: 
     }
 
     // Push down all inDateRange filters to time dimensions to leverage pre-aggregations
-    const dateRangeFilters = {};
+    const dateRangeFilters: Record<string, string[]> = {};
     filters = filters.filter((f) => {
       if (f.operator === 'inDateRange' && !dateRangeFilters[f.member]) {
         dateRangeFilters[f.member] = f.values;
@@ -465,7 +481,7 @@ export function getJsonQuery(metaConfig: any, args: Record<string, any>, infos: 
   };
 }
 
-export function getJsonQueryFromGraphQLQuery(query: string, metaConfig: any, variableValues: Record<string, any> = {}) {
+export function getJsonQueryFromGraphQLQuery(query: string, metaConfig: GraphQLMetaCube[], variableValues: Record<string, any> = {}) {
   const ast = gql(query);
 
   const operation: any = ast.definitions.find(
@@ -492,7 +508,7 @@ export function getJsonQueryFromGraphQLQuery(query: string, metaConfig: any, var
   return getJsonQuery(metaConfig, args, resolveInfo);
 }
 
-export function makeSchema(metaConfig: any): GraphQLSchema {
+export function makeSchema(metaConfig: GraphQLMetaCube[]): GraphQLSchema {
   const types: any[] = [
     DateTimeScalar,
     FloatFilter,
@@ -502,7 +518,7 @@ export function makeSchema(metaConfig: any): GraphQLSchema {
     TimeDimension
   ];
 
-  function hasMembers(cube: any) {
+  function hasMembers(cube: GraphQLMetaCube) {
     if (cube.public === false) {
       return false;
     }
@@ -654,7 +670,7 @@ export function makeSchema(metaConfig: any): GraphQLSchema {
               queryType: QueryType.REGULAR_QUERY,
               ...(query.cache ? { cache: query.cache } : {}),
               context: req.context,
-              res: async (message) => {
+              res: async (message: Record<string, any>) => {
                 if (message.error) {
                   reject(new Error(message.error));
                 }
@@ -679,7 +695,7 @@ export function makeSchema(metaConfig: any): GraphQLSchema {
             usedPreAggregations: results.usedPreAggregations,
           };
 
-          return results.data.map(entry => R.toPairs(entry)
+          return results.data.map((entry: Record<string, unknown>) => R.toPairs(entry)
             .reduce((accum, pair) => {
               let path = pair[0].split('.');
               path[0] = unCapitalize(path[0]);

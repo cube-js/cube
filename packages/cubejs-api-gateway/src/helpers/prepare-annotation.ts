@@ -10,7 +10,7 @@ import { isPredefinedGranularity } from '@cubejs-backend/shared';
 import { MetaConfig, MetaConfigMap, toConfigMap } from './to-config-map';
 import { MemberType } from '../types/strings';
 import { MemberType as MemberTypeEnum } from '../types/enums';
-import { MemberExpression } from '../types/query';
+import { MemberExpression, QueryTimeDimension } from '../types/query';
 
 type GranularityMeta = {
   name: string;
@@ -41,18 +41,22 @@ type AnnotatedConfigItem = Omit<ConfigItem, 'granularities'> & {
   granularity?: GranularityMeta;
 };
 
+type AnnotationEntry = undefined | [string, ConfigItem];
+
 /**
  * Returns annotations by MetaConfigMap and cube's member type.
  */
 const annotation = (
   configMap: MetaConfigMap,
   memberType: MemberType,
-) => (member: string | MemberExpression): undefined | [string, ConfigItem] => {
+) => (member: string | MemberExpression): AnnotationEntry => {
   const [cubeName, fieldName] = (<MemberExpression>member).expression ? [(<MemberExpression>member).cubeName, (<MemberExpression>member).name] : (<string>member).split('.');
   const memberWithoutGranularity = [cubeName, fieldName].join('.');
-  const cubeConfig = configMap[cubeName];
-  const config: ConfigItem = cubeConfig && cubeConfig[memberType]
-    .find(m => m.name === memberWithoutGranularity);
+  // MetaConfigMap only declares the cube's name and title; its member lists are there too.
+  const cubeConfig = configMap[cubeName] as
+    MetaConfigMap[string] & Partial<Record<MemberType, (ConfigItem & { name: string })[]>> | undefined;
+  const config: ConfigItem | undefined = cubeConfig?.[memberType]
+    ?.find(m => m.name === memberWithoutGranularity);
 
   if (!config) {
     return undefined;
@@ -85,24 +89,24 @@ function prepareAnnotation(metaConfig: MetaConfig[], query: any) {
     measures: R.fromPairs(
       (query.measures || []).map(
         annotation(configMap, MemberTypeEnum.MEASURES)
-      ).filter(a => !!a)
+      ).filter((a: AnnotationEntry) => !!a)
     ),
     dimensions: R.fromPairs(
       dimensions
         .map(annotation(configMap, MemberTypeEnum.DIMENSIONS))
-        .filter(a => !!a)
+        .filter((a: AnnotationEntry) => !!a)
     ),
     segments: R.fromPairs(
       (query.segments || [])
         .map(annotation(configMap, MemberTypeEnum.SEGMENTS))
-        .filter(a => !!a)
+        .filter((a: AnnotationEntry) => !!a)
     ),
     timeDimensions: R.fromPairs(
       R.unnest(
         (query.timeDimensions || [])
-          .filter(td => !!td.granularity)
+          .filter((td: QueryTimeDimension) => !!td.granularity)
           .map(
-            td => {
+            (td: QueryTimeDimension & { granularity: string }) => {
               const an = annotation(
                 configMap,
                 MemberTypeEnum.DIMENSIONS,

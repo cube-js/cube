@@ -4,7 +4,7 @@ import bodyParser from 'body-parser';
 // eslint-disable-next-line import/no-extraneous-dependencies
 import express from 'express';
 import { graphqlHTTP } from 'express-graphql';
-import { GraphQLObjectType } from 'graphql';
+import { GraphQLObjectType, GraphQLSchema } from 'graphql';
 // eslint-disable-next-line import/no-extraneous-dependencies
 import fs from 'fs-extra';
 import request from 'supertest';
@@ -139,7 +139,7 @@ function gqlQuery(query: string, variables?: Record<string, string | number>) {
   });
 }
 
-function expectValidSchema(schema) {
+function expectValidSchema(schema: GraphQLSchema) {
   expect(schema).toBeDefined();
   expect(schema.getTypeMap()).toHaveProperty('OrdersMembers');
   const ordersFields = (schema.getType('OrdersMembers') as GraphQLObjectType).getFields();
@@ -161,7 +161,7 @@ describe('GraphQL Schema', () => {
           req,
           res,
           apiGateway: {
-            async load({ query, res: response }) {
+            async load({ query, res: response }: { query: unknown, res: (message: Record<string, unknown>) => void }) {
               expect(query).toMatchSnapshot(req.body.query);
 
               response({
@@ -186,7 +186,7 @@ describe('GraphQL Schema', () => {
           req,
           res,
           apiGateway: {
-            async load({ query, res: response }) {
+            async load({ query, res: response }: { query: unknown, res: (message: Record<string, unknown>) => void }) {
               expect(query).toMatchSnapshot(req.body.query);
 
               response({
@@ -239,7 +239,7 @@ describe('GraphQL Schema', () => {
           req,
           res,
           apiGateway: {
-            async load({ query, res: response }) {
+            async load({ query, res: response }: { query: unknown, res: (message: Record<string, unknown>) => void }) {
               expect(query).toMatchSnapshot(req.body.query);
 
               response({
@@ -307,7 +307,7 @@ describe('GraphQL Schema', () => {
           req,
           res,
           apiGateway: {
-            async load({ query, res: response }) {
+            async load({ query, res: response }: { query: unknown, res: (message: Record<string, unknown>) => void }) {
               response({
                 query,
                 annotation: mockAnnotation,
@@ -366,7 +366,7 @@ describe('GraphQL Schema', () => {
             req,
             res,
             apiGateway: {
-              async load({ query, res: response }) {
+              async load({ query, res: response }: { query: unknown, res: (message: Record<string, unknown>) => void }) {
                 response({
                   query,
                   annotation: mockAnnotation,

@@ -30,9 +30,15 @@ jest.mock('@cubejs-backend/native', () => {
   });
 });
 
-const logger = (type, message) => console.log({ type, ...message });
+type SystemRouteTest = { route: string, method?: 'get' | 'post' };
 
-async function requestBothGetAndPost(app, { url, query, body }, assert) {
+const logger = (type: string, message: Record<string, unknown>) => console.log({ type, ...message });
+
+async function requestBothGetAndPost(
+  app: express.Application,
+  { url, query, body }: { url: string, query: Record<string, unknown>, body: Record<string, unknown> },
+  assert: (res: request.Response) => void,
+) {
   {
     const res = await request(app)
       .get(url)
@@ -456,7 +462,7 @@ describe('API Gateway', () => {
     return requestBothGetAndPost(
       app,
       { url: '/cubejs-api/v1/dry-run', query: { query: JSON.stringify(query) }, body: { query } },
-      (res) => {
+      (res: request.Response) => {
         expect(res.body).toStrictEqual({
           queryType: 'regularQuery',
           normalizedQueries: [
@@ -519,7 +525,7 @@ describe('API Gateway', () => {
     return requestBothGetAndPost(
       app,
       { url: '/cubejs-api/v1/dry-run', query: { query: JSON.stringify(query) }, body: { query } },
-      (res) => {
+      (res: request.Response) => {
         expect(res.body.normalizedQueries).toStrictEqual([
           {
             cacheMode: 'stale-if-slow',
@@ -593,7 +599,7 @@ describe('API Gateway', () => {
     return requestBothGetAndPost(
       app,
       { url: '/cubejs-api/v1/dry-run', query: { query: JSON.stringify(query) }, body: { query } },
-      (res) => {
+      (res: request.Response) => {
         expect(res.body).toStrictEqual({
           queryType: 'regularQuery',
           normalizedQueries: [
@@ -640,7 +646,7 @@ describe('API Gateway', () => {
     return requestBothGetAndPost(
       app,
       { url: '/cubejs-api/v1/dry-run', query: { query: JSON.stringify(query) }, body: { query } },
-      (res) => {
+      (res: request.Response) => {
         expect(res.body).toStrictEqual({
           queryType: 'regularQuery',
           normalizedQueries: [
@@ -765,9 +771,9 @@ describe('API Gateway', () => {
     expect(res.body.cubes[0]?.name).toBe('Foo');
     expect(res.body.cubes[0]?.description).toBe('cube from compilerApi mock');
     expect(res.body.cubes[0]?.hasOwnProperty('sql')).toBe(false);
-    expect(res.body.cubes[0]?.dimensions.find(dimension => dimension.name === 'Foo.id').description).toBe('id dimension from compilerApi mock');
-    expect(res.body.cubes[0]?.measures.find(measure => measure.name === 'Foo.bar').description).toBe('measure from compilerApi mock');
-    expect(res.body.cubes[0]?.segments.find(segment => segment.name === 'Foo.quux').description).toBe('segment from compilerApi mock');
+    expect(res.body.cubes[0]?.dimensions.find((dimension: { name: string }) => dimension.name === 'Foo.id').description).toBe('id dimension from compilerApi mock');
+    expect(res.body.cubes[0]?.measures.find((measure: { name: string }) => measure.name === 'Foo.bar').description).toBe('measure from compilerApi mock');
+    expect(res.body.cubes[0]?.segments.find((segment: { name: string }) => segment.name === 'Foo.quux').description).toBe('segment from compilerApi mock');
   });
 
   test('meta endpoint returns view groups', async () => {
@@ -792,12 +798,12 @@ describe('API Gateway', () => {
       includes: ['FooView'],
     });
 
-    const fooView = res.body.cubes.find(c => c.name === 'FooView');
+    const fooView = res.body.cubes.find((c: { name: string }) => c.name === 'FooView');
     expect(fooView).toBeDefined();
     expect(fooView.viewGroups).toEqual(['analytics']);
     expect(fooView.type).toBe('view');
 
-    const fooCube = res.body.cubes.find(c => c.name === 'Foo');
+    const fooCube = res.body.cubes.find((c: { name: string }) => c.name === 'Foo');
     expect(fooCube).toBeDefined();
     expect(fooCube.viewGroups).toBeUndefined();
   });
@@ -814,9 +820,9 @@ describe('API Gateway', () => {
     expect(res.body.cubes[0]?.name).toBe('Foo');
     expect(res.body.cubes[0]?.description).toBe('cube from compilerApi mock');
     expect(res.body.cubes[0]?.hasOwnProperty('sql')).toBe(true);
-    expect(res.body.cubes[0]?.dimensions.find(dimension => dimension.name === 'Foo.id').description).toBe('id dimension from compilerApi mock');
-    expect(res.body.cubes[0]?.measures.find(measure => measure.name === 'Foo.bar').description).toBe('measure from compilerApi mock');
-    expect(res.body.cubes[0]?.segments.find(segment => segment.name === 'Foo.quux').description).toBe('segment from compilerApi mock');
+    expect(res.body.cubes[0]?.dimensions.find((dimension: { name: string }) => dimension.name === 'Foo.id').description).toBe('id dimension from compilerApi mock');
+    expect(res.body.cubes[0]?.measures.find((measure: { name: string }) => measure.name === 'Foo.bar').description).toBe('measure from compilerApi mock');
+    expect(res.body.cubes[0]?.segments.find((segment: { name: string }) => segment.name === 'Foo.quux').description).toBe('segment from compilerApi mock');
   });
 
   test('meta endpoint with onlyViews=true returns only views and their groups', async () => {
@@ -850,7 +856,7 @@ describe('API Gateway', () => {
       .set('Authorization', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.e30.t-IDcSemACt8x4iTMCda8Yhe3iZaWbvV5XKSTbuAn0M')
       .expect(200);
 
-    expect(res.body.cubes.map(c => c.name).sort()).toEqual(['Foo', 'FooView']);
+    expect(res.body.cubes.map((c: { name: string }) => c.name).sort()).toEqual(['Foo', 'FooView']);
   });
 
   test('meta endpoint extended with onlyViews=true returns only views', async () => {
@@ -1078,14 +1084,14 @@ describe('API Gateway', () => {
       return { app, token, tokenUser };
     };
 
-    const notAllowedTestFactory = ({ route, method = 'get' }) => async () => {
+    const notAllowedTestFactory = ({ route, method = 'get' }: SystemRouteTest) => async () => {
       const { app } = await appPrepareFactory();
       return request(app)[method](`/cubejs-system/v1/${route}`)
         .set('Content-type', 'application/json')
         .expect(403);
     };
 
-    const notAllowedWithUserTokenTestFactory = ({ route, method = 'get' }) => async () => {
+    const notAllowedWithUserTokenTestFactory = ({ route, method = 'get' }: SystemRouteTest) => async () => {
       const { app, tokenUser } = await appPrepareFactory();
 
       return request(app)[method](`/cubejs-system/v1/${route}`)
@@ -1094,7 +1100,7 @@ describe('API Gateway', () => {
         .expect(403);
     };
 
-    const notExistsTestFactory = ({ route, method = 'get' }) => async () => {
+    const notExistsTestFactory = ({ route, method = 'get' }: SystemRouteTest) => async () => {
       const { app } = await createApiGateway();
 
       return request(app)[method](`/cubejs-system/v1/${route}`)
@@ -1102,7 +1108,11 @@ describe('API Gateway', () => {
         .expect(404);
     };
 
-    const successTestFactory = ({ route, method = 'get', successBody = {}, successResult, scope = [''] }) => async () => {
+    const successTestFactory = ({ route, method = 'get', successBody = {}, successResult, scope = [''] }: SystemRouteTest & {
+      successBody?: object,
+      successResult: object,
+      scope?: string[],
+    }) => async () => {
       const { app, token } = await appPrepareFactory(scope);
 
       const req = request(app)[method](`/cubejs-system/v1/${route}`)
@@ -1145,7 +1155,7 @@ describe('API Gateway', () => {
     };
     */
 
-    const testConfigs = [
+    const testConfigs: (SystemRouteTest & { successBody?: object, successResult: object })[] = [
       { route: 'context', successResult: { basePath: 'awesomepathtotest' } },
       { route: 'pre-aggregations', successResult: { preAggregations: preAggregationsResultFactory() } },
       { route: 'pre-aggregations/security-contexts', successResult: { securityContexts: scheduledRefreshContextsFactory().map(obj => obj.securityContext) } },

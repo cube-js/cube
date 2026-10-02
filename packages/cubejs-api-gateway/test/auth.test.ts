@@ -6,15 +6,15 @@ import jwt from 'jsonwebtoken';
 import { pausePromise } from '@cubejs-backend/shared';
 import { resetLogger } from '@cubejs-backend/native';
 
-import { ApiGateway, ApiGatewayOptions, CubejsHandlerError, Request, RequestContext } from '../src';
+import { ApiGateway, ApiGatewayOptions, CubejsHandlerError, NormalizedQuery, Request, RequestContext } from '../src';
 import { AdapterApiMock, DataSourceStorageMock } from './mocks';
 import { generateAuthToken } from './utils';
 
 class ApiGatewayOpenAPI extends ApiGateway {
   protected isRunning: Promise<void> | null = null;
 
-  public coerceForSqlQuery(query, context: RequestContext) {
-    return super.coerceForSqlQuery(query, context);
+  public coerceForSqlQuery(query: Partial<NormalizedQuery>, context: RequestContext) {
+    return super.coerceForSqlQuery(query as NormalizedQuery, context);
   }
 
   public async startSQLServer(): Promise<void> {
@@ -199,7 +199,7 @@ describe('test authorization', () => {
       //
     });
 
-    const expectSecurityContext = (securityContext) => {
+    const expectSecurityContext = (securityContext: Record<string, unknown>) => {
       expect(securityContext.uid).toEqual(5);
       expect(securityContext.iat).toBeDefined();
       expect(securityContext.exp).toBeDefined();
@@ -235,7 +235,7 @@ describe('test authorization', () => {
       //
     });
 
-    const expectSecurityContext = (securityContext) => {
+    const expectSecurityContext = (securityContext: Record<string, unknown>) => {
       expect(securityContext.uid).toEqual(5);
       expect(securityContext.iat).toBeDefined();
       expect(securityContext.exp).toBeDefined();
@@ -348,7 +348,7 @@ describe('test authorization', () => {
       //
     });
 
-    const expectSecurityContext = (securityContext) => {
+    const expectSecurityContext = (securityContext: Record<string, unknown>) => {
       expect(securityContext.u).toEqual({
         uid: 5,
       });
@@ -381,7 +381,7 @@ describe('test authorization', () => {
       //
     });
 
-    const expectSecurityContext = (securityContext) => {
+    const expectSecurityContext = (securityContext: Record<string, unknown>) => {
       expect(securityContext.uid).toEqual(5);
       expect(securityContext.iat).toBeDefined();
       expect(securityContext.exp).toBeDefined();
@@ -458,7 +458,7 @@ describe('test authorization', () => {
       //
     });
 
-    const expectSecurityContext = (securityContext) => {
+    const expectSecurityContext = (securityContext: Record<string, unknown>) => {
       expect(securityContext.uid).toEqual(5);
       expect(securityContext.iat).toBeDefined();
       expect(securityContext.exp).toBeDefined();
@@ -510,7 +510,7 @@ describe('test authorization', () => {
       //
     });
 
-    const expectSecurityContext = (securityContext) => {
+    const expectSecurityContext = (securityContext: Record<string, unknown>) => {
       expect(securityContext.uid).toEqual(5);
       expect(securityContext.iat).toBeDefined();
       expect(securityContext.exp).toBeDefined();
@@ -954,7 +954,7 @@ describe('test authorization', () => {
       }
     }));
 
-    const expectSecurityContext = (securityContext) => {
+    const expectSecurityContext = (securityContext: Record<string, unknown>) => {
       expect(securityContext.uid).toEqual(5);
       expect(securityContext.extendedField).toEqual('added_by_extend_context');
       expect(securityContext.iat).toBeDefined();
