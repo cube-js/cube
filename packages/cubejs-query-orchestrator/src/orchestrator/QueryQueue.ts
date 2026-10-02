@@ -60,7 +60,7 @@ export type QueryQueueOptions = {
   skipQueue?: boolean,
 };
 
-function factoryQueueDriver(cacheAndQueueDriver: string, queueDriverOptions): QueueDriverInterface {
+export function factoryQueueDriver(cacheAndQueueDriver: string, queueDriverOptions): QueueDriverInterface {
   switch (cacheAndQueueDriver || 'memory') {
     case 'memory':
       return new LocalQueueDriver(queueDriverOptions);

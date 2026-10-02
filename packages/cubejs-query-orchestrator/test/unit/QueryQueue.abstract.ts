@@ -4,9 +4,9 @@ import crypto from 'crypto';
 import type { QueryKey, QueryKeyHash, QueueDriverInterface, QueueDriverOptions } from '@cubejs-backend/base-driver';
 import { QueuePriority } from '@cubejs-backend/base-driver';
 import { pausePromise } from '@cubejs-backend/shared';
-import { CubeStoreDriver, CubestoreQueueDriverConnection, CubeStoreQueueDriver } from '@cubejs-backend/cubestore-driver';
+import { CubeStoreDriver, CubestoreQueueDriverConnection } from '@cubejs-backend/cubestore-driver';
 
-import { LocalQueueDriver, QueryQueue, QueryQueueOptions } from '../../src';
+import { factoryQueueDriver, QueryQueue, QueryQueueOptions } from '../../src';
 import { ContinueWaitError } from '../../src/orchestrator/ContinueWaitError';
 import { processUidRE } from '../../src/orchestrator/utils';
 
@@ -31,12 +31,10 @@ export const QueryQueueTest = (name: string, options: QueryQueueTestOptions) => 
   describe(`QueryQueue${name}`, () => {
     jest.setTimeout(10 * 1000);
 
-    // Same switch as QueryQueue's private factoryQueueDriver, for tests that need
-    // driver options the shared queue instance cannot provide
-    const createQueueDriver = (driverOptions: QueueDriverOptions): QueueDriverInterface => (
-      options.cacheAndQueueDriver === 'cubestore'
-        ? new CubeStoreQueueDriver(() => options.cubeStoreDriverFactory!(), driverOptions)
-        : new LocalQueueDriver(driverOptions)
+    // For tests that need driver options the shared queue instance cannot provide
+    const createQueueDriver = (driverOptions: QueueDriverOptions): QueueDriverInterface => factoryQueueDriver(
+      options.cacheAndQueueDriver,
+      { ...driverOptions, cubeStoreDriverFactory: options.cubeStoreDriverFactory }
     );
 
     const delayFn = (result, delay) => new Promise(resolve => setTimeout(() => resolve(result), delay));
