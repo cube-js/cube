@@ -184,7 +184,7 @@ arguments, e.g., `memo(["columns", table], fn)`. A keyless `memo(fn)` that runs
 more than once per compilation stage is an error.
 
 The function passed to `memo()` should only fetch and return data. Calling
-`cube()`, `view()`, `context()` or `asyncModule()` from it is an error, as the
+`cube()`, `view()`, `context()`, `view_group()` or `asyncModule()` from it is an error, as the
 function doesn't run again in later compilation stages. Define the model objects
 from the returned data outside of `memo()`, as in the example above. Every
 stage gets the same returned object, so don't mutate it or pass it to `cube()`

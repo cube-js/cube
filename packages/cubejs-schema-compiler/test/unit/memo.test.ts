@@ -143,6 +143,7 @@ describe.each([
     ['cube', 'cube(\'orders\', { sql_table: \'orders\' })'],
     ['view', 'view(\'orders_view\', { cubes: [] })'],
     ['context', 'context(\'ctx\', { contextMembers: [] })'],
+    ['view_group', 'view_group(\'group\', { views: [] })'],
     ['asyncModule', 'asyncModule(async () => {})'],
   ])('rejects %s() called from the memoized function', async (globalName, call) => {
     const sync = prepareCompiler([{
