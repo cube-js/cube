@@ -22,7 +22,7 @@ deployment it was created in.
 In the deployment sidebar, open **Scheduled** (the clock icon, below
 **Explore**). The **Scheduled tasks** tab of the
 **Scheduled tasks and refreshes** page lists the deployment's tasks with their
-name, schedule, status, and description, and is searchable. The
+name, schedule, status, condition, and description, and is searchable. The
 **Scheduled refreshes** tab lists the deployment's
 [dashboard scheduled refreshes](/docs/explore-analyze/scheduled-refreshes#viewing-all-scheduled-refreshes);
 if you can use only one of the two, the page shows it without tabs.
@@ -39,6 +39,9 @@ A task has:
   each execution.
 - **Schedule** — how often the task runs (see below).
 - **Enabled** — a toggle to activate or pause a scheduled task.
+- **Notify only when a condition is met** (optional) — a metric condition
+  that decides whether the agent runs at all (see
+  [Conditional tasks](#conditional-tasks)).
 
 ## Schedule options
 
@@ -47,7 +50,8 @@ Scheduled Tasks use the same schedule editor as
 offering these frequencies:
 
 - **Manual** — no schedule; the task runs only when you trigger it with
-  **Run now**.
+  **Run now** (or, on a [conditional task](#conditional-tasks),
+  **Check now**).
 - **Hourly**, **Daily**, **Weekly** (with a day of the week), and **Monthly**
   (with a day of the month) — each with a time picker.
 - **Custom** — a raw five-field cron expression. Its minute field must be a
@@ -56,6 +60,59 @@ offering these frequencies:
 
 A **timezone** selector (defaulting to your browser's timezone) controls when
 the schedule fires; it is stored per task.
+
+## Conditional tasks
+
+Turn on **Notify only when a condition is met** in the task dialog to hear
+from the agent only when a metric moves. Before the agent runs, Cube reads one
+measure, with the creator's data access, and checks the condition:
+
+- **Measure** — the metric to watch.
+- **Time dimension** and **By** (Day, Week, Month, Quarter, or Year) —
+  picking a measure fills in the first time dimension of its view, if it has
+  one. Clear it to watch the measure's all-time total instead.
+- **Condition** — one of:
+  - **changes by** — the last complete period moved **Up**, **Down**, or
+    **Up or down** by at least the percentage you enter, compared with the
+    period before it.
+  - **goes above or below** — the value **is above**, **is below**, or **is
+    equal to** the number you enter. With a time dimension, the value is the
+    last complete period's; without one, the total.
+  - **is unusual** — the last complete period is outside the range of the
+    periods before it (their median ± 3 × median absolute deviation). It needs
+    at least 8 complete periods before the last one.
+
+**changes by** and **is unusual** compare periods, so they're unavailable
+without a time dimension. The period still in progress is never read: a
+monthly condition checked in mid-September compares August with July.
+
+The task notifies once each time the condition starts to hold:
+
+- The agent runs the task's **Instructions** in a new chat thread that opens
+  with the facts it found: the value read, what it was compared with, and the
+  periods. Ask follow-up questions in that thread as in any chat.
+- If the task's **Notify me when a run finishes** switch is on, your in-app
+  inbox gets a message titled with the task's name and *"condition met"*
+  that states the change, for example *"Revenue rose 7.2 % (Aug → Sep 2026),
+  above your 5 % threshold"*. With the switch off, the agent still writes
+  the thread, but nothing reaches your inbox.
+
+While the condition keeps holding, later checks send nothing. Once a check
+finds it no longer holding, the next time it holds notifies again. Changing
+the condition's measure, time dimension, period, or rule, or pausing the
+task, starts over: the next check that finds the condition holding notifies.
+Editing only the name, instructions, or schedule doesn't.
+
+A check that finds the condition not holding, or that can't decide (for
+example, the measure is no longer in the data model, or the previous period
+was 0, so there is no % change), runs no agent, creates no thread, and sends
+nothing. It doesn't appear in **History**; the task's
+[Last check](#task-detail-page) shows what it read and why nothing was sent.
+
+Every scheduled run of a conditional task checks the condition. A **Manual**
+task's condition is checked only when you press **Check now**, which checks it
+right away, exactly as a scheduled run would. **Run now** skips the check: it
+always runs the agent and leaves the condition's state as it was.
 
 ## Limits
 
@@ -80,8 +137,8 @@ only role is a custom role that leaves it out, get no **New task** button, and
 the agent and the Platform API refuse to create a task for them; tasks they
 already created stay theirs to manage. Only a task's creator, or a user with
 the **Admin** [role](/admin/users-and-permissions/roles-and-permissions), can
-edit, pause, run, or delete it, because every run executes as the creator
-(see [Reading the output](#reading-the-output)).
+edit, pause, run, check, or delete it, because every run executes as the
+creator (see [Reading the output](#reading-the-output)).
 
 The admin exception carries the creator's data access with it: an admin who edits
 another user's task changes what runs under that user's access. A run's chat
@@ -106,7 +163,11 @@ From the list, you can:
 - **Run now** — trigger a one-off run immediately. This works for both manual
   and scheduled tasks. Triggering a run shows a notification with a **View**
   link straight to the run's chat thread, and the thread appears in the
-  Recent Chats sidebar immediately.
+  Recent Chats sidebar immediately. On a
+  [conditional task](#conditional-tasks), **Run now** runs the agent without
+  checking the condition.
+- **Check now** — on a conditional task, check the condition right away. The
+  result shows on the task's detail page.
 - **Delete** a task. Deleting removes its schedule and stops all future runs.
 
 {/* TODO: screenshot — New task dropdown with Create with agent and Set up manually options */}
@@ -117,9 +178,17 @@ Clicking a task in the list opens its detail page. The header shows a
 breadcrumb back to Scheduled Tasks, the task name, a status tag (**Manual**,
 **Active**, or **Paused**), and the description, along with actions to
 **Edit** (pencil), **Delete** (trash), and a primary **Run now** button.
+A conditional task also has a **Check now** button.
 
 The page shows:
 
+- **Condition** — on a conditional task only: the condition in plain
+  language (for example, *"When Count changes by ≥ 5 % vs the previous
+  month"*) and its **Last check**. The last check shows when it ran, its
+  result (**Condition not met**, **Condition met — notified**, **Still
+  holding — already notified**, **Could not check**, or **Check failed**),
+  the value it read with the comparison it made, and, when nothing was
+  sent, why.
 - **History** — the task's runs, newest first. Each entry is a timestamped
   link that opens that run's chat thread, if you can
   [access it](#managing-tasks). Currently-executing runs
@@ -180,10 +249,13 @@ scheduled tasks"*, *"Updated scheduled task"*, and *"Deleted scheduled
 task"*.
 
 The agent manages task definitions: when listing tasks, it can report each
-task's id, name, description, schedule, timezone, enabled state, and next
-run time. A task's run history lives on its [detail page](#task-detail-page).
-The agent follows the same [limits](#limits) and permissions as the
-**Scheduled** page, and a scheduled run can't create or change tasks itself.
+task's id, name, description, schedule, timezone, enabled state, next run
+time, inbox notification switch, and condition with its last check. It can
+also add, change, or remove a task's [condition](#conditional-tasks) — for
+example, *"tell me when monthly orders change by 5% or more."* A task's run
+history lives on its [detail page](#task-detail-page). The agent follows
+the same [limits](#limits) and permissions as the **Scheduled** page, and a
+scheduled run can't create or change tasks itself.
 
 ## Managing tasks with the Platform API
 
@@ -192,6 +264,8 @@ scripts and CI with the [Platform API](/api-reference/introduction) (by
 default, only admins can
 [create API keys](/admin/account-billing/api-keys#personal-api-keys)). Its
 Scheduled Tasks endpoints follow the same [limits](#limits) and
-[permissions](#managing-tasks) as the **Scheduled** page. See the
+[permissions](#managing-tasks) as the **Scheduled** page. A task's optional
+`condition` field holds its [condition](#conditional-tasks) (`null` on an
+update removes it), and `lastConditionCheck` holds its latest check. See the
 [API reference](/api-reference/scheduled-tasks/list-scheduled-tasks) for the
 endpoints, fields, and responses.
