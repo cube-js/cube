@@ -240,7 +240,9 @@ class TemplateFilterRef:
         self.context.add_filter(self.attribute, func)
         return func
 
-_template_context = contextvars.ContextVar('cube_template_context', default=None)
+# Kept when the runtime runs this module again for the next compilation: calls still running hold
+# tokens of it
+_template_context = globals().get('_template_context') or contextvars.ContextVar('cube_template_context', default=None)
 
 
 def _memo_key(args, kwargs):
