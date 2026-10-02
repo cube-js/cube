@@ -948,33 +948,55 @@ export const QueryQueueTest = (name: string, options: QueryQueueTestOptions) => 
         });
       });
 
+      // The memory driver reads the time only from Date.now, so the deadline tests below can pin
+      // it instead of sleeping on sub-second margins
+      const withClock = async (fn: (setTime: (ms: number) => void) => Promise<void>) => {
+        const start = Date.now();
+        let now = start;
+        const spy = jest.spyOn(Date, 'now').mockImplementation(() => now);
+
+        try {
+          await fn((ms) => {
+            now = start + ms;
+          });
+        } finally {
+          spy.mockRestore();
+        }
+      };
+
       // Cube Store keeps the deadline of the first add
       onlyLocalTest('re-adding a pending query extends its orphaned deadline', async () => {
-        await withConnections(1, async (connection) => {
+        await withConnections(1, async (connection) => withClock(async (setTime) => {
           const key: QueryKey = ['orphaned-extended', []];
           const hash = connection.redisHash(key);
 
           await addQuery(connection, key, 'orphaned-extended-1', 1);
-          await pausePromise(700);
+
+          setTime(700);
           await addQuery(connection, key, 'orphaned-extended-2', 1);
-          await pausePromise(700);
+
+          setTime(1500);
           expect(await connection.getOrphanedQueries()).toEqual([]);
 
-          await pausePromise(500);
+          setTime(1800);
           expect(await connection.getOrphanedQueries()).toEqual([[hash, expect.any(Number)]]);
-        });
+        }));
       });
 
       onlyLocalTest('re-adding with a shorter orphaned timeout keeps the later deadline', async () => {
-        await withConnections(1, async (connection) => {
+        await withConnections(1, async (connection) => withClock(async (setTime) => {
           const key: QueryKey = ['orphaned-kept', []];
+          const hash = connection.redisHash(key);
 
           await addQuery(connection, key, 'orphaned-kept-1', 60);
           await addQuery(connection, key, 'orphaned-kept-2', 1);
 
-          await pausePromise(1000 + 500 /* additional timeout on CI */);
+          setTime(1500);
           expect(await connection.getOrphanedQueries()).toEqual([]);
-        });
+
+          setTime(60500);
+          expect(await connection.getOrphanedQueries()).toEqual([[hash, expect.any(Number)]]);
+        }));
       });
 
       test('getQueriesToCancel reports each item once', async () => {
