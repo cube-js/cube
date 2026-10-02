@@ -496,24 +496,99 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
+        # Pushed by digest and merged into one multi-arch manifest by
+        # docker-cubestore-manifest.
         include:
-          # amd64 and arm64 are pushed by digest and merged into one multi-arch
-          # manifest by docker-cubestore-manifest.
           - os: ubuntu-24.04
             arch: amd64
             platforms: linux/amd64
             build-args: WITH_AVX2=1
-            multiarch: true
           - os: ubuntu-24.04-arm
             arch: arm64
             platforms: linux/arm64
             build-args: WITH_AVX2=0
-            multiarch: true
+    timeout-minutes: 60
+    permissions:
+      contents: write
+    steps:
+      - name: Check out the repo
+        uses: actions/checkout@v7
+      - name: Repo metadata
+        id: repo
+        uses: actions/github-script@v9
+        with:
+          script: |
+            const { data } = await github.rest.repos.get(context.repo)
+            const reg = new RegExp('📊 ', 'ug');
+            data.description = data.description.replace(reg, "")
+            return data
+      - name: Prepare
+        id: prep
+        run: |
+          VERSION=noop
+
+          if [ "${{ github.event_name }}" = "schedule" ]; then
+            VERSION=nightly
+          elif [[ $GITHUB_REF == refs/tags/* ]]; then
+            VERSION=${GITHUB_REF#refs/tags/}
+          fi
+
+          {
+            echo "version=${VERSION}"
+            echo "created=$(date -u +'%Y-%m-%dT%H:%M:%SZ')"
+          } >> "$GITHUB_OUTPUT"
+      - name: Login to DockerHub
+        uses: docker/login-action@v4
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4
+      - name: Push to Docker Hub
+        id: build
+        uses: docker/build-push-action@v7
+        with:
+          context: ./rust/
+          file: ./rust/cubestore/Dockerfile
+          platforms: ${{ matrix.platforms }}
+          build-args: ${{ matrix.build-args }}
+          outputs: type=image,name=cubejs/cubestore,push-by-digest=true,name-canonical=true,push=true
+          cache-from: type=gha,scope=cubestore-${{ matrix.arch }}
+          cache-to: type=gha,mode=max,scope=cubestore-${{ matrix.arch }}
+          labels: |
+            org.opencontainers.image.title=${{ fromJson(steps.repo.outputs.result).name }}
+            org.opencontainers.image.description=${{ fromJson(steps.repo.outputs.result).description }}
+            org.opencontainers.image.url=${{ fromJson(steps.repo.outputs.result).html_url }}
+            org.opencontainers.image.source=${{ fromJson(steps.repo.outputs.result).clone_url }}
+            org.opencontainers.image.version=${{ steps.prep.outputs.version }}
+            org.opencontainers.image.created=${{ steps.prep.outputs.created }}
+            org.opencontainers.image.revision=${{ github.sha }}
+            org.opencontainers.image.licenses=${{ fromJson(steps.repo.outputs.result).license.spdx_id }}
+      - name: Export digest
+        env:
+          DIGEST: ${{ steps.build.outputs.digest }}
+        run: |
+          mkdir -p "${{ runner.temp }}/digests"
+          touch "${{ runner.temp }}/digests/${DIGEST#sha256:}"
+      - name: Upload digest
+        uses: actions/upload-artifact@v7
+        with:
+          name: cubestore-digests-${{ matrix.arch }}
+          path: ${{ runner.temp }}/digests/*
+          if-no-files-found: error
+          retention-days: 1
+
+  docker-cubestore-non-avx:
+    name: Cube Store Docker (non-AVX)
+    runs-on: ${{ matrix.os }}
+    needs: [detect_branch]
+    strategy:
+      matrix:
+        include:
           - os: ubuntu-24.04
             arch: amd64-non-avx
             platforms: linux/amd64
             build-args: WITH_AVX2=0
-            multiarch: false
             postfix: "-non-avx"
             tag: "non-avx"
     timeout-minutes: 60
@@ -568,15 +643,14 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v4
       - name: Push to Docker Hub
-        id: build
         uses: docker/build-push-action@v7
         with:
           context: ./rust/
           file: ./rust/cubestore/Dockerfile
           platforms: ${{ matrix.platforms }}
           build-args: ${{ matrix.build-args }}
-          tags: ${{ !matrix.multiarch && steps.prep.outputs.tags || '' }}
-          outputs: ${{ matrix.multiarch && 'type=image,name=cubejs/cubestore,push-by-digest=true,name-canonical=true,push=true' || 'type=image,push=true' }}
+          push: true
+          tags: ${{ steps.prep.outputs.tags }}
           cache-from: type=gha,scope=cubestore-${{ matrix.arch }}
           cache-to: type=gha,mode=max,scope=cubestore-${{ matrix.arch }}
           labels: |
@@ -588,21 +662,6 @@ jobs:
             org.opencontainers.image.created=${{ steps.prep.outputs.created }}
             org.opencontainers.image.revision=${{ github.sha }}
             org.opencontainers.image.licenses=${{ fromJson(steps.repo.outputs.result).license.spdx_id }}
-      - name: Export digest
-        if: matrix.multiarch
-        env:
-          DIGEST: ${{ steps.build.outputs.digest }}
-        run: |
-          mkdir -p "${{ runner.temp }}/digests"
-          touch "${{ runner.temp }}/digests/${DIGEST#sha256:}"
-      - name: Upload digest
-        if: matrix.multiarch
-        uses: actions/upload-artifact@v7
-        with:
-          name: cubestore-digests-${{ matrix.arch }}
-          path: ${{ runner.temp }}/digests/*
-          if-no-files-found: error
-          retention-days: 1
 
   docker-cubestore-manifest:
     name: Cube Store Docker (multi-arch manifest)
