@@ -10,6 +10,7 @@ mod custom_granularities;
 mod filter_member_operand;
 mod filtered_measures;
 mod filters_segments;
+mod join_aliases;
 mod joins;
 mod member_expressions;
 mod modifiers;

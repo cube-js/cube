@@ -127,7 +127,12 @@ impl PhysicalPlanBuilder {
         context.measure_subquery = true;
         let sub_query = self.process_node(dimension_subquery.query.as_ref(), &context)?;
         let dim_name = dimension_subquery.subquery_dimension.name();
-        let cube_name = dimension_subquery.subquery_dimension.cube_id();
+        let cube_id = dimension_subquery.subquery_dimension.cube_id();
+        let cube_name = if cube_id.is_joined() {
+            self.query_tools.alias_for_cube(&cube_id)?
+        } else {
+            cube_id.to_string()
+        };
         let primary_keys_dimensions = &dimension_subquery.primary_keys_dimensions;
         let sub_query_alias = format!("{cube_name}_{dim_name}_subquery");
         let conditions = primary_keys_dimensions

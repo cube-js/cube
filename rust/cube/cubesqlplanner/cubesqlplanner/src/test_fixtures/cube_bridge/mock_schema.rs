@@ -541,6 +541,22 @@ impl MockViewBuilder {
         self
     }
 
+    // The cube a join path ends at, following each step through the joins of
+    // the cube before it, so an aliased step leads to the cube it joins.
+    fn join_path_target(cubes: &HashMap<String, MockCube>, parts: &[&str]) -> Option<String> {
+        let mut current = parts.first()?.to_string();
+        for part in &parts[1..] {
+            current = match cubes
+                .get(&current)
+                .and_then(|cube| cube.definition.get_join(part))
+            {
+                Some(join) => join.static_data().name.clone(),
+                None => part.to_string(),
+            };
+        }
+        Some(current)
+    }
+
     pub fn finish_view(mut self) -> MockSchemaBuilder {
         let mut all_dimensions = self.dimensions;
         let mut all_measures = self.measures;
@@ -550,8 +566,13 @@ impl MockViewBuilder {
         for view_cube in &self.view_cubes {
             let join_path_parts: Vec<&str> = view_cube.join_path.split('.').collect();
             let target_cube_name = join_path_parts.last().unwrap();
+            let source_cube_name =
+                Self::join_path_target(&self.schema_builder.cubes, &join_path_parts);
 
-            if let Some(source_cube) = self.schema_builder.cubes.get(*target_cube_name) {
+            if let Some(source_cube) = source_cube_name
+                .as_ref()
+                .and_then(|name| self.schema_builder.cubes.get(name))
+            {
                 let members_to_include: Vec<String> = if view_cube.includes.is_empty() {
                     let mut all_members = Vec::new();
                     all_members.extend(source_cube.dimensions.keys().cloned());

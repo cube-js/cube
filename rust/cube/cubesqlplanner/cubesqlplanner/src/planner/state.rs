@@ -50,7 +50,7 @@ impl State {
         max_member_resolution_depth: Option<usize>,
     ) -> Result<Rc<Self>, CubeError> {
         let query_tools = QueryTools::try_new(
-            cube_evaluator.clone(),
+            cube_evaluator,
             base_tools.clone(),
             join_graph,
             timezone_name,
@@ -60,7 +60,7 @@ impl State {
         )?;
 
         let compiler = Rc::new(RefCell::new(Compiler::new(
-            cube_evaluator,
+            query_tools.model_cubes().clone(),
             base_tools,
             security_context,
             query_tools.timezone(),
