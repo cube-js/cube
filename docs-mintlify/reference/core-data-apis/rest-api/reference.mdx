@@ -1198,13 +1198,11 @@ This requires a token with the `meta-private` scope as well as `meta`; without
 it, the request fails with `403`. To get such a token, call the Control Plane
 API's [`tokens-for-meta-sync`][ref-cpa-meta-sync-token] endpoint, which data
 catalog integrations use, with a `security_context` and
-`"scopes": ["meta-private"]`; it always adds `meta`. The scope is granted only
-to callers with the `SchemaRead` ([View data model][ref-custom-roles])
-permission on the deployment, or to admins on accounts without role-based
-access control. For anyone else it is silently left out of the token rather
-than rejected, so the problem only shows up as a `403` later. Tokens from the
-general-purpose [token endpoint][ref-cpa-create-token] never carry
-`meta-private`.
+`"scopes": ["meta-private"]`; it always adds `meta`. The scope is
+[granted only to some callers][ref-cpa-meta-sync-token] and is silently left out
+of the token for anyone else, so a missing permission only shows up as a `403`
+later. Tokens from the general-purpose [token endpoint][ref-cpa-create-token]
+never carry `meta-private`.
 
 `include_private` doesn't bypass [data access policies][ref-dap]. Whatever a data
 access policy hides from the token's security context is never returned, even
@@ -1324,7 +1322,6 @@ Keep-Alive: timeout=5
 [ref-dap]: /docs/data-modeling/data-access-policies
 [ref-cpa-create-token]: /api-reference/environments/create-deployment-environment-token
 [ref-cpa-meta-sync-token]: /reference/control-plane-api#apiv1deploymentsdeployment_idenvironmentsenvironment_idtokens-for-meta-sync
-[ref-custom-roles]: /admin/users-and-permissions/custom-roles
 [ref-env-db-name]: /reference/configuration/environment-variables#cubejs_db_name
 [ref-env-db-schema]: /reference/configuration/environment-variables#cubejs_db_schema
 [ref-env-bq-project-id]: /reference/configuration/environment-variables#cubejs_db_bq_project_id
