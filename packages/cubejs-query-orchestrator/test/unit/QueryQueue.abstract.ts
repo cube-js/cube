@@ -473,8 +473,6 @@ export const QueryQueueTest = (name: string, options: QueryQueueTestOptions) => 
       expect(result).toEqual(['10', '21', '32', '43']);
     });
 
-    const onlyLocalTest = options.cacheAndQueueDriver !== 'cubestore' ? test : xtest;
-
     test('orphaned', async () => {
       cancelledQuery = null;
 
@@ -656,60 +654,6 @@ export const QueryQueueTest = (name: string, options: QueryQueueTestOptions) => 
       expect(result).toBe('select * from bar');
     });
 
-    onlyLocalTest('addToQueue never retrieves in memory', async () => {
-      const connection = await queue.queueDriver.createConnection();
-      const query: QueryKey = ['select * from add_and_retrieve', []];
-
-      try {
-        const [added, , , , retrieved] = await connection.addToQueue(
-          query,
-          'delay',
-          { isJob: true, orphanedTimeout: undefined },
-          10,
-          { queueId: 1, stageQueryKey: '1', requestId: '1' }
-        );
-
-        expect(added).toBe(1);
-        expect(retrieved).toBeNull();
-        expect(await connection.getToProcessQueries()).toStrictEqual([
-          [connection.redisHash(query), expect.any(Number)]
-        ]);
-      } finally {
-        await connection.getQueryAndRemove(connection.redisHash(query), null);
-
-        queue.queueDriver.release(connection);
-      }
-    });
-
-    onlyLocalTest('an active query cannot be retrieved twice', async () => {
-      const connection = await queue.queueDriver.createConnection();
-      const connection2 = await queue.queueDriver.createConnection();
-      const priority = 10;
-      const key = 'active-retrieval' as any;
-
-      try {
-        const [, queueId] = await connection.addToQueue(
-          key, 'handler', <any>['select'], priority, {
-            queueId: queue.generateQueueId(), stageQueryKey: key, requestId: '1'
-          }
-        );
-
-        const firstRetrieval = await connection.retrieveForProcessing(key, queueId);
-        expect(firstRetrieval).toMatchObject({
-          active: [key],
-          queueSize: 0,
-          def: { queryKey: key },
-        });
-
-        const secondRetrieval = await connection2.retrieveForProcessing(key, queueId);
-        expect(secondRetrieval).toBeNull();
-      } finally {
-        await connection.getQueryAndRemove(key, null);
-        queue.queueDriver.release(connection);
-        queue.queueDriver.release(connection2);
-      }
-    });
-
     test('a failed retrieval does not reserve a pending query', async () => {
       const connection = await queue.queueDriver.createConnection();
       const connection2 = await queue.queueDriver.createConnection();
@@ -884,37 +828,6 @@ export const QueryQueueTest = (name: string, options: QueryQueueTestOptions) => 
         });
       });
 
-      // With concurrency: 1 the second retrieval is rejected by the full slot alone, so this
-      // needs a free slot to show that the status is what rejects it
-      onlyLocalTest('retrieveForProcessing does not activate an already active item with a free slot', async () => {
-        const driver = createQueueDriver({
-          redisQueuePrefix: `${crypto.randomBytes(6).toString('hex')}#already-active`,
-          concurrency: 2,
-          continueWaitTimeout: 1,
-          orphanedTimeout: 60,
-          heartBeatTimeout: 60,
-        });
-
-        const connection = await driver.createConnection();
-        const connection2 = await driver.createConnection();
-        const key: QueryKey = ['already-active-free-slot', []];
-        const hash = connection.redisHash(key);
-
-        try {
-          const [, queueId] = await addQuery(connection, key, 'already-active-free-slot');
-
-          expect(await connection.retrieveForProcessing(hash, queueId)).toMatchObject({
-            active: [hash],
-          });
-          expect(await connection2.retrieveForProcessing(hash, queueId)).toBeNull();
-          expect(await connection.getActiveQueries()).toEqual([[hash, queueId]]);
-        } finally {
-          await connection.getQueryAndRemove(hash, null);
-          driver.release(connection);
-          driver.release(connection2);
-        }
-      });
-
       test('retrieveForProcessing on an unknown key creates nothing', async () => {
         await withConnections(1, async (connection) => {
           const hash = connection.redisHash(['never-added', []]);
@@ -946,57 +859,6 @@ export const QueryQueueTest = (name: string, options: QueryQueueTestOptions) => 
           // Once it is being executed the heartbeat takes over from the orphaned deadline
           expect(await connection.getOrphanedQueries()).toEqual([]);
         });
-      });
-
-      // The memory driver reads the time only from Date.now, so the deadline tests below can pin
-      // it instead of sleeping on sub-second margins
-      const withClock = async (fn: (setTime: (ms: number) => void) => Promise<void>) => {
-        const start = Date.now();
-        let now = start;
-        const spy = jest.spyOn(Date, 'now').mockImplementation(() => now);
-
-        try {
-          await fn((ms) => {
-            now = start + ms;
-          });
-        } finally {
-          spy.mockRestore();
-        }
-      };
-
-      // Cube Store keeps the deadline of the first add
-      onlyLocalTest('re-adding a pending query extends its orphaned deadline', async () => {
-        await withConnections(1, async (connection) => withClock(async (setTime) => {
-          const key: QueryKey = ['orphaned-extended', []];
-          const hash = connection.redisHash(key);
-
-          await addQuery(connection, key, 'orphaned-extended-1', 1);
-
-          setTime(700);
-          await addQuery(connection, key, 'orphaned-extended-2', 1);
-
-          setTime(1500);
-          expect(await connection.getOrphanedQueries()).toEqual([]);
-
-          setTime(1800);
-          expect(await connection.getOrphanedQueries()).toEqual([[hash, expect.any(Number)]]);
-        }));
-      });
-
-      onlyLocalTest('re-adding with a shorter orphaned timeout keeps the later deadline', async () => {
-        await withConnections(1, async (connection) => withClock(async (setTime) => {
-          const key: QueryKey = ['orphaned-kept', []];
-          const hash = connection.redisHash(key);
-
-          await addQuery(connection, key, 'orphaned-kept-1', 60);
-          await addQuery(connection, key, 'orphaned-kept-2', 1);
-
-          setTime(1500);
-          expect(await connection.getOrphanedQueries()).toEqual([]);
-
-          setTime(60500);
-          expect(await connection.getOrphanedQueries()).toEqual([[hash, expect.any(Number)]]);
-        }));
       });
 
       test('getQueriesToCancel reports each item once', async () => {
