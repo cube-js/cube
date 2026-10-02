@@ -150,7 +150,7 @@ describe.each([
       fileName: 'orders.js',
       content: `memo('defs', () => { ${call}; });`,
     }], { sharedVmContext });
-    await expect(sync.compiler.compile()).rejects.toThrow(`${globalName}() can't be called from the function passed to memo('defs')`);
+    await expect(sync.compiler.compile()).rejects.toThrow(`${globalName}() can't be called from the function passed to memo("defs")`);
 
     const async = prepareCompiler([{
       fileName: 'orders.js',
@@ -163,7 +163,7 @@ describe.each([
         });
       `,
     }], { sharedVmContext });
-    await expect(async.compiler.compile()).rejects.toThrow(`${globalName}() can't be called from the function passed to memo('defs')`);
+    await expect(async.compiler.compile()).rejects.toThrow(`${globalName}() can't be called from the function passed to memo("defs")`);
   });
 
   it('generates the key when it is omitted', async () => {
@@ -332,6 +332,15 @@ describe.each([
     await compiler.compile();
 
     expect(cubeEvaluator.cubeFromPath('orders').sqlTable!()).toEqual('orders_table_users_table');
+  });
+
+  it('names the call site of a keyless memo() in errors', async () => {
+    const { compiler } = prepareCompiler([{
+      fileName: 'orders.js',
+      content: `memo(() => { cube('orders', { sql_table: 'orders' }); });`,
+    }], { sharedVmContext });
+
+    await expect(compiler.compile()).rejects.toThrow("cube() can't be called from the function passed to memo() at orders.js:1:0");
   });
 
   it('reports invalid arguments', async () => {

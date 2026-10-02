@@ -595,10 +595,10 @@ export class DataSchemaCompiler {
     // Model objects go to the current stage only, while a memoized function runs in the first stage
     // that asks for its key: objects defined from there would be missing from all later stages.
     const assertOutsideMemo = (globalName: string) => {
-      const key = memoFnStorage.getStore();
-      if (key !== undefined) {
+      const memoCall = memoFnStorage.getStore();
+      if (memoCall !== undefined) {
         throw new UserError(
-          `${globalName}() can't be called from the function passed to memo('${key}'): ` +
+          `${globalName}() can't be called from the function passed to ${memoCall}: ` +
           'return the data from memo() and define model objects outside of it'
         );
       }
@@ -706,7 +706,8 @@ export class DataSchemaCompiler {
           throw new Error('memo() expects a string or a JSON-serializable key as its first argument');
         }
         const callSite = MemoKeyTranspiler.callSiteOf(key);
-        const label = callSite ?? (typeof key === 'string' ? key : cacheKey);
+        // For errors: the key as the code would write it
+        const label = callSite !== undefined ? `memo() at ${callSite}` : `memo(${cacheKey})`;
         if (memoStage < 0 || !ctxFileStorage.getStore()) {
           // Called from a member (`sql: () => memo(...)`) evaluated by a compiler or a query, not
           // from a model file: it may run any number of times, so there's no stage to cache for
