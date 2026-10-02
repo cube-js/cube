@@ -1423,7 +1423,7 @@ dependencies = [
 
 [[package]]
 name = "cubestore"
-version = "1.7.48"
+version = "1.7.49"
 dependencies = [
  "actix-rt",
  "anyhow",

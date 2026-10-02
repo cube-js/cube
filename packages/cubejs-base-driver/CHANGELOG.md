@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.7.49](https://github.com/cube-js/cube/compare/v1.7.48...v1.7.49) (2026-10-02)
+
+### Features
+
+- **prestodb-driver:** Tag Presto/Trino queries with requestId trace token ([#12080](https://github.com/cube-js/cube/issues/12080)) ([f2d3393](https://github.com/cube-js/cube/commit/f2d33931f69127efeda1aca0b4f76a0d32cf2463)), closes [#12072](https://github.com/cube-js/cube/issues/12072)
+
 ## [1.7.48](https://github.com/cube-js/cube/compare/v1.7.47...v1.7.48) (2026-10-01)
 
 **Note:** Version bump only for package @cubejs-backend/base-driver
