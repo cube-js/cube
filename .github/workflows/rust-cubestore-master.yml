@@ -133,6 +133,13 @@ jobs:
     runs-on: ubuntu-24.04
     needs: [cubestore-docker-image-dev]
     timeout-minutes: 15
+    strategy:
+      matrix:
+        # -arm64v8 tags used to be a separate arm64-only image, keep publishing
+        # them as aliases of the same multi-arch manifest.
+        include:
+          - postfix: ""
+          - postfix: "-arm64v8"
     steps:
       - name: Check out the repo
         uses: actions/checkout@v7
@@ -161,27 +168,20 @@ jobs:
             VERSION="pr-${{ github.event.number }}"
           fi
 
-          TAGS=("${VERSION}")
+          TAGS="${DOCKER_IMAGE}:${VERSION}${{ matrix.postfix }}"
 
           if [[ "$VERSION" =~ ^v[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}$ ]]; then
             MINOR="${VERSION%.*}"
             MAJOR="${MINOR%.*}"
-            TAGS+=("${MINOR}" "${MAJOR}")
+            TAGS="$TAGS,${DOCKER_IMAGE}:${MINOR}${{ matrix.postfix }},${DOCKER_IMAGE}:${MAJOR}${{ matrix.postfix }}"
           elif [ "${{ github.event_name }}" = "push" ]; then
-            TAGS+=("build-1${GITHUB_RUN_NUMBER}")
+            TAGS="$TAGS,${DOCKER_IMAGE}:build-1${GITHUB_RUN_NUMBER}${{ matrix.postfix }}"
           fi
-
-          # -arm64v8 tags used to be a separate arm64-only image, keep them as
-          # aliases of the multi-arch manifest so existing pins keep working.
-          FLAGS=""
-          for TAG in "${TAGS[@]}"; do
-            FLAGS="$FLAGS -t ${DOCKER_IMAGE}:${TAG} -t ${DOCKER_IMAGE}:${TAG}-arm64v8"
-          done
 
           {
             echo "image=${DOCKER_IMAGE}"
             echo "version=${VERSION}"
-            echo "flags=${FLAGS}"
+            echo "tags=${TAGS}"
           } >> "$GITHUB_OUTPUT"
       - name: Login to DockerHub
         uses: docker/login-action@v4
@@ -194,13 +194,14 @@ jobs:
         working-directory: ${{ runner.temp }}/digests
         env:
           IMAGE: ${{ steps.prep.outputs.image }}
-          FLAGS: ${{ steps.prep.outputs.flags }}
+          TAGS: ${{ steps.prep.outputs.tags }}
         run: |
           # shellcheck disable=SC2046,SC2086
-          docker buildx imagetools create $FLAGS $(printf "${IMAGE}@sha256:%s " *)
+          docker buildx imagetools create $(printf -- '-t %s ' ${TAGS//,/ }) $(printf "${IMAGE}@sha256:%s " *)
       - name: Inspect image
-        run: docker buildx imagetools inspect ${{ steps.prep.outputs.image }}:${{ steps.prep.outputs.version }}
+        run: docker buildx imagetools inspect ${{ steps.prep.outputs.image }}:${{ steps.prep.outputs.version }}${{ matrix.postfix }}
       - name: Update repo description
+        if: matrix.postfix == ''
         uses: peter-evans/dockerhub-description@v5
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
