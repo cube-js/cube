@@ -175,8 +175,10 @@ The token always carries the `meta` scope. To also read
 [private cubes, views, and members][ref-metadata-api-private], request the
 `meta-private` scope. It is added only if you have the `SchemaRead`
 ([View data model][ref-custom-roles]) permission on the deployment, or are an
-admin on an account without role-based access control; otherwise it is
-silently left out. Any other scope you request is ignored.
+admin on an account without role-based access control; otherwise it is left
+out rather than refused. Any other scope you request is ignored. The `scopes`
+property of the response lists the scopes the token carries, so check it to
+see whether `meta-private` was granted.
 
 Path parameters:
 
@@ -214,7 +216,8 @@ Example response:
   "data": {
     "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
     "created_at": "2024-01-15T10:30:00.000Z",
-    "expires_at": "2024-01-15T11:30:00.000Z"
+    "expires_at": "2024-01-15T11:30:00.000Z",
+    "scopes": ["meta"]
   }
 }
 ```
