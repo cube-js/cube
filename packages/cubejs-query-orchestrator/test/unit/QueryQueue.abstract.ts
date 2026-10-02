@@ -1,12 +1,12 @@
 import { Readable } from 'stream';
 import crypto from 'crypto';
 
-import type { QueryKey, QueryKeyHash, QueueDriverInterface } from '@cubejs-backend/base-driver';
+import type { QueryKey, QueryKeyHash, QueueDriverConnectionInterface, QueueDriverInterface, QueueDriverOptions } from '@cubejs-backend/base-driver';
 import { QueuePriority } from '@cubejs-backend/base-driver';
 import { pausePromise } from '@cubejs-backend/shared';
 import { CubeStoreDriver, CubestoreQueueDriverConnection } from '@cubejs-backend/cubestore-driver';
 
-import { QueryQueue, QueryQueueOptions } from '../../src';
+import { factoryQueueDriver, QueryQueue, QueryQueueOptions } from '../../src';
 import { ContinueWaitError } from '../../src/orchestrator/ContinueWaitError';
 import { processUidRE } from '../../src/orchestrator/utils';
 
@@ -30,6 +30,11 @@ class QueryQueueExtended extends QueryQueue {
 export const QueryQueueTest = (name: string, options: QueryQueueTestOptions) => {
   describe(`QueryQueue${name}`, () => {
     jest.setTimeout(10 * 1000);
+
+    const createQueueDriver = (driverOptions: QueueDriverOptions): QueueDriverInterface => factoryQueueDriver(
+      options.cacheAndQueueDriver,
+      { ...driverOptions, cubeStoreDriverFactory: options.cubeStoreDriverFactory }
+    );
 
     const delayFn = (result, delay) => new Promise(resolve => setTimeout(() => resolve(result), delay));
     const logger = jest.fn((message, event) => console.log(`${message} ${JSON.stringify(event)}`));
@@ -468,8 +473,6 @@ export const QueryQueueTest = (name: string, options: QueryQueueTestOptions) => 
       expect(result).toEqual(['10', '21', '32', '43']);
     });
 
-    const onlyLocalTest = options.cacheAndQueueDriver !== 'cubestore' ? test : xtest;
-
     test('orphaned', async () => {
       cancelledQuery = null;
 
@@ -651,60 +654,6 @@ export const QueryQueueTest = (name: string, options: QueryQueueTestOptions) => 
       expect(result).toBe('select * from bar');
     });
 
-    onlyLocalTest('addToQueue never retrieves in memory', async () => {
-      const connection = await queue.queueDriver.createConnection();
-      const query: QueryKey = ['select * from add_and_retrieve', []];
-
-      try {
-        const [added, , , , retrieved] = await connection.addToQueue(
-          query,
-          'delay',
-          { isJob: true, orphanedTimeout: undefined },
-          10,
-          { queueId: 1, stageQueryKey: '1', requestId: '1' }
-        );
-
-        expect(added).toBe(1);
-        expect(retrieved).toBeNull();
-        expect(await connection.getToProcessQueries()).toStrictEqual([
-          [connection.redisHash(query), expect.any(Number)]
-        ]);
-      } finally {
-        await connection.getQueryAndRemove(connection.redisHash(query), null);
-
-        queue.queueDriver.release(connection);
-      }
-    });
-
-    onlyLocalTest('an active query cannot be retrieved twice', async () => {
-      const connection = await queue.queueDriver.createConnection();
-      const connection2 = await queue.queueDriver.createConnection();
-      const priority = 10;
-      const key = 'active-retrieval' as any;
-
-      try {
-        const [, queueId] = await connection.addToQueue(
-          key, 'handler', <any>['select'], priority, {
-            queueId: queue.generateQueueId(), stageQueryKey: key, requestId: '1'
-          }
-        );
-
-        const firstRetrieval = await connection.retrieveForProcessing(key, queueId);
-        expect(firstRetrieval).toMatchObject({
-          active: [key],
-          queueSize: 0,
-          def: { queryKey: key },
-        });
-
-        const secondRetrieval = await connection2.retrieveForProcessing(key, queueId);
-        expect(secondRetrieval).toBeNull();
-      } finally {
-        await connection.getQueryAndRemove(key, null);
-        queue.queueDriver.release(connection);
-        queue.queueDriver.release(connection2);
-      }
-    });
-
     test('a failed retrieval does not reserve a pending query', async () => {
       const connection = await queue.queueDriver.createConnection();
       const connection2 = await queue.queueDriver.createConnection();
@@ -798,6 +747,202 @@ export const QueryQueueTest = (name: string, options: QueryQueueTestOptions) => 
         await connection.getQueryAndRemove(key, null);
         queue.queueDriver.release(connection);
       }
+    });
+
+    // A queue item being active is the only lock there is, so these pin down the semantics both
+    // drivers have to agree on. Note the suite runs with concurrency: 1.
+    describe('queue driver semantics', () => {
+      const priority = 10;
+
+      // Recorded on add rather than at the end of a test, so that a failed assertion cannot leave
+      // an active item behind to saturate the queue for every test after it
+      let addedKeys: QueryKey[] = [];
+
+      afterEach(async () => {
+        const connection = await queue.queueDriver.createConnection();
+
+        try {
+          for (const key of addedKeys) {
+            await connection.getQueryAndRemove(connection.redisHash(key), null);
+          }
+        } finally {
+          addedKeys = [];
+          queue.queueDriver.release(connection);
+        }
+      });
+
+      const addToQueue = (connection: QueueDriverConnectionInterface, queryKey: QueryKey, requestId: string, orphanedTimeout = 60) => connection.addToQueue(
+        queryKey,
+        'delay',
+        { isJob: true },
+        priority,
+        { queueId: queue.generateQueueId(), stageQueryKey: queryKey, requestId, orphanedTimeout }
+      );
+
+      const addQuery = (connection: QueueDriverConnectionInterface, queryKey: QueryKey, requestId: string, orphanedTimeout = 60) => {
+        addedKeys.push(queryKey);
+
+        return addToQueue(connection, queryKey, requestId, orphanedTimeout);
+      };
+
+      // heartBeatTimeout is derived from heartBeatInterval * 4, which is way too long for the
+      // tests that need an item to stall, so they get a driver of their own. Its prefix is
+      // theirs alone, so cleanup drops everything in it instead of tracking keys.
+      const withShortHeartbeat = async (fn: (connection: QueueDriverConnectionInterface) => Promise<void>) => {
+        const driver = createQueueDriver({
+          redisQueuePrefix: `${crypto.randomBytes(6).toString('hex')}#short_heartbeat`,
+          concurrency: 1,
+          continueWaitTimeout: 1,
+          orphanedTimeout: 60,
+          heartBeatTimeout: 1,
+        });
+        const connection = await driver.createConnection();
+
+        try {
+          await fn(connection);
+        } finally {
+          const [active, toProcess] = await connection.getQueryStageState(true);
+
+          for (const hash of [...active, ...toProcess]) {
+            await connection.getQueryAndRemove(hash as QueryKeyHash, null);
+          }
+
+          driver.release(connection);
+        }
+      };
+
+      const withConnections = async (count: number, fn: (...connections: QueueDriverConnectionInterface[]) => Promise<void>) => {
+        const connections = await Promise.all(
+          Array.from({ length: count }, () => queue.queueDriver.createConnection())
+        );
+
+        try {
+          await fn(...connections);
+        } finally {
+          connections.forEach(connection => queue.queueDriver.release(connection));
+        }
+      };
+
+      test('addToQueue dedupes by key and returns the existing queue id', async () => {
+        await withConnections(2, async (connection, connection2) => {
+          const key: QueryKey = ['dedupe', []];
+
+          const [added, queueId] = await addQuery(connection, key, 'dedupe-1');
+          expect(added).toBe(1);
+
+          const [addedAgain, queueIdAgain] = await addQuery(connection2, key, 'dedupe-2');
+          expect(addedAgain).toBe(0);
+          expect(queueIdAgain).toEqual(queueId);
+
+          // The first add wins outright: the second one must not overwrite the payload
+          const def = await connection.getQueryDef(connection.redisHash(key), queueId);
+          expect(def.requestId).toBe('dedupe-1');
+        });
+      });
+
+      test('retrieveForProcessing does not activate an already active item', async () => {
+        await withConnections(2, async (connection, connection2) => {
+          const key: QueryKey = ['already-active', []];
+          const hash = connection.redisHash(key);
+
+          const [, queueId] = await addQuery(connection, key, 'already-active');
+
+          expect(await connection.retrieveForProcessing(hash, queueId)).toMatchObject({
+            active: [hash],
+            def: { queryKey: key },
+          });
+          expect(await connection2.retrieveForProcessing(hash, queueId)).toBeNull();
+          expect(await connection.getActiveQueries()).toEqual([[hash, queueId]]);
+        });
+      });
+
+      test('retrieveForProcessing on an unknown key creates nothing', async () => {
+        await withConnections(1, async (connection) => {
+          const hash = connection.redisHash(['never-added', []]);
+
+          expect(await connection.retrieveForProcessing(hash, queue.generateQueueId())).toBeNull();
+
+          const [active, toProcess] = await connection.getQueryStageState(true);
+          expect(active).not.toContain(hash);
+          expect(toProcess).not.toContain(hash);
+          expect(await connection.getQueryDef(hash, null)).toBe(null);
+        });
+      });
+
+      // orphanedTimeout is in seconds and the deadline is derived from it, so the only way to
+      // get an orphaned item is to wait it out
+      test('orphaned queries only cover pending items', async () => {
+        await withConnections(1, async (connection) => {
+          const key: QueryKey = ['orphaned-pending', []];
+          const hash = connection.redisHash(key);
+
+          const [, queueId] = await addQuery(connection, key, 'orphaned-pending', 1);
+          expect(await connection.getOrphanedQueries()).toEqual([]);
+
+          await pausePromise(1000 + 500 /* additional timeout on CI */);
+          expect(await connection.getOrphanedQueries()).toEqual([[hash, expect.any(Number)]]);
+
+          expect(await connection.retrieveForProcessing(hash, queueId)).not.toBeNull();
+
+          // Once it is being executed the heartbeat takes over from the orphaned deadline
+          expect(await connection.getOrphanedQueries()).toEqual([]);
+        });
+      });
+
+      // An active item past both its heartbeat and its orphaned deadline is the one which used to
+      // be reported twice, as stalled and as orphaned
+      test('getQueriesToCancel reports each item once', async () => {
+        await withShortHeartbeat(async (connection) => {
+          const key: QueryKey = ['cancel-once', []];
+          const hash = connection.redisHash(key);
+
+          const [, queueId] = await addToQueue(connection, key, 'cancel-once', 1);
+          expect(await connection.retrieveForProcessing(hash, queueId)).not.toBeNull();
+
+          await pausePromise(1000 + 500 /* additional timeout on CI */);
+
+          const toCancel = await connection.getQueriesToCancel();
+          expect(toCancel.filter(([queryKey]) => queryKey === hash)).toHaveLength(1);
+        });
+      });
+
+      test('setResultAndRemoveQuery reports failure for a removed item', async () => {
+        await withConnections(1, async (connection) => {
+          const key: QueryKey = ['ack-removed', []];
+          const hash = connection.redisHash(key);
+
+          const [, queueId] = await addQuery(connection, key, 'ack-removed');
+          expect(await connection.retrieveForProcessing(hash, queueId)).not.toBeNull();
+
+          // Emulates the query being cancelled or orphaned while it was executing
+          const [removed] = await connection.getQueryAndRemove(hash, queueId);
+          expect(removed).toBeTruthy();
+
+          expect(await connection.setResultAndRemoveQuery(hash, { result: 'late' }, queueId)).toBe(false);
+        });
+      });
+
+      test('stalled queries only cover active items with an old heartbeat', async () => {
+        await withShortHeartbeat(async (connection) => {
+          const key: QueryKey = ['stalled', []];
+          const hash = connection.redisHash(key);
+
+          const [, queueId] = await addToQueue(connection, key, 'stalled');
+
+          // Pending items are never stalled, no matter how long they sit there
+          await pausePromise(1500);
+          expect(await connection.getStalledQueries()).toEqual([]);
+
+          expect(await connection.retrieveForProcessing(hash, queueId)).not.toBeNull();
+          expect(await connection.getStalledQueries()).toEqual([]);
+
+          await pausePromise(1500);
+          expect(await connection.getStalledQueries()).toEqual([[hash, queueId]]);
+
+          await connection.updateHeartBeat(hash, queueId);
+          expect(await connection.getStalledQueries()).toEqual([]);
+        });
+      });
     });
 
     // eslint-disable-next-line no-unused-expressions
