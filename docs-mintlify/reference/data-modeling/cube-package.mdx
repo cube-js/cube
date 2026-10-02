@@ -147,13 +147,13 @@ def wrap_2(data):
 The `memo` decorator calls a function once per set of arguments during a data
 model compilation, then returns the stored result, or raises the stored
 exception, on every later call from any template. It works with sync and async
-functions. Arguments that are plain data (numbers, strings, lists, dicts) match
-by value, and other objects, e.g. `self` of a method, match only as the same
-object. Apply it below `template.function`. Calls made while a template function
-runs, including calls between your own Python functions and to memoized
-functions imported from other modules, are cached per compilation. Other calls,
-e.g., while `globals.py` loads or to methods of objects a template function
-returned, aren't cached:
+functions. Arguments match when they are equal and of the same type, e.g. dates,
+lists or dicts. Objects that don't define equality, e.g. `self` of a method,
+match only themselves. Apply it below `template.function`. Calls made while a
+template function runs, including calls between your own Python functions and to
+memoized functions imported from other modules, are cached per compilation.
+Other calls, e.g., while `globals.py` loads or to methods of objects a template
+function returned, aren't cached:
 
 ```python
 from cube import TemplateContext, memo

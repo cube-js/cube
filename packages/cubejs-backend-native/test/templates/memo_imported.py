@@ -1,5 +1,7 @@
+from datetime import date
+
 from cube import TemplateContext
-from memo_helper import Client, api, load_imported
+from memo_helper import Client, api, load_day, load_imported
 
 template = TemplateContext()
 template.add_function('load_imported', load_imported)
@@ -25,3 +27,9 @@ def client_tables(schema):
 @template.function
 def client_calls():
     return len(Client.calls)
+
+
+@template.function
+def day():
+    # A new but equal date on every call
+    return load_day(date(2024, 1, 1))

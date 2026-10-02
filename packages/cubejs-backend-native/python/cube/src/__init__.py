@@ -245,23 +245,31 @@ _template_context = globals().get('_template_context') or contextvars.ContextVar
 
 
 def _memo_key(args, kwargs):
-    """The key of a call and the arguments it identifies by object. Those are kept with the entry:
-    a freed object's id can be reused by another."""
+    """The key of a call: equal arguments of the same type make the same key. It holds hashable
+    arguments; unhashable objects, keyed by id(), are returned to keep with the entry, as a freed
+    object's id can be reused by another."""
     pinned = []
 
     def plain(value):
-        if value is None or isinstance(value, (bool, int, float, str)):
-            return value
-        if isinstance(value, (list, tuple)):
-            return ['list', [plain(item) for item in value]]
+        if isinstance(value, list):
+            return ('list', tuple(plain(item) for item in value))
+        if isinstance(value, tuple):
+            return ('tuple', tuple(plain(item) for item in value))
         if isinstance(value, dict):
-            items = [[json.dumps(plain(k)), plain(v)] for k, v in value.items()]
-            return ['dict', sorted(items, key=lambda item: item[0])]
-        # Any other object, e.g. the `self` of a memoized method, is the same argument only as itself
-        pinned.append(value)
-        return ['object', id(value)]
+            return ('dict', frozenset((plain(k), plain(v)) for k, v in value.items()))
+        if isinstance(value, float) and value != value:
+            # Every NaN is unequal to itself
+            return (float, 'nan')
+        try:
+            hash(value)
+        except TypeError:
+            pinned.append(value)
+            return ('object', id(value))
+        # The type keeps 1, 1.0 and True apart. Objects without their own __eq__, e.g. the `self`
+        # of a memoized method, match only themselves
+        return (type(value), value)
 
-    return json.dumps([plain(args), sorted([name, plain(value)] for name, value in kwargs.items())]), pinned
+    return (plain(args), tuple(sorted((name, plain(value)) for name, value in kwargs.items()))), pinned
 
 
 def memo(func):

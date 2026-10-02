@@ -35,3 +35,12 @@ class Client:
     def tables(self):
         Client.calls.append(self.schema)
         return {'a': 1, 'b': 2}[self.schema]
+
+
+days = []
+
+
+@memo
+def load_day(day):
+    days.append(day)
+    return len(days)
