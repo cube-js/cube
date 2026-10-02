@@ -1,7 +1,7 @@
 import { Readable } from 'stream';
 import crypto from 'crypto';
 
-import type { QueryKey, QueryKeyHash, QueueDriverInterface, QueueDriverOptions } from '@cubejs-backend/base-driver';
+import type { QueryKey, QueryKeyHash, QueueDriverConnectionInterface, QueueDriverInterface, QueueDriverOptions } from '@cubejs-backend/base-driver';
 import { QueuePriority } from '@cubejs-backend/base-driver';
 import { pausePromise } from '@cubejs-backend/shared';
 import { CubeStoreDriver, CubestoreQueueDriverConnection } from '@cubejs-backend/cubestore-driver';
@@ -827,7 +827,7 @@ export const QueryQueueTest = (name: string, options: QueryQueueTestOptions) => 
         }
       });
 
-      const addQuery = (connection: any, queryKey: QueryKey, requestId: string, orphanedTimeout = 60) => {
+      const addQuery = (connection: QueueDriverConnectionInterface, queryKey: QueryKey, requestId: string, orphanedTimeout = 60) => {
         addedKeys.push(queryKey);
 
         return connection.addToQueue(
@@ -839,7 +839,7 @@ export const QueryQueueTest = (name: string, options: QueryQueueTestOptions) => 
         );
       };
 
-      const withConnections = async (count: number, fn: (...connections: any[]) => Promise<void>) => {
+      const withConnections = async (count: number, fn: (...connections: QueueDriverConnectionInterface[]) => Promise<void>) => {
         const connections = await Promise.all(
           Array.from({ length: count }, () => queue.queueDriver.createConnection())
         );
@@ -895,8 +895,8 @@ export const QueryQueueTest = (name: string, options: QueryQueueTestOptions) => 
           heartBeatTimeout: 60,
         });
 
-        const connection: any = await driver.createConnection();
-        const connection2: any = await driver.createConnection();
+        const connection = await driver.createConnection();
+        const connection2 = await driver.createConnection();
         const key: QueryKey = ['already-active-free-slot', []];
         const hash = connection.redisHash(key);
 
@@ -1017,7 +1017,7 @@ export const QueryQueueTest = (name: string, options: QueryQueueTestOptions) => 
           heartBeatTimeout: 1,
         });
 
-        const connection: any = await driver.createConnection();
+        const connection = await driver.createConnection();
         const key: QueryKey = ['stalled', []];
         const hash = connection.redisHash(key);
 
