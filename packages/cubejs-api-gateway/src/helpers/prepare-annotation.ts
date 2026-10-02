@@ -42,13 +42,23 @@ type AnnotatedConfigItem = Omit<ConfigItem, 'granularities'> & {
 };
 
 /**
+ * The member of the data model a member path names, when the path goes
+ * through joins: `orders.customer.city` is `users.city`.
+ */
+type MemberTarget = (path: string) => string | undefined;
+
+/**
  * Returns annotations by MetaConfigMap and cube's member type.
  */
 const annotation = (
   configMap: MetaConfigMap,
   memberType: MemberType,
+  memberTarget?: MemberTarget,
 ) => (member: string | MemberExpression): undefined | [string, ConfigItem] => {
-  const [cubeName, fieldName] = (<MemberExpression>member).expression ? [(<MemberExpression>member).cubeName, (<MemberExpression>member).name] : (<string>member).split('.');
+  const memberPath = (<MemberExpression>member).expression ? undefined : memberTarget?.(<string>member);
+  const [cubeName, fieldName] = (<MemberExpression>member).expression ?
+    [(<MemberExpression>member).cubeName, (<MemberExpression>member).name] :
+    (memberPath ?? <string>member).split('.');
   const memberWithoutGranularity = [cubeName, fieldName].join('.');
   const cubeConfig = configMap[cubeName];
   const config: ConfigItem = cubeConfig && cubeConfig[memberType]
@@ -78,23 +88,23 @@ const annotation = (
 /**
  * Returns annotations object by MetaConfigs and query.
  */
-function prepareAnnotation(metaConfig: MetaConfig[], query: any) {
+function prepareAnnotation(metaConfig: MetaConfig[], query: any, memberTarget?: MemberTarget) {
   const configMap = toConfigMap(metaConfig);
   const dimensions = (query.dimensions || []);
   return {
     measures: R.fromPairs(
       (query.measures || []).map(
-        annotation(configMap, MemberTypeEnum.MEASURES)
+        annotation(configMap, MemberTypeEnum.MEASURES, memberTarget)
       ).filter(a => !!a)
     ),
     dimensions: R.fromPairs(
       dimensions
-        .map(annotation(configMap, MemberTypeEnum.DIMENSIONS))
+        .map(annotation(configMap, MemberTypeEnum.DIMENSIONS, memberTarget))
         .filter(a => !!a)
     ),
     segments: R.fromPairs(
       (query.segments || [])
-        .map(annotation(configMap, MemberTypeEnum.SEGMENTS))
+        .map(annotation(configMap, MemberTypeEnum.SEGMENTS, memberTarget))
         .filter(a => !!a)
     ),
     timeDimensions: R.fromPairs(
@@ -106,6 +116,7 @@ function prepareAnnotation(metaConfig: MetaConfig[], query: any) {
               const an = annotation(
                 configMap,
                 MemberTypeEnum.DIMENSIONS,
+                memberTarget,
               )(
                 `${td.dimension}.${td.granularity}`
               );
@@ -137,7 +148,8 @@ function prepareAnnotation(metaConfig: MetaConfig[], query: any) {
 
               const dimWithoutGranularity = annotation(
                 configMap,
-                MemberTypeEnum.DIMENSIONS
+                MemberTypeEnum.DIMENSIONS,
+                memberTarget,
               )(td.dimension);
 
               if (dimWithoutGranularity && dimWithoutGranularity[1].granularities) {
@@ -157,6 +169,7 @@ function prepareAnnotation(metaConfig: MetaConfig[], query: any) {
 export default prepareAnnotation;
 export {
   ConfigItem,
+  MemberTarget,
   GranularityMeta,
   annotation,
   prepareAnnotation,
