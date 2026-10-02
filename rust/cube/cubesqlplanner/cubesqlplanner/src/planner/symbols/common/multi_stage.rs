@@ -82,8 +82,8 @@ impl MultiStageProperties {
         }
 
         let grain = match definition.grain()? {
-            Some(g) => build_grain_from_directive(g, compiler)?,
-            None => build_grain_from_legacy(&definition.static_data(), compiler)?,
+            Some(g) => build_grain_from_directive(cube_id, g, compiler)?,
+            None => build_grain_from_legacy(cube_id, &definition.static_data(), compiler)?,
         };
 
         let filter = build_filter(cube_id, definition.filter()?, compiler)?;
@@ -104,8 +104,11 @@ impl MultiStageProperties {
             return Ok(None);
         }
 
-        let include =
-            resolve_reference_paths(&definition.static_data().add_group_by_references, compiler)?;
+        let include = resolve_reference_paths(
+            cube_id,
+            &definition.static_data().add_group_by_references,
+            compiler,
+        )?;
         let filter = build_filter(cube_id, definition.filter()?, compiler)?;
 
         Ok(Some(Self {
@@ -120,6 +123,7 @@ impl MultiStageProperties {
 }
 
 fn resolve_reference_paths(
+    cube_id: &CubeId,
     refs: &Option<Vec<String>>,
     compiler: &mut Compiler,
 ) -> Result<Option<Vec<Rc<MemberSymbol>>>, CubeError> {
@@ -127,7 +131,7 @@ fn resolve_reference_paths(
         Some(paths) => {
             let symbols = paths
                 .iter()
-                .map(|p| compiler.add_dimension_evaluator(p.clone()))
+                .map(|p| compiler.add_dimension_evaluator_for(cube_id, p.clone()))
                 .collect::<Result<Vec<_>, _>>()?;
             Ok(Some(symbols))
         }
@@ -136,6 +140,7 @@ fn resolve_reference_paths(
 }
 
 fn build_grain_from_directive(
+    cube_id: &CubeId,
     grain: Rc<dyn MultiStageGrainReferences>,
     compiler: &mut Compiler,
 ) -> Result<MultiStageGrain, CubeError> {
@@ -146,25 +151,26 @@ fn build_grain_from_directive(
         ));
     }
     Ok(MultiStageGrain {
-        exclude: resolve_reference_paths(&static_data.exclude, compiler)?,
-        keep_only: resolve_reference_paths(&static_data.keep_only, compiler)?,
-        include: resolve_reference_paths(&static_data.include, compiler)?,
+        exclude: resolve_reference_paths(cube_id, &static_data.exclude, compiler)?,
+        keep_only: resolve_reference_paths(cube_id, &static_data.keep_only, compiler)?,
+        include: resolve_reference_paths(cube_id, &static_data.include, compiler)?,
     })
 }
 
 fn build_grain_from_legacy(
+    cube_id: &CubeId,
     static_data: &MeasureDefinitionStatic,
     compiler: &mut Compiler,
 ) -> Result<MultiStageGrain, CubeError> {
     Ok(MultiStageGrain {
-        exclude: resolve_reference_paths(&static_data.reduce_by_references, compiler)?,
-        keep_only: resolve_reference_paths(&static_data.group_by_references, compiler)?,
-        include: resolve_reference_paths(&static_data.add_group_by_references, compiler)?,
+        exclude: resolve_reference_paths(cube_id, &static_data.reduce_by_references, compiler)?,
+        keep_only: resolve_reference_paths(cube_id, &static_data.group_by_references, compiler)?,
+        include: resolve_reference_paths(cube_id, &static_data.add_group_by_references, compiler)?,
     })
 }
 
 fn build_filter(
-    _cube_id: &CubeId,
+    cube_id: &CubeId,
     filter: Option<Rc<dyn crate::cube_bridge::multi_stage_filter::MultiStageFilterReferences>>,
     compiler: &mut Compiler,
 ) -> Result<Option<MultiStageFilter>, CubeError> {
@@ -183,8 +189,8 @@ fn build_filter(
         Some(s) => MultiStageFilterMode::from_str(s)?,
         None => MultiStageFilterMode::Relative,
     };
-    let exclude = resolve_reference_paths(&static_data.exclude, compiler)?;
-    let keep_only = resolve_reference_paths(&static_data.keep_only, compiler)?;
+    let exclude = resolve_reference_paths(cube_id, &static_data.exclude, compiler)?;
+    let keep_only = resolve_reference_paths(cube_id, &static_data.keep_only, compiler)?;
 
     let mut include_dimension = Vec::new();
     let mut include_time_dimension = Vec::new();
@@ -192,7 +198,8 @@ fn build_filter(
     if let Some(items) = &static_data.include {
         if !items.is_empty() {
             let query_tools = compiler.query_tools()?;
-            let mut filter_compiler = FilterCompiler::new(compiler, query_tools);
+            let mut filter_compiler =
+                FilterCompiler::new(compiler, query_tools).for_owner(cube_id.clone());
             for item in items {
                 filter_compiler.add_item(item)?;
             }
