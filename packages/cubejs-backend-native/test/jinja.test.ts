@@ -225,18 +225,21 @@ suite('Python memo', () => {
     expect(second.map((r) => r.trim())).toEqual([expected, expected]);
   });
 
-  it('starts a new cache per compilation for functions in imported modules', async () => {
-    const compileImported = async () => {
+  it('gives each compilation its own cache for functions in imported modules', async () => {
+    const load = async () => {
       const fileName = path.join(process.cwd(), 'test', 'templates', 'memo_imported.py');
       const pyCtx = await nativeInstance.loadPythonContext(fileName, fs.readFileSync(fileName, 'utf8'));
       const jinjaEngine = nativeInstance.newJinjaEngine({ debugInfo: true, filters: pyCtx.filters, workers: 1 });
       loadTemplateFile(jinjaEngine, 'memo_imported.yml.jinja');
 
-      return (await jinjaEngine.renderTemplate('memo_imported.yml.jinja', {}, { ...pyCtx.functions })).trim();
+      return async () => (await jinjaEngine.renderTemplate('memo_imported.yml.jinja', {}, { ...pyCtx.functions })).trim();
     };
 
-    // memo_helper.py is imported once, so its call counter carries over to the second compilation
-    expect(await compileImported()).toEqual('imported: 1 1');
-    expect(await compileImported()).toEqual('imported: 2 2');
+    // memo_helper.py is imported once, so its call counter is shared, and compilations overlap
+    const renderA = await load();
+    expect(await renderA()).toEqual('imported: 1 1');
+    const renderB = await load();
+    expect(await renderA()).toEqual('imported: 1 1');
+    expect(await renderB()).toEqual('imported: 2 2');
   });
 });

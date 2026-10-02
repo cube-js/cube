@@ -3,7 +3,6 @@ import functools
 import inspect
 import json
 import os
-import sys
 import threading
 from typing import Union, Callable, Dict, Any
 
@@ -186,7 +185,7 @@ class TemplateContext:
         if not callable(func):
             raise TemplateException("function registration must be used with functions, actual: '%s'" % type(func).__name__)
 
-        self.functions[name] = func
+        self.functions[name] = _memo_for_template(func)
 
     def add_variable(self, name, val):
         if name in self.functions:
@@ -198,7 +197,7 @@ class TemplateContext:
         if not callable(func):
             raise TemplateException("function registration must be used with functions, actual: '%s'" % type(func).__name__)
 
-        self.filters[name] = func
+        self.filters[name] = _memo_for_template(func)
 
     def function(self, func):
         if isinstance(func, str):
@@ -239,16 +238,6 @@ class TemplateFilterRef:
         self.context.add_filter(self.attribute, func)
         return func
 
-# The runtime runs this module again before each data model compilation, which gives each
-# compilation a token of its own
-_compilation = object()
-
-
-def _compilation_token():
-    module = sys.modules.get('cube')
-    return getattr(module, '_compilation', None) if module is not None else None
-
-
 def _memo_key(args, kwargs):
     # Arguments come from Jinja as plain data; anything else is keyed by its repr
     call = [args, sorted(kwargs.items())]
@@ -260,22 +249,15 @@ def _memo_key(args, kwargs):
 
 
 def memo(func):
-    """Calls `func` once per set of arguments and returns that result to every later call during a
-    data model compilation. Each compilation starts with an empty cache, also for functions in
-    modules that `globals.py` imports, which are loaded only once."""
+    """Calls `func` once per set of arguments and returns that result to every later call. Registered
+    with a `TemplateContext`, it gets a cache of that context's own: each data model compilation
+    loads `globals.py`, and so a `TemplateContext`, anew."""
     if not callable(func):
         raise TemplateException("memo must be used with functions, actual: '%s'" % type(func).__name__)
 
     # Exceptions are stored too: every template sees the same outcome
-    cache = {'compilation': None, 'results': {}}
+    stored = {}
     lock = threading.RLock()
-
-    def results():
-        token = _compilation_token()
-        if cache['compilation'] is not token:
-            cache['compilation'] = token
-            cache['results'] = {}
-        return cache['results']
 
     if inspect.iscoroutinefunction(func):
         async def call(*args, **kwargs):
@@ -291,7 +273,6 @@ def memo(func):
             key = _memo_key(args, kwargs)
             loop = asyncio.get_running_loop()
             with lock:
-                stored = results()
                 entry = stored.get(key)
                 if entry is None or entry[1].cancelled() or (entry[0] is not loop and not entry[1].done()):
                     # A task, so concurrent calls on the loop share one invocation
@@ -305,13 +286,13 @@ def memo(func):
                 raise error.with_traceback(tb)
             return value
 
+        async_wrapper.cube_memo_func = func
         return async_wrapper
 
     @functools.wraps(func)
     def wrapper(*args, **kwargs):
         key = _memo_key(args, kwargs)
         with lock:
-            stored = results()
             if key not in stored:
                 try:
                     stored[key] = (True, func(*args, **kwargs))
@@ -324,7 +305,15 @@ def memo(func):
             raise error.with_traceback(tb)
         return value
 
+    wrapper.cube_memo_func = func
     return wrapper
+
+
+def _memo_for_template(func):
+    # A memoized function from a module globals.py imports is shared by every compilation: the
+    # context registers a copy with a cache of its own
+    original = getattr(func, 'cube_memo_func', None)
+    return memo(original) if original is not None else func
 
 
 def context_func(func):
