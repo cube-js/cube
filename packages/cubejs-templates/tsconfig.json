@@ -6,7 +6,6 @@
   "compilerOptions": {
     "outDir": "dist",
     "rootDir": ".",
-    "noImplicitAny": false,
   },
   "references": [
     { "path": "../cubejs-backend-shared" }

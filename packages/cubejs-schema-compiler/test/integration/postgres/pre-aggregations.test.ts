@@ -6,6 +6,7 @@ import { PostgresQuery } from '../../../src/adapter/PostgresQuery';
 import { BigqueryQuery } from '../../../src/adapter/BigqueryQuery';
 import { prepareJsCompiler } from '../../unit/PrepareCompiler';
 import { dbRunner } from './PostgresDBRunner';
+import type { TestPreAggregationDescription, TestQueryWithParams } from '../utils/BaseDbRunner';
 
 describe('PreAggregations', () => {
   jest.setTimeout(200000);
@@ -1584,7 +1585,7 @@ describe('PreAggregations', () => {
     });
 
     const preAggregationsDescription: any = query.preAggregations?.preAggregationsDescription();
-    const preAggregationFromQuery = preAggregationsDescription.find(p => p.preAggregationId === preAggregation.id);
+    const preAggregationFromQuery = preAggregationsDescription.find((p: TestPreAggregationDescription) => p.preAggregationId === preAggregation.id);
     if (preAggregationFromQuery === undefined) {
       throw expect(preAggregationFromQuery).toBeDefined();
     }
@@ -1610,7 +1611,7 @@ describe('PreAggregations', () => {
     });
 
     const preAggregationsDescription: any = query.preAggregations?.preAggregationsDescription();
-    const preAggregationFromQuery = preAggregationsDescription.find(p => p.preAggregationId === preAggregation.id);
+    const preAggregationFromQuery = preAggregationsDescription.find((p: TestPreAggregationDescription) => p.preAggregationId === preAggregation.id);
     if (preAggregationFromQuery === undefined) {
       throw expect(preAggregationFromQuery).toBeDefined();
     }
@@ -1953,7 +1954,7 @@ describe('PreAggregations', () => {
       expect(queryAndParams[0]).toMatch(/visitors_default/ig);
       const preAggregationsDescription = query.preAggregations?.preAggregationsDescription();
       console.log(preAggregationsDescription);
-      expect((<any>preAggregationsDescription).filter(p => p.type === 'rollup').length).toBe(0);
+      expect((<any>preAggregationsDescription).filter((p: TestPreAggregationDescription) => p.type === 'rollup').length).toBe(0);
 
       return dbRunner.evaluateQueryWithPreAggregations(query).then(res => {
         expect(res).toEqual(
@@ -2618,10 +2619,10 @@ describe('PreAggregations', () => {
 
     const queries = dbRunner.tempTablePreAggregations(preAggregationsDescription);
 
-    const desc = preAggregationsDescription.find(e => e.tableName === 'visitors_multi_stage');
+    const desc = preAggregationsDescription.find((e: TestPreAggregationDescription) => e.tableName === 'visitors_multi_stage');
     expect(desc.invalidateKeyQueries[0][1][0]).toEqual(PreAggregationPartitionRangeLoader.TO_PARTITION_RANGE);
 
-    const vcMainDesc = preAggregationsDescription.find(e => e.tableName === 'vc_main');
+    const vcMainDesc = preAggregationsDescription.find((e: TestPreAggregationDescription) => e.tableName === 'vc_main');
     expect(vcMainDesc.invalidateKeyQueries.length).toEqual(1);
 
     console.log(JSON.stringify(queries.concat(queryAndParams)));
@@ -2669,7 +2670,7 @@ describe('PreAggregations', () => {
     const preAggregationsDescription: any = query.preAggregations?.preAggregationsDescription();
     console.log(JSON.stringify(preAggregationsDescription, null, 2));
     const partitionedTables = preAggregationsDescription
-      .filter(({ tableName }) => tableName.indexOf('visitors_partitioned') === 0);
+      .filter(({ tableName }: TestPreAggregationDescription) => tableName.indexOf('visitors_partitioned') === 0);
 
     expect(partitionedTables[0].invalidateKeyQueries[0][2].updateWindowSeconds).toEqual(86400 * 7);
     expect(partitionedTables[0].invalidateKeyQueries[0][2].renewalThresholdOutsideUpdateWindow).toEqual(86400);
@@ -3329,9 +3330,9 @@ describe('PreAggregations', () => {
   it('partitioned huge span', async () => {
     await compiler.compile();
 
-    let queryAndParams;
-    let preAggregationsDescription;
-    let query;
+    let queryAndParams!: TestQueryWithParams;
+    let preAggregationsDescription!: TestPreAggregationDescription[];
+    let query!: PostgresQuery;
 
     for (let i = 0; i < 10; i++) {
       query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
@@ -3522,7 +3523,11 @@ describe('PreAggregations', () => {
       }],
       preAggregationsSchema: '',
       queryFactory: {
-        createQuery: (cube, compilers, options) => {
+        createQuery: (
+          cube: string,
+          compilers: ConstructorParameters<typeof PostgresQuery>[0],
+          options: ConstructorParameters<typeof PostgresQuery>[1]
+        ) => {
           if (cube === 'RealTimeLambdaVisitors') {
             // eslint-disable-next-line global-require
             const { KsqlQuery } = require('../../../../../cubejs-ksql-driver');
@@ -3538,7 +3543,7 @@ describe('PreAggregations', () => {
     console.log(queryAndParams);
     const preAggregationsDescription: any = query.preAggregations?.preAggregationsDescription();
     console.log(JSON.stringify(preAggregationsDescription, null, 2));
-    const { loadSql } = preAggregationsDescription.find(p => p.preAggregationId === 'RealTimeLambdaVisitors.partitioned');
+    const { loadSql } = preAggregationsDescription.find((p: TestPreAggregationDescription) => p.preAggregationId === 'RealTimeLambdaVisitors.partitioned');
 
     expect(loadSql[0]).not.toMatch(/GROUP BY/);
     expect(loadSql[0]).toMatch(/THEN 1 END `real_time_lambda_visitors__count`/);
@@ -3558,8 +3563,8 @@ describe('PreAggregations', () => {
     const preAggregationsDescription: any = query.preAggregations?.preAggregationsDescription();
     console.log(preAggregationsDescription);
     expect(preAggregationsDescription.length).toBe(2);
-    const aaa = preAggregationsDescription.find(p => p.preAggregationId === 'cube_1.aaa');
-    const bbb = preAggregationsDescription.find(p => p.preAggregationId === 'cube_2.bbb');
+    const aaa = preAggregationsDescription.find((p: TestPreAggregationDescription) => p.preAggregationId === 'cube_1.aaa');
+    const bbb = preAggregationsDescription.find((p: TestPreAggregationDescription) => p.preAggregationId === 'cube_2.bbb');
     expect(aaa).toBeDefined();
     expect(bbb).toBeDefined();
 
@@ -3590,9 +3595,9 @@ describe('PreAggregations', () => {
     const preAggregationsDescription: any = query.preAggregations?.preAggregationsDescription();
     console.log(preAggregationsDescription);
     expect(preAggregationsDescription.length).toBe(3);
-    const xxx = preAggregationsDescription.find(p => p.preAggregationId === 'cube_x.xxx');
-    const yyy = preAggregationsDescription.find(p => p.preAggregationId === 'cube_y.yyy');
-    const zzz = preAggregationsDescription.find(p => p.preAggregationId === 'cube_z.zzz');
+    const xxx = preAggregationsDescription.find((p: TestPreAggregationDescription) => p.preAggregationId === 'cube_x.xxx');
+    const yyy = preAggregationsDescription.find((p: TestPreAggregationDescription) => p.preAggregationId === 'cube_y.yyy');
+    const zzz = preAggregationsDescription.find((p: TestPreAggregationDescription) => p.preAggregationId === 'cube_z.zzz');
     expect(xxx).toBeDefined();
     expect(yyy).toBeDefined();
     expect(zzz).toBeDefined();
@@ -3666,8 +3671,8 @@ describe('PreAggregations', () => {
     const preAggregationsDescription: any = query.preAggregations?.preAggregationsDescription();
     console.log(preAggregationsDescription);
     expect(preAggregationsDescription.length).toBe(2);
-    const aaa = preAggregationsDescription.find(p => p.preAggregationId === 'cube_a.aaa_rollup');
-    const bbb = preAggregationsDescription.find(p => p.preAggregationId === 'cube_b.bbb_rollup');
+    const aaa = preAggregationsDescription.find((p: TestPreAggregationDescription) => p.preAggregationId === 'cube_a.aaa_rollup');
+    const bbb = preAggregationsDescription.find((p: TestPreAggregationDescription) => p.preAggregationId === 'cube_b.bbb_rollup');
     expect(aaa).toBeDefined();
     expect(bbb).toBeDefined();
 
@@ -3753,8 +3758,8 @@ describe('PreAggregations', () => {
 
       // Verify that both rollups are included in the description
       expect(preAggregationsDescription.length).toBe(2);
-      const factsRollup = preAggregationsDescription.find(p => p.preAggregationId === 'test_facts.facts_rollup');
-      const bridgeRollup = preAggregationsDescription.find(p => p.preAggregationId === 'other_facts.bridge_rollup');
+      const factsRollup = preAggregationsDescription.find((p: TestPreAggregationDescription) => p.preAggregationId === 'test_facts.facts_rollup');
+      const bridgeRollup = preAggregationsDescription.find((p: TestPreAggregationDescription) => p.preAggregationId === 'other_facts.bridge_rollup');
       expect(factsRollup).toBeDefined();
       expect(bridgeRollup).toBeDefined();
 

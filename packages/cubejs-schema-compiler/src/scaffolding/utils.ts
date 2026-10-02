@@ -20,9 +20,9 @@ const splitString = (value: string, options: any = {}) => {
   return output;
 };
 
-const transformWords = (input: string, options, joinChar = '', transformFn = s => s) => (input ? splitString(input, options).map(transformFn).join(joinChar) : '');
+const transformWords = (input: string, options: Options, joinChar = '', transformFn = (s: string) => s) => (input ? splitString(input, options).map(transformFn).join(joinChar) : '');
 
-const lowercase = (input = '', options) => input.toLocaleLowerCase(options?.locale);
+const lowercase = (input = '', options?: Options) => input.toLocaleLowerCase(options?.locale);
 
 type Options = {
   uppercase?: boolean;

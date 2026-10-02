@@ -1,3 +1,4 @@
+import { BaseQuery } from '../../src/adapter/BaseQuery';
 import { BigqueryQuery } from '../../src/adapter/BigqueryQuery';
 import { PostgresQuery } from '../../src/adapter/PostgresQuery';
 import { allDialects } from './allDialects';
@@ -39,7 +40,7 @@ const model = [
   '});',
 ].join('\n');
 
-async function queryFor(QueryClass, useNativeSqlPlanner: boolean, options = {}) {
+async function queryFor(QueryClass: typeof BaseQuery, useNativeSqlPlanner: boolean, options = {}) {
   const { compiler, joinGraph, cubeEvaluator } = prepareJsCompiler(model);
   await compiler.compile();
 

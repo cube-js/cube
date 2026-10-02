@@ -38,7 +38,7 @@ export class BaseDimension {
     return [`${this.dimensionSql()} ${this.aliasName()}`];
   }
 
-  public hasNoRemapping() {
+  public hasNoRemapping(): boolean {
     return this.dimensionSql() === this.aliasName();
   }
 
@@ -46,7 +46,7 @@ export class BaseDimension {
     return [`${this.aliasName()}`];
   }
 
-  public dimensionSql() {
+  public dimensionSql(): string {
     if (this.expression) {
       return this.convertTzForRawTimeDimensionIfNeeded(() => this.query.evaluateSymbolSql(this.expressionCubeName, this.expressionName, this.definition(), 'dimension'));
     }
@@ -57,7 +57,7 @@ export class BaseDimension {
   }
 
   // We need this for dimensions however we don't for filters for performance reasons
-  public convertTzForRawTimeDimensionIfNeeded(sql) {
+  public convertTzForRawTimeDimensionIfNeeded(sql: () => string): string {
     if (this.query.options.convertTzForRawTimeDimension) {
       return this.query.evaluateSymbolSqlWithContext(sql, {
         convertTzForRawTimeDimension: true

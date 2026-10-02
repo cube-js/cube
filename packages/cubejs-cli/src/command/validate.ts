@@ -6,7 +6,7 @@ import { compile } from '@cubejs-backend/schema-compiler';
 
 import { displayError } from '../utils';
 
-async function validate(options) {
+async function validate(options: { schemaPath?: string }) {
   const schemaPath = options.schemaPath || getEnv('schemaPath');
 
   if (!fs.existsSync(path.join(process.cwd(), schemaPath))) {

@@ -1,5 +1,6 @@
 import { prepareJsCompiler } from './PrepareCompiler';
 import { PostgresQuery } from '../../src/adapter/PostgresQuery';
+import { FullPreAggregationDescription } from '../../src/adapter/PreAggregations';
 
 /**
  * Pre-aggregation references built by interpolating the cube itself
@@ -100,7 +101,7 @@ describe('pre-aggregation references interpolating the cube', () => {
       query.buildSqlAndParams();
 
       const descriptions: any = query.preAggregations?.preAggregationsDescription();
-      expect(descriptions.map(d => d.preAggregationId)).toEqual(['invoices.by_org_and_issued_date']);
+      expect(descriptions.map((d: FullPreAggregationDescription) => d.preAggregationId)).toEqual(['invoices.by_org_and_issued_date']);
     });
 
     it(`resolves interpolated measure and dimension references (${planner})`, async () => {
@@ -108,7 +109,7 @@ describe('pre-aggregation references interpolating the cube', () => {
       query.buildSqlAndParams();
 
       const descriptions: any = query.preAggregations?.preAggregationsDescription();
-      expect(descriptions.map(d => d.preAggregationId)).toEqual(['invoices.by_org_and_issued_date']);
+      expect(descriptions.map((d: FullPreAggregationDescription) => d.preAggregationId)).toEqual(['invoices.by_org_and_issued_date']);
     });
 
     it(`reports the member an interpolated reference names when it does not exist (${planner})`, async () => {

@@ -6,7 +6,6 @@
   ],
   "compilerOptions": {
     "types": ["node", "jest"],
-    "noImplicitAny": false,
     "outDir": "dist",
     "rootDir": ".",
   },

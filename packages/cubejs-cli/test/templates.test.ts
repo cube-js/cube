@@ -2,9 +2,9 @@ import templates from '../src/templates';
 
 const dotEnv = templates.docker.files['.env'];
 
-const secret = 123;
+const secret = '123';
 
-const generateTestEnv = (apiSecret, dbType) => ({
+const generateTestEnv = (apiSecret: string, dbType: string) => ({
   apiSecret,
   dbType,
   dockerVersion: 'latest',

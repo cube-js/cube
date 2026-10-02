@@ -191,7 +191,7 @@ describe('CubejsServerCore.getOrchestratorApi', () => {
         const id = drivers++;
 
         return {
-          testConnection: async () => undefined,
+          testConnection: async (): Promise<void> => undefined,
           release: async () => { closed.push(id); },
         };
       },

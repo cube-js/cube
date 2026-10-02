@@ -54,7 +54,7 @@ class QuestParamAllocator extends ParamAllocator {
 }
 
 class QuestFilter extends BaseFilter {
-  public orIsNullCheck(column: string, not: string): string {
+  public orIsNullCheck(column: string, not: boolean): string {
     return `${this.shouldAddOrIsNull(not) ? ` OR ${column} = NULL` : ''}`;
   }
 

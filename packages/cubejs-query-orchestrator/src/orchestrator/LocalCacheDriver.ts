@@ -23,7 +23,7 @@ export class LocalCacheDriver implements CacheDriverInterface {
     return this.store[key] && this.store[key].value;
   }
 
-  public async set(key: string, value, expiration) {
+  public async set(key: string, value: any, expiration: number) {
     this.store[key] = {
       value,
       exp: new Date().getTime() + expiration * 1000

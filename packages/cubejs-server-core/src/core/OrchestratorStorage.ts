@@ -4,7 +4,7 @@ import type { OrchestratorApi } from './OrchestratorApi';
 export class OrchestratorStorage {
   protected readonly storage: LRUCache<string, OrchestratorApi>;
 
-  protected readonly pendingReleases: Set<Promise<void>> = new Set();
+  protected readonly pendingReleases: Set<Promise<unknown>> = new Set();
 
   public constructor(options: { compilerCacheSize?: number, maxCompilerCacheKeepAlive?: number, updateCompilerCacheKeepAlive?: boolean } = { compilerCacheSize: 100 }) {
     this.storage = new LRUCache<string, OrchestratorApi>({
@@ -24,11 +24,9 @@ export class OrchestratorStorage {
   }
 
   protected release(api: OrchestratorApi) {
-    const pending: Promise<void> = api.release()
-      .then(() => undefined, () => undefined)
-      .then(() => {
-        this.pendingReleases.delete(pending);
-      });
+    const pending: Promise<unknown> = api.release()
+      .catch((): void => undefined)
+      .finally(() => this.pendingReleases.delete(pending));
 
     this.pendingReleases.add(pending);
   }

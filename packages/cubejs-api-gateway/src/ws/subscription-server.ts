@@ -24,6 +24,10 @@ const methodParams: Record<string, string[]> = Object.freeze({
   unsubscribe: [],
 });
 
+// methodParams keys in camelCase. `unsubscribe` has no ApiGateway handler: unsubscribing goes through
+// the `{ unsubscribe }` message instead, so a `{ method: 'unsubscribe' }` message fails at the dispatch.
+type WsMethod = 'load' | 'sql' | 'dryRun' | 'meta' | 'subscribe';
+
 const calcMessageLength = (message: unknown) => Buffer.byteLength(
   typeof message === 'string' ? message : JSON.stringify(message)
 );
@@ -40,7 +44,7 @@ export class SubscriptionServer {
   }
 
   protected resultFn(connectionId: string, messageId: string | undefined, requestId: string | undefined, logNetworkUsage: boolean = true) {
-    return async (message, { status } = { status: 200 }) => {
+    return async (message: unknown, { status }: { status: number } = { status: 200 }) => {
       if (logNetworkUsage) {
         this.apiGateway.log({ type: 'Outgoing network usage', service: 'api-ws', bytes: calcMessageLength(message), }, { requestId });
       }
@@ -185,7 +189,7 @@ export class SubscriptionServer {
 
       if (message.params) {
         for (const k of methodParams[message.method]) {
-          collectedParams[k] = message.params[k];
+          collectedParams[k] = (message.params as Record<string, unknown>)[k];
         }
       }
 
@@ -194,8 +198,10 @@ export class SubscriptionServer {
         delete collectedParams.cache;
       }
 
-      const method = message.method.replace(/[^a-z]+(.)/g, (_m, chr) => chr.toUpperCase());
-      await this.apiGateway[method]({
+      const method = message.method.replace(/[^a-z]+(.)/g, (_m, chr) => chr.toUpperCase()) as WsMethod;
+      // Each handler destructures the params its method collected above
+      const handler = this.apiGateway[method] as (request: Record<string, unknown>) => Promise<void>;
+      await handler.call(this.apiGateway, {
         ...collectedParams,
         connectionId,
         context,
@@ -207,7 +213,7 @@ export class SubscriptionServer {
           const subscription = await this.subscriptionStore.getSubscription(connectionId, subscriptionId);
           return subscription && subscription.state;
         },
-        subscribe: async (state) => this.subscriptionStore.subscribe(connectionId, subscriptionId, {
+        subscribe: async (state: unknown) => this.subscriptionStore.subscribe(connectionId, subscriptionId, {
           message,
           state
         }),

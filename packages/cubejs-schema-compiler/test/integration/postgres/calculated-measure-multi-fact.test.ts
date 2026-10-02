@@ -106,13 +106,13 @@ cube(\`Rates\`, {
 });
     `);
 
-  async function runQuery(q) {
+  async function runQuery(q: unknown) {
     await compiler.compile();
     const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, q);
     return dbRunner.testQuery(query.buildSqlAndParams());
   }
 
-  async function expectQueryToFail(q) {
+  async function expectQueryToFail(q: unknown) {
     await compiler.compile();
 
     try {

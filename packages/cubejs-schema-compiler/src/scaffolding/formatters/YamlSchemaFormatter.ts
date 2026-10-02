@@ -5,7 +5,7 @@ import {
 } from '../ScaffoldingTemplate';
 import { BaseSchemaFormatter } from './BaseSchemaFormatter';
 
-function isPlainObject(value) {
+function isPlainObject(value: unknown): boolean {
   if (typeof value !== 'object' || value === null) {
     return false;
   }
@@ -37,7 +37,7 @@ export class YamlSchemaFormatter extends BaseSchemaFormatter {
     value: SchemaDescriptor,
     level = 0,
     parent?: SchemaDescriptor
-  ) {
+  ): string {
     const indent = Array(level * 2)
       .fill(0)
       .reduce((memo) => `${memo} `, '');
@@ -73,20 +73,21 @@ export class YamlSchemaFormatter extends BaseSchemaFormatter {
           .join('\n')}\n`;
       }
 
+      const fields = value as Record<string, SchemaDescriptor>;
       const newLineKeys = Object.keys(value).includes('data_source') ? ['data_source'] : ['sql_table'];
       const content = Object.keys(value)
         .map((key) => {
-          if (!isPlainObject(value[key])) {
+          if (!isPlainObject(fields[key])) {
             const newLine = newLineKeys.includes(key) ? '\n' : '';
             return `${indent}${key}:${this.render(
-              value[key],
+              fields[key],
               level + 1,
               value
             )}${newLine}`;
           }
 
           return `${indent}${key}:${this.render(
-            Object.entries(value[key] || {}).map(([ok, ov]) => ({
+            Object.entries(fields[key] || {}).map(([ok, ov]) => ({
               name: ok,
               // @ts-ignore
               ...Object.entries(ov)

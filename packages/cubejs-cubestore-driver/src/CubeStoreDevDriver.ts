@@ -1,6 +1,6 @@
 import { CubeStoreHandler } from '@cubejs-backend/cubestore';
 
-import { CubeStoreDriver } from './CubeStoreDriver';
+import { CubeStoreDriver, CubeStoreQueryOptions } from './CubeStoreDriver';
 import { ConnectionConfig } from './types';
 
 export class CubeStoreDevDriver extends CubeStoreDriver {
@@ -23,7 +23,7 @@ export class CubeStoreDevDriver extends CubeStoreDriver {
     return this.cubeStoreHandler.acquire();
   }
 
-  public async query(query, values, options): Promise<any[]> {
+  public async query(query: string, values: any[], options?: CubeStoreQueryOptions): Promise<any[]> {
     await this.acquireCubeStore();
     return super.query(query, values, options);
   }

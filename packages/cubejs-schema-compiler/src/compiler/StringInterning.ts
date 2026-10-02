@@ -80,7 +80,7 @@ export function internStringsDeep<T>(root: T): T {
           const interned = visitValue(descriptor.value);
 
           if (typeof descriptor.value === 'string' && !frozen && descriptor.writable) {
-            obj[key] = interned;
+            (obj as Record<string, unknown>)[key] = interned;
           }
         }
       }

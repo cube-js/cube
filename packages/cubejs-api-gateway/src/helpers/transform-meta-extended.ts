@@ -49,7 +49,7 @@ function transformMeasure(measure: any, cubeDefinitions: any) {
   return {
     ...measure,
     sql: stringifyMemberSql(cubeDefinitions[cubeName]?.measures?.[memberName]?.sql),
-    filters: cubeDefinitions[cubeName]?.measures?.[memberName]?.filters?.map((filter) => ({
+    filters: cubeDefinitions[cubeName]?.measures?.[memberName]?.filters?.map((filter: { sql?: () => string }) => ({
       sql: stringifyMemberSql(filter.sql),
     })),
   };

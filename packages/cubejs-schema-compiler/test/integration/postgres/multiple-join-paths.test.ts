@@ -5,6 +5,7 @@ import { DataSchemaCompiler } from '../../../src/compiler/DataSchemaCompiler';
 import { JoinGraph } from '../../../src/compiler/JoinGraph';
 import { CubeEvaluator } from '../../../src/compiler/CubeEvaluator';
 import { testWithPreAggregation } from './pre-aggregation-utils';
+import type { TestPreAggregationDescription } from '../utils/BaseDbRunner';
 
 describe('Multiple join paths', () => {
   jest.setTimeout(200000);
@@ -428,7 +429,7 @@ describe('Multiple join paths', () => {
       });
 
       const preAggregationsDescription: any = query.preAggregations?.preAggregationsDescription();
-      const { loadSql } = preAggregationsDescription.find(p => p.preAggregationId === 'A.adex_with_join_paths');
+      const { loadSql } = preAggregationsDescription.find((p: TestPreAggregationDescription) => p.preAggregationId === 'A.adex_with_join_paths');
 
       expect(loadSql[0]).toMatch(/ON 'A' = 'D'/);
       expect(loadSql[0]).toMatch(/ON 'D' = 'E'/);
@@ -457,7 +458,7 @@ describe('Multiple join paths', () => {
       });
 
       const preAggregationsDescription: any = query.preAggregations?.preAggregationsDescription();
-      const preAggregation = preAggregationsDescription.find(p => p.preAggregationId === 'A.adex_with_join_paths');
+      const preAggregation = preAggregationsDescription.find((p: TestPreAggregationDescription) => p.preAggregationId === 'A.adex_with_join_paths');
       expect(preAggregation).toBeDefined();
     });
 
@@ -483,7 +484,7 @@ describe('Multiple join paths', () => {
       });
 
       const preAggregationsDescription: any = query.preAggregations?.preAggregationsDescription();
-      const preAggregation = preAggregationsDescription.find(p => p.preAggregationId === 'A.adex_with_join_paths');
+      const preAggregation = preAggregationsDescription.find((p: TestPreAggregationDescription) => p.preAggregationId === 'A.adex_with_join_paths');
       expect(preAggregation).toBeDefined();
     });
 
@@ -508,7 +509,7 @@ describe('Multiple join paths', () => {
       });
 
       const preAggregationsDescription: any = query.preAggregations?.preAggregationsDescription();
-      const preAggregation = preAggregationsDescription.find(p => p.preAggregationId === 'A.ad_without_join_paths');
+      const preAggregation = preAggregationsDescription.find((p: TestPreAggregationDescription) => p.preAggregationId === 'A.ad_without_join_paths');
       expect(preAggregation).toBeDefined();
     });
 
@@ -533,7 +534,7 @@ describe('Multiple join paths', () => {
       });
 
       const preAggregationsDescription: any = query.preAggregations?.preAggregationsDescription();
-      const preAggregation = preAggregationsDescription.find(p => p.preAggregationId === 'A.ad_without_join_paths');
+      const preAggregation = preAggregationsDescription.find((p: TestPreAggregationDescription) => p.preAggregationId === 'A.ad_without_join_paths');
       expect(preAggregation).toBeDefined();
     });
 
@@ -622,7 +623,7 @@ describe('Multiple join paths', () => {
           const query = makeReferenceQueryFor(preAggregationId);
 
           const preAggregationsDescription: any = query.preAggregations?.preAggregationsDescription();
-          const preAggregationFromQuery = preAggregationsDescription.find(p => p.preAggregationId === preAggregationId);
+          const preAggregationFromQuery = preAggregationsDescription.find((p: TestPreAggregationDescription) => p.preAggregationId === preAggregationId);
           if (preAggregationFromQuery === undefined) {
             throw expect(preAggregationFromQuery).toBeDefined();
           }
@@ -640,7 +641,7 @@ describe('Multiple join paths', () => {
           const query = makeReferenceQueryFor(preAggregationId, addTimeRange);
 
           const preAggregationsDescription: any = query.preAggregations?.preAggregationsDescription();
-          const preAggregationFromQuery = preAggregationsDescription.find(p => p.preAggregationId === preAggregationId);
+          const preAggregationFromQuery = preAggregationsDescription.find((p: TestPreAggregationDescription) => p.preAggregationId === preAggregationId);
           if (preAggregationFromQuery === undefined) {
             throw expect(preAggregationFromQuery).toBeDefined();
           }

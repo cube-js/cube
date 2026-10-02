@@ -8,7 +8,7 @@ import { prepareJsCompiler } from '../../unit/PrepareCompiler';
 import { ClickHouseDbRunner } from './ClickHouseDbRunner';
 import { logSqlAndParams } from '../../unit/TestUtil';
 
-const itif = (condition, description, fn) => (condition ? it(description, fn) : it.skip(description, fn));
+const itif = (condition: boolean, description: string, fn: jest.ProvidesCallback) => (condition ? it(description, fn) : it.skip(description, fn));
 
 describe('ClickHouse DataSchemaCompiler', () => {
   jest.setTimeout(200000);

@@ -34,9 +34,10 @@ export class JavaScriptSchemaFormatter extends BaseSchemaFormatter {
         descriptor.comments.map((comment) => `  // ${comment}`).join('\n')
       );
     } else if (typeof descriptor === 'object') {
-      const content = descriptor != null ? Object.keys(descriptor)
-        .filter(k => descriptor[k] != null)
-        .map(key => `${key}: ${this.render(descriptor[key], level + 1)}`)
+      const fields = descriptor as Record<string, SchemaDescriptor>;
+      const content = fields != null ? Object.keys(fields)
+        .filter(k => fields[k] != null)
+        .map(key => `${key}: ${this.render(fields[key], level + 1)}`)
         .join(lineSeparator)
         .split('\n')
         .map(l => `  ${l}`)

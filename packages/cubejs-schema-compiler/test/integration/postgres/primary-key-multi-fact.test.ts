@@ -57,7 +57,7 @@ cubes:
         type: sum
     `);
 
-  async function runQuery(q) {
+  async function runQuery(q: unknown) {
     await compiler.compile();
     const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, q);
     return dbRunner.testQuery(query.buildSqlAndParams());

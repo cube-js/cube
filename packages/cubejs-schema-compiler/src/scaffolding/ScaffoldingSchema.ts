@@ -130,11 +130,11 @@ export class ScaffoldingSchema {
   ) {}
 
   public resolveTableName(tableName: TableName) {
-    let tableParts;
+    let tableParts: string[];
     if (Array.isArray(tableName)) {
       tableParts = tableName;
     } else {
-      tableParts = tableName.match(/(["`].*?["`]|[^`".]+)+(?=\s*|\s*$)/g);
+      tableParts = tableName.match(/(["`].*?["`]|[^`".]+)+(?=\s*|\s*$)/g)!;
     }
 
     if (tableParts.length === 2) {
@@ -238,16 +238,16 @@ export class ScaffoldingSchema {
   }
 
   protected parseTableName(tableName: TableName): [string, string] {
-    let schemaAndTable;
+    let schemaAndTable: string[];
     if (Array.isArray(tableName)) {
       schemaAndTable = tableName;
     } else {
-      schemaAndTable = tableName.match(/(["`].*?["`]|[^`".]+)+(?=\s*|\s*$)/g);
+      schemaAndTable = tableName.match(/(["`].*?["`]|[^`".]+)+(?=\s*|\s*$)/g)!;
     }
     if (schemaAndTable.length !== 2) {
       throw new UserError(`Incorrect format for '${tableName}'. Should be in '<schema>.<table>' format`);
     }
-    return schemaAndTable;
+    return schemaAndTable as [string, string];
   }
 
   protected dimensions(tableDefinition: ColumnData[]): Dimension[] {
@@ -279,7 +279,7 @@ export class ScaffoldingSchema {
     }));
   }
 
-  protected fromMeasureDictionary(column) {
+  protected fromMeasureDictionary(column: ColumnData) {
     return !column.name.match(new RegExp(idRegex, 'i')) && !!MEASURE_DICTIONARY.find(word => this.fixCase(column.name).endsWith(word));
   }
 
@@ -293,7 +293,7 @@ export class ScaffoldingSchema {
     const timeColumns = R.pipe(
       // @ts-ignore
       R.filter(column => !column.name.startsWith('_') && this.columnType(column) === 'time'),
-      R.sortBy(column => this.timeColumnIndex(column)),
+      R.sortBy((column: ColumnData) => this.timeColumnIndex(column)),
       // @ts-ignore
       R.map(column => ({ ...column, columnType: 'time' })) // TODO do we need it?
       // @ts-ignore
@@ -371,7 +371,7 @@ export class ScaffoldingSchema {
       .filter(notEmpty));
   }
 
-  protected timeColumnIndex(column): number {
+  protected timeColumnIndex(column: ColumnData): number {
     const name = this.fixCase(column.name);
     if (name.indexOf('create') !== -1) {
       return 0;
@@ -382,7 +382,7 @@ export class ScaffoldingSchema {
     }
   }
 
-  protected columnType(column): ColumnType {
+  protected columnType(column: ColumnData): ColumnType {
     const type = this.fixCase(column.type);
 
     if (['time', 'date'].find(t => type.includes(t))) {

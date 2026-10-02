@@ -111,7 +111,7 @@ cube(\`C\`, {
 });
     `);
 
-  async function runQueryTest(q, expectedResult) {
+  async function runQueryTest(q: unknown, expectedResult: unknown) {
     await compiler.compile();
     const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, q);
 
@@ -243,7 +243,7 @@ cube(\`CustomerOrders\`, {
 });
   `);
 
-  async function runQueryTest(q, expectedResult) {
+  async function runQueryTest(q: unknown, expectedResult: unknown) {
     await compiler.compile();
     const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, q);
 

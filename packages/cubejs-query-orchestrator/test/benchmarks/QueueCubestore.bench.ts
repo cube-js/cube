@@ -4,7 +4,7 @@ import 'source-map-support/register';
 import { CubeStoreDriver } from '@cubejs-backend/cubestore-driver';
 import { QueryQueueBenchmark } from './QueueBench.abstract';
 
-let cubeStoreDriver;
+let cubeStoreDriver: CubeStoreDriver | undefined;
 
 const afterAll = async () => {
   if (cubeStoreDriver) {
@@ -22,7 +22,7 @@ const cubeStoreDriverFactory = async () => {
 };
 
 const beforeAll = async () => {
-  await (await cubeStoreDriverFactory()).query('QUEUE CLEAR');
+  await (await cubeStoreDriverFactory()).query('QUEUE CLEAR', []);
 };
 
 const workers = parseInt(process.env.WORKERS || '2', 10);

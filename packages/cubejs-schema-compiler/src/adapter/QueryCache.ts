@@ -1,5 +1,5 @@
 export class QueryCache {
-  private readonly storage: {};
+  private readonly storage: Record<string, any>;
 
   public constructor() {
     this.storage = {};

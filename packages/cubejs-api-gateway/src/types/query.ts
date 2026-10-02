@@ -135,7 +135,7 @@ interface Query {
   timeDimensions?: QueryTimeDimension[];
   segments?: (Member | MemberExpression | ParsedMemberExpression)[];
   limit?: null | number;
-  offset?: number;
+  offset?: null | number;
   total?: boolean;
   totalQuery?: boolean;
   order?: any;

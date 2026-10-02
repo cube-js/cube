@@ -10,7 +10,6 @@
     "rootDir": ".",
     "allowJs": true,
     "checkJs": true,
-    "noImplicitAny": false,
     "strictNullChecks": true,
     "strictFunctionTypes": true,
     "strictBindCallApply": true,

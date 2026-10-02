@@ -6,6 +6,7 @@ import { isPredefinedGranularity, TIME_SERIES } from '@cubejs-backend/shared';
 
 import { CubeSymbols, CubeDefinition, ToString } from './CubeSymbols';
 import type { ErrorReporter } from './ErrorReporter';
+import type { ViewGroupInput } from './ViewGroupEvaluator';
 import { CompilerInterface } from './PrepareCompiler';
 import { NAMED_NUMERIC_FORMATS } from './named-numeric-formats';
 
@@ -48,7 +49,7 @@ function formatStatePath(state: Joi.State): string {
   return '<unknown path>';
 }
 
-function condition(fun, then, otherwise) {
+function condition(fun: (value: any) => boolean, then: Joi.SchemaLike, otherwise: Joi.SchemaLike) {
   return Joi.alternatives().conditional(
     Joi.ref('.'), {
       is: Joi.custom((value, helper) => (fun(value) ? value : helper.message({}))),
@@ -58,15 +59,15 @@ function condition(fun, then, otherwise) {
   );
 }
 
-function defined(a) {
+function defined(a: unknown) {
   return typeof a !== 'undefined';
 }
 
-function inherit(a, b) {
+function inherit(a: Joi.SchemaMap, b: Joi.SchemaMap) {
   return Joi.object().keys({ ...a, ...b });
 }
 
-function requireOneOf(...keys) {
+function requireOneOf(...keys: string[]) {
   return Joi.alternatives().try(
     ...(keys.map((k) => Joi.object().keys({ [k]: Joi.exist().required() })))
   );
@@ -413,7 +414,7 @@ const BaseDimensionWithoutSubQuery = {
             const v = parseInt(intParsed[0], 10);
             const unit = intParsed[1];
 
-            const validIntervals = {
+            const validIntervals: Record<string, () => boolean> = {
               // Any number of years is valid
               year: () => true,
               // Only months divisible by a year with no remainder are valid
@@ -625,11 +626,11 @@ const OriginalSqlSchema = condition(
 const ReferencesFields = ['timeDimensionReference', 'rollupReferences', 'measureReferences', 'dimensionReferences', 'segmentReferences'];
 const NonReferencesFields = ['timeDimension', 'timeDimensions', 'rollups', 'measures', 'dimensions', 'segments'];
 
-function hasAnyField(fields, s) {
+function hasAnyField(fields: string[], s: Record<string, unknown>) {
   return !fields.every((f) => !defined(s[f]));
 }
 
-function errorOnMixing(schema) {
+function errorOnMixing(schema: Joi.SchemaLike) {
   return condition(
     (s) => hasAnyField(ReferencesFields, s) && hasAnyField(NonReferencesFields, s),
     Joi.any().forbidden().error(
@@ -1351,9 +1352,9 @@ const viewSchema = inherit(baseSchema, {
   defaultFilters: Joi.array().items(ViewDefaultFilterSchema),
 });
 
-function formatErrorMessageFromDetails(explain, d) {
+function formatErrorMessageFromDetails(explain: Map<string, string>, d: Joi.ValidationErrorItem) {
   if (d?.context?.details) {
-    d?.context?.details?.forEach((d2) => formatErrorMessageFromDetails(explain, d2));
+    d?.context?.details?.forEach((d2: Joi.ValidationErrorItem) => formatErrorMessageFromDetails(explain, d2));
   } else if (d?.message) {
     const key = d?.context?.message || d?.message;
     const val = key?.replace(`"${d.context?.label}"`, `(${d.context?.label} = ${d.context?.value})`);
@@ -1361,7 +1362,7 @@ function formatErrorMessageFromDetails(explain, d) {
   }
 }
 
-function formatErrorMessage(error) {
+function formatErrorMessage(error: Joi.ValidationError) {
   const explain = new Map();
   explain.set(error.message, error.message);
 
@@ -1378,7 +1379,7 @@ function formatErrorMessage(error) {
   return message.replace(/ = undefined\) is required/g, ') is required');
 }
 
-function collectFunctionFieldsPatterns(patterns, path, o) {
+function collectFunctionFieldsPatterns(patterns: Set<string>, path: string, o: any) {
   let key = o?.id || o?.key || ((o?.patterns?.length || 0) > 0 ? '*' : undefined);
   if (o?.schema?.type === 'array' && key && typeof key === 'string') {
     key = `${key}.0`;
@@ -1393,7 +1394,7 @@ function collectFunctionFieldsPatterns(patterns, path, o) {
   }
 
   if (Array.isArray(o)) {
-    o.forEach((v) => collectFunctionFieldsPatterns(patterns, newPath, v));
+    o.forEach((v: unknown) => collectFunctionFieldsPatterns(patterns, newPath, v));
   } else if (o instanceof Map) {
     o.forEach((v, k) => collectFunctionFieldsPatterns(patterns, newPath, v));
   } else if (o === Object(o)) {
@@ -1479,13 +1480,13 @@ export class CubeValidator implements CompilerInterface {
   ) {
   }
 
-  public compile(cubes, errorReporter: ErrorReporter) {
+  public compile(cubes: CubeDefinition[], errorReporter: ErrorReporter) {
     return this.cubeSymbols.cubeList.map(
       (v) => this.validate(this.cubeSymbols.getCubeDefinition(v.name), errorReporter.inContext(`${v.name} cube`))
     );
   }
 
-  public validate(cube, errorReporter: ErrorReporter) {
+  public validate(cube: any, errorReporter: ErrorReporter) {
     const options = {
       nonEnumerables: true,
       abortEarly: false, // This will allow all errors to be reported, not just the first one
@@ -1524,7 +1525,7 @@ export class CubeValidator implements CompilerInterface {
   // Reported outside the cube schema so the message stands on its own: a
   // granularity rejected by the schema is listed among the reasons every other
   // dimension alternative failed, which buries it.
-  private validateGranularitySql(cube, errorReporter: ErrorReporter): boolean {
+  private validateGranularitySql(cube: CubeDefinition, errorReporter: ErrorReporter): boolean {
     let valid = true;
 
     for (const [dimensionName, dimension] of Object.entries<any>(cube.dimensions || {})) {
@@ -1543,7 +1544,7 @@ export class CubeValidator implements CompilerInterface {
     return valid;
   }
 
-  public validateViewGroup(viewGroup, errorReporter: ErrorReporter) {
+  public validateViewGroup(viewGroup: ViewGroupInput, errorReporter: ErrorReporter) {
     const options = {
       nonEnumerables: true,
       abortEarly: false, // This will allow all errors to be reported, not just the first one

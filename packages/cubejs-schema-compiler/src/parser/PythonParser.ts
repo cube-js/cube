@@ -1,5 +1,5 @@
 /* eslint-disable no-underscore-dangle,camelcase */
-import { ErrorListener, CommonTokenStream, CharStream, RuleNode } from 'antlr4';
+import { ErrorListener, CommonTokenStream, CharStream, RuleNode, Recognizer, RecognitionException, Token } from 'antlr4';
 import * as t from '@babel/types';
 
 import Python3Lexer from './Python3Lexer';
@@ -145,29 +145,29 @@ export class PythonParser {
 
     const { errors } = this;
 
-    class ExprErrorListener implements ErrorListener<number> {
-      public syntaxError(recognizer, offendingSymbol, line, column, msg, err) {
+    class ExprErrorListener<TSymbol> implements ErrorListener<TSymbol> {
+      public syntaxError(recognizer: Recognizer<TSymbol>, offendingSymbol: TSymbol, line: number, column: number, msg: string, err: RecognitionException | undefined) {
         errors.push({
           msg, column, err, line, recognizer, offendingSymbol
         });
       }
 
-      public reportAmbiguity(recognizer, dfa, startIndex, stopIndex, exact, ambigAlts, configs) {
+      public reportAmbiguity() {
         // Optional: log ambiguity warnings if needed
       }
 
-      public reportAttemptingFullContext(recognizer, dfa, startIndex, stopIndex, conflictingAlts, configs) {
+      public reportAttemptingFullContext() {
         // Optional: log full context attempts if needed
       }
 
-      public reportContextSensitivity(recognizer, dfa, startIndex, stopIndex, prediction, configs) {
+      public reportContextSensitivity() {
         // Optional: log context sensitivity if needed
       }
     }
 
     const lexer = new Python3Lexer(chars);
     lexer.removeErrorListeners();
-    lexer.addErrorListener(new ExprErrorListener());
+    lexer.addErrorListener(new ExprErrorListener<number>());
 
     const commonTokenStream = new CommonTokenStream(lexer);
 
@@ -176,7 +176,7 @@ export class PythonParser {
     );
     parser.buildParseTrees = true;
     parser.removeErrorListeners();
-    parser.addErrorListener(new ExprErrorListener());
+    parser.addErrorListener(new ExprErrorListener<Token>());
 
     return parser.file_input();
   }

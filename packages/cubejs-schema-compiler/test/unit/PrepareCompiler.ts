@@ -10,21 +10,21 @@ export const prepareCompiler = (content: CompileContent | CompileContent[], opti
   dataSchemaFiles: () => Promise.resolve(Array.isArray(content) ? content : [content]),
 }, { adapter: 'postgres', ...options });
 
-export const prepareJsCompiler = (content, options = {}) => originalPrepareCompiler({
+export const prepareJsCompiler = (content: string | string[], options = {}) => originalPrepareCompiler({
   localPath: () => __dirname,
   dataSchemaFiles: () => Promise.resolve([
     { fileName: 'main.js', content: Array.isArray(content) ? content.join('\r\n') : content }
   ])
 }, { adapter: 'postgres', ...options });
 
-export const prepareYamlCompiler = (content, options = {}) => originalPrepareCompiler({
+export const prepareYamlCompiler = (content: string, options = {}) => originalPrepareCompiler({
   localPath: () => __dirname,
   dataSchemaFiles: () => Promise.resolve([
     { fileName: 'main.yml', content }
   ])
 }, { adapter: 'postgres', ...options });
 
-export const prepareCube = (cubeName, cube, options = {}) => {
+export const prepareCube = (cubeName: string, cube: object, options = {}) => {
   const fileName = `${cubeName}.js`;
   const content = `cube(${JSON.stringify(cubeName)}, ${JSON.stringify(cube).replace(/"([^"]+)":/g, '$1:')});`;
 

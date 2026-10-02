@@ -7,11 +7,11 @@ import type { ServerContainer as ServerContainerType } from '@cubejs-backend/ser
 import { displayError, event } from '../utils';
 
 // @todo There is another function with similar name inside utils, but without analytics
-const logStage = (stage) => {
+const logStage = (stage: string) => {
   console.log(`- ${stage}`);
 };
 
-const generate = async (options) => {
+const generate = async (options: { tables: string[], dataSource: string }) => {
   const generateSchemaOptions = { tables: options.tables };
 
   event({
@@ -81,7 +81,7 @@ const generate = async (options) => {
   const { tables, dataSource } = options;
 
   const files = scaffoldingTemplate.generateFilesByTableNames(tables, { dataSource });
-  await Promise.all(files.map(file => fs.writeFile(path.join(getEnv('schemaPath'), 'cubes', file.fileName), file.content)));
+  await Promise.all(files.map((file: { fileName: string, content: string }) => fs.writeFile(path.join(getEnv('schemaPath'), 'cubes', file.fileName), file.content)));
 
   await event({
     event: 'Generate Schema Success',
@@ -91,7 +91,7 @@ const generate = async (options) => {
   logStage(`Schema for ${options.tables.join(', ')} was successfully generated 🎉`);
 };
 
-const list = (val) => val.split(',');
+const list = (val: string) => val.split(',');
 
 export function configureGenerateCommand(program: CommanderStatic) {
   program

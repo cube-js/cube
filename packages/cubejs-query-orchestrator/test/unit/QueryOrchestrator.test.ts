@@ -1,6 +1,6 @@
 import { Readable } from 'stream';
-import type { BaseDriver } from '@cubejs-backend/base-driver';
-import type { OmitKnown } from '@cubejs-backend/shared';
+import type { BaseDriver, QueryColumnsResult, QuerySchemasResult, QueryTablesResult, TableStructure } from '@cubejs-backend/base-driver';
+import type { LoggerFnParams, OmitKnown } from '@cubejs-backend/shared';
 import { QueryOrchestrator } from '../../src/orchestrator/QueryOrchestrator';
 import { LocalCacheDriver } from '../../src/orchestrator/LocalCacheDriver';
 import type { QueryBody } from '../../src/orchestrator/QueryCache';
@@ -13,6 +13,10 @@ type TestQueryBody = OmitKnown<QueryBody, 'preAggregations'> & {
 class TestQueryOrchestrator extends QueryOrchestrator {
   public fetchQuery(queryBody: TestQueryBody) {
     return super.fetchQuery(queryBody as QueryBody);
+  }
+
+  public loadRefreshKeys(query: TestQueryBody) {
+    return super.loadRefreshKeys(query as QueryBody);
   }
 }
 
@@ -131,11 +135,11 @@ class MockDriver {
     }
 
     if (query.match(/^SELECT MAX\(created_at\)/)) {
-      promise = promise.then(() => [{ max: null }]);
+      promise = promise.then(() => [{ max: null as string | null }]);
     }
 
     if (query.match(/^SELECT MIN\(created_at\)/)) {
-      promise = promise.then(() => [{ min: null }]);
+      promise = promise.then(() => [{ min: null as string | null }]);
     }
 
     if (this.tablesReady.find(t => query.indexOf(t) !== -1)) {
@@ -163,7 +167,7 @@ class MockDriver {
     return new Promise<void>(resolve => setTimeout(() => resolve(), timeout));
   }
 
-  public async createSchemaIfNotExists(schema: string) {
+  public async createSchemaIfNotExists(schema: string): Promise<null> {
     this.schema = schema;
     return null;
   }
@@ -268,7 +272,7 @@ class MockDriverUnloadWithoutTempTableSupport extends MockDriver {
     return { unloadWithoutTempTable: true };
   }
 
-  public queryColumnTypes() {
+  public queryColumnTypes(): TableStructure {
     return [];
   }
 }
@@ -314,7 +318,7 @@ describe('QueryOrchestrator', () => {
   let testCount = 1;
   // Clients poll on `Continue wait`. The memory queue hands out a finished result only once, so a
   // query awaited by several concurrent partitions can answer one of them with `Continue wait`.
-  const fetchLongPolling = (orchestrator: TestQueryOrchestrator, q: TestQueryBody) => orchestrator.fetchQuery(q).catch(e => {
+  const fetchLongPolling = (orchestrator: TestQueryOrchestrator, q: TestQueryBody): ReturnType<TestQueryOrchestrator['fetchQuery']> => orchestrator.fetchQuery(q).catch(e => {
     if (e.toString().match(/Continue wait/)) {
       return fetchLongPolling(orchestrator, q);
     }
@@ -326,7 +330,7 @@ describe('QueryOrchestrator', () => {
         {
           name: 'id',
           type: 'integer',
-          attributes: [],
+          attributes: [] as string[],
         },
       ],
     },
@@ -360,8 +364,8 @@ describe('QueryOrchestrator', () => {
     // The mocks implement only the part of BaseDriver the orchestrator touches.
     const driverFactory = (dataSource: string) => mockDriverFor(dataSource) as unknown as BaseDriver;
     const logger =
-      (msg, params) => console.log(new Date().toJSON(), msg, params);
-    const options = (processUid) => ({
+      (msg: string, params: LoggerFnParams) => console.log(new Date().toJSON(), msg, params);
+    const options = (processUid: string) => ({
       externalDriverFactory: () => externalMockDriverLocal as unknown as BaseDriver,
       queryCacheOptions: {
         queueOptions: () => ({
@@ -856,7 +860,7 @@ describe('QueryOrchestrator', () => {
 
     await mockDriver.delay(200);
 
-    let firstResolve = null;
+    let firstResolve: string | null = null;
 
     console.log('Starting race');
 
@@ -1796,11 +1800,11 @@ describe('QueryOrchestrator', () => {
       queryOrchestrator.fetchQuery(query(4)),
     ].map(async streamPromise => {
       const stream = await streamPromise;
-      const data = await new Promise((resolve, reject) => {
-        stream.on('data', (row) => {
+      const data = await new Promise<Record<string, unknown>>((resolve, reject) => {
+        stream.on('data', (row: Record<string, unknown>) => {
           resolve(row);
         });
-        stream.on('error', (err) => {
+        stream.on('error', (err: Error) => {
           reject(err);
         });
       });
@@ -1848,11 +1852,11 @@ describe('QueryOrchestrator', () => {
       fetchLongPolling(streamingNode2, query(4)),
     ].map(async streamPromise => {
       const stream = await streamPromise;
-      const data = await new Promise((resolve, reject) => {
-        stream.on('data', (row) => {
+      const data = await new Promise<Record<string, unknown>>((resolve, reject) => {
+        stream.on('data', (row: Record<string, unknown>) => {
           resolve(row);
         });
-        stream.on('error', (err) => {
+        stream.on('error', (err: Error) => {
           reject(err);
         });
       });
@@ -1912,8 +1916,8 @@ describe('QueryOrchestrator', () => {
         { schema_name: 'staging' }
       ]);
 
-      metadataMockDriver.getTablesForSpecificSchemas = jest.fn().mockImplementation((schemas) => {
-        const tables = [];
+      metadataMockDriver.getTablesForSpecificSchemas = jest.fn().mockImplementation((schemas: QuerySchemasResult[]) => {
+        const tables: QueryTablesResult[] = [];
         schemas.forEach(schema => {
           if (schema.schema_name === 'public') {
             tables.push(
@@ -1931,8 +1935,8 @@ describe('QueryOrchestrator', () => {
         return Promise.resolve(tables);
       });
 
-      metadataMockDriver.getColumnsForSpecificTables = jest.fn().mockImplementation((tables) => {
-        const columns = [];
+      metadataMockDriver.getColumnsForSpecificTables = jest.fn().mockImplementation((tables: QueryTablesResult[]) => {
+        const columns: QueryColumnsResult[] = [];
         tables.forEach(table => {
           if (table.table_name === 'users') {
             columns.push(

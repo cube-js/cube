@@ -5,7 +5,7 @@ import { BaseFilter } from './BaseFilter';
 import { UserError } from '../compiler/UserError';
 import { BaseTimeDimension } from './BaseTimeDimension';
 
-const GRANULARITY_TO_INTERVAL = {
+const GRANULARITY_TO_INTERVAL: Record<string, (date: string) => string> = {
   day: (date: string) => `DATE_FORMAT(${date}, '%Y-%m-%dT00:00:00.000')`,
   week: (date: string) => `DATE_FORMAT(DATE_ADD('1900-01-01', INTERVAL TIMESTAMPDIFF(WEEK, '1900-01-01', ${date}) WEEK), '%Y-%m-%dT00:00:00.000')`,
   hour: (date: string) => `DATE_FORMAT(${date}, '%Y-%m-%dT%H:00:00.000')`,
@@ -17,7 +17,7 @@ const GRANULARITY_TO_INTERVAL = {
 };
 
 class MysqlFilter extends BaseFilter {
-  public likeIgnoreCase(column: string, not: boolean, param, type: string) {
+  public likeIgnoreCase(column: string, not: boolean, param: unknown, type: string) {
     const p = (!type || type === 'contains' || type === 'ends') ? '%' : '';
     const s = (!type || type === 'contains' || type === 'starts') ? '%' : '';
     return `${column}${not ? ' NOT' : ''} LIKE CONCAT('${p}', ${this.allocateParam(param)}, '${s}')`;
@@ -36,7 +36,7 @@ export class MysqlQuery extends BaseQuery {
     this.useGeneratedTimeSeries = getEnv('mysqlUseGeneratedTimeSeries', { dataSource: this.dataSource });
   }
 
-  public newFilter(filter) {
+  public newFilter(filter: any) {
     return new MysqlFilter(this, filter);
   }
 
@@ -83,7 +83,7 @@ export class MysqlQuery extends BaseQuery {
     return parts.reduce((acc, part) => `${fn}(${acc}, INTERVAL ${part})`, date);
   }
 
-  public timeGroupedColumn(granularity: string, dimension) {
+  public timeGroupedColumn(granularity: string, dimension: string) {
     return `CAST(${GRANULARITY_TO_INTERVAL[granularity](dimension)} AS DATETIME)`;
   }
 

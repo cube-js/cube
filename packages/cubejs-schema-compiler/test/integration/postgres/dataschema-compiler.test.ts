@@ -53,7 +53,7 @@ describe('DataSchemaCompiler', () => {
         compiler.throwIfAnyErrors();
         throw new Error();
       })
-      .catch((error) => {
+      .catch((error: unknown) => {
         expect(error).toBeInstanceOf(CompileError);
       });
   });
@@ -88,7 +88,7 @@ describe('DataSchemaCompiler', () => {
     return compiler.compile().then(() => {
       compiler.throwIfAnyErrors();
       throw new Error();
-    }).catch((error) => {
+    }).catch((error: unknown) => {
       expect(error).toBeInstanceOf(CompileError);
     });
   });
@@ -146,7 +146,7 @@ describe('DataSchemaCompiler', () => {
       return compiler.compile().then(() => {
         compiler.throwIfAnyErrors();
         throw new Error();
-      }).catch((error) => {
+      }).catch((error: Error) => {
         expect(error).toBeInstanceOf(CompileError);
         expect(error.message).toMatch(/Duplicate property parsing count/);
       });
@@ -438,7 +438,7 @@ describe('DataSchemaCompiler', () => {
     return compiler.compile().then(() => {
       compiler.throwIfAnyErrors();
       throw new Error();
-    }).catch((error) => {
+    }).catch((error: unknown) => {
       console.log(error);
       expect(error).toBeInstanceOf(CompileError);
     });
@@ -471,7 +471,7 @@ describe('DataSchemaCompiler', () => {
     return compiler.compile().then(() => {
       compiler.throwIfAnyErrors();
       throw new Error();
-    }).catch((error) => {
+    }).catch((error: unknown) => {
       console.log(error);
       expect(error).toBeInstanceOf(CompileError);
     });

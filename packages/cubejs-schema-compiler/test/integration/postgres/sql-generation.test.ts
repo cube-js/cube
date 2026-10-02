@@ -961,7 +961,7 @@ SELECT 1 AS revenue,  cast('2024-01-01' AS timestamp) as time UNION ALL
     });
   });
 
-  async function runQueryTest(q, expectedResult) {
+  async function runQueryTest(q: unknown, expectedResult: unknown) {
     await compiler.compile();
     const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, q);
     const res = await dbRunner.testQuery(query.buildSqlAndParams());
@@ -5197,7 +5197,7 @@ SELECT 1 AS revenue,  cast('2024-01-01' AS timestamp) as time UNION ALL
     return dbRunner
       .testQuery(sql)
       .then((res) => {
-        res.forEach((row) => {
+        res.forEach((row: Record<string, unknown>) => {
           const cols = Object.keys(row);
           expect(cols[0]).toEqual('b__aid');
           expect(cols[1]).toEqual('b__bval_sum');
@@ -5311,7 +5311,7 @@ SELECT 1 AS revenue,  cast('2024-01-01' AS timestamp) as time UNION ALL
               replaceAggregationType: null,
               addFilters: [
                 {
-                  sql: (visitors) => `${visitors.source} IN ('google', 'some')`,
+                  sql: (visitors: Record<string, string>) => `${visitors.source} IN ('google', 'some')`,
                 },
               ],
             },

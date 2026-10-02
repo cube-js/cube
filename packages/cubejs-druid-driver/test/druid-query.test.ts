@@ -1,8 +1,8 @@
-import { prepareCompiler as originalPrepareCompiler } from '@cubejs-backend/schema-compiler';
+import { prepareCompiler as originalPrepareCompiler, PrepareCompilerOptions } from '@cubejs-backend/schema-compiler';
 
 import { DruidQuery } from '../src/DruidQuery';
 
-export const testCompiler = (content, options) => originalPrepareCompiler({
+export const testCompiler = (content: string, options?: PrepareCompilerOptions) => originalPrepareCompiler({
   localPath: () => __dirname,
   dataSchemaFiles: () => Promise.resolve([
     { fileName: 'main.js', content },

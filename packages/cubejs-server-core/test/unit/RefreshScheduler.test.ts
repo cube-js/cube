@@ -1,5 +1,5 @@
 import R from 'ramda';
-import { BaseDriver } from '@cubejs-backend/query-orchestrator';
+import { BaseDriver, QueryWithParams } from '@cubejs-backend/query-orchestrator';
 import { pausePromise, SchemaFileRepository, createPromiseLock } from '@cubejs-backend/shared';
 import { CubejsServerCore, CompilerApi, RefreshScheduler } from '../../src';
 
@@ -298,7 +298,7 @@ class MockDriver extends BaseDriver {
   // eslint-disable-next-line @typescript-eslint/no-empty-function
   public async testConnection() {}
 
-  public query(query) {
+  public query(query: string) {
     this.executedQueries.push(query);
 
     // Track query attempts for backoff testing
@@ -307,7 +307,7 @@ class MockDriver extends BaseDriver {
     }
 
     let promise: any = Promise.resolve([query]);
-    promise = promise.then((res) => new Promise(resolve => setTimeout(() => resolve(res), 150)));
+    promise = promise.then((res: unknown) => new Promise(resolve => setTimeout(() => resolve(res), 150)));
 
     if (query.includes('sql_cube_refresh')) {
       promise = promise.then(() => [{ refresh_key: 'sql-key' }]);
@@ -337,7 +337,7 @@ class MockDriver extends BaseDriver {
     }
 
     if (this.tablesReady.find(t => query.indexOf(t) !== -1)) {
-      promise = promise.then(res => res.concat({ tableReady: true }));
+      promise = promise.then((res: unknown[]) => res.concat({ tableReady: true }));
     }
 
     promise.cancel = () => {
@@ -346,23 +346,23 @@ class MockDriver extends BaseDriver {
     return promise;
   }
 
-  public async getTablesQuery(schema) {
+  public async getTablesQuery(schema: string) {
     if (this.tablesQueryDelay) {
       await this.delay(this.tablesQueryDelay);
     }
     return this.tables.map(t => ({ table_name: t.replace(`${schema}.`, '') }));
   }
 
-  public delay(timeout) {
+  public delay(timeout: number) {
     return new Promise(resolve => setTimeout(() => resolve(null), timeout));
   }
 
-  public async createSchemaIfNotExists(schema) {
+  public async createSchemaIfNotExists(schema: string): Promise<null> {
     this.schema = schema;
     return null;
   }
 
-  public loadPreAggregationIntoTable(preAggregationTableName, loadSql) {
+  public loadPreAggregationIntoTable(preAggregationTableName: string, loadSql: string) {
     const matchedTableName = preAggregationTableName.match(/^(.*)_([0-9a-z]+)_([0-9a-z]+)_([0-9a-z]+)$/);
     const timezoneMatch = loadSql.match(/AT TIME ZONE '(.*?)'/);
     const timezone = timezoneMatch && timezoneMatch[1];
@@ -379,7 +379,7 @@ class MockDriver extends BaseDriver {
     return resPromise;
   }
 
-  public async dropTable(tableName) {
+  public async dropTable(tableName: string) {
     this.tables = this.tables.filter(t => t !== tableName);
     return this.query(`DROP TABLE ${tableName}`);
   }
@@ -401,7 +401,7 @@ const setupScheduler = ({ repository, useOriginalSqlPreAggregations, skipAssertS
   const externalDriver = new MockDriver();
 
   class CubejsServerCoreDisabledRefreshTimer extends CubejsServerCore {
-    public startScheduledRefreshTimer() {
+    public startScheduledRefreshTimer(): null {
       // disabling interval
       return null;
     }
@@ -1319,7 +1319,7 @@ describe('Refresh Scheduler', () => {
       const orchestrator = await serverCore.getOrchestratorApi(ctx);
       const queryCache = orchestrator.getQueryOrchestrator().getQueryCache();
       const intervalQuery = await compilerApi.getSql({ measures: ['Interval.count'], timezone: 'UTC' });
-      const intervalKeys = new Set<string>(intervalQuery.cacheKeyQueries.map(q => queryCache.refreshKeyCacheKey(q, intervalQuery.dataSource)));
+      const intervalKeys = new Set<string>(intervalQuery.cacheKeyQueries.map((q: QueryWithParams) => queryCache.refreshKeyCacheKey(q, intervalQuery.dataSource)));
       const set = jest.spyOn(queryCache.getCacheDriver(), 'set');
       let localEntries;
 
@@ -1337,7 +1337,7 @@ describe('Refresh Scheduler', () => {
 
       return {
         localEntries,
-        intervalKeyQueries: mockDriver.executedQueries.filter(q => intervalQuery.cacheKeyQueries.some(([sql]) => sql === q)),
+        intervalKeyQueries: mockDriver.executedQueries.filter(q => intervalQuery.cacheKeyQueries.some(([sql]: QueryWithParams) => sql === q)),
         sqlKeyQueries: mockDriver.executedQueries.filter(q => q.match(/sql_cube_refresh/)),
       };
     };

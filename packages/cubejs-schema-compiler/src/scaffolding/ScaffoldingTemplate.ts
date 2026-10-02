@@ -45,7 +45,7 @@ export class ScaffoldingTemplate {
 
   public constructor(
     dbSchema: DatabaseSchema,
-    private readonly driver,
+    private readonly driver: any,
     protected readonly options: ScaffoldingTemplateOptions = {
       snakeCase: false,
     }

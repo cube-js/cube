@@ -30,13 +30,13 @@ export const driverDependencies = (dbType: DatabaseType) => {
 /**
  * Resolve driver module object by db type.
  */
-export const lookupDriverClass = (dbType): Constructor<BaseDriver> & {
+export const lookupDriverClass = (dbType: string): Constructor<BaseDriver> & {
   dialectClass?: () => any;
   getDefaultConcurrency?: () => number;
 } => {
   // eslint-disable-next-line global-require,import/no-dynamic-require
   const module = require(
-    driverDependencies(dbType || process.env.CUBEJS_DB_TYPE)
+    driverDependencies(<DatabaseType>(dbType || process.env.CUBEJS_DB_TYPE))
   );
   if (module.default) {
     return module.default;

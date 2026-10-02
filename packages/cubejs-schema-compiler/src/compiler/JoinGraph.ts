@@ -88,7 +88,7 @@ export class JoinGraph implements CompilerInterface {
       // @ts-ignore
       R.map(groupedByFrom => R.fromPairs(groupedByFrom.map(join => [join.to, 1]))),
       R.groupBy((join: JoinEdge) => join.from),
-      R.map(v => v[1]),
+      R.map((v: [string, JoinEdge]) => v[1]),
       R.toPairs
     // @ts-ignore
     )(this.edges);
@@ -123,7 +123,7 @@ export class JoinGraph implements CompilerInterface {
     };
 
     const joinRequired =
-      (v) => `primary key for '${v}' is required when join is defined in order to make aggregates work properly`;
+      (v: string) => `primary key for '${v}' is required when join is defined in order to make aggregates work properly`;
 
     const duplicates = this.reportDuplicateJoinTargets(cube, errorReporter);
 
@@ -259,7 +259,7 @@ export class JoinGraph implements CompilerInterface {
     return this.builtJoins[key];
   }
 
-  protected cubeFromPath(cubePath) {
+  protected cubeFromPath(cubePath: JoinHint): string {
     if (Array.isArray(cubePath)) {
       return cubePath[cubePath.length - 1];
     }
@@ -282,7 +282,7 @@ export class JoinGraph implements CompilerInterface {
       }
       root = newRoot;
     }
-    const nodesJoined = {};
+    const nodesJoined: Record<string, boolean> = {};
     const result = cubesToJoin.map(joinHints => {
       if (!Array.isArray(joinHints)) {
         joinHints = [joinHints];
@@ -348,9 +348,9 @@ export class JoinGraph implements CompilerInterface {
   }
 
   protected findMultiplicationFactorFor(cube: string, joins: JoinTreeJoins): boolean {
-    const visited = {};
+    const visited: Record<string, boolean> = {};
     const self = this;
-    function findIfMultipliedRecursive(currentCube: string) {
+    function findIfMultipliedRecursive(currentCube: string): boolean {
       if (visited[currentCube]) {
         return false;
       }

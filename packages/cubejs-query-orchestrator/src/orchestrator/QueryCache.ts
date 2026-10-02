@@ -18,6 +18,9 @@ import {
   CacheDriverInterface,
   TableStructure,
   DriverInterface, QueryKey,
+  DownloadQueryResultsOptions,
+  DownloadTableMemoryData,
+  StreamOptions,
   QueuePriority,
 } from '@cubejs-backend/base-driver';
 
@@ -97,7 +100,7 @@ export type LoadRefreshKeyOptions = {
 
 export type Query = {
   requestId?: string;
-  dataSource: string;
+  dataSource?: string;
   preAggregations?: PreAggregationDescription[];
   groupedPartitionPreAggregations?: PreAggregationDescription[][];
   preAggregationsLoadCacheByDataSource?: any;
@@ -688,7 +691,10 @@ export class QueryCache {
     return this.queue[dataSource];
   }
 
-  protected async csvQuery(client, q) {
+  protected async csvQuery(
+    client: DriverInterface,
+    q: { query: string, values: unknown[], lambdaTypes: TableStructure } & StreamOptions & DownloadQueryResultsOptions,
+  ) {
     const headers = q.lambdaTypes.map(c => c.name);
     const writer = csvWriter({
       headers,
@@ -699,7 +705,7 @@ export class QueryCache {
     try {
       if (client.stream) {
         tableData = await client.stream(q.query, q.values, q);
-        const errors = [];
+        const errors: Error[] = [];
         await pipeline(tableData.rowStream, writer, (err) => {
           if (err) {
             errors.push(err);
@@ -709,7 +715,8 @@ export class QueryCache {
           throw new Error(`Lambda query errors ${errors.join(', ')}`);
         }
       } else {
-        tableData = await client.downloadQueryResults(q.query, q.values, q);
+        // Lambda queries are only issued against drivers that download into memory.
+        tableData = await client.downloadQueryResults(q.query, q.values, q) as DownloadTableMemoryData;
         tableData.rows.forEach(
           row => writer.write(row)
         );
@@ -814,7 +821,7 @@ export class QueryCache {
             .all([clientFactory()])
             .then(([client]) => (<DriverInterface>client).stream(req.query, req.values, { highWaterMark: getEnv('dbQueryStreamHighWaterMark'), requestId: req.requestId }))
             .then((source) => {
-              const cleanup = async (error) => {
+              const cleanup = async (error?: Error) => {
                 if (source.release) {
                   const toRelease = source.release;
                   delete source.release;
@@ -952,7 +959,7 @@ export class QueryCache {
     return Promise.all(
       this.loadRefreshKeys(cacheKeyQueries, expireSecs, options),
     )
-      .catch(e => {
+      .catch((e): any[] => {
         if (e instanceof ContinueWaitError) {
           throw e;
         }
@@ -992,7 +999,7 @@ export class QueryCache {
       ));
   }
 
-  public async loadRefreshKeysFromQuery(query: Query) {
+  public async loadRefreshKeysFromQuery(query: QueryBody) {
     return Promise.all(
       this.loadRefreshKeys(
         this.cacheKeyQueriesFrom(query),
@@ -1282,12 +1289,12 @@ export class QueryCache {
     return entry.result;
   }
 
-  protected async lastRefreshTime(cacheKey) {
+  protected async lastRefreshTime(cacheKey: CacheKey) {
     const cachedValue = await this.cacheDriver.get(this.queryCacheKey(cacheKey));
     return cachedValue && new Date(cachedValue.time);
   }
 
-  public async resultFromCacheIfExists(queryBody) {
+  public async resultFromCacheIfExists(queryBody: QueryBody) {
     const cacheKey = QueryCache.queryCacheKey(queryBody);
     const cachedValue = await this.cacheDriver.get(this.queryCacheKey(cacheKey));
     if (cachedValue) {

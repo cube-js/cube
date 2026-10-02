@@ -10,21 +10,21 @@ export class SourceContainer {
 
   public importDependencies: Record<string, string> = {};
 
-  protected filesToMove: Record<string, string> = {};
+  public filesToMove: Record<string, string> = {};
 
   public constructor(sourceFiles: File[]) {
     this.fileContent = fromPairs(sourceFiles.map(({ fileName, content }) => [fileName, content]));
   }
 
-  public getTargetSource(fileName) {
+  public getTargetSource(fileName: string) {
     return this.fileToTargetSource[fileName];
   }
 
-  public addTargetSource(fileName, target) {
+  public addTargetSource(fileName: string, target: any) {
     this.fileToTargetSource[fileName] = target;
   }
 
-  public add(fileName, content) {
+  public add(fileName: string, content: string) {
     this.fileContent[fileName] = content;
   }
 
@@ -56,7 +56,7 @@ export class SourceContainer {
     };
   }
 
-  public addFileToMove(from, to) {
+  public addFileToMove(from: string, to: string) {
     this.filesToMove[from] = to;
   }
 

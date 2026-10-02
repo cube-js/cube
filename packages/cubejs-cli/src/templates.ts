@@ -11,18 +11,18 @@ export type Template = {
 };
 
 // Shared environment variables, across all DB types
-const sharedDotEnvVars = env => `CUBEJS_DEV_MODE=true
+const sharedDotEnvVars = (env: TemplateFileContext) => `CUBEJS_DEV_MODE=true
 CUBEJS_DB_TYPE=${env.dbType}
 CUBEJS_API_SECRET=${env.apiSecret}
 CUBEJS_EXTERNAL_DEFAULT=true
 CUBEJS_SCHEDULED_REFRESH_DEFAULT=true
 CUBEJS_SCHEMA_PATH=model`;
 
-const defaultDotEnvVars = env => `# Cube environment variables: https://docs.cube.dev/reference/configuration/environment-variables
+const defaultDotEnvVars = (env: TemplateFileContext) => `# Cube environment variables: https://docs.cube.dev/reference/configuration/environment-variables
 ${sharedDotEnvVars(env)}
 CUBEJS_WEB_SOCKETS=true`;
 
-const athenaDotEnvVars = env => `# Cube environment variables: https://docs.cube.dev/reference/configuration/environment-variables
+const athenaDotEnvVars = (env: TemplateFileContext) => `# Cube environment variables: https://docs.cube.dev/reference/configuration/environment-variables
 CUBEJS_AWS_KEY=<YOUR ATHENA AWS KEY HERE>
 CUBEJS_AWS_SECRET=<YOUR ATHENA SECRET KEY HERE>
 CUBEJS_AWS_REGION=<AWS REGION STRING, e.g. us-east-1>
@@ -31,7 +31,7 @@ CUBEJS_AWS_S3_OUTPUT_LOCATION=<S3 OUTPUT LOCATION>
 CUBEJS_JDBC_DRIVER=athena
 ${sharedDotEnvVars(env)}`;
 
-const mongobiDotEnvVars = env => `${defaultDotEnvVars(env)}
+const mongobiDotEnvVars = (env: TemplateFileContext) => `${defaultDotEnvVars(env)}
 #CUBEJS_DB_SSL=<SSL_PROFILE>
 #CUBEJS_DB_SSL_CA=<SSL_CA>
 #CUBEJS_DB_SSL_CERT=<SSL_CERT>
@@ -39,16 +39,18 @@ const mongobiDotEnvVars = env => `${defaultDotEnvVars(env)}
 #CUBEJS_DB_SSL_PASSPHRASE=<SSL_PASSPHRASE>
 #CUBEJS_DB_SSL_REJECT_UNAUTHORIZED=<SSL_REJECT_UNAUTHORIZED>`;
 
-const dotEnv = env => {
+const dotEnv = (env: TemplateFileContext) => {
   if (env.driverEnvVariables) {
-    const envVars = env.driverEnvVariables.map(v => `${v}=<${v.replace('CUBEJS', 'YOUR')}>`).join('\n');
+    const envVars = env.driverEnvVariables.map((v: string) => `${v}=<${v.replace('CUBEJS', 'YOUR')}>`).join('\n');
     return `${envVars}\n${sharedDotEnvVars(env)}`;
   }
 
-  return {
+  const dotEnvByDbType: Record<string, string> = {
     athena: athenaDotEnvVars(env),
     mongobi: mongobiDotEnvVars(env)
-  }[env.dbType] || defaultDotEnvVars(env);
+  };
+
+  return dotEnvByDbType[env.dbType] || defaultDotEnvVars(env);
 };
 
 const gitIgnore = `.env

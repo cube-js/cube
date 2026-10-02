@@ -2,8 +2,20 @@ import { parseSqlInterval, splitSqlInterval } from '@cubejs-backend/shared';
 import { BaseQuery } from './BaseQuery';
 import { BaseFilter } from './BaseFilter';
 import { BaseTimeDimension } from './BaseTimeDimension';
+import { PreAggregationDefinitionExtended } from './PreAggregations';
 
-const GRANULARITY_TO_INTERVAL = {
+type DateJoinConditionFn = (
+  dateFrom: string,
+  dateTo: string,
+  dateField: string,
+  dimensionDateFrom: string,
+  dimensionDateTo: string,
+  isFromStartToEnd: boolean
+) => string;
+
+type DateJoinCondition = [BaseTimeDimension, DateJoinConditionFn][];
+
+const GRANULARITY_TO_INTERVAL: Record<string, string> = {
   day: 'DAY',
   week: 'WEEK(MONDAY)',
   hour: 'HOUR',
@@ -15,7 +27,7 @@ const GRANULARITY_TO_INTERVAL = {
 };
 
 class BigqueryFilter extends BaseFilter {
-  public likeIgnoreCase(column, not, param, type) {
+  public likeIgnoreCase(column: string, not: boolean, param: unknown, type: string) {
     const p = (!type || type === 'contains' || type === 'ends') ? '%' : '';
     const s = (!type || type === 'contains' || type === 'starts') ? '%' : '';
     return `LOWER(${column})${not ? ' NOT' : ''} LIKE CONCAT('${p}', LOWER(${this.allocateParam(param)}) , '${s}')`;
@@ -31,33 +43,33 @@ class BigqueryFilter extends BaseFilter {
     return '?';
   }
 
-  public castToString(sql) {
+  public castToString(sql: string) {
     return `CAST(${sql} as STRING)`;
   }
 }
 
 export class BigqueryQuery extends BaseQuery {
-  public castToString(sql) {
+  public castToString(sql: string) {
     return `CAST(${sql} as STRING)`;
   }
 
-  public convertTz(field) {
+  public convertTz(field: string) {
     return `TIMESTAMP(DATETIME(${field}, '${this.timezone}'))`;
   }
 
-  public timeStampCast(value) {
+  public timeStampCast(value: string) {
     return `TIMESTAMP(${value})`;
   }
 
-  public dateTimeCast(value) {
+  public dateTimeCast(value: string) {
     return `DATETIME(TIMESTAMP(${value}))`;
   }
 
-  public escapeColumnName(name) {
+  public escapeColumnName(name: string) {
     return `\`${name}\``;
   }
 
-  public timeGroupedColumn(granularity, dimension) {
+  public timeGroupedColumn(granularity: string, dimension: string) {
     return this.timeStampCast(`DATETIME_TRUNC(${dimension}, ${GRANULARITY_TO_INTERVAL[granularity]})`);
   }
 
@@ -144,7 +156,7 @@ export class BigqueryQuery extends BaseQuery {
     return this.formatInterval(interval);
   }
 
-  public newFilter(filter) {
+  public newFilter(filter: any) {
     return new BigqueryFilter(this, filter);
   }
 
@@ -163,11 +175,11 @@ export class BigqueryQuery extends BaseQuery {
     return 6;
   }
 
-  public subtractInterval(date, interval) {
+  public subtractInterval(date: string, interval: string) {
     return this.applyInterval('SUB', date, interval);
   }
 
-  public addInterval(date, interval) {
+  public addInterval(date: string, interval: string) {
     return this.applyInterval('ADD', date, interval);
   }
 
@@ -188,7 +200,7 @@ export class BigqueryQuery extends BaseQuery {
     }, date);
   }
 
-  public subtractTimestampInterval(timestamp, interval) {
+  public subtractTimestampInterval(timestamp: string, interval: string) {
     return this.subtractInterval(timestamp, interval);
   }
 
@@ -196,7 +208,7 @@ export class BigqueryQuery extends BaseQuery {
     return `${interval}`;
   }
 
-  public addTimestampInterval(timestamp, interval) {
+  public addTimestampInterval(timestamp: string, interval: string) {
     return this.addInterval(timestamp, interval);
   }
 
@@ -213,7 +225,7 @@ export class BigqueryQuery extends BaseQuery {
    * Overridden from BaseQuery to support BigQuery strict data types for
    * joining conditions (note timeStampCast)
    */
-  public override rollingWindowToDateJoinCondition(granularity) {
+  public override rollingWindowToDateJoinCondition(granularity: string): DateJoinCondition {
     return Object.values(
       this.timeDimensions.reduce((acc, td) => {
         const key = td.dimension;
@@ -227,7 +239,7 @@ export class BigqueryQuery extends BaseQuery {
         }
 
         return acc;
-      }, {})
+      }, {} as Record<string, BaseTimeDimension>)
     ).map(
       d => [
         d,
@@ -241,7 +253,7 @@ export class BigqueryQuery extends BaseQuery {
    * Overridden from BaseQuery to support BigQuery strict data types for
    * joining conditions (note timeStampCast)
    */
-  public override rollingWindowDateJoinCondition(trailingInterval, leadingInterval, offset) {
+  public override rollingWindowDateJoinCondition(trailingInterval: string | undefined, leadingInterval: string | undefined, offset: string | undefined): DateJoinCondition {
     offset = offset || 'end';
     return Object.values(
       this.timeDimensions.reduce((acc, td) => {
@@ -256,7 +268,7 @@ export class BigqueryQuery extends BaseQuery {
         }
 
         return acc;
-      }, {})
+      }, {} as Record<string, BaseTimeDimension>)
     )
       .map(
         d => [d, (dateFrom: string, dateTo: string, dateField: string, _dimensionDateFrom: string, _dimensionDateTo: string, isFromStartToEnd: boolean) => {
@@ -280,7 +292,7 @@ export class BigqueryQuery extends BaseQuery {
   }
 
   // Should be protected, but BaseQuery is in js
-  public override dateFromStartToEndConditionSql(dateJoinCondition, fromRollup, isFromStartToEnd) {
+  public override dateFromStartToEndConditionSql(dateJoinCondition: DateJoinCondition, fromRollup: boolean, isFromStartToEnd: boolean) {
     return dateJoinCondition.map(
       ([d, f]) => ({
         filterToWhere: () => {
@@ -303,23 +315,23 @@ export class BigqueryQuery extends BaseQuery {
   }
 
   // eslint-disable-next-line no-unused-vars
-  public preAggregationLoadSql(cube, preAggregation, tableName) {
+  public preAggregationLoadSql(cube: string, preAggregation: PreAggregationDefinitionExtended, tableName: string) {
     return this.preAggregationSql(cube, preAggregation);
   }
 
-  public hllInit(sql) {
+  public hllInit(sql: string) {
     return `HLL_COUNT.INIT(${sql})`;
   }
 
-  public hllMerge(sql) {
+  public hllMerge(sql: string) {
     return `HLL_COUNT.MERGE(${sql})`;
   }
 
-  public countDistinctApprox(sql) {
+  public countDistinctApprox(sql: string) {
     return `APPROX_COUNT_DISTINCT(${sql})`;
   }
 
-  public concatStringsSql(strings) {
+  public concatStringsSql(strings: string[]) {
     return `CONCAT(${strings.join(', ')})`;
   }
 

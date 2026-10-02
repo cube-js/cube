@@ -8,7 +8,6 @@
     "types": ["node", "jest"],
     "outDir": "dist",
     "rootDir": ".",
-    "noImplicitAny": true,
     "strictNullChecks": true,
     "strictFunctionTypes": true,
     "strictBindCallApply": true,
