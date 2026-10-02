@@ -921,7 +921,10 @@ export const QueryQueueTest = (name: string, options: QueryQueueTestOptions) => 
           const [added, nextQueueId] = await addQuery(connection, key, 'result-next-run-2');
           expect(added).toBe(1);
           expect(nextQueueId).not.toEqual(queueId);
-          expect(await connection.getResultBlocking(hash, nextQueueId)).toBeNull();
+          await connection.retrieveForProcessing(hash, nextQueueId);
+          await connection.setResultAndRemoveQuery(hash, { result: 'next' }, nextQueueId);
+
+          expect(await connection.getResultBlocking(hash, nextQueueId)).toMatchObject({ result: 'next' });
         });
       });
 

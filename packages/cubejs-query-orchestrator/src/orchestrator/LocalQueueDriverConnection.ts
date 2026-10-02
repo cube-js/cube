@@ -92,13 +92,19 @@ export interface LocalQueueResult {
 }
 
 /**
- * Results indexed by run id and by key, both indexes are only ever updated together.
+ * Results indexed by run id and by key, the indexes are only ever updated together.
  */
 export class LocalQueueResults {
   /**
    * Insertion order is ack order, so the expired results are always at the front.
    */
-  protected readonly byId: Map<number, LocalQueueResult> = new Map();
+  protected readonly unread: Map<number, LocalQueueResult> = new Map();
+
+  /**
+   * Insertion order is read order, and a read sets the same lifetime for all of them, so the
+   * expired results are always at the front here too.
+   */
+  protected readonly consumed: Map<number, LocalQueueResult> = new Map();
 
   /**
    * The last acknowledged run of every key.
@@ -106,7 +112,7 @@ export class LocalQueueResults {
   protected readonly byKey: Map<QueryKeyHash, LocalQueueResult> = new Map();
 
   public getById(id: number, now: number): LocalQueueResult | null {
-    const result = this.byId.get(id);
+    const result = this.unread.get(id) || this.consumed.get(id);
 
     return result && result.expire >= now ? result : null;
   }
@@ -118,17 +124,33 @@ export class LocalQueueResults {
   }
 
   public add(result: LocalQueueResult): void {
-    this.byId.set(result.id, result);
+    this.unread.set(result.id, result);
     this.byKey.set(result.key, result);
   }
 
+  public consume(result: LocalQueueResult, expire: number): void {
+    if (result.deleted) {
+      return;
+    }
+
+    result.deleted = true;
+    result.expire = Math.min(result.expire, expire);
+    this.unread.delete(result.id);
+    this.consumed.set(result.id, result);
+  }
+
   public removeExpired(now: number): void {
-    for (const result of this.byId.values()) {
+    this.removeExpiredFrom(this.unread, now);
+    this.removeExpiredFrom(this.consumed, now);
+  }
+
+  protected removeExpiredFrom(results: Map<number, LocalQueueResult>, now: number): void {
+    for (const result of results.values()) {
       if (result.expire >= now) {
         return;
       }
 
-      this.byId.delete(result.id);
+      results.delete(result.id);
       if (this.byKey.get(result.key) === result) {
         this.byKey.delete(result.key);
       }
@@ -293,6 +315,18 @@ export class LocalQueueDriverConnection implements QueueDriverConnectionInterfac
     ];
   }
 
+  /**
+   * Cube Store marks a result ready-to-delete only for a waiter blocked at the ack, here every
+   * read does it, so a key lookup of a later request never gets a run that was already read.
+   * Past the first read only the joiners of the same executeInQueue call still ask, by id and
+   * within milliseconds, so the result no longer has to live for RESULT_TTL_MS.
+   */
+  protected consume(result: LocalQueueResult, now: number): any {
+    this.state.results.consume(result, now + this.continueWaitTimeout * 1000);
+
+    return result.value;
+  }
+
   protected async waitForResult(item: LocalQueueItem): Promise<any> {
     let timer: ReturnType<typeof setTimeout> | undefined;
     const timeout = new Promise((resolve) => {
@@ -302,11 +336,10 @@ export class LocalQueueDriverConnection implements QueueDriverConnectionInterfac
     try {
       const value = await Promise.race([item.result, timeout]);
 
-      const result = value && this.state.results.getById(item.id, Date.now());
+      const now = Date.now();
+      const result = value && this.state.results.getById(item.id, now);
       if (result) {
-        // Like Cube Store's ready-to-delete: a key lookup of a later request must not be
-        // answered with the result of a run that was already consumed
-        result.deleted = true;
+        this.consume(result, now);
       }
 
       return value;
@@ -326,18 +359,12 @@ export class LocalQueueDriverConnection implements QueueDriverConnectionInterfac
     if (queueId) {
       const result = this.state.results.getById(Number(queueId), now);
       if (result) {
-        if (result.key !== queryKeyHash) {
-          return null;
-        }
-
-        result.deleted = true;
-        return result.value;
+        return result.key === queryKeyHash ? this.consume(result, now) : null;
       }
     } else {
       const result = this.state.results.getByKey(queryKeyHash, now);
       if (result && !result.deleted) {
-        result.deleted = true;
-        return result.value;
+        return this.consume(result, now);
       }
     }
 
@@ -363,8 +390,7 @@ export class LocalQueueDriverConnection implements QueueDriverConnectionInterfac
       return null;
     }
 
-    result.deleted = true;
-    return result.value;
+    return this.consume(result, now);
   }
 
   public async addToQueue(

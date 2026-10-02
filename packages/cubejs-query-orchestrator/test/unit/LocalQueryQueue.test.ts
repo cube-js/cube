@@ -87,6 +87,27 @@ describe('LocalQueueDriver', () => {
       expect(await connection.getResult(key)).toBeNull();
     });
 
+    test('a read result expires after continueWaitTimeout', async () => {
+      const connection = await createDriver().createConnection();
+      const key: QueryKey = ['result-read-expires', []];
+      const hash = connection.redisHash(key);
+
+      const queueId = await run(connection, key, 'result-read-expires');
+      const unreadQueueId = await run(connection, ['result-unread', []], 'result-unread');
+
+      jest.setSystemTime(start + 500);
+      expect(await connection.getResultBlocking(hash, queueId)).toMatchObject({ result: 'result-read-expires' });
+
+      jest.setSystemTime(start + 1500);
+      expect(await connection.getResultBlocking(hash, queueId)).toMatchObject({ result: 'result-read-expires' });
+
+      jest.setSystemTime(start + 1501);
+      expect(await connection.getResultBlocking(hash, queueId)).toBeNull();
+      // An unread result acked before it keeps its own lifetime
+      expect(await connection.getResultBlocking(connection.redisHash(['result-unread', []]), unreadQueueId))
+        .toMatchObject({ result: 'result-unread' });
+    });
+
     test('a result read by queue id is not served by key to another request', async () => {
       const connection = await createDriver().createConnection();
       const key: QueryKey = ['result-read-by-id', []];
