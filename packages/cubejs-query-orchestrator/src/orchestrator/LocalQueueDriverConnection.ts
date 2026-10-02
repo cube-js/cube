@@ -19,9 +19,8 @@ import {
 } from './LocalQueueDriver';
 
 /**
- * A queue item goes `Pending -> Active -> Deleted`. There is no terminal state: `Active` is the
- * only lock there is, it's set atomically by retrieveForProcessing and released by an ack or a
- * cancel, both of which delete the item outright.
+ * `Pending -> Active`, then removed outright by an ack or a cancel. `Active` is the only lock
+ * there is: retrieveForProcessing sets it atomically.
  */
 export enum LocalQueueItemStatus {
   Pending = 'pending',
