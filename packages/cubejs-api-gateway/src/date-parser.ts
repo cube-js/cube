@@ -21,35 +21,36 @@ export function dateParser(dateString: string, timezone: string, now: Date = new
   let momentRange: moment.Moment[];
   dateString = dateString.toLowerCase();
 
-  if (dateString.match(/(this|last|next)\s+(day|week|month|year|quarter|hour|minute|second)/)) {
-    const match = dateString.match(/(this|last|next)\s+(day|week|month|year|quarter|hour|minute|second)/)!;
-    const unit = match[2] as moment.unitOfTime.DurationConstructor & moment.unitOfTime.StartOf;
+  const relMatch = dateString.match(/(this|last|next)\s+(day|week|month|year|quarter|hour|minute|second)/);
+  const relNMatch = relMatch ? null : dateString.match(/(last|next)\s+(\d+)\s+(day|week|month|year|quarter|hour|minute|second)/);
+
+  if (relMatch) {
+    const unit = relMatch[2] as moment.unitOfTime.DurationConstructor & moment.unitOfTime.StartOf;
     let start = moment.tz(timezone);
     let end = moment.tz(timezone);
-    if (match[1] === 'last') {
+    if (relMatch[1] === 'last') {
       start = start.add(-1, unit);
       end = end.add(-1, unit);
     }
-    if (match[1] === 'next') {
+    if (relMatch[1] === 'next') {
       start = start.add(1, unit);
       end = end.add(1, unit);
     }
 
     const span = unit === 'week' ? 'isoWeek' : unit;
     momentRange = [start.startOf(span), end.endOf(span)];
-  } else if (dateString.match(/(last|next)\s+(\d+)\s+(day|week|month|year|quarter|hour|minute|second)/)) {
-    const match = dateString.match(/(last|next)\s+(\d+)\s+(day|week|month|year|quarter|hour|minute|second)/)!;
-    const unit = match[3] as moment.unitOfTime.DurationConstructor & moment.unitOfTime.StartOf;
+  } else if (relNMatch) {
+    const unit = relNMatch[3] as moment.unitOfTime.DurationConstructor & moment.unitOfTime.StartOf;
 
     let start = moment.tz(timezone);
     let end = moment.tz(timezone);
-    if (match[1] === 'last') {
-      start = start.add(-parseInt(match[2], 10), unit);
+    if (relNMatch[1] === 'last') {
+      start = start.add(-parseInt(relNMatch[2], 10), unit);
       end = end.add(-1, unit);
     }
-    if (match[1] === 'next') {
+    if (relNMatch[1] === 'next') {
       start = start.add(1, unit);
-      end = end.add(parseInt(match[2], 10), unit);
+      end = end.add(parseInt(relNMatch[2], 10), unit);
     }
 
     const span = unit === 'week' ? 'isoWeek' : unit;
