@@ -2889,7 +2889,7 @@ from
         .map(row => Object.values(row).join('\n')).join('\n');
       expect(roundedPlan).toContain('CubeScanWrappedSql');
       const roundedSql = roundedPlan.match(/CubeScanExecutionPlan, SQL:\s*([\s\S]*)/)?.[1] ?? '';
-      if (type === 'mysql') {
+      if (['mysql', 'pinot'].includes(type)) {
         expect(roundedPlan).toMatch(/Projection:[^\n]*round\(/i);
         expect(roundedSql).not.toMatch(/ROUND\(/i);
       } else {
@@ -2899,20 +2899,25 @@ from
       expect(Number(roundedRows[0].rounded_ratio)).toBeCloseTo(0.5, 10);
       expect(Number(roundedRows[0].rounded_fraction)).toBeCloseTo(123.46, 10);
 
-      if (['postgres', 'mysql'].includes(type)) {
+      if (['postgres', 'mysql', 'pinot'].includes(type)) {
         const roundQuery = `
           SELECT ROUND(2.5 * COUNT(*) / COUNT(*)) AS "positive_tie",
             ROUND(-2.5 * COUNT(*) / COUNT(*)) AS "negative_tie",
             ROUND(2.4999999999999996 + (COUNT(*) - COUNT(*))) AS "below_tie",
             ROUND(1000000000000001.0 + (COUNT(*) - COUNT(*))) AS "large_integer",
             ROUND(0.125 * COUNT(*) / COUNT(*), 2) AS "positive_decimal_tie",
-            ROUND(-0.125 * COUNT(*) / COUNT(*), 2) AS "negative_decimal_tie"
+            ROUND(-0.125 * COUNT(*) / COUNT(*), 2) AS "negative_decimal_tie",
+            ROUND(1.005 + (COUNT(*) - COUNT(*)), 2) AS "decimal_precision_edge"
           FROM "Customers" WHERE LOWER("customerName") <> '__float_literal_test__'
         `;
         const roundPlan = (await connection.query(`EXPLAIN ${roundQuery}`)).rows
           .map(row => Object.values(row).join('\n')).join('\n');
         expect(roundPlan).toContain('CubeScanWrappedSql');
         expect(roundPlan).toMatch(/Projection:[^\n]*round\(/i);
+        if (['mysql', 'pinot'].includes(type)) {
+          const roundSql = roundPlan.match(/CubeScanExecutionPlan, SQL:\s*([\s\S]*)/)?.[1] ?? '';
+          expect(roundSql).not.toMatch(/ROUND\(/i);
+        }
         const roundRows = (await connection.query(roundQuery)).rows;
         expect(Number(roundRows[0].positive_tie)).toBe(3);
         expect(Number(roundRows[0].negative_tie)).toBe(-3);
@@ -2920,6 +2925,10 @@ from
         expect(Number(roundRows[0].large_integer)).toBe(1000000000000001);
         expect(Number(roundRows[0].positive_decimal_tie)).toBe(0.13);
         expect(Number(roundRows[0].negative_decimal_tie)).toBe(-0.13);
+        if (type === 'pinot') {
+          // Pinot ROUNDDECIMAL would return 1.01 instead of DataFusion's 1.00.
+          expect(Number(roundRows[0].decimal_precision_edge)).toBe(1);
+        }
       }
 
       if (['postgres', 'mssql', 'bigquery', 'redshift'].includes(type)) {
