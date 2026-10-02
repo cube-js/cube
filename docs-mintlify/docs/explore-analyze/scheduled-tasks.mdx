@@ -39,6 +39,9 @@ A task has:
   each execution.
 - **Schedule** — how often the task runs (see below).
 - **Enabled** — a toggle to activate or pause a scheduled task.
+- **Notify me when a run finishes** — a switch that sends a message to your
+  in-app inbox each time a run finishes or fails. On a conditional task, a
+  check that runs no agent sends nothing.
 - **Notify only when a condition is met** (optional) — a metric condition
   that decides whether the agent runs at all (see
   [Conditional tasks](#conditional-tasks)).
@@ -91,11 +94,13 @@ The task notifies once each time the condition starts to hold:
 - The agent runs the task's **Instructions** in a new chat thread that opens
   with the facts it found: the value read, what it was compared with, and the
   periods. Ask follow-up questions in that thread as in any chat.
-- If the task's **Notify me when a run finishes** switch is on, your in-app
-  inbox gets a message titled with the task's name and *"condition met"*
-  that states the change, for example *"Revenue rose 7.2 % (Aug → Sep 2026),
-  above your 5 % threshold"*. With the switch off, the agent still writes
-  the thread, but nothing reaches your inbox.
+- If the task's [Notify me when a run finishes](#anatomy-of-a-task) switch is
+  on, your in-app inbox gets a message titled with the task's name and
+  *"condition met"* that states the change, for example *"Revenue rose 7.2 %
+  (Aug → Sep 2026), above your 5 % threshold"*. The message names the
+  measure by the title picked in the task dialog, or by its full name (such
+  as `orders.revenue`) on a task that has no title for it. With the switch
+  off, the agent still writes the thread, but nothing reaches your inbox.
 
 While the condition keeps holding, later checks send nothing. Once a check
 finds it no longer holding, the next time it holds notifies again. Changing
@@ -250,12 +255,13 @@ task"*.
 
 The agent manages task definitions: when listing tasks, it can report each
 task's id, name, description, schedule, timezone, enabled state, next run
-time, inbox notification switch, and condition with its last check. It can
-also add, change, or remove a task's [condition](#conditional-tasks) — for
-example, *"tell me when monthly orders change by 5% or more."* A task's run
-history lives on its [detail page](#task-detail-page). The agent follows
-the same [limits](#limits) and permissions as the **Scheduled** page, and a
-scheduled run can't create or change tasks itself.
+time, **Notify me when a run finishes** setting, and condition with its last
+check. It can also add, change, or remove a task's
+[condition](#conditional-tasks) — for example, *"tell me when monthly orders
+change by 5% or more."* A task's run history lives on its
+[detail page](#task-detail-page). The agent follows the same
+[limits](#limits) and permissions as the **Scheduled** page, and a scheduled
+run can't create or change tasks itself.
 
 ## Managing tasks with the Platform API
 
