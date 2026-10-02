@@ -1,7 +1,7 @@
 from datetime import date
 
 from cube import TemplateContext
-from memo_helper import Cfg, Client, api, load_day, load_imported
+from memo_helper import Cfg, Client, Node, api, load_day, load_imported
 
 template = TemplateContext()
 template.add_function('load_imported', load_imported)
@@ -37,5 +37,13 @@ def day():
 
 @template.function
 def cfg():
-    # Equal but not hashable
+    # A new but equal frozen dataclass on every call
     return load_day(Cfg('a'))
+
+
+@template.function
+def tree():
+    # Refers back to itself, so it matches only itself
+    root = Node('root')
+    root.children.append(Node('child', parent=root))
+    return load_day(root) * 10 + load_day(root)

@@ -1,6 +1,5 @@
 import asyncio
 import contextvars
-import dataclasses
 import functools
 import inspect
 import os
@@ -249,31 +248,38 @@ def _memo_key(args, kwargs):
     arguments; other unhashable objects, keyed by id(), are returned to keep with the entry, as a
     freed object's id can be reused by another."""
     pinned = []
+    # The containers being walked, so one that contains itself doesn't recurse forever
+    path = set()
+
+    def by_identity(value):
+        pinned.append(value)
+        return ('object', id(value))
 
     def plain(value):
-        if isinstance(value, list):
-            return ('list', tuple(plain(item) for item in value))
-        if isinstance(value, tuple):
-            return ('tuple', tuple(plain(item) for item in value))
-        if isinstance(value, dict):
-            return ('dict', frozenset((plain(k), plain(v)) for k, v in value.items()))
-        if isinstance(value, (set, frozenset)):
-            return ('set', frozenset(plain(item) for item in value))
-        params = getattr(type(value), '__dataclass_params__', None)
-        if params is not None and params.eq:
-            # Compared by their fields, but not hashable unless frozen
-            return (type(value), tuple(plain(getattr(value, f.name)) for f in dataclasses.fields(value) if f.compare))
+        kind = type(value)
+        # Only the built-in containers: their equality is known to be by items
+        if kind in (list, tuple, dict, set, frozenset):
+            if id(value) in path:
+                return by_identity(value)
+            path.add(id(value))
+            try:
+                if kind is dict:
+                    return ('dict', frozenset((plain(k), plain(v)) for k, v in value.items()))
+                if kind in (set, frozenset):
+                    return ('set', frozenset(plain(item) for item in value))
+                return (kind.__name__, tuple(plain(item) for item in value))
+            finally:
+                path.discard(id(value))
         if isinstance(value, float) and value != value:
             # Every NaN is unequal to itself
             return (float, 'nan')
         try:
             hash(value)
         except TypeError:
-            pinned.append(value)
-            return ('object', id(value))
-        # The type keeps 1, 1.0 and True apart. Objects without their own __eq__, e.g. the `self`
-        # of a memoized method, match only themselves
-        return (type(value), value)
+            return by_identity(value)
+        # Matched by its own equality, with the type keeping 1, 1.0 and True apart. Objects without
+        # their own __eq__, e.g. the `self` of a memoized method, match only themselves
+        return (kind, value)
 
     return (plain(args), tuple(sorted((name, plain(value)) for name, value in kwargs.items()))), pinned
 
