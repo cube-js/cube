@@ -282,6 +282,16 @@ def memo(func):
                 entry = stored[key] = {'lock': threading.RLock()}
             return entry
 
+    def settle(stored, key, entry, task):
+        # Only the outcome stays: the task holds a copy of the contextvars, and so the
+        # TemplateContext keying this cache, which then could never be dropped
+        with lock:
+            if stored.get(key) is entry:
+                if task.cancelled():
+                    del stored[key]
+                else:
+                    stored[key] = (None, task.result())
+
     if inspect.iscoroutinefunction(func):
         async def call(*args, **kwargs):
             # The task returns the exception instead of raising it: re-raising it from the task
@@ -301,13 +311,17 @@ def memo(func):
             with lock:
                 stored = results(context)
                 entry = stored.get(key)
-                if entry is None or entry[1].cancelled() or (entry[0] is not loop and not entry[1].done()):
+                if entry is None or (entry[0] is not None and entry[0] is not loop and not entry[1].done()):
                     # A task, so concurrent calls on the loop share one invocation
-                    entry = (loop, asyncio.ensure_future(call(*args, **kwargs)))
-                    stored[key] = entry
-            task = entry[1]
-            # Shielded: cancelling one caller mustn't cancel the task the others share
-            ok, value = task.result() if task.done() else await asyncio.shield(task)
+                    task = asyncio.ensure_future(call(*args, **kwargs))
+                    entry = stored[key] = (loop, task)
+                    task.add_done_callback(functools.partial(settle, stored, key, entry))
+            if entry[0] is None:
+                ok, value = entry[1]
+            else:
+                task = entry[1]
+                # Shielded: cancelling one caller mustn't cancel the task the others share
+                ok, value = task.result() if task.done() else await asyncio.shield(task)
             if not ok:
                 error, tb = value
                 raise error.with_traceback(tb)

@@ -225,6 +225,15 @@ suite('Python memo', () => {
     expect(second.map((r) => r.trim())).toEqual([expected, expected]);
   });
 
+  it('drops a compilation\'s cached results with its TemplateContext', async () => {
+    const fileName = path.join(process.cwd(), 'test', 'templates', 'memo_leak.py');
+    const pyCtx = await nativeInstance.loadPythonContext(fileName, fs.readFileSync(fileName, 'utf8'));
+    const jinjaEngine = nativeInstance.newJinjaEngine({ debugInfo: true, filters: pyCtx.filters, workers: 1 });
+    loadTemplateFile(jinjaEngine, 'memo_leak.yml.jinja');
+
+    expect((await jinjaEngine.renderTemplate('memo_leak.yml.jinja', {}, { ...pyCtx.functions })).trim()).toEqual('kept: 0');
+  });
+
   it('keeps the cache of a call running while another compilation loads', async () => {
     const fileName = path.join(process.cwd(), 'test', 'templates', 'memo_reload.py');
     const content = fs.readFileSync(fileName, 'utf8');
