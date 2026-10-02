@@ -59,9 +59,41 @@ jobs:
         run: cargo test -- --test-threads=1
         working-directory: rust/cubestore
 
+  cubestore-docker-image-dev-prepare:
+    name: Release Cube Store :dev image (prepare)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    outputs:
+      version: ${{ steps.prep.outputs.version }}
+      created: ${{ steps.prep.outputs.created }}
+    steps:
+      - name: Prepare
+        id: prep
+        run: |
+          VERSION="dev"
+
+          if [ "${{ github.event_name }}" = "schedule" ]; then
+            VERSION="nightly"
+          elif [[ "$GITHUB_REF" == refs/tags/* ]]; then
+            VERSION="${GITHUB_REF#refs/tags/}"
+          elif [[ "$GITHUB_REF" == refs/heads/* ]]; then
+            VERSION=$(echo "${GITHUB_REF#refs/heads/}" | sed -r 's#/+#-#g')
+            if [ "${{ github.event.repository.default_branch }}" = "$VERSION" ]; then
+              VERSION="edge"
+            fi
+          elif [[ "$GITHUB_REF" == refs/pull/* ]]; then
+            VERSION="pr-${{ github.event.number }}"
+          fi
+
+          {
+            echo "version=${VERSION}"
+            echo "created=$(date -u +'%Y-%m-%dT%H:%M:%SZ')"
+          } >> "$GITHUB_OUTPUT"
+
   cubestore-docker-image-dev:
     name: Release Cube Store :dev image
     runs-on: ${{ matrix.os }}
+    needs: [cubestore-docker-image-dev-prepare]
     strategy:
       matrix:
         # Pushed by digest and merged into one multi-arch manifest by
@@ -109,6 +141,8 @@ jobs:
             org.opencontainers.image.description=${{ fromJson(steps.repo.outputs.result).description }}
             org.opencontainers.image.url=${{ fromJson(steps.repo.outputs.result).html_url }}
             org.opencontainers.image.source=${{ fromJson(steps.repo.outputs.result).clone_url }}
+            org.opencontainers.image.version=${{ needs.cubestore-docker-image-dev-prepare.outputs.version }}
+            org.opencontainers.image.created=${{ needs.cubestore-docker-image-dev-prepare.outputs.created }}
             org.opencontainers.image.revision=${{ github.sha }}
             org.opencontainers.image.licenses=${{ fromJson(steps.repo.outputs.result).license.spdx_id }}
       - name: Export digest
@@ -128,7 +162,7 @@ jobs:
   cubestore-docker-image-dev-manifest:
     name: Release Cube Store :dev image (multi-arch manifest)
     runs-on: ubuntu-24.04
-    needs: [cubestore-docker-image-dev]
+    needs: [cubestore-docker-image-dev-prepare, cubestore-docker-image-dev]
     timeout-minutes: 15
     strategy:
       matrix:
@@ -150,20 +184,7 @@ jobs:
         id: prep
         run: |
           DOCKER_IMAGE=cubejs/cubestore
-          VERSION="dev"
-
-          if [ "${{ github.event_name }}" = "schedule" ]; then
-            VERSION="nightly"
-          elif [[ "$GITHUB_REF" == refs/tags/* ]]; then
-            VERSION="${GITHUB_REF#refs/tags/}"
-          elif [[ "$GITHUB_REF" == refs/heads/* ]]; then
-            VERSION=$(echo "${GITHUB_REF#refs/heads/}" | sed -r 's#/+#-#g')
-            if [ "${{ github.event.repository.default_branch }}" = "$VERSION" ]; then
-              VERSION="edge"
-            fi
-          elif [[ "$GITHUB_REF" == refs/pull/* ]]; then
-            VERSION="pr-${{ github.event.number }}"
-          fi
+          VERSION="${{ needs.cubestore-docker-image-dev-prepare.outputs.version }}"
 
           TAGS="${DOCKER_IMAGE}:${VERSION}${{ matrix.postfix }}"
 
