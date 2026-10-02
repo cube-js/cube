@@ -238,9 +238,8 @@ from query results without an error.
 
 To avoid that, start the build range of each rollup earlier than the build range
 of the previous one ends, with a margin longer than the previous rollup's
-`refresh_key` interval plus its build time. Rows are not counted twice: a rollup skips partitions that the
-rollup takes. Rows are not counted twice: a rollup skips partitions that the
-previous one already serves.
+`refresh_key` interval plus its build time. Rows are not counted twice: a rollup
+skips partitions that the previous one already serves.
 
 <CodeGroup>
 
