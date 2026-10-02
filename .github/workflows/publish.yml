@@ -12,6 +12,9 @@ env:
 
 jobs:
   npm:
+    # cubestore and native download their binaries from this release in post-install, so
+    # publishing before the Linux binaries are uploaded breaks `npm install` of the new version
+    needs: [cubestore_linux, native_linux]
     runs-on: ubuntu-24.04
     timeout-minutes: 60
     permissions:
