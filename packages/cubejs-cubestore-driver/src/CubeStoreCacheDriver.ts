@@ -77,7 +77,7 @@ export class CubeStoreCacheDriver implements CacheDriverInterface {
     return null;
   }
 
-  public async set(key: string, value, expiration) {
+  public async set(key: string, value: unknown, expiration: number) {
     const strValue = JSON.stringify(value);
     const connection = await this.getConnection();
     await connection.query('CACHE SET TTL ? ? ?', [expiration, key, strValue], {

@@ -16,6 +16,7 @@ import {
   QueryOptions,
   StreamingSourceTableData,
   StreamTableData,
+  TableColumn,
   TableColumnQueryResult,
   TableStructure,
 } from '@cubejs-backend/base-driver';
@@ -67,7 +68,7 @@ type CreateTableOptions = {
   disableQuoting?: boolean
 };
 
-type CubeStoreQueryOptions = QueryOptions & {
+export type CubeStoreQueryOptions = QueryOptions & {
   sendParameters?: boolean,
   responseFormat?: QueryResultFormat,
 };
@@ -138,7 +139,7 @@ export class CubeStoreDriver extends BaseDriver implements DriverInterface {
       WHERE columns.table_schema NOT IN ('information_schema', 'system')`;
   }
 
-  public createTableSqlWithOptions(tableName, columns, options: CreateTableOptions) {
+  public createTableSqlWithOptions(tableName: string, columns: TableColumn[], options: CreateTableOptions) {
     let sql = this.createTableSql(tableName, columns);
     const params: string[] = [];
     const withEntries: string[] = [];
@@ -162,7 +163,7 @@ export class CubeStoreDriver extends BaseDriver implements DriverInterface {
       withEntries.push(`select_statement = ${escape(options.selectStatement)}`);
     }
     if (options.sourceTable) {
-      withEntries.push(`source_table = ${escape(`CREATE TABLE ${options.sourceTable.tableName} (${options.sourceTable.types.map(t => `${t.name} ${this.fromGenericType(t.type)}`).join(', ')})`)}`);
+      withEntries.push(`source_table = ${escape(`CREATE TABLE ${options.sourceTable.tableName} (${options.sourceTable.types.map((t: TableColumn) => `${t.name} ${this.fromGenericType(t.type)}`).join(', ')})`)}`);
     }
     if (options.streamOffset) {
       withEntries.push(`stream_offset = '${options.streamOffset}'`);
@@ -201,7 +202,7 @@ export class CubeStoreDriver extends BaseDriver implements DriverInterface {
   }
 
   @AsyncDebounce()
-  public async getTablesQuery(schemaName) {
+  public async getTablesQuery(schemaName: string) {
     return this.query(
       `SELECT table_name, build_range_end FROM information_schema.tables WHERE table_schema = ${this.param(0)}`,
       [schemaName]
@@ -209,7 +210,7 @@ export class CubeStoreDriver extends BaseDriver implements DriverInterface {
   }
 
   @AsyncDebounce()
-  public async getPrefixTablesQuery(schemaName, tablePrefixes) {
+  public async getPrefixTablesQuery(schemaName: string, tablePrefixes: string[]) {
     const prefixWhere = tablePrefixes.map(_ => 'table_name LIKE CONCAT(?, \'%\')').join(' OR ');
     return this.query(
       `SELECT table_name, build_range_end FROM information_schema.tables WHERE table_schema = ${this.param(0)} AND (${prefixWhere})`,
@@ -406,7 +407,7 @@ export class CubeStoreDriver extends BaseDriver implements DriverInterface {
 
       let rowCount = 0;
 
-      const endStream = (chunk, encoding, callback) => {
+      const endStream = (chunk: any, encoding: BufferEncoding | undefined, callback: (error?: Error | null) => void) => {
         const { stream } = getFileStream();
         currentFileStream = null;
         rowCount = 0;
@@ -429,7 +430,7 @@ export class CubeStoreDriver extends BaseDriver implements DriverInterface {
           }
         },
         final(callback: (error?: (Error | null)) => void) {
-          endStream(null, null, callback);
+          endStream(null, undefined, callback);
         },
         objectMode: true
       });

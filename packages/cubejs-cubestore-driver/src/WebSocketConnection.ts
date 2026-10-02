@@ -62,7 +62,7 @@ export type WebSocketQueryOptions = {
 interface CubeStoreWebSocket extends WebSocket {
   readyPromise: Promise<CubeStoreWebSocket>;
   lastHeartBeat: Date;
-  sentMessages: Record<number, SentMessage>;
+  sentMessages: Record<string, SentMessage>;
   sendAsync: (message: Uint8Array) => Promise<void>;
   // A failure that killed this socket and that re-sending can't fix, so the
   // message that caused it is rejected instead of being re-sent.
