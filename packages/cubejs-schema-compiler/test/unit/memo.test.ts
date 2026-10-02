@@ -316,6 +316,24 @@ describe.each([
     expect(calls.length).toBeGreaterThanOrEqual(2);
   });
 
+  it('treats an explicit { callSite } key as a plain key', async () => {
+    const { compiler, cubeEvaluator } = prepareCompiler([{
+      fileName: 'orders.js',
+      content: `
+        const tableFor = (name) => memo({ callSite: name }, () => name + '_table');
+        const tables = [tableFor('orders'), tableFor('users')];
+
+        cube('orders', {
+          sql_table: tables.join('_'),
+          measures: { count: { type: 'count' } },
+        });
+      `,
+    }], { sharedVmContext });
+    await compiler.compile();
+
+    expect(cubeEvaluator.cubeFromPath('orders').sqlTable!()).toEqual('orders_table_users_table');
+  });
+
   it('reports invalid arguments', async () => {
     const { compiler } = prepareCompiler([{
       fileName: 'orders.js',

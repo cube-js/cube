@@ -4,7 +4,7 @@ import type { TranspilerInterface, TraverseObject } from './transpiler.interface
 import type { ErrorReporter } from '../ErrorReporter';
 
 /**
- * Gives `memo(fn)` the key `{ callSite: 'orders.js:12:8' }`: it must be the same every time the file
+ * Gives `memo(fn)` the key `{ $memoCallSite: 'orders.js:12:8' }`: it must be the same every time the file
  * is evaluated, as each compile stage evaluates it again and looks the result up by it.
  */
 export class MemoKeyTranspiler implements TranspilerInterface {
@@ -13,8 +13,8 @@ export class MemoKeyTranspiler implements TranspilerInterface {
       return undefined;
     }
     const keys = Object.keys(key);
-    const { callSite } = key as { callSite?: unknown };
-    return keys.length === 1 && typeof callSite === 'string' ? callSite : undefined;
+    const { $memoCallSite } = key as { $memoCallSite?: unknown };
+    return keys.length === 1 && typeof $memoCallSite === 'string' ? $memoCallSite : undefined;
   }
 
   public traverseObject(_reporter: ErrorReporter): TraverseObject {
@@ -34,7 +34,7 @@ export class MemoKeyTranspiler implements TranspilerInterface {
         }
 
         args.unshift(t.objectExpression([
-          t.objectProperty(t.identifier('callSite'), t.stringLiteral(`${loc.filename}:${loc.start.line}:${loc.start.column}`)),
+          t.objectProperty(t.identifier('$memoCallSite'), t.stringLiteral(`${loc.filename}:${loc.start.line}:${loc.start.column}`)),
         ]));
       }
     };
