@@ -14,7 +14,6 @@ use crate::compile::rewrite::{
 use crate::transport::{DataSource, MetaContext, SqlTemplates};
 use datafusion::{arrow::datatypes::DataType, scalar::ScalarValue};
 use egg::Subst;
-use std::ops::ControlFlow;
 
 impl WrapperRules {
     pub fn literal_rules(&self, rules: &mut Vec<CubeRewrite>) {
@@ -100,19 +99,7 @@ impl WrapperRules {
                 || (templates.contains_sql_type(&data_type)
                     && templates.contains_template("expressions/cast"))
         };
-        match Self::template_sql_generator(data_source, meta) {
-            ControlFlow::Continue(generator) => supports_templates(&generator.get_sql_templates()),
-            // An unrestricted subquery can later use any source's generator.
-            // Approve only when every possible generator can render the literal.
-            ControlFlow::Break(true) => {
-                !meta.data_source_to_sql_generator.is_empty()
-                    && meta
-                        .data_source_to_sql_generator
-                        .values()
-                        .all(|generator| supports_templates(&generator.get_sql_templates()))
-            }
-            ControlFlow::Break(false) => false,
-        }
+        Self::all_generators_support(data_source, meta, supports_templates)
     }
 
     fn transform_literal(

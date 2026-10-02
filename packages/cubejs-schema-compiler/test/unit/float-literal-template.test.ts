@@ -20,16 +20,18 @@ describe('floating-point literal templates', () => {
     for (const name of ['RedshiftQuery', 'CrateQuery']) {
       const result = templates(name);
       expect(result.functions.ROUND).toBe(base.functions.ROUND);
-      expect(result.operators.float_modulo).toBe(base.operators.float_modulo);
+      expect(result.operators.float_modulo).toBe(name === 'RedshiftQuery' ? undefined : base.operators.float_modulo);
       expect(result.operators.round_single_arg).toBe(base.operators.round_single_arg);
     }
   });
 
   it.each(['MysqlQuery', 'MongoBiQuery'])('%s supports literals without FLOAT/DOUBLE casts', (name) => {
-    const { expressions } = templates(name);
+    const { expressions, operators } = templates(name);
     // The SQL API supplies a round-trippable exponent literal, or none for NULL.
     expect(expressions.float_literal).toBe('{% if value is none %}(NULL + 0e0){% else %}{{ value }}{% endif %}');
     expect(expressions.cast).toBeDefined();
+    expect(operators.round_single_arg).toBeUndefined();
+    expect(operators.round_multi_arg).toBeUndefined();
   });
 
   it.each([

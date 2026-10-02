@@ -104,31 +104,56 @@ async fn test_unary_round_pushdown_fallback() {
     if !Rewriter::sql_push_down_enabled() {
         return;
     }
-    for expression in ["ROUND(2.5 * COUNT(*))", "ROUND(2.5 * COUNT(*), 1)"] {
-        for supported in [false, true] {
+    for (expression, float_literal, single_arg) in [
+        ("ROUND(2.5 * COUNT(*))", true, true),
+        ("ROUND(2.5 * COUNT(*), 1)", true, false),
+        ("ROUND(CAST(2 AS REAL) * COUNT(*))", true, true),
+        ("ROUND(COUNT(*))", false, true),
+        ("ROUND(COUNT(*), 1)", false, false),
+    ] {
+        for unsupported in [
+            vec![],
+            vec!["operators/round_single_arg"],
+            vec!["operators/round_single_arg", "operators/round_multi_arg"],
+        ] {
             let mut templates = vec![(
                 "functions/ROUND".to_string(),
                 "ROUND({{ args_concat }})".to_string(),
             )];
-            if !supported {
-                templates.push(("operators/round_single_arg".to_string(), String::new()));
-            }
+            templates.extend(
+                unsupported
+                    .iter()
+                    .map(|name| (name.to_string(), String::new())),
+            );
             let plan = convert_select_to_query_plan_customized(
                 format!("SELECT {expression} AS value FROM KibanaSampleDataEcommerce WHERE LOWER(customer_gender) = 'test'"),
                 DatabaseProtocol::PostgreSQL,
                 templates,
             ).await;
             let logical = plan.as_logical_plan();
-            if supported || expression.ends_with(", 1)") {
-                assert!(logical
-                    .find_cube_scan_wrapped_sql()
-                    .wrapped_sql
-                    .sql
-                    .contains("ROUND("));
+            let supported = !unsupported.contains(&if single_arg {
+                "operators/round_single_arg"
+            } else {
+                "operators/round_multi_arg"
+            });
+            if supported || !float_literal {
+                assert!(
+                    logical
+                        .find_cube_scan_wrapped_sql()
+                        .wrapped_sql
+                        .sql
+                        .contains("ROUND("),
+                    "{}, {:?}: {:?}",
+                    expression,
+                    unsupported,
+                    logical
+                );
             } else {
                 assert!(
                     matches!(logical, LogicalPlan::Projection(_)),
-                    "{:?}",
+                    "{}, {:?}: {:?}",
+                    expression,
+                    unsupported,
                     logical
                 );
                 assert!(!logical
@@ -151,6 +176,8 @@ async fn test_float_modulo_pushdown_fallback() {
         "COUNT(*) % 2.0",
         "CAST(COUNT(*) AS REAL) % CAST(2 AS REAL)",
         "CAST(COUNT(*) AS BIGINT) % 2",
+        "COUNT(*) % 2",
+        "COUNT(*) % (1.5 + 0.5)",
     ] {
         for supported in [false, true] {
             let plan = convert_select_to_query_plan_customized(
@@ -159,7 +186,7 @@ async fn test_float_modulo_pushdown_fallback() {
                 if supported { vec![] } else { vec![("operators/float_modulo".to_string(), String::new())] },
             ).await;
             let logical = plan.as_logical_plan();
-            if supported || expression == "CAST(COUNT(*) AS BIGINT) % 2" {
+            if supported || matches!(expression, "CAST(COUNT(*) AS BIGINT) % 2" | "COUNT(*) % 2") {
                 assert!(logical
                     .find_cube_scan_wrapped_sql()
                     .wrapped_sql
@@ -168,7 +195,9 @@ async fn test_float_modulo_pushdown_fallback() {
             } else {
                 assert!(
                     matches!(logical, LogicalPlan::Projection(_)),
-                    "{:?}",
+                    "{}, supported={}: {:?}",
+                    expression,
+                    supported,
                     logical
                 );
                 assert!(!logical
@@ -179,6 +208,41 @@ async fn test_float_modulo_pushdown_fallback() {
             }
             plan.as_physical_plan().await.unwrap();
         }
+    }
+}
+
+#[tokio::test]
+async fn test_non_literal_numeric_expression_pushdown() {
+    if !Rewriter::sql_push_down_enabled() {
+        return;
+    }
+    for (expression, rendered) in [
+        ("taxful_total_price % 10", "%"),
+        ("(((EXTRACT(MONTH FROM order_date) - 1) % 3) + 1)", "%"),
+        ("ROUND(taxful_total_price)", "ROUND("),
+    ] {
+        let plan = convert_select_to_query_plan_customized(
+            format!("SELECT {expression} AS bucket, COUNT(*) AS count FROM KibanaSampleDataEcommerce WHERE LOWER(customer_gender) = 'test' GROUP BY 1"),
+            DatabaseProtocol::PostgreSQL,
+            vec![
+                ("operators/float_modulo".to_string(), String::new()),
+                ("operators/round_single_arg".to_string(), String::new()),
+                ("operators/round_multi_arg".to_string(), String::new()),
+                ("functions/ROUND".to_string(), "ROUND({{ args_concat }})".to_string()),
+            ],
+        ).await;
+        let logical = plan.as_logical_plan();
+        assert!(
+            logical
+                .find_cube_scan_wrapped_sql()
+                .wrapped_sql
+                .sql
+                .contains(rendered),
+            "{}: {:?}",
+            expression,
+            logical
+        );
+        plan.as_physical_plan().await.unwrap();
     }
 }
 

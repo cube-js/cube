@@ -229,6 +229,10 @@ export class MysqlQuery extends BaseQuery {
     // Exponent literals are floating-point even before MySQL 8.0.17, when CAST
     // to FLOAT/DOUBLE was introduced. Keep NULL floating-point without that cast too.
     templates.expressions.float_literal = '{% if value is none %}(NULL + 0e0){% else %}{{ value }}{% endif %}';
+    // Approximate inputs can round ties to even. Keep ROUND over float literals
+    // local so both arities retain DataFusion's rounding behavior.
+    delete templates.operators.round_single_arg;
+    delete templates.operators.round_multi_arg;
     // Timestamp constants arrive as ISO-8601 UTC strings ('2021-01-01T00:00:00.000Z').
     // MySQL parses the 'T'/'Z' markers only with a "Truncated incorrect datetime value"
     // warning and ignores the zone, so both markers are stripped instead. The driver

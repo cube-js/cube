@@ -44,7 +44,12 @@ use crate::{
     },
     config::ConfigObj,
     singular_eclass,
-    transport::{DataSource, MetaContext, SqlGenerator},
+    transport::{DataSource, MetaContext, SqlGenerator, SqlTemplates},
+};
+use datafusion::{
+    arrow::datatypes::DataType,
+    logical_plan::{Expr, ExprVisitable, ExpressionVisitor, Recursion},
+    scalar::ScalarValue,
 };
 use egg::{Subst, Var};
 use std::{fmt::Display, ops::ControlFlow, sync::Arc};
@@ -282,5 +287,53 @@ impl WrapperRules {
             .get_sql_templates()
             .templates
             .contains_key(template)
+    }
+
+    /// Unlike ordinary template checks, an unrestricted context must be safe
+    /// for every generator it could use later. Keep this conservative safeguard
+    /// separate from `can_rewrite_template`'s unrestricted behavior.
+    fn all_generators_support(
+        data_source: &DataSource,
+        meta: &MetaContext,
+        supports: impl Fn(&SqlTemplates) -> bool,
+    ) -> bool {
+        match Self::template_sql_generator(data_source, meta) {
+            ControlFlow::Continue(generator) => supports(&generator.get_sql_templates()),
+            ControlFlow::Break(true) => {
+                !meta.data_source_to_sql_generator.is_empty()
+                    && meta
+                        .data_source_to_sql_generator
+                        .values()
+                        .all(|generator| supports(&generator.get_sql_templates()))
+            }
+            ControlFlow::Break(false) => false,
+        }
+    }
+
+    // Only float literals acquire new source types in this PR. Members and
+    // functions with a logical Float64 type retain their previous SQL behavior.
+    fn expr_contains_float_literal(expr: &Expr) -> bool {
+        struct FloatLiteralVisitor(bool);
+
+        impl ExpressionVisitor for FloatLiteralVisitor {
+            fn pre_visit(mut self, expr: &Expr) -> datafusion::error::Result<Recursion<Self>> {
+                self.0 |= matches!(
+                    expr,
+                    Expr::Literal(ScalarValue::Float32(_) | ScalarValue::Float64(_))
+                ) || matches!(
+                    expr,
+                    // Constant folding renders these as float literals too,
+                    // while original_expr can retain their explicit cast.
+                    Expr::Cast { expr, data_type } | Expr::TryCast { expr, data_type }
+                        if matches!(data_type, DataType::Float32 | DataType::Float64)
+                            && matches!(expr.as_ref(), Expr::Literal(_))
+                );
+                Ok(Recursion::Continue(self))
+            }
+        }
+
+        expr.accept(FloatLiteralVisitor(false))
+            .map(|visitor| visitor.0)
+            .unwrap_or(true)
     }
 }

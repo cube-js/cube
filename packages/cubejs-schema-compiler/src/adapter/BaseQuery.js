@@ -4792,9 +4792,11 @@ export class BaseQuery {
 
       },
       operators: {
-        // Presence permits floating-point modulo pushdown through expressions.binary.
-        float_modulo: '%',
-        round_single_arg: 'ROUND',
+        // Presence-only capabilities, never rendered as SQL. Delete a key when
+        // float literals cannot safely use modulo or the corresponding ROUND arity.
+        float_modulo: 'supported',
+        round_single_arg: 'supported',
+        round_multi_arg: 'supported',
       },
       quotes: {
         identifiers: '"',

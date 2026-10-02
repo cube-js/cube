@@ -12,7 +12,6 @@ use crate::{
 };
 use datafusion::physical_plan::functions::BuiltinScalarFunction;
 use egg::Subst;
-use std::ops::ControlFlow;
 
 impl WrapperRules {
     pub fn scalar_function_rules(&self, rules: &mut Vec<CubeRewrite>) {
@@ -143,21 +142,15 @@ impl WrapperRules {
                     else {
                         return false;
                     };
-                    if args.len() == 1 {
-                        let template = "operators/round_single_arg";
-                        let supported = match Self::template_sql_generator(&data_source, &meta) {
-                            ControlFlow::Continue(generator) => {
-                                generator.get_sql_templates().contains_template(template)
-                            }
-                            ControlFlow::Break(true) => {
-                                !meta.data_source_to_sql_generator.is_empty()
-                                    && meta.data_source_to_sql_generator.values().all(|generator| {
-                                        generator.get_sql_templates().contains_template(template)
-                                    })
-                            }
-                            ControlFlow::Break(false) => false,
+                    if args.first().is_some_and(Self::expr_contains_float_literal) {
+                        let template = if args.len() == 1 {
+                            "operators/round_single_arg"
+                        } else {
+                            "operators/round_multi_arg"
                         };
-                        if !supported {
+                        if !Self::all_generators_support(&data_source, &meta, |templates| {
+                            templates.contains_template(template)
+                        }) {
                             return false;
                         }
                     }

@@ -2840,8 +2840,6 @@ from
           CAST(100 AS REAL) * COUNT(*) / (200 * COUNT(*)) AS "float32_ratio",
           100.1 * COUNT(*) / (200 * COUNT(*)) AS "fractional_ratio",
           -100.0 * COUNT(*) / (200 * COUNT(*)) AS "negative_ratio",
-          ROUND(100.0 * COUNT(*) / (200 * COUNT(*)), 2) AS "rounded_ratio",
-          ROUND(123.456 * COUNT(*) / COUNT(*), 2) AS "rounded_fraction",
           COUNT(*) / (2 * COUNT(*)) AS "integer_ratio",
           CAST(NULL AS DOUBLE) AS "float64_null",
           CAST(NULL AS REAL) AS "float32_null"
@@ -2880,16 +2878,35 @@ from
       expect(rows[0].float64_null).toBeNull();
       expect(rows[0].float32_null).toBeNull();
 
-      expect(Number(rows[0].rounded_ratio)).toBeCloseTo(0.5, 10);
-      expect(Number(rows[0].rounded_fraction)).toBeCloseTo(123.46, 10);
-      expect(pushedSql).toMatch(/ROUND\(/i);
+      // Keep ROUND separate so its local fallback cannot hide whether the
+      // arithmetic expressions above retain their source-side float types.
+      const roundedQuery = `
+        SELECT ROUND(100.0 * COUNT(*) / (200 * COUNT(*)), 2) AS "rounded_ratio",
+          ROUND(123.456 * COUNT(*) / COUNT(*), 2) AS "rounded_fraction"
+        FROM "Customers" WHERE LOWER("customerName") <> '__float_literal_test__'
+      `;
+      const roundedPlan = (await connection.query(`EXPLAIN ${roundedQuery}`)).rows
+        .map(row => Object.values(row).join('\n')).join('\n');
+      expect(roundedPlan).toContain('CubeScanWrappedSql');
+      const roundedSql = roundedPlan.match(/CubeScanExecutionPlan, SQL:\s*([\s\S]*)/)?.[1] ?? '';
+      if (type === 'mysql') {
+        expect(roundedPlan).toMatch(/Projection:[^\n]*round\(/i);
+        expect(roundedSql).not.toMatch(/ROUND\(/i);
+      } else {
+        expect(roundedSql).toMatch(/ROUND\(/i);
+      }
+      const roundedRows = (await connection.query(roundedQuery)).rows;
+      expect(Number(roundedRows[0].rounded_ratio)).toBeCloseTo(0.5, 10);
+      expect(Number(roundedRows[0].rounded_fraction)).toBeCloseTo(123.46, 10);
 
-      if (type === 'postgres') {
+      if (['postgres', 'mysql'].includes(type)) {
         const roundQuery = `
           SELECT ROUND(2.5 * COUNT(*) / COUNT(*)) AS "positive_tie",
             ROUND(-2.5 * COUNT(*) / COUNT(*)) AS "negative_tie",
             ROUND(2.4999999999999996 + (COUNT(*) - COUNT(*))) AS "below_tie",
-            ROUND(1000000000000001.0 + (COUNT(*) - COUNT(*))) AS "large_integer"
+            ROUND(1000000000000001.0 + (COUNT(*) - COUNT(*))) AS "large_integer",
+            ROUND(0.125 * COUNT(*) / COUNT(*), 2) AS "positive_decimal_tie",
+            ROUND(-0.125 * COUNT(*) / COUNT(*), 2) AS "negative_decimal_tie"
           FROM "Customers" WHERE LOWER("customerName") <> '__float_literal_test__'
         `;
         const roundPlan = (await connection.query(`EXPLAIN ${roundQuery}`)).rows
@@ -2901,9 +2918,11 @@ from
         expect(Number(roundRows[0].negative_tie)).toBe(-3);
         expect(Number(roundRows[0].below_tie)).toBe(2);
         expect(Number(roundRows[0].large_integer)).toBe(1000000000000001);
+        expect(Number(roundRows[0].positive_decimal_tie)).toBe(0.13);
+        expect(Number(roundRows[0].negative_decimal_tie)).toBe(-0.13);
       }
 
-      if (['postgres', 'mssql', 'bigquery'].includes(type)) {
+      if (['postgres', 'mssql', 'bigquery', 'redshift'].includes(type)) {
         // These sources must evaluate floating remainder locally and preserve integer results.
         const moduloQuery = `
           SELECT (3 * COUNT(*)) % (2.0 * COUNT(*)) / COUNT(*) AS "remainder",
