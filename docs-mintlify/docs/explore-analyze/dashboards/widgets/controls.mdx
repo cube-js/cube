@@ -319,7 +319,7 @@ Unlike the other control types, a parent control targets no member and never tou
 
 For example, an **Analysis** parent with the options `Retail`, `Wholesale` and `Promo` can set a **Channel** filter, a **Minimum order value** filter, and a **Date range** filter to a different combination for each option. Viewers see one dropdown; you can [hide](#visibility) the children if the individual values aren't worth showing.
 
-In the [dashboard builder][ref-workbooks], open the **Add Controls** menu in the toolbar and choose **Parent**, then click **Configure Parent** to set it up. The editor gives each option its own tab, and lists every filter, time granularity switcher and [field switcher](#field-switcher) on the dashboard inside it — so one tab is one complete arrangement, and you can read off what an option does to the whole row at a glance.
+In the [dashboard builder][ref-workbooks], open the **Add Controls** menu in the toolbar and choose **Parent**, then click **Configure Parent** to set it up, or let [**Save preset**](#save-preset) create one from the values the controls hold. The editor gives each option its own tab, and lists every filter, time granularity switcher and [field switcher](#field-switcher) on the dashboard inside it — so one tab is one complete arrangement, and you can read off what an option does to the whole row at a glance.
 
 <Info>
 A parent added to an empty dashboard has nothing to drive yet. A control added later appears in the tabs by itself, but is not driven until you save the parent's settings again.
@@ -327,7 +327,7 @@ A parent added to an empty dashboard has nothing to drive yet. A control added l
 
 ### Options
 
-Each option is a tab across the top of the editor. Add one with **+** at the end of the tab strip, double-click a tab's title to rename it — or press <kbd>F2</kbd> with the tab focused — and delete one with the ✕ that appears on it when you hover. The first tab cannot be deleted. A parent control can hold up to 50 options.
+Each option is a tab across the top of the editor. Add one with **+** at the end of the tab strip; it is named **Preset**, or **Preset 2**, **Preset 3** and so on when that name is taken. Double-click a tab's title to rename it — or press <kbd>F2</kbd> with the tab focused — and delete one with the ✕ that appears on it when you hover. The first tab cannot be deleted. A parent control can hold up to 50 options.
 
 A parent control created without options opens on a single tab named **Default**. That is a real option — saved with the control and offered in the viewer's dropdown like any other — so rename it if that label isn't what viewers should see.
 
@@ -437,6 +437,32 @@ The attribute is resolved for the viewer, not baked into the dashboard. Editing 
 </Note>
 
 Viewers can still switch to another option unless the control's [visibility](#visibility) is set to **Disabled**, and their own pick outranks the attribute for the rest of the session. A shared link never changes which option the recipient opens on: a parent control has no parameter of its own, so they resolve their own attribute, or the [default option](#default-option), exactly as they would without a link. What a link does carry is the children of an option the sharer picked **by hand** — the values of the ones it **Set to** — and [those win at load](#sharing-the-current-selection) over what the recipient's own option would have set. An option that resolved from the sharer's own attribute puts [nothing in the link](#sharing-the-current-selection), children included, so the recipient's own option decides every child it drives. A control the sharer set by hand still travels by the ordinary rules.
+
+### Saving control values as a preset {#save-preset}
+
+Instead of mapping an option row by row, you can set the controls on the dashboard itself and save what they hold as an option. In the [dashboard builder][ref-workbooks] of a dashboard that has been published, pick new values in its filters, time granularity switchers and field switchers. While those values are the only difference from the published version, the version button next to **Publish** reads **New values** instead of **Draft** (see [publishing and versions][ref-publishing]), and a **Save preset** button appears beside it. Pressing it saves the values the controls now hold as a new parent option named **Preset**, or **Preset 2** and so on when that name is taken:
+
+| The dashboard has | What Save preset does |
+|---|---|
+| No parent control driving any control | Adds a parent control titled **Presets** at the top of the dashboard, beside the other controls, with two options: **Default**, which resets every control, and **Preset**. **Default** is its [default option](#default-option). |
+| One parent control driving every filter, time granularity switcher and field switcher on the dashboard (each reads [**Fully driven** or **Partly driven**](#mapping-status-on-child-controls)) | Adds **Preset** to that parent, and adds **Default** before it when none of its options resets every control. |
+
+On the new option's tab, each control whose value you changed is **Set to** the value it now holds (**Clear**, for a filter or time granularity switcher you cleared), and each control you left alone is **Reset to default**, so it still opens on its own default for each viewer, a [user attribute](#user-attribute-default) value included.
+
+<Info>
+One **Undo** reverses the whole press: it removes the new parent control or option and gives the controls back the values you picked. The press itself puts every control back on its published value and the parent back on the option it was published on (**Default**, for a parent it creates), so the values you picked live on only in the new option.
+</Info>
+
+So the dashboard still opens on its published values, and the preset is one pick away: once you publish, viewers choose **Preset** in the parent control to switch to the values you saved. After the press the version button reads **Draft**, because the dashboard has gained a parent control or an option, and **Save preset** goes away.
+
+The parent's settings then open on the new option's tab, so you can [rename it](#options) and check its rows. The option is already part of the draft: **Cancel** closes the settings and keeps it.
+
+**Save preset** does not show:
+
+- On the **Workbook** tab, or before the dashboard's first publish.
+- When the draft holds any other change — a widget added, moved or reconfigured — which makes the version button read **Draft**.
+- When more than one parent control drives controls on the dashboard, or the one that does leaves some of them **Not driven**.
+- When the controls hold exactly what one of the driving parent's options sets, since the preset would repeat that option. That includes a draft whose only change is picking that option, which in the builder [saves its children's values](#default-option).
 
 ## Clearing and resetting
 
@@ -567,6 +593,7 @@ For filter, time granularity, and field switcher controls — the three that map
 [ref-workbook-agent]: /docs/explore-analyze/workbooks/workbook-agent
 
 [ref-workbooks]: /docs/explore-analyze/workbooks
+[ref-publishing]: /docs/explore-analyze/dashboards#publishing-and-versions
 [ref-charts]: /docs/explore-analyze/dashboards/widgets/charts
 [ref-granularities]: /docs/data-modeling/dimensions
 [ref-user-attributes]: /admin/users-and-permissions/user-attributes
