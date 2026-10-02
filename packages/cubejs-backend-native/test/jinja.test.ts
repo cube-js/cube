@@ -225,6 +225,22 @@ suite('Python memo', () => {
     expect(second.map((r) => r.trim())).toEqual([expected, expected]);
   });
 
+  it('keeps the cache of a call running while another compilation loads', async () => {
+    const fileName = path.join(process.cwd(), 'test', 'templates', 'memo_reload.py');
+    const content = fs.readFileSync(fileName, 'utf8');
+    const pyCtx = await nativeInstance.loadPythonContext(fileName, content);
+    const jinjaEngine = nativeInstance.newJinjaEngine({ debugInfo: true, filters: pyCtx.filters, workers: 1 });
+    loadTemplateFile(jinjaEngine, 'memo_reload.yml.jinja');
+
+    const rendering = jinjaEngine.renderTemplate('memo_reload.yml.jinja', {}, { ...pyCtx.functions });
+    // load_twice() is waiting between its two calls by now
+    await new Promise((resolve) => setTimeout(resolve, 200));
+    await nativeInstance.loadPythonContext(fileName, content);
+
+    // One call, its result cached for the second
+    expect((await rendering).trim()).toEqual('reload: 11');
+  });
+
   it('gives each compilation its own cache for functions in imported modules', async () => {
     const load = async () => {
       const fileName = path.join(process.cwd(), 'test', 'templates', 'memo_imported.py');
