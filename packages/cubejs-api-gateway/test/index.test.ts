@@ -1014,6 +1014,62 @@ describe('API Gateway', () => {
     });
   });
 
+  describe('transformed query', () => {
+    const PLAYGROUND_SECRET = 'playgroundSecret';
+    const DEFAULT_TOKEN = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.e30.t-IDcSemACt8x4iTMCda8Yhe3iZaWbvV5XKSTbuAn0M';
+
+    const recordSqlOptions = async (devServer: boolean, token: string = DEFAULT_TOKEN, endpoint: string = 'load') => {
+      const sqlOptions: any[] = [];
+      const recordingCompilerApi = async (ctx: any) => {
+        const api = await compilerApi(ctx);
+        return {
+          ...api,
+          getSql: (query: any, options: any) => {
+            sqlOptions.push(options);
+            return api.getSql();
+          },
+        };
+      };
+      const apiGateway = new ApiGateway(API_SECRET, recordingCompilerApi, async () => new AdapterApiMock(), logger, {
+        standalone: true,
+        dataSourceStorage: new DataSourceStorageMock(),
+        basePath: '/cubejs-api',
+        refreshScheduler: {},
+        devServer,
+        playgroundAuthSecret: PLAYGROUND_SECRET,
+      });
+      const app = express();
+      app.use(express.json());
+      apiGateway.initApp(app);
+
+      await request(app)
+        .get(`/cubejs-api/v1/${endpoint}?query=${encodeURIComponent(JSON.stringify({ measures: ['Foo.bar'] }))}`)
+        .set('Authorization', token)
+        .expect(200);
+      return sqlOptions;
+    };
+
+    // The pre-aggregation matcher behind it walks every multi-stage member, and
+    // only the dev/Playground `/load`, `/sql` and `/dry-run` responses return it.
+    test('is not computed for /load outside dev mode', async () => {
+      expect(await recordSqlOptions(false)).toEqual([{ includeTransformedQuery: false }]);
+    });
+
+    test('is computed in dev mode', async () => {
+      expect(await recordSqlOptions(true)).toEqual([{ includeTransformedQuery: true }]);
+    });
+
+    test('is computed for a Playground token outside dev mode', async () => {
+      const playgroundToken = generateAuthToken({ uid: 5, scope: ['dev-token'] }, {}, PLAYGROUND_SECRET);
+      expect(await recordSqlOptions(false, playgroundToken)).toEqual([{ includeTransformedQuery: true }]);
+    });
+
+    test.each(['sql', 'dry-run'])('is computed for /%s', async (endpoint) => {
+      expect(await recordSqlOptions(false, DEFAULT_TOKEN, endpoint))
+        .toEqual([expect.objectContaining({ includeTransformedQuery: true })]);
+    });
+  });
+
   describe('/v1/sql endpoint dataSource', () => {
     test('returns dataSource for single query', async () => {
       const { app } = await createApiGateway();

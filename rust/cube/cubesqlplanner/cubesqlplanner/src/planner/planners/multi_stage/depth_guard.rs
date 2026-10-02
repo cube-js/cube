@@ -19,8 +19,31 @@ use std::rc::Rc;
 /// any hand-written model, because where planning actually runs out of stack depends on what
 /// each stage plans and on the stack the caller happens to have. For a query served from a
 /// rollup the binding limit is `CUBESTORE_MAX_QUERY_PLAN_DEPTH` instead, which measures the
-/// plan Cube Store will decode and counts about two of its levels per stage.
+/// plan Cube Store will decode and counts about three of its levels per stage.
 pub const DEFAULT_MAX_MULTI_STAGE_DEPTH: usize = 150;
+
+/// Stages a query may plan in total, used when the query carries no limit of its own.
+///
+/// Depth alone does not bound the plan: a member reading its child in two different states
+/// doubles the stages per level, so a model a few dozen levels deep can ask for millions of them.
+pub const DEFAULT_MAX_MULTI_STAGE_STAGES: usize = 1000;
+
+pub fn check_multi_stage_stages(
+    planned: usize,
+    member: &MemberSymbol,
+    limit: usize,
+) -> Result<(), CubeError> {
+    if planned < limit {
+        return Ok(());
+    }
+    Err(CubeError::user(format!(
+        "Planning member '{}' needs more than {} multi-stage stages. Its members read each \
+         other in more distinct states than can be planned. Reduce how many states each \
+         stage is read in, or raise CUBEJS_MAX_MULTI_STAGE_STAGES.",
+        member.full_name(),
+        limit
+    )))
+}
 
 pub fn check_multi_stage_depth(roots: &[Rc<MemberSymbol>], limit: usize) -> Result<(), CubeError> {
     // Roots share a member graph, so they share the memo: measuring each one against its own

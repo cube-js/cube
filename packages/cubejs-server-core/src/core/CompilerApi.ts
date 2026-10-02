@@ -69,6 +69,9 @@ export interface GetSqlOptions {
   // Avoids building a rolling-window time series that would require a date range the
   // refresh path doesn't provide.
   preAggregationsOnly?: boolean;
+  // `canUseTransformedQuery` walks every multi-stage member, so only callers that
+  // return it ask for it.
+  includeTransformedQuery?: boolean;
 }
 
 export interface SqlResult {
@@ -83,7 +86,7 @@ export interface SqlResult {
   dataSource: string;
   aliasNameToMember: any;
   rollupMatchResults?: any;
-  canUseTransformedQuery: boolean;
+  canUseTransformedQuery?: TransformedQuery;
   memberNames: string[];
 }
 
@@ -369,7 +372,7 @@ export class CompilerApi {
   }
 
   public async getSql(query: NormalizedQuery, options: GetSqlOptions = {}): Promise<SqlResult> {
-    const { includeDebugInfo, exportAnnotatedSql, preAggregationsOnly } = options;
+    const { includeDebugInfo, exportAnnotatedSql, preAggregationsOnly, includeTransformedQuery = false } = options;
     const { sqlGenerator, compilers } = await this.getSqlGenerator(query);
 
     const getSqlFn = () => compilers.compiler.withQuery(sqlGenerator, () => ({
@@ -385,7 +388,8 @@ export class CompilerApi {
       aliasNameToMember: sqlGenerator.aliasNameToMember,
       rollupMatchResults: includeDebugInfo ?
         sqlGenerator.preAggregations.rollupMatchResultDescriptions() : undefined,
-      canUseTransformedQuery: sqlGenerator.preAggregations.canUseTransformedQuery(),
+      canUseTransformedQuery: includeTransformedQuery ?
+        sqlGenerator.preAggregations.canUseTransformedQuery() : undefined,
       memberNames: sqlGenerator.collectAllMemberNames(),
     }));
 

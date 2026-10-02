@@ -1,7 +1,7 @@
 use super::{
-    MultiStageInodeMember, MultiStageInodeMemberType, MultiStageLeafMemberType, MultiStageMember,
-    MultiStageMemberQueryPlanner, MultiStageMemberType, MultiStageQueryDescription, PlanningScope,
-    RollingWindowDescription, TimeSeriesDescription,
+    check_multi_stage_stages, MultiStageInodeMember, MultiStageInodeMemberType,
+    MultiStageLeafMemberType, MultiStageMember, MultiStageMemberQueryPlanner, MultiStageMemberType,
+    MultiStageQueryDescription, PlanningScope, RollingWindowDescription, TimeSeriesDescription,
 };
 use crate::cube_bridge::base_query_options::FilterValue;
 use crate::cube_bridge::measure_definition::RollingWindow;
@@ -653,6 +653,11 @@ impl MultiStageQueryPlanner {
         }) {
             return Ok(exists.clone());
         };
+        check_multi_stage_stages(
+            descriptions.len(),
+            &member,
+            self.query_properties.max_multi_stage_stages(),
+        )?;
 
         if let Some(rolling_window_query) = self.try_plan_rolling_window(
             member.clone(),

@@ -15,7 +15,9 @@ use crate::planner::filter::tree_ops;
 use crate::planner::filter::{Filter, FilterGroup, FilterItem, FilterOperator};
 use crate::planner::join_hints::JoinHints;
 use crate::planner::multi_fact_join_groups::{MeasuresJoinHints, MultiFactJoinGroups};
-use crate::planner::planners::multi_stage::{TimeShiftState, DEFAULT_MAX_MULTI_STAGE_DEPTH};
+use crate::planner::planners::multi_stage::{
+    TimeShiftState, DEFAULT_MAX_MULTI_STAGE_DEPTH, DEFAULT_MAX_MULTI_STAGE_STAGES,
+};
 use crate::planner::symbols::transforms;
 use crate::planner::time_dimension::SeriesSpan;
 use crate::planner::{CubeId, DimensionTimeShift, JoinTree, MeasureTimeShifts, MemberId};
@@ -175,6 +177,9 @@ pub struct QueryProperties {
     /// Multi-stage members one dependency path may carry before planning refuses the query.
     #[builder(default = DEFAULT_MAX_MULTI_STAGE_DEPTH)]
     max_multi_stage_depth: usize,
+    /// Multi-stage stages the whole query may plan before planning refuses it.
+    #[builder(default = DEFAULT_MAX_MULTI_STAGE_STAGES)]
+    max_multi_stage_stages: usize,
     #[builder(default = Rc::new(JoinHints::new()))]
     query_join_hints: Rc<JoinHints>,
     #[builder(default = true)]
@@ -439,6 +444,10 @@ impl QueryProperties {
 
     pub fn max_multi_stage_depth(&self) -> usize {
         self.max_multi_stage_depth
+    }
+
+    pub fn max_multi_stage_stages(&self) -> usize {
+        self.max_multi_stage_stages
     }
 
     pub fn use_original_sql_pre_aggregations_in_pre_aggregation(&self) -> bool {
@@ -1246,6 +1255,7 @@ impl PartialEq for QueryProperties {
             // A server-side safety budget, not something the query asks for: two requests that
             // differ only in it render the same SQL, or one of them is refused outright.
             max_multi_stage_depth: _,
+            max_multi_stage_stages: _,
             allow_multi_stage,
             disable_external_pre_aggregations,
             pre_aggregation_id,

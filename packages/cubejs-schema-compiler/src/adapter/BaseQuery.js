@@ -980,6 +980,7 @@ export class BaseQuery {
       joinHints: this.options.joinHints,
       cubestoreSupportMultistage: this.options.cubestoreSupportMultistage ?? getEnv('cubeStoreRollingWindowJoin'),
       maxMultiStageDepth: this.options.maxMultiStageDepth ?? getEnv('maxMultiStageDepth'),
+      maxMultiStageStages: this.options.maxMultiStageStages ?? getEnv('maxMultiStageStages'),
       maxMemberResolutionDepth: this.options.maxMemberResolutionDepth ?? getEnv('maxMemberResolutionDepth'),
       disableExternalPreAggregations: !!this.options.disableExternalPreAggregations,
       convertTzForRawTimeDimension: !!this.options.convertTzForRawTimeDimension,
@@ -1045,6 +1046,7 @@ export class BaseQuery {
       joinHints: this.options.joinHints,
       cubestoreSupportMultistage: this.options.cubestoreSupportMultistage ?? getEnv('cubeStoreRollingWindowJoin'),
       maxMultiStageDepth: this.options.maxMultiStageDepth ?? getEnv('maxMultiStageDepth'),
+      maxMultiStageStages: this.options.maxMultiStageStages ?? getEnv('maxMultiStageStages'),
       maxMemberResolutionDepth: this.options.maxMemberResolutionDepth ?? getEnv('maxMemberResolutionDepth'),
       disableExternalPreAggregations: !!this.options.disableExternalPreAggregations,
       subqueryJoins: this.options.subqueryJoins,
@@ -1516,11 +1518,15 @@ export class BaseQuery {
     const allMemberChildren = this.collectAllMemberChildren(context);
     const memberToIsMultiStage = this.collectAllMultiStageMembers(allMemberChildren);
 
+    const hasMultiStageMembersCache = {};
     const hasMultiStageMembers = (m) => {
       if (memberToIsMultiStage[m]) {
         return true;
       }
-      return allMemberChildren[m]?.some(c => hasMultiStageMembers(c)) || false;
+      if (!(m in hasMultiStageMembersCache)) {
+        hasMultiStageMembersCache[m] = allMemberChildren[m]?.some(c => hasMultiStageMembers(c)) || false;
+      }
+      return hasMultiStageMembersCache[m];
     };
 
     const measuresToRender = (multiplied, cumulative) => R.pipe(
@@ -1542,6 +1548,7 @@ export class BaseQuery {
         R.unnest
       )([false, true]);
     const withQueries = [];
+    const withQueriesMemo = new Map();
     const multiStageMembers = R.uniq(
       this.allMembersConcat(false)
         // TODO boolean logic filter support
@@ -1579,7 +1586,8 @@ export class BaseQuery {
         segments: this.options.segments || [],
       },
       allMemberChildren,
-      withQueries
+      withQueries,
+      withQueriesMemo
     ));
     const usedWithQueries = {};
     multiStageMembers.forEach(m => this.collectUsedWithQueries(usedWithQueries, m));
@@ -1639,18 +1647,34 @@ export class BaseQuery {
     return member;
   }
 
-  multiStageWithQueries(member, queryContext, memberChildren, withQueries) {
+  /**
+   * `memo` maps a member to the `[queryContext, subQuery]` pairs already walked
+   * for it. Each level visits its children twice, so without it a chain of N
+   * multi-stage members costs 2^N calls.
+   */
+  multiStageWithQueries(member, queryContext, memberChildren, withQueries, memo = new Map()) {
+    const memberMemo = memo.get(member) || [];
+    memo.set(member, memberMemo);
+    const memoized = memberMemo.find(([context]) => R.equals(context, queryContext));
+    if (memoized) {
+      return memoized[1];
+    }
+    const subQuery = this.multiStageWithQueriesUncached(member, queryContext, memberChildren, withQueries, memo);
+    memberMemo.push([queryContext, subQuery]);
+    return subQuery;
+  }
+
+  multiStageWithQueriesUncached(member, queryContext, memberChildren, withQueries, memo) {
     // TODO calculate based on remove_filter in future
     const wouldNodeApplyFilters = !memberChildren[member];
     let memberFrom = memberChildren[member]
-      ?.map(child => this.multiStageWithQueries(child, this.childrenMultiStageContext(member, queryContext), memberChildren, withQueries));
+      ?.map(child => this.multiStageWithQueries(child, this.childrenMultiStageContext(member, queryContext), memberChildren, withQueries, memo));
     const unionFromDimensions = memberFrom ? R.uniq(R.flatten(memberFrom.map(f => f.dimensions))) : queryContext.dimensions;
     const unionDimensionsContext = { ...queryContext, dimensions: unionFromDimensions.filter(d => !this.newDimension(d).isMultiStage()) };
-    // TODO is calling multiStageWithQueries twice optimal?
     memberFrom = memberChildren[member] &&
       R.uniqBy(
         f => f.alias,
-        memberChildren[member].map(child => this.multiStageWithQueries(child, this.childrenMultiStageContext(member, unionDimensionsContext), memberChildren, withQueries))
+        memberChildren[member].map(child => this.multiStageWithQueries(child, this.childrenMultiStageContext(member, unionDimensionsContext), memberChildren, withQueries, memo))
       );
     const selfContext = this.selfMultiStageContext(member, queryContext, wouldNodeApplyFilters);
     const subQuery = {

@@ -1589,6 +1589,7 @@ class ApiGateway {
           {
             includeDebugInfo: this.devServer || context.signedWithPlaygroundAuthSecret,
             exportAnnotatedSql,
+            includeTransformedQuery: true,
           }
         ))
       );
@@ -1838,7 +1839,8 @@ class ApiGateway {
         normalizedQueries.map(async (normalizedQuery) => (await this.getCompilerApi(context)).getSql(
           this.coerceForSqlQuery(normalizedQuery, context),
           {
-            includeDebugInfo: this.devServer || context.signedWithPlaygroundAuthSecret
+            includeDebugInfo: this.devServer || context.signedWithPlaygroundAuthSecret,
+            includeTransformedQuery: true,
           }
         ))
       );
@@ -1874,7 +1876,9 @@ class ApiGateway {
           const loadRequestSQLStarted = new Date();
           const sqlQueryRaw = await (await this.getCompilerApi(context))
             .getSql(
-              this.coerceForSqlQuery(normalizedQuery, context)
+              this.coerceForSqlQuery(normalizedQuery, context),
+              // Only the dev/Playground load response returns the transformed query.
+              { includeTransformedQuery: this.devServer || !!context.signedWithPlaygroundAuthSecret }
             );
           const sqlQuery = this.sanitizeSqlQuery(sqlQueryRaw);
 
