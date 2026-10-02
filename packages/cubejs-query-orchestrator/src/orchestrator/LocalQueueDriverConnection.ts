@@ -316,10 +316,8 @@ export class LocalQueueDriverConnection implements QueueDriverConnectionInterfac
   }
 
   /**
-   * Cube Store marks a result ready-to-delete only for a waiter blocked at the ack, here every
-   * read does it, so a key lookup of a later request never gets a run that was already read.
-   * Past the first read only the joiners of the same executeInQueue call still ask, by id and
-   * within milliseconds, so the result no longer has to live for RESULT_TTL_MS.
+   * Every read marks the result deleted, so a later request's key lookup never gets it.
+   * After that only joiners of the same run ask, by id, so it lives one continueWaitTimeout.
    */
   protected consume(result: LocalQueueResult, now: number): any {
     this.state.results.consume(result, now + this.continueWaitTimeout * 1000);
