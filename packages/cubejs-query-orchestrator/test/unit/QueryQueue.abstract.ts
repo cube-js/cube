@@ -800,6 +800,60 @@ export const QueryQueueTest = (name: string, options: QueryQueueTestOptions) => 
       }
     });
 
+    test('a finished result is served to every waiter of the run', async () => {
+      const connection = await queue.queueDriver.createConnection();
+      const queryKey = 'shared-result-query' as QueryKey;
+      const key = connection.redisHash(queryKey);
+
+      const add = async (requestId: string) => (await connection.addToQueue(
+        queryKey, 'handler', <any>['q'], 10, {
+          queueId: queue.generateQueueId(), stageQueryKey: key, requestId
+        }
+      ))[1];
+
+      try {
+        const queueId = await add('first');
+        await connection.retrieveForProcessing(key, queueId);
+        // A joiner waits for the run which is already in flight
+        expect(await add('joiner')).toEqual(queueId);
+        expect(await connection.setResultAndRemoveQuery(key, { result: 'first' }, queueId)).toBe(true);
+
+        // A joiner which saw the query in flight only asks after the first waiter got the result
+        expect(await connection.getResultBlocking(key, queueId)).toMatchObject({ result: 'first' });
+        expect(await connection.getResultBlocking(key, queueId)).toMatchObject({ result: 'first' });
+
+        // The next run of the key must not be answered with the previous result
+        const nextQueueId = await add('second');
+        expect(nextQueueId).not.toEqual(queueId);
+        expect(await connection.getResultBlocking(key, nextQueueId)).toBeNull();
+      } finally {
+        await connection.getQueryAndRemove(key, null);
+        queue.queueDriver.release(connection);
+      }
+    });
+
+    test('a finished result is served by getResult once', async () => {
+      const connection = await queue.queueDriver.createConnection();
+      const queryKey = 'get-result-once-query' as QueryKey;
+      const key = connection.redisHash(queryKey);
+
+      try {
+        const [, queueId] = await connection.addToQueue(
+          queryKey, 'handler', <any>['q'], 10, {
+            queueId: queue.generateQueueId(), stageQueryKey: key, requestId: '1'
+          }
+        );
+        await connection.retrieveForProcessing(key, queueId);
+        await connection.setResultAndRemoveQuery(key, { result: 'once' }, queueId);
+
+        expect(await connection.getResult(queryKey)).toMatchObject({ result: 'once' });
+        expect(await connection.getResult(queryKey)).toBeNull();
+      } finally {
+        await connection.getQueryAndRemove(key, null);
+        queue.queueDriver.release(connection);
+      }
+    });
+
     // eslint-disable-next-line no-unused-expressions
     options.cacheAndQueueDriver === 'cubestore' && describe('with CUBEJS_QUEUE_EXTERNAL_ID enabled', () => {
       jest.setTimeout(10 * 1000);
