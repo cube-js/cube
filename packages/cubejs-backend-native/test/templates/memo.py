@@ -8,11 +8,12 @@ calls = {'sync': 0, 'async': 0}
 @memo
 def load_sync(name):
     calls['sync'] += 1
-    return name + '_' + str(calls['sync'])
+    # The call number, so a cached result shows the number of the call that made it
+    return calls['sync']
 
 
 @template.function('load_async')
 @memo
 async def load_async_data(name):
     calls['async'] += 1
-    return name + '_' + str(calls['async'])
+    return calls['async']

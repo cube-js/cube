@@ -215,7 +215,7 @@ suite('Python memo', () => {
   };
 
   it('calls a memoized function once per arguments within a compilation', async () => {
-    const expected = 'sync: a_1 a_1 b_2\nasync: a_1 a_1 b_2';
+    const expected = 'sync: 1 1 2\nasync: 1 1 2';
 
     const first = await compile();
     expect(first.map((r) => r.trim())).toEqual([expected, expected]);
