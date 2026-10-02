@@ -8,7 +8,7 @@ import { displayError, displayWarning, event } from '../utils';
 export const defaultExpiry = '30 days';
 
 const parsePayload = (payloadArray: string[] = []) => {
-  const result = {};
+  const result: Record<string, string> = {};
 
   payloadArray.forEach((entry = '') => {
     const [key, value] = entry.split('=');
@@ -73,7 +73,7 @@ export const token = async (options: TokenOptions) => {
   return signedToken;
 };
 
-export const collect = (val, memo) => [val, ...memo];
+export const collect = (val: string, memo: string[]) => [val, ...memo];
 
 export function configureTokenCommand(program: CommanderStatic) {
   program

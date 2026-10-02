@@ -17,11 +17,11 @@ import {
 import templates from '../templates';
 
 // @todo There is another function with similar name inside utils, but without analytics
-const logStage = (stage) => {
+const logStage = (stage: string) => {
   console.log(`- ${stage}`);
 };
 
-const create = async (projectName, options) => {
+const create = async (projectName: string, options: { dbType: string }) => {
   const createAppOptions = { projectName, dbType: options.dbType, template: 'docker' };
 
   event({

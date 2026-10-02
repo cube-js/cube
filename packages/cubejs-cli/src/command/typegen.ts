@@ -16,13 +16,13 @@ const wrapInQuotes = (values: string[]) => {
 
 const stripSpaces = (str: string): string => str.replace(/\s/g, '');
 
-const selectName = (o) => o.name;
+const selectName = (o: { name: string }) => o.name;
 
 const createCubeProps = (cube: any) => {
   const cubeName = stripSpaces(cube.name);
   const dimensions = cube.dimensions.map(selectName);
   const measures = cube.measures.map(selectName);
-  const timeDimensions = cube.dimensions.filter((d) => d.type === 'time').map(selectName);
+  const timeDimensions = cube.dimensions.filter((d: { type: string }) => d.type === 'time').map(selectName);
   const segments = cube.segments.map(selectName);
 
   return `export type ${cubeName}Measure = ${wrapInQuotes(measures)};
@@ -51,12 +51,12 @@ export type Introspected${topLevelType}Name = ${cubeNames.map(c => `${c}${topLev
 `).join('\n')}`;
 };
 
-const generateQueryTypes = async (apiUrl, { token }) => {
+const generateQueryTypes = async (apiUrl: string, { token }: { token?: string }) => {
   if (!apiUrl) {
-    await displayError('Please specify the Cube API URL');
+    return displayError('Please specify the Cube API URL');
   }
   if (!token) {
-    await displayError('Type generation requires a token. Please generate one and try again');
+    return displayError('Type generation requires a token. Please generate one and try again');
   }
 
   let meta = {
