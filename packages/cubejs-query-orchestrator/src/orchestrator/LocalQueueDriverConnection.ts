@@ -153,7 +153,7 @@ export class LocalQueueDriverConnection implements QueueDriverConnectionInterfac
   protected resolveItem(queryKeyHash: QueryKeyHash, queueId?: QueueId | null): LocalQueueItem | null {
     if (queueId) {
       const item = this.state.items.getById(Number(queueId));
-      // QueryQueue.generateQueueId hands out ids from the same small integer range
+      // An id never resolves to an item under a different key
       return item?.key === queryKeyHash ? item : null;
     }
 
