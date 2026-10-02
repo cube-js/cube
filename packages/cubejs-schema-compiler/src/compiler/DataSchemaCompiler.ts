@@ -25,6 +25,18 @@ const ctxFileStorage = new AsyncLocalStorage<FileContent>();
 // Set while the function passed to `memo` runs, including its async continuations
 const memoFnStorage = new AsyncLocalStorage<string>();
 
+// For memo() keys: objects compare by their keys whatever the property order, and NaN and
+// Infinity don't encode as null
+const memoKeyReplacer = (_key: string, value: unknown) => {
+  if (typeof value === 'number' && !Number.isFinite(value)) {
+    return { $memoNumber: String(value) };
+  }
+  if (value && typeof value === 'object' && !Array.isArray(value)) {
+    return Object.fromEntries(Object.keys(value).sort().map((k) => [k, value[k]]));
+  }
+  return value;
+};
+
 // Shared realm: closures bind the running compile's scope lexically through `with`, so lazy reads
 // (sql reading COMPILE_CONTEXT) keep resolving it after the compile; the inner function keeps
 // top-level declarations off the shared global and gets the compile's own global as `this`.
@@ -698,7 +710,7 @@ export class DataSchemaCompiler {
         let cacheKey: string | undefined;
 
         try {
-          cacheKey = JSON.stringify(key);
+          cacheKey = JSON.stringify(key, memoKeyReplacer);
         } catch {
           // BigInt or a cyclic structure
         }

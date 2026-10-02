@@ -373,6 +373,29 @@ describe.each([
     expect(cubeEvaluator.cubeFromPath('orders').sqlTable!()).toEqual('a_b_c_d');
   });
 
+  it('matches object keys whatever their property order', async () => {
+    const { compiler, cubeEvaluator } = prepareCompiler([{
+      fileName: 'orders.js',
+      content: `
+        const table = [
+          memo({ table: 'orders', schema: 'public' }, () => 'a'),
+          memo({ schema: 'public', table: 'orders' }, () => 'b'),
+          memo([NaN], () => 'c'),
+          memo([null], () => 'd'),
+          memo([Infinity], () => 'e'),
+        ].join('_');
+
+        cube('orders', {
+          sql_table: table,
+          measures: { count: { type: 'count' } },
+        });
+      `,
+    }], { sharedVmContext });
+    await compiler.compile();
+
+    expect(cubeEvaluator.cubeFromPath('orders').sqlTable!()).toEqual('a_a_c_d_e');
+  });
+
   it.each([
     ['undefined', 'undefined'],
     ['a BigInt', '10n'],
