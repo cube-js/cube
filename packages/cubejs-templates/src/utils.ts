@@ -8,7 +8,7 @@ export type File = {
   content: string;
 };
 
-export async function fileContentsRecursive(dir: string, rootPath?: string, includeNodeModules: boolean = false) {
+export async function fileContentsRecursive(dir: string, rootPath?: string, includeNodeModules: boolean = false): Promise<File[]> {
   if (!rootPath) {
     rootPath = dir;
   }
@@ -45,7 +45,7 @@ export async function fileContentsRecursive(dir: string, rootPath?: string, incl
   ).reduce<File[]>((a, b) => a.concat(b), []);
 }
 
-export async function proxyFetch(url) {
+export async function proxyFetch(url: string) {
   return fetch(
     url,
     {

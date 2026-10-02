@@ -3,14 +3,21 @@ import R from 'ramda';
 export type Package = {
   name: string;
   version: string;
-  installsTo: string[] | null;
+  installsTo: Record<string, string> | null;
   receives: Record<string, string>;
+};
+
+export type DependencyNode = {
+  package: Package;
+  children: DependencyNode[];
+  // Instance returned by the template package's own module, assigned by AppContainer
+  packageInstance?: any;
 };
 
 const indexByName = (packages: Package[]) => R.indexBy(R.prop('name'), packages);
 
 export class DependencyTree {
-  protected rootNode: any = null;
+  protected rootNode: DependencyNode | null = null;
 
   protected resolved: any[] = [];
 
@@ -27,7 +34,7 @@ export class DependencyTree {
     return <Package[]> this.manifest.packages;
   }
 
-  public getRootNode() {
+  public getRootNode(): DependencyNode {
     if (this.rootNode) {
       return this.rootNode;
     }
@@ -49,12 +56,12 @@ export class DependencyTree {
     return this.rootNode;
   }
 
-  protected packagesInstalledTo(name): Record<string, unknown> {
+  protected packagesInstalledTo(name: string): Record<string, Package> {
     return indexByName(this.packages().filter((pkg) => (pkg.installsTo || {})[name]));
   }
 
-  protected getChildren(pkg): any[] {
-    const children: any[] = [];
+  protected getChildren(pkg: Package): Package[] {
+    const children: Package[] = [];
 
     Object.keys(pkg.receives || {}).forEach((receive) => {
       const currentPackages = this.packagesInstalledTo(receive);
@@ -71,13 +78,13 @@ export class DependencyTree {
     return children;
   }
 
-  protected build(node) {
+  protected build(node: DependencyNode) {
     if (!node) {
       return;
     }
 
     (this.getChildren(node.package) || []).forEach((child) => {
-      const childNode = {
+      const childNode: DependencyNode = {
         package: child,
         children: [],
       };

@@ -3,11 +3,12 @@ import fs from 'fs-extra';
 import path from 'path';
 import { executeCommand } from '@cubejs-backend/shared';
 
-import { fileContentsRecursive } from './utils';
+import { File, fileContentsRecursive } from './utils';
+import { DependencyNode } from './DependencyTree';
 import { SourceContainer } from './SourceContainer';
 
 export class AppContainer {
-  public static getPackageVersions(appPath) {
+  public static getPackageVersions(appPath: string) {
     try {
       return fs.readJsonSync(path.join(appPath, 'package.json')).cubejsTemplates || {};
     } catch (error) {
@@ -23,7 +24,11 @@ export class AppContainer {
 
   protected packagesPath: string;
 
-  public constructor(protected rootNode, { appPath, packagesPath }, playgroundContext) {
+  public constructor(
+    protected rootNode: DependencyNode,
+    { appPath, packagesPath }: { appPath: string, packagesPath: string },
+    playgroundContext: Record<string, unknown>,
+  ) {
     this.playgroundContext = playgroundContext;
     this.appPath = appPath;
     this.packagesPath = packagesPath;
@@ -41,14 +46,14 @@ export class AppContainer {
     this.setChildren(this.rootNode);
   }
 
-  protected setChildren(node) {
+  protected setChildren(node: DependencyNode) {
     if (!node) {
       return;
     }
 
-    node.children.forEach((currentNode) => {
+    node.children.forEach((currentNode: DependencyNode) => {
       this.setChildren(currentNode);
-      const [installsTo] = Object.keys(currentNode.package.installsTo);
+      const [installsTo] = Object.keys(currentNode.package.installsTo!);
       if (!node.packageInstance.children[installsTo]) {
         node.packageInstance.children[installsTo] = [];
       }
@@ -56,11 +61,11 @@ export class AppContainer {
     });
   }
 
-  protected createInstances(node) {
+  protected createInstances(node: DependencyNode) {
     const stack = [node];
 
     while (stack.length) {
-      const child = stack.pop();
+      const child = stack.pop()!;
 
       const scaffoldingPath = path.join(this.packagesPath, child.package.name, 'scaffolding');
       // eslint-disable-next-line
@@ -75,7 +80,7 @@ export class AppContainer {
 
       child.packageInstance = instance;
 
-      child.children.forEach((currentChild) => {
+      child.children.forEach((currentChild: DependencyNode) => {
         stack.push(currentChild);
       });
     }
@@ -85,9 +90,9 @@ export class AppContainer {
     return new SourceContainer(await fileContentsRecursive(this.appPath));
   }
 
-  public async persistSources(sourceContainer, packageVersions) {
+  public async persistSources(sourceContainer: SourceContainer, packageVersions: Record<string, string>) {
     const sources = sourceContainer.outputSources();
-    await Promise.all(sources.map((file) => fs.outputFile(path.join(this.appPath, file.fileName), file.content)));
+    await Promise.all(sources.map((file: File) => fs.outputFile(path.join(this.appPath, file.fileName), file.content)));
 
     await Promise.all(
       Object.entries<string>(sourceContainer.filesToMove).map(async ([from, to]) => {
@@ -116,7 +121,7 @@ export class AppContainer {
     }
   }
 
-  public async executeCommand(command, args, options) {
+  public async executeCommand(command: string, args: string | string[], options: object) {
     return executeCommand(command, args, options);
   }
 
