@@ -202,7 +202,6 @@ curl \
   -H "Content-Type: application/json" \
   -d '{
     "security_context": {"tenant_id": "acme"},
-    "scopes": ["meta-private"],
     "expires_in": 3600
   }' \
   "https://YOUR_CUBE_CLOUD_HOST/api/v1/deployments/123/environments/456/tokens-for-meta-sync"
