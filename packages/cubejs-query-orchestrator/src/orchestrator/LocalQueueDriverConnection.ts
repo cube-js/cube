@@ -115,25 +115,25 @@ export class LocalQueueItems {
 }
 
 export class LocalQueueDriverConnectionState {
-  public resultPromises: Record<string, PromiseWithResolve> = {};
+  public readonly resultPromises: Record<string, PromiseWithResolve> = {};
 
-  public items: LocalQueueItems = new LocalQueueItems();
+  public readonly items: LocalQueueItems = new LocalQueueItems();
 }
 
 export class LocalQueueDriverConnection implements QueueDriverConnectionInterface {
-  private redisQueuePrefix: string;
+  private readonly redisQueuePrefix: string;
 
-  private continueWaitTimeout: number;
+  private readonly continueWaitTimeout: number;
 
-  private orphanedTimeout: number;
+  private readonly orphanedTimeout: number;
 
-  private heartBeatTimeout: number;
+  private readonly heartBeatTimeout: number;
 
-  private concurrency: number;
+  private readonly concurrency: number;
 
-  private driver: LocalQueueDriver;
+  private readonly driver: LocalQueueDriver;
 
-  private state: LocalQueueDriverConnectionState;
+  private readonly state: LocalQueueDriverConnectionState;
 
   public constructor(driver: LocalQueueDriver, state: LocalQueueDriverConnectionState, options: QueueDriverOptions) {
     this.redisQueuePrefix = options.redisQueuePrefix;
