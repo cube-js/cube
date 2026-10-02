@@ -68,7 +68,7 @@ The Base Role is required. Save is disabled until one is selected.
 
 #### Auto-bump to Developer
 
-If you check any deployment-scoped action stronger than **Access deployment** (`DeploymentRead`) — for example, **Edit deployment** or **Edit data model** — the Base Role is automatically forced to **Developer**, and the Viewer and Explorer options are disabled with a tooltip:
+If you check any deployment-scoped action other than **Access deployment**, **Access AI agents**, **Create scheduled tasks**, **Download data**, or **Access chat history** — for example, **Edit deployment** or **Edit data model** — the Base Role is automatically forced to **Developer**, and the Viewer and Explorer options are disabled with a tooltip:
 
 > Selected actions require Developer role
 
@@ -118,6 +118,7 @@ Either grant **Full access** (a shortcut that enables every current and future d
 | Data Model  | View data model                     | Read data model files and dev branches.                                                                                                                                   |
 | Data Model  | Edit data model                     | Edit the data model on any branch, including the main/deploy branch. Allows committing and merging to main, force-syncing main, and starting dev mode against main.       |
 | Data Model  | Edit data model on dev branches     | Edit the data model only on non-default branches. Blocks any write that targets the main/deploy branch (including merging to main).                                       |
+| AI          | Access AI agents                    | Use the agent in Analytics Chat, workbooks, the IDE, and dashboards.                                                                                                      |
 | AI          | Create scheduled tasks              | Create [scheduled tasks][ref-scheduled-tasks] in the deployment, from the **Scheduled** page, by asking the agent, or with the Platform API. Editing, pausing, running, and deleting a task stay with its creator or an admin. Granted by default to the built-in Viewer, Explorer, and Developer roles. |
 | Monitoring  | Access query history                | View deployment query history, performance, and traces.                                                                                                                   |
 | Monitoring  | Access chat history                 | View other users' chat conversations for the deployment, including Analytics Chat and the Excel/Google Sheets add-in panes (**Admin → Chats History**).                  |
@@ -129,13 +130,13 @@ When **Full access** is checked, the granular checkboxes appear checked and disa
 
 <Tip>
 
-**Access deployment** (`DeploymentRead`), **Create scheduled tasks** (`ScheduledTasksCreate`), and **Download data** (`DownloadData`) do **not** auto-bump the Base Role to Developer, because Viewers also need them to open a deployment, schedule tasks in it, and download data from it.
+The actions that don't [auto-bump the Base Role](#auto-bump-to-developer) change neither the deployment's settings nor its data model, so a Viewer or Explorer role can hold them.
 
 </Tip>
 
 <Note>
 
-A custom role saved before **Create scheduled tasks** existed keeps it on every deployment where it can open the agent, and on every deployment if it has **Manage deployments (account-wide)**. The role editor shows it checked; saving the role with it unchecked withholds it. Permissions granted directly to a user or a group, rather than through a role, always include it wherever they open the agent.
+A custom role saved before **Create scheduled tasks** existed holds it on every deployment where the role grants **Access deployment** or **Access AI agents**, and on all deployments if it grants **Manage deployments (account-wide)**. The role editor shows it checked, and saving stores what the editor shows. To withhold it, uncheck it and save the role. Roles stack, so a user keeps it while any of their roles grants it.
 
 </Note>
 
@@ -263,7 +264,8 @@ This section lists every action a custom role can grant. The internal action nam
 | `SchemaRead`              | View data model                                             |
 | `SchemaUpdate`            | Edit data model                                             |
 | `SchemaUpdateDevBranches` | Edit data model on dev branches                             |
+| `DeploymentAgentRead`     | Access AI agents                                            |
+| `ScheduledTasksCreate`    | Create scheduled tasks                                      |
 | `APMRead`                 | Access query history                                        |
 | `ChatHistoryRead`         | Access chat history                                         |
 | `DownloadData`            | Download data                                               |
-| `ScheduledTasksCreate`    | Create scheduled tasks                                      |
