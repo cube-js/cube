@@ -157,8 +157,7 @@ export type PreAggTableToTempTable = [
 
 export type PreAggTableToTempTableNames = [string, { targetTableName: string; }];
 
-/** `refreshKeyIdentity`: sql, params, external, dataSource. */
-export type RefreshKeyIdentity = [string, string[], boolean, string];
+export type RefreshKeyIdentity = [sql: string, params: string[], external: boolean, dataSource: string];
 
 export type CacheKeyItem =
   string | string[] | boolean | QueryWithParams | QueryWithParams[] | RefreshKeyIdentity | undefined;
