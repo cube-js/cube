@@ -59,37 +59,36 @@ export interface LocalQueueItem {
    * update cannot mutate the def other connections are holding.
    */
   extra: Record<string, any> | null;
+  /**
+   * Resolved by the ack, every waiter of the run awaits the same promise. Goes away with the
+   * item when it is removed without an ack.
+   */
+  result: Promise<any>;
+  resolveResult: (value: any) => void;
 }
 
 /**
- * Mirrors Cube Store's QueueResult: the result of one run, kept under its id. Created along with
- * the item, so a waiter holds the promise before the ack.
+ * Mirrors Cube Store's QueueResult: written by the ack under the id of the run it belongs to.
  */
 export interface LocalQueueResult {
   id: number;
   key: QueryKeyHash;
-  /**
-   * Resolved by the ack and never replaced, so every waiter of the run gets the same value.
-   */
-  promise: Promise<any>;
-  resolve: (value: any) => void;
+  value: any;
   /**
    * Set once anybody took the result, after that only a lookup by id still serves it.
    * Cube Store's `deleted` flag.
    */
   deleted: boolean;
   /**
-   * Absolute deadline in ms, set by the ack.
+   * Absolute deadline in ms
    */
   expire: number;
 }
 
 /**
- * Results of the runs still in the queue, plus the acknowledged ones indexed by id and by key.
+ * Results indexed by run id and by key, both indexes are only ever updated together.
  */
 export class LocalQueueResults {
-  protected readonly pending: Map<number, LocalQueueResult> = new Map();
-
   /**
    * Insertion order is ack order, so the expired results are always at the front.
    */
@@ -100,51 +99,21 @@ export class LocalQueueResults {
    */
   protected readonly byKey: Map<QueryKeyHash, LocalQueueResult> = new Map();
 
-  public create(id: number, key: QueryKeyHash): void {
-    let resolve: ((value: any) => void) | undefined;
-    const promise = new Promise((r) => {
-      resolve = r;
-    });
-
-    this.pending.set(id, { id, key, promise, resolve: resolve!, deleted: false, expire: 0 });
-  }
-
-  /**
-   * A pending result as well as an acknowledged one, both can be awaited.
-   */
   public getById(id: number, now: number): LocalQueueResult | null {
-    const result = this.pending.get(id) || this.byId.get(id);
+    const result = this.byId.get(id);
 
-    return result && (!result.expire || result.expire >= now) ? result : null;
+    return result && result.expire >= now ? result : null;
   }
 
-  /**
-   * Only acknowledged results.
-   */
   public getByKey(key: QueryKeyHash, now: number): LocalQueueResult | null {
     const result = this.byKey.get(key);
 
     return result && result.expire >= now ? result : null;
   }
 
-  public ack(id: number, value: any, expire: number): void {
-    const result = this.pending.get(id);
-    if (!result) {
-      return;
-    }
-
-    this.pending.delete(id);
-    result.expire = expire;
-    this.byId.set(id, result);
+  public add(result: LocalQueueResult): void {
+    this.byId.set(result.id, result);
     this.byKey.set(result.key, result);
-    result.resolve(value);
-  }
-
-  /**
-   * The run won't be acknowledged. Its waiters time out on the promise they already hold.
-   */
-  public removePending(id: number): void {
-    this.pending.delete(id);
   }
 
   public removeExpired(now: number): void {
@@ -327,15 +296,17 @@ export class LocalQueueDriverConnection implements QueueDriverConnectionInterfac
     return now + this.continueWaitTimeout * 1000;
   }
 
-  protected async waitForResult(result: LocalQueueResult): Promise<any> {
+  protected async waitForResult(item: LocalQueueItem): Promise<any> {
     let timer: ReturnType<typeof setTimeout> | undefined;
     const timeout = new Promise((resolve) => {
       timer = setTimeout(() => resolve(null), this.continueWaitTimeout * 1000);
     });
 
     try {
-      const value = await Promise.race([result.promise, timeout]);
-      if (value) {
+      const value = await Promise.race([item.result, timeout]);
+
+      const result = value && this.state.results.getById(item.id, Date.now());
+      if (result) {
         // Like Cube Store's ready-to-delete: a key lookup of a later request must not be
         // answered with the result of a run that was already consumed
         result.deleted = true;
@@ -354,29 +325,32 @@ export class LocalQueueDriverConnection implements QueueDriverConnectionInterfac
   public async getResultBlocking(queryKeyHash: QueryKeyHash, queueId?: QueueId | null): Promise<any> {
     const now = Date.now();
 
-    if (!queueId) {
+    if (queueId) {
+      const result = this.state.results.getById(Number(queueId), now);
+      if (result) {
+        if (result.key !== queryKeyHash) {
+          return null;
+        }
+
+        result.deleted = true;
+        return result.value;
+      }
+    } else {
       const result = this.state.results.getByKey(queryKeyHash, now);
       if (result && !result.deleted) {
         result.deleted = true;
-        return result.promise;
+        return result.value;
       }
-
-      const item = this.state.items.getByKey(queryKeyHash);
-      if (!item) {
-        return null;
-      }
-
-      queueId = item.id;
     }
 
-    const result = this.state.results.getById(Number(queueId), now);
-    // With no result there is nothing that could ever resolve, so don't make the caller wait
-    // out the timeout
-    if (result?.key !== queryKeyHash) {
+    // With neither an item nor a result there is nothing that could ever resolve, so don't
+    // make the caller wait out the timeout
+    const item = this.resolveItem(queryKeyHash, queueId);
+    if (!item) {
       return null;
     }
 
-    return this.waitForResult(result);
+    return this.waitForResult(item);
   }
 
   /**
@@ -389,7 +363,7 @@ export class LocalQueueDriverConnection implements QueueDriverConnectionInterfac
     }
 
     result.deleted = true;
-    return result.promise;
+    return result.value;
   }
 
   public async addToQueue(
@@ -422,6 +396,11 @@ export class LocalQueueDriverConnection implements QueueDriverConnectionInterfac
 
     const id = this.state.items.nextId();
 
+    let resolveResult: ((value: any) => void) | undefined;
+    const result = new Promise((resolve) => {
+      resolveResult = resolve;
+    });
+
     const item: LocalQueueItem = {
       id,
       key,
@@ -441,10 +420,11 @@ export class LocalQueueDriverConnection implements QueueDriverConnectionInterfac
         addedToQueueTime: created,
       },
       extra: null,
+      result,
+      resolveResult: resolveResult!,
     };
 
     this.state.items.add(item);
-    this.state.results.create(id, key);
 
     return [
       1,
@@ -471,7 +451,6 @@ export class LocalQueueDriverConnection implements QueueDriverConnectionInterfac
     }
 
     this.state.items.remove(item);
-    this.state.results.removePending(item.id);
 
     return [this.mergeDef(item)];
   }
@@ -492,7 +471,14 @@ export class LocalQueueDriverConnection implements QueueDriverConnectionInterfac
 
     const now = Date.now();
     this.state.results.removeExpired(now);
-    this.state.results.ack(item.id, executionResult, this.resultExpire(now));
+    this.state.results.add({
+      id: item.id,
+      key: item.key,
+      value: executionResult,
+      deleted: false,
+      expire: this.resultExpire(now),
+    });
+    item.resolveResult(executionResult);
 
     return true;
   }
