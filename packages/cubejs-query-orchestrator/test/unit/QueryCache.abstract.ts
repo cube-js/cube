@@ -750,13 +750,13 @@ export const QueryCacheTest = (name: string, options: QueryCacheTestOptions) => 
         query: 'select data',
         values: ['value'],
         preAggregations: [],
-        invalidate: [],
+        invalidate: ['SELECT NOW()', [], false, 'default'],
         persistent: true,
       });
       expect(key1[0]).toEqual('select data');
       expect(key1[1]).toEqual(['value']);
       expect(key1[2]).toEqual([]);
-      expect(key1[3]).toEqual([]);
+      expect(key1[3]).toEqual(['SELECT NOW()', [], false, 'default']);
       // @ts-ignore
       expect(key1.persistent).toEqual(true);
 
@@ -764,13 +764,13 @@ export const QueryCacheTest = (name: string, options: QueryCacheTestOptions) => 
         query: 'select data',
         values: ['value'],
         preAggregations: [],
-        invalidate: [],
+        invalidate: ['SELECT NOW()', [], false, 'default'],
         persistent: false,
       });
       expect(key2[0]).toEqual('select data');
       expect(key2[1]).toEqual(['value']);
       expect(key2[2]).toEqual([]);
-      expect(key2[3]).toEqual([]);
+      expect(key2[3]).toEqual(['SELECT NOW()', [], false, 'default']);
       // @ts-ignore
       expect(key2.persistent).toEqual(false);
 

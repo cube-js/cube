@@ -3,7 +3,7 @@ import type { BaseDriver } from '@cubejs-backend/base-driver';
 import type { OmitKnown } from '@cubejs-backend/shared';
 import { QueryOrchestrator } from '../../src/orchestrator/QueryOrchestrator';
 import { LocalCacheDriver } from '../../src/orchestrator/LocalCacheDriver';
-import type { QueryBody } from '../../src/orchestrator/QueryCache';
+import type { QueryBody, QueryWithParams } from '../../src/orchestrator/QueryCache';
 import type { PreAggregationDescription, QueryDateRange } from '../../src/orchestrator/PreAggregations';
 
 type TestQueryBody = OmitKnown<QueryBody, 'preAggregations'> & {
@@ -13,6 +13,14 @@ type TestQueryBody = OmitKnown<QueryBody, 'preAggregations'> & {
 class TestQueryOrchestrator extends QueryOrchestrator {
   public fetchQuery(queryBody: TestQueryBody) {
     return super.fetchQuery(queryBody as QueryBody);
+  }
+
+  public queryStage(queryBody: TestQueryBody) {
+    return super.queryStage(queryBody as QueryBody);
+  }
+
+  public loadRefreshKeys(queryBody: TestQueryBody) {
+    return super.loadRefreshKeys(queryBody as QueryBody);
   }
 }
 
@@ -884,18 +892,19 @@ describe('QueryOrchestrator', () => {
   });
 
   test('in memory cache', async () => {
+    const cacheKeyQueries: QueryWithParams[] = [
+      ['SELECT NOW()', [], {
+        renewalThreshold: 21600,
+      }],
+      ['SELECT date_trunc(\'hour\', (NOW()::timestamptz AT TIME ZONE \'UTC\'))', [], {
+        renewalThreshold: 120,
+      }]
+    ];
     const query: TestQueryBody = {
       query: 'SELECT * FROM orders',
       values: [],
       cacheKeyQueries: {
-        queries: [
-          ['SELECT NOW()', [], {
-            renewalThreshold: 21600,
-          }],
-          ['SELECT date_trunc(\'hour\', (NOW()::timestamptz AT TIME ZONE \'UTC\'))', [], {
-            renewalThreshold: 120,
-          }]
-        ]
+        queries: cacheKeyQueries,
       },
       preAggregations: [{
         preAggregationsSchema: 'stb_pre_aggregations',
@@ -912,12 +921,12 @@ describe('QueryOrchestrator', () => {
     await queryOrchestrator.fetchQuery(query);
     expect(
       queryOrchestrator.getQueryCache().hasMemoryCacheEntry(
-        queryOrchestrator.getQueryCache().refreshKeyCacheKey(query.cacheKeyQueries.queries[0], 'default')
+        queryOrchestrator.getQueryCache().refreshKeyCacheKey(cacheKeyQueries[0], 'default')
       )
     ).toBe(true);
     expect(
       queryOrchestrator.getQueryCache().hasMemoryCacheEntry(
-        queryOrchestrator.getQueryCache().refreshKeyCacheKey(query.cacheKeyQueries.queries[1], 'default')
+        queryOrchestrator.getQueryCache().refreshKeyCacheKey(cacheKeyQueries[1], 'default')
       )
     ).toBe(false);
     expect(

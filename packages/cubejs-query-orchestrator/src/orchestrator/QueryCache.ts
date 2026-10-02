@@ -25,7 +25,8 @@ import { QueryQueue, QueryQueueOptions } from './QueryQueue';
 import { ContinueWaitError } from './ContinueWaitError';
 import { LocalCacheDriver } from './LocalCacheDriver';
 import { DriverFactory, DriverFactoryByDataSource } from './DriverFactory';
-import { LoadPreAggregationResult, PreAggregationDescription } from './PreAggregations';
+import { LambdaQuery, LoadPreAggregationResult, PreAggregationDescription } from './PreAggregations';
+import type { PreAggregationLoadCache } from './PreAggregationLoadCache';
 import {
   getCacheHash,
   evaluateLocalRefreshKey,
@@ -97,10 +98,10 @@ export type LoadRefreshKeyOptions = {
 
 export type Query = {
   requestId?: string;
-  dataSource: string;
+  dataSource?: string;
   preAggregations?: PreAggregationDescription[];
   groupedPartitionPreAggregations?: PreAggregationDescription[][];
-  preAggregationsLoadCacheByDataSource?: any;
+  preAggregationsLoadCacheByDataSource?: Record<string, PreAggregationLoadCache>;
   cacheMode?: CacheMode;
   compilerCacheFn?: <T>(subKey: string[], cacheFn: () => T) => T;
 };
@@ -118,14 +119,26 @@ export type QueryBody = {
   isJob?: boolean;
   forceNoCache?: boolean;
   preAggregations?: PreAggregationDescription[];
-  groupedPartitionPreAggregations?: PreAggregationDescription[][];
+  /** `null` streams rows with the SQL aliases as keys. */
   aliasNameToMember?: {
     [alias: string]: string;
+  } | null;
+  preAggregationsLoadCacheByDataSource?: Record<string, PreAggregationLoadCache>;
+  queuePriority?: number;
+  cacheKeyQueries?: QueryWithParams[] | {
+    queries?: QueryWithParams[];
+    renewalThreshold?: number;
   };
-  preAggregationsLoadCacheByDataSource?: {
-    [key: string]: any;
-  };
-  [key: string]: any;
+  expireSecs?: number;
+  invalidate?: RefreshKeyIdentity | false;
+  useCsvQuery?: boolean;
+  lambdaTypes?: TableStructure;
+  lambdaQueries?: Record<string, LambdaQuery>;
+  forceBuildPreAggregations?: boolean;
+  orphanedTimeout?: number;
+  metadata?: unknown;
+  timezone?: string;
+  context?: unknown;
 };
 
 /**
@@ -144,7 +157,10 @@ export type PreAggTableToTempTable = [
 
 export type PreAggTableToTempTableNames = [string, { targetTableName: string; }];
 
-export type CacheKeyItem = string | string[] | boolean | QueryWithParams | QueryWithParams[] | undefined;
+export type RefreshKeyIdentity = [sql: string, params: string[], external: boolean, dataSource: string];
+
+export type CacheKeyItem =
+  string | string[] | boolean | QueryWithParams | QueryWithParams[] | RefreshKeyIdentity | undefined;
 
 export type CacheKey =
   [CacheKeyItem, CacheKeyItem] |
@@ -298,7 +314,9 @@ export class QueryCache {
         preAggregationsTablesToTempTables,
       ));
 
-    const renewalThreshold = queryBody.cacheKeyQueries?.renewalThreshold;
+    const renewalThreshold = Array.isArray(queryBody.cacheKeyQueries)
+      ? undefined
+      : queryBody.cacheKeyQueries?.renewalThreshold;
 
     const expireSecs = this.getExpireSecs(queryBody);
 
@@ -452,9 +470,12 @@ export class QueryCache {
   }
 
   private cacheKeyQueriesFrom(queryBody: QueryBody): QueryWithParams[] {
-    return queryBody.cacheKeyQueries?.queries ||
-      queryBody.cacheKeyQueries ||
-      [];
+    const { cacheKeyQueries } = queryBody;
+    if (Array.isArray(cacheKeyQueries)) {
+      return cacheKeyQueries;
+    }
+
+    return cacheKeyQueries?.queries || [];
   }
 
   public static queryCacheKey(queryBody: QueryBody): CacheKey {
@@ -481,7 +502,7 @@ export class QueryCache {
   public static refreshKeyIdentity(
     sqlQuery: QueryWithParams,
     dataSource: string,
-  ): [string, string[], boolean, string] {
+  ): RefreshKeyIdentity {
     const [query, values, options] = sqlQuery;
     // Both spellings of each default have to collapse to one key: producers write "source database"
     // as `false` or as an absent option, and `getQueue` resolves an absent `dataSource` to `default`.
@@ -496,7 +517,7 @@ export class QueryCache {
    */
   public static buildRangeInvalidateKey(
     preAggregation: { invalidateKeyQueries?: QueryWithParams[], dataSource?: string },
-  ): [string, string[], boolean, string] | false {
+  ): RefreshKeyIdentity | false {
     const keyQuery = preAggregation.invalidateKeyQueries?.[0];
     return keyQuery ? QueryCache.refreshKeyIdentity(keyQuery, preAggregation.dataSource) : false;
   }
@@ -612,7 +633,7 @@ export class QueryCache {
       useCsvQuery?: boolean,
       lambdaTypes?: TableStructure,
       persistent?: boolean,
-      aliasNameToMember?: { [alias: string]: string },
+      aliasNameToMember?: { [alias: string]: string } | null,
     }
   ) {
     const queue = external
@@ -992,7 +1013,7 @@ export class QueryCache {
       ));
   }
 
-  public async loadRefreshKeysFromQuery(query: Query) {
+  public async loadRefreshKeysFromQuery(query: QueryBody) {
     return Promise.all(
       this.loadRefreshKeys(
         this.cacheKeyQueriesFrom(query),
@@ -1287,7 +1308,7 @@ export class QueryCache {
     return cachedValue && new Date(cachedValue.time);
   }
 
-  public async resultFromCacheIfExists(queryBody) {
+  public async resultFromCacheIfExists(queryBody: QueryBody) {
     const cacheKey = QueryCache.queryCacheKey(queryBody);
     const cachedValue = await this.cacheDriver.get(this.queryCacheKey(cacheKey));
     if (cachedValue) {

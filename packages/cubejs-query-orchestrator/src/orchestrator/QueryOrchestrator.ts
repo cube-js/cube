@@ -9,7 +9,7 @@ import {
   QueryKey
 } from '@cubejs-backend/base-driver';
 
-import { QueryCache, QueryBody, TempTable, PreAggTableToTempTable, QueryWithParams, CacheKey } from './QueryCache';
+import { QueryCache, Query, QueryBody, TempTable, PreAggTableToTempTable, QueryWithParams, CacheKey } from './QueryCache';
 import { PreAggregations, PreAggregationDescription, getLastUpdatedAtTimestamp } from './PreAggregations';
 import { DriverFactory, DriverFactoryByDataSource } from './DriverFactory';
 import { QueryStream } from './QueryStream';
@@ -293,11 +293,11 @@ export class QueryOrchestrator {
     };
   }
 
-  public async loadRefreshKeys(query) {
+  public async loadRefreshKeys(query: QueryBody) {
     return this.queryCache.loadRefreshKeysFromQuery(query);
   }
 
-  public async queryStage(queryBody: any) {
+  public async queryStage(queryBody: QueryBody) {
     const preAggregationsQueryStageStateByDataSource = {};
 
     const preAggregationsQueryStageState = async (dataSource) => {
@@ -345,7 +345,7 @@ export class QueryOrchestrator {
     }
   }
 
-  public resultFromCacheIfExists(queryBody: any) {
+  public resultFromCacheIfExists(queryBody: QueryBody) {
     return this.queryCache.resultFromCacheIfExists(queryBody);
   }
 
@@ -424,11 +424,11 @@ export class QueryOrchestrator {
     return data || [];
   }
 
-  public async expandPartitionsInPreAggregations(queryBody) {
+  public async expandPartitionsInPreAggregations(queryBody: Query) {
     return this.preAggregations.expandPartitionsInPreAggregations(queryBody);
   }
 
-  public async checkPartitionsBuildRangeCache(queryBody) {
+  public async checkPartitionsBuildRangeCache(queryBody: QueryBody) {
     return this.preAggregations.checkPartitionsBuildRangeCache(queryBody);
   }
 

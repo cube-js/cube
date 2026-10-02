@@ -378,7 +378,6 @@ export class RefreshScheduler {
         const sqlQuery = await compilerApi.getSql(query);
         await orchestratorApi.executeQuery({
           ...sqlQuery,
-          sql: null,
           preAggregations: [],
           cacheMode: 'must-revalidate',
           requestId: context.requestId,

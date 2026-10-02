@@ -201,7 +201,7 @@ export type LambdaOptions = {
 
 export type LambdaQuery = {
   sqlAndParams: QueryWithParams,
-  cacheKeyQueries: any[],
+  cacheKeyQueries: QueryWithParams[],
 };
 
 export type PreAggregationDescription = {
@@ -283,12 +283,6 @@ type PreAggregationsOptions = {
   continueWaitTimeout?: number;
   cacheAndQueueDriver?: CacheAndQueryDriverType;
   skipExternalCacheAndQueue?: boolean;
-};
-
-type PreAggregationQueryBody = QueryBody & {
-  preAggregationsLoadCacheByDataSource?: {
-    [key: string]: PreAggregationLoadCache,
-  };
 };
 
 export class PreAggregations {
@@ -599,7 +593,7 @@ export class PreAggregations {
   }
 
   public async loadAllPreAggregationsIfNeeded(
-    queryBody: PreAggregationQueryBody,
+    queryBody: QueryBody,
   ): Promise<{
     preAggregationsTablesToTempTables: PreAggTableToTempTable[],
     values: null | string[],
@@ -707,7 +701,7 @@ export class PreAggregations {
    * Determines whether range queries for the preAggregations from the
    * queryBody were cached or not.
    */
-  public async checkPartitionsBuildRangeCache(queryBody) {
+  public async checkPartitionsBuildRangeCache(queryBody: QueryBody) {
     const preAggregations = queryBody.preAggregations || [];
     return Promise.all(
       preAggregations.map(async (preAggregation) => {
