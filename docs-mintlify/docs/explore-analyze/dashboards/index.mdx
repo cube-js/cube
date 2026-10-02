@@ -157,17 +157,22 @@ out, the print version rebuilds it for A4 pages:
   to bottom, then left to right. Widgets inside a [layout
   container][ref-layout] print in the same flow, and a tabs container prints
   the widgets of **every** tab, in tab order, not only the tab on screen.
-- A table prints every row its query returned, fitted to the page width, and
+- A table prints every row its query returned, not only the rows its box
+  shows on the dashboard, fitted to the page width and under the column names
+  the dashboard shows. Unless it is one of the tables in the note below, it
   continues onto the following pages with its column headers repeated at the
-  top of each. A table row is never split between two pages.
+  top of each, and none of its rows is split between two pages.
 - A chart, KPI, text or AI summary block that doesn't fit in the space left on
   a page starts on the next page instead of being cut in two.
 
 <Info>
 
-A **pivoted** table is the exception to the table rule above: it prints as a
-fixed-height grid, the way it looks on the dashboard, so a long one shows only
-its first rows.
+A table with a dimension in its pivot's **Columns** or its measure names run
+down the side ([Pivots][ref-table-pivots]), or with [totals][ref-table-totals],
+subtotals or [row grouping][ref-table-row-grouping], prints as the grid the
+dashboard shows: every row, the totals row included, but its column headers
+appear once, above its first row, and are not repeated on the pages it
+continues onto.
 
 </Info>
 
@@ -182,6 +187,9 @@ offer it: they always render the on-screen layout.
 [ref-control-visibility]: /docs/explore-analyze/dashboards/widgets/controls#visibility
 [ref-control-data-defaults]: /docs/explore-analyze/dashboards/widgets/controls#defaults-resolved-from-the-data
 [ref-layout]: /docs/explore-analyze/dashboards/widgets/layout
+[ref-table-pivots]: /docs/explore-analyze/charts/chart-types/table#pivots
+[ref-table-totals]: /docs/explore-analyze/charts/chart-types/table#totals
+[ref-table-row-grouping]: /docs/explore-analyze/charts/chart-types/table#row-grouping
 [ref-dimension-links]: /docs/data-modeling/dimensions#links
 [ref-notifications]: /docs/explore-analyze/notifications
 [ref-scheduled-refreshes]: /docs/explore-analyze/scheduled-refreshes
