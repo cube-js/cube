@@ -494,23 +494,23 @@ jobs:
       fail-fast: false
       matrix:
         include:
+          # amd64 and arm64 are pushed by digest and merged into one multi-arch
+          # manifest by docker-cubestore-manifest.
           - os: ubuntu-24.04
-            target: x86_64-unknown-linux-gnu
+            arch: amd64
             platforms: linux/amd64
             build-args: WITH_AVX2=1
-            postfix: ""
-            tag: "latest"
+            multiarch: true
           - os: ubuntu-24.04-arm
-            target: aarch64-unknown-linux-gnu
+            arch: arm64
             platforms: linux/arm64
             build-args: WITH_AVX2=0
-            postfix: "-arm64v8"
-            tag: "arm64v8"
-          # Non AVX build
+            multiarch: true
           - os: ubuntu-24.04
-            target: x86_64-unknown-linux-gnu
+            arch: amd64-non-avx
             platforms: linux/amd64
             build-args: WITH_AVX2=0
+            multiarch: false
             postfix: "-non-avx"
             tag: "non-avx"
     timeout-minutes: 60
@@ -530,8 +530,6 @@ jobs:
             return data
       - name: Prepare
         id: prep
-        env:
-          GITHUB_SHA: ${{ github.sha }}
         run: |
           DOCKER_IMAGE=cubejs/cubestore
           VERSION=noop
@@ -567,16 +565,17 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v4
       - name: Push to Docker Hub
+        id: build
         uses: docker/build-push-action@v7
         with:
           context: ./rust/
           file: ./rust/cubestore/Dockerfile
           platforms: ${{ matrix.platforms }}
           build-args: ${{ matrix.build-args }}
-          push: true
-          tags: ${{ steps.prep.outputs.tags }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          tags: ${{ !matrix.multiarch && steps.prep.outputs.tags || '' }}
+          outputs: ${{ matrix.multiarch && 'type=image,name=cubejs/cubestore,push-by-digest=true,name-canonical=true,push=true' || 'type=image,push=true' }}
+          cache-from: type=gha,scope=cubestore-${{ matrix.arch }}
+          cache-to: type=gha,mode=max,scope=cubestore-${{ matrix.arch }}
           labels: |
             org.opencontainers.image.title=${{ fromJson(steps.repo.outputs.result).name }}
             org.opencontainers.image.description=${{ fromJson(steps.repo.outputs.result).description }}
@@ -586,6 +585,89 @@ jobs:
             org.opencontainers.image.created=${{ steps.prep.outputs.created }}
             org.opencontainers.image.revision=${{ github.sha }}
             org.opencontainers.image.licenses=${{ fromJson(steps.repo.outputs.result).license.spdx_id }}
+      - name: Export digest
+        if: matrix.multiarch
+        env:
+          DIGEST: ${{ steps.build.outputs.digest }}
+        run: |
+          mkdir -p "${{ runner.temp }}/digests"
+          touch "${{ runner.temp }}/digests/${DIGEST#sha256:}"
+      - name: Upload digest
+        if: matrix.multiarch
+        uses: actions/upload-artifact@v7
+        with:
+          name: cubestore-digests-${{ matrix.arch }}
+          path: ${{ runner.temp }}/digests/*
+          if-no-files-found: error
+          retention-days: 1
+
+  docker-cubestore-manifest:
+    name: Cube Store Docker (multi-arch manifest)
+    runs-on: ubuntu-24.04
+    needs: [docker-cubestore, detect_branch]
+    timeout-minutes: 15
+    steps:
+      - name: Check out the repo
+        uses: actions/checkout@v7
+      - name: Download digests
+        uses: actions/download-artifact@v8
+        with:
+          path: ${{ runner.temp }}/digests
+          pattern: cubestore-digests-*
+          merge-multiple: true
+      - name: Prepare
+        id: prep
+        run: |
+          DOCKER_IMAGE=cubejs/cubestore
+          VERSION=noop
+
+          if [ "${{ github.event_name }}" = "schedule" ]; then
+            VERSION=nightly
+          elif [[ $GITHUB_REF == refs/tags/* ]]; then
+            VERSION=${GITHUB_REF#refs/tags/}
+          fi
+
+          TAGS=("${VERSION}")
+
+          if [[ $VERSION =~ ^v[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}$ ]]; then
+            MINOR=${VERSION%.*}
+            MAJOR=${MINOR%.*}
+            TAGS+=("${MINOR}" "${MAJOR}")
+          fi
+
+          # -arm64v8 tags used to be a separate arm64-only image, keep them as
+          # aliases of the multi-arch manifest so existing pins keep working.
+          FLAGS=""
+          for TAG in "${TAGS[@]}"; do
+            FLAGS="$FLAGS -t ${DOCKER_IMAGE}:${TAG} -t ${DOCKER_IMAGE}:${TAG}-arm64v8"
+          done
+
+          if [ "${{ needs['detect_branch'].outputs.is_master }}" = "true" ]; then
+            FLAGS="$FLAGS -t ${DOCKER_IMAGE}:latest -t ${DOCKER_IMAGE}:arm64v8"
+          fi
+
+          {
+            echo "image=${DOCKER_IMAGE}"
+            echo "version=${VERSION}"
+            echo "flags=${FLAGS}"
+          } >> "$GITHUB_OUTPUT"
+      - name: Login to DockerHub
+        uses: docker/login-action@v4
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4
+      - name: Create manifest list and push
+        working-directory: ${{ runner.temp }}/digests
+        env:
+          IMAGE: ${{ steps.prep.outputs.image }}
+          FLAGS: ${{ steps.prep.outputs.flags }}
+        run: |
+          # shellcheck disable=SC2046,SC2086
+          docker buildx imagetools create $FLAGS $(printf "${IMAGE}@sha256:%s " *)
+      - name: Inspect image
+        run: docker buildx imagetools inspect ${{ steps.prep.outputs.image }}:${{ steps.prep.outputs.version }}
       - name: Update repo description
         uses: peter-evans/dockerhub-description@v5
         with:
