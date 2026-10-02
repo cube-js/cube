@@ -261,12 +261,13 @@ def memo(func):
             loop = asyncio.get_running_loop()
             with lock:
                 entry = results.get(key)
-                if entry is None or (entry[0] is not loop and not entry[1].done()):
+                if entry is None or entry[1].cancelled() or (entry[0] is not loop and not entry[1].done()):
                     # A task, so concurrent calls on the loop share one invocation
                     entry = (loop, asyncio.ensure_future(func(*args, **kwargs)))
                     results[key] = entry
             task = entry[1]
-            return task.result() if task.done() else await task
+            # Shielded: cancelling one caller mustn't cancel the task the others share
+            return task.result() if task.done() else await asyncio.shield(task)
 
         return async_wrapper
 
