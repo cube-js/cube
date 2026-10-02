@@ -5,7 +5,6 @@ import inspect
 import json
 import os
 import threading
-import weakref
 from typing import Union, Callable, Dict, Any
 
 
@@ -263,15 +262,19 @@ def memo(func):
         raise TemplateException("memo must be used with functions, actual: '%s'" % type(func).__name__)
 
     # Exceptions are stored too: every template sees the same outcome
-    per_context = weakref.WeakKeyDictionary()
+    # The cache of each compilation lives on its TemplateContext: what the results reference (a
+    # traceback's frames, a task's copied contextvars) leads back to it, which makes a cycle the
+    # GC frees with the context rather than a reference keeping the context alive
+    owner = object()
     # Held only to look entries up: a call runs under the lock of its own key and context, so
     # other compilations and other arguments don't wait for it
     lock = threading.Lock()
 
     def results(context):
-        stored = per_context.get(context)
+        caches = context.__dict__.setdefault('_cube_memo_caches', {})
+        stored = caches.get(owner)
         if stored is None:
-            stored = per_context[context] = {}
+            stored = caches[owner] = {}
         return stored
 
     def key_lock(context, key):
@@ -283,8 +286,7 @@ def memo(func):
             return entry
 
     def settle(stored, key, entry, task):
-        # Only the outcome stays: the task holds a copy of the contextvars, and so the
-        # TemplateContext keying this cache, which then could never be dropped
+        # Only the outcome stays, not the task and its event loop
         with lock:
             if stored.get(key) is entry:
                 if task.cancelled():
