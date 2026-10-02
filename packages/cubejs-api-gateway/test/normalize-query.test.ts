@@ -5,6 +5,7 @@ import {
   normalizeQueryPreAggregations,
   normalizeQueryPreAggregationPreview,
 } from '../src/query';
+import { ResultType } from '../src/types/enums';
 
 const baseQuery = {
   measures: ['Foo.count'],
@@ -15,13 +16,13 @@ describe('responseFormat validation', () => {
   test.each(['default', 'compact', 'columnar'])(
     'accepts responseFormat=%s',
     (responseFormat) => {
-      const result = normalizeQuery({ ...baseQuery, responseFormat }, false);
+      const result = normalizeQuery({ ...baseQuery, responseFormat: responseFormat as ResultType }, false);
       expect(result.responseFormat).toBe(responseFormat);
     }
   );
 
   test('rejects unknown responseFormat', () => {
-    expect(() => normalizeQuery({ ...baseQuery, responseFormat: 'arrow' }, false)).toThrow(/Invalid query format/);
+    expect(() => normalizeQuery({ ...baseQuery, responseFormat: 'arrow' as any }, false)).toThrow(/Invalid query format/);
   });
 });
 
