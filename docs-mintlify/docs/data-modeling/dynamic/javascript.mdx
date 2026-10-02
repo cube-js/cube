@@ -178,7 +178,10 @@ const dynamicCubes = await memo(async () =>
 );
 ```
 
-Pass a key explicitly to share one result between several call sites or files.
+Pass a key explicitly to share one result between several call sites or files,
+or when the call is in a function or a loop: its result likely depends on the
+arguments, e.g., `memo(["columns", table], fn)`. A keyless `memo(fn)` that runs
+more than once per compilation stage is an error.
 
 The function passed to `memo()` should only fetch and return data. Calling
 `cube()`, `view()`, `context()` or `asyncModule()` from it is an error, as the

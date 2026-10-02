@@ -15,7 +15,7 @@ import { UserError } from './UserError';
 import { ErrorReporter, ErrorReporterOptions, SyntaxErrorInterface } from './ErrorReporter';
 import { CONTEXT_SYMBOLS, CubeDefinition, CubeSymbols } from './CubeSymbols';
 import { ViewCompilationGate } from './ViewCompilationGate';
-import { TranspilerInterface } from './transpilers';
+import { MemoKeyTranspiler, TranspilerInterface } from './transpilers';
 import { CompilerInterface } from './PrepareCompiler';
 import { YamlCompiler } from './YamlCompiler';
 import { CubeDictionary } from './CubeDictionary';
@@ -588,6 +588,9 @@ export class DataSchemaCompiler {
     // the model is evaluated once per stage, and `memo` makes it do a costly call (an API request
     // from an `asyncModule`, say) only once per compile.
     const memoResults = new Map<string, { value: unknown } | { error: unknown }>();
+    // Stage that last looked up each key MemoKeyTranspiler generated
+    const memoCallSiteStages = new Map<string, number>();
+    let memoStage = -1;
 
     // Model objects go to the current stage only, while a memoized function runs in the first stage
     // that asks for its key: objects defined from there would be missing from all later stages.
@@ -702,12 +705,30 @@ export class DataSchemaCompiler {
         if (typeof cacheKey !== 'string') {
           throw new Error('memo() expects a string or a JSON-serializable key as its first argument');
         }
+        const callSite = MemoKeyTranspiler.callSiteOf(key);
+        const label = callSite ?? (typeof key === 'string' ? key : cacheKey);
+        if (memoStage < 0) {
+          // Called from a member evaluated after the compile (`sql: () => memo(...)`): there's no
+          // compile to cache for
+          return memoFnStorage.run(label, fn);
+        }
+        if (callSite !== undefined) {
+          // A top-level call site runs once per stage: twice means it's in a function or a loop,
+          // where the one key would give every call the result of the first one
+          if (memoCallSiteStages.get(cacheKey) === memoStage) {
+            throw new UserError(
+              `memo() at ${callSite} is called more than once per compile stage: as it's in a function or a loop, ` +
+              'its result may depend on the arguments: pass a key that does, e.g. memo([\'table\', name], fn)'
+            );
+          }
+          memoCallSiteStages.set(cacheKey, memoStage);
+        }
         let result = memoResults.get(cacheKey);
         if (!result) {
           // A promise is stored as is, so concurrent and later calls share one invocation.
           // A throw is stored too: every stage has to see the same outcome.
           try {
-            result = { value: memoFnStorage.run(typeof key === 'string' ? key : cacheKey, fn) };
+            result = { value: memoFnStorage.run(label, fn) };
           } catch (error) {
             result = { error };
           }
@@ -761,6 +782,7 @@ export class DataSchemaCompiler {
     const compilePhaseFirst = async (compilers: CompileCubeFilesCompilers, stage: 0 | 1 | 2 | 3) => {
       // clear the objects for the next phase
       cleanup();
+      memoStage = stage;
       transpiledFiles = await transpilePhaseFirst(stage);
 
       // We render jinja and transpile yaml only once on first phase and then use resulting JS for these files
@@ -774,6 +796,7 @@ export class DataSchemaCompiler {
     const compilePhase = async (compilers: CompileCubeFilesCompilers, stage: 0 | 1 | 2 | 3) => {
       // clear the objects for the next phase
       cleanup();
+      memoStage = stage;
       transpiledFiles = await transpilePhase(stage);
 
       return this.compileCubeFiles(cubes, contexts, viewGroups, compiledFiles, asyncModules, compilers, transpiledFiles, errorsReport);
@@ -819,7 +842,11 @@ export class DataSchemaCompiler {
         }
       })
       // A failed compile mustn't keep the fetched data either
-      .finally(() => memoResults.clear());
+      .finally(() => {
+        memoStage = -1;
+        memoResults.clear();
+        memoCallSiteStages.clear();
+      });
 
     // Every continuation of the compile (asyncModule callbacks included) sees its scope
     return this.compileScope ? sharedScopeStorage.run(this.compileScope, compileAll) : compileAll();

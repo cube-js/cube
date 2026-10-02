@@ -52,10 +52,14 @@ describe('Transpilers', () => {
     babelTraverse(ast, new MemoKeyTranspiler().traverseObject(new ErrorReporter()));
 
     expect(babelGenerator(ast, {}, content).code.split('\n')).toEqual([
-      'memo("orders.js:1:0", () => fetchColumns());',
+      'memo({',
+      '  callSite: "orders.js:1:0"',
+      '}, () => fetchColumns());',
       'memo(async () => 1, 2);',
       "memo('key', () => 1);",
-      'memo("orders.js:4:0", fetchTable);',
+      'memo({',
+      '  callSite: "orders.js:4:0"',
+      '}, fetchTable);',
       'function local() {',
       '  const memo = fn => fn();',
       '  return memo(() => 1);',

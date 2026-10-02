@@ -202,6 +202,79 @@ describe.each([
     expect(cubeEvaluator.cubeFromPath('orders').sqlTable!()).toMatch(/^orders_\d$/);
   });
 
+  it.each([
+    ['a function', `
+      const tableFor = (name) => memo(() => COMPILE_CONTEXT.tableFor(name));
+      const tables = [tableFor('orders'), tableFor('users')];
+    `],
+    ['a loop', `
+      const tables = [];
+      for (const name of ['orders', 'users']) {
+        tables.push(memo(() => COMPILE_CONTEXT.tableFor(name)));
+      }
+    `],
+  ])('rejects a keyless memo() in %s', async (_place, content) => {
+    const { compiler } = prepareCompiler([{ fileName: 'orders.js', content }], {
+      compileContext: { tableFor: (name: string) => name },
+      sharedVmContext,
+    });
+
+    await expect(compiler.compile()).rejects.toThrow(/memo\(\) at orders\.js:\d+:\d+ is called more than once per compile stage/);
+  });
+
+  it('allows a keyless memo() in a function called once per stage', async () => {
+    const calls: string[] = [];
+    const { compiler, cubeEvaluator } = prepareCompiler([{
+      fileName: 'orders.js',
+      content: `
+        const tableFor = (name) => memo(() => COMPILE_CONTEXT.tableFor(name));
+        // sql_table itself is evaluated lazily, after the compile
+        const table = tableFor('orders');
+        cube('orders', { sql_table: table, measures: { count: { type: 'count' } } });
+      `,
+    }], {
+      compileContext: {
+        tableFor: (name: string) => {
+          calls.push(name);
+          return `${name}_table`;
+        },
+      },
+      sharedVmContext,
+    });
+    await compiler.compile();
+
+    expect(calls).toEqual(['orders']);
+    expect(cubeEvaluator.cubeFromPath('orders').sqlTable!()).toEqual('orders_table');
+  });
+
+  it('calls the function each time from members evaluated after the compile', async () => {
+    const calls: string[] = [];
+    const { compiler, cubeEvaluator } = prepareCompiler([{
+      fileName: 'orders.js',
+      content: `
+        cube('orders', {
+          sql_table: memo(() => COMPILE_CONTEXT.tableFor('orders')),
+          measures: { count: { type: 'count' } },
+        });
+      `,
+    }], {
+      compileContext: {
+        tableFor: (name: string) => {
+          calls.push(name);
+          return `${name}_table`;
+        },
+      },
+      sharedVmContext,
+    });
+    await compiler.compile();
+    const callsAfterCompile = calls.length;
+
+    const orders = cubeEvaluator.cubeFromPath('orders');
+    expect(orders.sqlTable!()).toEqual('orders_table');
+    expect(orders.sqlTable!()).toEqual('orders_table');
+    expect(calls.length).toEqual(callsAfterCompile + 2);
+  });
+
   it('reports invalid arguments', async () => {
     const { compiler } = prepareCompiler([{
       fileName: 'orders.js',
@@ -234,7 +307,7 @@ describe.each([
     ['undefined', 'undefined'],
     ['a BigInt', '10n'],
     ['a cyclic structure', '(() => { const o = {}; o.o = o; return o; })()'],
-  ])('reports %s key', async (_name, key) => {
+  ])('reports %s key', async (_kind, key) => {
     const { compiler } = prepareCompiler([{
       fileName: 'orders.js',
       content: `memo(${key}, () => 1);`,
