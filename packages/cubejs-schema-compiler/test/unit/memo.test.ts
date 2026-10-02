@@ -276,6 +276,46 @@ describe.each([
     expect(calls.length).toEqual(callsAfterCompile + 2);
   });
 
+  it('calls the function from members that compilers evaluate', async () => {
+    const calls: string[] = [];
+    const joined = (name: string) => `
+      cube('${name}', {
+        sql_table: '${name}',
+        joins: { users: { relationship: 'many_to_one', sql: \`\${CUBE}.user_id = \${users}.id\` } },
+        measures: { count: { type: 'count' } },
+        dimensions: { id: { sql: 'id', type: 'number', primary_key: true } },
+      });
+    `;
+    const { compiler } = prepareCompiler([{
+      fileName: 'users.js',
+      content: `
+        cube('users', {
+          sql_table: 'users',
+          // The join graph evaluates it once per joining cube
+          measures: { total: { sql: memo(() => COMPILE_CONTEXT.columnFor('total')), type: 'sum' } },
+          dimensions: { id: { sql: 'id', type: 'number', primary_key: true } },
+        });
+      `,
+    }, {
+      fileName: 'orders.js',
+      content: joined('orders'),
+    }, {
+      fileName: 'items.js',
+      content: joined('items'),
+    }], {
+      compileContext: {
+        columnFor: (name: string) => {
+          calls.push(name);
+          return name;
+        },
+      },
+      sharedVmContext,
+    });
+
+    await compiler.compile();
+    expect(calls.length).toBeGreaterThanOrEqual(2);
+  });
+
   it('reports invalid arguments', async () => {
     const { compiler } = prepareCompiler([{
       fileName: 'orders.js',

@@ -707,9 +707,9 @@ export class DataSchemaCompiler {
         }
         const callSite = MemoKeyTranspiler.callSiteOf(key);
         const label = callSite ?? (typeof key === 'string' ? key : cacheKey);
-        if (memoStage < 0) {
-          // Called from a member evaluated after the compile (`sql: () => memo(...)`): there's no
-          // compile to cache for
+        if (memoStage < 0 || !ctxFileStorage.getStore()) {
+          // Called from a member (`sql: () => memo(...)`) evaluated by a compiler or a query, not
+          // from a model file: it may run any number of times, so there's no stage to cache for
           return memoFnStorage.run(label, fn);
         }
         if (callSite !== undefined) {

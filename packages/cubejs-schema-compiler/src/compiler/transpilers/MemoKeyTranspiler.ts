@@ -4,11 +4,8 @@ import type { TranspilerInterface, TraverseObject } from './transpiler.interface
 import type { ErrorReporter } from '../ErrorReporter';
 
 /**
- * MemoKeyTranspiler lets `memo(fn)` omit its key: it inserts one made of the file name and the
- * position of the call, `memo({ callSite: 'orders.js:12:8' }, fn)`. The key has to be the same
- * every time the file is evaluated, as each compile stage evaluates it again and looks the result
- * up by it. Being marked as a call site, it lets `memo` reject a call site that runs more than
- * once per stage (in a function or a loop).
+ * Gives `memo(fn)` the key `{ callSite: 'orders.js:12:8' }`: it must be the same every time the file
+ * is evaluated, as each compile stage evaluates it again and looks the result up by it.
  */
 export class MemoKeyTranspiler implements TranspilerInterface {
   public static callSiteOf(key: unknown): string | undefined {
