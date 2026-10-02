@@ -1,3 +1,5 @@
+import { isNativeSupported } from '@cubejs-backend/shared';
+
 import { prepareCompiler } from './PrepareCompiler';
 
 type Files = { fileName: string, content: string }[];
@@ -395,5 +397,44 @@ describe.each([
     }], { sharedVmContext });
 
     await expect(compiler.compile()).rejects.toThrow('memo() expects a key as its first argument: memo(key, fn)');
+  });
+});
+
+const pythonSuite = isNativeSupported() === true ? describe : xdescribe;
+
+pythonSuite('Python memo', () => {
+  const files = (): Files => [{
+    fileName: 'globals.py',
+    content: `
+from cube import TemplateContext, memo
+
+template = TemplateContext()
+calls = []
+
+
+@template.function('table_for')
+@memo
+def table_for(name):
+    calls.append(name)
+    return name + '_' + str(len(calls))
+`,
+  }, ...['orders', 'users'].map((name) => ({
+    fileName: `${name}.yml.jinja`,
+    content: `
+cubes:
+  - name: ${name}
+    sql_table: {{ table_for('shared') }}
+    measures:
+      - name: count
+        type: count
+`,
+  }))];
+
+  it('calls a memoized globals.py function once per arguments across model files', async () => {
+    const { compiler, cubeEvaluator } = prepareCompiler(files());
+    await compiler.compile();
+
+    expect(cubeEvaluator.cubeFromPath('orders').sqlTable!()).toEqual('shared_1');
+    expect(cubeEvaluator.cubeFromPath('users').sqlTable!()).toEqual('shared_1');
   });
 });

@@ -847,6 +847,8 @@ export class DataSchemaCompiler {
         memoStage = -1;
         memoResults.clear();
         memoCallSiteStages.clear();
+        // Python @memo caches live on the globals.py functions this holds
+        this.pythonContext = null;
       });
 
     // Every continuation of the compile (asyncModule callbacks included) sees its scope
