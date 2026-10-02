@@ -294,7 +294,7 @@ export function resolveDateRange(input: unknown, timezone: string): unknown {
     return input;
   }
 
-  return dateRange && dateRange.map(
+  return dateRange.map(
     (d, i) => (
       i === 0 ?
         moment.utc(d).format(d.match(DateRegex) ? 'YYYY-MM-DDT00:00:00.000' : moment.HTML5_FMT.DATETIME_LOCAL_MS) :
@@ -407,10 +407,7 @@ const normalizeQueryFilters = (filter: FilterInput[], timezone: string): FilterI
   })
 );
 
-/**
- * Parse incoming member expression
- * @throws {UserError}
- */
+/** @throws {UserError} */
 function parseInputMemberExpression(expression: unknown): InputMemberExpression {
   const { error } = inputMemberExpression.validate(expression);
   if (error) {
@@ -433,10 +430,7 @@ function normalizeQueryCacheMode(query: Query, cacheMode?: CacheMode): Query {
   return query;
 }
 
-/**
- * Normalize incoming network query.
- * @throws {UserError}
- */
+/** @throws {UserError} */
 const normalizeQuery = (query: Query, persistent?: boolean, cacheMode?: CacheMode): NormalizedQuery => {
   query = normalizeQueryCacheMode(query, cacheMode);
   query.timezone = query.timezone || getEnv('defaultTimezone');
@@ -481,6 +475,7 @@ const normalizeQuery = (query: Query, persistent?: boolean, cacheMode?: CacheMod
 
   return {
     ...query,
+    // order stays in [member, direction] tuple form until remapToQueryAdapterFormat, despite NormalizedQuery['order']
     ...(query.order ? { order: normalizeQueryOrder(query.order) } : {}),
     limit: newLimit,
     timezone,
