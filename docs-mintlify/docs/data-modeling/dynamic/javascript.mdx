@@ -183,7 +183,9 @@ Pass a key explicitly to share one result between several call sites or files.
 The function passed to `memo()` should only fetch and return data. Calling
 `cube()`, `view()`, `context()` or `asyncModule()` from it is an error, as the
 function doesn't run again in later compilation stages. Define the model objects
-from the returned data outside of `memo()`, as in the example above.
+from the returned data outside of `memo()`, as in the example above. Every
+stage gets the same returned object, so don't mutate it or pass it to `cube()`
+as is: build new definitions from it instead.
 
 ## Usage with `schema_version`
 

@@ -691,7 +691,14 @@ export class DataSchemaCompiler {
         if (typeof fn !== 'function') {
           throw new Error('memo() expects a function as its second argument');
         }
-        const cacheKey = typeof key === 'string' ? key : JSON.stringify(key);
+        // Strings are encoded too, or `memo('1', ...)` would share the result of `memo(1, ...)`
+        let cacheKey: string | undefined;
+
+        try {
+          cacheKey = JSON.stringify(key);
+        } catch {
+          // BigInt or a cyclic structure
+        }
         if (typeof cacheKey !== 'string') {
           throw new Error('memo() expects a string or a JSON-serializable key as its first argument');
         }
@@ -700,7 +707,7 @@ export class DataSchemaCompiler {
           // A promise is stored as is, so concurrent and later calls share one invocation.
           // A throw is stored too: every stage has to see the same outcome.
           try {
-            result = { value: memoFnStorage.run(cacheKey, fn) };
+            result = { value: memoFnStorage.run(typeof key === 'string' ? key : cacheKey, fn) };
           } catch (error) {
             result = { error };
           }
@@ -786,7 +793,6 @@ export class DataSchemaCompiler {
       .then(() => {
         // Free unneeded resources
         cleanup();
-        memoResults.clear();
         transpiledFiles = [];
         toCompile = [];
         // The functions put into the compile context (cube, view, require, ...) close over
@@ -811,7 +817,9 @@ export class DataSchemaCompiler {
         } else if (this.workerPool) {
           this.workerPool.terminate();
         }
-      });
+      })
+      // A failed compile mustn't keep the fetched data either
+      .finally(() => memoResults.clear());
 
     // Every continuation of the compile (asyncModule callbacks included) sees its scope
     return this.compileScope ? sharedScopeStorage.run(this.compileScope, compileAll) : compileAll();

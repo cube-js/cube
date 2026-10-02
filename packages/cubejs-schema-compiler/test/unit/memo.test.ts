@@ -213,6 +213,36 @@ describe.each([
     await expect(compiler.compile()).rejects.toThrow('memo() expects a function as its second argument');
   });
 
+  it('keeps string keys apart from other keys', async () => {
+    const { compiler, cubeEvaluator } = prepareCompiler([{
+      fileName: 'orders.js',
+      content: `
+        const table = [memo(1, () => 'a'), memo('1', () => 'b'), memo(['x'], () => 'c'), memo('["x"]', () => 'd')].join('_');
+
+        cube('orders', {
+          sql_table: table,
+          measures: { count: { type: 'count' } },
+        });
+      `,
+    }], { sharedVmContext });
+    await compiler.compile();
+
+    expect(cubeEvaluator.cubeFromPath('orders').sqlTable!()).toEqual('a_b_c_d');
+  });
+
+  it.each([
+    ['undefined', 'undefined'],
+    ['a BigInt', '10n'],
+    ['a cyclic structure', '(() => { const o = {}; o.o = o; return o; })()'],
+  ])('reports %s key', async (_name, key) => {
+    const { compiler } = prepareCompiler([{
+      fileName: 'orders.js',
+      content: `memo(${key}, () => 1);`,
+    }], { sharedVmContext });
+
+    await expect(compiler.compile()).rejects.toThrow('memo() expects a string or a JSON-serializable key as its first argument');
+  });
+
   it('reports memo(fn) that the transpiler did not give a key', async () => {
     const { compiler } = prepareCompiler([{
       fileName: 'orders.js',
