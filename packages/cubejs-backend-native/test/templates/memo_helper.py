@@ -1,3 +1,5 @@
+from dataclasses import dataclass
+
 from cube import memo
 
 # Imported modules load once per process, unlike globals.py
@@ -44,3 +46,8 @@ days = []
 def load_day(day):
     days.append(day)
     return len(days)
+
+
+@dataclass
+class Cfg:
+    name: str

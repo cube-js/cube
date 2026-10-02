@@ -1,7 +1,7 @@
 from datetime import date
 
 from cube import TemplateContext
-from memo_helper import Client, api, load_day, load_imported
+from memo_helper import Cfg, Client, api, load_day, load_imported
 
 template = TemplateContext()
 template.add_function('load_imported', load_imported)
@@ -33,3 +33,9 @@ def client_calls():
 def day():
     # A new but equal date on every call
     return load_day(date(2024, 1, 1))
+
+
+@template.function
+def cfg():
+    # Equal but not hashable
+    return load_day(Cfg('a'))

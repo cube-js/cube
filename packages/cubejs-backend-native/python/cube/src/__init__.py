@@ -1,8 +1,8 @@
 import asyncio
 import contextvars
+import dataclasses
 import functools
 import inspect
-import json
 import os
 import threading
 from typing import Union, Callable, Dict, Any
@@ -246,8 +246,8 @@ _template_context = globals().get('_template_context') or contextvars.ContextVar
 
 def _memo_key(args, kwargs):
     """The key of a call: equal arguments of the same type make the same key. It holds hashable
-    arguments; unhashable objects, keyed by id(), are returned to keep with the entry, as a freed
-    object's id can be reused by another."""
+    arguments; other unhashable objects, keyed by id(), are returned to keep with the entry, as a
+    freed object's id can be reused by another."""
     pinned = []
 
     def plain(value):
@@ -257,6 +257,12 @@ def _memo_key(args, kwargs):
             return ('tuple', tuple(plain(item) for item in value))
         if isinstance(value, dict):
             return ('dict', frozenset((plain(k), plain(v)) for k, v in value.items()))
+        if isinstance(value, (set, frozenset)):
+            return ('set', frozenset(plain(item) for item in value))
+        params = getattr(type(value), '__dataclass_params__', None)
+        if params is not None and params.eq:
+            # Compared by their fields, but not hashable unless frozen
+            return (type(value), tuple(plain(getattr(value, f.name)) for f in dataclasses.fields(value) if f.compare))
         if isinstance(value, float) and value != value:
             # Every NaN is unequal to itself
             return (float, 'nan')
