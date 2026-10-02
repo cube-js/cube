@@ -1,5 +1,5 @@
 use super::*;
-use crate::planner::BaseCube;
+use crate::planner::{BaseCube, CubeId};
 use cubenativeutils::CubeError;
 use std::rc::Rc;
 use typed_builder::TypedBuilder;
@@ -38,8 +38,8 @@ pub struct Cube {
 }
 
 impl Cube {
-    pub fn name(&self) -> &String {
-        &self.cube.name()
+    pub fn cube_id(&self) -> &CubeId {
+        self.cube.cube_id()
     }
 
     pub fn cube(&self) -> &Rc<BaseCube> {
@@ -53,7 +53,7 @@ impl Cube {
 
 impl PrettyPrint for Cube {
     fn pretty_print(&self, result: &mut PrettyPrintResult, state: &PrettyPrintState) {
-        result.println(&format!("Cube: {}", self.name()), state);
+        result.println(&format!("Cube: {}", self.cube_id()), state);
         if let Some(original_sql_pre_aggregation) = self.original_sql_pre_aggregation() {
             original_sql_pre_aggregation.pretty_print(result, state);
         }

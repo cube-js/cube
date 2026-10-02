@@ -60,9 +60,9 @@ impl<'a> LogicalNodeProcessor<'a, Query> for QueryProcessor<'a> {
         for member in logical_plan.schema().multi_stage_dimensions()? {
             if resolved_multistage_dimension
                 .iter()
-                .all(|d| d.full_name() != member.full_name())
+                .all(|d| d.id() != member.id())
             {
-                context.add_multi_stage_dimension(member.full_name());
+                context.add_multi_stage_dimension(member.id().clone());
             }
         }
 
@@ -136,14 +136,14 @@ impl<'a> LogicalNodeProcessor<'a, Query> for QueryProcessor<'a> {
                 // A rollup stores time dimensions already timezone-converted,
                 // so every occurrence of them in this select must render
                 // without the conversion.
-                let time_dimension_names = schema
+                let time_dimension_ids = schema
                     .time_dimensions
                     .iter()
-                    .map(|d| d.full_name())
+                    .map(|d| d.id().clone())
                     .collect::<HashSet<_>>();
                 let mark_tz_converted =
                     |symbol: &Rc<MemberSymbol>| -> Result<Rc<MemberSymbol>, CubeError> {
-                        transforms::mark_tz_converted_at_source(symbol, &time_dimension_names)
+                        transforms::mark_tz_converted_at_source(symbol, &time_dimension_ids)
                     };
                 schema = logical_transforms::mark_tz_converted_at_source_in_schema(&schema)?;
                 filter = transforms::map_filter_symbols(filter, &mark_tz_converted)?;
@@ -189,7 +189,7 @@ impl<'a> LogicalNodeProcessor<'a, Query> for QueryProcessor<'a> {
             context_factory.set_group_by_members(
                 schema
                     .all_dimensions()
-                    .map(|symbol| symbol.full_name())
+                    .map(|symbol| symbol.id().clone())
                     .collect(),
             );
         }
@@ -257,7 +257,9 @@ impl<'a> LogicalNodeProcessor<'a, Query> for QueryProcessor<'a> {
                 .iter()
                 .filter(|o| {
                     !(o.member_symbol().is_measure()
-                        && schema.find_member_positions(&o.name()).is_empty())
+                        && schema
+                            .find_member_positions(o.member_symbol().id())
+                            .is_empty())
                 })
                 .cloned()
                 .collect()
@@ -271,7 +273,10 @@ impl<'a> LogicalNodeProcessor<'a, Query> for QueryProcessor<'a> {
             order_by
                 .iter()
                 .map(|o| -> Result<_, CubeError> {
-                    if !schema.find_member_positions(&o.name()).is_empty() {
+                    if !schema
+                        .find_member_positions(o.member_symbol().id())
+                        .is_empty()
+                    {
                         return Ok(o.clone());
                     }
                     Ok(OrderByItem::new(

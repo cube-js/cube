@@ -155,7 +155,7 @@ impl MultiStageMemberQueryPlanner {
                 let granularity_obj = GranularityHelper::make_granularity_obj(
                     self.query_tools.cube_evaluator().clone(),
                     &mut evaluator_compiler,
-                    &time_dimension.cube_name(),
+                    &time_dimension.cube_id(),
                     &time_dimension.name(),
                     Some(granularity.clone()),
                 )?;
@@ -186,7 +186,7 @@ impl MultiStageMemberQueryPlanner {
         for period_dimension in period_dimensions {
             if !time_dimensions
                 .iter()
-                .any(|dimension| dimension.full_name() == period_dimension.full_name())
+                .any(|dimension| dimension.id() == period_dimension.id())
             {
                 time_dimensions.push(period_dimension.clone());
             }
@@ -234,7 +234,7 @@ impl MultiStageMemberQueryPlanner {
                 let Some(granularity_obj) = GranularityHelper::make_granularity_obj(
                     self.query_tools.cube_evaluator().clone(),
                     &mut evaluator_compiler,
-                    &time_dimension.cube_name(),
+                    &time_dimension.cube_id(),
                     &time_dimension.name(),
                     Some(query_granularity.clone()),
                 )?
@@ -432,11 +432,11 @@ impl MultiStageMemberQueryPlanner {
         time_dimensions.extend(all_dependend_time_dimensions.iter().cloned());
         dimensions = dimensions
             .into_iter()
-            .unique_by(|d| d.full_name())
+            .unique_by(|d| d.id().clone())
             .collect_vec();
         time_dimensions = time_dimensions
             .into_iter()
-            .unique_by(|d| d.full_name())
+            .unique_by(|d| d.id().clone())
             .collect_vec();
 
         let schema = LogicalSchema::default()
@@ -581,14 +581,14 @@ impl MultiStageMemberQueryPlanner {
             .input()
             .iter()
             .flat_map(|descr| descr.state().dimensions().iter().cloned())
-            .unique_by(|dim| dim.full_name())
+            .unique_by(|dim| dim.id().clone())
             .collect_vec();
         let time_dimensions = self
             .description
             .input()
             .iter()
             .flat_map(|descr| descr.state().time_dimensions().iter().cloned())
-            .unique_by(|dim| dim.full_name())
+            .unique_by(|dim| dim.id().clone())
             .collect_vec();
 
         LogicalSchema::default()

@@ -26,8 +26,8 @@ use super::query_properties::{OrderByItem, QueryProperties};
 use super::state::State;
 use super::symbols::transforms::patch_measure;
 use super::{
-    Compiler, GranularityHelper, MemberExpressionExpression, MemberExpressionSymbol, MemberSymbol,
-    TimeDimensionSymbol,
+    Compiler, CubeId, GranularityHelper, MemberExpressionExpression, MemberExpressionSymbol,
+    MemberSymbol, TimeDimensionSymbol,
 };
 
 /// One-shot translator from [`BaseQueryOptions`] into a finalized
@@ -153,7 +153,8 @@ impl QueryPropertiesCompiler {
             .map(|join| -> Result<LogicalSubqueryJoinItem, CubeError> {
                 let static_data = join.static_data();
                 let on = join.on()?;
-                let on_cube_name = on.static_data().cube_name.clone().unwrap_or_default();
+                let on_cube_name =
+                    CubeId::cube(on.static_data().cube_name.clone().unwrap_or_default());
                 let on_sql = match on.expression()? {
                     MemberExpressionExpressionDef::Sql(sql) => {
                         evaluator_compiler.compile_sql_call(&on_cube_name, sql)?
@@ -205,11 +206,13 @@ impl QueryPropertiesCompiler {
         evaluator_compiler: &mut Compiler,
         member_expression: &Rc<dyn MemberExpressionDefinition>,
     ) -> Result<Rc<MemberSymbol>, CubeError> {
-        let cube_name = member_expression
-            .static_data()
-            .cube_name
-            .clone()
-            .unwrap_or_default();
+        let cube_name = CubeId::cube(
+            member_expression
+                .static_data()
+                .cube_name
+                .clone()
+                .unwrap_or_default(),
+        );
         let name = member_expression
             .static_data()
             .expression_name
@@ -255,7 +258,7 @@ impl QueryPropertiesCompiler {
                 let granularity_obj = GranularityHelper::make_granularity_obj(
                     self.query_tools.cube_evaluator().clone(),
                     evaluator_compiler,
-                    &base_symbol.cube_name(),
+                    &base_symbol.cube_id(),
                     &base_symbol.name(),
                     d.granularity.clone(),
                 )?;
@@ -317,7 +320,7 @@ impl QueryPropertiesCompiler {
         member_expression: &Rc<dyn MemberExpressionDefinition>,
     ) -> Result<Rc<MemberSymbol>, CubeError> {
         let static_data = member_expression.static_data();
-        let cube_name = static_data.cube_name.clone().unwrap_or_default();
+        let cube_name = CubeId::cube(static_data.cube_name.clone().unwrap_or_default());
         let name = if let Some(name) = &static_data.expression_name {
             name.clone()
         } else if let Some(name) = &static_data.name {
@@ -421,7 +424,7 @@ impl QueryPropertiesCompiler {
             .cube_evaluator()
             .parse_path("segments".to_string(), member_name.to_string())?
             .into_iter();
-        let cube_name = iter.next().unwrap();
+        let cube_name = CubeId::cube(iter.next().unwrap());
         let name = iter.next().unwrap();
         let definition = self
             .query_tools
@@ -430,23 +433,20 @@ impl QueryPropertiesCompiler {
         let expression_evaluator =
             evaluator_compiler.compile_sql_call(&cube_name, definition.sql()?)?;
         let cube_symbol = evaluator_compiler.add_cube_table_evaluator(cube_name, vec![])?;
-        BaseSegment::try_new(
-            expression_evaluator,
-            cube_symbol,
-            name,
-            Some(member_name.to_string()),
-        )
+        BaseSegment::try_new(expression_evaluator, cube_symbol, name, false)
     }
 
     fn compile_member_expression_segment(
         evaluator_compiler: &mut Compiler,
         member_expression: &Rc<dyn MemberExpressionDefinition>,
     ) -> Result<Rc<BaseSegment>, CubeError> {
-        let cube_name = member_expression
-            .static_data()
-            .cube_name
-            .clone()
-            .unwrap_or_default();
+        let cube_name = CubeId::cube(
+            member_expression
+                .static_data()
+                .cube_name
+                .clone()
+                .unwrap_or_default(),
+        );
         let name = member_expression
             .static_data()
             .expression_name
@@ -463,7 +463,7 @@ impl QueryPropertiesCompiler {
             }
         };
         let cube_symbol = evaluator_compiler.add_cube_table_evaluator(cube_name, vec![])?;
-        BaseSegment::try_new(expression_evaluator, cube_symbol, name, None)
+        BaseSegment::try_new(expression_evaluator, cube_symbol, name, true)
     }
 
     // Returns `(dimension_filters, time_dimension_filters, measure_filters)`.
@@ -522,7 +522,7 @@ impl QueryPropertiesCompiler {
             filter_members.iter().map(|s| s.full_name()).collect();
 
         let cube_evaluator = self.query_tools.cube_evaluator();
-        let mut visited_cubes: HashSet<String> = HashSet::new();
+        let mut visited_cubes: HashSet<CubeId> = HashSet::new();
         let mut pending_view_filters: Vec<Rc<dyn ViewFilterDefinition>> = Vec::new();
 
         for sym in dimensions
@@ -531,11 +531,11 @@ impl QueryPropertiesCompiler {
             .chain(measures)
             .chain(filter_members.iter())
         {
-            let cube_name = sym.compiled_path().cube_name();
+            let cube_name = sym.compiled_path().cube_id();
             if !visited_cubes.insert(cube_name.clone()) {
                 continue;
             }
-            let cube_def = cube_evaluator.cube_from_path(cube_name.clone())?;
+            let cube_def = cube_evaluator.cube_from_path(cube_name.target().to_string())?;
             if !cube_def.static_data().is_view.unwrap_or(false) {
                 continue;
             }

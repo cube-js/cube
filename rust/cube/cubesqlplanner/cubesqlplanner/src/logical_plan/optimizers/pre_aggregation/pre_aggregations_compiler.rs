@@ -13,7 +13,6 @@ use crate::planner::multi_fact_join_groups::{MeasuresJoinHints, MultiFactJoinGro
 use crate::planner::planners::JoinPlanner;
 use crate::planner::planners::ResolvedJoinItem;
 use crate::planner::state::State;
-use crate::planner::Compiler;
 use crate::planner::GranularityHelper;
 use crate::planner::MemberSymbol;
 use crate::planner::SqlCall;
@@ -21,6 +20,7 @@ use crate::planner::SqlCallReference;
 use crate::planner::SymbolPath;
 use crate::planner::SymbolPathType;
 use crate::planner::TimeDimensionSymbol;
+use crate::planner::{Compiler, CubeId, MemberId};
 use crate::utils::debug::DebugSql;
 use cubenativeutils::CubeError;
 use cubenativeutils::CubeErrorCauseType;
@@ -63,15 +63,15 @@ pub struct PreAggregationsCompiler {
 }
 
 impl PreAggregationsCompiler {
-    pub fn try_new(query_tools: Rc<State>, cube_names: &Vec<String>) -> Result<Self, CubeError> {
+    pub fn try_new(query_tools: Rc<State>, cube_names: &Vec<CubeId>) -> Result<Self, CubeError> {
         let mut descriptions = Vec::new();
         for cube_name in cube_names.iter() {
             let pre_aggregations = query_tools
                 .cube_evaluator()
-                .pre_aggregations_for_cube_as_array(cube_name.clone())?;
+                .pre_aggregations_for_cube_as_array(cube_name.target().to_string())?;
             for pre_aggregation in pre_aggregations.iter() {
                 let full_name = PreAggregationFullName::new(
-                    cube_name.clone(),
+                    cube_name.target().to_string(),
                     pre_aggregation.static_data().name.clone(),
                 );
                 descriptions.push((full_name, pre_aggregation.clone()));
@@ -150,7 +150,7 @@ impl PreAggregationsCompiler {
                 let granularity_obj = GranularityHelper::make_granularity_obj(
                     self.query_tools.cube_evaluator().clone(),
                     &mut evaluator_compiler,
-                    &base_symbol.cube_name(),
+                    &base_symbol.cube_id(),
                     &base_symbol.name(),
                     Some(granularity.clone()),
                 )?;
@@ -174,7 +174,7 @@ impl PreAggregationsCompiler {
                 let granularity_obj = GranularityHelper::make_granularity_obj(
                     self.query_tools.cube_evaluator().clone(),
                     &mut evaluator_compiler,
-                    &base_symbol.cube_name(),
+                    &base_symbol.cube_id(),
                     &base_symbol.name(),
                     static_data.granularity.clone(),
                 )?;
@@ -402,9 +402,11 @@ impl PreAggregationsCompiler {
         for symbol in symbols {
             let path = symbol.path();
             if path.len() == 1 {
-                result.push(JoinHintItem::Single(path[0].clone()));
+                result.push(JoinHintItem::Single(path[0].target().to_string()));
             } else {
-                result.push(JoinHintItem::Vector(path.clone()));
+                result.push(JoinHintItem::Vector(
+                    path.iter().map(|cube| cube.target().to_string()).collect(),
+                ));
             }
         }
         result
@@ -484,21 +486,21 @@ impl PreAggregationsCompiler {
         items: &[PreAggregationJoinItem],
         rollup_join_name: &PreAggregationFullName,
     ) -> Result<(), CubeError> {
-        let mut columns: HashMap<String, String> = HashMap::new();
+        let mut columns: HashMap<MemberId, String> = HashMap::new();
         for member in items
             .iter()
             .flat_map(|item| item.from_members.iter().chain(item.to_members.iter()))
         {
-            let name = member.symbol.full_name();
-            if let Some(seen) = columns.get(&name) {
+            let id = member.symbol.id();
+            if let Some(seen) = columns.get(id) {
                 if seen != &member.column {
                     return Err(CubeError::user(format!(
                         "The \"{}\" pre-aggregation joins on {} through rollups storing it in different columns ({} and {}), so one of the joins would read a column that isn't there",
-                        rollup_join_name.name, name, seen, member.column,
+                        rollup_join_name.name, id, seen, member.column,
                     )));
                 }
             } else {
-                columns.insert(name, member.column.clone());
+                columns.insert(id.clone(), member.column.clone());
             }
         }
         Ok(())
@@ -752,10 +754,10 @@ impl PreAggregationsCompiler {
 
     pub fn compile_origin_sql_pre_aggregation(
         &mut self,
-        cube_name: &String,
+        cube_id: &CubeId,
     ) -> Result<Option<Rc<CompiledPreAggregation>>, CubeError> {
         let res = if let Some((name, _)) = self.descriptions.clone().iter().find(|(name, descr)| {
-            &name.cube_name == cube_name
+            &CubeId::cube(name.cube_name.clone()) == cube_id
                 && &descr.static_data().pre_aggregation_type == "originalSql"
         }) {
             Some(self.compile_pre_aggregation(name)?)
@@ -773,7 +775,8 @@ impl PreAggregationsCompiler {
     ) -> Result<Vec<Rc<MemberSymbol>>, CubeError> {
         let evaluator_compiler_cell = query_tools.compiler().clone();
         let mut evaluator_compiler = evaluator_compiler_cell.borrow_mut();
-        let sql_call = evaluator_compiler.compile_sql_call(&name.cube_name, ref_func)?;
+        let sql_call =
+            evaluator_compiler.compile_sql_call(&CubeId::cube(name.cube_name.clone()), ref_func)?;
         let symbols =
             Self::reference_symbols(&query_tools, &mut evaluator_compiler, name, &sql_call)?;
         for symbol in symbols.iter() {
@@ -789,7 +792,8 @@ impl PreAggregationsCompiler {
     ) -> Result<Rc<MemberSymbol>, CubeError> {
         let evaluator_compiler_cell = query_tools.compiler().clone();
         let mut evaluator_compiler = evaluator_compiler_cell.borrow_mut();
-        let sql_call = evaluator_compiler.compile_sql_call(&name.cube_name, ref_func)?;
+        let sql_call =
+            evaluator_compiler.compile_sql_call(&CubeId::cube(name.cube_name.clone()), ref_func)?;
 
         let symbols =
             Self::reference_symbols(&query_tools, &mut evaluator_compiler, name, &sql_call)?;
@@ -1011,7 +1015,7 @@ mod tests {
         ctx: &TestContext,
         pre_agg_name: &str,
     ) -> Result<Rc<CompiledPreAggregation>, CubeError> {
-        let cube_names = vec!["orders".to_string()];
+        let cube_names = vec![CubeId::cube("orders")];
         let mut compiler =
             PreAggregationsCompiler::try_new(ctx.query_tools().clone(), &cube_names).unwrap();
         let name = PreAggregationFullName::new("orders".to_string(), pre_agg_name.to_string());
@@ -1168,7 +1172,7 @@ mod tests {
         let test_context = TestContext::new(schema).unwrap();
         let query_tools = test_context.query_tools().clone();
 
-        let cube_names = vec!["visitors".to_string()];
+        let cube_names = vec![CubeId::cube("visitors")];
         let mut compiler = PreAggregationsCompiler::try_new(query_tools, &cube_names).unwrap();
 
         let pre_agg_name =
@@ -1203,7 +1207,7 @@ mod tests {
         let test_context = TestContext::new(schema).unwrap();
         let query_tools = test_context.query_tools().clone();
 
-        let cube_names = vec!["visitor_checkins".to_string()];
+        let cube_names = vec![CubeId::cube("visitor_checkins")];
         let mut compiler = PreAggregationsCompiler::try_new(query_tools, &cube_names).unwrap();
 
         let pre_agg_name = PreAggregationFullName::new(
@@ -1241,7 +1245,7 @@ mod tests {
         let test_context = TestContext::new(schema).unwrap();
         let query_tools = test_context.query_tools().clone();
 
-        let cube_names = vec!["visitors".to_string()];
+        let cube_names = vec![CubeId::cube("visitors")];
         let mut compiler = PreAggregationsCompiler::try_new(query_tools, &cube_names).unwrap();
 
         let pre_agg_name =
@@ -1277,7 +1281,7 @@ mod tests {
         let test_context = TestContext::new(schema).unwrap();
         let query_tools = test_context.query_tools().clone();
 
-        let cube_names = vec!["visitors".to_string(), "visitor_checkins".to_string()];
+        let cube_names = vec![CubeId::cube("visitors"), CubeId::cube("visitor_checkins")];
         let mut compiler = PreAggregationsCompiler::try_new(query_tools, &cube_names).unwrap();
 
         let compiled = compiler.compile_all_pre_aggregations(false).unwrap();
@@ -1305,7 +1309,7 @@ mod tests {
         let test_context = TestContext::new(schema).unwrap();
         let query_tools = test_context.query_tools().clone();
 
-        let cube_names = vec!["visitors".to_string()];
+        let cube_names = vec![CubeId::cube("visitors")];
         let mut compiler = PreAggregationsCompiler::try_new(query_tools, &cube_names).unwrap();
 
         let pre_agg_name =
@@ -1322,7 +1326,7 @@ mod tests {
         let query_tools = test_context.query_tools().clone();
 
         // Need both cubes for rollupJoin: visitor_checkins and visitors
-        let cube_names = vec!["visitor_checkins".to_string(), "visitors".to_string()];
+        let cube_names = vec![CubeId::cube("visitor_checkins"), CubeId::cube("visitors")];
         let mut compiler = PreAggregationsCompiler::try_new(query_tools, &cube_names).unwrap();
 
         let pre_agg_name = PreAggregationFullName::new(
@@ -1358,7 +1362,7 @@ mod tests {
         let test_context = TestContext::new(schema).unwrap();
         let query_tools = test_context.query_tools().clone();
 
-        let cube_names = vec!["visitor_checkins".to_string()];
+        let cube_names = vec![CubeId::cube("visitor_checkins")];
         let mut compiler = PreAggregationsCompiler::try_new(query_tools, &cube_names).unwrap();
 
         let pre_agg_name =
@@ -1416,7 +1420,7 @@ mod tests {
         let test_context = TestContext::new(schema).unwrap();
         let query_tools = test_context.query_tools().clone();
 
-        let cube_names = vec!["orders".to_string()];
+        let cube_names = vec![CubeId::cube("orders")];
         let mut compiler = PreAggregationsCompiler::try_new(query_tools, &cube_names).unwrap();
 
         let pre_agg_name =
@@ -1452,9 +1456,9 @@ mod tests {
         let query_tools = test_context.query_tools().clone();
 
         let cube_names = vec![
-            "line_items".to_string(),
-            "facts".to_string(),
-            "campaigns".to_string(),
+            CubeId::cube("line_items"),
+            CubeId::cube("facts"),
+            CubeId::cube("campaigns"),
         ];
         let mut compiler = PreAggregationsCompiler::try_new(query_tools, &cube_names).unwrap();
 
@@ -1510,7 +1514,7 @@ mod tests {
         let test_context = TestContext::new(schema).unwrap();
         let query_tools = test_context.query_tools().clone();
 
-        let cube_names = vec!["boards".to_string(), "locations".to_string()];
+        let cube_names = vec![CubeId::cube("boards"), CubeId::cube("locations")];
         let mut compiler = PreAggregationsCompiler::try_new(query_tools, &cube_names).unwrap();
 
         let pre_agg_name = PreAggregationFullName::new("boards".to_string(), "joined".to_string());

@@ -3,8 +3,9 @@ use super::FilterOperator;
 use crate::cube_bridge::base_query_options::{FilterItem as NativeFilterItem, FilterValue};
 use crate::planner::filter::{FilterGroup, FilterGroupOperator, FilterItem};
 use crate::planner::query_tools::QueryTools;
-use crate::planner::{Compiler, MemberSymbol};
+use crate::planner::{Compiler, MemberSymbol, SymbolPath, SymbolPathType};
 use cubenativeutils::CubeError;
+use std::collections::HashMap;
 use std::rc::Rc;
 use std::str::FromStr;
 
@@ -19,6 +20,7 @@ pub struct FilterCompiler<'a> {
     dimension_filters: Vec<FilterItem>,
     time_dimension_filters: Vec<FilterItem>,
     measures_filters: Vec<FilterItem>,
+    member_paths: HashMap<String, SymbolPath>,
 }
 
 impl<'a> FilterCompiler<'a> {
@@ -29,6 +31,7 @@ impl<'a> FilterCompiler<'a> {
             dimension_filters: vec![],
             time_dimension_filters: vec![],
             measures_filters: vec![],
+            member_paths: HashMap::new(),
         }
     }
 
@@ -107,13 +110,13 @@ impl<'a> FilterCompiler<'a> {
             Ok(FilterItem::Group(Rc::new(FilterGroup::new(op, items))))
         } else {
             if let (Some(member), Some(operator)) = (item.member(), &item.operator) {
-                let member_path = member.split(".").map(|m| m.to_string()).collect::<Vec<_>>();
-                let evaluator = if self.query_tools.cube_evaluator().is_measure(member_path)? {
+                let path = self.member_path(member)?;
+                let evaluator = if path.path_type() == &SymbolPathType::Measure {
                     self.evaluator_compiler
-                        .add_measure_evaluator(member.clone())?
+                        .add_measure_evaluator_by_path(path)?
                 } else {
                     self.evaluator_compiler
-                        .add_dimension_evaluator(member.clone())?
+                        .add_dimension_or_segment_by_path(path)?
                 };
                 Ok(FilterItem::Item(BaseFilter::try_new(
                     self.query_tools.clone(),
@@ -131,8 +134,19 @@ impl<'a> FilterCompiler<'a> {
         }
     }
 
+    // Resolved once per member: classifying a filter and compiling it both
+    // need the path, and resolving it calls into the data model.
+    fn member_path(&mut self, member: &String) -> Result<SymbolPath, CubeError> {
+        if let Some(path) = self.member_paths.get(member) {
+            return Ok(path.clone());
+        }
+        let path = SymbolPath::parse(self.query_tools.cube_evaluator().clone(), member)?;
+        self.member_paths.insert(member.clone(), path.clone());
+        Ok(path)
+    }
+
     fn get_item_type(
-        &self,
+        &mut self,
         item: &NativeFilterItem,
         expected_type: &Option<FilterType>,
     ) -> Result<Option<FilterType>, CubeError> {
@@ -144,10 +158,8 @@ impl<'a> FilterCompiler<'a> {
             if let (Some(member), Some(operator)) = (item.member(), &item.operator) {
                 let operator = FilterOperator::from_str(&operator)?;
                 let is_measure_filter_op = matches!(operator, FilterOperator::MeasureFilter);
-                let member_path = member.split(".").map(|m| m.to_string()).collect::<Vec<_>>();
-                if self.query_tools.cube_evaluator().is_measure(member_path)?
-                    && !is_measure_filter_op
-                {
+                let path = self.member_path(member)?;
+                if path.path_type() == &SymbolPathType::Measure && !is_measure_filter_op {
                     Ok(Some(FilterType::Measure))
                 } else {
                     Ok(Some(FilterType::Dimension))
@@ -161,7 +173,7 @@ impl<'a> FilterCompiler<'a> {
     }
 
     fn get_item_type_from_vec(
-        &self,
+        &mut self,
         items: &Vec<NativeFilterItem>,
         expected_type: &Option<FilterType>,
     ) -> Result<Option<FilterType>, CubeError> {

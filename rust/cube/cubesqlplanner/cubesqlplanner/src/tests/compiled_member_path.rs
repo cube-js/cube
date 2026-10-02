@@ -1,4 +1,4 @@
-use crate::planner::MemberSymbol;
+use crate::planner::{CubeId, MemberSymbol};
 use crate::test_fixtures::cube_bridge::MockSchema;
 use crate::test_fixtures::test_utils::TestContext;
 use std::rc::Rc;
@@ -15,11 +15,15 @@ fn many_to_one_ctx() -> TestContext {
     TestContext::new(MockSchema::from_yaml_file("common/many_to_one_views.yaml")).unwrap()
 }
 
+fn names(path: &[CubeId]) -> Vec<String> {
+    path.iter().map(|cube| cube.to_string()).collect()
+}
+
 fn dep_paths(symbol: &Rc<MemberSymbol>) -> Vec<(String, Vec<String>)> {
     let mut result: Vec<_> = symbol
         .get_dependencies()
         .into_iter()
-        .map(|d| (d.full_name(), d.path().clone()))
+        .map(|d| (d.full_name(), names(d.path())))
         .collect();
     result.sort_by(|a, b| a.0.cmp(&b.0));
     result
@@ -31,16 +35,16 @@ fn dep_paths(symbol: &Rc<MemberSymbol>) -> Vec<(String, Vec<String>)> {
 fn test_simple_dimension_path() {
     let ctx = simple_ctx();
     let dim = ctx.create_dimension("orders.status").unwrap();
-    assert_eq!(dim.path(), &vec!["orders".to_string()]);
-    assert_eq!(dim.cube_name(), "orders");
+    assert_eq!(names(dim.path()), vec!["orders".to_string()]);
+    assert_eq!(dim.cube_id().to_string(), "orders");
 }
 
 #[test]
 fn test_simple_measure_path() {
     let ctx = simple_ctx();
     let m = ctx.create_measure("orders.count").unwrap();
-    assert_eq!(m.path(), &vec!["orders".to_string()]);
-    assert_eq!(m.cube_name(), "orders");
+    assert_eq!(names(m.path()), vec!["orders".to_string()]);
+    assert_eq!(m.cube_id().to_string(), "orders");
 }
 
 // --- View paths ---
@@ -52,7 +56,7 @@ fn test_view_dimension_has_underlying_path() {
     // orders_with_customer.name → join_path: orders.customers
     let dim = ctx.create_dimension("orders_with_customer.name").unwrap();
     assert!(dim.as_ref_symbol().is_ok());
-    assert_eq!(dim.path(), &vec!["orders_with_customer".to_string()]);
+    assert_eq!(names(dim.path()), vec!["orders_with_customer".to_string()]);
 
     let deps = dep_paths(&dim);
     assert_eq!(deps.len(), 1);
@@ -70,7 +74,7 @@ fn test_many_to_one_view_child_has_underlying_path() {
     // many_to_one_view.child_dim → join_path: many_to_one_root.many_to_one_child
     let dim = ctx.create_dimension("many_to_one_view.child_dim").unwrap();
     assert!(dim.as_ref_symbol().is_ok());
-    assert_eq!(dim.path(), &vec!["many_to_one_view".to_string()]);
+    assert_eq!(names(dim.path()), vec!["many_to_one_view".to_string()]);
 
     let deps = dep_paths(&dim);
     assert_eq!(deps.len(), 1);
@@ -91,7 +95,7 @@ fn test_dep_path_same_cube_member_ref() {
     // visitors.visitor_id_proxy: sql = "{visitors.visitor_id}"
     let ctx = visitors_ctx();
     let dim = ctx.create_dimension("visitors.visitor_id_proxy").unwrap();
-    assert_eq!(dim.path(), &vec!["visitors".to_string()]);
+    assert_eq!(names(dim.path()), vec!["visitors".to_string()]);
 
     let deps = dep_paths(&dim);
     assert_eq!(deps.len(), 1);
@@ -103,7 +107,7 @@ fn test_dep_path_same_cube_member_ref() {
 fn test_dep_path_short_member_ref() {
     let ctx = visitors_ctx();
     let dim = ctx.create_dimension("visitors.visitor_id_twice").unwrap();
-    assert_eq!(dim.path(), &vec!["visitors".to_string()]);
+    assert_eq!(names(dim.path()), vec!["visitors".to_string()]);
 
     let deps = dep_paths(&dim);
     assert_eq!(deps.len(), 1);
@@ -120,7 +124,7 @@ fn test_dep_path_cross_cube_member_ref() {
     let dim = ctx
         .create_dimension("visitors.minVisitorCheckinDate")
         .unwrap();
-    assert_eq!(dim.path(), &vec!["visitors".to_string()]);
+    assert_eq!(names(dim.path()), vec!["visitors".to_string()]);
 
     let deps = dep_paths(&dim);
     assert_eq!(deps.len(), 1);
@@ -134,7 +138,7 @@ fn test_dep_path_cross_cube_member_ref() {
 fn test_dep_path_multiple_refs_in_sql() {
     let ctx = visitors_ctx();
     let dim = ctx.create_dimension("visitors.source_concat_id").unwrap();
-    assert_eq!(dim.path(), &vec!["visitors".to_string()]);
+    assert_eq!(names(dim.path()), vec!["visitors".to_string()]);
 
     let deps = dep_paths(&dim);
     assert_eq!(deps.len(), 2);
@@ -151,7 +155,7 @@ fn test_dep_path_measure_self_ref() {
     // visitors.total_revenue_proxy: sql = "{total_revenue}"
     let ctx = visitors_ctx();
     let m = ctx.create_measure("visitors.total_revenue_proxy").unwrap();
-    assert_eq!(m.path(), &vec!["visitors".to_string()]);
+    assert_eq!(names(m.path()), vec!["visitors".to_string()]);
 
     let deps = dep_paths(&m);
     assert_eq!(deps.len(), 1);
@@ -164,7 +168,7 @@ fn test_dep_path_measure_cross_cube_ref() {
     // customers.payments_per_order: sql = "{payments} / {orders.count}"
     let ctx = simple_ctx();
     let m = ctx.create_measure("customers.payments_per_order").unwrap();
-    assert_eq!(m.path(), &vec!["customers".to_string()]);
+    assert_eq!(names(m.path()), vec!["customers".to_string()]);
 
     let deps = dep_paths(&m);
     assert_eq!(deps.len(), 2);
@@ -180,7 +184,7 @@ fn test_dep_path_measure_mixed_refs() {
     let m = ctx
         .create_measure("visitors.total_revenue_per_count")
         .unwrap();
-    assert_eq!(m.path(), &vec!["visitors".to_string()]);
+    assert_eq!(names(m.path()), vec!["visitors".to_string()]);
 
     let deps = dep_paths(&m);
     assert_eq!(deps.len(), 2);
@@ -196,8 +200,8 @@ fn test_dep_path_measure_mixed_refs() {
 fn test_segment_compiled_path() {
     let ctx = visitors_ctx();
     let seg = ctx.create_symbol("visitors.google").unwrap();
-    assert_eq!(seg.path(), &vec!["visitors".to_string()]);
-    assert_eq!(seg.cube_name(), "visitors");
+    assert_eq!(names(seg.path()), vec!["visitors".to_string()]);
+    assert_eq!(seg.cube_id().to_string(), "visitors");
 
     let deps = dep_paths(&seg);
     assert_eq!(deps.len(), 1);
@@ -211,6 +215,6 @@ fn test_segment_compiled_path() {
 fn test_time_dimension_path() {
     let ctx = simple_ctx();
     let td = ctx.create_dimension("orders.created_at.day").unwrap();
-    assert_eq!(td.path(), &vec!["orders".to_string()]);
-    assert_eq!(td.cube_name(), "orders");
+    assert_eq!(names(td.path()), vec!["orders".to_string()]);
+    assert_eq!(td.cube_id().to_string(), "orders");
 }

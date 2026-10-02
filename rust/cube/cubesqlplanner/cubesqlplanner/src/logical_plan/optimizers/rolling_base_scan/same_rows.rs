@@ -126,7 +126,7 @@ fn same_root(a: &Option<Rc<Cube>>, b: &Option<Rc<Cube>>) -> bool {
 }
 
 fn same_cube(a: &Cube, b: &Cube) -> bool {
-    a.name() == b.name()
+    a.cube_id() == b.cube_id()
         && a.original_sql_pre_aggregation().as_ref().map(|p| p.name())
             == b.original_sql_pre_aggregation().as_ref().map(|p| p.name())
 }

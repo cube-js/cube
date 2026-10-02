@@ -1,7 +1,7 @@
 use super::CommonUtils;
 use crate::cube_bridge::join_definition::JoinDefinition;
 use crate::planner::state::State;
-use crate::planner::{JoinTree, JoinTreeItem};
+use crate::planner::{CubeId, JoinTree, JoinTreeItem};
 use cubenativeutils::CubeError;
 use std::rc::Rc;
 
@@ -20,25 +20,31 @@ impl JoinTreeBuilder {
     }
 
     pub fn build(&self, join: Rc<dyn JoinDefinition>) -> Result<Rc<JoinTree>, CubeError> {
-        let root = self.utils.cube_from_path(join.static_data().root.clone())?;
+        let root = self
+            .utils
+            .cube_from_path(&CubeId::cube(join.static_data().root.clone()))?;
         let mut joins = vec![];
         for join_definition in join.joins()?.iter() {
             let static_data = join_definition.static_data();
-            let cube = self.utils.cube_from_path(static_data.original_to.clone())?;
+            let cube = self
+                .utils
+                .cube_from_path(&CubeId::cube(static_data.original_to.clone()))?;
             let on_sql = self.utils.compile_join_condition(join_definition.clone())?;
             let relationship = join_definition.join()?.static_data().relationship.clone();
             joins.push(JoinTreeItem::new(
                 cube,
-                static_data.original_from.clone(),
+                CubeId::cube(static_data.original_from.clone()),
                 on_sql,
                 relationship_splits_rows(&relationship),
             ));
         }
-        Ok(JoinTree::new(
-            root,
-            joins,
-            join.static_data().multiplication_factor.clone(),
-        ))
+        let multiplication_factor = join
+            .static_data()
+            .multiplication_factor
+            .iter()
+            .map(|(cube, multiplied)| (CubeId::cube(cube.clone()), *multiplied))
+            .collect();
+        Ok(JoinTree::new(root, joins, multiplication_factor))
     }
 }
 

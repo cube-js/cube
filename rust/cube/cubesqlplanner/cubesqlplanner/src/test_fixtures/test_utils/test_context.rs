@@ -12,8 +12,8 @@ use crate::planner::filter::Filter;
 use crate::planner::sql_templates::PlanSqlTemplates;
 use crate::planner::state::State;
 use crate::planner::top_level_planner::TopLevelPlanner;
+use crate::planner::{CubeId, MemberSymbol, TimeDimensionSymbol};
 use crate::planner::{GranularityHelper, QueryProperties, QueryPropertiesCompiler};
-use crate::planner::{MemberSymbol, TimeDimensionSymbol};
 use crate::test_fixtures::cube_bridge::yaml::YamlBaseQueryOptions;
 use crate::test_fixtures::cube_bridge::{
     members_from_strings, MockBaseQueryOptions, MockBaseTools, MockSchema, MockSecurityContext,
@@ -325,7 +325,7 @@ impl TestContext {
             .cube_evaluator()
             .parse_path("segments".to_string(), path.to_string())?
             .into_iter();
-        let cube_name = iter.next().unwrap();
+        let cube_name = CubeId::cube(iter.next().unwrap());
         let name = iter.next().unwrap();
         let definition = self
             .query_tools
@@ -335,7 +335,7 @@ impl TestContext {
         let expression = compiler.compile_sql_call(&cube_name, definition.sql()?)?;
         let cube_symbol = compiler.add_cube_table_evaluator(cube_name.clone(), vec![])?;
         drop(compiler);
-        BaseSegment::try_new(expression, cube_symbol, name, Some(path.to_string()))
+        BaseSegment::try_new(expression, cube_symbol, name, false)
     }
 
     #[allow(dead_code)]
@@ -350,7 +350,7 @@ impl TestContext {
         let granularity_obj = GranularityHelper::make_granularity_obj(
             self.query_tools.cube_evaluator().clone(),
             &mut compiler,
-            &base_symbol.cube_name(),
+            &base_symbol.cube_id(),
             &base_symbol.name(),
             granularity.clone(),
         )?;
@@ -388,7 +388,12 @@ impl TestContext {
         group_by_members: Vec<String>,
     ) -> Result<String, CubeError> {
         let mut nodes_factory = SqlNodesFactory::default();
-        nodes_factory.set_group_by_members(group_by_members.into_iter().collect());
+        nodes_factory.set_group_by_members(
+            group_by_members
+                .iter()
+                .map(|name| super::member_id(name))
+                .collect(),
+        );
         let cube_ref_evaluator = Rc::new(nodes_factory.cube_ref_evaluator());
         let visitor = SqlEvaluatorVisitor::new(
             self.query_tools.query_tools().clone(),

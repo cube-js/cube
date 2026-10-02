@@ -24,6 +24,7 @@ use crate::planner::CaseSwitchItem;
 use crate::planner::Granularity;
 use crate::planner::GranularityHelper;
 use crate::planner::MeasureKind;
+use crate::planner::MemberId;
 use crate::planner::MemberSymbol;
 use crate::planner::MultiStageFilter;
 use crate::planner::MultiStageFilterMode;
@@ -168,7 +169,7 @@ impl MultiStageQueryPlanner {
     fn create_multi_stage_inode_member(
         &self,
         base_member: Rc<MemberSymbol>,
-        resolved_multi_stage_dimensions: &mut HashSet<String>,
+        resolved_multi_stage_dimensions: &mut HashSet<MemberId>,
     ) -> Result<(MultiStageInodeMember, bool), CubeError> {
         let inode = if let Ok(measure) = base_member.as_measure() {
             let member_type = match measure.kind() {
@@ -217,7 +218,7 @@ impl MultiStageQueryPlanner {
                 .and_then(|d| d.multi_stage().map(|ms| ms.grain.clone()))
                 .unwrap_or_default();
             resolved_multi_stage_dimensions
-                .insert(base_member.clone().resolve_reference_chain().full_name());
+                .insert(base_member.clone().resolve_reference_chain().id().clone());
             (
                 MultiStageInodeMember::new(MultiStageInodeMemberType::Dimension, grain, None),
                 false,
@@ -237,7 +238,7 @@ impl MultiStageQueryPlanner {
         parent_state: &Rc<QueryProperties>,
         result: &mut Vec<Rc<MultiStageQueryDescription>>,
         descriptions: &mut Vec<Rc<MultiStageQueryDescription>>,
-        resolved_multi_stage_dimensions: &mut HashSet<String>,
+        resolved_multi_stage_dimensions: &mut HashSet<MemberId>,
         scope: &mut PlanningScope,
     ) -> Result<(), CubeError> {
         // The CASE-SWITCH path plans every branch dependency as its own CTE,
@@ -352,7 +353,7 @@ impl MultiStageQueryPlanner {
         parent_state: &Rc<QueryProperties>,
         result: &mut Vec<Rc<MultiStageQueryDescription>>,
         descriptions: &mut Vec<Rc<MultiStageQueryDescription>>,
-        resolved_multi_stage_dimensions: &mut HashSet<String>,
+        resolved_multi_stage_dimensions: &mut HashSet<MemberId>,
         scope: &mut PlanningScope,
     ) -> Result<(), CubeError> {
         let is_masked = |m: &Rc<MemberSymbol>| {
@@ -360,9 +361,9 @@ impl MultiStageQueryPlanner {
                 .query_tools()
                 .is_member_masked(&m.full_name())
         };
-        let rendered: HashSet<String> = rendered_dependencies(&member, &is_masked)
+        let rendered: HashSet<MemberId> = rendered_dependencies(&member, &is_masked)
             .into_iter()
-            .map(|d| d.resolve_reference_chain().full_name())
+            .map(|d| d.resolve_reference_chain().id().clone())
             .collect();
         let mut has_inputs = false;
         for dep in member.get_dependencies() {
@@ -379,7 +380,7 @@ impl MultiStageQueryPlanner {
                 if !description.is_multi_stage_dimension() || member.as_dimension().is_ok() {
                     result.push(description);
                 }
-            } else if dep.is_dimension() && rendered.contains(&dep.full_name()) {
+            } else if dep.is_dimension() && rendered.contains(dep.id()) {
                 self.check_dimension_is_reachable(&member, dep, &new_state, parent_state)?;
             }
         }
@@ -474,10 +475,7 @@ impl MultiStageQueryPlanner {
                 .chain(state.time_dimensions().iter())
             {
                 let resolved = dimension.clone().resolve_reference_chain();
-                if !members
-                    .iter()
-                    .any(|m| m.full_name() == resolved.full_name())
-                {
+                if !members.iter().any(|m| m.id() == resolved.id()) {
                     members.push(resolved);
                 }
             }
@@ -539,7 +537,7 @@ impl MultiStageQueryPlanner {
         new_state: Rc<QueryProperties>,
         result: &mut Vec<Rc<MultiStageQueryDescription>>,
         descriptions: &mut Vec<Rc<MultiStageQueryDescription>>,
-        resolved_multi_stage_dimensions: &mut HashSet<String>,
+        resolved_multi_stage_dimensions: &mut HashSet<MemberId>,
         scope: &mut PlanningScope,
     ) -> Result<bool, CubeError> {
         let CaseSwitchItem::Member(switch_member) = &case.switch else {
@@ -550,12 +548,12 @@ impl MultiStageQueryPlanner {
         // `None` marks an unrestricted (open ELSE) entry: such a dependency
         // must be processed without a prefilter on switch_member, since the
         // outer CASE will dispatch by value at row level.
-        let mut deps: IndexMap<String, (Rc<MemberSymbol>, Option<Vec<String>>)> = IndexMap::new();
+        let mut deps: IndexMap<MemberId, (Rc<MemberSymbol>, Option<Vec<String>>)> = IndexMap::new();
 
         let mut record = |dep: Rc<MemberSymbol>, branch_values: Option<Vec<String>>| {
             let dep = dep.resolve_reference_chain();
             let entry = deps
-                .entry(dep.full_name())
+                .entry(dep.id().clone())
                 .or_insert_with(|| (dep.clone(), Some(Vec::new())));
             match (&mut entry.1, branch_values) {
                 (None, _) => {} // already unrestricted
@@ -624,7 +622,7 @@ impl MultiStageQueryPlanner {
         member: Rc<MemberSymbol>,
         state: Rc<QueryProperties>,
         descriptions: &mut Vec<Rc<MultiStageQueryDescription>>,
-        resolved_multi_stage_dimensions: &mut HashSet<String>,
+        resolved_multi_stage_dimensions: &mut HashSet<MemberId>,
         scope: &mut PlanningScope,
     ) -> Result<Rc<MultiStageQueryDescription>, CubeError> {
         let member = member.resolve_reference_chain();
@@ -644,7 +642,7 @@ impl MultiStageQueryPlanner {
             state
         };
 
-        let member_name = member.full_name();
+        let member_id = member.id().clone();
         // Skip without-member leaves: they carry the rank/similar member's
         // own name only to select its dimension grid, so `(member, state)`
         // alone can't tell them apart from the member's real inode CTE. A
@@ -782,8 +780,8 @@ impl MultiStageQueryPlanner {
                 if let Some(time_shift) = multi_stage_member.time_shift() {
                     new_state.add_time_shifts(time_shift.clone())?;
                 }
-                if new_state.has_filters_for_member(&member_name) {
-                    new_state.remove_filter_for_member(&member_name);
+                if new_state.has_filters_for_member(&member_id) {
+                    new_state.remove_filter_for_member(&member_id);
                 }
                 Rc::new(new_state)
             };
@@ -811,12 +809,12 @@ impl MultiStageQueryPlanner {
             let mut keys_input: Vec<Rc<MultiStageQueryDescription>> = vec![];
             if !use_window_path {
                 let new_state_has = |sym: &Rc<MemberSymbol>| {
-                    let sym_name = sym.clone().resolve_reference_chain().full_name();
+                    let sym_id = sym.clone().resolve_reference_chain().id().clone();
                     new_state
                         .dimensions()
                         .iter()
                         .chain(new_state.time_dimensions().iter())
-                        .any(|d| d.clone().resolve_reference_chain().full_name() == sym_name)
+                        .any(|d| d.clone().resolve_reference_chain().id() == &sym_id)
                 };
                 let any_missing = state
                     .dimensions()
@@ -868,7 +866,7 @@ impl MultiStageQueryPlanner {
         member: Rc<MemberSymbol>,
         state: Rc<QueryProperties>,
         descriptions: &mut Vec<Rc<MultiStageQueryDescription>>,
-        resolved_multi_stage_dimensions: &mut HashSet<String>,
+        resolved_multi_stage_dimensions: &mut HashSet<MemberId>,
         scope: &mut PlanningScope,
     ) -> Result<Option<Rc<MultiStageQueryDescription>>, CubeError> {
         if let Ok(measure) = member.as_measure() {
@@ -955,7 +953,7 @@ impl MultiStageQueryPlanner {
                 }
                 let uniq_time_dimensions = time_dimensions
                     .iter()
-                    .unique_by(|a| (a.cube_name(), a.name(), a.date_range_vec()))
+                    .unique_by(|a| (a.cube_id(), a.name(), a.date_range_vec()))
                     .collect_vec();
                 if uniq_time_dimensions.len() != 1 {
                     return Err(CubeError::internal(
@@ -1313,7 +1311,7 @@ impl MultiStageQueryPlanner {
         GranularityHelper::make_granularity_obj(
             self.query_tools.cube_evaluator().clone(),
             &mut compiler,
-            &time_dimension.cube_name(),
+            &time_dimension.cube_id(),
             &time_dimension.name(),
             Some(granularity.to_string()),
         )
@@ -1461,7 +1459,7 @@ impl MultiStageQueryPlanner {
             if let FilterItem::Item(filter) = filter_item {
                 if matches!(filter.filter_operator(), FilterOperator::InDateRange) {
                     new_state.replace_date_range_for_rolling_window_without_granularity(
-                        &filter.member_name(),
+                        &filter.member_id(),
                         &rolling_window.trailing,
                         &rolling_window.leading,
                         rolling_window.offset.as_deref().unwrap_or("end"),
@@ -1485,7 +1483,7 @@ impl MultiStageQueryPlanner {
         state: Rc<QueryProperties>,
     ) -> Result<(Rc<QueryProperties>, Rc<MemberSymbol>), CubeError> {
         let time_dimension_symbol = time_dimension.as_time_dimension()?;
-        let time_dimension_base_name = time_dimension_symbol.base_symbol().full_name();
+        let time_dimension_base_id = time_dimension_symbol.base_symbol().id().clone();
         let mut new_state = state.as_ref().clone();
         let trailing_granularity =
             GranularityHelper::granularity_from_interval(&rolling_window.trailing);
@@ -1520,13 +1518,13 @@ impl MultiStageQueryPlanner {
         if let Some(granularity) = self.get_to_date_rolling_granularity(rolling_window)? {
             let window_bounds = self.to_date_window_bounds(&time_dimension_symbol, &granularity)?;
             new_state.replace_to_date_date_range_filter(
-                &time_dimension_base_name,
+                &time_dimension_base_id,
                 &granularity,
                 window_bounds,
             )?;
         } else {
             new_state.replace_regular_date_range_filter(
-                &time_dimension_base_name,
+                &time_dimension_base_id,
                 rolling_window.trailing.clone(),
                 rolling_window.leading.clone(),
                 self.regular_scan_span(&time_dimension_symbol, rolling_window)?,
@@ -1555,13 +1553,13 @@ fn dimension_is_reachable(
     parent_state: &QueryProperties,
     is_masked: &dyn Fn(&Rc<MemberSymbol>) -> bool,
 ) -> bool {
-    let target = dimension.full_name();
+    let target = dimension.id();
     let carries = |state: &QueryProperties| {
         state
             .dimensions()
             .iter()
             .chain(state.time_dimensions().iter())
-            .any(|d| d.clone().resolve_reference_chain().full_name() == target)
+            .any(|d| d.clone().resolve_reference_chain().id() == target)
     };
     if carries(grain_state) || carries(parent_state) {
         return true;
@@ -1681,17 +1679,14 @@ fn multi_stage_filter_directive(member: &Rc<MemberSymbol>) -> Option<MultiStageF
 //    restricts the switch dimension, case branches are pruned at symbol
 //    level; the subsequent `mode: fixed` reset cannot un-prune them.
 //
-// `add_dimension_evaluator` wraps segment references into a `MemberExpression`
-// whose `full_name()` is prefixed with `expr:` (e.g. `expr:orders.completed`).
-// `BaseSegment::full_name()` carries the bare path (`orders.completed`). To make
-// `exclude`/`keep_only` match both forms, return the symbol's `full_name()`
-// alongside its `expr:`-stripped variant.
-fn filter_directive_match_names(symbol: &Rc<MemberSymbol>) -> Vec<String> {
-    let full = symbol.full_name();
-    if let Some(stripped) = full.strip_prefix("expr:") {
-        vec![full.clone(), stripped.to_string()]
+// Segment references compile to an `expr:` id while a `BaseSegment` keeps the
+// plain member id; `exclude`/`keep_only` must match both.
+fn filter_directive_match_ids(symbol: &Rc<MemberSymbol>) -> Vec<MemberId> {
+    let id = symbol.id().clone();
+    if let Some(named) = id.named_member() {
+        vec![id, named]
     } else {
-        vec![full]
+        vec![id]
     }
 }
 
@@ -1743,16 +1738,16 @@ fn query_filters_dropped(
 
 fn apply_filter_directive_to_state(filter: &MultiStageFilter, state: &mut QueryProperties) {
     if let Some(exclude) = &filter.exclude {
-        let names: Vec<String> = exclude
+        let names: Vec<MemberId> = exclude
             .iter()
-            .flat_map(|s| filter_directive_match_names(s))
+            .flat_map(|s| filter_directive_match_ids(s))
             .collect();
         state.remove_filters_for_members(&names);
     }
     if let Some(keep_only) = &filter.keep_only {
-        let names: Vec<String> = keep_only
+        let names: Vec<MemberId> = keep_only
             .iter()
-            .flat_map(|s| filter_directive_match_names(s))
+            .flat_map(|s| filter_directive_match_ids(s))
             .collect();
         state.keep_only_filters_for_members(&names);
     }

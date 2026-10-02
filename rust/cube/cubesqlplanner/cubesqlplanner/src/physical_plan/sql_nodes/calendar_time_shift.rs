@@ -3,7 +3,7 @@ use crate::physical_plan::SqlEvaluatorVisitor;
 use crate::planner::query_tools::QueryTools;
 use crate::planner::sql_templates::PlanSqlTemplates;
 use crate::planner::symbols::CalendarDimensionTimeShift;
-use crate::planner::MemberSymbol;
+use crate::planner::{MemberId, MemberSymbol};
 use cubenativeutils::CubeError;
 use std::any::Any;
 use std::collections::HashMap;
@@ -14,13 +14,13 @@ use std::rc::Rc;
 /// renders the shifted reference (interval / named slot / custom
 /// SQL) declared on the calendar cube.
 pub struct CalendarTimeShiftSqlNode {
-    shifts: HashMap<String, CalendarDimensionTimeShift>, // Key is the full pk name of the calendar cube
+    shifts: HashMap<MemberId, CalendarDimensionTimeShift>, // Key is the pk of the calendar cube
     input: Rc<dyn SqlNode>,
 }
 
 impl CalendarTimeShiftSqlNode {
     pub fn new(
-        shifts: HashMap<String, CalendarDimensionTimeShift>,
+        shifts: HashMap<MemberId, CalendarDimensionTimeShift>,
         input: Rc<dyn SqlNode>,
     ) -> Rc<Self> {
         Rc::new(Self { shifts, input })
@@ -43,7 +43,7 @@ impl SqlNode for CalendarTimeShiftSqlNode {
         let res = match node.as_ref() {
             MemberSymbol::Dimension(ev) => {
                 if !ev.is_reference() {
-                    if let Some(shift) = self.shifts.get(&ev.full_name()) {
+                    if let Some(shift) = self.shifts.get(ev.id()) {
                         if let Some(sql) = &shift.sql {
                             sql.eval(
                                 visitor,

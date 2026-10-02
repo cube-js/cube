@@ -17,7 +17,7 @@ impl SubQueryDimensionsCollector {
     pub fn extract_result(self) -> Vec<Rc<MemberSymbol>> {
         self.sub_query_dimensions
             .into_iter()
-            .unique_by(|m| m.full_name())
+            .unique_by(|m| m.id().clone())
             .collect()
     }
 

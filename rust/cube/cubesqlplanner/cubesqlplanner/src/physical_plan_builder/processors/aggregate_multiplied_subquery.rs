@@ -113,7 +113,7 @@ impl<'a> LogicalNodeProcessor<'a, AggregateMultipliedSubquery>
                 // makes the lineage explicit for future maintenance) is preserved.
                 let mut join_context_factory = context_factory.clone();
                 join_context_factory
-                    .add_cube_name_reference(cube.cube().name().clone(), pk_cube_alias.clone());
+                    .add_cube_name_reference(cube.cube().cube_id().clone(), pk_cube_alias.clone());
                 let join_visitor_context = Rc::new(VisitorContext::new(
                     query_tools.clone(),
                     &join_context_factory,

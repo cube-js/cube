@@ -1,7 +1,7 @@
 use cubenativeutils::CubeError;
 use itertools::Itertools;
 
-use crate::planner::{Case, CubeRef, SqlCall};
+use crate::planner::{Case, CubeId, CubeRef, MemberId, SqlCall};
 
 use super::common::CompiledMemberPath;
 use super::deps::{self, DepVisitor, DepVisitorMut, SymbolDeps};
@@ -67,8 +67,7 @@ impl Debug for MemberSymbol {
 /// forms; it answers "the same member?", not "the same symbol?".
 impl PartialEq for MemberSymbol {
     fn eq(&self, other: &Self) -> bool {
-        self.full_name() == other.full_name()
-            && std::mem::discriminant(self) == std::mem::discriminant(other)
+        self.id() == other.id() && std::mem::discriminant(self) == std::mem::discriminant(other)
     }
 }
 
@@ -109,6 +108,10 @@ impl MemberSymbol {
         self.compiled_path().full_name().clone()
     }
 
+    pub fn id(&self) -> &MemberId {
+        self.compiled_path().id()
+    }
+
     /// Optional SQL expression that wraps the rendered member output to
     /// mask its value (data hiding / column-level masking).
     pub fn mask_sql(&self) -> Option<&Rc<SqlCall>> {
@@ -129,11 +132,11 @@ impl MemberSymbol {
         self.compiled_path().name().clone()
     }
 
-    pub fn cube_name(&self) -> String {
-        self.compiled_path().cube_name().clone()
+    pub fn cube_id(&self) -> CubeId {
+        self.compiled_path().cube_id().clone()
     }
 
-    pub fn path(&self) -> &Vec<String> {
+    pub fn path(&self) -> &Vec<CubeId> {
         self.compiled_path().path()
     }
 
@@ -249,13 +252,13 @@ impl MemberSymbol {
     /// True if `member` is this symbol or any symbol reachable via
     /// `reference_member`. Self is included.
     pub fn has_member_in_reference_chain(&self, member: &Rc<MemberSymbol>) -> bool {
-        if self.full_name() == member.full_name() {
+        if self.id() == member.id() {
             return true;
         }
 
         let mut current = self.reference_member();
         while let Some(reference) = current {
-            if reference.full_name() == member.full_name() {
+            if reference.id() == member.id() {
                 return true;
             }
             current = reference.reference_member();
@@ -393,7 +396,7 @@ impl MemberSymbol {
         if !sql_cube_deps.is_empty() {
             Err(CubeError::user(format!(
                 "Multi stage member '{}' references cubes {}. Multi stage members can only reference other members.",
-                self.full_name(), sql_cube_deps.iter().map(|dep| dep.cube_name()).join(", ")
+                self.full_name(), sql_cube_deps.iter().map(|dep| dep.cube_id()).join(", ")
             )))
         } else if sql_call.dependencies_count() == 0 {
             Err(CubeError::user(format!(
@@ -405,17 +408,14 @@ impl MemberSymbol {
         }
     }
     fn validate_regular_member_cube_refs(&self, sql_call: &Rc<SqlCall>) -> Result<(), CubeError> {
-        let cube_name = self.cube_name();
+        let cube_name = self.cube_id();
         let sql_cube_deps = sql_call.cube_name_deps();
-        if sql_cube_deps
-            .iter()
-            .any(|dep| dep.cube_name() != &cube_name)
-        {
+        if sql_cube_deps.iter().any(|dep| dep.cube_id() != &cube_name) {
             Err(CubeError::user(format!(
                 "Member '{}' references foreign cubes: {}. Please split and move this definition to corresponding cubes.",
                 self.full_name(), sql_cube_deps.iter().filter_map(|dep|
-                    if dep.cube_name() != &cube_name {
-                        Some(dep.cube_name())
+                    if dep.cube_id() != &cube_name {
+                        Some(dep.cube_id())
                     } else {
                         None
                     }

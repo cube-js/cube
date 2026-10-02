@@ -4,7 +4,7 @@ use super::MemberSymbol;
 use crate::planner::query_tools::QueryTools;
 use crate::planner::state::State;
 use crate::planner::time_dimension::Granularity;
-use crate::planner::{GranularityHelper, QueryDateTime, QueryDateTimeHelper};
+use crate::planner::{CubeId, GranularityHelper, MemberId, QueryDateTime, QueryDateTimeHelper};
 use chrono::Duration;
 use chrono_tz::Tz;
 use cubenativeutils::CubeError;
@@ -76,11 +76,11 @@ impl TimeDimensionSymbol {
         let alias = alias_override
             .clone()
             .unwrap_or_else(|| format!("{}_{}", base_symbol.alias(), name_suffix));
-        let full_name = format!("{}_{}", base_symbol.full_name(), name_suffix);
+        let id = MemberId::time_dimension(base_symbol.id().clone(), granularity.as_deref());
 
         let compiled_path = CompiledMemberPath::new(
             base_symbol.compiled_path().cube().clone(),
-            full_name,
+            id,
             base_symbol.name().clone(),
             alias,
             base_symbol.path().clone(),
@@ -143,7 +143,7 @@ impl TimeDimensionSymbol {
         let new_granularity_obj = GranularityHelper::make_granularity_obj(
             state.cube_evaluator().clone(),
             &mut evaluator_compiler,
-            &&self.base_symbol.cube_name(),
+            &&self.base_symbol.cube_id(),
             &self.base_symbol.name(),
             new_granularity.clone(),
         )?;
@@ -189,6 +189,10 @@ impl TimeDimensionSymbol {
     /// dimension name and the granularity suffix.
     pub fn full_name(&self) -> String {
         self.compiled_path.full_name().clone()
+    }
+
+    pub fn id(&self) -> &crate::planner::MemberId {
+        self.compiled_path.id()
     }
 
     /// Granularity name appended to the base symbol's alias and full
@@ -260,11 +264,11 @@ impl TimeDimensionSymbol {
             .collect()
     }
 
-    pub fn cube_name(&self) -> String {
-        self.compiled_path.cube_name().clone()
+    pub fn cube_id(&self) -> CubeId {
+        self.compiled_path.cube_id().clone()
     }
 
-    pub fn path(&self) -> &Vec<String> {
+    pub fn path(&self) -> &Vec<CubeId> {
         self.compiled_path.path()
     }
 

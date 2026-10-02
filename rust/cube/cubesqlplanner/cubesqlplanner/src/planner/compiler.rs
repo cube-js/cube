@@ -2,7 +2,7 @@ use super::symbols::{MemberExpressionExpression, MemberExpressionSymbol, MemberS
 use super::SymbolPath;
 use super::SymbolPathType;
 use super::{
-    CubeNameSymbol, CubeNameSymbolFactory, CubeTableSymbol, CubeTableSymbolFactory,
+    CubeId, CubeNameSymbol, CubeNameSymbolFactory, CubeTableSymbol, CubeTableSymbolFactory,
     DimensionSymbolFactory, MeasureSymbolFactory, SqlCall, SymbolFactory,
 };
 use crate::cube_bridge::base_tools::BaseTools;
@@ -34,8 +34,8 @@ pub struct Compiler {
     timezone: Tz,
     member_to_alias: Option<HashMap<String, String>>,
     members: HashMap<SymbolPath, Rc<MemberSymbol>>,
-    cube_names: HashMap<Vec<String>, Rc<CubeNameSymbol>>,
-    cube_tables: HashMap<Vec<String>, Rc<CubeTableSymbol>>,
+    cube_names: HashMap<Vec<CubeId>, Rc<CubeNameSymbol>>,
+    cube_tables: HashMap<Vec<CubeId>, Rc<CubeTableSymbol>>,
     /// Members being resolved right now, outermost first: each one waits on the next.
     resolving: Vec<String>,
     max_resolution_depth: usize,
@@ -170,6 +170,14 @@ impl Compiler {
         dimension: String,
     ) -> Result<Rc<MemberSymbol>, CubeError> {
         let path = SymbolPath::parse(self.cube_evaluator.clone(), &dimension)?;
+        self.add_dimension_or_segment_by_path(path)
+    }
+
+    /// Like `add_dimension_evaluator`, for an already resolved path.
+    pub fn add_dimension_or_segment_by_path(
+        &mut self,
+        path: SymbolPath,
+    ) -> Result<Rc<MemberSymbol>, CubeError> {
         match path.path_type() {
             SymbolPathType::Segment => {
                 // A segment used as a dimension (a pre-aggregation projects its
@@ -215,15 +223,21 @@ impl Compiler {
         if let Some(exists) = self.members.get(&path) {
             return Ok(exists.clone());
         }
-        let full_name = path.full_name().clone();
-        let definition = self.cube_evaluator.segment_by_path(full_name.clone())?;
+        let full_name = path.full_name();
+        let definition = self
+            .cube_evaluator
+            .segment_by_path(path.member_id()?.target_path())?;
         let sql_call = self.resolve_nested(&path, |compiler| {
-            compiler.compile_sql_call(path.cube_name(), definition.sql()?)
+            compiler.compile_sql_call(path.cube_id(), definition.sql()?)
         })?;
         let alias = self.alias_for_member(&full_name).unwrap_or_else(|| {
-            PlanSqlTemplates::member_alias_name(path.cube_name(), path.symbol_name(), &None)
+            PlanSqlTemplates::member_alias_name(
+                &path.cube_id().to_string(),
+                path.symbol_name(),
+                &None,
+            )
         });
-        let cube_symbol = self.add_cube_table_evaluator(path.cube_name().clone(), vec![])?;
+        let cube_symbol = self.add_cube_table_evaluator(path.cube_id().clone(), vec![])?;
         let symbol = MemberExpressionSymbol::try_new(
             cube_symbol,
             path.symbol_name().clone(),
@@ -241,15 +255,15 @@ impl Compiler {
     /// placeholders. Cached by the normalised path.
     pub fn add_cube_name_evaluator(
         &mut self,
-        cube_name: String,
-        path: Vec<String>,
+        cube_id: CubeId,
+        path: Vec<CubeId>,
     ) -> Result<Rc<CubeNameSymbol>, CubeError> {
-        let cache_key = CubeNameSymbol::normalize_path(path.clone(), &cube_name);
+        let cache_key = CubeNameSymbol::normalize_path(path.clone(), &cube_id);
         if let Some(exists) = self.cube_names.get(&cache_key) {
             Ok(exists.clone())
         } else {
             let result =
-                CubeNameSymbolFactory::try_new(&cube_name, self.cube_evaluator.clone(), path)?
+                CubeNameSymbolFactory::try_new(&cube_id, self.cube_evaluator.clone(), path)?
                     .build(self)?;
             self.cube_names.insert(cache_key, result.clone());
             Ok(result)
@@ -260,15 +274,15 @@ impl Compiler {
     /// placeholders. Cached by the normalised path.
     pub fn add_cube_table_evaluator(
         &mut self,
-        cube_name: String,
-        path: Vec<String>,
+        cube_id: CubeId,
+        path: Vec<CubeId>,
     ) -> Result<Rc<CubeTableSymbol>, CubeError> {
-        let cache_key = CubeNameSymbol::normalize_path(path.clone(), &cube_name);
+        let cache_key = CubeNameSymbol::normalize_path(path.clone(), &cube_id);
         if let Some(exists) = self.cube_tables.get(&cache_key) {
             Ok(exists.clone())
         } else {
             let result =
-                CubeTableSymbolFactory::try_new(&cube_name, self.cube_evaluator.clone(), path)?
+                CubeTableSymbolFactory::try_new(&cube_id, self.cube_evaluator.clone(), path)?
                     .build(self)?;
             self.cube_tables.insert(cache_key, result.clone());
             Ok(result)
@@ -291,25 +305,25 @@ impl Compiler {
     /// to the given owning cube, via `SqlCallBuilder`.
     pub fn compile_sql_call(
         &mut self,
-        cube_name: &String,
+        cube_id: &CubeId,
         member_sql: Rc<dyn MemberSql>,
     ) -> Result<Rc<SqlCall>, CubeError> {
-        self.compile_sql_call_impl(cube_name, member_sql, false)
+        self.compile_sql_call_impl(cube_id, member_sql, false)
     }
 
     /// Compiles a cube's own `sql`, where a member reference is rejected
     /// rather than resolved.
     pub fn compile_cube_sql_call(
         &mut self,
-        cube_name: &String,
+        cube_id: &CubeId,
         member_sql: Rc<dyn MemberSql>,
     ) -> Result<Rc<SqlCall>, CubeError> {
-        self.compile_sql_call_impl(cube_name, member_sql, true)
+        self.compile_sql_call_impl(cube_id, member_sql, true)
     }
 
     fn compile_sql_call_impl(
         &mut self,
-        cube_name: &String,
+        cube_id: &CubeId,
         member_sql: Rc<dyn MemberSql>,
         is_cube_sql: bool,
     ) -> Result<Rc<SqlCall>, CubeError> {
@@ -324,7 +338,7 @@ impl Compiler {
         } else {
             call_builder
         };
-        let sql_call = call_builder.build(&cube_name, member_sql.clone())?;
+        let sql_call = call_builder.build(cube_id, member_sql.clone())?;
         Ok(Rc::new(sql_call))
     }
 
