@@ -436,6 +436,16 @@ export class OptsHandler {
       fastReload: getEnv('fastReload'),
     };
 
+    if (
+      typeof options.scheduledRefreshTimer === 'number' &&
+      getEnv('scheduledRefreshTimerIntervalOnly') &&
+      !getEnv('refreshWorkerMode')
+    ) {
+      // The number is only an interval here: whether this instance runs the
+      // refresh worker is decided by CUBEJS_REFRESH_WORKER
+      options.scheduledRefreshTimer = false;
+    }
+
     if (opts.contextToAppId && !opts.scheduledRefreshContexts) {
       this.core.logger('Multitenancy Without ScheduledRefreshContexts', {
         warning: (

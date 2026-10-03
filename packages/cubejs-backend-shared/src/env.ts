@@ -410,6 +410,11 @@ const variables: Record<string, (...args: any) => any> = {
     // so aligning this on getEnv('devMode') would silently stop it for bare instances
     return process.env.NODE_ENV !== 'production';
   },
+  // When set, a numeric `scheduledRefreshTimer` from the config only sets the
+  // refresh interval and no longer enables the refresh worker by itself
+  scheduledRefreshTimerIntervalOnly: () => get('CUBEJS_SCHEDULED_REFRESH_TIMER_INTERVAL_ONLY')
+    .default('false')
+    .asBoolStrict(),
   scheduledRefreshQueriesPerAppId: () => get('CUBEJS_SCHEDULED_REFRESH_QUERIES_PER_APP_ID').asIntPositive(),
   refreshWorkerConcurrency: () => get('CUBEJS_REFRESH_WORKER_CONCURRENCY')
     .asIntPositive(),

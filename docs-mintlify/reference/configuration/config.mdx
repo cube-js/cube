@@ -762,6 +762,10 @@ out of memory errors.
 
 </Warning>
 
+Set [`CUBEJS_SCHEDULED_REFRESH_TIMER_INTERVAL_ONLY`](/reference/configuration/environment-variables#cubejs_scheduled_refresh_timer_interval_only)
+to `true` to make a numeric value only set the interval, leaving the decision
+to run the refresh worker to [`CUBEJS_REFRESH_WORKER`](/reference/configuration/environment-variables#cubejs_refresh_worker).
+
 Cube enables background refresh by default using the [`CUBEJS_REFRESH_WORKER`](/reference/configuration/environment-variables#cubejs_refresh_worker)
 environment variable.
 
