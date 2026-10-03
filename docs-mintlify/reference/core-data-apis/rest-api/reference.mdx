@@ -885,10 +885,15 @@ Response includes:
   [private cubes and members](#private-cubes-and-members) are included
 - `title` - Human-readable title
 - `description` - Description from the data model, or an empty string
+- `meta` - [Custom metadata][ref-cubes-meta] from the data model. Omitted when
+  not defined
 - `table_references` - Data lineage to source tables, each with `data_source`,
   `table`, and, if the table is qualified, `schema`
 - `cube_references` - Relationships to other cubes, each as an object with
   `type` (currently always `upstream`) and `cube`
+- `joins` - Cubes only. The cube's [joins][ref-joins] to other cubes, sorted by
+  `cube`, each with `cube`, `relationship` (`many_to_one`, `one_to_many`, or
+  `one_to_one`), and `sql`, the join condition in the same form as member `sql`
 - `measures` and `dimensions` - Arrays of members, sorted by name
 
 Each member includes:
@@ -901,6 +906,7 @@ Each member includes:
 | `description` | Description from the data model, or an empty string |
 | `type` | The member type, e.g. `count`, `sum`, or `string` |
 | `sql` | The member's SQL definition (see below). Omitted when it can't be resolved |
+| `meta` | [Custom metadata][ref-dimensions-meta] from the data model. Omitted when not defined |
 | `is_primary_key` | Whether the dimension is a primary key. Dimensions only |
 | `member_references` | Upstream members the member is derived from, each with `cube` and `member` |
 | `column_references` | Source columns, each with `data_source`, `table`, `column`, and, if the table is qualified, `schema` |
@@ -929,6 +935,9 @@ Example response:
     "public": true,
     "title": "Orders",
     "description": "Order transactions",
+    "meta": {
+      "ai_context": "One row per order, including cancelled orders"
+    },
     "table_references": [
       {
         "data_source": "default",
@@ -937,6 +946,13 @@ Example response:
       }
     ],
     "cube_references": [],
+    "joins": [
+      {
+        "cube": "customers",
+        "relationship": "many_to_one",
+        "sql": "${CUBE}.customer_id = ${customers}.id"
+      }
+    ],
     "measures": [
       {
         "name": "total_amount",
@@ -1052,6 +1068,7 @@ entities before `offset` and `limit` are applied:
         }
       ],
       "cube_references": [],
+      "joins": [],
       "measures": [
         {
           "name": "total_amount",
@@ -1185,8 +1202,9 @@ By default, the Metadata API returns only the cubes, views, and members that are
 public (see `public` for [cubes][ref-cubes-public], [views][ref-views-public],
 [measures][ref-measures-public], and [dimensions][ref-dimensions-public]).
 References to anything it doesn't return are omitted: every entry in
-`member_references` and `cube_references` names a cube, view, or member that the
-Metadata API returns, though not necessarily in the same response.
+`member_references`, `cube_references`, and `joins` names a cube, view, or
+member that the Metadata API returns, though not necessarily in the same
+response.
 
 Data catalogs and lineage tools that need the complete data model can set
 `include_private` to `true`. Private cubes, views, and members are then returned
@@ -1206,9 +1224,9 @@ shows whether it was granted. Tokens from the general-purpose
 
 `include_private` doesn't bypass [data access policies][ref-dap]. Whatever a data
 access policy hides from the token's security context is never returned, even
-with `include_private`. It never appears in `member_references` or
-`cube_references`, and `table_references` and `column_references` are never
-traced through it.
+with `include_private`. It never appears in `member_references`,
+`cube_references`, or `joins`, and `table_references` and `column_references`
+are never traced through it.
 
 Example request:
 
@@ -1319,6 +1337,9 @@ Keep-Alive: timeout=5
 [ref-views-public]: /reference/data-modeling/view#public
 [ref-measures-public]: /reference/data-modeling/measures#public
 [ref-dimensions-public]: /reference/data-modeling/dimensions#public
+[ref-cubes-meta]: /reference/data-modeling/cube#meta
+[ref-dimensions-meta]: /reference/data-modeling/dimensions#meta
+[ref-joins]: /reference/data-modeling/joins
 [ref-dap]: /docs/data-modeling/data-access-policies
 [ref-cpa-create-token]: /api-reference/environments/create-deployment-environment-token
 [ref-cpa-meta-sync-token]: /reference/control-plane-api#apiv1deploymentsdeployment_idenvironmentsenvironment_idtokens-for-meta-sync
