@@ -1451,6 +1451,7 @@ class ApiGateway {
 
     const startTime = new Date().getTime();
     const compilerApi = await this.getCompilerApi(context);
+    const splitGranularity = await this.granularitySplitter(compilerApi, context);
 
     const queryNormalizationResult: Array<{
       normalizedQuery: NormalizedQuery,
@@ -1471,7 +1472,7 @@ class ApiGateway {
       }
 
       return {
-        normalizedQuery: (normalizeQuery(currentQuery, persistent, cacheMode)),
+        normalizedQuery: (normalizeQuery(currentQuery, persistent, cacheMode, splitGranularity)),
         hasExpressionsInQuery
       };
     });
@@ -1509,7 +1510,7 @@ class ApiGateway {
             rewrittenQuery = this.evalMemberExpressionsInQuery(rewrittenQuery);
           }
 
-          return normalizeQuery(rewrittenQuery, persistent, cacheMode);
+          return normalizeQuery(rewrittenQuery, persistent, cacheMode, splitGranularity);
         }
       )
     );
@@ -1607,6 +1608,46 @@ class ApiGateway {
         e, context, query, res, requestStarted
       });
     }
+  }
+
+  /**
+   * Tells a time dimension written with a granularity apart from a member path
+   * through joins, which the data model knows: `orders.created_at.day` against
+   * `orders.customer.city`.
+   */
+  protected async granularitySplitter(compilerApi: any, context: RequestContext) {
+    if (typeof compilerApi?.getCompilers !== 'function') {
+      return undefined;
+    }
+    const { cubeEvaluator } = await compilerApi.getCompilers({ requestId: context.requestId });
+    if (typeof cubeEvaluator?.resolveMemberPath !== 'function') {
+      return undefined;
+    }
+    return (path: string) => {
+      const resolved = cubeEvaluator.resolveMemberPath(path);
+      if (!resolved) {
+        return undefined;
+      }
+      return resolved.granularity ? { dimension: resolved.fullPath, granularity: resolved.granularity } : null;
+    };
+  }
+
+  /**
+   * The member of the data model a member path through joins names.
+   */
+  protected async memberTarget(context: RequestContext) {
+    const compilerApi = await this.getCompilerApi(context);
+    if (typeof compilerApi?.getCompilers !== 'function') {
+      return undefined;
+    }
+    const { cubeEvaluator } = await compilerApi.getCompilers({ requestId: context.requestId });
+    if (typeof cubeEvaluator?.resolveMemberPath !== 'function') {
+      return undefined;
+    }
+    return (path: string) => {
+      const resolved = cubeEvaluator.resolveMemberPath(path);
+      return resolved?.aliased ? resolved.targetPath : undefined;
+    };
   }
 
   private hasExpressionsInQuery(query: Query): boolean {
@@ -2180,7 +2221,7 @@ class ApiGateway {
           );
 
           const annotation = prepareAnnotation(
-            metaConfigResult, normalizedQuery
+            metaConfigResult, normalizedQuery, await this.memberTarget(context)
           );
 
           return this.prepareResultTransformData(
@@ -2315,7 +2356,7 @@ class ApiGateway {
           const response = await adapterApi.executeQuery(finalQuery);
 
           const annotation = prepareAnnotation(
-            metaConfigResult, normalizedQueries[0]
+            metaConfigResult, normalizedQueries[0], await this.memberTarget(context)
           );
 
           // TODO Can we just pass through data? Ensure hidden members can't be queried
@@ -2362,7 +2403,7 @@ class ApiGateway {
               Boolean(sqlQueries[index].slowQuery);
 
             const annotation = prepareAnnotation(
-              metaConfigResult, normalizedQuery
+              metaConfigResult, normalizedQuery, await this.memberTarget(context)
             );
 
             if (request.streaming) {

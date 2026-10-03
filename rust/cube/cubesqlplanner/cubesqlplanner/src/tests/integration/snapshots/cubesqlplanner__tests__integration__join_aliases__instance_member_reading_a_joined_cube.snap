@@ -1,0 +1,9 @@
+---
+source: cubesqlplanner/cubesqlplanner/src/tests/integration/join_aliases.rs
+assertion_line: 87
+expression: result
+---
+orders__customer__department_name | orders__count
+----------------------------------+--------------
+Ops                               | 2            
+Sales                             | 2

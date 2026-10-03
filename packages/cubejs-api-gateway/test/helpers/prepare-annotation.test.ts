@@ -240,3 +240,36 @@ describe('prepareAnnotation helpers', () => {
     ).toEqual({});
   });
 });
+
+describe('prepareAnnotation through join aliases', () => {
+  const metaConfig = [{
+    config: {
+      name: 'users',
+      title: 'Users',
+      measures: [{ name: 'users.count', title: 'Users Count', type: 'number' }],
+      dimensions: [
+        { name: 'users.city', title: 'Users City', type: 'string' },
+        { name: 'users.created_at', title: 'Users Created at', type: 'time' },
+      ],
+      segments: [],
+    },
+  }];
+  const memberTarget = (path: string) => ({
+    'orders.customer.count': 'users.count',
+    'orders.customer.city': 'users.city',
+    'orders.customer.created_at': 'users.created_at',
+    'orders.customer.created_at.month': 'users.created_at',
+  }[path]);
+
+  test('describes a member through an alias by its target, under the path requested', () => {
+    const result: any = prepareAnnotation(metaConfig as any, {
+      measures: ['orders.customer.count'],
+      dimensions: ['orders.customer.city'],
+      timeDimensions: [{ dimension: 'orders.customer.created_at', granularity: 'month' }],
+    }, memberTarget);
+    expect(result.measures['orders.customer.count'].title).toBe('Users Count');
+    expect(result.dimensions['orders.customer.city'].title).toBe('Users City');
+    expect(result.timeDimensions['orders.customer.created_at.month'].title).toBe('Users Created at');
+    expect(result.timeDimensions['orders.customer.created_at'].title).toBe('Users Created at');
+  });
+});

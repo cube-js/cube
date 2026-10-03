@@ -3,7 +3,7 @@ use super::FilterOperator;
 use crate::cube_bridge::base_query_options::{FilterItem as NativeFilterItem, FilterValue};
 use crate::planner::filter::{FilterGroup, FilterGroupOperator, FilterItem};
 use crate::planner::query_tools::QueryTools;
-use crate::planner::{Compiler, MemberSymbol, SymbolPath, SymbolPathType};
+use crate::planner::{Compiler, CubeId, MemberSymbol, SymbolPath, SymbolPathType};
 use cubenativeutils::CubeError;
 use std::collections::HashMap;
 use std::rc::Rc;
@@ -17,6 +17,7 @@ use std::str::FromStr;
 pub struct FilterCompiler<'a> {
     evaluator_compiler: &'a mut Compiler,
     query_tools: Rc<QueryTools>,
+    owner: Option<CubeId>,
     dimension_filters: Vec<FilterItem>,
     time_dimension_filters: Vec<FilterItem>,
     measures_filters: Vec<FilterItem>,
@@ -28,10 +29,29 @@ impl<'a> FilterCompiler<'a> {
         Self {
             evaluator_compiler,
             query_tools,
+            owner: None,
             dimension_filters: vec![],
             time_dimension_filters: vec![],
             measures_filters: vec![],
             member_paths: HashMap::new(),
+        }
+    }
+
+    /// Filters a member of `owner` declares. Inside a joined cube instance
+    /// their members name the data-model cube, so they resolve relative to
+    /// the instance.
+    pub fn for_owner(mut self, owner: CubeId) -> Self {
+        self.owner = Some(owner);
+        self
+    }
+
+    fn parse_member(&self, member: &str) -> Result<SymbolPath, CubeError> {
+        match self.owner.as_ref().filter(|owner| owner.is_joined()) {
+            Some(owner) => {
+                let parts = member.split('.').map(|s| s.to_string()).collect::<Vec<_>>();
+                SymbolPath::parse_parts(self.query_tools.model_cubes(), Some(owner), &parts)
+            }
+            None => SymbolPath::parse(self.query_tools.model_cubes(), member),
         }
     }
 
@@ -140,7 +160,7 @@ impl<'a> FilterCompiler<'a> {
         if let Some(path) = self.member_paths.get(member) {
             return Ok(path.clone());
         }
-        let path = SymbolPath::parse(self.query_tools.cube_evaluator().clone(), member)?;
+        let path = self.parse_member(member)?;
         self.member_paths.insert(member.clone(), path.clone());
         Ok(path)
     }

@@ -1,3 +1,4 @@
+use super::join_item_definition::{JoinItemDefinition, NativeJoinItemDefinition};
 use super::member_sql::{MemberSql, NativeMemberSql};
 use super::view_filter_definition::{NativeViewFilterDefinition, ViewFilterDefinition};
 use cubenativeutils::wrappers::serializer::{
@@ -42,4 +43,6 @@ pub trait CubeDefinition {
     fn sql(&self) -> Result<Option<Rc<dyn MemberSql>>, CubeError>;
     #[nbridge(field, optional, vec)]
     fn default_filters(&self) -> Result<Option<Vec<Rc<dyn ViewFilterDefinition>>>, CubeError>;
+    #[nbridge(field, optional, vec)]
+    fn joins(&self) -> Result<Option<Vec<Rc<dyn JoinItemDefinition>>>, CubeError>;
 }

@@ -125,13 +125,13 @@ export class JoinGraph implements CompilerInterface {
     const joinRequired =
       (v) => `primary key for '${v}' is required when join is defined in order to make aggregates work properly`;
 
-    const duplicates = this.reportDuplicateJoinTargets(cube, errorReporter);
+    const conflicting = this.reportConflictingJoins(cube, errorReporter);
 
     return cube.joins
       .filter(join => {
         // Which of the conflicting declarations was meant is unknowable, so none
         // of them becomes an edge
-        if (duplicates.has(join.name)) {
+        if (conflicting.has(join.alias ?? join.name)) {
           return false;
         }
 
@@ -152,7 +152,9 @@ export class JoinGraph implements CompilerInterface {
           return false;
         }
 
-        return true;
+        // An aliased join is reachable only through its alias, and join paths
+        // can not name an alias yet
+        return !join.alias;
       })
       .map(join => {
         const joinEdge: JoinEdge = {
@@ -168,45 +170,90 @@ export class JoinGraph implements CompilerInterface {
   }
 
   /**
-   * Only one edge per pair of cubes fits into the graph, so several declarations
-   * for the same pair would leave the join path ambiguous.
+   * A join is named by its alias, or by the joined cube when it has no alias.
+   * Names must be unique within a cube, and several joins to the same cube must
+   * all be aliased, otherwise the join path is ambiguous.
+   * Returns the names of the joins to drop.
    */
-  protected reportDuplicateJoinTargets(cube: CubeDefinition, errorReporter: ErrorReporter): Set<string> {
-    const duplicates = new Set<string>();
+  protected reportConflictingJoins(cube: CubeDefinition, errorReporter: ErrorReporter): Set<string> {
+    const conflicting = new Set<string>();
     // The raw definition, not `cube.joins`: `extends` merges the parent's joins
-    // in, and a child redeclaring one of them is a supported override. Duplicates
+    // in, and a child redeclaring one of them is a supported override. Conflicts
     // a parent declares are reported and dropped on the parent's own edges; a
     // cube extending it still resolves through one of them
     const ownJoins = this.cubeEvaluator.cubeDefinitions[cube.name]?.joins;
 
     // The map form is keyed by the joined cube name and can not hold duplicates
     if (!Array.isArray(ownJoins)) {
-      return duplicates;
+      return conflicting;
     }
 
-    const declarationsByCube = new Map<string, number[]>();
+    const byTarget = new Map<string, number[]>();
+    const byName = new Map<string, number[]>();
+    const push = (map: Map<string, number[]>, key: string, index: number) => {
+      const indexes = map.get(key) ?? [];
+      indexes.push(index);
+      map.set(key, indexes);
+    };
 
     ownJoins.forEach((join, index) => {
       if (!join?.name) {
         return;
       }
-      const declarations = declarationsByCube.get(join.name) ?? [];
-      declarations.push(index);
-      declarationsByCube.set(join.name, declarations);
+      push(byTarget, join.name, index);
+      push(byName, join.alias ?? join.name, index);
     });
 
-    for (const [joinedCube, indexes] of declarationsByCube.entries()) {
-      if (indexes.length > 1) {
-        duplicates.add(joinedCube);
-        const declarations = indexes.map(index => `joins[${index}]`).join(', ');
+    const declarations = (indexes: number[]) => indexes.map(index => `joins[${index}]`).join(', ');
+
+    const memberNames = new Set<string>(
+      ['measures', 'dimensions', 'segments', 'preAggregations']
+        .flatMap(type => Object.keys(cube[type] || {}))
+    );
+    ownJoins.forEach((join, index) => {
+      // A path segment naming the alias must not be readable as a member too
+      if (join?.alias && (memberNames.has(join.alias) || join.alias === 'CUBE' || join.alias === 'TABLE')) {
+        conflicting.add(join.alias);
         errorReporter.error(
-          `Cube '${cube.name}' declares ${indexes.length} joins to '${joinedCube}' (${declarations}). Only one join per pair of cubes is supported. Keep a single join to '${joinedCube}', or use extends to create a child cube of '${joinedCube}' and join that instead`,
+          `Cube '${cube.name}' declares a join to '${join.name}' (joins[${index}]) with the alias '${join.alias}', which is the name of a member of '${cube.name}' or a reserved name. Pick a different alias`,
+          cube.fileName
+        );
+      }
+    });
+
+    ownJoins.forEach((join, index) => {
+      // Would read as unaliased while being dropped from the graph as aliased
+      if (join?.alias && join.alias === join.name) {
+        conflicting.add(join.name);
+        errorReporter.error(
+          `Cube '${cube.name}' declares a join to '${join.name}' (joins[${index}]) with the alias '${join.alias}', which is the name of the joined cube. Remove the alias, or pick a different one`,
+          cube.fileName
+        );
+      }
+    });
+
+    for (const [joinedCube, indexes] of byTarget.entries()) {
+      if (indexes.length > 1 && indexes.some(index => !ownJoins[index].alias)) {
+        conflicting.add(joinedCube);
+        errorReporter.error(
+          `Cube '${cube.name}' declares ${indexes.length} joins to '${joinedCube}' (${declarations(indexes)}). Several joins to the same cube must each declare a distinct alias. Add an alias to each of them, or keep a single join to '${joinedCube}'`,
           cube.fileName
         );
       }
     }
 
-    return duplicates;
+    for (const [name, indexes] of byName.entries()) {
+      // Unaliased joins sharing a name share the joined cube, reported above
+      if (indexes.length > 1 && indexes.some(index => ownJoins[index].alias)) {
+        conflicting.add(name);
+        errorReporter.error(
+          `Cube '${cube.name}' declares ${indexes.length} joins named '${name}' (${declarations(indexes)}). A join is named by its alias, or by the joined cube when it has no alias, and the name must be unique within a cube`,
+          cube.fileName
+        );
+      }
+    }
+
+    return conflicting;
   }
 
   protected buildJoinNode(cube: CubeDefinition): Record<string, 1> {

@@ -1,4 +1,4 @@
-use crate::planner::Compiler;
+use crate::planner::{Compiler, ModelCubes};
 use crate::test_fixtures::cube_bridge::{MockBaseTools, MockCubeEvaluator, MockSecurityContext};
 use chrono_tz::Tz;
 use std::rc::Rc;
@@ -19,7 +19,7 @@ impl TestCompiler {
         let base_tools = Rc::new(MockBaseTools::default());
         let security_context = Rc::new(MockSecurityContext);
         let compiler = Compiler::new(
-            evaluator,
+            ModelCubes::new(evaluator),
             base_tools,
             security_context,
             timezone,
