@@ -68,6 +68,14 @@ With grouping on, every row dimension except the innermost becomes a group level
 nest one header per level, kept contiguous by that dimension's first-appearance order,
 with the header showing the dimension's value once instead of on every row underneath.
 
+Trailing dimensions that add no rows stay on the row itself instead of becoming group
+levels. For example, in a table grouped by `category › product › sku`, where every
+product has exactly one SKU, grouping stops at `category`: each row shows its product
+and SKU side by side, rather than every product getting a header with a single row
+under it. The outermost row dimension always groups. If the result hits the query's
+row limit, every dimension except the innermost groups as usual, because a partial
+result can't show which dimensions add rows.
+
 Turning it on also adds a **Row grouping** section to the **Style** tab, with:
 
 - **Expand all groups** / **Collapse all groups** — set every group's expand state at once.
