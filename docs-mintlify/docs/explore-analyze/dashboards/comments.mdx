@@ -51,22 +51,28 @@ resolved thread or add reactions to it.
 To open it again, choose **Re-open thread** from the same menu. The thread goes
 back to the **Open** tab.
 
-## Comments on a chart
+## Comments on a widget
 
-A thread can be about one chart instead of the whole dashboard. Open the chart
-tile's menu (`⋮`) and choose **Add comment**. The item shows the number of
-unresolved threads on that chart. The panel opens and shows only that chart's
-threads, and the box reads **Start a thread on {chart}…**.
+A thread can be about one widget instead of the whole dashboard: a
+[chart][ref-charts], a [text][ref-text] widget, or an [AI summary][ref-ai-summary].
+Move the pointer over the widget and click **Comment**. The panel opens and
+shows only that widget's threads, and the box reads **Start a thread on
+{widget}…**.
 
-{/* TODO: screenshot — a chart tile's ⋮ menu with the Add comment item and its unresolved count */}
+When a widget has unresolved threads, its button shows their number, for
+example **Comments (2)**. This button stays visible when the pointer is not on
+the widget.
+
+{/* TODO: screenshot — a dashboard with a chart, a text widget and an AI summary, each with its Comment button */}
 
 To change which threads the panel shows, use the picker at the top of the panel.
 Choose **All threads** to see every thread on the dashboard, or choose one
-chart. In the list, a thread about a chart shows the chart's name:
+widget. In the list, a thread about a widget shows the widget's name:
 
-- A chart without a title shows as **Untitled chart**.
-- A chart that was removed from the dashboard shows as **Removed chart**. Its
-  threads stay on the dashboard and you can still read them. If the chart comes
+- A widget without a title shows as **Untitled chart**, **Untitled text**, or
+  **Untitled analysis**.
+- A widget that was removed from the dashboard shows as **Removed widget**. Its
+  threads stay on the dashboard and you can still read them. If the widget comes
   back to the dashboard, its threads attach to it again.
 
 ## Editing and deleting
@@ -142,3 +148,6 @@ comment that is posted or edited.
 [ref-sharing]: /docs/organize-content/sharing#dashboard-comments
 [ref-audit-log]: /admin/monitoring/audit-log#event-types
 [ref-embed-comments]: /embedding/iframe/dashboards#comments
+[ref-charts]: /docs/explore-analyze/dashboards/widgets/charts
+[ref-text]: /docs/explore-analyze/dashboards/widgets/text
+[ref-ai-summary]: /docs/explore-analyze/dashboards/widgets/ai-summary
