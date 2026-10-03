@@ -5,8 +5,8 @@ use crate::{
         rules::{members::MemberRules, wrapper::WrapperRules},
         transforming_rewrite, wrapped_select, wrapped_select_having_expr_empty_tail,
         wrapped_select_joins_empty_tail, wrapper_pullup_replacer, wrapper_replacer_context,
-        LogicalPlanLanguage, WrappedSelectAlias, WrappedSelectSelectType, WrappedSelectType,
-        WrapperReplacerContextAliasToCube,
+        LogicalPlanLanguage, WrappedSelectAlias, WrappedSelectLimit, WrappedSelectOffset,
+        WrappedSelectSelectType, WrappedSelectType, WrapperReplacerContextAliasToCube,
     },
     var, var_iter, var_list_iter,
 };
@@ -385,6 +385,9 @@ impl WrapperRules {
                     "?inner_projection_expr",
                     "?inner_group_expr",
                     "?inner_aggr_expr",
+                    "?inner_joins",
+                    "?inner_limit",
+                    "?inner_offset",
                     "?alias_to_cube",
                     "?select_alias",
                     "?alias_to_cube_out",
@@ -459,6 +462,9 @@ impl WrapperRules {
         inner_projection_expr_var: &'static str,
         _inner_group_expr_var: &'static str,
         _inner_aggr_expr_var: &'static str,
+        inner_joins_var: &'static str,
+        inner_limit_var: &'static str,
+        inner_offset_var: &'static str,
         alias_to_cube_var: &'static str,
         select_alias_var: &'static str,
         alias_to_cube_out_var: &'static str,
@@ -467,6 +473,9 @@ impl WrapperRules {
         let projection_expr_var = var!(projection_expr_var);
         let inner_select_type_var = var!(inner_select_type_var);
         let inner_projection_expr_var = var!(inner_projection_expr_var);
+        let inner_joins_var = var!(inner_joins_var);
+        let inner_limit_var = var!(inner_limit_var);
+        let inner_offset_var = var!(inner_offset_var);
         let alias_to_cube_var = var!(alias_to_cube_var);
         let select_alias_var = var!(select_alias_var);
         let alias_to_cube_out_var = var!(alias_to_cube_out_var);
@@ -497,7 +506,22 @@ impl WrapperRules {
                     return match select_type {
                         WrappedSelectType::Projection => {
                             // TODO changes of alias can be non-trivial
-                            subst[projection_expr_var] != subst[inner_projection_expr_var]
+                            if subst[projection_expr_var] != subst[inner_projection_expr_var] {
+                                return true;
+                            }
+
+                            // Identical projections are still non-trivial over an inner select
+                            // with joins, limit or offset
+                            let inner_has_joins =
+                                var_list_iter!(egraph[subst[inner_joins_var]], WrappedSelectJoins)
+                                    .any(|joins| !joins.is_empty());
+                            let inner_has_limit =
+                                var_iter!(egraph[subst[inner_limit_var]], WrappedSelectLimit)
+                                    .any(|limit| limit.is_some());
+                            let inner_has_offset =
+                                var_iter!(egraph[subst[inner_offset_var]], WrappedSelectOffset)
+                                    .any(|offset| offset.is_some());
+                            inner_has_joins || inner_has_limit || inner_has_offset
                         }
                         WrappedSelectType::Aggregate => {
                             // TODO write rules for non trivial wrapped aggregate
