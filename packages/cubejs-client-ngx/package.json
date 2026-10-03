@@ -44,7 +44,7 @@
     "jest": "^29",
     "jest-environment-jsdom": "^29",
     "jest-preset-angular": "^14.6.2",
-    "ng-packagr": "^20.3.2",
+    "ng-packagr": "^22.1.1",
     "rxjs": "~7.8.0",
     "typescript": "~5.8.3",
     "zone.js": "~0.15.0"
