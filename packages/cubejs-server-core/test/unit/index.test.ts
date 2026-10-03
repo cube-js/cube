@@ -699,7 +699,6 @@ describe('index.test', () => {
     }
   ) => {
     test(`CUBEJS_SCHEDULED_REFRESH_TIMER_INTERVAL_ONLY with scheduledRefreshTimer ${input}, CUBEJS_REFRESH_WORKER=${refreshWorker}, NODE_ENV=${nodeEnv}`, async () => {
-      const prevNodeEnv = process.env.NODE_ENV;
       process.env.NODE_ENV = nodeEnv;
       process.env.CUBEJS_SCHEDULED_REFRESH_TIMER_INTERVAL_ONLY = 'true';
       if (refreshWorker !== undefined) {
@@ -720,7 +719,6 @@ describe('index.test', () => {
 
       await cubejsServerCore.beforeShutdown();
       await cubejsServerCore.shutdown();
-      process.env.NODE_ENV = prevNodeEnv;
     });
   };
 
