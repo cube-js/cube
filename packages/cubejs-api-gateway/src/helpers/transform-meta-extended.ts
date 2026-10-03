@@ -39,6 +39,7 @@ function transformCube(cube: any, cubeDefinitions: any) {
     ...cube,
     extends: stringifyMemberSql(cubeDefinitions[cube?.name]?.extends),
     sql: stringifyMemberSql(cubeDefinitions[cube?.name]?.sql),
+    sql_table: cubeDefinitions[cube?.name]?.sql_table,
     fileName: cubeDefinitions[cube?.name]?.fileName,
     refreshKey: cubeDefinitions[cube?.name]?.refreshKey,
   };
