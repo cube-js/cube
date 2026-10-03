@@ -171,8 +171,9 @@ From the list, you can:
   Recent Chats sidebar immediately. On a
   [conditional task](#conditional-tasks), **Run now** runs the agent without
   checking the condition.
-- **Check now** — on a conditional task, check the condition right away. The
-  result shows on the task's detail page.
+- **Check now** — on a conditional task, check the condition right away. A
+  **Check started** notification appears, and the result shows on the task's
+  detail page.
 - **Delete** a task. Deleting removes its schedule and stops all future runs.
 
 {/* TODO: screenshot — New task dropdown with Create with agent and Set up manually options */}
@@ -193,7 +194,9 @@ The page shows:
   result (**Condition not met**, **Condition met — notified**, **Still
   holding — already notified**, **Could not check**, or **Check failed**),
   the value it read with the comparison it made, and, when nothing was
-  sent, why.
+  sent, why. While a check runs, it reads **Checking…**. After a
+  **Condition met — notified** check, the agent run it started appears in
+  **History** on the same page.
 - **History** — the task's runs, newest first. Each entry is a timestamped
   link that opens that run's chat thread, if you can
   [access it](#managing-tasks). Currently-executing runs
