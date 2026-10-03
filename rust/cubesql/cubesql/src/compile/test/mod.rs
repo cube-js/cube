@@ -52,6 +52,8 @@ pub mod test_filters;
 #[cfg(test)]
 pub mod test_introspection;
 #[cfg(test)]
+mod test_trim;
+#[cfg(test)]
 pub mod test_udfs;
 #[cfg(test)]
 pub mod test_user_change;

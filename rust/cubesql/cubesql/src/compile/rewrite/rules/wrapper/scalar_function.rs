@@ -1,5 +1,6 @@
 use crate::{
     compile::rewrite::{
+        analysis::OriginalExpr,
         fun_expr_var_arg, list_rewrite, list_rewrite_with_vars, rewrite,
         rewriter::{CubeEGraph, CubeRewrite},
         rules::wrapper::WrapperRules,
@@ -7,6 +8,7 @@ use crate::{
         wrapper_pullup_replacer, wrapper_pushdown_replacer, wrapper_replacer_context, ListPattern,
         ListType, ScalarFunctionExprFun,
     },
+    transport::DataSource,
     var, var_iter,
 };
 use egg::Subst;
@@ -48,7 +50,7 @@ impl WrapperRules {
                         "?input_data_source",
                     ),
                 ),
-                self.transform_fun_expr("?fun", "?input_data_source"),
+                self.transform_fun_expr("?fun", "?args", "?input_data_source"),
             ),
             rewrite(
                 "wrapper-push-down-scalar-function-empty-tail",
@@ -120,9 +122,11 @@ impl WrapperRules {
     fn transform_fun_expr(
         &self,
         fun_var: &'static str,
+        args_var: &'static str,
         input_data_source_var: &'static str,
     ) -> impl Fn(&mut CubeEGraph, &mut Subst) -> bool {
         let fun_var = var!(fun_var);
+        let args_var = var!(args_var);
         let input_data_source_var = var!(input_data_source_var);
         let meta = self.meta_context.clone();
         move |egraph, subst| {
@@ -132,6 +136,30 @@ impl WrapperRules {
             };
 
             for fun in var_iter!(egraph[subst[fun_var]], ScalarFunctionExprFun).cloned() {
+                let name = fun.to_string().to_uppercase();
+                if matches!(name.as_str(), "TRIM" | "BTRIM" | "LTRIM" | "RTRIM") {
+                    let Some(OriginalExpr::List(args)) =
+                        &egraph[subst[args_var]].data.original_expr
+                    else {
+                        continue;
+                    };
+                    match &data_source {
+                        DataSource::Unrestricted => return true,
+                        DataSource::Specific(source) => {
+                            let Some(generator) = meta.data_source_to_sql_generator.get(*source)
+                            else {
+                                continue;
+                            };
+                            let templates = generator.get_sql_templates();
+                            let template =
+                                templates.scalar_function_template_name(&name, args.len());
+                            if templates.contains_template(&template) {
+                                return true;
+                            }
+                        }
+                    }
+                    continue;
+                }
                 if Self::can_rewrite_template(
                     &data_source,
                     &meta,
