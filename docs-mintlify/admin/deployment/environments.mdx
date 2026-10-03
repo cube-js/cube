@@ -108,6 +108,46 @@ Consumption? Resources? Move from  http://localhost:3000/product/deployment/clou
 
 */}
 
+## Pre-aggregations
+
+All environments of a deployment share the same Cube Store and the same
+[pre-aggregations schema][ref-preagg-schema]. There is no separate schema for
+staging or development environments, and the branch name is not part of a
+pre-aggregation table name.
+
+Cube tells pre-aggregation tables apart by the definition that produced them,
+so tables built from different branches coexist in the shared schema:
+
+- A branch that leaves a pre-aggregation unchanged is served from the tables the
+  production environment has already built. Nothing is built again.
+- A branch that changes a pre-aggregation, for example by adding a dimension or
+  editing a measure, builds its own tables next to the production ones. The
+  production environment keeps using its own tables and never serves tables
+  built from a branch.
+- Once the branch is merged, the production environment can reuse tables that
+  were already built from it instead of building them again.
+- Staging and development environments always run the most up-to-date Cube
+  version, while production follows its update channel. If the newer version
+  generates different SQL for a pre-aggregation, a branch builds its own tables
+  even though the definition is unchanged.
+- Staging and development environments have no [scheduled
+  refresh][ref-dev-mode-scheduled-refresh]. Their pre-aggregations are built
+  when first queried or when you use **Build All** or **Build Selected** on
+  the [Pre-Aggregations page][ref-preaggs-page].
+
+<Warning>
+
+Building pre-aggregations from a staging or development environment also runs
+the regular cleanup of unused tables in the shared schema. Production tables
+that were built more than 30 days ago and were not queried in the last 24 hours
+can be removed by it. The production environment rebuilds them on its next
+scheduled refresh; until then, queries served by those pre-aggregations can
+return incomplete results or fail. Avoid building large partitioned
+pre-aggregations from a branch. To test pre-aggregation builds safely, use a
+separate deployment on a different Git branch.
+
+</Warning>
+
 ## API endpoints
 
 Each environment provides its own set of API endpoints.
@@ -133,3 +173,6 @@ credentials**][ref-credentials].
 [ref-cli]: /reference/cli
 [ref-control-plane-api-staging]: /reference/control-plane-api#buildapiv1deploymentsdeployment_idbranchesstaging-environment
 [ref-generate-session]: /reference/embed-apis/generate-session
+[ref-preagg-schema]: /reference/configuration/config#pre_aggregations_schema
+[ref-preaggs-page]: /admin/monitoring/pre-aggregations#partitions
+[ref-dev-mode-scheduled-refresh]: /docs/data-modeling/dev-mode#scheduled-refresh
