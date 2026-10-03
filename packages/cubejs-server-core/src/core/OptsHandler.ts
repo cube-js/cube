@@ -439,10 +439,11 @@ export class OptsHandler {
     if (
       typeof options.scheduledRefreshTimer === 'number' &&
       getEnv('scheduledRefreshTimerIntervalOnly') &&
-      !getEnv('refreshWorkerMode')
+      !getEnv('refreshWorkerModeExplicit')
     ) {
-      // The number is only an interval here: whether this instance runs the
-      // refresh worker is decided by CUBEJS_REFRESH_WORKER
+      // The number is only an interval here: this instance runs the refresh
+      // worker only when CUBEJS_REFRESH_WORKER (or a deprecated alias) says so,
+      // not on the NODE_ENV-based default
       options.scheduledRefreshTimer = false;
     }
 

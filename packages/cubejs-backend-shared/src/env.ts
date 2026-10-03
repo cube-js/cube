@@ -389,7 +389,10 @@ const variables: Record<string, (...args: any) => any> = {
   schemaPath: () => get('CUBEJS_SCHEMA_PATH')
     .default('model')
     .asString(),
-  refreshWorkerMode: () => {
+  /**
+   * Refresh worker mode as set by env, or `undefined` when no env sets it.
+   */
+  refreshWorkerModeExplicit: (): boolean | number | undefined => {
     const refreshWorkerMode = get('CUBEJS_REFRESH_WORKER').asBool();
     if (refreshWorkerMode !== undefined) {
       return refreshWorkerMode;
@@ -406,12 +409,21 @@ const variables: Record<string, (...args: any) => any> = {
       return asBoolOrTime(process.env.CUBEJS_SCHEDULED_REFRESH_TIMER, 'CUBEJS_SCHEDULED_REFRESH_TIMER');
     }
 
+    return undefined;
+  },
+  refreshWorkerMode: () => {
+    // eslint-disable-next-line no-use-before-define
+    const refreshWorkerMode = getEnv('refreshWorkerModeExplicit');
+    if (refreshWorkerMode !== undefined) {
+      return refreshWorkerMode;
+    }
+
     // Deliberately NOT the dev mode decision: background refresh ran in dev mode too,
     // so aligning this on getEnv('devMode') would silently stop it for bare instances
     return process.env.NODE_ENV !== 'production';
   },
   // When set, a numeric `scheduledRefreshTimer` from the config only sets the
-  // refresh interval and no longer enables the refresh worker by itself
+  // refresh interval: the refresh worker runs only when an env enables it
   scheduledRefreshTimerIntervalOnly: () => get('CUBEJS_SCHEDULED_REFRESH_TIMER_INTERVAL_ONLY')
     .default('false')
     .asBoolStrict(),

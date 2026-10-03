@@ -694,10 +694,13 @@ describe('index.test', () => {
   });
 
   const expectIntervalOnlyRefreshTimer = (
-    { input, refreshWorker, output }: { input: boolean | number, refreshWorker?: string, output: number | false }
+    { input, refreshWorker, nodeEnv = 'production', output }: {
+      input: boolean | number, refreshWorker?: string, nodeEnv?: string, output: number | false
+    }
   ) => {
-    test(`CUBEJS_SCHEDULED_REFRESH_TIMER_INTERVAL_ONLY with scheduledRefreshTimer ${input}, CUBEJS_REFRESH_WORKER=${refreshWorker}`, async () => {
-      process.env.NODE_ENV = 'production';
+    test(`CUBEJS_SCHEDULED_REFRESH_TIMER_INTERVAL_ONLY with scheduledRefreshTimer ${input}, CUBEJS_REFRESH_WORKER=${refreshWorker}, NODE_ENV=${nodeEnv}`, async () => {
+      const prevNodeEnv = process.env.NODE_ENV;
+      process.env.NODE_ENV = nodeEnv;
       process.env.CUBEJS_SCHEDULED_REFRESH_TIMER_INTERVAL_ONLY = 'true';
       if (refreshWorker !== undefined) {
         process.env.CUBEJS_REFRESH_WORKER = refreshWorker;
@@ -717,12 +720,15 @@ describe('index.test', () => {
 
       await cubejsServerCore.beforeShutdown();
       await cubejsServerCore.shutdown();
+      process.env.NODE_ENV = prevNodeEnv;
     });
   };
 
   // A number alone no longer turns the refresh worker on (API / dev instances)
   expectIntervalOnlyRefreshTimer({ input: 60, output: false });
   expectIntervalOnlyRefreshTimer({ input: 60, refreshWorker: 'false', output: false });
+  // ...not even where the refresh worker would default on (NODE_ENV isn't production)
+  expectIntervalOnlyRefreshTimer({ input: 60, nodeEnv: 'development', output: false });
   // On a refresh worker the number still sets the interval
   expectIntervalOnlyRefreshTimer({ input: 60, refreshWorker: 'true', output: 60000 });
   // Booleans keep their meaning

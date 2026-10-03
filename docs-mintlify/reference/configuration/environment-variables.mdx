@@ -1649,8 +1649,9 @@ option](/reference/configuration/config#orchestrator_options).
 
 If `true`, a numeric [`scheduled_refresh_timer`](/reference/configuration/config#scheduled_refresh_timer)
 only sets the refresh worker's heartbeat interval and no longer turns the
-instance into a refresh worker by itself. Whether the refresh worker runs is
-then decided by [`CUBEJS_REFRESH_WORKER`](/reference/configuration/environment-variables#cubejs_refresh_worker).
+instance into a refresh worker by itself: the refresh worker then runs only
+when [`CUBEJS_REFRESH_WORKER`](/reference/configuration/environment-variables#cubejs_refresh_worker)
+is explicitly set to `true`.
 Use it to keep a shared configuration file from starting refresh workers on API
 instances.
 
