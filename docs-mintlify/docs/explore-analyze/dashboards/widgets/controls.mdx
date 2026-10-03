@@ -33,6 +33,8 @@ A `between` filter picks a calendar date for each bound on its **Fixed** tab, an
 
 Neither tab offers a list of values: each field takes one, and a `between` filter's two fields fill its two-entry `value` array with one bound each rather than with alternatives. The [**Selection Mode**](#single-vs-multiple-selection) switch is not offered for a time dimension either, so a time filter carries *several values* for one condition only when a hand-written [URL parameter](#sharing-the-current-selection) passes a list in its `value` — `f_orders.created_at={"type":"equals","value":["2026-01-01","2026-02-01"]}`.
 
+`is empty` and `is not empty` test for an empty string and are distinct from `is null` / `is not null`, which test for a missing value.
+
 ### Single vs. multiple selection
 
 Filters can allow either a single value or multiple values. The filter's edit sidebar sets this under **Selection Mode**, on a switch labelled **Enable multiple values** — offered on a string filter using `is`, and on no other combination. What each filter holds:
