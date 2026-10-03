@@ -767,14 +767,16 @@ const variables: Record<string, (...args: any) => any> = {
     required?: boolean,
     preAggregations?: boolean,
   }) => {
-    console.warn(
-      `The ${
-        keyByDataSource('CUBEJS_DB_SCHEMA', dataSource)
-      } is deprecated. Please, use the ${
-        keyByDataSource('CUBEJS_DB_NAME', dataSource)
-      } instead.`
-    );
     const val = get(keyByDataSource('CUBEJS_DB_SCHEMA', dataSource, preAggregations)).asString();
+    if (val) {
+      console.warn(
+        `The ${
+          keyByDataSource('CUBEJS_DB_SCHEMA', dataSource)
+        } is deprecated. Please, use the ${
+          keyByDataSource('CUBEJS_DB_NAME', dataSource)
+        } instead.`
+      );
+    }
     if (required && !val) {
       throw new Error(
         `The ${
@@ -798,14 +800,16 @@ const variables: Record<string, (...args: any) => any> = {
     required?: boolean,
     preAggregations?: boolean,
   }) => {
-    console.warn(
-      `The ${
-        keyByDataSource('CUBEJS_DATABASE', dataSource)
-      } is deprecated. Please, use the ${
-        keyByDataSource('CUBEJS_DB_NAME', dataSource)
-      } instead.`
-    );
     const val = get(keyByDataSource('CUBEJS_DATABASE', dataSource, preAggregations)).asString();
+    if (val) {
+      console.warn(
+        `The ${
+          keyByDataSource('CUBEJS_DATABASE', dataSource)
+        } is deprecated. Please, use the ${
+          keyByDataSource('CUBEJS_DB_NAME', dataSource)
+        } instead.`
+      );
+    }
     if (required && !val) {
       throw new Error(
         `The ${
@@ -1841,11 +1845,17 @@ const variables: Record<string, (...args: any) => any> = {
     dataSource,
     preAggregations,
   }: DataSourceOpts) => {
-    console.warn(
-      'The CUBEJS_DB_CATALOG is deprecated. ' +
-      'Please, use the CUBEJS_DB_PRESTO_CATALOG instead.'
-    );
-    return get(keyByDataSource('CUBEJS_DB_CATALOG', dataSource, preAggregations)).asString();
+    const val = get(keyByDataSource('CUBEJS_DB_CATALOG', dataSource, preAggregations)).asString();
+    if (val) {
+      console.warn(
+        `The ${
+          keyByDataSource('CUBEJS_DB_CATALOG', dataSource)
+        } is deprecated. Please, use the ${
+          keyByDataSource('CUBEJS_DB_PRESTO_CATALOG', dataSource)
+        } instead.`
+      );
+    }
+    return val;
   },
 
   /** ****************************************************************
