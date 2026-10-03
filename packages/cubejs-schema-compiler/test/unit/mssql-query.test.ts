@@ -283,6 +283,24 @@ describe('MssqlQuery', () => {
     expect(sql).not.toContain('TOP');
   });
 
+  it('keeps the offset for a query without ORDER BY (#7392)', async () => {
+    await compiler.compile();
+
+    // T-SQL only accepts OFFSET after an ORDER BY, so a measure-only query must still
+    // get one (e.g. ORDER BY (SELECT NULL)) instead of silently dropping the offset
+    const query = new MssqlQuery({ joinGraph, cubeEvaluator, compiler }, {
+      measures: ['visitors.count'],
+      timezone: 'UTC',
+      offset: 1,
+    });
+
+    const sql = query.buildSqlAndParams()[0];
+
+    expect(sql).toMatch(/ORDER BY/);
+    expect(sql).toContain('OFFSET 1 ROWS');
+    expect(sql).not.toMatch(/\bTOP\b/);
+  });
+
   it('renders DISTINCT before TOP in the select template', async () => {
     await compiler.compile();
 
