@@ -73,6 +73,62 @@ Select from common timezones including UTC, US timezones, London, Paris, Berlin,
 Tokyo, Shanghai, Singapore, and Sydney. Defaults to your browser's timezone if
 it matches a common one, otherwise UTC.
 
+### Control values
+
+By default, a schedule captures the dashboard the way it opens, with every
+[control][ref-controls] on its default value. To send a particular slice
+instead, turn off **Use default control values**. The dialog then lists the
+dashboard's filters, time granularity switchers, and field switchers, one row
+each. A row is titled with the control's title, or with its type (**Filter**,
+**Time Granularity**, **Dimension** or **Measure**) when the control has none.
+Controls inside a stack, grid, or tabs container get rows too.
+
+Each row has a dropdown with three choices:
+
+| Choice | What the schedule does with the control |
+| --- | --- |
+| **Use default** | Nothing. The control keeps the value the dashboard opens on. |
+| **Set to** | Sets the control to the value you pick. The row shows the control's own editor: a filter's operator and value inputs, a time granularity switcher's granularity picker limited to its allowed granularities, or a field switcher's member picker limited to the members it offers. |
+| **Clear** | Leaves the control unset, as if a viewer had cleared it. A filter stops filtering, and a time granularity switcher hands each chart back to the granularity it was built with. The control's default does not fill it back in. Field switchers don't offer **Clear**. |
+
+These values are what the schedule's [notification][ref-notifications] shows.
+The screenshot, the [AI summary][ref-ai-summary], and the dashboard link in the
+email or Slack message all use them, and the screenshot's queries re-check the
+cache for that slice before it is taken. **Set to** and **Clear** win over what
+the default option of a [parent control][ref-parent] would set for the control.
+
+<Info>
+
+Control values take effect only through a notification. Without one, the
+schedule refreshes the dashboard as it opens by default, and the values you set
+appear only in the schedule's summary line.
+
+</Info>
+
+A few rules decide which rows appear:
+
+- A [parent control][ref-parent] has no row. Its children have their own rows.
+- A filter whose [visibility][ref-visibility] is **Disabled** has no row,
+  because a disabled filter [ignores a value passed to it in a
+  link][ref-link-parameters].
+- Two controls of the same type on the same member share one row.
+- A dashboard with no control that can have a row shows neither the switch nor
+  the rows.
+
+While a row is on **Set to** with no value picked, **Save** and **Save as copy**
+are disabled, and the row asks you to pick a value or set the control to **Use
+default**. Turning **Use default control values** back on hides the rows, and
+saving then removes every value they held.
+
+A new schedule opens with **Use default control values** on. Editing or
+duplicating a schedule that sets at least one control to **Set to** or
+**Clear** opens with the switch off and the rows showing their saved choices.
+
+A schedule can also hold a value for a member that no control on the dashboard
+uses, for example after that control was deleted. Such a value has no row and
+has no effect on the screenshot. Saving the schedule keeps it, and the
+schedule's summary line names it by its member.
+
 ### Notifications
 
 You can optionally attach [notifications][ref-notifications] to a scheduled
@@ -94,6 +150,17 @@ The sidebar lists all existing schedules with the following information:
 - **Notification channel** — when a [notification][ref-notifications] is
   configured, the card shows its delivery channel, for example "Notification:
   Email" or "Notification: Slack (#channel)".
+- **Control values** — when the schedule sets
+  [control values](#control-values), a muted line names each control and what
+  the schedule does with it, for example "Control values: Status is completed ·
+  Region cleared · Date grain: Month · Break down by: Status". Each control is
+  named by its title, or by its type when it has none. Viewers with view-only
+  permission see it too, so they know which slice they subscribe to. While the
+  dashboard's controls and the deployment's data model load, a placeholder
+  stands in for the line. If the data model can't load, for example on a
+  stopped deployment or one still starting after a few seconds, a member the
+  line names (the one a field switcher is set to, or a value no control uses)
+  appears by its name in the data model instead of its title.
 
 ### Actions
 
@@ -132,6 +199,9 @@ see every scheduled refresh in the deployment. Each row shows:
 - **Notifications** — the delivery channel, for example "Notification: Email",
   or "—" when no notification is configured. A Slack notification shows its
   channel name only on rows you can edit; other rows show "Notification: Slack".
+- **Control values** — the same line as in the sidebar, naming each
+  [control value](#control-values) the schedule sets, or "—" when it sets
+  none.
 - **Subscribe** — the [subscribe toggle](#subscribing-to-notifications) for
   schedules you can only view.
 
@@ -163,19 +233,21 @@ Click **New scheduled refresh** above the list. The dialog described in
 [Creating a schedule](#creating-a-schedule) opens with an extra first field,
 **Dashboard**, which lists the published dashboards you can edit. Select one,
 set the schedule, and click **Save**; the new schedule appears in the list
-under that dashboard's title.
+under that dashboard's title. The [control values](#control-values) switch
+appears once you select a dashboard with at least one control that can have a
+row.
 
 ## Duplicating a schedule
 
 To create a new schedule based on an existing one — for example, to send the
 same dashboard to another Slack channel or a different set of recipients without
-re-entering the **Schedule**, timezone, and notification settings — you can
-duplicate it. There are two ways:
+re-entering the **Schedule**, timezone, control values, and notification
+settings — you can duplicate it. There are two ways:
 
 - **From the sidebar** — click the duplicate (copy) icon on a schedule card. The
-  form dialog opens pre-filled with its **Schedule**, timezone, and
-  notification configuration. Adjust anything you need, then click **Save** to
-  create the new schedule. On the
+  form dialog opens pre-filled with its **Schedule**, timezone,
+  [control values](#control-values), and notification configuration. Adjust
+  anything you need, then click **Save** to create the new schedule. On the
   [Scheduled refreshes](#viewing-all-scheduled-refreshes) tab, choose
   **Duplicate schedule** from the row's ⋯ menu instead.
 - **From the sidebar's edit dialog** — while editing a schedule, click **Save as
@@ -240,6 +312,10 @@ When a scheduled refresh runs, it progresses through these phases:
 The sidebar shows real-time status updates during execution.
 
 [ref-ai-summary]: /docs/explore-analyze/notifications#ai-summary
+[ref-controls]: /docs/explore-analyze/dashboards/widgets/controls
+[ref-parent]: /docs/explore-analyze/dashboards/widgets/controls#parent
+[ref-visibility]: /docs/explore-analyze/dashboards/widgets/controls#visibility
+[ref-link-parameters]: /docs/explore-analyze/dashboards/widgets/controls#sharing-the-current-selection
 [ref-roles]: /admin/users-and-permissions/roles-and-permissions
 [ref-scheduled-tasks]: /docs/explore-analyze/scheduled-tasks
 [ref-sharing]: /docs/organize-content/sharing#permission-inheritance
