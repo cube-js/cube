@@ -84,7 +84,7 @@ In the [single-agent setup](/admin/ai), there is an implicit `auto` space that h
 
 The [`agents/` file structure](/admin/ai#agent-configuration) is the same. What's different is how `agents/config.yml` is shaped:
 
-1. **Agents are defined as an array.** Each agent gets a unique `name` and an optional `description`, in addition to the standard agent [properties](/admin/ai#properties) (`llm`, `runtime`, `accessible_views`, `memory_mode`, etc.).
+1. **Agents are defined as an array.** Each agent gets a unique `name` and an optional `description`, in addition to the standard agent [properties](/admin/ai#properties) (`llm`, `runtime`, `accessible_views`, `memory_mode`, `suggestions`, etc.).
 2. **Spaces are introduced.** A `spaces` array defines the contexts agents operate in. Each space gets a unique `name`.
 3. **Rules and certified queries attach to spaces.** Use the `space` property in the frontmatter of each rule or certified query Markdown file to attach it to a specific space.
 
@@ -107,6 +107,9 @@ agents:
       - orders_view
       - customers_view
     memory_mode: user
+    suggestions:
+      - What were the top 5 products last quarter?
+      - Show revenue by region
 
   - name: marketing-analyst                 # Required
     description: "AI assistant for marketing analytics"
