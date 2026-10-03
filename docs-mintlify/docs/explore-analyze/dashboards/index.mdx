@@ -36,7 +36,11 @@ The button next to **Publish** reflects the dashboard's state — click it to op
 the [revision history](#revision-history):
 
 - **`v{N}`** — the published version and your draft match.
-- **Draft** — you have unpublished changes.
+- **New values** — your only unpublished changes are the values the controls
+  hold: picking a value in a control in the builder saves it as the value the
+  control opens on. **Save preset**, beside the button, can turn those values
+  into an option of a [parent control][ref-save-preset].
+- **Draft** — you have any other unpublished change.
 
 Before the first publish, no button is shown.
 
@@ -137,6 +141,7 @@ programmatically — see the [Control Plane API][ref-control-plane-api].
 [ref-workbooks]: /docs/explore-analyze/workbooks
 [ref-widgets]: /docs/explore-analyze/dashboards/widgets
 [ref-controls]: /docs/explore-analyze/dashboards/widgets/controls
+[ref-save-preset]: /docs/explore-analyze/dashboards/widgets/controls#save-preset
 [ref-dimension-links]: /docs/data-modeling/dimensions#links
 [ref-notifications]: /docs/explore-analyze/notifications
 [ref-scheduled-refreshes]: /docs/explore-analyze/scheduled-refreshes
