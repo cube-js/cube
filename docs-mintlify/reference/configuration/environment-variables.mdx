@@ -160,6 +160,18 @@ The cache and queue driver to use for the Cube deployment.
 It can be also set using the [`cache_and_queue_driver` configuration
 option](/reference/configuration/config#cache_and_queue_driver).
 
+## `CUBEJS_CLI_NO_DEPRECATION_WARNING`
+
+If set to any value other than `false` or `0`, hides the deprecation warning that
+the legacy `cubejs` CLI (the `cubejs-cli` npm package) prints when you run
+`cubejs auth`, `cubejs deploy`, or `cubejs` without a command. The warning points
+to the native [Cube CLI](/reference/cli). It is written to stderr, so command
+output is unaffected.
+
+| Possible Values | Default |
+| --------------- | ------- |
+| `true`, `false` | `false` |
+
 ## `CUBEJS_COMPILER_CACHE_SIZE`
 
 The maximum number of compiled data models to keep in the in-memory compiler
