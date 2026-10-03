@@ -38,7 +38,7 @@ import { version } from '../package.json';
 
 import { ClickHouseRowStream } from './RowStream';
 import { buildTransformFromMeta, transformRow } from './Transform';
-import { formatError } from './utils';
+import { formatError, formatParams, paramToken } from './utils';
 
 const SUPPORTED_BUCKET_TYPES = ['s3'];
 
@@ -336,7 +336,7 @@ export class ClickHouseDriver extends BaseDriver implements DriverInterface {
   }
 
   protected queryResponse(query: string, values: unknown[], options?: QueryOptions): Promise<ResponseJSON<Array<unknown>>> {
-    const formattedQuery = formatMySql(query, values);
+    const formattedQuery = formatParams(query, values);
 
     return this.withCancel(async (connection, queryId, signal) => {
       try {
@@ -400,6 +400,10 @@ export class ClickHouseDriver extends BaseDriver implements DriverInterface {
     await this.client.close();
   }
 
+  public param(paramIndex: number): string {
+    return paramToken(paramIndex);
+  }
+
   public informationSchemaQuery() {
     return `
       SELECT name as column_name,
@@ -455,7 +459,7 @@ export class ClickHouseDriver extends BaseDriver implements DriverInterface {
     const queryId = this.buildQueryId(requestId);
 
     try {
-      const formattedQuery = formatMySql(query, values);
+      const formattedQuery = formatParams(query, values);
 
       const format = 'JSONCompactEachRowWithNamesAndTypes';
 
@@ -572,7 +576,7 @@ export class ClickHouseDriver extends BaseDriver implements DriverInterface {
   }
 
   public getTablesQuery(schemaName: string): Promise<TableQueryResult[]> {
-    return this.query('SELECT name as table_name FROM system.tables WHERE database = ?', [schemaName]);
+    return this.query(`SELECT name as table_name FROM system.tables WHERE database = ${this.param(0)}`, [schemaName]);
   }
 
   public override async dropTable(tableName: string, options?: QueryOptions): Promise<void> {
@@ -686,7 +690,7 @@ export class ClickHouseDriver extends BaseDriver implements DriverInterface {
     const { bucketName, path } = this.parseBucketUrl(this.config.exportBucket.bucketName);
     const exportPrefix = path ? `${path}/${uuidv4()}` : uuidv4();
 
-    const formattedQuery = formatMySql(`
+    const formattedQuery = formatParams(`
       INSERT INTO FUNCTION
          s3(
              'https://${bucketName}.s3.${this.config.exportBucket.region}.amazonaws.com/${exportPrefix}/export.csv.gz',
