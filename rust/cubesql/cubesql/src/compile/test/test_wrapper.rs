@@ -104,12 +104,13 @@ async fn test_unary_round_pushdown_fallback() {
     if !Rewriter::sql_push_down_enabled() {
         return;
     }
-    for (expression, float_literal, single_arg) in [
-        ("ROUND(2.5 * COUNT(*))", true, true),
-        ("ROUND(2.5 * COUNT(*), 1)", true, false),
-        ("ROUND(CAST(2 AS REAL) * COUNT(*))", true, true),
-        ("ROUND(COUNT(*))", false, true),
-        ("ROUND(COUNT(*), 1)", false, false),
+    // COUNT(*) also becomes an output column whose origin is unknown to the gate.
+    for (expression, single_arg) in [
+        ("ROUND(2.5 * COUNT(*))", true),
+        ("ROUND(2.5 * COUNT(*), 1)", false),
+        ("ROUND(CAST(2 AS REAL) * COUNT(*))", true),
+        ("ROUND(COUNT(*))", true),
+        ("ROUND(COUNT(*), 1)", false),
     ] {
         for unsupported in [
             vec![],
@@ -136,7 +137,7 @@ async fn test_unary_round_pushdown_fallback() {
             } else {
                 "operators/round_multi_arg"
             });
-            if supported || !float_literal {
+            if supported {
                 assert!(
                     logical
                         .find_cube_scan_wrapped_sql()
@@ -186,7 +187,8 @@ async fn test_float_modulo_pushdown_fallback() {
                 if supported { vec![] } else { vec![("operators/float_modulo".to_string(), String::new())] },
             ).await;
             let logical = plan.as_logical_plan();
-            if supported || matches!(expression, "CAST(COUNT(*) AS BIGINT) % 2" | "COUNT(*) % 2") {
+            // Unknown integer aggregate columns fall back conservatively too.
+            if supported {
                 assert!(logical
                     .find_cube_scan_wrapped_sql()
                     .wrapped_sql
@@ -205,6 +207,57 @@ async fn test_float_modulo_pushdown_fallback() {
                     .wrapped_sql
                     .sql
                     .contains('%'));
+            }
+            plan.as_physical_plan().await.unwrap();
+        }
+    }
+}
+
+#[tokio::test]
+async fn test_float_literal_column_compatibility_fallback() {
+    if !Rewriter::sql_push_down_enabled() {
+        return;
+    }
+    for (query, operation) in [
+        ("SELECT SUM(1.5 * taxful_total_price) % 2 AS value FROM KibanaSampleDataEcommerce WHERE LOWER(customer_gender) = 'test'", "%"),
+        ("SELECT v % 2 AS value FROM (SELECT 1.5 * COUNT(*) AS v FROM KibanaSampleDataEcommerce WHERE LOWER(customer_gender) = 'test') q", "%"),
+        ("SELECT taxful_total_price % 2 AS value FROM (SELECT 1.5 * COUNT(*) AS taxful_total_price FROM KibanaSampleDataEcommerce WHERE LOWER(customer_gender) = 'test') KibanaSampleDataEcommerce", "%"),
+        ("SELECT taxful_total_price % 2 AS value FROM (SELECT 1.5 * taxful_total_price AS taxful_total_price FROM KibanaSampleDataEcommerce WHERE LOWER(customer_gender) = 'test') KibanaSampleDataEcommerce", "%"),
+        ("SELECT v % 1 AS value FROM (SELECT 1.5 AS v FROM KibanaSampleDataEcommerce WHERE LOWER(customer_gender) = 'test' LIMIT 1) q", "%"),
+        ("SELECT COUNT(*) % CAST(1 + 1 AS DOUBLE) AS value FROM KibanaSampleDataEcommerce WHERE LOWER(customer_gender) = 'test'", "%"),
+        ("SELECT ROUND(SUM(2.5 * taxful_total_price)) AS value FROM KibanaSampleDataEcommerce WHERE LOWER(customer_gender) = 'test'", "ROUND("),
+        ("SELECT ROUND(v) AS value FROM (SELECT 2.5 * COUNT(*) AS v FROM KibanaSampleDataEcommerce WHERE LOWER(customer_gender) = 'test') q", "ROUND("),
+        ("SELECT ROUND(taxful_total_price) AS value FROM (SELECT 2.5 * COUNT(*) AS taxful_total_price FROM KibanaSampleDataEcommerce WHERE LOWER(customer_gender) = 'test') KibanaSampleDataEcommerce", "ROUND("),
+        ("SELECT ROUND(v) AS value FROM (SELECT 2.5 AS v FROM KibanaSampleDataEcommerce WHERE LOWER(customer_gender) = 'test' LIMIT 1) q", "ROUND("),
+        ("SELECT ROUND(CAST(1 + 1 AS DOUBLE) * COUNT(*)) AS value FROM KibanaSampleDataEcommerce WHERE LOWER(customer_gender) = 'test'", "ROUND("),
+        ("SELECT ROUND(SUM(2.5 * taxful_total_price), 1) AS value FROM KibanaSampleDataEcommerce WHERE LOWER(customer_gender) = 'test'", "ROUND("),
+        ("SELECT ROUND(v, 1) AS value FROM (SELECT 2.5 * COUNT(*) AS v FROM KibanaSampleDataEcommerce WHERE LOWER(customer_gender) = 'test') q", "ROUND("),
+        ("SELECT ROUND(CAST(1 + 1 AS REAL) * COUNT(*), 1) AS value FROM KibanaSampleDataEcommerce WHERE LOWER(customer_gender) = 'test'", "ROUND("),
+    ] {
+        for supported in [false, true] {
+            let mut templates = vec![(
+                "functions/ROUND".to_string(),
+                "ROUND({{ args_concat }})".to_string(),
+            )];
+            if !supported {
+                templates.extend(
+                    ["operators/float_modulo", "operators/round_single_arg", "operators/round_multi_arg"]
+                        .iter()
+                        .map(|name| (name.to_string(), String::new())),
+                );
+            }
+            let plan = convert_select_to_query_plan_customized(
+                query.to_string(),
+                DatabaseProtocol::PostgreSQL,
+                templates,
+            ).await;
+            let logical = plan.as_logical_plan();
+            let sql = logical.find_cube_scan_wrapped_sql_deep().wrapped_sql.sql;
+            // A literal-only subquery can fold to a compatible float constant.
+            if supported && (query.contains("SELECT 1.5 AS v") || query.contains("SELECT 2.5 AS v")) {
+                logical.find_cube_scan_wrapped_sql();
+            } else {
+                assert_eq!(sql.contains(operation), supported, "{}: {:?} SQL={}", query, logical, sql);
             }
             plan.as_physical_plan().await.unwrap();
         }
@@ -233,6 +286,12 @@ async fn test_non_literal_numeric_expression_pushdown() {
         ).await;
         let logical = plan.as_logical_plan();
         assert!(
+            matches!(logical, LogicalPlan::Extension(_)),
+            "{}: {:?}",
+            expression,
+            logical
+        );
+        assert!(
             logical
                 .find_cube_scan_wrapped_sql()
                 .wrapped_sql
@@ -242,6 +301,32 @@ async fn test_non_literal_numeric_expression_pushdown() {
             expression,
             logical
         );
+        plan.as_physical_plan().await.unwrap();
+    }
+    for expression in ["n % 2", "ROUND(n)"] {
+        let plan = convert_select_to_query_plan_customized(
+            format!("SELECT {expression} AS value FROM (SELECT 1.5 * COUNT(*) AS v, COUNT(*) AS n FROM KibanaSampleDataEcommerce WHERE LOWER(customer_gender) = 'test') q"),
+            DatabaseProtocol::PostgreSQL,
+            vec![
+                ("operators/float_modulo".to_string(), String::new()),
+                ("operators/round_single_arg".to_string(), String::new()),
+                ("functions/ROUND".to_string(), "ROUND({{ args_concat }})".to_string()),
+            ],
+        ).await;
+        let logical = plan.as_logical_plan();
+        let sql = logical.find_cube_scan_wrapped_sql_deep().wrapped_sql.sql;
+        // Unknown integer output aliases use the same conservative fallback.
+        assert!(
+            matches!(logical, LogicalPlan::Projection(_)),
+            "{}: {:?}",
+            expression,
+            logical
+        );
+        assert!(!sql.contains(if expression.contains('%') {
+            "%"
+        } else {
+            "ROUND("
+        }));
         plan.as_physical_plan().await.unwrap();
     }
 }

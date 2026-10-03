@@ -33,6 +33,7 @@ mod wrapper_pull_up;
 
 use crate::{
     compile::rewrite::{
+        analysis::MemberNamesToExpr,
         fun_expr, rewrite,
         rewriter::{CubeEGraph, CubeRewrite, RewriteRules},
         rules::{
@@ -310,8 +311,8 @@ impl WrapperRules {
         }
     }
 
-    // Only float literals acquire new source types in this PR. Members and
-    // functions with a logical Float64 type retain their previous SQL behavior.
+    // Deliberately literal-only: members and functions typed Float64 keep their
+    // previous SQL rendering, so only float literals need compatibility gates.
     fn expr_contains_float_literal(expr: &Expr) -> bool {
         struct FloatLiteralVisitor(bool);
 
@@ -335,5 +336,47 @@ impl WrapperRules {
         expr.accept(FloatLiteralVisitor(false))
             .map(|visitor| visitor.0)
             .unwrap_or(true)
+    }
+
+    /// Preserve ordinary member expressions. Computed output columns whose
+    /// origin is absent from the member map are evaluated conservatively locally.
+    fn expr_contains_unknown_column(
+        expr: &Expr,
+        members: Option<&MemberNamesToExpr>,
+        meta: &MetaContext,
+    ) -> bool {
+        struct UnknownColumnVisitor<'a> {
+            unknown: bool,
+            members: Option<&'a MemberNamesToExpr>,
+            meta: &'a MetaContext,
+        }
+        impl ExpressionVisitor for UnknownColumnVisitor<'_> {
+            fn pre_visit(mut self, expr: &Expr) -> datafusion::error::Result<Recursion<Self>> {
+                if let Expr::Column(column) = expr {
+                    self.unknown |= !self.members.is_some_and(|members| {
+                        members.list.iter().any(|(name, _, expr)| {
+                            let Some(name) = name else {
+                                return false;
+                            };
+                            let Expr::Column(member_column) = expr else {
+                                return false;
+                            };
+                            (member_column == column
+                                || (column.relation.is_none() && member_column.name == column.name))
+                                && (self.meta.find_measure_with_name(name).is_some()
+                                    || self.meta.find_dimension_with_name(name).is_some())
+                        })
+                    });
+                }
+                Ok(Recursion::Continue(self))
+            }
+        }
+        expr.accept(UnknownColumnVisitor {
+            unknown: false,
+            members,
+            meta,
+        })
+        .map(|visitor| visitor.unknown)
+        .unwrap_or(true)
     }
 }

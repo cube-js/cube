@@ -21,7 +21,7 @@ describe('floating-point literal templates', () => {
       const result = templates(name);
       expect(result.functions.ROUND).toBe(base.functions.ROUND);
       expect(result.operators.float_modulo).toBe(name === 'RedshiftQuery' ? undefined : base.operators.float_modulo);
-      expect(result.operators.round_single_arg).toBe(base.operators.round_single_arg);
+      expect(result.operators.round_single_arg).toBe(name === 'RedshiftQuery' ? base.operators.round_single_arg : undefined);
     }
   });
 

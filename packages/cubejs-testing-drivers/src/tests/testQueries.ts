@@ -2899,7 +2899,7 @@ from
       expect(Number(roundedRows[0].rounded_ratio)).toBeCloseTo(0.5, 10);
       expect(Number(roundedRows[0].rounded_fraction)).toBeCloseTo(123.46, 10);
 
-      if (['postgres', 'mysql', 'pinot'].includes(type)) {
+      if (['postgres', 'mysql', 'pinot', 'crate', 'redshift'].includes(type)) {
         const roundQuery = `
           SELECT ROUND(2.5 * COUNT(*) / COUNT(*)) AS "positive_tie",
             ROUND(-2.5 * COUNT(*) / COUNT(*)) AS "negative_tie",
@@ -2913,9 +2913,13 @@ from
         const roundPlan = (await connection.query(`EXPLAIN ${roundQuery}`)).rows
           .map(row => Object.values(row).join('\n')).join('\n');
         expect(roundPlan).toContain('CubeScanWrappedSql');
-        expect(roundPlan).toMatch(/Projection:[^\n]*round\(/i);
+        const roundSql = roundPlan.match(/CubeScanExecutionPlan, SQL:\s*([\s\S]*)/)?.[1] ?? '';
+        if (type === 'redshift') {
+          expect(roundSql).toMatch(/ROUND\(/i);
+        } else {
+          expect(roundPlan).toMatch(/Projection:[^\n]*round\(/i);
+        }
         if (['mysql', 'pinot'].includes(type)) {
-          const roundSql = roundPlan.match(/CubeScanExecutionPlan, SQL:\s*([\s\S]*)/)?.[1] ?? '';
           expect(roundSql).not.toMatch(/ROUND\(/i);
         }
         const roundRows = (await connection.query(roundQuery)).rows;
