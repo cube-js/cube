@@ -182,7 +182,11 @@ describe('SQLInterface', () => {
         expect(checkSqlAuth.mock.calls[0][0]).toEqual({
           request: {
             id: expect.any(String),
-            meta: null,
+            meta: {
+              protocol: 'postgres',
+              apiType: 'sql',
+              database: 'test',
+            },
             method: expect.any(String),
             protocol: expect.any(String),
           },
@@ -241,7 +245,11 @@ describe('SQLInterface', () => {
       expect(checkSqlAuth.mock.calls[0][0]).toEqual({
         request: {
           id: expect.any(String),
-          meta: null,
+          meta: {
+            protocol: 'postgres',
+            apiType: 'sql',
+            database: 'test',
+          },
           method: expect.any(String),
           protocol: expect.any(String),
         },
