@@ -43,6 +43,9 @@ accessible_views:
   - orders_view
   - customers_view
 memory_mode: user
+suggestions:
+  - What were our top 10 customers by revenue last quarter?
+  - Show monthly order trends for this year
 ```
 
 ### Properties
@@ -54,6 +57,7 @@ memory_mode: user
 | `runtime`           | string           | `plain`                  | [Runtime mode](#runtime) — `plain` or `reasoning`.                                                                      |
 | `accessible_views`  | array            | _all views_              | List of view names exposed to the agent as context guidance for which views to query. This is not a security control — if omitted or empty, all views are exposed. Use [access policies](/reference/data-modeling/data-access-policies) to enforce actual access restrictions. |
 | `memory_mode`       | string           | `space`                  | [Memory isolation mode](#memory) — `space`, `user`, or `disabled`.                                                      |
+| `suggestions`       | array            | _none_                   | Starter prompts shown on the agent's empty chat screen. Selecting one fills the chat input without sending it, so write a full question. When set, they replace any suggestions configured in the UI. |
 
 Rules and certified queries have their own dedicated pages:
 
