@@ -24,6 +24,12 @@ class VerticaFilter extends BaseFilter {
 }
 
 class VerticaQuery extends BaseQuery {
+  sqlTemplates() {
+    const templates = super.sqlTemplates();
+    templates.types.double = 'DOUBLE PRECISION';
+    return templates;
+  }
+
   newFilter(filter) {
     return new VerticaFilter(this, filter);
   }

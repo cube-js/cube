@@ -237,6 +237,13 @@
     "SQL API: named prior month by category for one day"
   ],
   "tesseractSkip": [
+    "---------------------------------------",
+    "QuestDB + Tesseract: the bound string in the expression filter reaches",
+    "SqlQuery::finalize_query with an empty parameter list and panics, including",
+    "for an integer-only query. Float pushdown remains covered in legacy mode.",
+    "---------------------------------------",
+    "SQL API: floating-point literals preserve arithmetic in pushdown",
+
     "querying Products: dimensions -- doesn't work wo ordering",
     "querying ECommerce: total quantity, avg discount, total sales, total profit by product + order + total -- rounding in athena",
     "querying ECommerce: total quantity, avg discount, total sales, total profit by product + order + total -- noisy test",

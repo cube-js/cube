@@ -1,14 +1,16 @@
 use crate::{
     compile::rewrite::{
+        analysis::OriginalExpr,
         fun_expr_var_arg, list_rewrite, list_rewrite_with_vars, rewrite,
         rewriter::{CubeEGraph, CubeRewrite},
         rules::wrapper::WrapperRules,
         scalar_fun_expr_args_empty_tail, scalar_fun_expr_args_legacy, transforming_rewrite,
         wrapper_pullup_replacer, wrapper_pushdown_replacer, wrapper_replacer_context, ListPattern,
-        ListType, ScalarFunctionExprFun,
+        ListType, ScalarFunctionExprFun, WrapperReplacerContextPushToCube,
     },
     var, var_iter,
 };
+use datafusion::physical_plan::functions::BuiltinScalarFunction;
 use egg::Subst;
 
 impl WrapperRules {
@@ -48,7 +50,13 @@ impl WrapperRules {
                         "?input_data_source",
                     ),
                 ),
-                self.transform_fun_expr("?fun", "?input_data_source"),
+                self.transform_fun_expr(
+                    "?fun",
+                    "?args",
+                    "?input_data_source",
+                    "?cube_members",
+                    "?push_to_cube",
+                ),
             ),
             rewrite(
                 "wrapper-push-down-scalar-function-empty-tail",
@@ -120,10 +128,16 @@ impl WrapperRules {
     fn transform_fun_expr(
         &self,
         fun_var: &'static str,
+        args_var: &'static str,
         input_data_source_var: &'static str,
+        members_var: &'static str,
+        push_to_cube_var: &'static str,
     ) -> impl Fn(&mut CubeEGraph, &mut Subst) -> bool {
         let fun_var = var!(fun_var);
+        let args_var = var!(args_var);
         let input_data_source_var = var!(input_data_source_var);
+        let members_var = var!(members_var);
+        let push_to_cube_var = var!(push_to_cube_var);
         let meta = self.meta_context.clone();
         move |egraph, subst| {
             let Ok(data_source) = Self::get_data_source(egraph, subst, input_data_source_var)
@@ -132,6 +146,38 @@ impl WrapperRules {
             };
 
             for fun in var_iter!(egraph[subst[fun_var]], ScalarFunctionExprFun).cloned() {
+                if fun == BuiltinScalarFunction::Round {
+                    // A completed select can shadow names from the original Cube scan.
+                    let members = var_iter!(
+                        egraph[subst[push_to_cube_var]],
+                        WrapperReplacerContextPushToCube
+                    )
+                    .all(|push| *push)
+                    .then(|| egraph[subst[members_var]].data.member_name_to_expr.as_ref())
+                    .flatten();
+                    let Some(OriginalExpr::List(args)) =
+                        &egraph[subst[args_var]].data.original_expr
+                    else {
+                        return false;
+                    };
+                    if egraph[subst[args_var]].data.contains_float_literal
+                        || args.first().is_some_and(|expr| {
+                            Self::expr_contains_float_literal(expr)
+                                || Self::expr_contains_unknown_column(expr, members, &meta)
+                        })
+                    {
+                        let template = if args.len() == 1 {
+                            "operators/round_single_arg"
+                        } else {
+                            "operators/round_multi_arg"
+                        };
+                        if !Self::all_generators_support(&data_source, &meta, |templates| {
+                            templates.contains_template(template)
+                        }) {
+                            return false;
+                        }
+                    }
+                }
                 if Self::can_rewrite_template(
                     &data_source,
                     &meta,

@@ -2986,6 +2986,130 @@ from
       expect(res.rows).toMatchSnapshot();
     });
 
+    executePg('SQL API: floating-point literals preserve arithmetic in pushdown', async (connection) => {
+      // Depend on source rows so constant folding cannot evaluate the divisions locally.
+      // The expression filter also prevents using the Customers count pre-aggregation.
+      const query = `
+        SELECT
+          100.0 * COUNT(*) / (200 * COUNT(*)) AS "float64_ratio",
+          CAST(100 AS REAL) * COUNT(*) / (200 * COUNT(*)) AS "float32_ratio",
+          100.1 * COUNT(*) / (200 * COUNT(*)) AS "fractional_ratio",
+          -100.0 * COUNT(*) / (200 * COUNT(*)) AS "negative_ratio",
+          COUNT(*) / (2 * COUNT(*)) AS "integer_ratio",
+          CAST(NULL AS DOUBLE) AS "float64_null",
+          CAST(NULL AS REAL) AS "float32_null"
+        FROM "Customers"
+        WHERE LOWER("customerName") <> '__float_literal_test__'
+      `;
+      const explained = await connection.query(`EXPLAIN ${query}`);
+      const plan = explained.rows.map(row => Object.values(row).join('\n')).join('\n');
+      expect(plan).toContain('CubeScanWrappedSql');
+      expect(plan).not.toMatch(/Projection:[^\n]*[*/]/);
+
+      // Inspect the source SQL, not local projections that could supply the constants.
+      const pushedSql = plan.match(/CubeScanExecutionPlan, SQL:\s*([\s\S]*)/)?.[1] ?? '';
+      expect(pushedSql).not.toBe('');
+      if (type === 'mysql') {
+        expect(pushedSql.match(/(?<![-\w.])1e2\b/g)?.length).toBeGreaterThanOrEqual(2);
+        expect(pushedSql).toContain('1.001e2');
+        expect(pushedSql).toContain('-1e2');
+        expect(pushedSql.match(/\(NULL \+ 0e0\)/g)).toHaveLength(2);
+      } else {
+        // Dialects choose their own FLOAT/DOUBLE spellings, including precision.
+        expect(pushedSql.match(/CAST\(100 AS [\w ()]+\)/g)?.length).toBeGreaterThanOrEqual(2);
+        expect(pushedSql).toMatch(/CAST\(100\.1 AS [\w ()]+\)/);
+        expect(pushedSql).toMatch(/CAST\(-100 AS [\w ()]+\)/);
+        expect(pushedSql.match(/CAST\(NULL AS [\w ()]+\)/g)).toHaveLength(2);
+      }
+
+      const { rows } = await connection.query(query);
+      expect(rows).toHaveLength(1);
+      expect(Number(rows[0].float64_ratio)).toBeCloseTo(0.5, 10);
+      expect(Number(rows[0].float32_ratio)).toBeCloseTo(0.5, 6);
+      expect(Number(rows[0].fractional_ratio)).toBeCloseTo(0.5005, 10);
+      expect(Number(rows[0].negative_ratio)).toBeCloseTo(-0.5, 10);
+      expect(rows[0].integer_ratio).not.toBeNull();
+      expect(Number(rows[0].integer_ratio)).toBe(0);
+      expect(rows[0].float64_null).toBeNull();
+      expect(rows[0].float32_null).toBeNull();
+
+      // Keep ROUND separate so its local fallback cannot hide whether the
+      // arithmetic expressions above retain their source-side float types.
+      const roundedQuery = `
+        SELECT ROUND(100.0 * COUNT(*) / (200 * COUNT(*)), 2) AS "rounded_ratio",
+          ROUND(123.456 * COUNT(*) / COUNT(*), 2) AS "rounded_fraction"
+        FROM "Customers" WHERE LOWER("customerName") <> '__float_literal_test__'
+      `;
+      const roundedPlan = (await connection.query(`EXPLAIN ${roundedQuery}`)).rows
+        .map(row => Object.values(row).join('\n')).join('\n');
+      expect(roundedPlan).toContain('CubeScanWrappedSql');
+      const roundedSql = roundedPlan.match(/CubeScanExecutionPlan, SQL:\s*([\s\S]*)/)?.[1] ?? '';
+      if (['mysql', 'pinot'].includes(type)) {
+        expect(roundedPlan).toMatch(/Projection:[^\n]*round\(/i);
+        expect(roundedSql).not.toMatch(/ROUND\(/i);
+      } else {
+        expect(roundedSql).toMatch(/ROUND\(/i);
+      }
+      const roundedRows = (await connection.query(roundedQuery)).rows;
+      expect(Number(roundedRows[0].rounded_ratio)).toBeCloseTo(0.5, 10);
+      expect(Number(roundedRows[0].rounded_fraction)).toBeCloseTo(123.46, 10);
+
+      if (['postgres', 'mysql', 'pinot', 'crate', 'redshift'].includes(type)) {
+        const roundQuery = `
+          SELECT ROUND(2.5 * COUNT(*) / COUNT(*)) AS "positive_tie",
+            ROUND(-2.5 * COUNT(*) / COUNT(*)) AS "negative_tie",
+            ROUND(2.4999999999999996 + (COUNT(*) - COUNT(*))) AS "below_tie",
+            ROUND(1000000000000001.0 + (COUNT(*) - COUNT(*))) AS "large_integer",
+            ROUND(0.125 * COUNT(*) / COUNT(*), 2) AS "positive_decimal_tie",
+            ROUND(-0.125 * COUNT(*) / COUNT(*), 2) AS "negative_decimal_tie",
+            ROUND(1.005 + (COUNT(*) - COUNT(*)), 2) AS "decimal_precision_edge"
+          FROM "Customers" WHERE LOWER("customerName") <> '__float_literal_test__'
+        `;
+        const roundPlan = (await connection.query(`EXPLAIN ${roundQuery}`)).rows
+          .map(row => Object.values(row).join('\n')).join('\n');
+        expect(roundPlan).toContain('CubeScanWrappedSql');
+        const roundSql = roundPlan.match(/CubeScanExecutionPlan, SQL:\s*([\s\S]*)/)?.[1] ?? '';
+        if (type === 'redshift') {
+          expect(roundSql).toMatch(/ROUND\(/i);
+        } else {
+          expect(roundPlan).toMatch(/Projection:[^\n]*round\(/i);
+        }
+        if (['mysql', 'pinot'].includes(type)) {
+          expect(roundSql).not.toMatch(/ROUND\(/i);
+        }
+        const roundRows = (await connection.query(roundQuery)).rows;
+        expect(Number(roundRows[0].positive_tie)).toBe(3);
+        expect(Number(roundRows[0].negative_tie)).toBe(-3);
+        expect(Number(roundRows[0].below_tie)).toBe(2);
+        expect(Number(roundRows[0].large_integer)).toBe(1000000000000001);
+        expect(Number(roundRows[0].positive_decimal_tie)).toBe(0.13);
+        expect(Number(roundRows[0].negative_decimal_tie)).toBe(-0.13);
+        if (type === 'pinot') {
+          // Pinot ROUNDDECIMAL would return 1.01 instead of DataFusion's 1.00.
+          expect(Number(roundRows[0].decimal_precision_edge)).toBe(1);
+        }
+      }
+
+      if (['postgres', 'mssql', 'bigquery', 'redshift'].includes(type)) {
+        // These sources must evaluate floating remainder locally and preserve integer results.
+        const moduloQuery = `
+          SELECT (3 * COUNT(*)) % (2.0 * COUNT(*)) / COUNT(*) AS "remainder",
+            (3 * CAST(COUNT(*) AS BIGINT)) % (2 * CAST(COUNT(*) AS BIGINT)) AS "integer_remainder"
+          FROM "Customers" WHERE LOWER("customerName") <> '__float_literal_test__'
+        `;
+        const moduloPlan = (await connection.query(`EXPLAIN ${moduloQuery}`)).rows
+          .map(row => Object.values(row).join('\n')).join('\n');
+        expect(moduloPlan).toContain('CubeScanWrappedSql');
+        expect(moduloPlan).toMatch(/Projection:[^\n]*%/);
+        const moduloSql = moduloPlan.match(/CubeScanExecutionPlan, SQL:\s*([\s\S]*)/)?.[1];
+        expect(moduloSql).toBeDefined();
+        expect(moduloSql).not.toContain('%');
+        const moduloRows = (await connection.query(moduloQuery)).rows;
+        expect(Number(moduloRows[0].remainder)).toBeCloseTo(1, 10);
+        expect(Number(moduloRows[0].integer_remainder)).toBeGreaterThan(0);
+      }
+    });
+
     executePg('SQL API: metabase count cast to float32 from push down', async (connection) => {
       const res = await connection.query(`
         select cast(count(*) as float) as "a0" from "Customers"

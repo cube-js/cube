@@ -54,6 +54,340 @@ async fn test_simple_wrapper() {
 }
 
 #[tokio::test]
+async fn test_float_literal_pushdown_fallback() {
+    if !Rewriter::sql_push_down_enabled() {
+        return;
+    }
+    init_testing_logger();
+
+    for (literal, type_template, rendered) in [
+        ("100.0", "types/double", "CAST(100 AS DOUBLE)"),
+        ("CAST(100 AS REAL)", "types/float", "CAST(100 AS FLOAT)"),
+    ] {
+        for missing_template in [None, Some(type_template), Some("expressions/cast")] {
+            let plan = convert_select_to_query_plan_customized(
+                format!(
+                    "SELECT {literal} * COUNT(*) AS value FROM KibanaSampleDataEcommerce \
+             WHERE LOWER(customer_gender) = 'test'"
+                ),
+                DatabaseProtocol::PostgreSQL,
+                // The mock already supports deleting a template with an empty value.
+                missing_template
+                    .into_iter()
+                    .map(|name| (name.to_string(), String::new()))
+                    .collect(),
+            )
+            .await;
+            let logical_plan = plan.as_logical_plan();
+            if missing_template.is_some() {
+                assert!(
+                    matches!(logical_plan, LogicalPlan::Projection(_)),
+                    "missing {:?}: {:?}",
+                    missing_template,
+                    logical_plan
+                );
+            } else {
+                assert!(logical_plan
+                    .find_cube_scan_wrapped_sql()
+                    .wrapped_sql
+                    .sql
+                    .contains(rendered));
+            }
+            // Fallback must also produce an executable local physical plan.
+            plan.as_physical_plan().await.unwrap();
+        }
+    }
+}
+
+#[tokio::test]
+async fn test_unary_round_pushdown_fallback() {
+    if !Rewriter::sql_push_down_enabled() {
+        return;
+    }
+    // COUNT(*) also becomes an output column whose origin is unknown to the gate.
+    for (expression, single_arg) in [
+        ("ROUND(2.5 * COUNT(*))", true),
+        ("ROUND(2.5 * COUNT(*), 1)", false),
+        ("ROUND(CAST(2 AS REAL) * COUNT(*))", true),
+        ("ROUND(COUNT(*))", true),
+        ("ROUND(COUNT(*), 1)", false),
+    ] {
+        for unsupported in [
+            vec![],
+            vec!["operators/round_single_arg"],
+            vec!["operators/round_single_arg", "operators/round_multi_arg"],
+        ] {
+            let mut templates = vec![(
+                "functions/ROUND".to_string(),
+                "ROUND({{ args_concat }})".to_string(),
+            )];
+            templates.extend(
+                unsupported
+                    .iter()
+                    .map(|name| (name.to_string(), String::new())),
+            );
+            let plan = convert_select_to_query_plan_customized(
+                format!("SELECT {expression} AS value FROM KibanaSampleDataEcommerce WHERE LOWER(customer_gender) = 'test'"),
+                DatabaseProtocol::PostgreSQL,
+                templates,
+            ).await;
+            let logical = plan.as_logical_plan();
+            let supported = !unsupported.contains(&if single_arg {
+                "operators/round_single_arg"
+            } else {
+                "operators/round_multi_arg"
+            });
+            if supported {
+                assert!(
+                    logical
+                        .find_cube_scan_wrapped_sql()
+                        .wrapped_sql
+                        .sql
+                        .contains("ROUND("),
+                    "{}, {:?}: {:?}",
+                    expression,
+                    unsupported,
+                    logical
+                );
+            } else {
+                assert!(
+                    matches!(logical, LogicalPlan::Projection(_)),
+                    "{}, {:?}: {:?}",
+                    expression,
+                    unsupported,
+                    logical
+                );
+                assert!(!logical
+                    .find_cube_scan_wrapped_sql_deep()
+                    .wrapped_sql
+                    .sql
+                    .contains("ROUND("));
+            }
+            plan.as_physical_plan().await.unwrap();
+        }
+    }
+}
+
+#[tokio::test]
+async fn test_float_modulo_pushdown_fallback() {
+    if !Rewriter::sql_push_down_enabled() {
+        return;
+    }
+    for expression in [
+        "COUNT(*) % 2.0",
+        "CAST(COUNT(*) AS REAL) % CAST(2 AS REAL)",
+        "CAST(COUNT(*) AS BIGINT) % 2",
+        "COUNT(*) % 2",
+        "COUNT(*) % (1.5 + 0.5)",
+    ] {
+        for supported in [false, true] {
+            let plan = convert_select_to_query_plan_customized(
+                format!("SELECT {expression} AS value FROM KibanaSampleDataEcommerce WHERE LOWER(customer_gender) = 'test'"),
+                DatabaseProtocol::PostgreSQL,
+                if supported { vec![] } else { vec![("operators/float_modulo".to_string(), String::new())] },
+            ).await;
+            let logical = plan.as_logical_plan();
+            // Unknown integer aggregate columns fall back conservatively too.
+            if supported {
+                assert!(logical
+                    .find_cube_scan_wrapped_sql()
+                    .wrapped_sql
+                    .sql
+                    .contains('%'));
+            } else {
+                assert!(
+                    matches!(logical, LogicalPlan::Projection(_)),
+                    "{}, supported={}: {:?}",
+                    expression,
+                    supported,
+                    logical
+                );
+                assert!(!logical
+                    .find_cube_scan_wrapped_sql_deep()
+                    .wrapped_sql
+                    .sql
+                    .contains('%'));
+            }
+            plan.as_physical_plan().await.unwrap();
+        }
+    }
+}
+
+#[tokio::test]
+async fn test_float_literal_column_compatibility_fallback() {
+    if !Rewriter::sql_push_down_enabled() {
+        return;
+    }
+    for (query, operation) in [
+        ("SELECT SUM(1.5 * taxful_total_price) % 2 AS value FROM KibanaSampleDataEcommerce WHERE LOWER(customer_gender) = 'test'", "%"),
+        ("SELECT v % 2 AS value FROM (SELECT 1.5 * COUNT(*) AS v FROM KibanaSampleDataEcommerce WHERE LOWER(customer_gender) = 'test') q", "%"),
+        ("SELECT taxful_total_price % 2 AS value FROM (SELECT 1.5 * COUNT(*) AS taxful_total_price FROM KibanaSampleDataEcommerce WHERE LOWER(customer_gender) = 'test') KibanaSampleDataEcommerce", "%"),
+        ("SELECT taxful_total_price % 2 AS value FROM (SELECT 1.5 * taxful_total_price AS taxful_total_price FROM KibanaSampleDataEcommerce WHERE LOWER(customer_gender) = 'test') KibanaSampleDataEcommerce", "%"),
+        ("SELECT v % 1 AS value FROM (SELECT 1.5 AS v FROM KibanaSampleDataEcommerce WHERE LOWER(customer_gender) = 'test' LIMIT 1) q", "%"),
+        ("SELECT COUNT(*) % CAST(1 + 1 AS DOUBLE) AS value FROM KibanaSampleDataEcommerce WHERE LOWER(customer_gender) = 'test'", "%"),
+        ("SELECT ROUND(SUM(2.5 * taxful_total_price)) AS value FROM KibanaSampleDataEcommerce WHERE LOWER(customer_gender) = 'test'", "ROUND("),
+        ("SELECT ROUND(v) AS value FROM (SELECT 2.5 * COUNT(*) AS v FROM KibanaSampleDataEcommerce WHERE LOWER(customer_gender) = 'test') q", "ROUND("),
+        ("SELECT ROUND(taxful_total_price) AS value FROM (SELECT 2.5 * COUNT(*) AS taxful_total_price FROM KibanaSampleDataEcommerce WHERE LOWER(customer_gender) = 'test') KibanaSampleDataEcommerce", "ROUND("),
+        ("SELECT ROUND(v) AS value FROM (SELECT 2.5 AS v FROM KibanaSampleDataEcommerce WHERE LOWER(customer_gender) = 'test' LIMIT 1) q", "ROUND("),
+        ("SELECT ROUND(CAST(1 + 1 AS DOUBLE) * COUNT(*)) AS value FROM KibanaSampleDataEcommerce WHERE LOWER(customer_gender) = 'test'", "ROUND("),
+        ("SELECT ROUND(SUM(2.5 * taxful_total_price), 1) AS value FROM KibanaSampleDataEcommerce WHERE LOWER(customer_gender) = 'test'", "ROUND("),
+        ("SELECT ROUND(v, 1) AS value FROM (SELECT 2.5 * COUNT(*) AS v FROM KibanaSampleDataEcommerce WHERE LOWER(customer_gender) = 'test') q", "ROUND("),
+        ("SELECT ROUND(CAST(1 + 1 AS REAL) * COUNT(*), 1) AS value FROM KibanaSampleDataEcommerce WHERE LOWER(customer_gender) = 'test'", "ROUND("),
+    ] {
+        for supported in [false, true] {
+            let mut templates = vec![(
+                "functions/ROUND".to_string(),
+                "ROUND({{ args_concat }})".to_string(),
+            )];
+            if !supported {
+                templates.extend(
+                    ["operators/float_modulo", "operators/round_single_arg", "operators/round_multi_arg"]
+                        .iter()
+                        .map(|name| (name.to_string(), String::new())),
+                );
+            }
+            let plan = convert_select_to_query_plan_customized(
+                query.to_string(),
+                DatabaseProtocol::PostgreSQL,
+                templates,
+            ).await;
+            let logical = plan.as_logical_plan();
+            let sql = logical.find_cube_scan_wrapped_sql_deep().wrapped_sql.sql;
+            // A literal-only subquery can fold to a compatible float constant.
+            if supported && (query.contains("SELECT 1.5 AS v") || query.contains("SELECT 2.5 AS v")) {
+                logical.find_cube_scan_wrapped_sql();
+            } else {
+                assert_eq!(sql.contains(operation), supported, "{}: {:?} SQL={}", query, logical, sql);
+            }
+            plan.as_physical_plan().await.unwrap();
+        }
+    }
+}
+
+#[tokio::test]
+async fn test_non_literal_numeric_expression_pushdown() {
+    if !Rewriter::sql_push_down_enabled() {
+        return;
+    }
+    for (expression, rendered) in [
+        ("taxful_total_price % 10", "%"),
+        ("(((EXTRACT(MONTH FROM order_date) - 1) % 3) + 1)", "%"),
+        ("ROUND(taxful_total_price)", "ROUND("),
+    ] {
+        let plan = convert_select_to_query_plan_customized(
+            format!("SELECT {expression} AS bucket, COUNT(*) AS count FROM KibanaSampleDataEcommerce WHERE LOWER(customer_gender) = 'test' GROUP BY 1"),
+            DatabaseProtocol::PostgreSQL,
+            vec![
+                ("operators/float_modulo".to_string(), String::new()),
+                ("operators/round_single_arg".to_string(), String::new()),
+                ("operators/round_multi_arg".to_string(), String::new()),
+                ("functions/ROUND".to_string(), "ROUND({{ args_concat }})".to_string()),
+            ],
+        ).await;
+        let logical = plan.as_logical_plan();
+        assert!(
+            matches!(logical, LogicalPlan::Extension(_)),
+            "{}: {:?}",
+            expression,
+            logical
+        );
+        assert!(
+            logical
+                .find_cube_scan_wrapped_sql()
+                .wrapped_sql
+                .sql
+                .contains(rendered),
+            "{}: {:?}",
+            expression,
+            logical
+        );
+        plan.as_physical_plan().await.unwrap();
+    }
+    for expression in ["n % 2", "ROUND(n)"] {
+        let plan = convert_select_to_query_plan_customized(
+            format!("SELECT {expression} AS value FROM (SELECT 1.5 * COUNT(*) AS v, COUNT(*) AS n FROM KibanaSampleDataEcommerce WHERE LOWER(customer_gender) = 'test') q"),
+            DatabaseProtocol::PostgreSQL,
+            vec![
+                ("operators/float_modulo".to_string(), String::new()),
+                ("operators/round_single_arg".to_string(), String::new()),
+                ("functions/ROUND".to_string(), "ROUND({{ args_concat }})".to_string()),
+            ],
+        ).await;
+        let logical = plan.as_logical_plan();
+        let sql = logical.find_cube_scan_wrapped_sql_deep().wrapped_sql.sql;
+        // Unknown integer output aliases use the same conservative fallback.
+        assert!(
+            matches!(logical, LogicalPlan::Projection(_)),
+            "{}: {:?}",
+            expression,
+            logical
+        );
+        assert!(!sql.contains(if expression.contains('%') {
+            "%"
+        } else {
+            "ROUND("
+        }));
+        plan.as_physical_plan().await.unwrap();
+    }
+}
+
+#[tokio::test]
+async fn test_float_literal_member_pushdown_fallback() {
+    if !Rewriter::sql_push_down_enabled() {
+        return;
+    }
+    for (sql_type, type_template, rendered, literal) in [
+        (
+            "REAL",
+            "types/float",
+            "CAST(100 AS FLOAT)",
+            ScalarValue::Float32(Some(100.0)),
+        ),
+        (
+            "DOUBLE",
+            "types/double",
+            "CAST(100 AS DOUBLE)",
+            ScalarValue::Float64(Some(100.0)),
+        ),
+    ] {
+        for missing_source in [None, Some("default"), Some("other")] {
+            let meta = get_test_tenant_ctx_with_multi_data_source_view_and_templates(
+                missing_source
+                    .into_iter()
+                    .map(|source| (source, vec![(type_template.to_string(), String::new())]))
+                    .collect(),
+            );
+            let plan = convert_sql_to_cube_query(
+                &format!(
+                    "SELECT SUM(v) FROM (SELECT CAST(100 AS {sql_type}) AS v \
+                     FROM KibanaSampleDataEcommerce LIMIT 0) q"
+                ),
+                meta.clone(),
+                get_test_session(DatabaseProtocol::PostgreSQL, meta).await,
+            )
+            .await
+            .unwrap();
+            // LIMIT 0 preserves a literal scan member, bypassing expression gates.
+            // A missing type must still leave an executable local plan.
+            if missing_source != Some("default") {
+                let logical_plan = plan.as_logical_plan();
+                assert!(logical_plan
+                    .find_cube_scan_wrapped_sql()
+                    .wrapped_sql
+                    .sql
+                    .contains(rendered));
+                // An unrelated source must not force an alternative scan of regular members.
+                assert_eq!(
+                    logical_plan.find_cube_scan().member_fields,
+                    vec![MemberField::Literal(literal.clone())]
+                );
+            }
+            plan.as_physical_plan().await.unwrap();
+        }
+    }
+}
+
+#[tokio::test]
 async fn test_wrapper_group_by_rollup() {
     if !Rewriter::sql_push_down_enabled() {
         return;
@@ -4141,7 +4475,7 @@ async fn test_wrapper_multi_arg_aggregate_function() {
                     .request
                     .measures
             ),
-            vec!["APPROX_PERCENTILE(${KibanaSampleDataEcommerce.taxful_total_price}, 0.5)"],
+            vec!["APPROX_PERCENTILE(${KibanaSampleDataEcommerce.taxful_total_price}, CAST(0.5 AS DOUBLE))"],
             "{} is not pushed down",
             call
         );

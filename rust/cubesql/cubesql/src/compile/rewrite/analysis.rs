@@ -31,7 +31,7 @@ use datafusion::{
     },
     scalar::ScalarValue,
 };
-use egg::{Analysis, DidMerge, EGraph, Id};
+use egg::{Analysis, DidMerge, EGraph, Id, Language};
 use hashbrown;
 use std::{cmp::Ordering, fmt::Debug, ops::Index, sync::Arc};
 
@@ -51,6 +51,7 @@ pub struct LogicalPlanData {
     pub cube_reference: Option<String>,
     pub filter_operators: Option<Vec<(String, String)>>,
     pub is_empty_list: Option<bool>,
+    pub contains_float_literal: bool,
 }
 
 #[derive(Debug, Clone)]
@@ -1311,6 +1312,38 @@ impl Analysis<LogicalPlanLanguage> for LogicalPlanAnalysis {
         egraph: &mut EGraph<LogicalPlanLanguage, Self>,
         enode: &LogicalPlanLanguage,
     ) -> Self::Data {
+        let constant = Self::make_constant(egraph, enode);
+        // Expression-only fact: a folded CAST can introduce a float literal
+        // while original_expr still contains integer arithmetic.
+        let contains_float_literal = matches!(
+            constant,
+            Some(ConstantFolding::Scalar(
+                ScalarValue::Float32(_) | ScalarValue::Float64(_)
+            ))
+        ) || match enode {
+            LogicalPlanLanguage::WrapperPullupReplacer(params)
+            | LogicalPlanLanguage::WrapperPushdownReplacer(params) => {
+                egraph[params[0]].data.contains_float_literal
+            }
+            _ if is_expr_node(enode)
+                || matches!(
+                    enode,
+                    LogicalPlanLanguage::ScalarFunctionExprArgs(_)
+                        | LogicalPlanLanguage::ScalarUDFExprArgs(_)
+                        | LogicalPlanLanguage::AggregateFunctionExprArgs(_)
+                        | LogicalPlanLanguage::AggregateUDFExprArgs(_)
+                        | LogicalPlanLanguage::CaseExprExpr(_)
+                        | LogicalPlanLanguage::CaseExprWhenThenExpr(_)
+                        | LogicalPlanLanguage::CaseExprElseExpr(_)
+                ) =>
+            {
+                enode
+                    .children()
+                    .iter()
+                    .any(|id| egraph[*id].data.contains_float_literal)
+            }
+            _ => false,
+        };
         LogicalPlanData {
             iteration_timestamp: egraph.analysis.iteration_timestamp,
             original_expr: Self::make_original_expr(egraph, enode),
@@ -1319,11 +1352,12 @@ impl Analysis<LogicalPlanLanguage> for LogicalPlanAnalysis {
             column: Self::make_column_name(egraph, enode),
             expr_to_alias: Self::make_expr_to_alias(egraph, enode),
             referenced_expr: Self::make_referenced_expr(egraph, enode),
-            constant: Self::make_constant(egraph, enode),
+            constant,
             constant_in_list: Self::make_constant_in_list(egraph, enode),
             cube_reference: Self::make_cube_reference(egraph, enode),
             is_empty_list: Self::make_is_empty_list(egraph, enode),
             filter_operators: Self::make_filter_operators(egraph, enode),
+            contains_float_literal,
         }
     }
 
@@ -1352,6 +1386,7 @@ impl Analysis<LogicalPlanLanguage> for LogicalPlanAnalysis {
             | column_name
             | filter_operators
             | is_empty_list
+            | self.merge_max_field(&mut a.contains_float_literal, b.contains_float_literal)
             | self.merge_max_field(&mut a.iteration_timestamp, b.iteration_timestamp)
     }
 

@@ -217,6 +217,11 @@ export class PinotQuery extends BaseQuery {
     templates.functions.UTCTIMESTAMP = 'NOW()';
     templates.functions.STRING_AGG = 'LISTAGG({% if distinct %}DISTINCT {% endif %}{{ args_concat }})';
     delete templates.functions.WIDTH_BUCKET;
+    // Pinot ROUND buckets integer time values. ROUNDDECIMAL also differs from
+    // DataFusion for unary negative ties and binary floating-point precision.
+    // Keep both ROUND arities over float literals local.
+    delete templates.operators.round_single_arg;
+    delete templates.operators.round_multi_arg;
     templates.statements.select = '{% if ctes %} WITH \n' +
       '{{ ctes | join(\',\n\') }}\n' +
       '{% endif %}' +

@@ -1,10 +1,11 @@
 use crate::{
     compile::rewrite::{
+        analysis::OriginalExpr,
         binary_expr, rewrite,
         rewriter::{CubeEGraph, CubeRewrite},
         rules::wrapper::WrapperRules,
         transforming_rewrite, wrapper_pullup_replacer, wrapper_pushdown_replacer,
-        wrapper_replacer_context, BinaryExprOp,
+        wrapper_replacer_context, BinaryExprOp, WrapperReplacerContextPushToCube,
     },
     var, var_iter,
 };
@@ -64,7 +65,14 @@ impl WrapperRules {
                         "?input_data_source",
                     ),
                 ),
-                self.transform_binary_expr("?op", "?input_data_source"),
+                self.transform_binary_expr(
+                    "?op",
+                    "?input_data_source",
+                    "?cube_members",
+                    "?push_to_cube",
+                    "?left",
+                    "?right",
+                ),
             ),
         ]);
     }
@@ -73,9 +81,17 @@ impl WrapperRules {
         &self,
         operator_var: &'static str,
         input_data_source_var: &'static str,
+        members_var: &'static str,
+        push_to_cube_var: &'static str,
+        left_var: &'static str,
+        right_var: &'static str,
     ) -> impl Fn(&mut CubeEGraph, &mut Subst) -> bool {
         let operator_var = var!(operator_var);
         let input_data_source_var = var!(input_data_source_var);
+        let members_var = var!(members_var);
+        let push_to_cube_var = var!(push_to_cube_var);
+        let left_var = var!(left_var);
+        let right_var = var!(right_var);
         let meta = self.meta_context.clone();
         move |egraph, subst| {
             let Ok(data_source) = Self::get_data_source(egraph, subst, input_data_source_var)
@@ -87,8 +103,33 @@ impl WrapperRules {
                 return false;
             }
 
-            for op in var_iter!(egraph[subst[operator_var]], BinaryExprOp) {
+            for op in var_iter!(egraph[subst[operator_var]], BinaryExprOp).cloned() {
                 match op {
+                    Operator::Modulo => {
+                        if Self::all_generators_support(&data_source, &meta, |templates| {
+                            templates.contains_template("operators/float_modulo")
+                        }) {
+                            return true;
+                        }
+                        // A completed select can shadow names from the original Cube scan.
+                        let members = var_iter!(
+                            egraph[subst[push_to_cube_var]],
+                            WrapperReplacerContextPushToCube
+                        )
+                        .all(|push| *push)
+                        .then(|| egraph[subst[members_var]].data.member_name_to_expr.as_ref())
+                        .flatten();
+                        return [left_var, right_var].iter().all(|operand| {
+                            let Some(OriginalExpr::Expr(expr)) =
+                                &egraph[subst[*operand]].data.original_expr
+                            else {
+                                return false;
+                            };
+                            !egraph[subst[*operand]].data.contains_float_literal
+                                && !Self::expr_contains_float_literal(expr)
+                                && !Self::expr_contains_unknown_column(expr, members, &meta)
+                        });
+                    }
                     Operator::Like | Operator::NotLike => {
                         if Self::can_rewrite_template(&data_source, &meta, "expressions/like") {
                             return true;

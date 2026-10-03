@@ -4808,7 +4808,13 @@ export class BaseQuery {
         always_true: '1 = 1'
 
       },
-      operators: {},
+      operators: {
+        // Presence-only capabilities, never rendered as SQL. Delete a key when
+        // float literals cannot safely use modulo or the corresponding ROUND arity.
+        float_modulo: 'supported',
+        round_single_arg: 'supported',
+        round_multi_arg: 'supported',
+      },
       quotes: {
         identifiers: '"',
         escape: '""'
