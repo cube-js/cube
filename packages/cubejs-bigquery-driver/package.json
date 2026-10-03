@@ -16,6 +16,7 @@
     "tsc": "tsc",
     "watch": "tsc -w",
     "test": "yarn integration",
+    "unit": "jest --verbose dist/test/unit",
     "integration": "npm run integration:bigquery",
     "integration:bigquery": "NODE_OPTIONS=--experimental-vm-modules jest --verbose dist/test"
   },
