@@ -82,6 +82,7 @@ const BRIDGES: BridgeSpec[] = [
       'pre_aggregation_table_name',
       'sql_templates',
       'sql_utils_for_rust',
+      'try_join_tree_for_hints',
     ],
   },
   { name: 'caseDefinition', expected: ['else_label', 'when'] },

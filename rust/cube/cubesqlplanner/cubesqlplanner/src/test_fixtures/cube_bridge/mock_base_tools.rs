@@ -124,6 +124,19 @@ impl BaseTools for MockBaseTools {
         Ok(result as Rc<dyn JoinDefinition>)
     }
 
+    fn try_join_tree_for_hints(
+        &self,
+        hints: Vec<JoinHintItem>,
+    ) -> Result<Vec<Rc<dyn JoinDefinition>>, CubeError> {
+        Ok(self
+            .join_graph
+            .build_join(hints)
+            .ok()
+            .map(|result| result as Rc<dyn JoinDefinition>)
+            .into_iter()
+            .collect())
+    }
+
     fn compile_member_sql(
         &self,
         member_sql: Rc<dyn MemberSql>,

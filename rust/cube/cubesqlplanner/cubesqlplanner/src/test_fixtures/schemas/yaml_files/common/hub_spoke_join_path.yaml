@@ -1,0 +1,142 @@
+# Joins are declared only from `hub` and `ledger`, so `entities` is reachable
+# only through `hub`: a hint set naming `ledger`, `categories` and `entities`
+# without `hub` has no join root.
+cubes:
+  - name: hub
+    sql: "SELECT 1 AS id, 'o1' AS org_id, 'e1' AS entity_id, 'm1' AS management_id"
+    joins:
+      - name: ledger
+        relationship: one_to_many
+        sql: "{CUBE.management_id} = {ledger.management_id}"
+      - name: entities
+        relationship: many_to_one
+        sql: "{CUBE.entity_id} = {entities.id}"
+    dimensions:
+      - name: id
+        type: number
+        sql: id
+        primary_key: true
+      - name: org_id
+        type: string
+        sql: org_id
+      - name: entity_id
+        type: string
+        sql: entity_id
+      - name: management_id
+        type: string
+        sql: management_id
+    measures:
+      - name: count
+        type: count
+    pre_aggregations:
+      - name: hub_rollup
+        type: rollup
+        dimensions:
+          - id
+          - org_id
+          - entity_id
+          - management_id
+      # The only hub member is a measure.
+      - name: income_by_category
+        type: rollup
+        measures:
+          - count
+          - ledger.amount
+        dimensions:
+          - ledger.category_id
+          - categories.name
+          - entities.name
+      # No hub member at all: no join path covers its members.
+      - name: spoke_only_join
+        type: rollupJoin
+        measures:
+          - ledger.amount
+        dimensions:
+          - ledger.category_id
+          - categories.name
+          - entities.name
+        rollups:
+          - hub.hub_rollup
+          - ledger.ledger_rollup
+          - categories.categories_rollup
+          - entities.entities_rollup
+      - name: with_hub_join
+        type: rollupJoin
+        measures:
+          - ledger.amount
+        dimensions:
+          - org_id
+          - ledger.category_id
+          - categories.name
+          - entities.name
+        rollups:
+          - hub.hub_rollup
+          - ledger.ledger_rollup
+          - categories.categories_rollup
+          - entities.entities_rollup
+
+  - name: ledger
+    sql: "SELECT 1 AS id, 'm1' AS management_id, 'c1' AS category_id, 10 AS amount"
+    joins:
+      - name: categories
+        relationship: many_to_one
+        sql: "{CUBE.category_id} = {categories.id}"
+    dimensions:
+      - name: id
+        type: number
+        sql: id
+        primary_key: true
+      - name: management_id
+        type: string
+        sql: management_id
+      - name: category_id
+        type: string
+        sql: category_id
+    measures:
+      - name: amount
+        type: sum
+        sql: amount
+      - name: count
+        type: count
+    pre_aggregations:
+      - name: ledger_rollup
+        type: rollup
+        measures:
+          - amount
+        dimensions:
+          - management_id
+          - category_id
+
+  - name: categories
+    sql: "SELECT 'c1' AS id, 'Fees' AS name"
+    dimensions:
+      - name: id
+        type: string
+        sql: id
+        primary_key: true
+      - name: name
+        type: string
+        sql: name
+    pre_aggregations:
+      - name: categories_rollup
+        type: rollup
+        dimensions:
+          - id
+          - name
+
+  - name: entities
+    sql: "SELECT 'e1' AS id, 'Entity' AS name"
+    dimensions:
+      - name: id
+        type: string
+        sql: id
+        primary_key: true
+      - name: name
+        type: string
+        sql: name
+    pre_aggregations:
+      - name: entities_rollup
+        type: rollup
+        dimensions:
+          - id
+          - name
