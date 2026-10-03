@@ -133,7 +133,8 @@ jobs:
       - name: Build client
         run: yarn build
       - name: Lerna test
-        run: yarn lerna run --concurrency 1 --stream --no-prefix unit
+        # @cubejs-backend/cubestore runs in integration-cubestore against the PR-built cubestored
+        run: yarn lerna run --concurrency 1 --stream --no-prefix unit --ignore @cubejs-backend/cubestore
       - name: Fix lcov paths
         if: (matrix.node-version == '24.x')
         run: |
@@ -384,6 +385,14 @@ jobs:
         with:
           path: ./rust/cubestore/target/release/
           name: cubestored-x86_64-unknown-linux-gnu-release
+      # Before the background Cube Store starts: both would bind the same ports.
+      - name: Run Cube Store JS wrapper unit tests
+        timeout-minutes: 10
+        run: |
+          mkdir -p rust/cubestore/downloaded/latest/bin
+          cp -f rust/cubestore/target/release/cubestored rust/cubestore/downloaded/latest/bin/cubestored
+          chmod +x rust/cubestore/downloaded/latest/bin/cubestored
+          yarn --cwd rust/cubestore unit
       - name: Run Cube Store in background
         run: |
           chmod +x ./rust/cubestore/target/release/cubestored
