@@ -518,6 +518,13 @@ function hoistNullableMeta(node) {
   }
 }
 
+// Fail closed: abort if the flagged OIDC fields survive (upstream pattern changed)
+// or a `$ref` to a deleted `*SubjectType` schema is left dangling.
+if (/subjectType|SubjectType|user_email|\{user_|\.@\+/.test(JSON.stringify({ paths, schemas }))) {
+  console.error('Aborting: per-user OIDC fields survived stripping (did the upstream spec change?)');
+  process.exit(1);
+}
+
 hoistNullableMeta(paths);
 hoistNullableMeta(schemas);
 
