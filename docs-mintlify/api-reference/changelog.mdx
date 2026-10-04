@@ -15,7 +15,7 @@ rss: true
   - `GET /api/v1/deployments/{deploymentId}/agent-suggestions` returns the starter prompts an agent offers in chat, for the agents the caller can use (CUB-3700).
   - `GET /api/v1/deployments/{deploymentId}/reports/{reportId}/file` returns a report's definition as canonical JSON text (`content`) with its SHA-256 (`hash`), and `PATCH` on the same path changes part of it by exact-text replacement (CUB-5237).
   - `GET /api/v1/deployments/{deploymentId}/workbooks/{workbookId}/dashboard/file` returns the classic dashboard draft as canonical JSON text (`content`) with its SHA-256 (`hash`), and `PATCH` on the same path changes part of it by exact-text replacement (CUB-5237).
-  - `POST /api/v1/deployments/{deploymentId}/environments/{environmentId}/tokens` and `POST …/tokens-for-meta-sync` now return `data.scopes`, the runtime scopes signed into the token (CUB-4728). A requested scope the caller may not hold is dropped rather than refused, so this is how a caller tells which ones it got — for example, whether a meta-sync token carries `meta-private`. The token listing (`GET …/tokens`) is unchanged.
+  - `POST /api/v1/deployments/{deploymentId}/environments/{environmentId}/tokens` and `POST …/tokens-for-meta-sync` now return `data.scopes`, the runtime scopes signed into the token (CUB-4728). A requested scope the caller may not hold is dropped rather than refused, so this is how a caller tells which ones it got — for example, whether a meta-sync token carries `meta-private`. The token listing (`GET …/tokens`) is unchanged. The `data` type of the `POST …/tokens` response is now the schema `CreatedDeploymentEnvironmentToken` (was `DeploymentEnvironmentToken`), so code that names the old type for that response needs updating.
 
   ### Changed
 
