@@ -1,0 +1,59 @@
+cubes:
+  - name: actions
+    sql: "SELECT * FROM visitor_checkins"
+    joins:
+      - name: contracts
+        relationship: many_to_one
+        sql: "{CUBE.contract_id} = {contracts.id}"
+    dimensions:
+      - name: id
+        type: number
+        sql: id
+        primary_key: true
+      - name: contract_id
+        type: number
+        sql: visitor_id
+    measures:
+      - name: count
+        type: count
+    pre_aggregations:
+      - name: actions_rollup
+        type: rollup
+        measures:
+          - count
+        dimensions:
+          - contract_id
+      - name: actions_with_contracts
+        type: rollupJoin
+        measures:
+          - count
+          - contracts.total_value
+        dimensions:
+          - contract_id
+          - contracts.location
+        rollups:
+          - actions.actions_rollup
+          - contracts.contracts_rollup
+
+  - name: contracts
+    sql: "SELECT * FROM visitors"
+    dimensions:
+      - name: id
+        type: number
+        sql: id
+        primary_key: true
+      - name: location
+        type: string
+        sql: source
+    measures:
+      - name: total_value
+        type: sum
+        sql: id
+    pre_aggregations:
+      - name: contracts_rollup
+        type: rollup
+        measures:
+          - total_value
+        dimensions:
+          - id
+          - location
