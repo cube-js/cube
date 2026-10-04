@@ -389,6 +389,18 @@ pub fn sql_tests(prefix: &str) -> Vec<(&'static str, TestFn)> {
         t("sys_cachestore_healthcheck", sys_cachestore_healthcheck),
         t("join_multi_partition_small", join_multi_partition_small),
         t("join_multi_partition_large", join_multi_partition_large),
+        t(
+            "create_table_duplicate_columns",
+            create_table_duplicate_columns,
+        ),
+        t(
+            "create_table_duplicate_columns_csv_no_header",
+            create_table_duplicate_columns_csv_no_header,
+        ),
+        t(
+            "create_table_duplicate_columns_csv_header",
+            create_table_duplicate_columns_csv_header,
+        ),
     ];
 
     let test_list = if prefix == "migration" {
@@ -13537,4 +13549,70 @@ fn dec5f1(i: i64, f: u64) -> Decimal {
     assert!(f < 10);
     let f = if i < 0 { -(f as i64) } else { f as i64 };
     Decimal::new((i * 100_000 + 10_000 * f) as i128)
+}
+
+async fn create_table_duplicate_columns(service: Box<dyn SqlClient>) -> Result<(), CubeError> {
+    // https://github.com/cube-js/cube/issues/3485
+    service.exec_query("CREATE SCHEMA s").await?;
+    // Currently accepted; any later SELECT fails with
+    // "Schema contains duplicate qualified field name s."dup".a".
+    let r = service
+        .exec_query("CREATE TABLE s.dup (a int, a int, b text)")
+        .await;
+    let err = r.expect_err("CREATE TABLE with duplicate column names must fail");
+    assert!(
+        err.to_string().to_lowercase().contains("duplicate"),
+        "unexpected error: {}",
+        err
+    );
+    Ok(())
+}
+
+async fn create_table_duplicate_columns_csv_no_header(
+    service: Box<dyn SqlClient>,
+) -> Result<(), CubeError> {
+    let file = write_tmp_file(indoc! {"
+        1,2,x
+        3,4,y
+    "})?;
+    let path = file.path().to_string_lossy();
+    service.exec_query("CREATE SCHEMA s").await?;
+    let r = service
+        .exec_query(&format!(
+            "CREATE TABLE s.dup (a int, a int, b text) WITH (input_format = 'csv_no_header') LOCATION '{}'",
+            path
+        ))
+        .await;
+    let err = r.expect_err("csv_no_header import with duplicate column names must fail");
+    assert!(
+        err.to_string().to_lowercase().contains("duplicate"),
+        "unexpected error: {}",
+        err
+    );
+    Ok(())
+}
+
+async fn create_table_duplicate_columns_csv_header(
+    service: Box<dyn SqlClient>,
+) -> Result<(), CubeError> {
+    let file = write_tmp_file(indoc! {"
+        a,a,b
+        1,2,x
+        3,4,y
+    "})?;
+    let path = file.path().to_string_lossy();
+    service.exec_query("CREATE SCHEMA s").await?;
+    let r = service
+        .exec_query(&format!(
+            "CREATE TABLE s.dup (a int, a int, b text) WITH (input_format = 'csv') LOCATION '{}'",
+            path
+        ))
+        .await;
+    let err = r.expect_err("csv import with duplicate column names must fail");
+    assert!(
+        err.to_string().contains("Duplicate column"),
+        "unexpected error: {}",
+        err
+    );
+    Ok(())
 }
