@@ -10,6 +10,8 @@ rss: true
 <Update label="2026-10-04" description="v0.17.0" tags={["Added","Changed"]}>
   ### Added
 
+  - `notificationEnabled` on the create and update bodies and the response of `POST`/`PUT …/scheduled-tasks`: when `true`, the creator gets a notification in Cube's inbox when a run finishes, whether it succeeds or fails. Defaults to `false`.
+  - `expectedVersion` on the report update body (`PUT …/reports/{reportId}`): when it does not match the stored version of the report, the update answers `409` instead of overwriting a newer save.
   - `GET /api/v1/deployments/{deploymentId}/agent-suggestions` returns the starter prompts an agent offers in chat, for the agents the caller can use (CUB-3700).
   - `GET /api/v1/deployments/{deploymentId}/reports/{reportId}/file` returns a report's definition as canonical JSON text (`content`) with its SHA-256 (`hash`), and `PATCH` on the same path changes part of it by exact-text replacement (CUB-5237).
   - `GET /api/v1/deployments/{deploymentId}/workbooks/{workbookId}/dashboard/file` returns the classic dashboard draft as canonical JSON text (`content`) with its SHA-256 (`hash`), and `PATCH` on the same path changes part of it by exact-text replacement (CUB-5237).

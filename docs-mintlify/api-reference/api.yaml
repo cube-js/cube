@@ -7775,14 +7775,9 @@ components:
             - type: 'null'
         subFormat:
           oneOf:
-            - pattern: >-
-                ^(?:[A-Za-z0-9:_.@+-]|\{(?:deployment_id|component|region|user_email|username|user_id)\})+$
+            - pattern: ^(?:[A-Za-z0-9:_-]|\{(?:deployment_id|component|region)\})+$
               type: string
               maxLength: 200
-            - type: 'null'
-        subjectType:
-          oneOf:
-            - $ref: '#/components/schemas/CreateOidcTokenConfigInputSubjectType'
             - type: 'null'
         targetEnvVar:
           oneOf:
@@ -7793,11 +7788,6 @@ components:
       required:
         - audienceType
       type: object
-    CreateOidcTokenConfigInputSubjectType:
-      enum:
-        - deployment
-        - user
-      type: string
     CreateReportInput:
       properties:
         endResultCell:
@@ -12265,8 +12255,6 @@ components:
           oneOf:
             - type: string
             - type: 'null'
-        subjectType:
-          $ref: '#/components/schemas/OidcTokenConfigDTOSubjectType'
         targetEnvVar:
           oneOf:
             - type: string
@@ -12283,15 +12271,9 @@ components:
         - audience
         - name
         - isEnabled
-        - subjectType
         - createdAt
         - updatedAt
       type: object
-    OidcTokenConfigDTOSubjectType:
-      enum:
-        - deployment
-        - user
-      type: string
     PageInfo:
       properties:
         endCursor:
@@ -14512,8 +14494,7 @@ components:
             - type: 'null'
         subFormat:
           oneOf:
-            - pattern: >-
-                ^(?:[A-Za-z0-9:_.@+-]|\{(?:deployment_id|component|region|user_email|username|user_id)\})+$
+            - pattern: ^(?:[A-Za-z0-9:_-]|\{(?:deployment_id|component|region)\})+$
               type: string
               maxLength: 200
             - type: 'null'

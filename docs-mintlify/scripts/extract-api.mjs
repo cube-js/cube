@@ -499,6 +499,25 @@ function hoistNullableMeta(node) {
   }
   for (const v of Object.values(node)) hoistNullableMeta(v);
 }
+// Per-user OIDC subjects (`subjectType`, the `{user_*}` sub placeholders) are
+// gated behind the `useUserOidcTokens` tenant flag, not generally available.
+// Strip them from the generated schemas. Remove once the feature ships.
+{
+  for (const [name, def] of Object.entries(schemas)) {
+    if (/SubjectType$/.test(name) && Array.isArray(def.enum) && def.enum.includes('user')) {
+      delete schemas[name];
+      continue;
+    }
+    delete def.properties?.subjectType;
+    if (Array.isArray(def.required)) def.required = def.required.filter((r) => r !== 'subjectType');
+    for (const alt of def.properties?.subFormat?.oneOf ?? []) {
+      if (typeof alt.pattern === 'string') {
+        alt.pattern = alt.pattern.replace('|user_email|username|user_id', '').replace('.@+', '');
+      }
+    }
+  }
+}
+
 hoistNullableMeta(paths);
 hoistNullableMeta(schemas);
 
