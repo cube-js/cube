@@ -7,6 +7,20 @@ rss: true
 {/* GENERATED FILE — do not edit by hand. */}
 {/* Run scripts/extract-changelog.mjs against the platform client CHANGELOG.md. */}
 
+<Update label="2026-10-04" description="v0.17.0" tags={["Added","Changed"]}>
+  ### Added
+
+  - `GET /api/v1/deployments/{deploymentId}/agent-suggestions` returns the starter prompts an agent offers in chat, for the agents the caller can use (CUB-3700).
+  - `GET /api/v1/deployments/{deploymentId}/reports/{reportId}/file` returns a report's definition as canonical JSON text (`content`) with its SHA-256 (`hash`), and `PATCH` on the same path changes part of it by exact-text replacement (CUB-5237).
+  - `GET /api/v1/deployments/{deploymentId}/workbooks/{workbookId}/dashboard/file` returns the classic dashboard draft as canonical JSON text (`content`) with its SHA-256 (`hash`), and `PATCH` on the same path changes part of it by exact-text replacement (CUB-5237).
+  - `POST /api/v1/deployments/{deploymentId}/environments/{environmentId}/tokens` and `POST …/tokens-for-meta-sync` now return `data.scopes`, the runtime scopes signed into the token (CUB-4728). A requested scope the caller may not hold is dropped rather than refused, so this is how a caller tells which ones it got — for example, whether a meta-sync token carries `meta-private`. The token listing (`GET …/tokens`) is unchanged.
+
+  ### Changed
+
+  - `POST /api/v1/deployments/{deploymentId}/scheduled-tasks` now requires the new deployment-scoped `ScheduledTasksCreate` permission and answers `403` without it (CUB-4940). Every built-in role grants it, so only a custom role can withhold it. A custom role saved before this release keeps creating tasks on every deployment where it can use the agent, until an admin saves it without the permission; a custom role saved since holds it only where an admin grants it. Reading, updating, pausing, running and deleting a task are unchanged, including for a creator who no longer holds the permission. The RBAC action enums (`Policy.actions`, the resource user/group policy schemas and their inherited variants) gained `ScheduledTasksCreate`.
+  - `POST /api/v1/deployments/{deploymentId}/environments/{environmentId}/tokens-for-meta-sync` can now sign the `meta-private` scope (CUB-4728). It still always signs `meta`, and adds `meta-private` when it is listed in `scopes` and the caller holds data model read access (`SchemaRead`) on the deployment, or is an admin on a tenant with RBAC off; otherwise it is dropped rather than signed, and any other requested scope is still ignored. A token carrying it may pass `include_private=true` to the Metadata API (`/v1/entities`, `/v1/entities/{name}`, `/v1/entities/all`) to read private cubes, views and members with their full definitions; data access policies still apply. `POST …/tokens` does not sign `meta-private`.
+</Update>
+
 <Update label="2026-09-29" description="v0.16.0" tags={["Changed"]}>
   ### Changed
 

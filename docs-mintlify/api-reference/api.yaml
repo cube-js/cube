@@ -40,6 +40,7 @@ tags:
   - name: Notifications
   - name: Scheduled Tasks
   - name: Workspace
+  - name: Agents
   - name: Users
   - name: Users Admin
   - name: API Keys
@@ -287,6 +288,46 @@ paths:
           sent. Choosing a version that is not the channel’s latest also sets
           `releaseChannelVersionHold` unless you send it explicitly, so auto-upgrade does not undo
           the pin.
+  /api/v1/deployments/{deploymentId}/agent-suggestions:
+    get:
+      operationId: getAgentSuggestions
+      parameters:
+        - in: path
+          name: deploymentId
+          required: true
+          schema:
+            type: number
+        - in: query
+          name: agent
+          schema:
+            oneOf:
+              - type: string
+              - type: 'null'
+        - in: query
+          name: branchName
+          schema:
+            oneOf:
+              - type: string
+              - type: 'null'
+        - in: query
+          name: after
+          schema:
+            type: string
+        - in: query
+          name: first
+          schema:
+            minimum: 1
+            type: integer
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AgentSuggestionsListResponse'
+          description: ''
+      summary: Get agent suggestions
+      tags:
+        - Agents
   /api/v1/deployments/{deploymentId}/build-status:
     get:
       operationId: buildStatus
@@ -2429,6 +2470,84 @@ paths:
           report's query, name, or other definition — so, like refresh, it requires only
           read access to the report. A user who can view a report can place its data into
           their own sheet without being its creator or having edit rights.
+  /api/v1/deployments/{deploymentId}/reports/{reportId}/file:
+    get:
+      operationId: getReportFile
+      parameters:
+        - in: path
+          name: deploymentId
+          required: true
+          schema:
+            type: number
+        - in: path
+          name: reportId
+          required: true
+          schema:
+            type: number
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JsonConfigFileDto'
+          description: ''
+      summary: Read a report definition as editable JSON text
+      tags:
+        - Reports
+      x-mint:
+        content: >-
+          Returns the report's definition as canonical JSON text (`content`) and its SHA-256
+          (`hash`): `name` plus the definition fields of `meta` (`sqlQuery`, `chartCategory`, chart
+          specs, `pivotItems`, …). `vegaSpec` appears as a JSON object. Placements and run state are
+          left out.
+
+
+          Use it with `PATCH /reports/{reportId}/file` to change part of a report without resending
+          it.
+    patch:
+      operationId: replaceReportFileText
+      parameters:
+        - in: path
+          name: deploymentId
+          required: true
+          schema:
+            type: number
+        - in: path
+          name: reportId
+          required: true
+          schema:
+            type: number
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ReplaceJsonConfigTextInput'
+        description: ReplaceJsonConfigTextInput
+        required: false
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JsonConfigFileDto'
+          description: ''
+      summary: Replace text in a report definition
+      tags:
+        - Reports
+      x-mint:
+        content: >-
+          Changes part of a report by exact-text replacement, so a small change (a column, a filter,
+          one chart property) sends only that change instead of the whole report.
+
+
+          Read `GET /reports/{reportId}/file` first and copy each `oldText` from its `content`,
+          including whitespace. Without `replaceAll`, `oldText` must occur exactly once. Edits apply
+          in order; if any one fails, nothing is saved. A field removed from the file is cleared;
+          fields outside the file cannot be added.
+
+
+          Returns the new `content` and `hash`. Pass `expectedHash` to get `409` instead of editing
+          a report that changed since you read it. Requires **edit** access to the report.
   /api/v1/deployments/{deploymentId}/reports/{reportId}/refresh:
     put:
       operationId: refreshReport
@@ -2523,9 +2642,9 @@ paths:
         - Scheduled Tasks
       x-mint:
         content: >-
-          Saves a prompt for the agent to run on `cronExpression` in `timezone`, or only on demand
-          without a cron. Runs act as the caller. A cron fires at most hourly (`400` otherwise), and
-          a user can have 20 active tasks (`409` past that).
+          Saves a prompt the agent runs as the caller on `cronExpression` in `timezone`, or on
+          demand. Needs `ScheduledTasksCreate` (`403` otherwise). A cron fires at most hourly (`400`
+          otherwise), and a user can have 20 active tasks (`409` past that).
   /api/v1/deployments/{deploymentId}/scheduled-tasks/{taskId}:
     delete:
       operationId: deleteScheduledTask
@@ -3301,6 +3420,83 @@ paths:
       summary: Update published dashboard AI widget thread
       tags:
         - Workbooks
+  /api/v1/deployments/{deploymentId}/workbooks/{workbookId}/dashboard/file:
+    get:
+      operationId: getWorkbookDashboardFile
+      parameters:
+        - in: path
+          name: deploymentId
+          required: true
+          schema:
+            type: number
+        - in: path
+          name: workbookId
+          required: true
+          schema:
+            type: number
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JsonConfigFileDto'
+          description: ''
+      summary: Read the dashboard draft as editable JSON text
+      tags:
+        - Workbooks
+      x-mint:
+        content: >-
+          Returns the workbook's classic dashboard draft as canonical JSON text (`content`) and its
+          SHA-256 (`hash`).
+
+
+          Use it with `PATCH /workbooks/{workbookId}/dashboard/file` to change part of the dashboard
+          without resending the whole configuration. Returns `400` for a workbook whose dashboard is
+          a Dashboard App.
+    patch:
+      operationId: replaceWorkbookDashboardFileText
+      parameters:
+        - in: path
+          name: deploymentId
+          required: true
+          schema:
+            type: number
+        - in: path
+          name: workbookId
+          required: true
+          schema:
+            type: number
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ReplaceJsonConfigTextInput'
+        description: ReplaceJsonConfigTextInput
+        required: false
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JsonConfigFileDto'
+          description: ''
+      summary: Replace text in the dashboard draft
+      tags:
+        - Workbooks
+      x-mint:
+        content: >-
+          Changes part of the classic dashboard draft by exact-text replacement, so a small change
+          sends only that change instead of the whole configuration.
+
+
+          Read `GET /workbooks/{workbookId}/dashboard/file` first and copy each `oldText` from its
+          `content`, including whitespace. Without `replaceAll`, `oldText` must occur exactly once.
+          Edits apply in order; if any one fails, nothing is saved. The result is validated like
+          `PUT /workbooks/{workbookId}/dashboard`.
+
+
+          Returns the new `content` and `hash`. Pass `expectedHash` to get `409` instead of editing
+          a draft that changed since you read it. Requires **manage** access to the workbook.
   /api/v1/deployments/{deploymentId}/workbooks/{workbookId}/duplicate:
     post:
       operationId: duplicateWorkbook
@@ -6518,6 +6714,19 @@ components:
       required:
         - creationStep
       type: object
+    AgentSuggestionsListResponse:
+      properties:
+        items:
+          items:
+            type: string
+          type: array
+        pageInfo:
+          oneOf:
+            - $ref: '#/components/schemas/PageInfo'
+            - type: 'null'
+      required:
+        - items
+      type: object
     ApiKeyCreatedResponse:
       properties:
         allowedEndpoints:
@@ -7566,9 +7775,14 @@ components:
             - type: 'null'
         subFormat:
           oneOf:
-            - pattern: ^(?:[A-Za-z0-9:_-]|\{(?:deployment_id|component|region)\})+$
+            - pattern: >-
+                ^(?:[A-Za-z0-9:_.@+-]|\{(?:deployment_id|component|region|user_email|username|user_id)\})+$
               type: string
               maxLength: 200
+            - type: 'null'
+        subjectType:
+          oneOf:
+            - $ref: '#/components/schemas/CreateOidcTokenConfigInputSubjectType'
             - type: 'null'
         targetEnvVar:
           oneOf:
@@ -7579,6 +7793,11 @@ components:
       required:
         - audienceType
       type: object
+    CreateOidcTokenConfigInputSubjectType:
+      enum:
+        - deployment
+        - user
+      type: string
     CreateReportInput:
       properties:
         endResultCell:
@@ -7698,6 +7917,13 @@ components:
           maxLength: 255
           minLength: 1
           type: string
+        notificationEnabled:
+          oneOf:
+            - type: boolean
+            - type: 'null'
+          description: >-
+            Notify the creator in Cube's notification inbox when a run finishes, whether it succeeds
+            or fails. Defaults to `false`.
         prompt:
           description: >-
             What the agent is asked on every run, shown as the task's Instructions in Cube. Each run
@@ -11634,6 +11860,22 @@ components:
       required:
         - name
       type: object
+    JsonConfigFileDto:
+      properties:
+        content:
+          description: >-
+            The configuration as canonical JSON text: keys sorted, 2-space indentation, trailing
+            newline. `oldText` in a replacement must match this text exactly.
+          type: string
+        hash:
+          description: >-
+            SHA-256 of `content`. Send it back as `expectedHash` to reject the write if the
+            configuration changed since you read it.
+          type: string
+      required:
+        - content
+        - hash
+      type: object
     ListDatabricksMetricViewSyncsQueryStatus:
       enum:
         - QUEUED
@@ -12023,6 +12265,8 @@ components:
           oneOf:
             - type: string
             - type: 'null'
+        subjectType:
+          $ref: '#/components/schemas/OidcTokenConfigDTOSubjectType'
         targetEnvVar:
           oneOf:
             - type: string
@@ -12039,9 +12283,15 @@ components:
         - audience
         - name
         - isEnabled
+        - subjectType
         - createdAt
         - updatedAt
       type: object
+    OidcTokenConfigDTOSubjectType:
+      enum:
+        - deployment
+        - user
+      type: string
     PageInfo:
       properties:
         endCursor:
@@ -12263,6 +12513,7 @@ components:
               - AgentSpaceManage
               - AgentAdmin
               - DeploymentAgentRead
+              - ScheduledTasksCreate
               - OAuthIntegrationsManage
               - OAuthIntegrationsIssueTokens
               - McpToolsManage
@@ -12681,6 +12932,28 @@ components:
           type: array
       required:
         - files
+      type: object
+    ReplaceJsonConfigTextInput:
+      properties:
+        edits:
+          description: >-
+            Replacements applied in order, each to the result of the previous one. Either all apply
+            or nothing is saved.
+          items:
+            $ref: '#/components/schemas/TextReplacementInput'
+          maxItems: 50
+          minItems: 1
+          type: array
+        expectedHash:
+          oneOf:
+            - pattern: ^[a-f0-9]{64}$
+              type: string
+            - type: 'null'
+          description: >-
+            The `hash` from your last read. When set, the request fails with 409 if the
+            configuration changed since then.
+      required:
+        - edits
       type: object
     Report:
       properties:
@@ -13171,6 +13444,7 @@ components:
               - AgentSpaceManage
               - AgentAdmin
               - DeploymentAgentRead
+              - ScheduledTasksCreate
               - OAuthIntegrationsManage
               - OAuthIntegrationsIssueTokens
               - McpToolsManage
@@ -13309,6 +13583,9 @@ components:
             - type: string
             - type: 'null'
           description: When the schedule next fires (ISO 8601, UTC); null for a Manual or paused task.
+        notificationEnabled:
+          description: Whether a finished run notifies the creator in Cube's notification inbox.
+          type: boolean
         prompt:
           description: >-
             What the agent is asked on every run, shown as the task's Instructions in Cube. Each run
@@ -13329,6 +13606,7 @@ components:
         - prompt
         - timezone
         - isEnabled
+        - notificationEnabled
         - userId
       type: object
     ScheduledTaskRunResponse:
@@ -13846,6 +14124,26 @@ components:
             - type: boolean
             - type: 'null'
       type: object
+    TextReplacementInput:
+      properties:
+        newText:
+          description: Text to put in place of `oldText`.
+          type: string
+        oldText:
+          description: >-
+            Exact text to replace, copied from `content`, including whitespace. Must occur exactly
+            once unless `replaceAll` is set.
+          minLength: 1
+          type: string
+        replaceAll:
+          oneOf:
+            - type: boolean
+            - type: 'null'
+          description: Replace every occurrence of `oldText` instead of requiring one.
+      required:
+        - oldText
+        - newText
+      type: object
     ThemeFont:
       properties:
         family:
@@ -14214,7 +14512,8 @@ components:
             - type: 'null'
         subFormat:
           oneOf:
-            - pattern: ^(?:[A-Za-z0-9:_-]|\{(?:deployment_id|component|region)\})+$
+            - pattern: >-
+                ^(?:[A-Za-z0-9:_.@+-]|\{(?:deployment_id|component|region|user_email|username|user_id)\})+$
               type: string
               maxLength: 200
             - type: 'null'
@@ -14244,6 +14543,10 @@ components:
         endResultCell:
           oneOf:
             - type: string
+            - type: 'null'
+        expectedVersion:
+          oneOf:
+            - type: integer
             - type: 'null'
         externalWorkbookId:
           oneOf:
@@ -14357,6 +14660,13 @@ components:
               minLength: 1
             - type: 'null'
           description: Omit to leave unchanged. Explicit null answers `400`.
+        notificationEnabled:
+          oneOf:
+            - type: boolean
+            - type: 'null'
+          description: >-
+            Turn the inbox notification for finished runs on or off. Omit to leave unchanged.
+            Explicit null answers `400`.
         prompt:
           oneOf:
             - minLength: 1
