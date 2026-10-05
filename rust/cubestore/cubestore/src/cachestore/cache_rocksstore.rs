@@ -1809,17 +1809,7 @@ impl CacheStore for RocksCacheStore {
                         external_id: None,
                     })),
                     QueueResultAckEventResult::WithResult => {
-                        let response = self.queue_result_ready_to_delete(ack_event.id).await?;
-
-                        Ok(response.map(|response| match response {
-                            QueueResultResponse::Success { value, id, .. } => {
-                                QueueResultResponse::Success {
-                                    value,
-                                    id,
-                                    external_id: None,
-                                }
-                            }
-                        }))
+                        self.queue_result_ready_to_delete(ack_event.id).await
                     }
                 },
                 // The listener lagged behind the channel, the ack might have been dropped
@@ -3143,7 +3133,10 @@ mod tests {
         cachestore.add_listener(sender).await;
 
         let id = cachestore
-            .queue_add(queue_add_payload("prefix:path1"))
+            .queue_add(QueueAddPayload {
+                external_id: Some("ext-1".to_string()),
+                ..queue_add_payload("prefix:path1")
+            })
             .await?
             .id;
 
@@ -3167,8 +3160,12 @@ mod tests {
 
         for waiter in [waiter_1, waiter_2] {
             assert_eq!(
-                queue_result_value(waiter.await.unwrap()?),
-                Some("result".to_string())
+                waiter.await.unwrap()?,
+                Some(QueueResultResponse::Success {
+                    value: Some("result".to_string()),
+                    id,
+                    external_id: Some("ext-1".to_string()),
+                })
             );
         }
 
