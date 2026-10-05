@@ -56,6 +56,7 @@ tags:
   - name: Dashboard Embed Access
   - name: Usage Analytics
   - name: OpenAPI Spec
+  - name: Report Deliveries
 paths:
   /api/v1/api-keys:
     get:
@@ -2069,6 +2070,368 @@ paths:
       summary: List the pods currently scheduled for a deployment
       tags:
         - Deployments
+  /api/v1/deployments/{deploymentId}/report-deliveries:
+    get:
+      operationId: getReportDeliveries
+      parameters:
+        - in: path
+          name: deploymentId
+          required: true
+          schema:
+            type: integer
+          description: Numeric id of the deployment that owns the delivery.
+        - in: query
+          name: reportId
+          schema:
+            oneOf:
+              - minimum: 1
+                type: integer
+              - type: 'null'
+            description: Only deliveries of this report.
+        - in: query
+          name: ownerUserId
+          schema:
+            oneOf:
+              - minimum: 0
+                type: integer
+              - type: 'null'
+            description: Only deliveries owned by this user.
+        - in: query
+          name: spreadsheet
+          schema:
+            oneOf:
+              - type: string
+              - type: 'null'
+            description: Only deliveries into this spreadsheet (its URL or its id).
+        - in: query
+          name: status
+          schema:
+            oneOf:
+              - $ref: '#/components/schemas/GetReportDeliveriesQueryStatus'
+              - type: 'null'
+        - in: query
+          name: after
+          schema:
+            type: string
+        - in: query
+          name: first
+          schema:
+            minimum: 1
+            type: integer
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReportDeliveriesListResponse'
+          description: ''
+      summary: List report deliveries
+      tags:
+        - Report Deliveries
+      x-mint:
+        content: >-
+          In preview: ask Cube support to enable it. Newest first. Filter by `reportId`,
+          `ownerUserId`, `spreadsheet` or `status`. Admins see every delivery; others only their
+          own.
+    post:
+      operationId: createReportDelivery
+      parameters:
+        - in: path
+          name: deploymentId
+          required: true
+          schema:
+            type: integer
+          description: Numeric id of the deployment that owns the delivery.
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateReportDeliveryInput'
+        description: CreateReportDeliveryInput
+        required: false
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReportDeliveryResponse'
+          description: ''
+      summary: Create a report delivery
+      tags:
+        - Report Deliveries
+      x-mint:
+        content: >-
+          In preview: ask Cube support to enable it. Writes a report’s results into a Google Sheets
+          tab from `destination.anchorCell`. The caller owns it: their Google account writes, with
+          their data access. Needs read access to the report.
+  /api/v1/deployments/{deploymentId}/report-deliveries/{id}:
+    delete:
+      operationId: deleteReportDelivery
+      parameters:
+        - in: path
+          name: deploymentId
+          required: true
+          schema:
+            type: integer
+          description: Numeric id of the deployment that owns the delivery.
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+          description: Numeric id of the report delivery.
+      responses:
+        '200':
+          content:
+            application/json: {}
+          description: Successful response
+        '204':
+          description: Report delivery deleted.
+      summary: Delete a report delivery
+      tags:
+        - Report Deliveries
+      x-mint:
+        content: >-
+          In preview: ask Cube support to enable it. Also deletes its run history. Cells it already
+          wrote stay in the spreadsheet.
+    get:
+      operationId: getReportDelivery
+      parameters:
+        - in: path
+          name: deploymentId
+          required: true
+          schema:
+            type: integer
+          description: Numeric id of the deployment that owns the delivery.
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+          description: Numeric id of the report delivery.
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReportDeliveryResponse'
+          description: ''
+      summary: Get a report delivery
+      tags:
+        - Report Deliveries
+      x-mint:
+        content: >-
+          In preview: ask Cube support to enable it. `404` if the caller cannot see it. Admins see
+          every delivery; others only their own.
+    put:
+      operationId: updateReportDelivery
+      parameters:
+        - in: path
+          name: deploymentId
+          required: true
+          schema:
+            type: integer
+          description: Numeric id of the deployment that owns the delivery.
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+          description: Numeric id of the report delivery.
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateReportDeliveryInput'
+        description: UpdateReportDeliveryInput
+        required: false
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReportDeliveryResponse'
+          description: ''
+      summary: Update a report delivery
+      tags:
+        - Report Deliveries
+      x-mint:
+        content: >-
+          In preview: ask Cube support to enable it. Omitted fields stay unchanged; `destination`
+          and `schedule` are replaced whole, and `schedule: null` removes it. A new `reportId` needs
+          read access to that report; `ownerUserId` transfers the delivery.
+  /api/v1/deployments/{deploymentId}/report-deliveries/{id}/pause:
+    post:
+      operationId: pauseReportDelivery
+      parameters:
+        - in: path
+          name: deploymentId
+          required: true
+          schema:
+            type: integer
+          description: Numeric id of the deployment that owns the delivery.
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+          description: Numeric id of the report delivery.
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReportDeliveryResponse'
+          description: ''
+      summary: Pause a report delivery
+      tags:
+        - Report Deliveries
+      x-mint:
+        content: >-
+          In preview: ask Cube support to enable it. Its schedule stops firing until it is resumed;
+          a run can still be started by hand. Pausing a paused delivery changes nothing.
+  /api/v1/deployments/{deploymentId}/report-deliveries/{id}/resume:
+    post:
+      operationId: resumeReportDelivery
+      parameters:
+        - in: path
+          name: deploymentId
+          required: true
+          schema:
+            type: integer
+          description: Numeric id of the deployment that owns the delivery.
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+          description: Numeric id of the report delivery.
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReportDeliveryResponse'
+          description: ''
+      summary: Resume a paused report delivery
+      tags:
+        - Report Deliveries
+      x-mint:
+        content: >-
+          In preview: ask Cube support to enable it. Its schedule fires again from the next due
+          time; the fires missed while paused are not run.
+  /api/v1/deployments/{deploymentId}/report-deliveries/{id}/runs:
+    get:
+      operationId: getReportDeliveryRuns
+      parameters:
+        - in: path
+          name: deploymentId
+          required: true
+          schema:
+            type: integer
+          description: Numeric id of the deployment that owns the delivery.
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+          description: Numeric id of the report delivery.
+        - in: query
+          name: sortDirection
+          schema:
+            oneOf:
+              - $ref: '#/components/schemas/GetReportDeliveryRunsQuerySortDirection'
+              - type: 'null'
+        - in: query
+          name: after
+          schema:
+            type: string
+        - in: query
+          name: first
+          schema:
+            minimum: 1
+            type: integer
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReportDeliveryRunsListResponse'
+          description: ''
+      summary: List runs of a report delivery
+      tags:
+        - Report Deliveries
+      x-mint:
+        content: >-
+          In preview: ask Cube support to enable it. Newest first unless `sortDirection` says
+          otherwise, a running one included. `404` if the caller cannot see the delivery. Admins see
+          every delivery; others only their own.
+    post:
+      operationId: startReportDeliveryRun
+      parameters:
+        - in: path
+          name: deploymentId
+          required: true
+          schema:
+            type: integer
+          description: Numeric id of the deployment that owns the delivery.
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+          description: Numeric id of the report delivery.
+      responses:
+        '202':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StartReportDeliveryRunResponse'
+          description: ''
+      summary: Run a report delivery now
+      tags:
+        - Report Deliveries
+      x-mint:
+        content: >-
+          In preview: ask Cube support to enable it. Starts a run in the background and returns its
+          id. The run writes the report’s current results into the destination, whether or not the
+          delivery is paused. `409` while another run of it is still going.
+  /api/v1/deployments/{deploymentId}/report-deliveries/{id}/runs/{runId}:
+    get:
+      operationId: getReportDeliveryRun
+      parameters:
+        - in: path
+          name: deploymentId
+          required: true
+          schema:
+            type: integer
+          description: Numeric id of the deployment that owns the delivery.
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+          description: Numeric id of the report delivery.
+        - in: path
+          name: runId
+          required: true
+          schema:
+            type: integer
+          description: Numeric id of the run, as returned when it was started.
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReportDeliveryRunResponse'
+          description: ''
+      summary: Get a report delivery run
+      tags:
+        - Report Deliveries
+      x-mint:
+        content: >-
+          In preview: ask Cube support to enable it. Poll it after starting a run: `status` stays
+          `running` until the run finishes.
   /api/v1/deployments/{deploymentId}/reports:
     get:
       operationId: getReports
@@ -7788,6 +8151,56 @@ components:
       required:
         - audienceType
       type: object
+    CreateReportDeliveryInput:
+      properties:
+        destination:
+          $ref: '#/components/schemas/ReportDeliveryDestinationInput'
+          not:
+            type: 'null'
+        name:
+          maxLength: 255
+          minLength: 1
+          type: string
+        notifications:
+          oneOf:
+            - $ref: '#/components/schemas/ReportDeliveryNotificationsInput'
+            - type: 'null'
+          description: >-
+            How the owner hears that the delivery failed or recovered. A delivery that runs more
+            than once a day reports only changes in its status; a daily or rarer one reports every
+            failed run. Omit it for the inbox only.
+        reportId:
+          description: >-
+            Id of the report whose results are delivered. It must belong to this deployment, and the
+            caller must be able to read it.
+          type: integer
+        schedule:
+          oneOf:
+            - $ref: '#/components/schemas/ReportDeliveryScheduleInput'
+            - type: 'null'
+          description: When the delivery runs. Omit it for a delivery that runs only on request.
+        shape:
+          oneOf:
+            - $ref: '#/components/schemas/ReportDeliveryShapeInput'
+            - type: 'null'
+          description: >-
+            Which columns land in the sheet, in what order, under which headers. Omit it to deliver
+            every column the query returns, in its order, headed by its name.
+        writeMode:
+          oneOf:
+            - $ref: '#/components/schemas/CreateReportDeliveryInputWriteMode'
+            - type: 'null'
+      required:
+        - name
+        - reportId
+        - destination
+      type: object
+    CreateReportDeliveryInputWriteMode:
+      enum:
+        - overwrite
+        - append
+        - new_sheet
+      type: string
     CreateReportInput:
       properties:
         endResultCell:
@@ -11695,6 +12108,18 @@ components:
         - staging
         - development
       type: string
+    GetReportDeliveriesQueryStatus:
+      enum:
+        - active
+        - failing
+        - needs_reconnect
+        - orphaned
+      type: string
+    GetReportDeliveryRunsQuerySortDirection:
+      enum:
+        - ASC
+        - DESC
+      type: string
     GetReportsQuerySortBy:
       enum:
         - name
@@ -13070,6 +13495,418 @@ components:
         - updatedAt
         - type
       type: object
+    ReportDeliveriesListResponse:
+      properties:
+        items:
+          items:
+            $ref: '#/components/schemas/ReportDeliveryResponse'
+          type: array
+        pageInfo:
+          oneOf:
+            - $ref: '#/components/schemas/PageInfo'
+            - type: 'null'
+      required:
+        - items
+      type: object
+    ReportDeliveryColumn:
+      properties:
+        column:
+          oneOf:
+            - type: string
+            - type: 'null'
+        header:
+          oneOf:
+            - type: string
+            - type: 'null'
+        placeholder:
+          oneOf:
+            - type: boolean
+            - type: 'null'
+      type: object
+    ReportDeliveryColumnInput:
+      properties:
+        column:
+          oneOf:
+            - minLength: 1
+              type: string
+            - type: 'null'
+          description: >-
+            Name of a column the report’s query returns: its alias in the SQL. Provide this OR
+            `placeholder` (exactly one).
+        header:
+          oneOf:
+            - maxLength: 1000
+              type: string
+            - type: 'null'
+          description: >-
+            Text of the header cell. Defaults to the column name; required for a placeholder, where
+            it may be empty.
+        placeholder:
+          oneOf:
+            - $ref: '#/components/schemas/ReportDeliveryColumnInputPlaceholder'
+            - type: 'null'
+      type: object
+    ReportDeliveryColumnInputPlaceholder:
+      enum:
+        - true
+      type: boolean
+    ReportDeliveryDestination:
+      properties:
+        anchorCell:
+          description: Top-left cell of the delivered block, in A1 notation.
+          type: string
+        sheetId:
+          oneOf:
+            - type: integer
+            - type: 'null'
+        sheetName:
+          oneOf:
+            - type: string
+            - type: 'null'
+        spreadsheetId:
+          type: string
+      required:
+        - spreadsheetId
+        - anchorCell
+      type: object
+    ReportDeliveryDestinationInput:
+      properties:
+        anchorCell:
+          oneOf:
+            - type: string
+            - type: 'null'
+          description: Top-left cell of the delivered block, in A1 notation (e.g. `B3`). Defaults to `A1`.
+        sheetId:
+          oneOf:
+            - minimum: 0
+              type: integer
+            - type: 'null'
+          description: >-
+            Id of the tab to write into (the `gid` in the spreadsheet URL). A tab is followed by its
+            id through a rename. Provide this OR `sheetName`; neither when `writeMode` is
+            `new_sheet`.
+        sheetName:
+          oneOf:
+            - minLength: 1
+              type: string
+            - type: 'null'
+          description: >-
+            Title of the tab to write into. Provide this OR `sheetId`; neither when `writeMode` is
+            `new_sheet`.
+        spreadsheet:
+          description: 'The Google Sheets spreadsheet: its URL or its id.'
+          minLength: 1
+          type: string
+      required:
+        - spreadsheet
+      type: object
+    ReportDeliveryNotificationSettings:
+      properties:
+        email:
+          type: boolean
+        inbox:
+          type: boolean
+        slackChannelId:
+          oneOf:
+            - type: string
+            - type: 'null'
+          description: '`null` when nothing is posted to Slack.'
+        slackChannelName:
+          oneOf:
+            - type: string
+            - type: 'null'
+      required:
+        - inbox
+        - email
+      type: object
+    ReportDeliveryNotificationsInput:
+      properties:
+        email:
+          description: Email the owner's Cube address.
+          type: boolean
+        inbox:
+          description: Notify in the owner's Cube inbox.
+          type: boolean
+        slackChannelId:
+          oneOf:
+            - maxLength: 255
+              type: string
+              minLength: 1
+            - type: 'null'
+          description: Also post to this Slack channel, by id. Needs the Cube Slack app installed.
+        slackChannelName:
+          oneOf:
+            - maxLength: 255
+              type: string
+            - type: 'null'
+          description: The channel's name, kept for display only.
+      required:
+        - inbox
+        - email
+      type: object
+    ReportDeliveryResponse:
+      properties:
+        deploymentId:
+          type: integer
+        destination:
+          $ref: '#/components/schemas/ReportDeliveryDestination'
+        id:
+          type: integer
+        lastRunAt:
+          oneOf:
+            - type: string
+              format: date-time
+            - type: 'null'
+          description: When the last run finished. `null` before the first.
+        lastSuccessAt:
+          oneOf:
+            - type: string
+              format: date-time
+            - type: 'null'
+          description: When the last successful run finished. `null` if none has succeeded.
+        name:
+          type: string
+        nextRunAt:
+          oneOf:
+            - {}
+            - type: 'null'
+          description: When the schedule next fires. `null` when there is no schedule or it is paused.
+        notifications:
+          $ref: '#/components/schemas/ReportDeliveryNotificationSettings'
+          description: >-
+            How the owner hears that the delivery failed or recovered. A delivery that runs more
+            than once a day reports only changes in its status; a daily or rarer one reports every
+            failed run.
+        ownerUserId:
+          oneOf:
+            - type: integer
+            - type: 'null'
+          description: >-
+            The accountable user, whose Google account writes the sheet. `null` once that user has
+            been deleted.
+        pausedAt:
+          oneOf:
+            - {}
+            - type: 'null'
+          description: When the delivery was paused. `null` if it is not.
+        reportId:
+          oneOf:
+            - type: integer
+            - type: 'null'
+          description: The delivered report. `null` once that report has been deleted.
+        reportName:
+          oneOf:
+            - type: string
+            - type: 'null'
+          description: Name of the delivered report. `null` once that report has been deleted.
+        reportPublicId:
+          oneOf:
+            - type: string
+            - type: 'null'
+          description: Public id of the delivered report. `null` once that report has been deleted.
+        reportWorkbookId:
+          oneOf:
+            - type: integer
+            - type: 'null'
+          description: Workbook holding the delivered report. `null` once that report has been deleted.
+        runAsUserId:
+          oneOf:
+            - type: integer
+            - type: 'null'
+          description: The user whose data access the query runs with. `null` once that user has been deleted.
+        runningSince:
+          oneOf:
+            - type: string
+              format: date-time
+            - type: 'null'
+          description: When the run still in progress started. `null` while no run is going.
+        schedule:
+          oneOf:
+            - $ref: '#/components/schemas/ReportDeliverySchedule'
+            - type: 'null'
+          description: '`null` for a delivery that runs only on request.'
+        shape:
+          oneOf:
+            - $ref: '#/components/schemas/ReportDeliveryShape'
+            - type: 'null'
+          description: '`null` when every column is delivered as is.'
+        sheetTitle:
+          oneOf:
+            - type: string
+            - type: 'null'
+          description: >-
+            Current title of the destination tab, read from Google at most every few minutes. `null`
+            for a `new_sheet` delivery, or before its title has been read.
+        spreadsheetTitle:
+          oneOf:
+            - type: string
+            - type: 'null'
+          description: >-
+            Title of the destination spreadsheet, read from Google at most every few minutes and by
+            each run. `null` before then.
+        status:
+          $ref: '#/components/schemas/ReportDeliveryResponseStatus'
+        writeMode:
+          $ref: '#/components/schemas/ReportDeliveryResponseWriteMode'
+      required:
+        - id
+        - deploymentId
+        - name
+        - destination
+        - writeMode
+        - notifications
+        - status
+      type: object
+    ReportDeliveryResponseStatus:
+      enum:
+        - active
+        - failing
+        - needs_reconnect
+        - orphaned
+      type: string
+    ReportDeliveryResponseWriteMode:
+      enum:
+        - overwrite
+        - append
+        - new_sheet
+      type: string
+    ReportDeliveryRunFailure:
+      properties:
+        code:
+          description: Why the run failed, e.g. `collision`, `shape-changed`, `query-failed` or `reconnect`.
+          type: string
+        text:
+          description: A sentence for a person to read; never raw Google or warehouse output.
+          type: string
+      required:
+        - code
+        - text
+      type: object
+    ReportDeliveryRunResponse:
+      properties:
+        cellsWritten:
+          oneOf:
+            - type: integer
+            - type: 'null'
+          description: Cells written, headers included.
+        deliveryId:
+          type: integer
+        error:
+          oneOf:
+            - $ref: '#/components/schemas/ReportDeliveryRunFailure'
+            - type: 'null'
+          description: '`null` unless the run failed.'
+        finishedAt:
+          oneOf:
+            - type: string
+              format: date-time
+            - type: 'null'
+          description: '`null` while the run is going.'
+        id:
+          type: integer
+        rowsWritten:
+          oneOf:
+            - type: integer
+            - type: 'null'
+          description: Result rows written, headers excluded.
+        startedAt:
+          format: date-time
+          type: string
+        status:
+          $ref: '#/components/schemas/ReportDeliveryRunResponseStatus'
+        trigger:
+          $ref: '#/components/schemas/ReportDeliveryRunResponseTrigger'
+      required:
+        - id
+        - deliveryId
+        - status
+        - trigger
+        - startedAt
+      type: object
+    ReportDeliveryRunResponseStatus:
+      enum:
+        - running
+        - succeeded
+        - unchanged
+        - failed
+        - skipped
+        - missed
+      type: string
+    ReportDeliveryRunResponseTrigger:
+      enum:
+        - manual
+        - schedule
+      type: string
+    ReportDeliveryRunsListResponse:
+      properties:
+        items:
+          items:
+            $ref: '#/components/schemas/ReportDeliveryRunResponse'
+          type: array
+        pageInfo:
+          oneOf:
+            - $ref: '#/components/schemas/PageInfo'
+            - type: 'null'
+      required:
+        - items
+      type: object
+    ReportDeliverySchedule:
+      properties:
+        cronExpressions:
+          items:
+            type: string
+          type: array
+        timezone:
+          type: string
+      required:
+        - cronExpressions
+        - timezone
+      type: object
+    ReportDeliveryScheduleInput:
+      properties:
+        cronExpressions:
+          description: >-
+            Five-field cron expressions; the delivery runs whenever any matches. Runs of one
+            expression must be at least 15 minutes apart: `*/15 9-17 * * 1-5` is every quarter hour
+            from 09:00 to 17:45 on weekdays.
+          items:
+            type: string
+          maxItems: 24
+          minItems: 1
+          type: array
+        timezone:
+          oneOf:
+            - type: string
+            - type: 'null'
+          description: >-
+            IANA timezone the cron expressions are read in, e.g. `America/New_York`. Fixed offsets
+            such as `+02:00` are rejected. Defaults to `UTC`.
+      required:
+        - cronExpressions
+      type: object
+    ReportDeliveryShape:
+      properties:
+        columns:
+          items:
+            $ref: '#/components/schemas/ReportDeliveryColumn'
+          type: array
+      required:
+        - columns
+      type: object
+    ReportDeliveryShapeInput:
+      properties:
+        columns:
+          description: >-
+            The delivered columns, left to right. A column the query stops returning fails the run
+            rather than shifting the ones after it.
+          items:
+            $ref: '#/components/schemas/ReportDeliveryColumnInput'
+          maxItems: 500
+          minItems: 1
+          type: array
+      required:
+        - columns
+      type: object
     ReportDtoSource:
       enum:
         - GOOGLE_SHEETS
@@ -13930,6 +14767,14 @@ components:
             - type: string
             - type: 'null'
       type: object
+    StartReportDeliveryRunResponse:
+      properties:
+        runId:
+          description: Id of the run, which writes the sheet in the background; poll it for the outcome.
+          type: integer
+      required:
+        - runId
+      type: object
     StartSnowflakeSemanticViewPullInput:
       properties:
         branchName:
@@ -14519,6 +15364,60 @@ components:
         - widgetId
         - threadId
       type: object
+    UpdateReportDeliveryInput:
+      properties:
+        destination:
+          oneOf:
+            - $ref: '#/components/schemas/ReportDeliveryDestinationInput'
+            - type: 'null'
+          description: Replaces the whole destination.
+        name:
+          oneOf:
+            - maxLength: 255
+              type: string
+              minLength: 1
+            - type: 'null'
+        notifications:
+          oneOf:
+            - $ref: '#/components/schemas/ReportDeliveryNotificationsInput'
+            - type: 'null'
+          description: >-
+            Replaces the whole setting; null resets it to the inbox only. How the owner hears that
+            the delivery failed or recovered. A delivery that runs more than once a day reports only
+            changes in its status; a daily or rarer one reports every failed run.
+        ownerUserId:
+          oneOf:
+            - type: integer
+            - type: 'null'
+          description: >-
+            Transfer the delivery to this active user, who must be able to read its report. They
+            become owner and run-as user. Admins only.
+        reportId:
+          oneOf:
+            - type: integer
+            - type: 'null'
+          description: Deliver another report. The caller must be able to read it.
+        schedule:
+          oneOf:
+            - $ref: '#/components/schemas/ReportDeliveryScheduleInput'
+            - type: 'null'
+          description: Replaces the whole schedule. `null` removes it, so the delivery runs only on request.
+        shape:
+          oneOf:
+            - $ref: '#/components/schemas/ReportDeliveryShapeInput'
+            - type: 'null'
+          description: Replaces the whole shape. `null` removes it, delivering every column.
+        writeMode:
+          oneOf:
+            - $ref: '#/components/schemas/UpdateReportDeliveryInputWriteMode'
+            - type: 'null'
+      type: object
+    UpdateReportDeliveryInputWriteMode:
+      enum:
+        - overwrite
+        - append
+        - new_sheet
+      type: string
     UpdateReportInput:
       properties:
         endResultCell:

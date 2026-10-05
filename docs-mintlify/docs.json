@@ -1176,6 +1176,22 @@
                 ]
               },
               {
+                "group": "Report Deliveries",
+                "openapi": "/api-reference/api.yaml",
+                "pages": [
+                  "GET /api/v1/deployments/{deploymentId}/report-deliveries",
+                  "POST /api/v1/deployments/{deploymentId}/report-deliveries",
+                  "GET /api/v1/deployments/{deploymentId}/report-deliveries/{id}",
+                  "PUT /api/v1/deployments/{deploymentId}/report-deliveries/{id}",
+                  "DELETE /api/v1/deployments/{deploymentId}/report-deliveries/{id}",
+                  "POST /api/v1/deployments/{deploymentId}/report-deliveries/{id}/pause",
+                  "POST /api/v1/deployments/{deploymentId}/report-deliveries/{id}/resume",
+                  "GET /api/v1/deployments/{deploymentId}/report-deliveries/{id}/runs",
+                  "POST /api/v1/deployments/{deploymentId}/report-deliveries/{id}/runs",
+                  "GET /api/v1/deployments/{deploymentId}/report-deliveries/{id}/runs/{runId}"
+                ]
+              },
+              {
                 "group": "Users (SCIM)",
                 "openapi": "/api-reference/scim.yaml",
                 "pages": [
