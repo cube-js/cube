@@ -1452,7 +1452,12 @@ class ApiGateway {
 
     const startTime = new Date().getTime();
     const compilerApi = await this.getCompilerApi(context);
-    const splitGranularity = this.granularitySplitter(await this.memberPathResolver(context, compilerApi));
+    const resolveMemberPath = await this.memberPathResolver(context, compilerApi);
+    const splitGranularity = this.granularitySplitter(resolveMemberPath);
+    const normalize = (q: Query) => this.checkMemberPaths(
+      normalizeQuery(q, persistent, cacheMode, splitGranularity),
+      resolveMemberPath
+    );
 
     const queryNormalizationResult: Array<{
       normalizedQuery: NormalizedQuery,
@@ -1473,7 +1478,7 @@ class ApiGateway {
       }
 
       return {
-        normalizedQuery: (normalizeQuery(currentQuery, persistent, cacheMode, splitGranularity)),
+        normalizedQuery: normalize(currentQuery),
         hasExpressionsInQuery
       };
     });
@@ -1511,7 +1516,7 @@ class ApiGateway {
             rewrittenQuery = this.evalMemberExpressionsInQuery(rewrittenQuery);
           }
 
-          return normalizeQuery(rewrittenQuery, persistent, cacheMode, splitGranularity);
+          return normalize(rewrittenQuery);
         }
       )
     );
@@ -1625,6 +1630,34 @@ class ApiGateway {
       return undefined;
     }
     return (path: string) => cubeEvaluator.resolveMemberPath(path);
+  }
+
+  /**
+   * A path through joins names a member of another cube only through a join
+   * alias; other join paths are not part of the query format.
+   */
+  protected checkMemberPaths(query: NormalizedQuery, resolve?: (path: string) => any): NormalizedQuery {
+    if (!resolve) {
+      return query;
+    }
+    const filterMembers = (filters: any[] = []): unknown[] => filters.flatMap(
+      f => (f.and || f.or ? filterMembers(f.and || f.or) : [f.member ?? f.dimension])
+    );
+    const paths = [
+      ...(query.measures || []),
+      ...(query.dimensions || []),
+      ...(query.segments || []),
+      ...(query.timeDimensions || []).map(td => td.dimension),
+      ...filterMembers(query.filters),
+      ...((query.order || []) as unknown[]).map(o => (Array.isArray(o) ? o[0] : undefined)),
+    ];
+    for (const path of paths) {
+      const resolved = typeof path === 'string' ? resolve(path) : null;
+      if (resolved && !resolved.aliased && resolved.fullPath.split('.').length > 2) {
+        throw new UserError(`'${path}' names a member through joins with no join alias. Query it as '${resolved.targetPath}'`);
+      }
+    }
+    return query;
   }
 
   protected granularitySplitter(resolve?: (path: string) => any) {

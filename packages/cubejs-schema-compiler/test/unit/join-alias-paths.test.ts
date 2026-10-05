@@ -230,6 +230,24 @@ describe('Join aliases in the data model', () => {
     expect(sql).toContain('AS "orders__customer__departments" ON "orders__customer".department_id = "orders__customer__departments".id');
   });
 
+  it('keeps a view join map to cube names, up to the first alias', async () => {
+    const compilers = await compile(`${model}
+views:
+  - name: catalog_view
+    cubes:
+      - join_path: orders.products
+        prefix: true
+        includes:
+          - name
+      - join_path: orders.customer.departments
+        prefix: true
+        includes:
+          - name
+`);
+    const { joinMap } = compilers.cubeEvaluator.cubeFromPath('catalog_view') as { joinMap?: string[][] };
+    expect(joinMap).toEqual([['orders', 'products']]);
+  });
+
   it('drills a view measure into members of its own instance', async () => {
     const compilers = await compile(`${model.replace(
       '      - name: count\n        type: count\n    segments:',
