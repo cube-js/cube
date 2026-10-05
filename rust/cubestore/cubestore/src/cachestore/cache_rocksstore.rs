@@ -544,25 +544,18 @@ impl RocksCacheStore {
             .await
     }
 
-    async fn queue_result_delete_by_id(&self, id: u64) -> Result<(), CubeError> {
-        self.write_operation_queue("queue_result_delete_by_id", move |db_ref, batch_pipe| {
-            let result_schema = QueueResultRocksTable::new(db_ref.clone());
-            result_schema.try_delete(id, batch_pipe)?;
-
-            Ok(())
-        })
-        .await
-    }
-
     /// This method should be called when we are sure that we return data to the consumer
-    async fn queue_result_ready_to_delete(&self, id: u64) -> Result<(), CubeError> {
+    async fn queue_result_ready_to_delete(
+        &self,
+        id: u64,
+    ) -> Result<Option<QueueResultResponse>, CubeError> {
         self.write_operation_queue("queue_result_ready_to_delete", move |db_ref, batch_pipe| {
             let result_schema = QueueResultRocksTable::new(db_ref.clone());
             if let Some(row) = result_schema.get_row(id)? {
-                Self::queue_result_ready_to_delete_impl(&result_schema, batch_pipe, row)?;
+                Self::queue_result_ready_to_delete_impl(&result_schema, batch_pipe, row)
+            } else {
+                Ok(None)
             }
-
-            Ok(())
         })
         .await
     }
@@ -818,13 +811,6 @@ pub enum QueueKey {
 }
 
 impl QueueKey {
-    pub(crate) fn is_path(&self) -> bool {
-        match self {
-            QueueKey::ByPath(_) => true,
-            _ => false,
-        }
-    }
-
     pub(crate) fn is_id(&self) -> bool {
         match self {
             QueueKey::ById(_) => true,
@@ -1756,14 +1742,12 @@ impl CacheStore for RocksCacheStore {
                     let queue_result = QueueResult::new(path.clone(), result, external_id);
                     let result_schema = QueueResultRocksTable::new(db_ref.clone());
                     // QueueResult is a result of QueueItem, it's why we can use row_id of QueueItem
-                    let result_row = result_schema.insert_with_pk(id, queue_result, batch_pipe)?;
+                    result_schema.insert_with_pk(id, queue_result, batch_pipe)?;
 
                     batch_pipe.add_event(MetaStoreEvent::AckQueueItem(QueueResultAckEvent {
                         id,
                         path,
-                        result: QueueResultAckEventResult::WithResult {
-                            result: Arc::new(result_row.into_row().value),
-                        },
+                        result: QueueResultAckEventResult::WithResult,
                     }));
                 } else {
                     batch_pipe.add_event(MetaStoreEvent::AckQueueItem(QueueResultAckEvent {
@@ -1805,10 +1789,9 @@ impl CacheStore for RocksCacheStore {
             return Ok(store_in_result);
         }
 
-        let query_key_is_path = key.is_path();
         let fut = tokio::time::timeout(
             Duration::from_millis(timeout),
-            listener.wait_for_queue_ack_by_key(key),
+            listener.wait_for_queue_ack_by_key(key.clone()),
         );
 
         if let Ok(res) = fut.await {
@@ -1819,23 +1802,24 @@ impl CacheStore for RocksCacheStore {
                         id: ack_event.id,
                         external_id: None,
                     })),
-                    QueueResultAckEventResult::WithResult { result } => {
-                        if query_key_is_path {
-                            // Queue v1 behavior
-                            self.queue_result_delete_by_id(ack_event.id).await?;
-                        } else {
-                            // Queue v2 behavior
-                            self.queue_result_ready_to_delete(ack_event.id).await?;
-                        }
+                    QueueResultAckEventResult::WithResult => {
+                        // Soft delete (not a hard one) for both v1 and v2: other waiters on the same
+                        // key were woken by the same event and read this row too. GC removes it later.
+                        let response = self.queue_result_ready_to_delete(ack_event.id).await?;
 
-                        Ok(Some(QueueResultResponse::Success {
-                            value: Some(result.to_string()),
-                            id: ack_event.id,
-                            external_id: None,
+                        Ok(response.map(|response| match response {
+                            QueueResultResponse::Success { value, id, .. } => {
+                                QueueResultResponse::Success {
+                                    value,
+                                    id,
+                                    external_id: None,
+                                }
+                            }
                         }))
                     }
                 },
-                Ok(None) => Ok(None),
+                // The listener lagged behind the channel, the ack might have been dropped
+                Ok(None) => self.lookup_queue_result_by_key(key, None).await,
                 Err(e) => Err(e),
             }
         } else {
@@ -3119,6 +3103,131 @@ mod tests {
         assert!(res.unwrap().added);
 
         RocksCacheStore::cleanup_test_cachestore("test_queue_add_none_ext_rebuild");
+
+        Ok(())
+    }
+
+    fn queue_add_payload(path: &str) -> QueueAddPayload {
+        QueueAddPayload {
+            path: path.to_string(),
+            value: "payload".to_string(),
+            priority: 0,
+            orphaned: None,
+            process_id: None,
+            exclusive: false,
+            external_id: None,
+        }
+    }
+
+    fn queue_result_value(response: Option<QueueResultResponse>) -> Option<String> {
+        match response {
+            Some(QueueResultResponse::Success { value, .. }) => value,
+            None => None,
+        }
+    }
+
+    #[tokio::test]
+    async fn test_queue_result_blocking_multiple_waiters() -> Result<(), CubeError> {
+        init_test_logger().await;
+
+        let (_, cachestore) = RocksCacheStore::prepare_test_cachestore(
+            "test_queue_result_blocking_multiple_waiters",
+            Config::test("test_queue_result_blocking_multiple_waiters"),
+        );
+        // send() fails without a live receiver
+        let (sender, _receiver) = tokio::sync::broadcast::channel(16);
+        cachestore.add_listener(sender).await;
+
+        let id = cachestore
+            .queue_add(queue_add_payload("prefix:path1"))
+            .await?
+            .id;
+
+        let waiter = |key: QueueKey| {
+            let cachestore = cachestore.clone();
+            tokio::spawn(async move { cachestore.queue_result_blocking(key, 5000).await })
+        };
+        let by_id_1 = waiter(QueueKey::ById(id));
+        let by_id_2 = waiter(QueueKey::ById(id));
+        let by_path = waiter(QueueKey::ByPath("prefix:path1".to_string()));
+
+        tokio::time::sleep(std::time::Duration::from_millis(200)).await;
+        assert!(
+            cachestore
+                .queue_ack(QueueKey::ById(id), Some("result".to_string()))
+                .await?
+        );
+
+        for waiter in [by_id_1, by_id_2, by_path] {
+            assert_eq!(
+                queue_result_value(waiter.await.unwrap()?),
+                Some("result".to_string())
+            );
+        }
+
+        // Consumed by the waiters, but kept until GC
+        assert_eq!(
+            cachestore
+                .queue_result(QueueKey::ByPath("prefix:path1".to_string()), None)
+                .await?,
+            None
+        );
+        assert_eq!(
+            queue_result_value(cachestore.queue_result(QueueKey::ById(id), None).await?),
+            Some("result".to_string())
+        );
+
+        RocksCacheStore::cleanup_test_cachestore("test_queue_result_blocking_multiple_waiters");
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_queue_result_blocking_lagged_listener() -> Result<(), CubeError> {
+        init_test_logger().await;
+
+        let (_, cachestore) = RocksCacheStore::prepare_test_cachestore(
+            "test_queue_result_blocking_lagged_listener",
+            Config::test("test_queue_result_blocking_lagged_listener"),
+        );
+        let (sender, _receiver) = tokio::sync::broadcast::channel(1);
+        cachestore.add_listener(sender.clone()).await;
+
+        let id = cachestore
+            .queue_add(queue_add_payload("prefix:path1"))
+            .await?
+            .id;
+
+        let waiter = {
+            let cachestore = cachestore.clone();
+            tokio::spawn(async move {
+                cachestore
+                    .queue_result_blocking(QueueKey::ById(id), 5000)
+                    .await
+            })
+        };
+
+        tokio::time::sleep(std::time::Duration::from_millis(200)).await;
+        cachestore
+            .queue_ack(QueueKey::ById(id), Some("result".to_string()))
+            .await?;
+        // Overflow the channel before the waiter gets to the ack event
+        for _ in 0..2 {
+            sender
+                .send(MetaStoreEvent::AckQueueItem(QueueResultAckEvent {
+                    id: id + 1000,
+                    path: "prefix:other".to_string(),
+                    result: QueueResultAckEventResult::Empty,
+                }))
+                .unwrap();
+        }
+
+        assert_eq!(
+            queue_result_value(waiter.await.unwrap()?),
+            Some("result".to_string())
+        );
+
+        RocksCacheStore::cleanup_test_cachestore("test_queue_result_blocking_lagged_listener");
 
         Ok(())
     }
