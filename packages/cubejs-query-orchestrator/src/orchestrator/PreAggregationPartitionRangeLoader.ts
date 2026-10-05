@@ -297,8 +297,10 @@ export class PreAggregationPartitionRangeLoader {
       if (this.preAggregation.rollupLambdaId) {
         if (this.lambdaQuery && loadResults.length > 0) {
           const { buildRangeEnd, targetTableName } = loadResults[loadResults.length - 1];
-          const lambdaTypes = await this.loadCache.getTableColumnTypes(this.preAggregation, targetTableName);
-          lambdaTable = await this.downloadLambdaTable(buildRangeEnd, lambdaTypes);
+          if (!this.lambdaSourceDataCovered(buildRangeEnd)) {
+            const lambdaTypes = await this.loadCache.getTableColumnTypes(this.preAggregation, targetTableName);
+            lambdaTable = await this.downloadLambdaTable(buildRangeEnd, lambdaTypes);
+          }
         }
         const rollupLambdaResults = this.preAggregationsTablesToTempTables.filter(tempTableResult => tempTableResult[1].rollupLambdaId === this.preAggregation.rollupLambdaId);
         const filteredResults = loadResults.filter(
@@ -399,6 +401,22 @@ export class PreAggregationPartitionRangeLoader {
       }
       return result;
     }
+  }
+
+  /**
+   * The lambda query is lower bounded by `buildRangeEnd` (exclusive, via
+   * `afterDate FROM_PARTITION_RANGE`), so it can only contribute rows strictly after it.
+   * @see https://github.com/cube-js/cube/issues/11682
+   */
+  private lambdaSourceDataCovered(buildRangeEnd?: string): boolean {
+    // Not matchedTimeDimensionDateRange: with several usages it's one usage's range, while the
+    // source query is bounded by the union of all of them.
+    const matchedRangeEnd = this.lambdaQuery?.sourceDateRange?.[1];
+    if (!matchedRangeEnd || !buildRangeEnd) {
+      return false;
+    }
+    // buildRangeEnd comes back from the DB and may carry a `Z` suffix.
+    return reformatInIsoLocal(matchedRangeEnd) <= reformatInIsoLocal(buildRangeEnd);
   }
 
   /**

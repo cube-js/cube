@@ -202,6 +202,8 @@ export type LambdaOptions = {
 export type LambdaQuery = {
   sqlAndParams: QueryWithParams,
   cacheKeyQueries: QueryWithParams[],
+  /** Bounds the source query on both ends; undefined when it's unbounded. */
+  sourceDateRange?: QueryDateRange,
 };
 
 export type PreAggregationDescription = {
