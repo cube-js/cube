@@ -218,7 +218,14 @@
     "---- Time-shifted measure rolled up from a rollup: native planner, Postgres and BigQuery only ----",
     "querying RetailOrders: named prior month by category for one day (pre-aggregation in CubeStore)",
     "querying RetailOrders: named prior month by category over two months (pre-aggregation in CubeStore)",
-    "SQL API: named prior month by category for one day"
+    "SQL API: named prior month by category for one day",
+    "---------------------------------------",
+    "CrateDB: the union template parenthesizes every query of a set operation,",
+    "and CrateDB takes no parenthesized operand of UNION",
+    "---------------------------------------",
+    "SQL API: union all push down",
+    "SQL API: union distinct push down",
+    "SQL API: union with a limited query push down"
   ],
   "tesseractSkip": [
     "querying Products: dimensions -- doesn't work wo ordering",
@@ -268,6 +275,13 @@
     "---- Time-shifted measure rolled up from a rollup: native planner, Postgres and BigQuery only ----",
     "querying RetailOrders: named prior month by category for one day (pre-aggregation in CubeStore)",
     "querying RetailOrders: named prior month by category over two months (pre-aggregation in CubeStore)",
-    "SQL API: named prior month by category for one day"
+    "SQL API: named prior month by category for one day",
+    "---------------------------------------",
+    "CrateDB: the union template parenthesizes every query of a set operation,",
+    "and CrateDB takes no parenthesized operand of UNION",
+    "---------------------------------------",
+    "SQL API: union all push down",
+    "SQL API: union distinct push down",
+    "SQL API: union with a limited query push down"
   ]
 }
