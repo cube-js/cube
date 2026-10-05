@@ -1502,6 +1502,17 @@ The maximum number of partitions each pre-aggregation in a cube can use.
 | --------------- | ---------------------- | --------------------- |
 | A valid number  | `10000`                | `10000`               |
 
+## `CUBEJS_MAX_SOURCE_ROW_LIMIT`
+
+The maximum number of rows read from the data source for a
+[`rollup_lambda`][ref-preagg-union-source] pre-aggregation with
+`union_with_source_data`. If the source query hits this limit, it fails with an
+error instead of returning truncated data.
+
+| Possible Values | Default in Development | Default in Production |
+| --------------- | ---------------------- | --------------------- |
+| A valid number  | `200000`               | `200000`              |
+
 ## `CUBEJS_PG_SQL_PORT`
 
 The port used by the [SQL API][ref-sql-api] to listen to Postgres-compatible
@@ -2574,3 +2585,4 @@ The port for a Cube deployment to listen to API connections on.
 [nodejs-docs-tls-options]: https://nodejs.org/docs/latest/api/tls.html#tls_tls_createsecurecontext_options
 [ref-sls]: /docs/integrations/semantic-layer-sync
 [ref-multi-stage]: /docs/data-modeling/measures#multi-stage-measures
+[ref-preagg-union-source]: /reference/data-modeling/pre-aggregations#union_with_source_data
