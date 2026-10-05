@@ -48,7 +48,6 @@ pub enum QueueResultAckEventResult {
 #[derive(Clone, Serialize, Deserialize, Debug, Eq, PartialEq, Hash)]
 pub struct QueueResultAckEvent {
     pub id: u64,
-    pub path: String,
     pub result: QueueResultAckEventResult,
 }
 

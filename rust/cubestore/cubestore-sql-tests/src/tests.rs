@@ -11387,7 +11387,7 @@ async fn queue_latest_result_v1(service: Box<dyn SqlClient>) -> Result<(), CubeE
         );
 
         let blocking_res = service
-            .exec_query(r#"QUEUE RESULT_BLOCKING 5000 "STANDALONE#queue:1""#)
+            .exec_query(r#"QUEUE RESULT "STANDALONE#queue:1""#)
             .await?;
         assert_eq!(
             blocking_res.get_rows(),
@@ -11759,7 +11759,7 @@ async fn queue_full_workflow_v1(service: Box<dyn SqlClient>) -> Result<(), CubeE
         let service_to_move = service.clone();
         let blocking = async move {
             service_to_move
-                .exec_query(r#"QUEUE RESULT_BLOCKING 5000 "STANDALONE#queue:queue_key_3""#)
+                .exec_query(r#"QUEUE RESULT_BLOCKING 5000 3"#)
                 .await
                 .unwrap()
         };
@@ -12822,17 +12822,19 @@ async fn queue_multiple_result_blocking(service: Box<dyn SqlClient>) -> Result<(
     {
         let id_clone = id.clone();
         let service_to_move = service.clone();
+        let id_to_move = id.clone();
         let blocking1 = async move {
             service_to_move
-                .exec_query(r#"QUEUE RESULT_BLOCKING 5000 "STANDALONE#queue:12345""#)
+                .exec_query(&format!("QUEUE RESULT_BLOCKING 5000 {}", id_to_move))
                 .await
                 .unwrap()
         };
 
         let service_to_move = service.clone();
+        let id_to_move = id.clone();
         let blocking2 = async move {
             service_to_move
-                .exec_query(r#"QUEUE RESULT_BLOCKING 5000 "STANDALONE#queue:12345""#)
+                .exec_query(&format!("QUEUE RESULT_BLOCKING 5000 {}", id_to_move))
                 .await
                 .unwrap()
         };
