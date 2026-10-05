@@ -1,0 +1,316 @@
+---
+title: Google Sheets deliveries
+description: Write a saved exploration's results into a Google Sheets tab on a schedule or on demand, without anyone opening the spreadsheet.
+---
+
+<Warning>
+
+Google Sheets deliveries are currently in preview, and the user experience and API may
+still change. Reach out to the [Cube support team](/admin/account-billing/support) to
+activate this feature for your account.
+
+</Warning>
+
+A Google Sheets delivery writes the results of a saved exploration into a tab of a
+Google Sheets spreadsheet. Cube runs it on a schedule, or whenever you start it from
+the Cube interface or the [Platform API](#platform-api). Nothing has to be open: Cube
+runs the query and writes to the spreadsheet itself, as your Google account.
+
+<Info>
+
+To build explorations inside a spreadsheet and refresh them by hand, use the
+[Cube for Sheets][ref-cube-for-sheets] add-on instead. Deliveries don't need the
+add-on.
+
+</Info>
+
+## Before you start
+
+You need:
+
+- the Admin, Developer, or Explorer [role][ref-roles];
+- a saved exploration you can read; an unsaved one is saved as part of creating the
+  delivery;
+- a Google account [connected to Cube](#connect-a-google-account) that is an
+  **editor** of the target spreadsheet.
+
+Deliveries are not available in [embedded analytics][ref-embedding].
+
+## Connect a Google account
+
+Cube writes every run as one Google account: the delivery owner's. Spreadsheet version
+history shows that account as the editor.
+
+1. Open **Connected accounts**, listed below **Preferences** in the settings sidebar.
+2. In the **Google Sheets** section, click **Connect** and approve the Google consent
+   screen in the pop-up. Cube asks for your email address and access to your Google
+   Sheets spreadsheets.
+3. Optionally, paste a spreadsheet URL under **Test access to a spreadsheet** and click
+   **Test access**. Cube opens the spreadsheet as your account and lists its tabs.
+
+The test confirms that the account can open the spreadsheet, not that it can edit it.
+Make sure the account is an editor.
+
+The connection belongs to your Cube user; there is no organization-wide Google
+account. To have deliveries write as a shared Google account, connect it from a
+dedicated Cube user and [transfer](#transfer-ownership) deliveries to that user.
+
+If Google stops accepting the connection, the section shows **Reconnect needed**, and
+deliveries you own move to **Reconnect Google** on their next run. Click **Reconnect**
+to fix both.
+
+## Create a delivery
+
+Start from either place:
+
+- **Explore**: open the chevron next to **Convert to workbook** and choose **Deliver
+  to Sheets**. The exploration becomes the delivered report.
+- **Scheduled → Sheets deliveries**: click **New delivery**, or choose **New delivery
+  to this spreadsheet** on an existing delivery's row.
+
+If your Google account isn't connected yet, the dialog offers to connect it first.
+Then fill in the dialog:
+
+| Field | Description |
+| --- | --- |
+| **Report** | The saved exploration to deliver. Fixed when you start from Explore. |
+| **Name** | Defaults to `<report> delivery`. |
+| **Spreadsheet** | A Google Sheets URL or spreadsheet ID. Cube checks access as your Google account once you paste it. |
+| **Tab** | The tab to write to, picked from the spreadsheet's tabs. Cube follows the tab if it's renamed later. |
+| **Start at cell** | The top-left cell of the written block, in A1 notation. Defaults to `A1`. |
+| **Each run** | The [write mode](#write-modes). |
+| **Schedule** | When the delivery runs. See [Schedule](#schedule). |
+| **Notifications** | How you hear about failures. See [Notifications](#notifications). |
+
+Click **Create**. A new delivery doesn't run until its first scheduled time; use **Run
+now** to write the sheet right away.
+
+Only one delivery can write to a given spreadsheet, tab, and start cell. Saving a
+second one is rejected with the name of the delivery that already writes there.
+
+### Write modes
+
+| Mode | What each run does |
+| --- | --- |
+| **Overwrite** (default) | Replaces the delivered block, starting at the start cell, with the current results. |
+| **Append** | Adds the run's full result below the rows already written. The header is written on the first run only. |
+| **New tab** | Writes the result to a new tab named `<delivery name> YYYY-MM-DD HH:mm`, in the schedule's timezone (UTC without a schedule). **Tab** and **Start at cell** don't apply. |
+
+Append never removes duplicates, so it suits snapshot reports such as "yesterday's
+orders", not cumulative ones. An append delivery keeps growing until it reaches
+[Google's cell limit](#limits).
+
+### Schedule
+
+| Frequency | Runs |
+| --- | --- |
+| Manual (run on demand) | Only when started with **Run now** or the API. The default. |
+| Hourly | Every hour, at the chosen minute. |
+| Daily | Every day, at the chosen time. |
+| Weekly | On the chosen day of the week, at the chosen time. |
+| Monthly | On the chosen day of the month, at the chosen time. |
+| Custom (cron) | On a five-part cron expression: minute, hour, day of month, month, day of week. |
+
+The timezone defaults to your browser's. Runs must be at least 15 minutes apart, so
+`*/15 9-17 * * 1-5` works but `*/10 * * * *` doesn't. The `L`, `W`, `#`, `?`, and `H`
+cron tokens aren't supported.
+
+To run on several unrelated schedules (up to 24 cron expressions), set them through
+the [API](#platform-api). The dialog shows such a schedule but can only replace it as a
+whole.
+
+### Notifications
+
+A delivery notifies its **owner** when it fails and when it starts working again.
+Choose the channels in the dialog:
+
+| Channel | Default | Notes |
+| --- | --- | --- |
+| **Inbox** | On | A notification in the owner's Cube inbox. |
+| **Email** | Off | Sent to the owner's Cube email address. |
+| **Slack** | Off | Posted to the channel you pick. Needs the [Cube Slack app][ref-slack]; invite the bot to a private channel first. |
+
+How often it notifies depends on the schedule:
+
+- **Runs more than once a day**: only when its status changes, once when it starts
+  failing and once when it recovers.
+- **Runs daily or less often, or only on demand**: after every failed run, and once on
+  recovery.
+
+Only finished runs notify; a skipped run doesn't. An [orphaned](#statuses) delivery
+notifies nobody.
+
+## What a run writes
+
+Each run executes the report's saved query with the owner's data access and writes the
+result as a flat table:
+
+- one bold header row, using the query's column names, then one row per result row, in
+  the query's own order;
+- numbers as numbers, booleans as `TRUE`/`FALSE`, and nulls as empty cells; a row with
+  nulls is never dropped;
+- timestamps as date cells, formatted `yyyy-mm-dd` when every value in the column is
+  midnight and `yyyy-mm-dd hh:mm:ss` otherwise, with no timezone conversion.
+
+The write lands all at once: anyone reading the sheet sees either the previous block or
+the new one, never a half-written tab, and formulas that point at the block keep
+working.
+
+A delivery only writes inside its own block:
+
+- It tracks the block with a named range in the spreadsheet, so rows or columns you
+  insert above or to the left move the block instead of breaking it. Don't delete that
+  named range.
+- When the result shrinks, Cube clears the leftover cells. When it grows, it extends
+  only into empty cells. If the block would cover cells holding anything else, the run
+  fails and writes nothing.
+- Overwrite resets values and formatting inside the block on every run, so keep notes
+  and formatting outside it.
+
+Columns follow the query. If the query stops returning a column the delivery depends on,
+the run fails instead of shifting the other columns. To fix column order, rename
+headers, or add empty columns for notes, set the delivery's `shape` through the
+[API](#platform-api).
+
+Changing a delivery's tab or start cell clears the old block on the next run. Moving it
+to another spreadsheet leaves the old block untouched.
+
+## Manage deliveries
+
+Open **Scheduled → Sheets deliveries**. Admins see every delivery in the deployment;
+everyone else sees only their own. Each row shows the report, spreadsheet, tab and start
+cell, schedule, next run, last run, and status.
+
+| Action | Description |
+| --- | --- |
+| **Run now** | Writes the current results right away, even if the delivery is paused. |
+| **Pause** / **Resume** | Stops or restarts scheduled runs. Runs missed while paused aren't caught up. |
+| **Edit** | Changes any setting. An admin editing someone else's delivery doesn't change who it writes as. |
+| **Transfer owner** | Admins only. See [Transfer ownership](#transfer-ownership). |
+| **Delete** | Stops future runs and deletes the run history. Cells already written stay in the spreadsheet. |
+
+**Run now**, **Pause**, **Resume**, and **Delete** also work on several selected rows.
+
+Click a delivery to see its **Run history**: each run's status, trigger (**Manual** or
+**Scheduled**), start and finish time, duration, rows and cells written, and error.
+
+### Statuses
+
+| Status | Meaning |
+| --- | --- |
+| **Active** | The last run succeeded, or none has run yet. |
+| **Failing** | The last run failed. The run history shows why. |
+| **Reconnect Google** | The owner's Google connection stopped working. The owner must [reconnect](#connect-a-google-account). |
+| **Orphaned** | The owner was deactivated or deleted. Nothing runs until an admin transfers the delivery or reactivates the owner. |
+| **Paused** | Scheduled runs are stopped. |
+| **Running** | A run is in progress. A scheduled run that fires meanwhile is recorded as **Skipped**. |
+
+A failing delivery keeps running on its schedule; it isn't paused automatically.
+
+### Transfer ownership
+
+A delivery runs as its owner: the query uses the owner's data access, and the owner's
+Google account writes the sheet. An admin can hand it to another user with **Transfer
+owner**. The new owner must be active, be able to read the report, and have a Google
+account connected. A transfer returns an **Orphaned** or **Reconnect Google** delivery
+to **Active**.
+
+## Retries and failures
+
+Cube retries temporary errors, such as Google or data source rate limits, timeouts, and
+unavailable services, up to 5 times over roughly 7 minutes before the run fails. A run
+that hasn't finished after an hour is marked as failed.
+
+Common failures:
+
+| Error | Fix |
+| --- | --- |
+| The owner's Google account can't open the spreadsheet | Share the spreadsheet with that account as an editor. |
+| Reconnect the delivery owner's Google account | The owner reconnects on **Connected accounts**. |
+| Writing would overwrite filled cells | Clear the cells next to the block, or move the start cell. |
+| The query no longer returns a column | Restore the column in the report, or update the delivery's `shape`. |
+| The report's columns no longer match the header (append) | Start a new block, or switch to another write mode. |
+| The tab or the delivery's named range is missing | In **Edit**, choose another tab or start cell, then run the delivery. |
+| Writing would take the spreadsheet over Google's cell limit | Delete unused tabs, rows, or columns, or deliver to another spreadsheet. |
+
+## Limits
+
+- **Spreadsheet size**: Google caps a spreadsheet at 10,000,000 cells, counting the
+  full grid of every tab, empty cells included. A run that would exceed it fails
+  before writing.
+- **Rows**: deliveries have no row cap of their own. A run delivers what the report's
+  query returns, within the deployment's query row limit
+  ([`CUBEJS_DB_QUERY_LIMIT`][ref-query-limit], 50,000 rows by default). To deliver more
+  rows, raise it; if large runs then run out of memory, enable
+  [streaming mode][ref-stream-mode].
+- **Timestamps on the sheet**: a run writes no "last updated" stamp into the
+  spreadsheet. Use the run history, or `lastRunAt` and `lastSuccessAt` in the API.
+- **Triggers**: a delivery runs on its schedule or on demand. It can't run
+  automatically after a pre-aggregation refresh; call the [API](#platform-api) from
+  your pipeline instead.
+
+## Platform API
+
+Every delivery setting, including `shape` and multiple cron expressions, is available
+through the [Platform API][ref-platform-api] under
+`/api/v1/deployments/{deploymentId}/report-deliveries`; see the
+[Report Deliveries reference][ref-api-deliveries] for every field. Authenticate with a Platform
+API key or an OAuth token (`report.read` scope for reads, `report.write` for changes);
+embed tokens are refused. Until the feature is activated for your account, these
+endpoints return `404`.
+
+| Method and path | Description |
+| --- | --- |
+| [`GET /report-deliveries`](/api-reference/report-deliveries/list-report-deliveries) | List deliveries. Filter by `reportId`, `ownerUserId`, `spreadsheet`, or `status`. |
+| [`POST /report-deliveries`](/api-reference/report-deliveries/create-a-report-delivery) | Create a delivery. The caller becomes its owner. |
+| [`GET /report-deliveries/{id}`](/api-reference/report-deliveries/get-a-report-delivery) | Get a delivery. |
+| [`PUT /report-deliveries/{id}`](/api-reference/report-deliveries/update-a-report-delivery) | Update a delivery; send `ownerUserId` to transfer it (admins only). |
+| [`DELETE /report-deliveries/{id}`](/api-reference/report-deliveries/delete-a-report-delivery) | Delete a delivery and its run history. |
+| [`POST /report-deliveries/{id}/pause`](/api-reference/report-deliveries/pause-a-report-delivery) | Pause scheduled runs. |
+| [`POST /report-deliveries/{id}/resume`](/api-reference/report-deliveries/resume-a-paused-report-delivery) | Resume scheduled runs. |
+| [`POST /report-deliveries/{id}/runs`](/api-reference/report-deliveries/run-a-report-delivery-now) | Start a run. Returns `202` with a `runId`, or `409` while another run is in progress. |
+| [`GET /report-deliveries/{id}/runs`](/api-reference/report-deliveries/list-runs-of-a-report-delivery) | List runs, newest first. |
+| [`GET /report-deliveries/{id}/runs/{runId}`](/api-reference/report-deliveries/get-a-report-delivery-run) | Get one run. Poll it after starting a run: `status` stays `running` until the run finishes. |
+
+For example, to create a daily overwrite delivery with a fixed column layout:
+
+```json
+{
+  "name": "Daily orders",
+  "reportId": 2876,
+  "destination": {
+    "spreadsheet": "https://docs.google.com/spreadsheets/d/1AbC.../edit",
+    "sheetName": "Orders",
+    "anchorCell": "A1"
+  },
+  "writeMode": "overwrite",
+  "schedule": {
+    "cronExpressions": ["0 7 * * *"],
+    "timezone": "Europe/London"
+  },
+  "shape": {
+    "columns": [
+      { "column": "order_date", "header": "Date" },
+      { "column": "total_amount", "header": "Revenue" },
+      { "placeholder": true, "header": "Notes" }
+    ]
+  },
+  "notifications": { "inbox": true, "email": true }
+}
+```
+
+`shape.columns` sets the column order and headers; each entry is a query column
+(`column`, with an optional `header`) or an empty column (`placeholder: true` with a
+`header`). Placeholder columns are cleared on every run.
+
+The API doesn't check that the Google account can open the spreadsheet when you
+create a delivery; access problems show up on the first run.
+
+[ref-cube-for-sheets]: /docs/integrations/google-sheets
+[ref-roles]: /admin/users-and-permissions/roles-and-permissions
+[ref-embedding]: /embedding
+[ref-slack]: /docs/integrations/slack
+[ref-query-limit]: /reference/configuration/environment-variables#cubejs_db_query_limit
+[ref-stream-mode]: /reference/configuration/environment-variables#cubesql_stream_mode
+[ref-platform-api]: /api-reference/introduction#platform-api
+[ref-api-deliveries]: /api-reference/report-deliveries/list-report-deliveries
