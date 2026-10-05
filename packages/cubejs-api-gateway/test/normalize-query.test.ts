@@ -62,7 +62,7 @@ describe('timezone validation', () => {
     test('falls back to UTC when CUBEJS_DEFAULT_TIMEZONE is unset', () => {
       delete process.env.CUBEJS_DEFAULT_TIMEZONE;
 
-      const { timezone, ...queryWithoutTimezone } = baseQuery;
+      const { timezone: _timezone, ...queryWithoutTimezone } = baseQuery;
       const result = normalizeQuery(queryWithoutTimezone, false);
       expect(result.timezone).toBe('UTC');
     });
@@ -70,7 +70,7 @@ describe('timezone validation', () => {
     test('uses the canonicalized CUBEJS_DEFAULT_TIMEZONE when set', () => {
       process.env.CUBEJS_DEFAULT_TIMEZONE = 'america/new_york';
 
-      const { timezone, ...queryWithoutTimezone } = baseQuery;
+      const { timezone: _timezone, ...queryWithoutTimezone } = baseQuery;
       const result = normalizeQuery(queryWithoutTimezone, false);
       expect(result.timezone).toBe('America/New_York');
     });
