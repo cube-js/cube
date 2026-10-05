@@ -672,11 +672,9 @@ pub fn build_vanilla_plan<'a>(
     })
 }
 
-/// Splits a time dimension member requested with a granularity into the
-/// dimension and the granularity. The query's time dimensions say which
-/// members those are: a member path through joins has more segments than
-/// `{cube}.{dim}` without being one. A query without them falls back to the
-/// `{cube}.{dim}.{granularity}` form.
+/// Splits a time dimension member requested with a granularity, as the query's
+/// time dimensions name it: a path through joins is longer without being one.
+/// A query without time dimensions falls back to `{cube}.{dim}.{granularity}`.
 fn split_granularity<'a>(
     member_name: &'a str,
     query: &NormalizedQuery,

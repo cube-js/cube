@@ -534,37 +534,34 @@ cubes:
         primary_key: true
 ```
 
-### `Only one join per pair of cubes is supported`
+### `Several joins to the same cube must each declare a distinct alias`
 
-A cube can define at most one join to any other cube. Two joins to the same
-cube would leave the join path ambiguous, so the data model fails to compile.
-
-To join the same table through two different keys, use
-[`extends`][ref-extends] to create a second cube over it and join that:
+A cube can join the same cube more than once only when every one of those joins
+declares an [`alias`][ref-join-alias]: otherwise the join path is ambiguous and the
+data model fails to compile. Give each join its role as an alias, and reference the
+joined cube through it, as in `orders.customer.city`:
 
 ```yaml
 cubes:
-  - name: users
-    sql_table: users
-
-  - name: managers
-    extends: users
-
   - name: orders
     sql_table: orders
 
     joins:
       - name: users
-        sql: "{CUBE}.user_id = {users}.id"
+        alias: customer
+        sql: "{CUBE}.customer_id = {customer}.id"
         relationship: many_to_one
 
-      - name: managers
-        sql: "{CUBE}.manager_id = {managers}.id"
+      - name: users
+        alias: manager
+        sql: "{CUBE}.manager_id = {manager}.id"
         relationship: many_to_one
 ```
 
-A cube that `extends` another may redefine a join it inherits; that replaces
-the inherited one rather than adding a second join.
+Join aliases need the Tesseract SQL planner. Without it, use
+[`extends`][ref-extends] to create a second cube over the same table and join
+that instead. A cube that `extends` another may redefine a join it inherits;
+that replaces the inherited one rather than adding a second join.
 
 [ref-schema-ref-joins-relationship]: /reference/data-modeling/joins
 [ref-views]: /docs/data-modeling/views
@@ -573,3 +570,4 @@ the inherited one rather than adding a second join.
 [ref-primary-key]: /reference/data-modeling/dimensions#primary_key
 [ref-visual-model]: /docs/data-modeling/visual-modeler
 [ref-extends]: /reference/data-modeling/cube#extends
+[ref-join-alias]: /reference/data-modeling/joins#alias

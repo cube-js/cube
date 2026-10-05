@@ -2,6 +2,7 @@ use crate::cube_bridge::evaluator::CubeEvaluator;
 use crate::cube_bridge::join_definition::JoinDefinition;
 use crate::cube_bridge::join_graph::JoinGraph;
 use crate::cube_bridge::join_hints::JoinHintItem;
+use crate::planner::sql_templates::PlanSqlTemplates;
 use crate::test_fixtures::cube_bridge::{MockJoinDefinition, MockJoinItemDefinition};
 use cubenativeutils::CubeError;
 use std::any::Any;
@@ -177,6 +178,21 @@ impl MockJoinGraph {
                     cube_name,
                     join.effective_name()
                 )));
+            }
+            if let Some(alias) = &join.alias {
+                let sql_name = PlanSqlTemplates::alias_name(alias);
+                if alias.contains("__")
+                    || statics[i + 1..].iter().any(|j| {
+                        j.alias
+                            .as_ref()
+                            .is_some_and(|other| PlanSqlTemplates::alias_name(other) == sql_name)
+                    })
+                {
+                    return Err(CubeError::user(format!(
+                        "Cube '{}' declares a join with the alias '{}', which renders under a name another one does",
+                        cube_name, alias
+                    )));
+                }
             }
         }
         Ok(())

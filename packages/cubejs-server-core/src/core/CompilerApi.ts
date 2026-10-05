@@ -533,6 +533,17 @@ export class CompilerApi {
     const instances = new Map<string, { cubeName: string, members: { name: string, policyName: string }[] }>();
     for (const memberName of queryMemberNames) {
       const resolved = cubeEvaluator.resolveMemberPath(memberName);
+      // A path through joins that resolves to no cube instance can't be held
+      // to the policies of the cube it reads, so it is denied
+      if (!resolved?.aliased && memberName.split('.').length > 2) {
+        query.segments = query.segments || [];
+        query.segments.push({
+          expression: () => '1 = 0',
+          cubeName: memberName.split('.')[0],
+          name: 'rlsAccessDenied',
+        } as unknown as MemberExpression);
+        return { query, denied: true };
+      }
       const [instancePath, cubeName, policyName] = resolved?.aliased ?
         [resolved.instancePath, resolved.targetCube, resolved.targetPath] :
         [memberName.split('.')[0], memberName.split('.')[0], memberName];
@@ -846,18 +857,23 @@ export class CompilerApi {
    * Moves a filter on members of `cubeName` onto the cube instance at
    * `instancePath`.
    */
+  /**
+   * Moves a filter on members of `cubeName` onto the cube instance at
+   * `instancePath`. Policy filters only name members of their own cube.
+   */
   protected rebaseFilterMembers(filter: any, cubeName: string, instancePath: string): any {
     if (!filter || typeof filter !== 'object') {
       return filter;
     }
     const rebase = (member: any) => (typeof member === 'string' && member.startsWith(`${cubeName}.`) ?
       `${instancePath}${member.slice(cubeName.length)}` : member);
+    const rebaseAll = (filters: any[]) => filters.map((f: any) => this.rebaseFilterMembers(f, cubeName, instancePath));
     return {
       ...filter,
       ...(filter.member ? { member: rebase(filter.member) } : {}),
       ...(filter.dimension ? { dimension: rebase(filter.dimension) } : {}),
-      ...(filter.and ? { and: filter.and.map((f: any) => this.rebaseFilterMembers(f, cubeName, instancePath)) } : {}),
-      ...(filter.or ? { or: filter.or.map((f: any) => this.rebaseFilterMembers(f, cubeName, instancePath)) } : {}),
+      ...(filter.and ? { and: rebaseAll(filter.and) } : {}),
+      ...(filter.or ? { or: rebaseAll(filter.or) } : {}),
     };
   }
 

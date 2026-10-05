@@ -6,6 +6,7 @@ import type { CubeValidator } from './CubeValidator';
 import type { CubeEvaluator, MeasureDefinition } from './CubeEvaluator';
 import type { CubeDefinition, JoinDefinition } from './CubeSymbols';
 import type { ErrorReporter } from './ErrorReporter';
+import inflection from 'inflection';
 import { CompilerInterface } from './PrepareCompiler';
 
 export type JoinEdge = {
@@ -170,10 +171,8 @@ export class JoinGraph implements CompilerInterface {
   }
 
   /**
-   * A join is named by its alias, or by the joined cube when it has no alias.
-   * Names must be unique within a cube, and several joins to the same cube must
-   * all be aliased, otherwise the join path is ambiguous.
-   * Returns the names of the joins to drop.
+   * A join is named by its alias, or the joined cube; names are unique within a
+   * cube, and several joins to one cube must all be aliased. Returns the joins to drop.
    */
   protected reportConflictingJoins(cube: CubeDefinition, errorReporter: ErrorReporter): Set<string> {
     const conflicting = new Set<string>();
@@ -210,12 +209,30 @@ export class JoinGraph implements CompilerInterface {
       ['measures', 'dimensions', 'segments', 'preAggregations']
         .flatMap(type => Object.keys(cube[type] || {}))
     );
+    // The SQL alias of an instance joins the declaring cube's name and the
+    // alias, snake-cased: aliases that read alike there would share it
+    const sqlName = (name: string) => inflection.underscore(name);
+    const sqlNames = new Map<string, string>();
     ownJoins.forEach((join, index) => {
+      if (!join?.alias) {
+        return;
+      }
       // A path segment naming the alias must not be readable as a member too
-      if (join?.alias && (memberNames.has(join.alias) || join.alias === 'CUBE' || join.alias === 'TABLE')) {
+      let problem: string | undefined;
+      if (memberNames.has(join.alias) || join.alias === 'CUBE' || join.alias === 'TABLE') {
+        problem = `which is the name of a member of '${cube.name}' or a reserved name`;
+      } else if (join.alias.includes('__')) {
+        problem = 'which contains \'__\', the separator of the names it is rendered under';
+      } else if (sqlNames.has(sqlName(join.alias))) {
+        problem = `which renders under the same name as the alias '${sqlNames.get(sqlName(join.alias))}'`;
+      } else if (this.cubeEvaluator.cubeExists(`${cube.name}__${join.alias}`)) {
+        problem = `which renders under the same name as the cube '${cube.name}__${join.alias}'`;
+      }
+      sqlNames.set(sqlName(join.alias), join.alias);
+      if (problem) {
         conflicting.add(join.alias);
         errorReporter.error(
-          `Cube '${cube.name}' declares a join to '${join.name}' (joins[${index}]) with the alias '${join.alias}', which is the name of a member of '${cube.name}' or a reserved name. Pick a different alias`,
+          `Cube '${cube.name}' declares a join to '${join.name}' (joins[${index}]) with the alias '${join.alias}', ${problem}. Pick a different alias`,
           cube.fileName
         );
       }

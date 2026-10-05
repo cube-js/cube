@@ -3,11 +3,6 @@ use std::rc::Rc;
 
 /// Identity of a cube instance in a query. `Display` is its user-facing
 /// path; `target` is the data-model cube it instantiates.
-///
-/// A data-model cube is one instance of itself. A cube reached through a
-/// join that has to stay distinct from other routes to it — an aliased
-/// join, or any join below one — is an instance of its own, identified by
-/// the instance it is joined from and the name of that join.
 #[derive(Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct CubeId(Rc<CubeIdKind>);
 

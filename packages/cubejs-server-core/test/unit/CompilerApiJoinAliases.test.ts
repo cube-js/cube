@@ -45,6 +45,9 @@ cubes:
       - name: secret
         sql: secret
         type: string
+      - name: department_head_city
+        sql: "{departments.head_city}"
+        type: string
     measures:
       - name: count
         type: count
@@ -55,6 +58,7 @@ cubes:
             - id
             - city
             - count
+            - department_head_city
         member_masking:
           includes:
             - email
@@ -194,5 +198,18 @@ describe('CompilerApi row level security through join aliases', () => {
 
     const { sql } = await compilerApi.getSql(query as any);
     expect(sql[0]).toContain('"orders__manager__departments__head".city = $');
+  });
+
+  test('constrains an instance an alias reaches below a direct join of an instance', async () => {
+    const { query } = await applyRls({
+      measures: ['orders.count'],
+      dimensions: ['orders.customer.department_head_city'],
+    });
+    const rendered = JSON.stringify(query.filters);
+    expect(rendered).toContain('"member":"orders.customer.departments.head.city","operator":"equals","values":["Berlin"]');
+    expect(rendered).toContain('"member":"orders.customer.city","operator":"equals","values":["Berlin"]');
+
+    const { sql } = await compilerApi.getSql(query as any);
+    expect(sql[0]).toContain('"orders__customer__departments__head".city = $');
   });
 });

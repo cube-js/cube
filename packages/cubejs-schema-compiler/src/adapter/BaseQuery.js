@@ -634,15 +634,17 @@ export class BaseQuery {
   }
 
   /**
-   * Splits a member path into the member the data model defines and the join
-   * hint leading to it. A path through a join alias names a member of a cube
-   * instance: the model knows it by its target path, and the path itself is
-   * kept to name the member's output.
+   * Splits a member path into the data-model member and the join hint to it.
+   * Through a join alias the model knows the member by its target path, and the
+   * path itself names the member's output.
    * @param {string} path
    * @returns {{ path: string, joinHint: string[], aliasPath?: string }}
    */
   memberPathForModel(path) {
     const resolved = this.cubeEvaluator.resolveMemberPath(path);
+    if (resolved?.aliased) {
+      this.ensureNativePlannerForJoinAliases(path);
+    }
     if (resolved?.aliased && !resolved.granularity) {
       return { path: resolved.targetPath, joinHint: [], aliasPath: resolved.fullPath };
     }
@@ -3428,6 +3430,7 @@ export class BaseQuery {
   evaluateSymbolSql(cubeName, name, symbol, memberExpressionType, subPropertyName) {
     const aliasPath = this.cubeEvaluator.joinAliasPath();
     if (aliasPath && this.safeEvaluateSymbolContext().memberInstanceAliasPath !== aliasPath) {
+      this.ensureNativePlannerForJoinAliases([...aliasPath, name].join('.'));
       return this.evaluateSymbolSqlWithContext(
         () => this.evaluateSymbolSql(cubeName, name, symbol, memberExpressionType, subPropertyName),
         { memberInstance: this.aliasedMemberInstance(aliasPath, cubeName), memberInstanceAliasPath: aliasPath }
@@ -3892,6 +3895,15 @@ export class BaseQuery {
   }
 
   /**
+   * Only the Tesseract planner joins cube instances reached through a join alias.
+   */
+  ensureNativePlannerForJoinAliases(path) {
+    if (!(this.options.useNativeSqlPlanner ?? getEnv('nativeSqlPlanner'))) {
+      throw new UserError(`'${path}' goes through a join alias, and join aliases require the Tesseract SQL planner`);
+    }
+  }
+
+  /**
    * Names of the members the query reads. A member of a cube instance is named
    * by its path through the join alias, so policies can tell instances apart.
    */
@@ -3939,10 +3951,18 @@ export class BaseQuery {
    */
   aliasedMemberInstance(aliasPath, cubeName) {
     const outer = this.safeEvaluateSymbolContext().memberInstance;
-    const path = outer && aliasPath[0] === outer.cube ?
-      [outer.path, ...aliasPath.slice(1)].join('.') :
-      aliasPath.join('.');
-    return { path, cube: cubeName };
+    if (!outer) {
+      return { path: aliasPath.join('.'), cube: cubeName };
+    }
+    if (aliasPath[0] === outer.cube) {
+      return { path: [outer.path, ...aliasPath.slice(1)].join('.'), cube: cubeName };
+    }
+    const joins = this.cubeEvaluator.cubeFromPath(outer.cube).joins || [];
+    const joinedDirectly = joins.some(j => (j.alias ?? j.name) === aliasPath[0]);
+    return {
+      path: (joinedDirectly ? [outer.path, ...aliasPath] : aliasPath).join('.'),
+      cube: cubeName,
+    };
   }
 
   collectMultipliedMeasures(context) {

@@ -207,10 +207,8 @@ export type EvaluatedCube = {
 };
 
 /**
- * A member path resolved through the joins it names. A segment that names an
- * aliased join, or any join below one, reaches a cube instance of its own:
- * `orders.customer.city` is the `city` of `users` reached through the join
- * `orders` declares as `customer`.
+ * A member path resolved through its joins. An aliased join, or any join below
+ * one, reaches a cube instance of its own: `orders.customer.city` is `users.city`.
  */
 export type ResolvedMemberPath = {
   // The path as written, without a granularity.

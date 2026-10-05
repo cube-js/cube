@@ -320,3 +320,37 @@ describe('Queries over join aliases', () => {
     expect(result.memberNames).not.toContain('users.city');
   });
 });
+
+describe('Join alias limits', () => {
+  it('requires the Tesseract planner', async () => {
+    const compilers = prepareYamlCompiler(model);
+    await compilers.compiler.compile();
+    expect(() => new PostgresQuery(compilers, {
+      measures: ['orders.count'],
+      dimensions: ['orders.customer.city'],
+      timezone: 'UTC',
+      useNativeSqlPlanner: false,
+    })).toThrow(/join aliases require the Tesseract SQL planner/);
+  });
+
+  it.each([
+    ['contains a double underscore', 'alias: customer\n', 'alias: buyer__vip\n', /contains '__'/],
+    ['reads like another after snake-casing', 'alias: manager\n', 'alias: Customer\n', /renders under the same name as the alias 'customer'/],
+  ])('rejects an alias that %s', async (_, from, to, expected) => {
+    const { compiler } = prepareYamlCompiler(model.replace(from, to));
+    await expect(compiler.compile()).rejects.toThrow(expected);
+  });
+
+  it('rejects an alias rendering under the name of a cube', async () => {
+    const { compiler } = prepareYamlCompiler(`${model}
+  - name: orders__customer
+    sql_table: orders_customer
+    dimensions:
+      - name: id
+        sql: id
+        type: number
+        primary_key: true
+`);
+    await expect(compiler.compile()).rejects.toThrow(/renders under the same name as the cube 'orders__customer'/);
+  });
+});
