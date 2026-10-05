@@ -3227,6 +3227,17 @@ mod tests {
             .await?
             .id;
 
+        let overflow_channel = || {
+            for _ in 0..2 {
+                sender
+                    .send(MetaStoreEvent::AckQueueItem(QueueResultAckEvent {
+                        id: id + 1000,
+                        result: QueueResultAckEventResult::Empty,
+                    }))
+                    .unwrap();
+            }
+        };
+
         let waiter = {
             let cachestore = cachestore.clone();
             tokio::spawn(async move {
@@ -3237,26 +3248,30 @@ mod tests {
         };
 
         tokio::time::sleep(std::time::Duration::from_millis(200)).await;
-        // Overflow the channel while the query is still running
-        for _ in 0..2 {
-            sender
-                .send(MetaStoreEvent::AckQueueItem(QueueResultAckEvent {
-                    id: id + 1000,
-                    result: QueueResultAckEventResult::Empty,
-                }))
-                .unwrap();
-        }
+        // Lag while the query is still running: nothing in the store yet, so keep waiting
+        overflow_channel();
 
         tokio::time::sleep(std::time::Duration::from_millis(200)).await;
         assert!(!waiter.is_finished(), "waiter gave up before the timeout");
 
+        // queue_ack sends its event and returns without yielding, so on the current_thread
+        // runtime the overflow drops the ack before the waiter is polled. The result can
+        // only be found in the store.
         cachestore
             .queue_ack(QueueKey::ById(id), Some("result".to_string()))
             .await?;
+        overflow_channel();
 
         assert_eq!(
             queue_result_value(waiter.await.unwrap()?),
             Some("result".to_string())
+        );
+        // Consumed by the waiter, even though it never saw the ack
+        assert_eq!(
+            cachestore
+                .queue_result(QueueKey::ByPath("prefix:path1".to_string()), None)
+                .await?,
+            None
         );
 
         RocksCacheStore::cleanup_test_cachestore("test_queue_result_blocking_lagged_before_ack");
