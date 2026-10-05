@@ -12,5 +12,10 @@ written to render proves nothing about whether the database accepts it. Prefer a
 test that runs the query against the real database: `test/integration/<dialect>/`, run with
 `yarn integration:<dialect>` (Docker-based).
 
-Add a unit test only when an integration test is not possible (no Docker image or runner for
-the dialect) and the behaviour is important enough to guard.
+If the dialect has no runner in `test/integration/`, write the test in
+`packages/cubejs-testing-drivers` instead. Tests there must be cross-dialect: add the query to
+the shared suite in `src/tests/testQueries.ts` (models in `fixtures/_schemas.json`) so it runs
+against every driver, not as a one-off for a single database.
+
+Add a unit test only when neither kind of integration test is possible and the behaviour is
+important enough to guard.
