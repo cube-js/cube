@@ -144,18 +144,20 @@ out, the print version rebuilds it for A4 pages:
 - Page 1 opens with the dashboard's title and, under it, one read-only line
   stating the control selections the file was made with, each under the name
   its control shows on the dashboard, for example:
-  `Filter: Created at between 2016-01-01 – 2016-03-31 · Switch: State = Users City · Parent = Default`.
-  A filter reads as its name followed by its condition; a time granularity
-  switcher, field switcher or parent control reads as its name, `=` and the
-  value it holds. A control with no title is named as its header names it:
-  an untitled filter by its field, the others as **Time Granularity**,
-  **Dimension** or **Measure**, and **Parent**. Every control that holds a
-  value contributes to that line, [hidden][ref-control-visibility] ones
-  included; a control holding none, such as a filter with an operator but no
-  value, is left out. A filter whose default is [resolved from the
-  data][ref-control-data-defaults] is resolved for the print version too, so
-  the line and the charts state the value it resolves to. A dashboard with no
-  controls, or none holding a value, prints no such line.
+  `Order date between 2016-01-01 – 2016-03-31 · Grouping = Users City · Parent = Default`.
+  A filter reads as its name followed directly by its condition, with no colon
+  or `=` between them; a time granularity switcher, field switcher or parent
+  control reads as its name, `=` and the value it holds. A control with no
+  title is named as its header names it: an untitled filter by its field,
+  which then opens its condition once (`Status is completed`), the others as
+  **Time Granularity**, **Dimension** or **Measure**, and **Parent**. Every
+  control that holds a value contributes to that line,
+  [hidden][ref-control-visibility] ones included; a control holding none, such
+  as a filter with an operator but no value, is left out. A filter whose
+  default is [resolved from the data][ref-control-data-defaults] is resolved
+  for the print version too, so the line and the charts state the value it
+  resolves to. A dashboard with no controls, or none holding a value, prints no
+  such line.
 - The controls themselves are left out: no dropdown, picker or clear button
   appears on the page.
 - Every other widget — charts, tables, KPIs, text and AI summaries — prints
