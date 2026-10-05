@@ -295,7 +295,6 @@ export class PreAggregations {
     return this.hasCumulativeMeasuresValue;
   }
 
-  // Not cheap (evaluates member SQL) and matchedTimeDimensionDateRangeFor() runs once per description.
   private allBackAliasMembers(): Record<string, string> {
     if (!this.allBackAliasMembersValue) {
       this.allBackAliasMembersValue = this.query.allBackAliasMembers();
