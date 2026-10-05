@@ -202,7 +202,7 @@ export type LambdaOptions = {
 export type LambdaQuery = {
   sqlAndParams: QueryWithParams,
   cacheKeyQueries: QueryWithParams[],
-  /** Upper bounds the source query; undefined when it's unbounded above. */
+  /** Bounds the source query on both ends; undefined when it's unbounded. */
   sourceDateRange?: QueryDateRange,
 };
 
