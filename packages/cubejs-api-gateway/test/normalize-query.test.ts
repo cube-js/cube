@@ -14,10 +14,10 @@ const baseQuery = {
 };
 
 describe('responseFormat validation', () => {
-  test.each(['default', 'compact', 'columnar'])(
+  test.each(Object.values(ResultType))(
     'accepts responseFormat=%s',
     (responseFormat) => {
-      const result = normalizeQuery({ ...baseQuery, responseFormat: responseFormat as ResultType }, false);
+      const result = normalizeQuery({ ...baseQuery, responseFormat }, false);
       expect(result.responseFormat).toBe(responseFormat);
     }
   );
