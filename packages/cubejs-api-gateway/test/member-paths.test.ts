@@ -9,10 +9,17 @@ class TestApiGateway extends ApiGateway {
 }
 
 const resolved: Record<string, object> = {
-  'orders.count': { fullPath: 'orders.count', targetPath: 'orders.count', aliased: false },
-  'orders.customer.city': { fullPath: 'orders.customer.city', targetPath: 'users.city', aliased: true },
-  'orders.products.name': { fullPath: 'orders.products.name', targetPath: 'products.name', aliased: false },
-  'orders.created_at.day': { fullPath: 'orders.created_at', targetPath: 'orders.created_at', granularity: 'day', aliased: false },
+  'orders.count': { fullPath: 'orders.count', instancePath: 'orders', member: 'count', aliased: false },
+  'orders.customer.city': { fullPath: 'orders.customer.city', instancePath: 'orders.customer', member: 'city', aliased: true },
+  'orders.products.name': {
+    fullPath: 'orders.products.name', instancePath: 'products', member: 'name', targetPath: 'products.name', aliased: false,
+  },
+  'products.orders.customer.city': {
+    fullPath: 'products.orders.customer.city', instancePath: 'orders.customer', member: 'city', targetPath: 'users.city', aliased: true,
+  },
+  'orders.created_at.day': {
+    fullPath: 'orders.created_at', instancePath: 'orders', member: 'created_at', granularity: 'day', aliased: false,
+  },
 };
 const resolve = (path: string) => resolved[path] ?? null;
 
@@ -39,6 +46,11 @@ describe('Member paths through joins', () => {
     ['order', { order: [['orders.products.name', 'asc']] }],
   ])('rejects a join path with no alias in %s', (_, query) => {
     expect(() => gateway.checkMemberPaths(query as unknown as NormalizedQuery, resolve))
-      .toThrow(/'orders.products.name' names a member through joins with no join alias. Query it as 'products.name'/);
+      .toThrow(/'orders.products.name' goes through joins that are not join aliases. Query it as 'products.name'/);
+  });
+
+  it('rejects a cube hop before an alias', () => {
+    const query = { dimensions: ['products.orders.customer.city'] } as unknown as NormalizedQuery;
+    expect(() => gateway.checkMemberPaths(query, resolve)).toThrow(/Query it as 'orders.customer.city'/);
   });
 });

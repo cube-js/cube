@@ -1575,6 +1575,9 @@ export class CubeSymbols implements TranspilerSymbolResolver, CompilerInterface 
           }
 
           return () => {
+            if (query && segment) {
+              query.ensureNativePlannerForJoinAliases((joinHints ?? [cubeName]).join('.'));
+            }
             if (query) {
               query.pushCubeNameForCollectionIfNecessary(cube.cubeName());
               query.pushJoinHints(joinHints);

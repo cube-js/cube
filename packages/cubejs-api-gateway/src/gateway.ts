@@ -1632,8 +1632,8 @@ class ApiGateway {
   }
 
   /**
-   * A path through joins names a member of another cube only through a join
-   * alias; other join paths are not part of the query format.
+   * A member path is a cube or a cube instance reached through join aliases,
+   * and a member; other join paths are not part of the query format.
    */
   protected checkMemberPaths(query: NormalizedQuery, resolve?: (path: string) => any): NormalizedQuery {
     if (!resolve) {
@@ -1652,8 +1652,9 @@ class ApiGateway {
     ];
     for (const path of paths) {
       const resolved = typeof path === 'string' ? resolve(path) : null;
-      if (resolved && !resolved.aliased && resolved.fullPath.split('.').length > 2) {
-        throw new UserError(`'${path}' names a member through joins with no join alias. Query it as '${resolved.targetPath}'`);
+      const memberPath = resolved && `${resolved.instancePath}.${resolved.member}`;
+      if (resolved && resolved.fullPath !== memberPath) {
+        throw new UserError(`'${path}' goes through joins that are not join aliases. Query it as '${memberPath}'`);
       }
     }
     return query;

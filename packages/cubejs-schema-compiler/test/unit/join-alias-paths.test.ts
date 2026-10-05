@@ -394,6 +394,33 @@ describe('Join alias limits', () => {
     })).toThrow(/join aliases require the Tesseract SQL planner/);
   });
 
+  it('requires the Tesseract planner for a whole-cube reference to a self-join alias', async () => {
+    const compilers = prepareYamlCompiler(`
+cubes:
+  - name: employees
+    sql_table: employees
+    joins:
+      - name: employees
+        alias: supervisor
+        sql: "{CUBE}.supervisor_id = {supervisor}.id"
+        relationship: many_to_one
+    dimensions:
+      - name: id
+        sql: id
+        type: number
+        primary_key: true
+      - name: supervisor_name
+        sql: "{supervisor}.name"
+        type: string
+`);
+    await compilers.compiler.compile();
+    expect(() => new PostgresQuery(compilers, {
+      dimensions: ['employees.supervisor_name'],
+      timezone: 'UTC',
+      useNativeSqlPlanner: false,
+    }).buildSqlAndParams()).toThrow(/'employees.supervisor' goes through a join alias/);
+  });
+
   it.each([
     ['contains a double underscore', 'alias: customer\n', 'alias: buyer__vip\n', /contains '__'/],
     ['reads like another after snake-casing', 'alias: manager\n', 'alias: Customer\n', /renders under the same name as the alias 'customer'/],
