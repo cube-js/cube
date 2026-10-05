@@ -89,6 +89,93 @@ cube(`orders`, {
 
 </CodeGroup>
 
+### alias
+
+`alias` names a join within the cube that declares it, so the same cube can be
+joined more than once, each time in a different role. Members of the joined
+cube are then referenced through the declaring cube and the alias:
+`orders.customer.city`, not `users.city`.
+
+<CodeGroup>
+
+```yaml title="YAML"
+cubes:
+  - name: orders
+    # ...
+
+    joins:
+      - name: users
+        alias: customer
+        relationship: many_to_one
+        sql: "{CUBE}.customer_id = {customer}.id"
+
+      - name: users
+        alias: manager
+        relationship: many_to_one
+        sql: "{CUBE}.manager_id = {manager}.id"
+```
+
+```javascript title="JavaScript"
+cube(`orders`, {
+  // ...
+
+  joins: [
+    {
+      name: `users`,
+      alias: `customer`,
+      relationship: `many_to_one`,
+      sql: `${CUBE}.customer_id = ${customer}.id`
+    },
+    {
+      name: `users`,
+      alias: `manager`,
+      relationship: `many_to_one`,
+      sql: `${CUBE}.manager_id = ${manager}.id`
+    }
+  ]
+})
+```
+
+</CodeGroup>
+
+Each alias is joined separately, so a query can read both roles at once:
+
+```sql
+SELECT "orders__customer".city, "orders__manager".city, count(*)
+FROM orders AS "orders"
+LEFT JOIN users AS "orders__customer" ON "orders".customer_id = "orders__customer".id
+LEFT JOIN users AS "orders__manager" ON "orders".manager_id = "orders__manager".id
+GROUP BY 1, 2
+```
+
+An alias is local to the cube that declares it:
+
+- Queries, views and members of the declaring cube reach the joined cube
+  through it: `orders.customer.city` in a query, `join_path: orders.customer`
+  in a view, `{customer.city}` in a member of `orders`. The joined cube's own
+  name doesn't lead there: `users.city` is not reached through an alias.
+- Cubes joined below an alias belong to that role too:
+  `orders.customer.departments.name` and `orders.manager.departments.name` are
+  joined separately.
+- Inside the join's `sql`, the alias and the joined cube's name mean the joined
+  cube, and `{CUBE}` means the declaring one. In a cube joined to itself, its own
+  name means the declaring cube; use the alias for the joined copy.
+- Several joins to the same cube must each declare an alias. An alias must be
+  unique within the cube and may not repeat the joined cube's name, a member of
+  the declaring cube, `CUBE` or `TABLE`, or contain `__`.
+- Access policies of the joined cube apply to every role it is reached in, each
+  role constrained on its own. A [`queryRewrite`][ref-query-rewrite] that matches
+  members by their cube name should also match paths through aliases.
+
+<Note>
+
+Join aliases are supported by the Tesseract SQL planner only. Members reached
+through an alias aren't listed in the `/meta` endpoint, so the SQL API and
+Playground reach them through [views][ref-view-join-path]. Queries over them
+don't use pre-aggregations.
+
+</Note>
+
 ### relationship
 
 The `relationship` property is used to describe the type of the relationship
@@ -671,3 +758,5 @@ Please use views to address join predictability and stability.
 [wiki-left-join]: https://en.wikipedia.org/wiki/Join_(SQL)#Left_outer_join
 [wiki-1-1]: https://en.wikipedia.org/wiki/One-to-one_(data_model)
 [wiki-1-m]: https://en.wikipedia.org/wiki/One-to-many_(data_model)
+[ref-query-rewrite]: /reference/configuration/config#query_rewrite
+[ref-view-join-path]: /reference/data-modeling/view#join_path

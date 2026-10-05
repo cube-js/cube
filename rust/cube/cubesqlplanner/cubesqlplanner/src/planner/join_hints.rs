@@ -96,11 +96,9 @@ impl JoinHints {
         self.items
     }
 
-    /// Splits the hints into what the data model's join graph resolves and
-    /// the joined cube instances it knows nothing about, which the planner
-    /// joins on its own. An instance is replaced in the graph's hints by the
-    /// cube its chain of joins starts from, so that cube is in the tree the
-    /// instance is attached to. Instances come ancestors first, each once.
+    /// Splits hints into those the join graph resolves and the joined instances
+    /// the planner attaches itself; each instance is replaced in the graph hints
+    /// by its root cube. Instances come ancestors first, each once.
     pub fn split_joined(&self) -> (Vec<JoinHintItem>, Vec<CubeId>) {
         let mut graph_hints = Vec::new();
         let mut joined: Vec<CubeId> = Vec::new();

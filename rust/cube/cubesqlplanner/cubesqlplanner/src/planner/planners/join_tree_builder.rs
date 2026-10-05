@@ -20,10 +20,9 @@ pub enum JoinSource {
     Graph,
 }
 
-/// Resolves join hints into a `JoinTree`: the data model's join graph builds
-/// the tree over data-model cubes, joined cube instances are attached to it
-/// here, and every ON SQL is compiled once, so downstream planning reuses the
-/// compiled conditions instead of recompiling them on every use.
+/// Resolves join hints into a `JoinTree`: the join graph builds the tree over
+/// data-model cubes, joined cube instances are attached here, and every ON SQL
+/// is compiled once.
 pub struct JoinTreeBuilder {
     query_tools: Rc<State>,
     utils: CommonUtils,

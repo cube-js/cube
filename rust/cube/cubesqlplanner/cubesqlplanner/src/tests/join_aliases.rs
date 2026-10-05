@@ -451,3 +451,64 @@ fn test_multi_stage_filter_of_an_instance_member() {
     assert!(!sql.contains(r#""users".city"#), "{sql}");
     assert!(!sql.contains(r#"AS "users""#), "{sql}");
 }
+
+#[test]
+fn test_self_join_reads_its_own_name_as_itself() {
+    let schema = MockSchema::from_yaml(indoc! {r#"
+        cubes:
+          - name: employees
+            sql_table: employees
+            joins:
+              - name: employees
+                alias: supervisor
+                sql: "{employees}.supervisor_id = {supervisor}.id"
+                relationship: many_to_one
+            dimensions:
+              - name: id
+                type: number
+                sql: id
+                primary_key: true
+              - name: name
+                type: string
+                sql: name
+    "#})
+    .unwrap();
+    let sql = TestContext::new(schema)
+        .unwrap()
+        .build_sql(indoc! {r#"
+            dimensions:
+              - employees.name
+              - employees.supervisor.name
+        "#})
+        .unwrap();
+
+    assert!(
+        sql.contains(r#"ON "employees".supervisor_id = "employees__supervisor".id"#),
+        "{sql}"
+    );
+}
+
+#[test]
+fn test_rejects_aliases_rendering_alike() {
+    for (first, second) in [("shipTo", "ship_to"), ("customer__region", "billing")] {
+        let message = join_graph_error(&format!(
+            r#"
+cubes:
+  - name: orders
+    sql_table: orders
+    joins:
+      - name: users
+        alias: {first}
+        sql: "{{CUBE}}.a_id = {{users}}.id"
+        relationship: many_to_one
+      - name: users
+        alias: {second}
+        sql: "{{CUBE}}.b_id = {{users}}.id"
+        relationship: many_to_one
+  - name: users
+    sql_table: users
+"#
+        ));
+        assert!(message.contains("renders under a name"), "{message}");
+    }
+}

@@ -186,11 +186,9 @@ impl SymbolPath {
         Ok(None)
     }
 
-    // A cube reached through a join is an instance of its own when the join
-    // is aliased, and so is every cube joined below such an instance: the
-    // same cube reached another way is a different relation. Inside an
-    // instance the joined cube's own name means the instance, and only the
-    // cubes it joins directly are in reach.
+    // Inside an instance the joined cube's own name means the instance and only
+    // the cubes it joins directly are in reach; any join below an alias is an
+    // instance. A cube's own name always means the cube itself.
     fn resolve_cube_name(
         cubes: &ModelCubes,
         current_cube: Option<&CubeId>,
@@ -201,7 +199,8 @@ impl SymbolPath {
         if matches!(name, "CUBE" | "TABLE") {
             return Ok(current_cube.cloned());
         }
-        if let Some(joined) = joined.filter(|joined| joined.target() == name) {
+        let own_name = current_cube.is_some_and(|current| current.target() == name);
+        if let Some(joined) = joined.filter(|joined| joined.target() == name && !own_name) {
             return Ok(Some(joined.clone()));
         }
         if let Some(current) = current_cube {

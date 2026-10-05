@@ -1452,7 +1452,7 @@ class ApiGateway {
 
     const startTime = new Date().getTime();
     const compilerApi = await this.getCompilerApi(context);
-    const splitGranularity = await this.granularitySplitter(compilerApi, context);
+    const splitGranularity = this.granularitySplitter(await this.memberPathResolver(context, compilerApi));
 
     const queryNormalizationResult: Array<{
       normalizedQuery: NormalizedQuery,
@@ -1612,43 +1612,36 @@ class ApiGateway {
   }
 
   /**
-   * Tells a time dimension written with a granularity apart from a member path
-   * through joins, which the data model knows: `orders.created_at.day` against
-   * `orders.customer.city`.
+   * Resolves member paths through the data model's joins, so a path through a
+   * join alias can be told apart from a time dimension with a granularity.
    */
-  protected async granularitySplitter(compilerApi: any, context: RequestContext) {
-    if (typeof compilerApi?.getCompilers !== 'function') {
+  protected async memberPathResolver(context: RequestContext, compilerApi?: any) {
+    const api = compilerApi ?? await this.getCompilerApi(context);
+    if (typeof api?.getCompilers !== 'function') {
       return undefined;
     }
-    const { cubeEvaluator } = await compilerApi.getCompilers({ requestId: context.requestId });
+    const { cubeEvaluator } = await api.getCompilers({ requestId: context.requestId });
     if (typeof cubeEvaluator?.resolveMemberPath !== 'function') {
       return undefined;
     }
-    return (path: string) => {
-      const resolved = cubeEvaluator.resolveMemberPath(path);
+    return (path: string) => cubeEvaluator.resolveMemberPath(path);
+  }
+
+  protected granularitySplitter(resolve?: (path: string) => any) {
+    return resolve && ((path: string) => {
+      const resolved = resolve(path);
       if (!resolved) {
         return undefined;
       }
       return resolved.granularity ? { dimension: resolved.fullPath, granularity: resolved.granularity } : null;
-    };
+    });
   }
 
-  /**
-   * The member of the data model a member path through joins names.
-   */
-  protected async memberTarget(context: RequestContext) {
-    const compilerApi = await this.getCompilerApi(context);
-    if (typeof compilerApi?.getCompilers !== 'function') {
-      return undefined;
-    }
-    const { cubeEvaluator } = await compilerApi.getCompilers({ requestId: context.requestId });
-    if (typeof cubeEvaluator?.resolveMemberPath !== 'function') {
-      return undefined;
-    }
-    return (path: string) => {
-      const resolved = cubeEvaluator.resolveMemberPath(path);
+  protected memberTarget(resolve?: (path: string) => any) {
+    return resolve && ((path: string) => {
+      const resolved = resolve(path);
       return resolved?.aliased ? resolved.targetPath : undefined;
-    };
+    });
   }
 
   private hasExpressionsInQuery(query: Query): boolean {
@@ -2210,6 +2203,7 @@ class ApiGateway {
       });
 
       metaConfigResult = this.filterVisibleItemsInMeta(context, metaConfigResult);
+      const memberTarget = this.memberTarget(await this.memberPathResolver(context));
 
       const sqlQueries = await this.getSqlQueriesInternal(context, normalizedQueries);
 
@@ -2227,7 +2221,7 @@ class ApiGateway {
           );
 
           const annotation = prepareAnnotation(
-            metaConfigResult, normalizedQuery, await this.memberTarget(context)
+            metaConfigResult, normalizedQuery, memberTarget
           );
 
           return this.prepareResultTransformData(
@@ -2313,6 +2307,7 @@ class ApiGateway {
       });
 
       metaConfigResult = this.filterVisibleItemsInMeta(context, metaConfigResult);
+      const memberTarget = this.memberTarget(await this.memberPathResolver(context));
 
       const sqlQueries = await this
         .getSqlQueriesInternal(
@@ -2362,7 +2357,7 @@ class ApiGateway {
           const response = await adapterApi.executeQuery(finalQuery);
 
           const annotation = prepareAnnotation(
-            metaConfigResult, normalizedQueries[0], await this.memberTarget(context)
+            metaConfigResult, normalizedQueries[0], memberTarget
           );
 
           // TODO Can we just pass through data? Ensure hidden members can't be queried
@@ -2409,7 +2404,7 @@ class ApiGateway {
               Boolean(sqlQueries[index].slowQuery);
 
             const annotation = prepareAnnotation(
-              metaConfigResult, normalizedQuery, await this.memberTarget(context)
+              metaConfigResult, normalizedQuery, memberTarget
             );
 
             if (request.streaming) {
