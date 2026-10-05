@@ -7,24 +7,25 @@ use std::collections::HashMap;
 use std::rc::Rc;
 
 /// Per-query cache of join trees keyed by the `JoinHints` that produced
-/// them. The join graph is immutable within a `QueryTools` lifetime, so
-/// the same hints always resolve to the same join — caching avoids
-/// re-crossing the JS bridge and recompiling ON SQL when the same hints
-/// are resolved repeatedly (e.g. once per pre-aggregation candidate).
+/// them, including hints that have no join. The join graph is immutable
+/// within a `QueryTools` lifetime, so the same hints always resolve the same
+/// way — caching avoids re-crossing the JS bridge and recompiling ON SQL when
+/// the same hints are resolved repeatedly (e.g. once per pre-aggregation
+/// candidate).
 #[derive(Default)]
 pub struct JoinTreeCache {
-    by_hints: RefCell<HashMap<JoinHints, (JoinKey, Rc<JoinTree>)>>,
+    by_hints: RefCell<HashMap<JoinHints, Option<(JoinKey, Rc<JoinTree>)>>>,
 }
 
 impl JoinTreeCache {
-    /// Returns the cached `(JoinKey, JoinTree)` for `hints`, building and
-    /// storing it via `build` on a miss. `build` is supplied per call so
-    /// the cache holds no reference back to `QueryTools`.
-    pub fn get_or_build(
+    /// Returns the cached result for `hints`, building and storing it via
+    /// `build` on a miss; `None` when no join covers the hints. `build` is
+    /// supplied per call so the cache holds no reference back to `QueryTools`.
+    pub fn get_or_try_build(
         &self,
         hints: &JoinHints,
-        build: impl FnOnce() -> Result<(JoinKey, Rc<JoinTree>), CubeError>,
-    ) -> Result<(JoinKey, Rc<JoinTree>), CubeError> {
+        build: impl FnOnce() -> Result<Option<(JoinKey, Rc<JoinTree>)>, CubeError>,
+    ) -> Result<Option<(JoinKey, Rc<JoinTree>)>, CubeError> {
         // The lookup borrow is dropped before `build` runs and re-acquired for
         // the insert, so `build` may itself call back into the cache. Do not
         // fold this into a single `entry()` call — that would hold the borrow
@@ -37,24 +38,5 @@ impl JoinTreeCache {
             .borrow_mut()
             .insert(hints.clone(), built.clone());
         Ok(built)
-    }
-
-    /// Like `get_or_build`, for a `build` that may find no join. A miss that
-    /// builds nothing is not cached.
-    pub fn get_or_try_build(
-        &self,
-        hints: &JoinHints,
-        build: impl FnOnce() -> Result<Option<(JoinKey, Rc<JoinTree>)>, CubeError>,
-    ) -> Result<Option<(JoinKey, Rc<JoinTree>)>, CubeError> {
-        if let Some(cached) = self.by_hints.borrow().get(hints) {
-            return Ok(Some(cached.clone()));
-        }
-        let Some(built) = build()? else {
-            return Ok(None);
-        };
-        self.by_hints
-            .borrow_mut()
-            .insert(hints.clone(), built.clone());
-        Ok(Some(built))
     }
 }

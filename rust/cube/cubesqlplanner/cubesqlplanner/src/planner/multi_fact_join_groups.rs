@@ -83,10 +83,8 @@ impl MeasuresJoinHintsBuilder {
 ///   reaches the fallback in the first place. That also means the view grouping
 ///   only guards the case where `base_hints` is empty - a dimension of an
 ///   unrelated view still pulls a hint-less member expression into its join.
-/// - `query_hints` — `base_hints` plus the hints of every measure of the whole
-///   query, in order: the hint set of the single join tree all members share.
-///   Only used to resolve a measure whose own hint set has no join root (see
-///   `MultiFactJoinGroups::build_groups`). Inherited as-is like `hints_by_cube`.
+/// - `query_hints` — `base_hints` plus every measure's hints: the single tree over all
+///   members, for a measure whose own hints have no root. Inherited like `hints_by_cube`.
 #[derive(Clone, Debug)]
 pub struct MeasuresJoinHints {
     base_hints: JoinHints,

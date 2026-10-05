@@ -66,7 +66,6 @@ pub struct PreAggregationsCompiler {
     /// Pre-aggregations whose members the join graph has no path for, directly
     /// or through a rollup they are built from. No query can use one of them.
     unjoinable: HashSet<PreAggregationFullName>,
-    skipped: Vec<(PreAggregationFullName, String)>,
 }
 
 impl PreAggregationsCompiler {
@@ -90,7 +89,6 @@ impl PreAggregationsCompiler {
             compiled_cache: HashMap::new(),
             failed_cache: HashMap::new(),
             unjoinable: HashSet::new(),
-            skipped: Vec::new(),
         })
     }
 
@@ -793,10 +791,8 @@ impl PreAggregationsCompiler {
         members.iter().map(|m| m.full_name()).join(", ")
     }
 
-    /// Every pre-aggregation of the cubes. One whose members can't be joined can't
-    /// serve any query, so it is skipped rather than failing the query - see
-    /// `skipped_pre_aggregations` for why. Any other failure is a mistake in its
-    /// definition and is reported.
+    /// One whose members can't be joined serves no query, so it is skipped; any
+    /// other failure is reported.
     pub fn compile_all_pre_aggregations(
         &mut self,
         disable_external_pre_aggregations: bool,
@@ -805,10 +801,7 @@ impl PreAggregationsCompiler {
         for (name, _) in self.descriptions.clone().iter() {
             let pre_aggregation = match self.compile_pre_aggregation(name) {
                 Ok(pre_aggregation) => pre_aggregation,
-                Err(err) if self.unjoinable.contains(name) => {
-                    self.skipped.push((name.clone(), err.message));
-                    continue;
-                }
+                Err(_) if self.unjoinable.contains(name) => continue,
                 Err(err) => return Err(err),
             };
             if !(disable_external_pre_aggregations && pre_aggregation.external == Some(true)) {
@@ -836,11 +829,6 @@ impl PreAggregationsCompiler {
             return Ok(Vec::new());
         }
         Ok(vec![pre_aggregation])
-    }
-
-    /// Pre-aggregations `compile_all_pre_aggregations` left out, with the reason.
-    pub fn skipped_pre_aggregations(&self) -> &[(PreAggregationFullName, String)] {
-        &self.skipped
     }
 
     pub fn compile_origin_sql_pre_aggregation(
@@ -1366,8 +1354,8 @@ mod tests {
         );
     }
 
-    // A candidate whose members can't be joined is left out with its reason, and so is
-    // one built from it, whether its rollup failed just now or earlier.
+    // A candidate whose members can't be joined is left out, and so is one built from
+    // it, whether its rollup failed just now or earlier.
     #[test]
     fn test_compile_all_skips_unjoinable_pre_aggregations() {
         let schema = MockSchema::from_yaml_file("common/hub_spoke_join_path.yaml");
@@ -1383,21 +1371,25 @@ mod tests {
             compiled_names,
             vec!["hub_rollup", "income_by_category", "with_hub_join"]
         );
+    }
 
-        let skipped = compiler.skipped_pre_aggregations();
-        let skipped_names: Vec<&str> = skipped.iter().map(|(n, _)| n.name.as_str()).collect();
-        assert_eq!(
-            skipped_names,
-            vec!["spoke_only_join", "spoke_only_rollup", "spoke_only_lambda"]
-        );
-        for (name, reason) in skipped.iter() {
-            assert!(
-                reason.contains("Can't find join path to join 'ledger', 'categories', 'entities'"),
-                "{}: {}",
-                name.name,
-                reason
-            );
-        }
+    // Only a candidate that can't be joined is skipped: a mistake in a definition that
+    // can be joined is still reported.
+    #[test]
+    fn test_compile_all_reports_a_definition_error() {
+        let schema = MockSchema::from_yaml_file("common/rollup_join_chain_missing_key.yaml");
+        let test_context = TestContext::new(schema).unwrap();
+        let query_tools = test_context.query_tools().clone();
+
+        let mut compiler =
+            PreAggregationsCompiler::try_new(query_tools, &vec![CubeId::cube("cube_w")]).unwrap();
+        let err = compiler
+            .compile_all_pre_aggregations(false)
+            .map(|_| ())
+            .expect_err("a rollup join missing its key is a definition error")
+            .to_string();
+
+        assert!(err.contains("chain_rollup_join"), "got: {}", err);
     }
 
     #[test]
