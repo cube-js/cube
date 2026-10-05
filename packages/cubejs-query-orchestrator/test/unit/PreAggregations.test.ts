@@ -1078,8 +1078,10 @@ describe('PreAggregations', () => {
     // Passing `sourceRows` runs the real downloadLambdaTable against a stubbed query cache
     // instead of mocking it out, so the row limit guard is exercised end to end.
     const createLambdaLoader = (
-      matchedTimeDimensionDateRange?: [string, string],
-      { sourceRows, maxSourceRowLimit }: { sourceRows?: number, maxSourceRowLimit?: number } = {},
+      sourceDateRange?: [string, string],
+      { sourceRows, maxSourceRowLimit, configuredRowLimit = 10000 }: {
+        sourceRows?: number, maxSourceRowLimit?: number, configuredRowLimit?: number
+      } = {},
     ) => {
       const loader = new PreAggregationPartitionRangeLoader(
         {} as any, // driverFactory
@@ -1095,7 +1097,7 @@ describe('PreAggregations', () => {
           rollupLambdaId: 'Orders.d_lambda',
           lastRollupLambda: true,
           unionWithSourceData: true,
-          matchedTimeDimensionDateRange,
+          matchedTimeDimensionDateRange: sourceDateRange,
         }) as any,
         [], // preAggregationsTablesToTempTables
         { getTableColumnTypes: jest.fn().mockResolvedValue([{ name: 'ts', type: 'timestamp' }]) } as any,
@@ -1104,7 +1106,9 @@ describe('PreAggregations', () => {
             sqlAndParams: ['SELECT * FROM public.orders WHERE ts > ?', [FROM_PARTITION_RANGE]],
             cacheKeyQueries: [],
             maxSourceRowLimit,
+            sourceDateRange,
           },
+          maxSourceRowLimit: configuredRowLimit,
         } as any,
       );
 
@@ -1175,6 +1179,16 @@ describe('PreAggregations', () => {
       expect(result.lambdaTable?.name).toEqual('lambda_test_table');
     });
 
+    test('a configured limit below the rendered one still fails closed', async () => {
+      const { loader } = createLambdaLoader(
+        ['2024-01-01T00:00:00.000', '2024-01-05T23:59:59.999'],
+        { sourceRows: 6, maxSourceRowLimit: 10, configuredRowLimit: 5 },
+      );
+
+      await expect(loader.loadPreAggregations())
+        .rejects.toThrow('The maximum number of source rows 5 was reached for Orders.d');
+    });
+
     test('runs the source query when no date range was requested', async () => {
       const { loader, downloadLambdaTable } = createLambdaLoader(undefined);
 
@@ -1185,8 +1199,8 @@ describe('PreAggregations', () => {
   });
 
   describe('lambdaSourceDataCovered', () => {
-    const covered = (matchedTimeDimensionDateRange: any, buildRangeEnd: any) => (
-      createLoader({ matchedTimeDimensionDateRange }) as any
+    const covered = (sourceDateRange: any, buildRangeEnd: any, matchedTimeDimensionDateRange: any = sourceDateRange) => (
+      createLoader({ matchedTimeDimensionDateRange }, { lambdaQuery: { sourceDateRange } }) as any
     ).lambdaSourceDataCovered(buildRangeEnd);
 
     test('covered when the requested range ends within the built range', () => {
@@ -1205,6 +1219,16 @@ describe('PreAggregations', () => {
     test('keeps the source query when either bound is unknown', () => {
       expect(covered(undefined, '2024-01-02T23:59:59.999')).toBe(false);
       expect(covered(['2024-01-01T00:00:00.000', '2024-01-02T23:59:59.999'], undefined)).toBe(false);
+    });
+
+    test('follows the source query bound, not one usage range', () => {
+      // With several usages the description carries the first usage's range, while the source
+      // query is bounded by the union of all of them.
+      expect(covered(
+        ['2024-01-01T00:00:00.000', '2024-01-05T23:59:59.999'],
+        '2024-01-03T23:59:59.999',
+        ['2024-01-01T00:00:00.000', '2024-01-02T23:59:59.999'],
+      )).toBe(false);
     });
   });
 

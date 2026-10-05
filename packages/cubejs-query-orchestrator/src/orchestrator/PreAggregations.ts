@@ -207,6 +207,8 @@ export type LambdaQuery = {
    * MAX_SOURCE_ROW_LIMIT placeholder as a param.
    */
   maxSourceRowLimit?: number,
+  /** Upper bounds the source query; undefined when it's unbounded above. */
+  sourceDateRange?: QueryDateRange,
 };
 
 export type PreAggregationDescription = {

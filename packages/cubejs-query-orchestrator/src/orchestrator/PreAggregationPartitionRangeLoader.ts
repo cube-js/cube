@@ -409,7 +409,9 @@ export class PreAggregationPartitionRangeLoader {
    * @see https://github.com/cube-js/cube/issues/11682
    */
   private lambdaSourceDataCovered(buildRangeEnd?: string): boolean {
-    const matchedRangeEnd = this.preAggregation.matchedTimeDimensionDateRange?.[1];
+    // Not matchedTimeDimensionDateRange: with several usages it's one usage's range, while the
+    // source query is bounded by the union of all of them.
+    const matchedRangeEnd = this.lambdaQuery?.sourceDateRange?.[1];
     if (!matchedRangeEnd || !buildRangeEnd) {
       return false;
     }
@@ -449,7 +451,8 @@ export class PreAggregationPartitionRangeLoader {
         lambdaTypes,
       }
     );
-    const appliedRowLimit = this.lambdaQuery.maxSourceRowLimit ?? this.options.maxSourceRowLimit;
+    // A limit baked in at compile time comes from env and may exceed the configured one.
+    const appliedRowLimit = Math.min(this.lambdaQuery.maxSourceRowLimit ?? Infinity, this.options.maxSourceRowLimit);
     if (data.rowCount >= appliedRowLimit) {
       throw new Error(`The maximum number of source rows ${appliedRowLimit} was reached for ${this.preAggregation.preAggregationId}`);
     }

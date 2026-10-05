@@ -118,6 +118,8 @@ export class PreAggregations {
 
   private hasCumulativeMeasuresValue: boolean = false;
 
+  private allBackAliasMembersValue: Record<string, string> | undefined = undefined;
+
   public preAggregationForQuery: PreAggregationForQuery | undefined = undefined;
 
   public preAggregationUsageInfos: PreAggregationUsageInfo[] | undefined = undefined;
@@ -293,6 +295,14 @@ export class PreAggregations {
     return this.hasCumulativeMeasuresValue;
   }
 
+  // Not cheap (evaluates member SQL) and matchedTimeDimensionDateRangeFor() runs once per description.
+  private allBackAliasMembers(): Record<string, string> {
+    if (!this.allBackAliasMembersValue) {
+      this.allBackAliasMembersValue = this.query.allBackAliasMembers();
+    }
+    return this.allBackAliasMembersValue;
+  }
+
   // Return array of `aggregations` columns descriptions in form `<func>(<column>)`
   // Aggregations used in CubeStore create table for describe measures in CubeStore side
   public aggregationsColumns(cube: string, preAggregation: PreAggregationDefinition): string[] {
@@ -323,7 +333,7 @@ export class PreAggregations {
       return undefined;
     }
 
-    const allBackAliasMembers = this.query.allBackAliasMembers();
+    const allBackAliasMembers = this.allBackAliasMembers();
 
     let matchedTimeDimension: BaseTimeDimension | undefined;
 
@@ -396,9 +406,13 @@ export class PreAggregations {
     let merged: [string, string] | undefined;
 
     for (const usageInfo of usageInfos) {
+      // mergeUsageDateRanges() skips undated usages, but an unknown usage range may need
+      // anything, so bound nothing.
+      if (Object.values(usageInfo.usages).some(usage => !usage.dateRange)) {
+        return undefined;
+      }
       const usageDateRange = PreAggregations.mergeUsageDateRanges(usageInfo.usages);
       if (!usageDateRange) {
-        // An unknown usage range may need anything, so bound nothing.
         return undefined;
       }
       merged = merged

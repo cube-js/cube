@@ -1134,8 +1134,9 @@ export class BaseQuery {
       const sourceDateRange = timeDimension &&
         this.preAggregations.lambdaSourceDateRange(lambdaPreAgg, preAggForQuery);
       // Tesseract renders LIMIT as an inline number and can't carry the MAX_SOURCE_ROW_LIMIT
-      // placeholder (it parses to None, emitting no LIMIT at all), so resolve it here.
-      const resolvedRowLimit = this.options.maxSourceRowLimit ?? getEnv('maxSourceRowLimit');
+      // placeholder (it parses to None, emitting no LIMIT at all), so resolve it here. The legacy
+      // planner keeps the placeholder: only the orchestrator knows preAggregationsOptions.maxSourceRowLimit.
+      const resolvedRowLimit = this.useNativeSqlPlanner && getEnv('maxSourceRowLimit');
       const maxSourceRowLimit = typeof resolvedRowLimit === 'number' && resolvedRowLimit > 0
         ? resolvedRowLimit
         : undefined;
@@ -1176,6 +1177,7 @@ export class BaseQuery {
         sqlAndParams,
         cacheKeyQueries,
         maxSourceRowLimit,
+        sourceDateRange,
       };
     }
     return result;
