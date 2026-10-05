@@ -297,14 +297,7 @@ export class PreAggregationPartitionRangeLoader {
       if (this.preAggregation.rollupLambdaId) {
         if (this.lambdaQuery && loadResults.length > 0) {
           const { buildRangeEnd, targetTableName } = loadResults[loadResults.length - 1];
-          if (this.lambdaSourceDataCovered(buildRangeEnd)) {
-            this.logger('Skipping lambda source query', {
-              preAggregationId: this.preAggregation.preAggregationId,
-              requestId: this.requestId,
-              buildRangeEnd,
-              matchedTimeDimensionDateRange: this.preAggregation.matchedTimeDimensionDateRange,
-            });
-          } else {
+          if (!this.lambdaSourceDataCovered(buildRangeEnd)) {
             const lambdaTypes = await this.loadCache.getTableColumnTypes(this.preAggregation, targetTableName);
             lambdaTable = await this.downloadLambdaTable(buildRangeEnd, lambdaTypes);
           }
