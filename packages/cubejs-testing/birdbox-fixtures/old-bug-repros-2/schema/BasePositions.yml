@@ -1,0 +1,35 @@
+# https://github.com/cube-js/cube/issues/7421
+cubes:
+  - name: base_positions
+    sql: >
+      SELECT 1 AS position_id, 'a' AS position_name, '2024-01-15'::timestamp AS position_date UNION ALL
+      SELECT 2 AS position_id, 'b' AS position_name, '2024-01-20'::timestamp AS position_date UNION ALL
+      SELECT 3 AS position_id, 'c' AS position_name, '2024-02-10'::timestamp AS position_date
+
+    measures:
+      - name: position_count
+        type: count
+
+    dimensions:
+      - name: position_id
+        sql: position_id
+        type: number
+        primary_key: true
+      - name: position_name
+        sql: position_name
+        type: string
+      - name: position_date
+        sql: position_date
+        type: time
+
+    pre_aggregations:
+      - name: main
+        type: original_sql
+        external: false
+      - name: positions_per_month
+        external: false
+        measures:
+          - CUBE.position_count
+        time_dimension: CUBE.position_date
+        granularity: month
+        use_original_sql_pre_aggregations: true
