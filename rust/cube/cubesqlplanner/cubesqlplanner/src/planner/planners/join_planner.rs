@@ -1,4 +1,4 @@
-use super::{CommonUtils, JoinSource, JoinTreeBuilder};
+use super::{CommonUtils, JoinTreeBuilder};
 use crate::cube_bridge::join_definition::JoinDefinition;
 use crate::cube_bridge::join_item::JoinItem;
 use crate::logical_plan::*;
@@ -57,8 +57,8 @@ impl JoinPlanner {
         join_hints: JoinHints,
         dimension_subqueries: Vec<Rc<DimensionSubQuery>>,
     ) -> Result<Rc<LogicalJoin>, CubeError> {
-        let (_, join_tree) = JoinTreeBuilder::new(self.query_tools.clone())
-            .build_for_hints(&join_hints, JoinSource::Graph)?;
+        let (_, join_tree) =
+            JoinTreeBuilder::new(self.query_tools.clone()).build_for_hints(&join_hints)?;
         Ok(self.make_join_logical_plan(&join_tree, dimension_subqueries))
     }
 
