@@ -516,26 +516,30 @@ const remapToQueryAdapterFormat = (query: NormalizedQuery): NormalizedQuery => (
   ...(query.order ? { order: remapQueryOrder(query.order) } : {}),
 });
 
+type PreAggregationsQueryItem = {
+  id: string,
+  cacheOnly?: boolean,
+  metaOnly?: boolean,
+  partitions?: string[],
+  refreshRange?: [string, string],
+};
+
 type PreAggregationsQuery = {
   expand?: string[],
   metadata?: Record<string, unknown>,
   timezone?: string,
   timezones?: string[],
-  preAggregations?: {
-    id: string,
-    cacheOnly?: boolean,
-    metaOnly?: boolean,
-    partitions?: string[],
-    refreshRange?: [string, string],
-  }[],
+  preAggregations?: PreAggregationsQueryItem[],
 };
 
-const queryPreAggregationsSchema = Joi.object<PreAggregationsQuery>().keys({
+// Strict schema maps (`Joi.object<T, true>(map)`) make tsc require every key of T and match each
+// validator to its field type; `.keys()` only takes the partial map, which checks neither.
+const queryPreAggregationsSchema = Joi.object<PreAggregationsQuery, true>({
   expand: Joi.array().items(Joi.string()),
   metadata: Joi.object(),
   timezone: timezoneSchema,
   timezones: Joi.array().items(timezoneSchema),
-  preAggregations: Joi.array().items(Joi.object().keys({
+  preAggregations: Joi.array().items(Joi.object<PreAggregationsQueryItem, true>({
     id: Joi.string().required(),
     cacheOnly: Joi.boolean(),
     metaOnly: Joi.boolean(),
@@ -544,30 +548,32 @@ const queryPreAggregationsSchema = Joi.object<PreAggregationsQuery>().keys({
   }))
 });
 
+type PreAggregationVersionEntry = {
+  content_version?: string,
+  last_updated_at?: number,
+  naming_version?: number,
+  structure_version?: string,
+  table_name?: string,
+  build_range_end?: string,
+};
+
 type PreAggregationPreviewQuery = {
   preAggregationId: string,
   timezone: string,
-  versionEntry: {
-    content_version?: string,
-    last_updated_at?: number,
-    naming_version?: number,
-    structure_version?: string,
-    table_name?: string,
-    build_range_end?: string,
-  },
+  versionEntry: PreAggregationVersionEntry,
 };
 
-const queryPreAggregationPreviewSchema = Joi.object<PreAggregationPreviewQuery>().keys({
+const queryPreAggregationPreviewSchema = Joi.object<PreAggregationPreviewQuery, true>({
   preAggregationId: Joi.string().required(),
   timezone: timezoneSchema.required(),
-  versionEntry: Joi.object().required().keys({
+  versionEntry: Joi.object<PreAggregationVersionEntry, true>({
     content_version: Joi.string(),
     last_updated_at: Joi.number(),
     naming_version: Joi.number(),
     structure_version: Joi.string(),
     table_name: Joi.string(),
     build_range_end: Joi.string(),
-  })
+  }).required()
 });
 
 type CancelPreAggregationsQuery = {
@@ -575,7 +581,7 @@ type CancelPreAggregationsQuery = {
   queryKeys?: string[],
 };
 
-const queryCancelPreAggregationPreviewSchema = Joi.object<CancelPreAggregationsQuery>().keys({
+const queryCancelPreAggregationPreviewSchema = Joi.object<CancelPreAggregationsQuery, true>({
   dataSource: Joi.string(),
   queryKeys: Joi.array().items(Joi.string())
 });
