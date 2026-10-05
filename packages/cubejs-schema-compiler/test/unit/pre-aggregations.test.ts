@@ -335,6 +335,91 @@ describe('pre-aggregations', () => {
       expect(lambdaSql).toMatch(/LIMIT 200000/);
       expect(lambdaParams).not.toContain(MAX_SOURCE_ROW_LIMIT);
     });
+
+    describe('lambdaSourceDateRange', () => {
+      const requestedRange = [{
+        dimension: 'Events.ts',
+        dateRange: ['2024-02-01', '2024-02-29'],
+      }];
+      const requestedBounds = ['2024-02-01T00:00:00.000', '2024-02-29T23:59:59.999'];
+
+      const usageInfo = (overrides: any = {}) => ({
+        cubeName: 'Events',
+        preAggregationName: 'eventsLambda',
+        external: true,
+        usages: {},
+        ...overrides,
+      });
+
+      const sourceDateRangeFor = async (timeDimensions: any[], usageInfos?: any[]) => {
+        const { compiler, cubeEvaluator, joinGraph } = compileEvents();
+        await compiler.compile();
+
+        const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+          measures: ['Events.count'],
+          timeDimensions,
+          timezone: 'UTC',
+        });
+
+        const { preAggregations } = query;
+        const rollupLambda: any = preAggregations.findPreAggregationForQuery();
+        expect(rollupLambda).toBeDefined();
+        const [lambdaPreAgg] = rollupLambda.referencedPreAggregations.slice(-1);
+
+        // findPreAggregationForQuery() fills these on the native path, so override afterwards.
+        if (usageInfos) {
+          preAggregations.preAggregationUsageInfos = usageInfos;
+        }
+
+        return preAggregations.lambdaSourceDateRange(lambdaPreAgg, rollupLambda);
+      };
+
+      it('is the requested range when the query has no usages', async () => {
+        expect(await sourceDateRangeFor(requestedRange)).toEqual(requestedBounds);
+      });
+
+      it('is undefined when nothing bounds the request', async () => {
+        expect(await sourceDateRangeFor([{ dimension: 'Events.ts', granularity: 'day' }])).toBeUndefined();
+      });
+
+      it('widens to a usage reaching past the request', async () => {
+        // A forward time_shift usage reads partitions past the requested range, so bounding the
+        // source query by the request alone would drop the rows that usage needs.
+        const range = await sourceDateRangeFor(requestedRange, [
+          usageInfo({ usages: { main: { dateRange: ['2024-02-01T00:00:00.000', '2024-03-31T23:59:59.999'] } } }),
+        ]);
+
+        expect(range).toEqual(['2024-02-01T00:00:00.000', '2024-03-31T23:59:59.999']);
+      });
+
+      it('unions every usage of the same rollupLambda', async () => {
+        const range = await sourceDateRangeFor(requestedRange, [
+          usageInfo({ usages: { main: { dateRange: ['2024-02-01T00:00:00.000', '2024-02-29T23:59:59.999'] } } }),
+          usageInfo({ usages: { shifted: { dateRange: ['2024-01-01T00:00:00.000', '2024-03-31T23:59:59.999'] } } }),
+        ]);
+
+        expect(range).toEqual(['2024-01-01T00:00:00.000', '2024-03-31T23:59:59.999']);
+      });
+
+      it('ignores usages of another pre-aggregation', async () => {
+        const range = await sourceDateRangeFor(requestedRange, [
+          usageInfo({
+            preAggregationName: 'otherLambda',
+            usages: { main: { dateRange: ['2024-01-01T00:00:00.000', '2024-03-31T23:59:59.999'] } },
+          }),
+        ]);
+
+        expect(range).toEqual(requestedBounds);
+      });
+
+      it('bounds nothing when a usage range is unknown', async () => {
+        const range = await sourceDateRangeFor(requestedRange, [
+          usageInfo({ usages: { main: {} } }),
+        ]);
+
+        expect(range).toBeUndefined();
+      });
+    });
   });
 
   // @link https://github.com/cube-js/cube/issues/6623
