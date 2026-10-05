@@ -99,20 +99,13 @@ impl PreAggregationOptimizer {
         let cube_names = collect_cube_names_from_node(&plan)?;
         let mut compiler = PreAggregationsCompiler::try_new(self.query_tools.clone(), &cube_names)?;
 
-        let compiled_pre_aggregations =
-            compiler.compile_all_pre_aggregations(disable_external_pre_aggregations)?;
-
-        let filtered_pre_aggregations: Vec<_> = if let Some(id) = pre_aggregation_id {
-            compiled_pre_aggregations
-                .iter()
-                .filter(|pa| format!("{}.{}", pa.cube_name, pa.name) == id)
-                .cloned()
-                .collect()
+        let compiled_pre_aggregations = if let Some(id) = pre_aggregation_id {
+            compiler.compile_requested_pre_aggregation(id, disable_external_pre_aggregations)?
         } else {
-            compiled_pre_aggregations
+            compiler.compile_all_pre_aggregations(disable_external_pre_aggregations)?
         };
 
-        self.try_rewrite_root(&plan, &filtered_pre_aggregations)
+        self.try_rewrite_root(&plan, &compiled_pre_aggregations)
     }
 
     fn try_rewrite_root(
@@ -761,7 +754,7 @@ impl PreAggregationOptimizer {
 
         // The query's join groups answer both the multiplicativity gate
         // and the join-path comparison below, so build them once.
-        let query_groups = self.query_join_groups(schema, &all_measures)?;
+        let query_groups = self.query_join_groups(schema, filters, &all_measures)?;
 
         // A measure sitting under a row-multiplying join can't be rolled
         // up from a partially matching pre-aggregation.
@@ -827,13 +820,7 @@ impl PreAggregationOptimizer {
                 let query_has_multiplied = if has_filters {
                     MultiFactJoinGroups::try_new(
                         self.query_tools.clone(),
-                        MeasuresJoinHints::builder(&self.query_join_hints)
-                            .add_dimensions(&schema.dimensions)
-                            .add_dimensions(&schema.time_dimensions)
-                            .add_filters(&filters.dimensions_filters)
-                            .add_filters(&filters.time_dimensions_filters)
-                            .add_filters(&filters.segments)
-                            .build(&all_measures)?,
+                        self.filtered_join_hints(schema, filters, &all_measures)?,
                     )?
                     .has_multiplied_measures()?
                 } else {
@@ -974,13 +961,39 @@ impl PreAggregationOptimizer {
     fn query_join_groups(
         &self,
         schema: &Rc<LogicalSchema>,
+        filters: &Rc<LogicalFilter>,
         measures: &[Rc<MemberSymbol>],
     ) -> Result<MultiFactJoinGroups, CubeError> {
         let hints = MeasuresJoinHints::builder(&self.query_join_hints)
             .add_dimensions(&schema.dimensions)
             .add_dimensions(&schema.time_dimensions)
             .build(measures)?;
-        MultiFactJoinGroups::try_new(self.query_tools.clone(), hints)
+        if let Ok(groups) =
+            MultiFactJoinGroups::try_new_if_joinable(self.query_tools.clone(), hints)?
+        {
+            return Ok(groups);
+        }
+        // A filtered member can be the only link between the cubes the query
+        // selects from, and the query itself is planned with its filters.
+        MultiFactJoinGroups::try_new(
+            self.query_tools.clone(),
+            self.filtered_join_hints(schema, filters, measures)?,
+        )
+    }
+
+    fn filtered_join_hints(
+        &self,
+        schema: &Rc<LogicalSchema>,
+        filters: &Rc<LogicalFilter>,
+        measures: &[Rc<MemberSymbol>],
+    ) -> Result<MeasuresJoinHints, CubeError> {
+        MeasuresJoinHints::builder(&self.query_join_hints)
+            .add_dimensions(&schema.dimensions)
+            .add_dimensions(&schema.time_dimensions)
+            .add_filters(&filters.dimensions_filters)
+            .add_filters(&filters.time_dimensions_filters)
+            .add_filters(&filters.segments)
+            .build(measures)
     }
 
     fn are_join_paths_matching(

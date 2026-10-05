@@ -83,11 +83,14 @@ impl MeasuresJoinHintsBuilder {
 ///   reaches the fallback in the first place. That also means the view grouping
 ///   only guards the case where `base_hints` is empty - a dimension of an
 ///   unrelated view still pulls a hint-less member expression into its join.
+/// - `query_hints` — `base_hints` plus every measure's hints: the single tree over all
+///   members, for a measure whose own hints have no root. Inherited like `hints_by_cube`.
 #[derive(Clone, Debug)]
 pub struct MeasuresJoinHints {
     base_hints: JoinHints,
     measure_hints: Vec<MeasureJoinHints>,
     hints_by_cube: HashMap<CubeId, JoinHints>,
+    query_hints: JoinHints,
 }
 
 impl MeasuresJoinHints {
@@ -102,25 +105,26 @@ impl MeasuresJoinHints {
 
     /// Reuse the existing `base_hints` to produce a new
     /// `MeasuresJoinHints` over a different measure subset. `hints_by_cube`
-    /// keeps describing the whole query, not the subset.
+    /// and `query_hints` keep describing the whole query, not the subset.
     pub fn for_measures(&self, measures: &[Rc<MemberSymbol>]) -> Result<Self, CubeError> {
         Self::from_base_hints(
             self.base_hints.clone(),
             measures,
-            Some(self.hints_by_cube.clone()),
+            Some((self.hints_by_cube.clone(), self.query_hints.clone())),
         )
     }
 
-    /// `inherited_hints_by_cube` describes the whole query these measures were
-    /// taken from, so the measures add nothing to it; without it they are grouped
-    /// from scratch.
+    /// `inherited` describes the whole query these measures were taken from, so
+    /// the measures add nothing to it; without it they are grouped from scratch.
     fn from_base_hints(
         base_hints: JoinHints,
         measures: &[Rc<MemberSymbol>],
-        inherited_hints_by_cube: Option<HashMap<CubeId, JoinHints>>,
+        inherited: Option<(HashMap<CubeId, JoinHints>, JoinHints)>,
     ) -> Result<Self, CubeError> {
-        let inherited = inherited_hints_by_cube.is_some();
-        let mut hints_by_cube = inherited_hints_by_cube.unwrap_or_default();
+        let (mut hints_by_cube, mut query_hints, inherited) = match inherited {
+            Some((hints_by_cube, query_hints)) => (hints_by_cube, query_hints, true),
+            None => (HashMap::new(), base_hints.clone(), false),
+        };
 
         let mut measure_hints: Vec<MeasureJoinHints> = Vec::new();
         for m in measures {
@@ -138,6 +142,7 @@ impl MeasuresJoinHints {
                     .entry(m.cube_id())
                     .or_insert_with(JoinHints::new)
                     .extend(&own_hints);
+                query_hints.extend(&own_hints);
             }
             if is_multi_stage {
                 continue;
@@ -154,6 +159,7 @@ impl MeasuresJoinHints {
             base_hints,
             measure_hints,
             hints_by_cube,
+            query_hints,
         })
     }
 
@@ -232,20 +238,45 @@ impl MultiFactJoinGroups {
         Self::build(query_tools, measures_join_hints, true)
     }
 
+    /// Like `try_new`, but tells apart members the join graph has no path for:
+    /// that is the inner error, anything else failing is the outer one.
+    pub fn try_new_if_joinable(
+        query_tools: Rc<State>,
+        measures_join_hints: MeasuresJoinHints,
+    ) -> Result<Result<Self, CubeError>, CubeError> {
+        Ok(
+            Self::build_if_joinable(query_tools, measures_join_hints, false)?
+                .map_err(|hints| Self::no_join_path_error(&hints)),
+        )
+    }
+
     fn build(
         query_tools: Rc<State>,
         measures_join_hints: MeasuresJoinHints,
         merge_nested: bool,
     ) -> Result<Self, CubeError> {
-        let groups = Self::build_groups(&query_tools, &measures_join_hints, merge_nested)?;
+        Self::build_if_joinable(query_tools, measures_join_hints, merge_nested)?
+            .map_err(|hints| Self::no_join_path_error(&hints))
+    }
+
+    /// The inner error is the hint set the join graph has no path for.
+    fn build_if_joinable(
+        query_tools: Rc<State>,
+        measures_join_hints: MeasuresJoinHints,
+        merge_nested: bool,
+    ) -> Result<Result<Self, JoinHints>, CubeError> {
+        let groups = match Self::build_groups(&query_tools, &measures_join_hints, merge_nested)? {
+            Ok(groups) => groups,
+            Err(hints) => return Ok(Err(hints)),
+        };
         let (dimension_paths, measure_paths) = Self::precompute_paths(&groups);
-        Ok(Self {
+        Ok(Ok(Self {
             query_tools,
             measures_join_hints,
             groups,
             dimension_paths,
             measure_paths,
-        })
+        }))
     }
 
     /// Rebuilds the groups for a different measure subset, reusing
@@ -255,51 +286,62 @@ impl MultiFactJoinGroups {
         Self::build(self.query_tools.clone(), new_hints, false)
     }
 
+    /// The inner error is the hint set the join graph has no path for.
     fn build_groups(
         query_tools: &Rc<State>,
         hints: &MeasuresJoinHints,
         merge_nested: bool,
-    ) -> Result<Vec<(Rc<JoinTree>, Vec<Rc<MemberSymbol>>)>, CubeError> {
+    ) -> Result<Result<Vec<(Rc<JoinTree>, Vec<Rc<MemberSymbol>>)>, JoinHints>, CubeError> {
         let join_tree_builder = JoinTreeBuilder::new(query_tools.clone());
-        let resolve = |join_hints: &JoinHints| -> Result<(JoinKey, Rc<JoinTree>), CubeError> {
-            query_tools.join_tree_cache().get_or_build(join_hints, || {
-                let (key, join) = query_tools.join_for_hints(join_hints)?;
-                Ok((key, join_tree_builder.build(join)?))
-            })
-        };
+        let try_resolve =
+            |join_hints: &JoinHints| -> Result<Option<(JoinKey, Rc<JoinTree>)>, CubeError> {
+                query_tools
+                    .join_tree_cache()
+                    .get_or_try_build(join_hints, || {
+                        let Some((key, join)) = query_tools.try_join_for_hints(join_hints)? else {
+                            return Ok(None);
+                        };
+                        Ok(Some((key, join_tree_builder.build(join)?)))
+                    })
+            };
 
-        let measures_to_join = if hints.measure_hints.is_empty() {
-            if hints.base_hints.is_empty() {
-                vec![]
-            } else {
-                let (key, join_tree) = resolve(&hints.base_hints)?;
-                vec![(Vec::new(), key, join_tree, hints.base_hints.clone())]
+        let mut measures_to_join = Vec::new();
+        if hints.measure_hints.is_empty() {
+            if !hints.base_hints.is_empty() {
+                let Some((key, join_tree)) = try_resolve(&hints.base_hints)? else {
+                    return Ok(Err(hints.base_hints.clone()));
+                };
+                measures_to_join.push((Vec::new(), key, join_tree, hints.base_hints.clone()));
             }
         } else {
-            hints
-                .measure_hints
-                .iter()
-                .map(|mh| -> Result<_, CubeError> {
-                    let measure_hints = if mh.hints.is_empty() {
-                        Self::fallback_hints_for_measure(query_tools, &mh.measure, hints)?
-                    } else {
-                        mh.hints.clone()
-                    };
-                    if measure_hints.is_empty() {
-                        return Err(CubeError::user(format!(
-                            "Can't resolve the cube to query for '{}': the member references no \
-                             members of '{}', and neither the rest of the query nor the join map \
-                             of '{}' gives a cube to join from",
-                            mh.measure.full_name(),
-                            mh.measure.cube_id(),
-                            mh.measure.cube_id()
-                        )));
-                    }
-                    let (key, join_tree) = resolve(&measure_hints)?;
-                    Ok((vec![mh.measure.clone()], key, join_tree, measure_hints))
-                })
-                .collect::<Result<Vec<_>, _>>()?
-        };
+            for mh in hints.measure_hints.iter() {
+                let measure_hints = if mh.hints.is_empty() {
+                    Self::fallback_hints_for_measure(query_tools, &mh.measure, hints)?
+                } else {
+                    mh.hints.clone()
+                };
+                if measure_hints.is_empty() {
+                    return Err(CubeError::user(format!(
+                        "Can't resolve the cube to query for '{}': the member references no \
+                         members of '{}', and neither the rest of the query nor the join map \
+                         of '{}' gives a cube to join from",
+                        mh.measure.full_name(),
+                        mh.measure.cube_id(),
+                        mh.measure.cube_id()
+                    )));
+                }
+                // Directed joins can leave a measure's own hints rootless (spokes reached
+                // only through a hub another member names); read it through the query's tree.
+                let (key, join_tree, join_hints) = match try_resolve(&measure_hints)? {
+                    Some((key, join_tree)) => (key, join_tree, measure_hints),
+                    None => match try_resolve(&hints.query_hints)? {
+                        Some((key, join_tree)) => (key, join_tree, hints.query_hints.clone()),
+                        None => return Ok(Err(measure_hints)),
+                    },
+                };
+                measures_to_join.push((vec![mh.measure.clone()], key, join_tree, join_hints));
+            }
+        }
 
         let mut key_order: Vec<JoinKey> = Vec::new();
         let mut grouped: HashMap<JoinKey, GroupBuild> = HashMap::new();
@@ -332,13 +374,24 @@ impl MultiFactJoinGroups {
             && Self::has_nested_pair(&groups)
             && !Self::any_cube_has_pre_aggregations(query_tools, &groups)?
         {
-            Self::merge_nested_groups(&mut groups, &resolve)?;
+            Self::merge_nested_groups(&mut groups, &try_resolve)?;
         }
 
-        Ok(groups
+        Ok(Ok(groups
             .into_iter()
             .map(|group| (group.tree, group.measures))
-            .collect())
+            .collect()))
+    }
+
+    fn no_join_path_error(hints: &JoinHints) -> CubeError {
+        let cubes = hints
+            .iter()
+            .map(|item| match item {
+                JoinHintItem::Single(cube) => format!("'{}'", cube),
+                JoinHintItem::Vector(path) => format!("'{}'", path.join(",")),
+            })
+            .join(", ");
+        CubeError::user(format!("Can't find join path to join {}", cubes))
     }
 
     /// Whether any group's join tree is contained in another's - the only
@@ -410,7 +463,7 @@ impl MultiFactJoinGroups {
     /// along stays safe.
     fn merge_nested_groups(
         groups: &mut Vec<GroupBuild>,
-        resolve: &impl Fn(&JoinHints) -> Result<(JoinKey, Rc<JoinTree>), CubeError>,
+        try_resolve: &impl Fn(&JoinHints) -> Result<Option<(JoinKey, Rc<JoinTree>)>, CubeError>,
     ) -> Result<(), CubeError> {
         loop {
             let mut merged = None;
@@ -424,7 +477,7 @@ impl MultiFactJoinGroups {
                     // Resolving is a probe: a hint set the join graph refuses
                     // means there is no merge to make here, not that the query
                     // the groups came from is unplannable.
-                    let Ok((key, tree)) = resolve(&hints) else {
+                    let Some((key, tree)) = try_resolve(&hints)? else {
                         continue;
                     };
                     if key != other.key {

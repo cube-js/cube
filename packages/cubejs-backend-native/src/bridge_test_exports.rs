@@ -650,6 +650,7 @@ fn invoke_base_tools<IT: InnerTypes>(b: &NativeBaseTools<IT>) -> InvokeResult {
         b.pre_aggregation_table_name("Orders".to_string(), "main".to_string()),
     );
     r.record("join_tree_for_hints", b.join_tree_for_hints(vec![]));
+    r.record("try_join_tree_for_hints", b.try_join_tree_for_hints(vec![]));
     r.skip(
         "compile_member_sql",
         "Rc<dyn MemberSql> argument has no auto-default in Rust",
