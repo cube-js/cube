@@ -265,7 +265,7 @@ impl MockJoinGraph {
                 .iter()
                 .map(|hint| match hint {
                     JoinHintItem::Single(name) => format!("'{}'", name),
-                    JoinHintItem::Vector(path) => format!("'{}'", path.join(".")),
+                    JoinHintItem::Vector(path) => format!("'{}'", path.join(",")),
                 })
                 .collect();
             CubeError::user(format!(

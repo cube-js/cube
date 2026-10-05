@@ -820,13 +820,7 @@ impl PreAggregationOptimizer {
                 let query_has_multiplied = if has_filters {
                     MultiFactJoinGroups::try_new(
                         self.query_tools.clone(),
-                        MeasuresJoinHints::builder(&self.query_join_hints)
-                            .add_dimensions(&schema.dimensions)
-                            .add_dimensions(&schema.time_dimensions)
-                            .add_filters(&filters.dimensions_filters)
-                            .add_filters(&filters.time_dimensions_filters)
-                            .add_filters(&filters.segments)
-                            .build(&all_measures)?,
+                        self.filtered_join_hints(schema, filters, &all_measures)?,
                     )?
                     .has_multiplied_measures()?
                 } else {
@@ -981,14 +975,25 @@ impl PreAggregationOptimizer {
         }
         // A filtered member can be the only link between the cubes the query
         // selects from, and the query itself is planned with its filters.
-        let hints = MeasuresJoinHints::builder(&self.query_join_hints)
+        MultiFactJoinGroups::try_new(
+            self.query_tools.clone(),
+            self.filtered_join_hints(schema, filters, measures)?,
+        )
+    }
+
+    fn filtered_join_hints(
+        &self,
+        schema: &Rc<LogicalSchema>,
+        filters: &Rc<LogicalFilter>,
+        measures: &[Rc<MemberSymbol>],
+    ) -> Result<MeasuresJoinHints, CubeError> {
+        MeasuresJoinHints::builder(&self.query_join_hints)
             .add_dimensions(&schema.dimensions)
             .add_dimensions(&schema.time_dimensions)
             .add_filters(&filters.dimensions_filters)
             .add_filters(&filters.time_dimensions_filters)
             .add_filters(&filters.segments)
-            .build(measures)?;
-        MultiFactJoinGroups::try_new(self.query_tools.clone(), hints)
+            .build(measures)
     }
 
     fn are_join_paths_matching(
