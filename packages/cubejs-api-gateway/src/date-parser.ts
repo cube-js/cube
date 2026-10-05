@@ -68,7 +68,12 @@ export function dateParser(dateString: string, timezone: string, now: Date = new
       moment.tz(timezone).endOf('day').add(1, 'day')
     ];
   } else if (dateString.match(/^from (.*) to (.*)$/)) {
-    let [, from, to] = dateString.match(/^from(.{0,50})to(.{0,50})$/)!;
+    const match = dateString.match(/^from(.{0,50})to(.{0,50})$/);
+    if (!match) {
+      throw new UserError(`Can't parse date range: '${dateString}'`);
+    }
+
+    let [, from, to] = match;
     from = from.trim();
     to = to.trim();
 
