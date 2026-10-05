@@ -479,11 +479,18 @@ fn test_self_join_reads_its_own_name_as_itself() {
             dimensions:
               - employees.name
               - employees.supervisor.name
+              - employees.supervisor.supervisor.name
         "#})
         .unwrap();
 
     assert!(
         sql.contains(r#"ON "employees".supervisor_id = "employees__supervisor".id"#),
+        "{sql}"
+    );
+    assert!(
+        sql.contains(
+            r#"ON "employees__supervisor".supervisor_id = "employees__supervisor__supervisor".id"#
+        ),
         "{sql}"
     );
 }

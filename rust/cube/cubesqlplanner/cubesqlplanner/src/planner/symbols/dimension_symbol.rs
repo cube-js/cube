@@ -371,8 +371,13 @@ impl SymbolFactory for DimensionSymbolFactory {
         let cube = cube_evaluator.cube_from_path(path.cube_id().target().to_string())?;
         let alias = match compiler.alias_for_member(&path.full_name()) {
             Some(alias) => alias,
-            None => PlanSqlTemplates::member_alias_name(
+            None if path.cube_id().is_joined() => PlanSqlTemplates::member_alias_name(
                 &compiler.model_cubes().alias_base(path.cube_id())?,
+                path.symbol_name(),
+                &None,
+            ),
+            None => PlanSqlTemplates::member_alias_name(
+                cube.static_data().resolved_alias(),
                 path.symbol_name(),
                 &None,
             ),

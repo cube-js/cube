@@ -653,7 +653,7 @@ export class BaseQuery {
 
   isMeasurePath(path) {
     const resolved = this.cubeEvaluator.resolveMemberPath(path);
-    return this.cubeEvaluator.isMeasure(resolved?.aliased ? resolved.targetPath : path);
+    return this.cubeEvaluator.isMeasure(resolved?.targetPath ?? path);
   }
 
   initUngrouped() {

@@ -825,9 +825,11 @@ export class CubeSymbols implements TranspilerSymbolResolver, CompilerInterface 
         const split = fullPath.split('.');
         const cubeRef = this.resolveJoinPathTarget(split);
 
-        // No need to keep a simple direct cube joins in join map
-        if (split.length > 1) {
-          joinMap.push(split);
+        // No need to keep a simple direct cube joins in join map. Hints are
+        // extended with cube names only, so the path is kept up to its first alias
+        const plainPath = this.joinPathBeforeAlias(split);
+        if (plainPath.length > 1) {
+          joinMap.push(plainPath);
         }
 
         if (it.includes === '*') {
@@ -1457,6 +1459,14 @@ export class CubeSymbols implements TranspilerSymbolResolver, CompilerInterface 
       current = this.joinAliasTarget(current, segment) ?? segment;
     }
     return current;
+  }
+
+  /**
+   * The leading part of a join path that names cubes only, up to its first alias.
+   */
+  protected joinPathBeforeAlias(path: string[]): string[] {
+    const end = path.findIndex((segment, i) => i > 0 && this.joinAliasTarget(path[i - 1], segment));
+    return end === -1 ? path : path.slice(0, end);
   }
 
   /**
