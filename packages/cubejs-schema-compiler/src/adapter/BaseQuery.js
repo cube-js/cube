@@ -165,7 +165,7 @@ export class BaseQuery {
         allFilters = allFilters.concat(this.extractDimensionsAndMeasures(f.or));
       } else if (!f.member && !f.dimension) {
         throw new UserError(`member attribute is required for filter ${JSON.stringify(f)}`);
-      } else if (this.cubeEvaluator.isMeasure(f.member || f.dimension)) {
+      } else if (this.isMeasurePath(f.member || f.dimension)) {
         allFilters.push({ measure: f.member || f.dimension });
       } else {
         allFilters.push({ dimension: f.member || f.dimension });
@@ -232,7 +232,7 @@ export class BaseQuery {
         throw new UserError(`member attribute is required for filter ${JSON.stringify(f)}`);
       }
 
-      if (this.cubeEvaluator.isMeasure(f.member || f.dimension)) {
+      if (this.isMeasurePath(f.member || f.dimension)) {
         return Object.assign({}, f, {
           dimension: null,
           measure: f.member || f.dimension
@@ -649,6 +649,11 @@ export class BaseQuery {
       return { path: resolved.targetPath, joinHint: [], aliasPath: resolved.fullPath };
     }
     return CubeSymbols.joinHintFromPath(path);
+  }
+
+  isMeasurePath(path) {
+    const resolved = this.cubeEvaluator.resolveMemberPath(path);
+    return this.cubeEvaluator.isMeasure(resolved?.aliased ? resolved.targetPath : path);
   }
 
   initUngrouped() {

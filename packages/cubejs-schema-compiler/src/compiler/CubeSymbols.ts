@@ -1105,9 +1105,14 @@ export class CubeSymbols implements TranspilerSymbolResolver, CompilerInterface 
           ? evaluatedDrillMembers
           : [evaluatedDrillMembers]);
 
+        // Through a join alias the drill member belongs to the measure's own instance
+        const ownInstancePath = `${path.slice(0, -1).join('.')}.`;
         const filteredDrillMembers = drillMembersArray.flatMap(member => {
-          const found = viewAllMembers.find(v => v.member.endsWith(member) ||
-            (v.cube && `${v.cube}.${v.member.split('.').pop()}` === member));
+          const ownMember = member.startsWith(`${sourceCubeName}.`) &&
+            `${ownInstancePath}${member.slice(sourceCubeName.length + 1)}`;
+          const found = (ownMember && viewAllMembers.find(v => v.member === ownMember)) ||
+            viewAllMembers.find(v => v.member.endsWith(member) ||
+              (v.cube && `${v.cube}.${v.member.split('.').pop()}` === member));
           if (!found) {
             return [];
           }

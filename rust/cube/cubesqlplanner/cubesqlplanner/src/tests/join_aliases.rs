@@ -512,3 +512,86 @@ cubes:
         assert!(message.contains("renders under a name"), "{message}");
     }
 }
+
+fn employees_error(on_sql: &str, extra_dimension: &str) -> String {
+    let schema = MockSchema::from_yaml(&format!(
+        r#"
+cubes:
+  - name: employees
+    sql_table: employees
+    joins:
+      - name: employees
+        alias: supervisor
+        sql: "{on_sql}"
+        relationship: many_to_one
+      - name: departments
+        sql: "{{CUBE}}.department_id = {{departments}}.id"
+        relationship: many_to_one
+    dimensions:
+      - name: id
+        type: number
+        sql: id
+        primary_key: true
+      - name: name
+        type: string
+        sql: name
+{extra_dimension}
+  - name: departments
+    sql_table: departments
+    dimensions:
+      - name: id
+        type: number
+        sql: id
+        primary_key: true
+      - name: head_id
+        type: number
+        sql: head_id
+"#
+    ))
+    .unwrap();
+    TestContext::new(schema)
+        .unwrap()
+        .build_sql(indoc! {r#"
+            dimensions:
+              - employees.supervisor.name
+        "#})
+        .unwrap_err()
+        .message
+}
+
+#[test]
+fn test_rejects_a_self_join_never_reading_its_copy() {
+    let message = employees_error("{CUBE}.supervisor_id = {employees}.id", "");
+    assert!(message.contains("never reads the joined cube"), "{message}");
+}
+
+#[test]
+fn test_rejects_a_join_reading_a_cube_outside_it() {
+    let message = employees_error(
+        "{CUBE.head_key} = {supervisor}.id",
+        r#"      - name: head_key
+        type: number
+        sql: "{departments.head_id}""#,
+    );
+    assert!(
+        message.contains("reads `departments`, which is neither side of the join"),
+        "{message}"
+    );
+}
+
+#[test]
+fn test_one_to_many_below_an_alias_multiplies_the_root() {
+    let sql = sql(indoc! {r#"
+        measures:
+          - orders.total_amount
+        dimensions:
+          - orders.customer.reviews.id
+    "#});
+
+    // Each order repeats once per review of its customer, so the amounts are
+    // summed over the distinct orders of each review.
+    assert!(
+        sql.contains(r#"SELECT DISTINCT "orders_key_orders__customer__reviews".id "orders__customer__reviews__id", "orders_key_orders".id "orders__id""#),
+        "{sql}"
+    );
+}

@@ -1,5 +1,6 @@
 use super::CommonUtils;
 use crate::cube_bridge::join_definition::JoinDefinition;
+use crate::planner::collectors::collect_cube_names_from_symbols;
 use crate::planner::join_hints::{JoinHint, JoinHints};
 use crate::planner::join_multiplication::{is_multiplied, MultiplicationEdge};
 use crate::planner::query_tools::JoinKey;
@@ -146,16 +147,35 @@ impl JoinTreeBuilder {
         let on_sql = self
             .utils
             .compile_instance_join_condition(instance, &join)?;
-        for member in on_sql.get_dependencies() {
-            let cube = member.cube_id();
-            if &cube != parent && &cube != instance {
-                return Err(CubeError::user(format!(
-                    "The join `{}` of cube `{}` references `{}`, which is neither side of the join",
-                    instance.segment(),
-                    parent.target(),
-                    member.full_name()
-                )));
+        // Only the instance and the cubes it is reached through are in the
+        // tree when its ON SQL is rendered, members read on the way included
+        let mut cubes = collect_cube_names_from_symbols(&on_sql.get_dependencies())?;
+        cubes.extend(on_sql.get_cube_refs().iter().map(|r| r.cube_id().clone()));
+        let in_tree = |cube: &CubeId| {
+            let mut current = Some(instance);
+            while let Some(id) = current {
+                if id == cube {
+                    return true;
+                }
+                current = id.parent();
             }
+            false
+        };
+        if let Some(outside) = cubes.iter().find(|cube| !in_tree(cube)) {
+            return Err(CubeError::user(format!(
+                "The join `{}` of cube `{}` reads `{}`, which is neither side of the join",
+                instance.segment(),
+                parent.target(),
+                outside
+            )));
+        }
+        if !cubes.contains(instance) {
+            return Err(CubeError::user(format!(
+                "The join `{}` of cube `{}` never reads the joined cube. Refer to it as `{{{}}}`",
+                instance.segment(),
+                parent.target(),
+                instance.segment()
+            )));
         }
         let relationship = join.definition().static_data().relationship.clone();
         Ok(JoinTreeItem::new(

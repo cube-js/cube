@@ -13,7 +13,7 @@ export class BaseDimension {
   public readonly joinHint: Array<string> = [];
 
   // The path the member was requested by, when it goes through a join alias
-  public readonly aliasPath: string | undefined;
+  public aliasPath: string | undefined;
 
   public constructor(
     protected readonly query: BaseQuery,

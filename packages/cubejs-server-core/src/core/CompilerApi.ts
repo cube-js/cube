@@ -855,10 +855,6 @@ export class CompilerApi {
 
   /**
    * Moves a filter on members of `cubeName` onto the cube instance at
-   * `instancePath`.
-   */
-  /**
-   * Moves a filter on members of `cubeName` onto the cube instance at
    * `instancePath`. Policy filters only name members of their own cube.
    */
   protected rebaseFilterMembers(filter: any, cubeName: string, instancePath: string): any {
