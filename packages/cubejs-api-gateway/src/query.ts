@@ -5,7 +5,7 @@ import { CacheMode, canonicalTimezone, getEnv } from '@cubejs-backend/shared';
 
 import { UserError } from './user-error';
 import { dateParser } from './date-parser';
-import { QueryType as QueryTypeEnum } from './types/enums';
+import { QueryTypeEnum } from './types/enums';
 import type { QueryType } from './types/strings';
 import type { InputMemberExpression, NormalizedQuery, NormalizedQueryFilter, Query } from './types/query';
 

@@ -9,7 +9,7 @@ import {
 } from './types/strings';
 
 import {
-  QueryType,
+  QueryTypeEnum,
   ResultType,
 } from './types/enums';
 
@@ -61,7 +61,7 @@ export {
   ConfigItem,
   GranularityMeta,
   QueryTimeDimensionGranularity,
-  QueryType,
+  QueryTypeEnum as QueryType,
   ResultType,
   QueryFilter,
   LogicalAndFilter,
