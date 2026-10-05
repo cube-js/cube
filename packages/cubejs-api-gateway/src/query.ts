@@ -510,11 +510,11 @@ const remapQueryOrder = (order: unknown): { id: string, desc: boolean }[] => {
   return result;
 };
 
-const remapToQueryAdapterFormat = (query: NormalizedQuery): NormalizedQuery => (query ? {
+const remapToQueryAdapterFormat = (query: NormalizedQuery): NormalizedQuery => ({
   ...query,
   rowLimit: query.limit,
   ...(query.order ? { order: remapQueryOrder(query.order) } : {}),
-} : query);
+});
 
 type PreAggregationsQuery = {
   expand?: string[],
