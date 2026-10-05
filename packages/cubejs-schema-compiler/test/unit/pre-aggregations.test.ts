@@ -939,6 +939,259 @@ describe('pre-aggregations', () => {
     expect(preAggregationsDescription[0].preAggregationId).toEqual('orders.orders_external');
   });
 
+  describe('pre-aggregation time dimension date range', () => {
+    const compileEvents = () => prepareJsCompiler(
+      `
+        cube('Events', {
+          sql: \`SELECT * FROM public.events\`,
+
+          joins: {
+            Users: {
+              relationship: \`many_to_one\`,
+              sql: \`\${CUBE}.user_id = \${Users}.id\`,
+            },
+          },
+
+          preAggregations: {
+            partitioned: {
+              measures: [CUBE.count],
+              dimensions: [CUBE.status],
+              timeDimension: CUBE.ts,
+              granularity: \`day\`,
+              partitionGranularity: \`month\`,
+            },
+            unpartitioned: {
+              measures: [CUBE.count],
+              dimensions: [CUBE.status],
+              timeDimension: CUBE.ts,
+              granularity: \`day\`,
+            },
+            byUserSignup: {
+              measures: [CUBE.count],
+              timeDimension: CUBE.Users.signedUpAt,
+              granularity: \`day\`,
+              partitionGranularity: \`month\`,
+            },
+          },
+
+          measures: {
+            count: {
+              type: \`count\`,
+            },
+            runningCount: {
+              type: \`count\`,
+              rollingWindow: {
+                trailing: \`unbounded\`,
+              },
+            },
+          },
+
+          dimensions: {
+            id: {
+              sql: \`id\`,
+              type: \`number\`,
+              primaryKey: true,
+            },
+            status: {
+              sql: \`status\`,
+              type: \`string\`,
+            },
+            ts: {
+              sql: \`ts\`,
+              type: \`time\`,
+            },
+            createdAt: {
+              sql: \`created_at\`,
+              type: \`time\`,
+            },
+          },
+        });
+
+        cube('Users', {
+          sql: \`SELECT * FROM public.users\`,
+
+          dimensions: {
+            id: {
+              sql: \`id\`,
+              type: \`number\`,
+              primaryKey: true,
+            },
+            signedUpAt: {
+              sql: \`signed_up_at\`,
+              type: \`time\`,
+            },
+          },
+        });
+
+        view('events_view', {
+          cubes: [{
+            join_path: Events,
+            includes: '*',
+          }],
+        });
+      `
+    );
+
+    const preAggregationsFor = async (query: Record<string, any>, preAggregationName: string) => {
+      const { compiler, cubeEvaluator, joinGraph } = compileEvents();
+      await compiler.compile();
+
+      const { preAggregations } = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+        measures: ['Events.count'],
+        timezone: 'UTC',
+        ...query,
+      });
+      const foundPreAggregation: any = preAggregations.getRollupPreAggregationByName('Events', preAggregationName);
+
+      return { preAggregations, foundPreAggregation };
+    };
+
+    const inDateRange = (member: string, values: string[]) => ({ member, operator: 'inDateRange', values });
+
+    const january = ['2024-01-01T00:00:00.000', '2024-01-31T23:59:59.999'];
+    const february = ['2024-02-01T00:00:00.000', '2024-02-29T23:59:59.999'];
+
+    describe('dateRangeFiltersFor', () => {
+      const dateRangesOf = async (filters: any[], preAggregationName: string = 'partitioned') => {
+        const { preAggregations, foundPreAggregation } = await preAggregationsFor({ filters }, preAggregationName);
+
+        return preAggregations.dateRangeFiltersFor(foundPreAggregation).map(f => f.formattedDateRange());
+      };
+
+      it('finds nothing without filters', async () => {
+        expect(await dateRangesOf([])).toEqual([]);
+      });
+
+      it('finds a single inDateRange filter', async () => {
+        expect(await dateRangesOf([
+          inDateRange('Events.ts', ['2024-01-01', '2024-01-31']),
+        ])).toEqual([january]);
+      });
+
+      it('finds every inDateRange filter in query order', async () => {
+        expect(await dateRangesOf([
+          inDateRange('Events.ts', ['2024-02-01', '2024-02-29']),
+          { member: 'Events.status', operator: 'equals', values: ['active'] },
+          inDateRange('Events.ts', ['2024-01-01', '2024-01-31']),
+        ])).toEqual([february, january]);
+      });
+
+      it('skips inDateRange filters on other dimensions', async () => {
+        expect(await dateRangesOf([
+          inDateRange('Events.createdAt', ['2024-02-01', '2024-02-29']),
+          inDateRange('Events.ts', ['2024-01-01', '2024-01-31']),
+        ])).toEqual([january]);
+      });
+
+      it('skips date operators other than inDateRange', async () => {
+        expect(await dateRangesOf([
+          { member: 'Events.ts', operator: 'afterDate', values: ['2024-01-01'] },
+          { member: 'Events.ts', operator: 'beforeDate', values: ['2024-01-31'] },
+          { member: 'Events.ts', operator: 'notInDateRange', values: ['2024-01-01', '2024-01-31'] },
+        ])).toEqual([]);
+      });
+
+      it('skips inDateRange filters nested in a logical group', async () => {
+        expect(await dateRangesOf([{
+          or: [
+            inDateRange('Events.ts', ['2024-01-01', '2024-01-31']),
+            { member: 'Events.status', operator: 'equals', values: ['active'] },
+          ],
+        }])).toEqual([]);
+      });
+
+      it('resolves view members', async () => {
+        expect(await dateRangesOf([
+          inDateRange('events_view.ts', ['2024-01-01', '2024-01-31']),
+        ])).toEqual([january]);
+      });
+
+      it('matches a time dimension referenced through a join path', async () => {
+        expect(await dateRangesOf([
+          inDateRange('Users.signedUpAt', ['2024-01-01', '2024-01-31']),
+        ], 'byUserSignup')).toEqual([january]);
+      });
+    });
+
+    describe('matchedTimeDimensionDateRangeFor', () => {
+      const dateRangeFor = async (query: Record<string, any>, preAggregationName: string = 'partitioned') => {
+        const { preAggregations, foundPreAggregation } = await preAggregationsFor(query, preAggregationName);
+
+        return preAggregations.matchedTimeDimensionDateRangeFor(foundPreAggregation);
+      };
+
+      it('is undefined with no time dimension and no filters', async () => {
+        expect(await dateRangeFor({})).toBeUndefined();
+      });
+
+      it('is undefined for a pre-aggregation without partitions', async () => {
+        expect(await dateRangeFor({
+          filters: [inDateRange('Events.ts', ['2024-01-01', '2024-01-31'])],
+        }, 'unpartitioned')).toBeUndefined();
+      });
+
+      it('takes the requested time dimension range', async () => {
+        expect(await dateRangeFor({
+          timeDimensions: [{ dimension: 'Events.ts', granularity: 'day', dateRange: ['2024-01-01', '2024-01-31'] }],
+        })).toEqual(january);
+      });
+
+      it('ignores a time dimension without a date range', async () => {
+        expect(await dateRangeFor({
+          timeDimensions: [{ dimension: 'Events.ts', granularity: 'day' }],
+        })).toBeUndefined();
+      });
+
+      it('ignores a time dimension range on another dimension', async () => {
+        expect(await dateRangeFor({
+          timeDimensions: [{ dimension: 'Events.createdAt', dateRange: ['2024-01-01', '2024-01-31'] }],
+        })).toBeUndefined();
+      });
+
+      it('takes the first of several inDateRange filters', async () => {
+        // Not intersected yet, see the TODO in matchedTimeDimensionDateRangeFor().
+        expect(await dateRangeFor({
+          filters: [
+            inDateRange('Events.ts', ['2024-02-01', '2024-02-29']),
+            inDateRange('Events.ts', ['2024-01-01', '2024-01-31']),
+          ],
+        })).toEqual(february);
+      });
+
+      it('prefers the time dimension range over a filter', async () => {
+        expect(await dateRangeFor({
+          timeDimensions: [{ dimension: 'Events.ts', granularity: 'day', dateRange: ['2024-01-01', '2024-01-31'] }],
+          filters: [inDateRange('Events.ts', ['2024-02-01', '2024-02-29'])],
+        })).toEqual(january);
+      });
+
+      it('falls back to a filter when cumulative measures make the time dimension range unusable', async () => {
+        expect(await dateRangeFor({
+          measures: ['Events.runningCount'],
+          timeDimensions: [{ dimension: 'Events.ts', granularity: 'day', dateRange: ['2024-01-01', '2024-01-31'] }],
+          filters: [inDateRange('Events.ts', ['2024-02-01', '2024-02-29'])],
+        })).toEqual(february);
+      });
+
+      it('resolves view members', async () => {
+        expect(await dateRangeFor({
+          measures: ['events_view.count'],
+          timeDimensions: [{ dimension: 'events_view.ts', granularity: 'day', dateRange: ['2024-01-01', '2024-01-31'] }],
+        })).toEqual(january);
+      });
+
+      it('matches a time dimension referenced through a join path', async () => {
+        expect(await dateRangeFor({
+          timeDimensions: [{ dimension: 'Users.signedUpAt', granularity: 'day', dateRange: ['2024-01-01', '2024-01-31'] }],
+        }, 'byUserSignup')).toEqual(january);
+
+        expect(await dateRangeFor({
+          filters: [inDateRange('Users.signedUpAt', ['2024-01-01', '2024-01-31'])],
+        }, 'byUserSignup')).toEqual(january);
+      });
+    });
+  });
+
   describe('rollup with multiplied measure', () => {
     let compiler;
     let cubeEvaluator;

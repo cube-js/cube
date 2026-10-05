@@ -327,56 +327,42 @@ export class PreAggregations {
 
   /** Shared by partition selection and the rollupLambda source bound so both halves of the union agree. */
   public matchedTimeDimensionDateRangeFor(foundPreAggregation: PreAggregationForQuery): [string, string] | undefined {
-    const { preAggregation } = foundPreAggregation;
-
-    if (!preAggregation.partitionGranularity) {
+    if (!foundPreAggregation.preAggregation.partitionGranularity) {
       return undefined;
     }
 
-    const allBackAliasMembers = this.allBackAliasMembers();
-
-    let matchedTimeDimension: BaseTimeDimension | undefined;
-
-    if (!this.hasCumulativeMeasures()) {
-      matchedTimeDimension = this.query.timeDimensions.find(td => {
-        if (!td.dateRange) {
-          return false;
-        }
-
-        const timeDimensionsReference =
-          foundPreAggregation.preAggregation.rollupLambdaTimeDimensionsReference ||
-          foundPreAggregation.references.timeDimensions;
-        const timeDimensionReference = timeDimensionsReference[0];
-
-        // timeDimensionsReference[*].dimension can contain full join path, so we should trim it
-        const timeDimensionReferenceDimension = CubeSymbols.joinHintFromPath(timeDimensionReference.dimension).path;
-
-        if (td.dimension === timeDimensionReferenceDimension) {
-          return true;
-        }
-
-        // Handling for views
-        return td.dimension === allBackAliasMembers[timeDimensionReferenceDimension];
-      });
-    }
-
-    const filters = this.query.filters?.filter((td): td is BaseFilter => {
-      // TODO support all date operators
-      if (td.isDateOperator() && 'camelizeOperator' in td && td.camelizeOperator === 'inDateRange') {
-        if (td.dimension === foundPreAggregation.references.timeDimensions[0].dimension) {
-          return true;
-        }
-
-        // Handling for views
-        return td.dimension === allBackAliasMembers[foundPreAggregation.references.timeDimensions[0].dimension];
-      }
-
-      return false;
-    });
+    const matchedTimeDimension = this.hasCumulativeMeasures()
+      ? undefined
+      : this.query.timeDimensions.find(
+        td => td.dateRange && this.isTimeDimensionReference(foundPreAggregation, td.dimension)
+      );
 
     return matchedTimeDimension?.boundaryDateRangeFormatted() ||
-      filters?.[0]?.formattedDateRange() || // TODO intersect all date ranges
+      this.dateRangeFiltersFor(foundPreAggregation)[0]?.formattedDateRange() || // TODO intersect all date ranges
       undefined;
+  }
+
+  /**
+   * Top level `inDateRange` filters on the pre-aggregation's time dimension, in query order.
+   * TODO support all date operators
+   */
+  public dateRangeFiltersFor(foundPreAggregation: PreAggregationForQuery): BaseFilter[] {
+    return (this.query.filters || []).filter((filter): filter is BaseFilter => filter.isDateOperator() &&
+      'camelizeOperator' in filter &&
+      filter.camelizeOperator === 'inDateRange' &&
+      this.isTimeDimensionReference(foundPreAggregation, filter.dimension));
+  }
+
+  private isTimeDimensionReference(foundPreAggregation: PreAggregationForQuery, dimension: string): boolean {
+    const timeDimensionsReference =
+      foundPreAggregation.preAggregation.rollupLambdaTimeDimensionsReference ||
+      foundPreAggregation.references.timeDimensions;
+
+    // timeDimensionsReference[*].dimension can contain full join path, so we should trim it
+    const referenceDimension = CubeSymbols.joinHintFromPath(timeDimensionsReference[0].dimension).path;
+
+    // Handling for views
+    return dimension === referenceDimension || dimension === this.allBackAliasMembers()[referenceDimension];
   }
 
   /**
