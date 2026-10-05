@@ -111,6 +111,16 @@ cube("users", {
 
 </CodeGroup>
 
+<Note>
+
+The source data part is read with a row limit, set by
+[`CUBEJS_MAX_SOURCE_ROW_LIMIT`][ref-max-source-row-limit] (`200000` by default).
+If the source query reaches it, the query fails with an error instead of
+returning truncated data. Raise the limit or narrow the window not covered by
+the batch rollup.
+
+</Note>
+
 ### Batch and streaming data
 
 In this scenario, batch data is comes from one pre-aggregation and real-time
@@ -323,3 +333,4 @@ because that whole partition is skipped until it's complete. For example, with
 `date_trunc('month', CURRENT_DATE - INTERVAL '16 days')`.
 
 [streaming-pre-agg]: /docs/pre-aggregations/using-pre-aggregations#streaming-pre-aggregations
+[ref-max-source-row-limit]: /reference/configuration/environment-variables#cubejs_max_source_row_limit

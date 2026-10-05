@@ -382,8 +382,9 @@ export class MssqlQuery extends BaseQuery {
       '{{ ctes | join(\',\n\') }}\n' +
       '{% endif %}' +
       // T-SQL clause order is SELECT [ALL | DISTINCT] [TOP (expr)], so DISTINCT has to come
-      // first: `SELECT TOP 0 DISTINCT ...` is a syntax error
-      'SELECT {% if distinct %}DISTINCT {% endif %}{% if limit is not none and (not order_by or limit == 0) %}TOP {{ limit }} {% endif %}' +
+      // first: `SELECT TOP 0 DISTINCT ...` is a syntax error. A param limit (a string
+      // placeholder) needs the parenthesized `TOP (@_1)` form.
+      'SELECT {% if distinct %}DISTINCT {% endif %}{% if limit is not none and (not order_by or limit == 0) %}TOP {% if limit is string %}({{ limit }}){% else %}{{ limit }}{% endif %} {% endif %}' +
       '{{ select_concat | map(attribute=\'aliased\') | join(\', \') }} {% if from %}\n' +
       'FROM (\n' +
       '{{ from | indent(2, true) }}\n' +
@@ -395,10 +396,8 @@ export class MssqlQuery extends BaseQuery {
       '{% if group_by %}\nGROUP BY {{ group_by }}{% endif %}' +
       '{% if having %}\nHAVING {{ having }}{% endif %}' +
       '{% if order_by %}\nORDER BY {{ order_by | map(attribute=\'expr\') | join(\', \') }}' +
-      // FETCH NEXT must be greater than zero in T-SQL, so `LIMIT 0` is rendered as
-      // `TOP 0` above and the OFFSET/FETCH tail is dropped entirely. `limit` is always a
-      // number here (both renderers pass Option<usize>); `limit | int` would not work as a
-      // guard, since `none | int` is 0 and that would drop the 2147483647 fallback below
+      // `limit` may be a param placeholder string, so don't guard with `limit | int`:
+      // `none | int` is 0 and would drop the 2147483647 fallback below
       '{% if limit != 0 %}\nOFFSET {% if offset is not none %}{{ offset }}{% else %}0{% endif %} ROWS' +
       '\nFETCH NEXT {% if limit is not none %}{{ limit }}{% else %}2147483647{% endif %} ROWS ONLY{% endif %}{% endif %}' +
       '{% if ctes %}\nOPTION (MAXRECURSION 0){% endif %}';

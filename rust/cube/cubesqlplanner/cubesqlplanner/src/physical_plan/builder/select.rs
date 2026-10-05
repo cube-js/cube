@@ -3,6 +3,7 @@ use crate::physical_plan::{
     Schema, SchemaColumn, Select, SingleAliasedSource, SingleSource,
 };
 use crate::planner::filter::Filter;
+use crate::planner::RowLimit;
 
 use crate::physical_plan::expression::FunctionExpression;
 use crate::physical_plan::sql_nodes::SqlNodesFactory;
@@ -23,7 +24,7 @@ pub struct SelectBuilder {
     order_by: Vec<OrderBy>,
     ctes: Vec<Rc<Cte>>,
     is_distinct: bool,
-    limit: Option<usize>,
+    limit: Option<RowLimit>,
     offset: Option<usize>,
     result_schema: Schema,
 }
@@ -263,7 +264,7 @@ impl SelectBuilder {
         self.is_distinct = true;
     }
 
-    pub fn set_limit(&mut self, limit: Option<usize>) {
+    pub fn set_limit(&mut self, limit: Option<RowLimit>) {
         self.limit = limit;
     }
 

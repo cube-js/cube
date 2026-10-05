@@ -22,6 +22,7 @@ mod multi_stage_stages;
 mod no_query_tools_leak;
 mod positional_params;
 mod ref_symbol;
+mod row_limit;
 mod string_measures;
 mod subquery_dimensions;
 mod symbol_identity;
