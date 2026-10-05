@@ -21,7 +21,7 @@ CUBEJS_DB_HOST=my.presto.host
 CUBEJS_DB_USER=presto_user
 CUBEJS_DB_PASS=**********
 CUBEJS_DB_PRESTO_CATALOG=my_presto_catalog
-CUBEJS_DB_SCHEMA=my_presto_schema
+CUBEJS_DB_NAME=my_presto_schema
 ```
 
 ## Environment Variables
@@ -34,7 +34,7 @@ CUBEJS_DB_SCHEMA=my_presto_schema
 | [`CUBEJS_DB_PASS`](/reference/configuration/environment-variables#cubejs_db_pass)           | The password used to connect to the database                                        | A valid database password                     |    ✅    |
 | [`CUBEJS_DB_PRESTO_CATALOG`](/reference/configuration/environment-variables#cubejs_db_presto_catalog) | The catalog within Presto to connect to                                             | A valid catalog name within a Presto database |    ✅    |
 | [`CUBEJS_DB_PRESTO_AUTH_TOKEN`](/reference/configuration/environment-variables#cubejs_db_presto_auth_token) | The authentication token to use when connecting to Presto/Trino. It will be sent in the `Authorization` header. | A valid authentication token |    ❌    |
-| [`CUBEJS_DB_SCHEMA`](/reference/configuration/environment-variables#cubejs_db_schema)         | The schema within the database to connect to                                        | A valid schema name within a Presto database  |    ✅    |
+| [`CUBEJS_DB_NAME`](/reference/configuration/environment-variables#cubejs_db_name)             | The schema within the database to connect to                                        | A valid schema name within a Presto database  |    ✅    |
 | [`CUBEJS_DB_SSL`](/reference/configuration/environment-variables#cubejs_db_ssl)            | If `true`, enables SSL encryption for database connections from Cube                | `true`, `false`                               |    ❌    |
 | [`CUBEJS_DB_MAX_POOL`](/reference/configuration/environment-variables#cubejs_db_max_pool)       | The maximum number of concurrent database connections to pool. Default is `8`       | A valid number                                |    ❌    |
 | [`CUBEJS_CONCURRENCY`](/reference/configuration/environment-variables#cubejs_concurrency) | The number of [concurrent queries][ref-data-source-concurrency] to the data source | A valid number |    ❌    |
