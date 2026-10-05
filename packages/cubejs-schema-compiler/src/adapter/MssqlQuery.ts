@@ -383,7 +383,7 @@ export class MssqlQuery extends BaseQuery {
       '{% endif %}' +
       // T-SQL clause order is SELECT [ALL | DISTINCT] [TOP (expr)], so DISTINCT has to come
       // first: `SELECT TOP 0 DISTINCT ...` is a syntax error. A param limit (a string
-      // placeholder) needs the parenthesized `TOP (@P1)` form.
+      // placeholder) needs the parenthesized `TOP (@_1)` form.
       'SELECT {% if distinct %}DISTINCT {% endif %}{% if limit is not none and (not order_by or limit == 0) %}TOP {% if limit is string %}({{ limit }}){% else %}{{ limit }}{% endif %} {% endif %}' +
       '{{ select_concat | map(attribute=\'aliased\') | join(\', \') }} {% if from %}\n' +
       'FROM (\n' +
