@@ -1594,7 +1594,7 @@ cubes:
       }
     });
 
-    const lambdaQueryFor = async (useNativeSqlPlanner: boolean, maxSourceRowLimit?: number) => {
+    const lambdaQueryFor = async (useNativeSqlPlanner: boolean) => {
       const { compiler, cubeEvaluator, joinGraph } = prepareJsCompiler(
         `
           cube('Events', {
@@ -1641,8 +1641,7 @@ cubes:
         timeDimensions: [{ dimension: 'Events.ts', granularity: 'day', dateRange: ['2024-02-01', '2024-02-29'] }],
         timezone: 'UTC',
         useNativeSqlPlanner,
-        maxSourceRowLimit,
-      } as any);
+      });
 
       const [lambdaQuery] = Object.values<any>(query.buildLambdaQuery());
       expect(lambdaQuery).toBeDefined();
@@ -1650,29 +1649,17 @@ cubes:
       return lambdaQuery;
     };
 
-    describe('tesseract', () => {
-      it('renders the configured limit even above the env value', async () => {
-        const { sqlAndParams: [sql, params], maxSourceRowLimit } = await lambdaQueryFor(true, 50000);
+    it('tesseract renders the env limit inline', async () => {
+      const { sqlAndParams: [sql, params] } = await lambdaQueryFor(true);
 
-        expect(maxSourceRowLimit).toEqual(50000);
-        expect(sql).toMatch(/LIMIT 50000/);
-        expect(params).not.toContain(MAX_SOURCE_ROW_LIMIT);
-      });
-
-      it('falls back to the env value', async () => {
-        const { sqlAndParams: [sql, params], maxSourceRowLimit } = await lambdaQueryFor(true);
-
-        expect(maxSourceRowLimit).toEqual(1234);
-        expect(sql).toMatch(/LIMIT 1234/);
-        expect(params).not.toContain(MAX_SOURCE_ROW_LIMIT);
-      });
+      expect(sql).toMatch(/LIMIT 1234/);
+      expect(params).not.toContain(MAX_SOURCE_ROW_LIMIT);
     });
 
-    // The orchestrator substitutes the placeholder with preAggregationsOptions.maxSourceRowLimit.
+    // The orchestrator substitutes the placeholder with the same env limit.
     it('legacy leaves the limit to the orchestrator as a placeholder', async () => {
-      const { sqlAndParams: [, params], maxSourceRowLimit } = await lambdaQueryFor(false, 50000);
+      const { sqlAndParams: [, params] } = await lambdaQueryFor(false);
 
-      expect(maxSourceRowLimit).toBeUndefined();
       expect(params).toContain(MAX_SOURCE_ROW_LIMIT);
     });
   });

@@ -1908,11 +1908,7 @@ describe('PreAggregations', () => {
   });
 
   describe('downloadLambdaTable row limit', () => {
-    const downloadWith = (
-      { sourceRows, renderedRowLimit, configuredRowLimit }: {
-        sourceRows: number, renderedRowLimit?: number, configuredRowLimit: number
-      },
-    ) => {
+    const downloadWith = (sourceRows: number) => {
       const loader = new TestPartitionRangeLoader(
         {} as any, // driverFactory
         {} as any, // logger
@@ -1926,35 +1922,28 @@ describe('PreAggregations', () => {
         {} as any, // loadCache
         {
           lambdaQuery: {
-            sqlAndParams: ['SELECT * FROM public.orders WHERE ts > ?', [FROM_PARTITION_RANGE]],
+            sqlAndParams: ['SELECT * FROM public.orders WHERE ts > ? LIMIT 10', [FROM_PARTITION_RANGE]],
             cacheKeyQueries: [],
-            maxSourceRowLimit: renderedRowLimit,
           },
-          maxSourceRowLimit: configuredRowLimit,
+          maxSourceRowLimit: 10,
         } as any,
       );
 
       return loader.downloadLambdaTable('2024-01-02T23:59:59.999', []);
     };
 
-    test('fails closed at the configured limit', async () => {
-      await expect(downloadWith({ sourceRows: 10, configuredRowLimit: 10 }))
+    test('fails closed at the limit', async () => {
+      await expect(downloadWith(10))
         .rejects.toThrow('The maximum number of source rows 10 was reached for Orders.d');
     });
 
-    test('fails closed at a rendered limit below the configured one', async () => {
-      await expect(downloadWith({ sourceRows: 10, renderedRowLimit: 10, configuredRowLimit: 50 }))
-        .rejects.toThrow('The maximum number of source rows 10 was reached for Orders.d');
-    });
-
-    test('fails closed when the source query overshoots a lower configured limit', async () => {
-      await expect(downloadWith({ sourceRows: 12, renderedRowLimit: 50, configuredRowLimit: 10 }))
+    test('fails closed when the source query overshoots the limit', async () => {
+      await expect(downloadWith(12))
         .rejects.toThrow('The maximum number of source rows 10 was reached for Orders.d');
     });
 
     test('returns fewer rows than the limit', async () => {
-      await expect(downloadWith({ sourceRows: 9, renderedRowLimit: 10, configuredRowLimit: 10 }))
-        .resolves.toMatchObject({ name: 'lambda_test_table' });
+      await expect(downloadWith(9)).resolves.toMatchObject({ name: 'lambda_test_table' });
     });
   });
 });

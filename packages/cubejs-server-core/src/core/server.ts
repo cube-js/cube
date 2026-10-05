@@ -575,9 +575,6 @@ export class CubejsServerCore {
           schemaVersion: currentSchemaVersion,
           contextToGroups: this.options.contextToGroups,
           preAggregationsSchema: await this.preAggregationsSchema(context),
-          maxSourceRowLimit: this.optsHandler.resolveMaxSourceRowLimit(
-            (await this.orchestratorOptions(context)) || {},
-          ),
           context,
           allowJsDuplicatePropsInSchema: this.options.allowJsDuplicatePropsInSchema,
           allowNodeRequire: this.options.allowNodeRequire,
@@ -800,7 +797,6 @@ export class CubejsServerCore {
       logger: this.logger,
       externalDbType: options.externalDbType,
       preAggregationsSchema: options.preAggregationsSchema,
-      maxSourceRowLimit: options.maxSourceRowLimit,
       allowUngroupedWithoutPrimaryKey:
           this.options.allowUngroupedWithoutPrimaryKey ||
           getEnv('allowUngroupedWithoutPrimaryKey'),

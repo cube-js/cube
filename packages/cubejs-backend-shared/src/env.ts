@@ -2250,7 +2250,7 @@ const variables: Record<string, (...args: any) => any> = {
     .asInt(),
   maxSourceRowLimit: () => get('CUBEJS_MAX_SOURCE_ROW_LIMIT')
     .default(200000)
-    .asInt(),
+    .asIntPositive(),
   convertTzForRawTimeDimension: () => get('CUBESQL_SQL_PUSH_DOWN').default('true').asBoolStrict(),
   // Deprecated section
 

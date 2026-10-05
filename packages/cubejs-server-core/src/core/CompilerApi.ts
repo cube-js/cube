@@ -39,8 +39,6 @@ export interface CompilerApiOptions {
   allowUngroupedWithoutPrimaryKey?: boolean;
   convertTzForRawTimeDimension?: boolean;
   localRefreshKey?: boolean;
-  /** preAggregationsOptions.maxSourceRowLimit, rendered inline into Tesseract lambda queries. */
-  maxSourceRowLimit?: number;
   schemaVersion?: () => string | object | Promise<string | object>;
   contextToGroups?: (context: Context) => string[] | Promise<string[]>;
   compileContext?: any;
@@ -996,7 +994,6 @@ export class CompilerApi {
         allowUngroupedWithoutPrimaryKey: this.allowUngroupedWithoutPrimaryKey,
         convertTzForRawTimeDimension: this.convertTzForRawTimeDimension,
         localRefreshKey: this.localRefreshKey,
-        maxSourceRowLimit: this.options.maxSourceRowLimit,
         queryFactory: this.queryFactory,
       }
     );
