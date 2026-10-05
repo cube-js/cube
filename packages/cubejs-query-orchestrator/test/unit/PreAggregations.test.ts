@@ -8,6 +8,7 @@ import {
   QueryDateRange,
 } from '@cubejs-backend/shared';
 import crypto from 'crypto';
+import type { TableStructure } from '@cubejs-backend/base-driver';
 
 import { PreAggregationLoadCache, PreAggregationLoader, PreAggregationPartitionRangeLoader, PreAggregations, QueryCache, QueryCacheOptions, LocalCacheDriver, version, type QueryWithParams } from '../../src';
 import { evaluateLocalRefreshKey } from '../../src/orchestrator/utils';
@@ -108,6 +109,10 @@ class TestPartitionRangeLoader extends PreAggregationPartitionRangeLoader {
 
   public partitionRanges(ignoreMatchedDateRange?: boolean) {
     return super.partitionRanges(ignoreMatchedDateRange);
+  }
+
+  public downloadLambdaTable(fromDate: string, lambdaTypes: TableStructure) {
+    return super.downloadLambdaTable(fromDate, lambdaTypes);
   }
 }
 
@@ -1899,6 +1904,57 @@ describe('PreAggregations', () => {
         expect(oldResult).not.toBeNull(); // Should not hang
         expect(oldResult).toBe(expected);
       }
+    });
+  });
+
+  describe('downloadLambdaTable row limit', () => {
+    const downloadWith = (
+      { sourceRows, renderedRowLimit, configuredRowLimit }: {
+        sourceRows: number, renderedRowLimit?: number, configuredRowLimit: number
+      },
+    ) => {
+      const loader = new TestPartitionRangeLoader(
+        {} as any, // driverFactory
+        {} as any, // logger
+        {
+          options: {},
+          renewQuery: jest.fn().mockResolvedValue({ data: { rowCount: sourceRows, types: [], csvRows: '' } }),
+        } as any, // queryCache
+        {} as any, // preAggregations
+        mockPreAggregation({ preAggregationId: 'Orders.d', rollupLambdaId: 'Orders.d_lambda' }) as any,
+        [], // preAggregationsTablesToTempTables
+        {} as any, // loadCache
+        {
+          lambdaQuery: {
+            sqlAndParams: ['SELECT * FROM public.orders WHERE ts > ?', [FROM_PARTITION_RANGE]],
+            cacheKeyQueries: [],
+            maxSourceRowLimit: renderedRowLimit,
+          },
+          maxSourceRowLimit: configuredRowLimit,
+        } as any,
+      );
+
+      return loader.downloadLambdaTable('2024-01-02T23:59:59.999', []);
+    };
+
+    test('fails closed at the configured limit', async () => {
+      await expect(downloadWith({ sourceRows: 10, configuredRowLimit: 10 }))
+        .rejects.toThrow('The maximum number of source rows 10 was reached for Orders.d');
+    });
+
+    test('fails closed at a rendered limit below the configured one', async () => {
+      await expect(downloadWith({ sourceRows: 10, renderedRowLimit: 10, configuredRowLimit: 50 }))
+        .rejects.toThrow('The maximum number of source rows 10 was reached for Orders.d');
+    });
+
+    test('fails closed when the source query overshoots a lower configured limit', async () => {
+      await expect(downloadWith({ sourceRows: 12, renderedRowLimit: 50, configuredRowLimit: 10 }))
+        .rejects.toThrow('The maximum number of source rows 10 was reached for Orders.d');
+    });
+
+    test('returns fewer rows than the limit', async () => {
+      await expect(downloadWith({ sourceRows: 9, renderedRowLimit: 10, configuredRowLimit: 10 }))
+        .resolves.toMatchObject({ name: 'lambda_test_table' });
     });
   });
 });

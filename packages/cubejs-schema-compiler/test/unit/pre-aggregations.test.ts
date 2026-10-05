@@ -1,5 +1,6 @@
 import fs from 'fs';
 import path from 'path';
+import { MAX_SOURCE_ROW_LIMIT } from '@cubejs-backend/shared';
 import { prepareJsCompiler, prepareYamlCompiler } from './PrepareCompiler';
 import { createECommerceSchema, createSchemaYaml } from './utils';
 import { PostgresQuery, queryClass, QueryFactory } from '../../src';
@@ -1575,6 +1576,104 @@ cubes:
         dimensions: ['ledger.category_id', 'categories.name', 'entities.name'],
         preAggregationId: 'hub.spoke_only_join',
       })).toThrow(/Can't find join path to join 'ledger', 'categories', 'entities'/);
+    });
+  });
+
+  describe('rollupLambda unionWithSourceData source row limit', () => {
+    const originalLimit = process.env.CUBEJS_MAX_SOURCE_ROW_LIMIT;
+
+    beforeEach(() => {
+      process.env.CUBEJS_MAX_SOURCE_ROW_LIMIT = '1234';
+    });
+
+    afterEach(() => {
+      if (originalLimit === undefined) {
+        delete process.env.CUBEJS_MAX_SOURCE_ROW_LIMIT;
+      } else {
+        process.env.CUBEJS_MAX_SOURCE_ROW_LIMIT = originalLimit;
+      }
+    });
+
+    const lambdaQueryFor = async (useNativeSqlPlanner: boolean, maxSourceRowLimit?: number) => {
+      const { compiler, cubeEvaluator, joinGraph } = prepareJsCompiler(
+        `
+          cube('Events', {
+            sql: \`SELECT * FROM public.events\`,
+
+            preAggregations: {
+              eventsLambda: {
+                type: \`rollupLambda\`,
+                unionWithSourceData: true,
+                rollups: [CUBE.eventsRollup],
+              },
+              eventsRollup: {
+                measures: [CUBE.count],
+                timeDimension: CUBE.ts,
+                granularity: \`day\`,
+                partitionGranularity: \`month\`,
+              },
+            },
+
+            measures: {
+              count: {
+                type: \`count\`,
+              },
+            },
+
+            dimensions: {
+              id: {
+                sql: \`id\`,
+                type: \`number\`,
+                primaryKey: true,
+              },
+              ts: {
+                sql: \`ts\`,
+                type: \`time\`,
+              },
+            },
+          });
+        `
+      );
+      await compiler.compile();
+
+      const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+        measures: ['Events.count'],
+        timeDimensions: [{ dimension: 'Events.ts', granularity: 'day', dateRange: ['2024-02-01', '2024-02-29'] }],
+        timezone: 'UTC',
+        useNativeSqlPlanner,
+        maxSourceRowLimit,
+      } as any);
+
+      const [lambdaQuery] = Object.values<any>(query.buildLambdaQuery());
+      expect(lambdaQuery).toBeDefined();
+
+      return lambdaQuery;
+    };
+
+    describe('tesseract', () => {
+      it('renders the configured limit even above the env value', async () => {
+        const { sqlAndParams: [sql, params], maxSourceRowLimit } = await lambdaQueryFor(true, 50000);
+
+        expect(maxSourceRowLimit).toEqual(50000);
+        expect(sql).toMatch(/LIMIT 50000/);
+        expect(params).not.toContain(MAX_SOURCE_ROW_LIMIT);
+      });
+
+      it('falls back to the env value', async () => {
+        const { sqlAndParams: [sql, params], maxSourceRowLimit } = await lambdaQueryFor(true);
+
+        expect(maxSourceRowLimit).toEqual(1234);
+        expect(sql).toMatch(/LIMIT 1234/);
+        expect(params).not.toContain(MAX_SOURCE_ROW_LIMIT);
+      });
+    });
+
+    // The orchestrator substitutes the placeholder with preAggregationsOptions.maxSourceRowLimit.
+    it('legacy leaves the limit to the orchestrator as a placeholder', async () => {
+      const { sqlAndParams: [, params], maxSourceRowLimit } = await lambdaQueryFor(false, 50000);
+
+      expect(maxSourceRowLimit).toBeUndefined();
+      expect(params).toContain(MAX_SOURCE_ROW_LIMIT);
     });
   });
 });

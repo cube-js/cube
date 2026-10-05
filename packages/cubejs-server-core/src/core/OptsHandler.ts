@@ -637,11 +637,17 @@ export class OptsHandler {
         ? clone.preAggregationsOptions.maxPartitions
         : getEnv('maxPartitionsPerCube');
 
-    clone.preAggregationsOptions.maxSourceRowLimit =
-      clone.preAggregationsOptions.maxSourceRowLimit !== undefined
-        ? clone.preAggregationsOptions.maxSourceRowLimit
-        : getEnv('maxSourceRowLimit');
+    clone.preAggregationsOptions.maxSourceRowLimit = this.resolveMaxSourceRowLimit(clone);
 
     return clone;
+  }
+
+  /**
+   * Shared with the compiler, which renders the limit inline into Tesseract lambda queries.
+   */
+  public resolveMaxSourceRowLimit(orchestratorOptions: OrchestratorOptions): number {
+    return orchestratorOptions.preAggregationsOptions?.maxSourceRowLimit !== undefined
+      ? orchestratorOptions.preAggregationsOptions.maxSourceRowLimit
+      : getEnv('maxSourceRowLimit');
   }
 }

@@ -40,6 +40,12 @@ export interface PreAggregationsOptions {
    * CUBEJS_MAX_PARTITIONS_PER_CUBE environment variable as the default value.
    */
   maxPartitions?: number;
+
+  /**
+   * The maximum number of rows a rollupLambda source query may return. Uses
+   * CUBEJS_MAX_SOURCE_ROW_LIMIT environment variable as the default value.
+   */
+  maxSourceRowLimit?: number;
 }
 
 export interface OrchestratorOptions {

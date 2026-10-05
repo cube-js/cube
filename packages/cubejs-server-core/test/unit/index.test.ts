@@ -343,6 +343,55 @@ describe('index.test', () => {
     await cubejsServerCore.releaseConnections();
   });
 
+  describe('maxSourceRowLimit reaches the compiler', () => {
+    const originalLimit = process.env.CUBEJS_MAX_SOURCE_ROW_LIMIT;
+
+    beforeEach(() => {
+      process.env.CUBEJS_MAX_SOURCE_ROW_LIMIT = '1234';
+    });
+
+    afterEach(() => {
+      if (originalLimit === undefined) {
+        delete process.env.CUBEJS_MAX_SOURCE_ROW_LIMIT;
+      } else {
+        process.env.CUBEJS_MAX_SOURCE_ROW_LIMIT = originalLimit;
+      }
+    });
+
+    const compilerApiFor = async (options: CreateOptions) => {
+      const cubejsServerCore = new CubejsServerCoreOpen(<any>{
+        driverFactory: () => <any>({ type: 'mysql' }),
+        ...options,
+      });
+      const compilerApi = await cubejsServerCore.getCompilerApi({
+        authInfo: null,
+        securityContext: null,
+        requestId: 'XXX'
+      });
+      await cubejsServerCore.releaseConnections();
+      return compilerApi;
+    };
+
+    test('from preAggregationsOptions', async () => {
+      const compilerApi = await compilerApiFor({
+        orchestratorOptions: { preAggregationsOptions: { maxSourceRowLimit: 50000 } },
+      });
+      expect(compilerApi.options.maxSourceRowLimit).toStrictEqual(50000);
+    });
+
+    test('from an orchestratorOptions function', async () => {
+      const compilerApi = await compilerApiFor({
+        orchestratorOptions: () => ({ preAggregationsOptions: { maxSourceRowLimit: 50000 } }),
+      });
+      expect(compilerApi.options.maxSourceRowLimit).toStrictEqual(50000);
+    });
+
+    test('falls back to the env value', async () => {
+      const compilerApi = await compilerApiFor({});
+      expect(compilerApi.options.maxSourceRowLimit).toStrictEqual(1234);
+    });
+  });
+
   describe('CompilerApi', () => {
     const logger = jest.fn(() => {});
     const compilerApi = new CompilerApi(

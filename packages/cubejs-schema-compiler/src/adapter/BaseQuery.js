@@ -1129,6 +1129,14 @@ export class BaseQuery {
       const lambdaPreAgg = preAggForQuery.referencedPreAggregations[preAggForQuery.referencedPreAggregations.length - 1];
       // TODO(cristipp) Use source query instead of preaggregation references.
       const references = this.cubeEvaluator.evaluatePreAggregationReferences(lambdaPreAgg.cube, lambdaPreAgg.preAggregation);
+      // Tesseract renders LIMIT as an inline number and can't carry the MAX_SOURCE_ROW_LIMIT
+      // placeholder (it parses to None, emitting no LIMIT at all), so resolve it here. The legacy
+      // planner keeps the placeholder for the orchestrator to substitute.
+      const resolvedRowLimit = this.useNativeSqlPlanner &&
+        (this.options.maxSourceRowLimit ?? getEnv('maxSourceRowLimit'));
+      const maxSourceRowLimit = typeof resolvedRowLimit === 'number' && resolvedRowLimit > 0
+        ? resolvedRowLimit
+        : undefined;
       const lambdaQuery = this.newSubQuery(
         {
           measures: references.measures,
@@ -1148,7 +1156,7 @@ export class BaseQuery {
           order: [],
           limit: undefined,
           offset: undefined,
-          rowLimit: MAX_SOURCE_ROW_LIMIT,
+          rowLimit: maxSourceRowLimit ?? MAX_SOURCE_ROW_LIMIT,
           preAggregationQuery: true,
         }
       );
@@ -1157,7 +1165,7 @@ export class BaseQuery {
         () => this.cacheKeyQueries(),
         { preAggregationQuery: true }
       );
-      result[this.preAggregations.preAggregationId(lambdaPreAgg)] = { sqlAndParams, cacheKeyQueries };
+      result[this.preAggregations.preAggregationId(lambdaPreAgg)] = { sqlAndParams, cacheKeyQueries, maxSourceRowLimit };
     }
     return result;
   }
