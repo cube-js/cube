@@ -111,9 +111,9 @@ orders", not cumulative ones. An append delivery keeps growing until it reaches
 | Monthly | On the chosen day of the month, at the chosen time. |
 | Custom (cron) | On a five-part cron expression: minute, hour, day of month, month, day of week. |
 
-The timezone defaults to your browser's. Runs must be at least 15 minutes apart, so
-`*/15 9-17 * * 1-5` works but `*/10 * * * *` doesn't. The `L`, `W`, `#`, `?`, and `H`
-cron tokens aren't supported.
+The timezone defaults to your browser's. Runs of one cron expression must be at least
+15 minutes apart, so `*/15 9-17 * * 1-5` works but `*/10 * * * *` doesn't. The `L`, `W`,
+`#`, `?`, and `H` cron tokens aren't supported.
 
 To run on several unrelated schedules (up to 24 cron expressions), set them through
 the [API](#platform-api). The dialog shows such a schedule but can only replace it as a
@@ -185,7 +185,7 @@ cell, schedule, next run, last run, and status.
 | --- | --- |
 | **Run now** | Writes the current results right away, even if the delivery is paused. |
 | **Pause** / **Resume** | Stops or restarts scheduled runs. Runs missed while paused aren't caught up. |
-| **Edit** | Changes any setting. An admin editing someone else's delivery doesn't change who it writes as. |
+| **Edit** | Changes any setting. An admin editing someone else's delivery doesn't change its owner, so it still runs with the owner's data access and Google account. |
 | **Transfer owner** | Admins only. See [Transfer ownership](#transfer-ownership). |
 | **Delete** | Stops future runs and deletes the run history. Cells already written stay in the spreadsheet. |
 
@@ -210,7 +210,8 @@ A failing delivery keeps running on its schedule; it isn't paused automatically.
 ### Transfer ownership
 
 A delivery runs as its owner: the query uses the owner's data access, and the owner's
-Google account writes the sheet. An admin can hand it to another user with **Transfer
+Google account writes the sheet. In the API, `ownerUserId` and `runAsUserId` always name
+this same user. An admin can hand it to another user with **Transfer
 owner**. The new owner must be active, be able to read the report, and have a Google
 account connected. A transfer returns an **Orphaned** or **Reconnect Google** delivery
 to **Active**.
@@ -241,8 +242,7 @@ Common failures:
 - **Rows**: deliveries have no row cap of their own. A run delivers what the report's
   query returns, within the deployment's query row limit
   ([`CUBEJS_DB_QUERY_LIMIT`][ref-query-limit], 50,000 rows by default). To deliver more
-  rows, raise it; if large runs then run out of memory, enable
-  [streaming mode][ref-stream-mode].
+  rows, raise it.
 - **Timestamps on the sheet**: a run writes no "last updated" stamp into the
   spreadsheet. Use the run history, or `lastRunAt` and `lastSuccessAt` in the API.
 - **Triggers**: a delivery runs on its schedule or on demand. It can't run
@@ -261,7 +261,7 @@ endpoints return `404`.
 
 | Method and path | Description |
 | --- | --- |
-| [`GET /report-deliveries`](/api-reference/report-deliveries/list-report-deliveries) | List deliveries. Filter by `reportId`, `ownerUserId`, `spreadsheet`, or `status`. |
+| [`GET /report-deliveries`](/api-reference/report-deliveries/list-report-deliveries) | List deliveries. Filter by `reportId`, `ownerUserId`, `spreadsheet`, or `status` (`active`, `failing`, `needs_reconnect`, `orphaned`). |
 | [`POST /report-deliveries`](/api-reference/report-deliveries/create-a-report-delivery) | Create a delivery. The caller becomes its owner. |
 | [`GET /report-deliveries/{id}`](/api-reference/report-deliveries/get-a-report-delivery) | Get a delivery. |
 | [`PUT /report-deliveries/{id}`](/api-reference/report-deliveries/update-a-report-delivery) | Update a delivery; send `ownerUserId` to transfer it (admins only). |
@@ -311,6 +311,5 @@ create a delivery; access problems show up on the first run.
 [ref-embedding]: /embedding
 [ref-slack]: /docs/integrations/slack
 [ref-query-limit]: /reference/configuration/environment-variables#cubejs_db_query_limit
-[ref-stream-mode]: /reference/configuration/environment-variables#cubesql_stream_mode
 [ref-platform-api]: /api-reference/introduction#platform-api
 [ref-api-deliveries]: /api-reference/report-deliveries/list-report-deliveries
