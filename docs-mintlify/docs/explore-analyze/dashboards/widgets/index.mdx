@@ -39,6 +39,7 @@ Where the widget lands depends on how you opened the menu:
 
 - **After a click**, the widget is added at its usual [size](#widget-size) with its top-left corner on the clicked cell, shifted left or up only as far as it takes to fit. Where its usual size doesn't fit, it's added at its minimum size instead.
 - **After a drag**, the widget fills the selected region exactly. A control is the exception: it takes the region's width at its own fixed height.
+- **A divider** always spans the full width of the board, or of the grid it goes into, at a height of one row. A click offers it only on a row with no widget in it, and a drag only when the region spans that full width; it then takes the region's top row.
 
 The widgets already on the board never move to make room. A type that can't go there is still listed, but disabled; hover it to see why — there isn't room for even its minimum size, the selected region is smaller than its minimum, the workbook has no KPI or chart report left to add, or a container would go deeper than the [nesting limit](/docs/explore-analyze/dashboards/widgets/layout#nesting-containers).
 
@@ -48,7 +49,7 @@ If a widget is selected, your first click on an empty cell only clears the selec
 
 ## Widget size
 
-Widgets are sized in the dashboard's grid cells. Each type is added at its own size on a 12-column dashboard, and has a minimum it can't be dragged below. The one exception to the added size is [adding a widget at a spot on the canvas](#adding-a-widget-at-a-spot-on-the-canvas), which falls back to the minimum where that's all the room there is, and fills a region you drag out exactly:
+Widgets are sized in the dashboard's grid cells. Each type is added at its own size on a 12-column dashboard, and has a minimum it can't be dragged below. The one exception to the added size is [adding a widget at a spot on the canvas](#adding-a-widget-at-a-spot-on-the-canvas), which falls back to the minimum where that's all the room there is, and fills a region you drag out:
 
 | Widget | Added at | Minimum |
 | --- | --- | --- |
