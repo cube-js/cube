@@ -150,17 +150,18 @@ The sidebar lists all existing schedules with the following information:
 - **Notification channel** — when a [notification][ref-notifications] is
   configured, the card shows its delivery channel, for example "Notification:
   Email" or "Notification: Slack (#channel)".
-- **Control values** — when the schedule sets
-  [control values](#control-values), a muted line names each control and what
-  the schedule does with it, for example "Control values: Status is completed ·
-  Region cleared · Date grain: Month · Break down by: Status". Each control is
-  named by its title, or by its type when it has none. Viewers with view-only
-  permission see it too, so they know which slice they subscribe to. While the
-  dashboard's controls and the deployment's data model load, a placeholder
-  stands in for the line. If the data model can't load, for example on a
-  stopped deployment or one still starting after a few seconds, a member the
-  line names (the one a field switcher is set to, or a value no control uses)
-  appears by its name in the data model instead of its title.
+- **Control values** — when the schedule sets [control values](#control-values),
+  a muted line names each control and what the schedule does with it, for
+  example "Control values: Status is completed · Region cleared · Date grain:
+  Month · Break down by: Status". Each control is named by its title, or by its
+  type when it has none. A line too long for the card or the column is cut with
+  "…", and hovering it shows the whole line. Viewers with view-only permission
+  see it too, so they know which slice they subscribe to. While the dashboard's
+  controls and the deployment's data model load, a placeholder stands in for the
+  line. If the data model can't load, for example on a stopped deployment or one
+  still starting after a few seconds, a member the line names (the one a field
+  switcher is set to, or a value no control uses) appears by its name in the
+  data model instead of its title.
 
 ### Actions
 
