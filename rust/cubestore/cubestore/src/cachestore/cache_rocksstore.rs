@@ -1739,20 +1739,18 @@ impl CacheStore for RocksCacheStore {
                 queue_item_payload_tbl.try_delete(id, batch_pipe)?;
 
                 if let Some(result) = result {
-                    let queue_result = QueueResult::new(path.clone(), result, external_id);
+                    let queue_result = QueueResult::new(path, result, external_id);
                     let result_schema = QueueResultRocksTable::new(db_ref.clone());
                     // QueueResult is a result of QueueItem, it's why we can use row_id of QueueItem
                     result_schema.insert_with_pk(id, queue_result, batch_pipe)?;
 
                     batch_pipe.add_event(MetaStoreEvent::AckQueueItem(QueueResultAckEvent {
                         id,
-                        path,
                         result: QueueResultAckEventResult::WithResult,
                     }));
                 } else {
                     batch_pipe.add_event(MetaStoreEvent::AckQueueItem(QueueResultAckEvent {
                         id,
-                        path,
                         result: QueueResultAckEventResult::Empty {},
                     }));
                 }
@@ -1780,6 +1778,14 @@ impl CacheStore for RocksCacheStore {
         key: QueueKey,
         timeout: u64,
     ) -> Result<Option<QueueResultResponse>, CubeError> {
+        let QueueKey::ById(id) = key else {
+            return Err(CubeError::user(
+                "QUEUE RESULT_BLOCKING by path was removed and has not been used since Cube v0.33.7, \
+                 pass the queue id returned by QUEUE ADD"
+                    .to_string(),
+            ));
+        };
+
         // It's important to open listener at the beginning to protect race condition
         // it will fix the position (subscribe) of a broadcast channel
         let listener = self.get_listener().await;
@@ -1791,7 +1797,7 @@ impl CacheStore for RocksCacheStore {
 
         let fut = tokio::time::timeout(
             Duration::from_millis(timeout),
-            listener.wait_for_queue_ack_by_key(key.clone()),
+            listener.wait_for_queue_ack_by_id(id),
         );
 
         if let Ok(res) = fut.await {
@@ -1803,8 +1809,6 @@ impl CacheStore for RocksCacheStore {
                         external_id: None,
                     })),
                     QueueResultAckEventResult::WithResult => {
-                        // Soft delete (not a hard one) for both v1 and v2: other waiters on the same
-                        // key were woken by the same event and read this row too. GC removes it later.
                         let response = self.queue_result_ready_to_delete(ack_event.id).await?;
 
                         Ok(response.map(|response| match response {
@@ -3143,13 +3147,16 @@ mod tests {
             .await?
             .id;
 
-        let waiter = |key: QueueKey| {
+        let waiter = || {
             let cachestore = cachestore.clone();
-            tokio::spawn(async move { cachestore.queue_result_blocking(key, 5000).await })
+            tokio::spawn(async move {
+                cachestore
+                    .queue_result_blocking(QueueKey::ById(id), 5000)
+                    .await
+            })
         };
-        let by_id_1 = waiter(QueueKey::ById(id));
-        let by_id_2 = waiter(QueueKey::ById(id));
-        let by_path = waiter(QueueKey::ByPath("prefix:path1".to_string()));
+        let waiter_1 = waiter();
+        let waiter_2 = waiter();
 
         tokio::time::sleep(std::time::Duration::from_millis(200)).await;
         assert!(
@@ -3158,7 +3165,7 @@ mod tests {
                 .await?
         );
 
-        for waiter in [by_id_1, by_id_2, by_path] {
+        for waiter in [waiter_1, waiter_2] {
             assert_eq!(
                 queue_result_value(waiter.await.unwrap()?),
                 Some("result".to_string())
@@ -3178,6 +3185,26 @@ mod tests {
         );
 
         RocksCacheStore::cleanup_test_cachestore("test_queue_result_blocking_multiple_waiters");
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_queue_result_blocking_by_path_removed() -> Result<(), CubeError> {
+        init_test_logger().await;
+
+        let (_, cachestore) = RocksCacheStore::prepare_test_cachestore(
+            "test_queue_result_blocking_by_path_removed",
+            Config::test("test_queue_result_blocking_by_path_removed"),
+        );
+
+        let err = cachestore
+            .queue_result_blocking(QueueKey::ByPath("prefix:path1".to_string()), 1000)
+            .await
+            .unwrap_err();
+        assert!(err.message.contains("was removed"), "{}", err.message);
+
+        RocksCacheStore::cleanup_test_cachestore("test_queue_result_blocking_by_path_removed");
 
         Ok(())
     }
@@ -3216,7 +3243,6 @@ mod tests {
             sender
                 .send(MetaStoreEvent::AckQueueItem(QueueResultAckEvent {
                     id: id + 1000,
-                    path: "prefix:other".to_string(),
                     result: QueueResultAckEventResult::Empty,
                 }))
                 .unwrap();
