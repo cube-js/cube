@@ -4,6 +4,7 @@ import {
   normalizeQuery,
   normalizeQueryPreAggregations,
   normalizeQueryPreAggregationPreview,
+  normalizeQueryCancelPreAggregations,
 } from '../src/query';
 import { ResultType } from '../src/types/enums';
 
@@ -105,6 +106,119 @@ describe('normalizeQueryPreAggregationPreview timezone handling', () => {
 
   test('rejects invalid timezone', () => {
     expect(() => normalizeQueryPreAggregationPreview({ ...previewQuery, timezone: 'Not/AZone' })).toThrow(/Invalid query format/);
+  });
+});
+
+describe('normalizeQueryPreAggregations', () => {
+  test('passes validated fields through', () => {
+    const query = {
+      metadata: { foo: 'bar' },
+      expand: ['partitions'],
+      preAggregations: [{
+        id: 'cube.preAgg',
+        cacheOnly: true,
+        metaOnly: false,
+        partitions: ['cube_pre_agg_20240101'],
+        refreshRange: ['2024-01-01', '2024-01-31'],
+      }],
+    };
+
+    expect(normalizeQueryPreAggregations(query)).toEqual({
+      ...query,
+      timezones: ['UTC'],
+    });
+  });
+
+  test('prefers timezones over timezone', () => {
+    const result = normalizeQueryPreAggregations({ timezone: 'Europe/Berlin', timezones: ['America/New_York'] });
+    expect(result.timezones).toEqual(['America/New_York']);
+  });
+
+  test('falls back to default timezones', () => {
+    expect(normalizeQueryPreAggregations({}, { timezones: ['Asia/Tokyo'] }).timezones).toEqual(['Asia/Tokyo']);
+    expect(normalizeQueryPreAggregations({}, {}).timezones).toEqual(['UTC']);
+  });
+
+  test('returns Joi-converted values instead of the raw input', () => {
+    const result = normalizeQueryPreAggregations({
+      preAggregations: [{ id: 'cube.preAgg', cacheOnly: 'false', metaOnly: 'true' }],
+    });
+    expect(result.preAggregations).toEqual([{ id: 'cube.preAgg', cacheOnly: false, metaOnly: true }]);
+  });
+
+  test('drops the timezone key from the result', () => {
+    expect(normalizeQueryPreAggregations({ timezone: 'UTC' })).not.toHaveProperty('timezone');
+  });
+
+  test.each([
+    ['unknown top-level key', { nope: 1 }],
+    ['unknown pre-aggregation key', { preAggregations: [{ id: 'cube.preAgg', nope: 1 }] }],
+    ['missing pre-aggregation id', { preAggregations: [{ cacheOnly: true }] }],
+    ['refreshRange of wrong length', { preAggregations: [{ id: 'cube.preAgg', refreshRange: ['2024-01-01'] }] }],
+    ['non-boolean cacheOnly', { preAggregations: [{ id: 'cube.preAgg', cacheOnly: 'yes' }] }],
+    ['non-object metadata', { metadata: 'foo' }],
+    ['non-string expand item', { expand: [1] }],
+  ])('rejects %s', (_, query) => {
+    expect(() => normalizeQueryPreAggregations(query)).toThrow(/Invalid query format/);
+  });
+});
+
+describe('normalizeQueryPreAggregationPreview', () => {
+  const previewQuery = {
+    preAggregationId: 'cube.preAgg',
+    timezone: 'UTC',
+    versionEntry: {
+      content_version: 'a',
+      last_updated_at: 1704067200000,
+      naming_version: 2,
+      structure_version: 'b',
+      table_name: 'cube_pre_agg_abc',
+      build_range_end: '2024-01-31T23:59:59.999',
+    },
+  };
+
+  test('passes validated fields through', () => {
+    expect(normalizeQueryPreAggregationPreview(previewQuery)).toEqual(previewQuery);
+  });
+
+  test('returns Joi-converted values instead of the raw input', () => {
+    const result = normalizeQueryPreAggregationPreview({
+      ...previewQuery,
+      versionEntry: { ...previewQuery.versionEntry, last_updated_at: '1704067200000', naming_version: '2' },
+    });
+    expect(result.versionEntry.last_updated_at).toBe(1704067200000);
+    expect(result.versionEntry.naming_version).toBe(2);
+  });
+
+  test.each([
+    ['missing preAggregationId', { timezone: 'UTC', versionEntry: {} }],
+    ['missing timezone', { preAggregationId: 'cube.preAgg', versionEntry: {} }],
+    ['missing versionEntry', { preAggregationId: 'cube.preAgg', timezone: 'UTC' }],
+    ['unknown top-level key', { ...previewQuery, nope: 1 }],
+    ['unknown versionEntry key', { ...previewQuery, versionEntry: { nope: 1 } }],
+    ['non-numeric last_updated_at', { ...previewQuery, versionEntry: { last_updated_at: 'yesterday' } }],
+  ])('rejects %s', (_, query) => {
+    expect(() => normalizeQueryPreAggregationPreview(query)).toThrow(/Invalid query format/);
+  });
+});
+
+describe('normalizeQueryCancelPreAggregations', () => {
+  test('passes validated fields through', () => {
+    const query = { dataSource: 'default', queryKeys: ['key1', 'key2'] };
+    expect(normalizeQueryCancelPreAggregations(query)).toEqual(query);
+  });
+
+  test('accepts an empty query', () => {
+    expect(normalizeQueryCancelPreAggregations({})).toEqual({});
+  });
+
+  test.each([
+    ['unknown key', { nope: 1 }],
+    ['non-string dataSource', { dataSource: 1 }],
+    ['non-array queryKeys', { queryKeys: 'key1' }],
+    ['non-string queryKeys item', { queryKeys: [1] }],
+  ])('rejects %s', (_, query) => {
+    expect(() => normalizeQueryCancelPreAggregations(query)).toThrow(/Invalid query format/);
   });
 });
 
