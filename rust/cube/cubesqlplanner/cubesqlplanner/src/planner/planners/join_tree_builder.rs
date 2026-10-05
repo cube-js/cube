@@ -10,17 +10,6 @@ use cubenativeutils::CubeError;
 use std::collections::HashMap;
 use std::rc::Rc;
 
-/// Where the part of a join tree the data model's join graph resolves comes
-/// from.
-#[derive(Clone, Copy)]
-pub enum JoinSource {
-    /// The query's join resolution, which also follows the members the join
-    /// conditions reference.
-    Query,
-    /// The join graph alone.
-    Graph,
-}
-
 /// Resolves join hints into a `JoinTree`: the join graph builds the tree over
 /// data-model cubes, joined cube instances are attached here, and every ON SQL
 /// is compiled once.
@@ -37,19 +26,10 @@ impl JoinTreeBuilder {
         }
     }
 
-    pub fn build_for_hints(
-        &self,
-        hints: &JoinHints,
-        source: JoinSource,
-    ) -> Result<(JoinKey, Rc<JoinTree>), CubeError> {
+    /// The join graph's tree for `hints`.
+    pub fn build_for_hints(&self, hints: &JoinHints) -> Result<(JoinKey, Rc<JoinTree>), CubeError> {
         let (graph_hints, joined) = hints.split_joined();
-        let join = match source {
-            JoinSource::Query => self
-                .query_tools
-                .base_tools()
-                .join_tree_for_hints(graph_hints)?,
-            JoinSource::Graph => self.query_tools.join_graph().build_join(graph_hints)?,
-        };
+        let join = self.query_tools.join_graph().build_join(graph_hints)?;
         let tree = self.build(join, hints, &joined)?;
         Ok((JoinKey::from_tree(&tree), tree))
     }

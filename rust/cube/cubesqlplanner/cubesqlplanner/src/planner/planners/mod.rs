@@ -13,7 +13,7 @@ pub use common_utils::CommonUtils;
 pub use dimension_subquery_planner::DimensionSubqueryPlanner;
 pub use full_key_query_aggregate_planner::FullKeyAggregateQueryPlanner;
 pub use join_planner::*;
-pub use join_tree_builder::{JoinSource, JoinTreeBuilder};
+pub use join_tree_builder::JoinTreeBuilder;
 pub use multi_stage::MultiStageQueryPlanner;
 pub use multiplied_measures_query_planner::MultipliedMeasuresQueryPlanner;
 pub use order_planner::OrderPlanner;

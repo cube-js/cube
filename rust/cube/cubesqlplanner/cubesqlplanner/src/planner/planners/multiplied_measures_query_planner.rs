@@ -1,4 +1,4 @@
-use super::{CommonUtils, DimensionSubqueryPlanner, JoinPlanner, JoinSource, JoinTreeBuilder};
+use super::{CommonUtils, DimensionSubqueryPlanner, JoinPlanner, JoinTreeBuilder};
 use crate::logical_plan::*;
 use crate::planner::collectors::{
     collect_cube_names, collect_join_hints, collect_join_hints_for_measures,
@@ -275,8 +275,8 @@ impl MultipliedMeasuresQueryPlanner {
                 .get(key_cube.target())
                 .unwrap_or(&false));
         }
-        let (_, join) = JoinTreeBuilder::new(self.query_tools.clone())
-            .build_for_hints(join_hints, JoinSource::Graph)?;
+        let (_, join) =
+            JoinTreeBuilder::new(self.query_tools.clone()).build_for_hints(join_hints)?;
         Ok(join.is_multiplied(key_cube))
     }
 
