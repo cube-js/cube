@@ -5,6 +5,7 @@ use crate::planner::sql_templates::PlanSqlTemplates;
 use crate::planner::sql_templates::{
     TemplateGroupByColumn, TemplateOrderByColumn, TemplateProjectionColumn,
 };
+use crate::planner::RowLimit;
 use cubenativeutils::CubeError;
 use std::rc::Rc;
 
@@ -45,7 +46,7 @@ pub struct Select {
     pub(super) context: Rc<VisitorContext>,
     pub(super) ctes: Vec<Rc<Cte>>,
     pub(super) is_distinct: bool,
-    pub(super) limit: Option<usize>,
+    pub(super) limit: Option<RowLimit>,
     pub(super) offset: Option<usize>,
     pub(super) schema: Rc<Schema>,
 }
@@ -134,6 +135,13 @@ impl Select {
 
         let from = self.from.to_sql(templates, self.context.clone())?;
 
+        let limit = self.limit.as_ref().map(|limit| match limit {
+            RowLimit::Value(value) => minijinja::Value::from(*value),
+            RowLimit::Param(name) => {
+                minijinja::Value::from(self.context.query_tools().allocate_param(name))
+            }
+        });
+
         let result = templates.select(
             ctes,
             &from,
@@ -142,7 +150,7 @@ impl Select {
             group_by,
             having,
             order_by,
-            self.limit,
+            limit,
             self.offset,
             self.is_distinct,
             recursive,

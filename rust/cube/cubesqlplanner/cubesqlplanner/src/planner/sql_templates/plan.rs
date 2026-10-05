@@ -468,7 +468,8 @@ impl PlanSqlTemplates {
         group_by: Vec<TemplateGroupByColumn>,
         having: Option<String>,
         order_by: Vec<TemplateOrderByColumn>,
-        limit: Option<usize>,
+        // A number, or a param placeholder when the orchestrator substitutes the limit.
+        limit: Option<minijinja::Value>,
         offset: Option<usize>,
         distinct: bool,
         recursive: bool,

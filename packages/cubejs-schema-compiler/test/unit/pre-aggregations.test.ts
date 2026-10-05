@@ -1,9 +1,11 @@
 import fs from 'fs';
 import path from 'path';
+import { MAX_SOURCE_ROW_LIMIT } from '@cubejs-backend/shared';
 import { prepareJsCompiler, prepareYamlCompiler } from './PrepareCompiler';
 import { createECommerceSchema, createSchemaYaml } from './utils';
 import { PostgresQuery, queryClass, QueryFactory } from '../../src';
 import { RedshiftQuery } from '../../src/adapter/RedshiftQuery';
+import { MssqlQuery } from '../../src/adapter/MssqlQuery';
 
 describe('pre-aggregations', () => {
   it('rollupJoin scheduledRefresh', async () => {
@@ -1575,6 +1577,83 @@ cubes:
         dimensions: ['ledger.category_id', 'categories.name', 'entities.name'],
         preAggregationId: 'hub.spoke_only_join',
       })).toThrow(/Can't find join path to join 'ledger', 'categories', 'entities'/);
+    });
+  });
+
+  // The orchestrator substitutes preAggregationsOptions.maxSourceRowLimit for the placeholder.
+  describe('rollupLambda unionWithSourceData source row limit', () => {
+    const lambdaQueryFor = async (QueryClass: typeof PostgresQuery | typeof MssqlQuery, useNativeSqlPlanner: boolean) => {
+      const { compiler, cubeEvaluator, joinGraph } = prepareJsCompiler(
+        `
+          cube('Events', {
+            sql: \`SELECT * FROM public.events\`,
+
+            preAggregations: {
+              eventsLambda: {
+                type: \`rollupLambda\`,
+                unionWithSourceData: true,
+                rollups: [CUBE.eventsRollup],
+              },
+              eventsRollup: {
+                measures: [CUBE.count],
+                timeDimension: CUBE.ts,
+                granularity: \`day\`,
+                partitionGranularity: \`month\`,
+              },
+            },
+
+            measures: {
+              count: {
+                type: \`count\`,
+              },
+            },
+
+            dimensions: {
+              id: {
+                sql: \`id\`,
+                type: \`number\`,
+                primaryKey: true,
+              },
+              ts: {
+                sql: \`ts\`,
+                type: \`time\`,
+              },
+            },
+          });
+        `
+      );
+      await compiler.compile();
+
+      const query = new QueryClass({ joinGraph, cubeEvaluator, compiler }, {
+        measures: ['Events.count'],
+        timeDimensions: [{ dimension: 'Events.ts', granularity: 'day', dateRange: ['2024-02-01', '2024-02-29'] }],
+        timezone: 'UTC',
+        useNativeSqlPlanner,
+      });
+
+      const [lambdaQuery] = Object.values<any>(query.buildLambdaQuery());
+      expect(lambdaQuery).toBeDefined();
+
+      return lambdaQuery.sqlAndParams;
+    };
+
+    describe.each([
+      ['tesseract', true],
+      ['legacy', false],
+    ])('%s', (_name, useNativeSqlPlanner) => {
+      it('renders the limit as a param', async () => {
+        const [sql, params] = await lambdaQueryFor(PostgresQuery, useNativeSqlPlanner);
+
+        expect(sql).toMatch(new RegExp(`LIMIT \\$${params.indexOf(MAX_SOURCE_ROW_LIMIT) + 1}\\s*$`));
+      });
+    });
+
+    // T-SQL only accepts a param in TOP when it is parenthesized.
+    it('tesseract renders a parenthesized TOP param for MSSQL', async () => {
+      const [sql, params] = await lambdaQueryFor(MssqlQuery, true);
+
+      expect(params).toContain(MAX_SOURCE_ROW_LIMIT);
+      expect(sql).toMatch(/SELECT TOP \(@_\d+\) /);
     });
   });
 });

@@ -25,6 +25,7 @@ use super::filter::compiler::FilterCompiler;
 use super::filter::{BaseSegment, FilterItem};
 use super::join_hints::JoinHints;
 use super::query_properties::{OrderByItem, QueryProperties};
+use super::row_limit::RowLimit;
 use super::state::State;
 use super::symbols::transforms::patch_measure;
 use super::{
@@ -80,7 +81,7 @@ impl QueryPropertiesCompiler {
             .static_data()
             .row_limit
             .as_ref()
-            .and_then(|v| v.parse::<usize>().ok());
+            .and_then(|v| RowLimit::parse(v));
         let offset = options
             .static_data()
             .offset

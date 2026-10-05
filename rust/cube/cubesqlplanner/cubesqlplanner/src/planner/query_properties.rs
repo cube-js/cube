@@ -8,6 +8,7 @@
 
 use super::state::State;
 use super::MemberSymbol;
+use super::RowLimit;
 use crate::cube_bridge::base_query_options::FilterValue;
 use crate::logical_plan::LogicalSubqueryJoinItem;
 use crate::planner::collectors::{collect_multiplied_measures, has_multi_stage_members};
@@ -152,7 +153,7 @@ pub struct QueryProperties {
     #[builder(default)]
     order_by: Option<Vec<OrderByItem>>,
     #[builder(default)]
-    row_limit: Option<usize>,
+    row_limit: Option<RowLimit>,
     #[builder(default)]
     offset: Option<usize>,
     #[builder(default)]
@@ -414,8 +415,8 @@ impl QueryProperties {
         &self.measures_filters
     }
 
-    pub fn row_limit(&self) -> Option<usize> {
-        self.row_limit
+    pub fn row_limit(&self) -> Option<RowLimit> {
+        self.row_limit.clone()
     }
 
     pub fn query_join_hints(&self) -> &Rc<JoinHints> {
