@@ -544,6 +544,13 @@ impl RocksCacheStore {
             .await
     }
 
+    async fn queue_result_exists(&self, id: u64) -> Result<bool, CubeError> {
+        self.read_operation_queue("queue_result_exists", move |db_ref| {
+            Ok(QueueResultRocksTable::new(db_ref).get_row(id)?.is_some())
+        })
+        .await
+    }
+
     /// This method should be called when we are sure that we return data to the consumer
     async fn queue_result_ready_to_delete(
         &self,
@@ -1800,10 +1807,11 @@ impl CacheStore for RocksCacheStore {
                 let Some(ack_event) = listener.wait_for_queue_ack_by_id(id).await? else {
                     // After a lag the receiver resumes from the oldest retained event, so an ack
                     // that is not in the store yet is still ahead of us on the channel
-                    match self.queue_result_ready_to_delete(id).await? {
-                        Some(response) => return Ok(Some(response)),
-                        None => continue,
+                    // Every lagged waiter gets here at once, so look before taking the write path
+                    if self.queue_result_exists(id).await? {
+                        return self.queue_result_ready_to_delete(id).await;
                     }
+                    continue;
                 };
 
                 return match ack_event.result {
