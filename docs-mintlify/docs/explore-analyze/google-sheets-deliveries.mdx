@@ -169,7 +169,7 @@ A delivery only writes inside its own block:
 
 Columns follow the query. If the query stops returning a column the delivery depends on,
 the run fails instead of shifting the other columns. To fix column order, rename
-headers, or add empty columns for notes, set the delivery's `shape` through the
+headers, or add empty spacer columns, set the delivery's `shape` through the
 [API](#platform-api).
 
 Changing a delivery's tab or start cell clears the old block on the next run. Moving it
@@ -210,8 +210,7 @@ A failing delivery keeps running on its schedule; it isn't paused automatically.
 ### Transfer ownership
 
 A delivery runs as its owner: the query uses the owner's data access, and the owner's
-Google account writes the sheet. In the API, `ownerUserId` and `runAsUserId` always name
-this same user. An admin can hand it to another user with **Transfer
+Google account writes the sheet. An admin can hand it to another user with **Transfer
 owner**. The new owner must be active, be able to read the report, and have a Google
 account connected. A transfer returns an **Orphaned** or **Reconnect Google** delivery
 to **Active**.
@@ -240,9 +239,9 @@ Common failures:
   full grid of every tab, empty cells included. A run that would exceed it fails
   before writing.
 - **Rows**: deliveries have no row cap of their own. A run delivers what the report's
-  query returns, within the deployment's query row limit
-  ([`CUBEJS_DB_QUERY_LIMIT`][ref-query-limit], 50,000 rows by default). To deliver more
-  rows, raise it.
+  saved query returns, so the report's own [row limit][ref-row-limit] applies. To
+  deliver more rows, raise the report's row limit, and the deployment's maximum row
+  limit if needed.
 - **Timestamps on the sheet**: a run writes no "last updated" stamp into the
   spreadsheet. Use the run history, or `lastRunAt` and `lastSuccessAt` in the API.
 - **Triggers**: a delivery runs on its schedule or on demand. It can't run
@@ -292,7 +291,7 @@ For example, to create a daily overwrite delivery with a fixed column layout:
     "columns": [
       { "column": "order_date", "header": "Date" },
       { "column": "total_amount", "header": "Revenue" },
-      { "placeholder": true, "header": "Notes" }
+      { "placeholder": true, "header": "" }
     ]
   },
   "notifications": { "inbox": true, "email": true }
@@ -301,7 +300,8 @@ For example, to create a daily overwrite delivery with a fixed column layout:
 
 `shape.columns` sets the column order and headers; each entry is a query column
 (`column`, with an optional `header`) or an empty column (`placeholder: true` with a
-`header`). Placeholder columns are cleared on every run.
+`header`, which can be empty). Placeholder columns are cleared on every run, so don't
+type into them.
 
 The API doesn't check that the Google account can open the spreadsheet when you
 create a delivery; access problems show up on the first run.
@@ -310,6 +310,6 @@ create a delivery; access problems show up on the first run.
 [ref-roles]: /admin/users-and-permissions/roles-and-permissions
 [ref-embedding]: /embedding
 [ref-slack]: /docs/integrations/slack
-[ref-query-limit]: /reference/configuration/environment-variables#cubejs_db_query_limit
+[ref-row-limit]: /docs/explore-analyze/workbooks/querying-data#limiting
 [ref-platform-api]: /api-reference/introduction#platform-api
 [ref-api-deliveries]: /api-reference/report-deliveries/list-report-deliveries
