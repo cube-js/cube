@@ -38,7 +38,7 @@ import {
   ApiScopes,
 } from './types/strings';
 import {
-  QueryType as QueryTypeEnum, ResultType
+  QueryTypeEnum, ResultType
 } from './types/enums';
 import {
   BaseRequest,

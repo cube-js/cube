@@ -1,56 +1,59 @@
 import moment from 'moment-timezone';
-import { parse } from 'chrono-node';
+import { parse, ParsedComponents } from 'chrono-node';
 
 import { UserError } from './user-error';
 
-const momentFromResult = (result, timezone) => {
+const momentFromResult = (result: ParsedComponents, timezone: string): moment.Moment => {
   const dateMoment = moment().tz(timezone);
 
-  dateMoment.set('year', result.get('year'));
-  dateMoment.set('month', result.get('month') - 1);
-  dateMoment.set('date', result.get('day'));
-  dateMoment.set('hour', result.get('hour'));
-  dateMoment.set('minute', result.get('minute'));
-  dateMoment.set('second', result.get('second'));
-  dateMoment.set('millisecond', result.get('millisecond'));
+  dateMoment.set('year', result.get('year') as number);
+  dateMoment.set('month', (result.get('month') as number) - 1);
+  dateMoment.set('date', result.get('day') as number);
+  dateMoment.set('hour', result.get('hour') as number);
+  dateMoment.set('minute', result.get('minute') as number);
+  dateMoment.set('second', result.get('second') as number);
+  dateMoment.set('millisecond', result.get('millisecond') as number);
 
   return dateMoment;
 };
 
-export function dateParser(dateString, timezone, now = new Date()) {
-  let momentRange;
+export function dateParser(dateString: string, timezone: string, now: Date = new Date()): string[] {
+  let momentRange: moment.Moment[];
   dateString = dateString.toLowerCase();
 
-  if (dateString.match(/(this|last|next)\s+(day|week|month|year|quarter|hour|minute|second)/)) {
-    const match = dateString.match(/(this|last|next)\s+(day|week|month|year|quarter|hour|minute|second)/);
+  const relMatch = dateString.match(/(this|last|next)\s+(day|week|month|year|quarter|hour|minute|second)/);
+  const relNMatch = relMatch ? null : dateString.match(/(last|next)\s+(\d+)\s+(day|week|month|year|quarter|hour|minute|second)/);
+
+  if (relMatch) {
+    const unit = relMatch[2] as moment.unitOfTime.DurationConstructor & moment.unitOfTime.StartOf;
     let start = moment.tz(timezone);
     let end = moment.tz(timezone);
-    if (match[1] === 'last') {
-      start = start.add(-1, match[2]);
-      end = end.add(-1, match[2]);
+    if (relMatch[1] === 'last') {
+      start = start.add(-1, unit);
+      end = end.add(-1, unit);
     }
-    if (match[1] === 'next') {
-      start = start.add(1, match[2]);
-      end = end.add(1, match[2]);
+    if (relMatch[1] === 'next') {
+      start = start.add(1, unit);
+      end = end.add(1, unit);
     }
 
-    const span = match[2] === 'week' ? 'isoWeek' : match[2];
+    const span = unit === 'week' ? 'isoWeek' : unit;
     momentRange = [start.startOf(span), end.endOf(span)];
-  } else if (dateString.match(/(last|next)\s+(\d+)\s+(day|week|month|year|quarter|hour|minute|second)/)) {
-    const match = dateString.match(/(last|next)\s+(\d+)\s+(day|week|month|year|quarter|hour|minute|second)/);
+  } else if (relNMatch) {
+    const unit = relNMatch[3] as moment.unitOfTime.DurationConstructor & moment.unitOfTime.StartOf;
 
     let start = moment.tz(timezone);
     let end = moment.tz(timezone);
-    if (match[1] === 'last') {
-      start = start.add(-parseInt(match[2], 10), match[3]);
-      end = end.add(-1, match[3]);
+    if (relNMatch[1] === 'last') {
+      start = start.add(-parseInt(relNMatch[2], 10), unit);
+      end = end.add(-1, unit);
     }
-    if (match[1] === 'next') {
-      start = start.add(parseInt(1, 10), match[3]);
-      end = end.add(parseInt(match[2], 10), match[3]);
+    if (relNMatch[1] === 'next') {
+      start = start.add(1, unit);
+      end = end.add(parseInt(relNMatch[2], 10), unit);
     }
 
-    const span = match[3] === 'week' ? 'isoWeek' : match[3];
+    const span = unit === 'week' ? 'isoWeek' : unit;
     momentRange = [start.startOf(span), end.endOf(span)];
   } else if (dateString.match(/today/)) {
     momentRange = [moment.tz(timezone).startOf('day'), moment.tz(timezone).endOf('day')];
@@ -65,7 +68,12 @@ export function dateParser(dateString, timezone, now = new Date()) {
       moment.tz(timezone).endOf('day').add(1, 'day')
     ];
   } else if (dateString.match(/^from (.*) to (.*)$/)) {
-    let [, from, to] = dateString.match(/^from(.{0,50})to(.{0,50})$/);
+    const match = dateString.match(/^from(.{0,50})to(.{0,50})$/);
+    if (!match) {
+      throw new UserError(`Can't parse date range: '${dateString}'`);
+    }
+
+    let [, from, to] = match;
     from = from.trim();
     to = to.trim();
 
@@ -81,7 +89,7 @@ export function dateParser(dateString, timezone, now = new Date()) {
       throw new UserError(`Can't parse date: '${to}'`);
     }
 
-    const exactGranularity = ['second', 'minute', 'hour'].find(g => dateString.indexOf(g) !== -1) || 'day';
+    const exactGranularity: moment.unitOfTime.StartOf = (['second', 'minute', 'hour'] as const).find(g => dateString.indexOf(g) !== -1) || 'day';
     momentRange = [
       momentFromResult(fromResults[0].start, timezone),
       momentFromResult(toResults[0].start, timezone)
@@ -96,7 +104,7 @@ export function dateParser(dateString, timezone, now = new Date()) {
       throw new UserError(`Can't parse date: '${dateString}'`);
     }
 
-    const exactGranularity = ['second', 'minute', 'hour'].find(g => dateString.indexOf(g) !== -1) || 'day';
+    const exactGranularity: moment.unitOfTime.StartOf = (['second', 'minute', 'hour'] as const).find(g => dateString.indexOf(g) !== -1) || 'day';
     momentRange = results[0].end ? [
       momentFromResult(results[0].start, timezone),
       momentFromResult(results[0].end, timezone)

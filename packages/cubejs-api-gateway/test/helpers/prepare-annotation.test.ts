@@ -7,7 +7,7 @@
 /* globals describe,test,expect */
 /* eslint-disable import/no-duplicates */
 
-import { MemberType } from '../../src/types/enums';
+import { MemberTypeEnum } from '../../src/types/enums';
 import prepareAnnotationDef
   from '../../src/helpers/prepare-annotation';
 import {
@@ -32,7 +32,7 @@ describe('prepareAnnotation helpers', () => {
           name: 'cube_name.measures'
         }],
       }) as { name: string; title: string; }
-    }, MemberType.MEASURES)('cube_name.measures')).toBeDefined();
+    }, MemberTypeEnum.MEASURES)('cube_name.measures')).toBeDefined();
     expect(annotation({
       cube_name: ({
         name: 'cube_name',
@@ -41,7 +41,7 @@ describe('prepareAnnotation helpers', () => {
           name: 'cube_name.measures'
         }],
       }) as { name: string; title: string; }
-    }, MemberType.MEASURES)('cube_name.undefined')).toBeUndefined();
+    }, MemberTypeEnum.MEASURES)('cube_name.undefined')).toBeUndefined();
     // for dimensions
     expect(annotation({
       cube_name: ({
@@ -51,7 +51,7 @@ describe('prepareAnnotation helpers', () => {
           name: 'cube_name.dimensions'
         }],
       }) as { name: string; title: string; }
-    }, MemberType.DIMENSIONS)('cube_name.dimensions')).toBeDefined();
+    }, MemberTypeEnum.DIMENSIONS)('cube_name.dimensions')).toBeDefined();
     expect(annotation({
       cube_name: ({
         name: 'cube_name',
@@ -60,7 +60,7 @@ describe('prepareAnnotation helpers', () => {
           name: 'cube_name.dimensions'
         }],
       }) as { name: string; title: string; }
-    }, MemberType.DIMENSIONS)('cube_name.undefined')).toBeUndefined();
+    }, MemberTypeEnum.DIMENSIONS)('cube_name.undefined')).toBeUndefined();
     // for segments
     expect(annotation({
       cube_name: ({
@@ -70,7 +70,7 @@ describe('prepareAnnotation helpers', () => {
           name: 'cube_name.segments'
         }],
       }) as { name: string; title: string; }
-    }, MemberType.SEGMENTS)('cube_name.segments')).toBeDefined();
+    }, MemberTypeEnum.SEGMENTS)('cube_name.segments')).toBeDefined();
     expect(annotation({
       cube_name: ({
         name: 'cube_name',
@@ -79,7 +79,7 @@ describe('prepareAnnotation helpers', () => {
           name: 'cube_name.segments'
         }],
       }) as { name: string; title: string; }
-    }, MemberType.SEGMENTS)('cube_name.undefined')).toBeUndefined();
+    }, MemberTypeEnum.SEGMENTS)('cube_name.undefined')).toBeUndefined();
   });
   test('prepareAnnotation with empty parameters', () => {
     expect(
