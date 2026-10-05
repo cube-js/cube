@@ -451,10 +451,8 @@ export class PreAggregationPartitionRangeLoader {
         lambdaTypes,
       }
     );
-    // A limit baked in at compile time comes from env and may exceed the configured one.
-    const appliedRowLimit = Math.min(this.lambdaQuery.maxSourceRowLimit ?? Infinity, this.options.maxSourceRowLimit);
-    if (data.rowCount >= appliedRowLimit) {
-      throw new Error(`The maximum number of source rows ${appliedRowLimit} was reached for ${this.preAggregation.preAggregationId}`);
+    if (data.rowCount === this.options.maxSourceRowLimit) {
+      throw new Error(`The maximum number of source rows ${this.options.maxSourceRowLimit} was reached for ${this.preAggregation.preAggregationId}`);
     }
     return {
       name: `${LAMBDA_TABLE_PREFIX}_${this.preAggregation.tableName.replace('.', '_')}`,

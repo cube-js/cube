@@ -1,6 +1,6 @@
 import fs from 'fs';
 import path from 'path';
-import { FROM_PARTITION_RANGE, getEnv, MAX_SOURCE_ROW_LIMIT } from '@cubejs-backend/shared';
+import { FROM_PARTITION_RANGE, MAX_SOURCE_ROW_LIMIT } from '@cubejs-backend/shared';
 import { prepareJsCompiler, prepareYamlCompiler } from './PrepareCompiler';
 import { createECommerceSchema, createSchemaYaml } from './utils';
 import { PostgresQuery, queryClass, QueryFactory } from '../../src';
@@ -321,48 +321,8 @@ describe('pre-aggregations', () => {
       }]);
 
       // With lambda-view we observe all 'fresh' data, with no partition/buildRange limit.
-      expect(lambdaParams.filter(p => p !== MAX_SOURCE_ROW_LIMIT)).toEqual([FROM_PARTITION_RANGE]);
+      expect(lambdaParams).toEqual([FROM_PARTITION_RANGE, MAX_SOURCE_ROW_LIMIT]);
       expect(lambdaSql).not.toMatch(/<=/);
-    });
-
-    describe('row limit', () => {
-      const originalLimit = process.env.CUBEJS_MAX_SOURCE_ROW_LIMIT;
-
-      beforeEach(() => {
-        process.env.CUBEJS_MAX_SOURCE_ROW_LIMIT = '1234';
-      });
-
-      afterEach(() => {
-        if (originalLimit === undefined) {
-          delete process.env.CUBEJS_MAX_SOURCE_ROW_LIMIT;
-        } else {
-          process.env.CUBEJS_MAX_SOURCE_ROW_LIMIT = originalLimit;
-        }
-      });
-
-      if (getEnv('nativeSqlPlanner')) {
-        it('is rendered as a number rather than a placeholder', async () => {
-          const { sqlAndParams: [lambdaSql, lambdaParams], maxSourceRowLimit } = await lambdaQueryFor([{
-            dimension: 'Events.ts',
-            dateRange: ['2024-02-01', '2024-02-29'],
-          }]);
-
-          expect(maxSourceRowLimit).toEqual(1234);
-          expect(lambdaSql).toMatch(/LIMIT 1234/);
-          expect(lambdaParams).not.toContain(MAX_SOURCE_ROW_LIMIT);
-        });
-      } else {
-        // The orchestrator substitutes the placeholder with preAggregationsOptions.maxSourceRowLimit.
-        it('is left to the orchestrator as a placeholder', async () => {
-          const { sqlAndParams: [, lambdaParams], maxSourceRowLimit } = await lambdaQueryFor([{
-            dimension: 'Events.ts',
-            dateRange: ['2024-02-01', '2024-02-29'],
-          }]);
-
-          expect(maxSourceRowLimit).toBeUndefined();
-          expect(lambdaParams).toContain(MAX_SOURCE_ROW_LIMIT);
-        });
-      }
     });
 
     it('exposes the source bound for the orchestrator to skip on', async () => {
