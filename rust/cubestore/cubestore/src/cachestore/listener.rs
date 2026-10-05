@@ -1,7 +1,6 @@
 use crate::cachestore::QueueResultAckEvent;
 use crate::metastore::MetaStoreEvent;
 use crate::CubeError;
-use tokio::sync::broadcast::error::RecvError;
 use tokio::sync::broadcast::Receiver;
 
 pub struct RocksCacheStoreListener {
@@ -18,12 +17,7 @@ impl RocksCacheStoreListener {
         id: u64,
     ) -> Result<Option<QueueResultAckEvent>, CubeError> {
         loop {
-            let event = match self.receiver.recv().await {
-                Ok(event) => event,
-                // The ack might be among the skipped events, the caller must re-check the store
-                Err(RecvError::Lagged(_)) => return Ok(None),
-                Err(e) => return Err(e.into()),
-            };
+            let event = self.receiver.recv().await?;
             if let MetaStoreEvent::AckQueueItem(ack_event) = event {
                 if ack_event.id == id {
                     return Ok(Some(ack_event));

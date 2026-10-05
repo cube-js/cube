@@ -1812,8 +1812,7 @@ impl CacheStore for RocksCacheStore {
                         self.queue_result_ready_to_delete(ack_event.id).await
                     }
                 },
-                // The listener lagged behind the channel, the ack might have been dropped
-                Ok(None) => self.lookup_queue_result_by_key(key, None).await,
+                Ok(None) => Ok(None),
                 Err(e) => Err(e),
             }
         } else {
@@ -3202,55 +3201,6 @@ mod tests {
         assert!(err.message.contains("was removed"), "{}", err.message);
 
         RocksCacheStore::cleanup_test_cachestore("test_queue_result_blocking_by_path_removed");
-
-        Ok(())
-    }
-
-    #[tokio::test]
-    async fn test_queue_result_blocking_lagged_listener() -> Result<(), CubeError> {
-        init_test_logger().await;
-
-        let (_, cachestore) = RocksCacheStore::prepare_test_cachestore(
-            "test_queue_result_blocking_lagged_listener",
-            Config::test("test_queue_result_blocking_lagged_listener"),
-        );
-        let (sender, _receiver) = tokio::sync::broadcast::channel(1);
-        cachestore.add_listener(sender.clone()).await;
-
-        let id = cachestore
-            .queue_add(queue_add_payload("prefix:path1"))
-            .await?
-            .id;
-
-        let waiter = {
-            let cachestore = cachestore.clone();
-            tokio::spawn(async move {
-                cachestore
-                    .queue_result_blocking(QueueKey::ById(id), 5000)
-                    .await
-            })
-        };
-
-        tokio::time::sleep(std::time::Duration::from_millis(200)).await;
-        cachestore
-            .queue_ack(QueueKey::ById(id), Some("result".to_string()))
-            .await?;
-        // Overflow the channel before the waiter gets to the ack event
-        for _ in 0..2 {
-            sender
-                .send(MetaStoreEvent::AckQueueItem(QueueResultAckEvent {
-                    id: id + 1000,
-                    result: QueueResultAckEventResult::Empty,
-                }))
-                .unwrap();
-        }
-
-        assert_eq!(
-            queue_result_value(waiter.await.unwrap()?),
-            Some("result".to_string())
-        );
-
-        RocksCacheStore::cleanup_test_cachestore("test_queue_result_blocking_lagged_listener");
 
         Ok(())
     }
