@@ -416,7 +416,7 @@ impl QueryProperties {
     }
 
     pub fn row_limit(&self) -> Option<RowLimit> {
-        self.row_limit.clone()
+        self.row_limit
     }
 
     pub fn query_join_hints(&self) -> &Rc<JoinHints> {

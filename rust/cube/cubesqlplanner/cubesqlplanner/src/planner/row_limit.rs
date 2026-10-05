@@ -5,17 +5,17 @@ use std::fmt;
 /// reach the SQL as a bound param rather than as a number.
 pub const MAX_SOURCE_ROW_LIMIT: &str = "__MAX_SOURCE_ROW_LIMIT";
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum RowLimit {
     Value(usize),
-    /// Rendered as a param carrying this name, for the orchestrator to substitute.
-    Param(String),
+    /// Rendered as a `MAX_SOURCE_ROW_LIMIT` param, for the orchestrator to substitute.
+    MaxSourceRowLimit,
 }
 
 impl RowLimit {
     pub fn parse(value: &str) -> Option<Self> {
         if value == MAX_SOURCE_ROW_LIMIT {
-            return Some(Self::Param(value.to_string()));
+            return Some(Self::MaxSourceRowLimit);
         }
         value.parse::<usize>().ok().map(Self::Value)
     }
@@ -25,7 +25,7 @@ impl fmt::Display for RowLimit {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::Value(value) => write!(f, "{}", value),
-            Self::Param(name) => write!(f, "{}", name),
+            Self::MaxSourceRowLimit => write!(f, "{}", MAX_SOURCE_ROW_LIMIT),
         }
     }
 }
@@ -40,7 +40,7 @@ mod tests {
         assert_eq!(RowLimit::parse("10"), Some(RowLimit::Value(10)));
         assert_eq!(
             RowLimit::parse(MAX_SOURCE_ROW_LIMIT),
-            Some(RowLimit::Param(MAX_SOURCE_ROW_LIMIT.to_string()))
+            Some(RowLimit::MaxSourceRowLimit)
         );
         assert_eq!(RowLimit::parse("abc"), None);
     }

@@ -235,7 +235,7 @@ impl<'a> LogicalNodeProcessor<'a, Query> for QueryProcessor<'a> {
             select_builder.set_filter(filter);
         }
 
-        select_builder.set_limit(logical_plan.modifers().limit.clone());
+        select_builder.set_limit(logical_plan.modifers().limit);
         select_builder.set_offset(logical_plan.modifers().offset);
 
         if is_pre_aggregation {

@@ -1,6 +1,7 @@
 use super::{Cte, Expr, From, OrderBy, Schema};
 use crate::physical_plan::VisitorContext;
 use crate::planner::filter::Filter;
+use crate::planner::row_limit::MAX_SOURCE_ROW_LIMIT;
 use crate::planner::sql_templates::PlanSqlTemplates;
 use crate::planner::sql_templates::{
     TemplateGroupByColumn, TemplateOrderByColumn, TemplateProjectionColumn,
@@ -135,11 +136,13 @@ impl Select {
 
         let from = self.from.to_sql(templates, self.context.clone())?;
 
-        let limit = self.limit.as_ref().map(|limit| match limit {
-            RowLimit::Value(value) => minijinja::Value::from(*value),
-            RowLimit::Param(name) => {
-                minijinja::Value::from(self.context.query_tools().allocate_param(name))
-            }
+        let limit = self.limit.map(|limit| match limit {
+            RowLimit::Value(value) => minijinja::Value::from(value),
+            RowLimit::MaxSourceRowLimit => minijinja::Value::from(
+                self.context
+                    .query_tools()
+                    .allocate_param(MAX_SOURCE_ROW_LIMIT),
+            ),
         });
 
         let result = templates.select(
