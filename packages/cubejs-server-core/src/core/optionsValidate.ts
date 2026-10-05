@@ -134,7 +134,7 @@ const schemaOptions = Joi.object().keys({
         queueOptions: schemaQueueOptions,
         externalRefresh: Joi.boolean(),
         maxPartitions: Joi.number(),
-        maxSourceRowLimit: Joi.number(),
+        maxSourceRowLimit: Joi.number().integer().min(1),
       },
       rollupOnlyMode: Joi.boolean(),
       testConnectionTimeout: Joi.number().min(0).integer(),
