@@ -14,7 +14,7 @@ use crate::planner::state::State;
 use crate::planner::symbols::MeasureTimeShifts;
 use crate::planner::time_dimension::QueryDateTime;
 use crate::planner::{CubeId, MemberId, MemberSymbol};
-use cubenativeutils::{CubeError, CubeErrorCauseType};
+use cubenativeutils::CubeError;
 use std::cell::RefCell;
 use std::collections::{HashMap, HashSet};
 use std::rc::Rc;
@@ -72,7 +72,6 @@ pub struct PreAggregationOptimizer {
     /// Resolved primary-key names per cube. Every candidate pre-aggregation asks
     /// for the same cubes, and resolving them crosses the JS bridge.
     primary_keys_cache: RefCell<HashMap<CubeId, Vec<MemberId>>>,
-    skipped_pre_aggregations: Vec<(String, String)>,
 }
 
 impl PreAggregationOptimizer {
@@ -88,7 +87,6 @@ impl PreAggregationOptimizer {
             usages: Vec::new(),
             usage_counter: 0,
             primary_keys_cache: RefCell::new(HashMap::new()),
-            skipped_pre_aggregations: Vec::new(),
         }
     }
 
@@ -106,11 +104,6 @@ impl PreAggregationOptimizer {
         } else {
             compiler.compile_all_pre_aggregations(disable_external_pre_aggregations)?
         };
-        self.skipped_pre_aggregations = compiler
-            .skipped_pre_aggregations()
-            .iter()
-            .map(|(name, reason)| (format!("{}.{}", name.cube_name, name.name), reason.clone()))
-            .collect();
 
         self.try_rewrite_root(&plan, &compiled_pre_aggregations)
     }
@@ -138,11 +131,6 @@ impl PreAggregationOptimizer {
         }
 
         Ok(None)
-    }
-
-    /// Candidates that couldn't be compiled, by id, with the reason.
-    pub fn skipped_pre_aggregations(&self) -> &[(String, String)] {
-        &self.skipped_pre_aggregations
     }
 
     pub fn get_usages(&self) -> &Vec<PreAggregationUsage> {
@@ -986,22 +974,21 @@ impl PreAggregationOptimizer {
             .add_dimensions(&schema.dimensions)
             .add_dimensions(&schema.time_dimensions)
             .build(measures)?;
-        match MultiFactJoinGroups::try_new(self.query_tools.clone(), hints) {
-            Ok(groups) => Ok(groups),
-            // A filtered member can be the only link between the cubes the query
-            // selects from, and the query itself is planned with its filters.
-            Err(err) if matches!(err.cause, CubeErrorCauseType::User) => {
-                let hints = MeasuresJoinHints::builder(&JoinHints::new())
-                    .add_dimensions(&schema.dimensions)
-                    .add_dimensions(&schema.time_dimensions)
-                    .add_filters(&filters.dimensions_filters)
-                    .add_filters(&filters.time_dimensions_filters)
-                    .add_filters(&filters.segments)
-                    .build(measures)?;
-                MultiFactJoinGroups::try_new(self.query_tools.clone(), hints)
-            }
-            Err(err) => Err(err),
+        if let Ok(groups) =
+            MultiFactJoinGroups::try_new_if_joinable(self.query_tools.clone(), hints)?
+        {
+            return Ok(groups);
         }
+        // A filtered member can be the only link between the cubes the query
+        // selects from, and the query itself is planned with its filters.
+        let hints = MeasuresJoinHints::builder(&self.query_join_hints)
+            .add_dimensions(&schema.dimensions)
+            .add_dimensions(&schema.time_dimensions)
+            .add_filters(&filters.dimensions_filters)
+            .add_filters(&filters.time_dimensions_filters)
+            .add_filters(&filters.segments)
+            .build(measures)?;
+        MultiFactJoinGroups::try_new(self.query_tools.clone(), hints)
     }
 
     fn are_join_paths_matching(

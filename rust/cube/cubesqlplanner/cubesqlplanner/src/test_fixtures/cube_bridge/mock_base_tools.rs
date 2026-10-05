@@ -130,8 +130,7 @@ impl BaseTools for MockBaseTools {
     ) -> Result<Vec<Rc<dyn JoinDefinition>>, CubeError> {
         Ok(self
             .join_graph
-            .build_join(hints)
-            .ok()
+            .try_build_join(hints)?
             .map(|result| result as Rc<dyn JoinDefinition>)
             .into_iter()
             .collect())

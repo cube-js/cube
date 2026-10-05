@@ -1366,6 +1366,40 @@ mod tests {
         );
     }
 
+    // A candidate whose members can't be joined is left out with its reason, and so is
+    // one built from it, whether its rollup failed just now or earlier.
+    #[test]
+    fn test_compile_all_skips_unjoinable_pre_aggregations() {
+        let schema = MockSchema::from_yaml_file("common/hub_spoke_join_path.yaml");
+        let test_context = TestContext::new(schema).unwrap();
+        let query_tools = test_context.query_tools().clone();
+
+        let mut compiler =
+            PreAggregationsCompiler::try_new(query_tools, &vec![CubeId::cube("hub")]).unwrap();
+        let compiled = compiler.compile_all_pre_aggregations(false).unwrap();
+
+        let compiled_names: Vec<String> = compiled.iter().map(|pa| pa.name.clone()).collect();
+        assert_eq!(
+            compiled_names,
+            vec!["hub_rollup", "income_by_category", "with_hub_join"]
+        );
+
+        let skipped = compiler.skipped_pre_aggregations();
+        let skipped_names: Vec<&str> = skipped.iter().map(|(n, _)| n.name.as_str()).collect();
+        assert_eq!(
+            skipped_names,
+            vec!["spoke_only_join", "spoke_only_rollup", "spoke_only_lambda"]
+        );
+        for (name, reason) in skipped.iter() {
+            assert!(
+                reason.contains("Can't find join path to join 'ledger', 'categories', 'entities'"),
+                "{}: {}",
+                name.name,
+                reason
+            );
+        }
+    }
+
     #[test]
     fn test_compile_all_pre_aggregations() {
         let schema = MockSchema::from_yaml_file("common/pre_aggregations_test.yaml");

@@ -332,11 +332,8 @@ impl MultiFactJoinGroups {
                         mh.measure.cube_id()
                     )));
                 }
-                // Directed joins can leave a measure's own hints without a
-                // root that reaches them all, e.g. spoke cubes that connect
-                // only through a hub named by another member. The single
-                // tree over every member of the query is then the one the
-                // measure is read through.
+                // Directed joins can leave a measure's own hints rootless (spokes reached
+                // only through a hub another member names); read it through the query's tree.
                 let (key, join_tree, join_hints) = match try_resolve(&measure_hints)? {
                     Some((key, join_tree)) => (key, join_tree, measure_hints),
                     None => match try_resolve(&hints.query_hints)? {

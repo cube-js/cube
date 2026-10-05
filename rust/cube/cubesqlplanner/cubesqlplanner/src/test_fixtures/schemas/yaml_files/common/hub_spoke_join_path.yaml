@@ -74,6 +74,20 @@ cubes:
           - ledger.ledger_rollup
           - categories.categories_rollup
           - entities.entities_rollup
+      # Unjoinable like `spoke_only_join`, and compiled before the lambda over it,
+      # which then reads its failure from the cache.
+      - name: spoke_only_rollup
+        type: rollup
+        measures:
+          - ledger.amount
+        dimensions:
+          - ledger.category_id
+          - categories.name
+          - entities.name
+      - name: spoke_only_lambda
+        type: rollupLambda
+        rollups:
+          - hub.spoke_only_rollup
 
   - name: ledger
     sql: "SELECT 1 AS id, 'm1' AS management_id, 'c1' AS category_id, 10 AS amount"

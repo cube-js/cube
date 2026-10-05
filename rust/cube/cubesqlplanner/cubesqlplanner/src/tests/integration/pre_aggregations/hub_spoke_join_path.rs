@@ -22,7 +22,7 @@ fn used_names(ctx: &TestContext, query: &str) -> Result<(String, Vec<String>), C
     Ok((sql, names))
 }
 
-// The group of `ledger.amount` alone names `ledger`, `categories` and
+// The group of `ledger.count` alone names `ledger`, `categories` and
 // `entities`; it is read through the tree `hub.count` brings in.
 #[test]
 fn test_measure_resolved_through_other_measure_hub() -> Result<(), CubeError> {
