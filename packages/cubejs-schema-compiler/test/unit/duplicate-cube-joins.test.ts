@@ -574,7 +574,7 @@ ${usersCube}
     expect(joins.map(j => [j.name, j.alias])).toEqual([['users', 'customer']]);
   });
 
-  it('lets a child cube redeclare an inherited alias', async () => {
+  it('rejects a child cube redeclaring an inherited alias', async () => {
     const compilers = prepareYamlCompiler(`
 cubes:
   - name: orders_base
@@ -599,6 +599,8 @@ ${ordersMembers}
 ${usersCube}
 `);
 
-    await compilers.compiler.compile();
+    await expect(compilers.compiler.compile()).rejects.toThrow(
+      /Cube 'orders' declares a join named 'customer' \(joins\[0\]\), which redeclares an aliased join of the cube it extends/
+    );
   });
 });

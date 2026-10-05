@@ -230,6 +230,29 @@ describe('Join aliases in the data model', () => {
     expect(sql).toContain('AS "orders__customer__departments" ON "orders__customer".department_id = "orders__customer__departments".id');
   });
 
+  it('drills a view measure into members of its own instance', async () => {
+    const compilers = await compile(`${model.replace(
+      '      - name: count\n        type: count\n    segments:',
+      '      - name: count\n        type: count\n        drill_members:\n          - city\n    segments:'
+    )}
+views:
+  - name: staff_view
+    cubes:
+      - join_path: orders.customer
+        prefix: true
+        includes:
+          - city
+      - join_path: orders.manager
+        prefix: true
+        includes:
+          - city
+          - count
+`);
+    const view = compilers.cubeEvaluator.cubeFromPath('staff_view');
+    const { drillMembers } = view.measures.manager_count as { drillMembers?: () => string[] };
+    expect(drillMembers?.()).toEqual(['staff_view.manager_city']);
+  });
+
   it('accepts an alias in the JS model', async () => {
     const compilers = prepareJsCompiler(`
       cube('orders', {
@@ -319,6 +342,26 @@ describe('Queries over join aliases', () => {
     ]));
     expect(result.memberNames).not.toContain('users.city');
   });
+
+  it('filters on a measure of an instance', async () => {
+    const compilers = prepareYamlCompiler(modelWithAliasReferences);
+    await compilers.compiler.compile();
+    const query = new PostgresQuery(compilers, {
+      measures: ['orders.count'],
+      dimensions: ['orders.customer.city'],
+      filters: [{ member: 'orders.manager.count', operator: 'gt', values: ['1'] }],
+      timezone: 'UTC',
+    });
+
+    const { sql, memberNames } = compilers.compiler.withQuery(query, () => ({
+      sql: query.buildSqlAndParams()[0],
+      memberNames: query.collectAllMemberNames(),
+    }));
+    expect(query.measureFilters.map(f => f.measure)).toEqual(['users.count']);
+    expect(sql).toMatch(/HAVING [^\n]*"orders__manager"\.id[^\n]*> \$1/);
+    expect(memberNames).toContain('orders.manager.count');
+    expect(memberNames).not.toContain('users.count');
+  });
 });
 
 describe('Join alias limits', () => {
@@ -352,5 +395,26 @@ describe('Join alias limits', () => {
         primary_key: true
 `);
     await expect(compiler.compile()).rejects.toThrow(/renders under the same name as the cube 'orders__customer'/);
+  });
+
+  it('compares the names cubes render under, sql_alias included', async () => {
+    const { compiler } = prepareYamlCompiler(`${model.replace('    sql_table: orders\n', '    sql_table: orders\n    sql_alias: o\n')}
+  - name: legacy_customers
+    sql_alias: o__customer
+    sql_table: legacy_customers
+    dimensions:
+      - name: id
+        sql: id
+        type: number
+        primary_key: true
+`);
+    await expect(compiler.compile()).rejects.toThrow(/renders under the same name as the cube 'legacy_customers'/);
+  });
+
+  it('rejects an alias named like another cube', async () => {
+    const { compiler } = prepareYamlCompiler(model.replace('alias: manager\n', 'alias: departments\n'));
+    await expect(compiler.compile()).rejects.toThrow(
+      /alias 'departments', which is the name of the cube 'departments'/
+    );
   });
 });

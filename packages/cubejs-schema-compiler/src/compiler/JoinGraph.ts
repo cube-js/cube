@@ -51,6 +51,9 @@ export class JoinGraph implements CompilerInterface {
 
   private cachedConnectedComponents: Record<string, number> | null;
 
+  // Cube names by the name their SQL alias renders under
+  private renderedCubeNames: Map<string, string> = new Map();
+
   public constructor(cubeValidator: CubeValidator, cubeEvaluator: CubeEvaluator) {
     this.cubeValidator = cubeValidator;
     this.cubeEvaluator = cubeEvaluator;
@@ -63,6 +66,9 @@ export class JoinGraph implements CompilerInterface {
   }
 
   public compile(cubes: unknown, errorReporter: ErrorReporter): void {
+    this.renderedCubeNames = new Map(this.cubeEvaluator.cubeList.map(
+      cube => [this.renderedCubeName(cube), cube.name]
+    ));
     this.edges = R.compose<
       Array<CubeDefinition>,
       Array<CubeDefinition>,
@@ -213,6 +219,7 @@ export class JoinGraph implements CompilerInterface {
     // alias, snake-cased: aliases that read alike there would share it
     const sqlName = (name: string) => inflection.underscore(name);
     const sqlNames = new Map<string, string>();
+    const renderedCube = this.renderedCubeName(cube);
     ownJoins.forEach((join, index) => {
       if (!join?.alias) {
         return;
@@ -225,8 +232,10 @@ export class JoinGraph implements CompilerInterface {
         problem = 'which contains \'__\', the separator of the names it is rendered under';
       } else if (sqlNames.has(sqlName(join.alias))) {
         problem = `which renders under the same name as the alias '${sqlNames.get(sqlName(join.alias))}'`;
-      } else if (this.cubeEvaluator.cubeExists(`${cube.name}__${join.alias}`)) {
-        problem = `which renders under the same name as the cube '${cube.name}__${join.alias}'`;
+      } else if (join.alias !== join.name && this.cubeEvaluator.cubeExists(join.alias)) {
+        problem = `which is the name of the cube '${join.alias}' and would hide it from the members of '${cube.name}'`;
+      } else if (this.renderedCubeNames.has(`${renderedCube}__${sqlName(join.alias)}`)) {
+        problem = `which renders under the same name as the cube '${this.renderedCubeNames.get(`${renderedCube}__${sqlName(join.alias)}`)}'`;
       }
       sqlNames.set(sqlName(join.alias), join.alias);
       if (problem) {
@@ -270,7 +279,27 @@ export class JoinGraph implements CompilerInterface {
       }
     }
 
+    // `extends` puts the parent's joins first, and an alias resolves to the
+    // first join it names, so an aliased one can not be overridden
+    const allJoins = cube.joins ?? [];
+    const inherited = allJoins.slice(0, Math.max(0, allJoins.length - ownJoins.length));
+    ownJoins.forEach((join, index) => {
+      const name = join?.alias ?? join?.name;
+      const parentJoin = inherited.find(j => (j.alias ?? j.name) === name);
+      if (name && parentJoin && (join.alias || parentJoin.alias)) {
+        conflicting.add(name);
+        errorReporter.error(
+          `Cube '${cube.name}' declares a join named '${name}' (joins[${index}]), which redeclares an aliased join of the cube it extends. An aliased join can not be overridden, pick a different alias`,
+          cube.fileName
+        );
+      }
+    });
+
     return conflicting;
+  }
+
+  private renderedCubeName(cube: CubeDefinition & { sqlAlias?: string }): string {
+    return inflection.underscore(cube.sqlAlias ?? cube.name);
   }
 
   protected buildJoinNode(cube: CubeDefinition): Record<string, 1> {

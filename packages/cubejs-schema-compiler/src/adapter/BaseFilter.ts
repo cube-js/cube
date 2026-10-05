@@ -24,7 +24,11 @@ export class BaseFilter extends BaseDimension {
 
   public constructor(query: BaseQuery, filter: any) {
     super(query, filter.dimension);
-    this.measure = filter.measure;
+    if (filter.measure) {
+      const { path, aliasPath } = query.memberPathForModel(filter.measure);
+      this.measure = path;
+      this.aliasPath = aliasPath;
+    }
 
     this.operator = filter.operator;
     this.values = filter.values;

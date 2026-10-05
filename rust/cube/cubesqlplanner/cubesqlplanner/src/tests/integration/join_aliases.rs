@@ -305,3 +305,23 @@ async fn test_calendar_shift_through_one_alias_next_to_another() {
         insta::assert_snapshot!(result);
     }
 }
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_root_measure_next_to_a_one_to_many_below_an_alias() {
+    let ctx = create_context();
+    let query = indoc! {r#"
+        measures:
+          - orders.total_amount
+          - orders.customer.reviews.count
+        dimensions:
+          - orders.customer.city
+        order:
+          - id: orders.customer.city
+    "#};
+
+    ctx.build_sql(query).unwrap();
+
+    if let Some(result) = ctx.try_execute_pg(query, SEED).await {
+        insta::assert_snapshot!(result);
+    }
+}
