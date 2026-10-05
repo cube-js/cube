@@ -396,11 +396,8 @@ export class MssqlQuery extends BaseQuery {
       '{% if group_by %}\nGROUP BY {{ group_by }}{% endif %}' +
       '{% if having %}\nHAVING {{ having }}{% endif %}' +
       '{% if order_by %}\nORDER BY {{ order_by | map(attribute=\'expr\') | join(\', \') }}' +
-      // FETCH NEXT must be greater than zero in T-SQL, so `LIMIT 0` is rendered as
-      // `TOP 0` above and the OFFSET/FETCH tail is dropped entirely. `limit` is a number or,
-      // for a limit the orchestrator substitutes, a param placeholder string; `limit | int`
-      // would not work as a guard, since `none | int` is 0 and that would drop the
-      // 2147483647 fallback below
+      // `limit` may be a param placeholder string, so don't guard with `limit | int`:
+      // `none | int` is 0 and would drop the 2147483647 fallback below
       '{% if limit != 0 %}\nOFFSET {% if offset is not none %}{{ offset }}{% else %}0{% endif %} ROWS' +
       '\nFETCH NEXT {% if limit is not none %}{{ limit }}{% else %}2147483647{% endif %} ROWS ONLY{% endif %}{% endif %}' +
       '{% if ctes %}\nOPTION (MAXRECURSION 0){% endif %}';
