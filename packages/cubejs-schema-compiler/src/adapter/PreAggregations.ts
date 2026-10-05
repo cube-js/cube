@@ -324,7 +324,6 @@ export class PreAggregations {
     return [];
   }
 
-  /** Shared by partition selection and the rollupLambda source bound so both halves of the union agree. */
   public matchedTimeDimensionDateRangeFor(foundPreAggregation: PreAggregationForQuery): [string, string] | undefined {
     if (!foundPreAggregation.preAggregation.partitionGranularity) {
       return undefined;
@@ -341,10 +340,7 @@ export class PreAggregations {
       undefined;
   }
 
-  /**
-   * Top level `inDateRange` filters on the pre-aggregation's time dimension, in query order.
-   * TODO support all date operators
-   */
+  // TODO support all date operators
   public dateRangeFiltersFor(foundPreAggregation: PreAggregationForQuery): BaseFilter[] {
     return (this.query.filters || []).filter((filter): filter is BaseFilter => filter.isDateOperator() &&
       'camelizeOperator' in filter &&

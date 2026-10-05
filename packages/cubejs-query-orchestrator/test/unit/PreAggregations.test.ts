@@ -1172,8 +1172,6 @@ describe('PreAggregations', () => {
     });
 
     test('follows the source query bound, not one usage range', () => {
-      // With several usages the description carries the first usage's range, while the source
-      // query is bounded by the union of all of them.
       expect(covered(
         ['2024-01-01T00:00:00.000', '2024-01-05T23:59:59.999'],
         '2024-01-03T23:59:59.999',
