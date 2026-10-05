@@ -516,20 +516,6 @@ const remapToQueryAdapterFormat = (query: NormalizedQuery): NormalizedQuery => (
   ...(query.order ? { order: remapQueryOrder(query.order) } : {}),
 } : query);
 
-const queryPreAggregationsSchema = Joi.object().keys({
-  expand: Joi.array().items(Joi.string()),
-  metadata: Joi.object(),
-  timezone: timezoneSchema,
-  timezones: Joi.array().items(timezoneSchema),
-  preAggregations: Joi.array().items(Joi.object().keys({
-    id: Joi.string().required(),
-    cacheOnly: Joi.boolean(),
-    metaOnly: Joi.boolean(),
-    partitions: Joi.array().items(Joi.string()),
-    refreshRange: Joi.array().items(Joi.string()).length(2), // TODO: Deprecate after cloud changes
-  }))
-});
-
 type PreAggregationsQuery = {
   expand?: string[],
   metadata?: Record<string, unknown>,
@@ -544,35 +530,18 @@ type PreAggregationsQuery = {
   }[],
 };
 
-const normalizeQueryPreAggregations = (query: unknown, defaultValues?: { timezones?: string[] }) => {
-  const { error, value } = queryPreAggregationsSchema.validate(query);
-  if (error) {
-    throw new UserError(`Invalid query format: ${error.message || error.toString()}`);
-  }
-
-  // Only timezones take Joi's converted value (canonical names); the rest passes through as sent
-  const raw = query as PreAggregationsQuery;
-  const converted = value as PreAggregationsQuery;
-
-  return {
-    metadata: raw.metadata,
-    timezones: converted.timezones || (converted.timezone && [converted.timezone]) || defaultValues?.timezones || ['UTC'],
-    preAggregations: raw.preAggregations,
-    expand: raw.expand
-  };
-};
-
-const queryPreAggregationPreviewSchema = Joi.object().keys({
-  preAggregationId: Joi.string().required(),
-  timezone: timezoneSchema.required(),
-  versionEntry: Joi.object().required().keys({
-    content_version: Joi.string(),
-    last_updated_at: Joi.number(),
-    naming_version: Joi.number(),
-    structure_version: Joi.string(),
-    table_name: Joi.string(),
-    build_range_end: Joi.string(),
-  })
+const queryPreAggregationsSchema = Joi.object<PreAggregationsQuery>().keys({
+  expand: Joi.array().items(Joi.string()),
+  metadata: Joi.object(),
+  timezone: timezoneSchema,
+  timezones: Joi.array().items(timezoneSchema),
+  preAggregations: Joi.array().items(Joi.object().keys({
+    id: Joi.string().required(),
+    cacheOnly: Joi.boolean(),
+    metaOnly: Joi.boolean(),
+    partitions: Joi.array().items(Joi.string()),
+    refreshRange: Joi.array().items(Joi.string()).length(2), // TODO: Deprecate after cloud changes
+  }))
 });
 
 type PreAggregationPreviewQuery = {
@@ -588,18 +557,17 @@ type PreAggregationPreviewQuery = {
   },
 };
 
-const normalizeQueryPreAggregationPreview = (query: unknown): PreAggregationPreviewQuery => {
-  const { error, value } = queryPreAggregationPreviewSchema.validate(query);
-  if (error) {
-    throw new UserError(`Invalid query format: ${error.message || error.toString()}`);
-  }
-
-  return { ...(query as PreAggregationPreviewQuery), timezone: (value as PreAggregationPreviewQuery).timezone };
-};
-
-const queryCancelPreAggregationPreviewSchema = Joi.object().keys({
-  dataSource: Joi.string(),
-  queryKeys: Joi.array().items(Joi.string())
+const queryPreAggregationPreviewSchema = Joi.object<PreAggregationPreviewQuery>().keys({
+  preAggregationId: Joi.string().required(),
+  timezone: timezoneSchema.required(),
+  versionEntry: Joi.object().required().keys({
+    content_version: Joi.string(),
+    last_updated_at: Joi.number(),
+    naming_version: Joi.number(),
+    structure_version: Joi.string(),
+    table_name: Joi.string(),
+    build_range_end: Joi.string(),
+  })
 });
 
 type CancelPreAggregationsQuery = {
@@ -607,14 +575,35 @@ type CancelPreAggregationsQuery = {
   queryKeys?: string[],
 };
 
-const normalizeQueryCancelPreAggregations = (query: unknown): CancelPreAggregationsQuery => {
-  const { error } = queryCancelPreAggregationPreviewSchema.validate(query);
+const queryCancelPreAggregationPreviewSchema = Joi.object<CancelPreAggregationsQuery>().keys({
+  dataSource: Joi.string(),
+  queryKeys: Joi.array().items(Joi.string())
+});
+
+/** @throws {UserError} */
+function validateQuery<T>(schema: Joi.ObjectSchema<T>, query: unknown): T {
+  const { error, value } = schema.validate(query);
   if (error) {
     throw new UserError(`Invalid query format: ${error.message || error.toString()}`);
   }
 
-  return query as CancelPreAggregationsQuery;
+  return value;
+}
+
+const normalizeQueryPreAggregations = (query: unknown, defaultValues?: { timezones?: string[] }) => {
+  const { metadata, timezone, timezones, preAggregations, expand } = validateQuery(queryPreAggregationsSchema, query);
+
+  return {
+    metadata,
+    timezones: timezones || (timezone && [timezone]) || defaultValues?.timezones || ['UTC'],
+    preAggregations,
+    expand
+  };
 };
+
+const normalizeQueryPreAggregationPreview = (query: unknown): PreAggregationPreviewQuery => validateQuery(queryPreAggregationPreviewSchema, query);
+
+const normalizeQueryCancelPreAggregations = (query: unknown): CancelPreAggregationsQuery => validateQuery(queryCancelPreAggregationPreviewSchema, query);
 
 export {
   getQueryGranularity,
