@@ -221,10 +221,15 @@ export class PostgresDriver<Config extends PostgresDriverConfiguration = Postgre
         JOIN pg_catalog.pg_namespace n ON n.oid = c.relnamespace
         JOIN pg_catalog.pg_attribute a ON a.attrelid = con.conrelid AND a.attnum = k.attnum
         JOIN pg_catalog.pg_class fc ON fc.oid = con.confrelid
-        JOIN pg_catalog.pg_attribute fa ON fa.attrelid = con.confrelid AND fa.attnum = k.fattnum
-        LEFT JOIN pg_catalog.pg_constraint parent ON parent.oid = con.conparentid
-        WHERE con.contype = 'f' AND parent.conrelid IS DISTINCT FROM con.conrelid
-      ) AS columns
+        JOIN pg_catalog.pg_attribute fa ON fa.attrelid = con.confrelid AND fa.attnum = k.fattnum ` +
+      // Postgres 12+ clones an FK once per partition of a partitioned referenced table, on the same conrelid;
+      // those clones are dropped by joining the parent constraint. conparentid only exists since Postgres 11,
+      // and referencing it directly makes the whole query fail on Postgres 10 and forks built on older versions
+      // (Greenplum 6 is 9.4). row_to_json yields NULL for a missing column instead, which keeps every FK there.
+      // TODO: replace `(row_to_json(con) ->> 'conparentid')::oid` with `con.conparentid` once Postgres 11 is the minimum.
+      `LEFT JOIN pg_catalog.pg_constraint parent ON parent.oid = (row_to_json(con) ->> 'conparentid')::oid
+        WHERE con.contype = 'f' AND parent.conrelid IS DISTINCT FROM con.conrelid ` +
+      `) AS columns
       WHERE columns.table_schema NOT IN ('pg_catalog', 'information_schema')${conditionString ? ` AND (${conditionString})` : ''}`;
   }
 
