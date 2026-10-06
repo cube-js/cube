@@ -478,7 +478,11 @@ export const buildSqlAndParams = (cubeEvaluator: any): any[] => {
 
 export type ResultRow = Record<string, string>;
 
-export const parseCubestoreResultMessage = async (message: Buffer): Promise<ResultWrapper> => {
+/**
+ * The native side reads `message` on a worker thread without copying it. Do not mutate or
+ * transfer the buffer until the returned promise settles.
+ */
+export const parseCubestoreResultMessage = async (message: Readonly<Buffer>): Promise<ResultWrapper> => {
   const native = loadNative();
 
   const msg = await native.parseCubestoreResultMessage(message) as NativeQueryResultRef;

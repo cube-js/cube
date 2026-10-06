@@ -237,15 +237,57 @@ fn extract_query_result(
     }
 }
 
+/// Bytes of a JS `Buffer` lent to a worker thread without copying. The caller keeps the
+/// buffer alive with a `Root` until the task settles.
+struct PinnedJsBytes {
+    ptr: *const u8,
+    len: usize,
+}
+
+// SAFETY: only read, and only while the owning `Root<JsBuffer>` is held (see `as_slice`).
+unsafe impl Send for PinnedJsBytes {}
+
+impl PinnedJsBytes {
+    /// # Safety
+    /// The rooted buffer must not be written to, detached or transferred by JS while the
+    /// returned slice is in use. Otherwise flatbuffers' unchecked reads after verification
+    /// may go out of bounds.
+    unsafe fn as_slice(&self) -> &[u8] {
+        // N-API may hand out a null pointer for an empty buffer.
+        if self.len == 0 {
+            &[]
+        } else {
+            std::slice::from_raw_parts(self.ptr, self.len)
+        }
+    }
+}
+
 pub fn parse_cubestore_result_message(mut cx: FunctionContext) -> JsResult<JsPromise> {
     let msg = cx.argument::<JsBuffer>(0)?;
-    let msg_data = msg.as_slice(&cx).to_vec();
+    let msg_bytes = {
+        let slice = msg.as_slice(&cx);
+        PinnedJsBytes {
+            ptr: slice.as_ptr(),
+            len: slice.len(),
+        }
+    };
+    // ArrayBuffer backing stores live off the V8 heap and are never moved by GC, so rooting
+    // the Buffer is enough to keep `msg_bytes` valid. The only caller (WebSocketConnection)
+    // reads the message and never mutates it.
+    let msg_root = msg.root(&mut cx);
 
     let promise = cx
-        .task(move || QueryResult::from_cubestore_fb(&msg_data))
-        .promise(move |mut cx, res| match res {
-            Ok(result) => Ok(cx.boxed(Arc::new(result))),
-            Err(err) => cx.throw_error(err.to_string()),
+        .task(move || {
+            // SAFETY: see PinnedJsBytes::as_slice; `msg_root` outlives the task.
+            QueryResult::from_cubestore_fb(unsafe { msg_bytes.as_slice() })
+        })
+        .promise(move |mut cx, res| {
+            msg_root.drop(&mut cx);
+
+            match res {
+                Ok(result) => Ok(cx.boxed(Arc::new(result))),
+                Err(err) => cx.throw_error(err.to_string()),
+            }
         });
 
     Ok(promise)
