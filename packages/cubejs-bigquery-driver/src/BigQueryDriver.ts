@@ -437,6 +437,8 @@ export class BigQueryDriver extends BaseDriver implements DriverInterface {
       const labelKey = toLabel(key);
       if (/^[a-z]/.test(labelKey) && Object.keys(labels).length < 63) {
         labels[labelKey] = toLabel(value);
+      } else {
+        this.logger?.('Query Tag Dropped', { key, requestId: options?.requestId });
       }
     }
 

@@ -73,6 +73,17 @@ describe('BigQueryDriver.buildQueryLabels', () => {
       .toEqual({ ok: 'e', cube_request_id: 'abc' });
   });
 
+  test('logs the tags it drops', () => {
+    const logger = jest.fn();
+    const loggingDriver = Object.create(BigQueryDriverOpen.prototype) as BigQueryDriverOpen;
+    loggingDriver.setLogger(logger);
+
+    loggingDriver.buildQueryLabels({ requestId: 'abc', queryTags: { '1st_party': 'a', ok: 'b' } });
+
+    expect(logger).toHaveBeenCalledTimes(1);
+    expect(logger).toHaveBeenCalledWith('Query Tag Dropped', { key: '1st_party', requestId: 'abc' });
+  });
+
   test('keeps at most 63 tags, so cube_request_id fits into the 64 labels of a job', () => {
     const queryTags = Object.fromEntries(Array.from({ length: 70 }, (_, i) => [`k${i}`, 'v']));
     const labels = buildQueryLabels({ requestId: 'abc', queryTags });
