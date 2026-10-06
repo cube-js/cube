@@ -603,7 +603,7 @@ jobs:
             tag: "non-avx"
     timeout-minutes: 60
     permissions:
-      contents: write
+      contents: read
     steps:
       - name: Check out the repo
         uses: actions/checkout@v7
