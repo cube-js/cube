@@ -66,6 +66,7 @@ jobs:
     name: Release Cube Store :dev image (prepare)
     runs-on: ubuntu-24.04
     timeout-minutes: 5
+    permissions: {}
     outputs:
       version: ${{ steps.prep.outputs.version }}
       created: ${{ steps.prep.outputs.created }}
@@ -167,6 +168,8 @@ jobs:
     runs-on: ubuntu-24.04
     needs: [cubestore-docker-image-dev-prepare, cubestore-docker-image-dev]
     timeout-minutes: 15
+    permissions:
+      contents: read
     strategy:
       matrix:
         # -arm64v8 tags used to be a separate arm64-only image, publish them as
