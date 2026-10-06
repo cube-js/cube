@@ -68,6 +68,19 @@ describe('BigQueryDriver.buildQueryLabels', () => {
       });
   });
 
+  test('drops tag keys BigQuery would reject', () => {
+    expect(buildQueryLabels({ requestId: 'abc', queryTags: { '1st_party': 'a', _tenant: 'b', '-x': 'c', '': 'd', ok: 'e' } }))
+      .toEqual({ ok: 'e', cube_request_id: 'abc' });
+  });
+
+  test('keeps at most 63 tags, so cube_request_id fits into the 64 labels of a job', () => {
+    const queryTags = Object.fromEntries(Array.from({ length: 70 }, (_, i) => [`k${i}`, 'v']));
+    const labels = buildQueryLabels({ requestId: 'abc', queryTags });
+
+    expect(Object.keys(labels || {})).toHaveLength(64);
+    expect(labels?.cube_request_id).toBe('abc');
+  });
+
   test('keeps cube_request_id when a query tag uses the same key', () => {
     expect(buildQueryLabels({ requestId: 'abc', queryTags: { cube_request_id: 'spoofed' } })).toEqual({
       cube_request_id: 'abc',

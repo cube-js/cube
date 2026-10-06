@@ -431,10 +431,13 @@ export class BigQueryDriver extends BaseDriver implements DriverInterface {
     const toLabel = (s: string) => s.toLowerCase().replace(/[^a-z0-9_-]/g, '_').slice(0, 63);
     const labels: { [k: string]: string } = {};
 
-    // Keys are sanitized like values; a key that is still invalid (e.g. starts with a digit)
-    // makes BigQuery reject the job, so a misconfigured key surfaces instead of vanishing.
+    // Keys BigQuery would still reject are dropped, and one of the 64 labels is left for
+    // `cube_request_id`, so a misconfigured tag can't fail the job
     for (const [key, value] of Object.entries(options?.queryTags || {})) {
-      labels[toLabel(key)] = toLabel(value);
+      const labelKey = toLabel(key);
+      if (/^[a-z]/.test(labelKey) && Object.keys(labels).length < 63) {
+        labels[labelKey] = toLabel(value);
+      }
     }
 
     const requestId = options?.requestId && toLabel(extractRequestUUID(String(options.requestId)));
