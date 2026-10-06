@@ -435,10 +435,12 @@ export class BigQueryDriver extends BaseDriver implements DriverInterface {
     // `cube_request_id`, so a misconfigured tag can't fail the job
     for (const [key, value] of Object.entries(options?.queryTags || {})) {
       const labelKey = toLabel(key);
-      if (/^[a-z]/.test(labelKey) && Object.keys(labels).length < 63) {
-        labels[labelKey] = toLabel(value);
+      if (!/^[a-z]/.test(labelKey)) {
+        this.logger?.('Query Tag Dropped', { key, reason: 'invalid_key', requestId: options?.requestId });
+      } else if (Object.keys(labels).length >= 63) {
+        this.logger?.('Query Tag Dropped', { key, reason: 'label_limit', requestId: options?.requestId });
       } else {
-        this.logger?.('Query Tag Dropped', { key, requestId: options?.requestId });
+        labels[labelKey] = toLabel(value);
       }
     }
 
