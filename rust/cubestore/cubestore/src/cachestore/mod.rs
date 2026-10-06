@@ -8,6 +8,7 @@ mod queue_item;
 mod queue_item_payload;
 mod queue_result;
 mod scheduler;
+mod value;
 
 pub use cache_eviction_manager::{
     CacheEvictionManager, CacheEvictionPolicy, EvictionFinishedResult, EvictionResult, LFU_INIT_VAL,
@@ -27,3 +28,4 @@ pub use queue_item::{
 pub use queue_item_payload::QueueItemPayload;
 pub use queue_result::QueueResult;
 pub use scheduler::CacheStoreSchedulerImpl;
+pub use value::CacheValue;

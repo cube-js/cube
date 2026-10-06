@@ -233,14 +233,15 @@ impl CacheStoreSqlService {
             CacheCommand::Get { key } => {
                 let result = self.cachestore.cache_get(key.value).await?;
                 let value = if let Some(result) = result {
-                    TableValue::String(result.into_row().value)
+                    result.into_row().value.into_table_value()
                 } else {
                     TableValue::Null
                 };
 
                 (
-                    Arc::new(DataFrame::new(
+                    Arc::new(data_frame_with_value_column(
                         vec![Column::new("value".to_string(), ColumnType::String, 0)],
+                        0,
                         vec![Row::new(vec![value])],
                     )),
                     None,
@@ -277,9 +278,7 @@ impl CacheStoreSqlService {
                 (
                     Arc::new(DataFrame::new(
                         vec![Column::new("value".to_string(), ColumnType::String, 0)],
-                        vec![Row::new(vec![TableValue::String(
-                            row.get_row().get_value().clone(),
-                        )])],
+                        vec![Row::new(vec![row.into_row().value.into_table_value()])],
                     )),
                     None,
                     true,
@@ -410,7 +409,7 @@ impl CacheStoreSqlService {
                     .await?;
 
                 (
-                    Arc::new(DataFrame::new(
+                    Arc::new(data_frame_with_value_column(
                         vec![
                             Column::new("id".to_string(), ColumnType::String, 0),
                             Column::new("added".to_string(), ColumnType::Boolean, 1),
@@ -419,6 +418,7 @@ impl CacheStoreSqlService {
                             Column::new("payload".to_string(), ColumnType::String, 4),
                             Column::new("extra".to_string(), ColumnType::String, 5),
                         ],
+                        4,
                         vec![response.into_queue_add_and_retrieve_row()],
                     )),
                     Some(value_size),
@@ -443,7 +443,11 @@ impl CacheStoreSqlService {
                     vec![]
                 };
 
-                (Arc::new(DataFrame::new(columns, rows)), None, true)
+                (
+                    Arc::new(data_frame_with_value_column(columns, 0, rows)),
+                    None,
+                    true,
+                )
             }
             QueueCommand::Heartbeat { key } => {
                 self.cachestore.queue_heartbeat(key).await?;
@@ -482,11 +486,12 @@ impl CacheStoreSqlService {
                 };
 
                 (
-                    Arc::new(DataFrame::new(
+                    Arc::new(data_frame_with_value_column(
                         vec![
                             Column::new("payload".to_string(), ColumnType::String, 0),
                             Column::new("extra".to_string(), ColumnType::String, 1),
                         ],
+                        0,
                         rows,
                     )),
                     None,
@@ -549,16 +554,17 @@ impl CacheStoreSqlService {
                     columns.push(Column::new("payload".to_string(), ColumnType::String, 4));
                 }
 
-                (
-                    Arc::new(DataFrame::new(
-                        columns,
-                        rows.into_iter()
-                            .map(|item| item.into_queue_list_row())
-                            .collect(),
-                    )),
-                    None,
-                    true,
-                )
+                let rows = rows
+                    .into_iter()
+                    .map(|item| item.into_queue_list_row())
+                    .collect();
+                let data_frame = if with_payload {
+                    data_frame_with_value_column(columns, 4, rows)
+                } else {
+                    DataFrame::new(columns, rows)
+                };
+
+                (Arc::new(data_frame), None, true)
             }
             QueueCommand::Retrieve {
                 key,
@@ -571,7 +577,7 @@ impl CacheStoreSqlService {
                     .await?;
 
                 (
-                    Arc::new(DataFrame::new(
+                    Arc::new(data_frame_with_value_column(
                         vec![
                             Column::new("payload".to_string(), ColumnType::String, 0),
                             Column::new("extra".to_string(), ColumnType::String, 1),
@@ -579,6 +585,7 @@ impl CacheStoreSqlService {
                             Column::new("active".to_string(), ColumnType::String, 3),
                             Column::new("id".to_string(), ColumnType::String, 4),
                         ],
+                        0,
                         result.into_queue_retrieve_rows(extended),
                     )),
                     None,
@@ -595,13 +602,14 @@ impl CacheStoreSqlService {
                 };
 
                 (
-                    Arc::new(DataFrame::new(
+                    Arc::new(data_frame_with_value_column(
                         vec![
                             Column::new("payload".to_string(), ColumnType::String, 0),
                             Column::new("type".to_string(), ColumnType::String, 1),
                             Column::new("id".to_string(), ColumnType::String, 2),
                             Column::new("external_id".to_string(), ColumnType::String, 3),
                         ],
+                        0,
                         rows,
                     )),
                     None,
@@ -618,13 +626,14 @@ impl CacheStoreSqlService {
                 };
 
                 (
-                    Arc::new(DataFrame::new(
+                    Arc::new(data_frame_with_value_column(
                         vec![
                             Column::new("payload".to_string(), ColumnType::String, 0),
                             Column::new("type".to_string(), ColumnType::String, 1),
                             Column::new("id".to_string(), ColumnType::String, 2),
                             Column::new("external_id".to_string(), ColumnType::String, 3),
                         ],
+                        0,
                         rows,
                     )),
                     None,
@@ -661,6 +670,45 @@ impl CacheStoreSqlService {
 
         Ok(result)
     }
+}
+
+/// Cache values and queue payloads/results are text or binary, while a column has a single type:
+/// the column is Bytes once any value in it is binary, with text values emitted as UTF-8 bytes.
+/// Text-only results keep the String column.
+fn data_frame_with_value_column(
+    columns: Vec<Column>,
+    value_index: usize,
+    rows: Vec<Row>,
+) -> DataFrame {
+    let has_binary = rows
+        .iter()
+        .any(|row| matches!(row.values()[value_index], TableValue::Bytes(_)));
+    if !has_binary {
+        return DataFrame::new(columns, rows);
+    }
+
+    let columns = columns
+        .into_iter()
+        .map(|c| {
+            if c.get_index() == value_index {
+                Column::new(c.get_name().clone(), ColumnType::Bytes, value_index)
+            } else {
+                c
+            }
+        })
+        .collect();
+    let rows = rows
+        .into_iter()
+        .map(|row| {
+            let mut values = row.into_values();
+            if let TableValue::String(s) = &mut values[value_index] {
+                values[value_index] = TableValue::Bytes(std::mem::take(s).into_bytes());
+            }
+            Row::new(values)
+        })
+        .collect();
+
+    DataFrame::new(columns, rows)
 }
 
 #[async_trait]

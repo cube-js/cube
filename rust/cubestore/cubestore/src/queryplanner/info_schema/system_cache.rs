@@ -47,7 +47,7 @@ impl InfoSchemaTableDef for SystemCacheTableDef {
             key_builder.append_value(item.get_key());
             prefix_builder.append_option(item.get_prefix().as_deref());
             expire_builder.append_option(item.get_expire().as_ref().map(timestamp_nanos_or_panic));
-            value_builder.append_value(item.get_value());
+            value_builder.append_value(item.get_value().to_display_string());
         }
 
         vec![

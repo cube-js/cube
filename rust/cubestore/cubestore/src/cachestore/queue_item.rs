@@ -9,7 +9,7 @@ use chrono::{DateTime, Duration, Utc};
 use cuberockstore::rocksdb::WriteBatch;
 use std::cmp::Ordering;
 
-use crate::cachestore::QueueKey;
+use crate::cachestore::{CacheValue, QueueKey};
 use serde::{Deserialize, Deserializer, Serialize};
 
 // It's the x-process-id header, a uuid (36 chars), bounded on ingress in src/http
@@ -95,8 +95,9 @@ pub struct QueueItem {
 }
 
 impl RocksEntity for QueueItem {
+    // Bumped together with QueueItemPayload, so items are never left without payloads
     fn version() -> u32 {
-        5
+        6
     }
 }
 
@@ -282,7 +283,7 @@ pub enum QueueRetrieveResponse {
     Success {
         id: u64,
         item: QueueItem,
-        payload: String,
+        payload: CacheValue,
         pending: u64,
         active: Vec<String>,
     },
@@ -323,7 +324,7 @@ impl QueueRetrieveResponse {
                 pending,
                 active,
             } => vec![Row::new(vec![
-                TableValue::String(payload),
+                payload.into_table_value(),
                 if let Some(extra) = item.extra {
                     TableValue::String(extra)
                 } else {

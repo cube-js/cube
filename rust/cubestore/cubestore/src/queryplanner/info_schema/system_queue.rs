@@ -1,4 +1,4 @@
-use crate::cachestore::QueueAllItem;
+use crate::cachestore::{CacheValue, QueueAllItem};
 use crate::queryplanner::info_schema::timestamp_nanos_or_panic;
 use crate::queryplanner::{InfoSchemaTableDef, InfoSchemaTableDefContext};
 use crate::CubeError;
@@ -78,7 +78,7 @@ impl InfoSchemaTableDef for SystemQueueTableDef {
                 .append_option(item.get_heartbeat().as_ref().map(timestamp_nanos_or_panic));
             orphaned_builder
                 .append_option(item.get_orphaned().as_ref().map(timestamp_nanos_or_panic));
-            value_builder.append_option(row.payload.as_deref());
+            value_builder.append_option(row.payload.as_ref().map(CacheValue::to_display_string));
             extra_builder.append_option(item.get_extra().as_deref());
             process_id_builder.append_option(item.get_process_id().as_deref());
             exclusive_builder.append_value(item.get_exclusive());

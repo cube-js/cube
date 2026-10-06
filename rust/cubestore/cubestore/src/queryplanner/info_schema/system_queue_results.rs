@@ -54,7 +54,7 @@ impl InfoSchemaTableDef for SystemQueueResultsTableDef {
             path_builder.append_value(result.get_path());
             expire_builder.append_value(timestamp_nanos_or_panic(result.get_expire()));
             deleted_builder.append_value(result.is_deleted());
-            value_builder.append_value(result.get_value());
+            value_builder.append_value(result.get_value().to_display_string());
             external_id_builder.append_option(result.get_external_id().as_deref());
         }
 

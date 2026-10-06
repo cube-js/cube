@@ -1,7 +1,7 @@
 use crate::cachestore::{
-    CacheItem, CacheStore, QueueAddPayload, QueueAllItem, QueueCancelResponse, QueueGetResponse,
-    QueueItem, QueueItemStatus, QueueKey, QueueListItem, QueueResult, QueueResultResponse,
-    QueueRetrieveResponse,
+    CacheItem, CacheStore, CacheValue, QueueAddPayload, QueueAllItem, QueueCancelResponse,
+    QueueGetResponse, QueueItem, QueueItemStatus, QueueKey, QueueListItem, QueueResult,
+    QueueResultResponse, QueueRetrieveResponse,
 };
 use crate::metastore::job::{Job, JobRunnerPool, JobStatus, JobType};
 use crate::metastore::multi_index::{MultiIndex, MultiPartition};
@@ -893,7 +893,11 @@ impl CacheStore for CacheStoreMock {
         panic!("CacheStore mock!")
     }
 
-    async fn queue_ack(&self, _key: QueueKey, _result: Option<String>) -> Result<bool, CubeError> {
+    async fn queue_ack(
+        &self,
+        _key: QueueKey,
+        _result: Option<CacheValue>,
+    ) -> Result<bool, CubeError> {
         panic!("CacheStore mock!")
     }
 

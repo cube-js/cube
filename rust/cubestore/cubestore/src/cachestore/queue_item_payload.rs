@@ -1,3 +1,4 @@
+use crate::cachestore::CacheValue;
 use crate::metastore::{
     BaseRocksTable, IndexId, RocksEntity, RocksSecondaryIndex, RocksTable, TableId, TableInfo,
 };
@@ -10,7 +11,7 @@ use serde::{Deserialize, Deserializer, Serialize};
 #[derive(Clone, Serialize, Deserialize, Debug, Eq, PartialEq)]
 pub struct QueueItemPayload {
     // Immutable field
-    pub(crate) value: String,
+    pub(crate) value: CacheValue,
     #[serde(with = "ts_seconds")]
     created: DateTime<Utc>,
     #[serde(with = "ts_seconds")]
@@ -19,12 +20,12 @@ pub struct QueueItemPayload {
 
 impl RocksEntity for QueueItemPayload {
     fn version() -> u32 {
-        3
+        4
     }
 }
 
 impl QueueItemPayload {
-    pub fn new(value: String, created: DateTime<Utc>, expire: DateTime<Utc>) -> Self {
+    pub fn new(value: CacheValue, created: DateTime<Utc>, expire: DateTime<Utc>) -> Self {
         Self {
             value,
             created,
@@ -32,7 +33,7 @@ impl QueueItemPayload {
         }
     }
 
-    pub fn get_value(&self) -> &String {
+    pub fn get_value(&self) -> &CacheValue {
         &self.value
     }
 

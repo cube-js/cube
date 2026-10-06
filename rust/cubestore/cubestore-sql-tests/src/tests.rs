@@ -7,8 +7,9 @@ use cubestore::metastore::{Column, ColumnType};
 use cubestore::queryplanner::physical_plan_flags::PhysicalPlanFlags;
 use cubestore::queryplanner::pretty_printers::{pp_phys_plan, pp_phys_plan_ext, PPOptions};
 use cubestore::queryplanner::MIN_TOPK_STREAM_ROWS;
-use cubestore::sql::{timestamp_from_string, InlineTable, SqlQueryContext};
+use cubestore::sql::{timestamp_from_string, InlineTable, QueryParameter, SqlQueryContext};
 use cubestore::store::DataFrame;
+use cubestore::table::data::rows_to_columns;
 use cubestore::table::{Row, TableValue, TimestampValue};
 use cubestore::util::decimal::Decimal;
 use cubestore::CubeError;
@@ -304,6 +305,8 @@ pub fn sql_tests(prefix: &str) -> Vec<(&'static str, TestFn)> {
         t("build_range_end", build_range_end),
         t("cache_incr", cache_incr),
         t("cache_set_get_rm", cache_set_get_rm),
+        t("cache_binary_value", cache_binary_value),
+        t("queue_binary_value", queue_binary_value),
         t("cache_set_get_set_get", cache_set_get_set_get),
         t("cache_compaction", cache_compaction),
         t("cache_set_nx", cache_set_nx),
@@ -452,7 +455,15 @@ lazy_static::lazy_static! {
         "unique_key_and_multi_partitions",
         "unique_key_and_multi_partitions_hash_aggregate",
 
+        // Cache/queue tables were version-bumped for text-or-binary values, so upgrading
+        // truncates them and the pre-migration rows these tests read back are gone
+        "cache_incr",
+        "cache_prefix_keys",
+        "cache_set_get_set_get",
+
         // New tests
+        "cache_binary_value",
+        "queue_binary_value",
         "join_multi_partition_small",
         "join_multi_partition_large",
         "decimal_math",
@@ -9571,6 +9582,161 @@ async fn cache_set_get_rm(service: Box<dyn SqlClient>) -> Result<(), CubeError> 
         get_response.get_rows(),
         &vec![Row::new(vec![TableValue::Null,]),]
     );
+    Ok(())
+}
+
+fn binary_parameter_context(value: &[u8]) -> SqlQueryContext {
+    SqlQueryContext::default()
+        .with_parameters(&Some(vec![QueryParameter::BinaryValue(value.to_vec())]))
+}
+
+async fn cache_binary_value(service: Box<dyn SqlClient>) -> Result<(), CubeError> {
+    service
+        .exec_query_with_context(
+            binary_parameter_context(&[0x00, 0xff, 0x10]),
+            "CACHE SET 'bin:binary' ?",
+        )
+        .await?;
+    service.exec_query("CACHE SET 'bin:text' 'text'").await?;
+
+    let get_response = service.exec_query("CACHE GET 'bin:binary'").await?;
+    assert_eq!(
+        get_response.get_columns(),
+        &vec![Column::new("value".to_string(), ColumnType::Bytes, 0)]
+    );
+    assert_eq!(
+        get_response.get_rows(),
+        &vec![Row::new(vec![TableValue::Bytes(vec![0x00, 0xff, 0x10])])]
+    );
+
+    let get_response = service.exec_query("CACHE GET 'bin:text'").await?;
+    assert_eq!(
+        get_response.get_columns(),
+        &vec![Column::new("value".to_string(), ColumnType::String, 0)]
+    );
+    assert_eq!(
+        get_response.get_rows(),
+        &vec![Row::new(vec![TableValue::String("text".to_string())])]
+    );
+
+    let system_response = service
+        .exec_query("SELECT id, value FROM system.cache WHERE prefix = 'bin' ORDER BY id")
+        .await?;
+    assert_eq!(
+        to_rows(&system_response),
+        rows(&[("binary", "0x00FF10"), ("text", "text")])
+    );
+
+    let err = service
+        .exec_query("CACHE INCR 'bin:binary'")
+        .await
+        .unwrap_err();
+    assert!(
+        err.message.contains("value is binary"),
+        "unexpected error: {}",
+        err
+    );
+
+    Ok(())
+}
+
+async fn queue_binary_value(service: Box<dyn SqlClient>) -> Result<(), CubeError> {
+    let add_response = service
+        .exec_query_with_context(
+            binary_parameter_context(&[0x01, 0x02]),
+            r#"QUEUE ADD PRIORITY 1 "STANDALONE#bqueue:binary" ?"#,
+        )
+        .await?;
+    let binary_id = assert_queue_add_and_get_id(&add_response)?;
+    service
+        .exec_query(r#"QUEUE ADD PRIORITY 0 "STANDALONE#bqueue:text" "text";"#)
+        .await?;
+
+    let system_response = service
+        .exec_query(
+            "SELECT id, value FROM system.queue WHERE prefix = 'STANDALONE#bqueue' ORDER BY id",
+        )
+        .await?;
+    assert_eq!(
+        to_rows(&system_response),
+        rows(&[("binary", "0x0102"), ("text", "text")])
+    );
+
+    // Mixed payloads share a single Bytes column
+    let list_response = service
+        .exec_query(r#"QUEUE LIST WITH_PAYLOAD "STANDALONE#bqueue";"#)
+        .await?;
+    assert_eq!(
+        list_response.get_columns()[4],
+        Column::new("payload".to_string(), ColumnType::Bytes, 4)
+    );
+    assert_eq!(
+        list_response
+            .get_rows()
+            .iter()
+            .map(|r| r.values()[4].clone())
+            .collect::<Vec<_>>(),
+        vec![
+            TableValue::Bytes(vec![0x01, 0x02]),
+            TableValue::Bytes(b"text".to_vec())
+        ]
+    );
+    // Must not panic on a column/value type mismatch (Arrow response format)
+    rows_to_columns(list_response.get_columns(), list_response.get_rows());
+
+    let get_response = service
+        .exec_query(r#"QUEUE GET "STANDALONE#bqueue:text""#)
+        .await?;
+    assert_eq!(
+        get_response.get_columns()[0],
+        Column::new("payload".to_string(), ColumnType::String, 0)
+    );
+
+    let retrieve_response = service
+        .exec_query(r#"QUEUE RETRIEVE CONCURRENCY 2 "STANDALONE#bqueue:binary""#)
+        .await?;
+    assert_eq!(
+        retrieve_response.get_columns()[0],
+        Column::new("payload".to_string(), ColumnType::Bytes, 0)
+    );
+    assert_eq!(
+        retrieve_response.get_rows()[0].values()[0],
+        TableValue::Bytes(vec![0x01, 0x02])
+    );
+
+    let ack_response = service
+        .exec_query_with_context(
+            binary_parameter_context(&[0xca, 0xfe]),
+            &format!("QUEUE ACK {} ?", binary_id),
+        )
+        .await?;
+    assert_eq!(
+        ack_response.get_rows(),
+        &vec![Row::new(vec![TableValue::Boolean(true)])]
+    );
+
+    let system_response = service
+        .exec_query(
+            "SELECT path, value FROM system.queue_results WHERE path = 'STANDALONE#bqueue:binary'",
+        )
+        .await?;
+    assert_eq!(
+        to_rows(&system_response),
+        rows(&[("STANDALONE#bqueue:binary", "0xCAFE")])
+    );
+
+    let result_response = service
+        .exec_query(&format!("QUEUE RESULT {}", binary_id))
+        .await?;
+    assert_eq!(
+        result_response.get_columns()[0],
+        Column::new("payload".to_string(), ColumnType::Bytes, 0)
+    );
+    assert_eq!(
+        result_response.get_rows()[0].values()[0],
+        TableValue::Bytes(vec![0xca, 0xfe])
+    );
+
     Ok(())
 }
 

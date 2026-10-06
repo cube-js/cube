@@ -214,6 +214,9 @@ impl Row {
     pub fn values(&self) -> &Vec<TableValue> {
         &self.values
     }
+    pub fn into_values(self) -> Vec<TableValue> {
+        self.values
+    }
 }
 
 pub fn cmp_same_types(l: &TableValue, r: &TableValue) -> Ordering {

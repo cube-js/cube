@@ -1,3 +1,4 @@
+use crate::cachestore::CacheValue;
 use crate::metastore::{
     BaseRocksTable, IndexId, RocksEntity, RocksSecondaryIndex, RocksTable, TableId, TableInfo,
 };
@@ -11,7 +12,7 @@ use serde::{Deserialize, Deserializer, Serialize};
 pub struct CacheItem {
     pub(crate) prefix: Option<String>,
     pub(crate) key: String,
-    pub(crate) value: String,
+    pub(crate) value: CacheValue,
     #[serde(with = "ts_seconds_option")]
     pub(crate) expire: Option<DateTime<Utc>>,
 }
@@ -22,7 +23,11 @@ pub struct CacheItem {
 // SecondaryIndex::ByPath 13 + hash (let's take 18)
 pub const CACHE_ITEM_SIZE_WITHOUT_VALUE: u32 = (15 * 3) + 58 + (8 + 18) + (13 + 18);
 
-impl RocksEntity for CacheItem {}
+impl RocksEntity for CacheItem {
+    fn version() -> u32 {
+        2
+    }
+}
 
 impl CacheItem {
     pub fn parse_path_to_prefix(mut path: String) -> String {
@@ -42,7 +47,7 @@ impl CacheItem {
         path
     }
 
-    pub fn new(path: String, ttl: Option<u32>, value: String) -> CacheItem {
+    pub fn new(path: String, ttl: Option<u32>, value: impl Into<CacheValue>) -> CacheItem {
         let parts: Vec<&str> = path.rsplitn(2, ":").collect();
 
         let (prefix, key) = match parts.len() {
@@ -53,7 +58,7 @@ impl CacheItem {
         CacheItem {
             prefix,
             key,
-            value,
+            value: value.into(),
             expire: ttl.map(|ttl| Utc::now() + Duration::seconds(ttl as i64)),
         }
     }
@@ -78,7 +83,7 @@ impl CacheItem {
         &self.expire
     }
 
-    pub fn get_value(&self) -> &String {
+    pub fn get_value(&self) -> &CacheValue {
         &self.value
     }
 }

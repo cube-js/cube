@@ -1,4 +1,4 @@
-use crate::cachestore::QueueKey;
+use crate::cachestore::{CacheValue, QueueKey};
 use crate::metastore::{
     BaseRocksTable, IdRow, IndexId, RocksEntity, RocksSecondaryIndex, RocksTable, TableId,
     TableInfo,
@@ -12,7 +12,7 @@ use serde::{Deserialize, Deserializer, Serialize};
 #[derive(Clone, Serialize, Deserialize, Debug, Eq, PartialEq)]
 pub struct QueueResult {
     path: String,
-    pub(crate) value: String,
+    pub(crate) value: CacheValue,
     pub(crate) deleted: bool,
     #[serde(with = "ts_seconds")]
     pub(crate) expire: DateTime<Utc>,
@@ -22,12 +22,12 @@ pub struct QueueResult {
 
 impl RocksEntity for QueueResult {
     fn version() -> u32 {
-        4
+        5
     }
 }
 
 impl QueueResult {
-    pub fn new(path: String, value: String, external_id: Option<String>) -> Self {
+    pub fn new(path: String, value: CacheValue, external_id: Option<String>) -> Self {
         QueueResult {
             path,
             value,
@@ -41,7 +41,7 @@ impl QueueResult {
         &self.path
     }
 
-    pub fn get_value(&self) -> &String {
+    pub fn get_value(&self) -> &CacheValue {
         &self.value
     }
 

@@ -5,8 +5,8 @@ use crate::cachestore::cache_rocksstore::{
 };
 use crate::cachestore::queue_item::QueueRetrieveResponse;
 use crate::cachestore::{
-    CacheItem, CacheStore, QueueCancelResponse, QueueItem, QueueItemStatus, QueueKey, QueueResult,
-    QueueResultResponse, RocksCacheStore,
+    CacheItem, CacheStore, CacheValue, QueueCancelResponse, QueueItem, QueueItemStatus, QueueKey,
+    QueueResult, QueueResultResponse, RocksCacheStore,
 };
 use crate::config::ConfigObj;
 use crate::metastore::{IdRow, MetaStoreEvent, MetaStoreFs, RocksPropertyRow};
@@ -361,7 +361,11 @@ impl CacheStore for LazyRocksCacheStore {
             .await
     }
 
-    async fn queue_ack(&self, key: QueueKey, result: Option<String>) -> Result<bool, CubeError> {
+    async fn queue_ack(
+        &self,
+        key: QueueKey,
+        result: Option<CacheValue>,
+    ) -> Result<bool, CubeError> {
         self.init().await?.queue_ack(key, result).await
     }
 
@@ -666,7 +670,7 @@ mod tests {
         cachestore
             .queue_add(QueueAddPayload {
                 path: "queue:job1".to_string(),
-                value: "payload".to_string(),
+                value: "payload".into(),
                 priority: 0,
                 orphaned: None,
                 process_id: None,
@@ -694,7 +698,7 @@ mod tests {
             .cache_get("prefix:after".to_string())
             .await?
             .expect("must return row after wipe");
-        assert_eq!(row.into_row().value, "fresh".to_string());
+        assert_eq!(row.into_row().value, "fresh".into());
 
         // The local cachestore folder must exist again after the reopen.
         assert!(local.join("cachestore").exists());

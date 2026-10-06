@@ -7,7 +7,7 @@ use crate::cachestore::queue_item::{
     QueueItemStatus, QueueResultAckEvent, QueueResultAckEventResult, QueueRetrieveResponse,
 };
 use crate::cachestore::queue_result::{QueueResultRocksIndex, QueueResultRocksTable};
-use crate::cachestore::{compaction, QueueItemPayload, QueueResult};
+use crate::cachestore::{compaction, CacheValue, QueueItemPayload, QueueResult};
 use crate::config::injection::DIService;
 use crate::config::{Config, ConfigObj};
 use std::collections::HashMap;
@@ -834,7 +834,7 @@ pub struct QueueAddResponse {
 #[derive(Clone, Serialize, Deserialize, Debug, Eq, PartialEq)]
 pub struct QueueAddPayload {
     pub path: String,
-    pub value: String,
+    pub value: CacheValue,
     pub priority: i64,
     pub orphaned: Option<u32>,
     pub process_id: Option<String>,
@@ -845,7 +845,7 @@ pub struct QueueAddPayload {
 #[derive(Clone, Serialize, Deserialize, Debug, Eq, PartialEq)]
 pub struct QueueAddAndRetrievePayload {
     pub path: String,
-    pub value: String,
+    pub value: CacheValue,
     pub priority: i64,
     pub orphaned: Option<u32>,
     pub process_id: Option<String>,
@@ -863,7 +863,7 @@ pub struct QueueAddAndRetrieveResponse {
     /// Keys of the active items in the prefix after this operation
     pub active: Vec<String>,
     /// `Some` only when the item was claimed (moved to the active status) by this call
-    pub payload: Option<String>,
+    pub payload: Option<CacheValue>,
     pub extra: Option<String>,
 }
 
@@ -902,7 +902,8 @@ impl QueueAddAndRetrieveResponse {
             TableValue::Boolean(self.added),
             TableValue::Int(self.pending as i64),
             active_keys_to_value(self.active),
-            self.payload.map_or(TableValue::Null, TableValue::String),
+            self.payload
+                .map_or(TableValue::Null, CacheValue::into_table_value),
             self.extra.map_or(TableValue::Null, TableValue::String),
         ])
     }
@@ -911,13 +912,13 @@ impl QueueAddAndRetrieveResponse {
 #[derive(Clone, Serialize, Deserialize, Debug, Eq, PartialEq)]
 pub struct QueueCancelResponse {
     pub extra: Option<String>,
-    pub value: String,
+    pub value: CacheValue,
 }
 
 impl QueueCancelResponse {
     pub fn into_queue_cancel_row(self) -> Row {
         let res = vec![
-            TableValue::String(self.value),
+            self.value.into_table_value(),
             if let Some(extra) = self.extra {
                 TableValue::String(extra)
             } else {
@@ -932,7 +933,7 @@ impl QueueCancelResponse {
 #[derive(Clone, Serialize, Deserialize, Debug, Eq, PartialEq)]
 pub enum QueueResultResponse {
     Success {
-        value: Option<String>,
+        value: Option<CacheValue>,
         #[serde(default)]
         id: u64,
         #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -948,11 +949,7 @@ impl QueueResultResponse {
                 id,
                 external_id,
             } => Row::new(vec![
-                if let Some(v) = value {
-                    TableValue::String(v)
-                } else {
-                    TableValue::Null
-                },
+                value.map_or(TableValue::Null, CacheValue::into_table_value),
                 TableValue::String("success".to_string()),
                 TableValue::String(id.to_string()),
                 if let Some(ext_id) = external_id {
@@ -968,7 +965,7 @@ impl QueueResultResponse {
 #[derive(Clone, Serialize, Deserialize, Debug, Eq, PartialEq)]
 pub enum QueueListItem {
     ItemOnly(IdRow<QueueItem>),
-    WithPayload(IdRow<QueueItem>, String),
+    WithPayload(IdRow<QueueItem>, CacheValue),
 }
 
 impl QueueListItem {
@@ -993,7 +990,7 @@ impl QueueListItem {
         ];
 
         if let Some(payload) = payload {
-            res.push(TableValue::String(payload));
+            res.push(payload.into_table_value());
         };
 
         Row::new(res)
@@ -1003,13 +1000,13 @@ impl QueueListItem {
 #[derive(Clone, Serialize, Deserialize, Debug, Eq, PartialEq)]
 pub struct QueueGetResponse {
     extra: Option<String>,
-    payload: String,
+    payload: CacheValue,
 }
 
 impl QueueGetResponse {
     pub fn into_queue_get_row(self) -> Row {
         let res = vec![
-            TableValue::String(self.payload),
+            self.payload.into_table_value(),
             if let Some(extra) = self.extra {
                 TableValue::String(extra)
             } else {
@@ -1024,7 +1021,7 @@ impl QueueGetResponse {
 #[derive(Clone, Serialize, Deserialize, Debug, Eq, PartialEq)]
 pub struct QueueAllItem {
     pub item: IdRow<QueueItem>,
-    pub payload: Option<String>,
+    pub payload: Option<CacheValue>,
 }
 
 #[cuberpc::service]
@@ -1081,7 +1078,8 @@ pub trait CacheStore: DIService + Send + Sync {
         allow_concurrency: u32,
         caller_process_id: Option<String>,
     ) -> Result<QueueRetrieveResponse, CubeError>;
-    async fn queue_ack(&self, key: QueueKey, result: Option<String>) -> Result<bool, CubeError>;
+    async fn queue_ack(&self, key: QueueKey, result: Option<CacheValue>)
+        -> Result<bool, CubeError>;
     async fn queue_result(
         &self,
         key: QueueKey,
@@ -1284,8 +1282,18 @@ impl CacheStore for RocksCacheStore {
                 if let Some(id_row) = id_row_opt {
                     let mut new = id_row.row.clone();
 
-                    let last_val = id_row.row.value.parse::<i64>()?;
-                    new.value = (last_val + 1).to_string();
+                    let last_val = id_row
+                        .row
+                        .value
+                        .as_text()
+                        .ok_or_else(|| {
+                            CubeError::user(format!(
+                                "Unable to increment cache item \"{}\": value is binary",
+                                path
+                            ))
+                        })?
+                        .parse::<i64>()?;
+                    new.value = CacheValue::Text((last_val + 1).to_string());
 
                     cache_schema.update(id_row.id, new, &id_row.row, batch_pipe)
                 } else {
@@ -1724,7 +1732,11 @@ impl CacheStore for RocksCacheStore {
         .await
     }
 
-    async fn queue_ack(&self, key: QueueKey, result: Option<String>) -> Result<bool, CubeError> {
+    async fn queue_ack(
+        &self,
+        key: QueueKey,
+        result: Option<CacheValue>,
+    ) -> Result<bool, CubeError> {
         self.write_operation_queue("queue_ack", move |db_ref, batch_pipe| {
             let queue_item_tbl = QueueItemRocksTable::new(db_ref.clone());
             let queue_item_payload_tbl = QueueItemPayloadRocksTable::new(db_ref.clone());
@@ -2025,7 +2037,11 @@ impl CacheStore for ClusterCacheStoreClient {
         panic!("CacheStore cannot be used on the worker node! queue_retrieve_by_path was used.")
     }
 
-    async fn queue_ack(&self, _key: QueueKey, _result: Option<String>) -> Result<bool, CubeError> {
+    async fn queue_ack(
+        &self,
+        _key: QueueKey,
+        _result: Option<CacheValue>,
+    ) -> Result<bool, CubeError> {
         panic!("CacheStore cannot be used on the worker node! queue_ack was used.")
     }
 
@@ -2115,9 +2131,12 @@ mod tests {
         let key = "prefix:key".to_string();
         assert_eq!(
             cachestore.cache_incr(key.clone()).await?.get_row().value,
-            "1"
+            "1".into()
         );
-        assert_eq!(cachestore.cache_incr(key).await?.get_row().value, "2");
+        assert_eq!(
+            cachestore.cache_incr(key).await?.get_row().value,
+            "2".into()
+        );
 
         RocksCacheStore::cleanup_test_cachestore("cache_incr");
 
@@ -2158,7 +2177,7 @@ mod tests {
             .expect("must return row")
             .into_row();
         assert_eq!(row.get_path(), path);
-        assert_eq!(row.value, "value2".to_string());
+        assert_eq!(row.value, "value2".into());
         assert_eq!(row.expire.is_some(), true);
 
         RocksCacheStore::cleanup_test_cachestore("cache_set");
@@ -2191,7 +2210,7 @@ mod tests {
         cachestore
             .queue_add(QueueAddPayload {
                 path: "queue:p1".to_string(),
-                value: "qv1".to_string(),
+                value: "qv1".into(),
                 priority: 0,
                 orphaned: None,
                 process_id: None,
@@ -2645,7 +2664,7 @@ mod tests {
         let res = cachestore
             .queue_add(QueueAddPayload {
                 path: "prefix:path1".to_string(),
-                value: "v1".to_string(),
+                value: "v1".into(),
                 priority: 0,
                 orphaned: None,
                 process_id: None,
@@ -2660,7 +2679,7 @@ mod tests {
         let res = cachestore
             .queue_add(QueueAddPayload {
                 path: "prefix:path2".to_string(),
-                value: "v2".to_string(),
+                value: "v2".into(),
                 priority: 0,
                 orphaned: None,
                 process_id: None,
@@ -2678,7 +2697,7 @@ mod tests {
         let res = cachestore
             .queue_add(QueueAddPayload {
                 path: "prefix:path1".to_string(),
-                value: "v1-dup".to_string(),
+                value: "v1-dup".into(),
                 priority: 0,
                 orphaned: None,
                 process_id: None,
@@ -2694,7 +2713,7 @@ mod tests {
             let res = cachestore
                 .queue_add(QueueAddPayload {
                     path: "prefix:path3".to_string(),
-                    value: "v3".to_string(),
+                    value: "v3".into(),
                     priority: 0,
                     orphaned: None,
                     process_id: None,
@@ -2711,7 +2730,7 @@ mod tests {
             let res = cachestore
                 .queue_add(QueueAddPayload {
                     path: "prefix:path4".to_string(),
-                    value: "v4".to_string(),
+                    value: "v4".into(),
                     priority: 0,
                     orphaned: None,
                     process_id: None,
@@ -2762,7 +2781,7 @@ mod tests {
     ) -> QueueAddAndRetrievePayload {
         QueueAddAndRetrievePayload {
             path: path.to_string(),
-            value: value.to_string(),
+            value: value.into(),
             priority: 0,
             orphaned: None,
             process_id: None,
@@ -2785,7 +2804,7 @@ mod tests {
             .queue_add_and_retrieve(queue_add_and_retrieve_payload("prefix:path1", "v1", 1))
             .await?;
         assert!(res.added);
-        assert_eq!(res.payload, Some("v1".to_string()));
+        assert_eq!(res.payload, Some("v1".into()));
         assert_eq!(res.extra, None);
         assert_eq!(res.active, vec!["path1".to_string()]);
         // A claimed item is inserted as active, it was never pending
@@ -2808,7 +2827,7 @@ mod tests {
             .queue_add_and_retrieve(queue_add_and_retrieve_payload("prefix:path2", "v2-dup", 2))
             .await?;
         assert!(!res.added);
-        assert_eq!(res.payload, Some("v2".to_string()));
+        assert_eq!(res.payload, Some("v2".into()));
         assert_eq!(res.pending, 0);
 
         let mut active = res.active;
@@ -2837,7 +2856,7 @@ mod tests {
         let res = cachestore
             .queue_add(QueueAddPayload {
                 path: "prefix:path4".to_string(),
-                value: "v4".to_string(),
+                value: "v4".into(),
                 priority: 0,
                 orphaned: None,
                 process_id: None,
@@ -2868,7 +2887,7 @@ mod tests {
             cachestore
                 .queue_add(QueueAddPayload {
                     path: path.to_string(),
-                    value: "v".to_string(),
+                    value: "v".into(),
                     priority: 0,
                     orphaned: None,
                     process_id: None,
@@ -2895,7 +2914,7 @@ mod tests {
             .queue_add_and_retrieve(queue_add_and_retrieve_payload("prefix:path4", "v4", 4))
             .await?;
         assert!(res.added);
-        assert_eq!(res.payload, Some("v4".to_string()));
+        assert_eq!(res.payload, Some("v4".into()));
         assert_eq!(res.active, vec!["path4".to_string()]);
         assert_eq!(res.pending, 3);
 
@@ -2936,7 +2955,7 @@ mod tests {
             })
             .await?;
         assert!(res.added);
-        assert_eq!(res.payload, Some("v1".to_string()));
+        assert_eq!(res.payload, Some("v1".into()));
 
         let res = cachestore
             .queue_add_and_retrieve(QueueAddAndRetrievePayload {
@@ -2976,7 +2995,7 @@ mod tests {
             })
             .await?;
         assert!(!res.added);
-        assert_eq!(res.payload, Some("v2".to_string()));
+        assert_eq!(res.payload, Some("v2".into()));
         assert_queue_item_status(&cachestore, "path2", QueueItemStatus::Active, true).await?;
 
         // An exclusive item without an owner would be inserted straight in the active
@@ -3009,7 +3028,7 @@ mod tests {
         cachestore
             .queue_add(QueueAddPayload {
                 path: "prefix:path1".to_string(),
-                value: "v1".to_string(),
+                value: "v1".into(),
                 priority: 0,
                 orphaned: None,
                 process_id: None,
@@ -3021,7 +3040,7 @@ mod tests {
         cachestore
             .queue_add(QueueAddPayload {
                 path: "prefix:path2".to_string(),
-                value: "v2".to_string(),
+                value: "v2".into(),
                 priority: 0,
                 orphaned: None,
                 process_id: None,
@@ -3034,7 +3053,7 @@ mod tests {
         cachestore
             .queue_add(QueueAddPayload {
                 path: "prefix:path_ext".to_string(),
-                value: "v_ext".to_string(),
+                value: "v_ext".into(),
                 priority: 0,
                 orphaned: None,
                 process_id: None,
@@ -3062,7 +3081,7 @@ mod tests {
         let res = cachestore
             .queue_add(QueueAddPayload {
                 path: "prefix:path3".to_string(),
-                value: "v3".to_string(),
+                value: "v3".into(),
                 priority: 0,
                 orphaned: None,
                 process_id: None,
@@ -3080,7 +3099,7 @@ mod tests {
         let res = cachestore
             .queue_add(QueueAddPayload {
                 path: "prefix:path_ext_dup".to_string(),
-                value: "v_ext_dup".to_string(),
+                value: "v_ext_dup".into(),
                 priority: 0,
                 orphaned: None,
                 process_id: None,
@@ -3103,7 +3122,7 @@ mod tests {
     fn queue_add_payload(path: &str) -> QueueAddPayload {
         QueueAddPayload {
             path: path.to_string(),
-            value: "payload".to_string(),
+            value: "payload".into(),
             priority: 0,
             orphaned: None,
             process_id: None,
@@ -3112,7 +3131,7 @@ mod tests {
         }
     }
 
-    fn queue_result_value(response: Option<QueueResultResponse>) -> Option<String> {
+    fn queue_result_value(response: Option<QueueResultResponse>) -> Option<CacheValue> {
         match response {
             Some(QueueResultResponse::Success { value, .. }) => value,
             None => None,
@@ -3153,7 +3172,7 @@ mod tests {
         tokio::time::sleep(std::time::Duration::from_millis(200)).await;
         assert!(
             cachestore
-                .queue_ack(QueueKey::ById(id), Some("result".to_string()))
+                .queue_ack(QueueKey::ById(id), Some("result".into()))
                 .await?
         );
 
@@ -3161,7 +3180,7 @@ mod tests {
             assert_eq!(
                 waiter.await.unwrap()?,
                 Some(QueueResultResponse::Success {
-                    value: Some("result".to_string()),
+                    value: Some("result".into()),
                     id,
                     external_id: Some("ext-1".to_string()),
                 })
@@ -3177,7 +3196,7 @@ mod tests {
         );
         assert_eq!(
             queue_result_value(cachestore.queue_result(QueueKey::ById(id), None).await?),
-            Some("result".to_string())
+            Some("result".into())
         );
 
         RocksCacheStore::cleanup_test_cachestore("test_queue_result_blocking_multiple_waiters");

@@ -1,4 +1,4 @@
-use crate::cachestore::{QueueItemStatus, QueueKey, QUEUE_ITEM_EXTERNAL_ID_MAX_LEN};
+use crate::cachestore::{CacheValue, QueueItemStatus, QueueKey, QUEUE_ITEM_EXTERNAL_ID_MAX_LEN};
 use crate::config::env_parse_positive_lenient;
 use crate::sql::{QueryParameter, QueryParameters};
 use sqlparser::ast::{
@@ -81,7 +81,7 @@ pub enum RocksStoreName {
 pub enum CacheCommand {
     Set {
         key: Ident,
-        value: String,
+        value: CacheValue,
         ttl: Option<u32>,
         nx: bool,
     },
@@ -120,7 +120,7 @@ pub enum QueueCommand {
         priority: i64,
         orphaned: Option<u32>,
         key: Ident,
-        value: String,
+        value: CacheValue,
         external_id: Option<String>,
     },
     /// `QUEUE ADD` which also claims the item (moves it to the active status) in the
@@ -130,7 +130,7 @@ pub enum QueueCommand {
         priority: i64,
         orphaned: Option<u32>,
         key: Ident,
-        value: String,
+        value: CacheValue,
         external_id: Option<String>,
         concurrency: u32,
     },
@@ -156,7 +156,7 @@ pub enum QueueCommand {
     },
     Ack {
         key: QueueKey,
-        result: Option<String>,
+        result: Option<CacheValue>,
     },
     MergeExtra {
         key: QueueKey,
@@ -476,6 +476,24 @@ impl<'a> CubeStoreParser<'a> {
         }
     }
 
+    /// Text from a literal or a string parameter, binary from a binary parameter
+    fn parse_cache_value(&mut self) -> Result<CacheValue, ParserError> {
+        if let Token::Placeholder(placeholder) = self.parser.peek_token().token {
+            self.parser.next_token();
+
+            match self.unwrap_placeholder(&placeholder)? {
+                QueryParameter::StringValue(s) => Ok(CacheValue::Text(s)),
+                QueryParameter::BinaryValue(b) => Ok(CacheValue::Binary(b)),
+                other => Err(ParserError::ParserError(format!(
+                    "Wrong parameters type, actual: {}, expected: string or binary parameter",
+                    other.get_type()
+                ))),
+            }
+        } else {
+            Ok(CacheValue::Text(self.parser.parse_literal_string()?))
+        }
+    }
+
     fn parse_external_id(&mut self) -> Result<String, ParserError> {
         let external_id = self.parse_literal_string()?;
         if external_id.len() > QUEUE_ITEM_EXTERNAL_ID_MAX_LEN {
@@ -530,7 +548,7 @@ impl<'a> CubeStoreParser<'a> {
 
                 CacheCommand::Set {
                     key: self.parse_identifier()?,
-                    value: self.parse_literal_string()?,
+                    value: self.parse_cache_value()?,
                     ttl,
                     nx,
                 }
@@ -713,7 +731,7 @@ impl<'a> CubeStoreParser<'a> {
                     priority,
                     orphaned,
                     key: self.parse_identifier()?,
-                    value: self.parse_literal_string()?,
+                    value: self.parse_cache_value()?,
                     external_id,
                 }
             }
@@ -735,7 +753,7 @@ impl<'a> CubeStoreParser<'a> {
                     priority,
                     orphaned,
                     key: self.parse_identifier()?,
-                    value: self.parse_literal_string()?,
+                    value: self.parse_cache_value()?,
                     external_id,
                     concurrency: self.parse_integer("concurrency", false)?,
                 }
@@ -751,7 +769,7 @@ impl<'a> CubeStoreParser<'a> {
                 let result = if self.parser.parse_keyword(Keyword::NULL) {
                     None
                 } else {
-                    Some(self.parse_literal_string()?)
+                    Some(self.parse_cache_value()?)
                 };
 
                 QueueCommand::Ack { key, result }
@@ -1315,7 +1333,7 @@ mod tests {
                 assert_eq!(priority, 0);
                 assert_eq!(orphaned, None);
                 assert_eq!(key.value, "key");
-                assert_eq!(value, "value");
+                assert_eq!(value, "value".into());
                 assert_eq!(external_id, None);
                 assert_eq!(concurrency, 4);
             }
@@ -1350,6 +1368,43 @@ mod tests {
     }
 
     #[test]
+    fn parse_binary_value_placeholders() -> Result<(), CubeError> {
+        let binary = || QueryParameter::BinaryValue(vec![0, 255, 16]);
+
+        let mut parser = CubeStoreParser::new("CACHE SET 'prefix:key' ?", Some(vec![binary()]))?;
+        match parser.parse_statement()? {
+            Statement::Cache(CacheCommand::Set { value, .. }) => {
+                assert_eq!(value, CacheValue::Binary(vec![0, 255, 16]));
+            }
+            other => panic!("Expected CacheCommand::Set, actual: {:?}", other),
+        }
+
+        let mut parser = CubeStoreParser::new("QUEUE ADD 'prefix:key' ?", Some(vec![binary()]))?;
+        match parser.parse_statement()? {
+            Statement::Queue(QueueCommand::Add { value, .. }) => {
+                assert_eq!(value, CacheValue::Binary(vec![0, 255, 16]));
+            }
+            other => panic!("Expected QueueCommand::Add, actual: {:?}", other),
+        }
+
+        let mut parser = CubeStoreParser::new("QUEUE ACK 1 ?", Some(vec![binary()]))?;
+        match parser.parse_statement()? {
+            Statement::Queue(QueueCommand::Ack { result, .. }) => {
+                assert_eq!(result, Some(CacheValue::Binary(vec![0, 255, 16])));
+            }
+            other => panic!("Expected QueueCommand::Ack, actual: {:?}", other),
+        }
+
+        let mut parser = CubeStoreParser::new(
+            "CACHE SET 'prefix:key' ?",
+            Some(vec![QueryParameter::Int64Value(1)]),
+        )?;
+        assert!(parser.parse_statement().is_err());
+
+        Ok(())
+    }
+
+    #[test]
     fn parse_queue_add_and_retrieve_placeholders() -> Result<(), CubeError> {
         let mut parser = CubeStoreParser::new(
             "QUEUE ADD_AND_RETRIEVE ? ? ?",
@@ -1368,7 +1423,7 @@ mod tests {
                 ..
             }) => {
                 assert_eq!(key.value, "key");
-                assert_eq!(value, "value");
+                assert_eq!(value, "value".into());
                 assert_eq!(concurrency, 8);
             }
             other => panic!("Expected QueueCommand::AddAndRetrieve, actual: {:?}", other),
