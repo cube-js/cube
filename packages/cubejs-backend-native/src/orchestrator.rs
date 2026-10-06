@@ -237,17 +237,17 @@ fn extract_query_result(
     }
 }
 
-/// Bytes of a JS `Buffer` lent to a worker thread without copying. The caller keeps the
-/// buffer alive with a `Root` until the task settles.
-struct PinnedJsBytes {
+/// Non-owning view of a JS `Buffer`, lent to a worker thread without copying. The caller
+/// keeps the buffer alive with a `Root` until the task settles.
+struct JsBufferView {
     ptr: *const u8,
     len: usize,
 }
 
 // SAFETY: only read, and only while the owning `Root<JsBuffer>` is held (see `as_slice`).
-unsafe impl Send for PinnedJsBytes {}
+unsafe impl Send for JsBufferView {}
 
-impl PinnedJsBytes {
+impl JsBufferView {
     /// # Safety
     /// The rooted buffer must not be written to, detached or transferred by JS while the
     /// returned slice is in use. Otherwise flatbuffers' unchecked reads after verification
@@ -266,7 +266,7 @@ pub fn parse_cubestore_result_message(mut cx: FunctionContext) -> JsResult<JsPro
     let msg = cx.argument::<JsBuffer>(0)?;
     let msg_bytes = {
         let slice = msg.as_slice(&cx);
-        PinnedJsBytes {
+        JsBufferView {
             ptr: slice.as_ptr(),
             len: slice.len(),
         }
@@ -278,7 +278,7 @@ pub fn parse_cubestore_result_message(mut cx: FunctionContext) -> JsResult<JsPro
 
     let promise = cx
         .task(move || {
-            // SAFETY: see PinnedJsBytes::as_slice; `msg_root` outlives the task.
+            // SAFETY: see JsBufferView::as_slice; `msg_root` outlives the task.
             QueryResult::from_cubestore_fb(unsafe { msg_bytes.as_slice() })
         })
         .promise(move |mut cx, res| {
