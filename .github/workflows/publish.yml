@@ -10,6 +10,9 @@ env:
   CARGO_NET_RETRY: 10
   RUSTUP_MAX_RETRIES: 10
 
+permissions:
+  contents: read
+
 jobs:
   npm:
     # cubestore and native download their binaries from this release in post-install, so

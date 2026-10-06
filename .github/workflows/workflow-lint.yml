@@ -9,6 +9,9 @@ on:
     paths:
       - .github/workflows/**
 
+permissions:
+  contents: read
+
 jobs:
   lint:
     name: Lint workflows yaml
