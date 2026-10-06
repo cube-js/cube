@@ -76,24 +76,34 @@ export class OrchestratorApi {
       return query;
     }
 
-    const queryTags = await this.options.queryTags({
-      ...query.context as RequestContext,
-      dataSource: query.dataSource || 'default',
-    });
+    try {
+      const queryTags = await this.options.queryTags({
+        ...query.context as RequestContext,
+        dataSource: query.dataSource || 'default',
+      });
 
-    if (!queryTags) {
+      if (!queryTags) {
+        return query;
+      }
+
+      // The hook reads an arbitrary security context, so missing and non-string values are settled once here
+      return {
+        ...query,
+        queryTags: Object.fromEntries(
+          Object.entries(queryTags)
+            .filter(([, value]) => value != null)
+            .map(([key, value]) => [key, String(value)])
+        ),
+      };
+    } catch (e) {
+      // Tags only attribute cost, so a failing hook must not keep users from their data
+      this.logger('Query Tags Error', {
+        requestId: query.requestId,
+        error: (e as Error).stack || String(e),
+      });
+
       return query;
     }
-
-    // The hook reads an arbitrary security context, so missing and non-string values are settled once here
-    return {
-      ...query,
-      queryTags: Object.fromEntries(
-        Object.entries(queryTags)
-          .filter(([, value]) => value != null)
-          .map(([key, value]) => [key, String(value)])
-      ),
-    };
   }
 
   /**

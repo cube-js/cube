@@ -1004,7 +1004,8 @@ jobs as labels.
 Called on each query, except ones served by pre-aggregations in Cube Store. Receives the
 request context with the
 [security context][ref-sec-ctx] and the name of the
-[data source][ref-multiple-data-sources] as `dataSource`.
+[data source][ref-multiple-data-sources] as `dataSource`. If the function throws, Cube
+logs the error and runs the query without tags.
 
 <CodeGroup>
 

@@ -4,7 +4,7 @@ import functools
 import inspect
 import os
 import threading
-from typing import Union, Callable, Dict, Any
+from typing import Union, Callable, Dict, Any, Optional
 
 
 def file_repository(path):
@@ -82,7 +82,7 @@ class Configuration:
     pre_aggregations_schema: Union[Callable[[RequestContext], str], str]
     orchestrator_options: Union[Dict, Callable[[RequestContext], Dict]]
     context_to_groups: Callable[[RequestContext], list[str]]
-    query_tags: Callable[[RequestContext], Dict[str, str]]
+    query_tags: Callable[[RequestContext], Optional[Dict[str, Union[str, int, float, bool, None]]]]
     fast_reload: bool
 
     def __init__(self):

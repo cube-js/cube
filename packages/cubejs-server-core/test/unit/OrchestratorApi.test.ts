@@ -37,7 +37,8 @@ describe('OrchestratorApi queryTags', () => {
       release: async () => undefined,
     };
 
-    const api = new OrchestratorApi(async () => driver as any, () => undefined, {
+    const logger = jest.fn();
+    const api = new OrchestratorApi(async () => driver as any, logger, {
       cacheAndQueueDriver: 'memory',
       contextToDbType: async () => 'bigquery',
       contextToExternalDbType: () => 'cubestore',
@@ -47,7 +48,7 @@ describe('OrchestratorApi queryTags', () => {
     });
     apis.push(api);
 
-    return { api, driver };
+    return { api, driver, logger };
   }
 
   afterEach(async () => {
@@ -92,6 +93,20 @@ describe('OrchestratorApi queryTags', () => {
 
     expect(driver.query).toHaveBeenCalledWith('SELECT 1', [], expect.objectContaining({
       queryTags: { user_id: '42' },
+    }));
+  });
+
+  test('runs the query untagged and logs the error when the hook throws', async () => {
+    const { api, driver, logger } = createApi(({ securityContext }) => ({ user_id: securityContext.missing.id }));
+
+    await api.executeQuery(userQuery('alice'));
+
+    expect(driver.query).toHaveBeenCalledWith('SELECT 1', [], expect.not.objectContaining({
+      queryTags: expect.anything(),
+    }));
+    expect(logger).toHaveBeenCalledWith('Query Tags Error', expect.objectContaining({
+      requestId: 'request-alice',
+      error: expect.stringContaining('TypeError'),
     }));
   });
 
