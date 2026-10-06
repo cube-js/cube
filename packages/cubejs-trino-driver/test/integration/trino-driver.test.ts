@@ -82,4 +82,16 @@ describe('TrinoDriver', () => {
       expect(informationSchemaQuery).toContain('columns.table_schema = \'sf1\'');
     });
   });
+
+  // https://github.com/cube-js/cube/issues/12143
+  it('should preserve ORDER BY for results spanning several Trino batches', async () => {
+    await doWithDriver(async (driver: any) => {
+      const rows = await driver.query('SELECT orderkey, comment FROM orders ORDER BY orderkey LIMIT 100000', []);
+      const keys = rows.map((r: any) => Number(r.orderkey));
+
+      expect(keys.length).toBe(100000);
+      expect(keys[0]).toBe(1);
+      expect(keys).toEqual([...keys].sort((a, b) => a - b));
+    });
+  });
 });
