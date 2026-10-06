@@ -136,6 +136,11 @@ export type StreamOptions = {
    * database job/query for tracing (e.g. BigQuery job labels).
    */
   requestId?: string;
+  /**
+   * Key/value pairs from the `queryTags` config option, e.g. the user ID,
+   * forwarded so drivers can attach them to the database job/query.
+   */
+  queryTags?: Record<string, string>;
 };
 
 export type StreamingSourceOptions = {
@@ -173,6 +178,7 @@ export type UnloadOptions = {
 export type QueryOptions = {
   inlineTables?: InlineTables,
   requestId?: string,
+  queryTags?: Record<string, string>,
   [key: string]: any
 };
 

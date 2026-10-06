@@ -107,3 +107,12 @@ def context_to_groups(ctx):
         "dev",
         "analytics",
     ]
+
+
+@config
+def query_tags(ctx):
+    print("[python] query_tags", ctx)
+
+    return {
+        "user_id": ctx["securityContext"]["sub"],
+    }

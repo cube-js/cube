@@ -428,19 +428,21 @@ export class BigQueryDriver extends BaseDriver implements DriverInterface {
    * @see https://cloud.google.com/bigquery/docs/labels-intro#requirements
    */
   protected buildQueryLabels(options?: QueryOptions): { [k: string]: string } | undefined {
-    const requestId = options?.requestId;
-    if (!requestId) {
-      return undefined;
+    const toLabel = (s: string) => s.toLowerCase().replace(/[^a-z0-9_-]/g, '_').slice(0, 63);
+    const labels: { [k: string]: string } = {};
+
+    // Keys are sanitized like values; a key that is still invalid (e.g. starts with a digit)
+    // makes BigQuery reject the job, so a misconfigured key surfaces instead of vanishing.
+    for (const [key, value] of Object.entries(options?.queryTags || {})) {
+      labels[toLabel(key)] = toLabel(value);
     }
 
-    const queryUuid = extractRequestUUID(String(requestId));
-
-    const value = queryUuid.toLowerCase().replace(/[^a-z0-9_-]/g, '_').slice(0, 63);
-    if (!value) {
-      return undefined;
+    const requestId = options?.requestId && toLabel(extractRequestUUID(String(options.requestId)));
+    if (requestId) {
+      labels.cube_request_id = requestId;
     }
 
-    return { cube_request_id: value };
+    return Object.keys(labels).length ? labels : undefined;
   }
 
   protected async runQueryJob<T = QueryRowsResponse>(

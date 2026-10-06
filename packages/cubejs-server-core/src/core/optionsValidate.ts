@@ -89,6 +89,7 @@ const schemaOptions = Joi.object().keys({
   contextToCubeStoreRouterId: Joi.func(),
   contextToDataSourceId: Joi.func(),
   contextToApiScopes: Joi.func(),
+  queryTags: Joi.func(),
   repositoryFactory: Joi.func(),
   checkAuth: Joi.func(),
   jwt: jwtOptions,

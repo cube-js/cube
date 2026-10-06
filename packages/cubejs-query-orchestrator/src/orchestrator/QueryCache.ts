@@ -44,6 +44,7 @@ export type CacheQueryResultOptions = {
   priority?: number,
   external?: boolean,
   requestId?: string,
+  queryTags?: Record<string, string>,
   dataSource: string,
   waitForRenew?: boolean,
   forceNoCache?: boolean,
@@ -115,6 +116,8 @@ export type QueryBody = {
   scheduledRefresh?: boolean;
   cacheMode?: CacheMode;
   requestId?: string;
+  /** Labels the data source job (e.g. with the user); not part of the cache key. */
+  queryTags?: Record<string, string>;
   external?: boolean;
   isJob?: boolean;
   forceNoCache?: boolean;
@@ -337,6 +340,7 @@ export class QueryCache {
             priority: queuePriority,
             external: queryBody.external,
             requestId: queryBody.requestId,
+            queryTags: queryBody.queryTags,
             persistent: queryBody.persistent,
             dataSource: queryBody.dataSource,
             useCsvQuery: queryBody.useCsvQuery,
@@ -354,6 +358,7 @@ export class QueryCache {
               priority: queuePriority,
               external: queryBody.external,
               requestId: queryBody.requestId,
+              queryTags: queryBody.queryTags,
               dataSource: queryBody.dataSource,
               persistent: queryBody.persistent,
               inlineTables,
@@ -377,6 +382,7 @@ export class QueryCache {
           priority: queuePriority,
           external: queryBody.external,
           requestId: queryBody.requestId,
+          queryTags: queryBody.queryTags,
           dataSource: queryBody.dataSource,
           persistent: queryBody.persistent,
           skipRefreshKeyWaitForRenew: true,
@@ -397,6 +403,7 @@ export class QueryCache {
           priority: queuePriority,
           external: queryBody.external,
           requestId: queryBody.requestId,
+          queryTags: queryBody.queryTags,
           dataSource: queryBody.dataSource,
           persistent: queryBody.persistent,
           skipRefreshKeyWaitForRenew: true,
@@ -417,6 +424,7 @@ export class QueryCache {
         {
           external: queryBody.external,
           requestId: queryBody.requestId,
+          queryTags: queryBody.queryTags,
           dataSource: queryBody.dataSource,
           persistent: queryBody.persistent,
         }
@@ -437,6 +445,7 @@ export class QueryCache {
         forceNoCache,
         external: queryBody.external,
         requestId: queryBody.requestId,
+        queryTags: queryBody.queryTags,
         dataSource: queryBody.dataSource,
         persistent: queryBody.persistent,
       }
@@ -453,6 +462,7 @@ export class QueryCache {
         {
           external: queryBody.external,
           requestId: queryBody.requestId,
+          queryTags: queryBody.queryTags,
           dataSource: queryBody.dataSource,
           persistent: queryBody.persistent,
         }
@@ -616,6 +626,7 @@ export class QueryCache {
       external,
       priority,
       requestId,
+      queryTags,
       spanId,
       inlineTables,
       useCsvQuery,
@@ -628,6 +639,7 @@ export class QueryCache {
       external: boolean,
       priority?: number,
       requestId?: string,
+      queryTags?: Record<string, string>,
       spanId?: string,
       inlineTables?: InlineTables,
       useCsvQuery?: boolean,
@@ -645,6 +657,7 @@ export class QueryCache {
       query,
       values,
       requestId,
+      queryTags,
       inlineTables,
       useCsvQuery,
       lambdaTypes,
@@ -833,7 +846,11 @@ export class QueryCache {
           let logged = false;
           Promise
             .all([clientFactory()])
-            .then(([client]) => (<DriverInterface>client).stream(req.query, req.values, { highWaterMark: getEnv('dbQueryStreamHighWaterMark'), requestId: req.requestId }))
+            .then(([client]) => (<DriverInterface>client).stream(req.query, req.values, {
+              highWaterMark: getEnv('dbQueryStreamHighWaterMark'),
+              requestId: req.requestId,
+              queryTags: req.queryTags,
+            }))
             .then((source) => {
               const cleanup = async (error) => {
                 if (source.release) {
@@ -923,6 +940,7 @@ export class QueryCache {
     renewalThreshold: any,
     options: {
       requestId?: string,
+      queryTags?: Record<string, string>,
       skipRefreshKeyWaitForRenew?: boolean,
       external?: boolean,
       dataSource: string,
@@ -958,6 +976,7 @@ export class QueryCache {
     renewalThreshold: any,
     options: {
       requestId?: string,
+      queryTags?: Record<string, string>,
       skipRefreshKeyWaitForRenew?: boolean,
       priority?: number,
       external?: boolean,
@@ -999,6 +1018,7 @@ export class QueryCache {
               priority: options.priority,
               external: options.external,
               requestId: options.requestId,
+              queryTags: options.queryTags,
               dataSource: options.dataSource,
               useCsvQuery: options.useCsvQuery,
               lambdaTypes: options.lambdaTypes,
@@ -1152,6 +1172,7 @@ export class QueryCache {
         priority: options.priority,
         external: options.external,
         requestId: options.requestId,
+        queryTags: options.queryTags,
         spanId,
         persistent: options.persistent,
         dataSource: options.dataSource,

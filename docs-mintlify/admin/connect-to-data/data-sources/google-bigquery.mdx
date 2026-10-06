@@ -170,7 +170,30 @@ CUBEJS_DB_EXPORT_BUCKET_TYPE=gcp
 Cube does not require any additional configuration to enable SSL as Google
 BigQuery connections are made over HTTPS.
 
+## Query attribution
+
+Cube adds the `cube_request_id` [label][bq-docs-labels] to every BigQuery job it runs.
+Its value is the identifier shown for the query in Query History.
+
+To label jobs with the user or other request attributes, return them from
+[`query_tags`][ref-config-query-tags]. Cube lowercases keys and values, replaces
+characters other than ASCII letters, digits, `_`, and `-` with `_`, and truncates them to
+63 characters. Keys must start with a letter and a job can have at most 64 labels,
+otherwise BigQuery rejects the job. A tag can't override `cube_request_id`.
+
+For example, this query sums up the bytes billed per user over the last week:
+
+```sql
+SELECT
+  (SELECT value FROM UNNEST(labels) WHERE key = 'user_id') AS user_id,
+  SUM(total_bytes_billed) AS total_bytes_billed
+FROM `region-us`.INFORMATION_SCHEMA.JOBS
+WHERE creation_time > TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL 7 DAY)
+GROUP BY user_id
+```
+
 [bq]: https://cloud.google.com/bigquery
+[bq-docs-labels]: https://cloud.google.com/bigquery/docs/labels-intro#requirements
 [bq-docs-getting-started]:
   https://cloud.google.com/docs/authentication/getting-started
 [bq-docs-regional-locations]:
@@ -182,6 +205,7 @@ BigQuery connections are made over HTTPS.
 [google-support-create-svc-account]:
   https://support.google.com/a/answer/7378726?hl=en
 [ref-caching-large-preaggs]: /docs/pre-aggregations/using-pre-aggregations#export-bucket
+[ref-config-query-tags]: /reference/configuration/config#query_tags
 [ref-caching-using-preaggs-build-strats]: /docs/pre-aggregations/using-pre-aggregations#pre-aggregation-build-strategies
 [ref-oidc-gcp-bigquery]: /admin/deployment/oidc/gcp#bigquery
 [ref-schema-ref-types-formats-countdistinctapprox]: /reference/data-modeling/measures#type

@@ -135,6 +135,8 @@ export type ContextToAppIdFn = (context: RequestContext) => string | Promise<str
 export type ContextToGroupsFn = (context: RequestContext) => string[] | Promise<string[]>;
 export type ContextToOrchestratorIdFn = (context: RequestContext) => string | Promise<string>;
 export type ContextToCubeStoreRouterIdFn = (context: RequestContext) => string | Promise<string>;
+export type QueryTagsFn = (context: DriverContext) =>
+  Record<string, string> | undefined | Promise<Record<string, string> | undefined>;
 
 export type OrchestratorOptionsFn = (context: RequestContext) => OrchestratorOptions | Promise<OrchestratorOptions>;
 
@@ -206,6 +208,7 @@ export interface CreateOptions {
   contextToOrchestratorId?: ContextToOrchestratorIdFn;
   contextToCubeStoreRouterId?: ContextToCubeStoreRouterIdFn;
   contextToApiScopes?: ContextToApiScopesFn;
+  queryTags?: QueryTagsFn;
   repositoryFactory?: (context: RequestContext) => SchemaFileRepository;
   checkAuth?: CheckAuthFn;
   checkSqlAuth?: CheckSQLAuthFn;

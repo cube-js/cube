@@ -994,6 +994,59 @@ and read about a [workaround](https://github.com/cube-js/cube/issues/4118#issuec
 
 </Note>
 
+### `query_tags`
+
+Returns key/value tags, e.g., the user ID, that Cube attaches to the queries it runs in
+the data source. Use them to attribute data source usage and costs to users. Currently,
+only [Google BigQuery][ref-bigquery-query-attribution] supports tags; they are added to
+jobs as labels.
+
+Called on each query, except ones served by pre-aggregations in Cube Store. Receives the
+request context with the
+[security context][ref-sec-ctx] and the name of the
+[data source][ref-multiple-data-sources] as `dataSource`.
+
+<CodeGroup>
+
+```python title="Python"
+from cube import config
+
+@config('query_tags')
+def query_tags(ctx: dict) -> dict:
+  return {
+    'user_id': ctx['securityContext'].get('user_id')
+  }
+```
+
+```javascript title="JavaScript"
+module.exports = {
+  queryTags: ({ securityContext }) => {
+    return {
+      user_id: securityContext.user_id
+    }
+  }
+}
+```
+
+</CodeGroup>
+
+Tags are not a part of the cache key, so users still share cached query results.
+Consequently:
+
+- Identical queries that run at the same time are run in the data source once, with the
+  tags of the first one.
+- A cached result that is refreshed in the background gets the tags of the request that
+  triggered the refresh.
+- Refresh key queries, pre-aggregation builds, and source data queries of lambda
+  pre-aggregations get no tags.
+
+<Warning>
+
+Tags end up in data source metadata, e.g., BigQuery job history and billing exports.
+Prefer an opaque or hashed user ID over an email address or a name.
+
+</Warning>
+
 ### `allow_ungrouped_without_primary_key`
 
 Setting `allow_ungrouped_without_primary_key` to `True` disables the primary
@@ -1619,6 +1672,7 @@ module.exports = {
 [ref-multi-router-cube-store]: /admin/deployment/deployment-types#multi-router-cube-store
 [ref-compile-context]: /reference/data-modeling/context-variables#compile_context
 [ref-multiple-data-sources]: /admin/connect-to-data/multiple-data-sources
+[ref-bigquery-query-attribution]: /admin/connect-to-data/data-sources/google-bigquery#query-attribution
 [ref-websockets]: /recipes/core-data-api/real-time-data-fetch
 [ref-matching-preaggs]: /docs/pre-aggregations/matching-pre-aggregations
 [link-snake-case]: https://en.wikipedia.org/wiki/Snake_case

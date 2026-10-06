@@ -60,6 +60,7 @@ impl CubeConfigPy {
             "orchestrator_options",
             "pre_aggregations_schema",
             "query_rewrite",
+            "query_tags",
             "repository_factory",
             "scheduled_refresh_contexts",
             "schema_version",

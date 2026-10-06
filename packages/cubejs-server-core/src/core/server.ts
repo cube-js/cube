@@ -769,6 +769,7 @@ export class CubejsServerCore {
         }),
         // speedup with cache
         contextToExternalDbType: () => externalDbType,
+        queryTags: this.options.queryTags,
         redisPrefix: orchestratorId,
         skipExternalCacheAndQueue: externalDbType === 'cubestore',
         cacheAndQueueDriver: this.options.cacheAndQueueDriver,

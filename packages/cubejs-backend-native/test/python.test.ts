@@ -69,6 +69,7 @@ suite('Python Config', () => {
       repositoryFactory: expect.any(Function),
       schemaVersion: expect.any(Function),
       contextToGroups: expect.any(Function),
+      queryTags: expect.any(Function),
       scheduledRefreshContexts: expect.any(Function),
       scheduledRefreshTimeZones: expect.any(Function),
     });
@@ -97,6 +98,15 @@ suite('Python Config', () => {
     }
 
     expect(await config.contextToGroups({})).toEqual(['dev', 'analytics']);
+  });
+
+  test('query_tags', async () => {
+    if (!config.queryTags) {
+      throw new Error('queryTags was not defined in config.py');
+    }
+
+    expect(await config.queryTags({ securityContext: { sub: 'user-1' }, dataSource: 'default' }))
+      .toEqual({ user_id: 'user-1' });
   });
 
   test('context_to_api_scopes', async () => {

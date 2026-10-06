@@ -11,11 +11,12 @@ import {
   QueryOrchestratorOptions,
 } from '@cubejs-backend/query-orchestrator';
 
-import { DatabaseType, RequestContext } from './types';
+import { DatabaseType, QueryTagsFn, RequestContext } from './types';
 
 export interface OrchestratorApiOptions extends QueryOrchestratorOptions {
   contextToDbType: (dataSource: string) => Promise<DatabaseType>;
   contextToExternalDbType: () => DatabaseType;
+  queryTags?: QueryTagsFn;
   redisPrefix?: string;
 }
 
@@ -63,7 +64,36 @@ export class OrchestratorApi {
    */
   public async streamQuery(query: QueryBody): Promise<stream.Writable> {
     // TODO merge with fetchQuery
-    return this.orchestrator.streamQuery(query);
+    return this.orchestrator.streamQuery(await this.withQueryTags(query));
+  }
+
+  /**
+   * Evaluated per query rather than per orchestrator, which is shared by every user of an app.
+   * Queries without a request context (scheduled refresh) carry no tags, and Cube Store ignores them.
+   */
+  protected async withQueryTags(query: QueryBody): Promise<QueryBody> {
+    if (!this.options.queryTags || !query.context || query.external) {
+      return query;
+    }
+
+    const queryTags = await this.options.queryTags({
+      ...query.context as RequestContext,
+      dataSource: query.dataSource || 'default',
+    });
+
+    if (!queryTags) {
+      return query;
+    }
+
+    // The hook reads an arbitrary security context, so missing and non-string values are settled once here
+    return {
+      ...query,
+      queryTags: Object.fromEntries(
+        Object.entries(queryTags)
+          .filter(([, value]) => value != null)
+          .map(([key, value]) => [key, String(value)])
+      ),
+    };
   }
 
   /**
@@ -76,6 +106,8 @@ export class OrchestratorApi {
     const startQueryTime = (new Date()).getTime();
 
     try {
+      query = await this.withQueryTags(query);
+
       this.logger('Query started', {
         query: queryForLog,
         params: query.values,
