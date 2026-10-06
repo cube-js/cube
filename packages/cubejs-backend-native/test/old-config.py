@@ -18,6 +18,12 @@ async def check_auth(req, authorization):
 
 settings.check_auth = check_auth
 
+def extend_context(req):
+    print('[python] extend_context req=', req)
+    return {'security_context': req['securityContext']}
+
+settings.extend_context = extend_context
+
 async def repository_factory(ctx):
     print('[python] repository_factory ctx=', ctx)
 
