@@ -112,6 +112,8 @@ jobs:
             platforms: linux/arm64
             build-args: WITH_AVX2=0
     timeout-minutes: 60
+    permissions:
+      contents: read
     steps:
       - name: Check out the repo
         uses: actions/checkout@v7
