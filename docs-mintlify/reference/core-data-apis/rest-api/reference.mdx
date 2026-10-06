@@ -911,6 +911,18 @@ enclosing quotes removed — for example `COUNT(*)`, `${CUBE}.status`, or
 interpolations, and `${CUBE}` refers to the cube's own table alias. Members of a
 view carry the alias expression they resolve to, e.g. `${orders.total_amount}`.
 
+For a cube defined with [`sql`][ref-cubes-sql] rather than
+[`sql_table`][ref-cubes-sql-table], lineage is read from its SQL statement:
+
+- `table_references` lists every table the statement reads, including those in
+  common table expressions and subqueries
+- Members get `column_references` only when the statement is a `SELECT *` over a
+  single table, e.g. `SELECT * FROM orders WHERE status = 'completed'`
+- For any other statement, e.g. one that selects or renames specific columns,
+  aggregates, or uses joins or common table expressions, members have empty
+  `column_references` and contribute no columns to view members or other members
+  that reference them
+
 Example request:
 
 ```bash
@@ -1316,6 +1328,8 @@ Keep-Alive: timeout=5
 [ref-control-plane-api]: /reference/control-plane-api
 [self-metadata-api]: #metadata-api
 [ref-cubes-public]: /reference/data-modeling/cube#public
+[ref-cubes-sql]: /reference/data-modeling/cube#sql
+[ref-cubes-sql-table]: /reference/data-modeling/cube#sql_table
 [ref-views-public]: /reference/data-modeling/view#public
 [ref-measures-public]: /reference/data-modeling/measures#public
 [ref-dimensions-public]: /reference/data-modeling/dimensions#public
