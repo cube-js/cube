@@ -478,7 +478,7 @@ export const buildSqlAndParams = (cubeEvaluator: any): any[] => {
 
 export type ResultRow = Record<string, string>;
 
-/** Read without copying: don't mutate `message` until the promise settles. */
+/** Read without copying: don't mutate, detach or transfer `message` until the promise settles. */
 export const parseCubestoreResultMessage = async (message: Readonly<Buffer>): Promise<ResultWrapper> => {
   const native = loadNative();
 
