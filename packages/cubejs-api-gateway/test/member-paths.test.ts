@@ -3,8 +3,19 @@ import { NormalizedQuery } from '../src/types/query';
 import { AdapterApiMock, DataSourceStorageMock, compilerApi } from './mocks';
 
 class TestApiGateway extends ApiGateway {
+  public resolverCalls = 0;
+
   public checkMemberPaths(query: NormalizedQuery, resolve?: (path: string) => any) {
     return super.checkMemberPaths(query, resolve);
+  }
+
+  public getNormalizedQueries(query: Record<string, any>, context: any) {
+    return super.getNormalizedQueries(query, context);
+  }
+
+  protected async memberPathResolver(context: any, api?: any) {
+    this.resolverCalls++;
+    return super.memberPathResolver(context, api);
   }
 }
 
@@ -52,5 +63,15 @@ describe('Member paths through joins', () => {
   it('rejects a cube hop before an alias', () => {
     const query = { dimensions: ['products.orders.customer.city'] } as unknown as NormalizedQuery;
     expect(() => gateway.checkMemberPaths(query, resolve)).toThrow(/Query it as 'orders.customer.city'/);
+  });
+
+  it('reads the data model only for a query with a path longer than cube.member', async () => {
+    const context = { securityContext: {}, requestId: 'test' } as any;
+    gateway.resolverCalls = 0;
+    await gateway.getNormalizedQueries({ measures: ['Foo.bar'], dimensions: ['Foo.id'] }, context);
+    expect(gateway.resolverCalls).toBe(0);
+
+    await gateway.getNormalizedQueries({ measures: ['Foo.bar'], dimensions: ['Foo.time.day'] }, context);
+    expect(gateway.resolverCalls).toBe(1);
   });
 });
