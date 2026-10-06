@@ -172,8 +172,8 @@ jobs:
       contents: read
     strategy:
       matrix:
-        # -arm64v8 tags used to be a separate arm64-only image, publish them as
-        # aliases of the same multi-arch manifest (edge-arm64v8 is new here).
+        # -arm64v8 tags used to be a separate arm64-only image, keep publishing
+        # them as aliases of the same multi-arch manifest.
         include:
           - postfix: ""
           - postfix: "-arm64v8"
