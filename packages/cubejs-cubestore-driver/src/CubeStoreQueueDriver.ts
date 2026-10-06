@@ -19,6 +19,37 @@ import {
 import { getEnv, getProcessUid } from '@cubejs-backend/shared';
 
 import { CubeStoreDriver } from './CubeStoreDriver';
+import { ClientMessageTooLargeError, MessageTooLargeError, QueryError, ResultTooLargeError } from './errors';
+import { formatSize } from './WebSocketConnection';
+
+// Cube Store answers a message within twice its limit with this error for that message alone,
+// rather than by closing the connection, so the refusal is this result's own.
+const REQUEST_TOO_LARGE_RE = /^Request of (\d+) bytes exceeds the maximum message size of (\d+) bytes/;
+
+const cubeStoreLimit = (setting = 'CUBESTORE_TRANSPORT_MAX_MESSAGE_SIZE') => `set by ${setting} on the Cube Store side`;
+const CLIENT_LIMIT = 'set by CUBEJS_CUBESTORE_MAX_MESSAGE_SIZE, which has to be raised together with ' +
+  'CUBESTORE_TRANSPORT_MAX_MESSAGE_SIZE on the Cube Store side';
+
+type SizeOverLimit = { size: number, limit: number, setBy: string };
+
+function resultOverLimit(e: unknown): SizeOverLimit | null {
+  if (e instanceof QueryError) {
+    const match = REQUEST_TOO_LARGE_RE.exec(e.message);
+
+    return match ? { size: parseInt(match[1], 10), limit: parseInt(match[2], 10), setBy: cubeStoreLimit() } : null;
+  }
+
+  // A closed connection fails every message in flight, so only the one it names is too large.
+  if (!(e instanceof MessageTooLargeError) || !e.offender || e.limit === undefined || e.size === undefined) {
+    return null;
+  }
+
+  return {
+    size: e.size,
+    limit: e.limit,
+    setBy: e instanceof ClientMessageTooLargeError ? CLIENT_LIMIT : cubeStoreLimit(e.limitSetting),
+  };
+}
 
 function hashQueryKey(queryKey: QueryKey, processUid?: string): QueryKeyHash {
   processUid = processUid || getProcessUid();
@@ -395,6 +426,16 @@ export class CubestoreQueueDriverConnection implements QueueDriverConnectionInte
       executionResult ? JSON.stringify(executionResult) : executionResult
     ], {
       sendParameters: this.sendParameters && await this.driver.hasCapability('sendableParameters')
+    }).catch((e) => {
+      const overLimit = resultOverLimit(e);
+      if (overLimit) {
+        throw new ResultTooLargeError(
+          `Query result message of ${formatSize(overLimit.size)} exceeds the limit of ${formatSize(overLimit.limit)} ${overLimit.setBy}`,
+          e
+        );
+      }
+
+      throw e;
     });
     if (rows && rows.length === 1) {
       return rows[0].success === 'true';

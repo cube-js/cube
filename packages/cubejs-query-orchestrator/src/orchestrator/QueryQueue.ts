@@ -11,13 +11,17 @@ import {
   QueuePriority,
   RetrieveForProcessingSuccess
 } from '@cubejs-backend/base-driver';
-import { CubeStoreQueueDriver } from '@cubejs-backend/cubestore-driver';
+import { CubeStoreQueueDriver, MessageTooLargeError, ResultTooLargeError } from '@cubejs-backend/cubestore-driver';
 
 import { TimeoutError } from './TimeoutError';
 import { ContinueWaitError } from './ContinueWaitError';
 import { LocalQueueDriver } from './LocalQueueDriver';
 import { QueryStream } from './QueryStream';
 import { CacheAndQueryDriverType } from './QueryOrchestrator';
+
+// Far below the smallest message limit Cube Store accepts (16 MiB), so a truncated error fits unless
+// CUBEJS_CUBESTORE_MAX_MESSAGE_SIZE is set lower than any real query would need.
+const MAX_ERROR_RESULT_LENGTH = 64 * 1024;
 
 export type CancelHandlerFn = (query: QueryDef) => Promise<void>;
 export type QueryHandlerFn = (query: QueryDef, cancelHandler: CancelHandlerFn) => Promise<unknown>;
@@ -1056,19 +1060,80 @@ export class QueryQueue {
       // Setting the result only succeeds while the queue item is still there, so a failure means a
       // cancellation - orphaned, stalled or explicit - removed it and rejected the in-flight query.
       let queueItemWasActive: boolean;
+      // Cube Store may have stored the first ack before closing the connection, so a retry finding
+      // the item gone says nothing about a cancellation.
+      let resultAckRetried = false;
 
       try {
-        queueItemWasActive = await queueConnection.setResultAndRemoveQuery(queryKeyHashed, executionResult, queueId);
+        queueItemWasActive = await queueConnection.setResultAndRemoveQuery(queryKeyHashed, executionResult, queueId)
+          // An oversized message fails every message in flight on the shared connection, so a result
+          // known not to be the offender is sent again once it is gone. One that may be the offender
+          // is not, as sending it again would only close the connection again.
+          .catch((e) => {
+            if (!(e instanceof MessageTooLargeError) || e.offender !== false) {
+              throw e;
+            }
+
+            this.logger('Retrying execution result', {
+              queueId,
+              queryKey: query.queryKey,
+              queuePrefix: this.redisQueuePrefix,
+              requestId: query.requestId,
+              error: (e.stack || e).toString(),
+            });
+            resultAckRetried = true;
+            return queueConnection.setResultAndRemoveQuery(queryKeyHashed, executionResult, queueId);
+          });
       } catch (e: any) {
         // A storage failure says nothing about a cancellation, so an execution error is still an error.
-        if (executionError) {
-          logExecutionError(executionError);
+        if (!(e instanceof ResultTooLargeError)) {
+          if (executionError) {
+            logExecutionError(executionError);
+          }
+
+          throw e;
         }
 
-        throw e;
+        // Left unacked, the item would hold its slot until it is orphaned and the next waiter would
+        // run the query again, so its waiters get an error instead of a result that can't be stored.
+        if (executionError) {
+          // The error itself didn't fit, e.g. one embedding the SQL, so waiters get its beginning.
+          const { error } = executionResult;
+          executionResult = {
+            error: error.length > MAX_ERROR_RESULT_LENGTH ? `${error.slice(0, MAX_ERROR_RESULT_LENGTH)} [truncated]` : error,
+          };
+        } else {
+          executionError = { error: e, duration: ((new Date()).getTime() - startQueryTime) };
+          executionResult = {
+            error: `${e.message}. Reduce the number of rows or columns the query returns, e.g. by adding ` +
+              'filters or lowering the limit, add a pre-aggregation for it, or raise that limit.'
+          };
+        }
+
+        // Refused for its size, the same bytes can't have been stored by an earlier ack, so an item
+        // gone now is a real cancellation.
+        resultAckRetried = false;
+        queueItemWasActive = await queueConnection.setResultAndRemoveQuery(queryKeyHashed, executionResult, queueId)
+          .catch((ackError) => {
+            if (executionError) {
+              logExecutionError(executionError);
+            }
+
+            throw ackError;
+          });
       }
 
-      if (!queueItemWasActive) {
+      if (!queueItemWasActive && resultAckRetried) {
+        // Not reported as orphaned, see `resultAckRetried`, but a real cancellation still leaves a trace.
+        this.logger('Retried execution result found no active queue item', {
+          queueId,
+          queryKey: query.queryKey,
+          queuePrefix: this.redisQueuePrefix,
+          requestId: query.requestId,
+        });
+      }
+
+      if (!queueItemWasActive && !resultAckRetried) {
         this.logger('Orphaned execution result', {
           queueId,
           warn: 'Result for query was not set because the queue item is no longer active',
