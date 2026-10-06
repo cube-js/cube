@@ -1451,17 +1451,22 @@ class ApiGateway {
 
     const startTime = new Date().getTime();
     const compilerApi = await this.getCompilerApi(context);
-    const resolveMemberPath = await this.memberPathResolver(context, compilerApi);
-    const splitGranularity = this.granularitySplitter(resolveMemberPath);
-    const normalize = (q: Query) => this.checkMemberPaths(
-      normalizeQuery(q, persistent, cacheMode, splitGranularity),
-      resolveMemberPath
-    );
+    // The data model is read only for queries it takes to tell their paths apart
+    let resolver: ReturnType<ApiGateway['memberPathResolver']> | undefined;
+    const normalize = async (q: Query) => {
+      const resolve = this.hasLongMemberPaths(q)
+        ? await (resolver ??= this.memberPathResolver(context, compilerApi))
+        : undefined;
+      return this.checkMemberPaths(
+        normalizeQuery(q, persistent, cacheMode, this.granularitySplitter(resolve)),
+        resolve
+      );
+    };
 
     const queryNormalizationResult: Array<{
       normalizedQuery: NormalizedQuery,
       hasExpressionsInQuery: boolean
-    }> = queries.map((currentQuery) => {
+    }> = await Promise.all(queries.map(async (currentQuery) => {
       const hasExpressionsInQuery = this.hasExpressionsInQuery(currentQuery);
 
       if (hasExpressionsInQuery) {
@@ -1477,10 +1482,10 @@ class ApiGateway {
       }
 
       return {
-        normalizedQuery: normalize(currentQuery),
+        normalizedQuery: await normalize(currentQuery),
         hasExpressionsInQuery
       };
-    });
+    }));
 
     let normalizedQueries: NormalizedQuery[] = await Promise.all(
       queryNormalizationResult.map(
@@ -1632,6 +1637,35 @@ class ApiGateway {
   }
 
   /**
+   * The member paths a query names, in its raw or normalized form.
+   */
+  private memberPaths(query: Query | NormalizedQuery): unknown[] {
+    const filterMembers = (filters: any[] = []): unknown[] => filters.flatMap(
+      f => (f.and || f.or ? filterMembers(f.and || f.or) : [f.member ?? f.dimension])
+    );
+    const { order } = query as { order?: unknown };
+    const orderMembers = Array.isArray(order)
+      ? order.map(o => (Array.isArray(o) ? o[0] : o?.id))
+      : Object.keys(order || {});
+    return [
+      ...(query.measures || []),
+      ...(query.dimensions || []),
+      ...(query.segments || []),
+      ...(query.timeDimensions || []).map(td => td.dimension),
+      ...filterMembers(query.filters),
+      ...orderMembers,
+    ];
+  }
+
+  /**
+   * Whether the query names a member by a path longer than `cube.member`,
+   * which takes the data model to read.
+   */
+  protected hasLongMemberPaths(query: Query | NormalizedQuery): boolean {
+    return this.memberPaths(query).some(path => typeof path === 'string' && path.split('.').length > 2);
+  }
+
+  /**
    * A member path is a cube or a cube instance reached through join aliases,
    * and a member; other join paths are not part of the query format.
    */
@@ -1639,18 +1673,8 @@ class ApiGateway {
     if (!resolve) {
       return query;
     }
-    const filterMembers = (filters: any[] = []): unknown[] => filters.flatMap(
-      f => (f.and || f.or ? filterMembers(f.and || f.or) : [f.member ?? f.dimension])
-    );
-    const paths = [
-      ...(query.measures || []),
-      ...(query.dimensions || []),
-      ...(query.segments || []),
-      ...(query.timeDimensions || []).map(td => td.dimension),
-      ...filterMembers(query.filters),
-      ...((query.order || []) as unknown[]).map(o => (Array.isArray(o) ? o[0] : undefined)),
-    ];
-    for (const path of paths) {
+
+    for (const path of this.memberPaths(query)) {
       const resolved = typeof path === 'string' ? resolve(path) : null;
       const memberPath = resolved && `${resolved.instancePath}.${resolved.member}`;
       if (resolved && resolved.fullPath !== memberPath) {
@@ -2231,7 +2255,9 @@ class ApiGateway {
       });
 
       metaConfigResult = this.filterVisibleItemsInMeta(context, metaConfigResult);
-      const memberTarget = this.memberTarget(await this.memberPathResolver(context));
+      const memberTarget = this.memberTarget(
+        normalizedQueries.some(q => this.hasLongMemberPaths(q)) ? await this.memberPathResolver(context) : undefined
+      );
 
       const sqlQueries = await this.getSqlQueriesInternal(context, normalizedQueries);
 
@@ -2335,7 +2361,9 @@ class ApiGateway {
       });
 
       metaConfigResult = this.filterVisibleItemsInMeta(context, metaConfigResult);
-      const memberTarget = this.memberTarget(await this.memberPathResolver(context));
+      const memberTarget = this.memberTarget(
+        normalizedQueries.some(q => this.hasLongMemberPaths(q)) ? await this.memberPathResolver(context) : undefined
+      );
 
       const sqlQueries = await this
         .getSqlQueriesInternal(
