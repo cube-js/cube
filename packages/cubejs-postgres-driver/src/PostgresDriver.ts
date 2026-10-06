@@ -186,10 +186,8 @@ export class PostgresDriver<Config extends PostgresDriverConfiguration = Postgre
     return client;
   }
 
-  // Keys are read from pg_catalog: information_schema.constraint_column_usage only shows tables owned
-  // by the current role, and information_schema can't tie a referenced column to its referencing one,
-  // since constraint names are only unique per table.
-  // The `columns` alias is what the conditionString from getColumnsForSpecificTables() refers to.
+  // pg_catalog, not information_schema: constraint_column_usage hides tables the role doesn't own, and
+  // constraint names are only unique per table. `columns` is the alias getColumnsForSpecificTables() filters on.
   protected primaryKeysQuery(conditionString?: string): string | null {
     return `SELECT
         columns.table_schema as ${this.quoteIdentifier('table_schema')},
