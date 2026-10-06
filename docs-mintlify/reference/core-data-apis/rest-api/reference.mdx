@@ -893,7 +893,9 @@ Response includes:
   `type` (currently always `upstream`) and `cube`
 - `joins` - Cubes only. The cube's [joins][ref-joins] to other cubes, sorted by
   `cube`, each with `cube`, `relationship` (`many_to_one`, `one_to_many`, or
-  `one_to_one`), and `sql`, the join condition in the same form as member `sql`
+  `one_to_one`), and `sql`, the join condition in the same form as member `sql`.
+  `sql` is omitted when a [data access policy][ref-dap] governs either cube, since
+  the condition can name columns the policy hides
 - `measures` and `dimensions` - Arrays of members, sorted by name
 
 Each member includes:
