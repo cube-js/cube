@@ -131,4 +131,63 @@ describe('MySqlDriver', () => {
       );
     }
   });
+
+  describe('primary and foreign keys', () => {
+    let fkDriver: MySqlDriver;
+
+    beforeAll(async () => {
+      await mySqlDriver.query('DROP SCHEMA IF EXISTS fk_test', []);
+      await mySqlDriver.createSchemaIfNotExists('fk_test');
+      await mySqlDriver.query('CREATE TABLE fk_test.customers (id INT PRIMARY KEY, name VARCHAR(255))', []);
+      await mySqlDriver.query(
+        'CREATE TABLE fk_test.orders (id INT PRIMARY KEY, customer_id INT, ' +
+        'CONSTRAINT orders_customer_fk FOREIGN KEY (customer_id) REFERENCES fk_test.customers (id))',
+        []
+      );
+
+      // tablesSchema() is scoped to the configured database
+      fkDriver = createDriver(container, 'fk_test');
+    });
+
+    afterAll(async () => {
+      await fkDriver.release();
+    });
+
+    test('tablesSchemaV2 points foreign keys at the referenced table', async () => {
+      expect(await fkDriver.tablesSchemaV2()).toEqual({
+        fk_test: {
+          customers: [
+            { name: 'id', type: 'int', attributes: ['primaryKey'] },
+            { name: 'name', type: 'varchar', attributes: [] },
+          ],
+          orders: [
+            { name: 'customer_id', type: 'int', attributes: [], foreign_keys: [{ target_table: 'customers', target_column: 'id' }] },
+            { name: 'id', type: 'int', attributes: ['primaryKey'] },
+          ],
+        },
+      });
+    });
+
+    test('getColumnsForSpecificTables applies the table filter to keys', async () => {
+      const columns = await mySqlDriver.getColumnsForSpecificTables([
+        { schema_name: 'fk_test', table_name: 'customers' },
+        { schema_name: 'fk_test', table_name: 'orders' },
+      ]);
+
+      expect(columns.map(({ schema_name, table_name, column_name, attributes, foreign_keys }) => ({
+        schema_name, table_name, column_name, attributes, foreign_keys,
+      })).sort((a, b) => `${a.table_name}.${a.column_name}`.localeCompare(`${b.table_name}.${b.column_name}`))).toEqual([
+        { schema_name: 'fk_test', table_name: 'customers', column_name: 'id', attributes: ['primaryKey'], foreign_keys: [] },
+        { schema_name: 'fk_test', table_name: 'customers', column_name: 'name', attributes: undefined, foreign_keys: [] },
+        {
+          schema_name: 'fk_test',
+          table_name: 'orders',
+          column_name: 'customer_id',
+          attributes: undefined,
+          foreign_keys: [{ target_table: 'customers', target_column: 'id' }],
+        },
+        { schema_name: 'fk_test', table_name: 'orders', column_name: 'id', attributes: ['primaryKey'], foreign_keys: [] },
+      ]);
+    });
+  });
 });
