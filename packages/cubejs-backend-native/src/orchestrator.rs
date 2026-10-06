@@ -8,7 +8,7 @@ use cubeorchestrator::transport::{JsRawColumnarData, TransformDataRequest};
 use cubesql::compile::engine::df::scan::{ColumnarValueObject, FieldValue};
 use cubesql::CubeError;
 use neon::context::{Context, FunctionContext, ModuleContext};
-use neon::handle::Handle;
+use neon::handle::{Handle, Root};
 use neon::object::Object;
 use neon::prelude::{
     JsArray, JsArrayBuffer, JsBox, JsBuffer, JsFunction, JsObject, JsPromise, JsResult, JsString,
@@ -237,18 +237,31 @@ fn extract_query_result(
     }
 }
 
-/// Valid only while the underlying JS `Buffer` is rooted.
+/// Zero-copy view of a JS `Buffer` that keeps it rooted.
 struct JsBufferView {
+    root: Root<JsBuffer>,
     ptr: *const u8,
     len: usize,
 }
 
-// SAFETY: read-only; validity is guaranteed by `as_slice` callers.
+// SAFETY: `ptr` is only read, and the `Root` keeps its backing store alive; GC never moves
+// ArrayBuffer backing stores.
 unsafe impl Send for JsBufferView {}
 
 impl JsBufferView {
+    fn new<'a, C: Context<'a>>(cx: &mut C, buffer: Handle<'a, JsBuffer>) -> Self {
+        let slice = buffer.as_slice(cx);
+        let (ptr, len) = (slice.as_ptr(), slice.len());
+
+        Self {
+            root: buffer.root(cx),
+            ptr,
+            len,
+        }
+    }
+
     /// # Safety
-    /// The buffer must stay rooted and unmodified while the slice is in use.
+    /// JS must not mutate, detach or transfer the buffer while the slice is in use.
     unsafe fn as_slice(&self) -> &[u8] {
         // N-API may return null for an empty buffer.
         if self.len == 0 {
@@ -257,27 +270,24 @@ impl JsBufferView {
             std::slice::from_raw_parts(self.ptr, self.len)
         }
     }
+
+    fn release<'a, C: Context<'a>>(self, cx: &mut C) {
+        self.root.drop(cx);
+    }
 }
 
 pub fn parse_cubestore_result_message(mut cx: FunctionContext) -> JsResult<JsPromise> {
     let msg = cx.argument::<JsBuffer>(0)?;
-    let msg_bytes = {
-        let slice = msg.as_slice(&cx);
-        JsBufferView {
-            ptr: slice.as_ptr(),
-            len: slice.len(),
-        }
-    };
-    // GC never moves ArrayBuffer backing stores, so rooting keeps `msg_bytes` valid.
-    let msg_root = msg.root(&mut cx);
+    let msg = JsBufferView::new(&mut cx, msg);
 
     let promise = cx
         .task(move || {
-            // SAFETY: `msg_root` is dropped after the task; JS doesn't mutate the message.
-            QueryResult::from_cubestore_fb(unsafe { msg_bytes.as_slice() })
+            // SAFETY: JS doesn't mutate the message until the promise settles.
+            let res = QueryResult::from_cubestore_fb(unsafe { msg.as_slice() });
+            (msg, res)
         })
-        .promise(move |mut cx, res| {
-            msg_root.drop(&mut cx);
+        .promise(move |mut cx, (msg, res)| {
+            msg.release(&mut cx);
 
             match res {
                 Ok(result) => Ok(cx.boxed(Arc::new(result))),
