@@ -275,7 +275,12 @@ pub fn parse_cubestore_result_message(mut cx: FunctionContext) -> JsResult<JsPro
     let msg_root = msg.root(&mut cx);
 
     let promise = cx
-        .task(move || QueryResult::from_cubestore_fb(unsafe { msg_bytes.as_slice() }))
+        .task(move || {
+            // SAFETY: `msg_root` is dropped only in the settle closure, after this task has
+            // finished reading, and the JS caller doesn't mutate the message (see the
+            // parseCubestoreResultMessage contract in js/index.ts).
+            QueryResult::from_cubestore_fb(unsafe { msg_bytes.as_slice() })
+        })
         .promise(move |mut cx, res| {
             msg_root.drop(&mut cx);
 

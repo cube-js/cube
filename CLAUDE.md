@@ -131,6 +131,12 @@ yarn test
 3. **Testing**: Run relevant tests for modified packages
 4. **Linting**: Ensure code passes `yarn lint` before committing
 
+## Rust
+
+Every `unsafe` block and `unsafe impl` gets a `// SAFETY:` comment directly above it explaining
+why the invariants hold at that site, not what the code does. Every `unsafe fn` documents its
+caller contract in a `/// # Safety` section.
+
 ## Git
 
 Use conventional commits with these prefixes:
