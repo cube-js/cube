@@ -885,8 +885,8 @@ Response includes:
   [private cubes and members](#private-cubes-and-members) are included
 - `title` - Human-readable title
 - `description` - Description from the data model, or an empty string
-- `meta` - [Custom metadata][ref-cubes-meta] from the data model. Omitted when
-  not defined
+- `meta` - Custom metadata from the data model (see `meta` for
+  [cubes][ref-cubes-meta] and [views][ref-views-meta]). Omitted when not defined
 - `table_references` - Data lineage to source tables, each with `data_source`,
   `table`, and, if the table is qualified, `schema`
 - `cube_references` - Relationships to other cubes, each as an object with
@@ -909,7 +909,7 @@ Each member includes:
 | `description` | Description from the data model, or an empty string |
 | `type` | The member type, e.g. `count`, `sum`, or `string` |
 | `sql` | The member's SQL definition (see below). Omitted when it can't be resolved |
-| `meta` | [Custom metadata][ref-dimensions-meta] from the data model. Omitted when not defined |
+| `meta` | Custom metadata from the data model (see `meta` for [measures][ref-measures-meta] and [dimensions][ref-dimensions-meta]). Omitted when not defined |
 | `is_primary_key` | Whether the dimension is a primary key. Dimensions only |
 | `member_references` | Upstream members the member is derived from, each with `cube` and `member` |
 | `column_references` | Source columns, each with `data_source`, `table`, `column`, and, if the table is qualified, `schema` |
@@ -1063,6 +1063,9 @@ entities before `offset` and `limit` are applied:
       "public": true,
       "title": "Orders",
       "description": "Order transactions",
+      "meta": {
+        "ai_context": "One row per order, including cancelled orders"
+      },
       "table_references": [
         {
           "data_source": "default",
@@ -1071,7 +1074,13 @@ entities before `offset` and `limit` are applied:
         }
       ],
       "cube_references": [],
-      "joins": [],
+      "joins": [
+        {
+          "cube": "customers",
+          "relationship": "many_to_one",
+          "sql": "${CUBE}.customer_id = ${customers}.id"
+        }
+      ],
       "measures": [
         {
           "name": "total_amount",
@@ -1341,6 +1350,8 @@ Keep-Alive: timeout=5
 [ref-measures-public]: /reference/data-modeling/measures#public
 [ref-dimensions-public]: /reference/data-modeling/dimensions#public
 [ref-cubes-meta]: /reference/data-modeling/cube#meta
+[ref-views-meta]: /reference/data-modeling/view#meta
+[ref-measures-meta]: /reference/data-modeling/measures#meta
 [ref-dimensions-meta]: /reference/data-modeling/dimensions#meta
 [ref-joins]: /reference/data-modeling/joins
 [ref-dap]: /docs/data-modeling/data-access-policies
