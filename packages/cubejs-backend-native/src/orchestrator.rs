@@ -237,8 +237,7 @@ fn extract_query_result(
     }
 }
 
-/// Non-owning view of a JS `Buffer`, lent to a worker thread without copying. The caller
-/// keeps the buffer alive with a `Root` until the task settles.
+/// Valid only while the underlying JS `Buffer` is rooted.
 struct JsBufferView {
     ptr: *const u8,
     len: usize,
@@ -272,15 +271,11 @@ pub fn parse_cubestore_result_message(mut cx: FunctionContext) -> JsResult<JsPro
         }
     };
     // ArrayBuffer backing stores live off the V8 heap and are never moved by GC, so rooting
-    // the Buffer is enough to keep `msg_bytes` valid. The only caller (WebSocketConnection)
-    // reads the message and never mutates it.
+    // the Buffer is enough to keep `msg_bytes` valid.
     let msg_root = msg.root(&mut cx);
 
     let promise = cx
-        .task(move || {
-            // SAFETY: see JsBufferView::as_slice; `msg_root` outlives the task.
-            QueryResult::from_cubestore_fb(unsafe { msg_bytes.as_slice() })
-        })
+        .task(move || QueryResult::from_cubestore_fb(unsafe { msg_bytes.as_slice() }))
         .promise(move |mut cx, res| {
             msg_root.drop(&mut cx);
 
