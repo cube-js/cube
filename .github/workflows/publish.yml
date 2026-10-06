@@ -489,10 +489,34 @@ jobs:
           build-args: |
             IMAGE_VERSION=${{ steps.prep.outputs.version }}
 
+  docker-cubestore-prepare:
+    name: Cube Store Docker (prepare)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    outputs:
+      version: ${{ steps.prep.outputs.version }}
+      created: ${{ steps.prep.outputs.created }}
+    steps:
+      - name: Prepare
+        id: prep
+        run: |
+          VERSION=noop
+
+          if [ "${{ github.event_name }}" = "schedule" ]; then
+            VERSION=nightly
+          elif [[ $GITHUB_REF == refs/tags/* ]]; then
+            VERSION=${GITHUB_REF#refs/tags/}
+          fi
+
+          {
+            echo "version=${VERSION}"
+            echo "created=$(date -u +'%Y-%m-%dT%H:%M:%SZ')"
+          } >> "$GITHUB_OUTPUT"
+
   docker-cubestore:
     name: Cube Store Docker
     runs-on: ${{ matrix.os }}
-    needs: [detect_branch]
+    needs: [docker-cubestore-prepare]
     strategy:
       fail-fast: false
       matrix:
@@ -522,21 +546,6 @@ jobs:
             const reg = new RegExp('📊 ', 'ug');
             data.description = data.description.replace(reg, "")
             return data
-      - name: Prepare
-        id: prep
-        run: |
-          VERSION=noop
-
-          if [ "${{ github.event_name }}" = "schedule" ]; then
-            VERSION=nightly
-          elif [[ $GITHUB_REF == refs/tags/* ]]; then
-            VERSION=${GITHUB_REF#refs/tags/}
-          fi
-
-          {
-            echo "version=${VERSION}"
-            echo "created=$(date -u +'%Y-%m-%dT%H:%M:%SZ')"
-          } >> "$GITHUB_OUTPUT"
       - name: Login to DockerHub
         uses: docker/login-action@v4
         with:
@@ -560,8 +569,8 @@ jobs:
             org.opencontainers.image.description=${{ fromJson(steps.repo.outputs.result).description }}
             org.opencontainers.image.url=${{ fromJson(steps.repo.outputs.result).html_url }}
             org.opencontainers.image.source=${{ fromJson(steps.repo.outputs.result).clone_url }}
-            org.opencontainers.image.version=${{ steps.prep.outputs.version }}
-            org.opencontainers.image.created=${{ steps.prep.outputs.created }}
+            org.opencontainers.image.version=${{ needs.docker-cubestore-prepare.outputs.version }}
+            org.opencontainers.image.created=${{ needs.docker-cubestore-prepare.outputs.created }}
             org.opencontainers.image.revision=${{ github.sha }}
             org.opencontainers.image.licenses=${{ fromJson(steps.repo.outputs.result).license.spdx_id }}
       - name: Export digest
@@ -581,7 +590,7 @@ jobs:
   docker-cubestore-non-avx:
     name: Cube Store Docker (non-AVX)
     runs-on: ${{ matrix.os }}
-    needs: [detect_branch]
+    needs: [docker-cubestore-prepare, detect_branch]
     strategy:
       matrix:
         include:
@@ -610,13 +619,7 @@ jobs:
         id: prep
         run: |
           DOCKER_IMAGE=cubejs/cubestore
-          VERSION=noop
-
-          if [ "${{ github.event_name }}" = "schedule" ]; then
-            VERSION=nightly
-          elif [[ $GITHUB_REF == refs/tags/* ]]; then
-            VERSION=${GITHUB_REF#refs/tags/}
-          fi
+          VERSION="${{ needs.docker-cubestore-prepare.outputs.version }}"
 
           TAGS="${DOCKER_IMAGE}:${VERSION}${{ matrix.postfix }}"
 
@@ -630,11 +633,7 @@ jobs:
             TAGS="$TAGS,${DOCKER_IMAGE}:${{ matrix.tag }}"
           fi
 
-          {
-            echo "version=${VERSION}"
-            echo "tags=${TAGS}"
-            echo "created=$(date -u +'%Y-%m-%dT%H:%M:%SZ')"
-          } >> "$GITHUB_OUTPUT"
+          echo "tags=${TAGS}" >> "$GITHUB_OUTPUT"
       - name: Login to DockerHub
         uses: docker/login-action@v4
         with:
@@ -658,15 +657,15 @@ jobs:
             org.opencontainers.image.description=${{ fromJson(steps.repo.outputs.result).description }}
             org.opencontainers.image.url=${{ fromJson(steps.repo.outputs.result).html_url }}
             org.opencontainers.image.source=${{ fromJson(steps.repo.outputs.result).clone_url }}
-            org.opencontainers.image.version=${{ steps.prep.outputs.version }}
-            org.opencontainers.image.created=${{ steps.prep.outputs.created }}
+            org.opencontainers.image.version=${{ needs.docker-cubestore-prepare.outputs.version }}
+            org.opencontainers.image.created=${{ needs.docker-cubestore-prepare.outputs.created }}
             org.opencontainers.image.revision=${{ github.sha }}
             org.opencontainers.image.licenses=${{ fromJson(steps.repo.outputs.result).license.spdx_id }}
 
   docker-cubestore-manifest:
     name: Cube Store Docker (multi-arch manifest)
     runs-on: ubuntu-24.04
-    needs: [docker-cubestore, detect_branch]
+    needs: [docker-cubestore-prepare, docker-cubestore, detect_branch]
     timeout-minutes: 15
     strategy:
       matrix:
@@ -690,13 +689,7 @@ jobs:
         id: prep
         run: |
           DOCKER_IMAGE=cubejs/cubestore
-          VERSION=noop
-
-          if [ "${{ github.event_name }}" = "schedule" ]; then
-            VERSION=nightly
-          elif [[ $GITHUB_REF == refs/tags/* ]]; then
-            VERSION=${GITHUB_REF#refs/tags/}
-          fi
+          VERSION="${{ needs.docker-cubestore-prepare.outputs.version }}"
 
           TAGS="${DOCKER_IMAGE}:${VERSION}${{ matrix.postfix }}"
 
@@ -712,7 +705,6 @@ jobs:
 
           {
             echo "image=${DOCKER_IMAGE}"
-            echo "version=${VERSION}"
             echo "tags=${TAGS}"
           } >> "$GITHUB_OUTPUT"
       - name: Login to DockerHub
@@ -731,7 +723,7 @@ jobs:
           # shellcheck disable=SC2046,SC2086
           docker buildx imagetools create $(printf -- '-t %s ' ${TAGS//,/ }) $(printf "${IMAGE}@sha256:%s " *)
       - name: Inspect image
-        run: docker buildx imagetools inspect ${{ steps.prep.outputs.image }}:${{ steps.prep.outputs.version }}${{ matrix.postfix }}
+        run: docker buildx imagetools inspect ${{ steps.prep.outputs.image }}:${{ needs.docker-cubestore-prepare.outputs.version }}${{ matrix.postfix }}
       - name: Update repo description
         if: matrix.postfix == ''
         uses: peter-evans/dockerhub-description@v5
