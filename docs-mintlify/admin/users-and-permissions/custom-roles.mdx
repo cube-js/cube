@@ -68,7 +68,7 @@ The Base Role is required. Save is disabled until one is selected.
 
 #### Auto-bump to Developer
 
-If you check any deployment-scoped action other than **Access deployment**, **Access AI agents**, **Create scheduled tasks**, **Download data**, or **Access chat history** — for example, **Edit deployment** or **Edit data model** — the Base Role is automatically forced to **Developer**, and the Viewer and Explorer options are disabled with a tooltip:
+If you check any deployment-scoped action other than **Access deployment**, **Access AI agents**, **Create scheduled tasks**, **Download data**, **Access chat history**, or **View pre-aggregations** — for example, **Edit deployment** or **Edit data model** — the Base Role is automatically forced to **Developer**, and the Viewer and Explorer options are disabled with a tooltip:
 
 > Selected actions require Developer role
 
@@ -123,6 +123,8 @@ Either grant **Full access** (a shortcut that enables every current and future d
 | Monitoring  | Access query history                | View deployment query history, performance, and traces.                                                                                                                   |
 | Monitoring  | Access chat history                 | View other users' chat conversations for the deployment, including Analytics Chat and the Excel/Google Sheets add-in panes (**Admin → Chats History**).                  |
 | Data Export | Download data                       | Download query results as CSV from workbooks, Analytics Chat, and published dashboards. Granted by default to the built-in Viewer, Explorer, and Developer roles. See [Data download controls][ref-data-download-controls]. |
+| Pre-aggregations | View pre-aggregations          | Open the [Pre-Aggregations][ref-pre-aggregations-page] page to view partitions, build history, and build errors, without starting or cancelling builds.                    |
+| Pre-aggregations | Build pre-aggregations         | Open the Pre-Aggregations page, start builds (**Build All**, **Build Selected**), and cancel queued or running builds. **Edit deployment** and **Manage deployments (account-wide)** also allow this. |
 
 When **Full access** is checked, the granular checkboxes appear checked and disabled — granting Full access today also covers any deployment-scoped permissions added in the future.
 
@@ -136,6 +138,7 @@ A custom role saved before **Create scheduled tasks** existed holds it on every 
 
 [ref-data-download-controls]: /admin/users-and-permissions/roles-and-permissions#restricting-data-downloads
 [ref-scheduled-tasks]: /docs/explore-analyze/scheduled-tasks
+[ref-pre-aggregations-page]: /admin/monitoring/pre-aggregations
 
 ## Walkthroughs
 
@@ -263,3 +266,5 @@ This section lists every action a custom role can grant. The internal action nam
 | `APMRead`                 | Access query history                                        |
 | `ChatHistoryRead`         | Access chat history                                         |
 | `DownloadData`            | Download data                                               |
+| `PreAggregationRead`      | View pre-aggregations                                       |
+| `PreAggregationBuild`     | Build pre-aggregations                                      |
