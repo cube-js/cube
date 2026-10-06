@@ -80,6 +80,9 @@ on:
           - 'true'
           - 'false'
 
+permissions:
+  contents: read
+
 jobs:
   latest-tag-sha:
     runs-on: ubuntu-24.04

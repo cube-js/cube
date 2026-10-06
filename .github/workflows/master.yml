@@ -16,6 +16,9 @@ on:
       - 'rust/cubesql/**'
     branches:
       - master
+permissions:
+  contents: read
+
 jobs:
   latest-tag-sha:
     runs-on: ubuntu-24.04

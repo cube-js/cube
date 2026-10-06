@@ -21,6 +21,9 @@ env:
   VERSION: ${{ github.event.inputs.version || 'latest' }}
 
 # touch to trigger
+permissions:
+  contents: read
+
 jobs:
   cli:
     runs-on: ubuntu-24.04

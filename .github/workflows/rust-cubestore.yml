@@ -17,6 +17,9 @@ env:
   CARGO_NET_RETRY: 10
   RUSTUP_MAX_RETRIES: 10
 
+permissions:
+  contents: read
+
 jobs:
   debian:
     name: Debian Rust ${{ matrix.rust }}

@@ -44,6 +44,9 @@ env:
   # Current user version for Python. Should be aligned between build-native & docker-dev
   PYTHON_VERSION_CURRENT: 3.13
 
+permissions:
+  contents: read
+
 jobs:
   latest-tag-sha:
     runs-on: ubuntu-24.04
