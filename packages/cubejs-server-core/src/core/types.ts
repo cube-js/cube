@@ -135,8 +135,10 @@ export type ContextToAppIdFn = (context: RequestContext) => string | Promise<str
 export type ContextToGroupsFn = (context: RequestContext) => string[] | Promise<string[]>;
 export type ContextToOrchestratorIdFn = (context: RequestContext) => string | Promise<string>;
 export type ContextToCubeStoreRouterIdFn = (context: RequestContext) => string | Promise<string>;
+/** Missing values are dropped and the rest stringified before the tags reach a driver. */
+export type QueryTagValue = string | number | boolean | null | undefined;
 export type QueryTagsFn = (context: DriverContext) =>
-  Record<string, string> | undefined | Promise<Record<string, string> | undefined>;
+  Record<string, QueryTagValue> | undefined | Promise<Record<string, QueryTagValue> | undefined>;
 
 export type OrchestratorOptionsFn = (context: RequestContext) => OrchestratorOptions | Promise<OrchestratorOptions>;
 

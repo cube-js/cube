@@ -86,7 +86,7 @@ describe('OrchestratorApi queryTags', () => {
 
   test('stringifies tag values and drops missing ones', async () => {
     // A JS or Python hook can return anything the security context holds
-    const { api, driver } = createApi((() => ({ user_id: 42, org: undefined, team: null })) as unknown as QueryTagsFn);
+    const { api, driver } = createApi(() => ({ user_id: 42, org: undefined, team: null }));
 
     await api.executeQuery(userQuery('alice'));
 

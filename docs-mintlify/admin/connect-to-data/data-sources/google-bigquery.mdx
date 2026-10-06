@@ -181,6 +181,10 @@ characters other than ASCII letters, digits, `_`, and `-` with `_`, and truncate
 63 characters. Keys must start with a letter and a job can have at most 64 labels,
 otherwise BigQuery rejects the job. A tag can't override `cube_request_id`.
 
+Since labels are lowercase, IDs that differ only in case, e.g., base64 hashes or
+case-sensitive user IDs, end up as the same label. Use case-insensitive values, e.g., a
+hex-encoded hash.
+
 For example, this query sums up the bytes billed per user over the last week:
 
 ```sql

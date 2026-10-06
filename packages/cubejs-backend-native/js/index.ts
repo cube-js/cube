@@ -549,7 +549,7 @@ export interface PyConfiguration {
   scheduledRefreshContexts?: (ctx: unknown) => Promise<string[]>
   scheduledRefreshTimeZones?: (ctx: unknown) => Promise<string[]>
   contextToGroups?: (ctx: unknown) => Promise<string[]>
-  queryTags?: (ctx: unknown) => Promise<Record<string, string>>
+  queryTags?: (ctx: unknown) => Promise<Record<string, string | number | boolean | null> | null>
 }
 
 function simplifyExpressRequest(req: ExpressRequest) {
