@@ -3128,5 +3128,55 @@ from
       `);
       expect(res.rows).toMatchSnapshot();
     });
+
+    // A union whose queries reach one data source is pushed down as a single set operation,
+    // bounded by the row cap. Order across the queries of a union is not defined, so rows
+    // are compared sorted.
+    const sortedRows = (rows: Record<string, unknown>[]) => rows
+      .map(row => JSON.stringify(row))
+      .sort();
+
+    executePg('SQL API: union all push down', async (connection) => {
+      const res = await connection.query(`
+        SELECT 'products' AS source, category FROM Products GROUP BY 1, 2
+        UNION ALL
+        SELECT 'orders' AS source, category FROM ECommerce GROUP BY 1, 2
+      `);
+      expect(sortedRows(res.rows)).toEqual(sortedRows([
+        { source: 'orders', category: 'Furniture' },
+        { source: 'orders', category: 'Office Supplies' },
+        { source: 'orders', category: 'Technology' },
+        { source: 'products', category: 'Furniture' },
+        { source: 'products', category: 'Office Supplies' },
+        { source: 'products', category: 'Technology' },
+      ]));
+    });
+
+    executePg('SQL API: union distinct push down', async (connection) => {
+      const res = await connection.query(`
+        SELECT category FROM Products GROUP BY 1
+        UNION
+        SELECT category FROM ECommerce GROUP BY 1
+      `);
+      expect(sortedRows(res.rows)).toEqual(sortedRows([
+        { category: 'Furniture' },
+        { category: 'Office Supplies' },
+        { category: 'Technology' },
+      ]));
+    });
+
+    executePg('SQL API: union with a limited query push down', async (connection) => {
+      // Which two categories the limited query reads is not defined without an order,
+      // which would keep the union out of push down; how many it reads is
+      const res = await connection.query(`
+        (SELECT category FROM Products GROUP BY 1 LIMIT 2)
+        UNION ALL
+        (SELECT category FROM ECommerce GROUP BY 1)
+      `);
+      expect(res.rows.length).toEqual(5);
+      expect(new Set(res.rows.map(row => row.category))).toEqual(
+        new Set(['Furniture', 'Office Supplies', 'Technology'])
+      );
+    });
   });
 }
