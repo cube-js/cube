@@ -238,7 +238,7 @@ describe('PostgresDriver', () => {
   });
 
   describe('primary and foreign keys', () => {
-    const schemas = ['fk_name', 'fk_tenant_a', 'fk_tenant_b', 'fk_composite'];
+    const schemas = ['fk_name', 'fk_tenant_a', 'fk_tenant_b', 'fk_composite', 'fk_partitioned'];
     let readerDriver: PostgresDriver;
 
     beforeAll(async () => {
@@ -274,6 +274,20 @@ describe('PostgresDriver', () => {
         'CREATE TABLE fk_composite.children (a INT, b INT, FOREIGN KEY (a, b) REFERENCES fk_composite.parents (x, y))',
         []
       );
+
+      // Postgres clones an FK per partition of a partitioned referenced table (orders -> customers_1, ...)
+      await driver.query('CREATE TABLE fk_partitioned.customers (id INT PRIMARY KEY) PARTITION BY RANGE (id)', []);
+      await driver.query('CREATE TABLE fk_partitioned.customers_1 PARTITION OF fk_partitioned.customers FOR VALUES FROM (0) TO (100)', []);
+      await driver.query('CREATE TABLE fk_partitioned.customers_2 PARTITION OF fk_partitioned.customers FOR VALUES FROM (100) TO (200)', []);
+      await driver.query(
+        'CREATE TABLE fk_partitioned.orders (id INT PRIMARY KEY, customer_id INT REFERENCES fk_partitioned.customers (id))',
+        []
+      );
+      await driver.query(
+        'CREATE TABLE fk_partitioned.events (id INT, customer_id INT REFERENCES fk_partitioned.customers (id)) PARTITION BY RANGE (id)',
+        []
+      );
+      await driver.query('CREATE TABLE fk_partitioned.events_1 PARTITION OF fk_partitioned.events FOR VALUES FROM (0) TO (100)', []);
 
       // information_schema.constraint_column_usage only shows tables owned by the current role
       await driver.query('DROP ROLE IF EXISTS fk_reader', []);
@@ -333,6 +347,23 @@ describe('PostgresDriver', () => {
         parents: [
           { name: 'x', type: 'integer', attributes: ['primaryKey'] },
           { name: 'y', type: 'integer', attributes: ['primaryKey'] },
+        ],
+      },
+      fk_partitioned: {
+        ...Object.fromEntries(['customers', 'customers_1', 'customers_2'].map((table) => [table, [
+          { name: 'id', type: 'integer', attributes: ['primaryKey'] },
+        ]])),
+        events: [
+          { name: 'customer_id', type: 'integer', attributes: [], foreign_keys: [{ target_table: 'customers', target_column: 'id' }] },
+          { name: 'id', type: 'integer', attributes: [] },
+        ],
+        events_1: [
+          { name: 'customer_id', type: 'integer', attributes: [], foreign_keys: [{ target_table: 'customers', target_column: 'id' }] },
+          { name: 'id', type: 'integer', attributes: [] },
+        ],
+        orders: [
+          { name: 'customer_id', type: 'integer', attributes: [], foreign_keys: [{ target_table: 'customers', target_column: 'id' }] },
+          { name: 'id', type: 'integer', attributes: ['primaryKey'] },
         ],
       },
     };

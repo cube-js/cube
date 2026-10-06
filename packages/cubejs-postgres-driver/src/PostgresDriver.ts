@@ -222,7 +222,10 @@ export class PostgresDriver<Config extends PostgresDriverConfiguration = Postgre
         JOIN pg_catalog.pg_attribute a ON a.attrelid = con.conrelid AND a.attnum = k.attnum
         JOIN pg_catalog.pg_class fc ON fc.oid = con.confrelid
         JOIN pg_catalog.pg_attribute fa ON fa.attrelid = con.confrelid AND fa.attnum = k.fattnum
-        WHERE con.contype = 'f'
+        -- A partitioned referenced table gets a clone of the FK per partition on the same conrelid;
+        -- clones on a partition of a partitioned referencing table have a parent on another table and stay
+        LEFT JOIN pg_catalog.pg_constraint parent ON parent.oid = con.conparentid
+        WHERE con.contype = 'f' AND parent.conrelid IS DISTINCT FROM con.conrelid
       ) AS columns
       WHERE columns.table_schema NOT IN ('pg_catalog', 'information_schema')${conditionString ? ` AND (${conditionString})` : ''}`;
   }
