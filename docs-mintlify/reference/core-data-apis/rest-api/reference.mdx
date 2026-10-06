@@ -912,14 +912,16 @@ interpolations, and `${CUBE}` refers to the cube's own table alias. Members of a
 view carry the alias expression they resolve to, e.g. `${orders.total_amount}`.
 
 For a cube defined with [`sql`][ref-cubes-sql] rather than
-[`sql_table`][ref-cubes-sql-table], lineage is read from its SQL statement.
-`table_references` lists every table the statement reads, including tables read
-inside common table expressions and subqueries. Members get `column_references`
-only when the statement is a `SELECT *` that reads a single table, e.g.
-`SELECT * FROM orders WHERE status = 'completed'`. For any other statement, such
-as one that selects or renames specific columns, aggregates, or uses joins or
-common table expressions, the cube's members have empty `column_references` and
-contribute no columns to view members or other members that reference them.
+[`sql_table`][ref-cubes-sql-table], lineage is read from its SQL statement:
+
+- `table_references` lists every table the statement reads, including those in
+  common table expressions and subqueries
+- Members get `column_references` only when the statement is a `SELECT *` over a
+  single table, e.g. `SELECT * FROM orders WHERE status = 'completed'`
+- For any other statement, e.g. one that selects or renames specific columns,
+  aggregates, or uses joins or common table expressions, members have empty
+  `column_references` and contribute no columns to view members or other members
+  that reference them
 
 Example request:
 
