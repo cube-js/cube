@@ -133,9 +133,8 @@ yarn test
 
 ## Rust
 
-Every `unsafe` block and `unsafe impl` gets a `// SAFETY:` comment directly above it explaining
-why the invariants hold at that site, not what the code does. Every `unsafe fn` documents its
-caller contract in a `/// # Safety` section.
+Every `unsafe` block and `unsafe impl` needs a short `// SAFETY:` comment saying why it is sound
+(not what the code does). Every `unsafe fn` documents its caller contract in `/// # Safety`.
 
 ## Git
 

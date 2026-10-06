@@ -243,16 +243,14 @@ struct JsBufferView {
     len: usize,
 }
 
-// SAFETY: only read, and only while the owning `Root<JsBuffer>` is held (see `as_slice`).
+// SAFETY: read-only; validity is guaranteed by `as_slice` callers.
 unsafe impl Send for JsBufferView {}
 
 impl JsBufferView {
     /// # Safety
-    /// The rooted buffer must not be written to, detached or transferred by JS while the
-    /// returned slice is in use. Otherwise flatbuffers' unchecked reads after verification
-    /// may go out of bounds.
+    /// The buffer must stay rooted and unmodified while the slice is in use.
     unsafe fn as_slice(&self) -> &[u8] {
-        // N-API may hand out a null pointer for an empty buffer.
+        // N-API may return null for an empty buffer.
         if self.len == 0 {
             &[]
         } else {
@@ -270,15 +268,12 @@ pub fn parse_cubestore_result_message(mut cx: FunctionContext) -> JsResult<JsPro
             len: slice.len(),
         }
     };
-    // ArrayBuffer backing stores live off the V8 heap and are never moved by GC, so rooting
-    // the Buffer is enough to keep `msg_bytes` valid.
+    // GC never moves ArrayBuffer backing stores, so rooting keeps `msg_bytes` valid.
     let msg_root = msg.root(&mut cx);
 
     let promise = cx
         .task(move || {
-            // SAFETY: `msg_root` is dropped only in the settle closure, after this task has
-            // finished reading, and the JS caller doesn't mutate the message (see the
-            // parseCubestoreResultMessage contract in js/index.ts).
+            // SAFETY: `msg_root` is dropped after the task; JS doesn't mutate the message.
             QueryResult::from_cubestore_fb(unsafe { msg_bytes.as_slice() })
         })
         .promise(move |mut cx, res| {
