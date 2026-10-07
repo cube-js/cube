@@ -556,31 +556,74 @@ export class BaseQuery {
   }
 
   /**
-   * @private
+   * @protected
    * @param { import('../compiler/JoinGraph').FinishedJoinTree } joinTree
    * @param { string[] } joinHints
-   * @return { string[][] }
+   * @return { (string|string[])[] }
    */
   enrichedJoinHintsFromJoinTree(joinTree, joinHints) {
+    // The tree can hold two edges into one cube. The later edge wins so the next pass follows the
+    // later hint (e.g. a view's join path), unless it closes a cycle (hint `c -> b` when `c` is
+    // only reachable through `b`): that parent chain would loop forever
     const joinsMap = {};
 
     for (const j of joinTree.joins) {
       joinsMap[j.to] = j.from;
     }
 
-    return joinHints.map(jh => {
+    // A chain without repeats visits each cube with a parent at most once
+    const maxPathLength = joinTree.joins.length + 1;
+
+    return this.joinPathsToRoot(joinsMap, joinHints, maxPathLength) ??
+      this.joinPathsToRoot(this.acyclicJoinsMap(joinTree), joinHints, maxPathLength);
+  }
+
+  /**
+   * @private
+   * @param { Record<string, string> } joinsMap cube -> the cube it is joined from
+   * @param { string[] } joinHints
+   * @param { number } maxPathLength a longer chain must have looped
+   * @return { (string|string[])[] | null } null when the chain of some hint loops
+   */
+  joinPathsToRoot(joinsMap, joinHints, maxPathLength) {
+    const paths = [];
+
+    for (const jh of joinHints) {
       let cubeName = jh;
       const path = [cubeName];
       while (joinsMap[cubeName]) {
         cubeName = joinsMap[cubeName];
         path.push(cubeName);
+        if (path.length > maxPathLength) {
+          return null;
+        }
       }
 
-      if (path.length === 1) {
-        return path[0];
+      paths.push(path.length === 1 ? path[0] : path.reverse());
+    }
+
+    return paths;
+  }
+
+  /**
+   * @private
+   * @param { import('../compiler/JoinGraph').FinishedJoinTree } joinTree
+   * @return { Record<string, string> }
+   */
+  acyclicJoinsMap(joinTree) {
+    const joinsMap = {};
+
+    for (const j of joinTree.joins) {
+      let ancestor = j.from;
+      while (ancestor && ancestor !== j.to) {
+        ancestor = joinsMap[ancestor];
       }
-      return path.reverse();
-    });
+      if (!ancestor) {
+        joinsMap[j.to] = j.from;
+      }
+    }
+
+    return joinsMap;
   }
 
   /**
