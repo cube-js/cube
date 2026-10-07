@@ -96,104 +96,37 @@ const DRIVER_REBUILD_WARN_THRESHOLD = 50;
 const MAX_DRIVER_REBUILD_ATTEMPTS = 3;
 
 /**
- * How long a data source keeps a freshly rebuilt driver before another
- * configuration change may replace it. Inside the window the cached driver is
- * reused without even asking the factory, exactly as before this file learned
- * to rebuild at all.
- *
- * A rebuild tears down a connection pool, so the rate has to be bounded by
- * something other than how often contexts happen to differ. Without this, a
- * deployment whose `driverFactory` returns a configuration that is not stable
- * across calls — a credential minted per call, say, or one carrying a nonce —
- * would rebuild on request after request. That deployment works today, because
- * the driver is resolved once and the difference is never noticed; it must not
- * be turned into pool churn.
- *
- * The cost is that a credential which rotates twice inside one window is picked
- * up a window late rather than immediately. At half a minute against
- * credentials that live for an hour, that is not a tradeoff worth agonising
- * over — and the alternative, before this change, was "not until redeploy".
+ * Minimum gap between rebuilds of one alias set, so a factory whose config is
+ * not stable across calls (a per-call credential, a nonce) cannot churn the
+ * pool. Inside the window the cached driver is reused without asking the factory.
  */
 const DRIVER_REBUILD_MIN_INTERVAL_MS = 30 * 1000;
 
 /**
- * Separate refusal incidents, spanning the grace window, before the cached
- * driver is given up rather than reused. One of the two routes to a give-up —
- * see `PROBE_FAILURE_GRACE_MS` for the other, and `PROBE_FAILURE_COALESCE_MS`
- * for why the unit is incidents rather than failed checks.
- *
- * A probe failure is the factory declining to produce a connection for this
- * context. One is transient — a secret store blinking, a timeout — and reusing
- * what is cached is right. Sustained refusal is not: a `driverFactory` written
- * to fail closed on an unusable credential is stating that this connection must
- * not serve queries, and honouring that only when the factory happens to return
- * is how an expired credential goes on serving errors from a pool nobody
- * rebuilds.
+ * Separate refusal incidents, spanning the grace window, before a driver the
+ * factory keeps refusing to configure is given up rather than reused. One of two
+ * routes to a give-up; the other is an incident outlasting `PROBE_FAILURE_GRACE_MS`.
  */
 const MAX_PROBE_FAILURE_INCIDENTS = 3;
 
 /**
- * How long refusal has to go on before the driver is given up — both how long
- * repeated incidents must span, and how long a single unbroken one must run.
- *
- * Those are the two routes, and each covers a traffic profile the other cannot
- * reach. Where probes are sparse every refusal stands alone, so the count is
- * what accumulates. Where they are dense they coalesce into one incident that
- * never ends, and only its duration distinguishes it from a blink.
- *
- * Note what this means, because it is the thing to check before assuming
- * otherwise: one continuous dependency outage *is* enough, if it lasts. That is
- * deliberate — it is the same call this bound made when the window was widened
- * to minutes, and the recipe tells a `driver_factory` reaching an external
- * dependency to catch its own failures rather than propagate them.
- *
- * Minutes rather than seconds because a probe failure is not evidence about the
- * cached connection — it is evidence about whatever the factory had to reach to
- * answer. A secret store restarting, a token endpoint returning 503, a DNS blip
- * inside the factory: in every one of those the cached credential is untouched
- * and still valid, and giving the pool up makes a dependency's outage into a
- * query outage. A credential that has genuinely stopped working is not urgent
- * to the second, so the bar is set where a dependency can restart under it.
+ * How long refusal must last, as repeated incidents or one unbroken incident,
+ * before the driver is given up. Minutes, so a dependency restarting inside the
+ * factory does not drain a pool whose credential is still valid; an outage that
+ * outlasts it does, which is why the docs tell factories to catch their own failures.
  */
 const PROBE_FAILURE_GRACE_MS = 5 * 60 * 1000;
 
 /**
- * How long one refusal stays on the record before it is forgotten.
- *
- * Deliberately separate from the grace window, because the two pull opposite
- * ways. The grace window wants to be long, so a dependency can restart under
- * it. Retention wants to be long enough that a *sparse* deployment can still
- * reach the bound: probes are only issued when the security context fingerprint
- * changes, so a few-user deployment may probe once every several minutes, and
- * if a refusal expired at the grace window such a deployment would reset to one
- * every time and never give up a credential however permanently dead it was.
- *
- * Longer than the grace window, then, but far short of the days-apart flakes
- * that made a never-expiring record wrong: a refusal half an hour stale is not
- * evidence about the one happening now.
- *
- * Retention this long would, on its own, let two unrelated blinks half an hour
- * apart reach the bound between them. What keeps that from happening is that
- * the count is of incidents rather than of refusals — see
- * `PROBE_FAILURE_COALESCE_MS`.
+ * How long a refusal stays on the record. Longer than the grace window so a
+ * sparse deployment, which probes only when the security context changes, can
+ * still reach the bound.
  */
 const PROBE_FAILURE_RETENTION_MS = 30 * 60 * 1000;
 
 /**
- * How close together two refusals have to be to count as one.
- *
- * Retention outliving the grace window is what makes the bound reachable in a
- * sparse deployment, but on its own it also makes it reachable across unrelated
- * incidents: concurrent probes all fail on one blink of a dependency, and a
- * burst of three plus a single refusal six minutes later would otherwise
- * satisfy both conditions and drain a working pool for what was two brief
- * outages.
- *
- * Counting incidents rather than refusals removes that without giving the
- * sparse case back: a burst is one, and the bound still wants three. An
- * incident is bounded by its own duration as well as by the count, so a
- * refusal stream arriving faster than this window is caught by having lasted
- * rather than by being counted.
+ * Refusals this close together are one incident, so a burst of concurrent probes
+ * failing on one blink counts once.
  */
 const PROBE_FAILURE_COALESCE_MS = 2 * 1000;
 
@@ -1130,12 +1063,8 @@ export class CubejsServerCore {
         // and `probeFailed` below would not typecheck.
         } else if (staleness.stale === false) {
           if (!staleness.probeFailed) {
-            // Only a probe that reached the factory says anything about whether
-            // it is still refusing. Most reuse never calls it — an unchanged
-            // security context fingerprint is a plain cache hit — and clearing
-            // on those lets one context's hits erase another's refusals
-            // indefinitely, which is every mixed-traffic deployment: a refresh
-            // scheduler tick alone would keep the bound out of reach.
+            // Only a probe that reached the factory clears refusals: clearing on a
+            // plain fingerprint cache hit would let one context erase another's.
             if (staleness.probeResolved) {
               delete driverProbeFailures[rebuildKey];
             }
@@ -1176,18 +1105,13 @@ export class CubejsServerCore {
 
           const failingForMs = now - failures.firstFailureAt;
 
-          // Two shapes of sustained refusal, because either alone leaves a
-          // traffic profile uncovered. Repeated incidents catch a deployment
-          // whose probes are sparse enough that each refusal stands alone; one
-          // unbroken incident catches a busy deployment, where refusals arrive
-          // faster than the coalescing window and would otherwise count once
-          // however long the credential stayed dead.
+          // Repeated incidents catch sparse probing; one unbroken incident catches
+          // busy traffic, where refusals coalesce into a single count.
           const sustainedIncident = now - failures.incidentStartedAt >= PROBE_FAILURE_GRACE_MS;
           const repeatedIncidents = failures.count >= MAX_PROBE_FAILURE_INCIDENTS
             && failingForMs >= PROBE_FAILURE_GRACE_MS;
 
-          // Transient, as far as anything here can tell. Reuse, exactly as
-          // before this bound existed.
+          // Transient, as far as anything here can tell. Reuse.
           if (!sustainedIncident && !repeatedIncidents) {
             return cached;
           }
@@ -1317,18 +1241,8 @@ export class CubejsServerCore {
     const orchestratorApi = this.createOrchestratorApi(
       resolveDataSourceDriver,
       {
-        // Deliberately outside the staleness check that `resolveDataSourceDriver`
-        // applies to `requestContextRef.current`: this and `contextToDbType`
-        // below keep resolving from `context`, the request that created the
-        // orchestrator, and resolve once for its lifetime.
-        //
-        // Both were pinned that way before rebuilding existed, and neither is
-        // the shape the rebuild is for. The external store is Cube Store or a
-        // shared pre-aggregation warehouse — one connection the deployment owns,
-        // not one derived from who is asking — and a data source's type does not
-        // change per user, only its credentials do. Widening the rebuild to
-        // cover them would mean tearing down the pre-aggregation store's pool on
-        // a per-user signal that says nothing about it.
+        // Deliberately resolved from the creating `context`, outside the staleness
+        // check: the external store and the data source's db type are not per-user.
         externalDriverFactory: this.options.externalDriverFactory && (async () => {
           if (externalPreAggregationsDriverPromise) {
             return externalPreAggregationsDriverPromise;
@@ -1691,9 +1605,8 @@ export class CubejsServerCore {
    *     so step 2 short-circuits next time.
    *  4. The config genuinely changed. Rebuild.
    *
-   * Step 4 is what fixes a rotated per-user credential: previously the driver
-   * built from the first request's token was reused for the life of the
-   * process, so every new connection it opened failed to authenticate.
+   * Step 4 is what picks up a rotated per-user credential; without it the
+   * driver built from the first request's token would serve the whole process.
    *
    * A `stale: true` verdict is permission to rebuild, not an instruction to: the
    * caller rate-limits rebuilds per data source, because the rate at which a
@@ -1744,9 +1657,9 @@ export class CubejsServerCore {
     try {
       value = await this.options.driverFactory(context);
     } catch (error) {
-      // This call is a probe, not the request's own resolution: a cache hit
-      // never used to invoke the factory at all, so letting a transient failure
-      // here propagate would fail a query the cached driver could have served.
+      // This call is a probe, not the request's own resolution: letting a
+      // transient failure here propagate would fail a query the cached driver
+      // could have served.
       // Degrade to reuse, as with anything else that cannot be compared — but
       // report it, because a factory that keeps refusing is not transient and
       // the caller gives the driver up once these stop being occasional.
