@@ -162,6 +162,30 @@ describe('driver cache invalidation', () => {
     expect(core.builtDrivers).toHaveLength(2);
   });
 
+  // A cold id builds once, and callers arriving mid-build share that build, so
+  // they have to update the context it resolves drivers from just as a cache
+  // hit does.
+  test('a caller joining an in-flight build updates the context drivers are built from', async () => {
+    const core = new TestServerCore(<any>{
+      contextToOrchestratorId: () => 'ORCHESTRATOR',
+      logger: jest.fn(),
+      driverFactory: (ctx: any) => (<any>{ type: 'postgres', password: ctx.securityContext.token }),
+    });
+    const spy = jest.spyOn(<any>core, 'createOrchestratorApi');
+
+    await Promise.all([
+      core.getOrchestratorApi(<any>{ requestId: 'req-1', securityContext: { token: 'token-a' } }),
+      core.getOrchestratorApi(<any>{ requestId: 'req-2', securityContext: { token: 'token-b' } }),
+    ]);
+
+    expect(spy).toHaveBeenCalledTimes(1);
+
+    const driverFactory = <DriverFactoryByDataSource>spy.mock.calls[0][0];
+    const driver = <FakeDriver> await driverFactory('default');
+
+    expect(driver.builtFrom).toMatchObject({ password: 'token-b' });
+  });
+
   test('releases the driver it replaced, so its pool is drained', async () => {
     const { driverFactory, request } = await createCore({
       driverFactory: (ctx: any) => (<any>{ type: 'postgres', password: ctx.securityContext.token }),

@@ -839,24 +839,13 @@ export class CubejsServerCore {
     const orchestratorId = await this.contextToOrchestratorId(context);
 
     if (this.orchestratorStorage.has(orchestratorId)) {
-      const cachedOrchestratorApi = this.orchestratorStorage.get(orchestratorId);
-      const cachedContextRef = this.orchestratorRequestContexts.get(cachedOrchestratorApi);
-
-      // Keep the driver factory's view of the request context current. Without
-      // this it stays pinned to whichever request happened to create the
-      // orchestrator, and a driver built from context-derived credentials can
-      // never be rebuilt when they rotate.
-      if (cachedContextRef) {
-        cachedContextRef.current = context;
-      }
-
-      return cachedOrchestratorApi;
+      return this.trackRequestContext(this.orchestratorStorage.get(orchestratorId), context);
     }
 
     const building = this.buildingOrchestratorApis.get(orchestratorId);
 
     if (building) {
-      return building;
+      return building.then((orchestratorApi) => this.trackRequestContext(orchestratorApi, context));
     }
 
     // Registered before the first `await` in the build, so nothing can interleave
@@ -875,6 +864,22 @@ export class CubejsServerCore {
     this.buildingOrchestratorApis.set(orchestratorId, pending);
 
     return pending;
+  }
+
+  /**
+   * Keep the driver factory's view of the request context current for every
+   * caller an orchestrator serves. Without this it stays pinned to the request
+   * that built it, and a driver built from context-derived credentials can
+   * never be rebuilt when they rotate.
+   */
+  protected trackRequestContext(orchestratorApi: OrchestratorApi, context: RequestContext): OrchestratorApi {
+    const contextRef = this.orchestratorRequestContexts.get(orchestratorApi);
+
+    if (contextRef) {
+      contextRef.current = context;
+    }
+
+    return orchestratorApi;
   }
 
   protected async buildOrchestratorApi(orchestratorId: string, context: RequestContext): Promise<OrchestratorApi> {
