@@ -682,9 +682,7 @@ describe('Multiple join paths', () => {
       expect(sql).not.toMatch(/ON 'F' = 'X'/);
     });
 
-    // A reaches C only through B, so B is an intermediate cube of the A->C path. The C->B hint
-    // used to add a second edge into B, and enrichedJoinHintsFromJoinTree then walked
-    // B -> C -> B ... until `Array.push` threw `RangeError: Invalid array length`
+    // A reaches C only through B, so the C->B hint leads back into an already-joined cube
     it('should join a cube once when a hint leads back into an intermediate cube', async () => {
       expect(joinGraph.buildJoin(['A', 'C', ['C', 'B']])?.joins.map(j => `${j.from}->${j.to}`))
         .toEqual(['A->B', 'B->C']);
