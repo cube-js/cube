@@ -8,6 +8,9 @@ import { BaseSegment } from './BaseSegment';
 import { ParamAllocator } from './ParamAllocator';
 import { resolveWindowsTimezone } from './windows-iana';
 
+// Ordered from the smallest, so the first match is the interval's own unit.
+const INTERVAL_UNITS = ['second', 'minute', 'hour', 'day', 'week', 'month', 'quarter', 'year'];
+
 const abbrs = {
   EST: 'Eastern Standard Time',
   EDT: 'Eastern Standard Time',
@@ -289,6 +292,19 @@ export class MssqlQuery extends BaseQuery {
     }
 
     return res;
+  }
+
+  /**
+   * The generated time series steps with DATEADD, which takes a time unit and a
+   * count rather than an interval, so it needs the unit the interval is written
+   * in. `diffTimeUnitForInterval` degrades QUARTER to MONTH and WEEK to DAY,
+   * which made the series produce three or seven times as many periods as asked
+   * for. Same fix as SnowflakeQuery.
+   */
+  public override intervalAndMinimalTimeUnit(interval: string): [string, string] {
+    const unit = INTERVAL_UNITS.find(u => new RegExp(`\\b${u}s?\\b`, 'i').test(interval));
+
+    return [interval, unit || super.intervalAndMinimalTimeUnit(interval)[1]];
   }
 
   public sqlTemplates() {

@@ -1,4 +1,5 @@
 /* eslint-disable no-restricted-syntax */
+import { MssqlQuery } from '../../src/adapter/MssqlQuery';
 import { PostgresQuery } from '../../src/adapter/PostgresQuery';
 import { SnowflakeQuery } from '../../src/adapter/SnowflakeQuery';
 import { prepareYamlCompiler } from './PrepareCompiler';
@@ -65,6 +66,8 @@ cubes:
   const GENERATING_DIALECTS: [string, any, string][] = [
     ['Postgres', PostgresQuery, 'generate_series'],
     ['Snowflake', SnowflakeQuery, 'ARRAY_GENERATE_RANGE'],
+    // MSSQL recurses over the CTE it defines instead of calling a generator.
+    ['MSSQL', MssqlQuery, 'FROM time_series'],
   ];
 
   const PREDEFINED_GRANULARITIES = ['second', 'minute', 'hour', 'day', 'week', 'month', 'quarter', 'year'];
@@ -86,6 +89,21 @@ cubes:
       const sql = await buildSql(QueryClass, { measure: 'events.rolling_30d_users' });
 
       expect(sql).toContain(generator);
+    });
+  });
+
+  describe('MSSQL', () => {
+    it('steps the series by the granularity itself, not by its smallest time unit', async () => {
+      const weekly = await buildSql(MssqlQuery, { granularity: 'week' });
+      const quarterly = await buildSql(MssqlQuery, { granularity: 'quarter' });
+      const rangedQuarterly = await buildSql(MssqlQuery, { granularity: 'quarter', dateRange: ['2024-01-01', '2024-12-31'] });
+
+      expect(weekly).toContain('DATEADD(week, 1, date_from)');
+      expect(weekly).not.toContain('DATEADD(day, 1, date_from)');
+      expect(quarterly).toContain('DATEADD(quarter, 1, date_from)');
+      expect(quarterly).not.toContain('DATEADD(month, 1, date_from)');
+      expect(rangedQuarterly).toContain('DATEADD(quarter, 1, date_from)');
+      expect(rangedQuarterly).not.toContain('DATEADD(month, 1, date_from)');
     });
   });
 
