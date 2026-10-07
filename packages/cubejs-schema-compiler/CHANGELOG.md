@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.8.1](https://github.com/cube-js/cube/compare/v1.8.0...v1.8.1) (2026-10-07)
+
+### Bug Fixes
+
+- **tesseract:** Load the partitions a multi-stage rolling window reads ([#12147](https://github.com/cube-js/cube/issues/12147)) ([e0fd1e6](https://github.com/cube-js/cube/commit/e0fd1e6ea99bc67d422a69c5b6600f7e59aa519b))
+
 # [1.8.0](https://github.com/cube-js/cube/compare/v1.7.50...v1.8.0) (2026-10-07)
 
 ### Bug Fixes
