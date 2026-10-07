@@ -46,6 +46,28 @@ impl<C: Context<'static> + 'static> NativeStruct<NeonInnerTypes<C>> for NeonStru
         )?))
     }
 
+    fn get_field_by_key(
+        &self,
+        key: &NativeObjectHandle<NeonInnerTypes<C>>,
+    ) -> Result<NativeObjectHandle<NeonInnerTypes<C>>, CubeError> {
+        let neon_result = match key.object_ref().root_holder() {
+            RootHolder::String(key) => {
+                let key = key.value_ref().as_str();
+                self.object
+                    .map_neon_object(|cx, neon_object| neon_object.get::<JsValue, _, _>(cx, key))?
+            }
+            _ => {
+                let key = key.object_ref().get_js_value()?;
+                self.object
+                    .map_neon_object(|cx, neon_object| neon_object.get::<JsValue, _, _>(cx, key))?
+            }
+        };
+        Ok(NativeObjectHandle::new(NeonObject::new(
+            self.object.get_context(),
+            neon_result,
+        )?))
+    }
+
     fn has_field(&self, field_name: &str) -> Result<bool, CubeError> {
         let result = self.object.map_neon_object(|cx, neon_object| {
             let res = neon_object

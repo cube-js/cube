@@ -13,11 +13,26 @@ pub trait NativeObject<IT: InnerTypes>: Clone {
     fn into_rust_box(self) -> Result<IT::RustBox, CubeError>;
     fn is_null(&self) -> Result<bool, CubeError>;
     fn is_undefined(&self) -> Result<bool, CubeError>;
+    /// Resolves the concrete type in one step, for callers that would otherwise
+    /// probe `into_*` variants one by one.
+    fn into_typed(self) -> Result<NativeTypedObject<IT>, CubeError>;
     fn clone_to_context(&self, context: &IT::Context) -> Self;
     fn clone_to_function_context(
         &self,
         context: &<IT::FunctionIT as InnerTypes>::Context,
     ) -> <IT::FunctionIT as InnerTypes>::Object;
+}
+
+pub enum NativeTypedObject<IT: InnerTypes> {
+    Null,
+    Undefined,
+    Boolean(IT::Boolean),
+    Number(IT::Number),
+    String(IT::String),
+    Array(IT::Array),
+    Struct(IT::Struct),
+    Function(IT::Function),
+    RustBox(IT::RustBox),
 }
 
 pub trait NativeType<IT: InnerTypes> {
@@ -33,6 +48,12 @@ pub trait NativeArray<IT: InnerTypes>: NativeType<IT> {
 
 pub trait NativeStruct<IT: InnerTypes>: NativeType<IT> {
     fn get_field(&self, field_name: &str) -> Result<NativeObjectHandle<IT>, CubeError>;
+    /// Looks a field up by a key handle, e.g. one returned by
+    /// `get_own_property_names`, without materializing it as a `String` first.
+    fn get_field_by_key(
+        &self,
+        key: &NativeObjectHandle<IT>,
+    ) -> Result<NativeObjectHandle<IT>, CubeError>;
     fn set_field(&self, field_name: &str, value: NativeObjectHandle<IT>)
         -> Result<bool, CubeError>;
     fn has_field(&self, field_name: &str) -> Result<bool, CubeError>;
@@ -57,6 +78,12 @@ pub trait NativeFunction<IT: InnerTypes>: NativeType<IT> {
 
 pub trait NativeString<IT: InnerTypes>: NativeType<IT> {
     fn value(&self) -> Result<String, CubeError>;
+    fn into_value(self) -> Result<String, CubeError>
+    where
+        Self: Sized,
+    {
+        self.value()
+    }
 }
 
 pub trait NativeNumber<IT: InnerTypes>: NativeType<IT> {

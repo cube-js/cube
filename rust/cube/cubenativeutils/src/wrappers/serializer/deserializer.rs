@@ -1,7 +1,9 @@
 use super::error::NativeObjSerializerError;
 use crate::wrappers::{
     inner_types::InnerTypes,
-    object::{NativeArray, NativeBoolean, NativeNumber, NativeString, NativeStruct},
+    object::{
+        NativeArray, NativeBoolean, NativeNumber, NativeString, NativeStruct, NativeTypedObject,
+    },
     object_handle::NativeObjectHandle,
 };
 use serde::{
@@ -33,32 +35,30 @@ impl<'de, IT: InnerTypes> Deserializer<'de> for NativeSerdeDeserializer<IT> {
     where
         V: Visitor<'de>,
     {
-        if self.input.is_null()? || self.input.is_undefined()? {
-            visitor.visit_unit()
-        } else if let Ok(val) = self.input.to_boolean() {
-            visitor.visit_bool(val.value().unwrap())
-        } else if let Ok(val) = self.input.to_string() {
-            visitor.visit_string(val.value().unwrap())
-        } else if let Ok(val) = self.input.to_number() {
-            let num = val.value().unwrap();
-            // Preserve fractional numbers as floats; only integral values are
-            // narrowed to i64 (whole-number JS values are the common case, and
-            // self-describing consumers like FilterValue expect them as ints).
-            if num.fract() == 0.0 && num.is_finite() {
-                visitor.visit_i64(num as i64)
-            } else {
-                visitor.visit_f64(num)
+        match self.input.into_typed()? {
+            NativeTypedObject::Null | NativeTypedObject::Undefined => visitor.visit_unit(),
+            NativeTypedObject::Boolean(val) => visitor.visit_bool(val.value()?),
+            NativeTypedObject::String(val) => visitor.visit_string(val.into_value()?),
+            NativeTypedObject::Number(val) => {
+                let num = val.value()?;
+                // Preserve fractional numbers as floats; only integral values are
+                // narrowed to i64 (whole-number JS values are the common case, and
+                // self-describing consumers like FilterValue expect them as ints).
+                if num.fract() == 0.0 && num.is_finite() {
+                    visitor.visit_i64(num as i64)
+                } else {
+                    visitor.visit_f64(num)
+                }
             }
-        } else if let Ok(val) = self.input.to_array() {
-            let deserializer = NativeSeqDeserializer::<IT>::new(val);
-            visitor.visit_seq(deserializer)
-        } else if let Ok(val) = self.input.to_struct() {
-            let deserializer = NativeMapDeserializer::<IT>::new(val)?;
-            visitor.visit_map(deserializer)
-        } else {
-            Err(NativeObjSerializerError::Message(
-                "deserializer is not implemented".to_string(),
-            ))
+            NativeTypedObject::Array(val) => {
+                visitor.visit_seq(NativeSeqDeserializer::<IT>::new(val))
+            }
+            NativeTypedObject::Struct(val) => {
+                visitor.visit_map(NativeMapDeserializer::<IT>::new(val)?)
+            }
+            NativeTypedObject::Function(_) | NativeTypedObject::RustBox(_) => Err(
+                NativeObjSerializerError::Message("deserializer is not implemented".to_string()),
+            ),
         }
     }
     fn deserialize_option<V>(self, visitor: V) -> Result<V::Value, Self::Error>
@@ -123,8 +123,8 @@ impl<'de, IT: InnerTypes> Deserializer<'de> for NativeSerdeDeserializer<IT> {
     where
         V: Visitor<'de>,
     {
-        if let Ok(val) = self.input.to_number() {
-            visitor.visit_f32(val.value().unwrap() as f32)
+        if let Ok(val) = self.input.into_number() {
+            visitor.visit_f32(val.value()? as f32)
         } else {
             Err(NativeObjSerializerError::Message(
                 "JS Number expected for f32 field".to_string(),
@@ -136,8 +136,8 @@ impl<'de, IT: InnerTypes> Deserializer<'de> for NativeSerdeDeserializer<IT> {
     where
         V: Visitor<'de>,
     {
-        if let Ok(val) = self.input.to_number() {
-            visitor.visit_f64(val.value().unwrap())
+        if let Ok(val) = self.input.into_number() {
+            visitor.visit_f64(val.value()?)
         } else {
             Err(NativeObjSerializerError::Message(
                 "JS Number expected for f64 field".to_string(),
@@ -238,18 +238,17 @@ impl<'de, IT: InnerTypes> MapAccess<'de> for NativeMapDeserializer<IT> {
             .ok_or_else(|| {
                 NativeObjSerializerError::Message("Array index out of bounds".to_string())
             })?;
-        let prop_string = prop_name
-            .to_string()
-            .and_then(|s| s.value())
-            .map_err(|_| NativeObjSerializerError::Message("key should be string".to_string()))?;
-
-        let value = self.input.get_field(&prop_string).map_err(|_| {
+        let value = self.input.get_field_by_key(prop_name).map_err(|_| {
             NativeObjSerializerError::Message("Failed to get property name".to_string())
         })?;
 
         self.value_idx += 1;
         let de = NativeSerdeDeserializer::new(value);
         seed.deserialize(de).map_err(|err| {
+            let prop_string = prop_name
+                .to_string()
+                .and_then(|s| s.into_value())
+                .unwrap_or_default();
             NativeObjSerializerError::Message(format!("field `{prop_string}`: {err}"))
         })
     }

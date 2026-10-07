@@ -6,7 +6,7 @@ use super::{
     neon_struct::NeonStruct,
     RootHolder,
 };
-use crate::wrappers::object::NativeObject;
+use crate::wrappers::object::{NativeObject, NativeTypedObject};
 use crate::wrappers::{
     neon::{context::ContextHolder, inner_types::NeonInnerTypes},
     rust_handle::NativeRustHandle,
@@ -40,6 +40,10 @@ impl<C: Context<'static> + 'static> NeonObject<C> {
 
     pub fn from_root(root: RootHolder<C>) -> Self {
         Self { root_holder: root }
+    }
+
+    pub(crate) fn root_holder(&self) -> &RootHolder<C> {
+        &self.root_holder
     }
 
     pub fn get_js_value(&self) -> Result<Handle<'static, JsValue>, CubeError> {
@@ -110,6 +114,20 @@ impl<C: Context<'static> + 'static> NativeObject<NeonInnerTypes<C>> for NeonObje
 
     fn is_null(&self) -> Result<bool, CubeError> {
         Ok(self.is_null())
+    }
+
+    fn into_typed(self) -> Result<NativeTypedObject<NeonInnerTypes<C>>, CubeError> {
+        Ok(match self.root_holder {
+            RootHolder::Null(_) => NativeTypedObject::Null,
+            RootHolder::Undefined(_) => NativeTypedObject::Undefined,
+            RootHolder::Boolean(v) => NativeTypedObject::Boolean(NeonBoolean::new(v)),
+            RootHolder::Number(v) => NativeTypedObject::Number(NeonNumber::new(v)),
+            RootHolder::String(v) => NativeTypedObject::String(NeonString::new(v)),
+            RootHolder::Array(v) => NativeTypedObject::Array(NeonArray::new(v)),
+            RootHolder::Function(v) => NativeTypedObject::Function(NeonFunction::new(v)),
+            RootHolder::Struct(v) => NativeTypedObject::Struct(NeonStruct::new(v)),
+            RootHolder::RustBox(_) => NativeTypedObject::RustBox(self.into_rust_box()?),
+        })
     }
 
     fn is_undefined(&self) -> Result<bool, CubeError> {

@@ -124,6 +124,16 @@ impl<C: Context<'static> + 'static, V: Value + NeonPrimitiveMapping + 'static>
         self.context.clone()
     }
 
+    /// The value was already copied out of JS in `new`; reading it back does not
+    /// need the context.
+    pub fn value_ref(&self) -> &V::NativeType {
+        &self.value
+    }
+
+    pub fn into_value(self) -> V::NativeType {
+        self.value
+    }
+
     pub fn map_neon_object<T, F>(&self, f: F) -> Result<T, CubeError>
     where
         F: FnOnce(&mut C, &Handle<'static, V>) -> Result<T, CubeError>,
