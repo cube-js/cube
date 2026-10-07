@@ -1166,19 +1166,33 @@ impl MultiStageQueryPlanner {
         state: Rc<QueryProperties>,
         descriptions: &mut Vec<Rc<MultiStageQueryDescription>>,
     ) -> Result<Rc<MultiStageQueryDescription>, CubeError> {
-        let description = if let Some(description) =
-            descriptions.iter().find(|d| d.alias() == "time_series")
-        {
-            // Rolling windows share one series, so a window joining an existing
-            // one has to register its own boundary column on it.
+        // Rolling windows over the same date range share one series. An include
+        // narrows the range of its own windows, so those get a series of their own.
+        let date_range = time_dimension.as_time_dimension()?.date_range_vec();
+        let mut series_count = 0;
+        let mut existing = None;
+        for description in descriptions.iter() {
+            if let MultiStageMemberType::Leaf(MultiStageLeafMemberType::TimeSeries(series)) =
+                description.member().member_type()
+            {
+                series_count += 1;
+                if series.time_dimension.as_time_dimension()?.date_range_vec() == date_range {
+                    existing = Some(description.clone());
+                    break;
+                }
+            }
+        }
+        let description = if let Some(description) = existing {
+            // A window joining an existing series has to register its own
+            // boundary column on it.
             if let Some(granularity) = &calendar_period_granularity {
-                let granularities = Self::time_series_calendar_granularities(description)?;
+                let granularities = Self::time_series_calendar_granularities(&description)?;
                 let mut granularities = granularities.borrow_mut();
                 if !granularities.contains(granularity) {
                     granularities.push(granularity.clone());
                 }
             }
-            description.clone()
+            description
         } else {
             let get_range_query_description = if time_dimension
                 .as_time_dimension()?
@@ -1211,7 +1225,11 @@ impl MultiStageQueryPlanner {
                 state.clone(),
                 vec![],
                 vec![],
-                "time_series".to_string(),
+                if series_count == 0 {
+                    "time_series".to_string()
+                } else {
+                    format!("time_series_{}", series_count)
+                },
             );
             descriptions.push(time_series_node.clone());
             time_series_node
