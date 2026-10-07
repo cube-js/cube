@@ -130,13 +130,17 @@ const PROBE_FAILURE_RETENTION_MS = 30 * 60 * 1000;
  */
 const PROBE_FAILURE_COALESCE_MS = 2 * 1000;
 
+/** Security contexts remembered per driver; past this the oldest is re-probed. */
+const MAX_KNOWN_SECURITY_CONTEXTS = 64;
+
 /**
- * What a cached driver was built from. `null` on either fingerprint means
+ * What a cached driver was built from. A `null` config fingerprint means
  * "cannot tell whether it changed", which is always read as "assume it did
  * not"; `expiresAt` is undefined when the configuration named no lifetime.
  */
 type DriverOrigin = {
-  securityContextFingerprint: string | null;
+  /** Contexts known to resolve this configuration, so contexts taking turns skip the factory. */
+  knownSecurityContexts: Set<string>;
   configFingerprint: string | null;
   expiresAt: number | undefined;
   /** Whether an unusable lifetime was reported, so the per-probe carry-over warns once. */
@@ -947,11 +951,7 @@ export class CubejsServerCore {
           driverContext(),
         );
 
-        // `resolveDriverStaleness` awaits the user's factory, so another caller
-        // may have replaced or invalidated this key in the meantime. Its work
-        // supersedes ours, and `cached` is no longer ours to reuse or release:
-        // it has either been handed to that caller's requests or already
-        // released by it.
+        // The probe awaited user code, so a concurrent caller may have replaced or released `cached`.
         const superseding = driverPromise[factoryKey];
 
         if (superseding !== cached) {
@@ -966,10 +966,7 @@ export class CubejsServerCore {
             return superseding;
           }
 
-          // Invalidated rather than replaced — the winning caller's own build
-          // failed, so it released `cached` and left nothing to reuse. Build
-          // below, which cannot recurse again, carrying the probe's result when
-          // it already resolved one so the factory is not asked twice.
+          // Invalidated by a failed concurrent build: build here, reusing the probe's result if it has one.
           resolvedFactoryResult = staleness.stale ? staleness.factoryResult : undefined;
         // `=== false` rather than `!`: this package compiles with
         // `strictNullChecks` off, where the negation does not narrow the union
@@ -1063,7 +1060,7 @@ export class CubejsServerCore {
       // Shared by reference across `aliasedKeys`. Empty until the factory is
       // called, which `resolveDriverStaleness` reads as reuse.
       const origin: DriverOrigin = {
-        securityContextFingerprint: null,
+        knownSecurityContexts: new Set(),
         configFingerprint: null,
         expiresAt: undefined,
         lifetimeIgnoredReported: false,
@@ -1087,7 +1084,10 @@ export class CubejsServerCore {
             ? undefined
             : <DriverConfig>factoryResult.value;
 
-          origin.securityContextFingerprint = factoryResult.securityContextFingerprint;
+          if (factoryResult.securityContextFingerprint !== null) {
+            origin.knownSecurityContexts.add(factoryResult.securityContextFingerprint);
+          }
+
           origin.configFingerprint = factoryConfig
             ? driverConfigFingerprint(factoryConfig)
             : null;
@@ -1492,7 +1492,7 @@ export class CubejsServerCore {
 
     if (
       securityContextFingerprint === null ||
-      securityContextFingerprint === origin.securityContextFingerprint
+      origin.knownSecurityContexts.has(securityContextFingerprint)
     ) {
       return { stale: false };
     }
@@ -1518,7 +1518,14 @@ export class CubejsServerCore {
     const configFingerprint = config ? driverConfigFingerprint(config) : null;
 
     if (configFingerprint === null || configFingerprint === origin.configFingerprint) {
-      origin.securityContextFingerprint = securityContextFingerprint;
+      const known = origin.knownSecurityContexts;
+
+      if (known.size >= MAX_KNOWN_SECURITY_CONTEXTS) {
+        // Sets iterate in insertion order, so this forgets the oldest.
+        known.delete(known.values().next().value);
+      }
+
+      known.add(securityContextFingerprint);
 
       // `expiresAt` is outside the fingerprint, so carry a re-issued deadline
       // over, through the build path's guard so an elapsed one is not reinstated.

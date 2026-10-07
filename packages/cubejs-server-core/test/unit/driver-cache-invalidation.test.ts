@@ -238,6 +238,48 @@ describe('driver cache invalidation', () => {
     expect(factory).toHaveBeenCalledTimes(2);
   });
 
+  // Users of one tenant, or a user and the refresh scheduler, sharing an
+  // orchestrator must not re-ask the factory on every request.
+  test('remembers every context that resolved the cached configuration', async () => {
+    const factory = jest.fn(() => (<any>{ type: 'postgres', password: 'from-env' }));
+    const { core, driverFactory, request } = await createCore({ driverFactory: factory }, { user: 'a' });
+
+    await driverFactory('default');
+    await request({ user: 'b' });
+    await driverFactory('default');
+
+    await request({ user: 'a' }, 'req-3');
+    await driverFactory('default');
+    await request({ user: 'b' }, 'req-4');
+    await driverFactory('default');
+
+    expect(factory).toHaveBeenCalledTimes(2);
+    expect(core.builtDrivers).toHaveLength(1);
+  });
+
+  test('forgets the oldest remembered context past the bound', async () => {
+    const factory = jest.fn(() => (<any>{ type: 'postgres', password: 'from-env' }));
+    const { driverFactory, request } = await createCore({ driverFactory: factory }, { user: 0 });
+
+    await driverFactory('default');
+
+    // The build remembered user 0; 64 more distinct contexts push it out.
+    for (let user = 1; user <= 64; user++) {
+      await request({ user }, `req-${user}`);
+      await driverFactory('default');
+    }
+
+    expect(factory).toHaveBeenCalledTimes(65);
+
+    await request({ user: 64 }, 'req-recent');
+    await driverFactory('default');
+    expect(factory).toHaveBeenCalledTimes(65);
+
+    await request({ user: 0 }, 'req-evicted');
+    await driverFactory('default');
+    expect(factory).toHaveBeenCalledTimes(66);
+  });
+
   test('never rebuilds when the factory returns a constructed driver', async () => {
     class ConstructedDriver extends BaseDriver {
       public release = jest.fn(async () => {});
