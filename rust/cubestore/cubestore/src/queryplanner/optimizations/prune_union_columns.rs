@@ -37,9 +37,7 @@ impl AnalyzerRule for PruneUnionColumnsRule {
     }
 }
 
-// Walks down through nodes that pass their input columns through, collecting the column names
-// they read, until it reaches a subquery alias over a union. Returns `None` if the chain has any
-// other shape or nothing can be pruned.
+// The single input of a node that passes its input columns through.
 fn chain_input(node: &LogicalPlan) -> Option<&Arc<LogicalPlan>> {
     match node {
         LogicalPlan::Projection(p) => Some(&p.input),
@@ -65,6 +63,9 @@ fn reaches_union(node: &LogicalPlan) -> bool {
     false
 }
 
+// Walks down through nodes that pass their input columns through, collecting the column names
+// they read, until it reaches a subquery alias over a union. Returns `None` if the chain has any
+// other shape or nothing can be pruned.
 fn prune_chain(node: &LogicalPlan, required: &mut HashSet<String>) -> Result<Option<LogicalPlan>> {
     if !collect_columns(node, required)? {
         return Ok(None);

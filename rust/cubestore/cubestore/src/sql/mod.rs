@@ -3688,7 +3688,7 @@ mod tests {
             service.exec_query("INSERT INTO foo.b (a, b, c) VALUES (10, 20, 30)").await?.collect().await?;
             service.exec_query("INSERT INTO foo.x (x, y, z) VALUES (100, 200, 300)").await?.collect().await?;
 
-            let ints = |r: &DataFrame| {
+            let values = |r: &DataFrame| {
                 r.get_rows()
                     .iter()
                     .map(|r| r.values().clone())
@@ -3713,7 +3713,7 @@ mod tests {
             let r = service.exec_query(
                 "SELECT a, sum(c) FROM (SELECT * FROM foo.a UNION ALL SELECT * FROM foo.x) AS o GROUP BY 1 ORDER BY 1"
             ).await?.collect().await?;
-            assert_eq!(ints(&r), vec![vec![int(1), int(3)], vec![int(100), int(300)]]);
+            assert_eq!(values(&r), vec![vec![int(1), int(3)], vec![int(100), int(300)]]);
             let r = service.exec_query(
                 "EXPLAIN SELECT a, sum(c) FROM (SELECT * FROM foo.a UNION ALL SELECT * FROM foo.x) AS o GROUP BY 1"
             ).await?.collect().await?;
@@ -3729,6 +3729,19 @@ mod tests {
                     \n          Scan foo.x, source: CubeTable(index: default:3:[3]), fields: [x, z]"
                         .to_string()
                 )
+            );
+
+            // Inputs of different types are coerced level by level: `1` reaches text via `Float64`.
+            let r = service.exec_query(
+                "SELECT 1 AS x UNION ALL SELECT 2.5 AS x UNION ALL SELECT 'a' AS x"
+            ).await?.collect().await?;
+            assert_eq!(
+                values(&r),
+                vec![
+                    vec![TableValue::String("1.0".to_string())],
+                    vec![TableValue::String("2.5".to_string())],
+                    vec![TableValue::String("a".to_string())],
+                ]
             );
 
             Ok::<(), CubeError>(())

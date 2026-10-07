@@ -623,10 +623,8 @@ pub trait ConfigObj: DIService {
     /// partition coalesce (the hash aggregate ignores input order, so the per-row merge is wasted).
     fn coalesce_under_hash_aggregate(&self) -> bool;
 
-    /// Rewrite `UNION ALL` during logical planning: flatten nested unions, drop `SELECT *`
-    /// projections over their inputs, narrow them to the columns the query reads and give table
-    /// inputs the subquery alias. Off leaves unions to the stock DataFusion rules. Only the node
-    /// that plans the query uses it.
+    /// Rewrite `UNION ALL` before type coercion (`FlattenUnionRule`, `PruneUnionColumnsRule`).
+    /// Off leaves unions to the stock DataFusion rules.
     fn union_planning_rewrites(&self) -> bool;
 
     /// Router-side merge strategy for distributed value-ordered top-k. Defaults to FullMerge; the

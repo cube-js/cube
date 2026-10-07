@@ -35,7 +35,10 @@ impl AnalyzerRule for FlattenUnionRule {
                 return Ok(Transformed::no(LogicalPlan::Union(union)));
             }
             let mut flattened = Vec::with_capacity(union.inputs.len());
-            let changed = collect_union_inputs(union.inputs, &mut flattened);
+            let changed = collect_union_inputs(union.inputs.clone(), &mut flattened);
+            if !same_types(&flattened) {
+                return Ok(Transformed::no(LogicalPlan::Union(union)));
+            }
             let union = LogicalPlan::Union(Union {
                 inputs: flattened,
                 schema: union.schema,
@@ -68,10 +71,8 @@ pub fn is_aligned_union(union: &Union) -> bool {
     })
 }
 
-// Table scan inputs of a union under an alias get that alias too. The alias hides their own
-// qualifiers anyway, and with one qualifier `merge_schema` over the inputs, which every optimizer
-// rule computes for every node, deduplicates their fields instead of growing to all fields of all
-// inputs. Returns `None` if nothing changes.
+// Gives table-scan inputs of an aliased union the alias, so `merge_schema` (run by every
+// optimizer rule) dedups their fields instead of growing to all inputs' fields. `None` if unchanged.
 fn requalify_union_inputs(
     alias: &SubqueryAlias,
     union: &Union,
@@ -81,6 +82,9 @@ fn requalify_union_inputs(
     }
     let mut flattened = Vec::with_capacity(union.inputs.len());
     let flattened_any = collect_union_inputs(union.inputs.clone(), &mut flattened);
+    if !same_types(&flattened) {
+        return Ok(None);
+    }
     // Requalified duplicate names would make the schema invalid.
     let names = union
         .schema
@@ -119,6 +123,24 @@ fn requalify_union_inputs(
         Arc::new(union),
         alias.alias.clone(),
     )?)))
+}
+
+// Nested unions are coerced one by one, so with different input types an intermediate cast can
+// change the values, e.g. `1` becomes `'1.0'` via `Float64` instead of `'1'`. With the same types
+// coercion does nothing and flattening is safe.
+fn same_types(inputs: &[Arc<LogicalPlan>]) -> bool {
+    let Some((first, rest)) = inputs.split_first() else {
+        return true;
+    };
+    let first = first.schema().fields();
+    rest.iter().all(|i| {
+        let fields = i.schema().fields();
+        fields.len() == first.len()
+            && fields
+                .iter()
+                .zip(first.iter())
+                .all(|(a, b)| a.data_type() == b.data_type())
+    })
 }
 
 // Returns whether any input was flattened or had its `SELECT *` removed.

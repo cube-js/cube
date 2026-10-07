@@ -2347,7 +2347,7 @@ pub mod tests {
     pub async fn test_union_all_chain_is_flat() {
         let indices = default_indices();
         let sql = "SELECT order_id FROM s.Orders \
-             UNION ALL SELECT 1.5 AS order_id \
+             UNION ALL SELECT 1 AS order_id \
              UNION ALL SELECT customer_id AS order_id FROM s.Customers \
              UNION ALL SELECT order_customer AS order_id FROM s.Orders";
 
@@ -2371,8 +2371,7 @@ pub mod tests {
         assert_eq!(
             pretty_printers::pp_plan(&plan),
             "Union, schema: fields:[s.Orders.order_id], metadata:{}\
-            \n  Projection, [order_id]\
-            \n    Scan s.Orders, source: CubeTableLogical, fields: [order_id]\
+            \n  Scan s.Orders, source: CubeTableLogical, fields: [order_id]\
             \n  Projection, [order_id]\
             \n    Empty\
             \n  Projection, [order_id]\
@@ -2380,7 +2379,20 @@ pub mod tests {
             \n  Projection, [order_id]\
             \n    Scan s.Orders, source: CubeTableLogical, fields: [order_customer]"
         );
-        assert_eq!(plan.schema().field(0).data_type(), &DataType::Float64);
+        assert_eq!(plan.schema().field(0).data_type(), &DataType::Int64);
+
+        // Inputs of different types are coerced level by level, as without the rule.
+        let sql = "SELECT order_id FROM s.Orders \
+             UNION ALL SELECT 1.5 AS order_id \
+             UNION ALL SELECT order_customer AS order_id FROM s.Orders";
+        let plan = flatten
+            .analyze(unoptimized_plan(sql, &indices), &ConfigOptions::new())
+            .unwrap();
+        let LogicalPlan::Union(union) = &plan else {
+            panic!("expected a union, got {}", pretty_printers::pp_plan(&plan));
+        };
+        assert_eq!(union.inputs.len(), 2);
+        assert!(matches!(union.inputs[0].as_ref(), LogicalPlan::Union(_)));
     }
 
     #[tokio::test]
@@ -2422,6 +2434,13 @@ pub mod tests {
         );
         assert_eq!(
             union_widths(&format!("SELECT * FROM ({union}) AS o")),
+            vec![5, 5, 5]
+        );
+        // Narrowing a distinct union would change what it deduplicates on.
+        assert_eq!(
+            union_widths(
+                "SELECT order_customer FROM (SELECT * FROM s.Orders UNION SELECT * FROM s.Orders) AS o"
+            ),
             vec![5, 5, 5]
         );
         // Same-named columns from both sides of a join.
