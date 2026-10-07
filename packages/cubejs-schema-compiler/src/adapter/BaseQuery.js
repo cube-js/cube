@@ -556,7 +556,7 @@ export class BaseQuery {
   }
 
   /**
-   * @private
+   * @protected
    * @param { import('../compiler/JoinGraph').FinishedJoinTree } joinTree
    * @param { string[] } joinHints
    * @return { string[][] }
@@ -573,6 +573,9 @@ export class BaseQuery {
       const path = [cubeName];
       while (joinsMap[cubeName]) {
         cubeName = joinsMap[cubeName];
+        if (path.includes(cubeName)) {
+          throw new UserError(`Can not construct joins for the query, cyclic join path detected: ${[...path, cubeName].reverse().join(' -> ')}`);
+        }
         path.push(cubeName);
       }
 
