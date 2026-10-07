@@ -2333,6 +2333,7 @@ pub mod tests {
     use crate::sql::parser::{CubeStoreParser, Statement};
     use crate::table::{Row, TableValue};
     use crate::CubeError;
+    use datafusion::common::tree_node::{TreeNode, TreeNodeRecursion};
     use datafusion::config::ConfigOptions;
     use datafusion::error::DataFusionError;
     use datafusion::execution::{SessionState, SessionStateBuilder};
@@ -2341,6 +2342,143 @@ pub mod tests {
     use datafusion::sql::TableReference;
     use std::collections::HashMap;
     use std::iter::FromIterator;
+
+    #[tokio::test]
+    pub async fn test_union_all_chain_is_flat() {
+        let indices = default_indices();
+        let sql = "SELECT order_id FROM s.Orders \
+             UNION ALL SELECT 1 AS order_id \
+             UNION ALL SELECT customer_id AS order_id FROM s.Customers \
+             UNION ALL SELECT order_customer AS order_id FROM s.Orders";
+
+        // The chain must be flat before type coercion; flattening after it is quadratic.
+        let state = QueryPlannerImpl::make_execution_context(SessionConfig::new()).state();
+        let flatten = &state.analyzer().rules[0];
+        assert_eq!(flatten.name(), "flatten_union");
+        let plan = flatten
+            .analyze(unoptimized_plan(sql, &indices), &ConfigOptions::new())
+            .unwrap();
+        let LogicalPlan::Union(union) = &plan else {
+            panic!("expected a union, got {}", pretty_printers::pp_plan(&plan));
+        };
+        assert_eq!(union.inputs.len(), 4);
+        assert!(union
+            .inputs
+            .iter()
+            .all(|i| !matches!(i.as_ref(), LogicalPlan::Union(_))));
+
+        let plan = initial_plan(sql, &indices);
+        assert_eq!(
+            pretty_printers::pp_plan(&plan),
+            "Union, schema: fields:[s.Orders.order_id], metadata:{}\
+            \n  Scan s.Orders, source: CubeTableLogical, fields: [order_id]\
+            \n  Projection, [order_id]\
+            \n    Empty\
+            \n  Projection, [order_id]\
+            \n    Scan s.Customers, source: CubeTableLogical, fields: [customer_id]\
+            \n  Projection, [order_id]\
+            \n    Scan s.Orders, source: CubeTableLogical, fields: [order_customer]"
+        );
+        assert_eq!(plan.schema().field(0).data_type(), &DataType::Int64);
+
+        // Inputs of different types are coerced level by level, as without the rule.
+        let sql = "SELECT order_id FROM s.Orders \
+             UNION ALL SELECT 1.5 AS order_id \
+             UNION ALL SELECT order_customer AS order_id FROM s.Orders";
+        let plan = flatten
+            .analyze(unoptimized_plan(sql, &indices), &ConfigOptions::new())
+            .unwrap();
+        let LogicalPlan::Union(union) = &plan else {
+            panic!("expected a union, got {}", pretty_printers::pp_plan(&plan));
+        };
+        assert_eq!(union.inputs.len(), 2);
+        assert!(matches!(union.inputs[0].as_ref(), LogicalPlan::Union(_)));
+    }
+
+    #[tokio::test]
+    pub async fn test_prune_union_columns() {
+        let indices = default_indices();
+        let state = QueryPlannerImpl::make_execution_context(SessionConfig::new()).state();
+        let union_widths = |sql: &str| {
+            let plan = state
+                .analyzer()
+                .execute_and_check(
+                    unoptimized_plan(sql, &indices),
+                    state.config_options(),
+                    |_, _| {},
+                )
+                .unwrap();
+            let mut widths = Vec::new();
+            plan.apply(|p| {
+                if let LogicalPlan::Union(u) = p {
+                    widths.push(u.schema.fields().len());
+                    widths.extend(u.inputs.iter().map(|i| i.schema().fields().len()));
+                }
+                Ok(TreeNodeRecursion::Continue)
+            })
+            .unwrap();
+            widths
+        };
+        let union = "SELECT * FROM s.Orders UNION ALL SELECT * FROM s.Orders";
+
+        assert_eq!(
+            union_widths(&format!(
+                "SELECT order_customer, SUM(order_amount) FROM ({union}) AS o \
+                 WHERE o.order_city > 1 GROUP BY 1 ORDER BY 2 LIMIT 10"
+            )),
+            vec![3, 3, 3]
+        );
+        assert_eq!(
+            union_widths(&format!("SELECT count(*) FROM ({union}) AS o")),
+            vec![1, 1, 1]
+        );
+        assert_eq!(
+            union_widths(&format!("SELECT * FROM ({union}) AS o")),
+            vec![5, 5, 5]
+        );
+        // Narrowing a distinct union would change what it deduplicates on.
+        assert_eq!(
+            union_widths(
+                "SELECT order_customer FROM (SELECT * FROM s.Orders UNION SELECT * FROM s.Orders) AS o"
+            ),
+            vec![5, 5, 5]
+        );
+        // Same-named columns from both sides of a join.
+        assert_eq!(
+            union_widths(
+                "SELECT order_id FROM (\
+                 SELECT o1.order_id, o2.order_id, o1.order_amount FROM s.Orders o1 \
+                 JOIN s.Orders o2 ON o1.order_id = o2.order_id \
+                 UNION ALL \
+                 SELECT o1.order_id, o2.order_id, o1.order_amount FROM s.Orders o1 \
+                 JOIN s.Orders o2 ON o1.order_id = o2.order_id) AS o"
+            ),
+            vec![1, 1, 1]
+        );
+        // A join reads columns of the union outside the projection chain.
+        assert_eq!(
+            union_widths(&format!(
+                "SELECT customer_name FROM ({union}) AS o \
+                 JOIN s.Customers c ON o.order_customer = c.customer_id"
+            )),
+            vec![5, 5, 5]
+        );
+
+        let plan = initial_plan(
+            &format!("SELECT order_customer, SUM(order_amount) FROM ({union}) AS o GROUP BY 1"),
+            &indices,
+        );
+        assert_eq!(
+            pretty_printers::pp_plan(&plan),
+            "Aggregate\
+            \n  SubqueryAlias\
+            \n    Union, schema: fields:[o.order_customer, o.order_amount], metadata:{}\
+            \n      SubqueryAlias\
+            \n        Scan s.Orders, source: CubeTableLogical, fields: [order_customer, order_amount]\
+            \n      SubqueryAlias\
+            \n        Scan s.Orders, source: CubeTableLogical, fields: [order_customer, order_amount]"
+        );
+    }
 
     #[tokio::test]
     pub async fn test_choose_index() {
@@ -3358,6 +3496,13 @@ pub mod tests {
     }
 
     fn initial_plan(s: &str, i: &TestIndices) -> LogicalPlan {
+        QueryPlannerImpl::make_execution_context(SessionConfig::new())
+            .state()
+            .optimize(&unoptimized_plan(s, i))
+            .unwrap()
+    }
+
+    fn unoptimized_plan(s: &str, i: &TestIndices) -> LogicalPlan {
         let statement = match CubeStoreParser::new(s, None)
             .unwrap()
             .parse_statement()
@@ -3367,12 +3512,8 @@ pub mod tests {
             other => panic!("not a statement, actual {:?}", other),
         };
 
-        let plan = SqlToRel::new_with_options(i, sql_to_rel_options())
+        SqlToRel::new_with_options(i, sql_to_rel_options())
             .statement_to_plan(DFStatement::Statement(Box::new(statement)))
-            .unwrap();
-        QueryPlannerImpl::make_execution_context(SessionConfig::new())
-            .state()
-            .optimize(&plan)
             .unwrap()
     }
 

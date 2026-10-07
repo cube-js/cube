@@ -623,6 +623,10 @@ pub trait ConfigObj: DIService {
     /// partition coalesce (the hash aggregate ignores input order, so the per-row merge is wasted).
     fn coalesce_under_hash_aggregate(&self) -> bool;
 
+    /// Rewrite `UNION ALL` before type coercion (`FlattenUnionRule`, `PruneUnionColumnsRule`).
+    /// Off leaves unions to the stock DataFusion rules.
+    fn union_planning_rewrites(&self) -> bool;
+
     /// Router-side merge strategy for distributed value-ordered top-k. Defaults to FullMerge; the
     /// router's value governs the whole query, see [`TopKAggregateStrategy`].
     fn topk_aggregate_strategy(&self) -> TopKAggregateStrategy;
@@ -798,6 +802,7 @@ pub struct ConfigObjImpl {
     pub group_by_limit_per_partition: bool,
     pub limit_pushdown: bool,
     pub coalesce_under_hash_aggregate: bool,
+    pub union_planning_rewrites: bool,
     pub topk_aggregate_strategy: TopKAggregateStrategy,
     pub allow_decimal128: bool,
     pub enable_remove_orphaned_remote_files: bool,
@@ -1172,6 +1177,10 @@ impl ConfigObj for ConfigObjImpl {
 
     fn coalesce_under_hash_aggregate(&self) -> bool {
         self.coalesce_under_hash_aggregate
+    }
+
+    fn union_planning_rewrites(&self) -> bool {
+        self.union_planning_rewrites
     }
 
     fn topk_aggregate_strategy(&self) -> TopKAggregateStrategy {
@@ -2048,6 +2057,7 @@ impl Config {
                 group_by_limit_per_partition: env_flag("CUBESTORE_GROUP_BY_LIMIT_PER_PARTITION", true),
                 limit_pushdown: env_flag("CUBESTORE_LIMIT_PUSHDOWN", true),
                 coalesce_under_hash_aggregate: env_flag("CUBESTORE_COALESCE_UNDER_HASH_AGGREGATE", false),
+                union_planning_rewrites: env_flag("CUBESTORE_UNION_PLANNING_REWRITES", true),
                 topk_aggregate_strategy: env_topk_strategy("CUBESTORE_TOPK_STRATEGY"),
                 allow_decimal128: env_bool("CUBESTORE_ALLOW_DECIMAL128", false),
                 enable_remove_orphaned_remote_files: env_bool(
@@ -2317,6 +2327,7 @@ impl Config {
                 group_by_limit_per_partition: true,
                 limit_pushdown: true,
                 coalesce_under_hash_aggregate: false,
+                union_planning_rewrites: true,
                 topk_aggregate_strategy: TopKAggregateStrategy::FullMerge,
                 allow_decimal128: false,
                 enable_remove_orphaned_remote_files: false,
