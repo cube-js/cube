@@ -1,0 +1,229 @@
+---
+title: Data alerts
+description: Notify only when a value on a dashboard crosses a threshold, changes by a percentage, or falls outside its normal range.
+---
+
+<Warning>
+
+Data alerts are currently in preview, and their capabilities may still change.
+Reach out to the [Cube support team](/admin/account-billing/support) to activate
+this feature for your account.
+
+</Warning>
+
+<Info>
+
+Data alerts are available wherever [scheduled refreshes][ref-scheduled-refreshes]
+are: on [Premium and Enterprise plans](https://cube.dev/pricing), for users with
+at least the [Explorer][ref-roles] role and Edit or Manage permission on the
+workbook.
+
+</Info>
+
+A data alert turns a scheduled refresh into a watch on one number. Without an
+alert, a schedule with a [notification][ref-notifications] sends it after every
+run. With one, each run checks a value on the dashboard, and the notification
+goes out only when that value meets the condition you set — for example, when
+the orders count goes above 1,000, when revenue drops by 10% or more from the
+previous month, or when this week's sign-ups look unusual.
+
+An alert belongs to one schedule. The schedule's frequency is how often the
+condition is checked, and its notification — email recipients or a Slack
+channel — is who hears about it. The dashboard is still refreshed on every
+run, whether the alert fires or not.
+
+## Creating a data alert
+
+1. Open the [scheduled refreshes sidebar][ref-accessing] of a published
+   dashboard and click **New scheduled refresh**, or edit an existing
+   schedule.
+2. Turn on **Alert condition**.
+3. In **Chart**, pick the chart or KPI to watch. The list holds every chart and
+   KPI widget on the published dashboard, including those inside grid, stack,
+   and tabs containers.
+4. In **Measure**, pick the value to read. The chart's first measure is
+   selected for you.
+5. Under **Condition**, choose the [rule type](#rule-types) and fill in its
+   fields.
+6. Click **Add notification** and choose email recipients or a Slack channel.
+   An alert needs somewhere to send its notification, so **Save** stays
+   disabled until it has one.
+7. Click **Save**.
+
+While something is missing, the dialog footer says what it is — for example,
+"Enter the value to compare with." or "An alert needs a notification: add
+recipients or a Slack channel."
+
+You can also create an alert from the [Scheduled refreshes][ref-all-schedules]
+tab of the **Scheduled** page: the **Alert condition** section appears once you
+have picked a **Dashboard**.
+
+## Rule types
+
+### Threshold
+
+Fires when the measure **is above**, **is below**, or **is equal to** the number
+you enter in **Value**. **Is equal to** compares exactly, so it suits whole-number
+measures such as counts.
+
+### % change
+
+Fires when the measure **increases by ≥**, **decreases by ≥**, or **changes by
+≥** (in either direction) the percentage you enter, comparing the chart's last
+complete period with the period before it.
+
+When the previous period's value is 0 there is no percentage to compute, so the
+check can't run and nothing is sent.
+
+### Anomaly
+
+Fires when the last complete period falls outside the normal range of the
+periods before it. The normal range is their median ± 3 × the median absolute
+deviation. If every earlier period has the same value, the range is that value
+alone, and any other value is outside it.
+
+The rule needs at least 8 complete periods before the latest one. Until the
+chart has them, the check can't run and nothing is sent.
+
+### Which charts support which rule
+
+The dialog offers a rule type only where the chart has the value it reads, and
+says why when it doesn't:
+
+- A chart or KPI **without a time dimension** supports **Threshold** only. **%
+  change** and **Anomaly** compare periods, so they are disabled.
+- A chart **split by a dimension** besides its time dimension — a bar chart by
+  category, or a line chart with one line per status — has no single value to
+  check, so every rule type is disabled. Pick a KPI or a chart without a
+  breakdown. A chart with several measures and no breakdown is fine: you pick
+  one measure.
+- A chart whose query Cube can't read, such as a Python analysis or a chart
+  built from SQL, can't be checked at all.
+
+## What an alert checks
+
+**The data the notification shows.** The alert reads the chart with the
+dashboard's default filter values and the schedule's saved filters — the same
+data the notification's screenshot shows. The dialog, every alert email, and
+every Slack message say so: "Checked with the dashboard's default filters and
+this schedule's saved filters." If you republish the dashboard or change a
+default, the next check uses the new version.
+
+**The last complete period.** On a chart with a time dimension, every rule reads
+the last _complete_ period: the period still in progress, and any later periods
+the data holds, are skipped. A monthly chart checked on September 15 reads
+August. Periods follow the granularity the chart is drawn with, so a
+[time granularity switcher][ref-time-granularity] that changes it changes the
+period the alert reads. On a chart without a time dimension, the alert reads its
+single value.
+
+**The schedule creator's access.** The check runs once per run, with the data
+access of the person who created the schedule.
+
+## When an alert notifies
+
+An alert notifies when its condition **starts** to hold, and again only after it
+has stopped holding and then starts again. While the condition keeps holding,
+later runs send nothing, so a value that stays above its threshold for a week
+sends one notification, not seven. There is no notification when the condition
+stops holding.
+
+**Run now** checks against the same history as a scheduled run: pressing it
+twice while the condition holds notifies once.
+
+The alert starts fresh — as if its condition had never held — when you turn the
+schedule off, or edit the alert's condition. A check that can't run leaves the
+history as it was.
+
+A run whose alert does not fire is a plain refresh: no screenshot is generated,
+no [AI summary][ref-ai-summary] is written, and nothing is sent.
+
+## The notification
+
+A fired alert sends the schedule's usual notification — the dashboard link and
+screenshot, and the [AI summary][ref-ai-summary] if it is turned on — led by
+what the alert found:
+
+- **Email** — the subject is `Alert: <chart> on <dashboard>`. The message names
+  the condition, the chart, and the value read: the period it read, plus the
+  previous period and the change for **% change**, or the normal range for
+  **Anomaly**.
+- **Slack** — the message opens with the same `Alert: <chart> on <dashboard>`
+  line, followed by what the alert read, for example "Count increased by 2.5%
+  from 157 in 2026-08 to 161 in 2026-09 (alert at 1% or more)."
+
+Both state that the check used the dashboard's default filters and the
+schedule's saved filters, and that you will be notified again only after the
+condition stops holding.
+
+<Info>
+
+Because the check runs with the schedule creator's access, the values it read
+appear only in the creator's email and in the Slack message. Every other email
+recipient gets the condition and the chart, a note that the values are not shown
+because the check ran with the schedule creator's access, and a screenshot of
+the dashboard with their own access.
+
+</Info>
+
+## Following an alert in the sidebar
+
+In the scheduled refreshes sidebar, a schedule with an alert carries an
+**Alert** tag and a summary of its rule, for example "Alert: Count is above
+1,000 · Orders count". The same summary appears in the **Schedule** column of
+the [Scheduled refreshes][ref-all-schedules] tab.
+
+Below it, the card shows the last check. Before the first one it reads "Last
+check: not run yet"; afterwards it starts with "Last check" and the time of the
+check, followed by one of these:
+
+| Last check | Meaning |
+| --- | --- |
+| Count 20,003. Condition met, notified. | The condition started to hold and the notification was sent. |
+| Count 20,003. Condition still met, not notified again. | The condition was already holding at the previous check. |
+| Count 20,003. Condition not met. | Nothing was sent. |
+| could not check. … Nothing sent. | The check couldn't run; the line says why. |
+
+For **% change**, the line also names the previous period and the change, for
+example "Count 161 (2026-09). Previous: 157 (2026-08), +2.5%." For **Anomaly**,
+it names the normal range, for example "Normal range: 8 – 14."
+
+The values are shown only to the schedule's creator. Anyone else who opens the
+sidebar sees whether the condition was met and whether a notification was sent,
+with "values not shown, as it ran with the access of the schedule's creator."
+
+### When a check can't run
+
+A check that can't run sends nothing and doesn't change whether the alert
+counts as holding. The last-check line says why, for example:
+
+- The chart is no longer on the dashboard, or the measure is no longer in its
+  query.
+- The chart is now split by a dimension.
+- The chart returned no rows, or there is no complete period yet.
+- An **Anomaly** rule has too few complete periods, or a **% change** rule's
+  previous period was 0.
+
+When the chart or measure is gone, **Edit** shows the alert with the missing
+field flagged, for example "Count is no longer in “Orders by month”. Pick
+another measure."
+
+## Editing, duplicating, and deleting
+
+Edit a schedule to change or remove its alert: turn off **Alert condition** to
+make it a plain scheduled refresh again. [Duplicating a schedule][ref-duplicate]
+copies its alert, and deleting a schedule deletes its alert.
+
+If data alerts are turned off for your account, schedules keep their alerts but
+send nothing while they do. Editing such a schedule shows only the **Alert
+condition** switch; turn it off to remove the alert. When data alerts are turned
+back on, the alerts resume where they left off.
+
+[ref-accessing]: /docs/explore-analyze/scheduled-refreshes#accessing-scheduled-refreshes
+[ref-ai-summary]: /docs/explore-analyze/notifications#ai-summary
+[ref-all-schedules]: /docs/explore-analyze/scheduled-refreshes#viewing-all-scheduled-refreshes
+[ref-duplicate]: /docs/explore-analyze/scheduled-refreshes#duplicating-a-schedule
+[ref-notifications]: /docs/explore-analyze/notifications
+[ref-roles]: /admin/users-and-permissions/roles-and-permissions
+[ref-scheduled-refreshes]: /docs/explore-analyze/scheduled-refreshes
+[ref-time-granularity]: /docs/explore-analyze/dashboards/widgets/controls#time-granularity-switcher

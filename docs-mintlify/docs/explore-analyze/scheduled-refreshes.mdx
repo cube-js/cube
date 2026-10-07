@@ -19,7 +19,9 @@ queried in the background, refreshing Cube's in-memory cache. This warms up
 dashboards so they load instantly when users open them, eliminating wait times.
 
 You can also attach [notifications][ref-notifications] to scheduled refreshes to
-send email or Slack messages with a dashboard screenshot after each refresh.
+send email or Slack messages with a dashboard screenshot after each refresh, and
+a [data alert][ref-data-alerts] to send them only when a value on the dashboard
+meets a condition.
 
 ## Accessing scheduled refreshes
 
@@ -73,6 +75,12 @@ Select from common timezones including UTC, US timezones, London, Paris, Berlin,
 Tokyo, Shanghai, Singapore, and Sydney. Defaults to your browser's timezone if
 it matches a common one, otherwise UTC.
 
+### Alert condition
+
+Turn on **Alert condition** to make the schedule notify only when a chart's
+value crosses a threshold, changes by a percentage, or falls outside its normal
+range. See [Data alerts][ref-data-alerts] for details.
+
 ### Notifications
 
 You can optionally attach [notifications][ref-notifications] to a scheduled
@@ -94,6 +102,9 @@ The sidebar lists all existing schedules with the following information:
 - **Notification channel** — when a [notification][ref-notifications] is
   configured, the card shows its delivery channel, for example "Notification:
   Email" or "Notification: Slack (#channel)".
+- **Alert** — when the schedule has a [data alert][ref-data-alerts], the card
+  shows an **Alert** tag, a summary of its rule, and the outcome of its last
+  check.
 
 ### Actions
 
@@ -126,7 +137,8 @@ see every scheduled refresh in the deployment. Each row shows:
   off.
 - **Dashboard** — the dashboard's title. Click it to open the dashboard in the
   Dashboard Builder.
-- **Schedule** — the human-readable schedule, like "At 09:00 AM".
+- **Schedule** — the human-readable schedule, like "At 09:00 AM", and the
+  summary of its [data alert][ref-data-alerts] if it has one.
 - **Next run** — the next scheduled execution, or "Disabled" if the schedule is
   off.
 - **Notifications** — the delivery channel, for example "Notification: Email",
@@ -173,9 +185,9 @@ re-entering the **Schedule**, timezone, and notification settings — you can
 duplicate it. There are two ways:
 
 - **From the sidebar** — click the duplicate (copy) icon on a schedule card. The
-  form dialog opens pre-filled with its **Schedule**, timezone, and
-  notification configuration. Adjust anything you need, then click **Save** to
-  create the new schedule. On the
+  form dialog opens pre-filled with its **Schedule**, timezone, alert condition,
+  and notification configuration. Adjust anything you need, then click **Save**
+  to create the new schedule. On the
   [Scheduled refreshes](#viewing-all-scheduled-refreshes) tab, choose
   **Duplicate schedule** from the row's ⋯ menu instead.
 - **From the sidebar's edit dialog** — while editing a schedule, click **Save as
@@ -239,7 +251,12 @@ When a scheduled refresh runs, it progresses through these phases:
 
 The sidebar shows real-time status updates during execution.
 
+A schedule with a [data alert][ref-data-alerts] checks its condition during the
+**Refreshing dashboard** phase. When the alert does not fire, steps 4 to 6 are
+skipped.
+
 [ref-ai-summary]: /docs/explore-analyze/notifications#ai-summary
+[ref-data-alerts]: /docs/explore-analyze/data-alerts
 [ref-roles]: /admin/users-and-permissions/roles-and-permissions
 [ref-scheduled-tasks]: /docs/explore-analyze/scheduled-tasks
 [ref-sharing]: /docs/organize-content/sharing#permission-inheritance
