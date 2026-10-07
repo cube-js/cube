@@ -37,7 +37,7 @@ function loop(kind: 'json' | 'sqlTemplates', value: unknown, iterations: number)
 describe('NativeSerdeDeserializer', () => {
   benchmarkSuite('sql templates', {
     'PostgresQuery sqlTemplates() (1 call)': () => {
-      native.__testBridgeDeserializeSqlTemplates(sqlTemplates);
+      loop('sqlTemplates', sqlTemplates, 1);
     },
     'PostgresQuery sqlTemplates() x100 in Rust': () => {
       loop('sqlTemplates', sqlTemplates, 100);
