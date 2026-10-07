@@ -363,11 +363,10 @@ impl QueryPlannerImpl {
         config.options_mut().execution.parquet.split_row_group_reads = false;
 
         // TODO upgrade DF: build SessionContexts consistently
-        let analyzer_rules = std::iter::once(
-            Arc::new(FlattenUnionRule::new()) as Arc<dyn AnalyzerRule + Send + Sync>
-        )
-        .chain(Analyzer::new().rules)
-        .collect();
+        let analyzer_rules =
+            std::iter::once(Arc::new(FlattenUnionRule {}) as Arc<dyn AnalyzerRule + Send + Sync>)
+                .chain(Analyzer::new().rules)
+                .collect();
         let state = Self::minimal_session_state_from_final_config_with_runtime(config, runtime_env)
             .with_analyzer_rules(analyzer_rules)
             .with_optimizer_rule(Arc::new(RollingOptimizerRule {}))

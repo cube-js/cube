@@ -2345,13 +2345,28 @@ pub mod tests {
     #[tokio::test]
     pub async fn test_union_all_chain_is_flat() {
         let indices = default_indices();
-        let plan = initial_plan(
-            "SELECT order_id FROM s.Orders \
+        let sql = "SELECT order_id FROM s.Orders \
              UNION ALL SELECT 1.5 \
              UNION ALL SELECT customer_id FROM s.Customers \
-             UNION ALL SELECT order_customer FROM s.Orders",
-            &indices,
-        );
+             UNION ALL SELECT order_customer FROM s.Orders";
+
+        // The chain must be flat before type coercion; flattening after it is quadratic.
+        let state = QueryPlannerImpl::make_execution_context(SessionConfig::new()).state();
+        let flatten = &state.analyzer().rules[0];
+        assert_eq!(flatten.name(), "flatten_union");
+        let plan = flatten
+            .analyze(unoptimized_plan(sql, &indices), &ConfigOptions::new())
+            .unwrap();
+        let LogicalPlan::Union(union) = &plan else {
+            panic!("expected a union, got {}", pretty_printers::pp_plan(&plan));
+        };
+        assert_eq!(union.inputs.len(), 4);
+        assert!(union
+            .inputs
+            .iter()
+            .all(|i| !matches!(i.as_ref(), LogicalPlan::Union(_))));
+
+        let plan = initial_plan(sql, &indices);
         assert_eq!(
             pretty_printers::pp_plan(&plan),
             "Union, schema: fields:[s.Orders.order_id], metadata:{}\
@@ -2364,10 +2379,6 @@ pub mod tests {
             \n  Projection, [order_id]\
             \n    Scan s.Orders, source: CubeTableLogical, fields: [order_customer]"
         );
-        let LogicalPlan::Union(union) = &plan else {
-            panic!("expected a union, got {}", pretty_printers::pp_plan(&plan));
-        };
-        assert_eq!(union.inputs.len(), 4);
         assert_eq!(plan.schema().field(0).data_type(), &DataType::Float64);
     }
 
@@ -3387,6 +3398,13 @@ pub mod tests {
     }
 
     fn initial_plan(s: &str, i: &TestIndices) -> LogicalPlan {
+        QueryPlannerImpl::make_execution_context(SessionConfig::new())
+            .state()
+            .optimize(&unoptimized_plan(s, i))
+            .unwrap()
+    }
+
+    fn unoptimized_plan(s: &str, i: &TestIndices) -> LogicalPlan {
         let statement = match CubeStoreParser::new(s, None)
             .unwrap()
             .parse_statement()
@@ -3396,12 +3414,8 @@ pub mod tests {
             other => panic!("not a statement, actual {:?}", other),
         };
 
-        let plan = SqlToRel::new_with_options(i, sql_to_rel_options())
+        SqlToRel::new_with_options(i, sql_to_rel_options())
             .statement_to_plan(DFStatement::Statement(Box::new(statement)))
-            .unwrap();
-        QueryPlannerImpl::make_execution_context(SessionConfig::new())
-            .state()
-            .optimize(&plan)
             .unwrap()
     }
 
