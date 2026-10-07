@@ -562,28 +562,66 @@ export class BaseQuery {
    * @return { string[][] }
    */
   enrichedJoinHintsFromJoinTree(joinTree, joinHints) {
+    // The tree can hold two edges into the same cube when a hint path leads back into a cube an
+    // earlier path passed through. The later edge wins, so the next pass follows the later hint
     const joinsMap = {};
 
     for (const j of joinTree.joins) {
       joinsMap[j.to] = j.from;
     }
 
-    return joinHints.map(jh => {
+    // ...unless the later edge comes from one of the cube's own descendants (hint `c -> b` when
+    // `c` is only reachable through `b`): that parent chain loops forever, so fall back to a map
+    // that skips any edge closing a cycle
+    return this.joinPathsToRoot(joinsMap, joinHints) ??
+      this.joinPathsToRoot(this.acyclicJoinsMap(joinTree), joinHints);
+  }
+
+  /**
+   * @private
+   * @param { Record<string, string> } joinsMap cube -> the cube it is joined from
+   * @param { string[] } joinHints
+   * @return { (string|string[])[] | null } null when the chain of some hint loops
+   */
+  joinPathsToRoot(joinsMap, joinHints) {
+    const paths = [];
+
+    for (const jh of joinHints) {
       let cubeName = jh;
       const path = [cubeName];
       while (joinsMap[cubeName]) {
         cubeName = joinsMap[cubeName];
         if (path.includes(cubeName)) {
-          throw new UserError(`Can not construct joins for the query, cyclic join path detected: ${[...path, cubeName].reverse().join(' -> ')}`);
+          return null;
         }
         path.push(cubeName);
       }
 
-      if (path.length === 1) {
-        return path[0];
+      paths.push(path.length === 1 ? path[0] : path.reverse());
+    }
+
+    return paths;
+  }
+
+  /**
+   * @private
+   * @param { import('../compiler/JoinGraph').FinishedJoinTree } joinTree
+   * @return { Record<string, string> }
+   */
+  acyclicJoinsMap(joinTree) {
+    const joinsMap = {};
+
+    for (const j of joinTree.joins) {
+      let ancestor = j.from;
+      while (ancestor && ancestor !== j.to) {
+        ancestor = joinsMap[ancestor];
       }
-      return path.reverse();
-    });
+      if (!ancestor) {
+        joinsMap[j.to] = j.from;
+      }
+    }
+
+    return joinsMap;
   }
 
   /**

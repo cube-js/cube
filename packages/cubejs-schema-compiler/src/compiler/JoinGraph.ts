@@ -340,21 +340,9 @@ export class JoinGraph implements CompilerInterface {
         R.map(([_, join]: [number, JoinEdge]) => join),
         R.sortBy(([index]: [number, JoinEdge]) => index)
       );
-    // `nodesJoined` only tracks hint endpoints, so a later path can lead back into a cube that an
-    // earlier path passed through (or into the root). A second edge into the same cube would
-    // join it twice and turn the tree into a cycle, so the first edge into each cube wins.
-    const reached = new Set<string>([root]);
-    // @ts-ignore
-    const joins = pairsSortedByIndex(result.joins).filter(j => {
-      if (reached.has(j.to)) {
-        return false;
-      }
-      reached.add(j.to);
-      return true;
-    });
-
     return {
-      joins,
+      // @ts-ignore
+      joins: pairsSortedByIndex(result.joins),
       root
     };
   }

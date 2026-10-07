@@ -3,7 +3,6 @@ import { prepareJsCompiler } from '../../unit/PrepareCompiler';
 import { DataSchemaCompiler } from '../../../src/compiler/DataSchemaCompiler';
 import { JoinGraph } from '../../../src/compiler/JoinGraph';
 import { CubeEvaluator } from '../../../src/compiler/CubeEvaluator';
-import { UserError } from '../../../src/compiler/UserError';
 import { testWithPreAggregation } from './pre-aggregation-utils';
 
 class TestPostgresQuery extends PostgresQuery {
@@ -21,7 +20,7 @@ describe('Multiple join paths', () => {
 
   beforeAll(async () => {
     // All joins would look like this
-    // A-->B<->C-->X
+    // A-->B-->C-->X
     // |           ^
     // ├-->D-->E---┤
     // |           |
@@ -31,7 +30,6 @@ describe('Multiple join paths', () => {
     // All join conditions would be essentially `TRUE` for ADEX joins and `FALSE` for everything else
     // But they would use different syntax, to be able to test SQL generation
     // Also, there should be only one way to cover cubes A and D with joins: A->D join
-    // C->B is a back edge: it adds no new route out of A, but lets a hint lead back into B
 
     // TODO in this model queries like [A.a_id, X.x_id] become ambiguous, probably we want to handle this better
 
@@ -171,10 +169,6 @@ describe('Multiple join paths', () => {
         sql: 'SELECT 1 AS c_id, 100 AS c_value',
 
         joins: {
-          B: {
-            relationship: 'many_to_one',
-            sql: "'C' = 'B'",
-          },
           X: {
             relationship: 'many_to_one',
             sql: "'C' = 'X'",
@@ -681,46 +675,105 @@ describe('Multiple join paths', () => {
       expect(sql).not.toMatch(/ON 'A' = 'F'/);
       expect(sql).not.toMatch(/ON 'F' = 'X'/);
     });
+  });
 
-    // A reaches C only through B, so the C->B hint leads back into an already-joined cube
-    it('should join a cube once when a hint leads back into an intermediate cube', async () => {
-      expect(joinGraph.buildJoin(['A', 'C', ['C', 'B']])?.joins.map(j => `${j.from}->${j.to}`))
-        .toEqual(['A->B', 'B->C']);
+  // B is joined from A, C is only reachable through B, and both C and D also join B. A hint that
+  // leads into B again adds a second edge into it; the next pass of joinTreeForHints follows the
+  // later edge into each cube
+  describe('Hint leading back into an already joined cube', () => {
+    let backCompilers: ReturnType<typeof prepareJsCompiler>;
 
-      const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
-        measures: [],
-        dimensions: [
-          'A.a_id',
-          'C.c_id',
-        ],
-        joinHints: [
-          ['C', 'B'],
-        ],
-      });
+    beforeAll(async () => {
+      // language=JavaScript
+      backCompilers = prepareJsCompiler(`
+        cube('BackA', {
+          sql: 'SELECT 1 AS id',
+          joins: {
+            BackB: { relationship: 'many_to_one', sql: "'A' = 'B'" },
+            BackD: { relationship: 'many_to_one', sql: "'A' = 'D'" },
+          },
+          dimensions: { id: { type: 'number', sql: 'id', primaryKey: true } },
+          measures: { count: { type: 'count' } },
+        });
 
-      const [sql, _params] = query.buildSqlAndParams();
+        cube('BackB', {
+          sql: 'SELECT 1 AS id',
+          joins: {
+            BackC: { relationship: 'many_to_one', sql: "'B' = 'C'" },
+          },
+          dimensions: { id: { type: 'number', sql: 'id', primaryKey: true } },
+        });
+
+        cube('BackC', {
+          sql: 'SELECT 1 AS id',
+          joins: {
+            BackB: { relationship: 'many_to_one', sql: "'C' = 'B'" },
+          },
+          dimensions: { id: { type: 'number', sql: 'id', primaryKey: true } },
+        });
+
+        cube('BackD', {
+          sql: 'SELECT 1 AS id',
+          joins: {
+            BackB: { relationship: 'many_to_one', sql: "'D' = 'B'" },
+          },
+          dimensions: { id: { type: 'number', sql: 'id', primaryKey: true } },
+        });
+
+        view('BackCB_view', {
+          cubes: [
+            { joinPath: 'BackC', includes: ['id'], prefix: true },
+            { joinPath: 'BackC.BackB', includes: ['id'], prefix: true },
+          ],
+        });
+
+        view('BackDB_view', {
+          cubes: [
+            { joinPath: 'BackD', includes: ['id'], prefix: true },
+            { joinPath: 'BackD.BackB', includes: ['id'], prefix: true },
+          ],
+        });
+      `);
+      await backCompilers.compiler.compile();
+    });
+
+    function buildSql(dimensions: string[]): string {
+      const query = new PostgresQuery(backCompilers, { measures: ['BackA.count'], dimensions });
+      return query.buildSqlAndParams()[0];
+    }
+
+    it('should join through the later hint when the cube has another route', async () => {
+      const sql = buildSql(['BackC.id', 'BackDB_view.BackB_id']);
+
+      expect(sql).toMatch(/ON 'A' = 'D'/);
+      expect(sql).toMatch(/ON 'D' = 'B'/);
+      expect(sql).toMatch(/ON 'B' = 'C'/);
+      expect(sql).not.toMatch(/ON 'A' = 'B'/);
+    });
+
+    // Following the C->B hint would make C the parent of B while B is the parent of C. That parent
+    // chain used to loop until `Array.push` threw `RangeError: Invalid array length`
+    it('should keep the earlier edge when the later hint closes a cycle', async () => {
+      const sql = buildSql(['BackC.id', 'BackCB_view.BackB_id']);
 
       expect(sql).toMatch(/ON 'A' = 'B'/);
       expect(sql).toMatch(/ON 'B' = 'C'/);
       expect(sql).not.toMatch(/ON 'C' = 'B'/);
     });
 
-    it('should reject a cyclic join tree', async () => {
-      const query = new TestPostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
-        measures: [],
-        dimensions: ['A.a_id'],
-      });
-
+    it('should follow a cyclic join tree without looping', async () => {
+      const query = new TestPostgresQuery(backCompilers, { measures: ['BackA.count'] });
       const joinTree = {
-        root: 'A',
+        root: 'BackA',
         joins: [
-          { from: 'A', to: 'B' },
-          { from: 'B', to: 'C' },
-          { from: 'C', to: 'B' },
+          { from: 'BackA', to: 'BackB' },
+          { from: 'BackB', to: 'BackC' },
+          { from: 'BackC', to: 'BackB' },
         ],
       };
 
-      expect(() => query.enrichedJoinHintsFromJoinTree(joinTree, ['C'])).toThrow(UserError);
+      expect(query.enrichedJoinHintsFromJoinTree(joinTree, ['BackC', 'BackB']))
+        .toEqual([['BackA', 'BackB', 'BackC'], ['BackA', 'BackB']]);
     });
   });
 });
