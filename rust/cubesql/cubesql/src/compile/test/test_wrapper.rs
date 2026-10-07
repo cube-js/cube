@@ -4983,3 +4983,760 @@ async fn boolean_context_segment_members() {
         assert_eq!(expressions, vec![case["sql"].clone()]);
     }
 }
+
+/// Pivot SQL from a query builder: several conditional aggregations over one
+/// fan-out join must push down as a single grouped Cube query, not as an
+/// ungrouped scan aggregated in memory.
+#[tokio::test]
+async fn test_wrapper_conditional_aggregation_over_join() {
+    if !Rewriter::sql_push_down_enabled() {
+        return;
+    }
+    init_testing_logger();
+
+    let query_plan = convert_select_to_query_plan(
+        r#"
+        SELECT k.customer_gender AS "gender",
+               MAX(CASE WHEN l.content = 'PropA' THEN l.read END) AS "PropA",
+               MAX(CASE WHEN l.content = 'PropB' THEN l.read END) AS "PropB"
+        FROM KibanaSampleDataEcommerce k
+        LEFT JOIN Logs l ON k.__cubeJoinField = l.__cubeJoinField
+        WHERE k.customer_gender = 'female'
+        GROUP BY 1
+        "#
+        .to_string(),
+        DatabaseProtocol::PostgreSQL,
+    )
+    .await;
+
+    let logical_plan = query_plan.as_logical_plan();
+    let request = logical_plan.find_cube_scan_wrapped_sql().request;
+    assert_eq!(
+        request.ungrouped, None,
+        "query is grouped in Cube: {:?}",
+        request
+    );
+    let measures = request.measures.unwrap_or_default();
+    assert_eq!(
+        measures.len(),
+        2,
+        "both conditional aggregations are pushed down as measures: {:?}",
+        measures
+    );
+    assert!(
+        measures
+            .iter()
+            .all(|measure| measure.contains("MAX(CASE WHEN")),
+        "measures keep the conditional aggregation: {:?}",
+        measures
+    );
+
+    let physical_plan = query_plan.as_physical_plan().await.unwrap();
+    println!(
+        "Physical plan: {}",
+        displayable(physical_plan.as_ref()).indent()
+    );
+}
+
+/// The same pivot spread over CTEs joined together: the whole query, including the
+/// join between the CTEs, must be pushed down into a single Cube query.
+#[tokio::test]
+async fn test_wrapper_conditional_aggregation_multi_cte() {
+    if !Rewriter::sql_push_down_enabled() {
+        return;
+    }
+    init_testing_logger();
+
+    let query_plan = convert_select_to_query_plan(
+        r#"
+        WITH t_root AS (
+            SELECT k.customer_gender AS "gender",
+                   MAX(CASE WHEN l.content = 'PropA' THEN l.read END) AS "PropA"
+            FROM KibanaSampleDataEcommerce k
+            LEFT JOIN Logs l ON k.__cubeJoinField = l.__cubeJoinField
+            WHERE k.customer_gender = 'female'
+            GROUP BY 1
+        ),
+        t_prop_b AS (
+            SELECT k.customer_gender AS "__j_gender",
+                   MAX(l.content) AS "PropB"
+            FROM KibanaSampleDataEcommerce k
+            LEFT JOIN Logs l ON k.__cubeJoinField = l.__cubeJoinField
+            WHERE l.content = 'PropB' AND k.customer_gender = 'female'
+            GROUP BY 1
+        )
+        SELECT t_root."gender", t_root."PropA", t_prop_b."PropB"
+        FROM t_root
+        LEFT JOIN t_prop_b ON t_prop_b."__j_gender" = t_root."gender"
+        "#
+        .to_string(),
+        DatabaseProtocol::PostgreSQL,
+    )
+    .await;
+
+    let logical_plan = query_plan.as_logical_plan();
+    let sql = logical_plan.find_cube_scan_wrapped_sql().wrapped_sql.sql;
+    assert!(
+        sql.contains("MAX(CASE WHEN"),
+        "conditional aggregation is pushed down:\n{}",
+        sql
+    );
+    // The row-preserving CTE stays in `from`. Positions come from the CTE aliases, not the
+    // first `LEFT JOIN`, which could be a join Cube renders inside either of them.
+    let from_position = sql.find(r#") AS "t_root""#).expect(&sql);
+    let join_position = sql
+        .find(r#") AS "t_prop_b" ON ("t_root"."gender" = "t_prop_b"."j_gender")"#)
+        .expect(&sql);
+    assert!(
+        from_position < join_position,
+        "left CTE stays the from of the LEFT JOIN, right CTE is joined as a subquery on the \
+         original condition:\n{}",
+        sql
+    );
+    assert!(
+        sql[from_position..join_position].contains("LEFT JOIN (SELECT"),
+        "the second CTE is attached to the first one with a LEFT JOIN:\n{}",
+        sql
+    );
+
+    let physical_plan = query_plan.as_physical_plan().await.unwrap();
+    let plan = format!("{}", displayable(physical_plan.as_ref()).indent());
+    assert_eq!(
+        plan.matches("CubeScanExecutionPlan").count(),
+        1,
+        "the join between the CTEs is executed by the data source, not in memory:\n{}",
+        plan
+    );
+}
+
+/// A pivot query builder emits one CTE per property, all joined to the root CTE.
+/// Every join in that chain must be pushed down, not just the first one.
+#[tokio::test]
+async fn test_wrapper_conditional_aggregation_multi_cte_chain() {
+    if !Rewriter::sql_push_down_enabled() {
+        return;
+    }
+    init_testing_logger();
+
+    let query_plan = convert_select_to_query_plan(
+        r#"
+        WITH t_root AS (
+            SELECT k.customer_gender AS "gender",
+                   MAX(CASE WHEN l.content = 'PropA' THEN l.read END) AS "PropA"
+            FROM KibanaSampleDataEcommerce k
+            LEFT JOIN Logs l ON k.__cubeJoinField = l.__cubeJoinField
+            GROUP BY 1
+        ),
+        t_prop_b AS (
+            SELECT k.customer_gender AS "__j_b", MAX(l.content) AS "PropB"
+            FROM KibanaSampleDataEcommerce k
+            LEFT JOIN Logs l ON k.__cubeJoinField = l.__cubeJoinField
+            WHERE l.content = 'PropB'
+            GROUP BY 1
+        ),
+        t_prop_c AS (
+            SELECT k.customer_gender AS "__j_c", MAX(l.content) AS "PropC"
+            FROM KibanaSampleDataEcommerce k
+            LEFT JOIN Logs l ON k.__cubeJoinField = l.__cubeJoinField
+            WHERE l.content = 'PropC'
+            GROUP BY 1
+        )
+        SELECT t_root."gender", t_root."PropA", t_prop_b."PropB", t_prop_c."PropC"
+        FROM t_root
+        LEFT JOIN t_prop_b ON t_prop_b."__j_b" = t_root."gender"
+        LEFT JOIN t_prop_c ON t_prop_c."__j_c" = t_root."gender"
+        "#
+        .to_string(),
+        DatabaseProtocol::PostgreSQL,
+    )
+    .await;
+
+    let logical_plan = query_plan.as_logical_plan();
+    let sql = logical_plan.find_cube_scan_wrapped_sql().wrapped_sql.sql;
+    for joined in [
+        r#"AS "t_prop_b" ON ("t_root"."gender" = "t_prop_b"."j_b")"#,
+        r#"AS "t_prop_c" ON ("t_root"."gender" = "t_prop_c"."j_c")"#,
+    ] {
+        assert!(
+            sql.contains(joined),
+            "both CTE joins are pushed down, missing {}:\n{}",
+            joined,
+            sql
+        );
+    }
+
+    let physical_plan = query_plan.as_physical_plan().await.unwrap();
+    let plan = format!("{}", displayable(physical_plan.as_ref()).indent());
+    assert_eq!(
+        plan.matches("CubeScanExecutionPlan").count(),
+        1,
+        "a chain of CTE joins becomes a single Cube query:\n{}",
+        plan
+    );
+}
+
+/// A join condition can reference a CTE joined earlier in the query, so pushed-down joins
+/// must keep the order they had: a subquery can only be referenced after it is joined.
+#[tokio::test]
+async fn test_wrapper_grouped_join_chain_keeps_join_order() {
+    if !Rewriter::sql_push_down_enabled() {
+        return;
+    }
+    init_testing_logger();
+
+    let query_plan = convert_select_to_query_plan(
+        r#"
+        WITH t_root AS (
+            SELECT k.customer_gender AS "gender", MAX(l.content) AS "a"
+            FROM KibanaSampleDataEcommerce k
+            LEFT JOIN Logs l ON k.__cubeJoinField = l.__cubeJoinField
+            GROUP BY 1
+        ),
+        t_b AS (
+            SELECT k.customer_gender AS "jb", MAX(l.content) AS "b"
+            FROM KibanaSampleDataEcommerce k
+            LEFT JOIN Logs l ON k.__cubeJoinField = l.__cubeJoinField
+            GROUP BY 1
+        ),
+        t_c AS (
+            SELECT k.customer_gender AS "jc", MIN(l.content) AS "c"
+            FROM KibanaSampleDataEcommerce k
+            LEFT JOIN Logs l ON k.__cubeJoinField = l.__cubeJoinField
+            GROUP BY 1
+        )
+        SELECT t_root."gender", t_b."b", t_c."c"
+        FROM t_root
+        LEFT JOIN t_b ON t_b."jb" = t_root."gender"
+        LEFT JOIN t_c ON t_c."jc" = t_b."b"
+        "#
+        .to_string(),
+        DatabaseProtocol::PostgreSQL,
+    )
+    .await;
+
+    let logical_plan = query_plan.as_logical_plan();
+    let sql = logical_plan.find_cube_scan_wrapped_sql().wrapped_sql.sql;
+    let joined_b = sql
+        .find(r#") AS "t_b" ON ("t_root"."gender" = "t_b"."jb")"#)
+        .expect(&sql);
+    let joined_c = sql
+        .find(r#") AS "t_c" ON ("t_b"."b" = "t_c"."jc")"#)
+        .expect(&sql);
+    assert!(
+        joined_b < joined_c,
+        "t_b is joined before the condition that references it:\n{}",
+        sql
+    );
+
+    let physical_plan = query_plan.as_physical_plan().await.unwrap();
+    let plan = format!("{}", displayable(physical_plan.as_ref()).indent());
+    assert_eq!(
+        plan.matches("CubeScanExecutionPlan").count(),
+        1,
+        "the whole chain is one Cube query:\n{}",
+        plan
+    );
+}
+
+/// A join of grouped subqueries is not unique on its join keys, so it must not become a Cube
+/// subquery join: the query is either refused or joined outside Cube, never with numbers that
+/// depend on how a measure is classified.
+#[tokio::test]
+async fn test_wrapper_grouped_join_is_not_used_as_cube_subquery_join() {
+    if !Rewriter::sql_push_down_enabled() {
+        return;
+    }
+    init_testing_logger();
+
+    for query in [
+        // Ungrouped Cube query on the left
+        r#"
+        WITH m1 AS (
+            SELECT customer_gender AS g, sum(sumPrice) AS s
+            FROM KibanaSampleDataEcommerce GROUP BY 1
+        ),
+        m2 AS (
+            SELECT customer_gender AS g2, avg(avgPrice) AS v
+            FROM KibanaSampleDataEcommerce GROUP BY 1
+        ),
+        joined AS (
+            SELECT m2.v AS k, m1.g AS g FROM m1 LEFT JOIN m2 ON m2.g2 = m1.g
+        )
+        SELECT k.customer_gender, MEASURE(k.avgPrice) AS p
+        FROM KibanaSampleDataEcommerce k
+        LEFT JOIN joined ON joined.k = k.customer_gender
+        GROUP BY 1
+        "#,
+        // Grouped Cube query on the left
+        r#"
+        WITH a AS (
+            SELECT customer_gender AS g, MEASURE(sumPrice) AS p
+            FROM KibanaSampleDataEcommerce GROUP BY 1
+        ),
+        m1 AS (
+            SELECT customer_gender AS g1, sum(sumPrice) AS s
+            FROM KibanaSampleDataEcommerce GROUP BY 1
+        ),
+        m2 AS (
+            SELECT customer_gender AS g2, avg(avgPrice) AS v
+            FROM KibanaSampleDataEcommerce GROUP BY 1
+        ),
+        joined AS (
+            SELECT m2.v AS k, m1.g1 AS g FROM m1 LEFT JOIN m2 ON m2.g2 = m1.g1
+        )
+        SELECT a.g, a.p, joined.g FROM a LEFT JOIN joined ON joined.k = a.g
+        "#,
+    ] {
+        let meta = crate::compile::test::get_test_tenant_ctx();
+        let session =
+            crate::compile::test::get_test_session(DatabaseProtocol::PostgreSQL, meta.clone())
+                .await;
+        let query_plan =
+            crate::compile::test::convert_sql_to_cube_query(&query.to_string(), meta, session)
+                .await;
+
+        match query_plan {
+            Err(error) => {
+                assert!(
+                    error.to_string().contains("Can't detect Cube query"),
+                    "refused for an unrelated reason: {}",
+                    error
+                );
+            }
+            Ok(query_plan) => {
+                let physical_plan = query_plan.as_physical_plan().await.unwrap();
+                let plan = format!("{}", displayable(physical_plan.as_ref()).indent());
+                assert!(
+                    !plan.contains("subqueryJoins"),
+                    "the join of subqueries was sent to Cube as a subquery join:\n{}",
+                    plan
+                );
+            }
+        }
+    }
+}
+
+/// Cube measures can not be computed over a pushed-down join: MEASURE() has to stay in a
+/// DataFusion aggregate over the join, whose execution raises the explicit MEASURE error, rather
+/// than be folded into a Cube query that would give it aggregation semantics it does not have.
+#[tokio::test]
+async fn test_wrapper_no_measure_over_grouped_join_chain() {
+    if !Rewriter::sql_push_down_enabled() {
+        return;
+    }
+    init_testing_logger();
+
+    let query_plan = convert_select_to_query_plan(
+        r#"
+        WITH t_root AS (
+            SELECT k.customer_gender AS "g", MAX(l.content) AS "a"
+            FROM KibanaSampleDataEcommerce k
+            LEFT JOIN Logs l ON k.__cubeJoinField = l.__cubeJoinField
+            GROUP BY 1
+        ),
+        t_b AS (
+            SELECT k.customer_gender AS "jb", MIN(l.content) AS "b"
+            FROM KibanaSampleDataEcommerce k
+            LEFT JOIN Logs l ON k.__cubeJoinField = l.__cubeJoinField
+            GROUP BY 1
+        )
+        SELECT t_root."g", MEASURE(t_b."b") AS m
+        FROM t_root
+        LEFT JOIN t_b ON t_b."jb" = t_root."g"
+        GROUP BY 1
+        "#
+        .to_string(),
+        DatabaseProtocol::PostgreSQL,
+    )
+    .await;
+
+    let logical_plan = query_plan.as_logical_plan();
+    assert!(
+        logical_plan.try_expect_root_cube_scan().is_none(),
+        "MEASURE() over a pushed-down join is not wrapped:\n{}",
+        logical_plan.display_indent()
+    );
+
+    let physical_plan = query_plan.as_physical_plan().await.unwrap();
+    let plan = format!("{}", displayable(physical_plan.as_ref()).indent());
+    let aggregate = plan.find("aggr=[measure(t_b.b)]").expect(&plan);
+    let scan = plan.find("CubeScanExecutionPlan").expect(&plan);
+    assert!(
+        aggregate < scan && plan.matches("CubeScanExecutionPlan").count() == 1,
+        "MEASURE() is aggregated in DataFusion over the one pushed-down join:\n{}",
+        plan
+    );
+}
+
+/// A LIMIT between two joins belongs to the join below it. The second join must go on top of
+/// the limited select, never into it, or it would join before the rows are picked.
+#[tokio::test]
+async fn test_wrapper_grouped_join_chain_keeps_limit_between_joins() {
+    if !Rewriter::sql_push_down_enabled() {
+        return;
+    }
+    init_testing_logger();
+
+    let query_plan = convert_select_to_query_plan(
+        r#"
+        WITH m1 AS (
+            SELECT customer_gender AS g, sum(sumPrice) AS s
+            FROM KibanaSampleDataEcommerce GROUP BY 1
+        ),
+        m2 AS (
+            SELECT customer_gender AS g2, avg(avgPrice) AS v
+            FROM KibanaSampleDataEcommerce GROUP BY 1
+        ),
+        m3 AS (
+            SELECT customer_gender AS g3, count(count) AS w
+            FROM KibanaSampleDataEcommerce GROUP BY 1
+        ),
+        limited AS (
+            SELECT m1.g AS g, m2.v AS v FROM m1 LEFT JOIN m2 ON m2.g2 = m1.g LIMIT 5
+        )
+        SELECT limited.g, limited.v, m3.w
+        FROM limited
+        LEFT JOIN m3 ON m3.g3 = limited.g
+        "#
+        .to_string(),
+        DatabaseProtocol::PostgreSQL,
+    )
+    .await;
+
+    let logical_plan = query_plan.as_logical_plan();
+    let sql = logical_plan.find_cube_scan_wrapped_sql().wrapped_sql.sql;
+    let limit = sql.find("LIMIT 5").expect(&sql);
+    let second_join = sql
+        .find(r#"AS "m3" ON ("limited"."g" = "m3"."g3")"#)
+        .expect(&sql);
+    assert!(
+        limit < second_join,
+        "the second join is applied to the limited rows, not inside the limit:\n{}",
+        sql
+    );
+}
+
+/// Same column names on both sides of a pushed-down join must keep distinct aliases,
+/// or the outer projection would read the same column twice.
+#[tokio::test]
+async fn test_wrapper_grouped_join_wrapped_left_duplicate_names() {
+    if !Rewriter::sql_push_down_enabled() {
+        return;
+    }
+    init_testing_logger();
+
+    let query_plan = convert_select_to_query_plan(
+        r#"
+        WITH m1 AS (
+            SELECT customer_gender AS g, MAX(taxful_total_price) AS v
+            FROM KibanaSampleDataEcommerce
+            GROUP BY 1
+        ),
+        m2 AS (
+            SELECT customer_gender AS g, MAX(minPrice) AS v
+            FROM KibanaSampleDataEcommerce
+            GROUP BY 1
+        )
+        SELECT COALESCE(m1.g, m2.g) AS g, m1.v AS v1, m2.v AS v2
+        FROM m1
+        LEFT JOIN m2 ON m1.g = m2.g
+        "#
+        .to_string(),
+        DatabaseProtocol::PostgreSQL,
+    )
+    .await;
+
+    let logical_plan = query_plan.as_logical_plan();
+    let sql = logical_plan.find_cube_scan_wrapped_sql().wrapped_sql.sql;
+    assert!(
+        sql.contains(r#") AS "m2" ON ("m1"."g" = "m2"."g")"#),
+        "the two CTEs are joined, rather than merged into one query:\n{}",
+        sql
+    );
+    // The select that joins them is itself aliased `m1`, so the level above reads both sides
+    // off it - which only works because the right side's columns were given other names
+    assert!(
+        sql.contains(r#"COALESCE("m1"."g", "m1"."g_1")"#),
+        "join sides keep distinct aliases:\n{}",
+        sql
+    );
+    assert!(
+        sql.contains(r#""m1"."v" "v1", "m1"."v_1" "v2""#),
+        "same-named measures from both sides stay distinct:\n{}",
+        sql
+    );
+
+    let physical_plan = query_plan.as_physical_plan().await.unwrap();
+    println!(
+        "Physical plan: {}",
+        displayable(physical_plan.as_ref()).indent()
+    );
+}
+
+/// A join select that is changed by anything - a projection, a window, the alias
+/// of a CTE, an aggregation over a Cube subquery join - gets a select of its own on top, so the next join
+/// nests over that one instead of being added to the join list. Both have to stay pushed down.
+#[tokio::test]
+async fn test_wrapper_grouped_join_over_changed_join_select() {
+    if !Rewriter::sql_push_down_enabled() {
+        return;
+    }
+    init_testing_logger();
+
+    for query in [
+        // Grouped Cube query with a subquery join of its own
+        r#"
+        WITH a AS (
+            SELECT k.customer_gender AS g, MEASURE(k.avgPrice) AS p
+            FROM KibanaSampleDataEcommerce k
+            LEFT JOIN (
+                SELECT customer_gender AS g2, sum(sumPrice) AS s
+                FROM KibanaSampleDataEcommerce GROUP BY 1
+            ) sub ON sub.g2 = k.customer_gender
+            GROUP BY 1
+        ),
+        b AS (
+            SELECT customer_gender AS g3, count(count) AS c
+            FROM KibanaSampleDataEcommerce GROUP BY 1
+        )
+        SELECT a.g, a.p, b.c FROM a LEFT JOIN b ON b.g3 = a.g
+        "#,
+        // Join CTE with a projection, joined to another grouped subquery
+        r#"
+        WITH m1 AS (
+            SELECT customer_gender AS g, sum(sumPrice) AS s
+            FROM KibanaSampleDataEcommerce GROUP BY 1
+        ),
+        m2 AS (
+            SELECT customer_gender AS g2, avg(avgPrice) AS v
+            FROM KibanaSampleDataEcommerce GROUP BY 1
+        ),
+        m3 AS (
+            SELECT customer_gender AS g3, count(count) AS w
+            FROM KibanaSampleDataEcommerce GROUP BY 1
+        ),
+        j AS (SELECT m1.g AS g, m2.v AS v FROM m1 LEFT JOIN m2 ON m2.g2 = m1.g)
+        SELECT j.g, j.v, m3.w FROM j LEFT JOIN m3 ON m3.g3 = j.g
+        "#,
+        // Join CTE with a window function over the join
+        r#"
+        WITH m1 AS (
+            SELECT customer_gender AS g, sum(sumPrice) AS s
+            FROM KibanaSampleDataEcommerce GROUP BY 1
+        ),
+        m2 AS (
+            SELECT customer_gender AS g2, avg(avgPrice) AS v
+            FROM KibanaSampleDataEcommerce GROUP BY 1
+        ),
+        m3 AS (
+            SELECT customer_gender AS g3, count(count) AS w
+            FROM KibanaSampleDataEcommerce GROUP BY 1
+        ),
+        j AS (
+            SELECT m1.g AS g, m2.v AS v, ROW_NUMBER() OVER (ORDER BY m2.v) AS n
+            FROM m1 LEFT JOIN m2 ON m2.g2 = m1.g
+        )
+        SELECT j.g, j.n, m3.w FROM j LEFT JOIN m3 ON m3.g3 = j.g
+        "#,
+    ] {
+        let query_plan =
+            convert_select_to_query_plan(query.to_string(), DatabaseProtocol::PostgreSQL).await;
+        let physical_plan = query_plan.as_physical_plan().await.unwrap();
+        let plan = format!("{}", displayable(physical_plan.as_ref()).indent());
+        assert_eq!(
+            plan.matches("CubeScanExecutionPlan").count(),
+            1,
+            "the join over a changed join select is pushed down, not run in memory:\n{}",
+            plan
+        );
+    }
+}
+
+/// Every join type of a chain is kept, in order, in the one select the chain builds.
+#[tokio::test]
+async fn test_wrapper_grouped_join_chain_join_types() {
+    if !Rewriter::sql_push_down_enabled() {
+        return;
+    }
+    init_testing_logger();
+
+    for (first, second) in [("INNER", "INNER"), ("LEFT", "RIGHT"), ("FULL", "FULL")] {
+        let query_plan = convert_select_to_query_plan(
+            format!(
+                r#"
+                WITH r AS (
+                    SELECT customer_gender AS g, sum(sumPrice) AS s
+                    FROM KibanaSampleDataEcommerce GROUP BY 1
+                ),
+                b AS (
+                    SELECT customer_gender AS gb, avg(avgPrice) AS v
+                    FROM KibanaSampleDataEcommerce GROUP BY 1
+                ),
+                c AS (
+                    SELECT customer_gender AS gc, count(count) AS w
+                    FROM KibanaSampleDataEcommerce GROUP BY 1
+                )
+                SELECT r.g, b.v, c.w
+                FROM r
+                {first} JOIN b ON b.gb = r.g
+                {second} JOIN c ON c.gc = r.g
+                "#
+            ),
+            DatabaseProtocol::PostgreSQL,
+        )
+        .await;
+
+        let sql = query_plan
+            .as_logical_plan()
+            .find_cube_scan_wrapped_sql()
+            .wrapped_sql
+            .sql;
+        let joined_b = sql.find(&format!(r#"{first} JOIN (SELECT"#)).expect(&sql);
+        let joined_b_on = sql.find(r#") AS "b" ON ("r"."g" = "b"."gb")"#).expect(&sql);
+        let joined_c_on = sql.find(r#") AS "c" ON ("r"."g" = "c"."gc")"#).expect(&sql);
+        assert!(
+            joined_b < joined_b_on && joined_b_on < joined_c_on,
+            "{first} JOIN b comes before {second} JOIN c:\n{}",
+            sql
+        );
+        assert!(
+            sql[joined_b_on..joined_c_on].contains(&format!("{second} JOIN (SELECT")),
+            "c is joined with {second} JOIN:\n{}",
+            sql
+        );
+
+        let physical_plan = query_plan.as_physical_plan().await.unwrap();
+        let plan = format!("{}", displayable(physical_plan.as_ref()).indent());
+        assert_eq!(
+            plan.matches("CubeScanExecutionPlan").count(),
+            1,
+            "{first}/{second} chain is one Cube query:\n{}",
+            plan
+        );
+    }
+}
+
+/// A long chain of joins stays one flat select: the rewrite nests a select per join, and every
+/// pass over the plan after it has to stay linear in that depth, or the chain runs out of stack
+/// or time well before query builders stop adding properties.
+#[tokio::test]
+async fn test_wrapper_grouped_join_long_chain() {
+    if !Rewriter::sql_push_down_enabled() {
+        return;
+    }
+    init_testing_logger();
+
+    let joined = 16;
+    let mut ctes = vec![r#"t_root AS (
+        SELECT customer_gender AS g, sum(sumPrice) AS s
+        FROM KibanaSampleDataEcommerce GROUP BY 1
+    )"#
+    .to_string()];
+    let mut projection = vec!["t_root.g".to_string()];
+    let mut joins = vec![];
+    for i in 0..joined {
+        ctes.push(format!(
+            r#"t_{i} AS (
+                SELECT customer_gender AS j{i}, avg(avgPrice) AS p{i}
+                FROM KibanaSampleDataEcommerce GROUP BY 1
+            )"#
+        ));
+        projection.push(format!("t_{i}.p{i}"));
+        joins.push(format!("LEFT JOIN t_{i} ON t_{i}.j{i} = t_root.g"));
+    }
+    let query_plan = convert_select_to_query_plan(
+        format!(
+            "WITH {} SELECT {} FROM t_root {}",
+            ctes.join(", "),
+            projection.join(", "),
+            joins.join(" ")
+        ),
+        DatabaseProtocol::PostgreSQL,
+    )
+    .await;
+
+    let sql = query_plan
+        .as_logical_plan()
+        .find_cube_scan_wrapped_sql()
+        .wrapped_sql
+        .sql;
+    // Flat: a select per joined subquery plus a few around them, not one more per join
+    assert!(
+        sql.matches("SELECT").count() <= joined + 4,
+        "the chain renders as one select joining every subquery:\n{}",
+        sql
+    );
+
+    let physical_plan = query_plan.as_physical_plan().await.unwrap();
+    let plan = format!("{}", displayable(physical_plan.as_ref()).indent());
+    assert_eq!(
+        plan.matches("CubeScanExecutionPlan").count(),
+        1,
+        "the whole chain is one Cube query:\n{}",
+        plan
+    );
+}
+
+/// A joined side that is itself a join of subqueries reaches SQL generation as a nested
+/// wrapper holding a select with joins of its own. It is joined as plain SQL, never as a Cube
+/// subquery join, which would assume it is unique on the join keys.
+#[tokio::test]
+async fn test_wrapper_grouped_join_of_two_joins() {
+    if !Rewriter::sql_push_down_enabled() {
+        return;
+    }
+    init_testing_logger();
+
+    let query_plan = convert_select_to_query_plan(
+        r#"
+        WITH m1 AS (
+            SELECT customer_gender AS g1, sum(sumPrice) AS s
+            FROM KibanaSampleDataEcommerce GROUP BY 1
+        ),
+        m2 AS (
+            SELECT customer_gender AS g2, avg(avgPrice) AS v
+            FROM KibanaSampleDataEcommerce GROUP BY 1
+        ),
+        m3 AS (
+            SELECT customer_gender AS g3, count(count) AS c
+            FROM KibanaSampleDataEcommerce GROUP BY 1
+        ),
+        m4 AS (
+            SELECT customer_gender AS g4, max(maxPrice) AS x
+            FROM KibanaSampleDataEcommerce GROUP BY 1
+        ),
+        l AS (SELECT m1.g1 AS g, m2.v AS v FROM m1 LEFT JOIN m2 ON m2.g2 = m1.g1),
+        r AS (SELECT m3.g3 AS g, m4.x AS x FROM m3 LEFT JOIN m4 ON m4.g4 = m3.g3)
+        SELECT l.g, l.v, r.x FROM l LEFT JOIN r ON r.g = l.g
+        "#
+        .to_string(),
+        DatabaseProtocol::PostgreSQL,
+    )
+    .await;
+
+    let sql = query_plan
+        .as_logical_plan()
+        .find_cube_scan_wrapped_sql()
+        .wrapped_sql
+        .sql;
+    assert_eq!(
+        sql.matches(" JOIN ").count(),
+        3,
+        "both inner joins and the join between them are in the SQL:\n{}",
+        sql
+    );
+
+    let physical_plan = query_plan.as_physical_plan().await.unwrap();
+    let plan = format!("{}", displayable(physical_plan.as_ref()).indent());
+    assert_eq!(
+        plan.matches("CubeScanExecutionPlan").count(),
+        1,
+        "the whole query is one Cube query:\n{}",
+        plan
+    );
+    assert!(
+        !plan.contains("subqueryJoins"),
+        "the joined side is joined as plain SQL, not as a Cube subquery join:\n{}",
+        plan
+    );
+}
