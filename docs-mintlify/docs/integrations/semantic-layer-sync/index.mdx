@@ -357,13 +357,14 @@ Unless [multitenancy](#multitenancy) is enabled, syncs that run on build or on
 schedule don't run as any user. When a cube or view is available only to
 specific groups through [data access policies][ref-dap], these syncs publish
 the members that any of those groups can see. Everyone who can open the synced
-data source in the BI tool sees the names and descriptions of these members.
-Queries still go through the SQL API, which applies data access policies to the
-user the BI tool queries as. A manual sync publishes what the user who starts
-it can see.
+dataset or data source in the BI tool sees the names and descriptions of these
+members. Queries still go through the SQL API, which applies data access
+policies to the user the BI tool queries as. A manual sync publishes what the
+user who starts it can see.
 
-To hide such members from some users of the BI tool, restrict access to the
-synced database in the BI tool, or expose these members in a separate view.
+To hide such members from some users of the BI tool, restrict their access to
+the synced database, or move these members to a separate view and restrict
+access to its synced dataset or data source in the BI tool.
 
 ## Viewing history
 
