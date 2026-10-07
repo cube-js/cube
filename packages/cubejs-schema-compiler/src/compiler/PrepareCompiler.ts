@@ -42,7 +42,9 @@ export type PrepareCompilerOptions = {
   compiledScriptCache?: LRUCache<string, vm.Script>;
   compiledYamlCache?: LRUCache<string, string>;
   compiledJinjaCache?: LRUCache<string, string>;
-  // A transpiler worker pool reused across compiles; the caller terminates it
+  /**
+   * A transpiler worker pool reused across compiles; the caller terminates it
+   */
   transpilerWorkerPool?: workerpool.Pool;
   /**
    * Shared VM realm and string interning together. Defaults to CUBEJS_COMPILER_MULTI_TENANT_SHARING.
