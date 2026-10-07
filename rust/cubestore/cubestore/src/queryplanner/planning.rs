@@ -2333,6 +2333,7 @@ pub mod tests {
     use crate::sql::parser::{CubeStoreParser, Statement};
     use crate::table::{Row, TableValue};
     use crate::CubeError;
+    use datafusion::common::tree_node::{TreeNode, TreeNodeRecursion};
     use datafusion::config::ConfigOptions;
     use datafusion::error::DataFusionError;
     use datafusion::execution::{SessionState, SessionStateBuilder};
@@ -2380,6 +2381,70 @@ pub mod tests {
             \n    Scan s.Orders, source: CubeTableLogical, fields: [order_customer]"
         );
         assert_eq!(plan.schema().field(0).data_type(), &DataType::Float64);
+    }
+
+    #[tokio::test]
+    pub async fn test_prune_union_columns() {
+        let indices = default_indices();
+        let state = QueryPlannerImpl::make_execution_context(SessionConfig::new()).state();
+        let union_widths = |sql: &str| {
+            let plan = state
+                .analyzer()
+                .execute_and_check(
+                    unoptimized_plan(sql, &indices),
+                    state.config_options(),
+                    |_, _| {},
+                )
+                .unwrap();
+            let mut widths = Vec::new();
+            plan.apply(|p| {
+                if let LogicalPlan::Union(u) = p {
+                    widths.push(u.schema.fields().len());
+                    widths.extend(u.inputs.iter().map(|i| i.schema().fields().len()));
+                }
+                Ok(TreeNodeRecursion::Continue)
+            })
+            .unwrap();
+            widths
+        };
+        let union = "SELECT * FROM s.Orders UNION ALL SELECT * FROM s.Orders";
+
+        assert_eq!(
+            union_widths(&format!(
+                "SELECT order_customer, SUM(order_amount) FROM ({union}) AS o \
+                 WHERE o.order_city > 1 GROUP BY 1 ORDER BY 2 LIMIT 10"
+            )),
+            vec![3, 3, 3]
+        );
+        assert_eq!(
+            union_widths(&format!("SELECT count(*) FROM ({union}) AS o")),
+            vec![1, 1, 1]
+        );
+        assert_eq!(
+            union_widths(&format!("SELECT * FROM ({union}) AS o")),
+            vec![5, 5, 5]
+        );
+        // A join reads columns of the union outside the projection chain.
+        assert_eq!(
+            union_widths(&format!(
+                "SELECT customer_name FROM ({union}) AS o \
+                 JOIN s.Customers c ON o.order_customer = c.customer_id"
+            )),
+            vec![5, 5, 5]
+        );
+
+        let plan = initial_plan(
+            &format!("SELECT order_customer, SUM(order_amount) FROM ({union}) AS o GROUP BY 1"),
+            &indices,
+        );
+        assert_eq!(
+            pretty_printers::pp_plan(&plan),
+            "Aggregate\
+            \n  SubqueryAlias\
+            \n    Union, schema: fields:[s.Orders.order_customer, s.Orders.order_amount], metadata:{}\
+            \n      Scan s.Orders, source: CubeTableLogical, fields: [order_customer, order_amount]\
+            \n      Scan s.Orders, source: CubeTableLogical, fields: [order_customer, order_amount]"
+        );
     }
 
     #[tokio::test]

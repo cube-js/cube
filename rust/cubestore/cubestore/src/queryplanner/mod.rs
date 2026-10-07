@@ -62,6 +62,7 @@ use crate::queryplanner::topk::ClusterAggregateTopKLower;
 use crate::queryplanner::metadata_cache::MetadataCacheFactory;
 use crate::queryplanner::optimizations::flatten_union::FlattenUnionRule;
 use crate::queryplanner::optimizations::is_not_distinct_from_join_keys::IsNotDistinctFromJoinKeysRule;
+use crate::queryplanner::optimizations::prune_union_columns::PruneUnionColumnsRule;
 use crate::queryplanner::optimizations::rolling_optimizer::RollingOptimizerRule;
 use crate::queryplanner::pretty_printers::{pp_plan_ext, PPOptions};
 use crate::queryplanner::udfs::{registerable_aggregate_udfs_iter, registerable_scalar_udfs_iter};
@@ -363,10 +364,15 @@ impl QueryPlannerImpl {
         config.options_mut().execution.parquet.split_row_group_reads = false;
 
         // TODO upgrade DF: build SessionContexts consistently
-        let analyzer_rules =
-            std::iter::once(Arc::new(FlattenUnionRule {}) as Arc<dyn AnalyzerRule + Send + Sync>)
-                .chain(Analyzer::new().rules)
-                .collect();
+        let mut analyzer_rules: Vec<Arc<dyn AnalyzerRule + Send + Sync>> =
+            vec![Arc::new(FlattenUnionRule {})];
+        for rule in Analyzer::new().rules {
+            let expands_wildcard = rule.name() == "expand_wildcard_rule";
+            analyzer_rules.push(rule);
+            if expands_wildcard {
+                analyzer_rules.push(Arc::new(PruneUnionColumnsRule {}));
+            }
+        }
         let state = Self::minimal_session_state_from_final_config_with_runtime(config, runtime_env)
             .with_analyzer_rules(analyzer_rules)
             .with_optimizer_rule(Arc::new(RollingOptimizerRule {}))
