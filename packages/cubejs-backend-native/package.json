@@ -28,7 +28,7 @@
     "test:unit": "yarn run unit",
     "test:bridge": "npm run native:build-debug-bridge-tests && npm run tsc && jest --config jest-bridge.config.js --forceExit",
     "test:cargo": "cargo test",
-    "bench": "jest --config jest-bench.config.js --forceExit"
+    "bench": "npm run native:build -- --release --features python,bridge-test-harness && npm run tsc && jest --config jest-bench.config.js --forceExit"
   },
   "engines": {
     "node": ">=20.0.0"

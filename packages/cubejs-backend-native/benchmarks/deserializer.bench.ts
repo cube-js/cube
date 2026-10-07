@@ -4,20 +4,8 @@ import { benchmarkSuite } from 'jest-bench';
 
 import { loadNative } from '../js';
 
-// Needs the bridge test harness: `yarn native:build-release-bridge-tests`.
-// A debug build makes the numbers meaningless.
+// Needs a release build with the bridge test harness, which `yarn bench` makes.
 const native = loadNative();
-
-const harnessAvailable = typeof native.__testBridgeDeserializeLoop === 'function';
-
-if (!harnessAvailable) {
-  console.warn(
-    'Skipping NativeSerdeDeserializer benchmarks: the bridge test harness is not built. '
-    + 'Rebuild with `yarn native:build-release-bridge-tests`.'
-  );
-}
-
-const describeBench = harnessAvailable ? describe : describe.skip;
 
 const sqlTemplates = JSON.parse(
   fs.readFileSync(path.join(process.cwd(), 'benchmarks', 'fixtures', 'sql-templates.json'), 'utf8')
@@ -44,7 +32,7 @@ function loop(kind: 'json' | 'sqlTemplates', value: unknown, iterations: number)
   native.__testBridgeDeserializeLoop(kind, value, iterations);
 }
 
-describeBench('NativeSerdeDeserializer', () => {
+describe('NativeSerdeDeserializer', () => {
   benchmarkSuite('sql templates', {
     'PostgresQuery sqlTemplates() (1 call)': () => {
       native.__testBridgeDeserializeSqlTemplates(sqlTemplates);
