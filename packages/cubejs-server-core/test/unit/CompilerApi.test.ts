@@ -106,4 +106,72 @@ describe('CompilerApi', () => {
       expect(() => compilers.cubeEvaluator).toThrow(/disposed CompilerApi instance/);
     });
   });
+
+  describe('getSql cache', () => {
+    const model = (values: string) => `
+cubes:
+  - name: orders
+    sql: SELECT * FROM orders
+    dimensions:
+      - name: id
+        sql: id
+        type: number
+        primary_key: true
+      - name: created_at
+        sql: created_at
+        type: time
+    measures:
+      - name: amount
+        sql: amount
+        type: sum
+      - name: amount_in_range
+        multi_stage: true
+        type: number
+        sql: "{amount}"
+        filter:
+          include:
+            - member: orders.created_at
+              operator: inDateRange
+              values: ${values}
+`;
+
+    const compilerApiFor = (values: string) => new CompilerApi(
+      {
+        localPath: () => '/mock/path',
+        dataSchemaFiles: () => Promise.resolve([{ fileName: 'orders.yml', content: model(values) }]),
+      },
+      async () => 'postgres',
+      {
+        logger: () => {}, // eslint-disable-line @typescript-eslint/no-empty-function
+        sqlCache: true,
+      }
+    );
+
+    const sqlInTwoMinutes = async (compilerApi: CompilerApi) => {
+      const query: any = { measures: ['orders.amount_in_range'], timezone: 'UTC' };
+      const now = jest.spyOn(Date, 'now').mockReturnValue(Date.UTC(2026, 9, 7, 12, 0, 10));
+
+      try {
+        const first = await compilerApi.getSql(query);
+        const sameMinute = await compilerApi.getSql(query);
+        now.mockReturnValue(Date.UTC(2026, 9, 7, 12, 1, 10));
+        const nextMinute = await compilerApi.getSql(query);
+        return { first, sameMinute, nextMinute };
+      } finally {
+        now.mockRestore();
+        compilerApi.dispose();
+      }
+    };
+
+    test('a relative date range in the data model is compiled again in the next minute', async () => {
+      const { first, sameMinute, nextMinute } = await sqlInTwoMinutes(compilerApiFor('[today]'));
+      expect(sameMinute).toBe(first);
+      expect(nextMinute).not.toBe(first);
+    });
+
+    test('absolute date ranges keep the cached SQL', async () => {
+      const { first, nextMinute } = await sqlInTwoMinutes(compilerApiFor('["2026-10-01", "2026-10-07"]'));
+      expect(nextMinute).toBe(first);
+    });
+  });
 });

@@ -208,6 +208,21 @@ export type EvaluatedCube = {
 
 const INTERNED_CUBE_COLLECTIONS = ['measures', 'dimensions', 'segments', 'hierarchies', 'preAggregations', 'joins'] as const;
 
+// The relative date ranges Tesseract resolves in filter values.
+const RELATIVE_DATE_RANGE = /^\s*((this|last|next)\s+(\d+\s+)?[a-z]+|today|yesterday|tomorrow)\s*$/i;
+
+const hasRelativeDateValue = (item: any): boolean => {
+  if (!item) {
+    return false;
+  }
+  const group = item.or || item.and;
+  if (group) {
+    return group.some(hasRelativeDateValue);
+  }
+  return Array.isArray(item.values) &&
+    item.values.some((value: unknown) => typeof value === 'string' && RELATIVE_DATE_RANGE.test(value));
+};
+
 export class CubeEvaluator extends CubeSymbols {
   public evaluatedCubes: Record<string, EvaluatedCube> = {};
 
@@ -217,6 +232,13 @@ export class CubeEvaluator extends CubeSymbols {
 
   private isRbacEnabledCache: boolean | null = null;
 
+  /**
+   * Whether a multi-stage `filter.include` holds a relative date range such
+   * as `this month`. It resolves when the query is planned, so SQL compiled
+   * for it is only valid for a short while.
+   */
+  public hasRelativeDateFilters: boolean = false;
+
   public constructor(
     protected readonly cubeValidator: CubeValidator,
     protected readonly options: { internStrings?: boolean } = {},
@@ -225,6 +247,7 @@ export class CubeEvaluator extends CubeSymbols {
   }
 
   public compile(cubes: any[], errorReporter: ErrorReporter) {
+    this.hasRelativeDateFilters = false;
     super.compile(cubes, errorReporter);
     const validCubes = this.cubeList.filter(cube => this.cubeValidator.isCubeValid(cube)).sort((a, b) => {
       if (a.isView) {
@@ -686,6 +709,9 @@ export class CubeEvaluator extends CubeSymbols {
           }
           if (typeof filter.keepOnly === 'function') {
             filter.keepOnlyReferences = this.evaluateReferences(cubeName, filter.keepOnly);
+          }
+          if (Array.isArray(filter.include) && filter.include.some(hasRelativeDateValue)) {
+            this.hasRelativeDateFilters = true;
           }
           member.filter = filter;
         }

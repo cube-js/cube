@@ -396,7 +396,13 @@ export class CompilerApi {
     if (this.sqlCache) {
       // eslint-disable-next-line @typescript-eslint/no-unused-vars
       const { requestId, ...keyOptions } = query;
-      const key = { query: keyOptions, options };
+      const key = {
+        query: keyOptions,
+        options,
+        // Relative date ranges in the data model resolve to the current time,
+        // so their SQL is reused within the minute only.
+        ...(compilers.cubeEvaluator.hasRelativeDateFilters ? { minute: Math.floor(Date.now() / 60000) } : {}),
+      };
       return compilers.compilerCache.getQueryCache(key).cache(['sql'], getSqlFn);
     } else {
       return getSqlFn();
