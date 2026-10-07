@@ -8,6 +8,17 @@ import { loadNative } from '../js';
 // A debug build makes the numbers meaningless.
 const native = loadNative();
 
+const harnessAvailable = typeof native.__testBridgeDeserializeLoop === 'function';
+
+if (!harnessAvailable) {
+  console.warn(
+    'Skipping NativeSerdeDeserializer benchmarks: the bridge test harness is not built. '
+    + 'Rebuild with `yarn native:build-release-bridge-tests`.'
+  );
+}
+
+const describeBench = harnessAvailable ? describe : describe.skip;
+
 const sqlTemplates = JSON.parse(
   fs.readFileSync(path.join(process.cwd(), 'benchmarks', 'fixtures', 'sql-templates.json'), 'utf8')
 );
@@ -33,7 +44,7 @@ function loop(kind: 'json' | 'sqlTemplates', value: unknown, iterations: number)
   native.__testBridgeDeserializeLoop(kind, value, iterations);
 }
 
-describe('NativeSerdeDeserializer', () => {
+describeBench('NativeSerdeDeserializer', () => {
   benchmarkSuite('sql templates', {
     'PostgresQuery sqlTemplates() (1 call)': () => {
       native.__testBridgeDeserializeSqlTemplates(sqlTemplates);
