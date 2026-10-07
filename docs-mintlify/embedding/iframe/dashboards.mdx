@@ -105,6 +105,12 @@ allowed list is ignored, as is a member the field switcher doesn't offer — its
 [**Alternatives**](/docs/explore-analyze/dashboards/widgets/controls#field-switcher),
 plus the member it replaces.
 
+An `f_` or `tg_` parameter with an empty value — `f_orders_transactions.status=`,
+`tg_orders_transactions.created_at=` — opens that filter or time granularity
+switcher cleared rather than on its default. It is read on a published
+dashboard only, embedded or not; the dashboard builder ignores it, as does a
+control that has no default to clear.
+
 The reverse direction is published-only: when a viewer changes a control — or
 switches a tab — the new value is written back into the dashboard's own URL, so
 the state a link carries and the state a viewer reaches by clicking are the same
