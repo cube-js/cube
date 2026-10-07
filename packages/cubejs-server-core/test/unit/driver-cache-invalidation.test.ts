@@ -280,6 +280,28 @@ describe('driver cache invalidation', () => {
     expect(factory).toHaveBeenCalledTimes(66);
   });
 
+  test('keeps a context that is still in use past the bound', async () => {
+    const factory = jest.fn(() => (<any>{ type: 'postgres', password: 'from-env' }));
+    const { driverFactory, request } = await createCore({ driverFactory: factory }, { user: 0 });
+
+    await driverFactory('default');
+
+    for (let user = 1; user <= 64; user++) {
+      await request({ user }, `req-${user}`);
+      await driverFactory('default');
+
+      // User 0 keeps sending requests, as the refresh scheduler's context does.
+      if (user === 32) {
+        await request({ user: 0 }, 'req-busy');
+        await driverFactory('default');
+      }
+    }
+
+    await request({ user: 0 }, 'req-still-known');
+    await driverFactory('default');
+    expect(factory).toHaveBeenCalledTimes(65);
+  });
+
   test('never rebuilds when the factory returns a constructed driver', async () => {
     class ConstructedDriver extends BaseDriver {
       public release = jest.fn(async () => {});

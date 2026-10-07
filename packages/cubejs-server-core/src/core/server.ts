@@ -130,7 +130,7 @@ const PROBE_FAILURE_RETENTION_MS = 30 * 60 * 1000;
  */
 const PROBE_FAILURE_COALESCE_MS = 2 * 1000;
 
-/** Security contexts remembered per driver; past this the oldest is re-probed. */
+/** Security contexts remembered per driver; past this the least recently used is re-probed. */
 const MAX_KNOWN_SECURITY_CONTEXTS = 64;
 
 /**
@@ -1490,10 +1490,14 @@ export class CubejsServerCore {
 
     const securityContextFingerprint = fingerprint(context.securityContext);
 
-    if (
-      securityContextFingerprint === null ||
-      origin.knownSecurityContexts.has(securityContextFingerprint)
-    ) {
+    if (securityContextFingerprint === null) {
+      return { stale: false };
+    }
+
+    // Moved to the back on a hit, so eviction drops the least recently used.
+    if (origin.knownSecurityContexts.delete(securityContextFingerprint)) {
+      origin.knownSecurityContexts.add(securityContextFingerprint);
+
       return { stale: false };
     }
 
@@ -1521,7 +1525,7 @@ export class CubejsServerCore {
       const known = origin.knownSecurityContexts;
 
       if (known.size >= MAX_KNOWN_SECURITY_CONTEXTS) {
-        // Sets iterate in insertion order, so this forgets the oldest.
+        // Sets iterate in insertion order, so this forgets the least recently used.
         known.delete(known.values().next().value);
       }
 
