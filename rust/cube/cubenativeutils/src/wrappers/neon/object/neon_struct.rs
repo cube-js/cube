@@ -50,18 +50,10 @@ impl<C: Context<'static> + 'static> NativeStruct<NeonInnerTypes<C>> for NeonStru
         &self,
         key: &NativeObjectHandle<NeonInnerTypes<C>>,
     ) -> Result<NativeObjectHandle<NeonInnerTypes<C>>, CubeError> {
-        let neon_result = match key.object_ref().root_holder() {
-            RootHolder::String(key) => {
-                let key = key.value_ref().as_str();
-                self.object
-                    .map_neon_object(|cx, neon_object| neon_object.get::<JsValue, _, _>(cx, key))?
-            }
-            _ => {
-                let key = key.object_ref().get_js_value()?;
-                self.object
-                    .map_neon_object(|cx, neon_object| neon_object.get::<JsValue, _, _>(cx, key))?
-            }
-        };
+        let key = key.object_ref().get_js_value()?;
+        let neon_result = self
+            .object
+            .map_neon_object(|cx, neon_object| neon_object.get::<JsValue, _, _>(cx, key))?;
         Ok(NativeObjectHandle::new(NeonObject::new(
             self.object.get_context(),
             neon_result,

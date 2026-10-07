@@ -42,10 +42,6 @@ impl<C: Context<'static> + 'static> NeonObject<C> {
         Self { root_holder: root }
     }
 
-    pub(crate) fn root_holder(&self) -> &RootHolder<C> {
-        &self.root_holder
-    }
-
     pub fn get_js_value(&self) -> Result<Handle<'static, JsValue>, CubeError> {
         match &self.root_holder {
             RootHolder::Null(v) => v.map_neon_object(|_cx, obj| Ok(obj.upcast())),
