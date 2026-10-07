@@ -219,3 +219,46 @@ fn test_rollup_join_skips_an_ambiguous_candidate_for_a_resolvable_one() -> Resul
 
     Ok(())
 }
+
+// A measure from the one side of a many_to_one join is multiplied, so the planner serves it
+// from its own rollup while the rest of the query is served by the rollupJoin. With more
+// than one usage every pre-aggregation table must carry its `__usage_N` placeholder: that is
+// the only name the orchestrator maps to a built table. The rollupJoin's leg tables are
+// emitted bare, so Cube Store is queried for a table that was never built (#11124).
+#[test]
+fn test_rollup_join_with_multiplied_measure_names_every_table_by_usage() -> Result<(), CubeError> {
+    let ctx = TestContext::new(MockSchema::from_yaml_file(
+        "common/rollup_join_multiplied_measure.yaml",
+    ))?;
+
+    let (sql, pre_aggrs) = ctx.build_sql_with_used_pre_aggregations(indoc! {"
+        measures:
+          - actions.count
+          - contracts.total_value
+        dimensions:
+          - contracts.location
+    "})?;
+
+    assert!(
+        pre_aggrs.len() > 1,
+        "expected several usages, got {}",
+        pre_aggrs.len()
+    );
+    let table_refs = regex::Regex::new(r"(?:FROM|JOIN)\s+([^\s(]+)").unwrap();
+    let tables = table_refs
+        .captures_iter(&sql)
+        .map(|c| c[1].to_string())
+        .filter(|t| t.contains("_rollup"))
+        .collect::<Vec<_>>();
+    assert!(!tables.is_empty(), "no pre-aggregation tables in:\n{}", sql);
+    for table in tables {
+        assert!(
+            table.contains("__usage_"),
+            "{} is referenced without a usage suffix in:\n{}",
+            table,
+            sql
+        );
+    }
+
+    Ok(())
+}
