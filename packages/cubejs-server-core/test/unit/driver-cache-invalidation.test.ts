@@ -1379,4 +1379,34 @@ describe('driver cache invalidation', () => {
     expect(await driverFactory('default')).not.toBe(first);
     expect(core.builtDrivers).toHaveLength(2);
   });
+
+  // A session still on the pre-rotation token, or one that has fallen back to the
+  // service account, must not flip the connection back off the newer credential.
+  test('does not roll back onto an older credential', async () => {
+    const hour = 60 * 60 * 1000;
+    const factory = (ctx: any) => (<any>(ctx.securityContext.token
+      ? { type: 'postgres', password: ctx.securityContext.token, expiresAt: ctx.securityContext.exp }
+      : { type: 'postgres', password: 'service-account' }));
+    const { core, driverFactory, request } = await createCore(
+      { driverFactory: factory },
+      { token: 'token-1', exp: Date.now() + hour },
+    );
+
+    await driverFactory('default');
+
+    clock.advancePastRebuildInterval();
+    await request({ token: 'token-2', exp: Date.now() + 2 * hour }, 'req-2');
+    const current = <FakeDriver> await driverFactory('default');
+    expect(current.builtFrom).toMatchObject({ password: 'token-2' });
+
+    clock.advancePastRebuildInterval();
+    await request({ token: 'token-1', exp: Date.now() + hour }, 'req-old');
+    expect(await driverFactory('default')).toBe(current);
+
+    clock.advancePastRebuildInterval();
+    await request({ user: 'no-token' }, 'req-fallback');
+    expect(await driverFactory('default')).toBe(current);
+
+    expect(core.builtDrivers).toHaveLength(2);
+  });
 });

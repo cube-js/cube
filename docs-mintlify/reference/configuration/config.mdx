@@ -518,6 +518,10 @@ when it elapses whether or not anything else changed.
 
 It is deliberately excluded from the comparison, so a factory may return a
 deadline recomputed on every call without that reading as a new connection.
+While the cached connection's lifetime has not elapsed, a configuration with an
+earlier `expiresAt`, or none, does not replace it: a session still on a token
+from before a rotation cannot roll the connection back, and a fallback to a
+service account takes effect once the cached lifetime ends.
 
 </Info>
 

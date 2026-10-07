@@ -110,10 +110,8 @@ const DRIVER_REBUILD_MIN_INTERVAL_MS = 30 * 1000;
 const MAX_PROBE_FAILURE_INCIDENTS = 3;
 
 /**
- * How long refusal must last, as repeated incidents or one unbroken incident,
- * before the driver is given up. Minutes, so a dependency restarting inside the
- * factory does not drain a pool whose credential is still valid; an outage that
- * outlasts it does, which is why the docs tell factories to catch their own failures.
+ * How long refusal must last, as repeated incidents or one unbroken incident, before the
+ * driver is given up. Minutes, so a dependency restart does not drain a valid pool.
  */
 const PROBE_FAILURE_GRACE_MS = 5 * 60 * 1000;
 
@@ -1388,12 +1386,7 @@ export class CubejsServerCore {
     );
   }
 
-  /**
-   * Build a driver from whatever `driverFactory` returned. Split out of
-   * `resolveDriver` so a caller that has already invoked the factory — to
-   * compare its result against the cached driver's — can build from that same
-   * result instead of invoking a user-supplied function a second time.
-   */
+  /** Split from `resolveDriver` so a caller that already invoked the factory builds from that result, not a second call. */
   protected async createDriverFromFactoryResult(
     val: DriverConfig | BaseDriver,
     context: DriverContext,
@@ -1533,8 +1526,15 @@ export class CubejsServerCore {
     // release it, because it belongs to the factory.
     const config = isDriver(value) ? undefined : <DriverConfig>value;
     const configFingerprint = config ? driverConfigFingerprint(config) : null;
+    const unchanged = configFingerprint === null || configFingerprint === origin.configFingerprint;
+    const candidateExpiresAt = config ? parseDriverExpiry(config.expiresAt) : undefined;
 
-    if (configFingerprint === null || configFingerprint === origin.configFingerprint) {
+    // A credential expiring before the cached one, or naming no lifetime, comes from a
+    // context the connection has moved past: keep the cached one until it elapses.
+    const older = !unchanged && origin.expiresAt !== undefined
+      && (candidateExpiresAt === undefined || candidateExpiresAt < origin.expiresAt);
+
+    if (unchanged || older) {
       const known = origin.knownSecurityContexts;
 
       if (known.size >= MAX_KNOWN_SECURITY_CONTEXTS) {
@@ -1546,7 +1546,7 @@ export class CubejsServerCore {
 
       // `expiresAt` is outside the fingerprint, so carry a re-issued deadline
       // over, through the build path's guard so an elapsed one is not reinstated.
-      if (config) {
+      if (unchanged && config) {
         origin.expiresAt = this.resolveBuiltDriverExpiry(config, context.dataSource, origin);
       }
 
