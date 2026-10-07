@@ -10,9 +10,10 @@ lazy_static! {
     static ref RELATIVE: Regex =
         Regex::new(r"^(this|last|next)\s+(day|week|month|year|quarter|hour|minute|second)s?$")
             .unwrap();
-    static ref RELATIVE_N: Regex =
-        Regex::new(r"^(last|next)\s+(\d+)\s+(day|week|month|year|quarter|hour|minute|second)s?$")
-            .unwrap();
+    static ref RELATIVE_N: Regex = Regex::new(
+        r"^(last|next)\s+([1-9]\d*)\s+(day|week|month|year|quarter|hour|minute|second)s?$"
+    )
+    .unwrap();
 }
 
 /// Resolves a relative date range (`this month`, `last 7 days`, `yesterday`)
@@ -135,6 +136,7 @@ mod tests {
     fn absolute_dates_are_not_relative() {
         assert_eq!(at("2026-06-01"), None);
         assert_eq!(at("from 2026-01-01 to 2026-02-01"), None);
+        assert_eq!(at("last 0 days"), None);
     }
 
     #[test]
