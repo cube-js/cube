@@ -14,8 +14,9 @@ const describeBridge = bridgeHarnessAvailable ? describe : describe.skip;
 
 // Shared with benchmarks/deserializer.bench.ts: PostgresQuery#sqlTemplates()
 // output, i.e. exactly what Tesseract deserializes on every query.
+// Runs from dist/test/bridge, three levels below the package root.
 function loadSqlTemplates(): Record<string, Record<string, string>> {
-  const file = path.join(__dirname, '..', '..', 'benchmarks', 'fixtures', 'sql-templates.json');
+  const file = path.join(__dirname, '..', '..', '..', 'benchmarks', 'fixtures', 'sql-templates.json');
   return JSON.parse(fs.readFileSync(file, 'utf8'));
 }
 
