@@ -562,17 +562,15 @@ export class BaseQuery {
    * @return { string[][] }
    */
   enrichedJoinHintsFromJoinTree(joinTree, joinHints) {
-    // The tree can hold two edges into the same cube when a hint path leads back into a cube an
-    // earlier path passed through. The later edge wins, so the next pass follows the later hint
+    // The tree can hold two edges into one cube. The later edge wins so the next pass follows the
+    // later hint (e.g. a view's join path), unless it closes a cycle (hint `c -> b` when `c` is
+    // only reachable through `b`): that parent chain would loop forever
     const joinsMap = {};
 
     for (const j of joinTree.joins) {
       joinsMap[j.to] = j.from;
     }
 
-    // ...unless the later edge comes from one of the cube's own descendants (hint `c -> b` when
-    // `c` is only reachable through `b`): that parent chain loops forever, so fall back to a map
-    // that skips any edge closing a cycle
     return this.joinPathsToRoot(joinsMap, joinHints) ??
       this.joinPathsToRoot(this.acyclicJoinsMap(joinTree), joinHints);
   }
