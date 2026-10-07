@@ -62,25 +62,25 @@ have picked a **Dashboard**.
 
 ### Threshold
 
-Fires when the measure **is above**, **is below**, or **is equal to** the number
-you enter in **Value**. **Is equal to** compares exactly, so it suits whole-number
-measures such as counts.
+The condition is met when the measure **is above**, **is below**, or **is equal
+to** the number you enter in **Value**. **Is equal to** compares exactly, so it
+suits whole-number measures such as counts.
 
 ### % change
 
-Fires when the measure **increases by ≥**, **decreases by ≥**, or **changes by
-≥** (in either direction) the percentage you enter, comparing the chart's last
-complete period with the period before it.
+The condition is met when the measure **increases by ≥**, **decreases by ≥**,
+or **changes by ≥** (in either direction) the percentage you enter, comparing
+the chart's last complete period with the period before it.
 
 When the previous period's value is 0 there is no percentage to compute, so the
 check can't run and nothing is sent.
 
 ### Anomaly
 
-Fires when the last complete period falls outside the normal range of the
-periods before it. The normal range is their median ± 3 × the median absolute
-deviation. If every earlier period has the same value, the range is that value
-alone, and any other value is outside it.
+The condition is met when the last complete period falls outside the normal
+range of the periods before it. The normal range is their median ± 3 × the
+median absolute deviation. If every earlier period has the same value, the range
+is that value alone, and any other value is outside it.
 
 The rule needs at least 8 complete periods before the latest one. Until the
 chart has them, the check can't run and nothing is sent.
