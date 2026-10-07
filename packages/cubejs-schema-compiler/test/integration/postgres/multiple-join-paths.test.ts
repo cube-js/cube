@@ -749,8 +749,8 @@ describe('Multiple join paths', () => {
       expect(sql).not.toMatch(/ON 'A' = 'B'/);
     });
 
-    // Following the C->B hint would make C the parent of B while B is the parent of C. That parent
-    // chain used to loop until `Array.push` threw `RangeError: Invalid array length`
+    // Following the C->B hint would make C the parent of B while B is the parent of C, so that
+    // parent chain would never reach the root
     it('should keep the earlier edge when the later hint closes a cycle', async () => {
       const sql = buildSql(['BackC.id', 'BackCB_view.BackB_id']);
 
