@@ -575,7 +575,8 @@ Scan the stream for this frame rather than checking only the last line — the
 `__usage__` frame still follows it.
 
 To continue the turn, resend the **same** request — the same `chatId`, `input`
-and `messageId`. The run picks up where it stopped instead of starting over:
+and `messageId`. If the original request had no `chatId`, add the one returned
+as `state.chatId` on its `__cutoff__` frame. The run picks up where it stopped instead of starting over:
 the response replays the thread and then streams the rest of the turn. `input`
 may be omitted — `chatId` plus the suspended `messageId` is enough. Sending a
 different message instead ends the suspended turn, and the new run builds on
@@ -605,13 +606,16 @@ async function streamChat(body) {
   for await (const line of readLines(response.body)) {
     if (!line) continue;
     const msg = JSON.parse(line);
+    // A new thread's id arrives on __cutoff__; keep it so a resend resumes that thread
+    if (msg.id === "__cutoff__" && msg.state?.chatId) body.chatId = msg.state.chatId;
     if (msg.id === "__suspended__") suspended = msg;
-    // ...handle other messages
+    // ...handle other messages. A resumed response replays the thread first,
+    // so dedupe by `id` before rendering
   }
   return suspended;
 }
 
-const body = { chatId, input: "What is our revenue last month?", messageId: `${Date.now()}-message`, sessionSettings };
+const body = { input: "What is our revenue last month?", messageId: `${Date.now()}-message`, sessionSettings };
 // Resend the same body until the turn completes (a few attempts at most)
 let attempts = 0;
 while ((await streamChat(body)) && ++attempts < 3) {}

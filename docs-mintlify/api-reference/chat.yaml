@@ -101,7 +101,8 @@ paths:
         `{ "id": "__suspended__", "type": "suspend", "code": "chat_suspended", "retryable": true,
         "messageId": "<id>", "error": "<message>" }` before it closes. The content received so far
         is partial. Resend the same request — the same `chatId`, `input` and `messageId` — and the
-        run continues from where it stopped; the response replays the thread and then streams the
+        run continues from where it stopped (if the original request had no `chatId`, add the one
+        returned as `state.chatId` on its `__cutoff__` frame); the response replays the thread and then streams the
         rest of the turn. `input` may be omitted: `chatId` plus the suspended `messageId` resumes it
         too. A read of the thread (no `input`, no `messageId`) reports a pending suspension as
         `state.suspended.messageId` on `__cutoff__`. A request for a different message ends the
