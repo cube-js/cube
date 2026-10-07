@@ -165,7 +165,7 @@ export class BaseQuery {
         allFilters = allFilters.concat(this.extractDimensionsAndMeasures(f.or));
       } else if (!f.member && !f.dimension) {
         throw new UserError(`member attribute is required for filter ${JSON.stringify(f)}`);
-      } else if (this.cubeEvaluator.isMeasure(f.member || f.dimension)) {
+      } else if (this.isMeasurePath(f.member || f.dimension)) {
         allFilters.push({ measure: f.member || f.dimension });
       } else {
         allFilters.push({ dimension: f.member || f.dimension });
@@ -232,7 +232,7 @@ export class BaseQuery {
         throw new UserError(`member attribute is required for filter ${JSON.stringify(f)}`);
       }
 
-      if (this.cubeEvaluator.isMeasure(f.member || f.dimension)) {
+      if (this.isMeasurePath(f.member || f.dimension)) {
         return Object.assign({}, f, {
           dimension: null,
           measure: f.member || f.dimension
@@ -624,13 +624,36 @@ export class BaseQuery {
 
   get aliasNameToMember() {
     return R.fromPairs(
-      this.measures.map(m => [m.unescapedAliasName(), m.measure]).concat(
-        this.dimensions.map(m => [m.unescapedAliasName(), m.dimension])
+      this.measures.map(m => [m.unescapedAliasName(), m.memberPath()]).concat(
+        this.dimensions.map(m => [m.unescapedAliasName(), m.memberPath()])
       ).concat(
         this.timeDimensions.filter(m => !!m.granularity)
-          .map(m => [m.unescapedAliasName(), `${m.dimension}.${m.granularity}`])
+          .map(m => [m.unescapedAliasName(), `${m.memberPath()}.${m.granularity}`])
       )
     );
+  }
+
+  /**
+   * Splits a member path into the data-model member and the join hint to it.
+   * Through a join alias the model knows the member by its target path, and the
+   * path itself names the member's output.
+   * @param {string} path
+   * @returns {{ path: string, joinHint: string[], aliasPath?: string }}
+   */
+  memberPathForModel(path) {
+    const resolved = this.cubeEvaluator.resolveMemberPath(path);
+    if (resolved?.aliased) {
+      this.ensureNativePlannerForJoinAliases(path);
+    }
+    if (resolved?.aliased && !resolved.granularity) {
+      return { path: resolved.targetPath, joinHint: [], aliasPath: resolved.fullPath };
+    }
+    return CubeSymbols.joinHintFromPath(path);
+  }
+
+  isMeasurePath(path) {
+    const resolved = this.cubeEvaluator.resolveMemberPath(path);
+    return this.cubeEvaluator.isMeasure(resolved?.targetPath ?? path);
   }
 
   initUngrouped() {
@@ -2930,10 +2953,14 @@ export class BaseQuery {
    * @param {boolean} excludeTimeDimensions
    * @param {(t: () => void) => T} fn
    * @param {string | Array<string>} methodName
+   * @param {(member: unknown) => boolean} [memberFilter]
    * @returns {T}
    */
-  collectFromMembers(excludeTimeDimensions, fn, methodName) {
-    const membersToCollectFrom = this.allMembersConcat(excludeTimeDimensions)
+  collectFromMembers(excludeTimeDimensions, fn, methodName, memberFilter) {
+    const members = this.allMembersConcat(excludeTimeDimensions);
+    const membersToCollectFrom = (memberFilter ?
+      [{ getMembers: () => R.flatten(members.map(m => m.getMembers())).filter(memberFilter) }] :
+      members)
       .concat(this.join ? this.join.joins.map(j => ({
         getMembers: () => [{
           path: () => null,
@@ -3380,6 +3407,19 @@ export class BaseQuery {
   }
 
   pushMemberNameForCollectionIfNecessary(cubeName, name) {
+    // A member of a cube instance: the planner joins the instance itself, so
+    // only the cube it instantiates is collected, and the member under its path
+    const instance = this.safeEvaluateSymbolContext().memberInstance;
+    if (instance) {
+      this.pushCubeNameForCollectionIfNecessary(cubeName);
+      const context = this.safeEvaluateSymbolContext();
+      if (context.memberNames && name) {
+        context.memberNames.push(context.instanceMemberNames ?
+          this.instanceMemberName(instance, cubeName, name) :
+          this.cubeEvaluator.pathFromArray([cubeName, name]));
+      }
+      return;
+    }
     const pathFromArray = this.cubeEvaluator.pathFromArray([cubeName, name]);
     if (!this.cubeEvaluator.getCubeDefinition(cubeName).isView) {
       const joinHints = this.cubeEvaluator.joinHints();
@@ -3402,6 +3442,14 @@ export class BaseQuery {
   }
 
   evaluateSymbolSql(cubeName, name, symbol, memberExpressionType, subPropertyName) {
+    const aliasPath = this.cubeEvaluator.joinAliasPath();
+    if (aliasPath && this.safeEvaluateSymbolContext().memberInstanceAliasPath !== aliasPath) {
+      this.ensureNativePlannerForJoinAliases([...aliasPath, name].join('.'));
+      return this.evaluateSymbolSqlWithContext(
+        () => this.evaluateSymbolSql(cubeName, name, symbol, memberExpressionType, subPropertyName),
+        { memberInstance: this.aliasedMemberInstance(aliasPath, cubeName), memberInstanceAliasPath: aliasPath }
+      );
+    }
     const isMemberExpr = !!memberExpressionType;
     if (!memberExpressionType) {
       this.pushMemberNameForCollectionIfNecessary(cubeName, name);
@@ -3860,8 +3908,75 @@ export class BaseQuery {
     return R.uniq(context.memberNames);
   }
 
+  /**
+   * Only the Tesseract planner joins cube instances reached through a join alias.
+   */
+  ensureNativePlannerForJoinAliases(path) {
+    if (!(this.options.useNativeSqlPlanner ?? getEnv('nativeSqlPlanner'))) {
+      throw new UserError(`'${path}' goes through a join alias, and join aliases require the Tesseract SQL planner`);
+    }
+  }
+
+  /**
+   * Names of the members the query reads. A member of a cube instance is named
+   * by its path through the join alias, so policies can tell instances apart.
+   */
   collectAllMemberNames() {
-    return R.flatten(this.collectFromMembers(false, this.collectMemberNamesFor.bind(this), 'collectAllMemberNames'));
+    return this.evaluateSymbolSqlWithContext(() => this.collectAllMemberNamesInContext(), { instanceMemberNames: true });
+  }
+
+  collectAllMemberNamesInContext() {
+    const leaves = R.flatten(this.allMembersConcat(false).map(m => m.getMembers()));
+    const aliased = leaves.filter(m => m.aliasPath);
+    const names = aliased.length ?
+      R.flatten(this.collectFromMembers(false, this.collectMemberNamesFor.bind(this), 'collectAllMemberNames', m => !m.aliasPath)) :
+      R.flatten(this.collectFromMembers(false, this.collectMemberNamesFor.bind(this), 'collectAllMemberNames'));
+    return R.uniq(names.concat(aliased.flatMap(member => {
+      const resolved = this.cubeEvaluator.resolveMemberPath(member.aliasPath);
+      return this.evaluateSymbolSqlWithContext(
+        () => R.flatten(this.collectFrom(
+          [member],
+          this.collectMemberNamesFor.bind(this),
+          ['collectAllMemberNames', member.aliasPath]
+        )),
+        { memberInstance: { path: resolved.instancePath, cube: resolved.targetCube } }
+      );
+    })));
+  }
+
+  /**
+   * The name of a member read inside the cube instance `instance`: the
+   * instance's own cube and the cubes that cube joins directly belong to it.
+   */
+  instanceMemberName(instance, cubeName, name) {
+    if (cubeName === instance.cube) {
+      return `${instance.path}.${name}`;
+    }
+    const joins = this.cubeEvaluator.cubeFromPath(instance.cube).joins || [];
+    if (joins.some(j => (j.alias ?? j.name) === cubeName)) {
+      return `${instance.path}.${cubeName}.${name}`;
+    }
+    return this.cubeEvaluator.pathFromArray([cubeName, name]);
+  }
+
+  /**
+   * The cube instance a reference through a join alias reaches, from inside
+   * the instance being evaluated, if any.
+   */
+  aliasedMemberInstance(aliasPath, cubeName) {
+    const outer = this.safeEvaluateSymbolContext().memberInstance;
+    if (!outer) {
+      return { path: aliasPath.join('.'), cube: cubeName };
+    }
+    if (aliasPath[0] === outer.cube) {
+      return { path: [outer.path, ...aliasPath.slice(1)].join('.'), cube: cubeName };
+    }
+    const joins = this.cubeEvaluator.cubeFromPath(outer.cube).joins || [];
+    const joinedDirectly = joins.some(j => (j.alias ?? j.name) === aliasPath[0]);
+    return {
+      path: (joinedDirectly ? [outer.path, ...aliasPath] : aliasPath).join('.'),
+      cube: cubeName,
+    };
   }
 
   collectMultipliedMeasures(context) {
@@ -5677,6 +5792,9 @@ export class BaseQuery {
             memberChildren: undefined,
             inlineWhereConditions: undefined,
             collectOriginalSqlPreAggregations: undefined,
+            instanceMemberNames: undefined,
+            memberInstance: undefined,
+            memberInstanceAliasPath: undefined,
           }
         );
         const memberPath = member.expressionPath();

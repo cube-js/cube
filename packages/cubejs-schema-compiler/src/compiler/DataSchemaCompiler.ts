@@ -934,6 +934,11 @@ export class DataSchemaCompiler {
   }
 
   private prepareTranspileSymbols() {
+    const joinAliases = (symbols: Record<string, any>): string[] => {
+      const joins = symbols.cubeObj?.()?.joins;
+      return Array.isArray(joins) ? joins.map(join => join.alias).filter(Boolean) : [];
+    };
+
     const cubeNames: string[] = this.cubeDictionary.cubeNames();
     // We need only cubes and all its member names for transpiling.
     // Cubes doesn't change during transpiling, but are changed during compilation phase,
@@ -947,9 +952,11 @@ export class DataSchemaCompiler {
         ...Object.entries(this.cubeAndViewSymbols.symbols as Record<string, Record<string, any>>)
       ]
         .map(
-          ([key, value]: [string, Record<string, any>]) => [key, Object.fromEntries(
-            Object.keys(value).map((k) => [k, true]),
-          )],
+          ([key, value]: [string, Record<string, any>]) => [key, Object.fromEntries([
+            ...Object.keys(value).map((k) => [k, true]),
+            // A join alias is a name in the cube's own scope, like its members
+            ...joinAliases(value).map((alias) => [alias, true]),
+          ])],
         ),
     );
 

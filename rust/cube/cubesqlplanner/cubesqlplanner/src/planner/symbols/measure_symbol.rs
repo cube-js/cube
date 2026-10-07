@@ -528,15 +528,19 @@ impl SymbolFactory for MeasureSymbolFactory {
 
         let cube = cube_evaluator.cube_from_path(path.cube_id().target().to_string())?;
         let is_view = cube.static_data().is_view.unwrap_or(false);
-        let alias = compiler
-            .alias_for_member(&path.full_name())
-            .unwrap_or_else(|| {
-                PlanSqlTemplates::member_alias_name(
-                    cube.static_data().resolved_alias(),
-                    path.symbol_name(),
-                    &None,
-                )
-            });
+        let alias = match compiler.alias_for_member(&path.full_name()) {
+            Some(alias) => alias,
+            None if path.cube_id().is_joined() => PlanSqlTemplates::member_alias_name(
+                &compiler.model_cubes().alias_base(path.cube_id())?,
+                path.symbol_name(),
+                &None,
+            ),
+            None => PlanSqlTemplates::member_alias_name(
+                cube.static_data().resolved_alias(),
+                path.symbol_name(),
+                &None,
+            ),
+        };
 
         // A member re-exported from the view's `includes` is a `Ref`. Its mask may
         // reference members the view does not re-export, so it compiles against
@@ -601,7 +605,8 @@ impl SymbolFactory for MeasureSymbolFactory {
                 };
                 let name = shift_ref.name.clone();
                 if let Some(time_dimension) = &shift_ref.time_dimension {
-                    let dimension = compiler.add_dimension_evaluator(time_dimension.clone())?;
+                    let dimension = compiler
+                        .add_dimension_evaluator_for(path.cube_id(), time_dimension.clone())?;
                     let dimension = find_owned_by_cube_child(&dimension)?;
                     if let Some(exists) = shifts.get(dimension.id()) {
                         if exists.interval != interval || exists.name != name {

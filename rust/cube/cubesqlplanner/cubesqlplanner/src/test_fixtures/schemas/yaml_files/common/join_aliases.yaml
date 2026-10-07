@@ -1,0 +1,206 @@
+cubes:
+  - name: orders
+    sql_table: orders
+    joins:
+      - name: users
+        alias: customer
+        sql: "{CUBE}.customer_id = {users}.id"
+        relationship: many_to_one
+      - name: users
+        alias: manager
+        sql: "{CUBE}.manager_id = {manager}.id"
+        relationship: many_to_one
+      - name: products
+        sql: "{CUBE}.product_id = {products}.id"
+        relationship: many_to_one
+      - name: retail_calendar
+        alias: calendar_created
+        sql: "{CUBE.created_at} = {calendar_created.date_val}"
+        relationship: many_to_one
+      - name: retail_calendar
+        alias: calendar_completed
+        sql: "{CUBE.completed_at} = {retail_calendar.date_val}"
+        relationship: many_to_one
+    dimensions:
+      - name: id
+        type: number
+        sql: id
+        primary_key: true
+      - name: status
+        type: string
+        sql: status
+      - name: created_at
+        type: time
+        sql: created_at
+      - name: completed_at
+        type: time
+        sql: completed_at
+      - name: customer_city
+        type: string
+        sql: "{customer.city}"
+    measures:
+      - name: count
+        type: count
+      - name: total_amount
+        type: sum
+        sql: amount
+      - name: count_prev_year
+        type: number
+        multi_stage: true
+        sql: "{count}"
+        time_shift:
+          - interval: 1 year
+            type: prior
+
+  - name: invoices
+    sql_table: invoices
+    joins:
+      - name: users
+        alias: payer
+        sql: "{CUBE}.payer_id = {users}.id"
+        relationship: many_to_one
+    dimensions:
+      - name: id
+        type: number
+        sql: id
+        primary_key: true
+    measures:
+      - name: count
+        type: count
+
+  - name: users
+    sql_table: users
+    joins:
+      - name: departments
+        sql: "{CUBE}.department_id = {departments}.id"
+        relationship: many_to_one
+      - name: reviews
+        sql: "{CUBE}.id = {reviews}.user_id"
+        relationship: one_to_many
+    dimensions:
+      - name: id
+        type: number
+        sql: id
+        primary_key: true
+      - name: city
+        type: string
+        sql: city
+      - name: department_name
+        type: string
+        sql: "{departments.name}"
+      - name: review_count
+        type: number
+        sql: "{reviews.count}"
+        sub_query: true
+    segments:
+      - name: berliners
+        sql: "{CUBE}.city = 'Berlin'"
+    measures:
+      - name: count
+        type: count
+      - name: total_score
+        type: sum
+        sql: score
+      - name: berlin_score
+        type: sum
+        sql: "{CUBE.total_score}"
+        multi_stage: true
+        filter:
+          include:
+            - member: users.city
+              operator: equals
+              values:
+                - Berlin
+    pre_aggregations:
+      - name: by_city
+        measures:
+          - count
+        dimensions:
+          - city
+
+  - name: reviews
+    sql_table: reviews
+    dimensions:
+      - name: id
+        type: number
+        sql: id
+        primary_key: true
+    measures:
+      - name: count
+        type: count
+
+  - name: products
+    sql_table: products
+    dimensions:
+      - name: id
+        type: number
+        sql: id
+        primary_key: true
+      - name: name
+        type: string
+        sql: name
+
+  - name: departments
+    sql_table: departments
+    dimensions:
+      - name: id
+        type: number
+        sql: id
+        primary_key: true
+      - name: name
+        type: string
+        sql: name
+
+  - name: employees
+    sql_table: employees
+    joins:
+      - name: employees
+        alias: supervisor
+        sql: "{CUBE}.supervisor_id = {supervisor}.id"
+        relationship: many_to_one
+    dimensions:
+      - name: id
+        type: number
+        sql: id
+        primary_key: true
+      - name: name
+        type: string
+        sql: name
+    measures:
+      - name: count
+        type: count
+
+  - name: retail_calendar
+    calendar: true
+    sql: >
+      SELECT d::timestamp AS date_val,
+             (d - interval '1 year')::timestamp AS date_prev_year
+      FROM generate_series(DATE '2023-01-01', DATE '2026-12-31', interval '1 day') AS d
+    dimensions:
+      - name: date_val
+        type: time
+        sql: "{CUBE}.date_val"
+        primary_key: true
+        time_shift:
+          - interval: 1 year
+            type: prior
+            sql: "{CUBE}.date_prev_year"
+      - name: retail_date
+        type: time
+        sql: "{CUBE}.date_val"
+        time_shift:
+          - interval: 1 year
+            type: prior
+            sql: "{CUBE}.date_prev_year"
+
+views:
+  - name: orders_view
+    cubes:
+      - join_path: orders
+        includes:
+          - status
+          - count
+      - join_path: orders.customer
+        prefix: true
+        includes:
+          - city

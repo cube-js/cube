@@ -390,17 +390,15 @@ pub fn get_members(
         members_map.insert(member_name.clone(), column.clone());
         members_arr.push(member_name.clone());
 
-        let path = member_name.split(MEMBER_SEPARATOR).collect::<Vec<&str>>();
-        let calc_member = format!("{}{}{}", path[0], MEMBER_SEPARATOR, path[1]);
-
-        if path.len() == 3
-            && query.dimensions.as_ref().is_none_or(|dims| {
+        let split = split_granularity(member_name, query);
+        if let Some((base_member, granularity)) = split.filter(|(base_member, _)| {
+            query.dimensions.as_ref().is_none_or(|dims| {
                 !dims
                     .iter()
-                    .any(|dim| *dim == MemberOrMemberExpression::Member(calc_member.clone()))
+                    .any(|dim| *dim == MemberOrMemberExpression::Member(base_member.to_string()))
             })
-        {
-            let granularity = path[2];
+        }) {
+            let calc_member = base_member.to_string();
             // For cases when the same dimension with few different granularities is present
             //We should not duplicate the dimension without granularity
             let level = GRANULARITY_LEVELS
@@ -674,23 +672,46 @@ pub fn build_vanilla_plan<'a>(
     })
 }
 
+/// Splits a time dimension member requested with a granularity, as the query's
+/// time dimensions name it: a path through joins is longer without being one.
+/// A query without time dimensions falls back to `{cube}.{dim}.{granularity}`.
+fn split_granularity<'a>(
+    member_name: &'a str,
+    query: &NormalizedQuery,
+) -> Option<(&'a str, &'a str)> {
+    if let Some(time_dimensions) = &query.time_dimensions {
+        return time_dimensions.iter().find_map(|td| {
+            let granularity = td.granularity.as_deref()?;
+            let base_member = member_name
+                .strip_suffix(granularity)?
+                .strip_suffix(MEMBER_SEPARATOR)?;
+            (base_member == td.dimension).then(|| {
+                (
+                    base_member,
+                    &member_name[base_member.len() + MEMBER_SEPARATOR.len()..],
+                )
+            })
+        });
+    }
+    let mut indices = member_name.match_indices(MEMBER_SEPARATOR);
+    indices.next()?;
+    let second = indices.next()?.0;
+    if indices.next().is_some() {
+        return None;
+    }
+    Some((
+        &member_name[..second],
+        &member_name[second + MEMBER_SEPARATOR.len()..],
+    ))
+}
+
 // FIXME: For now custom granularities are not supported, only common ones.
 // There is no granularity type/class implementation in rust yet.
 fn compute_vanilla_granularity_track<'a>(
     member_name: &'a str,
     query: &NormalizedQuery,
 ) -> Option<VanillaGranularityTrack<'a>> {
-    // Require exactly two `.` separators — i.e. the `{cube}.{dim}.{granularity}` form.
-    let mut indices = member_name.match_indices(MEMBER_SEPARATOR);
-    indices.next()?;
-
-    let second = indices.next()?.0;
-    if indices.next().is_some() {
-        return None;
-    }
-
-    let base_member = &member_name[..second];
-    let granularity = &member_name[second + MEMBER_SEPARATOR.len()..];
+    let (base_member, granularity) = split_granularity(member_name, query)?;
 
     // Check that a member without granularity is absent in the query
     let already_requested = query.dimensions.as_ref().is_some_and(|dims| {
@@ -3651,6 +3672,39 @@ mod tests {
         let track = compute_vanilla_granularity_track("Cube.orderDate.day", &q)
             .expect("should produce a track");
         assert_eq!(track.base_member, "Cube.orderDate");
+    }
+
+    fn make_query_with_time_dimensions(
+        time_dimensions: Vec<(&str, Option<&str>)>,
+    ) -> NormalizedQuery {
+        let mut q = make_query_with_dims(None);
+        q.time_dimensions = Some(
+            time_dimensions
+                .into_iter()
+                .map(|(dimension, granularity)| QueryTimeDimension {
+                    dimension: dimension.to_string(),
+                    date_range: None,
+                    compare_date_range: None,
+                    granularity: granularity.map(|g| g.to_string()),
+                })
+                .collect(),
+        );
+        q
+    }
+
+    #[test]
+    fn test_compute_vanilla_granularity_track_follows_query_time_dimensions() {
+        let q = make_query_with_time_dimensions(vec![(
+            "orders.calendar_created.date_val",
+            Some("day"),
+        )]);
+        let track = compute_vanilla_granularity_track("orders.calendar_created.date_val.day", &q)
+            .expect("should produce a track");
+        assert_eq!(track.base_member, "orders.calendar_created.date_val");
+        assert_eq!(track.level, 4);
+
+        // A member path through joins is not a time dimension with a granularity
+        assert!(compute_vanilla_granularity_track("orders.customer.city", &q).is_none());
     }
 
     fn make_config_item(member_type: &str) -> ConfigItem {

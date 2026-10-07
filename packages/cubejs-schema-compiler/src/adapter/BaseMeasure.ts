@@ -1,7 +1,6 @@
 import { UserError } from '../compiler/UserError';
 import type { BaseQuery } from './BaseQuery';
 import { MeasureDefinition } from '../compiler/CubeEvaluator';
-import { CubeSymbols } from '../compiler/CubeSymbols';
 
 export class BaseMeasure {
   public readonly expression: any;
@@ -15,6 +14,9 @@ export class BaseMeasure {
   protected readonly patchedMeasure: MeasureDefinition | null = null;
 
   public readonly joinHint: Array<string> = [];
+
+  // The path the member was requested by, when it goes through a join alias
+  public readonly aliasPath: string | undefined;
 
   protected preparePatchedMeasure(sourceMeasure: string, newMeasureType: string | null, addFilters: Array<{ sql: Function }>): MeasureDefinition {
     const source = this.query.cubeEvaluator.measureByPath(sourceMeasure);
@@ -145,9 +147,10 @@ export class BaseMeasure {
     } else {
       // TODO move this `as` to static types
       const measurePath = measure as string;
-      const { path, joinHint } = CubeSymbols.joinHintFromPath(measurePath);
+      const { path, joinHint, aliasPath } = this.query.memberPathForModel(measurePath);
       this.measure = path;
       this.joinHint = joinHint;
+      this.aliasPath = aliasPath;
     }
   }
 
@@ -230,7 +233,14 @@ export class BaseMeasure {
     if (this.expression) {
       return this.query.aliasName(this.expressionName);
     }
-    return this.query.aliasName(this.measure);
+    return this.query.aliasName(this.memberPath());
+  }
+
+  /**
+   * The path naming the member in the query and its output.
+   */
+  public memberPath(): string {
+    return this.aliasPath ?? this.measure;
   }
 
   public isCumulative(): boolean {
