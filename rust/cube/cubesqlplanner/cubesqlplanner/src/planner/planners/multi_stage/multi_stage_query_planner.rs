@@ -876,6 +876,17 @@ impl MultiStageQueryPlanner {
     ) -> Result<Option<Rc<MultiStageQueryDescription>>, CubeError> {
         if let Ok(measure) = member.as_measure() {
             if measure.is_cumulative() {
+                // A rollup stores a rolling measure without its window and queries
+                // apply the window over it, so it is built unrolled.
+                if measure.is_multi_stage() && self.query_properties.is_pre_aggregation_query() {
+                    return Ok(Some(self.make_queries_descriptions(
+                        MemberSymbol::new_measure(transforms::strip_rolling_window(&measure)),
+                        state,
+                        descriptions,
+                        resolved_multi_stage_dimensions,
+                        scope,
+                    )?));
+                }
                 let rolling_window = if let Some(rolling_window) = measure.rolling_window() {
                     rolling_window.clone()
                 } else {

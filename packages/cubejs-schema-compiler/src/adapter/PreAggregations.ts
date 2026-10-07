@@ -98,6 +98,8 @@ export type TransformedQuery = any;
 
 export type UsageDateRangeInfo = {
   dateRange?: [string, string];
+  // No partition can be ruled out for the usage, e.g. an unbounded rolling window.
+  unbounded?: boolean;
 };
 
 export type PreAggregationUsageInfo = {
@@ -200,12 +202,20 @@ export class PreAggregations {
       // Compute the union of all usage date ranges so that partitions cover
       // every usage (e.g. time_shift may require earlier partitions).
       const mergedDateRange = PreAggregations.mergeUsageDateRanges(usageInfo.usages);
+      // A usage without a range has no filter on the partition dimension, so it
+      // may read any partition, as lambdaSourceDateRange() also assumes.
+      const unbounded = Object.values(usageInfo.usages).some(usage => usage.unbounded || !usage.dateRange);
 
-      return descriptions.map(desc => ({
-        ...desc,
-        usageMapping: usageInfo.usages,
-        ...(mergedDateRange && desc.matchedTimeDimensionDateRange ? { matchedTimeDimensionDateRange: mergedDateRange } : {}),
-      }));
+      return descriptions.map(desc => {
+        if (unbounded && desc.matchedTimeDimensionDateRange) {
+          return { ...desc, usageMapping: usageInfo.usages, matchedTimeDimensionDateRange: undefined };
+        }
+        return {
+          ...desc,
+          usageMapping: usageInfo.usages,
+          ...(mergedDateRange && desc.matchedTimeDimensionDateRange ? { matchedTimeDimensionDateRange: mergedDateRange } : {}),
+        };
+      });
     });
   }
 

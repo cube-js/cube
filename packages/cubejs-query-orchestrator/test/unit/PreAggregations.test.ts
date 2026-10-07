@@ -1075,7 +1075,11 @@ describe('PreAggregations', () => {
       jest.restoreAllMocks();
     });
 
-    const createLambdaLoader = (sourceDateRange?: [string, string]) => {
+    const createLambdaLoader = (
+      sourceDateRange?: [string, string],
+      usageMapping?: Record<string, any>,
+      preAggregationsTablesToTempTables: any[] = [],
+    ) => {
       const loader = new PreAggregationPartitionRangeLoader(
         {} as any, // driverFactory
         // eslint-disable-next-line @typescript-eslint/no-empty-function
@@ -1088,8 +1092,9 @@ describe('PreAggregations', () => {
           lastRollupLambda: true,
           unionWithSourceData: true,
           matchedTimeDimensionDateRange: sourceDateRange,
+          usageMapping,
         }) as any,
-        [], // preAggregationsTablesToTempTables
+        preAggregationsTablesToTempTables,
         { getTableColumnTypes: jest.fn().mockResolvedValue([{ name: 'ts', type: 'timestamp' }]) } as any,
         {
           lambdaQuery: {
@@ -1137,6 +1142,30 @@ describe('PreAggregations', () => {
       expect(downloadLambdaTable).toHaveBeenCalledWith(buildRangeEnd, [{ name: 'ts', type: 'timestamp' }]);
       expect(result.lambdaTable?.name).toEqual('lambda_stb_pre_aggregations_orders_d');
       expect(result.targetTableName).toMatch(/UNION ALL SELECT \* FROM lambda_stb_pre_aggregations_orders_d/);
+    });
+
+    // A lone usage is keyed by an empty suffix, several by `__usage_N`.
+    test.each(['', '__usage_0'])('a usage keyed %j reads the lambda tail', async (suffix) => {
+      const usageRange: [string, string] = ['2024-01-01T00:00:00.000', '2024-01-05T23:59:59.999'];
+      const { loader } = createLambdaLoader(usageRange, { [suffix]: { dateRange: usageRange } });
+
+      const result: any = await loader.loadPreAggregations();
+
+      expect(result.usageTargetTableNames[suffix]).toMatch(/UNION ALL SELECT \* FROM lambda_stb_pre_aggregations_orders_d/);
+    });
+
+    test('a usage reads nothing from partitions an earlier rollup in the lambda already covers', async () => {
+      const usageRange: [string, string] = ['2024-01-01T00:00:00.000', '2024-01-05T23:59:59.999'];
+      const { loader } = createLambdaLoader(
+        usageRange,
+        { '': { dateRange: usageRange } },
+        [['earlier', { rollupLambdaId: 'Orders.d_lambda', buildRangeEnd: '2024-01-03T00:00:00.000' }]],
+      );
+
+      const result: any = await loader.loadPreAggregations();
+
+      expect(result.usageTargetTableNames['']).toEqual(result.targetTableName);
+      expect(result.targetTableName).toContain('SELECT * FROM stb_pre_aggregations.orders_d20240102_abc_def WHERE 1 = 0');
     });
 
     test('runs the source query when no date range was requested', async () => {

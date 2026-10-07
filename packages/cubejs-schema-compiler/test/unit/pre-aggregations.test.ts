@@ -418,6 +418,14 @@ describe('pre-aggregations', () => {
         expect(range).toBeUndefined();
       });
 
+      it('bounds nothing when a usage is unbounded', async () => {
+        const range = await sourceDateRangeFor(requestedRange, [
+          usageInfo({ usages: { main: { unbounded: true } } }),
+        ]);
+
+        expect(range).toBeUndefined();
+      });
+
       it('bounds nothing when one of several usages has an unknown range', async () => {
         const range = await sourceDateRangeFor(requestedRange, [
           usageInfo({ usages: { main: { dateRange: requestedBounds }, undated: {} } }),

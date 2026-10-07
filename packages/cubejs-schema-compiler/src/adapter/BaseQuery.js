@@ -1080,14 +1080,10 @@ export class BaseQuery {
 
   applyNativePreAggResult(preAggResult) {
     if (!preAggResult) return;
-    if (Array.isArray(preAggResult)) {
-      this.preAggregations.preAggregationUsageInfos = preAggResult;
-      const first = preAggResult[0];
-      this.preAggregations.preAggregationForQuery =
-        this.getPreAggregationByName(first.cubeName, first.preAggregationName);
-    } else {
-      this.preAggregations.preAggregationForQuery = preAggResult;
-    }
+    this.preAggregations.preAggregationUsageInfos = preAggResult;
+    const first = preAggResult[0];
+    this.preAggregations.preAggregationForQuery =
+      this.getPreAggregationByName(first.cubeName, first.preAggregationName);
   }
 
   allCubeMembers(path) {

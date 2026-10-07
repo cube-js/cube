@@ -3,16 +3,17 @@ use super::*;
 use crate::logical_plan::visitor::{LogicalPlanRewriter, NodeRewriteResult};
 use crate::logical_plan::*;
 use crate::planner::collectors::{collect_cube_names_from_symbols, has_multi_stage_members};
+use crate::planner::filter::operators::date_range::DateRangeKind;
 use crate::planner::filter::typed_filter::resolve_base_symbol;
 use crate::planner::filter::FilterItem;
-use crate::planner::filter::FilterOp;
+use crate::planner::filter::{FilterOp, RollingScanBand};
 use crate::planner::join_hints::JoinHints;
 use crate::planner::multi_fact_join_groups::{MeasuresJoinHints, MultiFactJoinGroups};
 use crate::planner::planners::multi_stage::TimeShiftState;
 use crate::planner::planners::CommonUtils;
 use crate::planner::state::State;
 use crate::planner::symbols::MeasureTimeShifts;
-use crate::planner::time_dimension::QueryDateTime;
+use crate::planner::time_dimension::{QueryDateTime, QueryDateTimeHelper};
 use crate::planner::{CubeId, MemberId, MemberSymbol};
 use cubenativeutils::CubeError;
 use std::cell::RefCell;
@@ -23,6 +24,18 @@ pub struct PreAggregationUsage {
     pub index: usize,
     pub pre_aggregation: Rc<PreAggregation>,
     pub date_range: Option<(String, String)>,
+    /// The usage reads a band with no bound to state — e.g. an `unbounded`
+    /// rolling window — so no partition can be ruled out for it.
+    pub unbounded: bool,
+}
+
+/// The dates a matched node reads from its pre-aggregation.
+enum UsageScanRange {
+    /// No time-dimension filter states a range.
+    Unfiltered,
+    Bounded(String, String),
+    /// A rolling window whose band has no bound to state.
+    Unbounded,
 }
 
 impl PreAggregationUsage {
@@ -153,12 +166,17 @@ impl PreAggregationOptimizer {
     ) -> Result<Option<Rc<Query>>, CubeError> {
         for pre_aggregation in compiled_pre_aggregations.iter() {
             let external = pre_aggregation.external.unwrap_or(false);
-            let date_range =
-                Self::extract_date_range(&query.filter(), &self.query_tools, time_shifts, external);
+            let scan_range = Self::extract_scan_range(
+                &query.filter(),
+                pre_aggregation,
+                &self.query_tools,
+                time_shifts,
+                external,
+            );
             if let Some(rewritten) = self.try_rewrite_simple_query(
                 query,
                 pre_aggregation,
-                date_range,
+                scan_range,
                 is_user_query,
                 time_shifts,
             )? {
@@ -173,7 +191,7 @@ impl PreAggregationOptimizer {
         &mut self,
         query: &Rc<Query>,
         pre_aggregation: &Rc<CompiledPreAggregation>,
-        date_range: Option<(String, String)>,
+        scan_range: UsageScanRange,
         is_user_query: bool,
         time_shifts: &TimeShiftState,
     ) -> Result<Option<Rc<Query>>, CubeError> {
@@ -203,7 +221,7 @@ impl PreAggregationOptimizer {
                 return Ok(None);
             }
             let source =
-                self.make_pre_aggregation_source(pre_aggregation, &matched_measures, date_range)?;
+                self.make_pre_aggregation_source(pre_aggregation, &matched_measures, scan_range)?;
             let new_query = Query::builder()
                 .schema(query.schema().clone())
                 .filter(query.filter().clone())
@@ -227,8 +245,9 @@ impl PreAggregationOptimizer {
     ) -> Result<Option<Rc<Query>>, CubeError> {
         for pre_aggregation in compiled_pre_aggregations.iter() {
             let external = pre_aggregation.external.unwrap_or(false);
-            let date_range = Self::extract_date_range(
+            let scan_range = Self::extract_scan_range(
                 filter,
+                pre_aggregation,
                 &self.query_tools,
                 &TimeShiftState::default(),
                 external,
@@ -246,7 +265,7 @@ impl PreAggregationOptimizer {
                 let source = self.make_pre_aggregation_source(
                     pre_aggregation,
                     &matched_measures,
-                    date_range,
+                    scan_range,
                 )?;
                 let new_query = Query::builder()
                     .schema(schema.clone())
@@ -451,7 +470,7 @@ impl PreAggregationOptimizer {
         &mut self,
         pre_aggregation: &Rc<CompiledPreAggregation>,
         matched_measures: &HashSet<MemberId>,
-        date_range: Option<(String, String)>,
+        scan_range: UsageScanRange,
     ) -> Result<Rc<PreAggregation>, CubeError> {
         let usage_index = self.usage_counter;
         self.usage_counter += 1;
@@ -498,10 +517,16 @@ impl PreAggregationOptimizer {
             .build();
         let result = Rc::new(pre_aggregation_node);
 
+        let (date_range, unbounded) = match scan_range {
+            UsageScanRange::Unfiltered => (None, false),
+            UsageScanRange::Bounded(from, to) => (Some((from, to)), false),
+            UsageScanRange::Unbounded => (None, true),
+        };
         self.usages.push(PreAggregationUsage {
             index: usage_index,
             pre_aggregation: result.clone(),
             date_range,
+            unbounded,
         });
 
         Ok(result)
@@ -681,46 +706,122 @@ impl PreAggregationOptimizer {
         Ok(true)
     }
 
-    fn extract_date_range(
+    /// The dates a node reads, taken from its filters on the pre-aggregation's
+    /// partition time dimension.
+    fn extract_scan_range(
         filter: &LogicalFilter,
+        pre_aggregation: &CompiledPreAggregation,
         query_tools: &Rc<State>,
         time_shifts: &TimeShiftState,
         external: bool,
-    ) -> Option<(String, String)> {
+    ) -> UsageScanRange {
         let precision = query_tools
             .base_tools()
             .driver_tools(external)
             .ok()
             .and_then(|dt| dt.timestamp_precision().ok())
             .unwrap_or(3);
-        for item in &filter.time_dimensions_filters {
+        // Partitions are cut on the first time dimension, as in the JS side.
+        let partition_dimension = pre_aggregation.time_dimensions.first().map(|td| {
+            resolve_base_symbol(td)
+                .resolve_reference_chain()
+                .id()
+                .clone()
+        });
+        // Top-level items are ANDed, and a date range on the partition dimension
+        // can come as a plain filter as well as a time-dimension one.
+        let mut unbounded = false;
+        for item in filter
+            .time_dimensions_filters
+            .iter()
+            .chain(filter.dimensions_filters.iter())
+        {
             if let FilterItem::Item(base_filter) = item {
-                if let FilterOp::DateRange(date_range_op) = base_filter.operation() {
-                    if let Ok((from, to)) = date_range_op.formatted_date_range(precision) {
-                        // Apply time shift for this dimension if present.
-                        // SQL renders `column + interval`, so actual data range is `date - interval`.
-                        if let Some(interval) = time_shifts
-                            .get_for_symbol(base_filter.raw_member_evaluator_ref())
-                            .and_then(|s| s.interval.as_ref())
-                        {
-                            let tz = query_tools.timezone();
-                            let neg = -interval.clone();
-                            let shifted_from = QueryDateTime::from_date_str(tz, &from)
-                                .and_then(|dt| dt.add_interval(&neg))
-                                .map(|dt| dt.default_format())
-                                .unwrap_or(from);
-                            let shifted_to = QueryDateTime::from_date_str(tz, &to)
-                                .and_then(|dt| dt.add_interval(&neg))
-                                .map(|dt| dt.default_format())
-                                .unwrap_or(to);
-                            return Some((shifted_from, shifted_to));
-                        }
-                        return Some((from, to));
+                let member = base_filter.member_evaluator();
+                if partition_dimension.as_ref() != Some(member.resolve_reference_chain().id()) {
+                    continue;
+                }
+                let range = match base_filter.operation() {
+                    FilterOp::DateRange(date_range_op)
+                        if matches!(date_range_op.kind, DateRangeKind::InRange) =>
+                    {
+                        date_range_op.formatted_date_range(precision).ok()
                     }
+                    // An excluded range bounds nothing.
+                    FilterOp::DateRange(_) => None,
+                    // A band that can't be worked out leaves the partitions
+                    // unbounded rather than failing the query, unless another
+                    // filter bounds them.
+                    op => match Self::rolling_scan_range(op, query_tools, external, precision) {
+                        Ok(Some(RollingScanBand::Bounded(from, to))) => Some((from, to)),
+                        Ok(Some(RollingScanBand::Unbounded)) | Err(_) => {
+                            unbounded = true;
+                            None
+                        }
+                        Ok(None) => None,
+                    },
+                };
+                if let Some((from, to)) = range {
+                    // Apply time shift for this dimension if present.
+                    // SQL renders `column + interval`, so actual data range is `date - interval`.
+                    if let Some(interval) = time_shifts
+                        .get_for_symbol(base_filter.raw_member_evaluator_ref())
+                        .and_then(|s| s.interval.as_ref())
+                    {
+                        let tz = query_tools.timezone();
+                        let neg = -interval.clone();
+                        let shifted_from = QueryDateTime::from_date_str(tz, &from)
+                            .and_then(|dt| dt.add_interval(&neg))
+                            .map(|dt| dt.default_format())
+                            .unwrap_or(from);
+                        // A month shift clamps the day of month, so either end alone
+                        // can lose the last source day; the later of the two covers both.
+                        let tick = chrono::Duration::milliseconds(1);
+                        let inclusive = QueryDateTime::from_date_str(tz, &to)
+                            .and_then(|dt| dt.add_interval(&neg))
+                            .map(|dt| dt.default_format());
+                        let exclusive = QueryDateTime::from_date_str(tz, &to)
+                            .and_then(|dt| dt.add_duration(tick))
+                            .and_then(|dt| dt.add_interval(&neg))
+                            .and_then(|dt| dt.add_duration(-tick))
+                            .map(|dt| dt.default_format());
+                        let shifted_to = match (inclusive, exclusive) {
+                            (Ok(a), Ok(b)) => std::cmp::max(a, b),
+                            (Ok(a), Err(_)) | (Err(_), Ok(a)) => a,
+                            (Err(_), Err(_)) => to,
+                        };
+                        return UsageScanRange::Bounded(shifted_from, shifted_to);
+                    }
+                    return UsageScanRange::Bounded(from, to);
                 }
             }
         }
-        None
+        if unbounded {
+            UsageScanRange::Unbounded
+        } else {
+            UsageScanRange::Unfiltered
+        }
+    }
+
+    /// A rolling-window filter's band, formatted to the dialect's precision.
+    fn rolling_scan_range(
+        op: &FilterOp,
+        query_tools: &Rc<State>,
+        external: bool,
+        precision: u32,
+    ) -> Result<Option<RollingScanBand>, CubeError> {
+        // The series ends where the usage's own dialect renders it.
+        let templates = query_tools.plan_sql_templates(external)?;
+        let band = op.rolling_scan_band(query_tools.timezone(), |span| {
+            Ok(span.end(&templates)?.clone())
+        })?;
+        Ok(match band {
+            Some(RollingScanBand::Bounded(from, to)) => Some(RollingScanBand::Bounded(
+                QueryDateTimeHelper::format_from_date(&from, precision)?,
+                QueryDateTimeHelper::format_to_date(&to, precision)?,
+            )),
+            other => other,
+        })
     }
 
     fn is_schema_and_filters_match(
