@@ -98,6 +98,8 @@ export type TransformedQuery = any;
 
 export type UsageDateRangeInfo = {
   dateRange?: [string, string];
+  // No partition can be ruled out for the usage, e.g. an unbounded rolling window.
+  unbounded?: boolean;
 };
 
 export type PreAggregationUsageInfo = {
@@ -123,6 +125,10 @@ export class PreAggregations {
   public preAggregationForQuery: PreAggregationForQuery | undefined = undefined;
 
   public preAggregationUsageInfos: PreAggregationUsageInfo[] | undefined = undefined;
+
+  // The dates read by the only pre-aggregation usage Tesseract matched, which a
+  // rolling window or time shift widens past the requested date range.
+  public singleUsageInfo: UsageDateRangeInfo | undefined = undefined;
 
   public constructor(query: BaseQuery, historyQueries, cubeLatticeCache) {
     this.query = query;
@@ -159,7 +165,8 @@ export class PreAggregations {
         return this.preAggregationDescriptionsForUsageInfos(this.preAggregationUsageInfos);
       }
       if (preAggregationForQuery) {
-        return this.preAggregationDescriptionsFor(preAggregationForQuery);
+        return this.preAggregationDescriptionsFor(preAggregationForQuery)
+          .map(desc => this.coverSingleUsage(desc));
       }
     }
     if (
@@ -200,13 +207,46 @@ export class PreAggregations {
       // Compute the union of all usage date ranges so that partitions cover
       // every usage (e.g. time_shift may require earlier partitions).
       const mergedDateRange = PreAggregations.mergeUsageDateRanges(usageInfo.usages);
+      const unbounded = Object.values(usageInfo.usages).some(usage => usage.unbounded);
 
-      return descriptions.map(desc => ({
-        ...desc,
-        usageMapping: usageInfo.usages,
-        ...(mergedDateRange && desc.matchedTimeDimensionDateRange ? { matchedTimeDimensionDateRange: mergedDateRange } : {}),
-      }));
+      return descriptions.map(desc => {
+        if (unbounded && desc.matchedTimeDimensionDateRange) {
+          return { ...desc, usageMapping: usageInfo.usages, matchedTimeDimensionDateRange: undefined };
+        }
+        return {
+          ...desc,
+          usageMapping: usageInfo.usages,
+          ...(mergedDateRange && desc.matchedTimeDimensionDateRange ? { matchedTimeDimensionDateRange: mergedDateRange } : {}),
+        };
+      });
     });
+  }
+
+  /**
+   * Widens the partitions loaded for the only usage to the dates it reads. A
+   * rolling window or time shift reads past the requested date range, and the
+   * partitions of the requested range alone would cut those months off.
+   */
+  private coverSingleUsage(desc: FullPreAggregationDescription): FullPreAggregationDescription {
+    const usage = this.singleUsageInfo;
+    if (!usage || !desc.matchedTimeDimensionDateRange) {
+      return desc;
+    }
+    if (usage.unbounded) {
+      return { ...desc, matchedTimeDimensionDateRange: undefined };
+    }
+    if (!usage.dateRange) {
+      return desc;
+    }
+    const [from, to] = desc.matchedTimeDimensionDateRange;
+    const [usageFrom, usageTo] = usage.dateRange;
+    return {
+      ...desc,
+      matchedTimeDimensionDateRange: [
+        usageFrom < from ? usageFrom : from,
+        usageTo > to ? usageTo : to,
+      ],
+    };
   }
 
   private static mergeUsageDateRanges(usages: Record<string, UsageDateRangeInfo>): [string, string] | null {

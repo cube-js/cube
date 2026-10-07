@@ -8,9 +8,9 @@ import { prepareYamlCompiler } from './PrepareCompiler';
 //
 // A rolling measure with its own SQL is detected as cumulative and leaves
 // the partition range open. The same window written as a multi-stage measure
-// that references the base measure is not, so only the requested month's
-// partition is loaded while the generated SQL reads three months - the
-// rolling sum silently degrades to that single month.
+// that references the base measure is matched at its leaf, whose filter
+// carries the widened band; that band has to reach the partition range, or
+// the rolling sum silently degrades to the requested month alone.
 describe('Multi-stage rolling measures over a partitioned rollup', () => {
   const model = `
 cubes:

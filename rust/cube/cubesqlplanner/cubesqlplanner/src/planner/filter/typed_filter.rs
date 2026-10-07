@@ -17,8 +17,10 @@ use super::operators::nullability::NullabilityOp;
 use super::operators::rolling_window::{RegularRollingWindowOp, RollingWindowOffsetOp};
 use super::operators::to_date_rolling_window::ToDateRollingWindowOp;
 use super::FilterOperator;
+use crate::planner::time_dimension::UNBOUNDED_INTERVAL;
 use crate::planner::GranularityHelper;
 use crate::planner::SeriesSpan;
+use chrono_tz::Tz;
 
 /// Resolves TimeDimension to its base dimension symbol; returns as-is for other kinds.
 pub fn resolve_base_symbol(symbol: &Rc<MemberSymbol>) -> Rc<MemberSymbol> {
@@ -46,6 +48,53 @@ pub enum FilterOp {
     RegularRollingWindow(RegularRollingWindowOp),
     RollingWindowOffset(RollingWindowOffsetOp),
     ToDateRollingWindow(ToDateRollingWindowOp),
+}
+
+/// The dates a rolling-window filter's base scan reads, as far as they are
+/// known while planning.
+#[derive(Clone, Debug, PartialEq)]
+pub enum RollingScanBand {
+    /// The scan reads `[from, to]`.
+    Bounded(String, String),
+    /// The scan reads a band with no bound to state: an `unbounded` frame, or
+    /// a series only known at run time.
+    Unbounded,
+}
+
+impl FilterOp {
+    /// The band a rolling-window filter's base scan reads, wider than the
+    /// period the query reports by the window's frame. `None` for any filter
+    /// that is not a rolling window.
+    ///
+    /// A series' upper bound depends on the shape the dialect renders it in;
+    /// the later of the two ends covers either.
+    pub fn rolling_scan_band(&self, tz: Tz) -> Result<Option<RollingScanBand>, CubeError> {
+        let span_band = |span: &Option<SeriesSpan>| match span {
+            Some(span) => RollingScanBand::Bounded(
+                span.from.clone(),
+                std::cmp::max(&span.to_aligned, &span.to_stepped).clone(),
+            ),
+            None => RollingScanBand::Unbounded,
+        };
+        let is_unbounded =
+            |interval: &Option<String>| interval.as_deref() == Some(UNBOUNDED_INTERVAL);
+        let band = match self {
+            FilterOp::ToDateRollingWindow(op) => span_band(&op.window_range),
+            FilterOp::RegularRollingWindow(op) => {
+                if is_unbounded(&op.trailing) || is_unbounded(&op.leading) {
+                    RollingScanBand::Unbounded
+                } else {
+                    span_band(&op.scan_range)
+                }
+            }
+            FilterOp::RollingWindowOffset(op) => match op.band(tz)? {
+                Some((from, to)) => RollingScanBand::Bounded(from, to),
+                None => RollingScanBand::Unbounded,
+            },
+            _ => return Ok(None),
+        };
+        Ok(Some(band))
+    }
 }
 
 /// Filter bound to a member and decoded into a typed `FilterOp`.

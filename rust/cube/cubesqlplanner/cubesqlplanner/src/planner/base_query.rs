@@ -19,6 +19,21 @@ use std::rc::Rc;
 struct UsageDateRange {
     #[serde(skip_serializing_if = "Option::is_none")]
     date_range: Option<Vec<String>>,
+    /// No partition can be ruled out for the usage.
+    #[serde(skip_serializing_if = "std::ops::Not::not")]
+    unbounded: bool,
+}
+
+impl UsageDateRange {
+    fn from_usage(usage: &PreAggregationUsage) -> Self {
+        Self {
+            date_range: usage
+                .date_range
+                .as_ref()
+                .map(|(from, to)| vec![from.clone(), to.clone()]),
+            unbounded: usage.unbounded,
+        }
+    }
 }
 
 #[derive(Serialize)]
@@ -119,6 +134,13 @@ impl<IT: InnerTypes> BaseQuery<IT> {
                     .unwrap()
                     .to_native(self.context.clone())?,
             )?;
+            // The dates the usage reads, which a rolling window or time shift
+            // widens past the period the query reports. The partitions loaded
+            // for it have to cover them.
+            res.set(
+                3,
+                UsageDateRange::from_usage(usage).to_native(self.context.clone())?,
+            )?;
         }
 
         let result = NativeObjectHandle::new(res.into_object());
@@ -145,15 +167,9 @@ impl<IT: InnerTypes> BaseQuery<IT> {
                     usages: HashMap::new(),
                 });
 
-            group.usages.insert(
-                suffix,
-                UsageDateRange {
-                    date_range: usage
-                        .date_range
-                        .as_ref()
-                        .map(|(from, to)| vec![from.clone(), to.clone()]),
-                },
-            );
+            group
+                .usages
+                .insert(suffix, UsageDateRange::from_usage(usage));
         }
 
         let mut result: Vec<_> = groups.into_values().collect();

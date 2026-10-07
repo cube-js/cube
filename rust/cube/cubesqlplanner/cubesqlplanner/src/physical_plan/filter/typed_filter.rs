@@ -3,18 +3,14 @@ use super::ToSql;
 use crate::cube_bridge::member_sql::FilterParamsColumn;
 use crate::physical_plan::sql_nodes::SqlNode;
 use crate::physical_plan::SqlEvaluatorVisitor;
-use crate::planner::filter::operators::rolling_window::{
-    RegularRollingWindowOp, RollingWindowOffsetOp,
-};
+use crate::planner::filter::operators::rolling_window::RegularRollingWindowOp;
 use crate::planner::filter::operators::to_date_rolling_window::ToDateRollingWindowOp;
 use crate::planner::filter::typed_filter::{resolve_base_symbol, FilterOp, TypedFilter};
 use crate::planner::query_tools::QueryTools;
 use crate::planner::sql_call::SqlCallFilterParamsItem;
 use crate::planner::sql_templates::PlanSqlTemplates;
-use crate::planner::time_dimension::{shift_bound_wall_clock, SeriesSpan, UNBOUNDED_INTERVAL};
+use crate::planner::time_dimension::{SeriesSpan, UNBOUNDED_INTERVAL};
 use crate::planner::FiltersContext;
-use crate::planner::QueryDateTimeHelper;
-use crate::planner::QueryTimeSeries;
 use crate::planner::SqlInterval;
 use chrono_tz::Tz;
 use cubenativeutils::CubeError;
@@ -263,28 +259,7 @@ impl TypedFilter {
             // Without a granularity the window is anchored by one end of the
             // date range rather than by a series, and both its bounds are that
             // anchor shifted by the frame.
-            FilterOp::RollingWindowOffset(RollingWindowOffsetOp {
-                from,
-                to,
-                trailing,
-                leading,
-                offset,
-            }) => {
-                let precision = QueryTimeSeries::MILLISECOND_PRECISION;
-                let anchor = if offset == "start" {
-                    from.as_deref()
-                        .map(|v| QueryDateTimeHelper::format_from_date(v, precision))
-                } else {
-                    to.as_deref()
-                        .map(|v| QueryDateTimeHelper::format_to_date(v, precision))
-                };
-                let Some(anchor) = anchor.transpose()? else {
-                    return Ok(None);
-                };
-                let lower = shift_bound_wall_clock(tz, &anchor, trailing, true)?;
-                let upper = shift_bound_wall_clock(tz, &anchor, leading, false)?;
-                Ok(lower.zip(upper))
-            }
+            FilterOp::RollingWindowOffset(op) => op.band(tz),
             _ => Ok(None),
         }
     }
@@ -315,6 +290,7 @@ fn dispatch_to_sql(op: &FilterOp, ctx: &FilterSqlContext) -> Result<String, Cube
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::planner::time_dimension::shift_bound_wall_clock;
 
     fn shifted(date: &str, interval: &str, subtract: bool) -> String {
         shift_bound_wall_clock(
