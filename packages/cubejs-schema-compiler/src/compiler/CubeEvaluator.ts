@@ -211,7 +211,9 @@ const INTERNED_CUBE_COLLECTIONS = ['measures', 'dimensions', 'segments', 'hierar
 // Deliberately broad: any date-filter value that isn't an absolute date is
 // treated as relative, so a form Tesseract learns later is still recompiled.
 const DATE_OPERATORS = ['inDateRange', 'notInDateRange', 'beforeDate', 'beforeOrOnDate', 'afterDate', 'afterOrOnDate', 'onTheDate'];
-const ABSOLUTE_DATE = /^\d{4}-\d{2}-\d{2}([T ]\d{2}:\d{2}(:\d{2}(\.\d+)?)?(Z|[+-]\d{2}(:?\d{2})?)?)?$/;
+// The forms Tesseract parses: a date, or a date and time with seconds and an
+// optional `Z` / `±HH:MM` offset.
+const ABSOLUTE_DATE = /^\d{4}-\d{2}-\d{2}([T ]\d{2}:\d{2}:\d{2}(\.\d+)?(Z|[+-]\d{2}:\d{2})?)?$/;
 
 const hasRelativeDateValue = (item: any): boolean => {
   if (!item) {

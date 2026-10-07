@@ -184,6 +184,16 @@ ${rollup ? `    pre_aggregations:
       expect(await evaluate(['visitors_fi.amount_r3_on_positive'])).toEqual([{ vfi__amount_r3_on_positive: '1400' }]);
     });
 
+    it('a time without seconds is an error', async () => {
+      await expect(evaluate(['visitors_fi.amount_r3_on'], { range: '["2017-01-07T00:00", "2017-01-07T23:59"]' }))
+        .rejects.toThrow("Can't parse date '2017-01-07T00:00'");
+    });
+
+    it('a time with seconds and an offset is a date', async () => {
+      expect(await evaluate(['visitors_fi.amount_r3_on'], { range: '["2017-01-07T00:00:00Z", "2017-01-07T23:59:59+00:00"]' }))
+        .toEqual([{ vfi__amount_r3_on: '1400' }]);
+    });
+
     it('a relative value it cannot resolve is an error', async () => {
       await expect(evaluate(['visitors_fi.amount_r3_on'], { range: '[2 weeks ago]' }))
         .rejects.toThrow("Can't parse date '2 weeks ago'");
