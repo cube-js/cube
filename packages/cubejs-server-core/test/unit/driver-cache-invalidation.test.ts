@@ -1408,5 +1408,14 @@ describe('driver cache invalidation', () => {
     expect(await driverFactory('default')).toBe(current);
 
     expect(core.builtDrivers).toHaveLength(2);
+
+    // A fallback, including one caused by revoking the user's credential, takes
+    // effect once the cached lifetime ends.
+    clock.advance(2 * hour);
+    await request({ user: 'no-token' }, 'req-after-expiry');
+    const fallback = <FakeDriver> await driverFactory('default');
+
+    expect(fallback.builtFrom).toMatchObject({ password: 'service-account' });
+    expect(core.builtDrivers).toHaveLength(3);
   });
 });
