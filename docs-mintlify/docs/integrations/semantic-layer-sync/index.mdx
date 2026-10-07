@@ -351,6 +351,20 @@ You can also run a sync manually by navigating to **IDE → Integrations**
 and clicking **Start Sync** next to a relevant sync. This is convenient for working in the
 [development mode][ref-dev-mode].
 
+## Data access policies
+
+Unless [multitenancy](#multitenancy) is enabled, syncs that run on build or on
+schedule don't run as any user. When a cube or view is available only to
+specific groups through [data access policies][ref-dap], these syncs publish
+the members that any of those groups can see. Everyone who can open the synced
+data source in the BI tool sees the names and descriptions of these members.
+Queries still go through the SQL API, which applies data access policies to the
+user the BI tool queries as. A manual sync publishes what the user who starts
+it can see.
+
+To hide such members from some users of the BI tool, restrict access to the
+synced database in the BI tool, or expose these members in a separate view.
+
 ## Viewing history
 
 You can view the history of runs for a particular sync by navigating to
@@ -372,3 +386,4 @@ on, i.e., your development mode branch, shared branch, or main branch.
 [ref-config-schemaversion]: /reference/configuration/config#schema_version
 [ref-dev-mode]: /docs/data-modeling/dev-mode
 [ref-auto-sus]: /admin/deployment/auto-suspension
+[ref-dap]: /docs/data-modeling/data-access-policies
