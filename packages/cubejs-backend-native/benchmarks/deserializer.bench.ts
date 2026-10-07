@@ -4,7 +4,8 @@ import { benchmarkSuite } from 'jest-bench';
 
 import { loadNative } from '../js';
 
-// Needs a release build with the bridge test harness, which `yarn bench` makes.
+// Needs the bridge test harness: `yarn native:build-release-bridge-tests`.
+// A debug build makes the numbers meaningless.
 const native = loadNative();
 
 const sqlTemplates = JSON.parse(
