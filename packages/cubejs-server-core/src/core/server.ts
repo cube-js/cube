@@ -135,6 +135,12 @@ const PROBE_FAILURE_COALESCE_MS = 2 * 1000;
  */
 const PROBE_FAILURE_BACKOFF_MS = PROBE_FAILURE_COALESCE_MS / 2;
 
+/**
+ * How long a replaced driver stays open before release, so work that resolved it before
+ * the swap can finish: release destroys or drains it, failing anything started after.
+ */
+const REPLACED_DRIVER_RELEASE_DELAY_MS = 10 * 60 * 1000;
+
 /** Security contexts remembered per driver; past this the least recently used is re-probed. */
 const MAX_KNOWN_SECURITY_CONTEXTS = 64;
 
@@ -854,9 +860,8 @@ export class CubejsServerCore {
       });
 
       /**
-       * Drop every key pointing at `driver`, so no alias hands out a draining
-       * pool, and release it without awaiting: running queries finish, and a
-       * release failure must not fail this request.
+       * Drop every key pointing at `driver`, so no alias hands it out again, and
+       * release it later, off this request: a release failure must not fail it.
        */
       const replaceCachedDriver = (driver: Promise<BaseDriver>) => {
         Object.keys(driverPromise)
@@ -866,12 +871,12 @@ export class CubejsServerCore {
             delete driverOrigin[key];
           });
 
-        driver
+        this.scheduleReplacedDriverRelease(() => driver
           .then((resolved) => resolved.release())
           .catch((error) => this.logger('Driver release error', {
             dataSource,
             error: (error as Error).stack || (error as Error).toString(),
-          }));
+          })));
       };
 
       /** Per alias set, not per key, so a shared driver is one counter and one rebuild. */
@@ -1384,6 +1389,11 @@ export class CubejsServerCore {
       context,
       options,
     );
+  }
+
+  /** Release a replaced driver; see `REPLACED_DRIVER_RELEASE_DELAY_MS`. */
+  protected scheduleReplacedDriverRelease(release: () => void) {
+    setTimeout(release, REPLACED_DRIVER_RELEASE_DELAY_MS).unref();
   }
 
   /** Split from `resolveDriver` so a caller that already invoked the factory builds from that result, not a second call. */

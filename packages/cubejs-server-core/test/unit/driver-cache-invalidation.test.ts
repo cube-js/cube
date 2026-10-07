@@ -52,6 +52,17 @@ class TestServerCore extends CubejsServerCore {
 
   private inStalenessHook = false;
 
+  /** Cleared to keep production's delayed release of a replaced driver. */
+  public releaseReplacedDriversAtOnce = true;
+
+  protected scheduleReplacedDriverRelease(release: () => void) {
+    if (this.releaseReplacedDriversAtOnce) {
+      release();
+    } else {
+      super.scheduleReplacedDriverRelease(release);
+    }
+  }
+
   protected async resolveDriverStaleness(origin: any, context: any): Promise<any> {
     if (this.onStalenessProbe && !this.inStalenessHook) {
       this.inStalenessHook = true;
@@ -421,6 +432,31 @@ describe('driver cache invalidation', () => {
     const rebuilt = <FakeDriver> await driverFactory('default');
     expect(rebuilt).not.toBe(first);
     expect(rebuilt.builtFrom).toMatchObject({ password: 'token-b' });
+  });
+
+  // Work that resolved the old driver before the swap (a multi-step pre-aggregation
+  // build, a query not yet holding a connection) has to be able to finish on it.
+  test('keeps a replaced driver open for a grace period', async () => {
+    const timeout = jest.spyOn(global, 'setTimeout');
+    const { core, driverFactory, request } = await createCore({
+      driverFactory: (ctx: any) => (<any>{ type: 'postgres', password: ctx.securityContext.token }),
+    }, { token: 'token-a' });
+    core.releaseReplacedDriversAtOnce = false;
+
+    const first = <FakeDriver> await driverFactory('default');
+
+    await request({ token: 'token-b' });
+    await driverFactory('default');
+    await new Promise((resolve) => setImmediate(resolve));
+
+    expect(first.release).not.toHaveBeenCalled();
+
+    const scheduled = timeout.mock.calls.find(([, ms]) => ms === 10 * 60 * 1000);
+    timeout.mockRestore();
+    (<() => void>scheduled[0])();
+    await new Promise((resolve) => setImmediate(resolve));
+
+    expect(first.release).toHaveBeenCalledTimes(1);
   });
 
   // An outage must not turn every driver resolution into a call on the dependency
