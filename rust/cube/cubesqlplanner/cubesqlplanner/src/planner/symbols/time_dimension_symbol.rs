@@ -214,6 +214,17 @@ impl TimeDimensionSymbol {
         deps::collect_deps(self)
     }
 
+    /// The same time dimension over another date range.
+    pub fn with_date_range(&self, date_range: Option<(String, String)>) -> Rc<Self> {
+        self.derive(
+            self.base_symbol.clone(),
+            self.granularity.clone(),
+            self.granularity_obj.clone(),
+            date_range,
+            Some(self.alias()),
+        )
+    }
+
     pub fn date_range_vec(&self) -> Option<Vec<String>> {
         self.date_range.clone().map(|(from, to)| vec![from, to])
     }

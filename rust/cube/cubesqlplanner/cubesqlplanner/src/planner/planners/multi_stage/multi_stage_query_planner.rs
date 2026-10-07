@@ -724,7 +724,7 @@ impl MultiStageQueryPlanner {
                 };
 
                 if let Some(filter) = &directive_filter {
-                    apply_filter_directive_to_state(filter, &mut filtered_state);
+                    apply_filter_directive_to_state(filter, &mut filtered_state)?;
                 }
                 filtered_state
             };
@@ -980,6 +980,13 @@ impl MultiStageQueryPlanner {
 
                 let time_dimension =
                     GranularityHelper::find_dimension_with_min_granularity(&time_dimensions)?;
+                // The measure's own state carries the date range an include narrowed it to.
+                let time_dimension = state
+                    .time_dimensions()
+                    .iter()
+                    .filter_map(|d| d.as_time_dimension().ok())
+                    .find(|d| d.id() == time_dimension.id())
+                    .unwrap_or(time_dimension);
                 let time_dimension = MemberSymbol::new_time_dimension(time_dimension);
 
                 // Of the grain keys only `include` reaches the window assembly.
@@ -1787,7 +1794,10 @@ fn query_filters_dropped(
     ) || any_dropped(root.segments(), base.segments(), narrowed.segments())
 }
 
-fn apply_filter_directive_to_state(filter: &MultiStageFilter, state: &mut QueryProperties) {
+fn apply_filter_directive_to_state(
+    filter: &MultiStageFilter,
+    state: &mut QueryProperties,
+) -> Result<(), CubeError> {
     if let Some(exclude) = &filter.exclude {
         let names: Vec<MemberId> = exclude
             .iter()
@@ -1806,9 +1816,68 @@ fn apply_filter_directive_to_state(filter: &MultiStageFilter, state: &mut QueryP
         state.add_dimension_filters(filter.include_dimension.clone());
     }
     if !filter.include_time_dimension.is_empty() {
+        narrow_time_dimensions_to_include(&filter.include_time_dimension, state)?;
         state.add_time_dimension_filters(filter.include_time_dimension.clone());
     }
     if !filter.include_measure.is_empty() {
         state.add_measure_filters(filter.include_measure.clone());
     }
+    Ok(())
+}
+
+/// An include date range on a time dimension the query groups by narrows that
+/// dimension's date range, so the series has rows only inside the included period
+/// while rolling windows still read back from it.
+fn narrow_time_dimensions_to_include(
+    include: &[FilterItem],
+    state: &mut QueryProperties,
+) -> Result<(), CubeError> {
+    let mut time_dimensions = state.time_dimensions().clone();
+    for item in include {
+        let FilterItem::Item(filter) = item else {
+            continue;
+        };
+        let [FilterValue::Str(from), FilterValue::Str(to)] = filter.values().as_slice() else {
+            continue;
+        };
+        if !matches!(filter.filter_operator(), FilterOperator::InDateRange) {
+            continue;
+        }
+        let base_id = filter
+            .member_evaluator()
+            .resolve_reference_chain()
+            .id()
+            .clone();
+        // Bounds are compared normalized but kept as given, the form the series expects.
+        let precision = QueryTimeSeries::MILLISECOND_PRECISION;
+        let later_from = |a: &String, b: &String| -> Result<String, CubeError> {
+            let (na, nb) = (
+                QueryDateTimeHelper::format_from_date(a, precision)?,
+                QueryDateTimeHelper::format_from_date(b, precision)?,
+            );
+            Ok(if na >= nb { a.clone() } else { b.clone() })
+        };
+        let earlier_to = |a: &String, b: &String| -> Result<String, CubeError> {
+            let (na, nb) = (
+                QueryDateTimeHelper::format_to_date(a, precision)?,
+                QueryDateTimeHelper::format_to_date(b, precision)?,
+            );
+            Ok(if na <= nb { a.clone() } else { b.clone() })
+        };
+        for time_dimension in time_dimensions.iter_mut() {
+            let Ok(symbol) = time_dimension.as_time_dimension() else {
+                continue;
+            };
+            if symbol.base_symbol().clone().resolve_reference_chain().id() != &base_id {
+                continue;
+            }
+            let range = match symbol.date_range_vec().as_deref() {
+                Some([own_from, own_to]) => (later_from(own_from, from)?, earlier_to(own_to, to)?),
+                _ => (from.clone(), to.clone()),
+            };
+            *time_dimension = MemberSymbol::new_time_dimension(symbol.with_date_range(Some(range)));
+        }
+    }
+    state.set_time_dimensions(time_dimensions);
+    Ok(())
 }

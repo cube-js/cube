@@ -214,12 +214,10 @@ ${rollup ? `    pre_aggregations:
       })).toEqual([{ vfi__amount_htd: '1500' }]);
     });
 
-    it('with a granularity every row keeps its own window', async () => {
+    it('with a granularity only the included period has rows, read back by its window', async () => {
       expect(await evaluate(['visitors_fi.amount_r3_on', 'visitors_fi.amount_mtd_on'], {
         timeDimensions: [{ dimension: 'visitors_fi.created_at', granularity: 'day', dateRange: ['2017-01-05', '2017-01-07'] }],
       })).toEqual([
-        { vfi__created_at_day: '2017-01-05T00:00:00.000Z', vfi__amount_r3_on: '300', vfi__amount_mtd_on: '300' },
-        { vfi__created_at_day: '2017-01-06T00:00:00.000Z', vfi__amount_r3_on: '500', vfi__amount_mtd_on: '600' },
         { vfi__created_at_day: '2017-01-07T00:00:00.000Z', vfi__amount_r3_on: '1400', vfi__amount_mtd_on: '1500' },
       ]);
     });
