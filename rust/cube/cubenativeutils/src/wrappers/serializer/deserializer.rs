@@ -169,15 +169,18 @@ impl<'de, IT: InnerTypes> SeqAccess<'de> for NativeSeqDeserializer<IT> {
         if self.idx >= self.len {
             return Ok(None);
         }
-        let v = self
-            .input
-            .get(self.idx)
-            .map_err(|_| NativeObjSerializerError::Message("Failed to get element".to_string()))?;
+        let idx = self.idx;
+        let v = self.input.get(idx).map_err(|err| {
+            NativeObjSerializerError::from(err)
+                .context(format!("element {idx}: failed to read value"))
+        })?;
 
         self.idx += 1;
 
         let de = NativeSerdeDeserializer::new(v);
-        seed.deserialize(de).map(Some)
+        seed.deserialize(de)
+            .map(Some)
+            .map_err(|err| err.context(format!("element {idx}")))
     }
 }
 
@@ -191,8 +194,8 @@ struct NativeMapDeserializer<IT: InnerTypes> {
 
 impl<IT: InnerTypes> NativeMapDeserializer<IT> {
     pub fn new(input: IT::Struct) -> Result<Self, NativeObjSerializerError> {
-        let prop_names = input.get_own_property_names().map_err(|_| {
-            NativeObjSerializerError::Message("Failed to get property names".to_string())
+        let prop_names = input.get_own_property_names().map_err(|err| {
+            NativeObjSerializerError::from(err).context("failed to get property names")
         })?;
         let len = prop_names.len() as u32;
         Ok(Self {
@@ -238,18 +241,20 @@ impl<'de, IT: InnerTypes> MapAccess<'de> for NativeMapDeserializer<IT> {
             .ok_or_else(|| {
                 NativeObjSerializerError::Message("Array index out of bounds".to_string())
             })?;
-        let value = self.input.get_field_by_key(prop_name).map_err(|_| {
-            NativeObjSerializerError::Message("Failed to get property name".to_string())
+        let field = || {
+            let key = prop_name
+                .to_string()
+                .and_then(|s| s.into_value())
+                .unwrap_or_default();
+            format!("field `{key}`")
+        };
+        let value = self.input.get_field_by_key(prop_name).map_err(|err| {
+            NativeObjSerializerError::from(err)
+                .context(format!("{}: failed to read value", field()))
         })?;
 
         self.value_idx += 1;
         let de = NativeSerdeDeserializer::new(value);
-        seed.deserialize(de).map_err(|err| {
-            let prop_string = prop_name
-                .to_string()
-                .and_then(|s| s.into_value())
-                .unwrap_or_default();
-            NativeObjSerializerError::Message(format!("field `{prop_string}`: {err}"))
-        })
+        seed.deserialize(de).map_err(|err| err.context(field()))
     }
 }

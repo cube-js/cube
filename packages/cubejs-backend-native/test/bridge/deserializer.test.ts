@@ -94,6 +94,28 @@ describeBridge('bridge: NativeSerdeDeserializer', () => {
       expect(deserializeJson(input)).toEqual({ computed: 'from-getter' });
     });
 
+    it('rethrows the exception of a throwing getter', () => {
+      const input = {
+        ok: 1,
+        nested: {
+          get computed() {
+            throw new Error('boom from getter');
+          },
+        },
+      };
+      expect(() => deserializeJson(input)).toThrow('boom from getter');
+    });
+
+    it('rethrows the exception of a throwing array element getter', () => {
+      const input = [1];
+      Object.defineProperty(input, 0, {
+        get() {
+          throw new Error('boom from element');
+        },
+      });
+      expect(() => deserializeJson(input)).toThrow('boom from element');
+    });
+
     it('wide object', () => {
       const input: Record<string, string> = {};
 
