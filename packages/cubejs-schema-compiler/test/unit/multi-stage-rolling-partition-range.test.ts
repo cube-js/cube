@@ -89,12 +89,12 @@ cubes:
       useNativeSqlPlanner: true,
     });
 
-    query.buildSqlAndParams();
+    const [sql] = query.buildSqlAndParams();
     const descriptions: any[] = query.preAggregations?.preAggregationsDescription() || [];
     const monthly = descriptions.filter(d => d.preAggregationId === 'orders.monthly');
     expect(monthly.length).toEqual(1);
 
-    return monthly[0];
+    return { ...monthly[0], sql };
   };
 
   const partitionRangeFor = async (measures: string[]) => (await descriptionFor(measures)).matchedTimeDimensionDateRange;
@@ -106,6 +106,13 @@ cubes:
   it('a multi-stage rolling measure loads the whole window', async () => {
     expect(await partitionRangeFor(['orders.amount_r3_ms']))
       .toEqual(['2024-03-01T00:00:00.000', '2024-07-29T23:59:59.999']);
+  });
+
+  it('a single usage reads the table under its plain name', async () => {
+    const description = await descriptionFor(['orders.amount_r3_ms']);
+    expect(Object.keys(description.usageMapping)).toEqual(['']);
+    expect(description.sql).toContain(`${description.tableName} `);
+    expect(description.sql).not.toContain('__usage_');
   });
 
   it('a multi-stage to_date measure loads the period from its start', async () => {

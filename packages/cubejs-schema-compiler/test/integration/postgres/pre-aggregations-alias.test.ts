@@ -332,7 +332,7 @@ describe('PreAggregationsAlias', () => {
     return [
       preAggregation.reduce(
         (replacedQuery, desc) => replacedQuery
-          .replace(new RegExp(`${desc.tableName}(?:__usage_\\d+)?`, 'g'), `${desc.tableName}_${suffix}`)
+          .replace(new RegExp(desc.tableName, 'g'), `${desc.tableName}_${suffix}`)
           .replace(/CREATE INDEX (?!i_)/, `CREATE INDEX i_${suffix}_`),
         toReplace
       ),

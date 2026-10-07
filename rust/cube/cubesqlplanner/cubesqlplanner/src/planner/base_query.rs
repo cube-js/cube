@@ -104,13 +104,22 @@ impl<IT: InnerTypes> BaseQuery<IT> {
         let templates = self.query_tools.plan_sql_templates(is_external)?;
         let (result_sql, params) = self.query_tools.build_sql_and_params(&sql, &templates)?;
 
+        // A lone usage reads the table under its plain name, as it always has:
+        // the name keys `usedPreAggregations` and appears in `/sql` output.
+        let single_usage = usages.len() == 1;
+        let final_sql = if single_usage {
+            result_sql.replace(&format!("__usage_{}", usages[0].index), "")
+        } else {
+            result_sql
+        };
+
         let res = self.context.empty_array()?;
-        res.set(0, result_sql.to_native(self.context.clone())?)?;
+        res.set(0, final_sql.to_native(self.context.clone())?)?;
         res.set(1, params.to_native(self.context.clone())?)?;
 
         if !usages.is_empty() {
             // Grouped by (cubeName, name), with the dates each usage reads.
-            let grouped = Self::group_usages(&usages);
+            let grouped = Self::group_usages(&usages, single_usage);
             res.set(2, grouped.to_native(self.context.clone())?)?;
         }
 
@@ -118,7 +127,12 @@ impl<IT: InnerTypes> BaseQuery<IT> {
         Ok(result)
     }
 
-    fn group_usages(usages: &[PreAggregationUsage]) -> Vec<GroupedPreAggregationInfo> {
+    /// `unsuffixed` keys the usages by an empty suffix, for SQL whose table
+    /// names carry none.
+    fn group_usages(
+        usages: &[PreAggregationUsage],
+        unsuffixed: bool,
+    ) -> Vec<GroupedPreAggregationInfo> {
         let mut groups: HashMap<(String, String), GroupedPreAggregationInfo> = HashMap::new();
 
         for usage in usages {
@@ -127,7 +141,11 @@ impl<IT: InnerTypes> BaseQuery<IT> {
             let name = pre_agg.name().clone();
             let key = (cube_name.clone(), name.clone());
 
-            let suffix = format!("__usage_{}", usage.index);
+            let suffix = if unsuffixed {
+                String::new()
+            } else {
+                format!("__usage_{}", usage.index)
+            };
 
             let group = groups
                 .entry(key)

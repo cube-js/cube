@@ -1140,13 +1140,14 @@ describe('PreAggregations', () => {
       expect(result.targetTableName).toMatch(/UNION ALL SELECT \* FROM lambda_stb_pre_aggregations_orders_d/);
     });
 
-    test('a usage reads the lambda tail', async () => {
+    // A lone usage is keyed by an empty suffix, several by `__usage_N`.
+    test.each(['', '__usage_0'])('a usage keyed %j reads the lambda tail', async (suffix) => {
       const usageRange: [string, string] = ['2024-01-01T00:00:00.000', '2024-01-05T23:59:59.999'];
-      const { loader } = createLambdaLoader(usageRange, { __usage_0: { dateRange: usageRange } });
+      const { loader } = createLambdaLoader(usageRange, { [suffix]: { dateRange: usageRange } });
 
       const result: any = await loader.loadPreAggregations();
 
-      expect(result.usageTargetTableNames.__usage_0).toMatch(/UNION ALL SELECT \* FROM lambda_stb_pre_aggregations_orders_d/);
+      expect(result.usageTargetTableNames[suffix]).toMatch(/UNION ALL SELECT \* FROM lambda_stb_pre_aggregations_orders_d/);
     });
 
     test('runs the source query when no date range was requested', async () => {
