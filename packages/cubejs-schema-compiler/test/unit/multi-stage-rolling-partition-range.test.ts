@@ -103,7 +103,8 @@ cubes:
   const expectPartitionsFrom = (ranges: ([string, string] | undefined)[], from: string) => {
     ranges.forEach(range => {
       if (range) {
-        expect(range[0] <= from).toBe(true);
+        // Reports the range start itself when it begins after `from`.
+        expect(range[0] <= from ? from : range[0]).toEqual(from);
       }
     });
   };
