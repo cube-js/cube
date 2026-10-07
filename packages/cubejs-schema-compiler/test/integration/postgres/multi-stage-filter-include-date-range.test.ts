@@ -24,10 +24,21 @@ cubes:
       - name: created_at
         sql: created_at
         type: time
+        granularities:
+          - name: half_year
+            interval: 6 months
+            origin: "2016-07-01"
     measures:
       - name: amount
         sql: amount
         type: sum
+      - name: amount_htd
+        multi_stage: true
+        type: sum
+        sql: "{amount}"
+        rolling_window:
+          type: to_date
+          granularity: half_year
       - name: amount_r3
         multi_stage: true
         type: sum
@@ -189,6 +200,13 @@ ${rollup ? `    pre_aggregations:
       expect(await evaluate(['visitors_fi.amount_mtd'], {
         timeDimensions: [{ dimension: 'visitors_fi.created_at', dateRange: ['2017-01-06', '2017-01-07'] }],
       })).toEqual([{ vfi__amount_mtd: '1500' }]);
+    });
+
+    it('a to_date window over a custom period reads from the start of that period', async () => {
+      // Half years start on Jan 1 and Jul 1, so Jan 6 - 7 reads Jan 1 - 7.
+      expect(await evaluate(['visitors_fi.amount_htd'], {
+        timeDimensions: [{ dimension: 'visitors_fi.created_at', dateRange: ['2017-01-06', '2017-01-07'] }],
+      })).toEqual([{ vfi__amount_htd: '1500' }]);
     });
 
     it('with a granularity every row keeps its own window', async () => {
