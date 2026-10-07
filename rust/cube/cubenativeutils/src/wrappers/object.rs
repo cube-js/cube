@@ -13,8 +13,6 @@ pub trait NativeObject<IT: InnerTypes>: Clone {
     fn into_rust_box(self) -> Result<IT::RustBox, CubeError>;
     fn is_null(&self) -> Result<bool, CubeError>;
     fn is_undefined(&self) -> Result<bool, CubeError>;
-    /// Resolves the concrete type in one step, for callers that would otherwise
-    /// probe `into_*` variants one by one.
     fn into_typed(self) -> Result<NativeTypedObject<IT>, CubeError>;
     fn clone_to_context(&self, context: &IT::Context) -> Self;
     fn clone_to_function_context(

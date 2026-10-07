@@ -800,8 +800,7 @@ fn rust_box_unwrap(cx: FunctionContext) -> JsResult<JsValue> {
     )
 }
 
-/// Mirrors the shapes Tesseract bridges deserialize through serde: optionals,
-/// floats of both widths, sequences and string maps.
+/// Mirrors the shapes Tesseract bridges deserialize through serde.
 #[derive(serde::Deserialize, serde::Serialize)]
 struct DeserializeProbe {
     name: String,
