@@ -355,7 +355,7 @@ The API returns streaming JSON responses. Each line contains a separate JSON obj
 - **`messageId`** (string): Present only on the `__suspended__` frame — the `messageId` of the suspended turn, to resend
 - **`usage`** (object): Present only on the `__usage__` frame — `models` (string[]), `llmCalls`, `inputTokens`, `outputTokens`, `cacheWriteTokens`, `cacheReadTokens`, `totalTokens` (numbers)
 
-The stream always ends with one additional frame, `id: "__usage__"` (see the Usage Message example below). Treat it like the `__cutoff__` and `__state__` frames: filter it out of anything rendered as a chat message.
+The stream always ends with one additional frame, `id: "__usage__"` (see the Usage Message example below). Treat it like the `__cutoff__`, `__state__`, `__aborted__` and `__suspended__` frames: filter it out of anything rendered as a chat message.
 
 ### Response Examples
 
