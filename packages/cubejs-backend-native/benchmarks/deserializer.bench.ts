@@ -4,7 +4,8 @@ import { benchmarkSuite } from 'jest-bench';
 
 import { loadNative } from '../js';
 
-// Needs the bridge test harness: `yarn native:build-release-bridge-tests`.
+// Needs a release build with the bridge test harness (python-config.bench.ts also needs `python`):
+// `yarn native:build -- --release --features python,bridge-test-harness`.
 // A debug build makes the numbers meaningless.
 const native = loadNative();
 
