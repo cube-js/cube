@@ -49,7 +49,7 @@ impl<'de, IT: InnerTypes> Deserializer<'de> for NativeSerdeDeserializer<IT> {
                 }
             }
             NativeTypedObject::Array(val) => {
-                visitor.visit_seq(NativeSeqDeserializer::<IT>::new(val))
+                visitor.visit_seq(NativeSeqDeserializer::<IT>::new(val)?)
             }
             NativeTypedObject::Struct(val) => {
                 visitor.visit_map(NativeMapDeserializer::<IT>::new(val)?)
@@ -151,9 +151,9 @@ pub struct NativeSeqDeserializer<IT: InnerTypes> {
 }
 
 impl<IT: InnerTypes> NativeSeqDeserializer<IT> {
-    pub fn new(input: IT::Array) -> Self {
-        let len = input.len().unwrap();
-        Self { input, idx: 0, len }
+    pub fn new(input: IT::Array) -> Result<Self, NativeObjSerializerError> {
+        let len = input.len()?;
+        Ok(Self { input, idx: 0, len })
     }
 }
 
