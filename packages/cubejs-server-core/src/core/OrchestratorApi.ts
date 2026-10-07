@@ -16,7 +16,6 @@ import { DatabaseType, QueryTagsInternalFn, RequestContext } from './types';
 export interface OrchestratorApiOptions extends QueryOrchestratorOptions {
   contextToDbType: (dataSource: string) => Promise<DatabaseType>;
   contextToExternalDbType: () => DatabaseType;
-  /** Wrapped by `wrapQueryTagsFn`, so it never throws and returns only valid tags. */
   queryTags?: QueryTagsInternalFn;
   redisPrefix?: string;
 }

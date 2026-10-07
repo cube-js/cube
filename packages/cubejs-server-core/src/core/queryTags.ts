@@ -35,6 +35,9 @@ export function wrapQueryTagsFn(queryTagsFn: QueryTagsFn, logger: LoggerFn): Que
     for (const [key, value] of entries) {
       if (!QUERY_TAG_KEY.test(key)) {
         logger('Query Tag Dropped', { key, reason: 'invalid_key', requestId });
+      } else if (key.startsWith('cube_')) {
+        // Reserved for Cube's own labels, such as `cube_request_id`
+        logger('Query Tag Dropped', { key, reason: 'reserved_key', requestId });
       } else if (Object.keys(queryTags).length >= MAX_QUERY_TAGS) {
         logger('Query Tag Dropped', { key, reason: 'tag_limit', requestId });
       } else {

@@ -53,6 +53,16 @@ describe('wrapQueryTagsFn', () => {
     });
   });
 
+  test('drops and logs keys reserved for Cube\'s own labels', async () => {
+    const { queryTags, logger } = wrap(() => ({ cube_request_id: 'spoofed', cube_user: 'a', user_id: 'b' }));
+
+    await expect(queryTags(context)).resolves.toEqual({ user_id: 'b' });
+    expect(logger.mock.calls).toEqual([
+      ['Query Tag Dropped', { key: 'cube_request_id', reason: 'reserved_key', requestId: 'request-1' }],
+      ['Query Tag Dropped', { key: 'cube_user', reason: 'reserved_key', requestId: 'request-1' }],
+    ]);
+  });
+
   test(`keeps at most ${MAX_QUERY_TAGS} tags and logs the rest`, async () => {
     const { queryTags, logger } = wrap(() => Object.fromEntries(Array.from({ length: 65 }, (_, i) => [`k${i}`, 'v'])));
 
