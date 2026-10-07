@@ -3890,7 +3890,7 @@ paths:
 
 
           Returns the new `content` and `hash`. Pass `expectedHash` to get `409` instead of editing
-          a draft that changed since you read it. Requires **manage** access to the workbook.
+          a draft that changed since you read it. Requires **edit** access to the workbook.
   /api/v1/deployments/{deploymentId}/workbooks/{workbookId}/duplicate:
     post:
       operationId: duplicateWorkbook
