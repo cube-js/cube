@@ -118,3 +118,27 @@ export function createRustBoxProbeAlt(note: string): unknown {
 export function unwrapRustBoxProbe(handle: unknown): RustBoxProbeView {
   return native.__testBridgeRustBoxUnwrap(handle);
 }
+
+export function deserializeJson(value: unknown): unknown {
+  return JSON.parse(native.__testBridgeDeserializeJson(value));
+}
+
+export function deserializeTyped(value: unknown): unknown {
+  return JSON.parse(native.__testBridgeDeserializeTyped(value));
+}
+
+export function deserializeSqlTemplates(
+  value: unknown
+): Record<string, Record<string, string>> {
+  return JSON.parse(native.__testBridgeDeserializeSqlTemplates(value));
+}
+
+export type DeserializeLoopKind = 'json' | 'sqlTemplates';
+
+export function deserializeLoop(
+  kind: DeserializeLoopKind,
+  value: unknown,
+  iterations: number
+): number {
+  return native.__testBridgeDeserializeLoop(kind, value, iterations);
+}
