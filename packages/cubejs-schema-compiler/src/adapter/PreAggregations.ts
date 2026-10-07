@@ -126,6 +126,9 @@ export class PreAggregations {
 
   public preAggregationUsageInfos: PreAggregationUsageInfo[] | undefined = undefined;
 
+  // `preAggregationForQuery` is undefined on a miss too, so it can't tell "not matched yet" apart
+  private preAggregationForQueryResolved: boolean = false;
+
   public constructor(query: BaseQuery, historyQueries, cubeLatticeCache) {
     this.query = query;
     this.historyQueries = historyQueries;
@@ -970,7 +973,7 @@ export class PreAggregations {
    * pre-aggs appear in the schema file.
    */
   public findPreAggregationForQuery(): PreAggregationForQuery | undefined {
-    if (!this.preAggregationForQuery) {
+    if (!this.preAggregationForQueryResolved) {
       if (this.query.useNativeSqlPlanner && this.query.canUseNativeSqlPlannerPreAggregation) {
         this.preAggregationForQuery = this.query.findPreAggregationForQueryRust();
       } else {
@@ -980,8 +983,22 @@ export class PreAggregations {
             // Refresh worker can access specific pre-aggregations even in case those hidden by others
             .find(p => p.canUsePreAggregation && (!this.query.options.preAggregationId || p.preAggregationId === this.query.options.preAggregationId));
       }
+      this.preAggregationForQueryResolved = true;
     }
     return this.preAggregationForQuery;
+  }
+
+  /**
+   * Records the pre-aggregations the native planner matched while planning this query, so
+   * `findPreAggregationForQuery` doesn't run the planner a second time just to match.
+   */
+  public setNativePreAggregationResult(
+    usageInfos: PreAggregationUsageInfo[] | undefined,
+    preAggregationForQuery: PreAggregationForQuery | undefined,
+  ): void {
+    this.preAggregationUsageInfos = usageInfos;
+    this.preAggregationForQuery = preAggregationForQuery;
+    this.preAggregationForQueryResolved = true;
   }
 
   private findAutoRollupPreAggregationsForCube(cube: string, preAggregations: PreAggregationDefinitions): PreAggregationForQuery[] {
