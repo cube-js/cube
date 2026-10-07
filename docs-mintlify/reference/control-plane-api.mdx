@@ -395,12 +395,20 @@ curl \
 
 Request a server-rendered snapshot of a whole published dashboard as PNG or
 PDF — the same rendering the [Download as PNG or PDF][ref-dashboard-download]
-action uses — without driving a browser through the console. The endpoint
-renders the on-screen layout only; the [print version][ref-print-version] is
-not available here. A draft that has never been published can't be exported. Identify the dashboard with either
-`dashboardId` (numeric) or `dashboardPublicId` (string) — exactly one, not
-both. Requires **manage** access to the dashboard's workbook, the same
+action uses — without driving a browser through the console. A draft that
+has never been published can't be exported. Identify the dashboard with
+either `dashboardId` (numeric) or `dashboardPublicId` (string) — exactly one,
+not both. Requires **manage** access to the dashboard's workbook, the same
 permission the console's whole-dashboard download requires.
+
+By default (`layout: screenshot`) the file captures the dashboard as it is
+laid out on screen. Pass `layout: print` with `format: pdf` —
+`{"dashboardPublicId": "abc123", "format": "pdf", "layout": "print"}` — for
+the dashboard's [print version][ref-print-version] instead: the A4 document
+its **Print version** menu item produces, with every widget at full page
+width, one below another, every row of each table, and the control
+selections the file renders with stated as one summary line in place of the
+controls. `print` is available for PDF only.
 
 Rendering happens asynchronously, since a capture waits for every widget on
 the dashboard to finish querying: submit a job, poll it until `status` is
@@ -436,19 +444,18 @@ reflects that person's own row-level security. An embed subject that doesn't
 exist yet is provisioned by the call; the `groups`/`userAttributes`/
 `securityContext` passed with it apply to that render only, never to the
 user's stored context. This is meant for scheduled, per-recipient reports:
-one API key produces a correctly-scoped file per person, instead of one key
-per person.
+one API key produces a correctly-scoped file per person, in either layout,
+instead of one key per person.
 
-Submitting returns `400` for a request that supplies both ids or neither,
-`404` for a dashboard that doesn't belong to the deployment or a deactivated
-console subject, and `403` when the account has
-data downloads restricted (not bypassed for an on-behalf-of export, unlike a
-built-in scheduled notification) or when an embed subject's tenant doesn't
+Submitting returns `400` for a request that supplies both ids or neither, or
+`layout: print` with `format: png`, `404` for a dashboard that doesn't belong
+to the deployment or a deactivated console subject, and `403` when the account
+has data downloads restricted (not bypassed for an on-behalf-of export, unlike
+a built-in scheduled notification) or when an embed subject's tenant doesn't
 have the dashboard's workbook shared with it. It returns `429` when too many
 exports are already in flight for the identity being rendered as, so fan out
 per-recipient reports with a bounded number of jobs open at a time. See the
-[API reference][ref-api-reference] for the full request and response
-schema.
+[API reference][ref-api-reference] for the full request and response schema.
 
 [ref-dashboard-download]: /docs/explore-analyze/dashboards#download-as-png-or-pdf
 [ref-print-version]: /docs/explore-analyze/dashboards#print-version
