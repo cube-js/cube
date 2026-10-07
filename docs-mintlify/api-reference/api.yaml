@@ -9050,7 +9050,8 @@ components:
             - type: 'null'
           description: >-
             Filter value. Omit for is_null / is_not_null / is_empty / is_not_empty; provide a
-            2-element [start, end] array for between.
+            2-element [start, end] array for between. An empty array with no operator renders the
+            filter cleared.
       required:
         - member
       type: object
@@ -9068,6 +9069,12 @@ components:
         - not_starts_with
         - ends_with
         - not_ends_with
+        - in_month
+        - not_in_month
+        - in_quarter
+        - not_in_quarter
+        - in_year
+        - not_in_year
         - is_null
         - is_not_null
         - is_empty
@@ -9089,6 +9096,12 @@ components:
         - not_starts_with
         - ends_with
         - not_ends_with
+        - in_month
+        - not_in_month
+        - in_quarter
+        - not_in_quarter
+        - in_year
+        - not_in_year
         - is_null
         - is_not_null
         - is_empty
@@ -9274,7 +9287,7 @@ components:
     DashboardTimeGrainInput:
       properties:
         grain:
-          description: Granularity, e.g. "day", "week", "month"
+          description: Granularity, e.g. "day", "week", "month". An empty string renders the control cleared.
           type: string
         member:
           description: Time dimension path, e.g. "Orders.created_at"
