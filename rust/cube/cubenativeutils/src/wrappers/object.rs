@@ -47,7 +47,7 @@ pub trait NativeArray<IT: InnerTypes>: NativeType<IT> {
 pub trait NativeStruct<IT: InnerTypes>: NativeType<IT> {
     fn get_field(&self, field_name: &str) -> Result<NativeObjectHandle<IT>, CubeError>;
     /// Looks a field up by a key handle, e.g. one returned by
-    /// `get_own_property_names`, without materializing it as a `String` first.
+    /// `get_own_property_names`, so callers don't have to stringify it.
     fn get_field_by_key(
         &self,
         key: &NativeObjectHandle<IT>,
