@@ -208,8 +208,10 @@ export type EvaluatedCube = {
 
 const INTERNED_CUBE_COLLECTIONS = ['measures', 'dimensions', 'segments', 'hierarchies', 'preAggregations', 'joins'] as const;
 
-// The relative date ranges Tesseract resolves in filter values.
-const RELATIVE_DATE_RANGE = /^\s*((this|last|next)\s+(\d+\s+)?[a-z]+|today|yesterday|tomorrow)\s*$/i;
+// Deliberately broad: any date-filter value that isn't an absolute date is
+// treated as relative, so a form Tesseract learns later is still recompiled.
+const DATE_OPERATORS = ['inDateRange', 'notInDateRange', 'beforeDate', 'beforeOrOnDate', 'afterDate', 'afterOrOnDate', 'onTheDate'];
+const ABSOLUTE_DATE = /^\d{4}-\d{2}-\d{2}([T ]\d{2}:\d{2}(:\d{2}(\.\d+)?)?(Z|[+-]\d{2}(:?\d{2})?)?)?$/;
 
 const hasRelativeDateValue = (item: any): boolean => {
   if (!item) {
@@ -219,8 +221,8 @@ const hasRelativeDateValue = (item: any): boolean => {
   if (group) {
     return group.some(hasRelativeDateValue);
   }
-  return Array.isArray(item.values) &&
-    item.values.some((value: unknown) => typeof value === 'string' && RELATIVE_DATE_RANGE.test(value));
+  return DATE_OPERATORS.includes(item.operator) && Array.isArray(item.values) &&
+    item.values.some((value: unknown) => typeof value === 'string' && !ABSOLUTE_DATE.test(value.trim()));
 };
 
 export class CubeEvaluator extends CubeSymbols {
