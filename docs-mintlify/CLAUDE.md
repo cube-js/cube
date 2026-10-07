@@ -132,6 +132,7 @@ Make sure to use correct terms. On billing, pricing, and support pages, use **on
             - Tabs container
     - **Dashboard**
       - Scheduled refresh
+      - Saved control values (a viewer's personal control combinations, under the **Control values** icon; separate from Favorites)
     - **Semantic Model**
       - Semantic Model IDE (short: "IDE")
       - Semantic Model Agent

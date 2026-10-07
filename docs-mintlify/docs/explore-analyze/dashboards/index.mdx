@@ -60,6 +60,68 @@ widgets — so viewers can see which version they're looking at and what changed
 it. (The chip is in-app only; it doesn't appear on [embedded
 dashboards](/embedding/iframe/dashboards).)
 
+## Favorites
+
+The star next to a published dashboard's title adds its workbook to your
+**Favorites** in the sidebar; press the filled star to remove it. The workbook
+header, the dashboard builder and the workspace page carry the same star. It
+only adds and removes the favorite, whatever the dashboard's controls show and
+whether or not you have [saved control values](#saved-control-values) on it.
+
+## Saved control values
+
+When a published dashboard has a [control][ref-controls] you can change, a
+**Control values** icon sits right of the star. It shows whether the controls
+are where the dashboard opens them, and keeps the combinations of values you
+come back to so you can reopen one in a click.
+
+The icon has four states:
+
+| Icon | Tooltip | When |
+|---|---|---|
+| Sliders, greyed out | **Control values** | Every control is on its default and you have nothing saved. Pressing it does nothing. |
+| Sliders | **Control values** | Every control is on its default, and you have saved combinations. |
+| Sliders with an exclamation mark | **Control values changed** | You changed a control, and the combination isn't saved. Clearing a control that has a default counts as a change. |
+| Sliders with a check mark | **Control values** | The controls match one of your saved combinations. |
+
+Press the icon to open its menu:
+
+- **Reset controls to default** — returns every control to its default, a
+  cleared one included, and closes the menu. It's greyed out when the controls
+  are already there.
+- **Save current control values** — saves the combination on screen. It's shown
+  only while you have changed a control and the combination isn't saved yet.
+- Your saved combinations, oldest first, with a check on the one the controls
+  match. Select one to load it. Hover one to **Rename** or **Delete** it; a name
+  can't be empty.
+
+A saved combination is named after what you changed: each control's title and
+its value, separated by commas — for example `Region: City contains new,
+Granularity: Created at is Week, Order status: Status is not set`. A cleared
+control reads as `<field> is not set`, a filter without a title is named
+`Filter`, and a name longer than 100 characters is cut short with `…`.
+
+A combination stores the same values a [shared link][ref-controls-sharing]
+carries — filters, time granularities and field switcher picks, cleared controls
+included. Loading one sets those controls and returns every other control to its
+default. Other URL parameters, such as the open tab, stay as they are, both when
+you load a combination and when you reset.
+
+Saved control values are personal: only you see yours, and you can save up to
+50 on each dashboard. They are kept apart from [favorites](#favorites) — saving
+doesn't add the dashboard to your favorites, and removing it from your favorites
+keeps everything you saved. The sidebar's **Favorites** list doesn't show them.
+
+<Warning>
+
+**Delete** doesn't ask first, and a deleted combination can't be restored. To
+get it back, set the controls again and press **Save current control values**.
+
+</Warning>
+
+Saved control values are in-app only; [embedded
+dashboards](/embedding/iframe/dashboards) don't show the icon.
+
 ## Data freshness
 
 Each widget shows a [freshness](/docs/explore-analyze/workbooks/querying-data#result-freshness-and-provenance) leaf indicating how recently its data was refreshed. The dashboard's own leaf reflects its least-recently-refreshed widget, so you can see at a glance whether everything on the dashboard is up to date.
@@ -193,6 +255,7 @@ does, as `layout: print` on a PDF dashboard export.
 [ref-workbooks]: /docs/explore-analyze/workbooks
 [ref-widgets]: /docs/explore-analyze/dashboards/widgets
 [ref-controls]: /docs/explore-analyze/dashboards/widgets/controls
+[ref-controls-sharing]: /docs/explore-analyze/dashboards/widgets/controls#sharing-the-current-selection
 [ref-control-visibility]: /docs/explore-analyze/dashboards/widgets/controls#visibility
 [ref-control-data-defaults]: /docs/explore-analyze/dashboards/widgets/controls#defaults-resolved-from-the-data
 [ref-layout]: /docs/explore-analyze/dashboards/widgets/layout
