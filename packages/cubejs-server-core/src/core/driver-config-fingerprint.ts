@@ -6,6 +6,9 @@
 
 import crypto from 'crypto';
 
+// Keyed per process, so a heap dump cannot test guessed passwords against a digest.
+const FINGERPRINT_KEY = crypto.randomBytes(32);
+
 /**
  * Deterministic JSON with sorted keys and stable placeholders for values JSON
  * cannot represent. Throws on a circular structure ("not fingerprintable").
@@ -68,13 +71,13 @@ function stableStringify(value: unknown, seen: Set<unknown>): string {
 }
 
 /**
- * A short, stable digest of `value`, hashed so no credential is kept verbatim.
+ * A short digest of `value`, stable within this process and keyed so no credential is recoverable.
  * `null` means "cannot tell", which callers must read as "assume unchanged".
  */
 export function fingerprint(value: unknown): string | null {
   try {
     return crypto
-      .createHash('sha256')
+      .createHmac('sha256', FINGERPRINT_KEY)
       .update(stableStringify(value, new Set()))
       // 32 hex chars = 128 bits, which is far more than an equality check over
       // the handful of configurations one process resolves needs, and keeps the

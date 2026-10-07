@@ -1,3 +1,5 @@
+import crypto from 'crypto';
+
 import { fingerprint } from '../../src/core/driver-config-fingerprint';
 
 describe('fingerprint', () => {
@@ -49,6 +51,13 @@ describe('fingerprint', () => {
 
     expect(digest).not.toContain('super-secret');
     expect(digest).toMatch(/^[0-9a-f]{32}$/);
+  });
+
+  // A plain hash of a config with a guessable password can be checked offline.
+  test('is keyed, not a plain hash of the value', () => {
+    const plain = crypto.createHash('sha256').update(JSON.stringify('secret')).digest('hex').slice(0, 32);
+
+    expect(fingerprint('secret')).not.toEqual(plain);
   });
 
   test('returns null for a circular structure rather than throwing', () => {
