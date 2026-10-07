@@ -59,6 +59,19 @@ cubes:
             - member: visitors_fi.created_at
               operator: inDateRange
               values: ${range}
+      - name: amount_r3_on_positive
+        multi_stage: true
+        type: number
+        sql: "{amount_r3}"
+        filter:
+          include:
+            - and:
+                - member: visitors_fi.created_at
+                  operator: inDateRange
+                  values: ${range}
+                - member: visitors_fi.id
+                  operator: gt
+                  values: ["0"]
 ${rollup ? `    pre_aggregations:
       - name: daily
         measures:
@@ -154,6 +167,15 @@ ${rollup ? `    pre_aggregations:
         recent__amount_r10_yesterday: '300',
         recent__amount_last_7_days: '300',
       }]);
+    });
+
+    it('a date range nested in a top-level and anchors the window too', async () => {
+      expect(await evaluate(['visitors_fi.amount_r3_on_positive'])).toEqual([{ vfi__amount_r3_on_positive: '1400' }]);
+    });
+
+    it('a relative value it cannot resolve is an error', async () => {
+      await expect(evaluate(['visitors_fi.amount_r3_on'], { range: '[2 weeks ago]' }))
+        .rejects.toThrow("Can't parse date '2 weeks ago'");
     });
 
     it('a query date range on the same dimension still bounds the result', async () => {

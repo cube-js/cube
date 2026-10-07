@@ -3,7 +3,7 @@ use super::FilterOperator;
 use crate::cube_bridge::base_query_options::{FilterItem as NativeFilterItem, FilterValue};
 use crate::planner::filter::{FilterGroup, FilterGroupOperator, FilterItem};
 use crate::planner::query_tools::QueryTools;
-use crate::planner::time_dimension::resolve_relative_date_range;
+use crate::planner::time_dimension::{resolve_relative_date_range, QueryDateTimeHelper};
 use crate::planner::{Compiler, MemberSymbol, SymbolPath, SymbolPathType, TimeDimensionSymbol};
 use cubenativeutils::CubeError;
 use std::collections::HashMap;
@@ -62,6 +62,13 @@ impl<'a> FilterCompiler<'a> {
     }
 
     fn add_include_item_impl(&mut self, item: &NativeFilterItem) -> Result<(), CubeError> {
+        // Include entries are ANDed already, so a top-level `and` splits into them.
+        if let Some(items) = &item.and {
+            for item in items {
+                self.add_include_item_impl(item)?;
+            }
+            return Ok(());
+        }
         if let Some(FilterType::Dimension) = self.get_item_type(item, &None)? {
             let compiled_item = self.compile_item(item, &FilterType::Dimension)?;
             match self.as_time_dimension_date_range(&compiled_item)? {
@@ -201,18 +208,20 @@ impl<'a> FilterCompiler<'a> {
         else {
             return Ok(values.clone());
         };
-        let bounds = match operator {
-            FilterOperator::InDateRange
-            | FilterOperator::NotInDateRange
-            | FilterOperator::BeforeDate
-            | FilterOperator::AfterOrOnDate
-            | FilterOperator::BeforeOrOnDate
-            | FilterOperator::AfterDate => {
-                resolve_relative_date_range(value, self.query_tools.timezone())?
-            }
-            _ => None,
+        let bounds = if is_date_operator(operator) {
+            resolve_relative_date_range(value, self.query_tools.timezone())?
+        } else {
+            None
         };
         let Some((start, end)) = bounds else {
+            if is_date_operator(operator)
+                && QueryDateTimeHelper::parse_native_date_time(value).is_err()
+            {
+                return Err(CubeError::user(format!(
+                    "Can't parse date '{}'. Use an absolute date or one of: this / last / next <unit>, last / next <n> <units>, today, yesterday, tomorrow",
+                    value
+                )));
+            }
             return Ok(values.clone());
         };
         let resolved = match operator {
@@ -281,4 +290,16 @@ impl<'a> FilterCompiler<'a> {
         }
         Ok(result)
     }
+}
+
+fn is_date_operator(operator: &FilterOperator) -> bool {
+    matches!(
+        operator,
+        FilterOperator::InDateRange
+            | FilterOperator::NotInDateRange
+            | FilterOperator::BeforeDate
+            | FilterOperator::AfterOrOnDate
+            | FilterOperator::BeforeOrOnDate
+            | FilterOperator::AfterDate
+    )
 }

@@ -1380,28 +1380,44 @@ impl MultiStageQueryPlanner {
         let Some(series) = self.rolling_series_bounds(time_dimension)? else {
             return Ok(None);
         };
+        let Some(period_start) =
+            self.to_date_period_start(time_dimension, granularity, &series.from)?
+        else {
+            return Ok(None);
+        };
+        Ok(Some(SeriesSpan {
+            from: period_start,
+            ..series
+        }))
+    }
+
+    /// Start of the `granularity` period `from` falls in. `None` for a period
+    /// whose boundaries are rows of a calendar cube.
+    fn to_date_period_start(
+        &self,
+        time_dimension: &Rc<TimeDimensionSymbol>,
+        granularity: &str,
+        from: &String,
+    ) -> Result<Option<String>, CubeError> {
         let Some(period) = self.to_date_period_granularity(time_dimension, granularity)? else {
             return Ok(None);
         };
         if period.calendar_sql().is_some() {
             return Ok(None);
         }
-        let period_start = if period.is_predefined_granularity() {
-            QueryTimeSeries::period_start_predefined(
+        if period.is_predefined_granularity() {
+            return Ok(Some(QueryTimeSeries::period_start_predefined(
                 period.granularity(),
-                &series.from,
+                from,
                 QueryTimeSeries::MILLISECOND_PRECISION,
-            )?
-        } else {
-            let tz = self.query_tools.query_tools().timezone();
+            )?));
+        }
+        let tz = self.query_tools.query_tools().timezone();
+        Ok(Some(
             period
-                .align_date_to_origin(QueryDateTime::from_date_str(tz, &series.from)?)?
-                .default_format()
-        };
-        Ok(Some(SeriesSpan {
-            from: period_start,
-            ..series
-        }))
+                .align_date_to_origin(QueryDateTime::from_date_str(tz, from)?)?
+                .default_format(),
+        ))
     }
 
     /// The granularity of a `to_date` rolling window whose period boundary is
@@ -1482,14 +1498,15 @@ impl MultiStageQueryPlanner {
                 }
                 if let Some(granularity) = to_date_granularity {
                     // The window runs from the start of the period the range starts in.
-                    if let [FilterValue::Str(from), FilterValue::Str(to)] =
-                        filter.values().as_slice()
+                    let time_dimension = filter.raw_member_evaluator().as_time_dimension().ok();
+                    if let (Some(time_dimension), [FilterValue::Str(from), FilterValue::Str(to)]) =
+                        (time_dimension, filter.values().as_slice())
                     {
-                        let tz = self.query_tools.timezone();
-                        let from = QueryDateTime::from_date_str(tz, from)?
-                            .start_of(granularity)?
-                            .default_format();
-                        new_state.replace_bounds_of_date_filter(filter, from, to.clone())?;
+                        if let Some(from) =
+                            self.to_date_period_start(&time_dimension, granularity, from)?
+                        {
+                            new_state.replace_bounds_of_date_filter(filter, from, to.clone())?;
+                        }
                     }
                 } else {
                     new_state.replace_date_range_for_rolling_window_without_granularity(
