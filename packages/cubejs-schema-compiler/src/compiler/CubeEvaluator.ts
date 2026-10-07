@@ -239,7 +239,11 @@ export class CubeEvaluator extends CubeSymbols {
    * as `this month`. It resolves when the query is planned, so SQL compiled
    * for it is only valid for a short while.
    */
-  public hasRelativeDateFilters: boolean = false;
+  /**
+   * Cubes with a multi-stage `filter.include` on a relative date range. Their
+   * SQL depends on the current time.
+   */
+  public relativeDateFilterCubes: Set<string> = new Set();
 
   public constructor(
     protected readonly cubeValidator: CubeValidator,
@@ -249,7 +253,7 @@ export class CubeEvaluator extends CubeSymbols {
   }
 
   public compile(cubes: any[], errorReporter: ErrorReporter) {
-    this.hasRelativeDateFilters = false;
+    this.relativeDateFilterCubes = new Set();
     super.compile(cubes, errorReporter);
     const validCubes = this.cubeList.filter(cube => this.cubeValidator.isCubeValid(cube)).sort((a, b) => {
       if (a.isView) {
@@ -713,7 +717,7 @@ export class CubeEvaluator extends CubeSymbols {
             filter.keepOnlyReferences = this.evaluateReferences(cubeName, filter.keepOnly);
           }
           if (Array.isArray(filter.include) && filter.include.some(hasRelativeDateValue)) {
-            this.hasRelativeDateFilters = true;
+            this.relativeDateFilterCubes.add(cubeName);
           }
           member.filter = filter;
         }

@@ -133,6 +133,23 @@ cubes:
             - member: orders.created_at
               operator: inDateRange
               values: ${values}
+  - name: customers
+    sql: SELECT * FROM customers
+    dimensions:
+      - name: id
+        sql: id
+        type: number
+        primary_key: true
+    measures:
+      - name: count
+        type: count
+
+views:
+  - name: orders_view
+    cubes:
+      - join_path: orders
+        includes:
+          - amount_in_range
 `;
 
     const compilerApiFor = (values: string) => new CompilerApi(
@@ -147,8 +164,8 @@ cubes:
       }
     );
 
-    const sqlInTwoMinutes = async (compilerApi: CompilerApi) => {
-      const query: any = { measures: ['orders.amount_in_range'], timezone: 'UTC' };
+    const sqlInTwoMinutes = async (compilerApi: CompilerApi, measure = 'orders.amount_in_range') => {
+      const query: any = { measures: [measure], timezone: 'UTC' };
       const now = jest.spyOn(Date, 'now').mockReturnValue(Date.UTC(2026, 9, 7, 12, 0, 10));
 
       try {
@@ -167,6 +184,16 @@ cubes:
       const { first, sameMinute, nextMinute } = await sqlInTwoMinutes(compilerApiFor('[today]'));
       expect(sameMinute).toBe(first);
       expect(nextMinute).not.toBe(first);
+    });
+
+    test('a view over a relative date range is compiled again in the next minute', async () => {
+      const { first, nextMinute } = await sqlInTwoMinutes(compilerApiFor('[today]'), 'orders_view.amount_in_range');
+      expect(nextMinute).not.toBe(first);
+    });
+
+    test('a cube without relative date ranges keeps the cached SQL', async () => {
+      const { first, nextMinute } = await sqlInTwoMinutes(compilerApiFor('[today]'), 'customers.count');
+      expect(nextMinute).toBe(first);
     });
 
     test('absolute date ranges keep the cached SQL', async () => {
