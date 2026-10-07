@@ -760,16 +760,26 @@ impl PreAggregationOptimizer {
                             .and_then(|dt| dt.add_interval(&neg))
                             .map(|dt| dt.default_format())
                             .unwrap_or(from);
-                        // Shifted as an exclusive end: a month shift clamps the
-                        // day of month, and Jun 30 23:59 shifted alone would end
-                        // the range on May 30 and lose May 31.
+                        // A month shift clamps the day of month, so neither the
+                        // inclusive nor the exclusive end alone covers every case:
+                        // Jun 30 23:59 shifts to May 30 inclusively but May 31 as
+                        // an exclusive end, while Jul 30 23:59 shifts to Jun 30
+                        // inclusively but Jun 29 as an exclusive end. The later
+                        // of the two is the last source instant the SQL reads.
                         let tick = chrono::Duration::milliseconds(1);
-                        let shifted_to = QueryDateTime::from_date_str(tz, &to)
+                        let inclusive = QueryDateTime::from_date_str(tz, &to)
+                            .and_then(|dt| dt.add_interval(&neg))
+                            .map(|dt| dt.default_format());
+                        let exclusive = QueryDateTime::from_date_str(tz, &to)
                             .and_then(|dt| dt.add_duration(tick))
                             .and_then(|dt| dt.add_interval(&neg))
                             .and_then(|dt| dt.add_duration(-tick))
-                            .map(|dt| dt.default_format())
-                            .unwrap_or(to);
+                            .map(|dt| dt.default_format());
+                        let shifted_to = match (inclusive, exclusive) {
+                            (Ok(a), Ok(b)) => std::cmp::max(a, b),
+                            (Ok(a), Err(_)) | (Err(_), Ok(a)) => a,
+                            (Err(_), Err(_)) => to,
+                        };
                         return UsageScanRange::Bounded(shifted_from, shifted_to);
                     }
                     return UsageScanRange::Bounded(from, to);

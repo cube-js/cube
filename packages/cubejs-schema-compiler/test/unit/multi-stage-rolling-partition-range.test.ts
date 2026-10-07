@@ -69,21 +69,29 @@ cubes:
         time_dimension: created_at
         granularity: month
         partition_granularity: month
+      - name: daily
+        measures:
+          - amount
+        dimensions:
+          - status
+        time_dimension: created_at
+        granularity: day
+        partition_granularity: day
 `;
 
-  // The query asks for June 2024 only, at month granularity.
-  const descriptionFor = async (measures: string[]) => {
+  // The query asks for June 2024 only, at month granularity, unless told otherwise.
+  const descriptionFor = async (
+    measures: string[],
+    timeDimension: Record<string, any> = { granularity: 'month', dateRange: ['2024-06-01', '2024-06-30'] },
+    preAggregationId = 'orders.monthly',
+  ) => {
     const { compiler, joinGraph, cubeEvaluator } = prepareYamlCompiler(model);
     await compiler.compile();
 
     const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
       measures,
       dimensions: ['orders.status'],
-      timeDimensions: [{
-        dimension: 'orders.created_at',
-        granularity: 'month',
-        dateRange: ['2024-06-01', '2024-06-30'],
-      }],
+      timeDimensions: [{ dimension: 'orders.created_at', ...timeDimension }],
       timezone: 'UTC',
       preAggregationsSchema: '',
       useNativeSqlPlanner: true,
@@ -91,10 +99,10 @@ cubes:
 
     const [sql] = query.buildSqlAndParams();
     const descriptions: any[] = query.preAggregations?.preAggregationsDescription() || [];
-    const monthly = descriptions.filter(d => d.preAggregationId === 'orders.monthly');
-    expect(monthly.length).toEqual(1);
+    const matched = descriptions.filter(d => d.preAggregationId === preAggregationId);
+    expect(matched.length).toEqual(1);
 
-    return { ...monthly[0], sql };
+    return { ...matched[0], sql };
   };
 
   const partitionRangeFor = async (measures: string[]) => (await descriptionFor(measures)).matchedTimeDimensionDateRange;
@@ -123,6 +131,17 @@ cubes:
   it('a multi-stage time-shifted measure loads the shifted period', async () => {
     expect(await partitionRangeFor(['orders.amount_prev_month_ms']))
       .toEqual(['2024-05-01T00:00:00.000', '2024-05-31T23:59:59.999']);
+  });
+
+  it('a month shift ending on a day the earlier month also has keeps that day', async () => {
+    // Jul 30 shifted back a month is Jun 30, which an exclusive end (Jul 31) would clamp past.
+    const description = await descriptionFor(
+      ['orders.amount_prev_month_ms'],
+      { granularity: 'day', dateRange: ['2024-07-01', '2024-07-30'] },
+      'orders.daily',
+    );
+    expect(description.matchedTimeDimensionDateRange)
+      .toEqual(['2024-06-01T00:00:00.000', '2024-06-30T23:59:59.999']);
   });
 
   it('an unbounded multi-stage rolling measure is not bounded', async () => {
