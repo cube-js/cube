@@ -123,6 +123,7 @@ impl MultiStageMemberQueryPlanner {
             Some(self.plan_calendar_period_source(&time_dimension, &period_dimensions, scope)?)
         };
         let result = MultiStageTimeSeries::builder()
+            .name(self.description.alias().clone())
             .time_dimension(time_dimension.clone())
             .date_range(time_dimension.as_time_dimension()?.date_range_vec())
             .get_date_range_multistage_ref(time_series_description.date_range_cte.clone())

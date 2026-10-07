@@ -234,6 +234,12 @@ ${rollup ? `    pre_aggregations:
         { vfi__created_at_day: '2017-01-07T00:00:00.000Z', vfi__amount_r3: '1400', vfi__amount_r3_on: '1400' },
       ]);
     });
+
+    it('an include outside the query range has no rows', async () => {
+      expect(await evaluate(['visitors_fi.amount_r3_on'], {
+        timeDimensions: [{ dimension: 'visitors_fi.created_at', granularity: 'day', dateRange: ['2017-01-01', '2017-01-05'] }],
+      })).toEqual([]);
+    });
   } else {
     it.skip('multi-stage measures need Tesseract', () => {
       // Multi-stage measures are planned by Tesseract only.
