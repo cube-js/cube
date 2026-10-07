@@ -847,6 +847,10 @@ impl PreAggregationOptimizer {
             return Ok(None);
         }
 
+        if !self.are_masks_renderable(schema, filters, &all_measures, pre_aggregation)? {
+            return Ok(None);
+        }
+
         if let RowGrain::RawRows(node_join) = &row_grain {
             if !self.is_raw_rows_match(node_join.as_ref(), pre_aggregation)? {
                 return Ok(None);
@@ -1144,6 +1148,33 @@ impl PreAggregationOptimizer {
             }
         }
         Ok(Some(matcher.matched_measures().clone()))
+    }
+
+    fn are_masks_renderable(
+        &self,
+        schema: &Rc<LogicalSchema>,
+        filters: &Rc<LogicalFilter>,
+        all_measures: &Vec<Rc<MemberSymbol>>,
+        pre_aggregation: &CompiledPreAggregation,
+    ) -> Result<bool, CubeError> {
+        if !self.query_tools.query_tools().has_masked_members() {
+            return Ok(true);
+        }
+        let filter_members = filters
+            .dimensions_filters
+            .iter()
+            .chain(filters.time_dimensions_filters.iter())
+            .chain(filters.segments.iter())
+            .flat_map(|item| item.all_member_evaluators())
+            .collect::<Vec<_>>();
+        MaskMatcher::new(self.query_tools.query_tools().clone(), pre_aggregation).try_match(
+            schema
+                .dimensions
+                .iter()
+                .chain(schema.time_dimensions.iter())
+                .chain(all_measures.iter())
+                .chain(filter_members.iter()),
+        )
     }
 
     fn match_dimensions(

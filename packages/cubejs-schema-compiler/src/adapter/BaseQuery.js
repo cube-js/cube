@@ -1068,6 +1068,9 @@ export class BaseQuery {
       maxMultiStageStages: this.options.maxMultiStageStages ?? getEnv('maxMultiStageStages'),
       maxMemberResolutionDepth: this.options.maxMemberResolutionDepth ?? getEnv('maxMemberResolutionDepth'),
       disableExternalPreAggregations: !!this.options.disableExternalPreAggregations,
+      // A mask the pre-aggregation can't render rules it out, so the match
+      // must see the same masked members as the SQL build.
+      maskedMembers: this.options.maskedMembers,
       subqueryJoins: this.options.subqueryJoins,
     };
 

@@ -1,0 +1,82 @@
+# Masked members read from a rollup that stores their raw values.
+cubes:
+  - name: workers
+    sql: "SELECT 1 AS id, 'n' AS full_name, 'g' AS gender, 'd' AS department, now() AS created_at"
+    dimensions:
+      - name: id
+        type: number
+        sql: id
+        primary_key: true
+      - name: full_name
+        type: string
+        sql: full_name
+      - name: department
+        type: string
+        sql: department
+      - name: gender
+        type: string
+        sql: gender
+      - name: gender_literal_mask
+        type: string
+        sql: gender
+        mask:
+          sql: "'***'"
+      - name: gender_source_mask
+        type: string
+        sql: gender
+        mask:
+          sql: "CONCAT('***', {CUBE}.gender)"
+      - name: gender_stored_member_mask
+        type: string
+        sql: gender
+        mask:
+          sql: "CONCAT('***', {full_name})"
+      - name: gender_unstored_member_mask
+        type: string
+        sql: gender
+        mask:
+          sql: "CONCAT('***', {department})"
+      - name: full_name_upper
+        type: string
+        sql: "UPPER({full_name})"
+      - name: created_at
+        type: time
+        sql: created_at
+    measures:
+      - name: count
+        type: count
+      - name: full_name_length
+        type: sum
+        sql: "LENGTH({full_name})"
+      - name: female_count
+        type: count
+        filters:
+          - sql: "{gender} = 'F'"
+    segments:
+      - name: females
+        sql: "{gender} = 'F'"
+    pre_aggregations:
+      - name: by_gender
+        type: rollup
+        measures:
+          - count
+          - full_name_length
+          - female_count
+        dimensions:
+          - full_name
+          - full_name_upper
+          - gender
+          - gender_literal_mask
+          - gender_source_mask
+          - gender_stored_member_mask
+          - gender_unstored_member_mask
+        segments:
+          - females
+        time_dimension: created_at
+        granularity: day
+
+views:
+  - name: people
+    cubes:
+      - join_path: workers
+        includes: "*"

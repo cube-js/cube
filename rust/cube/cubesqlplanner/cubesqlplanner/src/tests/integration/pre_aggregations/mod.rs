@@ -2,6 +2,7 @@ mod calendar;
 mod calendar_stored_shift;
 mod external_split;
 mod hub_spoke_join_path;
+mod masked_members;
 mod multi_fact;
 mod multi_fact_view_stored_shift;
 mod multi_stage;

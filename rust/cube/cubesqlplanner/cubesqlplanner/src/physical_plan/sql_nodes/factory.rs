@@ -209,9 +209,10 @@ impl SqlNodesFactory {
             if !self.pre_aggregation_dimensions_references.is_empty() {
                 // Reading from a pre-aggregation: members are plain column refs,
                 // so a segment is already a stored column — no wrapping.
-                RenderReferencesSqlNode::new(
+                self.pre_aggregation_dimension_columns(
                     evaluate_sql_processor.clone(),
-                    self.pre_aggregation_dimensions_references.clone(),
+                    skip_masking,
+                    unmasked_root.clone(),
                 )
             } else {
                 // Building/evaluating the expression: wrap segment dimensions per
@@ -226,7 +227,11 @@ impl SqlNodesFactory {
             ParenthesizeSqlNode::new(evaluate_sql_processor.clone());
 
         let root_node = RootSqlNode::new(
-            self.dimension_processor(evaluate_sql_processor.clone()),
+            self.dimension_processor(
+                evaluate_sql_processor.clone(),
+                skip_masking,
+                unmasked_root.clone(),
+            ),
             self.time_dimension_processor(ParenthesizeSqlNode::new(evaluate_sql_processor.clone())),
             measure_processor.clone(),
             reference_processor,
@@ -280,9 +285,32 @@ impl SqlNodesFactory {
         MeasureRenderModifierSqlNode::new(aggregated, rolling_merge, raw_value, ungrouped_final)
     }
 
-    fn dimension_processor(&self, input: Rc<dyn SqlNode>) -> Rc<dyn SqlNode> {
+    /// A stored column holds the raw value, so a masked member must be
+    /// masked before its column is substituted, not inside the evaluation
+    /// the substitution skips.
+    fn pre_aggregation_dimension_columns(
+        &self,
+        input: Rc<dyn SqlNode>,
+        skip_masking: bool,
+        unmasked_root: Option<Rc<dyn SqlNode>>,
+    ) -> Rc<dyn SqlNode> {
+        MaskedSqlNode::new(
+            RenderReferencesSqlNode::new(input, self.pre_aggregation_dimensions_references.clone()),
+            false,
+            self.group_by_members.clone(),
+            skip_masking,
+            unmasked_root,
+        )
+    }
+
+    fn dimension_processor(
+        &self,
+        input: Rc<dyn SqlNode>,
+        skip_masking: bool,
+        unmasked_root: Option<Rc<dyn SqlNode>>,
+    ) -> Rc<dyn SqlNode> {
         let input = if !self.pre_aggregation_dimensions_references.is_empty() {
-            RenderReferencesSqlNode::new(input, self.pre_aggregation_dimensions_references.clone())
+            self.pre_aggregation_dimension_columns(input, skip_masking, unmasked_root)
         } else {
             let input: Rc<dyn SqlNode> = GeoDimensionSqlNode::new(input);
             let input: Rc<dyn SqlNode> = CaseSqlNode::new(input);
