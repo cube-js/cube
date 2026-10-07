@@ -6,10 +6,8 @@ use datafusion::optimizer::AnalyzerRule;
 use std::collections::HashSet;
 use std::sync::Arc;
 
-/// Collapses nested `UNION ALL`s into one `Union` top-down, before type coercion. DataFusion's
-/// `EliminateNestedUnion` does it bottom-up after coercion and re-coerces every already flattened
-/// input at each level, which is quadratic in the number of inputs. `SELECT * FROM table` inputs are
-/// replaced with the table scan, so wildcard expansion and coercion have nothing to do for them.
+/// Collapses nested `UNION ALL`s top-down before type coercion. Stock `EliminateNestedUnion` runs
+/// after it and re-coerces every flattened input at each level, which is quadratic in the inputs.
 #[derive(Debug)]
 pub struct FlattenUnionRule {}
 
@@ -31,14 +29,9 @@ impl AnalyzerRule for FlattenUnionRule {
             let LogicalPlan::Union(union) = plan else {
                 return Ok(Transformed::no(plan));
             };
-            if !is_aligned_union(&union) {
+            let Some((flattened, changed)) = flatten_inputs(&union) else {
                 return Ok(Transformed::no(LogicalPlan::Union(union)));
-            }
-            let mut flattened = Vec::with_capacity(union.inputs.len());
-            let changed = collect_union_inputs(union.inputs.clone(), &mut flattened);
-            if !same_types(&flattened) {
-                return Ok(Transformed::no(LogicalPlan::Union(union)));
-            }
+            };
             let union = LogicalPlan::Union(Union {
                 inputs: flattened,
                 schema: union.schema,
@@ -77,14 +70,9 @@ fn requalify_union_inputs(
     alias: &SubqueryAlias,
     union: &Union,
 ) -> datafusion::common::Result<Option<LogicalPlan>> {
-    if !is_aligned_union(union) {
+    let Some((flattened, flattened_any)) = flatten_inputs(union) else {
         return Ok(None);
-    }
-    let mut flattened = Vec::with_capacity(union.inputs.len());
-    let flattened_any = collect_union_inputs(union.inputs.clone(), &mut flattened);
-    if !same_types(&flattened) {
-        return Ok(None);
-    }
+    };
     // Requalified duplicate names would make the schema invalid.
     let names = union
         .schema
@@ -123,6 +111,16 @@ fn requalify_union_inputs(
         Arc::new(union),
         alias.alias.clone(),
     )?)))
+}
+
+// The flattened inputs and whether any changed, or `None` if the union must stay as is.
+fn flatten_inputs(union: &Union) -> Option<(Vec<Arc<LogicalPlan>>, bool)> {
+    if !is_aligned_union(union) {
+        return None;
+    }
+    let mut flattened = Vec::with_capacity(union.inputs.len());
+    let changed = collect_union_inputs(union.inputs.clone(), &mut flattened);
+    same_types(&flattened).then_some((flattened, changed))
 }
 
 // Nested unions are coerced one by one, so with different input types an intermediate cast can

@@ -9,9 +9,7 @@ use std::collections::HashSet;
 use std::sync::Arc;
 
 /// Narrows the inputs of a `UNION ALL` subquery to the columns read by the enclosing projection or
-/// aggregate, so type coercion and the optimizer do not process unused columns of every input.
-/// Runs after wildcard expansion and before type coercion. DataFusion's `OptimizeProjections`
-/// does the same, but only at the end of the optimizer.
+/// aggregate before type coercion. `OptimizeProjections` does the same, but only at the end.
 #[derive(Debug)]
 pub struct PruneUnionColumnsRule {}
 
