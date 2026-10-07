@@ -3,7 +3,8 @@ use super::FilterOperator;
 use crate::cube_bridge::base_query_options::{FilterItem as NativeFilterItem, FilterValue};
 use crate::planner::filter::{FilterGroup, FilterGroupOperator, FilterItem};
 use crate::planner::query_tools::QueryTools;
-use crate::planner::{Compiler, MemberSymbol, SymbolPath, SymbolPathType};
+use crate::planner::time_dimension::resolve_relative_date_range;
+use crate::planner::{Compiler, MemberSymbol, SymbolPath, SymbolPathType, TimeDimensionSymbol};
 use cubenativeutils::CubeError;
 use std::collections::HashMap;
 use std::rc::Rc;
@@ -35,10 +36,6 @@ impl<'a> FilterCompiler<'a> {
         }
     }
 
-    // TODO classify time-dimension filters into `time_dimension_filters` so
-    // callers like the multi-stage `filter:` directive can route them to
-    // `QueryProperties::time_dimensions_filters` instead of treating every
-    // include as a plain dimension filter.
     pub fn add_item(&mut self, item: &NativeFilterItem) -> Result<(), CubeError> {
         if let Some(item_type) = self.get_item_type(item, &None)? {
             let compiled_item = self.compile_item(item, &item_type)?;
@@ -48,6 +45,51 @@ impl<'a> FilterCompiler<'a> {
             }
         }
         Ok(())
+    }
+
+    /// Like `add_item`, but a date range on a time dimension goes to
+    /// `time_dimension_filters`, where it bounds rolling windows the way a
+    /// query's `dateRange` does. Used for the multi-stage `filter.include`.
+    pub fn add_include_item(&mut self, item: &NativeFilterItem) -> Result<(), CubeError> {
+        if let Some(FilterType::Dimension) = self.get_item_type(item, &None)? {
+            let compiled_item = self.compile_item(item, &FilterType::Dimension)?;
+            match self.as_time_dimension_date_range(&compiled_item)? {
+                Some(filter) => self.time_dimension_filters.push(filter),
+                None => self.dimension_filters.push(compiled_item),
+            }
+            return Ok(());
+        }
+        self.add_item(item)
+    }
+
+    /// The filter re-targeted at the time dimension without granularity, the
+    /// member a query's `dateRange` filters, so rollups match it as well.
+    fn as_time_dimension_date_range(
+        &self,
+        item: &FilterItem,
+    ) -> Result<Option<FilterItem>, CubeError> {
+        let FilterItem::Item(filter) = item else {
+            return Ok(None);
+        };
+        let member = filter.member_evaluator();
+        let is_time = member
+            .clone()
+            .resolve_reference_chain()
+            .as_dimension()
+            .is_ok_and(|dimension| dimension.is_time());
+        if !is_time || !matches!(filter.filter_operator(), FilterOperator::InDateRange) {
+            return Ok(None);
+        }
+        let time_dimension =
+            MemberSymbol::new_time_dimension(TimeDimensionSymbol::new(member, None, None, None));
+        Ok(Some(FilterItem::Item(BaseFilter::try_new(
+            self.query_tools.clone(),
+            time_dimension,
+            FilterType::Dimension,
+            FilterOperator::InDateRange,
+            Some(filter.values().clone()),
+            None,
+        )?)))
     }
 
     /// Lifts the optional `date_range` of a time-dimension request
@@ -118,12 +160,14 @@ impl<'a> FilterCompiler<'a> {
                     self.evaluator_compiler
                         .add_dimension_or_segment_by_path(path)?
                 };
+                let operator = FilterOperator::from_str(&operator)?;
+                let values = self.resolve_relative_dates(&operator, &item.values)?;
                 Ok(FilterItem::Item(BaseFilter::try_new(
                     self.query_tools.clone(),
                     evaluator,
                     item_type.clone(),
-                    FilterOperator::from_str(&operator)?,
-                    item.values.clone(),
+                    operator,
+                    values,
                     Some(&mut *self.evaluator_compiler),
                 )?))
             } else {
@@ -132,6 +176,40 @@ impl<'a> FilterCompiler<'a> {
                 ))) //TODO pring condition
             }
         }
+    }
+
+    /// A single relative date value (`this month`, `last 7 days`, ...) becomes
+    /// absolute bounds in the query's time zone, as the REST API resolves it
+    /// for query filters: both bounds for a range, the start for `beforeDate`
+    /// / `afterOrOnDate`, the end for `beforeOrOnDate` / `afterDate`.
+    fn resolve_relative_dates(
+        &self,
+        operator: &FilterOperator,
+        values: &Option<Vec<FilterValue>>,
+    ) -> Result<Option<Vec<FilterValue>>, CubeError> {
+        let Some([FilterValue::Str(value)]) = values.as_deref() else {
+            return Ok(values.clone());
+        };
+        let bounds = match operator {
+            FilterOperator::InDateRange
+            | FilterOperator::NotInDateRange
+            | FilterOperator::BeforeDate
+            | FilterOperator::AfterOrOnDate
+            | FilterOperator::BeforeOrOnDate
+            | FilterOperator::AfterDate => {
+                resolve_relative_date_range(value, self.query_tools.timezone())?
+            }
+            _ => None,
+        };
+        let Some((start, end)) = bounds else {
+            return Ok(values.clone());
+        };
+        let resolved = match operator {
+            FilterOperator::BeforeDate | FilterOperator::AfterOrOnDate => vec![start],
+            FilterOperator::BeforeOrOnDate | FilterOperator::AfterDate => vec![end],
+            _ => vec![start, end],
+        };
+        Ok(Some(resolved.into_iter().map(FilterValue::Str).collect()))
     }
 
     // Resolved once per member: classifying a filter and compiling it both

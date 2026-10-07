@@ -1471,9 +1471,31 @@ impl MultiStageQueryPlanner {
         state: Rc<QueryProperties>,
     ) -> Result<Rc<QueryProperties>, CubeError> {
         let mut new_state = state.as_ref().clone();
+        let to_date_granularity = rolling_window
+            .granularity
+            .as_ref()
+            .filter(|_| rolling_window.rolling_type.as_deref() == Some("to_date"));
         for filter_item in state.time_dimensions_filters() {
             if let FilterItem::Item(filter) = filter_item {
-                if matches!(filter.filter_operator(), FilterOperator::InDateRange) {
+                if !matches!(filter.filter_operator(), FilterOperator::InDateRange) {
+                    continue;
+                }
+                if let Some(granularity) = to_date_granularity {
+                    // The window runs from the start of the period the range starts in.
+                    if let [FilterValue::Str(from), FilterValue::Str(to)] =
+                        filter.values().as_slice()
+                    {
+                        let tz = self.query_tools.timezone();
+                        let from = QueryDateTime::from_date_str(tz, from)?
+                            .start_of(granularity)?
+                            .default_format();
+                        new_state.replace_range_in_date_filter(
+                            &filter.member_id(),
+                            from,
+                            to.clone(),
+                        )?;
+                    }
+                } else {
                     new_state.replace_date_range_for_rolling_window_without_granularity(
                         &filter.member_id(),
                         &rolling_window.trailing,

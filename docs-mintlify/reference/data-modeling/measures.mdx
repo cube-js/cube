@@ -829,7 +829,7 @@ measures: {
 |---|---|
 | `exclude` | A list of members (dimensions or segments) whose query filters are *dropped* at the inner stage. |
 | `keep_only` | A list of members whose query filters are *kept*; all other inherited filters are dropped. |
-| `include` | A list of additional predicates injected at the inner stage, regardless of the query. Each entry is a query-style filter (`member`, `operator`, `values`) and entries may be nested into `and` / `or` groups. |
+| `include` | A list of additional predicates injected at the inner stage, regardless of the query. Each entry is a query-style filter (`member`, `operator`, `values`) and entries may be nested into `and` / `or` groups. An `inDateRange` on a time dimension anchors [rolling windows][ref-rolling-window] like a query's `dateRange`, and a single relative value such as `this month` or `last 7 days` resolves at query time in the query's time zone. |
 | `mode` | How the override composes along a multi-stage chain: `relative` (default) or `fixed`. |
 
 The `mode` key controls how the override interacts with the filter context of

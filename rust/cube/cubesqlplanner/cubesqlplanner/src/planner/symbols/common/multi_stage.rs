@@ -43,11 +43,8 @@ pub struct MultiStageFilter {
     pub exclude: Option<Vec<Rc<MemberSymbol>>>,
     pub keep_only: Option<Vec<Rc<MemberSymbol>>>,
     pub include_dimension: Vec<FilterItem>,
-    // Currently always empty: `FilterCompiler::add_item` only buckets
-    // Dimension / Measure, so time-dim include filters land in
-    // `include_dimension`. Field kept for structural symmetry with
-    // `QueryProperties` (dim / time-dim / measure); will be populated once
-    // `FilterCompiler` classifies time-dimension filters separately.
+    // Date ranges on time dimensions, which bound rolling windows like a
+    // query's `dateRange`.
     pub include_time_dimension: Vec<FilterItem>,
     pub include_measure: Vec<FilterItem>,
 }
@@ -194,7 +191,7 @@ fn build_filter(
             let query_tools = compiler.query_tools()?;
             let mut filter_compiler = FilterCompiler::new(compiler, query_tools);
             for item in items {
-                filter_compiler.add_item(item)?;
+                filter_compiler.add_include_item(item)?;
             }
             let (dim, time_dim, meas) = filter_compiler.extract_result();
             include_dimension = dim;
