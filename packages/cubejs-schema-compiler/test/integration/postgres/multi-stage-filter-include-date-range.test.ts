@@ -68,11 +68,12 @@ ${rollup ? `    pre_aggregations:
         partition_granularity: day
 ` : ''}
   - name: recent
+    # Rows a few days inside the ranges below, so a day changing between
+    # planning and execution moves no row across a bound.
     sql: >
-      select 1 as id, 300 as amount, now() as created_at union all
-      select 2, 200, now() - interval '1 day' union all
-      select 3, 100, now() - interval '2 day' union all
-      select 4, 1000, now() - interval '10 day'
+      select 1 as id, 100 as amount, now() - interval '3 day' as created_at union all
+      select 2, 200, now() - interval '4 day' union all
+      select 3, 1000, now() - interval '30 day'
     dimensions:
       - name: id
         sql: id
@@ -85,25 +86,16 @@ ${rollup ? `    pre_aggregations:
       - name: amount
         sql: amount
         type: sum
-      - name: amount_r2
+      - name: amount_r10
         multi_stage: true
         type: sum
         sql: "{amount}"
         rolling_window:
-          trailing: 2 day
-      - name: amount_r2_today
+          trailing: 10 day
+      - name: amount_r10_yesterday
         multi_stage: true
         type: number
-        sql: "{amount_r2}"
-        filter:
-          include:
-            - member: recent.created_at
-              operator: inDateRange
-              values: [today]
-      - name: amount_r2_yesterday
-        multi_stage: true
-        type: number
-        sql: "{amount_r2}"
+        sql: "{amount_r10}"
         filter:
           include:
             - member: recent.created_at
@@ -120,12 +112,16 @@ ${rollup ? `    pre_aggregations:
               values: [last 7 days]
 `;
 
-  const evaluate = async (measures: string[], range = '["2017-01-07", "2017-01-07"]', withPreAggregations = false) => {
+  const evaluate = async (
+    measures: string[],
+    { range = '["2017-01-07", "2017-01-07"]', withPreAggregations = false, timeDimensions = [] as any[] } = {},
+  ) => {
     const { compiler, joinGraph, cubeEvaluator } = prepareYamlCompiler(model(range, withPreAggregations));
     await compiler.compile();
 
     const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
       measures,
+      timeDimensions,
       timezone: 'UTC',
       preAggregationsSchema: '',
     });
@@ -147,22 +143,40 @@ ${rollup ? `    pre_aggregations:
     });
 
     it('a rollup serves the windows with the partitions they read', async () => {
-      expect(await evaluate(['visitors_fi.amount_r3_on', 'visitors_fi.amount_mtd_on'], undefined, true)).toEqual([{
+      expect(await evaluate(['visitors_fi.amount_r3_on', 'visitors_fi.amount_mtd_on'], { withPreAggregations: true })).toEqual([{
         vfi__amount_r3_on: '1400',
         vfi__amount_mtd_on: '1500',
       }]);
     });
 
     it('a relative date range resolves at query time', async () => {
-      expect(await evaluate([
-        'recent.amount_r2_today',
-        'recent.amount_r2_yesterday',
-        'recent.amount_last_7_days',
-      ])).toEqual([{
-        recent__amount_r2_today: '500',
-        recent__amount_r2_yesterday: '300',
+      expect(await evaluate(['recent.amount_r10_yesterday', 'recent.amount_last_7_days'])).toEqual([{
+        recent__amount_r10_yesterday: '300',
         recent__amount_last_7_days: '300',
       }]);
+    });
+
+    it('a query date range on the same dimension still bounds the result', async () => {
+      // Jan 1 - 5 of the month to Jan 7.
+      expect(await evaluate(['visitors_fi.amount_mtd_on'], {
+        timeDimensions: [{ dimension: 'visitors_fi.created_at', dateRange: ['2017-01-01', '2017-01-05'] }],
+      })).toEqual([{ vfi__amount_mtd_on: '300' }]);
+    });
+
+    it('a to_date window over a query date range without granularity reads from the start of the period', async () => {
+      expect(await evaluate(['visitors_fi.amount_mtd'], {
+        timeDimensions: [{ dimension: 'visitors_fi.created_at', dateRange: ['2017-01-06', '2017-01-07'] }],
+      })).toEqual([{ vfi__amount_mtd: '1500' }]);
+    });
+
+    it('with a granularity every row keeps its own window', async () => {
+      expect(await evaluate(['visitors_fi.amount_r3_on', 'visitors_fi.amount_mtd_on'], {
+        timeDimensions: [{ dimension: 'visitors_fi.created_at', granularity: 'day', dateRange: ['2017-01-05', '2017-01-07'] }],
+      })).toEqual([
+        { vfi__created_at_day: '2017-01-05T00:00:00.000Z', vfi__amount_r3_on: '300', vfi__amount_mtd_on: '300' },
+        { vfi__created_at_day: '2017-01-06T00:00:00.000Z', vfi__amount_r3_on: '500', vfi__amount_mtd_on: '600' },
+        { vfi__created_at_day: '2017-01-07T00:00:00.000Z', vfi__amount_r3_on: '1400', vfi__amount_mtd_on: '1500' },
+      ]);
     });
   } else {
     it.skip('multi-stage measures need Tesseract', () => {

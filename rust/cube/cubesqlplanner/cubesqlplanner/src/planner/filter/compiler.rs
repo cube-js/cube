@@ -22,6 +22,9 @@ pub struct FilterCompiler<'a> {
     time_dimension_filters: Vec<FilterItem>,
     measures_filters: Vec<FilterItem>,
     member_paths: HashMap<String, SymbolPath>,
+    // Set while compiling a data-model `include`, whose relative date values
+    // never pass through the REST API's resolution.
+    resolve_relative_dates: bool,
 }
 
 impl<'a> FilterCompiler<'a> {
@@ -33,6 +36,7 @@ impl<'a> FilterCompiler<'a> {
             time_dimension_filters: vec![],
             measures_filters: vec![],
             member_paths: HashMap::new(),
+            resolve_relative_dates: false,
         }
     }
 
@@ -51,6 +55,13 @@ impl<'a> FilterCompiler<'a> {
     /// `time_dimension_filters`, where it bounds rolling windows the way a
     /// query's `dateRange` does. Used for the multi-stage `filter.include`.
     pub fn add_include_item(&mut self, item: &NativeFilterItem) -> Result<(), CubeError> {
+        self.resolve_relative_dates = true;
+        let result = self.add_include_item_impl(item);
+        self.resolve_relative_dates = false;
+        result
+    }
+
+    fn add_include_item_impl(&mut self, item: &NativeFilterItem) -> Result<(), CubeError> {
         if let Some(FilterType::Dimension) = self.get_item_type(item, &None)? {
             let compiled_item = self.compile_item(item, &FilterType::Dimension)?;
             match self.as_time_dimension_date_range(&compiled_item)? {
@@ -179,15 +190,15 @@ impl<'a> FilterCompiler<'a> {
     }
 
     /// A single relative date value (`this month`, `last 7 days`, ...) becomes
-    /// absolute bounds in the query's time zone, as the REST API resolves it
-    /// for query filters: both bounds for a range, the start for `beforeDate`
-    /// / `afterOrOnDate`, the end for `beforeOrOnDate` / `afterDate`.
+    /// absolute bounds in the query's time zone, as the REST API resolves it.
     fn resolve_relative_dates(
         &self,
         operator: &FilterOperator,
         values: &Option<Vec<FilterValue>>,
     ) -> Result<Option<Vec<FilterValue>>, CubeError> {
-        let Some([FilterValue::Str(value)]) = values.as_deref() else {
+        let Some([FilterValue::Str(value)]) =
+            values.as_deref().filter(|_| self.resolve_relative_dates)
+        else {
             return Ok(values.clone());
         };
         let bounds = match operator {

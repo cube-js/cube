@@ -1489,11 +1489,7 @@ impl MultiStageQueryPlanner {
                         let from = QueryDateTime::from_date_str(tz, from)?
                             .start_of(granularity)?
                             .default_format();
-                        new_state.replace_range_in_date_filter(
-                            &filter.member_id(),
-                            from,
-                            to.clone(),
-                        )?;
+                        new_state.replace_bounds_of_date_filter(filter, from, to.clone())?;
                     }
                 } else {
                     new_state.replace_date_range_for_rolling_window_without_granularity(

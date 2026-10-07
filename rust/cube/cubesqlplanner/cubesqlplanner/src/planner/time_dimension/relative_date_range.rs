@@ -15,10 +15,8 @@ lazy_static! {
             .unwrap();
 }
 
-/// Resolves a relative date range such as `this month`, `last 7 days` or
-/// `yesterday` to its `[start, end]` in `tz`, as the REST API's date parser
-/// does for a query's `dateRange`. Returns `None` for anything else, so
-/// absolute dates pass through untouched.
+/// Resolves a relative date range (`this month`, `last 7 days`, `yesterday`)
+/// to `[start, end]` in `tz`. Returns `None` for anything else.
 pub fn resolve_relative_date_range(
     value: &str,
     tz: Tz,
