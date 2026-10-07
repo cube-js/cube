@@ -138,7 +138,13 @@ impl QueryTools {
             return Ok(templates.clone());
         }
         let driver_tools = self.base_tools.driver_tools(external)?;
-        let templates = PlanSqlTemplates::try_new(driver_tools, external)?;
+        let templates = if external {
+            PlanSqlTemplates::try_new(driver_tools, true)?
+        } else {
+            // `driverTools(false)` is the base query itself, whose templates
+            // `try_new` already fetched.
+            PlanSqlTemplates::new(self.templates_render.clone(), driver_tools, false)
+        };
         *cache.borrow_mut() = Some(templates.clone());
         Ok(templates)
     }
