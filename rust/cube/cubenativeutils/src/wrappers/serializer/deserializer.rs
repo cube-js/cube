@@ -184,10 +184,11 @@ impl<'de, IT: InnerTypes> SeqAccess<'de> for NativeSeqDeserializer<IT> {
 
 struct NativeMapDeserializer<IT: InnerTypes> {
     input: IT::Struct,
-    prop_names: Vec<NativeObjectHandle<IT>>,
-    key_idx: u32,
-    value_idx: u32,
-    len: u32,
+    prop_names: std::vec::IntoIter<NativeObjectHandle<IT>>,
+    idx: usize,
+    // Fetched in `next_key_seed`, so the key handle can be moved into the key
+    // deserializer instead of being cloned for the lookup.
+    pending_value: Option<NativeObjectHandle<IT>>,
 }
 
 impl<IT: InnerTypes> NativeMapDeserializer<IT> {
@@ -195,14 +196,31 @@ impl<IT: InnerTypes> NativeMapDeserializer<IT> {
         let prop_names = input.get_own_property_names().map_err(|err| {
             NativeObjSerializerError::from(err).context("failed to get property names")
         })?;
-        let len = prop_names.len() as u32;
         Ok(Self {
             input,
-            prop_names,
-            key_idx: 0,
-            value_idx: 0,
-            len,
+            prop_names: prop_names.into_iter(),
+            idx: 0,
+            pending_value: None,
         })
+    }
+
+    fn field_context(key: &NativeObjectHandle<IT>) -> String {
+        let key = key
+            .to_string()
+            .and_then(|s| s.into_value())
+            .unwrap_or_default();
+        format!("field `{key}`")
+    }
+
+    /// Error path only: the key handle has been consumed by then, so the name is
+    /// looked up again.
+    fn current_field_context(&self) -> String {
+        self.input
+            .get_own_property_names()
+            .ok()
+            .and_then(|names| names.into_iter().nth(self.idx - 1))
+            .map(|key| Self::field_context(&key))
+            .unwrap_or_else(|| format!("field #{}", self.idx - 1))
     }
 }
 
@@ -212,15 +230,18 @@ impl<'de, IT: InnerTypes> MapAccess<'de> for NativeMapDeserializer<IT> {
     where
         K: DeserializeSeed<'de>,
     {
-        if self.key_idx >= self.len {
+        let Some(key) = self.prop_names.next() else {
             return Ok(None);
-        }
-        let v = self
-            .prop_names
-            .get(self.key_idx as usize)
-            .ok_or_else(|| NativeObjSerializerError::Message("Failed to get key".to_string()))?;
-        self.key_idx += 1;
-        seed.deserialize(NativeSerdeDeserializer::new(v.clone()))
+        };
+        self.idx += 1;
+        let value = self.input.get_field_by_key(&key).map_err(|err| {
+            NativeObjSerializerError::from(err).context(format!(
+                "{}: failed to read value",
+                Self::field_context(&key)
+            ))
+        })?;
+        self.pending_value = Some(value);
+        seed.deserialize(NativeSerdeDeserializer::new(key))
             .map(Some)
     }
 
@@ -228,31 +249,16 @@ impl<'de, IT: InnerTypes> MapAccess<'de> for NativeMapDeserializer<IT> {
     where
         V: DeserializeSeed<'de>,
     {
-        if self.value_idx >= self.len {
-            return Err(NativeObjSerializerError::Message(
-                "Array index out of bounds".to_string(),
-            ));
-        }
-        let prop_name = self
-            .prop_names
-            .get(self.value_idx as usize)
-            .ok_or_else(|| {
-                NativeObjSerializerError::Message("Array index out of bounds".to_string())
-            })?;
-        let field = || {
-            let key = prop_name
-                .to_string()
-                .and_then(|s| s.into_value())
-                .unwrap_or_default();
-            format!("field `{key}`")
-        };
-        let value = self.input.get_field_by_key(prop_name).map_err(|err| {
-            NativeObjSerializerError::from(err)
-                .context(format!("{}: failed to read value", field()))
+        let value = self.pending_value.take().ok_or_else(|| {
+            NativeObjSerializerError::Message(
+                "next_value_seed called before next_key_seed".to_string(),
+            )
         })?;
+        seed.deserialize(NativeSerdeDeserializer::new(value))
+            .map_err(|err| err.context(self.current_field_context()))
+    }
 
-        self.value_idx += 1;
-        let de = NativeSerdeDeserializer::new(value);
-        seed.deserialize(de).map_err(|err| err.context(field()))
+    fn size_hint(&self) -> Option<usize> {
+        Some(self.prop_names.len())
     }
 }
