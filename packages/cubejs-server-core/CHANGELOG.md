@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+# [1.8.0](https://github.com/cube-js/cube/compare/v1.7.50...v1.8.0) (2026-10-07)
+
+### Features
+
+- **server-core,cli:** Detect primary keys in generate data model, thanks [@haechangcho](https://github.com/haechangcho) ([#11806](https://github.com/cube-js/cube/issues/11806)) ([1e5e930](https://github.com/cube-js/cube/commit/1e5e930d5bcda418472627013247cf0dfa417f85)), closes [#10517](https://github.com/cube-js/cube/issues/10517) [#11270](https://github.com/cube-js/cube/issues/11270)
+
 ## [1.7.50](https://github.com/cube-js/cube/compare/v1.7.49...v1.7.50) (2026-10-02)
 
 ### Bug Fixes

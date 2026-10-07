@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+# [1.8.0](https://github.com/cube-js/cube/compare/v1.7.50...v1.8.0) (2026-10-07)
+
+### Bug Fixes
+
+- **backend-shared:** Warn about deprecated CUBEJS_DB_SCHEMA only when it is set ([#12099](https://github.com/cube-js/cube/issues/12099)) ([71bd0c7](https://github.com/cube-js/cube/commit/71bd0c78a7b95ac92a56d11b2b1afdb75fede395))
+
 ## [1.7.50](https://github.com/cube-js/cube/compare/v1.7.49...v1.7.50) (2026-10-02)
 
 **Note:** Version bump only for package @cubejs-client/playground

@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+# [1.8.0](https://github.com/cube-js/cube/compare/v1.7.50...v1.8.0) (2026-10-07)
+
+### Performance Improvements
+
+- **cubestore:** Reduce memory usage by keeping queue results out of the event channel ([#12116](https://github.com/cube-js/cube/issues/12116)) ([ce46122](https://github.com/cube-js/cube/commit/ce46122d1be2ca63b63a276feeaec6e223128245))
+
 ## [1.7.50](https://github.com/cube-js/cube/compare/v1.7.49...v1.7.50) (2026-10-02)
 
 **Note:** Version bump only for package @cubejs-backend/cubestore

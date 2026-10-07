@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+# [1.8.0](https://github.com/cube-js/cube/compare/v1.7.50...v1.8.0) (2026-10-07)
+
+### Features
+
+- **api-gateway:** Stricter validation for pre-aggregation queries and date ranges ([#12095](https://github.com/cube-js/cube/issues/12095)) ([87482c2](https://github.com/cube-js/cube/commit/87482c226d14a8b1b18b3f2ce926810f2b67b9e3))
+
 ## [1.7.50](https://github.com/cube-js/cube/compare/v1.7.49...v1.7.50) (2026-10-02)
 
 ### Bug Fixes

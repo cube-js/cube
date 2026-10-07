@@ -3,6 +3,28 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+# [1.8.0](https://github.com/cube-js/cube/compare/v1.7.50...v1.8.0) (2026-10-07)
+
+### Bug Fixes
+
+- **backend-shared:** Warn about deprecated CUBEJS_DB_SCHEMA only when it is set ([#12099](https://github.com/cube-js/cube/issues/12099)) ([71bd0c7](https://github.com/cube-js/cube/commit/71bd0c78a7b95ac92a56d11b2b1afdb75fede395))
+- **mysql-driver:** Point foreign keys at the referenced table ([#12124](https://github.com/cube-js/cube/issues/12124)) ([501bd70](https://github.com/cube-js/cube/commit/501bd70b2e8592644d976e5a66a6dcd3e57edde1)), closes [#11806](https://github.com/cube-js/cube/issues/11806)
+- **postgres-driver:** Detect primary and foreign keys via pg_catalog ([#12125](https://github.com/cube-js/cube/issues/12125)) ([f5e1185](https://github.com/cube-js/cube/commit/f5e1185f80e9d65d876014131f79d595c774ad56)), closes [#11806](https://github.com/cube-js/cube/issues/11806)
+- **schema-compiler,query-orchestrator:** Bound the rollupLambda source query ([#11708](https://github.com/cube-js/cube/issues/11708)) ([d403e7a](https://github.com/cube-js/cube/commit/d403e7a096920e04d96b15b52bb108e46030f4d9)), closes [#11682](https://github.com/cube-js/cube/issues/11682)
+- **schema-compiler:** Bound ClickHouse UNION LIMIT via a derived table ([#12113](https://github.com/cube-js/cube/issues/12113)) ([ff34ba1](https://github.com/cube-js/cube/commit/ff34ba18da67472bcc37347ad6fd7266ac089e6d))
+- **tesseract:** Render the MAX_SOURCE_ROW_LIMIT placeholder as a param ([#12122](https://github.com/cube-js/cube/issues/12122)) ([3dcdace](https://github.com/cube-js/cube/commit/3dcdacefc33368b9530936fc40698fb096e28c1c))
+- **tesseract:** Resolve join paths for cubes connected only through a hub ([#12070](https://github.com/cube-js/cube/issues/12070)) ([0f9c9c3](https://github.com/cube-js/cube/commit/0f9c9c3093f8304c64efe597f6e06dc011e6ad82)), closes [#11362](https://github.com/cube-js/cube/issues/11362)
+
+### Features
+
+- **api-gateway:** Stricter validation for pre-aggregation queries and date ranges ([#12095](https://github.com/cube-js/cube/issues/12095)) ([87482c2](https://github.com/cube-js/cube/commit/87482c226d14a8b1b18b3f2ce926810f2b67b9e3))
+- **server-core,cli:** Detect primary keys in generate data model, thanks [@haechangcho](https://github.com/haechangcho) ([#11806](https://github.com/cube-js/cube/issues/11806)) ([1e5e930](https://github.com/cube-js/cube/commit/1e5e930d5bcda418472627013247cf0dfa417f85)), closes [#10517](https://github.com/cube-js/cube/issues/10517) [#11270](https://github.com/cube-js/cube/issues/11270)
+
+### Performance Improvements
+
+- **cubestore:** Reduce memory usage by keeping queue results out of the event channel ([#12116](https://github.com/cube-js/cube/issues/12116)) ([ce46122](https://github.com/cube-js/cube/commit/ce46122d1be2ca63b63a276feeaec6e223128245))
+- **native:** Parse Cube Store results without copying the message ([#12139](https://github.com/cube-js/cube/issues/12139)) ([df5d35c](https://github.com/cube-js/cube/commit/df5d35ce38f3ef85ff4562d8d672a8eb163778a8))
+
 ## [1.7.50](https://github.com/cube-js/cube/compare/v1.7.49...v1.7.50) (2026-10-02)
 
 ### Bug Fixes

@@ -3,6 +3,16 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+# [1.8.0](https://github.com/cube-js/cube/compare/v1.7.50...v1.8.0) (2026-10-07)
+
+### Bug Fixes
+
+- **tesseract:** Resolve join paths for cubes connected only through a hub ([#12070](https://github.com/cube-js/cube/issues/12070)) ([0f9c9c3](https://github.com/cube-js/cube/commit/0f9c9c3093f8304c64efe597f6e06dc011e6ad82)), closes [#11362](https://github.com/cube-js/cube/issues/11362)
+
+### Performance Improvements
+
+- **native:** Parse Cube Store results without copying the message ([#12139](https://github.com/cube-js/cube/issues/12139)) ([df5d35c](https://github.com/cube-js/cube/commit/df5d35ce38f3ef85ff4562d8d672a8eb163778a8))
+
 ## [1.7.50](https://github.com/cube-js/cube/compare/v1.7.49...v1.7.50) (2026-10-02)
 
 ### Bug Fixes

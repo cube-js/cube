@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+# [1.8.0](https://github.com/cube-js/cube/compare/v1.7.50...v1.8.0) (2026-10-07)
+
+### Bug Fixes
+
+- **schema-compiler,query-orchestrator:** Bound the rollupLambda source query ([#11708](https://github.com/cube-js/cube/issues/11708)) ([d403e7a](https://github.com/cube-js/cube/commit/d403e7a096920e04d96b15b52bb108e46030f4d9)), closes [#11682](https://github.com/cube-js/cube/issues/11682)
+
 ## [1.7.50](https://github.com/cube-js/cube/compare/v1.7.49...v1.7.50) (2026-10-02)
 
 **Note:** Version bump only for package @cubejs-backend/query-orchestrator

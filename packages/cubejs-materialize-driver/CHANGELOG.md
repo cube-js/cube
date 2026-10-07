@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+# [1.8.0](https://github.com/cube-js/cube/compare/v1.7.50...v1.8.0) (2026-10-07)
+
+### Bug Fixes
+
+- **postgres-driver:** Detect primary and foreign keys via pg_catalog ([#12125](https://github.com/cube-js/cube/issues/12125)) ([f5e1185](https://github.com/cube-js/cube/commit/f5e1185f80e9d65d876014131f79d595c774ad56)), closes [#11806](https://github.com/cube-js/cube/issues/11806)
+
 ## [1.7.50](https://github.com/cube-js/cube/compare/v1.7.49...v1.7.50) (2026-10-02)
 
 **Note:** Version bump only for package @cubejs-backend/materialize-driver
