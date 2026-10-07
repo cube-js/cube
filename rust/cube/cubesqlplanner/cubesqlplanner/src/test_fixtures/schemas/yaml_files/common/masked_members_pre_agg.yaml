@@ -1,7 +1,7 @@
 # Masked members read from a rollup that stores their raw values.
 cubes:
   - name: workers
-    sql: "SELECT 1 AS id, 'n' AS full_name, 'g' AS gender, 'd' AS department, now() AS created_at"
+    sql: "SELECT * FROM workers"
     dimensions:
       - name: id
         type: number
