@@ -559,7 +559,7 @@ export class BaseQuery {
    * @protected
    * @param { import('../compiler/JoinGraph').FinishedJoinTree } joinTree
    * @param { string[] } joinHints
-   * @return { string[][] }
+   * @return { (string|string[])[] }
    */
   enrichedJoinHintsFromJoinTree(joinTree, joinHints) {
     // The tree can hold two edges into one cube. The later edge wins so the next pass follows the
