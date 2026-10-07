@@ -2343,6 +2343,35 @@ pub mod tests {
     use std::iter::FromIterator;
 
     #[tokio::test]
+    pub async fn test_union_all_chain_is_flat() {
+        let indices = default_indices();
+        let plan = initial_plan(
+            "SELECT order_id FROM s.Orders \
+             UNION ALL SELECT 1.5 \
+             UNION ALL SELECT customer_id FROM s.Customers \
+             UNION ALL SELECT order_customer FROM s.Orders",
+            &indices,
+        );
+        assert_eq!(
+            pretty_printers::pp_plan(&plan),
+            "Union, schema: fields:[s.Orders.order_id], metadata:{}\
+            \n  Projection, [order_id]\
+            \n    Scan s.Orders, source: CubeTableLogical, fields: [order_id]\
+            \n  Projection, [order_id]\
+            \n    Empty\
+            \n  Projection, [order_id]\
+            \n    Scan s.Customers, source: CubeTableLogical, fields: [customer_id]\
+            \n  Projection, [order_id]\
+            \n    Scan s.Orders, source: CubeTableLogical, fields: [order_customer]"
+        );
+        let LogicalPlan::Union(union) = &plan else {
+            panic!("expected a union, got {}", pretty_printers::pp_plan(&plan));
+        };
+        assert_eq!(union.inputs.len(), 4);
+        assert_eq!(plan.schema().field(0).data_type(), &DataType::Float64);
+    }
+
+    #[tokio::test]
     pub async fn test_choose_index() {
         let indices = default_indices();
         let plan = initial_plan("SELECT * FROM s.Customers WHERE customer_id = 1", &indices);

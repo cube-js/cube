@@ -1,5 +1,6 @@
 mod check_memory;
 mod distributed_partial_aggregate;
+pub mod flatten_union;
 mod inline_aggregate_rewriter;
 pub mod is_not_distinct_from_join_keys;
 pub mod rewrite_plan;
