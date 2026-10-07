@@ -619,7 +619,6 @@ describe('Multiple join paths', () => {
     ];
 
     for (const { preAggregationId, addTimeRange, expectedData } of preAggregationTests) {
-      // eslint-disable-next-line no-loop-func
       it(`pre-aggregation ${preAggregationId} should match its own references`, async () => {
         // Always not using range, because reference query would have no range to start from
         // but should match pre-aggregation anyway
@@ -632,7 +631,6 @@ describe('Multiple join paths', () => {
         }
       });
 
-      // eslint-disable-next-line no-loop-func
       it(`pre-aggregation ${preAggregationId} reference query should be executable`, async () => {
         // Adding date range for rolling window measure
         const query = makeReferenceQueryFor(preAggregationId, addTimeRange);
