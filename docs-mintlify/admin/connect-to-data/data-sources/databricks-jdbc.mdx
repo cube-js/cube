@@ -29,6 +29,32 @@ CUBEJS_DB_DATABRICKS_TOKEN=XXXXX
 CUBEJS_DB_DATABRICKS_ACCEPT_POLICY=true
 ```
 
+### Service principal (OAuth M2M)
+
+To connect as a [Databricks service principal][ref-databricks-m2m-oauth]
+instead of with a personal access token, set the OAuth client ID and secret
+of the service principal. The service principal needs access to the compute
+in the JDBC URL (for example, `CAN USE` on a SQL warehouse) and to the data
+Cube queries. Requires Cube v1.3.20 or later.
+
+```dotenv
+CUBEJS_DB_TYPE=databricks-jdbc
+CUBEJS_DB_DATABRICKS_URL=jdbc:databricks://dbc-XXXXXXX-XXXX.cloud.databricks.com:443/default;transportMode=http;ssl=1;httpPath=sql/protocolv1/o/XXXXX/XXXXX
+CUBEJS_DB_DATABRICKS_OAUTH_CLIENT_ID=<SERVICE_PRINCIPAL_CLIENT_ID>
+CUBEJS_DB_DATABRICKS_OAUTH_CLIENT_SECRET=<SERVICE_PRINCIPAL_OAUTH_SECRET>
+CUBEJS_DB_DATABRICKS_ACCEPT_POLICY=true
+```
+
+When [`CUBEJS_DB_DATABRICKS_OAUTH_CLIENT_ID`](/reference/configuration/environment-variables#cubejs_db_databricks_oauth_client_id)
+is set, Cube authenticates with OAuth and ignores
+[`CUBEJS_DB_DATABRICKS_TOKEN`](/reference/configuration/environment-variables#cubejs_db_databricks_token).
+Cube sets the `AuthMech`, `UID` and `PWD` connection properties itself, so
+OAuth parameters in the JDBC URL alone are not enough: set both environment
+variables.
+
+In Cube Cloud, select **Service principal (OAuth M2M) authentication** in the
+Databricks data source form and enter the client ID and secret.
+
 ### Docker
 
 Create a `.env` file [as above](#environment-variables), then extend the
