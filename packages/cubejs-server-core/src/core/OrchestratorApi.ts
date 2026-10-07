@@ -68,8 +68,9 @@ export class OrchestratorApi {
   }
 
   /**
-   * Evaluated per query rather than per orchestrator, which is shared by every user of an app.
-   * Queries without a request context (scheduled refresh) carry no tags, and Cube Store ignores them.
+   * The wrapper is built once in server core; it's called per query because one orchestrator serves
+   * every user of an app. Queries without a request context (scheduled refresh) carry no tags, and
+   * Cube Store ignores them.
    */
   protected async withQueryTags(query: QueryBody): Promise<QueryBody> {
     if (!this.options.queryTags || !query.context || query.external) {
