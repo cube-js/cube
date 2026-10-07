@@ -235,11 +235,6 @@ export class CubeEvaluator extends CubeSymbols {
   private isRbacEnabledCache: boolean | null = null;
 
   /**
-   * Whether a multi-stage `filter.include` holds a relative date range such
-   * as `this month`. It resolves when the query is planned, so SQL compiled
-   * for it is only valid for a short while.
-   */
-  /**
    * Cubes with a multi-stage `filter.include` on a relative date range. Their
    * SQL depends on the current time.
    */
