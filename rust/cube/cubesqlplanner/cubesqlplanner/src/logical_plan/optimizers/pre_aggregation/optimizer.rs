@@ -3,6 +3,7 @@ use super::*;
 use crate::logical_plan::visitor::{LogicalPlanRewriter, NodeRewriteResult};
 use crate::logical_plan::*;
 use crate::planner::collectors::{collect_cube_names_from_symbols, has_multi_stage_members};
+use crate::planner::filter::operators::date_range::DateRangeKind;
 use crate::planner::filter::typed_filter::resolve_base_symbol;
 use crate::planner::filter::FilterItem;
 use crate::planner::filter::{FilterOp, RollingScanBand};
@@ -740,9 +741,13 @@ impl PreAggregationOptimizer {
                     continue;
                 }
                 let range = match base_filter.operation() {
-                    FilterOp::DateRange(date_range_op) => {
+                    FilterOp::DateRange(date_range_op)
+                        if matches!(date_range_op.kind, DateRangeKind::InRange) =>
+                    {
                         date_range_op.formatted_date_range(precision).ok()
                     }
+                    // An excluded range bounds nothing.
+                    FilterOp::DateRange(_) => None,
                     // A band that can't be worked out leaves the partitions
                     // unbounded rather than failing the query.
                     op => match Self::rolling_scan_range(op, query_tools, external, precision) {
@@ -766,12 +771,8 @@ impl PreAggregationOptimizer {
                             .and_then(|dt| dt.add_interval(&neg))
                             .map(|dt| dt.default_format())
                             .unwrap_or(from);
-                        // A month shift clamps the day of month, so neither the
-                        // inclusive nor the exclusive end alone covers every case:
-                        // Jun 30 23:59 shifts to May 30 inclusively but May 31 as
-                        // an exclusive end, while Jul 30 23:59 shifts to Jun 30
-                        // inclusively but Jun 29 as an exclusive end. The later
-                        // of the two is the last source instant the SQL reads.
+                        // A month shift clamps the day of month, so either end alone
+                        // can lose the last source day; the later of the two covers both.
                         let tick = chrono::Duration::milliseconds(1);
                         let inclusive = QueryDateTime::from_date_str(tz, &to)
                             .and_then(|dt| dt.add_interval(&neg))

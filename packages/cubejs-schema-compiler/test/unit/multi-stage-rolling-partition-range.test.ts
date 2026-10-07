@@ -187,7 +187,7 @@ cubes:
 ${preAggregation}
 `;
 
-  const partitionRangeFor = async (preAggregation: string, query: Record<string, any>) => {
+  const descriptionFor = async (preAggregation: string, query: Record<string, any>) => {
     const { compiler, joinGraph, cubeEvaluator } = prepareYamlCompiler(model(preAggregation));
     await compiler.compile();
 
@@ -204,8 +204,21 @@ ${preAggregation}
     const [description]: any[] = pgQuery.preAggregations?.preAggregationsDescription() || [];
     expect(description.preAggregationId).toEqual('orders.monthly');
 
-    return description.matchedTimeDimensionDateRange;
+    return description;
   };
+
+  const partitionRangeFor = async (preAggregation: string, query: Record<string, any>) => (
+    (await descriptionFor(preAggregation, query)).matchedTimeDimensionDateRange
+  );
+
+  // A plain filter on the partition dimension needs it stored as a dimension too.
+  const usageRangeFor = async (operator: string) => (await descriptionFor(`        dimensions:
+          - status
+          - created_at
+        time_dimension: created_at
+        granularity: month`, {
+    filters: [{ member: 'orders.created_at', operator, values: ['2024-06-01', '2024-06-30'] }],
+  })).usageMapping[''].dateRange;
 
   const createdInJune = {
     dimension: 'orders.created_at',
@@ -223,6 +236,14 @@ ${preAggregation}
       filters: [{ member: 'orders.updated_at', operator: 'inDateRange', values: ['2020-01-01', '2020-12-31'] }],
       timeDimensions: [createdInJune],
     })).toEqual(june);
+  });
+
+  it('is bounded by a plain date range filter on the partition time dimension', async () => {
+    expect(await usageRangeFor('inDateRange')).toEqual(june);
+  });
+
+  it('is not bounded by an excluded range on the partition time dimension', async () => {
+    expect(await usageRangeFor('notInDateRange')).toBeUndefined();
   });
 
   it('is not bounded by a date range on a second time dimension alone', async () => {
