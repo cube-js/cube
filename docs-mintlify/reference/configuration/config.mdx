@@ -507,11 +507,14 @@ changing instead. Both are judged when `driver_factory` states the deadline, so
 a lifetime that was accepted is held to whatever it said.
 
 A driver is resolved once and then cached, and replaced when the configuration
-`driver_factory` returns changes. A connection built from a credential that
-*stops* rotating — an expired token whose refresh is failing — is the case that
-leaves behind: the factory keeps resolving an identical configuration while the
-connection is already dead. `expiresAt` states the lifetime outright, so the
-connection is replaced when it elapses whether or not anything else changed.
+`driver_factory` returns changes. Cube only asks `driver_factory` again when a
+request arrives with a security context it has not seen for that connection, so
+a credential read from elsewhere — a secret store, a file, a token cache — must
+state `expiresAt` to be replaced when it rotates. The same goes for a credential
+that *stops* rotating — an expired token whose refresh is failing: the factory
+keeps resolving an identical configuration while the connection is already
+dead. `expiresAt` states the lifetime outright, so the connection is replaced
+when it elapses whether or not anything else changed.
 
 It is deliberately excluded from the comparison, so a factory may return a
 deadline recomputed on every call without that reading as a new connection.
