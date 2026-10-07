@@ -722,10 +722,12 @@ impl PreAggregationOptimizer {
                     FilterOp::DateRange(date_range_op) => {
                         date_range_op.formatted_date_range(precision).ok()
                     }
-                    // The later of a series' two possible ends covers whichever
-                    // shape the dialect renders it in.
+                    // The series ends where the usage's own dialect renders it.
                     op => match op.rolling_scan_band(query_tools.timezone(), |span| {
-                        Ok(std::cmp::max(&span.to_aligned, &span.to_stepped).clone())
+                        let generated = query_tools
+                            .plan_sql_templates(external)?
+                            .supports_generated_time_series(span.predefined_granularity)?;
+                        Ok(span.to(generated).clone())
                     })? {
                         Some(RollingScanBand::Bounded(from, to)) => Some((
                             QueryDateTimeHelper::format_from_date(&from, precision)?,
@@ -748,8 +750,14 @@ impl PreAggregationOptimizer {
                             .and_then(|dt| dt.add_interval(&neg))
                             .map(|dt| dt.default_format())
                             .unwrap_or(from);
+                        // Shifted as an exclusive end: a month shift clamps the
+                        // day of month, and Jun 30 23:59 shifted alone would end
+                        // the range on May 30 and lose May 31.
+                        let tick = chrono::Duration::milliseconds(1);
                         let shifted_to = QueryDateTime::from_date_str(tz, &to)
+                            .and_then(|dt| dt.add_duration(tick))
                             .and_then(|dt| dt.add_interval(&neg))
+                            .and_then(|dt| dt.add_duration(-tick))
                             .map(|dt| dt.default_format())
                             .unwrap_or(to);
                         return Ok(UsageScanRange::Bounded(shifted_from, shifted_to));

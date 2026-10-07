@@ -97,7 +97,7 @@ for (const [index, schema] of Object.entries(SCHEMA_VARIANTS)) {
       console.log(toReplace);
       preAggregation = Array.isArray(preAggregation) ? preAggregation : [preAggregation];
       return [
-        preAggregation.reduce((replacedQuery, desc) => replacedQuery.replace(new RegExp(desc.tableName, 'g'), `${desc.tableName}_${suffix}`), toReplace),
+        preAggregation.reduce((replacedQuery, desc) => replacedQuery.replace(new RegExp(`${desc.tableName}(?:__usage_\\d+)?`, 'g'), `${desc.tableName}_${suffix}`), toReplace),
         params
       ];
     }

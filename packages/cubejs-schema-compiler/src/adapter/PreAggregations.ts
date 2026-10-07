@@ -126,10 +126,6 @@ export class PreAggregations {
 
   public preAggregationUsageInfos: PreAggregationUsageInfo[] | undefined = undefined;
 
-  // The dates read by the only pre-aggregation usage Tesseract matched, which a
-  // rolling window or time shift widens past the requested date range.
-  public singleUsageInfo: UsageDateRangeInfo | undefined = undefined;
-
   public constructor(query: BaseQuery, historyQueries, cubeLatticeCache) {
     this.query = query;
     this.historyQueries = historyQueries;
@@ -165,8 +161,7 @@ export class PreAggregations {
         return this.preAggregationDescriptionsForUsageInfos(this.preAggregationUsageInfos);
       }
       if (preAggregationForQuery) {
-        return this.preAggregationDescriptionsFor(preAggregationForQuery)
-          .map(desc => this.coverSingleUsage(desc));
+        return this.preAggregationDescriptionsFor(preAggregationForQuery);
       }
     }
     if (
@@ -220,34 +215,6 @@ export class PreAggregations {
         };
       });
     });
-  }
-
-  /**
-   * Widens the partitions loaded for the only usage to the dates it reads,
-   * which a rolling window or time shift takes past the requested range.
-   */
-  private coverSingleUsage(desc: FullPreAggregationDescription): FullPreAggregationDescription {
-    if (!this.singleUsageInfo || !desc.matchedTimeDimensionDateRange) {
-      return desc;
-    }
-    return {
-      ...desc,
-      matchedTimeDimensionDateRange: PreAggregations.widenToUsage(desc.matchedTimeDimensionDateRange, this.singleUsageInfo),
-    };
-  }
-
-  /**
-   * `range` widened to cover what `usage` reads; `undefined` when the usage has no bound.
-   */
-  private static widenToUsage(range: [string, string], usage: UsageDateRangeInfo | undefined): [string, string] | undefined {
-    if (!usage || !usage.dateRange) {
-      return usage?.unbounded ? undefined : range;
-    }
-    const [usageFrom, usageTo] = usage.dateRange;
-    return [
-      usageFrom < range[0] ? usageFrom : range[0],
-      usageTo > range[1] ? usageTo : range[1],
-    ];
   }
 
   private static mergeUsageDateRanges(usages: Record<string, UsageDateRangeInfo>): [string, string] | null {
@@ -422,7 +389,7 @@ export class PreAggregations {
     );
 
     if (usageInfos.length === 0) {
-      return PreAggregations.widenToUsage(matchedDateRange, this.singleUsageInfo);
+      return matchedDateRange;
     }
 
     let merged: [string, string] | undefined;

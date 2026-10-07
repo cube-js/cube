@@ -1013,9 +1013,9 @@ export class BaseQuery {
       // during the member-SQL callbacks the native planner makes back into JS.
       const buildResult = this.compilers.compiler.withQuery(this, () => nativeBuildSqlAndParams(queryParams));
 
-      const [query, params, preAggResult, singleUsage] = buildResult;
+      const [query, params, preAggResult] = buildResult;
       const paramsArray = [...params];
-      this.applyNativePreAggResult(preAggResult, singleUsage);
+      this.applyNativePreAggResult(preAggResult);
       return [query, paramsArray];
     } catch (e) {
       if (e.name === 'TesseractUserError') {
@@ -1073,23 +1073,17 @@ export class BaseQuery {
 
     const buildResult = nativeBuildSqlAndParams(queryParams);
 
-    const [, , preAggResult, singleUsage] = buildResult;
-    this.applyNativePreAggResult(preAggResult, singleUsage);
+    const [, , preAggResult] = buildResult;
+    this.applyNativePreAggResult(preAggResult);
     return this.preAggregations.preAggregationForQuery;
   }
 
-  applyNativePreAggResult(preAggResult, singleUsage) {
+  applyNativePreAggResult(preAggResult) {
     if (!preAggResult) return;
-    if (Array.isArray(preAggResult)) {
-      this.preAggregations.preAggregationUsageInfos = preAggResult;
-      this.preAggregations.singleUsageInfo = undefined;
-      const first = preAggResult[0];
-      this.preAggregations.preAggregationForQuery =
-        this.getPreAggregationByName(first.cubeName, first.preAggregationName);
-    } else {
-      this.preAggregations.preAggregationForQuery = preAggResult;
-      this.preAggregations.singleUsageInfo = singleUsage;
-    }
+    this.preAggregations.preAggregationUsageInfos = preAggResult;
+    const first = preAggResult[0];
+    this.preAggregations.preAggregationForQuery =
+      this.getPreAggregationByName(first.cubeName, first.preAggregationName);
   }
 
   allCubeMembers(path) {

@@ -115,7 +115,7 @@ cubes:
 
   it('a multi-stage time-shifted measure loads the shifted period', async () => {
     expect(await partitionRangeFor(['orders.amount_prev_month_ms']))
-      .toEqual(['2024-05-01T00:00:00.000', '2024-06-30T23:59:59.999']);
+      .toEqual(['2024-05-01T00:00:00.000', '2024-05-31T23:59:59.999']);
   });
 
   it('an unbounded multi-stage rolling measure is not bounded', async () => {

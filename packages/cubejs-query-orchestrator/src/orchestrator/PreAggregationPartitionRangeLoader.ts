@@ -335,7 +335,7 @@ export class PreAggregationPartitionRangeLoader {
         usageTargetTableNames = {};
 
         for (const [suffix, usageInfo] of Object.entries(this.preAggregation.usageMapping)) {
-          if (usageInfo.dateRange && this.preAggregation.partitionGranularity) {
+          if (usageInfo.dateRange && this.preAggregation.partitionGranularity && !emptyResult) {
             // Load partition ranges specific to this usage's dateRange.
             // Use partitionRange (generated locally via timeSeries, always in DEFAULT_TS_FORMAT)
             // instead of buildRangeEnd (from DB, may include Z suffix depending on driver timestampFormat).
@@ -351,6 +351,12 @@ export class PreAggregationPartitionRangeLoader {
                 return pEnd >= uStart && pStart <= uEnd;
               });
               const usageTableNames = usagePartitions.map(r => r.targetTableName);
+              // The lambda tail holds the rows past the last built partition. The
+              // usage filters by its own range, so it reads the tail as the full
+              // union does.
+              if (lambdaTable) {
+                usageTableNames.push(lambdaTable.name);
+              }
               if (usageTableNames.length === 1) {
                 [usageTargetTableNames[suffix]] = usageTableNames;
               } else if (usageTableNames.length > 0) {

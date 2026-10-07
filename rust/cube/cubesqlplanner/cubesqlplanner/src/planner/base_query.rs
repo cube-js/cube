@@ -2,7 +2,6 @@ use super::state::State;
 use super::top_level_planner::TopLevelPlanner;
 use super::{QueryProperties, QueryPropertiesCompiler};
 use crate::cube_bridge::base_query_options::BaseQueryOptions;
-use crate::cube_bridge::pre_aggregation_obj::NativePreAggregationObj;
 use crate::logical_plan::PreAggregationUsage;
 use cubenativeutils::wrappers::inner_types::InnerTypes;
 use cubenativeutils::wrappers::object::NativeArray;
@@ -105,42 +104,14 @@ impl<IT: InnerTypes> BaseQuery<IT> {
         let templates = self.query_tools.plan_sql_templates(is_external)?;
         let (result_sql, params) = self.query_tools.build_sql_and_params(&sql, &templates)?;
 
-        // For single usage, strip __usage_N suffix from SQL to maintain backward compat
-        let final_sql = if usages.len() == 1 {
-            result_sql.replace(&format!("__usage_{}", usages[0].index), "")
-        } else {
-            result_sql
-        };
-
         let res = self.context.empty_array()?;
-        res.set(0, final_sql.to_native(self.context.clone())?)?;
+        res.set(0, result_sql.to_native(self.context.clone())?)?;
         res.set(1, params.to_native(self.context.clone())?)?;
 
-        if usages.len() > 1 {
-            // Multiple usages: group by (cubeName, name), return array of grouped infos
+        if !usages.is_empty() {
+            // Grouped by (cubeName, name), with the dates each usage reads.
             let grouped = Self::group_usages(&usages);
             res.set(2, grouped.to_native(self.context.clone())?)?;
-        } else if let Some(usage) = usages.first() {
-            // Single usage: return old-style pre-aggregation object for backward compat
-            let pre_aggregation_obj = self.query_tools.base_tools().get_pre_aggregation_by_name(
-                usage.pre_aggregation.cube_name().clone(),
-                usage.pre_aggregation.name().clone(),
-            )?;
-            res.set(
-                2,
-                pre_aggregation_obj
-                    .as_any()
-                    .downcast::<NativePreAggregationObj<IT>>()
-                    .unwrap()
-                    .to_native(self.context.clone())?,
-            )?;
-            // The dates the usage reads, which a rolling window or time shift
-            // widens past the period the query reports. The partitions loaded
-            // for it have to cover them.
-            res.set(
-                3,
-                UsageDateRange::from_usage(usage).to_native(self.context.clone())?,
-            )?;
         }
 
         let result = NativeObjectHandle::new(res.into_object());

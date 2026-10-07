@@ -1075,7 +1075,7 @@ describe('PreAggregations', () => {
       jest.restoreAllMocks();
     });
 
-    const createLambdaLoader = (sourceDateRange?: [string, string]) => {
+    const createLambdaLoader = (sourceDateRange?: [string, string], usageMapping?: Record<string, any>) => {
       const loader = new PreAggregationPartitionRangeLoader(
         {} as any, // driverFactory
         // eslint-disable-next-line @typescript-eslint/no-empty-function
@@ -1088,6 +1088,7 @@ describe('PreAggregations', () => {
           lastRollupLambda: true,
           unionWithSourceData: true,
           matchedTimeDimensionDateRange: sourceDateRange,
+          usageMapping,
         }) as any,
         [], // preAggregationsTablesToTempTables
         { getTableColumnTypes: jest.fn().mockResolvedValue([{ name: 'ts', type: 'timestamp' }]) } as any,
@@ -1137,6 +1138,15 @@ describe('PreAggregations', () => {
       expect(downloadLambdaTable).toHaveBeenCalledWith(buildRangeEnd, [{ name: 'ts', type: 'timestamp' }]);
       expect(result.lambdaTable?.name).toEqual('lambda_stb_pre_aggregations_orders_d');
       expect(result.targetTableName).toMatch(/UNION ALL SELECT \* FROM lambda_stb_pre_aggregations_orders_d/);
+    });
+
+    test('a usage reads the lambda tail', async () => {
+      const usageRange: [string, string] = ['2024-01-01T00:00:00.000', '2024-01-05T23:59:59.999'];
+      const { loader } = createLambdaLoader(usageRange, { __usage_0: { dateRange: usageRange } });
+
+      const result: any = await loader.loadPreAggregations();
+
+      expect(result.usageTargetTableNames.__usage_0).toMatch(/UNION ALL SELECT \* FROM lambda_stb_pre_aggregations_orders_d/);
     });
 
     test('runs the source query when no date range was requested', async () => {
