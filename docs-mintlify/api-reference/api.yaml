@@ -8103,6 +8103,7 @@ components:
       enum:
         - png
         - pdf
+        - pdf_print
       type: string
     CreateNotificationInputScheduleType:
       enum:
@@ -15363,6 +15364,7 @@ components:
       enum:
         - png
         - pdf
+        - pdf_print
       type: string
     UpdateNotificationInputScheduleType:
       enum:
