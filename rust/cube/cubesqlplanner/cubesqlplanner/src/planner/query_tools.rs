@@ -51,6 +51,10 @@ pub struct QueryTools {
     // so this cache forms no reference cycle. It stays here only until the
     // early-compilation refactor resolves mask filters up front.
     member_mask_filters: RefCell<HashMap<String, FilterItem>>,
+    // Building templates re-fetches them from JS and recompiles them, and the
+    // planner asks for them several times per query.
+    plan_sql_templates: RefCell<Option<PlanSqlTemplates>>,
+    external_plan_sql_templates: RefCell<Option<PlanSqlTemplates>>,
 }
 
 impl QueryTools {
@@ -94,6 +98,8 @@ impl QueryTools {
             convert_tz_for_raw_time_dimension,
             masked_members: masked_set,
             member_mask_filters: RefCell::new(HashMap::new()),
+            plan_sql_templates: RefCell::new(None),
+            external_plan_sql_templates: RefCell::new(None),
         }))
     }
 
@@ -123,8 +129,24 @@ impl QueryTools {
     }
 
     pub fn plan_sql_templates(&self, external: bool) -> Result<PlanSqlTemplates, CubeError> {
+        let cache = if external {
+            &self.external_plan_sql_templates
+        } else {
+            &self.plan_sql_templates
+        };
+        if let Some(templates) = cache.borrow().as_ref() {
+            return Ok(templates.clone());
+        }
         let driver_tools = self.base_tools.driver_tools(external)?;
-        PlanSqlTemplates::try_new(driver_tools, external)
+        let templates = if external {
+            PlanSqlTemplates::try_new(driver_tools, true)?
+        } else {
+            // `driverTools(false)` is the base query itself, whose templates
+            // `try_new` already fetched.
+            PlanSqlTemplates::new(self.templates_render.clone(), driver_tools, false)
+        };
+        *cache.borrow_mut() = Some(templates.clone());
+        Ok(templates)
     }
 
     pub fn base_tools(&self) -> &Rc<dyn BaseTools> {

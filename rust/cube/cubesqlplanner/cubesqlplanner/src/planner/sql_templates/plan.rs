@@ -44,13 +44,21 @@ pub const UPPER_UPPER_BOUND: Boundary = Boundary {
 };
 
 impl PlanSqlTemplates {
-    pub fn try_new(driver_tools: Rc<dyn DriverTools>, external: bool) -> Result<Self, CubeError> {
-        let render = driver_tools.sql_templates()?;
-        Ok(Self {
+    pub fn new(
+        render: Rc<dyn SqlTemplatesRender>,
+        driver_tools: Rc<dyn DriverTools>,
+        external: bool,
+    ) -> Self {
+        Self {
             render,
             driver_tools,
             external,
-        })
+        }
+    }
+
+    pub fn try_new(driver_tools: Rc<dyn DriverTools>, external: bool) -> Result<Self, CubeError> {
+        let render = driver_tools.sql_templates()?;
+        Ok(Self::new(render, driver_tools, external))
     }
 
     pub fn convert_tz(&self, field: String) -> Result<String, CubeError> {
