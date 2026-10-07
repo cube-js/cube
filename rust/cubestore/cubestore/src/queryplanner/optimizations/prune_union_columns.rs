@@ -1,3 +1,4 @@
+use crate::queryplanner::optimizations::flatten_union::is_aligned_union;
 use datafusion::common::config::ConfigOptions;
 use datafusion::common::tree_node::{Transformed, TreeNode, TreeNodeRecursion};
 use datafusion::common::{Column, DFSchema, Result};
@@ -17,7 +18,9 @@ pub struct PruneUnionColumnsRule {}
 impl AnalyzerRule for PruneUnionColumnsRule {
     fn analyze(&self, plan: LogicalPlan, _config: &ConfigOptions) -> Result<LogicalPlan> {
         plan.transform_down_with_subqueries(|plan| {
-            if !matches!(plan, LogicalPlan::Projection(_) | LogicalPlan::Aggregate(_)) {
+            if !matches!(plan, LogicalPlan::Projection(_) | LogicalPlan::Aggregate(_))
+                || !reaches_union(&plan)
+            {
                 return Ok(Transformed::no(plan));
             }
             let mut required = HashSet::new();
@@ -37,17 +40,37 @@ impl AnalyzerRule for PruneUnionColumnsRule {
 // Walks down through nodes that pass their input columns through, collecting the column names
 // they read, until it reaches a subquery alias over a union. Returns `None` if the chain has any
 // other shape or nothing can be pruned.
+fn chain_input(node: &LogicalPlan) -> Option<&Arc<LogicalPlan>> {
+    match node {
+        LogicalPlan::Projection(p) => Some(&p.input),
+        LogicalPlan::Aggregate(a) => Some(&a.input),
+        LogicalPlan::Filter(f) => Some(&f.input),
+        LogicalPlan::Sort(s) => Some(&s.input),
+        LogicalPlan::Limit(l) => Some(&l.input),
+        _ => None,
+    }
+}
+
+fn reaches_union(node: &LogicalPlan) -> bool {
+    let mut node = node;
+    while let Some(input) = chain_input(node) {
+        match input.as_ref() {
+            LogicalPlan::Filter(_) | LogicalPlan::Sort(_) | LogicalPlan::Limit(_) => node = input,
+            LogicalPlan::SubqueryAlias(alias) => {
+                return matches!(alias.input.as_ref(), LogicalPlan::Union(_))
+            }
+            _ => return false,
+        }
+    }
+    false
+}
+
 fn prune_chain(node: &LogicalPlan, required: &mut HashSet<String>) -> Result<Option<LogicalPlan>> {
     if !collect_columns(node, required)? {
         return Ok(None);
     }
-    let input = match node {
-        LogicalPlan::Projection(p) => &p.input,
-        LogicalPlan::Aggregate(a) => &a.input,
-        LogicalPlan::Filter(f) => &f.input,
-        LogicalPlan::Sort(s) => &s.input,
-        LogicalPlan::Limit(l) => &l.input,
-        _ => return Ok(None),
+    let Some(input) = chain_input(node) else {
+        return Ok(None);
     };
     let new_input = match input.as_ref() {
         LogicalPlan::Filter(_) | LogicalPlan::Sort(_) | LogicalPlan::Limit(_) => {
@@ -63,7 +86,7 @@ fn prune_chain(node: &LogicalPlan, required: &mut HashSet<String>) -> Result<Opt
 
 fn collect_columns(node: &LogicalPlan, required: &mut HashSet<String>) -> Result<bool> {
     let mut supported = true;
-    for e in node.expressions() {
+    node.apply_expressions(|e| {
         e.apply(|e| {
             #[allow(deprecated)]
             match e {
@@ -84,12 +107,9 @@ fn collect_columns(node: &LogicalPlan, required: &mut HashSet<String>) -> Result
                 _ => {}
             }
             Ok(TreeNodeRecursion::Continue)
-        })?;
-        if !supported {
-            return Ok(false);
-        }
-    }
-    Ok(true)
+        })
+    })?;
+    Ok(supported)
 }
 
 #[allow(deprecated)]
@@ -107,9 +127,13 @@ fn is_count_star(f: &AggregateFunction) -> bool {
 }
 
 fn prune_union(alias: &SubqueryAlias, required: &HashSet<String>) -> Result<Option<LogicalPlan>> {
-    let LogicalPlan::Union(Union { inputs, schema }) = alias.input.as_ref() else {
+    let LogicalPlan::Union(union) = alias.input.as_ref() else {
         return Ok(None);
     };
+    if !is_aligned_union(union) {
+        return Ok(None);
+    }
+    let Union { inputs, schema } = union;
     let mut keep = alias
         .schema
         .fields()
@@ -150,6 +174,12 @@ fn prune_union(alias: &SubqueryAlias, required: &HashSet<String>) -> Result<Opti
 
 fn narrow(input: &Arc<LogicalPlan>, keep: &[usize]) -> Result<LogicalPlan> {
     let (exprs, input) = match input.as_ref() {
+        LogicalPlan::SubqueryAlias(a) => {
+            return Ok(LogicalPlan::SubqueryAlias(SubqueryAlias::try_new(
+                Arc::new(narrow(&a.input, keep)?),
+                a.alias.clone(),
+            )?));
+        }
         LogicalPlan::TableScan(scan) if scan.filters.is_empty() => {
             let projection = keep
                 .iter()

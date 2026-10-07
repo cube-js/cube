@@ -3526,17 +3526,22 @@ mod tests {
                                 \n    Aggregate\
                                 \n      ClusterSend, indices: [[1, 2, 3, 4, 2]]\
                                 \n        SubqueryAlias\
-                                \n          Union, schema: fields:[foo.a.a, foo.a.b, foo.a.c], metadata:{}\
-                                \n            Filter\
-                                \n              Scan foo.a, source: CubeTable(index: default:1:[1]:sort_on[a, b]), fields: *\
-                                \n            Filter\
-                                \n              Scan foo.b, source: CubeTable(index: default:2:[2]:sort_on[a, b]), fields: *\
-                                \n            Filter\
-                                \n              Scan foo.a1, source: CubeTable(index: default:3:[3]:sort_on[a, b]), fields: *\
-                                \n            Filter\
-                                \n              Scan foo.b1, source: CubeTable(index: default:4:[4]:sort_on[a, b]), fields: *\
-                                \n            Filter\
-                                \n              Scan foo.b, source: CubeTable(index: default:2:[2]:sort_on[a, b]), fields: *"
+                                \n          Union, schema: fields:[lambda.a, lambda.b, lambda.c], metadata:{}\
+                                \n            SubqueryAlias\
+                                \n              Filter\
+                                \n                Scan foo.a, source: CubeTable(index: default:1:[1]:sort_on[a, b]), fields: *\
+                                \n            SubqueryAlias\
+                                \n              Filter\
+                                \n                Scan foo.b, source: CubeTable(index: default:2:[2]:sort_on[a, b]), fields: *\
+                                \n            SubqueryAlias\
+                                \n              Filter\
+                                \n                Scan foo.a1, source: CubeTable(index: default:3:[3]:sort_on[a, b]), fields: *\
+                                \n            SubqueryAlias\
+                                \n              Filter\
+                                \n                Scan foo.b1, source: CubeTable(index: default:4:[4]:sort_on[a, b]), fields: *\
+                                \n            SubqueryAlias\
+                                \n              Filter\
+                                \n                Scan foo.b, source: CubeTable(index: default:2:[2]:sort_on[a, b]), fields: *"
 
                                );
                 }
@@ -3565,15 +3570,19 @@ mod tests {
                                 \n    Aggregate\
                                 \n      ClusterSend, indices: [[1, 3, 4, 2]]\
                                 \n        SubqueryAlias\
-                                \n          Union, schema: fields:[foo.a.a, foo.a.b, foo.a.c], metadata:{}\
-                                \n            Filter\
-                                \n              Scan foo.a, source: CubeTable(index: default:1:[1]:sort_on[a, b]), fields: *\
-                                \n            Filter\
-                                \n              Scan foo.a1, source: CubeTable(index: default:3:[3]:sort_on[a, b]), fields: *\
-                                \n            Filter\
-                                \n              Scan foo.b1, source: CubeTable(index: default:4:[4]:sort_on[a, b]), fields: *\
-                                \n            Filter\
-                                \n              Scan foo.b, source: CubeTable(index: default:2:[2]:sort_on[a, b]), fields: *"
+                                \n          Union, schema: fields:[lambda.a, lambda.b, lambda.c], metadata:{}\
+                                \n            SubqueryAlias\
+                                \n              Filter\
+                                \n                Scan foo.a, source: CubeTable(index: default:1:[1]:sort_on[a, b]), fields: *\
+                                \n            SubqueryAlias\
+                                \n              Filter\
+                                \n                Scan foo.a1, source: CubeTable(index: default:3:[3]:sort_on[a, b]), fields: *\
+                                \n            SubqueryAlias\
+                                \n              Filter\
+                                \n                Scan foo.b1, source: CubeTable(index: default:4:[4]:sort_on[a, b]), fields: *\
+                                \n            SubqueryAlias\
+                                \n              Filter\
+                                \n                Scan foo.b, source: CubeTable(index: default:2:[2]:sort_on[a, b]), fields: *"
 
                                );
                 }
@@ -3606,12 +3615,15 @@ mod tests {
                                 \n          Union, schema: fields:[foo.a.a, foo.a.b, foo.a.c], metadata:{}\
                                 \n            Filter\
                                 \n              Scan foo.a, source: CubeTable(index: default:1:[1]:sort_on[a, b]), fields: *\
-                                \n            Filter\
-                                \n              Scan foo.a1, source: CubeTable(index: default:3:[3]:sort_on[a, b]), fields: *\
-                                \n            Filter\
-                                \n              Scan foo.b1, source: CubeTable(index: default:4:[4]:sort_on[a, b]), fields: *\
-                                \n            Filter\
-                                \n              Scan foo.b, source: CubeTable(index: default:2:[2]:sort_on[a, b]), fields: *"
+                                \n            SubqueryAlias\
+                                \n              Filter\
+                                \n                Scan foo.a1, source: CubeTable(index: default:3:[3]:sort_on[a, b]), fields: *\
+                                \n            SubqueryAlias\
+                                \n              Filter\
+                                \n                Scan foo.b1, source: CubeTable(index: default:4:[4]:sort_on[a, b]), fields: *\
+                                \n            SubqueryAlias\
+                                \n              Filter\
+                                \n                Scan foo.b, source: CubeTable(index: default:2:[2]:sort_on[a, b]), fields: *"
 
                                );
                 }
@@ -3643,17 +3655,81 @@ mod tests {
                                 \n    Aggregate\
                                 \n      ClusterSend, indices: [[3, 4, 2]]\
                                 \n        SubqueryAlias\
-                                \n          Union, schema: fields:[foo.a.a, foo.a.b, foo.a.c], metadata:{}\
-                                \n            Filter\
-                                \n              Scan foo.a1, source: CubeTable(index: default:3:[3]:sort_on[a, b]), fields: *\
-                                \n            Filter\
-                                \n              Scan foo.b1, source: CubeTable(index: default:4:[4]:sort_on[a, b]), fields: *\
-                                \n            Filter\
-                                \n              Scan foo.b, source: CubeTable(index: default:2:[2]:sort_on[a, b]), fields: *"
+                                \n          Projection, [foo.a.a:a, foo.a.b:b, foo.a.c:c]\
+                                \n            Union, schema: fields:[lambda.a, lambda.b, lambda.c], metadata:{}\
+                                \n              SubqueryAlias\
+                                \n                Filter\
+                                \n                  Scan foo.a1, source: CubeTable(index: default:3:[3]:sort_on[a, b]), fields: *\
+                                \n              SubqueryAlias\
+                                \n                Filter\
+                                \n                  Scan foo.b1, source: CubeTable(index: default:4:[4]:sort_on[a, b]), fields: *\
+                                \n              SubqueryAlias\
+                                \n                Filter\
+                                \n                  Scan foo.b, source: CubeTable(index: default:2:[2]:sort_on[a, b]), fields: *"
                                 );
                 }
                 _ => assert!(false),
             };
+
+            Ok::<(), CubeError>(())
+        }).await;
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn union_rewrites_keep_columns() -> Result<(), CubeError> {
+        Config::test("union_rewrites_keep_columns").start_test(async move |services| {
+            let service = services.sql_service;
+            let _ = service.exec_query("CREATE SCHEMA foo").await?.collect().await?;
+            let _ = service.exec_query("CREATE TABLE foo.a (a int, b int, c int)").await?.collect().await?;
+            let _ = service.exec_query("CREATE TABLE foo.b (a int, b int, c int)").await?.collect().await?;
+            let _ = service.exec_query("CREATE TABLE foo.x (x int, y int, z int)").await?.collect().await?;
+            service.exec_query("INSERT INTO foo.a (a, b, c) VALUES (1, 2, 3)").await?.collect().await?;
+            service.exec_query("INSERT INTO foo.b (a, b, c) VALUES (10, 20, 30)").await?.collect().await?;
+            service.exec_query("INSERT INTO foo.x (x, y, z) VALUES (100, 200, 300)").await?.collect().await?;
+
+            let ints = |r: &DataFrame| {
+                r.get_rows()
+                    .iter()
+                    .map(|r| r.values().clone())
+                    .collect::<Vec<_>>()
+            };
+            let int = |v: i64| TableValue::Int(v);
+
+            // `BY NAME` inputs keep their own column order, so they must not be narrowed or flattened by
+            // position. DataFusion itself still reads reordered `BY NAME` inputs by position, so only
+            // planning and the row count are checked here.
+            for (sql, rows) in [
+                ("SELECT c FROM (SELECT c, a FROM foo.a UNION ALL BY NAME SELECT a, c FROM foo.b) AS o", 2),
+                ("SELECT b FROM (SELECT b, a, c FROM foo.a UNION ALL BY NAME SELECT a, c, b FROM foo.b) AS o", 2),
+                ("SELECT c FROM ((SELECT c, a FROM foo.a UNION ALL BY NAME SELECT a, c FROM foo.b) \
+                  UNION ALL SELECT a, c FROM foo.a) AS o", 3),
+            ] {
+                let r = service.exec_query(sql).await?.collect().await?;
+                assert_eq!(r.get_rows().len(), rows, "{}", sql);
+            }
+
+            // Inputs with other column names keep the projection that renames them.
+            let r = service.exec_query(
+                "SELECT a, sum(c) FROM (SELECT * FROM foo.a UNION ALL SELECT * FROM foo.x) AS o GROUP BY 1 ORDER BY 1"
+            ).await?.collect().await?;
+            assert_eq!(ints(&r), vec![vec![int(1), int(3)], vec![int(100), int(300)]]);
+            let r = service.exec_query(
+                "EXPLAIN SELECT a, sum(c) FROM (SELECT * FROM foo.a UNION ALL SELECT * FROM foo.x) AS o GROUP BY 1"
+            ).await?.collect().await?;
+            assert_eq!(
+                r.get_rows()[0].values()[0],
+                TableValue::String(
+                    "Aggregate\
+                    \n  ClusterSend, indices: [[1, 3]]\
+                    \n    SubqueryAlias\
+                    \n      Union, schema: fields:[foo.a.a, foo.a.c], metadata:{}\
+                    \n        Scan foo.a, source: CubeTable(index: default:1:[1]:sort_on[a]), fields: [a, c]\
+                    \n        Projection, [a, c]\
+                    \n          Scan foo.x, source: CubeTable(index: default:3:[3]), fields: [x, z]"
+                        .to_string()
+                )
+            );
 
             Ok::<(), CubeError>(())
         }).await;

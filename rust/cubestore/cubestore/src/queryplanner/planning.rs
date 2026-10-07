@@ -2347,9 +2347,9 @@ pub mod tests {
     pub async fn test_union_all_chain_is_flat() {
         let indices = default_indices();
         let sql = "SELECT order_id FROM s.Orders \
-             UNION ALL SELECT 1.5 \
-             UNION ALL SELECT customer_id FROM s.Customers \
-             UNION ALL SELECT order_customer FROM s.Orders";
+             UNION ALL SELECT 1.5 AS order_id \
+             UNION ALL SELECT customer_id AS order_id FROM s.Customers \
+             UNION ALL SELECT order_customer AS order_id FROM s.Orders";
 
         // The chain must be flat before type coercion; flattening after it is quadratic.
         let state = QueryPlannerImpl::make_execution_context(SessionConfig::new()).state();
@@ -2424,6 +2424,18 @@ pub mod tests {
             union_widths(&format!("SELECT * FROM ({union}) AS o")),
             vec![5, 5, 5]
         );
+        // Same-named columns from both sides of a join.
+        assert_eq!(
+            union_widths(
+                "SELECT order_id FROM (\
+                 SELECT o1.order_id, o2.order_id, o1.order_amount FROM s.Orders o1 \
+                 JOIN s.Orders o2 ON o1.order_id = o2.order_id \
+                 UNION ALL \
+                 SELECT o1.order_id, o2.order_id, o1.order_amount FROM s.Orders o1 \
+                 JOIN s.Orders o2 ON o1.order_id = o2.order_id) AS o"
+            ),
+            vec![1, 1, 1]
+        );
         // A join reads columns of the union outside the projection chain.
         assert_eq!(
             union_widths(&format!(
@@ -2441,9 +2453,11 @@ pub mod tests {
             pretty_printers::pp_plan(&plan),
             "Aggregate\
             \n  SubqueryAlias\
-            \n    Union, schema: fields:[s.Orders.order_customer, s.Orders.order_amount], metadata:{}\
-            \n      Scan s.Orders, source: CubeTableLogical, fields: [order_customer, order_amount]\
-            \n      Scan s.Orders, source: CubeTableLogical, fields: [order_customer, order_amount]"
+            \n    Union, schema: fields:[o.order_customer, o.order_amount], metadata:{}\
+            \n      SubqueryAlias\
+            \n        Scan s.Orders, source: CubeTableLogical, fields: [order_customer, order_amount]\
+            \n      SubqueryAlias\
+            \n        Scan s.Orders, source: CubeTableLogical, fields: [order_customer, order_amount]"
         );
     }
 

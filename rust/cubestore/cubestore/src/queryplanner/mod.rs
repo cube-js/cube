@@ -373,6 +373,12 @@ impl QueryPlannerImpl {
                 analyzer_rules.push(Arc::new(PruneUnionColumnsRule {}));
             }
         }
+        debug_assert!(
+            analyzer_rules
+                .iter()
+                .any(|r| r.name() == PruneUnionColumnsRule {}.name()),
+            "prune_union_columns must run right after wildcard expansion"
+        );
         let state = Self::minimal_session_state_from_final_config_with_runtime(config, runtime_env)
             .with_analyzer_rules(analyzer_rules)
             .with_optimizer_rule(Arc::new(RollingOptimizerRule {}))
