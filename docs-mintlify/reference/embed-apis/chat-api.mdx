@@ -1088,11 +1088,26 @@ Supports the same authentication methods as the Chat API: an
 
 <Info>
 
-A successful cancellation is indicated solely by the `204 No Content` status —
+The abort endpoint answers `204 No Content` as soon as the abort is published;
 the response has no body. The aborted `stream-chat-state` request itself does
-not fail with an HTTP error: the streaming response already returned `200 OK`
-when the stream opened, so treat the abort endpoint's `204` as the
-confirmation that the stream was aborted.
+not fail with an HTTP error — the streaming response already returned `200 OK`
+when the stream opened. Instead, that stream emits a terminal frame before it
+closes:
+
+```json
+{
+  "id": "__aborted__",
+  "type": "abort",
+  "code": "chat_aborted",
+  "error": "Chat streaming was aborted before the agent finished responding"
+}
+```
+
+Its presence means the content received is partial. Scan the stream for it
+rather than checking only the last line — the run winds down concurrently, so
+a late message, the `__state__` snapshot and the `__usage__` frame can still
+follow it. Calling the abort endpoint again, or on a finished chat, also
+answers `204`.
 
 </Info>
 
