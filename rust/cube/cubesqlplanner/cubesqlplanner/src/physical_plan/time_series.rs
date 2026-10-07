@@ -92,7 +92,7 @@ impl TimeSeries {
         };
         if let TimeSeriesDateRange::Filter(from_date, to_date) = date_range {
             if Self::is_empty_range(from_date, to_date)? {
-                return self.empty_to_sql(from_date, to_date, templates);
+                return self.empty_to_sql(to_date, templates);
             }
         }
         if templates.supports_generated_time_series(self.granularity.is_predefined_granularity())? {
@@ -184,31 +184,22 @@ impl TimeSeries {
             > QueryDateTimeHelper::format_to_date(to_date, precision)?)
     }
 
-    /// A series with no points. Rendered as the series over the reversed range,
-    /// filtered out, as an empty VALUES list or a recursive anchor would still
-    /// be invalid or emit a row.
+    /// A series with no points: one bucket, filtered out. An empty VALUES list
+    /// would be invalid and a recursive anchor would still emit a row.
     fn empty_to_sql(
         &self,
-        from_date: &str,
         to_date: &str,
         templates: &PlanSqlTemplates,
     ) -> Result<String, CubeError> {
-        let range = [to_date.to_string(), from_date.to_string()];
         let precision = templates.timestamp_precision()?;
-        let series = if self.granularity.is_predefined_granularity() {
-            QueryTimeSeries::generate_predefined(self.granularity.granularity(), &range, precision)?
-        } else {
-            QueryTimeSeries::generate_custom(
-                &self.granularity.granularity_interval().to_sql(),
-                &range,
-                &self.granularity.origin_local_formatted(),
-                precision,
-            )?
-        };
+        let bucket = vec![
+            QueryDateTimeHelper::format_from_date(to_date, precision)?,
+            QueryDateTimeHelper::format_to_date(to_date, precision)?,
+        ];
         let series = templates.time_series_select(
             format!("'{}'", to_date),
-            format!("'{}'", from_date),
-            series,
+            format!("'{}'", to_date),
+            vec![bucket],
         )?;
         Ok(format!(
             "SELECT * FROM ({}) {} WHERE 1 = 0",

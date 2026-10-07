@@ -51,3 +51,22 @@ fn test_include_outside_the_query_range_has_no_rows() {
         assert!(sql.contains("WHERE 1 = 0"), "got: {sql}");
     }
 }
+
+#[test]
+fn test_include_years_outside_the_query_range_has_no_rows() {
+    let ctx = TestContext::new(schema()).unwrap();
+
+    let query = indoc! {r#"
+        measures:
+          - orders.rolling_sum_3d_jan15
+        time_dimensions:
+          - dimension: orders.created_at
+            granularity: hour
+            dateRange:
+              - "2017-01-01"
+              - "2017-01-05"
+    "#};
+
+    let sql = ctx.build_sql(query).unwrap();
+    assert!(sql.contains("WHERE 1 = 0"), "got: {sql}");
+}
