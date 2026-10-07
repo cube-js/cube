@@ -78,6 +78,11 @@ view(`extended_orders`, {
 
 </CodeGroup>
 
+The child view also gets the [measures](#measures), [dimensions](#dimensions)
+and [folders](#folders) that the parent view defines. So you can define a view
+measure once and reuse it in other views. See [Reusing a view measure across
+views][ref-recipe-reuse-view-measures].
+
 ### `title`
 
 Use the `title` parameter to change the display name of the view.
@@ -1124,7 +1129,8 @@ The `access_policy` parameter is used to configure [access policies][ref-ref-dap
 [ref-viz-tools]: /admin/connect-to-data/visualization-tools
 [ref-workbook-filtering]: /docs/explore-analyze/workbooks/querying-data#filtering
 [ref-workbook-running]: /docs/explore-analyze/workbooks/querying-data#running-queries
-[ref-extension]: /docs/data-modeling/extending-cubes
+[ref-extension]: /docs/data-modeling/extending-cubes#extending-views
+[ref-recipe-reuse-view-measures]: /recipes/data-modeling/reusing-view-measures
 [ref-dim-name]: /reference/data-modeling/dimensions#name
 [ref-dim-public]: /reference/data-modeling/dimensions#public
 [ref-dim-title]: /reference/data-modeling/dimensions#title

@@ -469,6 +469,7 @@ impl QueryExecutor for QueryExecutorImpl {
             HashMap::new(),
             HashMap::new(),
             NoopParquetMetadataCache::new(),
+            self.config.max_query_plan_depth(),
         )?;
         let pre_serialized_plan = Arc::new(pre_serialized_plan);
         let ctx = self.router_context(cluster.clone(), pre_serialized_plan.clone())?;
@@ -495,6 +496,7 @@ impl QueryExecutor for QueryExecutorImpl {
             remote_to_local_names,
             chunk_id_to_record_batches,
             self.parquet_metadata_cache.cache().clone(),
+            self.config.max_query_plan_depth(),
         )?;
         let pre_serialized_plan = Arc::new(pre_serialized_plan);
         let ctx = self.worker_context(
@@ -2573,6 +2575,7 @@ mod tests {
                 pushable_chunk_filters: Vec::new(),
             },
             None,
+            crate::config::DEFAULT_MAX_QUERY_PLAN_DEPTH,
         )?;
         let exec = ClusterSendExec {
             properties: ClusterSendExec::compute_properties(input.properties(), 2),

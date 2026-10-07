@@ -252,7 +252,7 @@ export class JDBCDriver extends BaseDriver {
 
   public async query<R = unknown>(query: string, values: unknown[]): Promise<R[]> {
     const queryWithParams = this.prepareQueryWithParams(query, values);
-    const cancelObj: {cancel?: Function} = {};
+    const cancelObj: { cancel?: Function } = {};
     const promise = this.queryPromised(queryWithParams, cancelObj, this.prepareConnectionQueries());
     (promise as CancelablePromise<any>).cancel =
       () => cancelObj.cancel && cancelObj.cancel() ||
@@ -275,8 +275,10 @@ export class JDBCDriver extends BaseDriver {
 
     try {
       const conn = await this.pool.acquire();
+
       try {
         const prepareConnectionQueries = options.prepareConnectionQueries || [];
+
         for (let i = 0; i < prepareConnectionQueries.length; i++) {
           await this.executeStatement(conn, prepareConnectionQueries[i]);
         }
@@ -298,7 +300,7 @@ export class JDBCDriver extends BaseDriver {
 
     try {
       const query = this.prepareQueryWithParams(sql, values);
-      const cancelObj: {cancel?: Function} = {};
+      const cancelObj: { cancel?: Function } = {};
 
       const createStatement = promisify(conn.createStatement.bind(conn));
       const statement = await createStatement();
@@ -314,10 +316,10 @@ export class JDBCDriver extends BaseDriver {
           (
             err: unknown,
             res: {
-                labels: string[],
-                types: number[],
-                rows: { next: nextFn },
-              },
+              labels: string[],
+              types: number[],
+              rows: { next: nextFn },
+            },
           ) => {
             if (err) {
               reject(err);

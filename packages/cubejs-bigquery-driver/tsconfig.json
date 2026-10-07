@@ -6,9 +6,14 @@
     "package.json"
   ],
   "compilerOptions": {
+    "types": ["node", "jest"],
     "outDir": "dist",
     "rootDir": ".",
-    "baseUrl": ".",
     "resolveJsonModule": true
-  }
+  },
+  "references": [
+    { "path": "../cubejs-backend-shared" },
+    { "path": "../cubejs-base-driver" },
+    { "path": "../cubejs-testing-shared" }
+  ]
 }

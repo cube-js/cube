@@ -12,11 +12,9 @@ export function PivotOptions({
   return pivotConfig ? (
     <Checkbox
       isSelected={pivotConfig.fillMissingDates as boolean}
-      onChange={() =>
-        onUpdate({
-          fillMissingDates: !pivotConfig.fillMissingDates,
-        })
-      }
+      onChange={() => onUpdate({
+        fillMissingDates: !pivotConfig.fillMissingDates,
+      })}
     >
       Fill Missing Dates
     </Checkbox>

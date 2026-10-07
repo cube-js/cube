@@ -1,7 +1,7 @@
 {
   "extends": "./tsconfig.json",
   "compilerOptions": {
-    "module": "CommonJS",
+    "types": ["node", "jest"],
     "sourceMap": true,
     "inlineSourceMap": true,
     "inlineSources": true,

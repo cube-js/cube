@@ -1,11 +1,13 @@
 use cubenativeutils::CubeError;
 use itertools::Itertools;
 
-use crate::planner::{Case, CubeRef, SqlCall};
+use crate::planner::{Case, CubeId, CubeRef, MemberId, SqlCall};
 
 use super::common::CompiledMemberPath;
 use super::deps::{self, DepVisitor, DepVisitorMut, SymbolDeps};
-use super::{DimensionSymbol, MeasureSymbol, MemberExpressionSymbol, TimeDimensionSymbol};
+use super::{
+    DimensionSymbol, MeasureSymbol, MemberExpressionSymbol, RefSymbol, TimeDimensionSymbol,
+};
 use std::fmt::Debug;
 use std::ops::ControlFlow;
 use std::rc::Rc;
@@ -20,17 +22,23 @@ use std::rc::Rc;
 /// declared on a cube — or derived at query time: `TimeDimension`
 /// (a dimension at a chosen granularity and date range) or
 /// `MemberExpression` (synthetic, built from a SQL expression or a
-/// patched symbol). Identity is `full_name` + variant.
+/// patched symbol). `Ref` is a member with an identity of its own whose
+/// value is another member's (a view member). Identity is `full_name` +
+/// variant.
 ///
 /// Indivisible: renders as a single SQL expression. A symbol may depend
 /// on other symbols (`get_dependencies`); whether those deps are
 /// inlined or pushed into a CTE / subquery is a physical-plan decision.
+///
+/// Matches over the variants list every variant, with no `_ =>` arm, so
+/// that a new variant fails to compile wherever a decision depends on it.
 #[derive(Clone)]
 pub enum MemberSymbol {
     Dimension(Rc<DimensionSymbol>),
     TimeDimension(Rc<TimeDimensionSymbol>),
     Measure(Rc<MeasureSymbol>),
     MemberExpression(Rc<MemberExpressionSymbol>),
+    Ref(Rc<RefSymbol>),
 }
 
 impl Debug for MemberSymbol {
@@ -46,6 +54,7 @@ impl Debug for MemberSymbol {
                 .debug_tuple("MemberExpression")
                 .field(&self.full_name())
                 .finish(),
+            Self::Ref(_) => f.debug_tuple("Ref").field(&self.full_name()).finish(),
         }
     }
 }
@@ -58,8 +67,7 @@ impl Debug for MemberSymbol {
 /// forms; it answers "the same member?", not "the same symbol?".
 impl PartialEq for MemberSymbol {
     fn eq(&self, other: &Self) -> bool {
-        self.full_name() == other.full_name()
-            && std::mem::discriminant(self) == std::mem::discriminant(other)
+        self.id() == other.id() && std::mem::discriminant(self) == std::mem::discriminant(other)
     }
 }
 
@@ -80,12 +88,17 @@ impl MemberSymbol {
         Rc::new(Self::TimeDimension(symbol))
     }
 
+    pub fn new_ref(symbol: Rc<RefSymbol>) -> Rc<Self> {
+        Rc::new(Self::Ref(symbol))
+    }
+
     pub fn compiled_path(&self) -> &CompiledMemberPath {
         match self {
             Self::Dimension(d) => d.compiled_path(),
             Self::TimeDimension(d) => d.compiled_path(),
             Self::Measure(m) => m.compiled_path(),
             Self::MemberExpression(e) => e.compiled_path(),
+            Self::Ref(r) => r.compiled_path(),
         }
     }
 
@@ -95,6 +108,10 @@ impl MemberSymbol {
         self.compiled_path().full_name().clone()
     }
 
+    pub fn id(&self) -> &MemberId {
+        self.compiled_path().id()
+    }
+
     /// Optional SQL expression that wraps the rendered member output to
     /// mask its value (data hiding / column-level masking).
     pub fn mask_sql(&self) -> Option<&Rc<SqlCall>> {
@@ -102,7 +119,8 @@ impl MemberSymbol {
             Self::Dimension(d) => d.mask_sql().as_ref(),
             Self::TimeDimension(td) => td.base_symbol().mask_sql(),
             Self::Measure(m) => m.mask_sql().as_ref(),
-            _ => None,
+            Self::Ref(r) => r.mask_sql().as_ref(),
+            Self::MemberExpression(_) => None,
         }
     }
 
@@ -114,11 +132,11 @@ impl MemberSymbol {
         self.compiled_path().name().clone()
     }
 
-    pub fn cube_name(&self) -> String {
-        self.compiled_path().cube_name().clone()
+    pub fn cube_id(&self) -> CubeId {
+        self.compiled_path().cube_id().clone()
     }
 
-    pub fn path(&self) -> &Vec<String> {
+    pub fn path(&self) -> &Vec<CubeId> {
         self.compiled_path().path()
     }
 
@@ -132,7 +150,8 @@ impl MemberSymbol {
             Self::Dimension(d) => d.is_multi_stage(),
             Self::TimeDimension(d) => d.is_multi_stage(),
             Self::Measure(m) => m.is_multi_stage(),
-            _ => false,
+            Self::Ref(r) => r.target_member().is_some_and(|t| t.is_multi_stage()),
+            Self::MemberExpression(_) => false,
         }
     }
 
@@ -144,17 +163,27 @@ impl MemberSymbol {
             MemberSymbol::TimeDimension(time_dimension_symbol) => {
                 time_dimension_symbol.base_symbol().case()
             }
-            _ => None,
+            MemberSymbol::MemberExpression(_) | MemberSymbol::Ref(_) => None,
         }
     }
 
+    /// A `Ref` answers for its target.
     pub fn is_measure(&self) -> bool {
-        matches!(self, Self::Measure(_))
+        match self {
+            Self::Measure(_) => true,
+            Self::Ref(r) => r.target_member().is_some_and(|t| t.is_measure()),
+            Self::Dimension(_) | Self::TimeDimension(_) | Self::MemberExpression(_) => false,
+        }
     }
 
-    /// True for both `Dimension` and `TimeDimension`.
+    /// True for both `Dimension` and `TimeDimension`. A `Ref` answers for
+    /// its target.
     pub fn is_dimension(&self) -> bool {
-        matches!(self, Self::Dimension(_) | Self::TimeDimension(_))
+        match self {
+            Self::Dimension(_) | Self::TimeDimension(_) => true,
+            Self::Ref(r) => r.target_member().is_some_and(|t| t.is_dimension()),
+            Self::Measure(_) | Self::MemberExpression(_) => false,
+        }
     }
 
     /// Applies `f` to this symbol, then recurses into the dependencies of
@@ -182,6 +211,7 @@ impl MemberSymbol {
             Self::TimeDimension(d) => d.is_reference(),
             Self::Measure(m) => m.is_reference(),
             Self::MemberExpression(e) => e.is_reference(),
+            Self::Ref(_) => true,
         }
     }
 
@@ -192,6 +222,7 @@ impl MemberSymbol {
             Self::TimeDimension(d) => d.reference_member(),
             Self::Measure(m) => m.reference_member(),
             Self::MemberExpression(e) => e.reference_member(),
+            Self::Ref(r) => r.target_member().cloned(),
         }
     }
 
@@ -205,16 +236,29 @@ impl MemberSymbol {
         current
     }
 
+    /// Follows `Ref` targets only — unlike `resolve_reference_chain`, an
+    /// in-cube proxy is not followed — and returns the first non-`Ref`.
+    pub fn peel_refs(self: &Rc<Self>) -> Rc<MemberSymbol> {
+        let mut current = self.clone();
+        while let Self::Ref(r) = current.as_ref() {
+            match r.target_member() {
+                Some(target) => current = target.clone(),
+                None => break,
+            }
+        }
+        current
+    }
+
     /// True if `member` is this symbol or any symbol reachable via
     /// `reference_member`. Self is included.
     pub fn has_member_in_reference_chain(&self, member: &Rc<MemberSymbol>) -> bool {
-        if self.full_name() == member.full_name() {
+        if self.id() == member.id() {
             return true;
         }
 
         let mut current = self.reference_member();
         while let Some(reference) = current {
-            if reference.full_name() == member.full_name() {
+            if reference.id() == member.id() {
                 return true;
             }
             current = reference.reference_member();
@@ -246,24 +290,29 @@ impl MemberSymbol {
             Self::Dimension(d) => d.owned_by_cube(),
             Self::TimeDimension(d) => d.owned_by_cube(),
             Self::Measure(m) => m.owned_by_cube(),
-            Self::MemberExpression(_) => false,
+            Self::MemberExpression(_) | Self::Ref(_) => false,
         }
     }
 
     pub fn as_time_dimension(&self) -> Result<Rc<TimeDimensionSymbol>, CubeError> {
         match self {
             Self::TimeDimension(d) => Ok(d.clone()),
-            _ => Err(CubeError::internal(format!(
-                "{} is not a time dimension",
-                self.full_name()
-            ))),
+            Self::Dimension(_) | Self::Measure(_) | Self::MemberExpression(_) | Self::Ref(_) => {
+                Err(CubeError::internal(format!(
+                    "{} is not a time dimension",
+                    self.full_name()
+                )))
+            }
         }
     }
 
     pub fn as_dimension(&self) -> Result<Rc<DimensionSymbol>, CubeError> {
         match self {
             Self::Dimension(d) => Ok(d.clone()),
-            _ => Err(CubeError::internal(format!(
+            Self::TimeDimension(_)
+            | Self::Measure(_)
+            | Self::MemberExpression(_)
+            | Self::Ref(_) => Err(CubeError::internal(format!(
                 "{} is not a dimension",
                 self.full_name()
             ))),
@@ -273,8 +322,24 @@ impl MemberSymbol {
     pub fn as_measure(&self) -> Result<Rc<MeasureSymbol>, CubeError> {
         match self {
             Self::Measure(m) => Ok(m.clone()),
-            _ => Err(CubeError::internal(format!(
+            Self::Dimension(_)
+            | Self::TimeDimension(_)
+            | Self::MemberExpression(_)
+            | Self::Ref(_) => Err(CubeError::internal(format!(
                 "{} is not a measure",
+                self.full_name()
+            ))),
+        }
+    }
+
+    pub fn as_ref_symbol(&self) -> Result<Rc<RefSymbol>, CubeError> {
+        match self {
+            Self::Ref(r) => Ok(r.clone()),
+            Self::Dimension(_)
+            | Self::TimeDimension(_)
+            | Self::Measure(_)
+            | Self::MemberExpression(_) => Err(CubeError::internal(format!(
+                "{} is not a reference",
                 self.full_name()
             ))),
         }
@@ -283,10 +348,9 @@ impl MemberSymbol {
     pub fn as_member_expression(&self) -> Result<Rc<MemberExpressionSymbol>, CubeError> {
         match self {
             Self::MemberExpression(m) => Ok(m.clone()),
-            _ => Err(CubeError::internal(format!(
-                "{} is not a member expression",
-                self.full_name()
-            ))),
+            Self::Dimension(_) | Self::TimeDimension(_) | Self::Measure(_) | Self::Ref(_) => Err(
+                CubeError::internal(format!("{} is not a member expression", self.full_name())),
+            ),
         }
     }
 
@@ -295,7 +359,9 @@ impl MemberSymbol {
     pub fn alias_suffix(&self) -> Option<String> {
         match self {
             Self::TimeDimension(d) => Some(d.alias_suffix()),
-            _ => None,
+            Self::Dimension(_) | Self::Measure(_) | Self::MemberExpression(_) | Self::Ref(_) => {
+                None
+            }
         }
     }
 
@@ -310,7 +376,9 @@ impl MemberSymbol {
         let sql_calls = match self {
             Self::Dimension(dim) => dim.iter_sql_calls(),
             Self::Measure(meas) => meas.iter_sql_calls(),
-            _ => Box::new(std::iter::empty()),
+            Self::TimeDimension(_) | Self::MemberExpression(_) | Self::Ref(_) => {
+                Box::new(std::iter::empty())
+            }
         };
         if self.is_multi_stage() {
             for call in sql_calls {
@@ -328,7 +396,7 @@ impl MemberSymbol {
         if !sql_cube_deps.is_empty() {
             Err(CubeError::user(format!(
                 "Multi stage member '{}' references cubes {}. Multi stage members can only reference other members.",
-                self.full_name(), sql_cube_deps.iter().map(|dep| dep.cube_name()).join(", ")
+                self.full_name(), sql_cube_deps.iter().map(|dep| dep.cube_id()).join(", ")
             )))
         } else if sql_call.dependencies_count() == 0 {
             Err(CubeError::user(format!(
@@ -340,17 +408,14 @@ impl MemberSymbol {
         }
     }
     fn validate_regular_member_cube_refs(&self, sql_call: &Rc<SqlCall>) -> Result<(), CubeError> {
-        let cube_name = self.cube_name();
+        let cube_name = self.cube_id();
         let sql_cube_deps = sql_call.cube_name_deps();
-        if sql_cube_deps
-            .iter()
-            .any(|dep| dep.cube_name() != &cube_name)
-        {
+        if sql_cube_deps.iter().any(|dep| dep.cube_id() != &cube_name) {
             Err(CubeError::user(format!(
                 "Member '{}' references foreign cubes: {}. Please split and move this definition to corresponding cubes.",
                 self.full_name(), sql_cube_deps.iter().filter_map(|dep|
-                    if dep.cube_name() != &cube_name {
-                        Some(dep.cube_name())
+                    if dep.cube_id() != &cube_name {
+                        Some(dep.cube_id())
                     } else {
                         None
                     }
@@ -370,6 +435,7 @@ impl SymbolDeps for MemberSymbol {
             Self::TimeDimension(d) => d.as_ref().visit_deps(visitor),
             Self::Measure(m) => m.as_ref().visit_deps(visitor),
             Self::MemberExpression(e) => e.as_ref().visit_deps(visitor),
+            Self::Ref(r) => r.as_ref().visit_deps(visitor),
         }
     }
 
@@ -395,6 +461,11 @@ impl SymbolDeps for MemberSymbol {
                 body.visit_deps_mut(visitor)?;
                 *e = Rc::new(body);
             }
+            Self::Ref(r) => {
+                let mut body = (**r).clone();
+                body.visit_deps_mut(visitor)?;
+                *r = Rc::new(body);
+            }
         }
         Ok(())
     }
@@ -407,6 +478,7 @@ impl crate::utils::debug::DebugSql for MemberSymbol {
             MemberSymbol::Measure(m) => m.debug_sql(expand_deps),
             MemberSymbol::TimeDimension(t) => t.debug_sql(expand_deps),
             MemberSymbol::MemberExpression(e) => e.debug_sql(expand_deps),
+            MemberSymbol::Ref(r) => r.debug_sql(expand_deps),
         }
     }
 }

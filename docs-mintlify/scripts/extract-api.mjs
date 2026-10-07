@@ -125,7 +125,9 @@ function kebab(s) {
   return mintSlugify(normalizeTypography(String(s).trim()));
 }
 // Longest shared path prefix (by segment) across a tag's paths — the "Resource"
-// column value. Falls back to the single path when a tag has just one.
+// column value. Falls back to the single path when a tag has just one. A `/*`
+// suffix marks a prefix that is not itself one of the tag's paths, so the row
+// reads as a sub-resource group rather than implying a callable endpoint.
 function commonPathPrefix(pathList) {
   const split = pathList.map((p) => p.split('/'));
   const first = split[0];
@@ -133,8 +135,21 @@ function commonPathPrefix(pathList) {
   for (; i < first.length; i++) {
     if (!split.every((s) => s[i] === first[i])) break;
   }
-  return split.length === 1 ? first.join('/') : first.slice(0, i).join('/') || '/';
+  const prefix = split.length === 1 ? first.join('/') : first.slice(0, i).join('/') || '/';
+  if (split.length > 1 && prefix !== '/' && !pathList.includes(prefix)) {
+    return `${prefix}/*`;
+  }
+  return prefix;
 }
+
+// A shared parent can be too broad when a tag spans sibling collections.
+const SNOWFLAKE_RESOURCE_ROOT = '/api/v1/deployments/{deploymentId}/snowflake-semantic-view-';
+const RESOURCE_PATH_OVERRIDES = {
+  'Snowflake Semantic View Sync': {
+    display: `${SNOWFLAKE_RESOURCE_ROOT}{pulls,syncs}`,
+    prefixes: [`${SNOWFLAKE_RESOURCE_ROOT}pulls`, `${SNOWFLAKE_RESOURCE_ROOT}syncs`],
+  },
+};
 
 // The v1 REST API, on both path families it is served under: /api/v1/… on the
 // main console-server pods, and /build/api/v1/… routed to the build pods (which
@@ -171,6 +186,15 @@ const EXCLUDE_OPERATIONS = new Set([
   'GET /api/v1/ai-engineer/settings',
   // Report folders listing — not part of the public docs surface.
   'GET /api/v1/deployments/{deploymentId}/report-folders',
+  // Access-test is not in the preview API reference yet (CUB-4443). Remove once
+  // it is documented.
+  'POST /api/v1/deployments/{deploymentId}/databricks-metric-view-integrations/{dataSourceName}/access-test',
+  // Evaluations (CUB-3667): every operation's own description says "This
+  // capability is currently in preview — reach out to the Cube support team to
+  // activate it for your account", not GA. Remove once the feature ships.
+  'POST /api/v1/deployments/{deploymentId}/evaluations',
+  'GET /api/v1/deployments/{deploymentId}/evaluations/{evaluationId}',
+  'GET /api/v1/deployments/{deploymentId}/evaluations/{evaluationId}/results',
 ]);
 
 // Cube-staff-only operations (provisioning real cloud infrastructure — Regions,
@@ -208,8 +232,10 @@ const TAG_MAP = {
 const TAG_ORDER = [
   'Deployments', 'Deployment Creation', 'Environments', 'Env Variables', 'Regions',
   'Data Model', 'Data Model Uploads', 'GitHub', 'GitHub Connection', 'dbt Sync',
-  'Folders', 'Reports', 'Workbooks', 'Notifications', 'Workspace', 'Agents', 'Metadata',
-  'Users', 'Users Admin', 'Groups', 'User Groups',
+  'Databricks Metric View Publication', 'Databricks Metric View Integration',
+  'Snowflake Semantic View Sync',
+  'Folders', 'Reports', 'External Documents', 'Workbooks', 'Workbook Promotions', 'Dashboard Exports', 'Notifications', 'Scheduled Tasks', 'Workspace', 'Agents', 'Metadata',
+  'Users', 'Users Admin', 'Groups', 'User Groups', 'API Keys',
   'User Attributes', 'User Attribute Values', 'Resource Policies', 'Tenant Settings',
   'OAuth Integrations', 'User OAuth Tokens', 'OIDC Token Configs',
   'App Theme', 'AI Engineer', 'Embed', 'Embed Tenants', 'Dashboard Embed Access',
@@ -263,6 +289,7 @@ const ACRONYMS = [
   [/\boidc\b/gi, 'OIDC'],
   [/\bscim\b/gi, 'SCIM'],
   [/\bai\b/gi, 'AI'],
+  [/\bapi\b/gi, 'API'],
   // Product spelling: lowercase, even at the start of a tag or summary.
   [/\bdbt\b/gi, 'dbt'],
 ];
@@ -282,6 +309,7 @@ const src = yaml.load(fs.readFileSync(SRC, 'utf8'));
 //    trailing slash — a trailing slash breaks Mintlify dev), and clean tags +
 //    operationIds.
 const paths = {};
+const operationIds = new Map();
 const matchedExcludes = new Set();
 let autoExcludedCount = 0;
 for (const [key, val] of Object.entries(src.paths)) {
@@ -320,6 +348,15 @@ for (const [key, val] of Object.entries(src.paths)) {
     // strip "XxxController." prefix from operationId for clean page slugs
     if (typeof val[m].operationId === 'string') {
       val[m].operationId = val[m].operationId.replace(/^[^.]*\./, '');
+      const prior = operationIds.get(val[m].operationId);
+      if (prior) {
+        console.error(
+          `Aborting: operationId collision after normalization: ${val[m].operationId} ` +
+            `(${prior} and ${m.toUpperCase()} ${newKey}).`
+        );
+        process.exit(1);
+      }
+      operationIds.set(val[m].operationId, `${m.toUpperCase()} ${newKey}`);
     }
   }
   if (!kept) continue; // every operation on this path was excluded
@@ -450,6 +487,32 @@ function hoistNullableMeta(node) {
   }
   for (const v of Object.values(node)) hoistNullableMeta(v);
 }
+// Per-user OIDC subjects (`subjectType`, the `{user_*}` sub placeholders) are
+// gated behind the `useUserOidcTokens` tenant flag, not generally available.
+// Strip them from the generated schemas. Remove once the feature ships.
+{
+  for (const [name, def] of Object.entries(schemas)) {
+    if (/SubjectType$/.test(name) && Array.isArray(def.enum) && def.enum.includes('user')) {
+      delete schemas[name];
+      continue;
+    }
+    delete def.properties?.subjectType;
+    if (Array.isArray(def.required)) def.required = def.required.filter((r) => r !== 'subjectType');
+    for (const alt of def.properties?.subFormat?.oneOf ?? []) {
+      if (typeof alt.pattern === 'string') {
+        alt.pattern = alt.pattern.replace('|user_email|username|user_id', '').replace('.@+', '');
+      }
+    }
+  }
+}
+
+// Fail closed: abort if the flagged OIDC fields survive (upstream pattern changed)
+// or a `$ref` to a deleted `*SubjectType` schema is left dangling.
+if (/subjectType|SubjectType|user_email|\{user_|\.@\+/.test(JSON.stringify({ paths, schemas }))) {
+  console.error('Aborting: per-user OIDC fields survived stripping (did the upstream spec change?)');
+  process.exit(1);
+}
+
 hoistNullableMeta(paths);
 hoistNullableMeta(schemas);
 
@@ -507,10 +570,43 @@ const out = {
   },
 };
 
-writeOrCheck(OUT, yaml.dump(out, { lineWidth: 100, noRefs: true }));
-console.log('paths:', Object.keys(paths).length, '| schemas:', Object.keys(schemas).length, '| tags:', orderedTags.length);
-if (autoExcludedCount) {
-  console.log(`(${autoExcludedCount} Cube-staff-only operation(s) auto-excluded via SUPER_ADMIN_ONLY_MARKER)`);
+// Prose throughout `out` is authored in cubejs-enterprise, whose contributors can't see
+// this site's routes, so a hyperlink to the pre-#11851 `cube.dev/docs/<path>` scheme can
+// resurface anywhere in the document on any regeneration; scanning must happen here,
+// pre-serialization, since a `yaml.dump` line-wrap can split a markdown link across lines.
+const LEGACY_LINK_REWRITES = [
+  ['https://cube.dev/docs/product/apis-integrations/rest-api', '/reference/core-data-apis/rest-api'],
+];
+const leakedLegacyLinks = [];
+function rewriteString(s, loc) {
+  let out = s;
+  for (const [from, to] of LEGACY_LINK_REWRITES) out = out.split(from).join(to);
+  if (/https?:\/\/cube\.dev\/docs\//.test(out)) leakedLegacyLinks.push(loc);
+  return out;
+}
+function rewriteLegacyLinks(node, loc) {
+  if (Array.isArray(node)) {
+    node.forEach((n, i) => {
+      const at = `${loc}[${i}]`;
+      if (typeof n === 'string') node[i] = rewriteString(n, at);
+      else rewriteLegacyLinks(n, at);
+    });
+    return;
+  }
+  if (!node || typeof node !== 'object') return;
+  for (const [k, v] of Object.entries(node)) {
+    const at = `${loc}.${k}`;
+    if (typeof v === 'string') node[k] = rewriteString(v, at);
+    else rewriteLegacyLinks(v, at);
+  }
+}
+rewriteLegacyLinks(out, 'out');
+if (leakedLegacyLinks.length) {
+  console.error(
+    'Aborting: legacy cube.dev/docs/ hyperlink(s) survived rewriting — add a LEGACY_LINK_REWRITES entry:\n  ' +
+      leakedLegacyLinks.join('\n  ')
+  );
+  process.exit(1);
 }
 
 // 5. Group operations by tag (pages in source order within a tag) and capture,
@@ -527,6 +623,25 @@ for (const [p, val] of Object.entries(paths)) {
     if (!(pathsForTag[tag] || []).includes(p)) (pathsForTag[tag] = pathsForTag[tag] || []).push(p);
     (summariesForTag[tag] = summariesForTag[tag] || []).push(val[m].summary || '');
   }
+}
+
+for (const [tag, { prefixes }] of Object.entries(RESOURCE_PATH_OVERRIDES)) {
+  const tagPaths = pathsForTag[tag];
+  const covered = (prefix, path) => path === prefix || path.startsWith(`${prefix}/`);
+  if (
+    !tagPaths?.length ||
+    !tagPaths.every((path) => prefixes.some((prefix) => covered(prefix, path))) ||
+    !prefixes.every((prefix) => tagPaths.some((path) => covered(prefix, path)))
+  ) {
+    console.error(`Aborting: RESOURCE_PATH_OVERRIDES entry for ${tag} does not match its paths.`);
+    process.exit(1);
+  }
+}
+
+writeOrCheck(OUT, yaml.dump(out, { lineWidth: 100, noRefs: true }));
+console.log('paths:', Object.keys(paths).length, '| schemas:', Object.keys(schemas).length, '| tags:', orderedTags.length);
+if (autoExcludedCount) {
+  console.log(`(${autoExcludedCount} Cube-staff-only operation(s) auto-excluded via SUPER_ADMIN_ONLY_MARKER)`);
 }
 
 // The tag's representative page for the intro table: its first operation, unless
@@ -583,7 +698,7 @@ const rows = groups
   .map(
     (g) =>
       `| [${g.group}](/api-reference/${kebab(g.group)}/${kebab(linkSummaryForTag(g.group))}) ` +
-      `| \`${commonPathPrefix(pathsForTag[g.group])}\` | v1 |`
+      `| \`${RESOURCE_PATH_OVERRIDES[g.group]?.display ?? commonPathPrefix(pathsForTag[g.group])}\` | v1 |`
   )
   .join('\n');
 const table = [INTRO_TABLE_HEAD, rows, INTRO_SCIM_ROWS].join('\n');

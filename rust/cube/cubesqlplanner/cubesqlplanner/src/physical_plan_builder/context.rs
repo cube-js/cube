@@ -3,7 +3,8 @@ use cubenativeutils::CubeError;
 use crate::physical_plan::sql_nodes::SqlNodesFactory;
 use crate::physical_plan::Schema;
 use crate::planner::planners::multi_stage::{EvaluationContext, TimeShiftState};
-use crate::planner::MemberSymbol;
+use crate::planner::{CubeId, MemberId, MemberSymbol};
+use itertools::Itertools;
 use std::collections::HashMap;
 use std::rc::Rc;
 
@@ -19,13 +20,13 @@ pub(super) struct PushDownBuilderContext {
     pub alias_prefix: Option<String>,
     pub render_measure_for_ungrouped: bool,
     pub time_shifts: TimeShiftState,
-    pub original_sql_pre_aggregations: HashMap<String, String>,
+    pub original_sql_pre_aggregations: HashMap<CubeId, String>,
     pub required_measures: Option<Vec<Rc<MemberSymbol>>>,
     pub dimensions_query: bool,
     pub measure_subquery: bool,
     pub multi_stage_schemas: HashMap<String, Rc<Schema>>,
-    pub multi_stage_dimension_schemas: HashMap<Vec<String>, Rc<MultiStageDimensionContext>>,
-    pub multi_stage_dimensions: Vec<String>,
+    pub multi_stage_dimension_schemas: HashMap<Vec<MemberId>, Rc<MultiStageDimensionContext>>,
+    pub multi_stage_dimensions: Vec<MemberId>,
 }
 
 impl PushDownBuilderContext {
@@ -41,13 +42,12 @@ impl PushDownBuilderContext {
     pub fn make_sql_nodes_factory(&self) -> Result<SqlNodesFactory, CubeError> {
         let mut factory = SqlNodesFactory::new();
 
-        let (time_shifts, calendar_time_shifts) = self.time_shifts.extract_time_shifts()?;
-        let common_time_shifts = TimeShiftState {
-            dimensions_shifts: time_shifts,
-        };
-
-        factory.set_time_shifts(common_time_shifts);
-        factory.set_calendar_time_shifts(calendar_time_shifts);
+        let extracted = self.time_shifts.extract_time_shifts()?;
+        factory.set_time_shifts(TimeShiftState {
+            dimensions_shifts: extracted.interval_shifts,
+        });
+        factory.set_calendar_time_shifts(extracted.calendar_shifts);
+        factory.set_filter_params_time_shifts(extracted.filter_params_shifts);
         factory.set_original_sql_pre_aggregations(self.original_sql_pre_aggregations.clone());
         Ok(factory)
     }
@@ -60,8 +60,8 @@ impl PushDownBuilderContext {
         self.multi_stage_dimensions = Vec::new();
     }
 
-    pub fn add_multi_stage_dimension(&mut self, name: String) {
-        self.multi_stage_dimensions.push(name);
+    pub fn add_multi_stage_dimension(&mut self, id: MemberId) {
+        self.multi_stage_dimensions.push(id);
     }
 
     pub fn get_multi_stage_dimensions(
@@ -80,14 +80,14 @@ impl PushDownBuilderContext {
         } else {
             Err(CubeError::internal(format!(
                 "Cannot find source for resolve multi stage dimensions {}",
-                dimensions_to_resolve.join(", ")
+                dimensions_to_resolve.iter().join(", ")
             )))
         }
     }
 
     pub fn add_multi_stage_dimension_schema(
         &mut self,
-        resolved_dimensions: Vec<String>,
+        resolved_dimensions: Vec<MemberId>,
         cte_name: String,
         join_dimensions: Vec<Rc<MemberSymbol>>,
         schema: Rc<Schema>,

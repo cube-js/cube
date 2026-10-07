@@ -269,12 +269,12 @@ pub fn parse_sql_to_statement(
                 let err = if stmts.is_empty() {
                     CompilationError::user(format!(
                         "Invalid query, no statements was specified: {}",
-                        &query
+                        query
                     ))
                 } else {
                     CompilationError::unsupported(format!(
                         "Multiple statements was specified in one query: {}",
-                        &query
+                        query
                     ))
                 };
 

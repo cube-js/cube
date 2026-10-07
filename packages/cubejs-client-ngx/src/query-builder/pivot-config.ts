@@ -6,11 +6,11 @@ import {
 import { StateSubject } from './common';
 
 export class PivotConfig extends StateSubject<TPivotConfig> {
-  constructor(pivotConfig: TPivotConfig) {
+  public constructor(pivotConfig: TPivotConfig) {
     super(pivotConfig);
   }
-  
-  moveItem(
+
+  public moveItem(
     sourceIndex: number,
     destinationIndex: number,
     sourceAxis: TSourceAxis,
@@ -26,8 +26,8 @@ export class PivotConfig extends StateSubject<TPivotConfig> {
       )
     );
   }
-  
-  setFillMissingDates(fillMissingDates: boolean) {
+
+  public setFillMissingDates(fillMissingDates: boolean) {
     this.subject.next({
       ...this.get(),
       fillMissingDates

@@ -44,7 +44,11 @@ impl SqlNode for SegmentDimensionSqlNode {
             MemberSymbol::MemberExpression(e) if e.is_segment() => {
                 templates.wrap_segment_select(input)
             }
-            _ => Ok(input),
+            MemberSymbol::Dimension(_)
+            | MemberSymbol::TimeDimension(_)
+            | MemberSymbol::Measure(_)
+            | MemberSymbol::MemberExpression(_)
+            | MemberSymbol::Ref(_) => Ok(input),
         }
     }
 

@@ -61,6 +61,7 @@ export async function buildPreaggs(
     ).then((post) => readData(post)).then((_body) => {
       const body = _body.toString();
       let jobs: string[];
+
       // Nothing downstream settles the outer promise, and the 120s backstop below
       // is only armed once there are tokens to poll, so a body that is not JSON at
       // all - a proxy error page, or an empty response from a cube that died during
@@ -93,6 +94,7 @@ export async function buildPreaggs(
         const inProcess = [];
         let statusBody = '';
         let statuses: any;
+
         // Same reasoning as the parse above, one round later: a throw in here is an
         // unhandled rejection inside the interval callback, so the build would go on
         // polling and only die on the 120s backstop below with `timeout.` as its
@@ -187,6 +189,7 @@ export async function hookPreaggs(
         status: string,
         selector: any,
       }[];
+
       // Without this the orchestrator and compiler errors this call can raise are
       // unhandled rejections thrown out of an async interval callback: `stop()`
       // never runs, the poll carries on, and the build dies 60s later on `timeout.`

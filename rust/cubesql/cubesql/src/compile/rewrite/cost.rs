@@ -253,6 +253,8 @@ impl BestCubePlan {
         CubePlanCost {
             replacers: this_replacers,
             // Will be filled in finalize
+            plan_nodes_inside_wrapper: 0,
+            // Will be filled in finalize
             penalized_ast_size_outside_wrapper: 0,
             table_scans,
             filters,
@@ -328,6 +330,7 @@ pub struct CubePlanCostOptions {
 
 /// This cost struct maintains following structural relationships:
 /// - `replacers` > other nodes - having replacers in structure means not finished processing
+/// - `plan_nodes_inside_wrapper` > other nodes - a DataFusion node under a wrapper cannot be rendered as SQL, which matters where a wrapper reads a class that also holds plain forms (the queries of a pushed down union)
 /// - `penalized_ast_size_outside_wrapper` > other nodes - this is used to force "no post processing" mode, only CubeScan and CubeScanWrapped are expected as result
 /// - `table_scans` > other nodes - having table scan means not detected cube scan
 /// - `empty_wrappers` > `non_detected_cube_scans` - we don't want empty wrapper to hide non detected cube scan errors
@@ -347,6 +350,9 @@ pub struct CubePlanCostOptions {
 #[derive(Debug, Clone, Ord, PartialOrd, Eq, PartialEq)]
 pub struct CubePlanCost {
     replacers: i64,
+    // A DataFusion plan node under a `CubeScanWrapper` has no SQL to render, so a plan
+    // with one is not an answer, however cheap the rest of it is
+    plan_nodes_inside_wrapper: usize,
     penalized_ast_size_outside_wrapper: usize,
     table_scans: i64,
     empty_wrappers: i64,
@@ -420,6 +426,8 @@ impl CubePlanCost {
     pub fn add_child(&self, other: &Self) -> Self {
         Self {
             replacers: self.replacers + other.replacers,
+            plan_nodes_inside_wrapper: self.plan_nodes_inside_wrapper
+                + other.plan_nodes_inside_wrapper,
             // Will be filled in finalize
             penalized_ast_size_outside_wrapper: 0,
             table_scans: self.table_scans + other.table_scans,
@@ -479,9 +487,16 @@ impl CubePlanCost {
         state: &CubePlanState,
         sort_state: &SortState,
         under_limit: bool,
+        wrapper_depth: usize,
         enode: &LogicalPlanLanguage,
         options: CubePlanCostOptions,
     ) -> Self {
+        // `wrapper_depth` counts this node, so a wrapper is inside another at depth two
+        let plan_node_inside_wrapper = wrapper_depth > 0 && is_post_processing_node(enode);
+        // A wrapper inside a wrapper is how a pushed down union reads its queries: it
+        // renders as the query it holds, not as another wrapper, so it costs like none
+        let nested_wrapper =
+            wrapper_depth > 1 && matches!(enode, LogicalPlanLanguage::CubeScanWrapper(_));
         let ast_size_outside_wrapper = match state {
             CubePlanState::Wrapped => 0,
             CubePlanState::Unwrapped(size) => *size,
@@ -495,6 +510,8 @@ impl CubePlanCost {
 
         Self {
             replacers: self.replacers,
+            plan_nodes_inside_wrapper: self.plan_nodes_inside_wrapper
+                + if plan_node_inside_wrapper { 1 } else { 0 },
             penalized_ast_size_outside_wrapper,
             table_scans: self.table_scans,
             filters: self.filters,
@@ -593,7 +610,7 @@ impl CubePlanCost {
                 _ => 0,
             } + self.limitless_post_processing,
             unwrapped_subqueries: self.unwrapped_subqueries,
-            wrapper_nodes: self.wrapper_nodes,
+            wrapper_nodes: self.wrapper_nodes - if nested_wrapper { 1 } else { 0 },
             wrapped_select_non_push_to_cube: self.wrapped_select_non_push_to_cube,
             wrapped_select_ungrouped_scan: self.wrapped_select_ungrouped_scan,
             cube_scan_nodes: self.cube_scan_nodes,
@@ -625,6 +642,38 @@ impl CubePlanCost {
             ),
         }
     }
+}
+
+/// A DataFusion plan node the wrapper cannot render, so one that runs as post processing
+/// when it is outside a wrapper and makes the plan invalid when it is inside one. Every
+/// plan variant of the language is here except the ones SQL generation handles: the Cube
+/// nodes (`CubeScan`, `CubeScanWrapper`, `WrappedSelect`, `WrappedUnion`) and
+/// `EmptyRelation`.
+///
+/// One list serves both directions: it is what `plan_nodes_inside_wrapper` rejects and
+/// what `ast_size_outside_wrapper` counts, so a variant added or removed here changes the
+/// post processing penalty as much as the wrapper check.
+fn is_post_processing_node(node: &LogicalPlanLanguage) -> bool {
+    matches!(
+        node,
+        LogicalPlanLanguage::Projection(_)
+            | LogicalPlanLanguage::Filter(_)
+            | LogicalPlanLanguage::Window(_)
+            | LogicalPlanLanguage::Aggregate(_)
+            | LogicalPlanLanguage::Sort(_)
+            | LogicalPlanLanguage::Join(_)
+            | LogicalPlanLanguage::CrossJoin(_)
+            | LogicalPlanLanguage::Repartition(_)
+            | LogicalPlanLanguage::Subquery(_)
+            | LogicalPlanLanguage::Union(_)
+            | LogicalPlanLanguage::TableScan(_)
+            | LogicalPlanLanguage::Limit(_)
+            | LogicalPlanLanguage::TableUDFs(_)
+            | LogicalPlanLanguage::CreateExternalTable(_)
+            | LogicalPlanLanguage::Values(_)
+            | LogicalPlanLanguage::Distinct(_)
+            | LogicalPlanLanguage::Extension(_)
+    )
 }
 
 pub trait TopDownCost: Clone + Debug + PartialOrd {
@@ -914,6 +963,11 @@ pub struct CubePlanTopDownState {
     limit: SortState,
     /// Whether a select above bounds the rows every scan below it can return
     under_limit: bool,
+    /// How many `CubeScanWrapper` nodes are above, this node included: 0 outside any, 1 in
+    /// one, 2 in a wrapper nested in another. Saturates at 2, both because deeper nesting
+    /// changes nothing and because the state is part of the extraction memo key: the
+    /// e-graph has cycles, and a state that kept growing along one would never repeat
+    wrapper_depth: usize,
     max_row_limit: usize,
 }
 
@@ -923,6 +977,7 @@ impl CubePlanTopDownState {
             wrapped: CubePlanState::Unwrapped(0),
             limit: SortState::None,
             under_limit: false,
+            wrapper_depth: 0,
             max_row_limit,
         }
     }
@@ -1001,19 +1056,7 @@ impl TopDownState<LogicalPlanLanguage> for CubePlanTopDownState {
                 CubePlanState::Wrapped
             }
             _ => {
-                let ast_size_outside_wrapper = match node {
-                    LogicalPlanLanguage::Aggregate(_) => 1,
-                    LogicalPlanLanguage::Projection(_) => 1,
-                    LogicalPlanLanguage::Limit(_) => 1,
-                    LogicalPlanLanguage::Sort(_) => 1,
-                    LogicalPlanLanguage::Filter(_) => 1,
-                    LogicalPlanLanguage::Join(_) => 1,
-                    LogicalPlanLanguage::CrossJoin(_) => 1,
-                    LogicalPlanLanguage::Union(_) => 1,
-                    LogicalPlanLanguage::Window(_) => 1,
-                    LogicalPlanLanguage::Subquery(_) => 1,
-                    _ => 0,
-                };
+                let ast_size_outside_wrapper = if is_post_processing_node(node) { 1 } else { 0 };
                 CubePlanState::Unwrapped(ast_size_outside_wrapper)
             }
         };
@@ -1028,10 +1071,16 @@ impl TopDownState<LogicalPlanLanguage> for CubePlanTopDownState {
 
         let under_limit = self.under_limit || self.introduces_limit(node, egraph);
 
+        let wrapper_depth = match node {
+            LogicalPlanLanguage::CubeScanWrapper(_) => (self.wrapper_depth + 1).min(2),
+            _ => self.wrapper_depth,
+        };
+
         Self {
             wrapped,
             limit,
             under_limit,
+            wrapper_depth,
             max_row_limit: self.max_row_limit,
         }
     }
@@ -1053,6 +1102,7 @@ impl TopDownCostFunction<LogicalPlanLanguage, CubePlanTopDownState, CubePlanCost
             &state.wrapped,
             &state.limit,
             state.under_limit,
+            state.wrapper_depth,
             node,
             CubePlanCostOptions {
                 penalize_post_processing: self.penalize_post_processing,

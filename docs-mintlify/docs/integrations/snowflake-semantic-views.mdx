@@ -4,11 +4,17 @@ sidebarTitle: Snowflake Semantic Views
 description: Snowflake Semantic Views integration is available in Cube on the Enterprise plan.
 ---
 
-<Info>
+<Warning>
+
+Snowflake Semantic Views integration is in preview. Reach out to the [Cube support team](/admin/account-billing/support) to activate it for your account.
+
+</Warning>
+
+<Note>
 
 Snowflake Semantic Views integration is available in Cube on the [Enterprise plan](https://cube.dev/pricing).
 
-</Info>
+</Note>
 
 Cube supports bi-directional integration with Snowflake Semantic Views. This integration enables you to author views in Cube and use them in Snowflake, or work with Snowflake semantic views directly in Cube. This ensures consistency between your Cube definitions and Snowflake's semantic layer, allowing teams to work in their preferred environment.
 
@@ -63,7 +69,7 @@ recommended approach for straightforward table access (e.g., `sql_table: MY_SCHE
 The push integration uses the SQL Runner to execute DDL statements in Snowflake. To
 successfully create semantic views, ensure the following:
 
-- **Enable DDL operations** for your Cube deployment. In the Cube Cloud UI, go to
+- **Enable DDL operations** for your Cube deployment. In the Cube UI, go to
   **Deployment Settings** → **Configuration** and turn on **Enable DDL operations**.
   Without this setting, the SQL Runner will reject the DDL statements that the push
   integration generates.
@@ -117,6 +123,45 @@ When pushing a Cube view to Snowflake, the following are currently not supported
 
 We're working closely with Snowflake to expand coverage as Snowflake Semantic
 Views evolves.
+
+## Use the Platform API
+
+You can start a push or pull through the [Platform API](/api-reference/introduction) and poll its progress. Use your tenant URL (`https://<tenant>.cubecloud.dev`), deployment ID, and an API key in the `Authorization: Api-Key <key>` header. You can also use `Authorization: Bearer <oauth-token>` with the `deployment.write` scope. Starting a push or pull requires schema-update and SQL Runner read access to the deployment; checking progress requires schema-read or schema-update access. Push additionally requires [DDL operations](#prerequisites) to be enabled.
+
+| Action | Push | Pull |
+| --- | --- | --- |
+| Start | `POST /api/v1/deployments/{deploymentId}/snowflake-semantic-view-syncs` | `POST /api/v1/deployments/{deploymentId}/snowflake-semantic-view-pulls` |
+| Check progress | `GET /api/v1/deployments/{deploymentId}/snowflake-semantic-view-syncs/{syncJobId}` | `GET /api/v1/deployments/{deploymentId}/snowflake-semantic-view-pulls/{syncJobId}` |
+| Get result | `GET /api/v1/deployments/{deploymentId}/snowflake-semantic-view-syncs/{syncJobId}/result` | `GET /api/v1/deployments/{deploymentId}/snowflake-semantic-view-pulls/{syncJobId}/result` |
+
+Set the start-request fields for the direction you need:
+
+- **Push:** Send `schema`, a `prefix` for the Snowflake semantic view names, and an array of Cube `viewNames`.
+- **Pull:** Send `schema` and a repository-relative `outputPath`. Optionally specify Snowflake semantic `viewNames` (including `*` patterns), or omit them to pull every view in the schema.
+- **Branch:** Either request accepts `branchName`, which defaults to the deployment's deploy branch. A pull commits generated files to that branch, so use an existing review branch to inspect the changes first.
+- **Retries:** Either request accepts an optional UUID `idempotencyKey`. Retry with the same key and inputs to get the original job; use a new key when the inputs change.
+
+For example, start a push with:
+
+```bash
+curl -X POST "https://<tenant>.cubecloud.dev/api/v1/deployments/<deploymentId>/snowflake-semantic-view-syncs" \
+  -H "Authorization: Api-Key <api-key>" \
+  -H "Content-Type: application/json" \
+  -d '{"schema":"ECOMMERCE","prefix":"CUBE_","viewNames":["orders_view"]}'
+```
+
+Or pull a semantic view into a review branch:
+
+```bash
+curl -X POST "https://<tenant>.cubecloud.dev/api/v1/deployments/<deploymentId>/snowflake-semantic-view-pulls" \
+  -H "Authorization: Api-Key <api-key>" \
+  -H "Content-Type: application/json" \
+  -d '{"schema":"ECOMMERCE","outputPath":"model/snowflake","viewNames":["ORDERS_VIEW"],"branchName":"review-snowflake-views"}'
+```
+
+Each start request returns HTTP `202` with a `syncJobId` and `workflowId`. Use the `syncJobId` on the corresponding status endpoint above. Its `progress` object contains `stage` and `percentComplete`; `COMPLETED` and `FAILED` are terminal statuses. If a job fails, inspect its `error`. After `COMPLETED`, request the result endpoint. The result returns `viewCount`, `completedAt`, and `durationMs`; pull results also include `generatedFiles` with their paths.
+
+See the [Snowflake Semantic View Sync API reference](/api-reference/snowflake-semantic-view-sync/push-cube-views-to-snowflake-semantic-views) for request and response schemas, including optional fields.
 
 ## Benefits
 

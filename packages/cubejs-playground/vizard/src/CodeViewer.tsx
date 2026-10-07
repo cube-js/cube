@@ -274,7 +274,7 @@ export function CodeViewer(props: VizardCodeProps) {
             </Button>
           </TooltipProvider>
           <Button
-            to="!https://cube.dev/docs/product/workspace/vizard"
+            to="!https://docs.cube.dev/embedding/vizard"
             size="small"
             icon={<FileOutlined />}
           >

@@ -56,6 +56,14 @@ pub enum DataSourceError {
 }
 
 impl<'meta> DataSource<'meta> {
+    /// The data source when there is a specific one, `None` when unrestricted.
+    pub fn specific(&self) -> Option<&'meta str> {
+        match self {
+            DataSource::Unrestricted => None,
+            DataSource::Specific(data_source) => Some(data_source),
+        }
+    }
+
     pub fn specific_or<E>(self, err: E) -> Result<&'meta str, E> {
         match self {
             DataSource::Unrestricted => Err(err),
@@ -148,6 +156,27 @@ impl MetaContext {
             .into_iter()
             .map(|member| self.data_source_for_member_name(member))
             .try_fold(DataSource::Unrestricted, |l, r| l.merge(&r?))
+    }
+
+    /// Every data source reached by `members`, sorted and without duplicates. Unlike
+    /// [`Self::data_source_for_member_names`] this does not treat several data sources as
+    /// a conflict: members of a view can come from different data sources, and a caller
+    /// that does not know yet which of them a query will use keeps them all as the bound.
+    /// Synthetic fields reach no data source of their own and add nothing.
+    pub fn data_sources_for_member_names<'mem>(
+        &self,
+        members: impl IntoIterator<Item = &'mem str>,
+    ) -> Result<Vec<&str>, DataSourceError> {
+        // This runs inside rewrite transforms, so it stays a single allocation
+        let mut data_sources: Vec<&str> = Vec::new();
+        for member in members {
+            if let DataSource::Specific(data_source) = self.data_source_for_member_name(member)? {
+                data_sources.push(data_source);
+            }
+        }
+        data_sources.sort_unstable();
+        data_sources.dedup();
+        Ok(data_sources)
     }
 
     /// Data source for a cube or a view as a whole.
@@ -479,6 +508,46 @@ mod tests {
         assert!(matches!(
             ctx.data_source_for_cube_name("everything"),
             Ok(DataSource::Specific("analytics"))
+        ));
+    }
+
+    /// Members on several data sources are all kept, once each and in a stable order, so
+    /// that a caller can carry them as a bound; a member without a data source is still
+    /// an error, and synthetic fields add nothing.
+    #[test]
+    fn test_data_sources_for_member_names() {
+        let ctx = MetaContext::new(
+            vec![
+                cube_with_members("orders", &["orders.status"]),
+                cube_with_members("visits", &["visits.url"]),
+                cube_with_members("logs", &["logs.line"]),
+            ],
+            HashMap::from([
+                ("orders.status".to_string(), "warehouse".to_string()),
+                ("visits.url".to_string(), "analytics".to_string()),
+            ]),
+            HashMap::new(),
+            Uuid::new_v4(),
+        );
+
+        assert_eq!(
+            ctx.data_sources_for_member_names(vec![
+                "visits.url",
+                "orders.status",
+                "orders.__user",
+                "visits.url",
+            ])
+            .unwrap(),
+            vec!["analytics", "warehouse"]
+        );
+        assert_eq!(
+            ctx.data_sources_for_member_names(vec!["orders.__user"])
+                .unwrap(),
+            Vec::<&str>::new()
+        );
+        assert!(matches!(
+            ctx.data_sources_for_member_names(vec!["orders.status", "logs.line"]),
+            Err(DataSourceError::Missing(member)) if member == "logs.line"
         ));
     }
 

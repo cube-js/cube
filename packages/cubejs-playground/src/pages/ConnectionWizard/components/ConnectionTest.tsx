@@ -64,10 +64,11 @@ export default function ConnectionTest({
               </p>
               {/* eslint-disable-next-line */}
               <a
-                href="https://cube.dev/cube-core/getting-started/create-a-project"
+                href="https://docs.cube.dev/cube-core/getting-started/create-a-project"
                 target="_blank"
+                rel="noreferrer"
               >
-                https://cube.dev/cube-core/getting-started/create-a-project
+                https://docs.cube.dev/cube-core/getting-started/create-a-project
               </a>
             </>
           ))()}

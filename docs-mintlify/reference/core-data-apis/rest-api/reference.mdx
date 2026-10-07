@@ -56,6 +56,7 @@ Response
   including browsers holding a public embedding token. Fields that describe
   storage layout or query results stay behind
   [`CUBEJS_DEV_MODE`](/reference/configuration/environment-variables#cubejs_dev_mode)
+  (a local-development-only setting that bypasses authentication)
   and the Playground: `targetTableName` (the physical table of one specific build,
   version hashes included) and `refreshKeyValues`.
 
@@ -567,6 +568,15 @@ To trigger pre-aggregation builds, send a `POST` request with a payload
 including `post` as the `action` and `selector` properties. The response will
 contain an array of `tokens` (identifiers) of triggered jobs.
 
+<Note>
+
+Builds run in the process that receives the request, even on an instance that
+never builds pre-aggregations while serving queries. Restarting that instance
+interrupts any build it is running; such a build is reported as `failure`, so
+re-trigger the job for those partitions.
+
+</Note>
+
 Example request triggering builds of all pre-aggregations defined in all cubes
 using an empty security context and a `UTC` timezone:
 
@@ -672,8 +682,19 @@ In the `status` property of the payload, you can get the following statuses:
 | --- | --- |
 | `scheduled` | The job hasn't run yet |
 | `processing` | The job is currently running |
-| `missing_partition` | The job has failed |
-| `done` | The job has successfully completed |
+| `done` | The build has completed and its data has landed in the pre-aggregation storage |
+| `failure: <error>` | The build has failed; the error message is appended to the status. `failure: the build has not completed` means the instance running the build stopped before it finished, for example because it was restarted mid-build |
+| `missing_partition` | No table exists for this partition and no build outcome is recorded for it. Trigger the job again |
+| `not_found` | The token is unknown, or the job record has expired. Job records are kept for 24 hours |
+| `pre_agg_not_found` | The pre-aggregation the job was triggered for is no longer defined in the data model |
+
+<Note>
+
+`done` means the build itself has finished successfully. It doesn't mean the
+partition has any rows: a partition with no matching source data is built and
+reported as `done` with zero rows.
+
+</Note>
 
 Example request:
 
@@ -759,17 +780,44 @@ Example response:
         "type": "postgres",
         "database": "analytics",
         "schema": "public"
+      },
+      {
+        "name": "warehouse",
+        "type": "bigquery",
+        "properties": {
+          "project_id": "acme-analytics-123"
+        }
       }
     ]
   }
 }
 ```
 
+Each item under `data_sources` contains:
+
+| Property, type | Description |
+| --- | --- |
+| `name`, `string` | The name of the [data source][ref-datasources] |
+| `type`, `string` | The database type, e.g., `postgres` or `bigquery` |
+| `database`, `string` | The database name from [`CUBEJS_DB_NAME`][ref-env-db-name]. Omitted if not set |
+| `schema`, `string` | The schema from [`CUBEJS_DB_SCHEMA`][ref-env-db-schema]. Omitted if not set |
+| `properties`, `object` | Values specific to the data source `type`, listed below. Only contains identifiers, never credentials. Omitted if empty |
+
+The keys in `properties` depend on `type`:
+
+| Type | Property, type | Description |
+| --- | --- | --- |
+| `bigquery` | `project_id`, `string` | The Google Cloud project ID from [`CUBEJS_DB_BQ_PROJECT_ID`][ref-env-bq-project-id]. Omitted if not set |
+
+For data sources other than `default`, values are read from the
+[prefixed variables][ref-datasources-env], e.g.,
+`CUBEJS_DS_WAREHOUSE_DB_BQ_PROJECT_ID` for the `warehouse` data source.
+
 ### `{base_path}/v1/entities`
 
 Send a `GET` request to list all cubes and views in the data model. Results are
-sorted by type (cubes first), then by name. Each item contains only `type` and
-`name`; use [`/v1/entities/{name}`](#base_path/v1/entities/name) or
+sorted by type (cubes first), then by name. Each item contains only `type`,
+`name`, and `public`; use [`/v1/entities/{name}`](#base_path/v1/entities/name) or
 [`/v1/entities/all`](#base_path/v1/entities/all) for detailed metadata.
 
 Query parameters:
@@ -778,6 +826,7 @@ Query parameters:
 | --- | --- | --- |
 | `offset` | Pagination offset. Defaults to `0` | No |
 | `limit` | Maximum number of items to return. Defaults to all items | No |
+| `include_private` | Set to `true` to include [private cubes, views, and members](#private-cubes-and-members). Requires the `meta-private` scope. Defaults to `false` | No |
 
 Example request:
 
@@ -795,11 +844,13 @@ total number of entities before `offset` and `limit` are applied:
   "data": [
     {
       "type": "cube",
-      "name": "orders"
+      "name": "orders",
+      "public": true
     },
     {
       "type": "view",
-      "name": "orders_view"
+      "name": "orders_view",
+      "public": true
     }
   ],
   "pagination": {
@@ -820,10 +871,18 @@ Path parameters:
 | --- | --- |
 | `name` | The cube or view name |
 
+Query parameters:
+
+| Parameter | Description | Required |
+| --- | --- | --- |
+| `include_private` | Set to `true` to include [private cubes, views, and members](#private-cubes-and-members). Requires the `meta-private` scope. Defaults to `false` | No |
+
 Response includes:
 
 - `type` - Either `cube` or `view`
 - `name` - The cube or view name
+- `public` - Whether the cube or view is public. Can only be `false` when
+  [private cubes and members](#private-cubes-and-members) are included
 - `title` - Human-readable title
 - `description` - Description from the data model, or an empty string
 - `table_references` - Data lineage to source tables, each with `data_source`,
@@ -837,6 +896,7 @@ Each member includes:
 | Field | Description |
 | --- | --- |
 | `name` | The member name, without the cube prefix |
+| `public` | Whether the member is public. Can only be `false` when [private cubes and members](#private-cubes-and-members) are included |
 | `title` | Human-readable title |
 | `description` | Description from the data model, or an empty string |
 | `type` | The member type, e.g. `count`, `sum`, or `string` |
@@ -850,6 +910,18 @@ enclosing quotes removed — for example `COUNT(*)`, `${CUBE}.status`, or
 `${total_amount} - ${refunds}`. References to other members appear as `${member}`
 interpolations, and `${CUBE}` refers to the cube's own table alias. Members of a
 view carry the alias expression they resolve to, e.g. `${orders.total_amount}`.
+
+For a cube defined with [`sql`][ref-cubes-sql] rather than
+[`sql_table`][ref-cubes-sql-table], lineage is read from its SQL statement:
+
+- `table_references` lists every table the statement reads, including those in
+  common table expressions and subqueries
+- Members get `column_references` only when the statement is a `SELECT *` over a
+  single table, e.g. `SELECT * FROM orders WHERE status = 'completed'`
+- For any other statement, e.g. one that selects or renames specific columns,
+  aggregates, or uses joins or common table expressions, members have empty
+  `column_references` and contribute no columns to view members or other members
+  that reference them
 
 Example request:
 
@@ -866,6 +938,7 @@ Example response:
   "data": {
     "type": "cube",
     "name": "orders",
+    "public": true,
     "title": "Orders",
     "description": "Order transactions",
     "table_references": [
@@ -879,6 +952,7 @@ Example response:
     "measures": [
       {
         "name": "total_amount",
+        "public": true,
         "title": "Total Amount",
         "description": "",
         "type": "sum",
@@ -897,6 +971,7 @@ Example response:
     "dimensions": [
       {
         "name": "id",
+        "public": true,
         "title": "Id",
         "description": "",
         "type": "number",
@@ -914,6 +989,7 @@ Example response:
       },
       {
         "name": "status",
+        "public": true,
         "title": "Status",
         "description": "",
         "type": "string",
@@ -944,6 +1020,7 @@ Request body:
 | --- | --- | --- | --- |
 | `cubes` | `array` | Array of cube names to retrieve | No |
 | `views` | `array` | Array of view names to retrieve | No |
+| `include_private` | `boolean` | Set to `true` to include [private cubes, views, and members](#private-cubes-and-members). Requires the `meta-private` scope. Defaults to `false` | No |
 
 Query parameters:
 
@@ -951,6 +1028,7 @@ Query parameters:
 | --- | --- | --- |
 | `offset` | Pagination offset. Defaults to `0` | No |
 | `limit` | Maximum number of items to return. Defaults to all items | No |
+| `include_private` | Same as the `include_private` request body property, which takes precedence when both are set | No |
 
 If neither `cubes` nor `views` is provided, all cubes and views are returned.
 
@@ -975,6 +1053,7 @@ entities before `offset` and `limit` are applied:
     {
       "type": "cube",
       "name": "orders",
+      "public": true,
       "title": "Orders",
       "description": "Order transactions",
       "table_references": [
@@ -988,6 +1067,7 @@ entities before `offset` and `limit` are applied:
       "measures": [
         {
           "name": "total_amount",
+          "public": true,
           "title": "Total Amount",
           "description": "",
           "type": "sum",
@@ -1006,6 +1086,7 @@ entities before `offset` and `limit` are applied:
       "dimensions": [
         {
           "name": "id",
+          "public": true,
           "title": "Id",
           "description": "",
           "type": "number",
@@ -1023,6 +1104,7 @@ entities before `offset` and `limit` are applied:
         },
         {
           "name": "status",
+          "public": true,
           "title": "Status",
           "description": "",
           "type": "string",
@@ -1043,6 +1125,7 @@ entities before `offset` and `limit` are applied:
     {
       "type": "view",
       "name": "orders_view",
+      "public": true,
       "title": "Orders View",
       "description": "",
       "table_references": [
@@ -1058,6 +1141,7 @@ entities before `offset` and `limit` are applied:
       "measures": [
         {
           "name": "total_amount",
+          "public": true,
           "title": "Total Amount",
           "description": "",
           "type": "sum",
@@ -1078,6 +1162,7 @@ entities before `offset` and `limit` are applied:
       "dimensions": [
         {
           "name": "status",
+          "public": true,
           "title": "Status",
           "description": "",
           "type": "string",
@@ -1104,6 +1189,45 @@ entities before `offset` and `limit` are applied:
     "total": 2
   }
 }
+```
+
+### Private cubes and members
+
+By default, the Metadata API returns only the cubes, views, and members that are
+public (see `public` for [cubes][ref-cubes-public], [views][ref-views-public],
+[measures][ref-measures-public], and [dimensions][ref-dimensions-public]).
+References to anything it doesn't return are omitted: every entry in
+`member_references` and `cube_references` names a cube, view, or member that the
+Metadata API returns, though not necessarily in the same response.
+
+Data catalogs and lineage tools that need the complete data model can set
+`include_private` to `true`. Private cubes, views, and members are then returned
+with their full definitions and `public` set to `false`. A view's
+`table_references`, and the `column_references` of its members, then include the
+tables and columns it reads through private cubes; by default, these are left out.
+
+This requires a token with the `meta-private` scope as well as `meta`; without
+it, the request fails with `403`. To get such a token, call the Control Plane
+API's [`tokens-for-meta-sync`][ref-cpa-meta-sync-token] endpoint, which data
+catalog integrations use, with a `security_context` and
+`"scopes": ["meta-private"]`; it always adds `meta`. The scope is
+[granted only to some callers][ref-cpa-meta-sync-token] and is left out of the
+token for anyone else rather than refused; the `scopes` property of the response
+shows whether it was granted. Tokens from the general-purpose
+[token endpoint][ref-cpa-create-token] never carry `meta-private`.
+
+`include_private` doesn't bypass [data access policies][ref-dap]. Whatever a data
+access policy hides from the token's security context is never returned, even
+with `include_private`. It never appears in `member_references` or
+`cube_references`, and `table_references` and `column_references` are never
+traced through it.
+
+Example request:
+
+```bash
+curl \
+  -H "Authorization: Bearer TOKEN" \
+  "https://example.cubecloud.dev/cubejs-api/v1/entities/customers?include_private=true"
 ```
 
 ## Health checks
@@ -1203,3 +1327,16 @@ Keep-Alive: timeout=5
 [link-tzdb]: https://en.wikipedia.org/wiki/Tz_database
 [ref-control-plane-api]: /reference/control-plane-api
 [self-metadata-api]: #metadata-api
+[ref-cubes-public]: /reference/data-modeling/cube#public
+[ref-cubes-sql]: /reference/data-modeling/cube#sql
+[ref-cubes-sql-table]: /reference/data-modeling/cube#sql_table
+[ref-views-public]: /reference/data-modeling/view#public
+[ref-measures-public]: /reference/data-modeling/measures#public
+[ref-dimensions-public]: /reference/data-modeling/dimensions#public
+[ref-dap]: /docs/data-modeling/data-access-policies
+[ref-cpa-create-token]: /api-reference/environments/create-deployment-environment-token
+[ref-cpa-meta-sync-token]: /reference/control-plane-api#apiv1deploymentsdeployment_idenvironmentsenvironment_idtokens-for-meta-sync
+[ref-env-db-name]: /reference/configuration/environment-variables#cubejs_db_name
+[ref-env-db-schema]: /reference/configuration/environment-variables#cubejs_db_schema
+[ref-env-bq-project-id]: /reference/configuration/environment-variables#cubejs_db_bq_project_id
+[ref-datasources-env]: /admin/connect-to-data/multiple-data-sources#under-the-hood

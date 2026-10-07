@@ -13905,6 +13905,36 @@ Array [
 ]
 `;
 
+exports[`Queries with the @cubejs-backend/pinot-driver querying custom granularities ECommerce: count by fiscal_year_by_1st_april + no dimension 1`] = `
+Array [
+  Object {
+    "ECommerce.count": "5",
+    "ECommerce.customOrderDateNoPreAgg": "2019-04-01T00:00:00.000",
+    "ECommerce.customOrderDateNoPreAgg.fiscal_year_by_1st_april": "2019-04-01T00:00:00.000",
+  },
+  Object {
+    "ECommerce.count": "39",
+    "ECommerce.customOrderDateNoPreAgg": "2020-04-01T00:00:00.000",
+    "ECommerce.customOrderDateNoPreAgg.fiscal_year_by_1st_april": "2020-04-01T00:00:00.000",
+  },
+]
+`;
+
+exports[`Queries with the @cubejs-backend/pinot-driver querying custom granularities ECommerce: count by fiscal_year_by_15th_april + no dimension 1`] = `
+Array [
+  Object {
+    "ECommerce.count": "6",
+    "ECommerce.customOrderDateNoPreAgg": "1555286400000",
+    "ECommerce.customOrderDateNoPreAgg.fiscal_year_by_15th_april": "1555286400000",
+  },
+  Object {
+    "ECommerce.count": "38",
+    "ECommerce.customOrderDateNoPreAgg": "1586908800000",
+    "ECommerce.customOrderDateNoPreAgg.fiscal_year_by_15th_april": "1586908800000",
+  },
+]
+`;
+
 exports[`Queries with the @cubejs-backend/pinot-driver querying custom granularities ECommerce: count by half_year + dimension 1`] = `
 Array [
   Object {
@@ -14317,6 +14347,71 @@ Array [
     "ECommerce.count": "25",
     "ECommerce.customOrderDateNoPreAgg": "2020-10-01T00:00:00.000",
     "ECommerce.customOrderDateNoPreAgg.half_year_by_1st_april": "2020-10-01T00:00:00.000",
+  },
+]
+`;
+
+exports[`Queries with the @cubejs-backend/pinot-driver querying custom granularities ECommerce: count by monthly_from_15th + no dimension 1`] = `
+Array [
+  Object {
+    "ECommerce.count": "1",
+    "ECommerce.customOrderDateNoPreAgg": "1576368000000",
+    "ECommerce.customOrderDateNoPreAgg.monthly_from_15th": "1576368000000",
+  },
+  Object {
+    "ECommerce.count": "1",
+    "ECommerce.customOrderDateNoPreAgg": "1579046400000",
+    "ECommerce.customOrderDateNoPreAgg.monthly_from_15th": "1579046400000",
+  },
+  Object {
+    "ECommerce.count": "1",
+    "ECommerce.customOrderDateNoPreAgg": "1581724800000",
+    "ECommerce.customOrderDateNoPreAgg.monthly_from_15th": "1581724800000",
+  },
+  Object {
+    "ECommerce.count": "3",
+    "ECommerce.customOrderDateNoPreAgg": "1584230400000",
+    "ECommerce.customOrderDateNoPreAgg.monthly_from_15th": "1584230400000",
+  },
+  Object {
+    "ECommerce.count": "3",
+    "ECommerce.customOrderDateNoPreAgg": "1586908800000",
+    "ECommerce.customOrderDateNoPreAgg.monthly_from_15th": "1586908800000",
+  },
+  Object {
+    "ECommerce.count": "5",
+    "ECommerce.customOrderDateNoPreAgg": "1589500800000",
+    "ECommerce.customOrderDateNoPreAgg.monthly_from_15th": "1589500800000",
+  },
+  Object {
+    "ECommerce.count": "4",
+    "ECommerce.customOrderDateNoPreAgg": "1592179200000",
+    "ECommerce.customOrderDateNoPreAgg.monthly_from_15th": "1592179200000",
+  },
+  Object {
+    "ECommerce.count": "3",
+    "ECommerce.customOrderDateNoPreAgg": "1597449600000",
+    "ECommerce.customOrderDateNoPreAgg.monthly_from_15th": "1597449600000",
+  },
+  Object {
+    "ECommerce.count": "4",
+    "ECommerce.customOrderDateNoPreAgg": "1600128000000",
+    "ECommerce.customOrderDateNoPreAgg.monthly_from_15th": "1600128000000",
+  },
+  Object {
+    "ECommerce.count": "8",
+    "ECommerce.customOrderDateNoPreAgg": "1602720000000",
+    "ECommerce.customOrderDateNoPreAgg.monthly_from_15th": "1602720000000",
+  },
+  Object {
+    "ECommerce.count": "9",
+    "ECommerce.customOrderDateNoPreAgg": "1605398400000",
+    "ECommerce.customOrderDateNoPreAgg.monthly_from_15th": "1605398400000",
+  },
+  Object {
+    "ECommerce.count": "2",
+    "ECommerce.customOrderDateNoPreAgg": "1607990400000",
+    "ECommerce.customOrderDateNoPreAgg.monthly_from_15th": "1607990400000",
   },
 ]
 `;

@@ -88,6 +88,7 @@ export function invokeBridge(name: string, fixture: unknown): InvokeResult {
  */
 export function expectAllInvocationsOk(result: InvokeResult): void {
   const failures: string[] = [];
+
   for (const [field, entry] of Object.entries(result)) {
     if (entry.status === 'error') {
       failures.push(`${field}: error: ${entry.message}`);

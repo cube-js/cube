@@ -1,0 +1,11 @@
+---
+source: cubesqlplanner/cubesqlplanner/src/tests/integration/view_members.rs
+expression: result
+---
+orders_view__status_label | orders_view__amount_per_order | orders_view__total_amount_ref
+--------------------------+-------------------------------+------------------------------
+completed:Alice           | 150.0000000000000000          | 300.00                       
+completed:Bob             | 225.0000000000000000          | 450.00                       
+completed:Diana           | 400.0000000000000000          | 400.00                       
+pending:Alice             | 62.5000000000000000           | 125.00                       
+pending:Bob               | 100.0000000000000000          | 100.00

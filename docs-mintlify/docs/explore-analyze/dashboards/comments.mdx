@@ -1,0 +1,144 @@
+---
+title: Comments
+description: Discuss a dashboard with your team in threaded comments. Reply, resolve, react, and mention teammates, on the whole dashboard or on one chart.
+---
+
+Comments let your team discuss a [published dashboard][ref-dashboards] on the
+dashboard itself. Start a thread about the whole dashboard or about one chart.
+Other people can reply to it, react to it, and resolve it when the question is
+answered. Mention a teammate with `@` to send them a notification.
+
+<Note>
+  An admin must turn on comments for your account before the **Comments**
+  button appears. See [Turn it on](#turn-it-on).
+</Note>
+
+{/* TODO: screenshot — the Comments panel open next to a published dashboard, with one open thread and one resolved thread */}
+
+## Opening the panel
+
+Open a published dashboard and click **Comments** in the dashboard header. The
+button shows the number of unresolved threads. Its tooltip reads **Show
+comments** or **Hide comments**.
+
+The panel opens on the right side of the dashboard. Drag its edge to make it
+wider or narrower. Click **Comments** again to close it.
+
+## Threads and replies
+
+To start a thread, type in the box that reads **Start a thread…** and click
+**Comment**. You can also press Enter to post. Press Shift+Enter to add a new
+line.
+
+To reply, type in the **Reply…** box under a thread and click **Reply**.
+Replies are one level deep: you reply to a thread, not to another reply.
+
+The newest thread is at the top. Replies inside a thread are in the order they
+were posted, oldest first. A new reply does not move its thread to the top.
+
+Comments are plain text. Markdown and other formatting are shown as typed.
+
+## Resolving threads
+
+The panel has two tabs: **Open** and **Resolved**. New threads are on the
+**Open** tab.
+
+To resolve a thread, open the **More actions** (`⋯`) menu on its first comment
+and choose **Resolve thread**. The thread moves to the **Resolved** tab and
+shows who resolved it, for example **Resolved by Ada**. You can't reply to a
+resolved thread or add reactions to it.
+
+To open it again, choose **Re-open thread** from the same menu. The thread goes
+back to the **Open** tab.
+
+## Comments on a chart
+
+A thread can be about one chart instead of the whole dashboard. Open the chart
+tile's menu (`⋮`) and choose **Add comment**. The item shows the number of
+unresolved threads on that chart. The panel opens and shows only that chart's
+threads, and the box reads **Start a thread on {chart}…**.
+
+{/* TODO: screenshot — a chart tile's ⋮ menu with the Add comment item and its unresolved count */}
+
+To change which threads the panel shows, use the picker at the top of the panel.
+Choose **All threads** to see every thread on the dashboard, or choose one
+chart. In the list, a thread about a chart shows the chart's name:
+
+- A chart without a title shows as **Untitled chart**.
+- A chart that was removed from the dashboard shows as **Removed chart**. Its
+  threads stay on the dashboard and you can still read them. If the chart comes
+  back to the dashboard, its threads attach to it again.
+
+## Editing and deleting
+
+To change your comment, open its **More actions** (`⋯`) menu and choose
+**Edit**. An edited comment shows the **edited** mark.
+
+To delete a reply, choose **Delete**. To delete a whole thread, choose **Delete
+thread** on its first comment. This also deletes all the replies in the thread.
+Cube asks you to confirm, and you can't undo a delete.
+
+## Reactions
+
+To react to a comment, click **Add reaction** and choose one of six reactions:
+👍 ✅ 👀 ❤️ 🎉 😀. This is a fixed set; you can't add other emoji.
+
+Each reaction shows how many people added it. Hover a reaction to see who added
+it. Click a reaction to add yours, or click it again to remove it. Reactions do
+not send notifications.
+
+{/* TODO: screenshot — a comment with a row of reactions and the Add reaction button */}
+
+## Mentions
+
+To mention a teammate, type `@` in a comment and start typing their name. Cube
+shows a list of the users in your account, with each user's name and email.
+Your own entry is marked **(you)**. Choose a person to add the mention. In the
+posted comment, the mention is highlighted, and a mention of you has a different
+color.
+
+The person you mention gets a notification in their in-app inbox, with a link to
+the comment. Cube does not send mentions by email.
+
+Only a person you choose from the list is mentioned. If you type `@` and a name
+without choosing from the list, it stays plain text and sends no notification.
+When you edit a comment, only the people you add get a notification. You don't
+get a notification when you mention yourself.
+
+## Linking to a comment
+
+To share a link to a comment, open its **More actions** (`⋯`) menu and choose
+**Copy link**. Cube copies the link and shows **Link copied**.
+
+When someone opens the link, the dashboard opens with the **Comments** panel
+open. The panel switches to the tab that has the comment, scrolls to it, and
+highlights it for a short time.
+
+## Permissions
+
+Only the author of a comment can edit or delete it. People who can edit the
+workbook can resolve any thread, and the author of a thread can resolve it too.
+To learn what each access level allows, see
+[Dashboard comments][ref-sharing].
+
+## Turn it on
+
+Go to **Admin → Settings → Dashboard Comments** and turn on **Allow comments on
+dashboards**. This setting is off by default and applies to the whole account.
+
+{/* TODO: screenshot — Admin → Settings → Dashboard Comments card with the Allow comments on dashboards switch */}
+
+This setting controls comments in the Cube app only. Embedded dashboards have
+their own setting, [**Allow comments on embedded dashboards**][ref-embed-comments].
+
+When you turn the setting off, the **Comments** button and panel disappear and
+nobody can add comments, replies, or reactions. Cube does not delete existing
+threads. They come back when you turn the setting on again.
+
+If your account uses [Audit Log][ref-audit-log], it records the text of every
+comment that is posted or edited.
+
+[ref-dashboards]: /docs/explore-analyze/dashboards
+[ref-sharing]: /docs/organize-content/sharing#dashboard-comments
+[ref-audit-log]: /admin/monitoring/audit-log#event-types
+[ref-embed-comments]: /embedding/iframe/dashboards#comments

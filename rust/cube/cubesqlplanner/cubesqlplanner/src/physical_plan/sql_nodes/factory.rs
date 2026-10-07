@@ -9,9 +9,10 @@ use super::{
 use crate::physical_plan::cube_ref_evaluator::CubeRefEvaluator;
 use crate::physical_plan::sql_nodes::calendar_time_shift::CalendarTimeShiftSqlNode;
 use crate::physical_plan::sql_nodes::RenderReferences;
-use crate::planner::planners::multi_stage::TimeShiftState;
+use crate::planner::planners::multi_stage::{FilterParamsTimeShifts, TimeShiftState};
 use crate::planner::query_tools::QueryTools;
 use crate::planner::symbols::CalendarDimensionTimeShift;
+use crate::planner::{CubeId, MemberId};
 use std::collections::{HashMap, HashSet};
 use std::rc::Rc;
 
@@ -22,18 +23,19 @@ use std::rc::Rc;
 #[derive(Clone, Default)]
 pub struct SqlNodesFactory {
     time_shifts: TimeShiftState,
-    calendar_time_shifts: HashMap<String, CalendarDimensionTimeShift>,
+    calendar_time_shifts: HashMap<MemberId, CalendarDimensionTimeShift>,
+    filter_params_time_shifts: FilterParamsTimeShifts,
     render_references: RenderReferences,
     pre_aggregation_dimensions_references: RenderReferences,
     pre_aggregation_measures_references: RenderReferences,
     ungrouped_measure_references: RenderReferences,
-    cube_name_references: HashMap<String, String>,
+    cube_name_references: HashMap<CubeId, String>,
     use_local_tz_in_date_range: bool,
-    original_sql_pre_aggregations: HashMap<String, String>,
-    // Full names of the members present in the query GROUP BY. Used by
+    original_sql_pre_aggregations: HashMap<CubeId, String>,
+    // Ids of the members present in the query GROUP BY. Used by
     // MaskedSqlNode to decide whether conditional masking can be applied to an
     // aggregate measure.
-    group_by_members: HashSet<String>,
+    group_by_members: HashSet<MemberId>,
 }
 
 impl SqlNodesFactory {
@@ -49,9 +51,17 @@ impl SqlNodesFactory {
         &self.time_shifts
     }
 
+    pub fn set_filter_params_time_shifts(&mut self, shifts: FilterParamsTimeShifts) {
+        self.filter_params_time_shifts = shifts;
+    }
+
+    pub fn filter_params_time_shifts(&self) -> &FilterParamsTimeShifts {
+        &self.filter_params_time_shifts
+    }
+
     pub fn set_calendar_time_shifts(
         &mut self,
-        calendar_time_shifts: HashMap<String, CalendarDimensionTimeShift>,
+        calendar_time_shifts: HashMap<MemberId, CalendarDimensionTimeShift>,
     ) {
         self.calendar_time_shifts = calendar_time_shifts;
     }
@@ -60,7 +70,7 @@ impl SqlNodesFactory {
         self.use_local_tz_in_date_range = value;
     }
 
-    pub fn set_group_by_members(&mut self, value: HashSet<String>) {
+    pub fn set_group_by_members(&mut self, value: HashSet<MemberId>) {
         self.group_by_members = value;
     }
 
@@ -97,7 +107,7 @@ impl SqlNodesFactory {
             .insert(name, value);
     }
 
-    pub fn set_original_sql_pre_aggregations(&mut self, value: HashMap<String, String>) {
+    pub fn set_original_sql_pre_aggregations(&mut self, value: HashMap<CubeId, String>) {
         self.original_sql_pre_aggregations = value;
     }
 
@@ -117,11 +127,11 @@ impl SqlNodesFactory {
         self.ungrouped_measure_references.insert(name, value);
     }
 
-    pub fn set_cube_name_references(&mut self, value: HashMap<String, String>) {
+    pub fn set_cube_name_references(&mut self, value: HashMap<CubeId, String>) {
         self.cube_name_references = value;
     }
 
-    pub fn add_cube_name_reference(&mut self, key: String, value: String) {
+    pub fn add_cube_name_reference(&mut self, key: CubeId, value: String) {
         self.cube_name_references.insert(key, value);
     }
 
@@ -210,10 +220,16 @@ impl SqlNodesFactory {
             };
         let default_processor: Rc<dyn SqlNode> = ParenthesizeSqlNode::new(default_processor);
 
+        // A reference renders its target; of its own it only applies its own
+        // mask and parenthesizes the target for its context.
+        let reference_processor: Rc<dyn SqlNode> =
+            ParenthesizeSqlNode::new(evaluate_sql_processor.clone());
+
         let root_node = RootSqlNode::new(
             self.dimension_processor(evaluate_sql_processor.clone()),
             self.time_dimension_processor(ParenthesizeSqlNode::new(evaluate_sql_processor.clone())),
             measure_processor.clone(),
+            reference_processor,
             default_processor,
         );
         RenderReferencesSqlNode::new(root_node, self.render_references.clone())
@@ -278,7 +294,8 @@ impl SqlNodesFactory {
 
         let input: Rc<dyn SqlNode> = ParenthesizeSqlNode::new(input);
 
-        let input: Rc<dyn SqlNode> = TimeDimensionNode::new(input);
+        let input: Rc<dyn SqlNode> =
+            TimeDimensionNode::new(self.pre_aggregation_dimensions_references.clone(), input);
 
         let input = if !self.calendar_time_shifts.is_empty() {
             CalendarTimeShiftSqlNode::new(self.calendar_time_shifts.clone(), input)
@@ -300,7 +317,8 @@ impl SqlNodesFactory {
     }
 
     fn time_dimension_processor(&self, input: Rc<dyn SqlNode>) -> Rc<dyn SqlNode> {
-        let input: Rc<dyn SqlNode> = TimeDimensionNode::new(input);
+        let input: Rc<dyn SqlNode> =
+            TimeDimensionNode::new(self.pre_aggregation_dimensions_references.clone(), input);
 
         input
     }

@@ -16,8 +16,9 @@ use super::information_schema::postgres::{
     InfoSchemaRoleTableGrantsProvider as PostgresInfoSchemaRoleTableGrantsProvider,
     InfoSchemaSqlImplementationInfoProvider as PostgresInfoSchemaSqlImplementationInfoProvider,
     InfoSchemaSqlSizingProvider as PostgresInfoSchemaSqlSizingProvider,
-    InfoSchemaTestingBlockingProvider, InfoSchemaTestingDatasetProvider, PgCatalogAmProvider,
-    PgCatalogAttrdefProvider, PgCatalogAttributeProvider, PgCatalogAuthMembersProvider,
+    InfoSchemaTestingBlockingProvider, InfoSchemaTestingDatasetProvider,
+    InfoSchemaTestingPanicProvider, PgCatalogAmProvider, PgCatalogAttrdefProvider,
+    PgCatalogAttributeProvider, PgCatalogAuthMembersProvider,
     PgCatalogAvailableExtensionVersionsProvider, PgCatalogCastProvider, PgCatalogClassProvider,
     PgCatalogCollationProvider, PgCatalogConstraintProvider, PgCatalogDatabaseProvider,
     PgCatalogDependProvider, PgCatalogDescriptionProvider, PgCatalogEnumProvider,
@@ -201,6 +202,8 @@ impl DatabaseProtocol {
             "information_schema.testing_dataset".to_string()
         } else if let Some(_) = any.downcast_ref::<InfoSchemaTestingBlockingProvider>() {
             "information_schema.testing_blocking".to_string()
+        } else if let Some(_) = any.downcast_ref::<InfoSchemaTestingPanicProvider>() {
+            "information_schema.testing_panic".to_string()
         } else {
             return Err(CubeError::internal(format!(
                 "Unknown table provider with schema: {:?}",
@@ -355,6 +358,8 @@ impl DatabaseProtocol {
                 "testing_blocking" => {
                     return Some(Arc::new(InfoSchemaTestingBlockingProvider::new()))
                 }
+                #[cfg(debug_assertions)]
+                "testing_panic" => return Some(Arc::new(InfoSchemaTestingPanicProvider::new())),
                 _ => return None,
             },
             "pg_catalog" => match table.as_str() {

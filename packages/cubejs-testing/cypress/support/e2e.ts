@@ -13,12 +13,9 @@
 // https://on.cypress.io/configuration
 // ***********************************************************
 
-// Import commands.js using ES2015 syntax:
-// import 'cypress-plugin-snapshots/commands';
-
 import 'cypress-localstorage-commands';
 import '@4tw/cypress-drag-drop';
-import { addMatchImageSnapshotCommand } from 'cypress-image-snapshot/command';
+import { addMatchImageSnapshotCommand } from '@simonsmith/cypress-image-snapshot/command';
 
 import './commands';
 

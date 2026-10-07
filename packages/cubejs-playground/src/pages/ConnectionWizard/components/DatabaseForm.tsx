@@ -3,6 +3,27 @@ import { useEffect } from 'react';
 
 import Base64Upload from './Base64Upload';
 
+function databaseFormControl(param) {
+  if (!param.title) {
+    return (
+      <Input.TextArea
+        data-testid={param.env}
+        rows={1}
+        style={{
+          overflow: 'hidden',
+          resize: 'none',
+        }}
+      />
+    );
+  }
+
+  if (param.env === 'CUBEJS_DB_PASS') {
+    return <Input.Password data-testid={param.env} />;
+  }
+
+  return <Input data-testid={param.env} />;
+}
+
 export default function DatabaseForm({
   db,
   deployment,
@@ -36,46 +57,29 @@ export default function DatabaseForm({
       }}
       initialValues={defaultValues}
     >
-      {db.settings.map((param) =>
-        param.type === 'base64upload' ? (
-          <Base64Upload
-            onInput={({ raw, encoded }) => {
-              if (param.uploadTarget) {
-                form.setFieldsValue({ [param.uploadTarget]: encoded });
-              }
-              if (param.extractField) {
-                form.setFieldsValue({
-                  [param.extractField.formField]:
+      {db.settings.map((param) => (param.type === 'base64upload' ? (
+        <Base64Upload
+          onInput={({ raw, encoded }) => {
+            if (param.uploadTarget) {
+              form.setFieldsValue({ [param.uploadTarget]: encoded });
+            }
+            if (param.extractField) {
+              form.setFieldsValue({
+                [param.extractField.formField]:
                     raw[param.extractField.jsonField],
-                });
-              }
-            }}
-          />
-        ) : (
-          <Form.Item
-            key={param.env}
-            label={param.title || param.env}
-            name={param.env}
-          >
-            {param.title ? (
-              param.env === 'CUBEJS_DB_PASS' ? (
-                <Input.Password data-testid={param.env} />
-              ) : (
-                <Input data-testid={param.env} />
-              )
-            ) : (
-              <Input.TextArea
-                data-testid={param.env}
-                rows={1}
-                style={{
-                  overflow: 'hidden',
-                  resize: 'none',
-                }}
-              />
-            )}
-          </Form.Item>
-        )
-      )}
+              });
+            }
+          }}
+        />
+      ) : (
+        <Form.Item
+          key={param.env}
+          label={param.title || param.env}
+          name={param.env}
+        >
+          {databaseFormControl(param)}
+        </Form.Item>
+      )))}
 
       <Button
         data-testid="wizard-form-submit-btn"

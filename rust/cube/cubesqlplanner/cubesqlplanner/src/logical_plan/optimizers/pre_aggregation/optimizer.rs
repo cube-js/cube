@@ -11,8 +11,9 @@ use crate::planner::multi_fact_join_groups::{MeasuresJoinHints, MultiFactJoinGro
 use crate::planner::planners::multi_stage::TimeShiftState;
 use crate::planner::planners::CommonUtils;
 use crate::planner::state::State;
+use crate::planner::symbols::MeasureTimeShifts;
 use crate::planner::time_dimension::QueryDateTime;
-use crate::planner::MemberSymbol;
+use crate::planner::{CubeId, MemberId, MemberSymbol};
 use cubenativeutils::CubeError;
 use std::cell::RefCell;
 use std::collections::{HashMap, HashSet};
@@ -48,20 +49,40 @@ enum RowGrain {
     RawRows(Option<Rc<LogicalJoin>>),
 }
 
+// Outcome of one matching pass over a single set of candidate pre-aggregations.
+enum MultiStageMatch {
+    Matched(Rc<RootQuery>),
+    // A stage matched no candidate, so no subset of the candidates covers it
+    // either.
+    UnmatchedStage,
+    // Every stage matched, but the matches span both external types, so no one
+    // query can read them all.
+    ExternalTypesSplit,
+}
+
 pub struct PreAggregationOptimizer {
     query_tools: Rc<State>,
+    // The join hints the query was planned with. A query whose members alone don't
+    // determine a join root resolves only with these, so the query-side hint sets
+    // rebuilt here have to start from them.
+    query_join_hints: Rc<JoinHints>,
     allow_multi_stage: bool,
     usages: Vec<PreAggregationUsage>,
     usage_counter: usize,
     /// Resolved primary-key names per cube. Every candidate pre-aggregation asks
     /// for the same cubes, and resolving them crosses the JS bridge.
-    primary_keys_cache: RefCell<HashMap<String, Vec<String>>>,
+    primary_keys_cache: RefCell<HashMap<CubeId, Vec<MemberId>>>,
 }
 
 impl PreAggregationOptimizer {
-    pub fn new(query_tools: Rc<State>, allow_multi_stage: bool) -> Self {
+    pub fn new(
+        query_tools: Rc<State>,
+        query_join_hints: Rc<JoinHints>,
+        allow_multi_stage: bool,
+    ) -> Self {
         Self {
             query_tools,
+            query_join_hints,
             allow_multi_stage,
             usages: Vec::new(),
             usage_counter: 0,
@@ -78,20 +99,13 @@ impl PreAggregationOptimizer {
         let cube_names = collect_cube_names_from_node(&plan)?;
         let mut compiler = PreAggregationsCompiler::try_new(self.query_tools.clone(), &cube_names)?;
 
-        let compiled_pre_aggregations =
-            compiler.compile_all_pre_aggregations(disable_external_pre_aggregations)?;
-
-        let filtered_pre_aggregations: Vec<_> = if let Some(id) = pre_aggregation_id {
-            compiled_pre_aggregations
-                .iter()
-                .filter(|pa| format!("{}.{}", pa.cube_name, pa.name) == id)
-                .cloned()
-                .collect()
+        let compiled_pre_aggregations = if let Some(id) = pre_aggregation_id {
+            compiler.compile_requested_pre_aggregation(id, disable_external_pre_aggregations)?
         } else {
-            compiled_pre_aggregations
+            compiler.compile_all_pre_aggregations(disable_external_pre_aggregations)?
         };
 
-        self.try_rewrite_root(&plan, &filtered_pre_aggregations)
+        self.try_rewrite_root(&plan, &compiled_pre_aggregations)
     }
 
     fn try_rewrite_root(
@@ -183,7 +197,7 @@ impl PreAggregationOptimizer {
             if !Self::can_carry_time_shifts(
                 pre_aggregation,
                 &matched_measures,
-                &Self::read_member_names(&query.schema(), &query.filter()),
+                &Self::read_member_ids(&query.schema(), &query.filter()),
                 time_shifts,
             ) {
                 return Ok(None);
@@ -256,6 +270,41 @@ impl PreAggregationOptimizer {
         root: &Rc<RootQuery>,
         compiled_pre_aggregations: &[Rc<CompiledPreAggregation>],
     ) -> Result<Option<Rc<RootQuery>>, CubeError> {
+        match self.match_multistages(root, compiled_pre_aggregations)? {
+            MultiStageMatch::Matched(rewritten) => return Ok(Some(rewritten)),
+            MultiStageMatch::UnmatchedStage => return Ok(None),
+            MultiStageMatch::ExternalTypesSplit => {}
+        }
+
+        // Retrying within a single external type trades per-stage precision for
+        // a set one query can read, against an alternative of reading the fact
+        // table. CubeStore goes first as the default and faster store.
+        for external in [true, false] {
+            let candidates: Vec<_> = compiled_pre_aggregations
+                .iter()
+                .filter(|pa| pa.external.unwrap_or(false) == external)
+                .cloned()
+                .collect();
+            let outcome = self.match_multistages(root, &candidates)?;
+            // These candidates share one external type, and that is the same
+            // value a usage built from them reports, so the pass cannot split.
+            debug_assert!(
+                !matches!(outcome, MultiStageMatch::ExternalTypesSplit),
+                "a pass over one external type reported a split"
+            );
+            if let MultiStageMatch::Matched(rewritten) = outcome {
+                return Ok(Some(rewritten));
+            }
+        }
+
+        Ok(None)
+    }
+
+    fn match_multistages(
+        &mut self,
+        root: &Rc<RootQuery>,
+        compiled_pre_aggregations: &[Rc<CompiledPreAggregation>],
+    ) -> Result<MultiStageMatch, CubeError> {
         let query = root.query();
         let rewriter = LogicalPlanRewriter::new();
         let mut has_unrewritten_leaf = false;
@@ -357,7 +406,7 @@ impl PreAggregationOptimizer {
             // Rollback usages added during failed attempt
             self.usages.truncate(saved_usages_len);
             self.usage_counter = saved_counter;
-            return Ok(None);
+            return Ok(MultiStageMatch::UnmatchedStage);
         }
 
         let source = if let QuerySource::FullKeyAggregate(full_key_aggregate) = query.source() {
@@ -371,14 +420,15 @@ impl PreAggregationOptimizer {
             query.source().clone()
         };
 
-        // Reject mixed external/non-external pre-aggregation usages
+        // One query cannot read both external types, so a set that spans
+        // them is unusable as a whole.
         let new_usages = &self.usages[saved_usages_len..];
         if !new_usages.is_empty() {
             let first_external = new_usages[0].external();
             if new_usages.iter().any(|u| u.external() != first_external) {
                 self.usages.truncate(saved_usages_len);
                 self.usage_counter = saved_counter;
-                return Ok(None);
+                return Ok(MultiStageMatch::ExternalTypesSplit);
             }
         }
 
@@ -389,7 +439,7 @@ impl PreAggregationOptimizer {
             .source(source)
             .build();
 
-        Ok(Some(Rc::new(
+        Ok(MultiStageMatch::Matched(Rc::new(
             RootQuery::builder()
                 .ctes(rewritten_multistages)
                 .query(Rc::new(result))
@@ -400,7 +450,7 @@ impl PreAggregationOptimizer {
     fn make_pre_aggregation_source(
         &mut self,
         pre_aggregation: &Rc<CompiledPreAggregation>,
-        matched_measures: &HashSet<String>,
+        matched_measures: &HashSet<MemberId>,
         date_range: Option<(String, String)>,
     ) -> Result<Rc<PreAggregation>, CubeError> {
         let usage_index = self.usage_counter;
@@ -409,7 +459,7 @@ impl PreAggregationOptimizer {
         let filtered_measures: Vec<Rc<MemberSymbol>> = pre_aggregation
             .measures
             .iter()
-            .filter(|m| matched_measures.contains(&m.full_name()))
+            .filter(|m| matched_measures.contains(m.peel_refs().id()))
             .cloned()
             .collect();
         let schema = LogicalSchema {
@@ -511,9 +561,9 @@ impl PreAggregationOptimizer {
     // stored measure reading a shifted member is therefore always unusable,
     // however cleanly the shift could be attributed to it. Only the measures
     // matching consumed are examined, since the rest are never read.
-    // Resolved names of every member the query reads, so a stored member no
+    // Resolved ids of every member the query reads, so a stored member no
     // one reads cannot decide anything.
-    fn read_member_names(schema: &LogicalSchema, filter: &LogicalFilter) -> HashSet<String> {
+    fn read_member_ids(schema: &LogicalSchema, filter: &LogicalFilter) -> HashSet<MemberId> {
         let mut symbols: Vec<Rc<MemberSymbol>> = schema
             .dimensions
             .iter()
@@ -534,26 +584,23 @@ impl PreAggregationOptimizer {
             .map(|symbol| {
                 resolve_base_symbol(&symbol)
                     .resolve_reference_chain()
-                    .full_name()
+                    .id()
+                    .clone()
             })
             .collect()
     }
 
     fn can_carry_time_shifts(
         pre_aggregation: &CompiledPreAggregation,
-        matched_measures: &HashSet<String>,
-        read_members: &HashSet<String>,
+        matched_measures: &HashSet<MemberId>,
+        read_members: &HashSet<MemberId>,
         time_shifts: &TimeShiftState,
     ) -> bool {
         if time_shifts.is_empty() {
             return true;
         }
         let is_read = |member: &Rc<MemberSymbol>| {
-            read_members.contains(
-                &resolve_base_symbol(member)
-                    .resolve_reference_chain()
-                    .full_name(),
-            )
+            read_members.contains(resolve_base_symbol(member).resolve_reference_chain().id())
         };
         let grouping_members_carry_shift = pre_aggregation
             .time_dimensions
@@ -569,8 +616,69 @@ impl PreAggregationOptimizer {
             && pre_aggregation
                 .measures
                 .iter()
-                .filter(|measure| matched_measures.contains(&measure.full_name()))
+                .filter(|measure| matched_measures.contains(measure.peel_refs().id()))
                 .all(|measure| !time_shifts.has_shift_under(measure))
+    }
+
+    // A shift lands only on the time members a query reads: named and common
+    // shifts on all of them, a dimension shift on those it lists. Dropping a
+    // stored member the build shifted would drop part of the stored shift.
+    fn stored_shifts_carry_over(
+        pre_aggregation: &CompiledPreAggregation,
+        matched_measures: &HashSet<MemberId>,
+        schema: &LogicalSchema,
+        filter: &LogicalFilter,
+    ) -> Result<bool, CubeError> {
+        let base_name = |member: &Rc<MemberSymbol>| {
+            resolve_base_symbol(member)
+                .resolve_reference_chain()
+                .id()
+                .clone()
+        };
+        let stored_time_members: Vec<MemberId> = pre_aggregation
+            .time_dimensions
+            .iter()
+            .chain(pre_aggregation.dimensions.iter())
+            .filter(|member| {
+                resolve_base_symbol(member)
+                    .resolve_reference_chain()
+                    .as_dimension()
+                    .is_ok_and(|dimension| dimension.is_time())
+            })
+            .map(base_name)
+            .collect();
+        let read = Self::read_member_ids(schema, filter);
+
+        for stored in pre_aggregation
+            .measures
+            .iter()
+            .filter(|m| matched_measures.contains(m.peel_refs().id()))
+        {
+            let mut on_every_member = false;
+            let mut targets = HashSet::new();
+            let mut measure = stored.peel_refs().as_measure()?;
+            loop {
+                match measure.time_shift() {
+                    Some(MeasureTimeShifts::Dimensions(shifts)) => {
+                        targets.extend(shifts.iter().map(|shift| base_name(&shift.dimension)))
+                    }
+                    Some(_) => on_every_member = true,
+                    None => {}
+                }
+                match measure.time_shift_proxy_target() {
+                    Some(target) => measure = target.as_measure()?,
+                    None => break,
+                }
+            }
+            if stored_time_members
+                .iter()
+                .filter(|name| on_every_member || targets.contains(*name))
+                .any(|name| !read.contains(name))
+            {
+                return Ok(false);
+            }
+        }
+        Ok(true)
     }
 
     fn extract_date_range(
@@ -621,7 +729,7 @@ impl PreAggregationOptimizer {
         filters: &Rc<LogicalFilter>,
         pre_aggregation: &CompiledPreAggregation,
         row_grain: RowGrain,
-    ) -> Result<Option<HashSet<String>>, CubeError> {
+    ) -> Result<Option<HashSet<MemberId>>, CubeError> {
         let helper = OptimizerHelper::new();
 
         let match_state = self.match_dimensions(
@@ -646,7 +754,7 @@ impl PreAggregationOptimizer {
 
         // The query's join groups answer both the multiplicativity gate
         // and the join-path comparison below, so build them once.
-        let query_groups = self.query_join_groups(schema, &all_measures)?;
+        let query_groups = self.query_join_groups(schema, filters, &all_measures)?;
 
         // A measure sitting under a row-multiplying join can't be rolled
         // up from a partially matching pre-aggregation.
@@ -663,15 +771,26 @@ impl PreAggregationOptimizer {
             return Ok(None);
         };
 
+        if match_state == MatchState::Partial
+            && !Self::stored_shifts_carry_over(pre_aggregation, &matched_measures, schema, filters)?
+        {
+            return Ok(None);
+        }
+
         // An ungrouped read projects stored columns as they are, with no
         // aggregate around them, so a measure kept as a mergeable sketch would
         // reach the client as the sketch instead of a number.
         if matches!(row_grain, RowGrain::RawRows(_)) {
             for symbol in pre_aggregation.measures.iter() {
-                if !matched_measures.contains(symbol.full_name().as_str()) {
+                if !matched_measures.contains(symbol.peel_refs().id()) {
                     continue;
                 }
-                if symbol.as_measure()?.kind().is_stored_as_state() {
+                if symbol
+                    .peel_refs()
+                    .as_measure()?
+                    .rollup_kind()
+                    .is_stored_as_state()
+                {
                     return Ok(None);
                 }
             }
@@ -701,13 +820,7 @@ impl PreAggregationOptimizer {
                 let query_has_multiplied = if has_filters {
                     MultiFactJoinGroups::try_new(
                         self.query_tools.clone(),
-                        MeasuresJoinHints::builder(&JoinHints::new())
-                            .add_dimensions(&schema.dimensions)
-                            .add_dimensions(&schema.time_dimensions)
-                            .add_filters(&filters.dimensions_filters)
-                            .add_filters(&filters.time_dimensions_filters)
-                            .add_filters(&filters.segments)
-                            .build(&all_measures)?,
+                        self.filtered_join_hints(schema, filters, &all_measures)?,
                     )?
                     .has_multiplied_measures()?
                 } else {
@@ -766,18 +879,18 @@ impl PreAggregationOptimizer {
             return Ok(false);
         };
 
-        let stored_dimensions: HashSet<String> = pre_aggregation
+        let stored_dimensions: HashSet<MemberId> = pre_aggregation
             .dimensions
             .iter()
-            .map(|d| d.clone().resolve_reference_chain().full_name())
+            .map(|d| d.clone().resolve_reference_chain().id().clone())
             .collect();
 
-        let joined_cubes: HashSet<String> = std::iter::once(root.name().clone())
+        let joined_cubes: HashSet<CubeId> = std::iter::once(root.cube_id().clone())
             .chain(
                 node_join
                     .joins()
                     .iter()
-                    .map(|item| item.cube().name().clone()),
+                    .map(|item| item.cube().cube_id().clone()),
             )
             .collect();
 
@@ -790,12 +903,12 @@ impl PreAggregationOptimizer {
             }
         }
 
-        let identifying_cubes = std::iter::once(root.name().clone()).chain(
+        let identifying_cubes = std::iter::once(root.cube_id().clone()).chain(
             node_join
                 .joins()
                 .iter()
                 .filter(|item| item.splits_rows())
-                .map(|item| item.cube().name().clone()),
+                .map(|item| item.cube().cube_id().clone()),
         );
 
         for cube_name in identifying_cubes {
@@ -819,7 +932,7 @@ impl PreAggregationOptimizer {
     /// the rollup and leaves its row count untouched.
     fn pre_aggregation_grain_cubes(
         pre_aggregation: &CompiledPreAggregation,
-    ) -> Result<Vec<String>, CubeError> {
+    ) -> Result<Vec<CubeId>, CubeError> {
         let members = pre_aggregation
             .dimensions
             .iter()
@@ -830,31 +943,57 @@ impl PreAggregationOptimizer {
         collect_cube_names_from_symbols(&members)
     }
 
-    fn resolved_primary_keys(&self, cube_name: &String) -> Result<Vec<String>, CubeError> {
-        if let Some(cached) = self.primary_keys_cache.borrow().get(cube_name) {
+    fn resolved_primary_keys(&self, cube_id: &CubeId) -> Result<Vec<MemberId>, CubeError> {
+        if let Some(cached) = self.primary_keys_cache.borrow().get(cube_id) {
             return Ok(cached.clone());
         }
         let keys = CommonUtils::new(self.query_tools.clone())
-            .primary_keys_dimensions(cube_name)?
+            .primary_keys_dimensions(cube_id)?
             .into_iter()
-            .map(|key| key.resolve_reference_chain().full_name())
+            .map(|key| key.resolve_reference_chain().id().clone())
             .collect::<Vec<_>>();
         self.primary_keys_cache
             .borrow_mut()
-            .insert(cube_name.clone(), keys.clone());
+            .insert(cube_id.clone(), keys.clone());
         Ok(keys)
     }
 
     fn query_join_groups(
         &self,
         schema: &Rc<LogicalSchema>,
+        filters: &Rc<LogicalFilter>,
         measures: &[Rc<MemberSymbol>],
     ) -> Result<MultiFactJoinGroups, CubeError> {
-        let hints = MeasuresJoinHints::builder(&JoinHints::new())
+        let hints = MeasuresJoinHints::builder(&self.query_join_hints)
             .add_dimensions(&schema.dimensions)
             .add_dimensions(&schema.time_dimensions)
             .build(measures)?;
-        MultiFactJoinGroups::try_new(self.query_tools.clone(), hints)
+        if let Ok(groups) =
+            MultiFactJoinGroups::try_new_if_joinable(self.query_tools.clone(), hints)?
+        {
+            return Ok(groups);
+        }
+        // A filtered member can be the only link between the cubes the query
+        // selects from, and the query itself is planned with its filters.
+        MultiFactJoinGroups::try_new(
+            self.query_tools.clone(),
+            self.filtered_join_hints(schema, filters, measures)?,
+        )
+    }
+
+    fn filtered_join_hints(
+        &self,
+        schema: &Rc<LogicalSchema>,
+        filters: &Rc<LogicalFilter>,
+        measures: &[Rc<MemberSymbol>],
+    ) -> Result<MeasuresJoinHints, CubeError> {
+        MeasuresJoinHints::builder(&self.query_join_hints)
+            .add_dimensions(&schema.dimensions)
+            .add_dimensions(&schema.time_dimensions)
+            .add_filters(&filters.dimensions_filters)
+            .add_filters(&filters.time_dimensions_filters)
+            .add_filters(&filters.segments)
+            .build(measures)
     }
 
     fn are_join_paths_matching(
@@ -896,7 +1035,7 @@ impl PreAggregationOptimizer {
         measures: &Vec<Rc<MemberSymbol>>,
         pre_aggregation: &CompiledPreAggregation,
         only_additive: bool,
-    ) -> Result<Option<HashSet<String>>, CubeError> {
+    ) -> Result<Option<HashSet<MemberId>>, CubeError> {
         let mut matcher = MeasureMatcher::new(pre_aggregation, only_additive);
         for measure in measures.iter() {
             if !matcher.try_match(measure)? {

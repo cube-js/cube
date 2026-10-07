@@ -2,7 +2,7 @@ use super::filter_operator::FilterOperator;
 use super::typed_filter::{resolve_base_symbol, TypedFilter};
 use crate::cube_bridge::base_query_options::FilterValue;
 use crate::planner::Compiler;
-use crate::planner::MemberSymbol;
+use crate::planner::{MemberId, MemberSymbol};
 use cubenativeutils::CubeError;
 use itertools::Itertools;
 use std::rc::Rc;
@@ -157,6 +157,10 @@ impl BaseFilter {
 
     pub fn member_name(&self) -> String {
         self.member_evaluator().full_name()
+    }
+
+    pub fn member_id(&self) -> MemberId {
+        self.member_evaluator().id().clone()
     }
 
     /// True when the filter compares its member to exactly one value

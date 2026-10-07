@@ -1,4 +1,4 @@
-import { parseSqlInterval } from '@cubejs-backend/shared';
+import { parseSqlInterval, splitSqlInterval } from '@cubejs-backend/shared';
 import { BaseQuery } from './BaseQuery';
 import { BaseFilter } from './BaseFilter';
 
@@ -108,6 +108,25 @@ export class PrestodbQuery extends BaseQuery {
 
   public timeGroupedColumn(granularity, dimension) {
     return `date_trunc('${GRANULARITY_TO_INTERVAL[granularity]}', ${dimension})`;
+  }
+
+  public subtractInterval(date: string, interval: string): string {
+    return this.applyInterval('-', date, interval);
+  }
+
+  public addInterval(date: string, interval: string): string {
+    return this.applyInterval('+', date, interval);
+  }
+
+  /**
+   * A Presto INTERVAL literal carries a single unit, so a compound interval is applied one unit at
+   * a time, coarsest first.
+   */
+  private applyInterval(operator: '+' | '-', date: string, interval: string): string {
+    return splitSqlInterval(interval).reduce(
+      (acc, part) => `${acc} ${operator} interval ${this.intervalString(part)}`,
+      date
+    );
   }
 
   public intervalString(interval: string): string {

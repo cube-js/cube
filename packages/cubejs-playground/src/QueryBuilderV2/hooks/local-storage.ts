@@ -19,10 +19,12 @@ const storage = new (class Storage {
 
         try {
           value = JSON.parse(event.newValue || '');
-        } catch (error: any) {
+        } catch {
           value = event.newValue;
         }
-        event.key && this.emit(event.key, value);
+        if (event.key) {
+          this.emit(event.key, value);
+        }
       }
     });
   }
@@ -68,7 +70,7 @@ const storage = new (class Storage {
       }
 
       return parsed !== undefined ? parsed : defaultValue;
-    } catch (error: any) {
+    } catch {
       return typeof defaultValue === 'function' ? defaultValue(null) : defaultValue;
     }
   }
@@ -89,9 +91,9 @@ export function useLocalStorage<T = any>(
   useEffect(() => {
     setValue(getter);
 
-    storage.subscribe(key, (value: T) => {
+    storage.subscribe(key, (nextValue: T) => {
       // @ts-ignore
-      setValue(typeof defaultValue === 'function' ? defaultValue(value) : (value ?? defaultValue));
+      setValue(typeof defaultValue === 'function' ? defaultValue(nextValue) : (nextValue ?? defaultValue));
     });
 
     return () => {
@@ -107,9 +109,7 @@ export function useLocalStorage<T = any>(
   useEffect(() => {
     storage.onClear(handleClear);
 
-    return () => {
-      return storage.onClearUnsubscribe(handleClear);
-    };
+    return () => storage.onClearUnsubscribe(handleClear);
   }, [key]);
 
   return useMemo(() => {

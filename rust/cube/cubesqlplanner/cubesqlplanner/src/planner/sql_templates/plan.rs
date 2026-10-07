@@ -310,8 +310,21 @@ impl PlanSqlTemplates {
         )
     }
 
+    /// The type a cast has to name to produce a NULL of `sql_type`.
+    pub fn nullable_type(&self, sql_type: &str) -> Result<String, CubeError> {
+        if !self.render.contains_template("types/nullable") {
+            return Ok(sql_type.to_string());
+        }
+
+        self.render
+            .render_template("types/nullable", context! { data_type => sql_type })
+    }
+
     pub fn cast_to_string(&self, expr: &str) -> Result<String, CubeError> {
         let string_type = self.render.render_template("types/string", context! {})?;
+        // The keys this counts may hold NULLs, and a dialect whose types reject one would
+        // fail the whole query over a key it should simply not count
+        let string_type = self.nullable_type(&string_type)?;
         self.cast(expr, &string_type)
     }
 
@@ -455,7 +468,8 @@ impl PlanSqlTemplates {
         group_by: Vec<TemplateGroupByColumn>,
         having: Option<String>,
         order_by: Vec<TemplateOrderByColumn>,
-        limit: Option<usize>,
+        // A number, or a param placeholder when the orchestrator substitutes the limit.
+        limit: Option<minijinja::Value>,
         offset: Option<usize>,
         distinct: bool,
         recursive: bool,
@@ -918,6 +932,23 @@ mod tests {
         let render = MockSqlTemplatesRender::try_new(t).unwrap();
         let driver_tools = Rc::new(MockDriverTools::with_sql_templates(render));
         PlanSqlTemplates::try_new(driver_tools, false).unwrap()
+    }
+
+    #[test]
+    fn test_nullable_type_is_the_type_itself_where_the_dialect_names_nothing() {
+        let templates = plan_templates_with(vec![]);
+
+        assert_eq!(templates.nullable_type("integer").unwrap(), "integer");
+    }
+
+    #[test]
+    fn test_nullable_type_is_the_form_the_dialect_names() {
+        let templates = plan_templates_with(vec![("types/nullable", "Nullable({{ data_type }})")]);
+
+        assert_eq!(
+            templates.nullable_type("integer").unwrap(),
+            "Nullable(integer)"
+        );
     }
 
     #[test]

@@ -11,7 +11,7 @@ use crate::physical_plan_builder::context::MultiStageDimensionContext;
 use crate::planner::query_properties::OrderByItem;
 use crate::planner::query_tools::QueryTools;
 use crate::planner::sql_templates::PlanSqlTemplates;
-use crate::planner::MemberSymbol;
+use crate::planner::{CubeId, MemberSymbol};
 use cubenativeutils::CubeError;
 use itertools::Itertools;
 use std::collections::HashMap;
@@ -58,7 +58,7 @@ impl PhysicalPlanBuilder {
     pub fn build(
         &self,
         logical_plan: Rc<RootQuery>,
-        original_sql_pre_aggregations: HashMap<String, String>,
+        original_sql_pre_aggregations: HashMap<CubeId, String>,
         total_query: bool,
     ) -> Result<Rc<Select>, CubeError> {
         let mut context = PushDownBuilderContext::default();
@@ -127,7 +127,7 @@ impl PhysicalPlanBuilder {
         context.measure_subquery = true;
         let sub_query = self.process_node(dimension_subquery.query.as_ref(), &context)?;
         let dim_name = dimension_subquery.subquery_dimension.name();
-        let cube_name = dimension_subquery.subquery_dimension.cube_name();
+        let cube_name = dimension_subquery.subquery_dimension.cube_id();
         let primary_keys_dimensions = &dimension_subquery.primary_keys_dimensions;
         let sub_query_alias = format!("{cube_name}_{dim_name}_subquery");
         let conditions = primary_keys_dimensions
@@ -233,7 +233,7 @@ impl PhysicalPlanBuilder {
     ) -> Result<Vec<OrderBy>, CubeError> {
         let mut result = Vec::new();
         for o in order_by.iter() {
-            let positions = logical_schema.find_member_positions(&o.name());
+            let positions = logical_schema.find_member_positions(o.member_symbol().id());
 
             // TODO: Check for `is_measure` is temporary here until
             // correct processing of order by dimension that is not included in the

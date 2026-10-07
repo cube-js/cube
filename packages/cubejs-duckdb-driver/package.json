@@ -2,7 +2,7 @@
   "name": "@cubejs-backend/duckdb-driver",
   "description": "Cube DuckDB database driver",
   "author": "Cube Dev, Inc.",
-  "version": "1.7.32",
+  "version": "1.8.0",
   "repository": {
     "type": "git",
     "url": "https://github.com/cube-js/cube.git",
@@ -16,36 +16,40 @@
     "index.js"
   ],
   "main": "index.js",
+  "exports": {
+    ".": {
+      "types": "./dist/src/index.d.ts",
+      "import": "./dist/src/index.js",
+      "require": "./index.js"
+    },
+    "./dist/*": "./dist/*",
+    "./package.json": "./package.json"
+  },
   "typings": "dist/src/index.d.ts",
   "scripts": {
     "build": "rm -rf dist && npm run tsc",
     "tsc": "tsc",
     "watch": "tsc -w",
-    "unit": "jest --verbose dist/test/unit",
-    "integration": "npm run integration:duckdb",
-    "integration:duckdb": "jest --verbose dist/test",
-    "lint": "eslint src/* --ext .ts",
-    "lint:fix": "eslint --fix src/* --ext .ts"
+    "unit": "NODE_OPTIONS=--experimental-vm-modules jest --verbose dist/test/unit"
   },
   "dependencies": {
-    "@cubejs-backend/base-driver": "1.7.32",
-    "@cubejs-backend/schema-compiler": "1.7.32",
-    "@cubejs-backend/shared": "1.7.32",
-    "duckdb": "^1.4.1"
+    "@cubejs-backend/base-driver": "1.8.0",
+    "@cubejs-backend/schema-compiler": "1.8.0",
+    "@cubejs-backend/shared": "1.8.0",
+    "@duckdb/node-api": "1.5.5-r.5",
+    "luxon": "^3.4.4"
   },
   "license": "Apache-2.0",
   "devDependencies": {
-    "@cubejs-backend/linter": "1.7.32",
-    "@cubejs-backend/testing-shared": "1.7.32",
+    "@cubejs-backend/linter": "1.8.0",
+    "@cubejs-backend/testing-shared": "1.8.0",
     "@types/jest": "^29",
+    "@types/luxon": "^3.4.2",
     "@types/node": "^22",
     "jest": "^29",
-    "typescript": "~5.2.2"
+    "typescript": "~6.0.3"
   },
   "publishConfig": {
     "access": "public"
-  },
-  "eslintConfig": {
-    "extends": "../cubejs-linter"
   }
 }

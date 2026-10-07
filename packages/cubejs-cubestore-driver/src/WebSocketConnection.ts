@@ -546,15 +546,18 @@ export class WebSocketConnection {
     let inlineTablesOffset: number | null = null;
     if (inlineTables && inlineTables.length > 0) {
       const inlineTableOffsets: number[] = [];
+
       for (const table of inlineTables) {
         const nameOffset = builder.createString(table.name);
         const columnOffsets: number[] = [];
+
         for (const column of table.columns) {
           const columnOffset = builder.createString(column.name);
           columnOffsets.push(columnOffset);
         }
         const columnsOffset = HttpTable.createColumnsVector(builder, columnOffsets);
         const typeOffsets: number[] = [];
+
         for (const column of table.columns) {
           const typeOffset = builder.createString(column.type);
           typeOffsets.push(typeOffset);

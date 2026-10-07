@@ -9,6 +9,9 @@ on:
     paths:
       - .github/workflows/**
 
+permissions:
+  contents: read
+
 jobs:
   lint:
     name: Lint workflows yaml
@@ -16,7 +19,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
       - name: Download actionlint
         id: get_actionlint
         run: bash <(curl https://raw.githubusercontent.com/rhysd/actionlint/main/scripts/download-actionlint.bash)

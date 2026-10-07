@@ -1,0 +1,8 @@
+---
+source: cubesqlplanner/cubesqlplanner/src/tests/integration/view_members.rs
+expression: result
+---
+orders_view__created_at_bi_weekly | orders_view__count
+----------------------------------+-------------------
+2025-02-18 00:00:00               | 3                 
+2025-03-04 00:00:00               | 5

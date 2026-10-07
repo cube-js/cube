@@ -52,11 +52,25 @@ When using signed embedding, you can pass [user attributes](/embedding/iframe/au
 
 Add these query parameters to the embed URL to hide parts of the chat UI:
 
-| Parameter        | Effect                                             |
-| ----------------- | --------------------------------------------------- |
-| `hideNewChat=1`   | Hides the **New chat** button.                     |
-| `hideChatInput=1` | Hides the message input, for a read-only transcript. |
-| `hideHistory=1`   | Hides the **Chat History** button.                 |
+| Parameter               | Effect                                               |
+| ----------------------- | ---------------------------------------------------- |
+| `showNewChat=false`     | Hides the **New chat** button.                       |
+| `showChatInput=false`   | Hides the message input, for a read-only transcript.  |
+| `showChatHistory=false` | Hides the **Chat History** button.                   |
+
+Only the exact literal string `false` hides a control, the same rule every other
+embed parameter follows — see [Show and hide
+features](/embedding/iframe/feature-visibility#parsing).
+
+<Note>
+These were originally `hideNewChat=1`, `hideChatInput=1`, and `hideHistory=1`.
+Those spellings still work, with both `1` and `true`, so existing embed URLs keep
+working — but they are no longer the documented form, and the `show…` parameter
+wins if you send both.
+</Note>
+
+These hide chrome only. Whether the session may use AI at all is decided when you
+generate it (`settings.allowAi`).
 
 By default, the chat header shows a **Chat History** button that lists the
 user's past conversations (matched by `externalId` under signed embedding) so

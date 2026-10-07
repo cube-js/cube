@@ -18,6 +18,7 @@ use super::operators::rolling_window::{RegularRollingWindowOp, RollingWindowOffs
 use super::operators::to_date_rolling_window::ToDateRollingWindowOp;
 use super::FilterOperator;
 use crate::planner::GranularityHelper;
+use crate::planner::SeriesSpan;
 
 /// Resolves TimeDimension to its base dimension symbol; returns as-is for other kinds.
 pub fn resolve_base_symbol(symbol: &Rc<MemberSymbol>) -> Rc<MemberSymbol> {
@@ -169,7 +170,8 @@ impl TypedFilterBuilder {
                 "string" | "time" => None,
                 _ => Some("number".to_string()),
             },
-            _ => None,
+            MemberSymbol::Ref(r) => r.target_member().and_then(Self::resolve_member_type),
+            MemberSymbol::TimeDimension(_) | MemberSymbol::MemberExpression(_) => None,
         }
     }
 
@@ -190,6 +192,18 @@ impl TypedFilterBuilder {
         Ok(Self::first_non_null_value(values)?
             .to_param_string()
             .unwrap_or_default())
+    }
+
+    /// Scan span a rolling-window filter carries from `at` onwards, as written
+    /// by the planner. Absent where the span was not derivable while planning.
+    fn series_span(values: &[FilterValue], at: usize) -> Option<SeriesSpan> {
+        let string_at = |index: usize| values.get(index).and_then(|v| v.to_param_string());
+        Some(SeriesSpan {
+            from: string_at(at)?,
+            to_aligned: string_at(at + 1)?,
+            to_stepped: string_at(at + 2)?,
+            predefined_granularity: matches!(values.get(at + 3), Some(FilterValue::Bool(true))),
+        })
     }
 
     // FIXME: late compilation. `compiler` and the builder's `query_tools` are
@@ -284,7 +298,10 @@ impl TypedFilterBuilder {
                 FilterOperator::RegularRollingWindowDateRange => {
                     let trailing = values.get(2).and_then(|v| v.to_param_string());
                     let leading = values.get(3).and_then(|v| v.to_param_string());
-                    FilterOp::RegularRollingWindow(RegularRollingWindowOp::new(trailing, leading))
+                    let scan_range = Self::series_span(&values, 4);
+                    FilterOp::RegularRollingWindow(RegularRollingWindowOp::new(
+                        trailing, leading, scan_range,
+                    ))
                 }
                 FilterOperator::RollingWindowOffsetDateRange => {
                     let from = values.first().and_then(|v| v.to_param_string());
@@ -326,7 +343,7 @@ impl TypedFilterBuilder {
                     let granularity_obj = GranularityHelper::make_granularity_obj(
                         query_tools.cube_evaluator().clone(),
                         evaluator_compiler,
-                        &resolved.cube_name(),
+                        &resolved.cube_id(),
                         &resolved.name(),
                         Some(granularity_name.clone()),
                     )?
@@ -338,7 +355,11 @@ impl TypedFilterBuilder {
                         ))
                     })?;
 
-                    FilterOp::ToDateRollingWindow(ToDateRollingWindowOp::new(granularity_obj))
+                    let window_range = Self::series_span(&values, 3);
+                    FilterOp::ToDateRollingWindow(ToDateRollingWindowOp::new(
+                        granularity_obj,
+                        window_range,
+                    ))
                 }
                 FilterOperator::Contains
                 | FilterOperator::NotContains

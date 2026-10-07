@@ -312,7 +312,7 @@ export class MssqlQuery extends BaseQuery {
     // MSSQL uses + for string concatenation instead of ||
     templates.expressions.concat_strings = '{{ strings | join(\' + \' ) }}';
     // NOTE: this template contains a comma; two order expressions are being generated
-    templates.expressions.sort = '{{ expr }} IS NULL {% if nulls_first %}DESC{% else %}ASC{% endif %}, {{ expr }} {% if asc %}ASC{% else %}DESC{% endif %}';
+    templates.expressions.sort = 'CASE WHEN {{ expr }} IS NULL THEN 1 ELSE 0 END {% if nulls_first %}DESC{% else %}ASC{% endif %}, {{ expr }} {% if asc %}ASC{% else %}DESC{% endif %}';
     // Timestamp constants arrive as ISO-8601 UTC strings ('2021-01-01T00:00:00.000Z');
     // CONVERT style 127 is defined as exactly this format (yyyy-mm-ddThh:mi:ss.mmmZ,
     // "ISO8601 with time zone Z"). The base template renders the value bare, which is
@@ -320,6 +320,12 @@ export class MssqlQuery extends BaseQuery {
     templates.expressions.timestamp_literal = 'CONVERT(DATETIME2, \'{{ value }}\', 127)';
     templates.types.string = 'VARCHAR';
     templates.types.boolean = 'BIT';
+    templates.expressions.true = 'CAST(1 AS BIT)';
+    templates.expressions.false = 'CAST(0 AS BIT)';
+    // SQL API expressions distinguish stored BIT values from SQL predicates.
+    // Keep UNKNOWN when a predicate is projected or used as a scalar operand.
+    templates.expressions.scalar_to_predicate = '({{ expr }} = CAST(1 AS BIT))';
+    templates.expressions.predicate_to_scalar = 'CAST(CASE WHEN {{ expr }} THEN 1 WHEN NOT ({{ expr }}) THEN 0 ELSE NULL END AS BIT)';
     templates.types.integer = 'INT';
     templates.types.float = 'FLOAT(24)';
     templates.types.double = 'FLOAT(53)';
@@ -376,22 +382,22 @@ export class MssqlQuery extends BaseQuery {
       '{{ ctes | join(\',\n\') }}\n' +
       '{% endif %}' +
       // T-SQL clause order is SELECT [ALL | DISTINCT] [TOP (expr)], so DISTINCT has to come
-      // first: `SELECT TOP 0 DISTINCT ...` is a syntax error
-      'SELECT {% if distinct %}DISTINCT {% endif %}{% if limit is not none and (not order_by or limit == 0) %}TOP {{ limit }} {% endif %}' +
+      // first: `SELECT TOP 0 DISTINCT ...` is a syntax error. A param limit (a string
+      // placeholder) needs the parenthesized `TOP (@_1)` form.
+      'SELECT {% if distinct %}DISTINCT {% endif %}{% if limit is not none and (not order_by or limit == 0) %}TOP {% if limit is string %}({{ limit }}){% else %}{{ limit }}{% endif %} {% endif %}' +
       '{{ select_concat | map(attribute=\'aliased\') | join(\', \') }} {% if from %}\n' +
       'FROM (\n' +
       '{{ from | indent(2, true) }}\n' +
       ') AS {{ from_alias }}{% elif from_prepared %}\n' +
       'FROM {{ from_prepared }}' +
       '{% endif %}' +
+      '{% for join in joins %}\n{{ join }}{% endfor %}' +
       '{% if filter %}\nWHERE {{ filter }}{% endif %}' +
       '{% if group_by %}\nGROUP BY {{ group_by }}{% endif %}' +
       '{% if having %}\nHAVING {{ having }}{% endif %}' +
       '{% if order_by %}\nORDER BY {{ order_by | map(attribute=\'expr\') | join(\', \') }}' +
-      // FETCH NEXT must be greater than zero in T-SQL, so `LIMIT 0` is rendered as
-      // `TOP 0` above and the OFFSET/FETCH tail is dropped entirely. `limit` is always a
-      // number here (both renderers pass Option<usize>); `limit | int` would not work as a
-      // guard, since `none | int` is 0 and that would drop the 2147483647 fallback below
+      // `limit` may be a param placeholder string, so don't guard with `limit | int`:
+      // `none | int` is 0 and would drop the 2147483647 fallback below
       '{% if limit != 0 %}\nOFFSET {% if offset is not none %}{{ offset }}{% else %}0{% endif %} ROWS' +
       '\nFETCH NEXT {% if limit is not none %}{{ limit }}{% else %}2147483647{% endif %} ROWS ONLY{% endif %}{% endif %}' +
       '{% if ctes %}\nOPTION (MAXRECURSION 0){% endif %}';

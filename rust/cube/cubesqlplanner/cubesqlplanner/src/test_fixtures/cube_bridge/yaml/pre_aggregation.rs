@@ -43,10 +43,8 @@ pub struct YamlPreAggregationDefinition {
     #[allow(dead_code)]
     incremental: Option<bool>,
     #[serde(default)]
-    #[allow(dead_code)]
     build_range_start: Option<String>,
     #[serde(default)]
-    #[allow(dead_code)]
     build_range_end: Option<String>,
     #[serde(default)]
     #[allow(dead_code)]
@@ -155,6 +153,8 @@ impl YamlPreAggregationDefinition {
                 .rollup_references_opt(rollup_references)
                 .time_dimension_references(time_dimension_references)
                 .indexes(indexes)
+                .build_range_start(self.build_range_start)
+                .build_range_end(self.build_range_end)
                 .build(),
         )
     }

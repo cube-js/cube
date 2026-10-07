@@ -8,13 +8,14 @@ import {
   reformatInIsoLocal,
   utcToLocalTimeZone,
   timeSeries,
+  timeSeriesBoundaries,
   localTimestampToUtc,
   parseUtcIntoLocalDate,
   LoggerFn,
 } from '@cubejs-backend/shared';
 import { InlineTable, QueuePriority, TableStructure } from '@cubejs-backend/base-driver';
 import { DriverFactory } from './DriverFactory';
-import { QueryCache, QueryWithParams } from './QueryCache';
+import { QueryCache, QueryWithParams, REFRESH_KEY_CACHE_TTL_SECONDS } from './QueryCache';
 import {
   getLastUpdatedAtTimestamp,
   LAMBDA_TABLE_PREFIX,
@@ -30,6 +31,11 @@ import { PreAggregationLoader } from './PreAggregationLoader';
 import { PreAggregationLoadCache } from './PreAggregationLoadCache';
 
 const DEFAULT_TS_FORMAT = 'YYYY-MM-DDTHH:mm:ss.SSS';
+
+interface ResolvedQueryDateRange {
+  local: QueryDateRange;
+  utc: QueryDateRange;
+}
 
 interface PreAggsPartitionRangeLoaderOpts {
   maxPartitions: number;
@@ -112,14 +118,19 @@ export class PreAggregationPartitionRangeLoader {
   }
 
   protected getInvalidationKeyValues(range) {
+    const { invalidateKeyQueries } = this.preAggregation;
+    if (!invalidateKeyQueries?.length) {
+      return Promise.resolve([]);
+    }
     const partitionTableName = PreAggregationPartitionRangeLoader.partitionTableName(
       this.preAggregation.tableName, this.preAggregation.partitionGranularity, range
     );
+    const partitionRange = this.resolvePartitionRange(range);
     return Promise.all(
-      (this.preAggregation.invalidateKeyQueries || []).map(
+      invalidateKeyQueries.map(
         (sqlQuery) => (
           this.loadCache.keyQueryResult(
-            this.replacePartitionSqlAndParams(sqlQuery, range, partitionTableName), this.waitForRenew, this.priority(QueuePriority.Interactive)
+            this.replacePartitionSqlAndParams(sqlQuery, partitionRange, partitionTableName), this.waitForRenew, this.priority(QueuePriority.Interactive)
           )
         )
       )
@@ -148,9 +159,20 @@ export class PreAggregationPartitionRangeLoader {
     return null;
   }
 
+  // Converted once per partition so every query shares the UTC boundaries instead of re-deriving them per param.
+  private resolvePartitionRange(local: QueryDateRange): ResolvedQueryDateRange {
+    return {
+      local,
+      utc: [
+        PreAggregationPartitionRangeLoader.inDbTimeZone(this.preAggregation, local[0]),
+        PreAggregationPartitionRangeLoader.inDbTimeZone(this.preAggregation, local[1]),
+      ],
+    };
+  }
+
   private replacePartitionSqlAndParams(
     query: QueryWithParams,
-    dateRange: QueryDateRange,
+    { local: dateRange, utc: utcDateRange }: ResolvedQueryDateRange,
     partitionTableName: string
   ): QueryWithParams {
     const [sql, params, options] = query;
@@ -159,11 +181,10 @@ export class PreAggregationPartitionRangeLoader {
     );
     return [sql.replace(this.preAggregation.tableName, partitionTableName), params?.map(
       param => {
-        if (dateRange && param === FROM_PARTITION_RANGE) {
-          // Timestamp is in local timezone, so we need to convert to utc with desired format
-          return localTimestampToUtc(this.preAggregation.timezone, this.preAggregation.timestampFormat, dateRange[0]);
-        } else if (dateRange && param === TO_PARTITION_RANGE) {
-          return localTimestampToUtc(this.preAggregation.timezone, this.preAggregation.timestampFormat, dateRange[1]);
+        if (param === FROM_PARTITION_RANGE) {
+          return utcDateRange[0];
+        } else if (param === TO_PARTITION_RANGE) {
+          return utcDateRange[1];
         } else {
           return param;
         }
@@ -182,36 +203,46 @@ export class PreAggregationPartitionRangeLoader {
     }];
   }
 
-  private partitionPreAggregationDescription(range: QueryDateRange, buildRange: QueryDateRange): PreAggregationDescription {
-    const partitionTableName = PreAggregationPartitionRangeLoader.partitionTableName(
-      this.preAggregation.tableName, this.preAggregation.partitionGranularity, range
-    );
-    const [_, buildRangeEnd] = buildRange;
-    const loadRange: [string, string] = [...range];
+  private loadRangeEnd(range: QueryDateRange, buildRangeEnd: string): string {
     const partitionInvalidateKeyQueries = this.preAggregation.partitionInvalidateKeyQueries || this.preAggregation.invalidateKeyQueries;
     // `partitionInvalidateKeyQueries = []` in case of real time
     if ((!partitionInvalidateKeyQueries || partitionInvalidateKeyQueries.length > 0) && buildRangeEnd < range[1]) {
-      loadRange[1] = buildRangeEnd;
+      return buildRangeEnd;
     }
+    return range[1];
+  }
+
+  protected partitionPreAggregationDescription(range: QueryDateRange, buildRange: QueryDateRange): PreAggregationDescription {
+    const partitionTableName = PreAggregationPartitionRangeLoader.partitionTableName(
+      this.preAggregation.tableName, this.preAggregation.partitionGranularity, range
+    );
+    const loadRange: [string, string] = [range[0], this.loadRangeEnd(range, buildRange[1])];
+    const clipped = loadRange[1] !== range[1];
+    const partitionRange = this.resolvePartitionRange(range);
+    const partitionLoadRange = clipped ? this.resolvePartitionRange(loadRange) : partitionRange;
     const sealAt = addSecondsToLocalTimestamp(
       loadRange[1], this.preAggregation.timezone, this.preAggregation.updateWindowSeconds || 0
     ).toISOString();
+    const structureVersionLoadSql = this.preAggregation.loadSql &&
+      this.replacePartitionSqlAndParams(this.preAggregation.loadSql, partitionRange, partitionTableName);
+    // Reuse the SQL tuple for unclipped partitions to reduce computation and memory allocations.
+    const loadSql = clipped
+      ? this.preAggregation.loadSql && this.replacePartitionSqlAndParams(this.preAggregation.loadSql, partitionLoadRange, partitionTableName)
+      : structureVersionLoadSql;
     return {
       ...this.preAggregation,
       tableName: partitionTableName,
-      structureVersionLoadSql: this.preAggregation.loadSql &&
-        this.replacePartitionSqlAndParams(this.preAggregation.loadSql, range, partitionTableName),
-      loadSql: this.preAggregation.loadSql &&
-        this.replacePartitionSqlAndParams(this.preAggregation.loadSql, loadRange, partitionTableName),
+      structureVersionLoadSql,
+      loadSql,
       sql: this.preAggregation.sql &&
-        this.replacePartitionSqlAndParams(this.preAggregation.sql, loadRange, partitionTableName),
+        this.replacePartitionSqlAndParams(this.preAggregation.sql, partitionLoadRange, partitionTableName),
       invalidateKeyQueries: (this.preAggregation.invalidateKeyQueries || [])
-        .map(q => this.replacePartitionSqlAndParams(q, range, partitionTableName)),
-      partitionInvalidateKeyQueries: this.preAggregation.partitionInvalidateKeyQueries?.map(q => this.replacePartitionSqlAndParams(q, range, partitionTableName)),
+        .map(q => this.replacePartitionSqlAndParams(q, partitionRange, partitionTableName)),
+      partitionInvalidateKeyQueries: this.preAggregation.partitionInvalidateKeyQueries?.map(q => this.replacePartitionSqlAndParams(q, partitionRange, partitionTableName)),
       indexesSql: (this.preAggregation.indexesSql || [])
-        .map(q => ({ ...q, sql: this.replacePartitionSqlAndParams(q.sql, range, partitionTableName) })),
+        .map(q => ({ ...q, sql: this.replacePartitionSqlAndParams(q.sql, partitionRange, partitionTableName) })),
       previewSql: this.preAggregation.previewSql &&
-        this.replacePartitionSqlAndParams(this.preAggregation.previewSql, range, partitionTableName),
+        this.replacePartitionSqlAndParams(this.preAggregation.previewSql, partitionRange, partitionTableName),
       buildRangeStart: loadRange[0],
       buildRangeEnd: loadRange[1],
       sealAt, // Used only for kSql pre aggregations
@@ -266,8 +297,10 @@ export class PreAggregationPartitionRangeLoader {
       if (this.preAggregation.rollupLambdaId) {
         if (this.lambdaQuery && loadResults.length > 0) {
           const { buildRangeEnd, targetTableName } = loadResults[loadResults.length - 1];
-          const lambdaTypes = await this.loadCache.getTableColumnTypes(this.preAggregation, targetTableName);
-          lambdaTable = await this.downloadLambdaTable(buildRangeEnd, lambdaTypes);
+          if (!this.lambdaSourceDataCovered(buildRangeEnd)) {
+            const lambdaTypes = await this.loadCache.getTableColumnTypes(this.preAggregation, targetTableName);
+            lambdaTable = await this.downloadLambdaTable(buildRangeEnd, lambdaTypes);
+          }
         }
         const rollupLambdaResults = this.preAggregationsTablesToTempTables.filter(tempTableResult => tempTableResult[1].rollupLambdaId === this.preAggregation.rollupLambdaId);
         const filteredResults = loadResults.filter(
@@ -300,6 +333,7 @@ export class PreAggregationPartitionRangeLoader {
       let usageTargetTableNames: Record<string, string> | undefined;
       if (this.preAggregation.usageMapping) {
         usageTargetTableNames = {};
+
         for (const [suffix, usageInfo] of Object.entries(this.preAggregation.usageMapping)) {
           if (usageInfo.dateRange && this.preAggregation.partitionGranularity) {
             // Load partition ranges specific to this usage's dateRange.
@@ -359,6 +393,7 @@ export class PreAggregationPartitionRangeLoader {
       ).loadPreAggregation(true);
       if (result && this.preAggregation.usageMapping) {
         const usageTargetTableNames: Record<string, string> = {};
+
         for (const suffix of Object.keys(this.preAggregation.usageMapping)) {
           usageTargetTableNames[suffix] = result.targetTableName;
         }
@@ -366,6 +401,22 @@ export class PreAggregationPartitionRangeLoader {
       }
       return result;
     }
+  }
+
+  /**
+   * The lambda query is lower bounded by `buildRangeEnd` (exclusive, via
+   * `afterDate FROM_PARTITION_RANGE`), so it can only contribute rows strictly after it.
+   * @see https://github.com/cube-js/cube/issues/11682
+   */
+  private lambdaSourceDataCovered(buildRangeEnd?: string): boolean {
+    // Not matchedTimeDimensionDateRange: with several usages it's one usage's range, while the
+    // source query is bounded by the union of all of them.
+    const matchedRangeEnd = this.lambdaQuery?.sourceDateRange?.[1];
+    if (!matchedRangeEnd || !buildRangeEnd) {
+      return false;
+    }
+    // buildRangeEnd comes back from the DB and may carry a `Z` suffix.
+    return reformatInIsoLocal(matchedRangeEnd) <= reformatInIsoLocal(buildRangeEnd);
   }
 
   /**
@@ -387,7 +438,7 @@ export class PreAggregationPartitionRangeLoader {
       query,
       <string[]>values,
       cacheKeyQueries,
-      60 * 60,
+      REFRESH_KEY_CACHE_TTL_SECONDS,
       [query, <string[]>values],
       undefined,
       {
@@ -412,14 +463,40 @@ export class PreAggregationPartitionRangeLoader {
 
   public async partitionPreAggregations(): Promise<PreAggregationDescription[]> {
     if (this.preAggregation.partitionGranularity && !this.preAggregation.expandedPartition) {
-      const { buildRange, partitionRanges } = await this.partitionRanges();
-      return this.compilerCacheFn(['partitions', JSON.stringify(buildRange)], () => partitionRanges.map(range => this.partitionPreAggregationDescription(range, buildRange)));
+      const { buildRange, dateRange } = await this.resolveDateRanges();
+      const { preAggregationId, tableName, dataSource, timezone, partitionGranularity, timestampFormat, timestampPrecision } = this.preAggregation;
+      const identity = { preAggregationId, tableName, dataSource, timezone, partitionGranularity, timestampFormat, timestampPrecision };
+      const cachedPlan = this.compilerCacheFn<{ rangeKey: string | null; descriptions: PreAggregationDescription[] }>(
+        ['partitionPlan', JSON.stringify(identity)], () => ({ rangeKey: null, descriptions: [] })
+      );
+      // Only the last partition can end past the build range, so its load range end is all the build range contributes.
+      const [, lastPartition] = timeSeriesBoundaries(
+        partitionGranularity, dateRange, { timestampPrecision }
+      );
+      const rangeKey = JSON.stringify([dateRange, lastPartition && this.loadRangeEnd(lastPartition, buildRange[1])]);
+      if (cachedPlan.rangeKey === rangeKey) {
+        this.checkMaxPartitions(cachedPlan.descriptions.length);
+        return cachedPlan.descriptions;
+      }
+
+      const descriptions = this.partitionRangesForDateRange(dateRange)
+        .map(range => this.partitionPreAggregationDescription(range, buildRange));
+      // Replace only after successful expansion; in-flight requests may still use the old array.
+      Object.assign(cachedPlan, { rangeKey, descriptions });
+      return descriptions;
     } else {
       return [this.preAggregation];
     }
   }
 
-  private async partitionRanges(ignoreMatchedDateRange?: boolean): Promise<PartitionRanges> {
+  /**
+   * `dateRange` selects the partitions, `buildRange` bounds what they load. Clipping a partition's
+   * load range to the query range would build it partially under the same table name, and the
+   * next query would reuse that table as if it were complete.
+   */
+  private async resolveDateRanges(
+    ignoreMatchedDateRange?: boolean
+  ): Promise<{ buildRange: QueryDateRange, dateRange: QueryDateRange }> {
     const buildRange = await this.loadBuildRange();
 
     // buildRange was localized in loadBuildRange()
@@ -436,22 +513,28 @@ export class PreAggregationPartitionRangeLoader {
       dateRange = [buildRange[1], buildRange[1]];
     }
 
-    const partitionRanges = this.compilerCacheFn(
-      ['timeSeries', this.preAggregation.partitionGranularity, JSON.stringify(dateRange), `${this.preAggregation.timestampPrecision}`],
-      () => PreAggregationPartitionRangeLoader.timeSeries(
-        this.preAggregation.partitionGranularity,
-        dateRange,
-        this.preAggregation.timestampPrecision
-      )
-    );
+    return { buildRange, dateRange };
+  }
 
-    if (partitionRanges.length > this.options.maxPartitions) {
+  private checkMaxPartitions(count: number): void {
+    if (count > this.options.maxPartitions) {
       throw new Error(
-        `Pre-aggregation '${this.preAggregation.tableName}' requested to build ${partitionRanges.length} partitions which exceeds the maximum number of partitions per pre-aggregation of ${this.options.maxPartitions}`
+        `Pre-aggregation '${this.preAggregation.tableName}' requested to build ${count} partitions which exceeds the maximum number of partitions per pre-aggregation of ${this.options.maxPartitions}`
       );
     }
+  }
 
-    return { buildRange: dateRange, partitionRanges };
+  private partitionRangesForDateRange(dateRange: QueryDateRange): QueryDateRange[] {
+    const ranges = PreAggregationPartitionRangeLoader.timeSeries(
+      this.preAggregation.partitionGranularity, dateRange, this.preAggregation.timestampPrecision
+    );
+    this.checkMaxPartitions(ranges.length);
+    return ranges;
+  }
+
+  protected async partitionRanges(ignoreMatchedDateRange?: boolean): Promise<PartitionRanges> {
+    const { buildRange, dateRange } = await this.resolveDateRanges(ignoreMatchedDateRange);
+    return { buildRange, partitionRanges: this.partitionRangesForDateRange(dateRange) };
   }
 
   public async loadBuildRange(timestampFormat: string = DEFAULT_TS_FORMAT): Promise<QueryDateRange> {
@@ -467,16 +550,16 @@ export class PreAggregationPartitionRangeLoader {
     }
 
     // startDate & endDate are `localized` here
-    const wholeSeriesRanges = PreAggregationPartitionRangeLoader.timeSeries(
+    const [firstPartition, lastPartition] = timeSeriesBoundaries(
       this.preAggregation.partitionGranularity,
       this.orNowIfEmpty([startDate, endDate]),
-      this.preAggregation.timestampPrecision,
+      { timestampPrecision: this.preAggregation.timestampPrecision },
     );
     const [rangeStart, rangeEnd] = await Promise.all(
       preAggregationStartEndQueries.map(
         async (rangeQuery, i) => PreAggregationPartitionRangeLoader.extractDate(
           await this.loadRangeQuery(
-            rangeQuery, i === 0 ? wholeSeriesRanges[0] : wholeSeriesRanges[wholeSeriesRanges.length - 1],
+            rangeQuery, i === 0 ? firstPartition : lastPartition,
           ),
           this.preAggregation.timezone,
           timestampFormat,

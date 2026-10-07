@@ -1,6 +1,6 @@
 use crate::cube_bridge::member_sql::{
-    CompiledMemberTemplate, FilterParamsColumn, FilterParamsItem, MemberSql, SqlTemplate,
-    SqlTemplateArgs,
+    CompiledMemberTemplate, FilterGroupItem, FilterParamsColumn, FilterParamsItem, MemberSql,
+    SqlTemplate, SqlTemplateArgs,
 };
 use crate::test_fixtures::cube_bridge::MockFilterParamsCallback;
 use cubenativeutils::CubeError;
@@ -201,37 +201,34 @@ impl MockMemberSql {
                     continue;
                 }
 
-                // `{FILTER_PARAMS_COLUMN:<cube>.<member>:<column>}` records a
-                // FILTER_PARAMS binding whose column is a plain string, the way
-                // `.filter('created_at')` is written in the data model.
-                if let Some(body) = path.strip_prefix("FILTER_PARAMS_COLUMN:") {
-                    let (cube_name, name, column) = Self::parse_filter_params_body(body)?;
-                    let index = args.insert_filter_params(FilterParamsItem {
-                        cube_name,
-                        name,
-                        column: FilterParamsColumn::String(column),
-                    });
+                // `{FILTER_PARAMS_COLUMN:<member>:<column>}` records a FILTER_PARAMS
+                // binding whose column is a plain string, the way
+                // `.filter('created_at')` is written in the data model, and
+                // `{FILTER_PARAMS:<member>:<column>}` one whose column is a
+                // callback, where `[path]` is a member reference recorded into
+                // this template's own args and `%N` stands for the Nth filter
+                // value the planner passes at render time. `<member>` is
+                // `<cube>.<member>` optionally followed by `@<shift>`, which
+                // addresses the named time shift the way
+                // `.time_shifts.<shift>.filter(...)` does.
+                if path.starts_with("FILTER_PARAMS_COLUMN:") || path.starts_with("FILTER_PARAMS:") {
+                    let item = Self::parse_filter_params_item(&path, args, args_names)?;
+                    let index = args.insert_filter_params(item);
                     result.push_str(&format!("{{fp:{}}}", index));
                     continue;
                 }
 
-                // `{FILTER_PARAMS:<cube>.<member>:<column>}` records a FILTER_PARAMS
-                // binding with a callback column and yields `{fp:N}`. Inside
-                // `<column>`, `[path]` is a member reference — recorded into this
-                // template's own args, so the callback's output indexes the same
-                // dependency list — and `%N` stands for the Nth filter value the
-                // planner passes at render time.
-                if let Some(body) = path.strip_prefix("FILTER_PARAMS:") {
-                    let (cube_name, name, column) = Self::parse_filter_params_body(body)?;
-                    let column = Self::parse_column_references(&column, args, args_names)?;
-                    let index = args.insert_filter_params(FilterParamsItem {
-                        cube_name,
-                        name,
-                        column: FilterParamsColumn::Callback(Rc::new(
-                            MockFilterParamsCallback::new(column),
-                        )),
-                    });
-                    result.push_str(&format!("{{fp:{}}}", index));
+                // `{FILTER_GROUP|<item>|<item>}` records several of the bindings
+                // above as one group and yields `{fg:N}`. `|` separates the
+                // items, since the scanner above stops at the first `}` and so
+                // cannot nest their braces.
+                if let Some(body) = path.strip_prefix("FILTER_GROUP|") {
+                    let filter_params = body
+                        .split('|')
+                        .map(|spec| Self::parse_filter_params_item(spec.trim(), args, args_names))
+                        .collect::<Result<Vec<_>, _>>()?;
+                    let index = args.insert_filter_group(FilterGroupItem { filter_params });
+                    result.push_str(&format!("{{fg:{}}}", index));
                     continue;
                 }
 
@@ -269,8 +266,45 @@ impl MockMemberSql {
         Ok(result)
     }
 
-    // Splits a `<cube>.<member>:<column>` FILTER_PARAMS body.
-    fn parse_filter_params_body(body: &str) -> Result<(String, String, String), CubeError> {
+    // Parses one `FILTER_PARAMS_COLUMN:<member>:<column>` /
+    // `FILTER_PARAMS:<member>:<column>` binding spec.
+    fn parse_filter_params_item(
+        spec: &str,
+        args: &mut SqlTemplateArgs,
+        args_names: &mut Vec<String>,
+    ) -> Result<FilterParamsItem, CubeError> {
+        if let Some(body) = spec.strip_prefix("FILTER_PARAMS_COLUMN:") {
+            let (cube_name, name, time_shift_name, column) = Self::parse_filter_params_body(body)?;
+            Ok(FilterParamsItem {
+                cube_name,
+                name,
+                time_shift_name,
+                column: FilterParamsColumn::String(column),
+            })
+        } else if let Some(body) = spec.strip_prefix("FILTER_PARAMS:") {
+            let (cube_name, name, time_shift_name, column) = Self::parse_filter_params_body(body)?;
+            let column = Self::parse_column_references(&column, args, args_names)?;
+            Ok(FilterParamsItem {
+                cube_name,
+                name,
+                time_shift_name,
+                column: FilterParamsColumn::Callback(Rc::new(MockFilterParamsCallback::new(
+                    column,
+                ))),
+            })
+        } else {
+            Err(CubeError::user(format!(
+                "FILTER_PARAMS binding must start with `FILTER_PARAMS:` or \
+                 `FILTER_PARAMS_COLUMN:`: {}",
+                spec
+            )))
+        }
+    }
+
+    // Splits a `<cube>.<member>[@<shift>]:<column>` FILTER_PARAMS body.
+    fn parse_filter_params_body(
+        body: &str,
+    ) -> Result<(String, String, Option<String>, String), CubeError> {
         let (member, column) = body.split_once(':').ok_or_else(|| {
             CubeError::user(format!(
                 "FILTER_PARAMS needs a `<cube>.<member>:<column>` body: {}",
@@ -285,6 +319,16 @@ impl MockMemberSql {
                 column
             )));
         }
+        let (member, time_shift_name) = match member.split_once('@') {
+            Some((member, shift)) if !shift.is_empty() => (member, Some(shift.to_string())),
+            Some(_) => {
+                return Err(CubeError::user(format!(
+                    "FILTER_PARAMS time shift name must be non-empty: {}",
+                    member
+                )))
+            }
+            None => (member, None),
+        };
         let member_parts = member.split('.').collect::<Vec<_>>();
         if member_parts.len() != 2 || member_parts.iter().any(|p| p.is_empty()) {
             return Err(CubeError::user(format!(
@@ -295,6 +339,7 @@ impl MockMemberSql {
         Ok((
             member_parts[0].to_string(),
             member_parts[1].to_string(),
+            time_shift_name,
             column.to_string(),
         ))
     }

@@ -69,7 +69,10 @@ On a number member the comparisons appear on the chip as `=`, `≠`, `>`, `≥`,
 
 - **is** and **is not** accept several values, matching any of them. On a string
   member the value picker lists the member's own values and searches them
-  server-side, so you select from what the data actually contains.
+  server-side, so you select from what the data actually contains. When the
+  member has null rows, the list ends with a **(null)** entry: with **is** it
+  also matches the null rows, and with **is not** it excludes them. **is not**
+  without **(null)** keeps null rows.
 - The **contains**, **starts with** and **ends with** family matches a
   substring, prefix or suffix, ignoring case.
 - **between** includes both bounds.
@@ -182,7 +185,7 @@ also enabled, the pinned totals row shows a grand total for each pivot group.
 - The toggle adds subtotals for all pivot levels at once; there is no
   per-group control.
 - Subtotals are not available for flat (non-pivoted) tables or in the
-  values-as-rows table layout.
+  [values-as-rows table layout](/docs/explore-analyze/charts/chart-types/table#pivot-presets).
 - [Calculations][ref-calculated-fields] based on window functions, such as
   **Running total**, are excluded — same as for row and column totals.
 

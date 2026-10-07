@@ -1,0 +1,59 @@
+cubes:
+  - name: locations
+    sql: "SELECT 1 as id, 'A' as board_id, '2026-01-01'::timestamp as ts"
+
+    joins:
+      - name: boards
+        relationship: many_to_one
+        sql: "{CUBE.board_id} = {boards.board_id}"
+    dimensions:
+      - name: id
+        type: number
+        sql: id
+        primary_key: true
+      - name: board_id
+        type: string
+        sql: board_id
+      - name: ts
+        type: time
+        sql: ts
+    measures:
+      - name: count
+        type: count
+    pre_aggregations:
+      - name: locations_rollup
+        type: rollup
+        dimensions:
+          - board_id
+        time_dimension: ts
+        granularity: day
+
+  - name: boards
+    sql: "SELECT 'A' as board_id, 1 as good"
+
+    dimensions:
+      - name: board_id
+        type: string
+        sql: board_id
+        primary_key: true
+    measures:
+      - name: good_count
+        type: sum
+        sql: good
+    pre_aggregations:
+      - name: boards_rollup
+        type: rollup
+        measures:
+          - good_count
+        dimensions:
+          - board_id
+      # `locations` is reached only through its time dimension.
+      - name: joined
+        type: rollupJoin
+        measures:
+          - good_count
+        time_dimension: locations.ts
+        granularity: day
+        rollups:
+          - locations.locations_rollup
+          - boards.boards_rollup

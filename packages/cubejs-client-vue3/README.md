@@ -1,11 +1,11 @@
-<p align="center"><a href="https://cube.dev"><img src="https://i.imgur.com/zYHXm4o.png" alt="Cube.js" width="300px"></a></p>
+<p align="center"><a href="https://cube.dev"><img src="https://i.imgur.com/zYHXm4o.png" alt="Cube" width="300px"></a></p>
 
 [Website](https://cube.dev) • [Docs](https://docs.cube.dev) • [Blog](https://cube.dev/blog) • [Slack](https://slack.cube.dev) • [Twitter](https://twitter.com/the_cube_dev)
 
 [![npm version](https://badge.fury.io/js/%40cubejs-client%2Fvue.svg)](https://badge.fury.io/js/%40cubejs-client%2Fvue)
 [![GitHub Actions](https://github.com/cube-js/cube.js/workflows/Build/badge.svg)](https://github.com/cube-js/cube.js/actions?query=workflow%3ABuild+branch%3Amaster)
 
-# Cube.js Vue
+# Cube Vue
 
 ## Project setup
 ```
@@ -37,4 +37,4 @@ See [Configuration Reference](https://cli.vuejs.org/config/).
 
 ### License
 
-Cube.js Vue is [MIT licensed](./LICENSE).
+Cube Vue is [MIT licensed](./LICENSE).

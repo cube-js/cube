@@ -35,7 +35,7 @@ export function titleize(str: string) {
   str = str.toLowerCase().replace(underbar, ' ').replace(dot, ' ');
   const strArr = str.split(' ');
   const j = strArr.length;
-  let d: string[], l: number;
+  let d: string[]; let l: number;
 
   for (let i = 0; i < j; i++) {
     d = strArr[i].split('-');

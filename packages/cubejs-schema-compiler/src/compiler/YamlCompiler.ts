@@ -14,7 +14,7 @@ import {
   transpiledFieldsPatterns,
   TranspilerCubeResolver, TranspilerSymbolResolver
 } from './transpilers';
-import { PythonParser } from '../parser/PythonParser';
+import { PythonParser, transpileSimpleFString } from '../parser/PythonParser';
 import { nonStringFields } from './CubeValidator';
 import { ErrorReporter } from './ErrorReporter';
 import { camelizeCube } from './utils';
@@ -218,9 +218,10 @@ export class YamlCompiler {
 
   private transpileYaml(obj, propertyPath, cubeName, errorsReport: ErrorReporter) {
     if (transpiledFields.has(propertyPath[propertyPath.length - 1])) {
+      const fullPath = propertyPath.join('.');
+
       for (const p of transpiledFieldsPatterns) {
-        const fullPath = propertyPath.join('.');
-        if (fullPath.match(p)) {
+        if (p.test(fullPath)) {
           // View default filter `member` / `unless` are member references in
           // the view's own namespace — not Python expressions — so they go
           // through the same f-string path as `values`. The view's
@@ -307,6 +308,7 @@ export class YamlCompiler {
     const result: string[] = [];
     const stateStack: EscapeStateStack[] = [];
     const peek = () => stateStack[stateStack.length - 1] || { inStr: true, inFormattedStr: true };
+
     for (let i = 0; i < str.length; i++) {
       if (str[i] === 'f' && str[i + 1] === '"' && !peek().inStr) {
         i += 1;
@@ -362,6 +364,11 @@ export class YamlCompiler {
       return t.nullLiteral();
     }
 
+    const simple = transpileSimpleFString(codeString);
+    if (simple) {
+      return simple;
+    }
+
     try {
       const pythonParser = new PythonParser(codeString);
       return pythonParser.transpileToJs();
@@ -406,6 +413,7 @@ export class YamlCompiler {
       .filter((name): name is string => name != null);
 
     const seen = new Set<string>();
+
     for (const name of names) {
       if (seen.has(name)) {
         errorsReport.error(message(name));

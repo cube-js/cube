@@ -5,7 +5,7 @@ use crate::{
             agg_fun_expr, agg_fun_expr_within_group_empty_tail, aggregate, alias_expr,
             analysis::ConstantFolding,
             binary_expr, case_expr, column_expr, cube_scan_wrapper, grouping_set_expr,
-            literal_bool, literal_null, original_expr_name, rewrite,
+            is_null_expr, literal_bool, literal_int, literal_null, original_expr_name, rewrite,
             rewriter::{CubeEGraph, CubeRewrite},
             rules::{members::MemberRules, wrapper::WrapperRules},
             subquery, transforming_chain_rewrite, transforming_rewrite, udaf_expr, wrapped_select,
@@ -292,6 +292,7 @@ impl WrapperRules {
                         "?out_measure_expr",
                         "?out_measure_alias",
                         "?alias_to_cube",
+                        "?input_data_source",
                     ),
                 )
             },
@@ -400,6 +401,7 @@ impl WrapperRules {
                     "?fun",
                     "?distinct",
                     "?cube_members",
+                    "?input_data_source",
                     "?replace_agg_type",
                     "?out_measure_alias",
                 ),
@@ -461,7 +463,58 @@ impl WrapperRules {
                     "?fun",
                     "?distinct",
                     "?cube_members",
+                    "?input_data_source",
                     "?replace_agg_type",
+                    "?out_measure_alias",
+                ),
+            ),
+            // TODO: workaround for PowerBI, it uses COUNT(DISTINCT(col)) + MAX(CASE ...) to
+            // count NULLs as a distinct value. We don't support that yet, so don't count
+            // them: fold the MAX(CASE ...) half into a literal 0, which is also what lets
+            // the aggregation keep pushing to Cube instead of falling back to an ungrouped
+            // scan. Keep in sync with "aggregate-function-powerbi-count-distinct-max-case",
+            // whose note carries the effect on results.
+            transforming_chain_rewrite(
+                "wrapper-push-down-powerbi-count-distinct-max-case",
+                wrapper_pushdown_replacer("?aggr_expr", "?context"),
+                vec![
+                    (
+                        "?aggr_expr",
+                        agg_fun_expr(
+                            "Max",
+                            vec![case_expr(
+                                None,
+                                vec![(
+                                    is_null_expr(column_expr("?measure_column")),
+                                    literal_int(1),
+                                )],
+                                Some(literal_int(0)),
+                            )],
+                            "?distinct",
+                            agg_fun_expr_within_group_empty_tail(),
+                        ),
+                    ),
+                    (
+                        "?context",
+                        wrapper_replacer_context(
+                            "?alias_to_cube",
+                            "WrapperReplacerContextPushToCube:true",
+                            "?in_projection",
+                            "?cube_members",
+                            "?grouped_subqueries",
+                            "?ungrouped_scan",
+                            "?input_data_source",
+                        ),
+                    ),
+                ],
+                wrapper_pullup_replacer(
+                    alias_expr(literal_int(0), "?out_measure_alias"),
+                    "?context",
+                ),
+                self.transform_powerbi_max_case(
+                    "?aggr_expr",
+                    "?measure_column",
+                    "?cube_members",
                     "?out_measure_alias",
                 ),
             ),
@@ -1111,10 +1164,17 @@ impl WrapperRules {
         out_expr_var: Var,
         out_alias_var: Var,
         alias_to_cube_var: Var,
+        input_data_source_var: Var,
         meta: &MetaContext,
         disable_strict_agg_type_match: bool,
     ) -> bool {
         let Some(alias) = original_expr_name(egraph, subst[original_expr_var]) else {
+            return false;
+        };
+        // Read before members are resolved, which holds the e-graph mutably
+        let Ok(context_data_source) =
+            Self::context_data_source(egraph, subst, input_data_source_var, meta)
+        else {
             return false;
         };
 
@@ -1175,6 +1235,10 @@ impl WrapperRules {
                                     &column.name,
                                 )
                             {
+                                if !Self::member_fits_data_source(context_data_source, meta, member)
+                                {
+                                    continue;
+                                }
                                 if let Some(measure) = meta.find_measure_with_name(member) {
                                     let Some(call_agg_type) = &call_agg_type else {
                                         // call_agg_type is None, rewrite as is
@@ -1246,6 +1310,7 @@ impl WrapperRules {
         out_expr_var: &'static str,
         out_alias_var: &'static str,
         alias_to_cube_var: &'static str,
+        input_data_source_var: &'static str,
     ) -> impl Fn(&mut CubeEGraph, &mut Subst) -> bool {
         let original_expr_var = var!(original_expr_var);
         let column_var = column_var.map(|v| var!(v));
@@ -1256,6 +1321,7 @@ impl WrapperRules {
         let out_expr_var = var!(out_expr_var);
         let out_alias_var = var!(out_alias_var);
         let alias_to_cube_var = var!(alias_to_cube_var);
+        let input_data_source_var = var!(input_data_source_var);
         let meta = self.meta_context.clone();
         let disable_strict_agg_type_match = self.config_obj.disable_strict_agg_type_match();
         move |egraph, subst| {
@@ -1270,9 +1336,79 @@ impl WrapperRules {
                 out_expr_var,
                 out_alias_var,
                 alias_to_cube_var,
+                input_data_source_var,
                 &meta,
                 disable_strict_agg_type_match,
             )
+        }
+    }
+
+    /// The column has to resolve to a Cube measure `is_same_agg_type("countDistinct")`
+    /// accepts, which is `countDistinct` and `countDistinctApprox` but also `number`.
+    /// It does not require the paired COUNT(DISTINCT ...) to be present, so a lone
+    /// MAX(CASE WHEN <number measure> IS NULL ...) folds to 0 as well. Both are true of
+    /// "aggregate-function-powerbi-count-distinct-max-case" as well, and the two must
+    /// keep matching: narrowing one alone would make results depend on whether the query
+    /// has an ORDER BY.
+    fn transform_powerbi_max_case(
+        &self,
+        aggr_expr_var: &'static str,
+        column_var: &'static str,
+        cube_members_var: &'static str,
+        out_measure_alias_var: &'static str,
+    ) -> impl Fn(&mut CubeEGraph, &mut Subst) -> bool {
+        let aggr_expr_var = var!(aggr_expr_var);
+        let column_var = var!(column_var);
+        let cube_members_var = var!(cube_members_var);
+        let out_measure_alias_var = var!(out_measure_alias_var);
+
+        let meta = self.meta_context.clone();
+
+        move |egraph, subst| {
+            let Some(alias) = original_expr_name(egraph, subst[aggr_expr_var]) else {
+                return false;
+            };
+
+            let columns = var_iter!(egraph[subst[column_var]], ColumnExprColumn)
+                .cloned()
+                .collect::<Vec<_>>();
+
+            let Some(member_names_to_expr) = &mut egraph
+                .index_mut(subst[cube_members_var])
+                .data
+                .member_name_to_expr
+            else {
+                return false;
+            };
+
+            let mut found = false;
+            for column in columns {
+                let Some((&(Some(ref member), _, _), _)) =
+                    LogicalPlanData::do_find_member_by_alias(member_names_to_expr, &column.name)
+                else {
+                    continue;
+                };
+
+                let Some(measure) = meta.find_measure_with_name(member) else {
+                    continue;
+                };
+
+                if measure.is_same_agg_type("countDistinct", false) {
+                    found = true;
+                    break;
+                }
+            }
+
+            if !found {
+                return false;
+            }
+
+            subst.insert(
+                out_measure_alias_var,
+                egraph.add(LogicalPlanLanguage::AliasExprAlias(AliasExprAlias(alias))),
+            );
+
+            true
         }
     }
 
@@ -1284,6 +1420,7 @@ impl WrapperRules {
         fun_name_var: &'static str,
         distinct_var: &'static str,
         cube_members_var: &'static str,
+        input_data_source_var: &'static str,
         replace_agg_type_var: &'static str,
         out_measure_alias_var: &'static str,
     ) -> impl Fn(&mut CubeEGraph, &mut Subst) -> bool {
@@ -1293,6 +1430,7 @@ impl WrapperRules {
         let fun_name_var = var!(fun_name_var);
         let distinct_var = var!(distinct_var);
         let cube_members_var = var!(cube_members_var);
+        let input_data_source_var = var!(input_data_source_var);
         let replace_agg_type_var = var!(replace_agg_type_var);
         let out_measure_alias_var = var!(out_measure_alias_var);
 
@@ -1312,6 +1450,12 @@ impl WrapperRules {
             };
 
             let Some(alias) = original_expr_name(egraph, subst[aggr_expr_var]) else {
+                return false;
+            };
+            // Read before members are resolved, which holds the e-graph mutably
+            let Ok(context_data_source) =
+                Self::context_data_source(egraph, subst, input_data_source_var, &meta)
+            else {
                 return false;
             };
 
@@ -1347,6 +1491,10 @@ impl WrapperRules {
                         else {
                             continue;
                         };
+
+                        if !Self::member_fits_data_source(context_data_source, &meta, member) {
+                            continue;
+                        }
 
                         let Some(measure) = meta.find_measure_with_name(member) else {
                             continue;

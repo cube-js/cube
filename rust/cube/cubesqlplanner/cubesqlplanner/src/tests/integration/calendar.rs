@@ -328,6 +328,54 @@ async fn test_two_named_shifts() {
     }
 }
 
+// --- nested interval shifts on a calendar dimension ---
+
+// Characterisation, not a statement of intent.
+//
+// Nested interval shifts are added together before the calendar is consulted,
+// and the calendar is then asked for one shift of the summed interval. It
+// declares 1 month and 1 year but nothing for their sum, so the composition
+// falls through to plain arithmetic on the calendar's primary key: the retail
+// year is 364 days and its months are 4 or 5 weeks long, so a nominal
+// `1 year 1 month` back is not where either mapping leads. Recorded here so
+// the fall-through is visible; what it should do instead is not settled by
+// this test.
+#[tokio::test(flavor = "multi_thread")]
+async fn test_nested_interval_shifts_fall_through_to_plain_arithmetic() {
+    let ctx = create_context();
+
+    let query = indoc! {r#"
+        measures:
+          - calendar_orders.count
+          - calendar_orders.count_shifted_calendar_m
+          - calendar_orders.count_shifted_calendar_y
+          - calendar_orders.count_shifted_m_then_y
+        time_dimensions:
+          - dimension: custom_calendar.retail_date
+            granularity: year
+            dateRange:
+              - "2025-02-02"
+              - "2026-02-01"
+        order:
+          - id: custom_calendar.retail_date
+    "#};
+
+    let sql = ctx.build_sql(query).unwrap();
+
+    // The stage carrying both shifts offsets the primary key by their sum
+    // instead of following either declaration.
+    assert!(
+        sql.contains("date_val + interval '-1 year -1 month'")
+            || sql.contains("date_val - interval '1 year 1 month'"),
+        "the composed shift is plain arithmetic on the primary key\nsql: {}",
+        sql
+    );
+
+    if let Some(result) = ctx.try_execute_pg(query, SEED).await {
+        insta::assert_snapshot!(result);
+    }
+}
+
 // --- to_date windows bounded by the calendar ---
 //
 // The retail calendar starts 2024-02-04 with 7-day weeks and 4-5-4 months, so

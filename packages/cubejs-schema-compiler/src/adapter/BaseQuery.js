@@ -27,7 +27,7 @@ import {
 } from '@cubejs-backend/shared';
 
 import { CubeSymbols } from '../compiler/CubeSymbols';
-import { UserError } from '../compiler/UserError';
+import { JoinPathNotFoundError, UserError } from '../compiler/UserError';
 import { SqlParser } from '../parser/SqlParser';
 import { BaseDimension } from './BaseDimension';
 import { BaseFilter } from './BaseFilter';
@@ -256,6 +256,7 @@ export class BaseQuery {
     };
     this.maskedMembers = new Set();
     this.memberMaskFilters = {};
+
     for (const item of this.options.maskedMembers || []) {
       this.maskedMembers.add(item.member);
       if (item.filter) {
@@ -393,6 +394,7 @@ export class BaseQuery {
        * @type {Record<string, string[]>}
        */
       const queryJoinGraph = {};
+
       for (const { originalFrom, originalTo } of (this.join?.joins || [])) {
         if (!queryJoinGraph[originalFrom]) {
           queryJoinGraph[originalFrom] = [];
@@ -407,6 +409,25 @@ export class BaseQuery {
       } else {
         throw e;
       }
+    }
+  }
+
+  /**
+   * Same as joinTreeForHints(), but returns an empty list instead of throwing when the join graph
+   * has no path covering the hints, and a single-element list otherwise. An exception thrown into
+   * the native planner stays pending there, so it can't probe hint sets by catching.
+   * @public
+   * @param {Array<(Array<string> | string)>} hints
+   * @return {Array<import('../compiler/JoinGraph').FinishedJoinTree>}
+   */
+  tryJoinTreeForHints(hints) {
+    try {
+      return [this.joinTreeForHints(hints)];
+    } catch (e) {
+      if (e instanceof JoinPathNotFoundError) {
+        return [];
+      }
+      throw e;
     }
   }
 
@@ -465,6 +486,7 @@ export class BaseQuery {
     const currentContext = this.safeEvaluateSymbolContext();
     if (contextPropNames) {
       const contextKey = {};
+
       for (const element of contextPropNames) {
         contextKey[element] = currentContext[element];
       }
@@ -976,6 +998,9 @@ export class BaseQuery {
       totalQuery: this.options.totalQuery,
       joinHints: this.options.joinHints,
       cubestoreSupportMultistage: this.options.cubestoreSupportMultistage ?? getEnv('cubeStoreRollingWindowJoin'),
+      maxMultiStageDepth: this.options.maxMultiStageDepth ?? getEnv('maxMultiStageDepth'),
+      maxMultiStageStages: this.options.maxMultiStageStages ?? getEnv('maxMultiStageStages'),
+      maxMemberResolutionDepth: this.options.maxMemberResolutionDepth ?? getEnv('maxMemberResolutionDepth'),
       disableExternalPreAggregations: !!this.options.disableExternalPreAggregations,
       convertTzForRawTimeDimension: !!this.options.convertTzForRawTimeDimension,
       maskedMembers: this.options.maskedMembers,
@@ -1039,6 +1064,9 @@ export class BaseQuery {
       securityContext: this.contextSymbols.securityContext,
       joinHints: this.options.joinHints,
       cubestoreSupportMultistage: this.options.cubestoreSupportMultistage ?? getEnv('cubeStoreRollingWindowJoin'),
+      maxMultiStageDepth: this.options.maxMultiStageDepth ?? getEnv('maxMultiStageDepth'),
+      maxMultiStageStages: this.options.maxMultiStageStages ?? getEnv('maxMultiStageStages'),
+      maxMemberResolutionDepth: this.options.maxMemberResolutionDepth ?? getEnv('maxMemberResolutionDepth'),
       disableExternalPreAggregations: !!this.options.disableExternalPreAggregations,
       subqueryJoins: this.options.subqueryJoins,
     };
@@ -1101,6 +1129,10 @@ export class BaseQuery {
       const lambdaPreAgg = preAggForQuery.referencedPreAggregations[preAggForQuery.referencedPreAggregations.length - 1];
       // TODO(cristipp) Use source query instead of preaggregation references.
       const references = this.cubeEvaluator.evaluatePreAggregationReferences(lambdaPreAgg.cube, lambdaPreAgg.preAggregation);
+      const [timeDimension] = references.timeDimensions;
+      // @see https://github.com/cube-js/cube/issues/11682
+      const sourceDateRange = timeDimension &&
+        this.preAggregations.lambdaSourceDateRange(lambdaPreAgg, preAggForQuery);
       const lambdaQuery = this.newSubQuery(
         {
           measures: references.measures,
@@ -1108,13 +1140,18 @@ export class BaseQuery {
           timeDimensions: references.timeDimensions,
           filters: [
             ...this.options.filters ?? [],
-            references.timeDimensions.length > 0
-              ? {
-                member: references.timeDimensions[0].dimension,
-                operator: 'afterDate',
-                values: [FROM_PARTITION_RANGE]
-              }
-              : [],
+            ...(timeDimension ? [{
+              member: timeDimension.dimension,
+              operator: 'afterDate',
+              values: [FROM_PARTITION_RANGE]
+            }] : []),
+            // Kept separate from the afterDate filter on purpose: inDateRange's lower bound is
+            // inclusive and would double count rows sitting exactly at the partition end.
+            ...(sourceDateRange ? [{
+              member: timeDimension.dimension,
+              operator: 'inDateRange',
+              values: sourceDateRange
+            }] : []),
           ],
           segments: this.options.segments,
           order: [],
@@ -1129,7 +1166,11 @@ export class BaseQuery {
         () => this.cacheKeyQueries(),
         { preAggregationQuery: true }
       );
-      result[this.preAggregations.preAggregationId(lambdaPreAgg)] = { sqlAndParams, cacheKeyQueries };
+      result[this.preAggregations.preAggregationId(lambdaPreAgg)] = {
+        sqlAndParams,
+        cacheKeyQueries,
+        sourceDateRange,
+      };
     }
     return result;
   }
@@ -1509,11 +1550,15 @@ export class BaseQuery {
     const allMemberChildren = this.collectAllMemberChildren(context);
     const memberToIsMultiStage = this.collectAllMultiStageMembers(allMemberChildren);
 
+    const hasMultiStageMembersCache = {};
     const hasMultiStageMembers = (m) => {
       if (memberToIsMultiStage[m]) {
         return true;
       }
-      return allMemberChildren[m]?.some(c => hasMultiStageMembers(c)) || false;
+      if (!(m in hasMultiStageMembersCache)) {
+        hasMultiStageMembersCache[m] = allMemberChildren[m]?.some(c => hasMultiStageMembers(c)) || false;
+      }
+      return hasMultiStageMembersCache[m];
     };
 
     const measuresToRender = (multiplied, cumulative) => R.pipe(
@@ -1535,6 +1580,7 @@ export class BaseQuery {
         R.unnest
       )([false, true]);
     const withQueries = [];
+    const withQueriesMemo = new Map();
     const multiStageMembers = R.uniq(
       this.allMembersConcat(false)
         // TODO boolean logic filter support
@@ -1572,7 +1618,8 @@ export class BaseQuery {
         segments: this.options.segments || [],
       },
       allMemberChildren,
-      withQueries
+      withQueries,
+      withQueriesMemo
     ));
     const usedWithQueries = {};
     multiStageMembers.forEach(m => this.collectUsedWithQueries(usedWithQueries, m));
@@ -1632,18 +1679,34 @@ export class BaseQuery {
     return member;
   }
 
-  multiStageWithQueries(member, queryContext, memberChildren, withQueries) {
+  /**
+   * `memo` maps a member to the `[queryContext, subQuery]` pairs already walked
+   * for it. Each level visits its children twice, so without it a chain of N
+   * multi-stage members costs 2^N calls.
+   */
+  multiStageWithQueries(member, queryContext, memberChildren, withQueries, memo = new Map()) {
+    const memberMemo = memo.get(member) || [];
+    memo.set(member, memberMemo);
+    const memoized = memberMemo.find(([context]) => R.equals(context, queryContext));
+    if (memoized) {
+      return memoized[1];
+    }
+    const subQuery = this.multiStageWithQueriesUncached(member, queryContext, memberChildren, withQueries, memo);
+    memberMemo.push([queryContext, subQuery]);
+    return subQuery;
+  }
+
+  multiStageWithQueriesUncached(member, queryContext, memberChildren, withQueries, memo) {
     // TODO calculate based on remove_filter in future
     const wouldNodeApplyFilters = !memberChildren[member];
     let memberFrom = memberChildren[member]
-      ?.map(child => this.multiStageWithQueries(child, this.childrenMultiStageContext(member, queryContext), memberChildren, withQueries));
+      ?.map(child => this.multiStageWithQueries(child, this.childrenMultiStageContext(member, queryContext), memberChildren, withQueries, memo));
     const unionFromDimensions = memberFrom ? R.uniq(R.flatten(memberFrom.map(f => f.dimensions))) : queryContext.dimensions;
     const unionDimensionsContext = { ...queryContext, dimensions: unionFromDimensions.filter(d => !this.newDimension(d).isMultiStage()) };
-    // TODO is calling multiStageWithQueries twice optimal?
     memberFrom = memberChildren[member] &&
       R.uniqBy(
         f => f.alias,
-        memberChildren[member].map(child => this.multiStageWithQueries(child, this.childrenMultiStageContext(member, unionDimensionsContext), memberChildren, withQueries))
+        memberChildren[member].map(child => this.multiStageWithQueries(child, this.childrenMultiStageContext(member, unionDimensionsContext), memberChildren, withQueries, memo))
       );
     const selfContext = this.selfMultiStageContext(member, queryContext, wouldNodeApplyFilters);
     const subQuery = {
@@ -3380,6 +3443,7 @@ export class BaseQuery {
     }
 
     this.safeEvaluateSymbolContext().currentMember = memberPath;
+
     try {
       if (this.maskedMembers && this.maskedMembers.has(memberPath) && !memberExpressionType &&
           !this.safeEvaluateSymbolContext().skipMasking) {
@@ -3825,6 +3889,9 @@ export class BaseQuery {
     };
   }
 
+  /**
+   * @returns {string[]}
+   */
   collectLeafMeasures(fn) {
     const context = { leafMeasures: {} };
     this.evaluateSymbolSqlWithContext(
@@ -3847,6 +3914,7 @@ export class BaseQuery {
   evaluateSymbolSqlWithContext(fn, context) {
     const oldContext = this.evaluateSymbolContext;
     this.evaluateSymbolContext = oldContext ? Object.assign({}, oldContext, context) : context;
+
     try {
       const result = fn();
       this.evaluateSymbolContext = oldContext;
@@ -4765,20 +4833,9 @@ export class BaseQuery {
         lt: '{{ column }} < {{ param }}',
         lte: '{{ column }} <= {{ param }}',
         like_pattern: '{% if start_wild %}\'%\' || {% endif %}{{ value }}{% if end_wild %}|| \'%\'{% endif %}',
-        // Character the native planner uses to escape `%`, `_` and itself inside
-        // a user-supplied LIKE value, mirroring what BaseFilter.escapeWildcardChars
-        // does on the legacy path. Without it the planner skips escaping entirely
-        // and a user searching for a literal `%` gets a wildcard instead, matching
-        // every row. Backslash is the default LIKE escape character in Postgres,
-        // MySQL, BigQuery, ClickHouse and Cube Store, so no ESCAPE clause is
-        // needed here - and Cube Store's parser rejects one outright, which is
-        // why this must stay a bare escape character. Dialects whose LIKE has no
-        // default escape character add the explicit clause themselves: Presto and
-        // Trino in `like_pattern`, MSSQL, Oracle and Snowflake in
-        // `tesseract.ilike` (their pattern is wrapped, so the clause cannot go
-        // inside it), and DuckDB and Pinot likewise in `tesseract.ilike` - those
-        // two live in their driver packages rather than in this directory, so a
-        // sweep of only this directory will miss them.
+        // Stays bare - Cube Store rejects ESCAPE. Dialects with no default escape char add the
+        // clause in `like_pattern`/`tesseract.ilike`, some in driver packages (Pinot, Dremio,
+        // Druid, DuckDB) - a sweep of this directory misses them. Wrong for ksqlDB (no ESCAPE).
         like_escape_char: '\\',
         always_true: '1 = 1'
 
@@ -5378,7 +5435,7 @@ export class BaseQuery {
     }
 
     const filterParams = filter.filterParams();
-    const filterParamArg = filterParamArgs.filter(p => {
+    const matching = filterParamArgs.filter(p => {
       const member = p.__member();
       return member === filter.measure ||
         member === filter.dimension ||
@@ -5386,10 +5443,18 @@ export class BaseQuery {
           aliases[member] === filter.measure ||
           aliases[member] === filter.dimension
         ));
-    })[0];
+    });
+
+    if (!matching.length) {
+      throw new Error(`FILTER_PARAMS arg not found for ${filter.measure || filter.dimension}`);
+    }
+
+    // Several args can name the same member, one per time shift it addresses.
+    // Only the one addressing no shift describes the rows this query reads.
+    const filterParamArg = matching.find(p => !(p.__timeShift && p.__timeShift()));
 
     if (!filterParamArg) {
-      throw new Error(`FILTER_PARAMS arg not found for ${filter.measure || filter.dimension}`);
+      return BaseFilter.ALWAYS_TRUE;
     }
 
     if (typeof filterParamArg.__column() !== 'function') {
@@ -5453,51 +5518,98 @@ export class BaseQuery {
         // and do not check cube validity as it's part of compilation step.
         const cubeName = allFilters && cubeEvaluator.cubeNameFromPath(name);
         return new Proxy({ cube: cubeName }, {
-          get: (cubeNameObj, propertyName) => ({
-            filter: (column) => ({
-              __column() {
-                return column;
-              },
-              __member() {
-                return cubeEvaluator.pathFromArray([cubeNameObj.cube, propertyName]);
-              },
-              toString() {
-                // Segments should be excluded because they are evaluated separately in cubeReferenceProxy
-                // In other case this falls into the recursive loop/stack exceeded caused by:
-                // collectFrom() -> traverseSymbol() -> evaluateSymbolSql() ->
-                // evaluateSql() -> resolveSymbolsCall() -> cubeReferenceProxy->toString() ->
-                // evaluateSymbolSql() -> evaluateSql()... -> and got here again
-                //
-                // When FILTER_PARAMS is used in dimension/measure SQL - we also hit recursive loop:
-                // allBackAliasMembersExceptSegments() -> collectFrom() -> traverseSymbol() -> evaluateSymbolSql() ->
-                // autoPrefixAndEvaluateSql() -> evaluateSql() -> filterProxyFromAllFilters->Proxy->toString()
-                // and so on...
-                // For this case aliasGathering flag is added to the context in first iteration and
-                // is checked below to prevent looping.
-                const aliases = allFilters ?
-                  allFilters
-                    .map(v => (v.query && !v.query.safeEvaluateSymbolContext().aliasGathering ? v.query.allBackAliasMembersExceptSegments() : {}))
-                    .reduce((a, b) => ({ ...a, ...b }), {})
-                  : {};
-                // Filtering aliases that somehow relate to this group member
-                const groupMember = cubeEvaluator.pathFromArray([cubeNameObj.cube, propertyName]);
-                const aliasesForGroupMembers = Object.entries(aliases)
-                  .filter(([key, _value]) => key === groupMember)
-                  .map(([_key, value]) => value);
-                const filter = BaseQuery.findAndSubTreeForFilterGroup(
-                  newGroupFilter({ operator: 'and', values: allFilters }),
-                  [groupMember],
-                  newGroupFilter,
-                  aliasesForGroupMembers
+          get: (cubeNameObj, propertyName) => new Proxy({}, {
+            get: (memberTarget, prop) => {
+              if (prop === 'filter') {
+                return (column) => BaseQuery.filterProxyBinding(
+                  cubeNameObj.cube, propertyName, false, column, allFilters, cubeEvaluator, allocateParam, newGroupFilter
                 );
-
-                return `(${BaseQuery.renderFilterParams(filter, [this], allocateParam, newGroupFilter, aliases)})`;
               }
-            })
+              // A time shift is addressed only by the native planner. Here the
+              // binding still has to exist, so that a model written for it
+              // compiles and FILTER_GROUP can recover its member, but it
+              // restates nothing.
+              if (prop === 'time_shifts' || prop === 'timeShifts') {
+                return new Proxy({}, {
+                  get: (_shiftTarget, timeShiftName) => {
+                    // Under `time_shifts` every string reads as the name of a
+                    // shift, so string coercion and `filter` — the plain form
+                    // with `time_shifts.` inserted by mistake — are reserved.
+                    if (typeof timeShiftName !== 'string' || BaseQuery.NOT_SHIFT_NAMES.has(timeShiftName)) {
+                      return () => {
+                        throw new UserError(
+                          `FILTER_PARAMS.${cubeNameObj.cube}.${propertyName}.time_shifts needs the name of a time shift: ` +
+                          'FILTER_PARAMS.<cube>.<member>.time_shifts.<name>.filter(...)'
+                        );
+                      };
+                    }
+                    return {
+                      filter: (column) => BaseQuery.filterProxyBinding(
+                        cubeNameObj.cube, propertyName, true, column, allFilters, cubeEvaluator, allocateParam, newGroupFilter
+                      )
+                    };
+                  }
+                });
+              }
+              return Reflect.get(memberTarget, prop);
+            }
           })
         });
       }
     });
+  }
+
+  static get NOT_SHIFT_NAMES() {
+    return new Set(['toString', 'valueOf', 'filter']);
+  }
+
+  static filterProxyBinding(cubeName, propertyName, isTimeShift, column, allFilters, cubeEvaluator, allocateParam, newGroupFilter) {
+    return {
+      __column() {
+        return column;
+      },
+      __member() {
+        return cubeEvaluator.pathFromArray([cubeName, propertyName]);
+      },
+      __timeShift() {
+        return isTimeShift;
+      },
+      toString() {
+        if (isTimeShift) {
+          return `(${BaseFilter.ALWAYS_TRUE})`;
+        }
+        // Segments should be excluded because they are evaluated separately in cubeReferenceProxy
+        // In other case this falls into the recursive loop/stack exceeded caused by:
+        // collectFrom() -> traverseSymbol() -> evaluateSymbolSql() ->
+        // evaluateSql() -> resolveSymbolsCall() -> cubeReferenceProxy->toString() ->
+        // evaluateSymbolSql() -> evaluateSql()... -> and got here again
+        //
+        // When FILTER_PARAMS is used in dimension/measure SQL - we also hit recursive loop:
+        // allBackAliasMembersExceptSegments() -> collectFrom() -> traverseSymbol() -> evaluateSymbolSql() ->
+        // autoPrefixAndEvaluateSql() -> evaluateSql() -> filterProxyFromAllFilters->Proxy->toString()
+        // and so on...
+        // For this case aliasGathering flag is added to the context in first iteration and
+        // is checked below to prevent looping.
+        const aliases = allFilters ?
+          allFilters
+            .map(v => (v.query && !v.query.safeEvaluateSymbolContext().aliasGathering ? v.query.allBackAliasMembersExceptSegments() : {}))
+            .reduce((a, b) => ({ ...a, ...b }), {})
+          : {};
+        // Filtering aliases that somehow relate to this group member
+        const groupMember = cubeEvaluator.pathFromArray([cubeName, propertyName]);
+        const aliasesForGroupMembers = Object.entries(aliases)
+          .filter(([key, _value]) => key === groupMember)
+          .map(([_key, value]) => value);
+        const filter = BaseQuery.findAndSubTreeForFilterGroup(
+          newGroupFilter({ operator: 'and', values: allFilters }),
+          [groupMember],
+          newGroupFilter,
+          aliasesForGroupMembers
+        );
+
+        return `(${BaseQuery.renderFilterParams(filter, [this], allocateParam, newGroupFilter, aliases)})`;
+      }
+    };
   }
 
   /**
@@ -5597,6 +5709,7 @@ export class BaseQuery {
      * @type {Record<string, string>}
      */
     const res = {};
+
     for (const [original, alias] of Object.entries(aliases)) {
       const [cube, field] = original.split('.');
       const path = buildJoinPath(cube);
@@ -5640,6 +5753,7 @@ export class BaseQuery {
         visited.add(node);
 
         const neighbors = query.joinGraphPaths[node] || [];
+
         for (const neighbor of neighbors) {
           if (dfs(neighbor)) {
             path.unshift(node);
@@ -5657,7 +5771,7 @@ export class BaseQuery {
   /**
    * Returns a function that constructs the full member path
    * based on the query's join structure.
-   * @returns {(function(member: string): (string))}
+   * @returns {(member: string) => string}
    */
   resolveFullMemberPathFn() {
     const { root: queryJoinRoot } = this.join || {};

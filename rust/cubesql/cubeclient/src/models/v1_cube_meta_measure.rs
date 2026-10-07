@@ -1,7 +1,7 @@
 /*
- * Cube.js
+ * Cube
  *
- * Cube.js Swagger Schema
+ * Cube Swagger Schema
  *
  * The version of the OpenAPI document: 1.0.0
  *

@@ -1,0 +1,135 @@
+---
+title: XIRR function
+description: How the XIRR aggregate function calculates the internal rate of return for irregular cash flows, what its arguments do, and how it behaves on edge cases.
+hidden: true
+---
+
+`XIRR` is an aggregate function that calculates the annualized [internal rate of
+return][link-xirr] for a series of cash flows that occur on irregular dates. It is
+Cube's counterpart to the `XIRR` function in Excel and DAX, and solves the same equation.
+
+The function is available in:
+
+- The [SQL API][ref-sql-api-custom-functions], in queries with post-processing (v1.3.8
+  and later).
+- Cube Store (v1.3.12 and later). This is what serves `XIRR` when it is used in a
+  [multi-stage measure][ref-multi-stage] queried through any Core Data API, including
+  the REST (JSON) API, as long as the query hits a pre-aggregation.
+- The DAX API.
+
+This page explains how the function itself works. For a complete data model example,
+see the [XIRR recipe][ref-xirr-recipe].
+
+## Syntax
+
+```sql
+XIRR(payment, date [, initial_guess [, on_error]])
+```
+
+| Argument | Type | Description |
+| --- | --- | --- |
+| `payment` | numeric | Cash flow amount. Use negative values for money paid out (investments, contributions) and positive values for money received (distributions, the ending value). `NULL` is treated as `0`. |
+| `date` | date or timestamp | Date of the cash flow. The time part is ignored. Must not be `NULL`. |
+| `initial_guess` | float, optional | Starting point for the solver. Must be greater than `-1` and the same on every row. Defaults to `0.1` when omitted or `NULL`. |
+| `on_error` | numeric, optional | Value to return when no solution is found. Must be the same on every row; `NULL` is allowed. When omitted, the query fails with an error instead. |
+
+The result is a double: an annualized rate expressed as a fraction, so `0.1` means
+10% per year. `XIRR(DISTINCT ...)` is not supported.
+
+## How the rate is calculated
+
+`XIRR` finds the rate `r` at which the net present value of all cash flows in the
+group is zero:
+
+```text
+NPV(r) = SUM( payment_i / (1 + r) ^ t_i ) = 0
+t_i    = (date_i - date_0) / 365
+```
+
+where `t_i` is the time of each cash flow in years and `date_0` is the earliest date in
+the group. Note that:
+
+- Time is measured in years as the number of days since the earliest cash flow,
+  divided by 365. Leap days count as ordinary days.
+- The earliest date is the anchor regardless of row order, so rows can arrive in any
+  order and the result is the same. Unlike Excel, the earliest cash flow does not need
+  to be the first one.
+- Cash flows on the same date are discounted identically, so it makes no difference
+  whether they are summed per day before the call or passed as separate rows.
+
+The equation has no closed-form solution, so it is solved numerically with Newton's
+method:
+
+1. Start at `initial_guess` (`0.1` by default).
+2. Compute `NPV(r)` and its derivative at the current rate. Rows whose payment is
+   exactly `0` are skipped.
+3. If the absolute value of `NPV(r)` is below `0.000001`, stop and return `r`.
+4. Otherwise, move the rate by `NPV(r) / NPV'(r)` and repeat.
+5. After 100 iterations without meeting the tolerance, or as soon as a step produces a
+   rate that is not a number (for example, after stepping to -100% or below), the
+   function reports no solution.
+
+The tolerance is absolute and in the units of `payment`: the iteration stops when the
+discounted cash flows sum to less than one millionth. Scaling every payment by the same
+factor does not change the rate, so if your amounts are very large (billions), passing
+them in thousands or millions gives the solver more floating-point headroom.
+
+## Results and errors
+
+The function evaluates once per group and behaves as follows:
+
+| Situation | Result |
+| --- | --- |
+| The solver converges | The rate, as a fraction |
+| All payments have the same sign, so the equation has no root | No solution: `on_error` if provided, otherwise the query fails with `The XIRR function couldn't find a solution` |
+| No convergence within 100 iterations, or a step produces a non-numeric rate | Same as above |
+| Every payment in the group is `0` or `NULL` | Returns `initial_guess` unchanged, because `NPV` is already zero at the starting point. See the note below |
+| The group has no rows | Error: `A result for XIRR couldn't be determined because the arguments are empty` |
+| `date` is `NULL` on any row | Error: ``One or more values for the `date` argument passed to XIRR is null`` |
+| `initial_guess` is `-1` or lower | Error: ``The `initial_guess` argument passed to the XIRR function must be greater than -1`` |
+| `initial_guess` or `on_error` differs between rows of the group | Error: ``The `initial_guess` argument passed to XIRR is inconsistent`` (or the same for `on_error`) |
+
+<Warning>
+
+A group with no non-zero cash flows does not fail; it echoes `initial_guess` back
+(`0.1` by default), which looks like a real 10% return. If a group in your data can
+have no flows, guard the call, for example:
+`CASE WHEN SUM(ABS(payment)) > 0 THEN XIRR(payment, date, 0.1, NULL) END`.
+
+</Warning>
+
+## Convergence
+
+Newton's method follows the slope from a single starting point, so the starting point
+matters for unusual series:
+
+- For strongly negative returns, such as a large loss over the period, the default
+  `0.1` guess can step past -100% and fail. Pass a negative `initial_guess`, for example
+  `-0.9`, or evaluate the function twice with two guesses and combine the results with
+  `COALESCE`.
+- Because the result is annualized, a short window turns a small gain or loss into a
+  large rate. Read `XIRR` over windows long enough for an annualized figure to be
+  meaningful.
+
+## Where the function runs
+
+`XIRR` exists in the SQL API's post-processing engine and in Cube Store. It does not
+exist in your upstream database. When you use it in the data model:
+
+- Define it as a `multi_stage` measure of type `number_agg` whose `grain` includes a
+  day-level time dimension, and serve it from a pre-aggregation with `day` granularity.
+  Cube Store then receives one row per day and runs the solver. The
+  [XIRR recipe][ref-xirr-recipe] shows the full pattern.
+- Every dimension a query groups or filters by must be present in that pre-aggregation.
+  A query that cannot be matched falls through to the upstream database, which fails
+  with its own unknown-function error, for example
+  `function xirr(numeric, date) does not exist` in Postgres.
+- Applying a time granularity to such a query groups the cash flows into buckets and
+  solves each bucket separately. A bucket that does not contain both an outflow and an
+  inflow has no root, so it returns `on_error` or fails.
+
+
+[link-xirr]: https://support.microsoft.com/en-us/office/xirr-function-de1242ec-6477-445b-b11b-a303ad9adc9d
+[ref-sql-api-custom-functions]: /reference/core-data-apis/sql-api/reference#custom-functions
+[ref-multi-stage]: /docs/data-modeling/measures#multi-stage-measures
+[ref-xirr-recipe]: /recipes/data-modeling/xirr

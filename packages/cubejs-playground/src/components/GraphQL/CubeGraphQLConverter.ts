@@ -211,10 +211,9 @@ export class CubeGraphQLConverter {
     const filters = Array.isArray(filter) ? filter : [filter];
 
     const value = (f): t.ValueNode => {
-      const kind =
-        this.types[f.member || f.dimension] === 'number'
-          ? t.Kind.FLOAT
-          : t.Kind.STRING;
+      const kind = this.types[f.member || f.dimension] === 'number'
+        ? t.Kind.FLOAT
+        : t.Kind.STRING;
 
       if (['set', 'notSet'].includes(f.operator)) {
         return {
@@ -255,8 +254,8 @@ export class CubeGraphQLConverter {
       }
 
       if (
-        singleValueOperators.includes(f.operator) &&
-        (f.values || []).length > 1
+        singleValueOperators.includes(f.operator)
+        && (f.values || []).length > 1
       ) {
         throw new Error(
           `Filter operator "${f.operator}" must have a single value`
@@ -275,21 +274,21 @@ export class CubeGraphQLConverter {
             f.values === undefined && !['set', 'notSet'].includes(f.operator)
               ? []
               : [
-                  {
-                    kind: t.Kind.OBJECT_FIELD,
-                    name: {
-                      kind: t.Kind.NAME,
-                      // A single value maps to "equals"
-                      // Whereas multiple values for "equals" operator maps to "in"
-                      // value: operatorsMap[f.operator] || f.operator,
-                      value:
+                {
+                  kind: t.Kind.OBJECT_FIELD,
+                  name: {
+                    kind: t.Kind.NAME,
+                    // A single value maps to "equals"
+                    // Whereas multiple values for "equals" operator maps to "in"
+                    // value: operatorsMap[f.operator] || f.operator,
+                    value:
                         f.operator === 'equals' && (f.values || []).length <= 1
                           ? f.operator
                           : operatorsMap[f.operator] || f.operator,
-                    },
-                    value: value(f),
                   },
-                ],
+                  value: value(f),
+                },
+              ],
         },
       };
     });
@@ -440,7 +439,7 @@ export class CubeGraphQLConverter {
             value: key,
           },
           value: {
-            kind: <typeof t.Kind.STRING | typeof  t.Kind.INT>kind,
+            kind: <typeof t.Kind.STRING | typeof t.Kind.INT>kind,
             value: this.cubeQuery[key],
           },
         });
@@ -505,18 +504,18 @@ export class CubeGraphQLConverter {
 
         // eslint-disable-next-line
         const currentField = this.cubes[cubeName].fields.find(
-          ({ name }) => name === field
+          ({ name: fieldName }) => fieldName === field
         );
 
         this.cubes[cubeName].fields.push({
           name: field,
           ...(gqlGranularity
             ? {
-                granularities: [
-                  ...(currentField?.granularities || []),
-                  gqlGranularity,
-                ],
-              }
+              granularities: [
+                ...(currentField?.granularities || []),
+                gqlGranularity,
+              ],
+            }
             : null),
         });
       });

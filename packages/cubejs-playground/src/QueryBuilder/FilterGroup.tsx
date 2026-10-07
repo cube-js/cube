@@ -25,15 +25,14 @@ const FilterGroup = ({
   updateMethods,
   missingMembers,
 }: Props) => {
-  const operatorsByMemberName = useDeepMemo(() => {
-    return members.reduce(
-      (memo, item) => ({
-        ...memo,
-        [item.member]: [...(memo[item.member] || []), item.operator],
-      }),
-      {}
-    );
-  }, [members]);
+  const operatorsByMemberName = useDeepMemo(() => members.reduce(
+    (memo, item) => ({
+      ...memo,
+      [item.member]: [...(memo[item.member] || []), item.operator],
+    }),
+    {}
+  ),
+  [members]);
 
   return (
     <SectionRow>
@@ -53,9 +52,7 @@ const FilterGroup = ({
               style={{
                 minWidth: 150,
               }}
-              onClick={(updateWith) =>
-                updateMethods.update(m, { ...m, dimension: updateWith })
-              }
+              onClick={(updateWith) => updateMethods.update(m, { ...m, dimension: updateWith })}
             >
               {m.dimension.title}
             </MemberDropdown>
@@ -74,9 +71,7 @@ const FilterGroup = ({
               disabled={disabled}
               value={m.operator}
               style={{ width: 200 }}
-              onChange={(operator) =>
-                updateMethods.update(m, { ...m, operator })
-              }
+              onChange={(operator) => updateMethods.update(m, { ...m, operator })}
             >
               {m.operators.map((operator) => {
                 const isOperatorDisabled = operatorsByMemberName[
@@ -90,8 +85,8 @@ const FilterGroup = ({
                     title={
                       isOperatorDisabled
                         ? `There is already a filter applied with this operator for ${
-                            m.dimension?.title || m.name
-                          }`
+                          m.dimension?.title || m.name
+                        }`
                         : operator.name
                     }
                     disabled={isOperatorDisabled}

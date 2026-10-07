@@ -17,13 +17,13 @@ impl SubQueryDimensionsCollector {
     pub fn extract_result(self) -> Vec<Rc<MemberSymbol>> {
         self.sub_query_dimensions
             .into_iter()
-            .unique_by(|m| m.full_name())
+            .unique_by(|m| m.id().clone())
             .collect()
     }
 
     fn check_dim_has_measures(&self, dim: &DimensionSymbol) -> bool {
         for dep in dim.get_dependencies().iter() {
-            if let MemberSymbol::Measure(_) = dep.as_ref() {
+            if dep.is_measure() {
                 return true;
             }
         }
@@ -52,7 +52,9 @@ impl TraversalVisitor for SubQueryDimensionsCollector {
                 Ok(Some(()))
             }
             MemberSymbol::TimeDimension(dim) => self.on_node_traverse(dim.base_symbol(), &()),
-            _ => Ok(Some(())),
+            MemberSymbol::Measure(_) | MemberSymbol::MemberExpression(_) | MemberSymbol::Ref(_) => {
+                Ok(Some(()))
+            }
         }
     }
 }

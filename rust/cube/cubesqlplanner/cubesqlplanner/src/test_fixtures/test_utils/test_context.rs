@@ -12,8 +12,8 @@ use crate::planner::filter::Filter;
 use crate::planner::sql_templates::PlanSqlTemplates;
 use crate::planner::state::State;
 use crate::planner::top_level_planner::TopLevelPlanner;
+use crate::planner::{CubeId, MemberSymbol, TimeDimensionSymbol};
 use crate::planner::{GranularityHelper, QueryProperties, QueryPropertiesCompiler};
-use crate::planner::{MemberSymbol, TimeDimensionSymbol};
 use crate::test_fixtures::cube_bridge::yaml::YamlBaseQueryOptions;
 use crate::test_fixtures::cube_bridge::{
     members_from_strings, MockBaseQueryOptions, MockBaseTools, MockSchema, MockSecurityContext,
@@ -68,6 +68,7 @@ impl TestContext {
             self.custom_sql_templates.clone(),
             true,
             self.should_reuse_params,
+            None,
         )
     }
 
@@ -93,6 +94,7 @@ impl TestContext {
             Some(Tz::UTC.to_string()),
             false,
             false,
+            None,
             None,
             None,
         )?;
@@ -144,6 +146,7 @@ impl TestContext {
             Some(sql_templates),
             false,
             should_reuse_params,
+            None,
         )
     }
 
@@ -193,6 +196,7 @@ impl TestContext {
             self.custom_sql_templates.clone(),
             self.external_cubestore,
             self.should_reuse_params,
+            static_data.max_member_resolution_depth,
         )
     }
 
@@ -214,6 +218,7 @@ impl TestContext {
             None,
             false,
             true,
+            None,
         )
     }
 
@@ -228,6 +233,7 @@ impl TestContext {
         custom_sql_templates: Option<crate::test_fixtures::cube_bridge::MockSqlTemplatesRender>,
         external_cubestore: bool,
         should_reuse_params: bool,
+        max_member_resolution_depth: Option<usize>,
     ) -> Result<Self, CubeError> {
         use crate::test_fixtures::cube_bridge::MockDriverTools;
         let mut driver_tools = match custom_sql_templates.clone() {
@@ -266,6 +272,7 @@ impl TestContext {
             convert_tz_for_raw_time_dimension,
             masked_members,
             member_to_alias,
+            max_member_resolution_depth,
         )?;
 
         Ok(Self {
@@ -318,7 +325,7 @@ impl TestContext {
             .cube_evaluator()
             .parse_path("segments".to_string(), path.to_string())?
             .into_iter();
-        let cube_name = iter.next().unwrap();
+        let cube_name = CubeId::cube(iter.next().unwrap());
         let name = iter.next().unwrap();
         let definition = self
             .query_tools
@@ -328,7 +335,7 @@ impl TestContext {
         let expression = compiler.compile_sql_call(&cube_name, definition.sql()?)?;
         let cube_symbol = compiler.add_cube_table_evaluator(cube_name.clone(), vec![])?;
         drop(compiler);
-        BaseSegment::try_new(expression, cube_symbol, name, Some(path.to_string()))
+        BaseSegment::try_new(expression, cube_symbol, name, false)
     }
 
     #[allow(dead_code)]
@@ -343,7 +350,7 @@ impl TestContext {
         let granularity_obj = GranularityHelper::make_granularity_obj(
             self.query_tools.cube_evaluator().clone(),
             &mut compiler,
-            &base_symbol.cube_name(),
+            &base_symbol.cube_id(),
             &base_symbol.name(),
             granularity.clone(),
         )?;
@@ -381,7 +388,12 @@ impl TestContext {
         group_by_members: Vec<String>,
     ) -> Result<String, CubeError> {
         let mut nodes_factory = SqlNodesFactory::default();
-        nodes_factory.set_group_by_members(group_by_members.into_iter().collect());
+        nodes_factory.set_group_by_members(
+            group_by_members
+                .iter()
+                .map(|name| super::member_id(name))
+                .collect(),
+        );
         let cube_ref_evaluator = Rc::new(nodes_factory.cube_ref_evaluator());
         let visitor = SqlEvaluatorVisitor::new(
             self.query_tools.query_tools().clone(),
@@ -534,6 +546,9 @@ impl TestContext {
                 )
                 .total_query(yaml_options.total_query)
                 .cubestore_support_multistage(yaml_options.cubestore_support_multistage)
+                .max_multi_stage_depth(yaml_options.max_multi_stage_depth)
+                .max_multi_stage_stages(yaml_options.max_multi_stage_stages)
+                .max_member_resolution_depth(yaml_options.max_member_resolution_depth)
                 .disable_external_pre_aggregations(
                     yaml_options
                         .disable_external_pre_aggregations
@@ -779,7 +794,14 @@ impl TestContext {
                             }
                         }
                     }
-                    let yaml = Self::build_pre_agg_query_yaml(pre_agg, &union_measures);
+                    let build_range = self
+                        .pre_agg_build_range(client, pre_agg.cube_name(), pre_agg.name())
+                        .await;
+                    let yaml = Self::build_pre_agg_query_yaml(
+                        pre_agg,
+                        &union_measures,
+                        build_range.as_ref(),
+                    );
                     let inlined_sql = self.build_pre_agg_table_sql(&yaml);
 
                     for table in &tables {
@@ -801,23 +823,14 @@ impl TestContext {
         let pa_ctx = Self::new_with_options(self.schema.clone(), Tz::UTC, None, None, false, false)
             .expect("Failed to create pre-agg context");
 
-        let (raw_sql, _) = pa_ctx
-            .build_sql_with_used_pre_aggregations(yaml)
-            .unwrap_or_else(|e| {
-                panic!(
-                    "Failed to build pre-agg SQL.\nQuery YAML:\n{}\nError: {}",
-                    yaml, e
-                )
-            });
-
-        let templates = pa_ctx
-            .query_tools
-            .plan_sql_templates(false)
-            .expect("Failed to get SQL templates");
-        let (sql, params) = pa_ctx
-            .query_tools
-            .build_sql_and_params(&raw_sql, &templates)
-            .expect("Failed to build pre-agg SQL and params");
+        // Planned and resolved in one context, so the params a build range
+        // allocates are the ones its placeholders refer to.
+        let (sql, params) = pa_ctx.build_sql_and_params(yaml).unwrap_or_else(|e| {
+            panic!(
+                "Failed to build pre-agg SQL.\nQuery YAML:\n{}\nError: {}",
+                yaml, e
+            )
+        });
         Self::inline_params(&sql, &params)
     }
 
@@ -860,8 +873,43 @@ impl TestContext {
         }
     }
 
+    /// The pre-aggregation's build range, evaluated the way the refresh does:
+    /// by running its `build_range_start` / `build_range_end` SQL. The table
+    /// is then built as one partition spanning that range.
     #[cfg(feature = "integration-postgres")]
-    fn build_pre_agg_query_yaml(pre_agg: &PreAggregation, measures: &[String]) -> String {
+    async fn pre_agg_build_range(
+        &self,
+        client: &tokio_postgres::Client,
+        cube_name: &str,
+        pre_agg_name: &str,
+    ) -> Option<(String, String)> {
+        let desc = self.schema.get_pre_aggregation(cube_name, pre_agg_name)?;
+        let (start_sql, end_sql) = desc.build_range()?;
+        let evaluate = |sql: &str| {
+            format!(
+                "SELECT to_char(v::timestamp, 'YYYY-MM-DD\"T\"HH24:MI:SS.MS') FROM ({}) AS r(v)",
+                sql
+            )
+        };
+        let mut bounds = Vec::new();
+        for sql in [start_sql, end_sql] {
+            let row = client
+                .query_one(&evaluate(sql), &[])
+                .await
+                .unwrap_or_else(|e| panic!("Failed to evaluate build range {}: {}", sql, e));
+            bounds.push(row.get::<_, String>(0));
+        }
+        let end = bounds.pop()?;
+        let start = bounds.pop()?;
+        Some((start, end))
+    }
+
+    #[cfg(feature = "integration-postgres")]
+    fn build_pre_agg_query_yaml(
+        pre_agg: &PreAggregation,
+        measures: &[String],
+        build_range: Option<&(String, String)>,
+    ) -> String {
         let mut yaml = String::new();
 
         if !measures.is_empty() {
@@ -904,6 +952,12 @@ impl TestContext {
                     }
                 } else {
                     yaml.push_str(&format!("  - dimension: {}\n", td.full_name()));
+                }
+                if let Some((start, end)) = build_range {
+                    yaml.push_str(&format!(
+                        "    dateRange:\n      - \"{}\"\n      - \"{}\"\n",
+                        start, end
+                    ));
                 }
             }
         }
@@ -1121,8 +1175,22 @@ impl TestContext {
                     .map(|c| (c.name().to_string(), Self::cubestore_type(c.type_())))
                     .collect();
 
+                // CubeStore imports an HLL sketch as base64; Postgres prints hex.
+                let select_list = columns
+                    .iter()
+                    .map(|(n, t)| {
+                        if *t == "HLL_POSTGRES" {
+                            format!(
+                                "translate(encode(decode(substr(\"{}\"::text, 3), 'hex'), 'base64'), E'\\n', '')",
+                                n
+                            )
+                        } else {
+                            format!("\"{}\"", n)
+                        }
+                    })
+                    .join(", ");
                 let messages = client
-                    .simple_query(&format!("SELECT * FROM \"{}\"", table_name))
+                    .simple_query(&format!("SELECT {} FROM \"{}\"", select_list, table_name))
                     .await
                     .unwrap_or_else(|e| {
                         panic!("Failed to read pre-agg table {}: {}", table_name, e)
@@ -1289,6 +1357,7 @@ impl TestContext {
             Type::NUMERIC => "decimal",
             Type::BOOL => "boolean",
             Type::TIMESTAMP | Type::TIMESTAMPTZ | Type::DATE => "timestamp",
+            _ if pg_type.name() == "hll" => "HLL_POSTGRES",
             _ => "varchar",
         }
     }

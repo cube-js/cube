@@ -50,6 +50,9 @@
       "path": "packages/cubejs-testing"
     },
     {
+      "path": "packages/cubejs-testing/cypress"
+    },
+    {
       "path": "packages/cubejs-druid-driver"
     },
     {

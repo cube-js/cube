@@ -1,7 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 
-import { CubeToMetaTransformer } from 'src/compiler/CubeToMetaTransformer';
+import { CubeToMetaTransformer } from '../../src/compiler/CubeToMetaTransformer';
 import { prepareYamlCompiler } from './PrepareCompiler';
 
 describe('Switch Dimension', () => {

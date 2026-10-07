@@ -8,6 +8,7 @@
 
 use super::state::State;
 use super::MemberSymbol;
+use super::RowLimit;
 use crate::cube_bridge::base_query_options::FilterValue;
 use crate::logical_plan::LogicalSubqueryJoinItem;
 use crate::planner::collectors::{collect_multiplied_measures, has_multi_stage_members};
@@ -15,9 +16,12 @@ use crate::planner::filter::tree_ops;
 use crate::planner::filter::{Filter, FilterGroup, FilterItem, FilterOperator};
 use crate::planner::join_hints::JoinHints;
 use crate::planner::multi_fact_join_groups::{MeasuresJoinHints, MultiFactJoinGroups};
-use crate::planner::planners::multi_stage::TimeShiftState;
+use crate::planner::planners::multi_stage::{
+    TimeShiftState, DEFAULT_MAX_MULTI_STAGE_DEPTH, DEFAULT_MAX_MULTI_STAGE_STAGES,
+};
 use crate::planner::symbols::transforms;
-use crate::planner::{DimensionTimeShift, JoinTree, MeasureTimeShifts};
+use crate::planner::time_dimension::SeriesSpan;
+use crate::planner::{CubeId, DimensionTimeShift, JoinTree, MeasureTimeShifts, MemberId};
 use cubenativeutils::CubeError;
 use itertools::Itertools;
 use std::cell::OnceCell;
@@ -61,10 +65,9 @@ impl PartialEq for OrderByItem {
     }
 }
 
-// Compare two member symbols by their reference-chain-resolved full name.
-fn member_chain_eq(a: &Rc<MemberSymbol>, b: &Rc<MemberSymbol>) -> bool {
-    a.clone().resolve_reference_chain().full_name()
-        == b.clone().resolve_reference_chain().full_name()
+/// Compare two member symbols by their reference-chain-resolved id.
+pub fn member_chain_eq(a: &Rc<MemberSymbol>, b: &Rc<MemberSymbol>) -> bool {
+    a.clone().resolve_reference_chain().id() == b.clone().resolve_reference_chain().id()
 }
 
 /// A measure paired with the cube it should be aggregated under. The bound
@@ -73,20 +76,20 @@ fn member_chain_eq(a: &Rc<MemberSymbol>, b: &Rc<MemberSymbol>) -> bool {
 #[derive(Debug, Clone)]
 pub struct MultipliedMeasure {
     measure: Rc<MemberSymbol>,
-    cube_name: String,
+    cube_id: CubeId,
 }
 
 impl MultipliedMeasure {
-    pub fn new(measure: Rc<MemberSymbol>, cube_name: String) -> Rc<Self> {
-        Rc::new(Self { measure, cube_name })
+    pub fn new(measure: Rc<MemberSymbol>, cube_id: CubeId) -> Rc<Self> {
+        Rc::new(Self { measure, cube_id })
     }
 
     pub fn measure(&self) -> &Rc<MemberSymbol> {
         &self.measure
     }
 
-    pub fn cube_name(&self) -> &String {
-        &self.cube_name
+    pub fn cube_id(&self) -> &CubeId {
+        &self.cube_id
     }
 }
 
@@ -94,7 +97,7 @@ impl MultipliedMeasure {
 /// aggregated alongside the rest of the query, wrapped in a multiplied
 /// subquery, or planned as a multi-stage CTE.
 ///
-/// `render_forms` maps a leaf measure's full name to its distinct
+/// `render_forms` maps a leaf measure's id to its distinct
 /// render form (a `count` rewritten to `MultipliedCount`), recorded
 /// during the single classification pass. Applied via [`Self::render`].
 #[derive(Default, Clone, Debug)]
@@ -102,7 +105,7 @@ pub struct FullKeyAggregateMeasures {
     pub multiplied_measures: Vec<Rc<MultipliedMeasure>>,
     pub regular_measures: Vec<Rc<MemberSymbol>>,
     pub multi_stage_measures: Vec<Rc<MemberSymbol>>,
-    render_forms: HashMap<String, Rc<MemberSymbol>>,
+    render_forms: HashMap<MemberId, Rc<MemberSymbol>>,
 }
 
 impl FullKeyAggregateMeasures {
@@ -150,7 +153,7 @@ pub struct QueryProperties {
     #[builder(default)]
     order_by: Option<Vec<OrderByItem>>,
     #[builder(default)]
-    row_limit: Option<usize>,
+    row_limit: Option<RowLimit>,
     #[builder(default)]
     offset: Option<usize>,
     #[builder(default)]
@@ -172,6 +175,12 @@ pub struct QueryProperties {
     use_original_sql_pre_aggregations_in_pre_aggregation: bool,
     #[builder(default)]
     total_query: bool,
+    /// Multi-stage members one dependency path may carry before planning refuses the query.
+    #[builder(default = DEFAULT_MAX_MULTI_STAGE_DEPTH)]
+    max_multi_stage_depth: usize,
+    /// Multi-stage stages the whole query may plan before planning refuses it.
+    #[builder(default = DEFAULT_MAX_MULTI_STAGE_STAGES)]
+    max_multi_stage_stages: usize,
     #[builder(default = Rc::new(JoinHints::new()))]
     query_join_hints: Rc<JoinHints>,
     #[builder(default = true)]
@@ -361,7 +370,7 @@ impl QueryProperties {
             .iter()
             .flatten()
             .filter_map(|order| {
-                if order.member_evaluator.as_dimension().is_ok() {
+                if order.member_evaluator.peel_refs().as_dimension().is_ok() {
                     Some(order.member_evaluator.clone())
                 } else {
                     None
@@ -406,7 +415,7 @@ impl QueryProperties {
         &self.measures_filters
     }
 
-    pub fn row_limit(&self) -> Option<usize> {
+    pub fn row_limit(&self) -> Option<RowLimit> {
         self.row_limit
     }
 
@@ -432,6 +441,14 @@ impl QueryProperties {
 
     pub fn is_pre_aggregations_match_only(&self) -> bool {
         self.pre_aggregations_match_only
+    }
+
+    pub fn max_multi_stage_depth(&self) -> usize {
+        self.max_multi_stage_depth
+    }
+
+    pub fn max_multi_stage_stages(&self) -> usize {
+        self.max_multi_stage_stages
     }
 
     pub fn use_original_sql_pre_aggregations_in_pre_aggregation(&self) -> bool {
@@ -499,7 +516,7 @@ impl QueryProperties {
 
         let res = members
             .into_iter()
-            .unique_by(|m| m.full_name())
+            .unique_by(|m| m.id().clone())
             .collect_vec();
         Ok(res)
     }
@@ -527,7 +544,7 @@ impl QueryProperties {
         }
         members
             .into_iter()
-            .unique_by(|m| m.full_name())
+            .unique_by(|m| m.id().clone())
             .collect_vec()
     }
 
@@ -625,30 +642,30 @@ impl QueryProperties {
                                 .unwrap_or_else(|| item.measure.clone());
                             result
                                 .multiplied_measures
-                                .push(MultipliedMeasure::new(rendered.clone(), item.cube_name));
+                                .push(MultipliedMeasure::new(rendered.clone(), item.cube_id));
                             rendered
                         }
                     };
                     result
                         .render_forms
-                        .insert(item.measure.full_name(), rendered);
+                        .insert(item.measure.id().clone(), rendered);
                 }
             }
         }
         result.multi_stage_measures = result
             .multi_stage_measures
             .into_iter()
-            .unique_by(|itm| itm.full_name())
+            .unique_by(|itm| itm.id().clone())
             .collect();
         result.regular_measures = result
             .regular_measures
             .into_iter()
-            .unique_by(|itm| itm.full_name())
+            .unique_by(|itm| itm.id().clone())
             .collect();
         result.multiplied_measures = result
             .multiplied_measures
             .into_iter()
-            .unique_by(|itm| itm.measure.full_name())
+            .unique_by(|itm| itm.measure.id().clone())
             .collect();
 
         Ok(result)
@@ -667,11 +684,9 @@ impl QueryProperties {
             self.fill_missed_measures_from_filter(item, &mut measures)?;
         }
         for item in self.order_by.iter().flatten() {
-            if let Ok(measure) = item.member_evaluator.as_measure() {
-                if !measures
-                    .iter()
-                    .any(|m| m.full_name() == measure.full_name())
-                {
+            if item.member_evaluator.peel_refs().as_measure().is_ok() {
+                let id = item.member_evaluator.id();
+                if !measures.iter().any(|m| m.id() == id) {
                     measures.push(item.member_evaluator.clone());
                 }
             }
@@ -691,8 +706,8 @@ impl QueryProperties {
                 }
             }
             FilterItem::Item(item) => {
-                let item_member_name = item.member_name();
-                if !measures.iter().any(|m| m.full_name() == item_member_name) {
+                let item_member_id = item.member_id();
+                if !measures.iter().any(|m| m.id() == &item_member_id) {
                     measures.push(item.member_evaluator().clone());
                 }
             }
@@ -755,11 +770,11 @@ impl QueryProperties {
     /// in `resolved_dimensions` or that have no multi-stage members.
     pub fn remove_multistage_dimensions(
         &mut self,
-        resolved_dimensions: &HashSet<String>,
+        resolved_dimensions: &HashSet<MemberId>,
     ) -> Result<(), CubeError> {
         let mut filtered = Vec::new();
         for d in &self.dimensions {
-            if resolved_dimensions.contains(&d.clone().resolve_reference_chain().full_name())
+            if resolved_dimensions.contains(d.clone().resolve_reference_chain().id())
                 || !has_multi_stage_members(d, true)?
             {
                 filtered.push(d.clone());
@@ -768,7 +783,7 @@ impl QueryProperties {
         self.dimensions = filtered;
         let mut filtered = Vec::new();
         for d in &self.time_dimensions {
-            if resolved_dimensions.contains(&d.clone().resolve_reference_chain().full_name())
+            if resolved_dimensions.contains(d.clone().resolve_reference_chain().id())
                 || !has_multi_stage_members(d, true)?
             {
                 filtered.push(d.clone());
@@ -808,13 +823,13 @@ impl QueryProperties {
             if let Some(exists) = self
                 .time_shifts
                 .dimensions_shifts
-                .get_mut(&ts.dimension.full_name())
+                .get_mut(ts.dimension.id())
             {
                 if let Some(interval) = exists.interval.clone() {
                     if let Some(new_interval) = ts.interval {
                         exists.interval = Some(interval + new_interval);
                     } else {
-                        return Err(CubeError::internal(format!(
+                        return Err(CubeError::user(format!(
                             "Cannot use both named ({}) and interval ({}) shifts for the same dimension: {}.",
                             ts.name.clone().unwrap_or("-".to_string()),
                             interval.to_sql(),
@@ -823,14 +838,14 @@ impl QueryProperties {
                     }
                 } else if let Some(named_shift) = exists.name.clone() {
                     return if let Some(new_interval) = ts.interval {
-                        Err(CubeError::internal(format!(
+                        Err(CubeError::user(format!(
                             "Cannot use both named ({}) and interval ({}) shifts for the same dimension: {}.",
                             named_shift,
                             new_interval.to_sql(),
                             ts.dimension.full_name(),
                         )))
                     } else {
-                        Err(CubeError::internal(format!(
+                        Err(CubeError::user(format!(
                             "Cannot use more than one named shifts ({}, {}) for the same dimension: {}.",
                             ts.name.clone().unwrap_or("-".to_string()),
                             named_shift,
@@ -841,7 +856,7 @@ impl QueryProperties {
             } else {
                 self.time_shifts
                     .dimensions_shifts
-                    .insert(ts.dimension.full_name(), ts);
+                    .insert(ts.dimension.id().clone(), ts);
             }
         }
         Ok(())
@@ -880,11 +895,11 @@ impl QueryProperties {
                     None
                 }
             })
-            .unique_by(|s| s.full_name())
+            .unique_by(|s| s.id().clone())
             .collect_vec()
     }
 
-    pub fn remove_filter_for_member(&mut self, member_name: &str) {
+    pub fn remove_filter_for_member(&mut self, member_name: &MemberId) {
         self.time_dimensions_filters =
             Self::extract_filters_exclude_member(member_name, &self.time_dimensions_filters);
         self.dimensions_filters =
@@ -894,7 +909,7 @@ impl QueryProperties {
         self.invalidate_join_groups_cache();
     }
 
-    pub fn remove_filters_for_members(&mut self, member_names: &[String]) {
+    pub fn remove_filters_for_members(&mut self, member_names: &[MemberId]) {
         self.time_dimensions_filters =
             tree_ops::exclude_members(member_names, &self.time_dimensions_filters);
         self.dimensions_filters = tree_ops::exclude_members(member_names, &self.dimensions_filters);
@@ -903,7 +918,7 @@ impl QueryProperties {
         self.invalidate_join_groups_cache();
     }
 
-    pub fn keep_only_filters_for_members(&mut self, member_names: &[String]) {
+    pub fn keep_only_filters_for_members(&mut self, member_names: &[MemberId]) {
         self.time_dimensions_filters =
             tree_ops::keep_only_members(member_names, &self.time_dimensions_filters);
         self.dimensions_filters =
@@ -929,7 +944,7 @@ impl QueryProperties {
     }
 
     fn extract_filters_exclude_member(
-        member_name: &str,
+        member_name: &MemberId,
         filters: &[FilterItem],
     ) -> Vec<FilterItem> {
         let mut result = Vec::new();
@@ -943,7 +958,7 @@ impl QueryProperties {
                     result.push(new_group);
                 }
                 FilterItem::Item(itm) => {
-                    if itm.member_name() != member_name {
+                    if &itm.member_id() != member_name {
                         result.push(FilterItem::Item(itm.clone()));
                     }
                 }
@@ -953,13 +968,13 @@ impl QueryProperties {
         result
     }
 
-    pub fn has_filters_for_member(&self, member_name: &str) -> bool {
+    pub fn has_filters_for_member(&self, member_name: &MemberId) -> bool {
         Self::has_filters_for_member_impl(member_name, &self.time_dimensions_filters)
             || Self::has_filters_for_member_impl(member_name, &self.dimensions_filters)
             || Self::has_filters_for_member_impl(member_name, &self.measures_filters)
     }
 
-    fn has_filters_for_member_impl(member_name: &str, filters: &[FilterItem]) -> bool {
+    fn has_filters_for_member_impl(member_name: &MemberId, filters: &[FilterItem]) -> bool {
         for item in filters.iter() {
             match item {
                 FilterItem::Group(group) => {
@@ -968,7 +983,7 @@ impl QueryProperties {
                     }
                 }
                 FilterItem::Item(itm) => {
-                    if itm.member_name() == member_name {
+                    if &itm.member_id() == member_name {
                         return true;
                     }
                 }
@@ -986,7 +1001,7 @@ impl QueryProperties {
     /// sides `unbounded` drops it entirely.
     pub fn replace_date_range_for_rolling_window_without_granularity(
         &mut self,
-        member_name: &str,
+        member_name: &MemberId,
         trailing: &Option<String>,
         leading: &Option<String>,
         offset: &str,
@@ -999,7 +1014,7 @@ impl QueryProperties {
         if trailing.as_deref() == Some("unbounded") && leading.as_deref() == Some("unbounded") {
             self.time_dimensions_filters.retain(|item| match item {
                 FilterItem::Item(itm) => {
-                    !(itm.member_name() == member_name
+                    !(&itm.member_id() == member_name
                         && matches!(itm.filter_operator(), FilterOperator::InDateRange))
                 }
                 _ => true,
@@ -1027,17 +1042,23 @@ impl QueryProperties {
         Ok(())
     }
 
+    /// Rewrite the `InDateRange` filter on `member_name` into a regular
+    /// rolling-window filter. The filter carries
+    /// `[from, to, trailing, leading]`, followed by the span the base scan
+    /// reads when that is known at plan time.
     pub fn replace_regular_date_range_filter(
         &mut self,
-        member_name: &str,
+        member_name: &MemberId,
         left_interval: Option<String>,
         right_interval: Option<String>,
+        scan_range: Option<SeriesSpan>,
     ) -> Result<(), CubeError> {
         let operator = FilterOperator::RegularRollingWindowDateRange;
-        let values = vec![
+        let mut values = vec![
             FilterValue::from(left_interval),
             FilterValue::from(right_interval),
         ];
+        values.extend(series_span_values(scan_range));
         self.time_dimensions_filters = self.change_date_range_filter_impl(
             member_name,
             &self.time_dimensions_filters,
@@ -1050,13 +1071,18 @@ impl QueryProperties {
         Ok(())
     }
 
+    /// Rewrite the `InDateRange` filter on `member_name` into a `to_date`
+    /// rolling-window filter. The filter carries `[from, to, granularity]`,
+    /// followed by the span the window reads when that is known at plan time.
     pub fn replace_to_date_date_range_filter(
         &mut self,
-        member_name: &str,
+        member_name: &MemberId,
         granularity: &String,
+        window_range: Option<SeriesSpan>,
     ) -> Result<(), CubeError> {
         let operator = FilterOperator::ToDateRollingWindowDateRange;
-        let values = vec![FilterValue::Str(granularity.clone())];
+        let mut values = vec![FilterValue::Str(granularity.clone())];
+        values.extend(series_span_values(window_range));
         self.time_dimensions_filters = self.change_date_range_filter_impl(
             member_name,
             &self.time_dimensions_filters,
@@ -1071,7 +1097,7 @@ impl QueryProperties {
 
     pub fn replace_range_in_date_filter(
         &mut self,
-        member_name: &str,
+        member_name: &MemberId,
         new_from: String,
         new_to: String,
     ) -> Result<(), CubeError> {
@@ -1093,7 +1119,7 @@ impl QueryProperties {
     /// but forces the rewritten filter to use raw (unparametrized) values.
     pub fn replace_range_to_subquery_in_date_filter(
         &mut self,
-        member_name: &str,
+        member_name: &MemberId,
         new_from: String,
         new_to: String,
     ) -> Result<(), CubeError> {
@@ -1113,7 +1139,7 @@ impl QueryProperties {
 
     fn change_date_range_filter_impl(
         &self,
-        member_name: &str,
+        member_name: &MemberId,
         filters: &[FilterItem],
         operator: &FilterOperator,
         use_raw_values: Option<bool>,
@@ -1138,7 +1164,7 @@ impl QueryProperties {
                     result.push(new_group);
                 }
                 FilterItem::Item(itm) => {
-                    let itm = if itm.member_name() == member_name
+                    let itm = if &itm.member_id() == member_name
                         && matches!(itm.filter_operator(), FilterOperator::InDateRange)
                     {
                         let mut values = if let Some(values) = replacement_values {
@@ -1227,6 +1253,10 @@ impl PartialEq for QueryProperties {
             pre_aggregations_match_only,
             use_original_sql_pre_aggregations_in_pre_aggregation,
             total_query,
+            // A server-side safety budget, not something the query asks for: two requests that
+            // differ only in it render the same SQL, or one of them is refused outright.
+            max_multi_stage_depth: _,
+            max_multi_stage_stages: _,
             allow_multi_stage,
             disable_external_pre_aggregations,
             pre_aggregation_id,
@@ -1273,5 +1303,20 @@ impl PartialEq for QueryProperties {
                         && a.join_type == b.join_type
                         && a.on_sql.struct_eq(&b.on_sql)
                 })
+    }
+}
+
+/// Tail a rolling-window filter carries its scan span in: the lower bound, the
+/// two upper bounds one per series shape, and whether the granularity is a
+/// predefined one. Empty where the span is not derivable while planning.
+fn series_span_values(span: Option<SeriesSpan>) -> Vec<FilterValue> {
+    match span {
+        Some(span) => vec![
+            FilterValue::Str(span.from),
+            FilterValue::Str(span.to_aligned),
+            FilterValue::Str(span.to_stepped),
+            FilterValue::Bool(span.predefined_granularity),
+        ],
+        None => vec![],
     }
 }

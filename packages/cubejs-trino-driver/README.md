@@ -1,4 +1,4 @@
-<p align="center"><a href="https://cube.dev"><img src="https://i.imgur.com/zYHXm4o.png" alt="Cube.js" width="300px"></a></p>
+<p align="center"><a href="https://cube.dev"><img src="https://i.imgur.com/zYHXm4o.png" alt="Cube" width="300px"></a></p>
 
 [Website](https://cube.dev) • [Docs](https://docs.cube.dev) • [Blog](https://cube.dev/blog) • [Slack](https://slack.cube.dev) • [Twitter](https://twitter.com/the_cube_dev)
 
@@ -11,4 +11,4 @@
 
 ### License
 
-Cube.js Trino Driver is [Apache 2.0 licensed](./LICENSE).
+Cube Trino Driver is [Apache 2.0 licensed](./LICENSE).

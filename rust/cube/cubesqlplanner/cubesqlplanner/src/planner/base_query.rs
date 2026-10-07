@@ -59,6 +59,7 @@ impl<IT: InnerTypes> BaseQuery<IT> {
                 .unwrap_or(false),
             options.static_data().masked_members.clone(),
             options.static_data().member_to_alias.clone(),
+            options.static_data().max_member_resolution_depth,
         )?;
 
         let request = QueryPropertiesCompiler::new(query_tools.clone()).build(options)?;

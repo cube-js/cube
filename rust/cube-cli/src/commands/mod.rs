@@ -11,6 +11,7 @@ pub mod deploy;
 pub mod deployments;
 pub mod embed;
 pub mod environments;
+pub mod evals;
 pub mod folders;
 pub mod github;
 pub mod groups;

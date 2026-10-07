@@ -86,15 +86,6 @@
           "CUBEJS_DB_EXPORT_GCS_CREDENTIALS": "${DRIVERS_TESTS_CUBEJS_DB_EXPORT_GCS_CREDENTIALS}"
         }
       }
-    },
-    "encrypted-pk": {
-      "cube": {
-        "environment": {
-          "CUBEJS_DB_SNOWFLAKE_AUTHENTICATOR": "SNOWFLAKE_JWT",
-          "CUBEJS_DB_SNOWFLAKE_PRIVATE_KEY": "${DRIVERS_TESTS_CUBEJS_DB_SNOWFLAKE_PRIVATE_KEY}",
-          "CUBEJS_DB_SNOWFLAKE_PRIVATE_KEY_PASS": "${DRIVERS_TESTS_CUBEJS_DB_SNOWFLAKE_PRIVATE_KEY_PASS}"
-        }
-      }
     }
   },
   "cube": {
@@ -105,7 +96,9 @@
 
       "CUBEJS_DB_TYPE": "snowflake",
       "CUBEJS_DB_USER": "${DRIVERS_TESTS_CUBEJS_DB_SNOWFLAKE_USER}",
-      "CUBEJS_DB_PASS": "${DRIVERS_TESTS_CUBEJS_DB_SNOWFLAKE_PASS}",
+      "CUBEJS_DB_SNOWFLAKE_AUTHENTICATOR": "SNOWFLAKE_JWT",
+      "CUBEJS_DB_SNOWFLAKE_PRIVATE_KEY": "${DRIVERS_TESTS_CUBEJS_DB_SNOWFLAKE_PRIVATE_KEY}",
+      "CUBEJS_DB_SNOWFLAKE_PRIVATE_KEY_PASS": "${DRIVERS_TESTS_CUBEJS_DB_SNOWFLAKE_PRIVATE_KEY_PASS}",
       "CUBEJS_DB_NAME": "DEMO_DB",
       "CUBEJS_PRE_AGGREGATIONS_SCHEMA": "drivers_tests_preaggs",
 
@@ -274,10 +267,16 @@
     "---------------------------------------",
     "Requires Tesseract.                    ",
     "---------------------------------------",
+    "    A custom granularity origin on a single-unit interval only reaches the grouping under Tesseract.",
+    "querying custom granularities ECommerce: count by fiscal_year_by_1st_april + no dimension",
+    "querying custom granularities ECommerce: count by fiscal_year_by_15th_april + no dimension",
+    "querying custom granularities ECommerce: count by monthly_from_15th + no dimension",
     "querying BigECommerce: rolling window by 2 day without date range",
     "querying BigECommerce: rolling window by 2 month without date range",
     "querying BigECommerce: rolling window YTD without date range",
     "querying BigECommerce with Retail Calendar: totalCountRetailYearAgo",
+    "querying BigECommerce with Retail Calendar: prior year and month by week (no pre-aggregation)",
+    "querying BigECommerce with Retail Calendar: prior year and month by week (pre-aggregation in CubeStore)",
     "querying BigECommerce with Retail Calendar: totalCountRetailMonthAgo",
     "querying BigECommerce with Retail Calendar: totalCountRetailWeekAgo",
     "querying BigECommerce: multi-stage group by time dimension",
@@ -286,7 +285,11 @@
     "querying SwitchSourceTest: filter by switch dimensions",
     "querying BigECommerce: SeveralMultiStageMeasures",
     "querying BigECommerce: two multi-stage branches sharing one pre-aggregation",
-    "querying BigECommerce: base measure plus multi-stage over non-partitioned pre-aggregation"
+    "querying BigECommerce: base measure plus multi-stage over non-partitioned pre-aggregation",
+    "---- Time-shifted measure rolled up from a rollup: native planner, Postgres and BigQuery only ----",
+    "querying RetailOrders: named prior month by category for one day (pre-aggregation in CubeStore)",
+    "querying RetailOrders: named prior month by category over two months (pre-aggregation in CubeStore)",
+    "SQL API: named prior month by category for one day"
   ],
   "tesseractSkip": [
     "for the Customers.RollingExternal",
@@ -317,17 +320,19 @@
     "SQL API: Extended nested Rollup over asterisk",
     "SQL API: SQL push down push to cube quoted alias",
 
-
-
-    "querying BigECommerce: rolling window by 2 day without date range",
-    "querying BigECommerce: rolling window by 2 month without date range",
-    "querying BigECommerce: rolling window YTD without date range",
     "querying custom granularities (with preaggregation) ECommerce: totalQuantity by half_year + no dimension",
 
     "---- Different results comparing to baseQuery version. Need to investigate ----",
     "querying BigECommerce: rolling window YTD (month + week)",
     "querying BigECommerce: rolling window YTD (month + week + no gran)",
     "querying BigECommerce: rolling window YTD without granularity",
-    "querying BigECommerce: two multi-stage branches sharing one pre-aggregation"
+    "querying BigECommerce: two multi-stage branches sharing one pre-aggregation",
+    "---- Calendar-shifted measure stored in a rollup: covered on Postgres only for now ----",
+    "querying BigECommerce with Retail Calendar: prior year and month by week (no pre-aggregation)",
+    "querying BigECommerce with Retail Calendar: prior year and month by week (pre-aggregation in CubeStore)",
+    "---- Time-shifted measure rolled up from a rollup: native planner, Postgres and BigQuery only ----",
+    "querying RetailOrders: named prior month by category for one day (pre-aggregation in CubeStore)",
+    "querying RetailOrders: named prior month by category over two months (pre-aggregation in CubeStore)",
+    "SQL API: named prior month by category for one day"
   ]
 }

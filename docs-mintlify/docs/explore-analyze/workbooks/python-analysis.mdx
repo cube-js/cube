@@ -1,6 +1,6 @@
 ---
 title: Python analysis
-description: Attach a Python script to a report to run forecasting, regression, cohort, and other analysis that SQL can't express, and save the result as a re-runnable report.
+description: Attach a Python script to a workbook report or exploration to run forecasting, regression, cohort, and other analysis that SQL can't express.
 ---
 
 <Warning>
@@ -11,10 +11,10 @@ team](/admin/account-billing/support) to activate this feature for your account.
 
 </Warning>
 
-A report can carry an attached **Python script** that transforms the report's SQL
-result. The report's chart then renders the script's **output** instead of the raw
-SQL rows. This turns an analysis that would otherwise scroll away in a chat
-transcript into a saved, re-runnable, shareable report.
+A workbook report or exploration can carry an attached **Python script** that
+transforms its SQL result. Its chart then renders the script's **output** instead
+of the raw SQL rows. This turns an analysis that would otherwise scroll away in a
+chat transcript into a saved, re-runnable, shareable analysis.
 
 Use it for work SQL can't express — forecasting, regression, cohort analysis,
 statistical tests, clustering, and anomaly detection.
@@ -23,7 +23,7 @@ statistical tests, clustering, and anomaly detection.
   <img src="https://static.cube.dev/docs/explore-analyze/workbooks/python-analysis/code-panel-forecast.png" alt="A workbook report with the Python code panel open, showing a Prophet forecast script above a chart plotting actual monthly orders alongside the forecast and its confidence interval" />
 </Frame>
 
-## Adding Python to a report
+## Adding Python to a workbook report or exploration
 
 ### From Analytics Chat
 
@@ -43,7 +43,7 @@ The agent reaches for Python **only** when the answer genuinely needs a statisti
 or machine-learning library. Ordinary aggregations, top-N, ratios, running totals,
 period-over-period comparisons, and time series all stay in SQL, because a Python
 run costs a re-query plus a sandbox start. If you expected Python and got a plain
-SQL report, that is usually correct behavior.
+SQL query, that is usually correct behavior.
 
 </Info>
 
@@ -55,16 +55,16 @@ Click **Python** in the toolbar to open the Python panel, then **Add script** to
 attach one. Cube seeds a starter script and opens it on the **Script** tab.
 Opening the panel does not attach anything by itself — only **Add script** does.
 
-**Remove**, in the panel header, detaches the script, after which the report
-behaves like any SQL-backed one again.
+**Remove**, in the panel header, detaches the script, after which the analysis is
+SQL-backed again.
 
-Attaching Python clears any existing SQL result: a python-backed report renders its
-last Python run, and a freshly attached script has none until you press **Run**.
+Attaching Python clears any existing SQL result: a Python-backed analysis renders
+its last Python run, and a freshly attached script has none until you press **Run**.
 
 Attaching Python in Explore is only available on a **saved** exploration. On an
 unsaved one the **Python** button is disabled with the tooltip *"Save the
 exploration to add Python"* — **Run** executes server-persisted code, so the
-analysis needs a saved report to live on.
+analysis needs a saved exploration to live on.
 
 ## Writing the script
 
@@ -95,7 +95,7 @@ These packages are pre-installed, along with their dependencies:
 | `prophet` | Time series forecasting with seasonality and holidays |
 | `matplotlib`, `seaborn`, `plotly` | Plotting |
 
-Figures are not a supported output. The report's chart is built from `output.json`, and
+Figures are not a supported output. The chart is built from `output.json`, and
 anything a script writes to disk is discarded with the sandbox — so the plotting
 libraries are importable, but a saved figure has nowhere to go.
 
@@ -112,7 +112,7 @@ adding packages to the environment is coming.
 The panel's **Script** tab is editable in place, with line numbers. **Reset**
 restores the starter template.
 
-- **Edits do not run anything.** They save with the report, and the rendered result
+- **Edits do not run anything.** They save with the analysis, and the rendered result
   keeps showing the previous run.
 - When the code or its input SQL has changed since the last run, the result is
   marked **Outdated**, with the tooltip *"The Python code or its input SQL changed
@@ -122,22 +122,23 @@ restores the starter template.
 - The **Output** tab shows what the last run printed — the script's stdout and
   stderr, so `print()` is how you inspect intermediate values. Both are captured up
   to the cap in [Limits](#limits), so a chatty script gets truncated.
-- The **input SQL panel is read-only** on a python report: that SQL is the
+- The **input SQL panel is read-only** on a Python-backed analysis: that SQL is the
   sandbox's input, not what gets charted. It still offers the **Semantic SQL** and
   **Generated SQL** tabs, both derived from that input query.
 - **A failed run keeps the previous chart.** The error surfaces alongside the last
   successful result, which stays rendered.
 
-**Run is the only way the saved result changes.** Opening the report, reloading the
-page, or viewing a dashboard never re-runs anything on its own.
+**Run is the only way the saved result changes.** Opening the workbook report or
+exploration, reloading the page, or viewing a dashboard never re-runs anything on
+its own.
 
 {/* TODO: screenshot — the code panel showing the Outdated tag */}
 
 ## On dashboards
 
-Python reports render their **saved output** on dashboards. Nothing re-runs on
-dashboard load, so a dashboard full of Python reports costs no compute to open —
-each widget shows whatever the last **Run** produced.
+Python-backed workbook reports render their **saved output** on dashboards.
+Nothing re-runs on dashboard load, so a dashboard full of Python reports costs
+no compute to open — each widget shows whatever the last **Run** produced.
 
 A python widget can be opened in [Explore](/docs/explore-analyze/explore) from a
 dashboard and run from there.
@@ -147,8 +148,8 @@ dashboard and run from there.
 <Warning>
 
 Python runs with the **security context of the person who pressed Run** — or of the
-chat user who saved the analysis. The result is then persisted on the report, and
-**anyone who can view the workbook can see it**.
+chat user who saved the analysis. The result is then persisted with the workbook
+report or exploration, and **anyone who can view that item can see the result**.
 
 Row-level security is applied at **run time**, not at view time. A user with broad
 access can Run, and the stored output is then readable by people whose own access
@@ -156,8 +157,8 @@ is narrower.
 
 </Warning>
 
-Take this into account when deciding who can run and publish Python reports, the
-same way you would for any other saved result shared through a workbook.
+Take this into account when deciding who can run Python analyses or publish Python
+reports, the same way you would for any other shared saved result.
 
 ## Limits
 
@@ -170,9 +171,9 @@ same way you would for any other saved result shared through a workbook.
 | stdout/stderr captured | 16 KB |
 
 Exceeding the output caps means the analysis still returns in chat but **cannot be
-saved to a report**. Aggregate or summarize inside the script so the output stays
-within the caps — analysis results such as forecasts, cohorts, and test statistics
-are small by nature.
+saved to a workbook report or exploration**. Aggregate or summarize inside the
+script so the output stays within the caps — analysis results such as forecasts,
+cohorts, and test statistics are small by nature.
 
 ## Learn more
 

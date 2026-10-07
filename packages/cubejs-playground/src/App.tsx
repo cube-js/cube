@@ -1,5 +1,4 @@
 /* eslint-disable no-undef,react/jsx-no-target-blank */
-import '@ant-design/compatible/assets/index.css';
 import { Alert, Layout } from 'antd';
 import { Component, PropsWithChildren, useEffect } from 'react';
 import { RouteComponentProps, withRouter } from 'react-router-dom';
@@ -44,12 +43,16 @@ class App extends Component<PropsWithChildren<RouteComponentProps>, AppState> {
     return { fatalError: error };
   }
 
-  state: AppState = {
-    fatalError: null,
-    context: null,
-    showLoader: false,
-    isAppContextSet: false,
-  };
+  constructor(props: PropsWithChildren<RouteComponentProps>) {
+    super(props);
+
+    this.state = {
+      fatalError: null,
+      context: null,
+      showLoader: false,
+      isAppContextSet: false,
+    };
+  }
 
   async componentDidMount() {
     setTimeout(() => this.setState({ showLoader: true }), 700);

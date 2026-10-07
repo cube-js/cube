@@ -228,6 +228,16 @@ cubes:
         time_shift:
           - name: one_year_common_interval
 
+      # Two interval shifts, one nested under the other. The calendar declares
+      # 1 month and 1 year separately but nothing for their sum.
+      - name: count_shifted_m_then_y
+        type: number
+        multi_stage: true
+        sql: "{count_shifted_calendar_m}"
+        time_shift:
+          - interval: 1 year
+            type: prior
+
       - name: count_week_to_date
         type: count
         rolling_window:

@@ -426,6 +426,19 @@ pub trait ConfigObj: DIService {
     /// leaving the row-count split as the only trigger.
     fn wal_split_size_threshold_bytes(&self) -> Option<u64>;
 
+    /// Maximum number of logical plans built at the same time: `auto` by default, which is
+    /// `max(4, 2 x cores)`. `0` disables the limit.
+    fn max_concurrent_query_plans(&self) -> usize;
+
+    /// Maximum number of queries waiting for a planning slot. Over that, a query is rejected
+    /// instead of queued. `0` disables the limit.
+    fn max_queued_query_plans(&self) -> usize;
+
+    /// Nesting a query plan may reach: plan nodes, expression nodes and the roots of subqueries
+    /// carried in expressions all count, because the protobuf encoding nests them the same way.
+    /// Decoding recurses per level, so this bounds the stack a plan costs to move between nodes.
+    fn max_query_plan_depth(&self) -> usize;
+
     fn select_worker_pool_size(&self) -> usize;
 
     fn select_worker_idle_timeout(&self) -> u64;
@@ -601,6 +614,11 @@ pub trait ConfigObj: DIService {
     /// the subtree's schema and the partition count the router sees the same either way.
     fn group_by_limit_per_partition(&self) -> bool;
 
+    /// Push the query's `LIMIT` into the workers for `GROUP BY ... ORDER BY ... LIMIT`. Off makes
+    /// every worker emit all of its groups and leaves the cut to the router. Node-local and not in
+    /// [`PlanningFlags`]: the worker receives the router's plan, descriptor included.
+    fn limit_pushdown(&self) -> bool;
+
     /// Replace the sort-preserving merge feeding a grouped Linear (hash) aggregate with a plain
     /// partition coalesce (the hash aggregate ignores input order, so the per-row merge is wasted).
     fn coalesce_under_hash_aggregate(&self) -> bool;
@@ -709,6 +727,9 @@ pub struct ConfigObjImpl {
     pub data_dir: PathBuf,
     pub dump_dir: Option<PathBuf>,
     pub store_provider: FileStoreProvider,
+    pub max_concurrent_query_plans: usize,
+    pub max_queued_query_plans: usize,
+    pub max_query_plan_depth: usize,
     pub select_worker_pool_size: usize,
     pub select_worker_idle_timeout: u64,
     pub job_runners_count: usize,
@@ -775,6 +796,7 @@ pub struct ConfigObjImpl {
     pub repartition_check_overlapping_children: bool,
     pub group_by_limit_factor: usize,
     pub group_by_limit_per_partition: bool,
+    pub limit_pushdown: bool,
     pub coalesce_under_hash_aggregate: bool,
     pub topk_aggregate_strategy: TopKAggregateStrategy,
     pub allow_decimal128: bool,
@@ -887,6 +909,18 @@ impl ConfigObj for ConfigObjImpl {
 
     fn wal_split_size_threshold_bytes(&self) -> Option<u64> {
         self.wal_split_size_threshold_bytes
+    }
+
+    fn max_concurrent_query_plans(&self) -> usize {
+        self.max_concurrent_query_plans
+    }
+
+    fn max_queued_query_plans(&self) -> usize {
+        self.max_queued_query_plans
+    }
+
+    fn max_query_plan_depth(&self) -> usize {
+        self.max_query_plan_depth
     }
 
     fn select_worker_pool_size(&self) -> usize {
@@ -1132,6 +1166,10 @@ impl ConfigObj for ConfigObjImpl {
         self.group_by_limit_per_partition
     }
 
+    fn limit_pushdown(&self) -> bool {
+        self.limit_pushdown
+    }
+
     fn coalesce_under_hash_aggregate(&self) -> bool {
         self.coalesce_under_hash_aggregate
     }
@@ -1369,6 +1407,43 @@ fn env_topk_strategy(name: &str) -> TopKAggregateStrategy {
     }
 }
 
+/// The oversubscription is deliberate: planning also waits on the metastore, and undershooting
+/// costs throughput several times over while overshooting only costs memory.
+fn auto_max_concurrent_query_plans() -> usize {
+    let cores = std::thread::available_parallelism()
+        .map(|c| c.get())
+        .unwrap_or(4);
+    std::cmp::max(4, 2 * cores)
+}
+
+/// `auto` (the default) sizes the limit by the cores available to the process, an explicit number
+/// overrides it and `0` turns the throttling off.
+fn max_concurrent_query_plans_from_env() -> usize {
+    const NAME: &str = "CUBESTORE_MAX_CONCURRENT_QUERY_PLANS";
+    let value = match env::var(NAME) {
+        Ok(value) => value,
+        Err(_) => return auto_max_concurrent_query_plans(),
+    };
+    let value = value.trim();
+    if value.eq_ignore_ascii_case("auto") {
+        return auto_max_concurrent_query_plans();
+    }
+    value.parse().unwrap_or_else(|e: std::num::ParseIntError| {
+        log::warn!(
+            "Ignoring environment variable '{}' with '{}' value: {}; using auto",
+            NAME,
+            value,
+            e
+        );
+        auto_max_concurrent_query_plans()
+    })
+}
+
+/// Chosen against the smaller of the two stacks a plan is decoded on, the select worker's
+/// (`CUBESTORE_SELECT_WORKER_STACK_SIZE`), with room to spare. Raising one without the other
+/// trades a reportable error for the stack overflow the budget exists to prevent.
+pub const DEFAULT_MAX_QUERY_PLAN_DEPTH: usize = 150;
+
 fn env_bool(name: &str, default: bool) -> bool {
     env::var(name)
         .ok()
@@ -1417,15 +1492,34 @@ where
     env_optparse(name).unwrap_or(default)
 }
 
+/// Lenient read for a budget that has to be at least one. `0` reads as "no limit" to most
+/// operators but would be the tightest possible setting, so it is rejected like a malformed
+/// value: warn and keep the default rather than enforce something nobody asked for.
+pub fn env_parse_positive_lenient(name: &str, default: usize) -> usize {
+    match env_parse_lenient(name, default) {
+        0 => {
+            log::warn!(
+                "Ignoring environment variable '{}' with '0' value: it must be at least 1; \
+                 using default {}",
+                name,
+                default
+            );
+            default
+        }
+        value => value,
+    }
+}
+
 /// Lenient numeric env read for opt-in performance toggles: an unparseable value logs a warning and
 /// falls back to the default instead of panicking, so a typo can't take a node down on startup.
+/// Surrounding whitespace is ignored, which a value coming from YAML easily carries.
 pub fn env_parse_lenient<T>(name: &str, default: T) -> T
 where
     T: FromStr,
     T::Err: Display,
 {
     match env::var(name) {
-        Ok(v) => match v.parse::<T>() {
+        Ok(v) => match v.trim().parse::<T>() {
             Ok(n) => n,
             Err(e) => {
                 log::warn!(
@@ -1757,6 +1851,12 @@ impl Config {
                         FileStoreProvider::Filesystem { remote_dir: None }
                     }
                 },
+                max_concurrent_query_plans: max_concurrent_query_plans_from_env(),
+                max_query_plan_depth: env_parse_positive_lenient(
+                    "CUBESTORE_MAX_QUERY_PLAN_DEPTH",
+                    DEFAULT_MAX_QUERY_PLAN_DEPTH,
+                ),
+                max_queued_query_plans: env_parse_lenient("CUBESTORE_MAX_QUEUED_QUERY_PLANS", 5000),
                 select_worker_pool_size: env_parse("CUBESTORE_SELECT_WORKERS", 4),
                 select_worker_idle_timeout: env_parse_duration(
                     "CUBESTORE_SELECT_WORKERS_IDLE_TIMEOUT",
@@ -1946,6 +2046,7 @@ impl Config {
                 ),
                 group_by_limit_factor: env_parse_lenient("CUBESTORE_GROUP_BY_LIMIT_FACTOR", 2),
                 group_by_limit_per_partition: env_flag("CUBESTORE_GROUP_BY_LIMIT_PER_PARTITION", true),
+                limit_pushdown: env_flag("CUBESTORE_LIMIT_PUSHDOWN", true),
                 coalesce_under_hash_aggregate: env_flag("CUBESTORE_COALESCE_UNDER_HASH_AGGREGATE", false),
                 topk_aggregate_strategy: env_topk_strategy("CUBESTORE_TOPK_STRATEGY"),
                 allow_decimal128: env_bool("CUBESTORE_ALLOW_DECIMAL128", false),
@@ -2146,6 +2247,9 @@ impl Config {
                 store_provider: FileStoreProvider::Filesystem {
                     remote_dir: Some(Self::test_remote_dir_path(directory, name)),
                 },
+                max_concurrent_query_plans: 8,
+                max_query_plan_depth: DEFAULT_MAX_QUERY_PLAN_DEPTH,
+                max_queued_query_plans: 5000,
                 select_worker_pool_size: 0,
                 select_worker_idle_timeout: 600,
                 job_runners_count: 4,
@@ -2211,6 +2315,7 @@ impl Config {
                 repartition_check_overlapping_children: false,
                 group_by_limit_factor: 2,
                 group_by_limit_per_partition: true,
+                limit_pushdown: true,
                 coalesce_under_hash_aggregate: false,
                 topk_aggregate_strategy: TopKAggregateStrategy::FullMerge,
                 allow_decimal128: false,

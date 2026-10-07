@@ -1,4 +1,4 @@
-use super::ParamsAllocator;
+use super::{CubeId, ParamsAllocator};
 use crate::cube_bridge::base_query_options::{FilterValue, MaskedMemberItem};
 use crate::cube_bridge::base_tools::BaseTools;
 use crate::cube_bridge::evaluator::CubeEvaluator;
@@ -11,7 +11,6 @@ use crate::planner::join_hints::JoinHints;
 use crate::planner::sql_templates::PlanSqlTemplates;
 use chrono_tz::Tz;
 use cubenativeutils::CubeError;
-use itertools::Itertools;
 use std::cell::RefCell;
 use std::collections::{HashMap, HashSet};
 use std::rc::Rc;
@@ -151,15 +150,35 @@ impl QueryTools {
         let join = self
             .base_tools
             .join_tree_for_hints(hints.items().to_vec())?;
-        let join_key = JoinKey {
+        Ok((Self::join_key(&join)?, join))
+    }
+
+    /// Like `join_for_hints`, but `None` when the join graph has no path
+    /// covering `hints`.
+    pub fn try_join_for_hints(
+        &self,
+        hints: &JoinHints,
+    ) -> Result<Option<(JoinKey, Rc<dyn JoinDefinition>)>, CubeError> {
+        let Some(join) = self
+            .base_tools
+            .try_join_tree_for_hints(hints.items().to_vec())?
+            .into_iter()
+            .next()
+        else {
+            return Ok(None);
+        };
+        Ok(Some((Self::join_key(&join)?, join)))
+    }
+
+    fn join_key(join: &Rc<dyn JoinDefinition>) -> Result<JoinKey, CubeError> {
+        Ok(JoinKey {
             root: join.static_data().root.to_string(),
             joins: join
                 .joins()?
                 .iter()
                 .map(|i| i.static_data().clone())
                 .collect(),
-        };
-        Ok((join_key, join))
+        })
     }
 
     pub fn alias_name(&self, name: &str) -> String {
@@ -174,24 +193,14 @@ impl QueryTools {
         }
     }
 
-    pub fn parse_member_path(&self, name: &str) -> Result<(String, String), CubeError> {
-        let path = name.split('.').collect_vec();
-        if path.len() == 2 {
-            Ok((path[0].to_string(), path[1].to_string()))
-        } else {
-            Err(CubeError::internal(format!(
-                "Invalid member name: '{}'",
-                name
-            )))
-        }
-    }
-
-    pub fn alias_for_cube(&self, cube_name: &String) -> Result<String, CubeError> {
-        let cube_definition = self.cube_evaluator().cube_from_path(cube_name.clone())?;
+    pub fn alias_for_cube(&self, cube_id: &CubeId) -> Result<String, CubeError> {
+        let cube_definition = self
+            .cube_evaluator()
+            .cube_from_path(cube_id.target().to_string())?;
         let res = if let Some(sql_alias) = &cube_definition.static_data().sql_alias {
             sql_alias.clone()
         } else {
-            cube_name.clone()
+            cube_id.to_string()
         };
         Ok(res)
     }

@@ -83,8 +83,8 @@ The pre-aggregation system includes:
 ### Unit Tests (`test/unit/`)
 - `QueryCache.test.ts`: Query caching functionality
 - `QueryQueue.test.ts`: Queue management and processing
-- `QueryOrchestrator.test.js`: Main orchestrator logic
-- `PreAggregations.test.js`: Pre-aggregation management
+- `QueryOrchestrator.test.ts`: Main orchestrator logic
+- `PreAggregations.test.ts`: Pre-aggregation management
 
 ### Integration Tests (`test/integration/`)
 - `cubestore/`: CubeStore-specific integration tests
@@ -125,7 +125,7 @@ Key configuration options in `QueryOrchestratorOptions`:
 ## Development Notes
 
 - Uses TypeScript with relaxed strict settings (`tsconfig.json`)
-- Inherits linting rules from `@cubejs-backend/linter`
+- Linted by the repo-root `oxlint` run; rules come from `@cubejs-backend/linter`
 - Jest configuration extends base repository config
 - Docker Compose setup for integration testing
 - Coverage reports generated in `coverage/` directory

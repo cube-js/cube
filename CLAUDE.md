@@ -29,8 +29,11 @@ yarn tsc:watch
 # Clean build artifacts
 yarn clean
 
-# Run linting across all packages
+# Run linting (oxlint over the whole repo) plus the package.json linter
 yarn lint
+
+# oxlint only
+yarn lint:js
 
 # Fix linting issues
 yarn lint:fix
@@ -51,9 +54,8 @@ yarn test
 
 ### Documentation Development
 
-**IMPORTANT: `/docs-mintlify` is the active documentation site. `/docs` is the legacy
-docs site and is deprecated — do NOT add or edit content there.** When asked to write or
-update documentation, work in `/docs-mintlify` unless the user explicitly says otherwise.
+Documentation lives in `/docs-mintlify`. When asked to write or update documentation,
+work there unless the user explicitly says otherwise.
 
 ```bash
 cd docs-mintlify
@@ -79,8 +81,7 @@ yarn dev    # Start the Mintlify dev server
   - Database drivers: `cubejs-postgres-driver`, `cubejs-bigquery-driver`, etc.
   - API layer: `cubejs-api-gateway`
 - **`/rust`**: Rust components including CubeSQL (SQL interface) and CubeStore (distributed storage)
-- **`/docs-mintlify`**: Mintlify documentation site — **the active docs site** (author docs here)
-- **`/docs`**: Legacy Next.js/Nextra documentation site — **deprecated**, do not edit
+- **`/docs-mintlify`**: Mintlify documentation site
 - **`/examples`**: Example implementations and recipes
 
 ### Key Components
@@ -102,6 +103,10 @@ yarn dev    # Start the Mintlify dev server
 - Most packages have Jest-based unit tests in `/test` directories
 - TypeScript packages use `jest.config.js` with TypeScript compilation
 - Snapshot testing for SQL compilation and query planning
+- To call a `protected` method from a test, subclass the class in the test file and widen the
+  method to `public` (`class TestFoo extends Foo { public bar() { return super.bar(); } }`)
+  instead of casting the instance to `any`. Casts hide signature changes from the compiler;
+  the subclass keeps the call type-checked. `private` members cannot be widened this way.
 
 ### Integration Tests
 - Driver-specific integration tests in `/packages/cubejs-testing-drivers`
@@ -126,15 +131,34 @@ yarn test
 3. **Testing**: Run relevant tests for modified packages
 4. **Linting**: Ensure code passes `yarn lint` before committing
 
+## Rust
+
+Every `unsafe` block and `unsafe impl` needs a short `// SAFETY:` comment saying why it is sound
+(not what the code does). Every `unsafe fn` documents its caller contract in `/// # Safety`.
+
 ## Git
 
 Use conventional commits with these prefixes:
-- `feat:` — new features
-- `fix:` — bug fixes
+- `feat:` — new user-facing features
+- `fix:` — bug fixes users can observe
 - `docs:` — documentation changes
-- `refactor:` — code refactoring
+- `refactor:` — refactoring of shipped code (refactors of tests, CI or tooling are `chore:`)
+- `perf:` — performance improvements
+- `chore:` — internal changes: tests, CI, build/tooling, dependency bumps
+
+`feat:` and `fix:` exist to surface a change to users in the changelog. If users can't notice the
+change (a test fix, a CI tweak, a refactor of test helpers), use `chore:` even when it "fixes"
+something — e.g. `chore(query-orchestrator): Revive QueryOrchestrator.test`, not `fix(...)`.
+The same rule applies to PR titles, since the squash commit takes the PR title.
 
 Include scope in parentheses when applicable, e.g., `fix(tesseract):` or `feat(databricks-jdbc-driver):`.
+
+Start the subject after the prefix with a capital letter: `feat(tesseract): Support rolling windows`,
+not `feat(tesseract): support rolling windows`. This applies to PR titles too.
+
+PRs are squash-merged. When merging one, use the `merge-pr` skill: always pass `--body` (but not
+`--subject`) to `gh pr merge`, otherwise the raw PR description (template checklist included)
+becomes the squash commit body.
 
 ## Common File Patterns
 
@@ -147,8 +171,7 @@ Include scope in parentheses when applicable, e.g., `fix(tesseract):` or `feat(d
 
 ## Important Notes
 
-- Documentation lives in `/docs-mintlify` (active, Mintlify). `/docs` is the legacy docs
-  site and is deprecated — do not add or edit content there. See `docs-mintlify/CLAUDE.md`.
+- Documentation lives in `/docs-mintlify` (Mintlify). See `docs-mintlify/CLAUDE.md`.
 - The main Cube application development happens in `/packages`
 - For data model changes, focus on `cubejs-schema-compiler` package
 - For query execution changes, focus on `cubejs-query-orchestrator` package

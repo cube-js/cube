@@ -5,6 +5,7 @@ import {
   BaseQuery,
   ParamAllocator
 } from '@cubejs-backend/schema-compiler';
+import { splitSqlInterval } from '@cubejs-backend/shared';
 
 const GRANULARITY_TO_INTERVAL: Record<string, string> = {
   second: 's',
@@ -92,17 +93,24 @@ export class QuestQuery extends BaseQuery {
   }
 
   public subtractInterval(date: string, interval: string): string {
-    const [number, type] = this.parseInterval(interval);
-    const { unit, factor } = INTERVAL_TO_QUEST_DATE_UNIT[type];
-
-    return `dateadd('${unit}', ${-number * factor}, ${date})`;
+    return this.applyInterval(-1, date, interval);
   }
 
   public addInterval(date: string, interval: string): string {
-    const [number, type] = this.parseInterval(interval);
-    const { unit, factor } = INTERVAL_TO_QUEST_DATE_UNIT[type];
+    return this.applyInterval(1, date, interval);
+  }
 
-    return `dateadd('${unit}', ${number * factor}, ${date})`;
+  /**
+   * A dateadd() call carries a single period unit, so a compound interval becomes one call per
+   * unit, coarsest first.
+   */
+  private applyInterval(sign: 1 | -1, date: string, interval: string): string {
+    return splitSqlInterval(interval).reduce((acc, part) => {
+      const [number, type] = this.parseInterval(part);
+      const { unit, factor } = INTERVAL_TO_QUEST_DATE_UNIT[type];
+
+      return `dateadd('${unit}', ${sign * number * factor}, ${acc})`;
+    }, date);
   }
 
   public unixTimestampSql(): string {

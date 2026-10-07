@@ -5,7 +5,7 @@ use crate::physical_plan::sql_nodes::{SqlNode, SqlNodesFactory};
 use crate::physical_plan::{SqlEvaluatorVisitor, VisitorContext};
 use crate::planner::query_tools::QueryTools;
 use crate::planner::sql_templates::PlanSqlTemplates;
-use crate::planner::{CubeNameSymbol, CubeTableSymbol};
+use crate::planner::{CubeId, CubeNameSymbol, CubeTableSymbol};
 use crate::utils::sql_expression_scanner::analyze_template_arg_contexts;
 use cubenativeutils::CubeError;
 use itertools::Itertools;
@@ -36,14 +36,14 @@ pub enum CubeRef {
 }
 
 impl CubeRef {
-    pub fn cube_name(&self) -> &String {
+    pub fn cube_id(&self) -> &CubeId {
         match self {
-            CubeRef::Name(symbol) => symbol.cube_name(),
-            CubeRef::Table(symbol) => symbol.cube_name(),
+            CubeRef::Name(symbol) => symbol.cube_id(),
+            CubeRef::Table(symbol) => symbol.cube_id(),
         }
     }
 
-    pub fn path(&self) -> &Vec<String> {
+    pub fn path(&self) -> &Vec<CubeId> {
         match self {
             CubeRef::Name(symbol) => symbol.path(),
             CubeRef::Table(symbol) => symbol.path(),
@@ -147,6 +147,10 @@ impl SqlCallArg {
 #[derive(Debug, Clone)]
 pub struct SqlCallFilterParamsItem {
     pub filter_symbol_name: String,
+    /// The time shift this binding addresses. Only a stage where that shift is
+    /// active renders it; `None` binds the member as the query filters it,
+    /// which a calendar mapping cannot restate over the source column.
+    pub time_shift_name: Option<String>,
     pub column: FilterParamsColumn,
     /// The column callback compiled into a call of its own, when the
     /// data model gave one. Its placeholders index its own
@@ -521,17 +525,19 @@ impl SqlCall {
                     .map(|itm| &itm.filter_symbol_name)
                     .collect_vec();
                 if let Some(subtree) = filter_item.find_subtree_for_members(&symbols) {
-                    let mut filter_params_columns = HashMap::new();
+                    let mut filter_params_columns: HashMap<String, Vec<_>> = HashMap::new();
                     for itm in items {
                         filter_params_columns
-                            .insert(itm.filter_symbol_name.clone(), (*itm).clone());
+                            .entry(itm.filter_symbol_name.clone())
+                            .or_default()
+                            .push((*itm).clone());
                     }
 
                     let context = VisitorContext::new_for_filter_params(
                         query_tools.clone(),
                         &SqlNodesFactory::new(),
                         filter_params_columns,
-                        visitor.time_shifts().clone(),
+                        visitor.filter_params_time_shifts().clone(),
                     );
                     return crate::physical_plan::filter::render_filter_item(
                         &context, &subtree, templates,
@@ -634,7 +640,11 @@ impl SqlCall {
         let captures = INTERPOLATED_REFERENCE_RE.captures(element)?;
         let index = captures.get(1)?.as_str().parse::<usize>().ok()?;
         let cube_ref = self.deps.get(index)?.as_cube_ref()?.as_name()?;
-        let mut path = cube_ref.path().clone();
+        let mut path = cube_ref
+            .path()
+            .iter()
+            .map(|cube| cube.to_string())
+            .collect::<Vec<_>>();
         path.extend(
             captures
                 .get(2)?
@@ -672,7 +682,7 @@ impl SqlCall {
             .iter()
             .map(|dep| match dep {
                 SqlDependency::Symbol(symbol) => symbol.full_name(),
-                SqlDependency::CubeRef(cube_ref) => cube_ref.cube_name().clone(),
+                SqlDependency::CubeRef(cube_ref) => cube_ref.cube_id().to_string(),
             })
             .collect_vec();
         Self::substitute_template(element, &deps, &[], &[], &[], &[])
@@ -723,7 +733,7 @@ impl SqlCall {
                 .all(|(a, b)| match (a, b) {
                     (SqlDependency::Symbol(x), SqlDependency::Symbol(y)) => x == y,
                     (SqlDependency::CubeRef(x), SqlDependency::CubeRef(y)) => {
-                        x.cube_name() == y.cube_name() && x.path() == y.path()
+                        x.cube_id() == y.cube_id() && x.path() == y.path()
                     }
                     _ => false,
                 })
@@ -794,9 +804,9 @@ impl crate::utils::debug::DebugSql for SqlCall {
                 }
                 SqlDependency::CubeRef(cr) => {
                     if expand_deps {
-                        cr.cube_name().clone()
+                        cr.cube_id().to_string()
                     } else {
-                        format!("{{{}}}", cr.cube_name())
+                        format!("{{{}}}", cr.cube_id())
                     }
                 }
             })
@@ -869,8 +879,8 @@ mod tests {
 
     fn cube_name_dep(cube_name: &str, path: &[&str]) -> SqlDependency {
         SqlDependency::CubeRef(CubeRef::Name(CubeNameSymbol::new(
-            cube_name.to_string(),
-            path.iter().map(|p| p.to_string()).collect(),
+            CubeId::cube(cube_name),
+            path.iter().map(|p| CubeId::cube(*p)).collect(),
         )))
     }
 
@@ -1011,7 +1021,7 @@ mod tests {
             .query_tools()
             .compiler()
             .borrow_mut()
-            .add_cube_table_evaluator("orders".to_string(), vec![])
+            .add_cube_table_evaluator(CubeId::cube("orders"), vec![])
             .unwrap();
         let sql_call = single(
             "{arg:0}.created_at",

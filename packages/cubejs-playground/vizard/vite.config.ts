@@ -12,7 +12,7 @@ export default defineConfig({
       output: {
         manualChunks: {
           react: ['react', 'react-dom'],
-          other: ['react-router-dom', 'styled-components'],
+          other: ['styled-components'],
           icons: ['@ant-design/icons'],
           clients: ['@cubejs-client/core', '@cubejs-client/react'],
           uikit: ['@cube-dev/ui-kit'],

@@ -1,11 +1,11 @@
-import type { ClientConfiguration } from 'aws-sdk/clients/rdsdataservice';
+import type { RDSDataClientConfig } from '@aws-sdk/client-rds-data';
 
 declare module '@cubejs-backend/mysql-aurora-serverless-driver' {
   export interface ConnectionOptions {
     secretArn?: string,
     resourceArn?: string,
     database?: string,
-    options?: ClientConfiguration
+    options?: RDSDataClientConfig
   }
 
   export default class AuroraServerlessMySqlDriver {

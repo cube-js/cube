@@ -16,6 +16,7 @@ module.exports = {
     '^uuid$': require.resolve('uuid'),
     '^yaml$': require.resolve('yaml'),
     '^antlr4$': require.resolve('antlr4'),
+    '^(\\.{1,2}/.*)\\.js$': '$1',
   },
   setupFiles: ['../../jest.setup.js'],
   snapshotFormat: {

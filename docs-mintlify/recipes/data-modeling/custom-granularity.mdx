@@ -10,7 +10,8 @@ different from [default granularities][ref-default-granularities] such as `week`
 (starting on Monday) or `year` (starting on January 1).
 
 Below, we explore the following examples of custom granularities:
-* *Week starting on Sunday*, commonly used in the US and some other countries.
+* *Week starting on Sunday*, commonly used in the US and some other countries. A
+*fiscal week* that starts on any other day is defined the same way.
 * *[Fiscal year][wiki-fiscal-year]* and *fiscal quarter*, commonly used in
 accounting and financial reporting.
 
@@ -18,6 +19,14 @@ accounting and financial reporting.
 
 Consider the following data model. `interval` and `offset` parameters are used to
 configure each custom granularity in `granularities`.
+
+`interval` is the only way to define a granularity under a name of your own, and it
+places the granularity in the `day` → `week` → `month` → `quarter` → `year` hierarchy,
+so Cube derives it arithmetically and rolls it up with the units around it. In exchange,
+the period has to be a fixed length. A period that varies in length, such as a month of
+a 4-5-4 retail calendar, is read from a pre-calculated column instead — see [overriding
+granularities][ref-calendar-cubes] and the [custom calendar
+recipe][ref-recipe-custom-calendar].
 
 Note that each custom granularity is also exposed via a [proxy
 dimension][ref-proxy-granularity]. This is not just a convenience: while the
@@ -171,3 +180,5 @@ Querying this data modal would yield the following result:
 [ref-rest-api]: /reference/core-data-apis/rest-api
 [ref-graphql-api]: /reference/core-data-apis/graphql-api
 [ref-proxy-granularity]: /docs/data-modeling/dimensions#time-dimension-granularity-references
+[ref-calendar-cubes]: /docs/data-modeling/concepts/calendar-cubes#overriding-granularities
+[ref-recipe-custom-calendar]: /recipes/data-modeling/custom-calendar
