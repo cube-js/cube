@@ -5,12 +5,9 @@ use cubenativeutils::CubeError;
 use std::collections::HashSet;
 use std::rc::Rc;
 
-/// Decides whether the masks of the members a query reads can be rendered
-/// over a pre-aggregation. A stored column holds the raw value, so a masked
-/// member is masked on top of it, and its mask may read only what the
-/// pre-aggregation stores: a mask over a source column, or over a member the
-/// pre-aggregation can't provide, has nothing to read there. A stored column
-/// computed from a masked member holds a raw-derived value no mask covers.
+/// Rejects a pre-aggregation whose stored columns can't carry the query's masks:
+/// a mask (or mask filter) reading a source column or an unstored member, or a
+/// stored column computed from a masked member (its value is raw-derived).
 pub struct MaskMatcher<'a> {
     query_tools: Rc<QueryTools>,
     pre_aggregation: &'a CompiledPreAggregation,

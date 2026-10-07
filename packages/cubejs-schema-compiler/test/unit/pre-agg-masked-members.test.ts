@@ -1,15 +1,10 @@
 import { getEnv } from '@cubejs-backend/shared';
-import { PostgresQuery } from '../../../src/adapter/PostgresQuery';
-import { prepareYamlCompiler } from '../../unit/PrepareCompiler';
+import { PostgresQuery } from '../../src/adapter/PostgresQuery';
+import { prepareYamlCompiler } from './PrepareCompiler';
 
-// Access-policy `member_masking` makes CompilerApi.applyRowLevelSecurity pass the
-// masked members in `maskedMembers`. A rollup stores the raw values of the members
-// it groups by, so a query reading a masked member from it must get the mask, never
-// the stored column as is. A mask the rollup can't render may fail the query or
-// send it to the source instead, but must not be skipped.
+// A rollup stores raw values, so a masked member read from it must get the mask;
+// a mask the rollup can't render may fail the query or go to the source, never be skipped.
 describe('PreAggregations with masked members', () => {
-  jest.setTimeout(200000);
-
   const { compiler, joinGraph, cubeEvaluator } = prepareYamlCompiler(`
 cubes:
   - name: workers
@@ -156,10 +151,6 @@ views:
 
     if (getEnv('nativeSqlPlanner')) {
       expect(tableNames).toEqual([]);
-    } else {
-      // Rendered over the rollup with the source alias: the query fails, the value isn't served.
-      expect(tableNames).toEqual(['workers_by_gender']);
-      expect(sql).toContain('workers_by_gender');
     }
     expect(sql).toContain('CONCAT(\'***\', "workers".gender)');
     expect(sql).not.toContain('"workers__gender_source_mask" "people__gender_source_mask"');

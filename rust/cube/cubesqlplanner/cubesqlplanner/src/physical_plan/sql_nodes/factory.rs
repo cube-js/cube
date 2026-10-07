@@ -207,8 +207,8 @@ impl SqlNodesFactory {
 
         let default_processor: Rc<dyn SqlNode> =
             if !self.pre_aggregation_dimensions_references.is_empty() {
-                // Reading from a pre-aggregation: members are plain column refs,
-                // so a segment is already a stored column — no wrapping.
+                // Reading from a pre-aggregation: a segment is already a stored
+                // column, so it needs no SegmentDimensionSqlNode, only the mask.
                 self.pre_aggregation_dimension_columns(
                     evaluate_sql_processor.clone(),
                     skip_masking,

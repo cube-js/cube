@@ -1,11 +1,5 @@
-//! Masked members and pre-aggregations.
-//!
-//! A rollup stores a member's raw value, so a masked member read from it must
-//! be masked on top of the stored column. A mask that reads something the
-//! rollup doesn't store can't be rendered there, and a stored column computed
-//! from a masked member holds a raw-derived value no mask covers, so such a
-//! rollup must not be used at all: the query goes to the source, where the
-//! mask renders as usual.
+//! Masked members and pre-aggregations: a masked member read from a rollup is
+//! masked over the stored column, or the rollup is skipped when it can't be.
 
 use crate::logical_plan::PreAggregationUsage;
 use crate::test_fixtures::cube_bridge::MockSchema;
