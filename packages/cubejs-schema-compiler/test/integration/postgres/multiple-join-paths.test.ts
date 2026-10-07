@@ -4,7 +4,14 @@ import { prepareJsCompiler } from '../../unit/PrepareCompiler';
 import { DataSchemaCompiler } from '../../../src/compiler/DataSchemaCompiler';
 import { JoinGraph } from '../../../src/compiler/JoinGraph';
 import { CubeEvaluator } from '../../../src/compiler/CubeEvaluator';
+import { UserError } from '../../../src/compiler/UserError';
 import { testWithPreAggregation } from './pre-aggregation-utils';
+
+class TestPostgresQuery extends PostgresQuery {
+  public enrichedJoinHintsFromJoinTree(joinTree, joinHints) {
+    return super.enrichedJoinHintsFromJoinTree(joinTree, joinHints);
+  }
+}
 
 describe('Multiple join paths', () => {
   jest.setTimeout(200000);
@@ -15,7 +22,7 @@ describe('Multiple join paths', () => {
 
   beforeAll(async () => {
     // All joins would look like this
-    // A-->B-->C-->X
+    // A-->B<->C-->X
     // |           ^
     // ├-->D-->E---┤
     // |           |
@@ -25,6 +32,7 @@ describe('Multiple join paths', () => {
     // All join conditions would be essentially `TRUE` for ADEX joins and `FALSE` for everything else
     // But they would use different syntax, to be able to test SQL generation
     // Also, there should be only one way to cover cubes A and D with joins: A->D join
+    // C->B is a back edge: it adds no new route out of A, but lets a hint lead back into B
 
     // TODO in this model queries like [A.a_id, X.x_id] become ambiguous, probably we want to handle this better
 
@@ -164,6 +172,10 @@ describe('Multiple join paths', () => {
         sql: 'SELECT 1 AS c_id, 100 AS c_value',
 
         joins: {
+          B: {
+            relationship: 'many_to_one',
+            sql: "'C' = 'B'",
+          },
           X: {
             relationship: 'many_to_one',
             sql: "'C' = 'X'",
@@ -681,6 +693,49 @@ describe('Multiple join paths', () => {
       expect(sql).not.toMatch(/ON 'C' = 'X'/);
       expect(sql).not.toMatch(/ON 'A' = 'F'/);
       expect(sql).not.toMatch(/ON 'F' = 'X'/);
+    });
+
+    // A reaches C only through B, so B is an intermediate cube of the A->C path. The C->B hint
+    // used to add a second edge into B, and enrichedJoinHintsFromJoinTree then walked
+    // B -> C -> B ... until `Array.push` threw `RangeError: Invalid array length`
+    it('should join a cube once when a hint leads back into an intermediate cube', async () => {
+      expect(joinGraph.buildJoin(['A', 'C', ['C', 'B']])?.joins.map(j => `${j.from}->${j.to}`))
+        .toEqual(['A->B', 'B->C']);
+
+      const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+        measures: [],
+        dimensions: [
+          'A.a_id',
+          'C.c_id',
+        ],
+        joinHints: [
+          ['C', 'B'],
+        ],
+      });
+
+      const [sql, _params] = query.buildSqlAndParams();
+
+      expect(sql).toMatch(/ON 'A' = 'B'/);
+      expect(sql).toMatch(/ON 'B' = 'C'/);
+      expect(sql).not.toMatch(/ON 'C' = 'B'/);
+    });
+
+    it('should reject a cyclic join tree', async () => {
+      const query = new TestPostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+        measures: [],
+        dimensions: ['A.a_id'],
+      });
+
+      const joinTree = {
+        root: 'A',
+        joins: [
+          { from: 'A', to: 'B' },
+          { from: 'B', to: 'C' },
+          { from: 'C', to: 'B' },
+        ],
+      };
+
+      expect(() => query.enrichedJoinHintsFromJoinTree(joinTree, ['C'])).toThrow(UserError);
     });
   });
 });
