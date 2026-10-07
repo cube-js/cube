@@ -610,7 +610,7 @@ async function streamChat(body) {
     if (msg.id === "__cutoff__" && msg.state?.chatId) body.chatId = msg.state.chatId;
     if (msg.id === "__suspended__") suspended = msg;
     // ...handle other messages. A resumed response replays the thread first,
-    // so dedupe by `id` before rendering
+    // so upsert by `id` (don't append) before rendering
   }
   return suspended;
 }
