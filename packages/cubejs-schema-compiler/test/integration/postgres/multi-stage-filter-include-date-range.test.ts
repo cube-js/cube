@@ -189,6 +189,11 @@ ${rollup ? `    pre_aggregations:
         .rejects.toThrow("Can't parse date '2 weeks ago'");
     });
 
+    it('a relative value next to an absolute one is an error', async () => {
+      await expect(evaluate(['visitors_fi.amount_r3_on'], { range: '[last month, "2017-01-07"]' }))
+        .rejects.toThrow("Can't parse date 'last month'");
+    });
+
     it('a query date range on the same dimension still bounds the result', async () => {
       // Jan 1 - 5 of the month to Jan 7.
       expect(await evaluate(['visitors_fi.amount_mtd_on'], {

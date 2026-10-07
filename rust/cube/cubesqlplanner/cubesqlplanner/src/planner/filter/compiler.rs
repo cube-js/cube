@@ -203,33 +203,36 @@ impl<'a> FilterCompiler<'a> {
         operator: &FilterOperator,
         values: &Option<Vec<FilterValue>>,
     ) -> Result<Option<Vec<FilterValue>>, CubeError> {
-        let Some([FilterValue::Str(value)]) =
-            values.as_deref().filter(|_| self.resolve_relative_dates)
+        let Some(items) = values
+            .as_deref()
+            .filter(|_| self.resolve_relative_dates && is_date_operator(operator))
         else {
             return Ok(values.clone());
         };
-        let bounds = if is_date_operator(operator) {
-            resolve_relative_date_range(value, self.query_tools.timezone())?
-        } else {
-            None
-        };
-        let Some((start, end)) = bounds else {
-            if is_date_operator(operator)
-                && QueryDateTimeHelper::parse_native_date_time(value).is_err()
+        if let [FilterValue::Str(value)] = items {
+            if let Some((start, end)) =
+                resolve_relative_date_range(value, self.query_tools.timezone())?
             {
-                return Err(CubeError::user(format!(
-                    "Can't parse date '{}'. Use an absolute date or one of: this / last / next <unit>, last / next <n> <units>, today, yesterday, tomorrow",
-                    value
-                )));
+                let resolved = match operator {
+                    FilterOperator::BeforeDate | FilterOperator::AfterOrOnDate => vec![start],
+                    FilterOperator::BeforeOrOnDate | FilterOperator::AfterDate => vec![end],
+                    _ => vec![start, end],
+                };
+                return Ok(Some(resolved.into_iter().map(FilterValue::Str).collect()));
             }
-            return Ok(values.clone());
-        };
-        let resolved = match operator {
-            FilterOperator::BeforeDate | FilterOperator::AfterOrOnDate => vec![start],
-            FilterOperator::BeforeOrOnDate | FilterOperator::AfterDate => vec![end],
-            _ => vec![start, end],
-        };
-        Ok(Some(resolved.into_iter().map(FilterValue::Str).collect()))
+        }
+        // Anything else has to be an absolute date, or it reaches the database as text.
+        for item in items {
+            if let FilterValue::Str(value) = item {
+                if QueryDateTimeHelper::parse_native_date_time(value).is_err() {
+                    return Err(CubeError::user(format!(
+                        "Can't parse date '{}'. Use an absolute date or one of: this / last / next <unit>, last / next <n> <units>, today, yesterday, tomorrow",
+                        value
+                    )));
+                }
+            }
+        }
+        Ok(values.clone())
     }
 
     // Resolved once per member: classifying a filter and compiling it both
