@@ -223,30 +223,31 @@ export class PreAggregations {
   }
 
   /**
-   * Widens the partitions loaded for the only usage to the dates it reads. A
-   * rolling window or time shift reads past the requested date range, and the
-   * partitions of the requested range alone would cut those months off.
+   * Widens the partitions loaded for the only usage to the dates it reads,
+   * which a rolling window or time shift takes past the requested range.
    */
   private coverSingleUsage(desc: FullPreAggregationDescription): FullPreAggregationDescription {
-    const usage = this.singleUsageInfo;
-    if (!usage || !desc.matchedTimeDimensionDateRange) {
+    if (!this.singleUsageInfo || !desc.matchedTimeDimensionDateRange) {
       return desc;
     }
-    if (usage.unbounded) {
-      return { ...desc, matchedTimeDimensionDateRange: undefined };
-    }
-    if (!usage.dateRange) {
-      return desc;
-    }
-    const [from, to] = desc.matchedTimeDimensionDateRange;
-    const [usageFrom, usageTo] = usage.dateRange;
     return {
       ...desc,
-      matchedTimeDimensionDateRange: [
-        usageFrom < from ? usageFrom : from,
-        usageTo > to ? usageTo : to,
-      ],
+      matchedTimeDimensionDateRange: PreAggregations.widenToUsage(desc.matchedTimeDimensionDateRange, this.singleUsageInfo),
     };
+  }
+
+  /**
+   * `range` widened to cover what `usage` reads; `undefined` when the usage has no bound.
+   */
+  private static widenToUsage(range: [string, string], usage: UsageDateRangeInfo | undefined): [string, string] | undefined {
+    if (!usage || !usage.dateRange) {
+      return usage?.unbounded ? undefined : range;
+    }
+    const [usageFrom, usageTo] = usage.dateRange;
+    return [
+      usageFrom < range[0] ? usageFrom : range[0],
+      usageTo > range[1] ? usageTo : range[1],
+    ];
   }
 
   private static mergeUsageDateRanges(usages: Record<string, UsageDateRangeInfo>): [string, string] | null {
@@ -421,7 +422,7 @@ export class PreAggregations {
     );
 
     if (usageInfos.length === 0) {
-      return matchedDateRange;
+      return PreAggregations.widenToUsage(matchedDateRange, this.singleUsageInfo);
     }
 
     let merged: [string, string] | undefined;

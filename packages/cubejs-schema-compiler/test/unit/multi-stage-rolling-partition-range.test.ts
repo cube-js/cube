@@ -1,16 +1,8 @@
 import { PostgresQuery } from '../../src/adapter/PostgresQuery';
 import { prepareYamlCompiler } from './PrepareCompiler';
 
-// A partitioned rollup stores only the base monthly sum. Rolling and
-// time-shifted measures built on top of it reach back before the queried
-// date range, so the partitions loaded for the query must cover those
-// earlier months too, not only the months inside the requested range.
-//
-// A rolling measure with its own SQL is detected as cumulative and leaves
-// the partition range open. The same window written as a multi-stage measure
-// that references the base measure is matched at its leaf, whose filter
-// carries the widened band; that band has to reach the partition range, or
-// the rolling sum silently degrades to the requested month alone.
+// A multi-stage rolling or shifted measure over the base measure is matched at
+// its leaf; the partitions loaded must cover the band that leaf reads.
 describe('Multi-stage rolling measures over a partitioned rollup', () => {
   const model = `
 cubes:
@@ -53,6 +45,13 @@ cubes:
           type: to_date
           granularity: year
 
+      - name: amount_running_total_ms
+        multi_stage: true
+        type: sum
+        sql: "{amount}"
+        rolling_window:
+          trailing: unbounded
+
       - name: amount_prev_month_ms
         multi_stage: true
         type: number
@@ -73,12 +72,12 @@ cubes:
 `;
 
   // The query asks for June 2024 only, at month granularity.
-  const partitionRangeFor = async (measure: string) => {
+  const descriptionFor = async (measures: string[]) => {
     const { compiler, joinGraph, cubeEvaluator } = prepareYamlCompiler(model);
     await compiler.compile();
 
     const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
-      measures: [measure],
+      measures,
       dimensions: ['orders.status'],
       timeDimensions: [{
         dimension: 'orders.created_at',
@@ -93,35 +92,39 @@ cubes:
     query.buildSqlAndParams();
     const descriptions: any[] = query.preAggregations?.preAggregationsDescription() || [];
     const monthly = descriptions.filter(d => d.preAggregationId === 'orders.monthly');
-    expect(monthly.length).toBeGreaterThan(0);
+    expect(monthly.length).toEqual(1);
 
-    return monthly.map(d => d.matchedTimeDimensionDateRange);
+    return monthly[0];
   };
 
-  // Partitions must reach back to `from`: an undefined range means
-  // "not bounded", which covers it as well.
-  const expectPartitionsFrom = (ranges: ([string, string] | undefined)[], from: string) => {
-    ranges.forEach(range => {
-      if (range) {
-        // Reports the range start itself when it begins after `from`.
-        expect(range[0] <= from ? from : range[0]).toEqual(from);
-      }
-    });
-  };
+  const partitionRangeFor = async (measures: string[]) => (await descriptionFor(measures)).matchedTimeDimensionDateRange;
 
-  it('a rolling measure with its own sql loads the whole window', async () => {
-    expectPartitionsFrom(await partitionRangeFor('orders.amount_r3'), '2024-04-01T00:00:00.000');
+  it('a rolling measure with its own sql is not bounded', async () => {
+    expect(await partitionRangeFor(['orders.amount_r3'])).toBeUndefined();
   });
 
-  it('a multi-stage rolling measure over the base measure loads the whole window', async () => {
-    expectPartitionsFrom(await partitionRangeFor('orders.amount_r3_ms'), '2024-04-01T00:00:00.000');
+  it('a multi-stage rolling measure loads the whole window', async () => {
+    expect(await partitionRangeFor(['orders.amount_r3_ms']))
+      .toEqual(['2024-03-01T00:00:00.000', '2024-07-29T23:59:59.999']);
   });
 
-  it('a multi-stage to_date measure over the base measure loads the period from its start', async () => {
-    expectPartitionsFrom(await partitionRangeFor('orders.amount_ytd_ms'), '2024-01-01T00:00:00.000');
+  it('a multi-stage to_date measure loads the period from its start', async () => {
+    expect(await partitionRangeFor(['orders.amount_ytd_ms']))
+      .toEqual(['2024-01-01T00:00:00.000', '2024-07-29T23:59:59.999']);
   });
 
-  it('a multi-stage time-shifted measure over the base measure loads the shifted period', async () => {
-    expectPartitionsFrom(await partitionRangeFor('orders.amount_prev_month_ms'), '2024-05-01T00:00:00.000');
+  it('a multi-stage time-shifted measure loads the shifted period', async () => {
+    expect(await partitionRangeFor(['orders.amount_prev_month_ms']))
+      .toEqual(['2024-05-01T00:00:00.000', '2024-06-30T23:59:59.999']);
+  });
+
+  it('an unbounded multi-stage rolling measure is not bounded', async () => {
+    expect(await partitionRangeFor(['orders.amount_running_total_ms'])).toBeUndefined();
+  });
+
+  it('an unbounded usage lifts the bound of the usages it is grouped with', async () => {
+    const description = await descriptionFor(['orders.amount_running_total_ms', 'orders.amount_prev_month_ms']);
+    expect(Object.keys(description.usageMapping)).toHaveLength(2);
+    expect(description.matchedTimeDimensionDateRange).toBeUndefined();
   });
 });

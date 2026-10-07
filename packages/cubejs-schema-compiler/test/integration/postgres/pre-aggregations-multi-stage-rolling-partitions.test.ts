@@ -3,11 +3,9 @@ import { PostgresQuery } from '../../../src/adapter/PostgresQuery';
 import { prepareJsCompiler } from '../../unit/PrepareCompiler';
 import { dbRunner } from './PostgresDBRunner';
 
-// A day-partitioned rollup stores only the base daily sum. Multi-stage
-// rolling, to_date and time-shifted measures over that sum read days before
-// the requested one, so the partitions loaded for the query must include
-// those days. Daily amounts in `visitors`: Jan 3 = 100, Jan 5 = 200,
-// Jan 6 = 300, Jan 7 = 900.
+// Multi-stage measures over a day-partitioned rollup of the base sum read days
+// before the requested one. Daily amounts in `visitors`: Jan 3 = 100,
+// Jan 5 = 200, Jan 6 = 300, Jan 7 = 900.
 describe('PreAggregations multi-stage rolling measures over partitions', () => {
   jest.setTimeout(200000);
 

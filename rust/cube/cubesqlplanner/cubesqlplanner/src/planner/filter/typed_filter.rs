@@ -62,29 +62,29 @@ pub enum RollingScanBand {
 }
 
 impl FilterOp {
-    /// The band a rolling-window filter's base scan reads, wider than the
-    /// period the query reports by the window's frame. `None` for any filter
-    /// that is not a rolling window.
-    ///
-    /// A series' upper bound depends on the shape the dialect renders it in;
-    /// the later of the two ends covers either.
-    pub fn rolling_scan_band(&self, tz: Tz) -> Result<Option<RollingScanBand>, CubeError> {
-        let span_band = |span: &Option<SeriesSpan>| match span {
-            Some(span) => RollingScanBand::Bounded(
-                span.from.clone(),
-                std::cmp::max(&span.to_aligned, &span.to_stepped).clone(),
-            ),
-            None => RollingScanBand::Unbounded,
+    /// The band a rolling-window filter's base scan reads, or `None` for any
+    /// other filter. `span_end` picks a series' upper bound, which depends on
+    /// the shape the dialect renders the series in.
+    pub fn rolling_scan_band(
+        &self,
+        tz: Tz,
+        span_end: impl Fn(&SeriesSpan) -> Result<String, CubeError>,
+    ) -> Result<Option<RollingScanBand>, CubeError> {
+        let span_band = |span: &Option<SeriesSpan>| -> Result<RollingScanBand, CubeError> {
+            Ok(match span {
+                Some(span) => RollingScanBand::Bounded(span.from.clone(), span_end(span)?),
+                None => RollingScanBand::Unbounded,
+            })
         };
         let is_unbounded =
             |interval: &Option<String>| interval.as_deref() == Some(UNBOUNDED_INTERVAL);
         let band = match self {
-            FilterOp::ToDateRollingWindow(op) => span_band(&op.window_range),
+            FilterOp::ToDateRollingWindow(op) => span_band(&op.window_range)?,
             FilterOp::RegularRollingWindow(op) => {
                 if is_unbounded(&op.trailing) || is_unbounded(&op.leading) {
                     RollingScanBand::Unbounded
                 } else {
-                    span_band(&op.scan_range)
+                    span_band(&op.scan_range)?
                 }
             }
             FilterOp::RollingWindowOffset(op) => match op.band(tz)? {

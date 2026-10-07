@@ -3,13 +3,12 @@ use super::ToSql;
 use crate::cube_bridge::member_sql::FilterParamsColumn;
 use crate::physical_plan::sql_nodes::SqlNode;
 use crate::physical_plan::SqlEvaluatorVisitor;
-use crate::planner::filter::operators::rolling_window::RegularRollingWindowOp;
-use crate::planner::filter::operators::to_date_rolling_window::ToDateRollingWindowOp;
-use crate::planner::filter::typed_filter::{resolve_base_symbol, FilterOp, TypedFilter};
+use crate::planner::filter::typed_filter::{
+    resolve_base_symbol, FilterOp, RollingScanBand, TypedFilter,
+};
 use crate::planner::query_tools::QueryTools;
 use crate::planner::sql_call::SqlCallFilterParamsItem;
 use crate::planner::sql_templates::PlanSqlTemplates;
-use crate::planner::time_dimension::{SeriesSpan, UNBOUNDED_INTERVAL};
 use crate::planner::FiltersContext;
 use crate::planner::SqlInterval;
 use chrono_tz::Tz;
@@ -233,40 +232,14 @@ impl TypedFilter {
         ctx: &FilterSqlContext,
         tz: Tz,
     ) -> Result<Option<(String, String)>, CubeError> {
-        let span_band = |span: &Option<SeriesSpan>| match span {
-            Some(span) => Ok(Some((
-                span.from.clone(),
-                ctx.series_span_end(span)?.clone(),
-            ))),
-            None => Ok(None),
-        };
-        match self.operation() {
-            FilterOp::ToDateRollingWindow(ToDateRollingWindowOp { window_range, .. }) => {
-                span_band(window_range)
-            }
-            FilterOp::RegularRollingWindow(RegularRollingWindowOp {
-                trailing,
-                leading,
-                scan_range,
-            }) => {
-                // The span already carries the frame, so it is the band. An
-                // unbounded side leaves it unstatable: no date says "no bound".
-                if is_unbounded(trailing) || is_unbounded(leading) {
-                    return Ok(None);
-                }
-                span_band(scan_range)
-            }
-            // Without a granularity the window is anchored by one end of the
-            // date range rather than by a series, and both its bounds are that
-            // anchor shifted by the frame.
-            FilterOp::RollingWindowOffset(op) => op.band(tz),
-            _ => Ok(None),
-        }
+        let band = self
+            .operation()
+            .rolling_scan_band(tz, |span| Ok(ctx.series_span_end(span)?.clone()))?;
+        Ok(match band {
+            Some(RollingScanBand::Bounded(from, to)) => Some((from, to)),
+            _ => None,
+        })
     }
-}
-
-fn is_unbounded(interval: &Option<String>) -> bool {
-    interval.as_deref() == Some(UNBOUNDED_INTERVAL)
 }
 
 fn dispatch_to_sql(op: &FilterOp, ctx: &FilterSqlContext) -> Result<String, CubeError> {

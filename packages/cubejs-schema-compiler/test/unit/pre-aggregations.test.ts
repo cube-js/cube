@@ -349,7 +349,7 @@ describe('pre-aggregations', () => {
         ...overrides,
       });
 
-      const sourceDateRangeFor = async (timeDimensions: any[], usageInfos?: any[]) => {
+      const sourceDateRangeFor = async (timeDimensions: any[], usageInfos?: any[], singleUsage?: any) => {
         const { compiler, cubeEvaluator, joinGraph } = compileEvents();
         await compiler.compile();
 
@@ -367,6 +367,9 @@ describe('pre-aggregations', () => {
         // findPreAggregationForQuery() fills these on the native path, so override afterwards.
         if (usageInfos) {
           preAggregations.preAggregationUsageInfos = usageInfos;
+        }
+        if (singleUsage) {
+          preAggregations.singleUsageInfo = singleUsage;
         }
 
         return preAggregations.lambdaSourceDateRange(lambdaPreAgg, rollupLambda);
@@ -416,6 +419,20 @@ describe('pre-aggregations', () => {
         ]);
 
         expect(range).toBeUndefined();
+      });
+
+      it('widens to the dates a single usage reads', async () => {
+        // A rolling window served by one usage reads days before the request; its source
+        // tail has to cover them as well.
+        const range = await sourceDateRangeFor(requestedRange, undefined, {
+          dateRange: ['2024-01-01T00:00:00.000', '2024-02-29T23:59:59.999'],
+        });
+
+        expect(range).toEqual(['2024-01-01T00:00:00.000', '2024-02-29T23:59:59.999']);
+      });
+
+      it('bounds nothing when a single usage is unbounded', async () => {
+        expect(await sourceDateRangeFor(requestedRange, undefined, { unbounded: true })).toBeUndefined();
       });
 
       it('bounds nothing when one of several usages has an unknown range', async () => {

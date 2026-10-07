@@ -703,10 +703,7 @@ impl PreAggregationOptimizer {
         Ok(true)
     }
 
-    /// The dates a node reads, taken from its time-dimension filters. A
-    /// rolling-window leaf reads a band wider than the period the query
-    /// reports, and the partitions loaded for it have to cover that band, not
-    /// the reported period.
+    /// The dates a node reads, taken from its time-dimension filters.
     fn extract_scan_range(
         filter: &LogicalFilter,
         query_tools: &Rc<State>,
@@ -725,7 +722,11 @@ impl PreAggregationOptimizer {
                     FilterOp::DateRange(date_range_op) => {
                         date_range_op.formatted_date_range(precision).ok()
                     }
-                    op => match op.rolling_scan_band(query_tools.timezone())? {
+                    // The later of a series' two possible ends covers whichever
+                    // shape the dialect renders it in.
+                    op => match op.rolling_scan_band(query_tools.timezone(), |span| {
+                        Ok(std::cmp::max(&span.to_aligned, &span.to_stepped).clone())
+                    })? {
                         Some(RollingScanBand::Bounded(from, to)) => Some((
                             QueryDateTimeHelper::format_from_date(&from, precision)?,
                             QueryDateTimeHelper::format_to_date(&to, precision)?,
