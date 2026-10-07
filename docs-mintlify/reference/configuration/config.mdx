@@ -522,7 +522,9 @@ While the cached connection's lifetime has not elapsed, a configuration with an
 earlier `expiresAt`, or none, does not replace it: a session still on a token
 from before a rotation cannot roll the connection back. A fallback to a service
 account, including one caused by revoking the user's credential, therefore
-takes effect only when the cached lifetime ends.
+takes effect only when the cached lifetime ends. The cached credential is used
+right up to `expiresAt`, so state it with whatever margin new connections need
+before the credential's real expiry.
 
 </Info>
 

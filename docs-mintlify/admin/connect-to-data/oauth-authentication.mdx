@@ -263,18 +263,22 @@ def driver_factory(ctx: dict) -> dict:
     # `expiresAt` covers what a comparison cannot see. A credential whose
     # refresh is failing upstream stops rotating: it resolves to an identical
     # configuration indefinitely while the connection built from it is already
-    # dead. Stating the deadline replaces that connection anyway.
+    # dead. Stating the deadline replaces that connection anyway. It is stated
+    # EXPIRY_SKEW_SECONDS early, when `_access_token` stops handing the token
+    # out, because Cube keeps using a cached token right up to `expiresAt`.
     #
     # Only for the user's own token — the service-account credential below has
     # no deadline of its own, and giving it the user's would rebuild the
     # fallback connection forever.
+    expires_at = _parse_expiry(creds.get("accessTokenExpiresAt"))
+
     return {
         "type": "databricks-jdbc",
         "url": os.environ["CUBEJS_DB_DATABRICKS_URL"],
         "token": access_token or os.environ["CUBEJS_DB_DATABRICKS_TOKEN"],
         **(
-            {"expiresAt": creds.get("accessTokenExpiresAt")}
-            if access_token
+            {"expiresAt": expires_at - EXPIRY_SKEW_SECONDS}
+            if access_token and expires_at is not None
             else {}
         ),
         "acceptPolicy": True,
@@ -303,22 +307,31 @@ def context_to_orchestrator_id(ctx: dict) -> str:
 // gap, rather than one that is merely still valid at this instant.
 const EXPIRY_SKEW_MS = 120 * 1000;
 
+/** The user's credentials for this data source, or an empty object. */
+function credentials(securityContext) {
+  // For other data sources, swap `databricks` for `snowflake`, etc.
+  return securityContext?.cubeCloud?.userCredentials?.databricks ?? {};
+}
+
+/** When the token expires, in epoch milliseconds, or NaN if absent or unreadable. */
+function tokenExpiresAt(creds) {
+  const raw = creds.accessTokenExpiresAt;
+  // Epoch milliseconds if the value is far too large to be seconds. Reading
+  // seconds as milliseconds would land in 1970 and reject every token.
+  return typeof raw === "number"
+    ? (raw > 1e11 ? raw : raw * 1000)
+    : Date.parse(raw ?? "");
+}
+
 /** The user's OAuth token, or undefined to fall back to the service account. */
 function accessToken(securityContext) {
-  // For other data sources, swap `databricks` for `snowflake`, etc.
-  const creds = securityContext?.cubeCloud?.userCredentials?.databricks ?? {};
+  const creds = credentials(securityContext);
 
   if (!creds.accessToken) {
     return undefined;
   }
 
-  const raw = creds.accessTokenExpiresAt;
-  // Epoch milliseconds if the value is far too large to be seconds. Reading
-  // seconds as milliseconds would land in 1970 and reject every token.
-  const expiresAt =
-    typeof raw === "number"
-      ? (raw > 1e11 ? raw : raw * 1000)
-      : Date.parse(raw ?? "");
+  const expiresAt = tokenExpiresAt(creds);
 
   // Gate on the expiry rather than on `status`: a failed background refresh can
   // flag the record while the token already in hand is still valid, and
@@ -342,20 +355,24 @@ module.exports = {
   // `expiresAt` covers what a comparison cannot see. A credential whose refresh
   // is failing upstream stops rotating: it resolves to an identical
   // configuration indefinitely while the connection built from it is already
-  // dead. Stating the deadline replaces that connection anyway.
+  // dead. Stating the deadline replaces that connection anyway. It is stated
+  // EXPIRY_SKEW_MS early, when `accessToken` stops handing the token out,
+  // because Cube keeps using a cached token right up to `expiresAt`.
   //
   // Only for the user's own token — the service-account credential below has no
   // deadline of its own, and giving it the user's would rebuild the fallback
   // connection forever.
   driverFactory: ({ securityContext }) => {
     const token = accessToken(securityContext);
-    const creds = securityContext?.cubeCloud?.userCredentials?.databricks;
+    const expiresAt = tokenExpiresAt(credentials(securityContext));
 
     return {
       type: "databricks-jdbc",
       url: process.env.CUBEJS_DB_DATABRICKS_URL,
       token: token ?? process.env.CUBEJS_DB_DATABRICKS_TOKEN,
-      ...(token ? { expiresAt: creds?.accessTokenExpiresAt } : {}),
+      ...(token && !Number.isNaN(expiresAt)
+        ? { expiresAt: expiresAt - EXPIRY_SKEW_MS }
+        : {}),
       acceptPolicy: true,
       catalog: process.env.CUBEJS_DB_DATABRICKS_CATALOG,
     };
@@ -393,8 +410,8 @@ module.exports = {
 4. **Rotation replaces the connection** — on the next request after a
    rotation, Cube compares what `driver_factory` now resolves against what
    the cached connection was built from. When they differ it builds a
-   replacement and drains the old pool, so in-flight queries finish on the
-   connection they started on.
+   replacement and releases the old connection ten minutes later, so work
+   already running on it can finish.
 
 5. **A stated lifetime replaces it even when nothing changed** — `expiresAt`
    is enforced on its own, so a credential that stops rotating rather than
