@@ -60,39 +60,13 @@ describe('BigQueryDriver.buildQueryLabels', () => {
     });
   });
 
-  test('sanitizes query tag keys and values like cube_request_id', () => {
-    expect(buildQueryLabels({ queryTags: { 'User.Email': 'John.Doe@Example.com', ['k'.repeat(70)]: 'v'.repeat(70) } }))
+  test('encodes query tag values like cube_request_id', () => {
+    // Keys arrive already validated by server core
+    expect(buildQueryLabels({ queryTags: { user_email: 'John.Doe@Example.com', long: 'v'.repeat(70) } }))
       .toEqual({
         user_email: 'john_doe_example_com',
-        ['k'.repeat(63)]: 'v'.repeat(63),
+        long: 'v'.repeat(63),
       });
-  });
-
-  test('drops tag keys BigQuery would reject', () => {
-    expect(buildQueryLabels({ requestId: 'abc', queryTags: { '1st_party': 'a', _tenant: 'b', '-x': 'c', '': 'd', ok: 'e' } }))
-      .toEqual({ ok: 'e', cube_request_id: 'abc' });
-  });
-
-  test('logs the tags it drops with the reason', () => {
-    const logger = jest.fn();
-    const loggingDriver = Object.create(BigQueryDriverOpen.prototype) as BigQueryDriverOpen;
-    loggingDriver.setLogger(logger);
-
-    const validTags = Object.fromEntries(Array.from({ length: 64 }, (_, i) => [`k${i}`, 'v']));
-    loggingDriver.buildQueryLabels({ requestId: 'abc', queryTags: { '1st_party': 'a', ...validTags } });
-
-    expect(logger.mock.calls).toEqual([
-      ['Query Tag Dropped', { key: '1st_party', reason: 'invalid_key', requestId: 'abc' }],
-      ['Query Tag Dropped', { key: 'k63', reason: 'label_limit', requestId: 'abc' }],
-    ]);
-  });
-
-  test('keeps at most 63 tags, so cube_request_id fits into the 64 labels of a job', () => {
-    const queryTags = Object.fromEntries(Array.from({ length: 70 }, (_, i) => [`k${i}`, 'v']));
-    const labels = buildQueryLabels({ requestId: 'abc', queryTags });
-
-    expect(Object.keys(labels || {})).toHaveLength(64);
-    expect(labels?.cube_request_id).toBe('abc');
   });
 
   test('keeps cube_request_id when a query tag uses the same key', () => {

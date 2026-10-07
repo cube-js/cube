@@ -1007,6 +1007,11 @@ request context with the
 [data source][ref-multiple-data-sources] as `dataSource`. If the function throws, Cube
 logs the error and runs the query without tags.
 
+Tag keys must start with a lowercase letter, contain only lowercase letters, digits, `_`,
+and `-`, and be at most 63 characters long. Values are converted to strings, and `null`
+values are skipped. Cube drops tags with invalid keys and tags beyond the first 63, and
+logs them as `Query Tag Dropped`.
+
 <CodeGroup>
 
 ```python title="Python"

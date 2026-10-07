@@ -4,7 +4,8 @@ import { QueryBody } from '@cubejs-backend/query-orchestrator';
 
 import { CubejsServerCore } from '../../src';
 import { OrchestratorApi } from '../../src/core/OrchestratorApi';
-import { QueryTagsFn } from '../../src/core/types';
+import { wrapQueryTagsFn } from '../../src/core/queryTags';
+import { DriverContext, QueryTagsFn } from '../../src/core/types';
 
 describe('OrchestratorApi', () => {
   // https://github.com/cube-js/cube/issues/11313
@@ -44,7 +45,7 @@ describe('OrchestratorApi queryTags', () => {
       contextToExternalDbType: () => 'cubestore',
       queryCacheOptions: { queueOptions: async () => ({ concurrency: 1 }) },
       redisPrefix: randomUUID(),
-      queryTags,
+      queryTags: queryTags && wrapQueryTagsFn(queryTags, logger),
     });
     apis.push(api);
 
@@ -84,17 +85,6 @@ describe('OrchestratorApi queryTags', () => {
       }));
     }
   );
-
-  test('stringifies tag values and drops missing ones', async () => {
-    // A JS or Python hook can return anything the security context holds
-    const { api, driver } = createApi(() => ({ user_id: 42, org: undefined, team: null }));
-
-    await api.executeQuery(userQuery('alice'));
-
-    expect(driver.query).toHaveBeenCalledWith('SELECT 1', [], expect.objectContaining({
-      queryTags: { user_id: '42' },
-    }));
-  });
 
   test('runs the query untagged and logs the error when the hook throws', async () => {
     const { api, driver, logger } = createApi(({ securityContext }) => ({ user_id: securityContext.missing.id }));
@@ -153,12 +143,13 @@ describe('OrchestratorApi queryTags', () => {
     expect(queryTags).not.toHaveBeenCalled();
   });
 
-  test('CubejsServerCore hands the queryTags option to its orchestrator api', async () => {
+  test('CubejsServerCore hands the validated queryTags option to its orchestrator api', async () => {
     const core = new CubejsServerCore(<any>{
       apiSecret: 'secret',
       driverFactory: () => ({ type: 'bigquery' }),
       cacheAndQueueDriver: 'memory',
-      queryTags: tagUser,
+      logger: () => undefined,
+      queryTags: (ctx: DriverContext) => ({ ...tagUser(ctx), '1st_party': 'dropped' }),
     });
 
     try {

@@ -11,12 +11,13 @@ import {
   QueryOrchestratorOptions,
 } from '@cubejs-backend/query-orchestrator';
 
-import { DatabaseType, QueryTagsFn, RequestContext } from './types';
+import { DatabaseType, QueryTagsInternalFn, RequestContext } from './types';
 
 export interface OrchestratorApiOptions extends QueryOrchestratorOptions {
   contextToDbType: (dataSource: string) => Promise<DatabaseType>;
   contextToExternalDbType: () => DatabaseType;
-  queryTags?: QueryTagsFn;
+  /** Wrapped by `wrapQueryTagsFn`, so it never throws and returns only valid tags. */
+  queryTags?: QueryTagsInternalFn;
   redisPrefix?: string;
 }
 
@@ -76,34 +77,12 @@ export class OrchestratorApi {
       return query;
     }
 
-    try {
-      const queryTags = await this.options.queryTags({
-        ...query.context as RequestContext,
-        dataSource: query.dataSource || 'default',
-      });
+    const queryTags = await this.options.queryTags({
+      ...query.context as RequestContext,
+      dataSource: query.dataSource || 'default',
+    });
 
-      if (!queryTags) {
-        return query;
-      }
-
-      // The hook reads an arbitrary security context, so missing and non-string values are settled once here
-      return {
-        ...query,
-        queryTags: Object.fromEntries(
-          Object.entries(queryTags)
-            .filter(([, value]) => value != null)
-            .map(([key, value]) => [key, String(value)])
-        ),
-      };
-    } catch (e) {
-      // Tags only attribute cost, so a failing hook must not keep users from their data
-      this.logger('Query Tags Error', {
-        requestId: query.requestId,
-        error: (e as Error).stack || String(e),
-      });
-
-      return query;
-    }
+    return queryTags ? { ...query, queryTags } : query;
   }
 
   /**

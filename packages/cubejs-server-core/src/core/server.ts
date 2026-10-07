@@ -68,7 +68,9 @@ import type {
   ScheduledRefreshTimeZonesFn,
   ContextToCubeStoreRouterIdFn,
   LoggerFnParams,
+  QueryTagsInternalFn,
 } from './types';
+import { wrapQueryTagsFn } from './queryTags';
 import {
   ContextToOrchestratorIdFn,
   ContextAcceptanceResult,
@@ -167,6 +169,8 @@ export class CubejsServerCore {
 
   protected readonly orchestratorOptions: OrchestratorOptionsFn;
 
+  protected readonly queryTags: QueryTagsInternalFn | undefined;
+
   public logger: LoggerFn;
 
   protected optsHandler: OptsHandler;
@@ -226,6 +230,9 @@ export class CubejsServerCore {
     this.preAggregationsSchema = wrapToFnIfNeeded(this.options.preAggregationsSchema);
     this.orchestratorOptions = wrapToFnIfNeeded(this.options.orchestratorOptions);
     this.scheduledRefreshTimeZones = wrapToFnIfNeeded(this.options.scheduledRefreshTimeZones || []);
+    // `this.logger` is replaced later when the agent or telemetry wrap it
+    this.queryTags = this.options.queryTags
+      && wrapQueryTagsFn(this.options.queryTags, (msg, params) => this.logger(msg, params));
 
     this.compilerCache = new LRUCache<string, CompilerApi>({
       max: this.options.compilerCacheSize || 250,
@@ -769,7 +776,7 @@ export class CubejsServerCore {
         }),
         // speedup with cache
         contextToExternalDbType: () => externalDbType,
-        queryTags: this.options.queryTags,
+        queryTags: this.queryTags,
         redisPrefix: orchestratorId,
         skipExternalCacheAndQueue: externalDbType === 'cubestore',
         cacheAndQueueDriver: this.options.cacheAndQueueDriver,

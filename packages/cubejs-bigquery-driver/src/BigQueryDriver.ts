@@ -429,20 +429,11 @@ export class BigQueryDriver extends BaseDriver implements DriverInterface {
    */
   protected buildQueryLabels(options?: QueryOptions): { [k: string]: string } | undefined {
     const toLabel = (s: string) => s.toLowerCase().replace(/[^a-z0-9_-]/g, '_').slice(0, 63);
-    const labels: { [k: string]: string } = {};
-
-    // Keys BigQuery would still reject are dropped, and one of the 64 labels is left for
-    // `cube_request_id`, so a misconfigured tag can't fail the job
-    for (const [key, value] of Object.entries(options?.queryTags || {})) {
-      const labelKey = toLabel(key);
-      if (!/^[a-z]/.test(labelKey)) {
-        this.logger?.('Query Tag Dropped', { key, reason: 'invalid_key', requestId: options?.requestId });
-      } else if (Object.keys(labels).length >= 63) {
-        this.logger?.('Query Tag Dropped', { key, reason: 'label_limit', requestId: options?.requestId });
-      } else {
-        labels[labelKey] = toLabel(value);
-      }
-    }
+    // Server core already validated the tag keys and capped the tags at 63, so only the values,
+    // which other data sources take as they are, need BigQuery's label encoding
+    const labels: { [k: string]: string } = Object.fromEntries(
+      Object.entries(options?.queryTags || {}).map(([key, value]) => [key, toLabel(value)])
+    );
 
     const requestId = options?.requestId && toLabel(extractRequestUUID(String(options.requestId)));
     if (requestId) {

@@ -139,6 +139,7 @@ export type StreamOptions = {
   /**
    * Key/value pairs from the `queryTags` config option, e.g. the user ID,
    * forwarded so drivers can attach them to the database job/query.
+   * Server core validates them: at most 63 tags, keys match `^[a-z][a-z0-9_-]{0,62}$`.
    */
   queryTags?: Record<string, string>;
 };

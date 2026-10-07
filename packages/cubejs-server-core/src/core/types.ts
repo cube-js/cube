@@ -139,6 +139,9 @@ export type ContextToCubeStoreRouterIdFn = (context: RequestContext) => string |
 export type QueryTagValue = string | number | boolean | null | undefined;
 export type QueryTagsFn = (context: DriverContext) =>
   Record<string, QueryTagValue> | undefined | Promise<Record<string, QueryTagValue> | undefined>;
+export type QueryTags = Record<string, string>;
+/** `QueryTagsFn` after `wrapQueryTagsFn`: never throws and returns only valid tags. */
+export type QueryTagsInternalFn = (context: DriverContext) => Promise<QueryTags | undefined>;
 
 export type OrchestratorOptionsFn = (context: RequestContext) => OrchestratorOptions | Promise<OrchestratorOptions>;
 

@@ -176,11 +176,9 @@ Cube adds the `cube_request_id` [label][bq-docs-labels] to every BigQuery job it
 Its value is the identifier shown for the query in Query History.
 
 To label jobs with the user or other request attributes, return them from
-[`query_tags`][ref-config-query-tags]. Cube lowercases keys and values, replaces
-characters other than ASCII letters, digits, `_`, and `-` with `_`, and truncates them to
-63 characters. Tags whose keys don't start with a letter, and tags beyond the first 63, as
-a job can have at most 64 labels, are dropped and logged as `Query Tag Dropped`. A tag
-can't override `cube_request_id`.
+[`query_tags`][ref-config-query-tags]. Tag keys already meet the label requirements. Cube
+lowercases tag values, replaces characters other than ASCII letters, digits, `_`, and `-`
+with `_`, and truncates them to 63 characters. A tag can't override `cube_request_id`.
 
 Since labels are lowercase, IDs that differ only in case, e.g., base64 hashes or
 case-sensitive user IDs, end up as the same label. Use case-insensitive values, e.g., a
