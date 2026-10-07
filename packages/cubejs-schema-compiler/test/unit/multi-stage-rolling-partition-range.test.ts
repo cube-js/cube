@@ -135,3 +135,89 @@ cubes:
     expect(description.matchedTimeDimensionDateRange).toBeUndefined();
   });
 });
+
+// Only filters on the partition time dimension bound the partitions.
+describe('Pre-aggregation partition range with another time dimension', () => {
+  const model = (preAggregation: string) => `
+cubes:
+  - name: orders
+    sql: "SELECT * FROM orders"
+    dimensions:
+      - name: id
+        sql: id
+        type: number
+        primary_key: true
+      - name: status
+        sql: status
+        type: string
+      - name: created_at
+        sql: created_at
+        type: time
+      - name: updated_at
+        sql: updated_at
+        type: time
+    measures:
+      - name: amount
+        type: sum
+        sql: amount
+    pre_aggregations:
+      - name: monthly
+        measures:
+          - amount
+        partition_granularity: month
+${preAggregation}
+`;
+
+  const partitionRangeFor = async (preAggregation: string, query: Record<string, any>) => {
+    const { compiler, joinGraph, cubeEvaluator } = prepareYamlCompiler(model(preAggregation));
+    await compiler.compile();
+
+    const pgQuery = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+      measures: ['orders.amount'],
+      dimensions: ['orders.status'],
+      ...query,
+      timezone: 'UTC',
+      preAggregationsSchema: '',
+      useNativeSqlPlanner: true,
+    });
+
+    pgQuery.buildSqlAndParams();
+    const [description]: any[] = pgQuery.preAggregations?.preAggregationsDescription() || [];
+    expect(description.preAggregationId).toEqual('orders.monthly');
+
+    return description.matchedTimeDimensionDateRange;
+  };
+
+  const createdInJune = {
+    dimension: 'orders.created_at',
+    granularity: 'month',
+    dateRange: ['2024-06-01', '2024-06-30'],
+  };
+  const june = ['2024-06-01T00:00:00.000', '2024-06-30T23:59:59.999'];
+
+  it('ignores a date filter on a stored time dimension', async () => {
+    expect(await partitionRangeFor(`        dimensions:
+          - status
+          - updated_at
+        time_dimension: created_at
+        granularity: month`, {
+      filters: [{ member: 'orders.updated_at', operator: 'inDateRange', values: ['2020-01-01', '2020-12-31'] }],
+      timeDimensions: [createdInJune],
+    })).toEqual(june);
+  });
+
+  it('ignores a date range on a second time dimension', async () => {
+    expect(await partitionRangeFor(`        dimensions:
+          - status
+        time_dimensions:
+          - dimension: created_at
+            granularity: month
+          - dimension: updated_at
+            granularity: day`, {
+      timeDimensions: [
+        { dimension: 'orders.updated_at', granularity: 'day', dateRange: ['2020-01-01', '2020-12-31'] },
+        createdInJune,
+      ],
+    })).toEqual(june);
+  });
+});
