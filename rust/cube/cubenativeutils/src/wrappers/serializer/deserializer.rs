@@ -1,7 +1,9 @@
 use super::error::NativeObjSerializerError;
 use crate::wrappers::{
     inner_types::InnerTypes,
-    object::{NativeArray, NativeBoolean, NativeNumber, NativeString, NativeStruct},
+    object::{
+        NativeArray, NativeBoolean, NativeNumber, NativeString, NativeStruct, NativeTypedObject,
+    },
     object_handle::NativeObjectHandle,
 };
 use serde::{
@@ -33,32 +35,28 @@ impl<'de, IT: InnerTypes> Deserializer<'de> for NativeSerdeDeserializer<IT> {
     where
         V: Visitor<'de>,
     {
-        if self.input.is_null()? || self.input.is_undefined()? {
-            visitor.visit_unit()
-        } else if let Ok(val) = self.input.to_boolean() {
-            visitor.visit_bool(val.value().unwrap())
-        } else if let Ok(val) = self.input.to_string() {
-            visitor.visit_string(val.value().unwrap())
-        } else if let Ok(val) = self.input.to_number() {
-            let num = val.value().unwrap();
-            // Preserve fractional numbers as floats; only integral values are
-            // narrowed to i64 (whole-number JS values are the common case, and
-            // self-describing consumers like FilterValue expect them as ints).
-            if num.fract() == 0.0 && num.is_finite() {
-                visitor.visit_i64(num as i64)
-            } else {
-                visitor.visit_f64(num)
+        match self.input.into_typed()? {
+            NativeTypedObject::Null | NativeTypedObject::Undefined => visitor.visit_unit(),
+            NativeTypedObject::Boolean(val) => visitor.visit_bool(val.value()?),
+            NativeTypedObject::String(val) => visitor.visit_string(val.into_value()?),
+            NativeTypedObject::Number(val) => {
+                let num = val.value()?;
+                // Self-describing consumers like FilterValue expect whole numbers as ints.
+                if num.fract() == 0.0 && num.is_finite() {
+                    visitor.visit_i64(num as i64)
+                } else {
+                    visitor.visit_f64(num)
+                }
             }
-        } else if let Ok(val) = self.input.to_array() {
-            let deserializer = NativeSeqDeserializer::<IT>::new(val);
-            visitor.visit_seq(deserializer)
-        } else if let Ok(val) = self.input.to_struct() {
-            let deserializer = NativeMapDeserializer::<IT>::new(val)?;
-            visitor.visit_map(deserializer)
-        } else {
-            Err(NativeObjSerializerError::Message(
-                "deserializer is not implemented".to_string(),
-            ))
+            NativeTypedObject::Array(val) => {
+                visitor.visit_seq(NativeSeqDeserializer::<IT>::new(val)?)
+            }
+            NativeTypedObject::Struct(val) => {
+                visitor.visit_map(NativeMapDeserializer::<IT>::new(val)?)
+            }
+            NativeTypedObject::Function(_) | NativeTypedObject::RustBox(_) => Err(
+                NativeObjSerializerError::Message("deserializer is not implemented".to_string()),
+            ),
         }
     }
     fn deserialize_option<V>(self, visitor: V) -> Result<V::Value, Self::Error>
@@ -123,8 +121,8 @@ impl<'de, IT: InnerTypes> Deserializer<'de> for NativeSerdeDeserializer<IT> {
     where
         V: Visitor<'de>,
     {
-        if let Ok(val) = self.input.to_number() {
-            visitor.visit_f32(val.value().unwrap() as f32)
+        if let Ok(val) = self.input.into_number() {
+            visitor.visit_f32(val.value()? as f32)
         } else {
             Err(NativeObjSerializerError::Message(
                 "JS Number expected for f32 field".to_string(),
@@ -136,8 +134,8 @@ impl<'de, IT: InnerTypes> Deserializer<'de> for NativeSerdeDeserializer<IT> {
     where
         V: Visitor<'de>,
     {
-        if let Ok(val) = self.input.to_number() {
-            visitor.visit_f64(val.value().unwrap())
+        if let Ok(val) = self.input.into_number() {
+            visitor.visit_f64(val.value()?)
         } else {
             Err(NativeObjSerializerError::Message(
                 "JS Number expected for f64 field".to_string(),
@@ -153,9 +151,9 @@ pub struct NativeSeqDeserializer<IT: InnerTypes> {
 }
 
 impl<IT: InnerTypes> NativeSeqDeserializer<IT> {
-    pub fn new(input: IT::Array) -> Self {
-        let len = input.len().unwrap();
-        Self { input, idx: 0, len }
+    pub fn new(input: IT::Array) -> Result<Self, NativeObjSerializerError> {
+        let len = input.len()?;
+        Ok(Self { input, idx: 0, len })
     }
 }
 
@@ -169,39 +167,60 @@ impl<'de, IT: InnerTypes> SeqAccess<'de> for NativeSeqDeserializer<IT> {
         if self.idx >= self.len {
             return Ok(None);
         }
-        let v = self
-            .input
-            .get(self.idx)
-            .map_err(|_| NativeObjSerializerError::Message("Failed to get element".to_string()))?;
+        let idx = self.idx;
+        let v = self.input.get(idx).map_err(|err| {
+            NativeObjSerializerError::from(err)
+                .context(format!("element {idx}: failed to read value"))
+        })?;
 
         self.idx += 1;
 
         let de = NativeSerdeDeserializer::new(v);
-        seed.deserialize(de).map(Some)
+        seed.deserialize(de)
+            .map(Some)
+            .map_err(|err| err.context(format!("element {idx}")))
     }
 }
 
 struct NativeMapDeserializer<IT: InnerTypes> {
     input: IT::Struct,
-    prop_names: Vec<NativeObjectHandle<IT>>,
-    key_idx: u32,
-    value_idx: u32,
-    len: u32,
+    prop_names: std::vec::IntoIter<NativeObjectHandle<IT>>,
+    idx: usize,
+    // Fetched in `next_key_seed`, so the key handle can be moved into the key
+    // deserializer instead of being cloned for the lookup.
+    pending_value: Option<NativeObjectHandle<IT>>,
 }
 
 impl<IT: InnerTypes> NativeMapDeserializer<IT> {
     pub fn new(input: IT::Struct) -> Result<Self, NativeObjSerializerError> {
-        let prop_names = input.get_own_property_names().map_err(|_| {
-            NativeObjSerializerError::Message("Failed to get property names".to_string())
+        let prop_names = input.get_own_property_names().map_err(|err| {
+            NativeObjSerializerError::from(err).context("failed to get property names")
         })?;
-        let len = prop_names.len() as u32;
         Ok(Self {
             input,
-            prop_names,
-            key_idx: 0,
-            value_idx: 0,
-            len,
+            prop_names: prop_names.into_iter(),
+            idx: 0,
+            pending_value: None,
         })
+    }
+
+    fn field_context(key: &NativeObjectHandle<IT>) -> String {
+        let key = key
+            .to_string()
+            .and_then(|s| s.into_value())
+            .unwrap_or_default();
+        format!("field `{key}`")
+    }
+
+    /// Error path only: the key handle has been consumed by then, so the name is
+    /// looked up again.
+    fn current_field_context(&self) -> String {
+        self.input
+            .get_own_property_names()
+            .ok()
+            .and_then(|names| names.into_iter().nth(self.idx - 1))
+            .map(|key| Self::field_context(&key))
+            .unwrap_or_else(|| format!("field #{}", self.idx - 1))
     }
 }
 
@@ -211,15 +230,18 @@ impl<'de, IT: InnerTypes> MapAccess<'de> for NativeMapDeserializer<IT> {
     where
         K: DeserializeSeed<'de>,
     {
-        if self.key_idx >= self.len {
+        let Some(key) = self.prop_names.next() else {
             return Ok(None);
-        }
-        let v = self
-            .prop_names
-            .get(self.key_idx as usize)
-            .ok_or_else(|| NativeObjSerializerError::Message("Failed to get key".to_string()))?;
-        self.key_idx += 1;
-        seed.deserialize(NativeSerdeDeserializer::new(v.clone()))
+        };
+        self.idx += 1;
+        let value = self.input.get_field_by_key(&key).map_err(|err| {
+            NativeObjSerializerError::from(err).context(format!(
+                "{}: failed to read value",
+                Self::field_context(&key)
+            ))
+        })?;
+        self.pending_value = Some(value);
+        seed.deserialize(NativeSerdeDeserializer::new(key))
             .map(Some)
     }
 
@@ -227,30 +249,16 @@ impl<'de, IT: InnerTypes> MapAccess<'de> for NativeMapDeserializer<IT> {
     where
         V: DeserializeSeed<'de>,
     {
-        if self.value_idx >= self.len {
-            return Err(NativeObjSerializerError::Message(
-                "Array index out of bounds".to_string(),
-            ));
-        }
-        let prop_name = self
-            .prop_names
-            .get(self.value_idx as usize)
-            .ok_or_else(|| {
-                NativeObjSerializerError::Message("Array index out of bounds".to_string())
-            })?;
-        let prop_string = prop_name
-            .to_string()
-            .and_then(|s| s.value())
-            .map_err(|_| NativeObjSerializerError::Message("key should be string".to_string()))?;
-
-        let value = self.input.get_field(&prop_string).map_err(|_| {
-            NativeObjSerializerError::Message("Failed to get property name".to_string())
+        let value = self.pending_value.take().ok_or_else(|| {
+            NativeObjSerializerError::Message(
+                "next_value_seed called before next_key_seed".to_string(),
+            )
         })?;
+        seed.deserialize(NativeSerdeDeserializer::new(value))
+            .map_err(|err| err.context(self.current_field_context()))
+    }
 
-        self.value_idx += 1;
-        let de = NativeSerdeDeserializer::new(value);
-        seed.deserialize(de).map_err(|err| {
-            NativeObjSerializerError::Message(format!("field `{prop_string}`: {err}"))
-        })
+    fn size_hint(&self) -> Option<usize> {
+        Some(self.prop_names.len())
     }
 }
