@@ -41,9 +41,7 @@ impl<'de, IT: InnerTypes> Deserializer<'de> for NativeSerdeDeserializer<IT> {
             NativeTypedObject::String(val) => visitor.visit_string(val.into_value()?),
             NativeTypedObject::Number(val) => {
                 let num = val.value()?;
-                // Preserve fractional numbers as floats; only integral values are
-                // narrowed to i64 (whole-number JS values are the common case, and
-                // self-describing consumers like FilterValue expect them as ints).
+                // Self-describing consumers like FilterValue expect whole numbers as ints.
                 if num.fract() == 0.0 && num.is_finite() {
                     visitor.visit_i64(num as i64)
                 } else {

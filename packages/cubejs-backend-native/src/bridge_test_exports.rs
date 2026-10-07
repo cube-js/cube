@@ -853,8 +853,8 @@ fn deserialize_sql_templates_json(cx: FunctionContext) -> JsResult<JsValue> {
     )
 }
 
-/// Runs the deserializer `iterations` times inside one native call so a
-/// benchmark measures the deserializer rather than the JS -> N-API hop.
+/// Loops natively so a benchmark measures the deserializer rather than the
+/// JS -> N-API hop.
 fn deserialize_loop_inner<IT: InnerTypes>(
     kind: &str,
     obj: NativeObjectHandle<IT>,
