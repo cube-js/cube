@@ -225,6 +225,20 @@ ${preAggregation}
     })).toEqual(june);
   });
 
+  it('is not bounded by a date range on a second time dimension alone', async () => {
+    expect(await partitionRangeFor(`        dimensions:
+          - status
+        time_dimensions:
+          - dimension: created_at
+            granularity: month
+          - dimension: updated_at
+            granularity: day`, {
+      timeDimensions: [
+        { dimension: 'orders.updated_at', granularity: 'day', dateRange: ['2020-01-01', '2020-12-31'] },
+      ],
+    })).toBeUndefined();
+  });
+
   it('ignores a date range on a second time dimension', async () => {
     expect(await partitionRangeFor(`        dimensions:
           - status

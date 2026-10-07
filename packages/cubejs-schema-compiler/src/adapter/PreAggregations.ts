@@ -202,7 +202,9 @@ export class PreAggregations {
       // Compute the union of all usage date ranges so that partitions cover
       // every usage (e.g. time_shift may require earlier partitions).
       const mergedDateRange = PreAggregations.mergeUsageDateRanges(usageInfo.usages);
-      const unbounded = Object.values(usageInfo.usages).some(usage => usage.unbounded);
+      // A usage without a range has no filter on the partition dimension, so it
+      // may read any partition, as lambdaSourceDateRange() also assumes.
+      const unbounded = Object.values(usageInfo.usages).some(usage => usage.unbounded || !usage.dateRange);
 
       return descriptions.map(desc => {
         if (unbounded && desc.matchedTimeDimensionDateRange) {

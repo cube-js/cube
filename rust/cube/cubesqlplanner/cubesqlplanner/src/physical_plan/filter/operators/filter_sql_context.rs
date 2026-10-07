@@ -231,10 +231,7 @@ impl<'a> FilterSqlContext<'a> {
 
     /// Upper bound of `span` for the series shape this dialect renders.
     pub fn series_span_end<'s>(&self, span: &'s SeriesSpan) -> Result<&'s String, CubeError> {
-        let generated = self
-            .plan_templates
-            .supports_generated_time_series(span.predefined_granularity)?;
-        Ok(span.to(generated))
+        span.end(self.plan_templates)
     }
 
     pub fn date_range_from_time_series(&self) -> Result<(String, String), CubeError> {

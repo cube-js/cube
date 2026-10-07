@@ -727,7 +727,13 @@ impl PreAggregationOptimizer {
                 .id()
                 .clone()
         });
-        for item in &filter.time_dimensions_filters {
+        // Top-level items are ANDed, and a date range on the partition dimension
+        // can come as a plain filter as well as a time-dimension one.
+        for item in filter
+            .time_dimensions_filters
+            .iter()
+            .chain(filter.dimensions_filters.iter())
+        {
             if let FilterItem::Item(base_filter) = item {
                 let member = base_filter.member_evaluator();
                 if partition_dimension.as_ref() != Some(member.resolve_reference_chain().id()) {
@@ -797,11 +803,9 @@ impl PreAggregationOptimizer {
         precision: u32,
     ) -> Result<Option<RollingScanBand>, CubeError> {
         // The series ends where the usage's own dialect renders it.
+        let templates = query_tools.plan_sql_templates(external)?;
         let band = op.rolling_scan_band(query_tools.timezone(), |span| {
-            let generated = query_tools
-                .plan_sql_templates(external)?
-                .supports_generated_time_series(span.predefined_granularity)?;
-            Ok(span.to(generated).clone())
+            Ok(span.end(&templates)?.clone())
         })?;
         Ok(match band {
             Some(RollingScanBand::Bounded(from, to)) => Some(RollingScanBand::Bounded(
