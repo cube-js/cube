@@ -444,6 +444,12 @@ paths:
           defaults.
 
 
+          Pass `layout: print` with `format: pdf` for the paginated A4 document the dashboard's
+          "Print version" menu item produces — one column, every table row, the filter state as a
+          summary line — instead of the default `screenshot` of the board. `print` with `format:
+          png` returns `400`.
+
+
           By default the dashboard renders under the calling user's own security context, so the
           file shows what that user would see. Requires **manage** access to the dashboard's
           workbook — the same permission the console's own "Download as PNG / PDF" actions require,
@@ -884,12 +890,14 @@ paths:
         - in: query
           name: status
           schema:
+            description: Return only runs with this status.
             oneOf:
               - $ref: '#/components/schemas/DbtSyncRunsQueryStatus'
               - type: 'null'
         - in: query
           name: trigger
           schema:
+            description: Return only runs started this way.
             oneOf:
               - $ref: '#/components/schemas/DbtSyncRunsQueryTrigger'
               - type: 'null'
@@ -1086,6 +1094,25 @@ paths:
         - in: query
           name: accessSource
           schema:
+            description: >-
+              Filter workbooks by how access is granted:
+
+
+              - `tenant`: the workbook itself is explicitly shared with the named embed tenant.
+              Excludes workbooks available only through the all-embed-users group or a shared
+              folder.
+
+              - `allEmbedUsers`: the workbook itself is explicitly shared with the built-in
+              all-embed-users group, making it available to every embed tenant. Excludes
+              tenant-specific direct shares and folder-inherited access.
+
+              - `folder`: access is inherited because the workbook is inside a shared folder or any
+              of its descendant folders. The folder may be shared specifically with the named tenant
+              or with all embed users.
+
+
+              Omit this parameter to return the union of all three access sources. A workbook can
+              match more than one source.
             oneOf:
               - $ref: '#/components/schemas/EmbedTenantWorkbooksListQueryAccessSource'
               - type: 'null'
@@ -2106,6 +2133,9 @@ paths:
         - in: query
           name: status
           schema:
+            description: >-
+              Only deliveries in this status, e.g. `failing` or `no_sheet_access` for the ones
+              needing attention.
             oneOf:
               - $ref: '#/components/schemas/GetReportDeliveriesQueryStatus'
               - type: 'null'
@@ -2339,6 +2369,7 @@ paths:
         - in: query
           name: sortDirection
           schema:
+            description: 'Order by when the run started: `DESC` (default) is newest first.'
             oneOf:
               - $ref: '#/components/schemas/GetReportDeliveryRunsQuerySortDirection'
               - type: 'null'
@@ -8052,6 +8083,7 @@ components:
             - type: 'null'
         scheduleType:
           $ref: '#/components/schemas/CreateNotificationInputScheduleType'
+          description: Type of schedule
         timeGrains:
           oneOf:
             - items:
@@ -8187,6 +8219,10 @@ components:
             Which columns land in the sheet, in what order, under which headers. Omit it to deliver
             every column the query returns, in its order, headed by its name.
         writeMode:
+          description: >-
+            What each run does with what the previous one wrote. `overwrite` (the default) replaces
+            the delivered block. `append` adds the whole result below it, header only on the first
+            run and no deduplication. `new_sheet` writes each run to a new tab.
           oneOf:
             - $ref: '#/components/schemas/CreateReportDeliveryInputWriteMode'
             - type: 'null'
@@ -8932,6 +8968,9 @@ components:
           description: Rendering progress, 0-100, when the renderer reports one.
         status:
           $ref: '#/components/schemas/DashboardExportStatusResponseStatus'
+          description: >-
+            Job lifecycle: `pending` and `processing` mean keep polling, `completed` means the file
+            is ready to download, `failed` means it will never be.
       required:
         - status
       type: object
@@ -8991,6 +9030,7 @@ components:
           pattern: .+\..+
           type: string
         operator:
+          description: Filter operator (defaults to "equals")
           oneOf:
             - $ref: '#/components/schemas/DashboardFilterInputOperator'
             - type: 'null'
@@ -9649,6 +9689,9 @@ components:
           type: string
         selectionMode:
           $ref: '#/components/schemas/DatabricksMetricViewPublicationPreviewInputSelectionMode'
+          description: >-
+            Choose every deployed Cube view ('all'), an exact ordered list ('selected'), or names
+            matching viewNameRegex ('pattern').
         sourceOverrides:
           oneOf:
             - type: object
@@ -9901,6 +9944,9 @@ components:
             - type: 'null'
         outcome:
           $ref: '#/components/schemas/DatabricksMetricViewPublicationViewResultOutcome'
+          description: >-
+            'partial' means the view published without measures it cannot represent; read
+            withheldMembers for which.
         source:
           oneOf:
             - type: string
@@ -10034,6 +10080,9 @@ components:
             - type: 'null'
         status:
           $ref: '#/components/schemas/DatabricksMetricViewSyncRunResponseStatus'
+          description: >-
+            PARTIAL means at least one view published and another did not. Every non-successful view
+            keeps its previous Databricks definition.
         targetCatalog:
           oneOf:
             - type: string
@@ -11695,6 +11744,7 @@ components:
             this.
         type:
           $ref: '#/components/schemas/ExportSubjectInputType'
+          description: Subject kind
         userAttributes:
           oneOf:
             - items:
@@ -11819,14 +11869,14 @@ components:
     FinishUploadBody:
       properties:
         autoRemoveFiles:
+          default: true
           oneOf:
             - type: boolean
-              default: true
             - type: 'null'
         awaitGitOperations:
+          default: true
           oneOf:
             - type: boolean
-              default: true
             - type: 'null'
         commitMessage:
           oneOf:
@@ -12523,6 +12573,7 @@ components:
             security when the report is rendered.
         type:
           $ref: '#/components/schemas/NotificationRecipientInputType'
+          description: Recipient kind
         userAttributes:
           oneOf:
             - items:
@@ -13542,6 +13593,9 @@ components:
             Text of the header cell. Defaults to the column name; required for a placeholder, where
             it may be empty.
         placeholder:
+          description: >-
+            `true` for an empty column that holds only its header. Provide this OR `column` (exactly
+            one).
           oneOf:
             - $ref: '#/components/schemas/ReportDeliveryColumnInputPlaceholder'
             - type: 'null'
@@ -13748,6 +13802,10 @@ components:
           $ref: '#/components/schemas/ReportDeliveryResponseStatus'
         writeMode:
           $ref: '#/components/schemas/ReportDeliveryResponseWriteMode'
+          description: >-
+            What each run does with what the previous one wrote. `overwrite` (the default) replaces
+            the delivered block. `append` adds the whole result below it, header only on the first
+            run and no deduplication. `new_sheet` writes each run to a new tab.
       required:
         - id
         - deploymentId
@@ -13814,6 +13872,7 @@ components:
           type: string
         status:
           $ref: '#/components/schemas/ReportDeliveryRunResponseStatus'
+          description: '`running` until the run finishes.'
         trigger:
           $ref: '#/components/schemas/ReportDeliveryRunResponseTrigger'
       required:
@@ -14303,6 +14362,9 @@ components:
       properties:
         deletionPolicy:
           $ref: '#/components/schemas/SaveDatabricksMetricViewIntegrationInputDeletionPolicy'
+          description: >-
+            Use retain. The delete-managed value is deprecated and currently retains obsolete Metric
+            Views; it does not delete them.
         enabled:
           type: boolean
         expectedConfigurationVersion:
@@ -14667,6 +14729,17 @@ components:
             scheduled-notification API uses.
         format:
           $ref: '#/components/schemas/StartDashboardExportInputFormat'
+          description: 'Output format: `png` or `pdf`.'
+        layout:
+          default: screenshot
+          description: >-
+            How the dashboard is laid out. `screenshot` (the default) renders the board as it looks
+            on screen. `print` renders the paginated A4 document the dashboard's 'Print version'
+            menu item produces: one column, every table row, and the filter state as a summary line
+            instead of filter controls. `print` is available for `format: 'pdf'` only.
+          oneOf:
+            - $ref: '#/components/schemas/StartDashboardExportInputLayout'
+            - type: 'null'
         memberSwitchers:
           oneOf:
             - items:
@@ -14696,6 +14769,11 @@ components:
       enum:
         - png
         - pdf
+      type: string
+    StartDashboardExportInputLayout:
+      enum:
+        - screenshot
+        - print
       type: string
     StartDatabricksMetricViewSyncInput:
       properties:
@@ -14733,6 +14811,11 @@ components:
             so a CI job can POST the manifest it just validated and be sure Cube converts exactly
             that — no re-parse of a branch tip that may already have moved.
         output:
+          description: >-
+            What to do with the generated cubes. `branch` (the default) commits them to a new Cube
+            branch for review. `files` commits nothing and creates no branch — the files are
+            returned from `GET /dbt-sync/{syncJobId}/generated-files` instead, so your own CI can
+            commit them to your repository through its normal review. Independent of `source`.
           oneOf:
             - $ref: '#/components/schemas/StartDbtSyncInputOutput'
             - type: 'null'
@@ -14746,6 +14829,12 @@ components:
             so CI can sync the ref under review (e.g. a pull request’s head branch) instead of the
             tracked branch. The generated Cube branch is named after it.
         source:
+          description: >-
+            Where the dbt metadata comes from. `git` (the default) clones the deployment’s dbt
+            repository and runs dbt to produce a manifest. `manifest` converts a manifest you supply
+            in `manifest` below, so Cube never needs access to the dbt repository — and the sync
+            takes seconds rather than minutes, because no sandbox is provisioned and no dbt command
+            runs.
           oneOf:
             - $ref: '#/components/schemas/StartDbtSyncInputSource'
             - type: 'null'
@@ -15252,6 +15341,7 @@ components:
             - $ref: '#/components/schemas/UpdateNotificationInputNotificationFormat'
             - type: 'null'
         scheduleType:
+          description: Type of schedule
           oneOf:
             - $ref: '#/components/schemas/UpdateNotificationInputScheduleType'
             - type: 'null'
@@ -15408,6 +15498,10 @@ components:
             - type: 'null'
           description: Replaces the whole shape. `null` removes it, delivering every column.
         writeMode:
+          description: >-
+            What each run does with what the previous one wrote. `overwrite` (the default) replaces
+            the delivered block. `append` adds the whole result below it, header only on the first
+            run and no deduplication. `new_sheet` writes each run to a new tab.
           oneOf:
             - $ref: '#/components/schemas/UpdateReportDeliveryInputWriteMode'
             - type: 'null'
