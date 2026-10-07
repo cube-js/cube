@@ -255,14 +255,8 @@ export class CubejsServerCore {
   protected readonly orchestratorStorage: OrchestratorStorage = new OrchestratorStorage();
 
   /**
-   * The request context each cached orchestrator most recently served.
-   *
-   * An orchestrator's driver factory closes over the context of the request
-   * that created it, and the driver it resolves is then cached for the life of
-   * the process. When that driver's configuration is derived from the context —
-   * a per-user OAuth token, say — it goes stale the moment the credential
-   * rotates. Tracking the latest context lets the factory notice. Keyed by the
-   * api instance so an entry disappears with the orchestrator it belongs to.
+   * Latest request context per cached orchestrator, read by its driver factory so a
+   * context-derived driver can be rebuilt. Weak, so an entry dies with its api.
    */
   protected readonly orchestratorRequestContexts =
     new WeakMap<OrchestratorApi, { current: RequestContext }>();
@@ -770,12 +764,7 @@ export class CubejsServerCore {
     return pending;
   }
 
-  /**
-   * Keep the driver factory's view of the request context current for every
-   * caller an orchestrator serves. Without this it stays pinned to the request
-   * that built it, and a driver built from context-derived credentials can
-   * never be rebuilt when they rotate.
-   */
+  /** Record `context` as the latest one `orchestratorApi` served, for every caller including joiners. */
   protected trackRequestContext(orchestratorApi: OrchestratorApi, context: RequestContext): OrchestratorApi {
     const contextRef = this.orchestratorRequestContexts.get(orchestratorApi);
 
