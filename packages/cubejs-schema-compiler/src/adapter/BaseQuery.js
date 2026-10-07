@@ -571,17 +571,21 @@ export class BaseQuery {
       joinsMap[j.to] = j.from;
     }
 
-    return this.joinPathsToRoot(joinsMap, joinHints) ??
-      this.joinPathsToRoot(this.acyclicJoinsMap(joinTree), joinHints);
+    // A chain without repeats visits each cube with a parent at most once
+    const maxPathLength = joinTree.joins.length + 1;
+
+    return this.joinPathsToRoot(joinsMap, joinHints, maxPathLength) ??
+      this.joinPathsToRoot(this.acyclicJoinsMap(joinTree), joinHints, maxPathLength);
   }
 
   /**
    * @private
    * @param { Record<string, string> } joinsMap cube -> the cube it is joined from
    * @param { string[] } joinHints
+   * @param { number } maxPathLength a longer chain must have looped
    * @return { (string|string[])[] | null } null when the chain of some hint loops
    */
-  joinPathsToRoot(joinsMap, joinHints) {
+  joinPathsToRoot(joinsMap, joinHints, maxPathLength) {
     const paths = [];
 
     for (const jh of joinHints) {
@@ -589,10 +593,10 @@ export class BaseQuery {
       const path = [cubeName];
       while (joinsMap[cubeName]) {
         cubeName = joinsMap[cubeName];
-        if (path.includes(cubeName)) {
+        path.push(cubeName);
+        if (path.length > maxPathLength) {
           return null;
         }
-        path.push(cubeName);
       }
 
       paths.push(path.length === 1 ? path[0] : path.reverse());
