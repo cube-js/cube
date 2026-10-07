@@ -730,6 +730,7 @@ impl PreAggregationOptimizer {
         });
         // Top-level items are ANDed, and a date range on the partition dimension
         // can come as a plain filter as well as a time-dimension one.
+        let mut unbounded = false;
         for item in filter
             .time_dimensions_filters
             .iter()
@@ -749,11 +750,13 @@ impl PreAggregationOptimizer {
                     // An excluded range bounds nothing.
                     FilterOp::DateRange(_) => None,
                     // A band that can't be worked out leaves the partitions
-                    // unbounded rather than failing the query.
+                    // unbounded rather than failing the query, unless another
+                    // filter bounds them.
                     op => match Self::rolling_scan_range(op, query_tools, external, precision) {
                         Ok(Some(RollingScanBand::Bounded(from, to))) => Some((from, to)),
                         Ok(Some(RollingScanBand::Unbounded)) | Err(_) => {
-                            return UsageScanRange::Unbounded
+                            unbounded = true;
+                            None
                         }
                         Ok(None) => None,
                     },
@@ -793,7 +796,11 @@ impl PreAggregationOptimizer {
                 }
             }
         }
-        UsageScanRange::Unfiltered
+        if unbounded {
+            UsageScanRange::Unbounded
+        } else {
+            UsageScanRange::Unfiltered
+        }
     }
 
     /// A rolling-window filter's band, formatted to the dialect's precision.

@@ -179,6 +179,12 @@ cubes:
       - name: amount
         type: sum
         sql: amount
+      - name: amount_running_total_ms
+        multi_stage: true
+        type: sum
+        sql: "{amount}"
+        rolling_window:
+          trailing: unbounded
     pre_aggregations:
       - name: monthly
         measures:
@@ -244,6 +250,19 @@ ${preAggregation}
 
   it('is not bounded by an excluded range on the partition time dimension', async () => {
     expect(await usageRangeFor('notInDateRange')).toBeUndefined();
+  });
+
+  it('is bounded by a date range filter alongside an unbounded rolling window', async () => {
+    const description = await descriptionFor(`        dimensions:
+          - status
+          - created_at
+        time_dimension: created_at
+        granularity: month`, {
+      measures: ['orders.amount_running_total_ms'],
+      filters: [{ member: 'orders.created_at', operator: 'inDateRange', values: ['2024-01-01', '2024-06-30'] }],
+      timeDimensions: [createdInJune],
+    });
+    expect(description.usageMapping[''].dateRange).toEqual(['2024-01-01T00:00:00.000', '2024-06-30T23:59:59.999']);
   });
 
   it('is not bounded by a date range on a second time dimension alone', async () => {
