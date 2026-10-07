@@ -2,7 +2,8 @@ use crate::node_obj_deserializer::JsValueDeserializer;
 use crate::transport::MapCubeErrExt;
 use cubeorchestrator::query_message_parser::QueryResult;
 use cubeorchestrator::query_result_transform::{
-    DBResponsePrimitive, RequestResultData, RequestResultDataMulti, TransformedData,
+    columnar_plan, transform_value, ColumnarColumnSource, DBResponsePrimitive, RequestResultData,
+    RequestResultDataMulti,
 };
 use cubeorchestrator::transport::{JsRawColumnarData, TransformDataRequest};
 use cubesql::compile::engine::df::scan::{ColumnarValueObject, FieldValue};
@@ -17,6 +18,7 @@ use neon::prelude::{
 use neon::types::buffer::TypedArray;
 use serde::Deserialize;
 use std::borrow::Cow;
+use std::collections::HashMap;
 use std::sync::Arc;
 
 pub fn register_module(cx: &mut ModuleContext) -> NeonResult<()> {
@@ -31,11 +33,19 @@ pub fn register_module(cx: &mut ModuleContext) -> NeonResult<()> {
     Ok(())
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
+enum ColumnSource {
+    Db { index: usize, is_time: bool },
+    Constant(DBResponsePrimitive),
+}
+
+#[derive(Debug)]
 pub struct ResultWrapper {
     transform_data: TransformDataRequest,
     data: Arc<QueryResult>,
-    transformed_data: Option<TransformedData>,
+    /// Member name -> source column. Cells are read straight from `data`
+    /// instead of materializing a transformed copy of the whole result.
+    columns: Option<HashMap<String, ColumnSource>>,
     pub last_refresh_time: Option<String>,
     pub external: bool,
     pub used_pre_aggregations: Option<serde_json::Value>,
@@ -113,18 +123,34 @@ impl ResultWrapper {
         Ok(Self {
             transform_data: transform_request,
             data: query_result,
-            transformed_data: None,
+            columns: None,
             last_refresh_time: None,
             external: false,
             used_pre_aggregations: None,
         })
     }
 
-    pub fn transform_result(&mut self) -> Result<(), CubeError> {
-        self.transformed_data = Some(
-            TransformedData::transform(&self.transform_data, &self.data)
-                .map_cube_err("Can't prepare transformed data")?,
-        );
+    fn prepare_columns(&mut self) -> Result<(), CubeError> {
+        if self.columns.is_none() {
+            let (members, plan) = columnar_plan(&self.transform_data, &self.data)
+                .map_cube_err("Can't prepare transformed data")?;
+
+            let mut columns = HashMap::with_capacity(members.len());
+            for (member, entry) in members.into_iter().zip(plan) {
+                let source = match entry.source {
+                    ColumnarColumnSource::DbColumn { index } => ColumnSource::Db {
+                        index,
+                        is_time: entry.member_type == "time",
+                    },
+                    ColumnarColumnSource::Constant(value) => ColumnSource::Constant(value),
+                    ColumnarColumnSource::NullFilled => continue,
+                };
+                // The first occurrence wins, as with a positional lookup in `members`.
+                columns.entry(member).or_insert(source);
+            }
+
+            self.columns = Some(columns);
+        }
 
         Ok(())
     }
@@ -145,54 +171,58 @@ fn db_primitive_to_field_value(value: &DBResponsePrimitive) -> FieldValue<'_> {
     }
 }
 
+fn db_time_to_field_value(value: &DBResponsePrimitive) -> FieldValue<'_> {
+    match value {
+        DBResponsePrimitive::String(_) => match transform_value(value.clone(), "time") {
+            DBResponsePrimitive::String(s) => FieldValue::String(Cow::Owned(s)),
+            _ => unreachable!("transform_value keeps strings as strings"),
+        },
+        other => db_primitive_to_field_value(other),
+    }
+}
+
 impl ColumnarValueObject for ResultWrapper {
     fn len(&mut self) -> Result<usize, CubeError> {
-        if self.transformed_data.is_none() {
-            self.transform_result()?;
-        }
+        self.prepare_columns()?;
 
-        let TransformedData::Columnar { columns, .. } = self.transformed_data.as_ref().unwrap()
-        else {
-            return Err(CubeError::internal(
-                "ColumnarValueObject is only supported for columnar TransformedData".to_string(),
-            ));
-        };
-
-        Ok(columns.first().map(|c| c.len()).unwrap_or(0))
+        Ok(self.data.row_count())
     }
 
     fn column<'a>(
         &'a mut self,
         field_name: &str,
     ) -> Result<Box<dyn Iterator<Item = Result<FieldValue<'a>, CubeError>> + 'a>, CubeError> {
-        if self.transformed_data.is_none() {
-            self.transform_result()?;
-        }
+        self.prepare_columns()?;
 
-        let TransformedData::Columnar { members, columns } =
-            self.transformed_data.as_ref().unwrap()
-        else {
-            return Err(CubeError::internal(
-                "ColumnarValueObject is only supported for columnar TransformedData".to_string(),
-            ));
-        };
-
-        let Some(member_index) = members.iter().position(|m| m == field_name) else {
+        let row_count = self.data.row_count();
+        let Some(source) = self.columns.as_ref().unwrap().get(field_name) else {
             // Missing field → column of NULLs. See JsonColumnarValueObject::column.
-            let len = columns.first().map(|c| c.len()).unwrap_or(0);
-            return Ok(Box::new((0..len).map(|_| Ok(FieldValue::Null))));
+            return Ok(Box::new((0..row_count).map(|_| Ok(FieldValue::Null))));
         };
 
-        let Some(column) = columns.get(member_index) else {
-            return Err(CubeError::user(format!(
-                "Unexpected response from Cube, missing column for '{}'",
-                field_name
-            )));
-        };
+        match source {
+            ColumnSource::Db { index, is_time } => {
+                let column = self.data.column(*index).map_err(|_| {
+                    CubeError::user(format!(
+                        "Unexpected response from Cube, missing column for '{}'",
+                        field_name
+                    ))
+                })?;
 
-        Ok(Box::new(
-            column.iter().map(|v| Ok(db_primitive_to_field_value(v))),
-        ))
+                if *is_time {
+                    Ok(Box::new(
+                        column.iter().map(|v| Ok(db_time_to_field_value(v))),
+                    ))
+                } else {
+                    Ok(Box::new(
+                        column.iter().map(|v| Ok(db_primitive_to_field_value(v))),
+                    ))
+                }
+            }
+            ColumnSource::Constant(value) => Ok(Box::new(
+                (0..row_count).map(move |_| Ok(db_primitive_to_field_value(value))),
+            )),
+        }
     }
 }
 
