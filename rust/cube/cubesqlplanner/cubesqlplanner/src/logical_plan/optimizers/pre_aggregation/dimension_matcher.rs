@@ -145,6 +145,12 @@ impl<'a> DimensionMatcher<'a> {
         self.result
     }
 
+    /// Whether the pre-aggregation can provide the member, without marking
+    /// any of its dimensions as used.
+    pub fn match_symbol(&mut self, symbol: &Rc<MemberSymbol>) -> Result<MatchState, CubeError> {
+        self.try_match_symbol(symbol, false)
+    }
+
     fn try_match_symbol(
         &mut self,
         symbol: &Rc<MemberSymbol>,

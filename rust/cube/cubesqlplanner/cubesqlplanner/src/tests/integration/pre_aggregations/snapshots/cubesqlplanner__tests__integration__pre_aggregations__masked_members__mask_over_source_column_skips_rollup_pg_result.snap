@@ -1,0 +1,8 @@
+---
+source: cubesqlplanner/cubesqlplanner/src/tests/integration/pre_aggregations/masked_members.rs
+expression: result
+---
+people__gender_source_mask
+--------------------------
+***F                      
+***M

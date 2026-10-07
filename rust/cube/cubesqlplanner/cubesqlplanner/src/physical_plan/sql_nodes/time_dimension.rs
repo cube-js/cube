@@ -73,7 +73,17 @@ impl SqlNode for TimeDimensionNode {
                         templates,
                     )?;
                     let converted_tz = if ev.tz_converted_at_source() {
-                        input_sql
+                        // A mask stands in for the stored column untyped, and
+                        // the granularity function can't resolve an untyped
+                        // argument.
+                        let base = ev.base_symbol();
+                        if query_tools.is_member_masked(&base.full_name())
+                            || query_tools.is_member_masked(&base.peel_refs().full_name())
+                        {
+                            templates.time_stamp_cast(input_sql)?
+                        } else {
+                            input_sql
+                        }
                     } else {
                         templates.convert_tz(input_sql)?
                     };
