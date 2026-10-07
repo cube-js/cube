@@ -130,6 +130,13 @@ const PROBE_FAILURE_RETENTION_MS = 30 * 60 * 1000;
  */
 const PROBE_FAILURE_COALESCE_MS = 2 * 1000;
 
+/**
+ * How long after a refused probe the cached driver is reused without asking the
+ * factory, so an outage is not hit by every resolution. Under the coalescing
+ * window, so a continuous refusal still counts as one incident.
+ */
+const PROBE_FAILURE_BACKOFF_MS = PROBE_FAILURE_COALESCE_MS / 2;
+
 /** Security contexts remembered per driver; past this the least recently used is re-probed. */
 const MAX_KNOWN_SECURITY_CONTEXTS = 64;
 
@@ -942,6 +949,12 @@ export class CubejsServerCore {
           });
         }
 
+        return cached;
+      }
+
+      const lastRefusal = driverProbeFailures[rebuildKey];
+
+      if (cached && lastRefusal && Date.now() - lastRefusal.lastFailureAt < PROBE_FAILURE_BACKOFF_MS) {
         return cached;
       }
 

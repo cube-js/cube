@@ -415,11 +415,40 @@ describe('driver cache invalidation', () => {
     expect(await driverFactory('default')).toBe(first);
     expect(core.builtDrivers).toHaveLength(1);
 
-    // Once the factory recovers, the rotation is picked up as usual.
+    // Once the factory recovers, the rotation is picked up past the probe backoff.
     shouldFail = false;
+    clock.advance(1000);
     const rebuilt = <FakeDriver> await driverFactory('default');
     expect(rebuilt).not.toBe(first);
     expect(rebuilt.builtFrom).toMatchObject({ password: 'token-b' });
+  });
+
+  // An outage must not turn every driver resolution into a call on the dependency
+  // that is down.
+  test('stops probing for a moment after a refusal', async () => {
+    let shouldFail = false;
+    const factory = jest.fn((ctx: any) => {
+      if (shouldFail) {
+        throw new Error('secret store unreachable');
+      }
+
+      return <any>{ type: 'postgres', password: ctx.securityContext.token };
+    });
+    const { driverFactory, request } = await createCore({ driverFactory: factory }, { token: 'token-a' });
+
+    const first = await driverFactory('default');
+
+    shouldFail = true;
+    await request({ token: 'token-b' });
+
+    expect(await driverFactory('default')).toBe(first);
+    expect(await driverFactory('default')).toBe(first);
+    expect(await driverFactory('default')).toBe(first);
+    expect(factory).toHaveBeenCalledTimes(2);
+
+    clock.advance(1000);
+    expect(await driverFactory('default')).toBe(first);
+    expect(factory).toHaveBeenCalledTimes(3);
   });
 
   // Two queries in flight when a rotation lands both see the cached driver as
