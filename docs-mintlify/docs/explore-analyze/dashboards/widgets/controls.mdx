@@ -139,7 +139,7 @@ Moving the parent to an option that sets or resets this filter gives it a value 
 
 A [faceted filter](#faceted-filters) resolves its default inside its facet scope, so the default is always a value its own value list offers, and it resolves again when a sibling filter changes. For a measure of another view, each sibling's condition is carried over to that view's matching dimension, and a condition with no match there leaves the filter with no value rather than resolving over rows its value list excludes. The warning icon described below names that case.
 
-When the data gives no value, the filter applies none: the note after its title reads *No value applied*, and a warning icon at the end of the title line says why:
+When the data gives no value, the filter applies none: the note after its title reads *No value applied*, and a warning icon on the title line says why:
 
 - The dimension returned no rows — for example, because the filter is [faceted](#faceted-filters) and a sibling narrows it to a period with none.
 - The data could not be loaded — for example, because the query failed.
@@ -160,7 +160,7 @@ A faceted filter can take as a source any sibling, on its own semantic view or a
 - `is null`, `is not null`, `is empty` and `is not empty` carry no value and narrow as soon as they are set. Every other condition waits for a value, and until it has one it leaves the value list alone, just as it leaves the charts unfiltered.
 - A condition and value that together leave nothing to scope by narrow nothing either, as the warning below sets out.
 
-To pick which siblings a filter listens to, turn the **Facet** switch on in its edit sidebar: the source picker appears with it, reading **All**. The picker lists every other filter on the dashboard and greys out the ones it cannot use — a sibling whose condition cannot narrow a value list — with a tooltip saying so. A filter on another semantic view is selectable, and picking one adds a row under the picker for [matching it to a dimension of this filter's view](#sources-on-another-semantic-view). Left at **All**, the filter listens to every sibling on its own semantic view that the picker leaves selectable; picking entries narrows it to those. A filter you picked that later stops qualifying stays in the list with a warning icon rather than disappearing from it.
+To pick which siblings a filter listens to, turn the **Facet** switch on in its edit sidebar: the source picker appears with it, reading **All**. The picker lists every other filter on the dashboard and greys out the ones it cannot use — a sibling whose condition cannot be used for faceting — with a tooltip saying so. A filter on another semantic view is selectable, and picking one adds a row under the picker for [matching it to a dimension of this filter's view](#sources-on-another-semantic-view). Left at **All**, the filter listens to every sibling on its own semantic view that the picker leaves selectable; picking entries narrows it to those. A filter you picked that later stops qualifying stays in the list with a warning icon rather than disappearing from it.
 
 **Cancel** leaves the filter on the sources it was last saved with — it discards every unsaved edit in the sidebar, not only the source list — while turning **Facet** back off clears the entries you picked, and the dimensions you matched them to, so switching it on again starts from **All**.
 
@@ -188,6 +188,16 @@ A source can end up with nothing to scope by, leaving the value list as wide as 
 
 A list that *is* being scoped does not necessarily look shorter — a long one fills the dropdown either way, and the values the window drops need not be the ones on screen. To check that a source is narrowing it, look for a value you know the window has no rows for and confirm it is gone from the list. Searching for that value is not a check: a filter's value box takes values that are not in its list, so it offers back whatever you type.
 
+A faceted filter shows a facet icon on its title line, so you can tell which filters it is faceted by without opening its settings; a filter with **Facet** off shows none. Hovering the icon, or focusing it with the keyboard, lists the sources by title — *Faceted by: Status and Created at*. With the picker at **All** these are every sibling the filter follows, including filters placed in a stack, a grid or a tabs container; with entries picked, they are those entries and no other filter. A source the filter cannot use is left out: one on another semantic view you have not matched, and one whose condition cannot be used for faceting. A source is named by its condition, not its value, so it is listed while it waits for a value and in the cases the warning above lists, where its value leaves nothing to scope by. When no source is left — the filter is the only one on the dashboard, or every source you picked is one it cannot use — the icon stays and reads *Faceted by: no other filter*.
+
+In the dashboard builder, the tooltip adds *Click to configure.*, and clicking the icon opens the filter's edit sidebar, where the source picker is. The title line there ends with the widget's settings menu, after the facet icon and any warning icon. On a published dashboard the icon appears only while the pointer is over the filter or keyboard focus is inside it, as a chart's icons appear only while you hover the chart, and it only describes the filter and opens nothing. A source whose [visibility](#visibility) is **Hidden** is counted there rather than named — *Faceted by: Region and 1 hidden filter*, or *Faceted by: 1 hidden filter* when every source is hidden — so the tooltip never names a control the viewer cannot see; a **Disabled** source is named. The dashboard builder names every source, hidden ones included.
+
+Deleting a filter takes it out of every source list it is picked in, together with the dimension it was matched to, and a filter left at **All** follows the siblings that remain.
+
+<Warning>
+**Undo** puts a deleted filter back in every source list it was picked in. Otherwise, deleting the last filter left in a source list turns **Facet** off on the filter that listed it, rather than leaving its picker on **All**, which would make it follow every sibling. Its value list is no longer scoped and its facet icon goes away; to scope it again, turn **Facet** back on and pick its sources.
+</Warning>
+
 #### Sources on another semantic view
 
 A filter on one semantic view can narrow a faceted filter on another, once you say which dimension of the faceted filter's own view the source stands for. Pick it in the source picker like any other sibling and a row appears under the picker: **Based on** names the source's own view and dimension, and the picker beneath it — **Matching dimension for "*the source's title*"** — takes a dimension of *this* filter's view. The value list is scoped through that dimension, so the query behind it never names the source's view. The match is part of the dashboard, so it applies on a published dashboard and in an embed too, including when the source's value arrives in a [URL parameter](#sharing-the-current-selection).
@@ -197,7 +207,7 @@ The match is pre-selected for you when the answer is unambiguous: a dimension of
 Nothing is stored until you **Save**, and clearing a match or unchecking the source drops it from the dashboard: picking that source again suggests a match afresh rather than restoring the one you cleared.
 
 <Warning>
-A source you picked but have not matched narrows nothing, leaving the value list as wide as it was — match it, or uncheck it. Its row says so while it is unmatched: *Until you pick a matching dimension, this source does not narrow the list.*
+A source you picked but have not matched is not used for faceting, leaving the value list as wide as it was — match it, or uncheck it. Its row says so while it is unmatched: *Until you pick a matching dimension, this source is not used for faceting.*
 </Warning>
 
 ## Time granularity switcher
