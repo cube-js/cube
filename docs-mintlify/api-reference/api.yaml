@@ -12948,6 +12948,7 @@ components:
               - SchemaUpdateDevBranches
               - APMRead
               - ChatHistoryRead
+              - PreAggregationRead
               - PreAggregationBuild
               - AlertsCreate
               - AlertsRead
@@ -14299,6 +14300,7 @@ components:
               - SchemaUpdateDevBranches
               - APMRead
               - ChatHistoryRead
+              - PreAggregationRead
               - PreAggregationBuild
               - AlertsCreate
               - AlertsRead
