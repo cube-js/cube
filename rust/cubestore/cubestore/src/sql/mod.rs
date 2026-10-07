@@ -3737,6 +3737,53 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn union_planning_rewrites_off() -> Result<(), CubeError> {
+        Config::test("union_planning_rewrites_off")
+            .update_config(|mut c| {
+                c.union_planning_rewrites = false;
+                c
+            })
+            .start_test(async move |services| {
+                let service = services.sql_service;
+                let _ = service.exec_query("CREATE SCHEMA foo").await?.collect().await?;
+                let _ = service.exec_query("CREATE TABLE foo.a (a int, b int, c int)").await?.collect().await?;
+                let _ = service.exec_query("CREATE TABLE foo.b (a int, b int, c int)").await?.collect().await?;
+                service.exec_query("INSERT INTO foo.a (a, b, c) VALUES (1, 2, 3)").await?.collect().await?;
+                service.exec_query("INSERT INTO foo.b (a, b, c) VALUES (10, 20, 30)").await?.collect().await?;
+
+                let sql = "SELECT a, sum(c) FROM (SELECT * FROM foo.a UNION ALL SELECT * FROM foo.b) AS o \
+                           GROUP BY 1 ORDER BY 1";
+                let r = service.exec_query(sql).await?.collect().await?;
+                assert_eq!(
+                    r.get_rows().iter().map(|r| r.values().clone()).collect::<Vec<_>>(),
+                    vec![
+                        vec![TableValue::Int(1), TableValue::Int(3)],
+                        vec![TableValue::Int(10), TableValue::Int(30)],
+                    ]
+                );
+                let r = service.exec_query(&format!("EXPLAIN {}", sql)).await?.collect().await?;
+                // No alias on the union inputs: the rewrites did not run.
+                assert_eq!(
+                    r.get_rows()[0].values()[0],
+                    TableValue::String(
+                        "Sort\
+                        \n  Aggregate\
+                        \n    ClusterSend, indices: [[1, 2]]\
+                        \n      SubqueryAlias\
+                        \n        Union, schema: fields:[foo.a.a, foo.a.c], metadata:{}\
+                        \n          Scan foo.a, source: CubeTable(index: default:1:[1]:sort_on[a]), fields: [a, c]\
+                        \n          Scan foo.b, source: CubeTable(index: default:2:[2]:sort_on[a]), fields: [a, c]"
+                            .to_string()
+                    )
+                );
+
+                Ok::<(), CubeError>(())
+            })
+            .await;
+        Ok(())
+    }
+
+    #[tokio::test]
     async fn topk_streaming_merge() -> Result<(), CubeError> {
         // The streaming strategy keeps the per-row top-k node instead of the default router-side
         // re-aggregation + fetch-limited sort, and is what an operator falls back to. Exercise it

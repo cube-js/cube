@@ -347,12 +347,13 @@ impl QueryPlannerImpl {
     const EXECUTION_BATCH_SIZE: usize = 4096;
 
     pub fn make_execution_context(config: SessionConfig) -> SessionContext {
-        Self::make_execution_context_with_runtime(config, Arc::new(RuntimeEnv::default()))
+        Self::make_execution_context_with_runtime(config, Arc::new(RuntimeEnv::default()), true)
     }
 
     pub fn make_execution_context_with_runtime(
         mut config: SessionConfig,
         runtime_env: Arc<RuntimeEnv>,
+        union_planning_rewrites: bool,
     ) -> SessionContext {
         // The config parameter is from metadata_cache_factory (which we need to rename) but doesn't
         // include all necessary configs.
@@ -364,21 +365,11 @@ impl QueryPlannerImpl {
         config.options_mut().execution.parquet.split_row_group_reads = false;
 
         // TODO upgrade DF: build SessionContexts consistently
-        let mut analyzer_rules: Vec<Arc<dyn AnalyzerRule + Send + Sync>> =
-            vec![Arc::new(FlattenUnionRule {})];
-        for rule in Analyzer::new().rules {
-            let expands_wildcard = rule.name() == "expand_wildcard_rule";
-            analyzer_rules.push(rule);
-            if expands_wildcard {
-                analyzer_rules.push(Arc::new(PruneUnionColumnsRule {}));
-            }
-        }
-        debug_assert!(
-            analyzer_rules
-                .iter()
-                .any(|r| r.name() == PruneUnionColumnsRule {}.name()),
-            "prune_union_columns must run right after wildcard expansion"
-        );
+        let analyzer_rules = if union_planning_rewrites {
+            Self::analyzer_rules_with_union_rewrites()
+        } else {
+            Analyzer::new().rules
+        };
         let state = Self::minimal_session_state_from_final_config_with_runtime(config, runtime_env)
             .with_analyzer_rules(analyzer_rules)
             .with_optimizer_rule(Arc::new(RollingOptimizerRule {}))
@@ -393,9 +384,30 @@ impl QueryPlannerImpl {
         context
     }
 
+    fn analyzer_rules_with_union_rewrites() -> Vec<Arc<dyn AnalyzerRule + Send + Sync>> {
+        let mut rules: Vec<Arc<dyn AnalyzerRule + Send + Sync>> =
+            vec![Arc::new(FlattenUnionRule {})];
+        for rule in Analyzer::new().rules {
+            let expands_wildcard = rule.name() == "expand_wildcard_rule";
+            rules.push(rule);
+            if expands_wildcard {
+                rules.push(Arc::new(PruneUnionColumnsRule {}));
+            }
+        }
+        debug_assert!(
+            rules
+                .iter()
+                .any(|r| r.name() == PruneUnionColumnsRule {}.name()),
+            "prune_union_columns must run right after wildcard expansion"
+        );
+        rules
+    }
+
     fn execution_context(&self) -> Result<Arc<SessionContext>, CubeError> {
-        Ok(Arc::new(Self::make_execution_context(
+        Ok(Arc::new(Self::make_execution_context_with_runtime(
             self.metadata_cache_factory.make_session_config(),
+            Arc::new(RuntimeEnv::default()),
+            self.config.union_planning_rewrites(),
         )))
     }
 }
