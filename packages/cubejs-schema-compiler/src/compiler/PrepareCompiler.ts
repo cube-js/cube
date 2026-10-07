@@ -3,6 +3,7 @@ import { NativeInstance } from '@cubejs-backend/native';
 import { v4 as uuidv4 } from 'uuid';
 import { LRUCache } from 'lru-cache';
 import vm from 'vm';
+import type workerpool from 'workerpool';
 
 import { CubeValidator } from './CubeValidator';
 import { DataSchemaCompiler } from './DataSchemaCompiler';
@@ -41,6 +42,8 @@ export type PrepareCompilerOptions = {
   compiledScriptCache?: LRUCache<string, vm.Script>;
   compiledYamlCache?: LRUCache<string, string>;
   compiledJinjaCache?: LRUCache<string, string>;
+  // A transpiler worker pool reused across compiles; the caller terminates it
+  transpilerWorkerPool?: workerpool.Pool;
   /**
    * Shared VM realm and string interning together. Defaults to CUBEJS_COMPILER_MULTI_TENANT_SHARING.
    */

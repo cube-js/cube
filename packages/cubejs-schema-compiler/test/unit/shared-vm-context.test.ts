@@ -1,27 +1,32 @@
 import vm from 'vm';
+import workerpool from 'workerpool';
 import { LRUCache } from 'lru-cache';
 import { PostgresQuery } from '../../src/adapter/PostgresQuery';
 import { CubePropContextTranspiler, ImportExportTranspiler, ValidationTranspiler } from '../../src/compiler/transpilers';
-import { prepareCompiler } from './PrepareCompiler';
+import { prepareCompiler as prepareTestCompiler } from './PrepareCompiler';
 
 type Files = { fileName: string, content: string }[];
 
-// Every compile starts its own transpiler worker pool (CPU count - 1 threads by default), and the
-// tests below run several compiles at once: keep them to one thread each, so this file doesn't
-// starve suites that run next to it.
-const previousWorkerThreads = process.env.CUBEJS_TRANSPILATION_WORKER_THREADS_COUNT;
+// Every compile would otherwise cold-start its own transpiler worker (babel and the native addon
+// loaded again, ~0.4s idle and seconds on a loaded runner), and the tests below run several compiles
+// each: one warm worker for the whole file keeps them inside the jest timeout.
+let transpilerWorkerPool: workerpool.Pool;
 
 beforeAll(() => {
-  process.env.CUBEJS_TRANSPILATION_WORKER_THREADS_COUNT = '1';
+  transpilerWorkerPool = workerpool.pool(
+    require.resolve('../../src/compiler/transpilers/transpiler_worker'),
+    { maxWorkers: 1 },
+  );
 });
 
-afterAll(() => {
-  if (previousWorkerThreads === undefined) {
-    delete process.env.CUBEJS_TRANSPILATION_WORKER_THREADS_COUNT;
-  } else {
-    process.env.CUBEJS_TRANSPILATION_WORKER_THREADS_COUNT = previousWorkerThreads;
-  }
+afterAll(async () => {
+  await transpilerWorkerPool.terminate();
 });
+
+const prepareCompiler: typeof prepareTestCompiler = (content, options = {}) => prepareTestCompiler(
+  content,
+  { transpilerWorkerPool, ...options },
+);
 
 const tenantFiles = (): Files => [
   {
