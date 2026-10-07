@@ -195,7 +195,7 @@ ${rollup ? `    pre_aggregations:
     });
 
     it('a query date range on the same dimension still bounds the result', async () => {
-      // Jan 1 - 5 of the month to Jan 7.
+      // The query's Jan 1 - 5 range cuts the Jan 1 - 7 MTD window: Jan 3 + Jan 5.
       expect(await evaluate(['visitors_fi.amount_mtd_on'], {
         timeDimensions: [{ dimension: 'visitors_fi.created_at', dateRange: ['2017-01-01', '2017-01-05'] }],
       })).toEqual([{ vfi__amount_mtd_on: '300' }]);
