@@ -102,11 +102,12 @@ paths:
         "messageId": "<id>", "error": "<message>" }` before it closes. The content received so far
         is partial. Resend the same request — the same `chatId`, `input` and `messageId` — and the
         run continues from where it stopped (if the original request had no `chatId`, add the one
-        returned as `state.chatId` on its `__cutoff__` frame); the response replays the thread and then streams the
-        rest of the turn. `input` may be omitted: `chatId` plus the suspended `messageId` resumes it
-        too. A read of the thread (no `input`, no `messageId`) reports a pending suspension as
+        returned as `state.chatId` on its `__cutoff__` frame); the response replays the thread and
+        then streams the rest of the turn. `input` may be omitted: `chatId` plus the suspended
+        `messageId` resumes it too. A read of the thread (no `input`, no `messageId`) reports a pending suspension as
         `state.suspended.messageId` on `__cutoff__`. A request for a different message ends the
-        suspended turn. A suspended turn stays resumable for 24 hours.
+        suspended turn. A suspended turn stays resumable for 24 hours; after that, resending the
+        request returns the thread as it stands, with the partial turn, without rerunning it.
 
 
         Finding the final answer: filter assistant messages where `graphPath[0] === "final"` and
