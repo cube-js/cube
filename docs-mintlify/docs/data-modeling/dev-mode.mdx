@@ -125,9 +125,10 @@ the Cube Cloud UI.
 
 However, on CLI deployments, **none of these actions trigger a production
 build or redeploy** — production only changes when somebody explicitly runs
-`cubejs-cli deploy` against the deployment, and the next deploy overwrites
-any changes made through the UI. See [Deploy with CLI →
-Development mode][ref-deploy-with-cli-dev-mode] for the full behavior.
+`cubejs-cli deploy` against the deployment. CLI builds use the uploaded project;
+include UI changes in your local project if you want them in production. See
+[Deploy with CLI → Development mode][ref-deploy-with-cli-dev-mode] for the full
+behavior.
 
 ## Limitations
 
