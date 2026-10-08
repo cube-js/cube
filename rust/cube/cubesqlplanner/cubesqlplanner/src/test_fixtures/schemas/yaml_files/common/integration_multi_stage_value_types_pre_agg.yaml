@@ -1,0 +1,68 @@
+# Multi-stage measures of every value type over one rollup, each planned as its
+# own CTE, so their results are combined column by column on the key dims.
+cubes:
+    - name: orders
+      sql: "SELECT * FROM orders"
+      dimensions:
+          - name: id
+            type: number
+            sql: id
+            primary_key: true
+          - name: status
+            type: string
+            sql: status
+          # NULL for orders under 200: a NULL key next to non-NULL ones.
+          - name: size
+            type: string
+            sql: "CASE WHEN amount >= 200 THEN 'big' END"
+          - name: created_at
+            type: time
+            sql: created_at
+      measures:
+          - name: count
+            type: count
+          - name: total_amount
+            type: sum
+            sql: amount
+          - name: last_created_at
+            type: max
+            sql: created_at
+
+          - name: amount_total
+            type: number
+            multi_stage: true
+            sql: "{total_amount}"
+          - name: amount_label
+            type: string
+            multi_stage: true
+            sql: "CASE WHEN {total_amount} >= 300 THEN 'high' ELSE 'low' END"
+          - name: last_order_at
+            type: time
+            multi_stage: true
+            sql: "{last_created_at}"
+          - name: has_many_orders
+            type: boolean
+            multi_stage: true
+            sql: "{count} > 2"
+          # Rows of 2025-03-04..06 only: no value for (completed, NULL).
+          - name: amount_mid_week
+            type: number
+            multi_stage: true
+            sql: "{total_amount}"
+            filter:
+                include:
+                    - member: orders.created_at
+                      operator: inDateRange
+                      values: ["2025-03-04", "2025-03-06"]
+      pre_aggregations:
+          - name: orders_by_status_size_day
+            type: rollup
+            measures:
+                - count
+                - total_amount
+                - last_created_at
+            dimensions:
+                - status
+                - size
+            time_dimension: created_at
+            granularity: day

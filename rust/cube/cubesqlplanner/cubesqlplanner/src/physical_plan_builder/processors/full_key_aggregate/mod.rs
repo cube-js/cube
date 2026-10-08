@@ -1,6 +1,7 @@
 mod full_join_aggregate_strategy;
 mod inner_join_aggregate_strategy;
 mod keys_aggregate_strategy;
+mod union_aggregate_strategy;
 
 use super::super::{LogicalNodeProcessor, ProcessableNode, PushDownBuilderContext};
 use crate::logical_plan::FullKeyAggregate;
@@ -11,6 +12,7 @@ use full_join_aggregate_strategy::FullJoinFullKeyAggregateStrategy;
 use inner_join_aggregate_strategy::InnerJoinFullKeyAggregateStrategy;
 use keys_aggregate_strategy::KeysFullKeyAggregateStrategy;
 use std::rc::Rc;
+use union_aggregate_strategy::UnionFullKeyAggregateStrategy;
 
 trait FullKeyAggregateStrategy {
     fn process(
@@ -43,6 +45,10 @@ impl<'a> LogicalNodeProcessor<'a, FullKeyAggregate> for FullKeyAggregateProcesso
                 KeysFullKeyAggregateStrategy::new(self.builder)
             } else if !full_key_aggregate.schema().has_dimensions() {
                 InnerJoinFullKeyAggregateStrategy::new(self.builder)
+            } else if self.builder.templates().supports_union_full_key_aggregate()
+                && full_key_aggregate.multi_stage_subquery_refs().len() > 1
+            {
+                UnionFullKeyAggregateStrategy::new(self.builder)
             } else if self.builder.templates().supports_full_join() {
                 FullJoinFullKeyAggregateStrategy::new(self.builder)
             } else {
