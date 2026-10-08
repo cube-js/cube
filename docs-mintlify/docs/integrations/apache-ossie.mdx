@@ -79,7 +79,7 @@ to take from the Ossie model, and defaults to the dialect of the deployment's de
 The response is `202` with a `conversionId`, a `statusUrl` and a `resultUrl`. Poll `GET` on the
 `statusUrl` until the status is no longer `QUEUED` or `RUNNING`:
 
-- `COMPLETED`: a result is available. Its `outcome` is `success` or `failed`.
+- `COMPLETED`: the conversion produced a result. Its `outcome` is `success` or `failed`.
 - `FAILED`: the conversion ended without a result; `error` says why.
 - `CANCELLED`: the conversion was cancelled with `DELETE` on the `statusUrl`.
 
@@ -113,16 +113,20 @@ if [[ "$status" != COMPLETED ]]; then
   exit 1
 fi
 
-for _ in {1..15}; do
-  code=$(curl --silent --show-error -o result.json -w '%{http_code}' -H "$auth" "$api/$id/result")
-  [[ "$code" == 409 ]] || break
-  sleep 2
-done
-[[ "$code" == 200 ]] || { cat result.json; exit 1; }
+fetch() {
+  for _ in {1..15}; do
+    code=$(curl --silent --show-error -o "$1.json" -w '%{http_code}' -H "$auth" "$api/$id/$1")
+    [[ "$code" == 409 ]] || break
+    sleep 2
+  done
+  [[ "$code" == 200 ]] || { cat "$1.json"; exit 1; }
+}
 
+fetch result
 jq '{outcome, counts, issues}' result.json
 [[ $(jq -r '.outcome' result.json) == success ]] || exit 1
 
-content=$(curl --fail --silent --show-error -H "$auth" "$api/$id/files" | jq -er '.items[0].content')
+fetch files
+content=$(jq -er '.items[0].content' files.json)
 printf '%s\n' "$content" > ossie.yaml
 ```
