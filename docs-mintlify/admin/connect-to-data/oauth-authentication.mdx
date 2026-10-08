@@ -29,9 +29,9 @@ connection could leak to another.
 
 ## Prerequisites
 
-- A [Cube Cloud][ref-cube-cloud] deployment connected to an
+- A [Cube][ref-cube-cloud] deployment connected to an
   OAuth-capable data source
-- OAuth configured in your data source so that Cube Cloud can
+- OAuth configured in your data source so that Cube can
   obtain per-user tokens (via the **User Credentials** feature)
 - A service account credential (token or password) stored as an
   environment variable for fallback connectivity
@@ -74,8 +74,9 @@ register it with your data source's OAuth provider, then click
 
 Request a refresh token so users don't have to authorize again each time
 the access token expires. For Databricks, add `offline_access` to
-**Scopes** and to the Databricks OAuth app, and set a long enough
-`refresh_token_ttl_in_minutes` on the Databricks OAuth app.
+**Scopes** and to the Databricks OAuth app, and set
+`token_access_policy.refresh_token_ttl_in_minutes` on the Databricks
+OAuth app to how long a user can go before authorizing again.
 
 <Frame>
   <img src="/images/admin/connect-to-data/oauth-fill-fields.png" alt="New OAuth app form with fields for Name, Auth URL, Token URL, Client ID, Client Secret, Scopes, and Redirect URI" />
@@ -171,7 +172,7 @@ import os
 
 @config("driver_factory")
 def driver_factory(ctx: dict) -> dict:
-    # Extract the Cube Cloud security context, which contains
+    # Extract the Cube security context, which contains
     # per-user OAuth credentials when available.
     # "databricks" is the Name of the OAuth app.
     databricks_creds = (
@@ -204,14 +205,17 @@ def driver_factory(ctx: dict) -> dict:
 @config("context_to_orchestrator_id")
 def context_to_orchestrator_id(ctx: dict) -> str:
     # Give each user a separate orchestrator instance (DB connections,
-    # execution queues, pre-aggregation caches)
-    username = (
-        ctx
-        .get("securityContext", {})
-        .get("cubeCloud", {})
-        .get("username", "default")
+    # execution queues, pre-aggregation caches). The driver is cached per
+    # orchestrator, so the key also changes with the user's token.
+    cube_cloud = ctx.get("securityContext", {}).get("cubeCloud", {})
+    username = cube_cloud.get("username", "default")
+    databricks_creds = cube_cloud.get("userCredentials", {}).get("databricks", {})
+    token_key = (
+        databricks_creds.get("issuedAt")
+        if databricks_creds.get("status") == "active"
+        else "fallback"
     )
-    return f"CUBE_APP_{username}"
+    return f"CUBE_APP_{username}_{token_key}"
 ```
 
 </Tab>
@@ -221,7 +225,7 @@ def context_to_orchestrator_id(ctx: dict) -> str:
 ```javascript cube.js
 module.exports = {
   driverFactory: ({ securityContext }) => {
-    // Extract the Cube Cloud security context, which contains
+    // Extract the Cube security context, which contains
     // per-user OAuth credentials when available.
     // `databricks` is the Name of the OAuth app.
     const databricksCreds =
@@ -246,10 +250,17 @@ module.exports = {
   },
 
   // Give each user a separate orchestrator instance (DB connections,
-  // execution queues, pre-aggregation caches)
+  // execution queues, pre-aggregation caches). The driver is cached per
+  // orchestrator, so the key also changes with the user's token.
   contextToOrchestratorId: ({ securityContext }) => {
     const username = securityContext?.cubeCloud?.username ?? "default";
-    return `CUBE_APP_${username}`;
+    const databricksCreds =
+      securityContext?.cubeCloud?.userCredentials?.databricks ?? {};
+    const tokenKey =
+      databricksCreds.status === "active"
+        ? databricksCreds.issuedAt
+        : "fallback";
+    return `CUBE_APP_${username}_${tokenKey}`;
   },
 };
 ```
@@ -277,7 +288,9 @@ module.exports = {
    connection pool, execution queues, and pre-aggregation table cache.
    Without this, Cube would share a single cached connection across all
    users, causing one user's credentials to be reused for another user's
-   queries.
+   queries. Cube builds the driver once per orchestrator, so the key also
+   includes the token's `issuedAt`: when a user authorizes or their token
+   is refreshed, Cube builds a new connection with the current token.
 
 [ref-config]: /reference/configuration/config
 [ref-driver-factory]: /reference/configuration/config#driver_factory
