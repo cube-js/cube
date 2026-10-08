@@ -869,6 +869,20 @@ fn deserialize_loop_inner<IT: InnerTypes>(
                 _ => 1,
             },
             "sqlTemplates" => deserialize_sql_templates(obj.clone())?.len(),
+            "cubeStatic" => {
+                cubesqlplanner::cube_bridge::cube_definition::CubeDefinitionStatic::from_native(
+                    obj.clone(),
+                )?
+                .name
+                .len()
+            }
+            "measureStatic" => {
+                cubesqlplanner::cube_bridge::measure_definition::MeasureDefinitionStatic::from_native(
+                    obj.clone(),
+                )?
+                .measure_type
+                .len()
+            }
             _ => return Err(CubeError::user(format!("Unknown deserialize kind: {kind}"))),
         };
     }

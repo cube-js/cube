@@ -179,6 +179,7 @@
     "SQL API: SQL push down push to cube quoted alias",
     "SQL API: powerbi min max ungrouped flag",
     "SQL API: Window function over measure (running total)",
+    "SQL API: EXTRACT DOW from column reference in SQL push down",
     "SQL API: Timeshift measure from cube",
 
     "---------------------------------------",
@@ -264,6 +265,7 @@
     "SQL API: Rolling Window YTD (year + month + day + date_trunc IN)",
     "SQL API: Rolling Window YTD (year + month + day + date_trunc equal)",
     "SQL API: Window function over measure (running total)",
+    "SQL API: EXTRACT DOW from column reference in SQL push down",
     "SQL API: powerbi min max ungrouped flag",
 
     "---------------------------------------",

@@ -1,0 +1,121 @@
+---
+title: Apache Ossie
+description: Convert Cube data models to and from Apache Ossie, the Open Semantic Interchange format.
+---
+
+<Warning>
+
+Apache Ossie conversion is currently in preview. Reach out to the
+[Cube support team](/admin/account-billing/support) to activate it for your account.
+
+</Warning>
+
+[Apache Ossie (Open Semantic Interchange)](https://github.com/apache/ossie) is an open format
+for exchanging semantic models between tools. Cube converts models in both directions with the
+Apache Ossie Cube converter:
+
+- **Export** converts a Cube data model to one Ossie model: the YAML data model of a deployment's
+  latest successful build, or YAML files you upload, such as a local checkout.
+- **Import** converts an Ossie model to Cube data model files.
+
+Conversion runs in Cube through the [Platform API](/api-reference/introduction). It does not change
+your deployment: an import returns files for you to add to your data model.
+
+## What converts
+
+| Cube | Apache Ossie |
+| --- | --- |
+| Cube | Dataset |
+| Dimension | Field |
+| Measure | Metric |
+| Join | Relationship |
+| View, in an export with `view` | The model's name, description and AI context |
+
+An export with `view` converts only the public members of that view, under the names the view
+gives them. A whole-model export keeps its views in the Ossie model's Cube extensions.
+
+Cube features with no Ossie equivalent, such as segments, pre-aggregations, hierarchies, access
+policies and view curation, are kept in the Ossie model's Cube extensions, so importing the model
+back into Cube restores them. Other tools ignore them. On import, Ossie features with no Cube
+equivalent are kept under `meta.ossie` where Cube has room for them and reported as warnings where
+it does not.
+
+## Issues
+
+Every conversion returns a list of issues:
+
+- `ERROR`: the conversion failed and returned no files, for example a cube that uses `extends`.
+- `WARNING`: something was dropped or changed, for example a skipped Jinja-templated file or a
+  measure whose value can change when a join fans out.
+- `INFO`: something was kept in another form, for example a `geo` dimension split into latitude
+  and longitude fields.
+
+A measure such as `sum` or `avg`, read through a join that fans out, converts with a warning, since
+an Ossie expression cannot carry Cube's fan-out correction. Set `strictFanout` to `true` in the
+conversion request to fail instead. It defaults to `true` for a view export and `false` otherwise.
+
+## Limits
+
+- Only static YAML models convert. JavaScript models and Jinja-templated files are skipped.
+- An upload holds at most 512 `.yml` or `.yaml` files: each file up to 2 MiB, and 20 MiB in total.
+  An Ossie model is at most 2 MiB.
+- Each conversion has 60 seconds to run. Conversions and their results are kept for at most
+  one day.
+- Each user can run two conversions at a time and start six a minute. Over either limit, the API
+  answers `429` with a `Retry-After` header.
+
+## Convert with the Platform API
+
+Use a [Platform API key](/api-reference/authentication) with `SchemaRead` or `SchemaUpdate`
+[access](/admin/users-and-permissions/custom-roles) to the deployment. The endpoints are under
+`/api/v1/deployments/{deploymentId}/ossie-conversions`.
+
+Start a conversion with `POST`. For an export of the deployment's data model, send
+`{"direction": "export"}`, and add `"view": "<name>"` to export one view. To export your own files,
+send `"source": "files"` and `files`, a map of relative paths to YAML. For an import, send
+`{"direction": "import", "ossieYaml": "<document>"}`. On import, `dialect` picks which warehouse SQL
+to take from the Ossie model, and defaults to the dialect of the deployment's default data source.
+
+The response is `202` with a `conversionId`, a `statusUrl` and a `resultUrl`. Poll `GET` on the
+`statusUrl` until the status is no longer `QUEUED` or `RUNNING`:
+
+- `COMPLETED`: a result is available. Its `outcome` is `success` or `failed`.
+- `FAILED`: the conversion ended without a result; `error` says why.
+- `CANCELLED`: the conversion was cancelled with `DELETE` on the `statusUrl`.
+
+`GET` on the `resultUrl` returns the counts and issues, and `GET …/{conversionId}/files` returns
+the files: `ossie.yaml` for an export, or the Cube data model files for an import. Both answer
+`409` unless the status is `COMPLETED`.
+
+This example exports the deployment's data model and requires `curl` and `jq`. Set `CUBE_API_URL`
+to your tenant host without a trailing slash, `DEPLOYMENT_ID` to the deployment, and
+`CUBE_API_TOKEN` to the API key.
+
+```bash
+set -euo pipefail
+
+api="$CUBE_API_URL/api/v1/deployments/$DEPLOYMENT_ID/ossie-conversions"
+auth="Authorization: Bearer $CUBE_API_TOKEN"
+
+conversion=$(curl --fail --silent --show-error -X POST -H "$auth" \
+  -H 'Content-Type: application/json' -d '{"direction": "export"}' "$api")
+id=$(jq -er '.conversionId' <<<"$conversion")
+
+while :; do
+  status=$(curl --fail --silent --show-error -H "$auth" "$api/$id" | jq -r '.status')
+  [[ "$status" == QUEUED || "$status" == RUNNING ]] || break
+  sleep 5
+done
+
+if [[ "$status" != COMPLETED ]]; then
+  curl --fail --silent --show-error -H "$auth" "$api/$id" | jq '{status, error}'
+  exit 1
+fi
+
+result=$(curl --fail --silent --show-error -H "$auth" "$api/$id/result")
+jq '{outcome, counts, issues}' <<<"$result"
+[[ $(jq -r '.outcome' <<<"$result") == success ]] || exit 1
+
+content=$(curl --fail --silent --show-error -H "$auth" "$api/$id/files" | jq -er '.items[0].content')
+printf '%s\n' "$content" > ossie.yaml
+```
