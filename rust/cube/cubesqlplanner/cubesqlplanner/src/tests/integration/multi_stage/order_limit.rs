@@ -106,3 +106,39 @@ async fn test_limit_and_offset() {
         insta::assert_snapshot!(result);
     }
 }
+
+// Multi-stage CTEs are read by the outer query, which applies the requested
+// order itself: a CTE must not sort by the default order (first measure desc).
+#[tokio::test(flavor = "multi_thread")]
+async fn test_multi_stage_ctes_are_not_ordered() {
+    let ctx = create_context();
+
+    let query = indoc! {r#"
+        measures:
+          - orders.amount_prev_month
+          - orders.rolling_sum_3m
+        dimensions:
+          - orders.status
+        time_dimensions:
+          - dimension: orders.created_at
+            granularity: month
+            dateRange:
+              - "2024-01-01"
+              - "2024-03-31"
+        order:
+          - id: orders.status
+        row_limit: "10"
+    "#};
+
+    let sql = ctx.build_sql(query).unwrap();
+    assert_eq!(
+        sql.matches("ORDER BY").count(),
+        1,
+        "only the outer query should be ordered, got:\n{}",
+        sql
+    );
+
+    if let Some(result) = ctx.try_execute_pg(query, SEED).await {
+        insta::assert_snapshot!(result);
+    }
+}

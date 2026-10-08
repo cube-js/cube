@@ -9,13 +9,29 @@ fn create_context() -> TestContext {
 
 const SEED: &str = "integration_multi_stage_tables.sql";
 
-/// PARTITION BY clause bodies (text between `PARTITION BY` and the following
-/// `ORDER BY`) of every window function in `sql`.
+/// PARTITION BY clause bodies of every window function in `sql`.
 fn partition_by_clauses(sql: &str) -> Vec<String> {
     sql.match_indices("PARTITION BY")
         .map(|(i, _)| {
             let rest = &sql[i + "PARTITION BY".len()..];
-            let end = rest.find("ORDER BY").unwrap_or(rest.len());
+            // The clause ends at the window's own `ORDER BY` or at the `)`
+            // closing `OVER (`, whichever comes first.
+            let mut depth = 0;
+            let end = rest
+                .char_indices()
+                .find(|&(j, c)| match c {
+                    '(' => {
+                        depth += 1;
+                        false
+                    }
+                    ')' if depth == 0 => true,
+                    ')' => {
+                        depth -= 1;
+                        false
+                    }
+                    _ => depth == 0 && rest[j..].starts_with("ORDER BY"),
+                })
+                .map_or(rest.len(), |(j, _)| j);
             rest[..end].to_string()
         })
         .collect()

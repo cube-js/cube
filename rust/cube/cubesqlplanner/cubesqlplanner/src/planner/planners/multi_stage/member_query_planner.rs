@@ -9,8 +9,8 @@ use crate::planner::symbols::transforms;
 use crate::planner::GranularityHelper;
 use crate::planner::MemberSymbol;
 use crate::planner::MultiStageGrain;
+use crate::planner::QueryProperties;
 use crate::planner::TimeDimensionSymbol;
-use crate::planner::{OrderByItem, QueryProperties};
 
 use cubenativeutils::CubeError;
 use itertools::Itertools;
@@ -268,7 +268,6 @@ impl MultiStageMemberQueryPlanner {
             schema,
             is_ungrouped: self.description.member().is_ungrupped(),
             rolling_window,
-            order_by: self.query_order_by()?,
             time_series_input: MultiStageSubqueryRef::builder()
                 .name(inputs[0].0.clone())
                 .symbols(inputs[0].1.clone())
@@ -387,7 +386,6 @@ impl MultiStageMemberQueryPlanner {
             .calculation_type(calculation_type)
             .partition_by(partition_by)
             .window_function_to_use(window_function_to_use)
-            .order_by(self.query_order_by()?)
             .source(Rc::new(
                 FullKeyAggregate::builder()
                     .schema(full_key_aggregate_schema)
@@ -462,7 +460,6 @@ impl MultiStageMemberQueryPlanner {
         let full_key_aggregate_schema = self.input_schema();
         let result = MultiStageDimensionCalculation::builder()
             .schema(schema)
-            .order_by(self.query_order_by()?)
             .multi_stage_dimension(cte_member.clone())
             .source(Rc::new(
                 FullKeyAggregate::builder()
@@ -536,6 +533,8 @@ impl MultiStageMemberQueryPlanner {
             .ungrouped(self.description.member().is_ungrupped())
             .query_join_hints(self.query_properties.query_join_hints().clone())
             .allow_multi_stage(false)
+            // A CTE's row order is invisible to the query reading it.
+            .order_by(Some(vec![]))
             .disable_external_pre_aggregations(
                 self.query_properties.disable_external_pre_aggregations(),
             )
@@ -632,22 +631,6 @@ impl MultiStageMemberQueryPlanner {
             dimensions
         };
         dimensions
-    }
-
-    fn query_order_by(&self) -> Result<Vec<OrderByItem>, CubeError> {
-        let member_node = self.description.member_node();
-        let measures = if member_node.as_measure().is_ok() {
-            vec![member_node.clone()]
-        } else {
-            vec![]
-        };
-
-        let order_items = QueryProperties::default_order(
-            &self.description.state().dimensions(),
-            &self.description.state().time_dimensions(),
-            &measures,
-        );
-        Ok(order_items)
     }
 }
 

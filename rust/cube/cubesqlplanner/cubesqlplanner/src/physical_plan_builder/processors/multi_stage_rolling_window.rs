@@ -161,10 +161,6 @@ impl<'a> LogicalNodeProcessor<'a, MultiStageRollingWindow>
                 })
                 .collect::<Result<Vec<_>, _>>()?;
             select_builder.set_group_by(group_by);
-            select_builder.set_order_by(
-                self.builder
-                    .make_order_by(&schema, &rolling_window.order_by)?,
-            );
         }
 
         let select = Rc::new(select_builder.build(query_tools.clone(), context_factory));

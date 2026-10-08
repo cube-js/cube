@@ -1,5 +1,4 @@
 use crate::logical_plan::*;
-use crate::planner::query_properties::OrderByItem;
 use crate::planner::MemberSymbol;
 use cubenativeutils::CubeError;
 use itertools::Itertools;
@@ -55,8 +54,6 @@ pub struct MultiStageMeasureCalculation {
     #[builder(default)]
     partition_by: Vec<Rc<MemberSymbol>>,
     window_function_to_use: MultiStageCalculationWindowFunction,
-    #[builder(default)]
-    order_by: Vec<OrderByItem>,
     source: Rc<FullKeyAggregate>,
 }
 
@@ -79,10 +76,6 @@ impl MultiStageMeasureCalculation {
 
     pub fn window_function_to_use(&self) -> &MultiStageCalculationWindowFunction {
         &self.window_function_to_use
-    }
-
-    pub fn order_by(&self) -> &Vec<OrderByItem> {
-        &self.order_by
     }
 
     pub fn source(&self) -> &Rc<FullKeyAggregate> {
@@ -124,19 +117,6 @@ impl PrettyPrint for MultiStageMeasureCalculation {
         if self.is_ungrouped() {
             result.println("is_ungrouped: true", &state);
         }
-        if !self.order_by().is_empty() {
-            result.println("order_by:", &state);
-            for order_by in self.order_by().iter() {
-                result.println(
-                    &format!(
-                        "{} {}",
-                        order_by.name(),
-                        if order_by.desc() { "desc" } else { "asc" }
-                    ),
-                    &details_state,
-                );
-            }
-        }
         result.println("source:", &state);
         self.source().pretty_print(result, &details_state);
     }
@@ -162,7 +142,6 @@ impl LogicalNode for MultiStageMeasureCalculation {
                 .calculation_type(self.calculation_type().clone())
                 .partition_by(self.partition_by().clone())
                 .window_function_to_use(self.window_function_to_use().clone())
-                .order_by(self.order_by().clone())
                 .source(source.clone().into_logical_node()?)
                 .build(),
         ))

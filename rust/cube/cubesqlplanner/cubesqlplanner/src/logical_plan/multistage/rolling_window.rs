@@ -1,5 +1,4 @@
 use crate::logical_plan::*;
-use crate::planner::query_properties::OrderByItem;
 use crate::planner::Granularity;
 use crate::planner::MemberSymbol;
 use cubenativeutils::CubeError;
@@ -71,7 +70,6 @@ pub struct MultiStageRollingWindow {
     pub is_ungrouped: bool,
     pub rolling_time_dimension: Rc<MemberSymbol>,
     pub rolling_window: MultiStageRollingWindowType,
-    pub order_by: Vec<OrderByItem>,
     pub time_series_input: MultiStageSubqueryRef,
     pub measure_input: MultiStageSubqueryRef,
     pub time_dimension_in_measure_input: Rc<MemberSymbol>, //time dimension in measure input can have different granularity
@@ -93,19 +91,6 @@ impl PrettyPrint for MultiStageRollingWindow {
             ),
             state,
         );
-        if !self.order_by.is_empty() {
-            result.println("order_by:", &state);
-            for order_by in self.order_by.iter() {
-                result.println(
-                    &format!(
-                        "{} {}",
-                        order_by.name(),
-                        if order_by.desc() { "desc" } else { "asc" }
-                    ),
-                    &details_state,
-                );
-            }
-        }
         result.println("time_series_input:", &state);
         self.time_series_input.pretty_print(result, &details_state);
         result.println("measure_input:", &state);

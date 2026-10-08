@@ -1,6 +1,5 @@
 use crate::logical_plan::*;
 use crate::planner::collectors::has_multi_stage_members;
-use crate::planner::query_properties::OrderByItem;
 use crate::planner::{MemberId, MemberSymbol};
 use cubenativeutils::CubeError;
 use itertools::Itertools;
@@ -13,8 +12,6 @@ use typed_builder::TypedBuilder;
 pub struct MultiStageDimensionCalculation {
     schema: Rc<LogicalSchema>,
     multi_stage_dimension: Rc<MemberSymbol>,
-    #[builder(default)]
-    order_by: Vec<OrderByItem>,
     source: Rc<FullKeyAggregate>,
 }
 
@@ -25,10 +22,6 @@ impl MultiStageDimensionCalculation {
 
     pub fn multi_stage_dimension(&self) -> &Rc<MemberSymbol> {
         &self.multi_stage_dimension
-    }
-
-    pub fn order_by(&self) -> &Vec<OrderByItem> {
-        &self.order_by
     }
 
     pub fn source(&self) -> &Rc<FullKeyAggregate> {
@@ -75,19 +68,6 @@ impl PrettyPrint for MultiStageDimensionCalculation {
         let details_state = state.new_level();
         result.println("schema:", &state);
         self.schema().pretty_print(result, &details_state);
-        if !self.order_by().is_empty() {
-            result.println("order_by:", &state);
-            for order_by in self.order_by().iter() {
-                result.println(
-                    &format!(
-                        "{} {}",
-                        order_by.name(),
-                        if order_by.desc() { "desc" } else { "asc" }
-                    ),
-                    &details_state,
-                );
-            }
-        }
         result.println("source:", &state);
         self.source().pretty_print(result, &details_state);
     }
@@ -109,7 +89,6 @@ impl LogicalNode for MultiStageDimensionCalculation {
         Ok(Rc::new(
             Self::builder()
                 .schema(self.schema().clone())
-                .order_by(self.order_by().clone())
                 .multi_stage_dimension(self.multi_stage_dimension.clone())
                 .source(source.clone().into_logical_node()?)
                 .build(),

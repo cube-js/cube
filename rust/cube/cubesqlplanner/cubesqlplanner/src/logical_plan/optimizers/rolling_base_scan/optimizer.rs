@@ -178,7 +178,6 @@ impl RollingBaseScanOptimizer {
                     is_ungrouped: window.is_ungrouped,
                     rolling_time_dimension: window.rolling_time_dimension.clone(),
                     rolling_window: window.rolling_window.clone(),
-                    order_by: window.order_by.clone(),
                     time_series_input: window.time_series_input.clone(),
                     measure_input,
                     time_dimension_in_measure_input: window.time_dimension_in_measure_input.clone(),
