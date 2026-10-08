@@ -218,8 +218,16 @@ fn model_files(dir: &Path) -> Result<Map<String, Value>> {
             continue;
         }
 
-        let content = std::fs::read_to_string(&path)
-            .with_context(|| format!("failed to read {}", path.display()))?;
+        let content = match std::fs::read_to_string(&path) {
+            Ok(content) => content,
+            // Not UTF-8, so not a model the server would accept: skip it like other YAML.
+            Err(err) if err.kind() == std::io::ErrorKind::InvalidData => continue,
+            Err(err) => {
+                return Err(
+                    anyhow::Error::new(err).context(format!("failed to read {}", path.display()))
+                )
+            }
+        };
         if is_cube_model_yaml(&content) {
             files.insert(rel, Value::String(content));
         }
@@ -497,7 +505,10 @@ async fn finish(
             output::print_json(&doc);
         }
 
-        bail!("Ossie conversion {id} failed; see its ERROR issues");
+        bail!(
+            "Ossie conversion {id} ended with outcome `{}`, not `success`; see its issues",
+            util::one_cell(&util::status_of(&result, "outcome"))
+        );
     }
 
     // The document goes out on failure too: its `conversionId` is how a pipeline recovers.
@@ -898,6 +909,10 @@ mod tests {
         write(&root, "cube.js", "module.exports = {};\n");
         write(&root, ".github/workflows/ci.yml", "cubes: []\n");
         write(&root, "node_modules/pkg/cubes.yml", "cubes: []\n");
+        // A Latin-1 file elsewhere in the project is skipped rather than failing the export.
+        let latin1 = root.join("config/legacy.yml");
+        std::fs::create_dir_all(latin1.parent().unwrap()).unwrap();
+        std::fs::write(&latin1, b"name: caf\xe9\n").unwrap();
 
         let files = model_files(&root).unwrap();
         assert_eq!(
