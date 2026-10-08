@@ -34,7 +34,6 @@ impl<C: Context<'static> + 'static, V: Object + 'static> ObjectNeonTypeHolder<C,
         self.map_neon_object_with_error(|cx, object| Ok(f(cx, object)?))
     }
 
-    /// Maps an object with a callback that can also return native errors.
     pub fn map_neon_object_with_error<T, F>(&self, f: F) -> Result<T, CubeError>
     where
         F: FnOnce(&mut C, &Handle<'static, V>) -> Result<T, CubeError>,

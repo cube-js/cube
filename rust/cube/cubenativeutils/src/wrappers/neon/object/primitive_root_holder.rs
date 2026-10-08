@@ -132,7 +132,6 @@ pub(crate) fn read_js_string<'cx, C: Context<'cx>>(
     }
 }
 
-/// Borrows the complete UTF-8 string from `buf` when it fits; otherwise reads an owned copy.
 pub(crate) fn read_js_string_into<'cx, 'buf, C: Context<'cx>>(
     cx: &mut C,
     value: Handle<'cx, JsString>,
@@ -149,7 +148,7 @@ pub(crate) fn read_js_string_into<'cx, 'buf, C: Context<'cx>>(
     }
 }
 
-/// Copies into spare capacity and returns its initialized prefix, possibly truncated.
+/// The result may be a truncated prefix of the string.
 fn copy_js_utf8<'cx, 'buf, C: Context<'cx>>(
     cx: &mut C,
     value: Handle<'cx, JsString>,

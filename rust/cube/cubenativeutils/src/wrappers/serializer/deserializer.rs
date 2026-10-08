@@ -202,7 +202,7 @@ impl<'de, IT: InnerTypes> SeqAccess<'de> for NativeSeqDeserializer<IT> {
 
 struct NativeMapDeserializer<IT: InnerTypes, K: AsRef<str>> {
     entries: std::vec::IntoIter<(K, NativeObjectHandle<IT>)>,
-    // Set in `next_key_seed`; the key stays here for the error context of its value.
+    // Keeps the key for the error context of its value.
     current: Option<(K, NativeObjectHandle<IT>)>,
 }
 

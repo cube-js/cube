@@ -12,12 +12,10 @@ use neon::prelude::*;
 use neon::thread::LocalKey;
 use std::mem::MaybeUninit;
 
-/// `Object.keys`, looked up once per addon instance.
 static OBJECT_KEYS: LocalKey<Root<JsFunction>> = LocalKey::new();
 
-/// Own enumerable string keys, as `Object.keys` returns them. N-API's
-/// `napi_get_all_property_names` always collects keys through V8's slow `KeyAccumulator` (a hash
-/// set per call); `Object.keys` copies the enum cache of the object's map instead.
+/// N-API's `napi_get_all_property_names` always collects keys through V8's slow `KeyAccumulator`
+/// (a hash set per call); `Object.keys` copies the enum cache of the object's map instead.
 fn object_keys<C: Context<'static>>(
     cx: &mut C,
     object: Handle<'static, JsObject>,
@@ -47,8 +45,6 @@ impl<C: Context<'static> + 'static> NeonStruct<C> {
         Self { object }
     }
 
-    /// Own string-keyed properties whose key `select` maps to `Some`, read in one `with_context`;
-    /// values of skipped keys are never read.
     fn collect_entries<K: std::fmt::Display>(
         &self,
         capacity_limit: usize,
