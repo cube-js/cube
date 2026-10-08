@@ -116,5 +116,6 @@ result=$(curl --fail --silent --show-error -H "$auth" "$api/$id/result")
 jq '{outcome, counts, issues}' <<<"$result"
 [[ $(jq -r '.outcome' <<<"$result") == success ]] || exit 1
 
-curl --fail --silent --show-error -H "$auth" "$api/$id/files" | jq -er '.items[0].content' > ossie.yaml
+content=$(curl --fail --silent --show-error -H "$auth" "$api/$id/files" | jq -er '.items[0].content')
+printf '%s\n' "$content" > ossie.yaml
 ```
