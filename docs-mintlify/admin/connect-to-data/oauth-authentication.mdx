@@ -47,8 +47,9 @@ schemas — to limit exposure. To reject those queries instead, make
 `driver_factory` fail closed for user requests and keep the service
 account token only for the refresh worker's context, as in the
 [per-user OIDC token example][ref-oidc-per-user]. Fail closed with a
-non-empty token the warehouse rejects: an empty `token` makes the
-Databricks driver read the service account token from the environment.
+non-empty token the warehouse rejects: an empty token makes the
+Databricks and Snowflake drivers read a credential from the environment
+instead.
 
 Anyone who can sign tokens with the deployment's API secret can set
 `cubeCloud.username` and query as that user, with that user's OAuth
@@ -313,7 +314,8 @@ module.exports = {
    is refreshed, Cube builds a new connection with the current token. The
    trade-off: each refresh starts the user on a new orchestrator with an
    empty cache and new connections, and superseded orchestrators keep
-   theirs until they are evicted from the orchestrator cache.
+   theirs, which the liveness probe keeps testing, until they are evicted
+   from the orchestrator cache.
 
 [ref-config]: /reference/configuration/config
 [ref-driver-factory]: /reference/configuration/config#driver_factory
