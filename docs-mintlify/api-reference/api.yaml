@@ -444,6 +444,12 @@ paths:
           defaults.
 
 
+          Pass `layout: print` with `format: pdf` for the paginated A4 document the dashboard's
+          "Print version" menu item produces — one column, every table row, the filter state as a
+          summary line — instead of the default `screenshot` of the board. `print` with `format:
+          png` returns `400`.
+
+
           By default the dashboard renders under the calling user's own security context, so the
           file shows what that user would see. Requires **manage** access to the dashboard's
           workbook — the same permission the console's own "Download as PNG / PDF" actions require,
@@ -884,12 +890,14 @@ paths:
         - in: query
           name: status
           schema:
+            description: Return only runs with this status.
             oneOf:
               - $ref: '#/components/schemas/DbtSyncRunsQueryStatus'
               - type: 'null'
         - in: query
           name: trigger
           schema:
+            description: Return only runs started this way.
             oneOf:
               - $ref: '#/components/schemas/DbtSyncRunsQueryTrigger'
               - type: 'null'
@@ -1086,6 +1094,25 @@ paths:
         - in: query
           name: accessSource
           schema:
+            description: >-
+              Filter workbooks by how access is granted:
+
+
+              - `tenant`: the workbook itself is explicitly shared with the named embed tenant.
+              Excludes workbooks available only through the all-embed-users group or a shared
+              folder.
+
+              - `allEmbedUsers`: the workbook itself is explicitly shared with the built-in
+              all-embed-users group, making it available to every embed tenant. Excludes
+              tenant-specific direct shares and folder-inherited access.
+
+              - `folder`: access is inherited because the workbook is inside a shared folder or any
+              of its descendant folders. The folder may be shared specifically with the named tenant
+              or with all embed users.
+
+
+              Omit this parameter to return the union of all three access sources. A workbook can
+              match more than one source.
             oneOf:
               - $ref: '#/components/schemas/EmbedTenantWorkbooksListQueryAccessSource'
               - type: 'null'
@@ -1658,59 +1685,59 @@ paths:
         - in: query
           name: dashboardId
           schema:
-            oneOf:
-              - minimum: 1
-                type: integer
-              - type: 'null'
             description: >-
               Optional filter: only return notifications for this numeric dashboard id. Provide this
               OR dashboardPublicId, not both.
-        - in: query
-          name: dashboardPublicId
-          schema:
-            oneOf:
-              - type: string
-              - type: 'null'
-            description: >-
-              Optional filter: only return notifications for this dashboard public id. Provide this
-              OR dashboardId, not both.
-        - in: query
-          name: recipientUserId
-          schema:
             oneOf:
               - minimum: 1
                 type: integer
               - type: 'null'
+        - in: query
+          name: dashboardPublicId
+          schema:
+            description: >-
+              Optional filter: only return notifications for this dashboard public id. Provide this
+              OR dashboardId, not both.
+            oneOf:
+              - type: string
+              - type: 'null'
+        - in: query
+          name: recipientUserId
+          schema:
             description: >-
               Optional filter: only return notifications received by this user, by user id. Mutually
               exclusive with recipientEmail and the embed-user filter.
+            oneOf:
+              - minimum: 1
+                type: integer
+              - type: 'null'
         - in: query
           name: recipientEmail
           schema:
-            oneOf:
-              - type: string
-              - type: 'null'
             description: >-
               Optional filter: only return notifications received by this user, by email. Mutually
               exclusive with recipientUserId and the embed-user filter.
+            oneOf:
+              - type: string
+              - type: 'null'
         - in: query
           name: recipientEmbedTenantName
           schema:
-            oneOf:
-              - type: string
-              - type: 'null'
             description: >-
               Optional filter: only return notifications received by this embed user. Required
               together with recipientExternalId; mutually exclusive with the user filters.
-        - in: query
-          name: recipientExternalId
-          schema:
             oneOf:
               - type: string
               - type: 'null'
+        - in: query
+          name: recipientExternalId
+          schema:
             description: >-
               Optional filter: only return notifications received by this embed user. Required
               together with recipientEmbedTenantName; mutually exclusive with the user filters.
+            oneOf:
+              - type: string
+              - type: 'null'
         - in: query
           name: after
           schema:
@@ -2083,29 +2110,32 @@ paths:
         - in: query
           name: reportId
           schema:
+            description: Only deliveries of this report.
             oneOf:
               - minimum: 1
                 type: integer
               - type: 'null'
-            description: Only deliveries of this report.
         - in: query
           name: ownerUserId
           schema:
+            description: Only deliveries owned by this user.
             oneOf:
               - minimum: 0
                 type: integer
               - type: 'null'
-            description: Only deliveries owned by this user.
         - in: query
           name: spreadsheet
           schema:
+            description: Only deliveries into this spreadsheet (its URL or its id).
             oneOf:
               - type: string
               - type: 'null'
-            description: Only deliveries into this spreadsheet (its URL or its id).
         - in: query
           name: status
           schema:
+            description: >-
+              Only deliveries in this status, e.g. `failing` or `no_sheet_access` for the ones
+              needing attention.
             oneOf:
               - $ref: '#/components/schemas/GetReportDeliveriesQueryStatus'
               - type: 'null'
@@ -2339,6 +2369,7 @@ paths:
         - in: query
           name: sortDirection
           schema:
+            description: 'Order by when the run started: `DESC` (default) is newest first.'
             oneOf:
               - $ref: '#/components/schemas/GetReportDeliveryRunsQuerySortDirection'
               - type: 'null'
@@ -2976,8 +3007,9 @@ paths:
         - Scheduled Tasks
       x-mint:
         content: >-
-          Every scheduled task in the deployment, most recently updated first, with its next run
-          time. Needs access to the deployment; embed sessions get `403`.
+          The scheduled tasks in the deployment the caller can see — their own and those shared with
+          them, or every task for an admin — most recently updated first, with each next run time.
+          Needs access to the deployment; embed sessions get `403`.
     post:
       operationId: createScheduledTask
       parameters:
@@ -3057,6 +3089,10 @@ paths:
       summary: Get a scheduled task
       tags:
         - Scheduled Tasks
+      x-mint:
+        content: >-
+          A task is visible to its creator, to admins and to whoever it is shared with; anyone else
+          gets `404`.
     put:
       operationId: updateScheduledTask
       parameters:
@@ -3859,7 +3895,7 @@ paths:
 
 
           Returns the new `content` and `hash`. Pass `expectedHash` to get `409` instead of editing
-          a draft that changed since you read it. Requires **manage** access to the workbook.
+          a draft that changed since you read it. Requires **edit** access to the workbook.
   /api/v1/deployments/{deploymentId}/workbooks/{workbookId}/duplicate:
     post:
       operationId: duplicateWorkbook
@@ -4942,10 +4978,10 @@ paths:
         - in: query
           name: search
           schema:
+            description: Case-insensitive substring match against the embed user’s email or external id.
             oneOf:
               - type: string
               - type: 'null'
-            description: Case-insensitive substring match against the embed user’s email or external id.
         - in: query
           name: after
           schema:
@@ -7233,6 +7269,8 @@ components:
             - type: 'null'
         applyThemeGlobally:
           type: boolean
+        boardDashboardsEnabled:
+          type: boolean
         creatorMode:
           oneOf:
             - $ref: '#/components/schemas/CreatorMode'
@@ -7260,6 +7298,7 @@ components:
         - restrictDataDownload
         - sheetsAgentChatEnabled
         - dashboardAppsEnabled
+        - boardDashboardsEnabled
         - aiPaywalled
       type: object
     AppTheme:
@@ -7923,15 +7962,15 @@ components:
     CreateDeploymentTokenInput:
       properties:
         expiresIn:
+          description: >-
+            Token lifetime in seconds, between 60 and 86400. Omit to keep the historical default of
+            24 hours (86400). Callers that hold the token outside a browser session — scripts, BI
+            tools, scheduled jobs — should request a short lifetime and re-issue tokens instead.
           oneOf:
             - maximum: 86400
               type: integer
               minimum: 60
             - type: 'null'
-          description: >-
-            Token lifetime in seconds, between 60 and 86400. Omit to keep the historical default of
-            24 hours (86400). Callers that hold the token outside a browser session — scripts, BI
-            tools, scheduled jobs — should request a short lifetime and re-issue tokens instead.
       type: object
     CreateEmbedDashboardCommentBody:
       properties:
@@ -7949,11 +7988,11 @@ components:
     CreateEmbedGroupInput:
       properties:
         description:
+          description: Optional human-readable description.
           oneOf:
             - maxLength: 500
               type: string
             - type: 'null'
-          description: Optional human-readable description.
         name:
           description: >-
             Group name, unique within the embed tenant. The `system:` prefix is reserved and
@@ -7983,65 +8022,65 @@ components:
     CreateNotificationInput:
       properties:
         customCron:
+          description: Custom cron expression (required if scheduleType is CUSTOM)
           oneOf:
             - type: string
             - type: 'null'
-          description: Custom cron expression (required if scheduleType is CUSTOM)
         dashboardId:
-          oneOf:
-            - type: integer
-            - type: 'null'
           description: >-
             Numeric id of the dashboard to run on the schedule. Provide this OR dashboardPublicId
             (exactly one).
-        dashboardPublicId:
           oneOf:
-            - type: string
+            - type: integer
             - type: 'null'
+        dashboardPublicId:
           description: >-
             Public id of the dashboard to run on the schedule. Provide this OR dashboardId (exactly
             one).
+          oneOf:
+            - type: string
+            - type: 'null'
         dayOfMonth:
-          oneOf:
-            - type: integer
-            - type: 'null'
           description: Day of month (1-31)
-        dayOfWeek:
           oneOf:
             - type: integer
             - type: 'null'
+        dayOfWeek:
           description: Day of week (0-6, Sunday=0)
+          oneOf:
+            - type: integer
+            - type: 'null'
         filters:
+          description: >-
+            Dimension filters applied to the dashboard when the notification is rendered
+            (substituted into the screenshot/PDF for every recipient).
           oneOf:
             - items:
                 $ref: '#/components/schemas/DashboardFilterInput'
               type: array
             - type: 'null'
-          description: >-
-            Dimension filters applied to the dashboard when the notification is rendered
-            (substituted into the screenshot/PDF for every recipient).
         hour:
+          description: Hour of the day (0-23)
           oneOf:
             - type: integer
             - type: 'null'
-          description: Hour of the day (0-23)
         memberSwitchers:
+          description: Field-switcher selections applied to the dashboard when the notification is rendered.
           oneOf:
             - items:
                 $ref: '#/components/schemas/DashboardMemberSwitcherInput'
               type: array
             - type: 'null'
-          description: Field-switcher selections applied to the dashboard when the notification is rendered.
         minute:
+          description: Minute of the hour (0-59)
           oneOf:
             - type: integer
             - type: 'null'
-          description: Minute of the hour (0-59)
         notificationAiSummary:
+          description: Include an AI-generated "what changed" summary in the notification body. Off by default.
           oneOf:
             - type: boolean
             - type: 'null'
-          description: Include an AI-generated "what changed" summary in the notification body. Off by default.
         notificationEnabled:
           oneOf:
             - type: boolean
@@ -8052,18 +8091,19 @@ components:
             - type: 'null'
         scheduleType:
           $ref: '#/components/schemas/CreateNotificationInputScheduleType'
+          description: Type of schedule
         timeGrains:
+          description: Time-grain overrides applied to the dashboard when the notification is rendered.
           oneOf:
             - items:
                 $ref: '#/components/schemas/DashboardTimeGrainInput'
               type: array
             - type: 'null'
-          description: Time-grain overrides applied to the dashboard when the notification is rendered.
         timezone:
+          description: Timezone for the schedule (e.g. "America/New_York")
           oneOf:
             - type: string
             - type: 'null'
-          description: Timezone for the schedule (e.g. "America/New_York")
       required:
         - scheduleType
       type: object
@@ -8162,31 +8202,35 @@ components:
           minLength: 1
           type: string
         notifications:
-          oneOf:
-            - $ref: '#/components/schemas/ReportDeliveryNotificationsInput'
-            - type: 'null'
           description: >-
             How the owner hears that the delivery failed or recovered. A delivery that runs more
             than once a day reports only changes in its status; a daily or rarer one reports every
             failed run. Omit it for the inbox only.
+          oneOf:
+            - $ref: '#/components/schemas/ReportDeliveryNotificationsInput'
+            - type: 'null'
         reportId:
           description: >-
             Id of the report whose results are delivered. It must belong to this deployment, and the
             caller must be able to read it.
           type: integer
         schedule:
+          description: When the delivery runs. Omit it for a delivery that runs only on request.
           oneOf:
             - $ref: '#/components/schemas/ReportDeliveryScheduleInput'
             - type: 'null'
-          description: When the delivery runs. Omit it for a delivery that runs only on request.
         shape:
-          oneOf:
-            - $ref: '#/components/schemas/ReportDeliveryShapeInput'
-            - type: 'null'
           description: >-
             Which columns land in the sheet, in what order, under which headers. Omit it to deliver
             every column the query returns, in its order, headed by its name.
+          oneOf:
+            - $ref: '#/components/schemas/ReportDeliveryShapeInput'
+            - type: 'null'
         writeMode:
+          description: >-
+            What each run does with what the previous one wrote. `overwrite` (the default) replaces
+            the delivered block. `append` adds the whole result below it, header only on the first
+            run and no deduplication. `new_sheet` writes each run to a new tab.
           oneOf:
             - $ref: '#/components/schemas/CreateReportDeliveryInputWriteMode'
             - type: 'null'
@@ -8293,40 +8337,40 @@ components:
     CreateScheduledTaskInput:
       properties:
         agentId:
+          description: The agent that runs the task. Omit for the deployment default.
           oneOf:
             - type: integer
             - type: 'null'
-          description: The agent that runs the task. Omit for the deployment default.
         cronExpression:
-          oneOf:
-            - maxLength: 100
-              type: string
-            - type: 'null'
           description: >-
             Standard 5-field cron (minute hour day-of-month month day-of-week), e.g. `0 9 * * 1-5`
             for 9:00 on weekdays. A task runs at most once an hour, so the minute field is a single
             number. Null or omitted makes the task Manual: it runs only when started with `POST
             /scheduled-tasks/{taskId}/run`.
+          oneOf:
+            - maxLength: 100
+              type: string
+            - type: 'null'
         description:
           oneOf:
             - type: string
             - type: 'null'
         isEnabled:
+          description: Create the schedule paused with `false`. Defaults to `true`.
           oneOf:
             - type: boolean
             - type: 'null'
-          description: Create the schedule paused with `false`. Defaults to `true`.
         name:
           maxLength: 255
           minLength: 1
           type: string
         notificationEnabled:
-          oneOf:
-            - type: boolean
-            - type: 'null'
           description: >-
             Notify the creator in Cube's notification inbox when a run finishes, whether it succeeds
             or fails. Defaults to `false`.
+          oneOf:
+            - type: boolean
+            - type: 'null'
         prompt:
           description: >-
             What the agent is asked on every run, shown as the task's Instructions in Cube. Each run
@@ -8334,11 +8378,11 @@ components:
           minLength: 1
           type: string
         timezone:
+          description: IANA time zone the cron is read in, e.g. `America/New_York`. Defaults to `UTC`.
           oneOf:
             - maxLength: 100
               type: string
             - type: 'null'
-          description: IANA time zone the cron is read in, e.g. `America/New_York`. Defaults to `UTC`.
       required:
         - name
         - prompt
@@ -8916,22 +8960,25 @@ components:
     DashboardExportStatusResponse:
       properties:
         contentType:
-          oneOf:
-            - type: string
-            - type: 'null'
           description: MIME type of the rendered file. Present once `status` is `completed`.
-        error:
           oneOf:
             - type: string
             - type: 'null'
+        error:
           description: Why the render failed. Present only when `status` is `failed`.
+          oneOf:
+            - type: string
+            - type: 'null'
         progress:
+          description: Rendering progress, 0-100, when the renderer reports one.
           oneOf:
             - type: number
             - type: 'null'
-          description: Rendering progress, 0-100, when the renderer reports one.
         status:
           $ref: '#/components/schemas/DashboardExportStatusResponseStatus'
+          description: >-
+            Job lifecycle: `pending` and `processing` mean keep polling, `completed` means the file
+            is ready to download, `failed` means it will never be.
       required:
         - status
       type: object
@@ -8977,29 +9024,33 @@ components:
     DashboardFilterInput:
       properties:
         caseSensitive:
-          oneOf:
-            - {}
-            - type: 'null'
           description: 'For string filters: whether matching is case-sensitive'
-        endInclusive:
           oneOf:
             - {}
             - type: 'null'
+        endInclusive:
           description: 'For between filters: whether the end bound is inclusive'
+          oneOf:
+            - {}
+            - type: 'null'
         member:
           description: Dimension path, e.g. "Orders.status"
           pattern: .+\..+
           type: string
         operator:
+          description: Filter operator (defaults to "equals")
           oneOf:
             - $ref: '#/components/schemas/DashboardFilterInputOperator'
             - type: 'null'
         startInclusive:
+          description: 'For between filters: whether the start bound is inclusive'
           oneOf:
             - {}
             - type: 'null'
-          description: 'For between filters: whether the start bound is inclusive'
         value:
+          description: >-
+            Filter value. Omit for is_null / is_not_null / is_empty / is_not_empty; provide a
+            2-element [start, end] array for between.
           oneOf:
             - oneOf:
                 - type: string
@@ -9008,9 +9059,6 @@ components:
                 - type: array
                   items: {}
             - type: 'null'
-          description: >-
-            Filter value. Omit for is_null / is_not_null / is_empty / is_not_empty; provide a
-            2-element [start, end] array for between.
       required:
         - member
       type: object
@@ -9649,36 +9697,39 @@ components:
           type: string
         selectionMode:
           $ref: '#/components/schemas/DatabricksMetricViewPublicationPreviewInputSelectionMode'
+          description: >-
+            Choose every deployed Cube view ('all'), an exact ordered list ('selected'), or names
+            matching viewNameRegex ('pattern').
         sourceOverrides:
-          oneOf:
-            - type: object
-              additionalProperties:
-                type: string
-            - type: 'null'
           description: >-
             Optional map of Cube view name to the root source dataset the view projects from, for
             view projections where that root would otherwise be ambiguous.
-        targetNames:
           oneOf:
             - type: object
               additionalProperties:
                 type: string
             - type: 'null'
+        targetNames:
           description: Optional Cube view name to Databricks Metric View name overrides.
-        viewNameRegex:
           oneOf:
-            - type: string
+            - type: object
+              additionalProperties:
+                type: string
             - type: 'null'
+        viewNameRegex:
           description: >-
             A safe, bounded regex subset for view names. Supports literals, ^, $, dot, and one .*
             wildcard; grouping, alternation, lookaround, and backreferences are rejected.
+          oneOf:
+            - type: string
+            - type: 'null'
         viewNames:
+          description: Required only when selectionMode is 'selected'.
           oneOf:
             - items:
                 type: string
               type: array
             - type: 'null'
-          description: Required only when selectionMode is 'selected'.
       required:
         - dataSourceName
         - selectionMode
@@ -9901,6 +9952,9 @@ components:
             - type: 'null'
         outcome:
           $ref: '#/components/schemas/DatabricksMetricViewPublicationViewResultOutcome'
+          description: >-
+            'partial' means the view published without measures it cannot represent; read
+            withheldMembers for which.
         source:
           oneOf:
             - type: string
@@ -10017,10 +10071,10 @@ components:
         integrationPublicId:
           type: string
         progress:
+          description: Live progress while the run is active; null once it is terminal.
           oneOf:
             - $ref: '#/components/schemas/DatabricksMetricViewSyncProgressResponse'
             - type: 'null'
-          description: Live progress while the run is active; null once it is terminal.
         runId:
           type: string
         stage:
@@ -10034,6 +10088,9 @@ components:
             - type: 'null'
         status:
           $ref: '#/components/schemas/DatabricksMetricViewSyncRunResponseStatus'
+          description: >-
+            PARTIAL means at least one view published and another did not. Every non-successful view
+            keeps its previous Databricks definition.
         targetCatalog:
           oneOf:
             - type: string
@@ -10115,10 +10172,10 @@ components:
         cubeViewName:
           type: string
         detail:
+          description: A stable reason code, never raw Databricks output.
           oneOf:
             - type: string
             - type: 'null'
-          description: A stable reason code, never raw Databricks output.
         outcome:
           $ref: '#/components/schemas/DatabricksMetricViewSyncViewOutcomeResponseOutcome'
         withheldMembers:
@@ -10199,20 +10256,20 @@ components:
     DbtSyncLogEntry:
       properties:
         durationMs:
+          description: For a phase line, how long the phase took, in milliseconds.
           oneOf:
             - type: integer
             - type: 'null'
-          description: For a phase line, how long the phase took, in milliseconds.
         level:
           description: info or error.
           type: string
         message:
           type: string
         phase:
+          description: The phase this line belongs to, e.g. dbt-compile.
           oneOf:
             - type: string
             - type: 'null'
-          description: The phase this line belongs to, e.g. dbt-compile.
         stream:
           description: >-
             Always "system" in this version. "stdout" and "stderr" join it once dbt’s own output is
@@ -10243,10 +10300,10 @@ components:
     DbtSyncProgress:
       properties:
         message:
+          description: Human-readable description of what the sync is doing right now.
           oneOf:
             - type: string
             - type: 'null'
-          description: Human-readable description of what the sync is doing right now.
         percentComplete:
           description: >-
             Rough completion percentage derived from the stage. Progress reporting only — do not
@@ -10306,52 +10363,52 @@ components:
           description: The Cube branch this sync wrote its generated cubes to.
           type: string
         completedAt:
-          oneOf:
-            - type: string
-            - type: 'null'
           description: >-
             When the sync finished, as an ISO 8601 timestamp, or null while it is still running.
             This is stamped by the process that ran the sync whereas startedAt is stamped by the
             process that launched it — two different clocks — so for a run that failed moments after
             starting, completedAt can even precede startedAt. Use durationMs to show how long a run
             took rather than subtracting these.
+          oneOf:
+            - type: string
+            - type: 'null'
         deploymentId:
           type: integer
         durationMs:
-          oneOf:
-            - type: integer
-            - type: 'null'
           description: >-
             How long the sync took, in milliseconds, and the value to use when showing a duration.
             Measured from a single clock, so it is never negative — prefer it over subtracting
             startedAt from completedAt, which can disagree with it by a small skew.
+          oneOf:
+            - type: integer
+            - type: 'null'
         errorMessage:
-          oneOf:
-            - type: string
-            - type: 'null'
           description: Why the sync stopped. Present only for a failed run.
+          oneOf:
+            - type: string
+            - type: 'null'
         failedPhase:
-          oneOf:
-            - type: string
-            - type: 'null'
           description: The phase that failed, e.g. dbt-compile.
+          oneOf:
+            - type: string
+            - type: 'null'
         gitRef:
-          oneOf:
-            - type: string
-            - type: 'null'
           description: The dbt-repository ref this sync was run against, when pinned.
-        lastStage:
           oneOf:
             - type: string
             - type: 'null'
+        lastStage:
           description: The pipeline stage the run reached, e.g. COMPILING_DBT.
+          oneOf:
+            - type: string
+            - type: 'null'
         phases:
+          description: Per-phase timings, in the order they ran. Absent while the sync is running.
           oneOf:
             - items:
                 $ref: '#/components/schemas/DbtSyncRunPhase'
               type: array
             - type: 'null'
-          description: Per-phase timings, in the order they ran. Absent while the sync is running.
         source:
           description: >-
             Where this sync got its dbt metadata: `git` (Cube cloned the dbt repository and ran dbt)
@@ -10386,10 +10443,10 @@ components:
             - $ref: '#/components/schemas/DbtSyncRunTriggerContext'
             - type: 'null'
         userId:
+          description: The Cube user who started the sync, when a user started it.
           oneOf:
             - type: integer
             - type: 'null'
-          description: The Cube user who started the sync, when a user started it.
       required:
         - syncJobId
         - deploymentId
@@ -10434,45 +10491,45 @@ components:
     DbtSyncRunStats:
       properties:
         cubeCount:
+          description: How many cubes the sync generated.
           oneOf:
             - type: integer
             - type: 'null'
-          description: How many cubes the sync generated.
         dbtVersion:
-          oneOf:
-            - type: string
-            - type: 'null'
           description: >-
             The dbt version that produced the converted manifest, from its `metadata` block.
             Advisory — absent when the producer omitted it.
-        generatedFileCount:
-          oneOf:
-            - type: integer
-            - type: 'null'
-          description: How many files the sync wrote to the branch it created.
-        macros:
-          oneOf:
-            - type: integer
-            - type: 'null'
-          description: dbt macros found in the manifest.
-        manifestGeneratedAt:
           oneOf:
             - type: string
             - type: 'null'
+        generatedFileCount:
+          description: How many files the sync wrote to the branch it created.
+          oneOf:
+            - type: integer
+            - type: 'null'
+        macros:
+          description: dbt macros found in the manifest.
+          oneOf:
+            - type: integer
+            - type: 'null'
+        manifestGeneratedAt:
           description: >-
             When dbt generated the converted manifest, as an ISO 8601 timestamp. For an uploaded
             manifest this is how you tell a stale upload from a fresh one; it is NOT when the sync
             ran.
+          oneOf:
+            - type: string
+            - type: 'null'
         models:
-          oneOf:
-            - type: integer
-            - type: 'null'
           description: dbt models found in the manifest.
-        sources:
           oneOf:
             - type: integer
             - type: 'null'
+        sources:
           description: dbt sources found in the manifest.
+          oneOf:
+            - type: integer
+            - type: 'null'
       type: object
     DbtSyncRunTriggerContext:
       properties:
@@ -10508,10 +10565,10 @@ components:
     DbtSyncStatusResponse:
       properties:
         error:
+          description: Why the sync stopped. Present only when the status is FAILED.
           oneOf:
             - type: string
             - type: 'null'
-          description: Why the sync stopped. Present only when the status is FAILED.
         progress:
           $ref: '#/components/schemas/DbtSyncProgress'
         status:
@@ -10652,11 +10709,11 @@ components:
             - $ref: '#/components/schemas/PageInfo'
             - type: 'null'
         pagination:
+          deprecated: true
+          description: 'Deprecated: use `pageInfo` instead. Kept for backward compatibility.'
           oneOf:
             - $ref: '#/components/schemas/DeploymentsPagination'
             - type: 'null'
-          description: 'Deprecated: use `pageInfo` instead. Kept for backward compatibility.'
-          deprecated: true
       required:
         - items
         - data
@@ -10684,11 +10741,11 @@ components:
             - $ref: '#/components/schemas/PageInfo'
             - type: 'null'
         pagination:
+          deprecated: true
+          description: 'Deprecated: use `pageInfo` instead. Kept for backward compatibility.'
           oneOf:
             - $ref: '#/components/schemas/DeploymentsPagination'
             - type: 'null'
-          description: 'Deprecated: use `pageInfo` instead. Kept for backward compatibility.'
-          deprecated: true
       required:
         - items
         - data
@@ -10969,14 +11026,14 @@ components:
     DeploymentsListResponse:
       properties:
         count:
+          deprecated: true
+          description: >-
+            Deprecated: total number of accessible deployments, ignoring pagination. Kept for
+            backward compatibility.
           oneOf:
             - minimum: 0
               type: integer
             - type: 'null'
-          description: >-
-            Deprecated: total number of accessible deployments, ignoring pagination. Kept for
-            backward compatibility.
-          deprecated: true
         data:
           deprecated: true
           description: 'Deprecated: use `items` instead. Kept for backward compatibility.'
@@ -10996,12 +11053,12 @@ components:
           deprecated: true
           description: 'Deprecated: use `pageInfo` instead. Kept for backward compatibility.'
         totalCount:
+          deprecated: true
+          description: 'Deprecated: use `count`. Kept for backward compatibility.'
           oneOf:
             - minimum: 0
               type: integer
             - type: 'null'
-          description: 'Deprecated: use `count`. Kept for backward compatibility.'
-          deprecated: true
       required:
         - items
         - data
@@ -11206,19 +11263,19 @@ components:
     EmbedGroupMemberInput:
       properties:
         embedUserId:
+          description: Numeric id of an existing embed user. Provide this OR `externalId`.
           oneOf:
             - minimum: 1
               type: integer
             - type: 'null'
-          description: Numeric id of an existing embed user. Provide this OR `externalId`.
         externalId:
+          description: >-
+            External id of the embed user (the `externalId` passed to `generate-session`). Provide
+            this OR `embedUserId`.
           oneOf:
             - minLength: 1
               type: string
             - type: 'null'
-          description: >-
-            External id of the embed user (the `externalId` passed to `generate-session`). Provide
-            this OR `embedUserId`.
       type: object
     EmbedGroupMembersInput:
       properties:
@@ -11292,9 +11349,6 @@ components:
     EmbedSessionSettings:
       properties:
         allowAi:
-          oneOf:
-            - type: boolean
-            - type: 'null'
           description: >-
             Whether this session may use AI at all. This is the master switch over every AI surface
             in the embed: the dashboard agent, the workbook chat, the AI summary widgets and the
@@ -11305,10 +11359,10 @@ components:
             here disables a surface whose own `show*` key is `true`. It does not change user roles
             or permissions for non-AI API calls. `null` is accepted and means the same as omitting
             it.
-        allowChatWorkspaceAuthoring:
           oneOf:
             - type: boolean
             - type: 'null'
+        allowChatWorkspaceAuthoring:
           description: >-
             Whether AI Chat authenticated with this session may create or modify persistent Cube
             Workspace content. Set to `false` for headless chat integrations that render answers in
@@ -11318,20 +11372,20 @@ components:
             `true` to preserve the session user's role-derived authoring capabilities; `true` never
             grants access the user does not already have. This setting changes only AI Chat tools
             and instructions. It does not change user roles or permissions for direct API calls.
-        locale:
           oneOf:
-            - type: string
+            - type: boolean
             - type: 'null'
+        locale:
           description: >-
             UI language for every embed viewed with this session, as a BCP-47 code — a full code
             (`es-ES`), a short code (`es`) or a regional variant all resolve to a shipped locale.
             Sits between the per-iframe `?locale=` parameter, which still wins because it is the
             more specific answer, and the account-wide default under Embed → Settings. A language
             Cube does not ship falls through to that default rather than failing the session.
-        showAiWidgets:
           oneOf:
-            - type: boolean
+            - type: string
             - type: 'null'
+        showAiWidgets:
           description: >-
             Whether AI summary widgets are authorable and refreshable with this session: the "AI
             widget" entry in the dashboard editor's Add widgets menu, and the prompt input plus
@@ -11340,30 +11394,30 @@ components:
             Omit to inherit the account-wide embed setting (enabled by default); `false` disables
             them even if they are enabled account-wide, `true` enables them even if they are
             disabled account-wide.
-        showDashboardChat:
           oneOf:
             - type: boolean
             - type: 'null'
+        showDashboardChat:
           description: >-
             Whether embedded published dashboards viewed with this session show the AI chat (agent
             panel and launcher bubble). Omit to inherit the account-wide embed setting (shown by
             default); `false` hides the chat even if it is enabled account-wide, `true` shows it
             even if it is disabled account-wide. Only affects the dashboard surface, and only hides
             the entry point — use `allowAi` to withhold AI from the session.
-        showDashboardSettings:
           oneOf:
             - type: boolean
             - type: 'null'
+        showDashboardSettings:
           description: >-
             Whether the dashboard editor viewed with this session offers its settings panel — the
             gear button and the sidebar behind it. That panel is the ONLY place an embed user can
             reach the dashboard slug, the per-dashboard time zone, the per-dashboard agent, the grid
             behaviour switches and the dashboard theme, so `false` withdraws all of them together.
             Omit or set to `true` to keep the panel (the default).
-        showGroupByCube:
           oneOf:
             - type: boolean
             - type: 'null'
+        showGroupByCube:
           description: >-
             Whether the workbook data pane viewed with this session offers the "Group by Cube" /
             "Group by Folder" item in its more-actions menu. `false` hides the item AND pins the
@@ -11372,10 +11426,10 @@ components:
             makes the pane look the same for every user of the session rather than freezing whatever
             each of them last picked. No content is withdrawn either way. Omit or set to `true` to
             leave the choice with the user (the default).
-        showMemberNames:
           oneOf:
             - type: boolean
             - type: 'null'
+        showMemberNames:
           description: >-
             Whether the workbook data pane viewed with this session may display raw member NAMES
             instead of their titles (the "Show Member Names" item in the pane's more-actions menu).
@@ -11384,10 +11438,10 @@ components:
             the menu item AND pins the pane to titles, so a user who already switched to names is
             returned to titles — hiding the control alone would leave them stuck on names with no
             way back. Omit or set to `true` to leave the choice with the user (the default).
-        showWorkbookChat:
           oneOf:
             - type: boolean
             - type: 'null'
+        showWorkbookChat:
           description: >-
             Whether the Creator Mode workbook viewed with this session shows its AI entry points:
             the chat side panel and its toggle, the launchpad's "Ask Cube Agent" button and the "Fix
@@ -11395,10 +11449,10 @@ components:
             (shown by default); `false` hides them even if they are enabled account-wide, `true`
             shows them even if they are disabled account-wide. Hides entry points only — use
             `allowAi` to withhold AI from the session.
-        showWorkbookShare:
           oneOf:
             - type: boolean
             - type: 'null'
+        showWorkbookShare:
           description: >-
             Whether the Creator Mode workspace viewed with this session offers sharing: the workbook
             header's Share button and the Share action on a workbook, dashboard, exploration or
@@ -11406,16 +11460,19 @@ components:
             should only ever see their own content. Omit or set to `true` to keep sharing available
             (the default). Hides the entry points only — it does not revoke access already granted,
             and it never widens what the session's own permissions allow.
-        timezone:
           oneOf:
-            - type: string
+            - type: boolean
             - type: 'null'
+        timezone:
           description: >-
             IANA time zone the agent runs its queries in for every embed viewed with this session
             (e.g. `America/New_York`). Sits between the per-iframe `?timezone=` parameter and the
             account-wide default, and remains subject to the tenant time-zone policy — it is not a
             way around it. A bare UTC offset or an unknown name falls through to the account default
             rather than failing the session, because Cube would compute in UTC and report nothing.
+          oneOf:
+            - type: string
+            - type: 'null'
       type: object
     EmbedSettings:
       properties:
@@ -11656,59 +11713,60 @@ components:
     ExportSubjectInput:
       properties:
         email:
-          oneOf:
-            - type: string
-            - type: 'null'
           description: >-
             Main user email (for type=USER; provide this OR userId). For type=EMBED_USER it is the
             email recorded on the provisioned embed user, and the externalId is used when it is
             omitted.
+          oneOf:
+            - type: string
+            - type: 'null'
         embedTenantName:
-          oneOf:
-            - type: string
-            - type: 'null'
           description: Embed tenant name (for type=EMBED_USER)
-        externalId:
           oneOf:
             - type: string
             - type: 'null'
+        externalId:
           description: >-
             Embed user external id (for type=EMBED_USER). The user is provisioned if it does not
             exist yet.
+          oneOf:
+            - type: string
+            - type: 'null'
         groups:
+          description: >-
+            Embed user groups (type=EMBED_USER). Must reference groups that already exist; drives
+            what the rendered dashboard is allowed to show.
           oneOf:
             - items:
                 type: string
               type: array
             - type: 'null'
-          description: >-
-            Embed user groups (type=EMBED_USER). Must reference groups that already exist; drives
-            what the rendered dashboard is allowed to show.
         securityContext:
-          oneOf:
-            - type: object
-              additionalProperties: true
-            - type: 'null'
           description: >-
             Security context applied to the embed user before rendering (type=EMBED_USER) — the same
             object a generate-session call takes. Row-level rules in the data model see exactly
             this.
+          oneOf:
+            - type: object
+              additionalProperties: true
+            - type: 'null'
         type:
           $ref: '#/components/schemas/ExportSubjectInputType'
+          description: Subject kind
         userAttributes:
+          description: >-
+            Embed user attribute values (type=EMBED_USER). Names must reference attribute
+            definitions that already exist.
           oneOf:
             - items:
                 $ref: '#/components/schemas/UserAttributeInput'
               type: array
             - type: 'null'
-          description: >-
-            Embed user attribute values (type=EMBED_USER). Names must reference attribute
-            definitions that already exist.
         userId:
+          description: Main user id (for type=USER; provide this OR email)
           oneOf:
             - type: integer
             - type: 'null'
-          description: Main user id (for type=USER; provide this OR email)
       required:
         - type
       type: object
@@ -11819,14 +11877,14 @@ components:
     FinishUploadBody:
       properties:
         autoRemoveFiles:
+          default: true
           oneOf:
             - type: boolean
-              default: true
             - type: 'null'
         awaitGitOperations:
+          default: true
           oneOf:
             - type: boolean
-              default: true
             - type: 'null'
         commitMessage:
           oneOf:
@@ -11907,14 +11965,14 @@ components:
     FoldersListResponse:
       properties:
         count:
+          deprecated: true
+          description: >-
+            Deprecated: total number of accessible folders, ignoring pagination. Kept for backward
+            compatibility.
           oneOf:
             - minimum: 0
               type: integer
             - type: 'null'
-          description: >-
-            Deprecated: total number of accessible folders, ignoring pagination. Kept for backward
-            compatibility.
-          deprecated: true
         data:
           deprecated: true
           description: 'Deprecated: use `items` instead. Kept for backward compatibility.'
@@ -11943,9 +12001,6 @@ components:
     GenerateSession:
       properties:
         branchName:
-          oneOf:
-            - type: string
-            - type: 'null'
           description: >-
             Branch of `deploymentId` whose data model this session queries. Omit it — or pass the
             deployment’s production branch — to query the production environment, which is the
@@ -11957,6 +12012,9 @@ components:
             should be able to reach at any time. A name that is not a branch of the deployment
             returns `404`. Content (dashboards, workbooks, reports) is not branch-scoped — the same
             saved content is rendered against the branch’s data model.
+          oneOf:
+            - type: string
+            - type: 'null'
         creatorMode:
           oneOf:
             - type: boolean
@@ -11987,23 +12045,18 @@ components:
             - type: string
             - type: 'null'
         groupDefinitions:
-          oneOf:
-            - items:
-                $ref: '#/components/schemas/GroupDefinition'
-              type: array
-            - type: 'null'
+          deprecated: true
           description: >-
             Deprecated and ignored. Global groups can no longer be created through this endpoint —
             define them beforehand via the Cube UI or admin API. Still accepted for backward
             compatibility (no error), but it has no effect. To create per-embed-tenant groups, use
             `tenantGroupDefinitions`.
-          deprecated: true
-        groups:
           oneOf:
             - items:
-                type: string
+                $ref: '#/components/schemas/GroupDefinition'
               type: array
             - type: 'null'
+        groups:
           description: >-
             Global user groups — defined once at the tenant level and shared across every embed
             tenant — to assign this embed user to. Use `groups` for **data-model access control**:
@@ -12014,6 +12067,11 @@ components:
             names that do not resolve to an existing group are rejected. Global groups are NOT shown
             in an embed tenant’s Creator Mode UI. To share or organize content inside a single embed
             tenant, use `tenantGroups` instead.
+          oneOf:
+            - items:
+                type: string
+              type: array
+            - type: 'null'
         internalId:
           oneOf:
             - type: string
@@ -12038,32 +12096,27 @@ components:
               additionalProperties: true
             - type: 'null'
         settings:
-          oneOf:
-            - $ref: '#/components/schemas/EmbedSessionSettings'
-              type: object
-            - type: 'null'
           description: >-
             Per-session overrides for embed behavior, stored in the signed embed token. Each
             documented key applies only to this session; omitted keys preserve their existing
             default behavior.
-        tenantGroupDefinitions:
           oneOf:
-            - items:
-                $ref: '#/components/schemas/GroupDefinition'
-              type: array
+            - $ref: '#/components/schemas/EmbedSessionSettings'
+              type: object
             - type: 'null'
+        tenantGroupDefinitions:
           description: >-
             Idempotently create or update the per-embed-tenant groups referenced by `tenantGroups`,
             before they are assigned. Requires `creatorMode: true` and `embedTenantName`. Use this
             to declare a tenant’s groups in the same call that assigns them, so you do not need a
             separate admin request. Applies only to per-embed-tenant groups; global groups must be
             defined beforehand.
-        tenantGroups:
           oneOf:
             - items:
-                type: string
+                $ref: '#/components/schemas/GroupDefinition'
               type: array
             - type: 'null'
+        tenantGroups:
           description: >-
             Per-embed-tenant user groups — scoped to the single embed tenant named by
             `embedTenantName` — to assign this embed user to. Use `tenantGroups` for **content
@@ -12075,6 +12128,11 @@ components:
             `system:tenant:{embedTenantName}:group:{groupName}`, so a tenant group can never collide
             with — or be mistaken for — a global `groups` entry of the same name. For
             organization-wide data-model access policies, use `groups`.
+          oneOf:
+            - items:
+                type: string
+              type: array
+            - type: 'null'
         userAttributeDefinitions:
           oneOf:
             - items:
@@ -12113,6 +12171,7 @@ components:
         - active
         - failing
         - needs_reconnect
+        - no_sheet_access
         - orphaned
       type: string
     GetReportDeliveryRunsQuerySortDirection:
@@ -12390,12 +12449,12 @@ components:
         deploymentId:
           type: integer
         filters:
+          description: Dimension filters applied when the notification is rendered.
           oneOf:
             - items:
                 $ref: '#/components/schemas/DashboardFilter'
               type: array
             - type: 'null'
-          description: Dimension filters applied when the notification is rendered.
         humanReadableSchedule:
           description: Human-readable description of the cron schedule
           type: string
@@ -12404,12 +12463,12 @@ components:
         isEnabled:
           type: boolean
         memberSwitchers:
+          description: Field-switcher selections applied when the notification is rendered.
           oneOf:
             - items:
                 $ref: '#/components/schemas/DashboardMemberSwitcher'
               type: array
             - type: 'null'
-          description: Field-switcher selections applied when the notification is rendered.
         notificationAiSummary:
           description: Whether this notification carries an AI-generated "what changed" summary in its body.
           type: boolean
@@ -12418,12 +12477,12 @@ components:
         notificationFormat:
           type: string
         timeGrains:
+          description: Time-grain overrides applied when the notification is rendered.
           oneOf:
             - items:
                 $ref: '#/components/schemas/DashboardTimeGrain'
               type: array
             - type: 'null'
-          description: Time-grain overrides applied when the notification is rendered.
         timezone:
           type: string
       required:
@@ -12480,63 +12539,64 @@ components:
     NotificationRecipientInput:
       properties:
         channelId:
-          oneOf:
-            - type: string
-            - type: 'null'
           description: Slack channel id (for type=SLACK)
+          oneOf:
+            - type: string
+            - type: 'null'
         channelName:
-          oneOf:
-            - type: string
-            - type: 'null'
           description: Slack channel display name (optional, for type=SLACK)
+          oneOf:
+            - type: string
+            - type: 'null'
         email:
-          oneOf:
-            - type: string
-            - type: 'null'
           description: Main user email (for type=USER; provide this OR userId)
+          oneOf:
+            - type: string
+            - type: 'null'
         embedTenantName:
-          oneOf:
-            - type: string
-            - type: 'null'
           description: Embed tenant name (for type=EMBED_USER)
-        externalId:
           oneOf:
             - type: string
             - type: 'null'
+        externalId:
           description: Embed user external id (for type=EMBED_USER)
+          oneOf:
+            - type: string
+            - type: 'null'
         groups:
+          description: >-
+            Embed user groups (type=EMBED_USER). Must reference groups that already exist; drives
+            per-recipient access when the report is rendered.
           oneOf:
             - items:
                 type: string
               type: array
             - type: 'null'
-          description: >-
-            Embed user groups (type=EMBED_USER). Must reference groups that already exist; drives
-            per-recipient access when the report is rendered.
         securityContext:
+          description: >-
+            Embed user security context (type=EMBED_USER). Applied for per-recipient row-level
+            security when the report is rendered.
           oneOf:
             - type: object
               additionalProperties: true
             - type: 'null'
-          description: >-
-            Embed user security context (type=EMBED_USER). Applied for per-recipient row-level
-            security when the report is rendered.
         type:
           $ref: '#/components/schemas/NotificationRecipientInputType'
+          description: Recipient kind
         userAttributes:
+          description: >-
+            Embed user attribute values (type=EMBED_USER). Names must reference attribute
+            definitions that already exist.
           oneOf:
             - items:
                 $ref: '#/components/schemas/UserAttributeInput'
               type: array
             - type: 'null'
-          description: >-
-            Embed user attribute values (type=EMBED_USER). Names must reference attribute
-            definitions that already exist.
         userId:
+          description: Main user id (for type=USER; provide this OR email)
           oneOf:
             - type: integer
             - type: 'null'
-          description: Main user id (for type=USER; provide this OR email)
       required:
         - type
       type: object
@@ -12897,6 +12957,7 @@ components:
               - SchemaUpdateDevBranches
               - APMRead
               - ChatHistoryRead
+              - PreAggregationRead
               - PreAggregationBuild
               - AlertsCreate
               - AlertsRead
@@ -12921,6 +12982,7 @@ components:
               - AgentAdmin
               - DeploymentAgentRead
               - ScheduledTasksCreate
+              - ScheduledTaskRead
               - OAuthIntegrationsManage
               - OAuthIntegrationsIssueTokens
               - McpToolsManage
@@ -12962,6 +13024,7 @@ components:
         - Dashboard
         - Folder
         - ChatThread
+        - ScheduledTask
       type: string
     PostTokenBySessionIdInput:
       properties:
@@ -13043,16 +13106,16 @@ components:
     ProvisionEmbedUserInput:
       properties:
         email:
-          oneOf:
-            - format: email
-              type: string
-            - type: 'null'
           description: >-
             Email address, shown wherever the user is listed and searchable through `GET
             /embed-tenants/{embedTenantName}/users`. Must be a valid address, and is stored
             lowercased. Omit it and Cube derives a synthetic `{externalId}@cubecloud.dev`
             placeholder instead, which is what makes a user hard to recognise in a list. Supplying
             it again later updates the stored address.
+          oneOf:
+            - format: email
+              type: string
+            - type: 'null'
         externalId:
           description: >-
             The id your own system knows this user by — the same `externalId` you will pass to
@@ -13061,34 +13124,34 @@ components:
           minLength: 1
           type: string
         groups:
-          oneOf:
-            - items:
-                type: string
-              type: array
-            - type: 'null'
           description: >-
             Global, account-wide groups (the `groups` field of `generate-session`) that gate
             data-model access. They must already exist. Supplying the field REPLACES the user’s
             global groups; omit it to leave them untouched, pass `[]` to clear them.
-        tenantGroups:
           oneOf:
             - items:
                 type: string
               type: array
             - type: 'null'
+        tenantGroups:
           description: >-
             Groups belonging to this embed tenant (the `tenantGroups` field of `generate-session`),
             which scope content sharing and organization within the tenant. Create them first via
             `POST /embed-tenants/{embedTenantName}/groups`. Supplying the field REPLACES the user’s
             tenant groups; omit it to leave them untouched, pass `[]` to clear them.
+          oneOf:
+            - items:
+                type: string
+              type: array
+            - type: 'null'
         userProfile:
+          description: >-
+            Display name and avatar. `displayName` is the name shown wherever the user appears,
+            including on content they author. Omitted fields keep their current value.
           oneOf:
             - $ref: '#/components/schemas/EmbedUserProfile'
               type: object
             - type: 'null'
-          description: >-
-            Display name and avatar. `displayName` is the name shown wherever the user appears,
-            including on content they author. Omitted fields keep their current value.
       required:
         - externalId
       type: object
@@ -13290,10 +13353,10 @@ components:
     RemoveNotificationRecipientInput:
       properties:
         embedTenantName:
+          description: Embed tenant name (required for type=EMBED_USER; resolves the storage partition)
           oneOf:
             - type: string
             - type: 'null'
-          description: Embed tenant name (required for type=EMBED_USER; resolves the storage partition)
         id:
           description: >-
             Recipient id: userId (type=USER), embedUserId (type=EMBED_USER), or channelId
@@ -13352,13 +13415,13 @@ components:
           minItems: 1
           type: array
         expectedHash:
+          description: >-
+            The `hash` from your last read. When set, the request fails with 409 if the
+            configuration changed since then.
           oneOf:
             - pattern: ^[a-f0-9]{64}$
               type: string
             - type: 'null'
-          description: >-
-            The `hash` from your last read. When set, the request fails with 409 if the
-            configuration changed since then.
       required:
         - edits
       type: object
@@ -13526,22 +13589,25 @@ components:
     ReportDeliveryColumnInput:
       properties:
         column:
+          description: >-
+            Name of a column the report’s query returns: its alias in the SQL. Provide this OR
+            `placeholder` (exactly one).
           oneOf:
             - minLength: 1
               type: string
             - type: 'null'
-          description: >-
-            Name of a column the report’s query returns: its alias in the SQL. Provide this OR
-            `placeholder` (exactly one).
         header:
+          description: >-
+            Text of the header cell. Defaults to the column name; required for a placeholder, where
+            it may be empty.
           oneOf:
             - maxLength: 1000
               type: string
             - type: 'null'
-          description: >-
-            Text of the header cell. Defaults to the column name; required for a placeholder, where
-            it may be empty.
         placeholder:
+          description: >-
+            `true` for an empty column that holds only its header. Provide this OR `column` (exactly
+            one).
           oneOf:
             - $ref: '#/components/schemas/ReportDeliveryColumnInputPlaceholder'
             - type: 'null'
@@ -13572,27 +13638,27 @@ components:
     ReportDeliveryDestinationInput:
       properties:
         anchorCell:
+          description: Top-left cell of the delivered block, in A1 notation (e.g. `B3`). Defaults to `A1`.
           oneOf:
             - type: string
             - type: 'null'
-          description: Top-left cell of the delivered block, in A1 notation (e.g. `B3`). Defaults to `A1`.
         sheetId:
-          oneOf:
-            - minimum: 0
-              type: integer
-            - type: 'null'
           description: >-
             Id of the tab to write into (the `gid` in the spreadsheet URL). A tab is followed by its
             id through a rename. Provide this OR `sheetName`; neither when `writeMode` is
             `new_sheet`.
+          oneOf:
+            - minimum: 0
+              type: integer
+            - type: 'null'
         sheetName:
+          description: >-
+            Title of the tab to write into. Provide this OR `sheetId`; neither when `writeMode` is
+            `new_sheet`.
           oneOf:
             - minLength: 1
               type: string
             - type: 'null'
-          description: >-
-            Title of the tab to write into. Provide this OR `sheetId`; neither when `writeMode` is
-            `new_sheet`.
         spreadsheet:
           description: 'The Google Sheets spreadsheet: its URL or its id.'
           minLength: 1
@@ -13607,10 +13673,10 @@ components:
         inbox:
           type: boolean
         slackChannelId:
+          description: '`null` when nothing is posted to Slack.'
           oneOf:
             - type: string
             - type: 'null'
-          description: '`null` when nothing is posted to Slack.'
         slackChannelName:
           oneOf:
             - type: string
@@ -13628,18 +13694,18 @@ components:
           description: Notify in the owner's Cube inbox.
           type: boolean
         slackChannelId:
+          description: Also post to this Slack channel, by id. Needs the Cube Slack app installed.
           oneOf:
             - maxLength: 255
               type: string
               minLength: 1
             - type: 'null'
-          description: Also post to this Slack channel, by id. Needs the Cube Slack app installed.
         slackChannelName:
+          description: The channel's name, kept for display only.
           oneOf:
             - maxLength: 255
               type: string
             - type: 'null'
-          description: The channel's name, kept for display only.
       required:
         - inbox
         - email
@@ -13653,24 +13719,24 @@ components:
         id:
           type: integer
         lastRunAt:
-          oneOf:
-            - type: string
-              format: date-time
-            - type: 'null'
           description: When the last run finished. `null` before the first.
-        lastSuccessAt:
           oneOf:
             - type: string
               format: date-time
             - type: 'null'
+        lastSuccessAt:
           description: When the last successful run finished. `null` if none has succeeded.
+          oneOf:
+            - type: string
+              format: date-time
+            - type: 'null'
         name:
           type: string
         nextRunAt:
+          description: When the schedule next fires. `null` when there is no schedule or it is paused.
           oneOf:
             - {}
             - type: 'null'
-          description: When the schedule next fires. `null` when there is no schedule or it is paused.
         notifications:
           $ref: '#/components/schemas/ReportDeliveryNotificationSettings'
           description: >-
@@ -13678,76 +13744,80 @@ components:
             than once a day reports only changes in its status; a daily or rarer one reports every
             failed run.
         ownerUserId:
-          oneOf:
-            - type: integer
-            - type: 'null'
           description: >-
             The accountable user, whose Google account writes the sheet. `null` once that user has
             been deleted.
+          oneOf:
+            - type: integer
+            - type: 'null'
         pausedAt:
+          description: When the delivery was paused. `null` if it is not.
           oneOf:
             - {}
             - type: 'null'
-          description: When the delivery was paused. `null` if it is not.
         reportId:
-          oneOf:
-            - type: integer
-            - type: 'null'
           description: The delivered report. `null` once that report has been deleted.
+          oneOf:
+            - type: integer
+            - type: 'null'
         reportName:
-          oneOf:
-            - type: string
-            - type: 'null'
           description: Name of the delivered report. `null` once that report has been deleted.
-        reportPublicId:
           oneOf:
             - type: string
             - type: 'null'
+        reportPublicId:
           description: Public id of the delivered report. `null` once that report has been deleted.
+          oneOf:
+            - type: string
+            - type: 'null'
         reportWorkbookId:
-          oneOf:
-            - type: integer
-            - type: 'null'
           description: Workbook holding the delivered report. `null` once that report has been deleted.
-        runAsUserId:
           oneOf:
             - type: integer
             - type: 'null'
+        runAsUserId:
           description: The user whose data access the query runs with. `null` once that user has been deleted.
+          oneOf:
+            - type: integer
+            - type: 'null'
         runningSince:
+          description: When the run still in progress started. `null` while no run is going.
           oneOf:
             - type: string
               format: date-time
             - type: 'null'
-          description: When the run still in progress started. `null` while no run is going.
         schedule:
+          description: '`null` for a delivery that runs only on request.'
           oneOf:
             - $ref: '#/components/schemas/ReportDeliverySchedule'
             - type: 'null'
-          description: '`null` for a delivery that runs only on request.'
         shape:
+          description: '`null` when every column is delivered as is.'
           oneOf:
             - $ref: '#/components/schemas/ReportDeliveryShape'
             - type: 'null'
-          description: '`null` when every column is delivered as is.'
         sheetTitle:
-          oneOf:
-            - type: string
-            - type: 'null'
           description: >-
             Current title of the destination tab, read from Google at most every few minutes. `null`
             for a `new_sheet` delivery, or before its title has been read.
-        spreadsheetTitle:
           oneOf:
             - type: string
             - type: 'null'
+        spreadsheetTitle:
           description: >-
             Title of the destination spreadsheet, read from Google at most every few minutes and by
             each run. `null` before then.
+          oneOf:
+            - type: string
+            - type: 'null'
         status:
           $ref: '#/components/schemas/ReportDeliveryResponseStatus'
         writeMode:
           $ref: '#/components/schemas/ReportDeliveryResponseWriteMode'
+          description: >-
+            What each run does with what the previous one wrote. `overwrite` (the default) replaces
+            the delivered block. `append` adds the whole result below it, header only on the first
+            run and no deduplication. `new_sheet` writes each run to a new tab.
       required:
         - id
         - deploymentId
@@ -13762,6 +13832,7 @@ components:
         - active
         - failing
         - needs_reconnect
+        - no_sheet_access
         - orphaned
       type: string
     ReportDeliveryResponseWriteMode:
@@ -13785,35 +13856,36 @@ components:
     ReportDeliveryRunResponse:
       properties:
         cellsWritten:
+          description: Cells written, headers included.
           oneOf:
             - type: integer
             - type: 'null'
-          description: Cells written, headers included.
         deliveryId:
           type: integer
         error:
+          description: '`null` unless the run failed.'
           oneOf:
             - $ref: '#/components/schemas/ReportDeliveryRunFailure'
             - type: 'null'
-          description: '`null` unless the run failed.'
         finishedAt:
+          description: '`null` while the run is going.'
           oneOf:
             - type: string
               format: date-time
             - type: 'null'
-          description: '`null` while the run is going.'
         id:
           type: integer
         rowsWritten:
+          description: Result rows written, headers excluded.
           oneOf:
             - type: integer
             - type: 'null'
-          description: Result rows written, headers excluded.
         startedAt:
           format: date-time
           type: string
         status:
           $ref: '#/components/schemas/ReportDeliveryRunResponseStatus'
+          description: '`running` until the run finishes.'
         trigger:
           $ref: '#/components/schemas/ReportDeliveryRunResponseTrigger'
       required:
@@ -13875,12 +13947,12 @@ components:
           minItems: 1
           type: array
         timezone:
-          oneOf:
-            - type: string
-            - type: 'null'
           description: >-
             IANA timezone the cron expressions are read in, e.g. `America/New_York`. Fixed offsets
             such as `+02:00` are rejected. Defaults to `UTC`.
+          oneOf:
+            - type: string
+            - type: 'null'
       required:
         - cronExpressions
       type: object
@@ -14041,11 +14113,11 @@ components:
           minLength: 1
           type: string
         to:
+          deprecated: true
           oneOf:
             - minimum: 0
               type: integer
             - type: 'null'
-          deprecated: true
       required:
         - from
         - hash
@@ -14060,11 +14132,11 @@ components:
           minLength: 1
           type: string
         to:
+          deprecated: true
           oneOf:
             - minimum: 0
               type: integer
             - type: 'null'
-          deprecated: true
       required:
         - from
         - hash
@@ -14166,14 +14238,14 @@ components:
     ReportsListResponse:
       properties:
         count:
+          deprecated: true
+          description: >-
+            Deprecated: total number of accessible reports, ignoring pagination. Kept for backward
+            compatibility.
           oneOf:
             - minimum: 0
               type: integer
             - type: 'null'
-          description: >-
-            Deprecated: total number of accessible reports, ignoring pagination. Kept for backward
-            compatibility.
-          deprecated: true
         data:
           deprecated: true
           description: 'Deprecated: use `items` instead. Kept for backward compatibility.'
@@ -14240,6 +14312,7 @@ components:
               - SchemaUpdateDevBranches
               - APMRead
               - ChatHistoryRead
+              - PreAggregationRead
               - PreAggregationBuild
               - AlertsCreate
               - AlertsRead
@@ -14264,6 +14337,7 @@ components:
               - AgentAdmin
               - DeploymentAgentRead
               - ScheduledTasksCreate
+              - ScheduledTaskRead
               - OAuthIntegrationsManage
               - OAuthIntegrationsIssueTokens
               - McpToolsManage
@@ -14303,6 +14377,9 @@ components:
       properties:
         deletionPolicy:
           $ref: '#/components/schemas/SaveDatabricksMetricViewIntegrationInputDeletionPolicy'
+          description: >-
+            Use retain. The delete-managed value is deprecated and currently retains obsolete Metric
+            Views; it does not delete them.
         enabled:
           type: boolean
         expectedConfigurationVersion:
@@ -14372,18 +14449,18 @@ components:
     ScheduledTaskResponse:
       properties:
         agentId:
+          description: The agent that runs the task; null runs the deployment default.
           oneOf:
             - type: integer
             - type: 'null'
-          description: The agent that runs the task; null runs the deployment default.
         cronExpression:
-          oneOf:
-            - type: string
-            - type: 'null'
           description: >-
             Standard 5-field cron (minute hour day-of-month month day-of-week), e.g. `0 9 * * 1-5`
             for 9:00 on weekdays. Null when the task is Manual: it runs only when started with `POST
             /scheduled-tasks/{taskId}/run`.
+          oneOf:
+            - type: string
+            - type: 'null'
         deploymentId:
           type: integer
         description:
@@ -14398,10 +14475,10 @@ components:
         name:
           type: string
         nextRunAt:
+          description: When the schedule next fires (ISO 8601, UTC); null for a Manual or paused task.
           oneOf:
             - type: string
             - type: 'null'
-          description: When the schedule next fires (ISO 8601, UTC); null for a Manual or paused task.
         notificationEnabled:
           description: Whether a finished run notifies the creator in Cube's notification inbox.
           type: boolean
@@ -14436,12 +14513,12 @@ components:
         createdAt:
           type: string
         status:
-          oneOf:
-            - type: string
-            - type: 'null'
           description: >-
             in-progress, completed, or failed when recorded. Treat unrecognized values as
             non-terminal.
+          oneOf:
+            - type: string
+            - type: 'null'
       required:
         - chatThreadUuid
         - createdAt
@@ -14645,50 +14722,61 @@ components:
     StartDashboardExportInput:
       properties:
         dashboardId:
-          oneOf:
-            - type: integer
-            - type: 'null'
           description: >-
             Numeric id of the dashboard to export. Provide either this or `dashboardPublicId`, not
             both.
+          oneOf:
+            - type: integer
+            - type: 'null'
         dashboardPublicId:
+          description: Public id of the dashboard to export. Provide either this or `dashboardId`, not both.
           oneOf:
             - type: string
             - type: 'null'
-          description: Public id of the dashboard to export. Provide either this or `dashboardId`, not both.
         filters:
+          description: >-
+            Dimension filters applied to the dashboard while it renders. Same shape the
+            scheduled-notification API uses.
           oneOf:
             - items:
                 $ref: '#/components/schemas/DashboardFilterInput'
               type: array
             - type: 'null'
-          description: >-
-            Dimension filters applied to the dashboard while it renders. Same shape the
-            scheduled-notification API uses.
         format:
           $ref: '#/components/schemas/StartDashboardExportInputFormat'
+          description: 'Output format: `png` or `pdf`.'
+        layout:
+          default: screenshot
+          description: >-
+            How the dashboard is laid out. `screenshot` (the default) renders the board as it looks
+            on screen. `print` renders the paginated A4 document the dashboard's 'Print version'
+            menu item produces: one column, every table row, and the filter state as a summary line
+            instead of filter controls. `print` is available for `format: 'pdf'` only.
+          oneOf:
+            - $ref: '#/components/schemas/StartDashboardExportInputLayout'
+            - type: 'null'
         memberSwitchers:
+          description: Field-switcher selections applied to the dashboard while it renders.
           oneOf:
             - items:
                 $ref: '#/components/schemas/DashboardMemberSwitcherInput'
               type: array
             - type: 'null'
-          description: Field-switcher selections applied to the dashboard while it renders.
         renderAs:
-          oneOf:
-            - $ref: '#/components/schemas/ExportSubjectInput'
-            - type: 'null'
           description: >-
             Render the dashboard as this user instead of the caller — the queries behind the image
             run under THEIR security context. Requires the caller to be a tenant admin. Omit to
             render as the API key's own user.
+          oneOf:
+            - $ref: '#/components/schemas/ExportSubjectInput'
+            - type: 'null'
         timeGrains:
+          description: Time-grain overrides applied to the dashboard while it renders.
           oneOf:
             - items:
                 $ref: '#/components/schemas/DashboardTimeGrainInput'
               type: array
             - type: 'null'
-          description: Time-grain overrides applied to the dashboard while it renders.
       required:
         - format
       type: object
@@ -14696,6 +14784,11 @@ components:
       enum:
         - png
         - pdf
+      type: string
+    StartDashboardExportInputLayout:
+      enum:
+        - screenshot
+        - print
       type: string
     StartDatabricksMetricViewSyncInput:
       properties:
@@ -14706,13 +14799,13 @@ components:
           minimum: 1
           type: integer
         idempotencyKey:
+          description: >-
+            Optional idempotency key. Repeating a start with the same key returns the original run
+            instead of publishing twice; omit it and every call starts a new run.
           oneOf:
             - format: uuid
               type: string
             - type: 'null'
-          description: >-
-            Optional idempotency key. Repeating a start with the same key returns the original run
-            instead of publishing twice; omit it and every call starts a new run.
       required:
         - configurationVersion
       type: object
@@ -14723,29 +14816,40 @@ components:
             - type: string
             - type: 'null'
         manifest:
-          oneOf:
-            - type: object
-              additionalProperties: true
-            - type: 'null'
           description: >-
             The contents of your dbt `target/manifest.json`, as JSON. Required when `source` is
             `manifest` and ignored otherwise. Produced by `dbt parse`, `dbt compile` or `dbt build`,
             so a CI job can POST the manifest it just validated and be sure Cube converts exactly
             that — no re-parse of a branch tip that may already have moved.
+          oneOf:
+            - type: object
+              additionalProperties: true
+            - type: 'null'
         output:
+          description: >-
+            What to do with the generated cubes. `branch` (the default) commits them to a new Cube
+            branch for review. `files` commits nothing and creates no branch — the files are
+            returned from `GET /dbt-sync/{syncJobId}/generated-files` instead, so your own CI can
+            commit them to your repository through its normal review. Independent of `source`.
           oneOf:
             - $ref: '#/components/schemas/StartDbtSyncInputOutput'
             - type: 'null'
         ref:
-          oneOf:
-            - type: string
-            - type: 'null'
           description: >-
             Git ref in the dbt repository to sync from — a branch or a tag, NOT a commit SHA.
             Overrides the branch saved on the deployment’s dbt git integration for this sync only,
             so CI can sync the ref under review (e.g. a pull request’s head branch) instead of the
             tracked branch. The generated Cube branch is named after it.
+          oneOf:
+            - type: string
+            - type: 'null'
         source:
+          description: >-
+            Where the dbt metadata comes from. `git` (the default) clones the deployment’s dbt
+            repository and runs dbt to produce a manifest. `manifest` converts a manifest you supply
+            in `manifest` below, so Cube never needs access to the dbt repository — and the sync
+            takes seconds rather than minutes, because no sandbox is provisioned and no dbt command
+            runs.
           oneOf:
             - $ref: '#/components/schemas/StartDbtSyncInputSource'
             - type: 'null'
@@ -14778,10 +14882,10 @@ components:
     StartSnowflakeSemanticViewPullInput:
       properties:
         branchName:
+          description: Cube branch to write. Defaults to the deployment's deploy branch.
           oneOf:
             - type: string
             - type: 'null'
-          description: Cube branch to write. Defaults to the deployment's deploy branch.
         commitMessage:
           oneOf:
             - type: string
@@ -14791,13 +14895,13 @@ components:
             - type: string
             - type: 'null'
         idempotencyKey:
+          description: >-
+            Optional idempotency key. Repeating a pull with the same key and inputs returns the
+            original sync.
           oneOf:
             - format: uuid
               type: string
             - type: 'null'
-          description: >-
-            Optional idempotency key. Repeating a pull with the same key and inputs returns the
-            original sync.
         namePrefix:
           oneOf:
             - type: string
@@ -14813,12 +14917,12 @@ components:
             - type: string
             - type: 'null'
         viewNames:
+          description: Semantic view names or * patterns to pull. Omit to pull every view in the schema.
           oneOf:
             - items:
                 type: string
               type: array
             - type: 'null'
-          description: Semantic view names or * patterns to pull. Omit to pull every view in the schema.
       required:
         - schema
         - outputPath
@@ -14826,22 +14930,22 @@ components:
     StartSnowflakeSemanticViewSyncInput:
       properties:
         branchName:
+          description: Cube branch to publish. Defaults to the deployment's deploy branch when omitted.
           oneOf:
             - type: string
             - type: 'null'
-          description: Cube branch to publish. Defaults to the deployment's deploy branch when omitted.
         dataSource:
           oneOf:
             - type: string
             - type: 'null'
         idempotencyKey:
+          description: >-
+            Optional idempotency key. Repeating a start with the same key returns the original sync
+            instead of pushing the views twice.
           oneOf:
             - format: uuid
               type: string
             - type: 'null'
-          description: >-
-            Optional idempotency key. Repeating a start with the same key returns the original sync
-            instead of pushing the views twice.
         prefix:
           minLength: 1
           type: string
@@ -14963,10 +15067,10 @@ components:
           minLength: 1
           type: string
         replaceAll:
+          description: Replace every occurrence of `oldText` instead of requiring one.
           oneOf:
             - type: boolean
             - type: 'null'
-          description: Replace every occurrence of `oldText` instead of requiring one.
       required:
         - oldText
         - newText
@@ -15175,11 +15279,11 @@ components:
     UpdateEmbedGroupInput:
       properties:
         description:
+          description: New description. Pass an empty string to clear it. Omit to leave it unchanged.
           oneOf:
             - maxLength: 500
               type: string
             - type: 'null'
-          description: New description. Pass an empty string to clear it. Omit to leave it unchanged.
       type: object
     UpdateFolderInput:
       properties:
@@ -15208,41 +15312,41 @@ components:
             - type: integer
             - type: 'null'
         filters:
+          description: >-
+            Dimension filters applied to the dashboard when the notification is rendered. Replaces
+            the existing set when provided.
           oneOf:
             - items:
                 $ref: '#/components/schemas/DashboardFilterInput'
               type: array
             - type: 'null'
-          description: >-
-            Dimension filters applied to the dashboard when the notification is rendered. Replaces
-            the existing set when provided.
         hour:
           oneOf:
             - type: integer
             - type: 'null'
         isEnabled:
+          description: Enable or disable the schedule
           oneOf:
             - type: boolean
             - type: 'null'
-          description: Enable or disable the schedule
         memberSwitchers:
+          description: >-
+            Field-switcher selections applied to the dashboard when the notification is rendered.
+            Replaces the existing set when provided.
           oneOf:
             - items:
                 $ref: '#/components/schemas/DashboardMemberSwitcherInput'
               type: array
             - type: 'null'
-          description: >-
-            Field-switcher selections applied to the dashboard when the notification is rendered.
-            Replaces the existing set when provided.
         minute:
           oneOf:
             - type: integer
             - type: 'null'
         notificationAiSummary:
+          description: Include an AI-generated "what changed" summary in the notification body. Off by default.
           oneOf:
             - type: boolean
             - type: 'null'
-          description: Include an AI-generated "what changed" summary in the notification body. Off by default.
         notificationEnabled:
           oneOf:
             - type: boolean
@@ -15252,18 +15356,19 @@ components:
             - $ref: '#/components/schemas/UpdateNotificationInputNotificationFormat'
             - type: 'null'
         scheduleType:
+          description: Type of schedule
           oneOf:
             - $ref: '#/components/schemas/UpdateNotificationInputScheduleType'
             - type: 'null'
         timeGrains:
+          description: >-
+            Time-grain overrides applied to the dashboard when the notification is rendered.
+            Replaces the existing set when provided.
           oneOf:
             - items:
                 $ref: '#/components/schemas/DashboardTimeGrainInput'
               type: array
             - type: 'null'
-          description: >-
-            Time-grain overrides applied to the dashboard when the notification is rendered.
-            Replaces the existing set when provided.
         timezone:
           oneOf:
             - type: string
@@ -15367,10 +15472,10 @@ components:
     UpdateReportDeliveryInput:
       properties:
         destination:
+          description: Replaces the whole destination.
           oneOf:
             - $ref: '#/components/schemas/ReportDeliveryDestinationInput'
             - type: 'null'
-          description: Replaces the whole destination.
         name:
           oneOf:
             - maxLength: 255
@@ -15378,36 +15483,40 @@ components:
               minLength: 1
             - type: 'null'
         notifications:
-          oneOf:
-            - $ref: '#/components/schemas/ReportDeliveryNotificationsInput'
-            - type: 'null'
           description: >-
             Replaces the whole setting; null resets it to the inbox only. How the owner hears that
             the delivery failed or recovered. A delivery that runs more than once a day reports only
             changes in its status; a daily or rarer one reports every failed run.
-        ownerUserId:
           oneOf:
-            - type: integer
+            - $ref: '#/components/schemas/ReportDeliveryNotificationsInput'
             - type: 'null'
+        ownerUserId:
           description: >-
             Transfer the delivery to this active user, who must be able to read its report. They
             become owner and run-as user. Admins only.
-        reportId:
           oneOf:
             - type: integer
             - type: 'null'
+        reportId:
           description: Deliver another report. The caller must be able to read it.
+          oneOf:
+            - type: integer
+            - type: 'null'
         schedule:
+          description: Replaces the whole schedule. `null` removes it, so the delivery runs only on request.
           oneOf:
             - $ref: '#/components/schemas/ReportDeliveryScheduleInput'
             - type: 'null'
-          description: Replaces the whole schedule. `null` removes it, so the delivery runs only on request.
         shape:
+          description: Replaces the whole shape. `null` removes it, delivering every column.
           oneOf:
             - $ref: '#/components/schemas/ReportDeliveryShapeInput'
             - type: 'null'
-          description: Replaces the whole shape. `null` removes it, delivering every column.
         writeMode:
+          description: >-
+            What each run does with what the previous one wrote. `overwrite` (the default) replaces
+            the delivered block. `append` adds the whole result below it, header only on the first
+            run and no deduplication. `new_sheet` writes each run to a new tab.
           oneOf:
             - $ref: '#/components/schemas/UpdateReportDeliveryInputWriteMode'
             - type: 'null'
@@ -15507,62 +15616,62 @@ components:
     UpdateScheduledTaskInput:
       properties:
         agentId:
-          oneOf:
-            - type: integer
-            - type: 'null'
           description: >-
             The agent that runs the task. Omit to leave unchanged; null resets it to the deployment
             default.
+          oneOf:
+            - type: integer
+            - type: 'null'
         cronExpression:
+          description: >-
+            New standard 5-field cron, at most hourly (the minute field is a single number). Omit it
+            to keep the current schedule; send null to make the task Manual.
           oneOf:
             - maxLength: 100
               type: string
             - type: 'null'
-          description: >-
-            New standard 5-field cron, at most hourly (the minute field is a single number). Omit it
-            to keep the current schedule; send null to make the task Manual.
         description:
+          description: Omit to leave unchanged. Send null to clear the description.
           oneOf:
             - type: string
             - type: 'null'
-          description: Omit to leave unchanged. Send null to clear the description.
         isEnabled:
-          oneOf:
-            - type: boolean
-            - type: 'null'
           description: >-
             `false` pauses the schedule, `true` resumes it. Omit to leave unchanged. Explicit null
             answers `400`.
+          oneOf:
+            - type: boolean
+            - type: 'null'
         name:
+          description: Omit to leave unchanged. Explicit null answers `400`.
           oneOf:
             - maxLength: 255
               type: string
               minLength: 1
             - type: 'null'
-          description: Omit to leave unchanged. Explicit null answers `400`.
         notificationEnabled:
-          oneOf:
-            - type: boolean
-            - type: 'null'
           description: >-
             Turn the inbox notification for finished runs on or off. Omit to leave unchanged.
             Explicit null answers `400`.
+          oneOf:
+            - type: boolean
+            - type: 'null'
         prompt:
+          description: >-
+            New prompt, shown as the task's Instructions in Cube. Omit to leave unchanged. Explicit
+            null answers `400`.
           oneOf:
             - minLength: 1
               type: string
             - type: 'null'
-          description: >-
-            New prompt, shown as the task's Instructions in Cube. Omit to leave unchanged. Explicit
-            null answers `400`.
         timezone:
+          description: >-
+            New IANA time zone for the cron, e.g. `America/New_York`. Omit it to keep the current
+            one. Explicit null answers `400`.
           oneOf:
             - maxLength: 100
               type: string
             - type: 'null'
-          description: >-
-            New IANA time zone for the cron, e.g. `America/New_York`. Omit it to keep the current
-            one. Explicit null answers `400`.
       type: object
     UpdateWorkbookInput:
       properties:
@@ -15616,12 +15725,12 @@ components:
           description: Id of the Usage Analytics deployment the token was issued for.
           type: integer
         expiresAt:
-          oneOf:
-            - type: string
-            - type: 'null'
           description: >-
             When the token expires, as an ISO-8601 timestamp. Request a new token before this moment
             — issuing one is idempotent and cheap.
+          oneOf:
+            - type: string
+            - type: 'null'
         token:
           description: >-
             A short-lived JWT for the Usage Analytics deployment, carrying this tenant’s security
@@ -15724,14 +15833,14 @@ components:
                   type: string
             - type: 'null'
         userPolicies:
+          description: >-
+            The caller's effective resource policies: direct grants, organization-wide grants, and
+            grants inherited from their groups. Only populated by `GET /api/v1/users/me`.
           oneOf:
             - items:
                 $ref: '#/components/schemas/Policy'
               type: array
             - type: 'null'
-          description: >-
-            The caller's effective resource policies: direct grants, organization-wide grants, and
-            grants inherited from their groups. Only populated by `GET /api/v1/users/me`.
         username:
           type: string
       required:
@@ -16144,14 +16253,14 @@ components:
             - type: integer
             - type: 'null'
         lastSeenChangelogId:
-          oneOf:
-            - type: integer
-            - type: 'null'
+          deprecated: true
           description: >-
             Deprecated and ignored. The changelog now arrives in the notification inbox, which
             carries its own read state. Accepted for backward compatibility but never read or
             written.
-          deprecated: true
+          oneOf:
+            - type: integer
+            - type: 'null'
         locale:
           oneOf:
             - type: string
@@ -16549,14 +16658,14 @@ components:
     WorkbooksListResponse:
       properties:
         count:
+          deprecated: true
+          description: >-
+            Deprecated: total number of accessible workbooks, ignoring pagination. Kept for backward
+            compatibility.
           oneOf:
             - minimum: 0
               type: integer
             - type: 'null'
-          description: >-
-            Deprecated: total number of accessible workbooks, ignoring pagination. Kept for backward
-            compatibility.
-          deprecated: true
         data:
           deprecated: true
           description: 'Deprecated: use `items` instead. Kept for backward compatibility.'
