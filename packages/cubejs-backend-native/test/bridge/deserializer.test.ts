@@ -1,3 +1,4 @@
+import { execFileSync } from 'child_process';
 import fs from 'fs';
 import path from 'path';
 
@@ -31,6 +32,11 @@ describeBridge('bridge: NativeSerdeDeserializer', () => {
       ['ascii string', 'hello', 'hello'],
       ['unicode string', 'привет 世界', 'привет 世界'],
       ['emoji string', '🙂👍🏽', '🙂👍🏽'],
+      // As many UTF-8 bytes as UTF-16 units fit before the string ends: not ASCII.
+      ['multibyte first', 'éa', 'éa'],
+      ['multibyte last', 'abcé', 'abcé'],
+      ['lone surrogate', 'a\uD800b', 'a\uFFFDb'],
+      ['embedded NUL', 'a\0b', 'a\0b'],
       ['string with quotes and newlines', 'a "b"\n\'c\'\t\\', 'a "b"\n\'c\'\t\\'],
       ['zero', 0, 0],
       ['negative zero', -0, 0],
@@ -117,6 +123,39 @@ describeBridge('bridge: NativeSerdeDeserializer', () => {
       expect(() => deserializeJson(input)).toThrow('boom from element');
     });
 
+    it('skips non-enumerable properties, like JSON.stringify', () => {
+      const input = { visible: 1 };
+      Object.defineProperty(input, 'hidden', { value: 2, enumerable: false });
+      expect(deserializeJson(input)).toEqual({ visible: 1 });
+    });
+
+    it('rethrows the exception of a throwing ownKeys trap', () => {
+      const input = new Proxy({}, {
+        ownKeys() {
+          throw new Error('boom from ownKeys');
+        },
+      });
+      expect(() => deserializeJson(input)).toThrow('boom from ownKeys');
+    });
+
+    it.each([
+      ['no array', "() => 'not an array'"],
+      ['non-string keys', '() => [1]'],
+    ])('rejects a replaced Object.keys that returns %s', (_name, fake) => {
+      // `Object.keys` is cached on first use per addon instance, so each case needs a fresh process.
+      const script = `
+        const native = require(${JSON.stringify(path.join(__dirname, '..', '..', 'js'))}).loadNative();
+        Object.keys = ${fake};
+        try {
+          native.__testBridgeDeserializeJson({ a: 1 });
+          process.stdout.write('no error');
+        } catch (e) {
+          process.stdout.write(e.constructor.name);
+        }
+      `;
+      expect(execFileSync(process.execPath, ['-e', script], { encoding: 'utf8' })).toBe('TypeError');
+    });
+
     it('wide object', () => {
       const input: Record<string, string> = {};
 
@@ -140,6 +179,18 @@ describeBridge('bridge: NativeSerdeDeserializer', () => {
     it('names the offending field', () => {
       expect(() => deserializeJson({ ok: 1, bad: () => 1 }))
         .toThrow('field `bad`: deserializer is not implemented');
+    });
+
+    it('rejects a symbol and a bigint', () => {
+      expect(() => deserializeJson({ s: Symbol('s') }))
+        .toThrow('field `s`: failed to read value: Unsupported JsValue of type Symbol');
+      expect(() => deserializeJson([BigInt(1)]))
+        .toThrow('element 0: failed to read value: Unsupported JsValue of type BigInt');
+    });
+
+    it('names the offending element', () => {
+      expect(() => deserializeJson([1, () => 1]))
+        .toThrow('element 1: deserializer is not implemented');
     });
 
     it('names every level of a nested offending field', () => {
@@ -187,6 +238,38 @@ describeBridge('bridge: NativeSerdeDeserializer', () => {
       const { name: _name, ...rest } = base;
       expect(() => deserializeTyped(rest)).toThrow('missing field `name`');
     });
+
+    it('does not read fields the struct does not declare', () => {
+      const input = {
+        ...base,
+        get unknown() {
+          throw new Error('must not be read');
+        },
+      };
+      expect(deserializeTyped(input)).toEqual(base);
+    });
+
+    it('handles keys longer than the stack buffer used to match fields', () => {
+      const long = 'x'.repeat(200);
+      // 125 UTF-8 bytes: fits the 128-byte buffer, but too close to its end to be trusted.
+      const nearBoundary = `${'é'.repeat(62)}a`;
+      expect(deserializeTyped({ ...base, [long]: 1, [nearBoundary]: 2 })).toEqual(base);
+    });
+
+    it.each([123, 124, 125, 126, 127, 128, 200])(
+      'skips unknown keys with a %i-byte prefix without reading their values', (length) => {
+        const input = { ...base };
+        for (const suffix of ['', 'é', '世', '🙂', '\0tail', '\uD800']) {
+          Object.defineProperty(input, `${'x'.repeat(length)}${suffix}`, {
+            enumerable: true,
+            get() {
+              throw new Error('unknown field must not be read');
+            },
+          });
+        }
+        expect(deserializeTyped(input)).toEqual(base);
+      }
+    );
 
     it('ignores unknown fields', () => {
       expect(deserializeTyped({ ...base, extra: { nested: [1, 2] } })).toEqual(base);
