@@ -397,7 +397,18 @@ export class CompilerApi {
       // eslint-disable-next-line @typescript-eslint/no-unused-vars
       const { requestId, ...keyOptions } = query;
       const key = { query: keyOptions, options };
-      return compilers.compilerCache.getQueryCache(key).cache(['sql'], getSqlFn);
+      const sql = await compilers.compilerCache.getQueryCache(key).cache(['sql'], getSqlFn);
+      // Relative date ranges in the data model resolve to the current time, so
+      // SQL reaching a cube with one is reused within the minute only.
+      const { relativeDateFilterCubes } = compilers.cubeEvaluator;
+      const isRelative = relativeDateFilterCubes.size > 0 &&
+        sql.memberNames?.some((member: string) => relativeDateFilterCubes.has(member.split('.')[0]));
+      if (!isRelative) {
+        return sql;
+      }
+      return compilers.compilerCache
+        .getQueryCache({ ...key, minute: Math.floor(Date.now() / 60000) })
+        .cache(['sql'], getSqlFn);
     } else {
       return getSqlFn();
     }

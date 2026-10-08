@@ -13,7 +13,7 @@ use crate::cube_bridge::base_query_options::FilterValue;
 use crate::logical_plan::LogicalSubqueryJoinItem;
 use crate::planner::collectors::{collect_multiplied_measures, has_multi_stage_members};
 use crate::planner::filter::tree_ops;
-use crate::planner::filter::{Filter, FilterGroup, FilterItem, FilterOperator};
+use crate::planner::filter::{BaseFilter, Filter, FilterGroup, FilterItem, FilterOperator};
 use crate::planner::join_hints::JoinHints;
 use crate::planner::multi_fact_join_groups::{MeasuresJoinHints, MultiFactJoinGroups};
 use crate::planner::planners::multi_stage::{
@@ -1111,6 +1111,32 @@ impl QueryProperties {
             &vec![],
             &Some(replacement_values),
         )?;
+        self.invalidate_join_groups_cache();
+        Ok(())
+    }
+
+    /// Rewrites the bounds of one top-level `InDateRange` filter, leaving any
+    /// other date range on the same member as it is.
+    pub fn replace_bounds_of_date_filter(
+        &mut self,
+        filter: &Rc<BaseFilter>,
+        new_from: String,
+        new_to: String,
+    ) -> Result<(), CubeError> {
+        for item in self.time_dimensions_filters.iter_mut() {
+            if let FilterItem::Item(itm) = item {
+                if Rc::ptr_eq(itm, filter) {
+                    *itm = itm.change_operator(
+                        FilterOperator::InDateRange,
+                        vec![FilterValue::Str(new_from), FilterValue::Str(new_to)],
+                        itm.use_raw_values(),
+                        self.query_tools.query_tools().clone(),
+                        None,
+                    )?;
+                    break;
+                }
+            }
+        }
         self.invalidate_join_groups_cache();
         Ok(())
     }

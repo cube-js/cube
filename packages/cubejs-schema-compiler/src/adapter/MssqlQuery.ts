@@ -348,15 +348,15 @@ export class MssqlQuery extends BaseQuery {
       '{% endfor %}' +
       ') AS dates (date_from, date_to)';
     // MSSQL uses recursive CTE for time series generation.
-    // The template body becomes content of `time_series AS (...)` CTE,
-    // so it self-references `time_series` for recursion.
+    // The template body becomes content of the series CTE, so it
+    // self-references that CTE (`series_name`) for recursion.
     templates.statements.generated_time_series_select =
       'SELECT CAST({{ start }} AS DATETIME2) AS date_from,\n' +
       '       DATEADD(MILLISECOND, -1, DATEADD({{ minimal_time_unit }}, 1, CAST({{ start }} AS DATETIME2))) AS date_to\n' +
       'UNION ALL\n' +
       'SELECT DATEADD({{ minimal_time_unit }}, 1, date_from),\n' +
       '       DATEADD(MILLISECOND, -1, DATEADD({{ minimal_time_unit }}, 1, DATEADD({{ minimal_time_unit }}, 1, date_from)))\n' +
-      'FROM time_series\n' +
+      'FROM {{ series_name }}\n' +
       'WHERE DATEADD({{ minimal_time_unit }}, 1, date_from) <= CAST({{ end }} AS DATETIME2)';
 
     templates.statements.generated_time_series_with_cte_range_source =
@@ -368,7 +368,7 @@ export class MssqlQuery extends BaseQuery {
       'SELECT DATEADD({{ minimal_time_unit }}, 1, date_from),\n' +
       '       DATEADD(MILLISECOND, -1, DATEADD({{ minimal_time_unit }}, 1, DATEADD({{ minimal_time_unit }}, 1, date_from))),\n' +
       '       max_date\n' +
-      'FROM time_series\n' +
+      'FROM {{ series_name }}\n' +
       'WHERE DATEADD({{ minimal_time_unit }}, 1, date_from) <= max_date';
 
     // MSSQL uses OFFSET/FETCH instead of LIMIT/OFFSET

@@ -208,6 +208,25 @@ export type EvaluatedCube = {
 
 const INTERNED_CUBE_COLLECTIONS = ['measures', 'dimensions', 'segments', 'hierarchies', 'preAggregations', 'joins'] as const;
 
+// Deliberately broad: any date-filter value that isn't an absolute date is
+// treated as relative, so a form Tesseract learns later is still recompiled.
+const DATE_OPERATORS = ['inDateRange', 'notInDateRange', 'beforeDate', 'beforeOrOnDate', 'afterDate', 'afterOrOnDate', 'onTheDate'];
+// The forms Tesseract parses: a date, or a date and time with seconds and an
+// optional `Z` / `±HH:MM` offset.
+const ABSOLUTE_DATE = /^\d{4}-\d{2}-\d{2}([T ]\d{2}:\d{2}:\d{2}(\.\d+)?(Z|[+-]\d{2}:\d{2})?)?$/;
+
+const hasRelativeDateValue = (item: any): boolean => {
+  if (!item) {
+    return false;
+  }
+  const group = item.or || item.and;
+  if (group) {
+    return group.some(hasRelativeDateValue);
+  }
+  return DATE_OPERATORS.includes(item.operator) && Array.isArray(item.values) &&
+    item.values.some((value: unknown) => typeof value === 'string' && !ABSOLUTE_DATE.test(value.trim()));
+};
+
 export class CubeEvaluator extends CubeSymbols {
   public evaluatedCubes: Record<string, EvaluatedCube> = {};
 
@@ -217,6 +236,12 @@ export class CubeEvaluator extends CubeSymbols {
 
   private isRbacEnabledCache: boolean | null = null;
 
+  /**
+   * Cubes with a multi-stage `filter.include` on a relative date range. Their
+   * SQL depends on the current time.
+   */
+  public relativeDateFilterCubes: Set<string> = new Set();
+
   public constructor(
     protected readonly cubeValidator: CubeValidator,
     protected readonly options: { internStrings?: boolean } = {},
@@ -225,6 +250,7 @@ export class CubeEvaluator extends CubeSymbols {
   }
 
   public compile(cubes: any[], errorReporter: ErrorReporter) {
+    this.relativeDateFilterCubes = new Set();
     super.compile(cubes, errorReporter);
     const validCubes = this.cubeList.filter(cube => this.cubeValidator.isCubeValid(cube)).sort((a, b) => {
       if (a.isView) {
@@ -686,6 +712,9 @@ export class CubeEvaluator extends CubeSymbols {
           }
           if (typeof filter.keepOnly === 'function') {
             filter.keepOnlyReferences = this.evaluateReferences(cubeName, filter.keepOnly);
+          }
+          if (Array.isArray(filter.include) && filter.include.some(hasRelativeDateValue)) {
+            this.relativeDateFilterCubes.add(cubeName);
           }
           member.filter = filter;
         }

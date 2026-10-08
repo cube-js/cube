@@ -1,10 +1,14 @@
 use super::{QueryPlan, Schema, SchemaColumn};
 use crate::planner::sql_templates::TemplateProjectionColumn;
-use crate::planner::{sql_templates::PlanSqlTemplates, Granularity, MemberSymbol, QueryTimeSeries};
+use crate::planner::{
+    sql_templates::PlanSqlTemplates, Granularity, MemberSymbol, QueryDateTimeHelper,
+    QueryTimeSeries,
+};
 use cubenativeutils::CubeError;
 use std::rc::Rc;
 
 pub struct TimeSeries {
+    name: String,
     #[allow(dead_code)]
     time_dimension_name: String,
     source: TimeSeriesSource,
@@ -54,6 +58,7 @@ pub enum TimeSeriesSource {
 
 impl TimeSeries {
     pub fn new(
+        name: String,
         time_dimension: &Rc<MemberSymbol>,
         source: TimeSeriesSource,
         granularity: Granularity,
@@ -61,6 +66,7 @@ impl TimeSeries {
         let column = SchemaColumn::new(format!("date_from"), Some(time_dimension.clone()));
         let schema = Rc::new(Schema::new(vec![column]));
         Self {
+            name,
             time_dimension_name: time_dimension.full_name(),
             granularity,
             source,
@@ -84,6 +90,11 @@ impl TimeSeries {
             }
             TimeSeriesSource::Range(date_range) => date_range,
         };
+        if let TimeSeriesDateRange::Filter(from_date, to_date) = date_range {
+            if Self::is_empty_range(from_date, to_date)? {
+                return self.empty_to_sql(to_date, templates);
+            }
+        }
         if templates.supports_generated_time_series(self.granularity.is_predefined_granularity())? {
             let interval_description = templates
                 .interval_and_minimal_time_unit(self.granularity.granularity_interval().to_sql())?;
@@ -115,6 +126,7 @@ impl TimeSeries {
                         &templates.interval_string(interval)?,
                         &self.granularity.granularity_offset(),
                         &minimal_time_unit,
+                        &self.name,
                     )
                 }
                 TimeSeriesDateRange::Generated(cte_name) => {
@@ -126,6 +138,7 @@ impl TimeSeries {
                         &max_date_name,
                         &templates.interval_string(interval)?,
                         &minimal_time_unit,
+                        &self.name,
                     )
                 }
             }
@@ -161,6 +174,38 @@ impl TimeSeries {
             };
             templates.time_series_select(from_date.clone(), to_date.clone(), series)
         }
+    }
+
+    /// A range that ends before it starts, which an include outside the
+    /// query's date range narrows the series to.
+    fn is_empty_range(from_date: &str, to_date: &str) -> Result<bool, CubeError> {
+        let precision = QueryTimeSeries::MILLISECOND_PRECISION;
+        Ok(QueryDateTimeHelper::format_from_date(from_date, precision)?
+            > QueryDateTimeHelper::format_to_date(to_date, precision)?)
+    }
+
+    /// A series with no points: one bucket, filtered out. An empty VALUES list
+    /// would be invalid and a recursive anchor would still emit a row.
+    fn empty_to_sql(
+        &self,
+        to_date: &str,
+        templates: &PlanSqlTemplates,
+    ) -> Result<String, CubeError> {
+        let precision = templates.timestamp_precision()?;
+        let bucket = vec![
+            QueryDateTimeHelper::format_from_date(to_date, precision)?,
+            QueryDateTimeHelper::format_to_date(to_date, precision)?,
+        ];
+        let series = templates.time_series_select(
+            format!("'{}'", to_date),
+            format!("'{}'", to_date),
+            vec![bucket],
+        )?;
+        Ok(format!(
+            "SELECT * FROM ({}) {} WHERE 1 = 0",
+            series,
+            templates.quote_identifier("empty_series")?
+        ))
     }
 
     fn calendar_to_sql(

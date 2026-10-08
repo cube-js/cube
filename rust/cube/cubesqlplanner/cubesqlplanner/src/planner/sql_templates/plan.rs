@@ -605,10 +605,11 @@ impl PlanSqlTemplates {
         granularity: &str,
         granularity_offset: &Option<String>,
         minimal_time_unit: &str,
+        series_name: &str,
     ) -> Result<String, CubeError> {
         self.render.render_template(
             "statements/generated_time_series_select",
-            context! {date_from => date_from, date_to => date_to, start => start, end => end, granularity => granularity, granularity_offset => granularity_offset, minimal_time_unit => minimal_time_unit },
+            context! {date_from => date_from, date_to => date_to, start => start, end => end, granularity => granularity, granularity_offset => granularity_offset, minimal_time_unit => minimal_time_unit, series_name => series_name },
         )
     }
     pub fn generated_time_series_with_cte_range_source(
@@ -618,6 +619,7 @@ impl PlanSqlTemplates {
         max_name: &str,
         granularity: &str,
         minimal_time_unit: &str,
+        series_name: &str,
     ) -> Result<String, CubeError> {
         self.render.render_template(
             "statements/generated_time_series_with_cte_range_source",
@@ -627,6 +629,7 @@ impl PlanSqlTemplates {
                 max_name => max_name,
                 granularity => granularity,
                 minimal_time_unit => minimal_time_unit,
+                series_name => series_name,
             },
         )
     }
