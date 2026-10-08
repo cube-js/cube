@@ -36,6 +36,7 @@ describeBridge('bridge: NativeSerdeDeserializer', () => {
       ['multibyte first', 'éa', 'éa'],
       ['multibyte last', 'abcé', 'abcé'],
       ['lone surrogate', 'a\uD800b', 'a\uFFFDb'],
+      ['embedded NUL', 'a\0b', 'a\0b'],
       ['string with quotes and newlines', 'a "b"\n\'c\'\t\\', 'a "b"\n\'c\'\t\\'],
       ['zero', 0, 0],
       ['negative zero', -0, 0],
@@ -254,6 +255,21 @@ describeBridge('bridge: NativeSerdeDeserializer', () => {
       const nearBoundary = `${'é'.repeat(62)}a`;
       expect(deserializeTyped({ ...base, [long]: 1, [nearBoundary]: 2 })).toEqual(base);
     });
+
+    it.each([123, 124, 125, 126, 127, 128, 200])(
+      'skips unknown keys with a %i-byte prefix without reading their values', (length) => {
+        const input = { ...base };
+        for (const suffix of ['', 'é', '世', '🙂', '\0tail', '\uD800']) {
+          Object.defineProperty(input, `${'x'.repeat(length)}${suffix}`, {
+            enumerable: true,
+            get() {
+              throw new Error('unknown field must not be read');
+            },
+          });
+        }
+        expect(deserializeTyped(input)).toEqual(base);
+      }
+    );
 
     it('ignores unknown fields', () => {
       expect(deserializeTyped({ ...base, extra: { nested: [1, 2] } })).toEqual(base);

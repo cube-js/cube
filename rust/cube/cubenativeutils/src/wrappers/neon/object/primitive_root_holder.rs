@@ -2,6 +2,7 @@ use crate::wrappers::neon::context::ContextHolder;
 use crate::CubeError;
 use neon::prelude::*;
 use neon::sys::bindings as napi;
+use std::{borrow::Cow, mem::MaybeUninit};
 
 pub trait NeonPrimitiveMapping: Value {
     type NativeType: Clone;
@@ -115,60 +116,48 @@ pub(crate) fn read_js_string<'cx, C: Context<'cx>>(
     cx: &mut C,
     value: Handle<'cx, JsString>,
 ) -> String {
-    let env = cx.to_raw();
-    let raw = value.to_raw();
-    let read = |buf: &mut Vec<u8>| -> usize {
-        let mut written = 0usize;
-        // SAFETY: `buf` has `capacity()` writable bytes and N-API writes at most `bufsize`
-        // bytes including the NUL terminator; `raw` is a live string in `env`.
-        unsafe {
-            napi::get_value_string_utf8(
-                env,
-                raw,
-                buf.as_mut_ptr().cast(),
-                buf.capacity(),
-                &mut written,
-            )
-        }
-        .expect("napi_get_value_string_utf8 on a string");
-        written
-    };
-
-    let mut utf16_len = 0usize;
-    // SAFETY: a null buffer asks N-API only for the length, written to `utf16_len`.
-    unsafe { napi::get_value_string_utf16(env, raw, std::ptr::null_mut(), 0, &mut utf16_len) }
-        .expect("napi_get_value_string_utf16 on a string");
-
-    // An ASCII string is exactly `utf16_len` bytes. `written == utf16_len` alone doesn't prove
-    // the string was not truncated (`"éa"` fills 2 bytes with `é`), the ASCII check does.
+    let utf16_len = value.size_utf16(cx);
     let mut buf = Vec::with_capacity(utf16_len + 1);
-    let written = read(&mut buf);
-    // SAFETY: N-API initialized the first `written` bytes.
-    unsafe { buf.set_len(written) };
-    if written != utf16_len || !buf.is_ascii() {
-        // Sized exactly rather than at the `3 * utf16_len` worst case: measured faster, and the
-        // string is not left with a 3x allocation.
-        let mut utf8_len = 0usize;
-        // SAFETY: a null buffer asks N-API only for the UTF-8 length, written to `utf8_len`.
-        unsafe { napi::get_value_string_utf8(env, raw, std::ptr::null_mut(), 0, &mut utf8_len) }
-            .expect("napi_get_value_string_utf8 on a string");
-        buf = Vec::with_capacity(utf8_len + 1);
-        let written = read(&mut buf);
-        // SAFETY: N-API initialized the first `written` bytes.
-        unsafe { buf.set_len(written) };
+    let bytes = copy_js_utf8(cx, value, buf.spare_capacity_mut());
+
+    // A full ASCII copy proves the string wasn't truncated; length alone doesn't ("éa").
+    if bytes.len() != utf16_len || !bytes.is_ascii() {
+        return value.value(cx);
     }
-    // SAFETY: N-API writes valid UTF-8 (lone surrogates are replaced) and only truncates on a
-    // character boundary; neon's own `JsString::value` relies on the same.
-    unsafe { String::from_utf8_unchecked(buf) }
+    let written = bytes.len();
+    // SAFETY: copy_js_utf8 initialized the first `written` bytes, all checked as ASCII.
+    unsafe {
+        buf.set_len(written);
+        String::from_utf8_unchecked(buf)
+    }
 }
 
-/// Copies the string into `buf` with one N-API call and returns the number of bytes written.
-/// If the string doesn't fit, it is cut on a character boundary.
-pub(crate) fn read_js_string_into<'cx, C: Context<'cx>>(
+/// Borrows the complete UTF-8 string from `buf` when it fits; otherwise reads an owned copy.
+pub(crate) fn read_js_string_into<'cx, 'buf, C: Context<'cx>>(
     cx: &mut C,
     value: Handle<'cx, JsString>,
-    buf: &mut [u8],
-) -> usize {
+    buf: &'buf mut [MaybeUninit<u8>],
+) -> Cow<'buf, [u8]> {
+    let capacity = buf.len();
+    let bytes = copy_js_utf8(cx, value, buf);
+    // N-API stops before a character that doesn't fit, including its NUL terminator.
+    // Only trust a copy with enough room left for any UTF-8 character.
+    if bytes.len() + char::MAX_LEN_UTF8 < capacity {
+        Cow::Borrowed(bytes)
+    } else {
+        Cow::Owned(read_js_string(cx, value).into_bytes())
+    }
+}
+
+/// Copies into spare capacity and returns its initialized prefix, possibly truncated.
+fn copy_js_utf8<'cx, 'buf, C: Context<'cx>>(
+    cx: &mut C,
+    value: Handle<'cx, JsString>,
+    buf: &'buf mut [MaybeUninit<u8>],
+) -> &'buf [u8] {
+    if buf.is_empty() {
+        return &[];
+    }
     let mut written = 0usize;
     // SAFETY: `buf` is writable for `buf.len()` bytes, which N-API never exceeds (NUL included).
     unsafe {
@@ -181,7 +170,9 @@ pub(crate) fn read_js_string_into<'cx, C: Context<'cx>>(
         )
     }
     .expect("napi_get_value_string_utf8 on a string");
-    written
+    // SAFETY: N-API initialized the first `written` bytes without exceeding `buf.len()`.
+    // The returned slice borrows the buffer, so it cannot outlive or alias a write to it.
+    unsafe { std::slice::from_raw_parts(buf.as_ptr().cast(), written) }
 }
 
 pub struct PrimitiveNeonTypeHolder<C: Context<'static>, V: NeonPrimitiveMapping + 'static> {
