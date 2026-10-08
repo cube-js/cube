@@ -759,7 +759,7 @@ fn get_original_name(may_be_alias: &String, input: &LogicalPlan) -> String {
 /// non-column expr or mixed asc/desc). The real `nulls_first` is carried through so the worker
 /// top-k cut honors the query's explicit `NULLS FIRST/LAST` instead of re-deriving it from the
 /// sort direction (which would disagree with the router select and drop groups at the limit).
-pub(crate) fn sort_to_column_names(
+fn sort_to_column_names(
     sort_exprs: &Vec<SortExpr>,
     input: &LogicalPlan,
 ) -> (Vec<String>, bool, Vec<bool>) {
@@ -867,7 +867,7 @@ struct ChooseIndex<'a> {
 }
 
 #[derive(Debug, Default, Clone)]
-struct ChooseIndexContext {
+pub(crate) struct ChooseIndexContext {
     limit: Option<usize>,
     sort: Option<Vec<String>>,
     sort_is_asc: bool,
@@ -938,31 +938,9 @@ impl ChooseIndexContext {
         }
     }
 
-    /// The context for a relation the enclosing query's `LIMIT` does not count the rows of. Nothing
-    /// describing that query's output survives, [single_value_filtered_cols] included: a predicate
-    /// above the boundary does not constrain the relation below it, and that set drops columns from
-    /// both sides of the index-prefix check.
-    fn for_unrelated_relation() -> Self {
-        Self::default()
-    }
-    fn mark_filter_above(&self) -> Self {
-        Self {
-            filter_above: true,
-            ..self.clone()
-        }
-    }
-    fn mark_unusable_sort(&self) -> Self {
-        Self {
-            unusable_sort: true,
-            ..self.clone()
-        }
-    }
-}
-
-impl PlanRewriter for ChooseIndex<'_> {
-    type Context = ChooseIndexContext;
-
-    fn enter_node(&mut self, n: &LogicalPlan, context: &Self::Context) -> Option<Self::Context> {
+    /// The context for the subtree under `n`; `None` keeps the current one.
+    pub(crate) fn enter(&self, n: &LogicalPlan) -> Option<Self> {
+        let context = self;
         // TODO upgrade DF: This might be broken, or very sensitive to planning behavior.  For
         // example we handle skips, but don't remove limit when we see a Filter.  It might have been
         // so before the DF upgrade too.
@@ -1079,6 +1057,51 @@ impl PlanRewriter for ChooseIndex<'_> {
             // context produced here.
             _ => Some(ChooseIndexContext::for_unrelated_relation()),
         }
+    }
+
+    /// Whether the aggregate this context was entered for will get its `LIMIT` pushed to the
+    /// workers, by the index order or by the bounded worker sort. Both need the ORDER BY, if any,
+    /// to name only group columns and no `HAVING` between the aggregate and the limit.
+    pub(crate) fn group_limit_reaches_workers(&self) -> bool {
+        let Some(group_by) = self.group_by.as_ref().filter(|g| !g.is_empty()) else {
+            return false;
+        };
+        self.limit.is_some()
+            && !self.group_by_has_having
+            && !self.unusable_sort
+            && self
+                .sort
+                .iter()
+                .flatten()
+                .all(|name| group_by.contains(name))
+    }
+
+    /// The context for a relation the enclosing query's `LIMIT` does not count the rows of. Nothing
+    /// describing that query's output survives, [single_value_filtered_cols] included: a predicate
+    /// above the boundary does not constrain the relation below it, and that set drops columns from
+    /// both sides of the index-prefix check.
+    fn for_unrelated_relation() -> Self {
+        Self::default()
+    }
+    fn mark_filter_above(&self) -> Self {
+        Self {
+            filter_above: true,
+            ..self.clone()
+        }
+    }
+    fn mark_unusable_sort(&self) -> Self {
+        Self {
+            unusable_sort: true,
+            ..self.clone()
+        }
+    }
+}
+
+impl PlanRewriter for ChooseIndex<'_> {
+    type Context = ChooseIndexContext;
+
+    fn enter_node(&mut self, n: &LogicalPlan, context: &Self::Context) -> Option<Self::Context> {
+        context.enter(n)
     }
 
     fn rewrite(

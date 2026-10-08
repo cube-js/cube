@@ -1275,11 +1275,9 @@ impl TestContext {
         created
     }
 
-    /// Splits a partitioned pre-aggregation table into the per-partition
-    /// tables Cube builds: one per `partition_granularity` bucket of its time
-    /// column, suffixed with the bucket start as `YYYYMMDD`. Returns
-    /// `(suffix, WHERE clause)` pairs; a single unsuffixed pair when the table
-    /// is not partitioned.
+    /// Splits a partitioned pre-aggregation into one table per `partition_granularity` bucket of
+    /// its time column, suffixed with the bucket start as `YYYYMMDD` like Cube's partitions.
+    /// Returns a single unsuffixed entry when the table is not partitioned.
     #[cfg(feature = "integration-cubestore")]
     async fn cubestore_partitions(
         &self,

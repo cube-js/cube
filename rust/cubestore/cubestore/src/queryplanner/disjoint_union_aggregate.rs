@@ -8,7 +8,7 @@
 //! final value and the aggregate above the union is not needed.
 
 use crate::queryplanner::optimizations::rewrite_plan::{rewrite_plan, PlanRewriter};
-use crate::queryplanner::planning::{group_expr_to_column_names, sort_to_column_names};
+use crate::queryplanner::planning::ChooseIndexContext;
 use crate::queryplanner::serialized_plan::IndexSnapshot;
 use crate::queryplanner::CubeTableLogical;
 use crate::table::{Row, TableValue, TimestampValue};
@@ -19,8 +19,8 @@ use datafusion::datasource::DefaultTableSource;
 use datafusion::error::DataFusionError;
 use datafusion::logical_expr::expr::ScalarFunction;
 use datafusion::logical_expr::{
-    Aggregate, ColumnarValue, Expr, FetchType, Filter, LogicalPlan, Projection, ScalarFunctionArgs,
-    ScalarUDF, Sort, SubqueryAlias, TableScan, Union,
+    Aggregate, ColumnarValue, Expr, Filter, LogicalPlan, Projection, ScalarFunctionArgs, ScalarUDF,
+    SubqueryAlias, TableScan, Union,
 };
 use std::cmp::Ordering;
 use std::sync::Arc;
@@ -49,87 +49,30 @@ struct DisjointUnionAggregate<'a> {
     next_scan: usize,
 }
 
-// Mirrors what `ChooseIndex` reads to push a `LIMIT` into the workers. That pushdown stops each
-// worker after the first `n` groups, which beats aggregating every branch in full.
 #[derive(Clone, Default)]
 struct Scope {
     // Ordinal of the first cube table scan below the nearest aggregate.
     first_scan: usize,
-    limit: bool,
-    // Set once an aggregate takes the limit, so a deeper aggregate does not see it.
-    limit_claimed: bool,
-    having: bool,
-    sort: Vec<String>,
-    // An ORDER BY that is not a list of columns in one direction.
-    unusable_sort: bool,
-}
-
-impl Scope {
-    fn unrelated(&self) -> Scope {
-        Scope {
-            first_scan: self.first_scan,
-            ..Scope::default()
-        }
-    }
-
-    fn limit_reaches_workers(&self, agg: &Aggregate) -> bool {
-        if !self.limit || self.having || self.unusable_sort {
-            return false;
-        }
-        let Some(group) = group_expr_to_column_names(&agg.group_expr, &agg.input) else {
-            return false;
-        };
-        !group.is_empty() && self.sort.iter().all(|s| group.contains(s))
-    }
+    // What `ChooseIndex` will see here, so the two agree on whether the `LIMIT` reaches the workers.
+    choose_index: ChooseIndexContext,
 }
 
 impl PlanRewriter for DisjointUnionAggregate<'_> {
     type Context = Scope;
 
     fn enter_node(&mut self, n: &LogicalPlan, c: &Scope) -> Option<Scope> {
-        match n {
-            LogicalPlan::Limit(limit) => match limit.get_fetch_type().ok()? {
-                FetchType::Literal(Some(_)) => Some(Scope {
-                    limit: true,
-                    ..c.clone()
-                }),
-                FetchType::Literal(None) => None,
-                FetchType::UnsupportedExpr => Some(c.unrelated()),
-            },
-            LogicalPlan::Sort(Sort { expr, input, fetch }) => {
-                if fetch.is_none() && c.limit_claimed {
-                    return Some(c.unrelated());
-                }
-                let (names, _, _) = sort_to_column_names(expr, input);
-                Some(Scope {
-                    limit: c.limit || fetch.is_some(),
-                    unusable_sort: names.is_empty() && !expr.is_empty(),
-                    sort: names,
-                    ..c.clone()
-                })
-            }
-            LogicalPlan::Filter(_) => Some(Scope {
-                having: true,
-                ..c.clone()
-            }),
-            LogicalPlan::Aggregate(_) => {
-                let outer = if c.limit_claimed {
-                    c.unrelated()
-                } else {
-                    c.clone()
-                };
-                Some(Scope {
-                    first_scan: self.next_scan,
-                    limit_claimed: true,
-                    ..outer
-                })
-            }
-            LogicalPlan::Projection(_)
-            | LogicalPlan::SubqueryAlias(_)
-            | LogicalPlan::Union(_)
-            | LogicalPlan::TableScan(_) => None,
-            _ => Some(c.unrelated()),
+        let first_scan = match n {
+            LogicalPlan::Aggregate(_) => self.next_scan,
+            _ => c.first_scan,
+        };
+        let choose_index = c.choose_index.enter(n);
+        if choose_index.is_none() && first_scan == c.first_scan {
+            return None;
         }
+        Some(Scope {
+            first_scan,
+            choose_index: choose_index.unwrap_or_else(|| c.choose_index.clone()),
+        })
     }
 
     fn rewrite(&mut self, n: LogicalPlan, c: &Scope) -> Result<LogicalPlan, DataFusionError> {
@@ -141,7 +84,8 @@ impl PlanRewriter for DisjointUnionAggregate<'_> {
                 Ok(n)
             }
             LogicalPlan::Aggregate(agg) => {
-                if self.limit_pushdown && c.limit_reaches_workers(&agg) {
+                // A worker that stops after the first `n` groups beats aggregating every branch.
+                if self.limit_pushdown && c.choose_index.group_limit_reaches_workers() {
                     return Ok(LogicalPlan::Aggregate(agg));
                 }
                 let Some(scans) = self.indices.get(c.first_scan..self.next_scan) else {
