@@ -1079,18 +1079,26 @@ impl TestContext {
         // boundary group ($5) guards against one table name being a prefix
         // of another (`visitors` vs `visitors_daily`); the regex crate has
         // no lookahead, so the boundary char is captured and re-emitted.
-        for table in &table_names {
+        // A partitioned pre-aggregation is read as the UNION ALL of its
+        // partition tables, as the query orchestrator renders it.
+        for (table, partitions) in &table_names {
             let re = regex::Regex::new(&format!(
                 r#"(FROM|JOIN)(\s+)("?){}("?)([\s,)]|$)"#,
                 regex::escape(table)
             ))
             .expect("Failed to build table name regex");
-            final_sql = re
-                .replace_all(
-                    &final_sql,
-                    format!("${{1}}${{2}}{}.${{3}}{}${{4}}${{5}}", cs_schema, table),
-                )
-                .into_owned();
+            let replacement = match partitions.as_slice() {
+                [single] => format!("${{1}}${{2}}{}.\"{}\"${{5}}", cs_schema, single),
+                _ => format!(
+                    "${{1}}${{2}}({})${{5}}",
+                    partitions
+                        .iter()
+                        .map(|p| format!("SELECT * FROM {}.\"{}\"", cs_schema, p))
+                        .collect::<Vec<_>>()
+                        .join(" UNION ALL ")
+                ),
+            };
+            final_sql = re.replace_all(&final_sql, replacement).into_owned();
         }
 
         let rows: Vec<mysql_async::Row> = conn.query(&final_sql).await.unwrap_or_else(|e| {
@@ -1144,12 +1152,12 @@ impl TestContext {
         conn: &mut mysql_async::Conn,
         cs_schema: &str,
         pre_aggregations: &[PreAggregationUsage],
-    ) -> Vec<String> {
+    ) -> Vec<(String, Vec<String>)> {
         use itertools::Itertools;
         use mysql_async::prelude::Queryable;
         use std::collections::HashSet;
 
-        let mut created: Vec<String> = Vec::new();
+        let mut created: Vec<(String, Vec<String>)> = Vec::new();
         let mut seen: HashSet<String> = HashSet::new();
 
         for usage in pre_aggregations {
@@ -1189,71 +1197,138 @@ impl TestContext {
                         }
                     })
                     .join(", ");
-                let messages = client
-                    .simple_query(&format!("SELECT {} FROM \"{}\"", select_list, table_name))
-                    .await
-                    .unwrap_or_else(|e| {
-                        panic!("Failed to read pre-agg table {}: {}", table_name, e)
-                    });
+                let partitions = self
+                    .cubestore_partitions(client, pre_agg, &table_name, &columns)
+                    .await;
+                let mut physical = Vec::with_capacity(partitions.len());
+                for (suffix, filter) in partitions {
+                    let cs_table = format!("{}{}", table_name, suffix);
+                    let messages = client
+                        .simple_query(&format!(
+                            "SELECT {} FROM \"{}\"{}",
+                            select_list, table_name, filter
+                        ))
+                        .await
+                        .unwrap_or_else(|e| {
+                            panic!("Failed to read pre-agg table {}: {}", table_name, e)
+                        });
 
-                // Write the rows to a local CSV file and load it through
-                // `LOCATION` — the same CSV import pipeline production rollups
-                // go through.
-                let mut csv = columns.iter().map(|(n, _)| Self::csv_field(n)).join(",");
-                csv.push('\n');
-                for msg in &messages {
-                    if let tokio_postgres::SimpleQueryMessage::Row(row) = msg {
-                        let line = (0..columns.len())
-                            .map(|i| {
-                                Self::csv_field(&Self::cubestore_csv_value(
-                                    row.try_get(i).unwrap_or(None),
-                                    columns[i].1,
-                                ))
-                            })
-                            .join(",");
-                        csv.push_str(&line);
-                        csv.push('\n');
+                    // Write the rows to a local CSV file and load it through
+                    // `LOCATION` — the same CSV import pipeline production rollups
+                    // go through.
+                    let mut csv = columns.iter().map(|(n, _)| Self::csv_field(n)).join(",");
+                    csv.push('\n');
+                    for msg in &messages {
+                        if let tokio_postgres::SimpleQueryMessage::Row(row) = msg {
+                            let line = (0..columns.len())
+                                .map(|i| {
+                                    Self::csv_field(&Self::cubestore_csv_value(
+                                        row.try_get(i).unwrap_or(None),
+                                        columns[i].1,
+                                    ))
+                                })
+                                .join(",");
+                            csv.push_str(&line);
+                            csv.push('\n');
+                        }
                     }
+
+                    let csv_path = std::env::temp_dir().join(format!(
+                        "cubestore-test-{}-{}-{}.csv",
+                        std::process::id(),
+                        cs_schema,
+                        cs_table
+                    ));
+                    std::fs::write(&csv_path, csv)
+                        .unwrap_or_else(|e| panic!("Failed to write CSV {:?}: {}", csv_path, e));
+
+                    let cols_sql = columns
+                        .iter()
+                        .map(|(n, t)| format!("\"{}\" {}", n, t))
+                        .join(", ");
+                    let extra_sql =
+                        self.cubestore_table_extras_sql(&table.cube_name, &name, pre_agg, &columns);
+                    let create_sql = format!(
+                        "CREATE TABLE {}.\"{}\" ({}){} LOCATION '{}'",
+                        cs_schema,
+                        cs_table,
+                        cols_sql,
+                        extra_sql,
+                        csv_path.to_string_lossy()
+                    );
+                    conn.query_drop(&create_sql).await.unwrap_or_else(|e| {
+                        panic!(
+                            "Failed to create CubeStore table:\n{}\n\nError: {:?}",
+                            create_sql, e
+                        )
+                    });
+                    // CREATE TABLE ... LOCATION imports synchronously; the file is
+                    // no longer needed once it returns.
+                    let _ = std::fs::remove_file(&csv_path);
+
+                    physical.push(cs_table);
                 }
-
-                let csv_path = std::env::temp_dir().join(format!(
-                    "cubestore-test-{}-{}-{}.csv",
-                    std::process::id(),
-                    cs_schema,
-                    table_name
-                ));
-                std::fs::write(&csv_path, csv)
-                    .unwrap_or_else(|e| panic!("Failed to write CSV {:?}: {}", csv_path, e));
-
-                let cols_sql = columns
-                    .iter()
-                    .map(|(n, t)| format!("\"{}\" {}", n, t))
-                    .join(", ");
-                let extra_sql =
-                    self.cubestore_table_extras_sql(&table.cube_name, &name, pre_agg, &columns);
-                let create_sql = format!(
-                    "CREATE TABLE {}.\"{}\" ({}){} LOCATION '{}'",
-                    cs_schema,
-                    table_name,
-                    cols_sql,
-                    extra_sql,
-                    csv_path.to_string_lossy()
-                );
-                conn.query_drop(&create_sql).await.unwrap_or_else(|e| {
-                    panic!(
-                        "Failed to create CubeStore table:\n{}\n\nError: {:?}",
-                        create_sql, e
-                    )
-                });
-                // CREATE TABLE ... LOCATION imports synchronously; the file is
-                // no longer needed once it returns.
-                let _ = std::fs::remove_file(&csv_path);
-
-                created.push(table_name);
+                created.push((table_name, physical));
             }
         }
 
         created
+    }
+
+    /// Splits a partitioned pre-aggregation table into the per-partition
+    /// tables Cube builds: one per `partition_granularity` bucket of its time
+    /// column, suffixed with the bucket start as `YYYYMMDD`. Returns
+    /// `(suffix, WHERE clause)` pairs; a single unsuffixed pair when the table
+    /// is not partitioned.
+    #[cfg(feature = "integration-cubestore")]
+    async fn cubestore_partitions(
+        &self,
+        client: &tokio_postgres::Client,
+        pre_agg: &PreAggregation,
+        table_name: &str,
+        columns: &[(String, &'static str)],
+    ) -> Vec<(String, String)> {
+        let unpartitioned = vec![(String::new(), String::new())];
+        if !matches!(pre_agg.source().as_ref(), PreAggregationSource::Single(_)) {
+            return unpartitioned;
+        }
+        let Some(granularity) = self
+            .schema
+            .get_pre_aggregation(pre_agg.cube_name(), pre_agg.name())
+            .and_then(|d| d.partition_granularity().map(|g| g.to_string()))
+        else {
+            return unpartitioned;
+        };
+        let time_columns = columns
+            .iter()
+            .filter(|(_, t)| *t == "timestamp")
+            .collect::<Vec<_>>();
+        let [(time_column, _)] = time_columns.as_slice() else {
+            return unpartitioned;
+        };
+        let bucket = format!(
+            "to_char(date_trunc('{}', \"{}\"), 'YYYYMMDD')",
+            granularity, time_column
+        );
+        let rows = client
+            .query(
+                &format!(
+                    "SELECT DISTINCT {} FROM \"{}\" WHERE \"{}\" IS NOT NULL ORDER BY 1",
+                    bucket, table_name, time_column
+                ),
+                &[],
+            )
+            .await
+            .unwrap_or_else(|e| panic!("Failed to list partitions of {}: {}", table_name, e));
+        if rows.is_empty() {
+            return unpartitioned;
+        }
+        rows.iter()
+            .map(|r| {
+                let b: String = r.get(0);
+                (b.clone(), format!(" WHERE {} = '{}'", bucket, b))
+            })
+            .collect()
     }
 
     /// Renders the CubeStore CREATE TABLE tail: `AGGREGATIONS (...)` plus

@@ -1,0 +1,9 @@
+---
+source: cubesqlplanner/cubesqlplanner/src/tests/integration/cubestore/partitioned_rollup.rs
+expression: normalize(result)
+---
+part_sales__sold_at_month|part_sales__amount
+2024-01-01 00:00:00|74724.0000000000
+2024-02-01 00:00:00|71994.0000000000
+2024-03-01 00:00:00|69264.0000000000
+2024-04-01 00:00:00|78534.0000000000

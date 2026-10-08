@@ -1,0 +1,39 @@
+cubes:
+  - name: part_sales
+    sql: "SELECT * FROM cs_part_sales"
+    dimensions:
+      - name: id
+        type: number
+        sql: id
+        primary_key: true
+      - name: hcp
+        type: string
+        sql: hcp
+      - name: brand
+        type: string
+        sql: brand
+      - name: sold_at
+        type: time
+        sql: sold_at
+    measures:
+      - name: amount
+        type: sum
+        sql: amount
+    pre_aggregations:
+      - name: monthly
+        type: rollup
+        measures:
+          - amount
+        dimensions:
+          - hcp
+          - brand
+        time_dimension: sold_at
+        granularity: month
+        partition_granularity: month
+        indexes:
+          - name: month_hcp_brand_agg
+            columns:
+              - sold_at
+              - hcp
+              - brand
+            type: aggregate

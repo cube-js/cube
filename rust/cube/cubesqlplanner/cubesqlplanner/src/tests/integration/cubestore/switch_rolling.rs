@@ -12,6 +12,7 @@
 //! Note that a debug-built `cubestored` overflows its stack on rolling-window
 //! queries, so `CUBESTORED_BIN_PATH` must point at a release build.
 
+use super::normalize;
 use crate::test_fixtures::cube_bridge::MockSchema;
 use crate::test_fixtures::test_utils::TestContext;
 use indoc::indoc;
@@ -114,50 +115,6 @@ fn assert_served_by(ctx: &TestContext, query: &str, expected_rollup: &str) {
             .map(|u| u.name().clone())
             .collect::<Vec<_>>()
     );
-}
-
-/// Engine-independent form of a result table. CubeStore renders timestamps as
-/// `...T00:00:00.000Z` where Postgres uses `... 00:00:00` — matched on that
-/// shape, so a string cell like the `YTD` calc-group value is left alone — and
-/// ratios are
-/// computed in f64 against Postgres' NUMERIC, so the two differ in the last
-/// digit (`2.4285714285714284` vs `...86`); numbers are therefore compared
-/// rounded. Everything else must match cell for cell.
-fn normalize(table: &str) -> String {
-    fn normalize_cell(cell: &str) -> String {
-        let cell = cell.trim();
-        // Only rewrite cells shaped like CubeStore's `2024-05-01T00:00:00.000Z`,
-        // so string values carrying a `T` or `Z` — the `YTD` calc group here —
-        // survive untouched.
-        let cell = match cell.strip_suffix('Z') {
-            Some(timestamp) if timestamp.contains('T') => {
-                timestamp.replacen('T', " ", 1).replace(".000", "")
-            }
-            _ => cell.to_string(),
-        };
-        match cell.parse::<f64>() {
-            Ok(value) => format!("{value:.10}"),
-            Err(_) => cell,
-        }
-    }
-
-    table
-        .lines()
-        .filter(|line| {
-            // the `---+---` separator, not a data row whose first cell is negative
-            !line
-                .trim()
-                .chars()
-                .all(|c| matches!(c, '-' | '+' | ' ' | '|'))
-        })
-        .map(|line| {
-            line.split('|')
-                .map(normalize_cell)
-                .collect::<Vec<_>>()
-                .join("|")
-        })
-        .collect::<Vec<_>>()
-        .join("\n")
 }
 
 /// Runs `query` through the rollup and through the raw source, asserts the two

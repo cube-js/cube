@@ -31,7 +31,6 @@ pub struct YamlPreAggregationDefinition {
     #[serde(default)]
     segments: Option<Vec<String>>,
     #[serde(default)]
-    #[allow(dead_code)]
     partition_granularity: Option<String>,
     #[serde(default)]
     #[allow(dead_code)]
@@ -155,6 +154,7 @@ impl YamlPreAggregationDefinition {
                 .indexes(indexes)
                 .build_range_start(self.build_range_start)
                 .build_range_end(self.build_range_end)
+                .partition_granularity(self.partition_granularity)
                 .build(),
         )
     }
