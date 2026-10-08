@@ -219,6 +219,7 @@
               "docs/integrations/google-sheets",
               "docs/integrations/snowflake-semantic-views",
               "docs/integrations/databricks-metric-views",
+              "docs/integrations/apache-ossie",
               "docs/integrations/dbt",
               {
                 "group": "Semantic Layer Sync",
