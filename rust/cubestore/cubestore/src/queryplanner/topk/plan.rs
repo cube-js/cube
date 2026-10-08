@@ -802,11 +802,9 @@ fn plan_topk_full_merge(
     // partitions and EnforceDistribution is disabled in CubeStore, so fan the workers in explicitly
     // (otherwise SanityCheckPlan rejects the plan with a SinglePartition distribution error).
     let coalesced = Arc::new(CoalescePartitionsExec::new(cluster));
-    // The worker emits final values, and for sum/min/max a final value is also the accumulator
-    // state, so the router merges them in Final mode with the original aggregates. Re-running
-    // the aggregate over its own output instead would derive the output type a second time:
-    // sum() widens a decimal's precision on each application, and HAVING is typed against the
-    // single-sum type.
+    // Final mode is valid only because sum/min/max emit their accumulator state as the final
+    // value; re-running sum() over worker output would widen decimal precision a second time
+    // and break HAVING, which is typed against the single-sum type.
     let reagg = Arc::new(AggregateExec::try_new(
         AggregateMode::Final,
         reagg_group,
