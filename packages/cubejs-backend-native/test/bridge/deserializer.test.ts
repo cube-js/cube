@@ -31,6 +31,10 @@ describeBridge('bridge: NativeSerdeDeserializer', () => {
       ['ascii string', 'hello', 'hello'],
       ['unicode string', 'привет 世界', 'привет 世界'],
       ['emoji string', '🙂👍🏽', '🙂👍🏽'],
+      // As many UTF-8 bytes as UTF-16 units fit before the string ends: not ASCII.
+      ['multibyte first', 'éa', 'éa'],
+      ['multibyte last', 'abcé', 'abcé'],
+      ['lone surrogate', 'a\uD800b', 'a\uFFFDb'],
       ['string with quotes and newlines', 'a "b"\n\'c\'\t\\', 'a "b"\n\'c\'\t\\'],
       ['zero', 0, 0],
       ['negative zero', -0, 0],
@@ -140,6 +144,16 @@ describeBridge('bridge: NativeSerdeDeserializer', () => {
     it('names the offending field', () => {
       expect(() => deserializeJson({ ok: 1, bad: () => 1 }))
         .toThrow('field `bad`: deserializer is not implemented');
+    });
+
+    it('rejects a symbol and a bigint', () => {
+      expect(() => deserializeJson({ s: Symbol('s') })).toThrow('field `s`: failed to read value');
+      expect(() => deserializeJson([BigInt(1)])).toThrow('element 0: failed to read value');
+    });
+
+    it('names the offending element', () => {
+      expect(() => deserializeJson([1, () => 1]))
+        .toThrow('element 1: deserializer is not implemented');
     });
 
     it('names every level of a nested offending field', () => {

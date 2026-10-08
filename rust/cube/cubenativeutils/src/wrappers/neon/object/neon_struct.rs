@@ -1,4 +1,4 @@
-use super::{NeonObject, ObjectNeonTypeHolder, RootHolder};
+use super::{primitive_root_holder::read_js_string, NeonObject, ObjectNeonTypeHolder, RootHolder};
 use crate::wrappers::{
     neon::{inner_types::NeonInnerTypes, object::IntoNeonObject},
     object::{NativeStruct, NativeType},
@@ -46,18 +46,44 @@ impl<C: Context<'static> + 'static> NativeStruct<NeonInnerTypes<C>> for NeonStru
         )?))
     }
 
-    fn get_field_by_key(
-        &self,
-        key: &NativeObjectHandle<NeonInnerTypes<C>>,
-    ) -> Result<NativeObjectHandle<NeonInnerTypes<C>>, CubeError> {
-        let key = key.object_ref().get_js_value()?;
-        let neon_result = self
-            .object
-            .map_neon_object(|cx, neon_object| neon_object.get::<JsValue, _, _>(cx, key))?;
-        Ok(NativeObjectHandle::new(NeonObject::new(
-            self.object.get_context(),
-            neon_result,
-        )?))
+    fn entries(&self) -> Result<Vec<(String, NativeObjectHandle<NeonInnerTypes<C>>)>, CubeError> {
+        let context = self.object.get_context();
+        // The key whose value failed to read, so the error can name it.
+        let mut failed_key = None;
+        self.object
+            .map_neon_object(|cx, object| {
+                let names = object.get_own_property_names(cx)?;
+                let len = names.len(cx);
+                let mut entries = Vec::with_capacity(len as usize);
+                for idx in 0..len {
+                    let key = names.get_value(cx, idx)?;
+                    // SAFETY: neon requests the names with `SKIP_SYMBOLS` and `NumbersToStrings`,
+                    // so every element is a string, alive for as long as `names` is.
+                    let key = unsafe { JsString::from_raw(&*cx, key.to_raw()) };
+                    let name = read_js_string(cx, key);
+                    // Looked up by the original key handle: a fresh JsString built from `name`
+                    // would be re-internalized by V8 on every lookup.
+                    let value = match object
+                        .get_value(cx, key)
+                        .map_err(CubeError::from)
+                        .and_then(|value| RootHolder::new_in(cx, &context, value))
+                    {
+                        Ok(value) => value,
+                        Err(err) => {
+                            failed_key = Some(name);
+                            return Ok(Err(err));
+                        }
+                    };
+                    entries.push((name, NeonObject::from_root(value).into()));
+                }
+                Ok(Ok(entries))
+            })?
+            .map_err(|mut err| {
+                if let Some(key) = failed_key {
+                    err.message = format!("field `{key}`: failed to read value: {}", err.message);
+                }
+                err
+            })
     }
 
     fn has_field(&self, field_name: &str) -> Result<bool, CubeError> {

@@ -38,19 +38,27 @@ impl<C: Context<'static> + 'static> NativeArray<NeonInnerTypes<C>> for NeonArray
             .map_neon_object::<_, _>(|cx, object| Ok(object.len(cx)))
     }
     fn to_vec(&self) -> Result<Vec<NativeObjectHandle<NeonInnerTypes<C>>>, CubeError> {
-        let neon_vec = self
-            .object
-            .map_neon_object::<_, _>(|cx, object| object.to_vec(cx))?;
-
-        neon_vec
-            .into_iter()
-            .map(|o| -> Result<_, CubeError> {
-                Ok(NativeObjectHandle::new(NeonObject::new(
-                    self.object.get_context(),
-                    o,
-                )?))
-            })
-            .collect::<Result<Vec<_>, _>>()
+        let context = self.object.get_context();
+        self.object.map_neon_object(|cx, object| {
+            let len = object.len(cx);
+            let mut items = Vec::with_capacity(len as usize);
+            for idx in 0..len {
+                let item = match object
+                    .get_value(cx, idx)
+                    .map_err(CubeError::from)
+                    .and_then(|value| RootHolder::new_in(cx, &context, value))
+                {
+                    Ok(item) => item,
+                    Err(mut err) => {
+                        err.message =
+                            format!("element {idx}: failed to read value: {}", err.message);
+                        return Ok(Err(err));
+                    }
+                };
+                items.push(NeonObject::from_root(item).into());
+            }
+            Ok(Ok(items))
+        })?
     }
     fn set(
         &self,

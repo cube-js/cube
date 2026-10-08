@@ -46,12 +46,8 @@ pub trait NativeArray<IT: InnerTypes>: NativeType<IT> {
 
 pub trait NativeStruct<IT: InnerTypes>: NativeType<IT> {
     fn get_field(&self, field_name: &str) -> Result<NativeObjectHandle<IT>, CubeError>;
-    /// Looks a field up by a key handle, e.g. one returned by
-    /// `get_own_property_names`, so callers don't have to stringify it.
-    fn get_field_by_key(
-        &self,
-        key: &NativeObjectHandle<IT>,
-    ) -> Result<NativeObjectHandle<IT>, CubeError>;
+    /// Own enumerable string-keyed properties with their values, read in one pass.
+    fn entries(&self) -> Result<Vec<(String, NativeObjectHandle<IT>)>, CubeError>;
     fn set_field(&self, field_name: &str, value: NativeObjectHandle<IT>)
         -> Result<bool, CubeError>;
     fn has_field(&self, field_name: &str) -> Result<bool, CubeError>;

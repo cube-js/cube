@@ -8,7 +8,7 @@ use crate::wrappers::{
 };
 use serde::{
     self,
-    de::{DeserializeOwned, DeserializeSeed, MapAccess, SeqAccess, Visitor},
+    de::{DeserializeOwned, DeserializeSeed, IntoDeserializer, MapAccess, SeqAccess, Visitor},
     forward_to_deserialize_any, Deserializer,
 };
 
@@ -145,15 +145,15 @@ impl<'de, IT: InnerTypes> Deserializer<'de> for NativeSerdeDeserializer<IT> {
 }
 
 pub struct NativeSeqDeserializer<IT: InnerTypes> {
-    input: IT::Array,
-    idx: u32,
-    len: u32,
+    items: std::iter::Enumerate<std::vec::IntoIter<NativeObjectHandle<IT>>>,
 }
 
 impl<IT: InnerTypes> NativeSeqDeserializer<IT> {
     pub fn new(input: IT::Array) -> Result<Self, NativeObjSerializerError> {
-        let len = input.len()?;
-        Ok(Self { input, idx: 0, len })
+        let items = input.to_vec()?;
+        Ok(Self {
+            items: items.into_iter().enumerate(),
+        })
     }
 }
 
@@ -164,63 +164,31 @@ impl<'de, IT: InnerTypes> SeqAccess<'de> for NativeSeqDeserializer<IT> {
     where
         T: DeserializeSeed<'de>,
     {
-        if self.idx >= self.len {
+        let Some((idx, item)) = self.items.next() else {
             return Ok(None);
-        }
-        let idx = self.idx;
-        let v = self.input.get(idx).map_err(|err| {
-            NativeObjSerializerError::from(err)
-                .context(format!("element {idx}: failed to read value"))
-        })?;
-
-        self.idx += 1;
-
-        let de = NativeSerdeDeserializer::new(v);
-        seed.deserialize(de)
+        };
+        seed.deserialize(NativeSerdeDeserializer::new(item))
             .map(Some)
             .map_err(|err| err.context(format!("element {idx}")))
+    }
+
+    fn size_hint(&self) -> Option<usize> {
+        Some(self.items.len())
     }
 }
 
 struct NativeMapDeserializer<IT: InnerTypes> {
-    input: IT::Struct,
-    prop_names: std::vec::IntoIter<NativeObjectHandle<IT>>,
-    idx: usize,
-    // Fetched in `next_key_seed`, so the key handle can be moved into the key
-    // deserializer instead of being cloned for the lookup.
-    pending_value: Option<NativeObjectHandle<IT>>,
+    entries: std::vec::IntoIter<(String, NativeObjectHandle<IT>)>,
+    // Set in `next_key_seed`; the key stays here for the error context of its value.
+    current: Option<(String, NativeObjectHandle<IT>)>,
 }
 
 impl<IT: InnerTypes> NativeMapDeserializer<IT> {
     pub fn new(input: IT::Struct) -> Result<Self, NativeObjSerializerError> {
-        let prop_names = input.get_own_property_names().map_err(|err| {
-            NativeObjSerializerError::from(err).context("failed to get property names")
-        })?;
         Ok(Self {
-            input,
-            prop_names: prop_names.into_iter(),
-            idx: 0,
-            pending_value: None,
+            entries: input.entries()?.into_iter(),
+            current: None,
         })
-    }
-
-    fn field_context(key: &NativeObjectHandle<IT>) -> String {
-        let key = key
-            .to_string()
-            .and_then(|s| s.into_value())
-            .unwrap_or_default();
-        format!("field `{key}`")
-    }
-
-    /// Error path only: the key handle has been consumed by then, so the name is
-    /// looked up again.
-    fn current_field_context(&self) -> String {
-        self.input
-            .get_own_property_names()
-            .ok()
-            .and_then(|names| names.into_iter().nth(self.idx - 1))
-            .map(|key| Self::field_context(&key))
-            .unwrap_or_else(|| format!("field #{}", self.idx - 1))
     }
 }
 
@@ -230,35 +198,28 @@ impl<'de, IT: InnerTypes> MapAccess<'de> for NativeMapDeserializer<IT> {
     where
         K: DeserializeSeed<'de>,
     {
-        let Some(key) = self.prop_names.next() else {
+        let Some(entry) = self.entries.next() else {
             return Ok(None);
         };
-        self.idx += 1;
-        let value = self.input.get_field_by_key(&key).map_err(|err| {
-            NativeObjSerializerError::from(err).context(format!(
-                "{}: failed to read value",
-                Self::field_context(&key)
-            ))
-        })?;
-        self.pending_value = Some(value);
-        seed.deserialize(NativeSerdeDeserializer::new(key))
-            .map(Some)
+        let (key, _) = self.current.insert(entry);
+        // By `&str`: struct field identifiers only need to compare it.
+        seed.deserialize(key.as_str().into_deserializer()).map(Some)
     }
 
     fn next_value_seed<V>(&mut self, seed: V) -> Result<V::Value, Self::Error>
     where
         V: DeserializeSeed<'de>,
     {
-        let value = self.pending_value.take().ok_or_else(|| {
+        let (key, value) = self.current.take().ok_or_else(|| {
             NativeObjSerializerError::Message(
                 "next_value_seed called before next_key_seed".to_string(),
             )
         })?;
         seed.deserialize(NativeSerdeDeserializer::new(value))
-            .map_err(|err| err.context(self.current_field_context()))
+            .map_err(|err| err.context(format!("field `{key}`")))
     }
 
     fn size_hint(&self) -> Option<usize> {
-        Some(self.prop_names.len())
+        Some(self.entries.len())
     }
 }
