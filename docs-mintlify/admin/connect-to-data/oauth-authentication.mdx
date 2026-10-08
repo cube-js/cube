@@ -34,7 +34,8 @@ connection could leak to another.
 - OAuth configured in your data source so that Cube can
   obtain per-user tokens (via the **User Credentials** feature)
 - A service account credential (token or password) stored as an
-  environment variable for fallback connectivity
+  environment variable, used for background operations and for users
+  without an active token
 
 <Warning>
 
@@ -42,7 +43,9 @@ The service account credential is used for Cube's internal liveness
 checks, background operations, and queries from users without an active
 token, who see whatever the service account can access. Grant it the
 minimum permissions necessary — ideally read-only access to the required
-schemas — to limit exposure.
+schemas — to limit exposure. To reject those queries instead, make
+`driver_factory` fail closed, as in the
+[per-user OIDC token example][ref-oidc-per-user].
 
 </Warning>
 
@@ -273,8 +276,10 @@ module.exports = {
 
 1. **User makes a request** — Cube attaches the user's own OAuth
    credentials to `securityContext.cubeCloud.userCredentials.<app_name>`,
-   where `<app_name>` is the **Name** of the OAuth app. Requests that
-   aren't tied to a Cube user carry no user credentials.
+   where `<app_name>` is the **Name** of the OAuth app, as
+   `{ status, accessToken, accessTokenExpiresAt, issuedAt }`. `issuedAt`
+   changes whenever the token is replaced. Requests that aren't tied to a
+   Cube user carry no user credentials.
 
 2. **`driver_factory` resolves the credential** — If the credential status
    is `active`, the user's OAuth token is used. Otherwise — the user hasn't
@@ -290,11 +295,15 @@ module.exports = {
    users, causing one user's credentials to be reused for another user's
    queries. Cube builds the driver once per orchestrator, so the key also
    includes the token's `issuedAt`: when a user authorizes or their token
-   is refreshed, Cube builds a new connection with the current token.
+   is refreshed, Cube builds a new connection with the current token. The
+   trade-off: each refresh starts the user on a new orchestrator with an
+   empty cache and new connections, and superseded orchestrators keep
+   theirs until they are evicted from the orchestrator cache.
 
 [ref-config]: /reference/configuration/config
 [ref-driver-factory]: /reference/configuration/config#driver_factory
 [ref-context-to-orchestrator-id]: /reference/configuration/config#context_to_orchestrator_id
+[ref-oidc-per-user]: /admin/deployment/oidc#per-user-tokens
 [ref-databricks-jdbc]: /admin/connect-to-data/data-sources/databricks-jdbc
 [ref-snowflake]: /admin/connect-to-data/data-sources/snowflake
 [ref-data-sources]: /admin/connect-to-data/data-sources
