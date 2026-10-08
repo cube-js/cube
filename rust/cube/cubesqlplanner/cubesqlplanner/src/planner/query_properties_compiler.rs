@@ -109,7 +109,7 @@ impl QueryPropertiesCompiler {
         let cubestore_union_full_key_aggregate = options
             .static_data()
             .cubestore_union_full_key_aggregate
-            .unwrap_or(true);
+            .unwrap_or(false);
         let disable_external_pre_aggregations =
             options.static_data().disable_external_pre_aggregations;
         let pre_aggregation_id = options.static_data().pre_aggregation_id.clone();

@@ -651,6 +651,7 @@ async fn test_multi_stage_value_types_combined_over_rollup() {
         order:
           - id: orders.status
           - id: orders.size
+        cubestore_union_full_key_aggregate: true
     "};
 
     let ctx = TestContext::new(MockSchema::from_yaml_file(yaml)).unwrap();
