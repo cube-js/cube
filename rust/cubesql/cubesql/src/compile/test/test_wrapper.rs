@@ -30,6 +30,46 @@ use crate::{
 };
 
 #[tokio::test]
+async fn test_mssql_integral_float_literal_pushdown() {
+    if !Rewriter::sql_push_down_enabled() {
+        return;
+    }
+    let context = TestContext::with_custom_templates(
+        DatabaseProtocol::PostgreSQL,
+        vec![(
+            "expressions/float_literal".into(),
+            "{% if is_int32 %}CAST({{ value }} AS DECIMAL(10, 0)){% else %}{{ value }}{% endif %}"
+                .into(),
+        )],
+    )
+    .await;
+    for literal in [
+        "100.0",
+        "CAST(100 AS DOUBLE)",
+        "CAST(100 AS REAL)",
+        "CAST(50 + 50 AS DOUBLE)",
+    ] {
+        let query = format!(
+            "SELECT {literal} * COUNT(*) / NULLIF(3 * COUNT(*), 0) AS percentage \
+             FROM KibanaSampleDataEcommerce WHERE LOWER(customer_gender) <> 'invalid'"
+        );
+        let plan = context.convert_sql_to_cube_query(&query).await.unwrap();
+        let sql = plan
+            .as_logical_plan()
+            .find_cube_scan_wrapped_sql()
+            .wrapped_sql
+            .sql;
+        assert!(
+            sql.contains("CAST(100 AS DECIMAL(10, 0))"),
+            "{}: {}",
+            literal,
+            sql
+        );
+        plan.as_physical_plan().await.unwrap();
+    }
+}
+
+#[tokio::test]
 async fn test_simple_wrapper() {
     if !Rewriter::sql_push_down_enabled() {
         return;
