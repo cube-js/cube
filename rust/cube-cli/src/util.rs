@@ -438,6 +438,14 @@ pub fn read_text(path: &str, what: &str) -> Result<(String, String)> {
 /// outside it. Lexical only, deliberately: the check is about what the SERVER can
 /// name, not about what already exists, so symlinks are not resolved.
 pub fn resolve_within(root: &Path, raw: &str) -> Result<PathBuf> {
+    // No real file name has one, and the path is printed after it is written.
+    if raw.chars().any(char::is_control) {
+        bail!(
+            "refusing to write {}: the server returned a path with control characters",
+            raw.escape_debug()
+        );
+    }
+
     let candidate = Path::new(raw);
     if candidate.is_absolute() {
         bail!("refusing to write the absolute path {raw} returned by the server");
@@ -1123,6 +1131,8 @@ mod tests {
             "model/../../outside.yml",
             "/etc/passwd",
             "",
+            // Printed after it is written, so it could drive the terminal.
+            "model/cubes/\u{1b}]0;pwned\u{7}.yml",
         ] {
             assert!(
                 resolve_within(root, hostile).is_err(),

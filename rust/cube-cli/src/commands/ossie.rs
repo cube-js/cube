@@ -248,6 +248,13 @@ fn started_id(started: &Value) -> Result<String> {
     if util::is_blank(&id) {
         bail!("Cube started the Ossie conversion but returned no conversion id");
     }
+    // Every message names the id, and one with control characters could drive the terminal.
+    if id.chars().any(char::is_control) {
+        bail!(
+            "Cube started the Ossie conversion but returned the unusable conversion id {}",
+            id.escape_debug()
+        );
+    }
 
     Ok(id)
 }
@@ -936,6 +943,16 @@ mod tests {
 
         let _ = std::fs::remove_dir_all(root);
         let _ = std::fs::remove_dir_all(empty);
+    }
+
+    #[test]
+    fn a_started_conversion_needs_a_printable_id() {
+        assert_eq!(started_id(&json!({"conversionId": "c-1"})).unwrap(), "c-1");
+        assert!(started_id(&json!({"conversionId": " "})).is_err());
+        let err = started_id(&json!({"conversionId": "c\u{1b}]0;pwned\u{7}"}))
+            .unwrap_err()
+            .to_string();
+        assert!(!err.contains('\u{1b}'), "{err:?}");
     }
 
     #[test]
