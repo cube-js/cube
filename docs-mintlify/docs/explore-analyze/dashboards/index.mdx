@@ -40,6 +40,11 @@ the [revision history](#revision-history):
 
 Before the first publish, no button is shown.
 
+A dashboard can require [review][ref-reviews] before it is published. Then
+**Publish** reads **Request review**, and the dashboard goes live only once a
+reviewer approves the changes. While the draft matches the review, a **Review**
+button replaces **Draft** and opens the review.
+
 While editing, **Undo** and **Redo** step through your draft changes, and
 **Revert** discards all unpublished changes to restore the currently published
 version.
@@ -49,7 +54,8 @@ version.
 The revision history lists every published version alongside the current draft.
 Each row shows the version number, when it was published, and by whom. Select a
 version to preview it, then **Restore** to make it your current draft — publish
-again to make it the live version.
+again to make it the live version. The history also lists the revisions of each
+[review][ref-reviews], each with an **Open review** button.
 
 ### What viewers see
 
@@ -192,6 +198,7 @@ does, as `layout: print` on a PDF dashboard export.
 
 [ref-workbooks]: /docs/explore-analyze/workbooks
 [ref-widgets]: /docs/explore-analyze/dashboards/widgets
+[ref-reviews]: /docs/explore-analyze/dashboards/reviews
 [ref-controls]: /docs/explore-analyze/dashboards/widgets/controls
 [ref-control-visibility]: /docs/explore-analyze/dashboards/widgets/controls#visibility
 [ref-control-data-defaults]: /docs/explore-analyze/dashboards/widgets/controls#defaults-resolved-from-the-data

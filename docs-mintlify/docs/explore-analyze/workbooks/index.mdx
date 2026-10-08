@@ -160,7 +160,8 @@ From the workbook's row actions menu on the workspace page (not available in
 and choose the target deployment. Cube previews what will change before you apply it.
 The first promotion to a given deployment creates a linked copy there and publishes the
 dashboard; every later promotion to the same deployment updates that copy, instead of
-creating another one, and republishes the dashboard.
+creating another one, and republishes the dashboard. A later promotion into a copy
+whose dashboard [requires review][ref-reviews] is refused.
 
 You need read access to the source workbook and access to the target deployment; once a
 linked copy exists there, you also need edit access to it. If the destination copy was
@@ -192,6 +193,7 @@ has not been published will be lost.
 </Warning>
 
 [ref-dashboards]: /docs/explore-analyze/dashboards
+[ref-reviews]: /docs/explore-analyze/dashboards/reviews
 [ref-sharing-duplicates]: /docs/organize-content/sharing#duplicates
 [ref-promotions-api]: /api-reference/workbook-promotions/promote-and-publish-a-workbook
 
