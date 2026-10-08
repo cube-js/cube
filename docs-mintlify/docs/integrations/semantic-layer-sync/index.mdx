@@ -351,6 +351,29 @@ You can also run a sync manually by navigating to **IDE → Integrations**
 and clicking **Start Sync** next to a relevant sync. This is convenient for working in the
 [development mode][ref-dev-mode].
 
+## Data access policies
+
+Syncs that run on build or on schedule don't run as any user, unless
+[multitenancy](#multitenancy) is enabled. With multitenancy, each of these syncs
+publishes what its security context can see. Otherwise, when a cube or view is
+available only to specific groups through [data access policies][ref-dap],
+these syncs publish the members that any of those groups can see. They leave out
+members granted only by policies whose conditions depend on the user, and skip
+such cubes and views altogether when groups come from a
+[custom mapping][ref-dap-mapping].
+
+A manual sync publishes what the user who starts it can see. Outside
+[development mode][ref-dev-mode], it updates the same database as the syncs on
+build and on schedule, so it replaces what they published.
+
+Everyone who can open the synced dataset or data source in the BI tool sees the
+names and descriptions of the published members. Queries still go through the
+SQL API, which applies data access policies to the user the BI tool queries as.
+
+To hide such members from some users of the BI tool, restrict their access to
+the synced database, or move these members to a separate view and restrict
+access to its synced dataset or data source in the BI tool.
+
 ## Viewing history
 
 You can view the history of runs for a particular sync by navigating to
@@ -372,3 +395,5 @@ on, i.e., your development mode branch, shared branch, or main branch.
 [ref-config-schemaversion]: /reference/configuration/config#schema_version
 [ref-dev-mode]: /docs/data-modeling/dev-mode
 [ref-auto-sus]: /admin/deployment/auto-suspension
+[ref-dap]: /docs/data-modeling/data-access-policies
+[ref-dap-mapping]: /docs/data-modeling/data-access-policies#custom-mapping
