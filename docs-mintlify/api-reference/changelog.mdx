@@ -7,6 +7,16 @@ rss: true
 {/* GENERATED FILE — do not edit by hand. */}
 {/* Run scripts/extract-changelog.mjs against the platform client CHANGELOG.md. */}
 
+<Update label="2026-10-08" description="v0.19.0" tags={["Added","Fixed"]}>
+  ### Added
+
+  - `layout` on the body of `POST /api/v1/deployments/{deploymentId}/dashboard-exports`: `print` returns the paginated A4 PDF the dashboard's Print version menu item produces (one column, every table row, the filter state as a summary line instead of filter controls); `screenshot`, the default, keeps today's board image. `print` requires `format: 'pdf'` — with `png` the request answers `400` (CUB-5008).
+
+  ### Fixed
+
+  - A field's description, default and deprecation now reach the types and the API reference for every field. Before, a field taking one of a fixed set of values showed only those values (`format` on dashboard exports read only `"png" | "pdf"`), and an optional field's description sat where the generated types never read it (CUB-5411).
+</Update>
+
 <Update label="2026-10-05" description="v0.18.0" tags={["Changed"]}>
   ### Changed
 
