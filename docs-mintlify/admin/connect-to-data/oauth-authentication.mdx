@@ -44,10 +44,11 @@ checks, background operations, and queries from users without an active
 token, who see whatever the service account can access. Grant it the
 minimum permissions necessary — ideally read-only access to the required
 schemas — to limit exposure. To reject those queries instead, make
-`driver_factory` fail closed by returning a non-empty token the warehouse
-rejects; an empty `token` makes the Databricks driver read the service
-account token from the environment. See the
-[per-user OIDC token example][ref-oidc-per-user].
+`driver_factory` fail closed for user requests and keep the service
+account token only for the refresh worker's context, as in the
+[per-user OIDC token example][ref-oidc-per-user]. Fail closed with a
+non-empty token the warehouse rejects: an empty `token` makes the
+Databricks driver read the service account token from the environment.
 
 </Warning>
 
