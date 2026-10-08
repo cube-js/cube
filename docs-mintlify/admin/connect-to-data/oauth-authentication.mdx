@@ -20,8 +20,8 @@ operations.
 
 This pattern applies to any data source that supports OAuth, including
 [Databricks][ref-databricks-jdbc] and [Snowflake][ref-snowflake]. The
-examples below use Databricks; switch the `userCredentials` key and
-driver options for any other OAuth-capable data source.
+examples below use Databricks; for any other OAuth-capable data
+source, update the driver options.
 
 Because every user connects with different credentials, you also need
 per-user query orchestrator state. Without this, one user's cached
@@ -72,6 +72,11 @@ required **Scopes**. Copy the **Redirect URI** shown in this form and
 register it with your data source's OAuth provider, then click
 **Create**.
 
+Request a refresh token so users don't have to authorize again each time
+the access token expires. For Databricks, add `offline_access` to
+**Scopes** and to the Databricks OAuth app, and set a long enough
+`refresh_token_ttl_in_minutes` on the Databricks OAuth app.
+
 <Frame>
   <img src="/images/admin/connect-to-data/oauth-fill-fields.png" alt="New OAuth app form with fields for Name, Auth URL, Token URL, Client ID, Client Secret, Scopes, and Redirect URI" />
 </Frame>
@@ -89,9 +94,7 @@ and click **Authorize** to generate an access token.
 Cube refreshes the access token automatically as long as the provider
 issues a refresh token. A user needs to authorize again only if the
 refresh token expires or is revoked; **Connected apps** shows the
-current status. For Databricks, add `offline_access` to the scopes, both
-on the Databricks OAuth app and in **Scopes** above, and set a long
-enough `refresh_token_ttl_in_minutes` on the Databricks OAuth app.
+current status.
 
 <Frame>
   <img src="/images/admin/connect-to-data/oauth-authorize.png" alt="Connected apps page showing the OAuth integration with an Authorize action" />
