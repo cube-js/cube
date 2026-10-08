@@ -1,6 +1,5 @@
 ---
 source: cubesqlplanner/cubesqlplanner/src/tests/integration/pre_aggregations/multi_fact.rs
-assertion_line: 162
 expression: result
 ---
 orders__status | orders__count | customers__count

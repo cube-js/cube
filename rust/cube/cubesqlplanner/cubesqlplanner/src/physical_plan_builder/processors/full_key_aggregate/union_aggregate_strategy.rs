@@ -1,5 +1,5 @@
 use super::FullKeyAggregateStrategy;
-use crate::logical_plan::{FullKeyAggregate, LogicalJoin};
+use crate::logical_plan::FullKeyAggregate;
 use crate::physical_plan::sql_nodes::SqlNodesFactory;
 use crate::physical_plan::{
     Expr, From, FromSource, QualifiedColumnName, SelectBuilder, SingleAliasedSource, Union,
@@ -11,14 +11,9 @@ use cubenativeutils::CubeError;
 use itertools::Itertools;
 use std::rc::Rc;
 
-/// Union-based assembly: every measure ref contributes one `UNION ALL` branch
-/// that projects the key dims, its own measures, and an untyped NULL for the
-/// measures of the other refs. Grouping the union by the key dims and picking
-/// the one non-NULL value per measure yields the same rows as a FULL JOIN on
-/// the dims, NULL keys included (GROUP BY treats NULLs as equal), while every
-/// ref is read once and no join is planned.
-///
-/// Each ref holds at most one row per key, so the pick never merges values.
+/// One `UNION ALL` branch per ref (own measures, NULL padding for the rest), grouped by
+/// the key dims: a FULL JOIN on the dims, NULL keys included, with each ref read once.
+/// Needs `GROUP_ANY` to skip NULLs and each ref to hold at most one row per key.
 pub(super) struct UnionFullKeyAggregateStrategy<'a> {
     builder: &'a PhysicalPlanBuilder,
 }
@@ -37,11 +32,7 @@ impl FullKeyAggregateStrategy for UnionFullKeyAggregateStrategy<'_> {
     ) -> Result<Rc<From>, CubeError> {
         let query_tools = self.builder.query_tools();
         let refs = full_key_aggregate.multi_stage_subquery_refs();
-
-        if refs.is_empty() {
-            let empty_join = LogicalJoin::builder().build();
-            return self.builder.process_node(&empty_join, context);
-        }
+        debug_assert!(refs.len() > 1);
 
         let key_dims = full_key_aggregate
             .schema()
