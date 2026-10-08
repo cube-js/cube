@@ -1,11 +1,6 @@
-//! Pushes an aggregate below a `UNION ALL` of tables when no group can take rows from two
-//! branches.
-//!
-//! The proof uses the min/max rows the metastore keeps for every partition and chunk. A group key
-//! `f(c)`, where `c` is the leading sort column of each branch's index and `f` is the identity or
-//! `date_trunc`, separates the branches when the intervals `[f(min c), f(max c)]` do not overlap.
-//! Every group then lives in exactly one branch, so aggregating each branch on its own gives the
-//! final value and the aggregate above the union is not needed.
+//! Pushes an aggregate below a `UNION ALL` of tables when a group key `f(c)` — `c` the leading
+//! sort column of every branch's index, `f` identity or `date_trunc` — maps each branch's
+//! partition/chunk `[min c, max c]` to non-overlapping intervals, so every group lives in one branch.
 
 use crate::queryplanner::optimizations::rewrite_plan::{rewrite_plan, PlanRewriter};
 use crate::queryplanner::planning::ChooseIndexContext;
@@ -678,6 +673,36 @@ mod tests {
             let one_loaded = "SELECT m, sum(v) FROM \
                 (SELECT * FROM s.t1 UNION ALL SELECT * FROM s.empty) t GROUP BY 1 ORDER BY 1";
             assert!(!pushed_down(&logical_plan(&service, one_loaded).await));
+
+            // Leading `x` is disjoint from `t1.m`, but `m` repeats January.
+            exec(
+                &service,
+                "CREATE TABLE s.by_x (x timestamp, m timestamp, k text, v int)",
+            )
+            .await?;
+            exec(
+                &service,
+                "INSERT INTO s.by_x (x, m, k, v) VALUES \
+                 ('2025-01-01T00:00:00.000Z', '2024-01-01T00:00:00.000Z', 'a', 1000)",
+            )
+            .await?;
+            let non_leading = "SELECT m, sum(v) FROM \
+                (SELECT m, v FROM s.t1 UNION ALL SELECT m, v FROM s.by_x) t GROUP BY 1 ORDER BY 1";
+            assert!(!pushed_down(&logical_plan(&service, non_leading).await));
+            assert_eq!(
+                exec(&service, non_leading).await?[0],
+                Row::new(vec![ts("2024-01-01T00:00:00.000Z"), TableValue::Int(1024)])
+            );
+
+            // Shifting `t1` by a month lands it on February, which `t2` holds.
+            let computed = "SELECT m, sum(v) FROM \
+                (SELECT m + INTERVAL '1 month' AS m, v FROM s.t1 \
+                 UNION ALL SELECT m, v FROM s.t2) t GROUP BY 1 ORDER BY 1";
+            assert!(!pushed_down(&logical_plan(&service, computed).await));
+            assert_eq!(
+                exec(&service, computed).await?[0],
+                Row::new(vec![ts("2024-02-01T00:00:00.000Z"), TableValue::Int(48)])
+            );
             Ok(())
         })
         .await;

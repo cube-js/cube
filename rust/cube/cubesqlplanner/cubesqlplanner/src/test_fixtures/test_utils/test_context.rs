@@ -1031,6 +1031,68 @@ impl TestContext {
     pub async fn try_execute_cubestore(&self, query_yaml: &str, seed_file: &str) -> Option<String> {
         use mysql_async::prelude::Queryable;
 
+        let (mut conn, final_sql) = self.cubestore_sql(query_yaml, seed_file).await;
+        let rows: Vec<mysql_async::Row> = conn.query(&final_sql).await.unwrap_or_else(|e| {
+            panic!(
+                "CubeStore SQL execution failed:\n{}\n\nError: {:?}",
+                final_sql, e
+            )
+        });
+
+        let columns: Vec<String> = rows
+            .first()
+            .map(|r| {
+                r.columns_ref()
+                    .iter()
+                    .map(|c| c.name_str().to_string())
+                    .collect()
+            })
+            .unwrap_or_default();
+        let formatted_rows: Vec<Vec<String>> = rows
+            .iter()
+            .map(|r| {
+                (0..r.columns_ref().len())
+                    .map(|i| Self::mysql_value_to_string(r.as_ref(i)))
+                    .collect()
+            })
+            .collect();
+
+        // Rows are NOT re-sorted here: every test must carry a total `order:`
+        // so the query itself pins row order (CubeStore aggregates in parallel
+        // and returns rows unordered otherwise). This keeps ORDER BY rendering
+        // under test instead of masking it.
+        Some(super::integration_context::format_rows_table(
+            columns,
+            formatted_rows,
+        ))
+    }
+
+    /// `EXPLAIN` of the query `try_execute_cubestore` runs, as CubeStore's logical plan.
+    #[cfg(feature = "integration-cubestore")]
+    pub async fn try_explain_cubestore(&self, query_yaml: &str, seed_file: &str) -> Option<String> {
+        use mysql_async::prelude::Queryable;
+
+        let (mut conn, sql) = self.cubestore_sql(query_yaml, seed_file).await;
+        conn.query_first(format!("EXPLAIN {}", sql))
+            .await
+            .unwrap_or_else(|e| panic!("CubeStore EXPLAIN failed:\n{}\n\nError: {:?}", sql, e))
+    }
+
+    #[cfg(not(feature = "integration-cubestore"))]
+    pub async fn try_explain_cubestore(
+        &self,
+        _query_yaml: &str,
+        _seed_file: &str,
+    ) -> Option<String> {
+        None
+    }
+
+    #[cfg(feature = "integration-cubestore")]
+    async fn cubestore_sql(
+        &self,
+        query_yaml: &str,
+        seed_file: &str,
+    ) -> (mysql_async::Conn, String) {
         let options = self.create_query_options_from_yaml(query_yaml);
         let client = super::pg_service::connect_and_seed(seed_file).await;
 
@@ -1100,40 +1162,7 @@ impl TestContext {
             };
             final_sql = re.replace_all(&final_sql, replacement).into_owned();
         }
-
-        let rows: Vec<mysql_async::Row> = conn.query(&final_sql).await.unwrap_or_else(|e| {
-            panic!(
-                "CubeStore SQL execution failed:\n{}\n\nError: {:?}",
-                final_sql, e
-            )
-        });
-
-        let columns: Vec<String> = rows
-            .first()
-            .map(|r| {
-                r.columns_ref()
-                    .iter()
-                    .map(|c| c.name_str().to_string())
-                    .collect()
-            })
-            .unwrap_or_default();
-        let formatted_rows: Vec<Vec<String>> = rows
-            .iter()
-            .map(|r| {
-                (0..r.columns_ref().len())
-                    .map(|i| Self::mysql_value_to_string(r.as_ref(i)))
-                    .collect()
-            })
-            .collect();
-
-        // Rows are NOT re-sorted here: every test must carry a total `order:`
-        // so the query itself pins row order (CubeStore aggregates in parallel
-        // and returns rows unordered otherwise). This keeps ORDER BY rendering
-        // under test instead of masking it.
-        Some(super::integration_context::format_rows_table(
-            columns,
-            formatted_rows,
-        ))
+        (conn, final_sql)
     }
 
     #[cfg(not(feature = "integration-cubestore"))]

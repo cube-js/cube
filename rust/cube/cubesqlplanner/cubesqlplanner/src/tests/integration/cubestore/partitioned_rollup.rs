@@ -1,13 +1,5 @@
-//! Queries over a rollup partitioned by month, so CubeStore reads it as the
-//! UNION ALL of one table per month, as the query orchestrator renders it. Each
-//! shape runs through the rollup in CubeStore and straight from Postgres, and
-//! the two results must agree.
-//!
-//! Grouping by the month (or anything finer) never mixes two partitions, so
-//! CubeStore may aggregate each partition table on its own
-//! (`CUBESTORE_DISJOINT_UNION_AGGREGATE`); these shapes pin the answer either
-//! way.
-//!
+//! A month-partitioned rollup, read by CubeStore as the UNION ALL of one table
+//! per month, must agree with the same query run straight against Postgres.
 //! Requires `--features integration-cubestore` and a release `cubestored`.
 
 use super::normalize;
@@ -50,8 +42,7 @@ async fn run_both(query: &str, snapshot: &str) {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn test_partitioned_rollup_top_cells() {
-    run_both(
-        indoc! {r#"
+    let query = indoc! {r#"
             measures:
               - part_sales.amount
             dimensions:
@@ -64,10 +55,16 @@ async fn test_partitioned_rollup_top_cells() {
               - id: part_sales.amount
                 desc: true
             limit: "5"
-        "#},
-        "partitioned_rollup_top_cells",
-    )
-    .await;
+        "#};
+    run_both(query, "partitioned_rollup_top_cells").await;
+
+    // Months are disjoint, so CubeStore aggregates each partition table on its own.
+    let rollup =
+        TestContext::new_with_external_cubestore(MockSchema::from_yaml_file(YAML)).unwrap();
+    if let Some(plan) = rollup.try_explain_cubestore(query, SEED).await {
+        let union = plan.find("Union").expect(&plan);
+        assert!(plan[union..].contains("Aggregate"), "{plan}");
+    }
 }
 
 #[tokio::test(flavor = "multi_thread")]
