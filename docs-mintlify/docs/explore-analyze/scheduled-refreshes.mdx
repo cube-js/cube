@@ -103,7 +103,7 @@ The sidebar lists all existing schedules with the following information:
   configured, the card shows its delivery channel, for example "Notification:
   Email" or "Notification: Slack (#channel)".
 - **Alert** — when the schedule has a [data alert][ref-data-alerts], the card
-  shows an **Alert** tag, a summary of its rule, and the outcome of its last
+  shows an **Alert** badge, a summary of its rule, and the outcome of its last
   check.
 
 ### Actions
@@ -175,7 +175,9 @@ Click **New scheduled refresh** above the list. The dialog described in
 [Creating a schedule](#creating-a-schedule) opens with an extra first field,
 **Dashboard**, which lists the published dashboards you can edit. Select one,
 set the schedule, and click **Save**; the new schedule appears in the list
-under that dashboard's title.
+under that dashboard's title. The [Alert condition](#alert-condition) switch
+stays disabled until you have selected a dashboard, since an alert watches one
+of its charts.
 
 ## Duplicating a schedule
 
