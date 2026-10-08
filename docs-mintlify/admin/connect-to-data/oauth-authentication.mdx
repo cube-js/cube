@@ -15,8 +15,8 @@ enabled for your Cube deployment.
 You want each user's queries to run under their own database identity
 using OAuth tokens managed by Cube. When a user has no active
 token, for example because they haven't authorized yet, Cube falls back
-to a service account, which also runs connectivity checks and background
-operations.
+to a service account, which also runs background operations such as
+pre-aggregation builds.
 
 This pattern applies to any data source that supports OAuth, including
 [Databricks][ref-databricks-jdbc] and [Snowflake][ref-snowflake]. The
@@ -39,8 +39,8 @@ connection could leak to another.
 
 <Warning>
 
-The service account credential is used for Cube's internal liveness
-checks, background operations, and queries from users without an active
+The service account credential is used for background operations, such
+as pre-aggregation builds, and for queries from users without an active
 token, who see whatever the service account can access. Grant it the
 minimum permissions necessary — ideally read-only access to the required
 schemas — to limit exposure. To reject those queries instead, make
@@ -292,8 +292,9 @@ module.exports = {
    `{ status, accessToken, accessTokenExpiresAt, issuedAt }`. `issuedAt`
    changes whenever the token is replaced. Requests that aren't tied to a
    Cube user carry no user credentials, so they also fall back to the
-   service account — including requests authenticated with your own JWT
-   or `checkAuth`.
+   service account. This includes requests authenticated with your own JWT
+   or `checkAuth`, unless their security context sets
+   `cubeCloud.username`.
 
 2. **`driver_factory` resolves the credential** — If the credential status
    is `active`, the user's OAuth token is used. Otherwise — the user hasn't
