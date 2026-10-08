@@ -1,6 +1,6 @@
 ---
 title: Set up per-user OAuth
-description: Configure Cube to authenticate each user with their own OAuth token, falling back to a service account for liveness checks.
+description: Configure Cube to authenticate each user with their own OAuth token, falling back to a service account when a user has no active token.
 ---
 
 <Note>
@@ -13,9 +13,10 @@ enabled for your Cube Cloud deployment.
 ## Use case
 
 You want each user's queries to run under their own database identity
-using OAuth tokens managed by Cube Cloud. When a user's token is
-unavailable or expired, Cube falls back to a service account so that
-connectivity checks and background operations still work.
+using OAuth tokens managed by Cube Cloud. When a user has no active
+token, for example because they haven't authorized yet, Cube falls back
+to a service account, which also runs connectivity checks and background
+operations.
 
 This pattern applies to any data source that supports OAuth, including
 [Databricks][ref-databricks-jdbc] and [Snowflake][ref-snowflake]. The
@@ -37,10 +38,11 @@ connection could leak to another.
 
 <Warning>
 
-The service account credential is used only as a fallback for Cube's
-internal liveness checks and background operations. Grant it the minimum
-permissions necessary — ideally read-only access to the required schemas —
-to limit exposure if the credential is compromised.
+The service account credential is used for Cube's internal liveness
+checks, background operations, and queries from users without an active
+token, who see whatever the service account can access. Grant it the
+minimum permissions necessary — ideally read-only access to the required
+schemas — to limit exposure.
 
 </Warning>
 
@@ -78,10 +80,18 @@ register it with your data source's OAuth provider, then click
 
 <Step title="Authorize the app">
 
+Each user does this once for their own account. An admin's token is
+never used for other users.
+
 Open the sidebar and go to **Connected apps**. Find your OAuth app
 and click **Authorize** to generate an access token.
 
-You'll need to repeat this step whenever the token expires.
+Cube refreshes the access token automatically as long as the provider
+issues a refresh token. A user needs to authorize again only if the
+refresh token expires or is revoked; **Connected apps** shows the
+current status. For Databricks, add `offline_access` to the scopes, both
+on the Databricks OAuth app and in **Scopes** above, and set a long
+enough `refresh_token_ttl_in_minutes` on the Databricks OAuth app.
 
 <Frame>
   <img src="/images/admin/connect-to-data/oauth-authorize.png" alt="Connected apps page showing the OAuth integration with an Authorize action" />
@@ -140,10 +150,11 @@ CUBEJS_DB_SNOWFLAKE_ROLE=MY_ROLE
 
 ### Configuration file
 
-The examples below use Databricks. To target a different data source,
-swap `userCredentials.databricks` for the matching key (for example,
-`userCredentials.snowflake`) and update the `driver_factory` return
-value with the correct `type` and driver-specific options. See the
+The examples below use Databricks with an OAuth app named `databricks`.
+`userCredentials` is keyed by the **Name** of the OAuth app, so replace
+`databricks` with the name of your app. To target a different data
+source, also update the `driver_factory` return value with the correct
+`type` and driver-specific options. See the
 [data sources reference][ref-data-sources] for available drivers.
 
 <Tabs>
@@ -159,7 +170,7 @@ import os
 def driver_factory(ctx: dict) -> dict:
     # Extract the Cube Cloud security context, which contains
     # per-user OAuth credentials when available.
-    # For other data sources, swap "databricks" for "snowflake", etc.
+    # "databricks" is the Name of the OAuth app.
     databricks_creds = (
         ctx
         .get("securityContext", {})
@@ -169,7 +180,8 @@ def driver_factory(ctx: dict) -> dict:
     )
 
     # Only use the OAuth token when the credential status is "active".
-    # An expired or revoked token falls back to the service account.
+    # Otherwise (not authorized yet, expired, or revoked), fall back to
+    # the service account.
     oauth_token = (
         databricks_creds.get("accessToken")
         if databricks_creds.get("status") == "active"
@@ -208,12 +220,13 @@ module.exports = {
   driverFactory: ({ securityContext }) => {
     // Extract the Cube Cloud security context, which contains
     // per-user OAuth credentials when available.
-    // For other data sources, swap `databricks` for `snowflake`, etc.
+    // `databricks` is the Name of the OAuth app.
     const databricksCreds =
       securityContext?.cubeCloud?.userCredentials?.databricks ?? {};
 
     // Only use the OAuth token when the credential status is "active".
-    // An expired or revoked token falls back to the service account.
+    // Otherwise (not authorized yet, expired, or revoked), fall back to
+    // the service account.
     const oauthToken =
       databricksCreds.status === "active"
         ? databricksCreds.accessToken
@@ -244,13 +257,16 @@ module.exports = {
 
 ## How it works
 
-1. **User makes a request** — Cube Cloud attaches the user's OAuth
-   credentials to `securityContext.cubeCloud.userCredentials.<data_source>`
-   (for example, `.databricks` or `.snowflake`).
+1. **User makes a request** — Cube attaches the user's own OAuth
+   credentials to `securityContext.cubeCloud.userCredentials.<app_name>`,
+   where `<app_name>` is the **Name** of the OAuth app. Requests that
+   aren't tied to a Cube user carry no user credentials.
 
 2. **`driver_factory` resolves the credential** — If the credential status
-   is `active`, the user's OAuth token is used. Otherwise, Cube falls back
-   to the service account credential stored in environment variables.
+   is `active`, the user's OAuth token is used. Otherwise — the user hasn't
+   authorized (`missing`), or the token is `expired` or in `error` — Cube
+   falls back to the service account credential stored in environment
+   variables.
 
 3. **Per-user orchestrator** —
    [`context_to_orchestrator_id`][ref-context-to-orchestrator-id] returns
