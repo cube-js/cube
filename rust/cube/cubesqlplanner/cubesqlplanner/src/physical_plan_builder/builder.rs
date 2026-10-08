@@ -23,14 +23,24 @@ const ORIGINAL_QUERY: &str = "original_query";
 pub struct PhysicalPlanBuilder {
     query_tools: Rc<QueryTools>,
     plan_sql_templates: PlanSqlTemplates,
+    union_full_key_aggregate: bool,
 }
 
 impl PhysicalPlanBuilder {
-    pub fn new(query_tools: Rc<QueryTools>, plan_sql_templates: PlanSqlTemplates) -> Self {
+    pub fn new(
+        query_tools: Rc<QueryTools>,
+        plan_sql_templates: PlanSqlTemplates,
+        union_full_key_aggregate: bool,
+    ) -> Self {
         Self {
             query_tools,
             plan_sql_templates,
+            union_full_key_aggregate,
         }
+    }
+
+    pub(super) fn supports_union_full_key_aggregate(&self) -> bool {
+        self.union_full_key_aggregate && self.plan_sql_templates.supports_union_full_key_aggregate()
     }
 
     pub(super) fn query_tools(&self) -> &Rc<QueryTools> {

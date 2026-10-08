@@ -45,7 +45,7 @@ impl<'a> LogicalNodeProcessor<'a, FullKeyAggregate> for FullKeyAggregateProcesso
                 KeysFullKeyAggregateStrategy::new(self.builder)
             } else if !full_key_aggregate.schema().has_dimensions() {
                 InnerJoinFullKeyAggregateStrategy::new(self.builder)
-            } else if self.builder.templates().supports_union_full_key_aggregate()
+            } else if self.builder.supports_union_full_key_aggregate()
                 && full_key_aggregate.multi_stage_subquery_refs().len() > 1
             {
                 UnionFullKeyAggregateStrategy::new(self.builder)

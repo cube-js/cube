@@ -669,3 +669,32 @@ async fn test_multi_stage_value_types_combined_over_rollup() {
         insta::assert_snapshot!(result);
     }
 }
+
+#[test]
+fn test_multi_stage_union_combine_can_be_turned_off() {
+    let yaml = "common/integration_multi_stage_value_types_pre_agg.yaml";
+    let query = |union: bool| {
+        format!(
+            indoc! {"
+                measures:
+                  - orders.amount_total
+                  - orders.amount_label
+                  - orders.amount_mid_week
+                dimensions:
+                  - orders.status
+                  - orders.size
+                order:
+                  - id: orders.status
+                  - id: orders.size
+                cubestore_union_full_key_aggregate: {}
+            "},
+            union
+        )
+    };
+
+    let ctx = TestContext::new_with_external_cubestore(MockSchema::from_yaml_file(yaml)).unwrap();
+    let union_sql = ctx.build_sql(&query(true)).unwrap();
+    let join_sql = ctx.build_sql(&query(false)).unwrap();
+    assert!(!union_sql.contains("JOIN"), "{union_sql}");
+    assert!(join_sql.contains("JOIN"), "{join_sql}");
+}
