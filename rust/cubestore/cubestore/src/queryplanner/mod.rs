@@ -11,6 +11,7 @@ use datafusion_datasource::memory::MemorySourceConfig;
 use datafusion_datasource::source::DataSourceExec;
 pub use planning::PlanningMeta;
 mod check_memory;
+mod disjoint_union_aggregate;
 mod group_by_limit_aggregate;
 pub mod physical_plan_flags;
 pub mod pretty_printers;
@@ -241,6 +242,7 @@ impl QueryPlanner for QueryPlannerImpl {
                 &self.meta_store.as_ref(),
                 self.config.enable_topk(),
                 self.config.limit_pushdown(),
+                self.config.disjoint_union_aggregate(),
             )
             .await?;
             let workers = compute_workers(

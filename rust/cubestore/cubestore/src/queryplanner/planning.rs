@@ -38,6 +38,7 @@ use crate::metastore::table::{Table, TablePath};
 use crate::metastore::{
     AggregateFunction, Chunk, Column, IdRow, Index, IndexType, MetaStore, Partition, Schema,
 };
+use crate::queryplanner::disjoint_union_aggregate::push_aggregate_into_disjoint_union;
 use crate::queryplanner::metadata_cache::NoopParquetMetadataCache;
 use crate::queryplanner::optimizations::rewrite_plan::{rewrite_plan, PlanRewriter};
 use crate::queryplanner::panic::PanicWorkerSerialized;
@@ -87,6 +88,7 @@ pub async fn choose_index(
 ) -> Result<(LogicalPlan, PlanningMeta), DataFusionError> {
     choose_index_ext(
         p, metastore, /* enable_topk */ true, /* limit_pushdown */ true,
+        /* disjoint_union_aggregate */ false,
     )
     .await
 }
@@ -127,6 +129,7 @@ pub async fn choose_index_ext(
     metastore: &dyn PlanIndexStore,
     enable_topk: bool,
     limit_pushdown: bool,
+    disjoint_union_aggregate: bool,
 ) -> Result<(LogicalPlan, PlanningMeta), DataFusionError> {
     // Prepare information to choose the index.
     let mut collector = CollectConstraints::default();
@@ -206,6 +209,12 @@ pub async fn choose_index_ext(
     {
         i.partitions = pick_partitions(i, c, ps)?;
     }
+
+    let p = if disjoint_union_aggregate {
+        push_aggregate_into_disjoint_union(p, &indices)?
+    } else {
+        p
+    };
 
     // Precompute, per index scan, the dedup-safe pushable predicate so the worker can
     // trim in-memory chunks before IPC without re-deriving it from the plan. Encoding
@@ -3087,10 +3096,16 @@ pub mod tests {
         limit_pushdown: bool,
     ) -> Vec<String> {
         let plan = initial_plan(sql, indices);
-        let plan = choose_index_ext(plan, indices, /* enable_topk */ true, limit_pushdown)
-            .await
-            .unwrap()
-            .0;
+        let plan = choose_index_ext(
+            plan,
+            indices,
+            /* enable_topk */ true,
+            limit_pushdown,
+            false,
+        )
+        .await
+        .unwrap()
+        .0;
         let mut opts = PPOptions::none();
         opts.show_limit_pushdown = true;
         pretty_printers::pp_plan_ext(&plan, &opts)

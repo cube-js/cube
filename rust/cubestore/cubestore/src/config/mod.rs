@@ -614,6 +614,10 @@ pub trait ConfigObj: DIService {
     /// the subtree's schema and the partition count the router sees the same either way.
     fn group_by_limit_per_partition(&self) -> bool;
 
+    /// Aggregate each `UNION ALL` branch on its own when the partition and chunk min/max prove that
+    /// no group spans two branches. Router-only: it rewrites the logical plan before index choice.
+    fn disjoint_union_aggregate(&self) -> bool;
+
     /// Push the query's `LIMIT` into the workers for `GROUP BY ... ORDER BY ... LIMIT`. Off makes
     /// every worker emit all of its groups and leaves the cut to the router. Node-local and not in
     /// [`PlanningFlags`]: the worker receives the router's plan, descriptor included.
@@ -800,6 +804,7 @@ pub struct ConfigObjImpl {
     pub repartition_check_overlapping_children: bool,
     pub group_by_limit_factor: usize,
     pub group_by_limit_per_partition: bool,
+    pub disjoint_union_aggregate: bool,
     pub limit_pushdown: bool,
     pub coalesce_under_hash_aggregate: bool,
     pub union_planning_rewrites: bool,
@@ -1169,6 +1174,10 @@ impl ConfigObj for ConfigObjImpl {
 
     fn group_by_limit_per_partition(&self) -> bool {
         self.group_by_limit_per_partition
+    }
+
+    fn disjoint_union_aggregate(&self) -> bool {
+        self.disjoint_union_aggregate
     }
 
     fn limit_pushdown(&self) -> bool {
@@ -2055,6 +2064,7 @@ impl Config {
                 ),
                 group_by_limit_factor: env_parse_lenient("CUBESTORE_GROUP_BY_LIMIT_FACTOR", 2),
                 group_by_limit_per_partition: env_flag("CUBESTORE_GROUP_BY_LIMIT_PER_PARTITION", true),
+                disjoint_union_aggregate: env_flag("CUBESTORE_DISJOINT_UNION_AGGREGATE", false),
                 limit_pushdown: env_flag("CUBESTORE_LIMIT_PUSHDOWN", true),
                 coalesce_under_hash_aggregate: env_flag("CUBESTORE_COALESCE_UNDER_HASH_AGGREGATE", false),
                 union_planning_rewrites: env_flag("CUBESTORE_UNION_PLANNING_REWRITES", true),
@@ -2325,6 +2335,7 @@ impl Config {
                 repartition_check_overlapping_children: false,
                 group_by_limit_factor: 2,
                 group_by_limit_per_partition: true,
+                disjoint_union_aggregate: false,
                 limit_pushdown: true,
                 coalesce_under_hash_aggregate: false,
                 union_planning_rewrites: true,
