@@ -179,7 +179,7 @@ Run `cube <command> --help` for the full options of any command.
 | `data-model` | Data model files and Git workflow: `list`, `get`, `put`, `delete`, `rename`, `file-hashes`, `branches`, `create-branch`, `delete-branch`, `enable-branch`/`disable-branch`, `dev-mode`, `commit`, `pull`, `merge`, `merge-to-default` |
 | `dbt` | dbt sync: `sync` (`--ref` or `--manifest`, `--wait`), `generate` (`--manifest`, `--out`, `--check`), `status`, `result`, `logs`, `history` (`--status`, `--trigger`), `cancel` |
 | `evals` | Agent evals: `run` (`--branch`, `--agent`, `--file`, `--wait`), `status` (`--wait`), `results` (`--first`, `--after`) |
-| `ossie` | [Apache Ossie](#apache-ossie) conversion: `export` (`--view`, `--from-dir`, `--wait`, `--out`), `import` (`--file`, `--out`, `--check`), `status` (`--wait`), `result` (`--out`), `cancel` |
+| `ossie` | [Apache Ossie](#apache-ossie) conversion: `export` (`--view`, `--strict-fanout`, `--from-dir`, `--wait`, `--out`), `import` (`--file`, `--dialect`, `--base-cube`, `--out`, `--check`), `status` (`--wait`), `result` (`--out`), `cancel` |
 | `environments` | Deployment environments and environment tokens |
 | `variables` | Deployment environment variables |
 | `folders`, `workbooks`, `reports`, `workspace` | Workspace content management |
@@ -656,7 +656,9 @@ Like [`dbt generate`](#generate-cubes-without-committing-them), `--out` is the r
 your data model project, since the generated paths are project-relative
 (`model/cubes/…`). `--file -` reads the model from standard input, and `--dialect`
 picks the warehouse SQL to take from it, defaulting to the dialect of the deployment's
-data source. `--check` compares the files with what is on disk instead of writing them.
+data source. `--base-cube NAME` roots the generated view at that cube when the Ossie
+relationships don't determine one. `--check` compares the files with what is on disk
+instead of writing them.
 
 Both commands print the conversion's counts and issues. They exit non-zero when the
 conversion fails, has an `ERROR` issue, or, with `--check`, finds a missing or different

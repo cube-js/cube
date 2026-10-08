@@ -213,8 +213,8 @@ fn model_files(dir: &Path) -> Result<Map<String, Value>> {
 
     let mut files = Map::new();
     for (rel, path) in found {
-        let lower = rel.to_ascii_lowercase();
-        if !lower.ends_with(".yml") && !lower.ends_with(".yaml") {
+        // Case-sensitive, like the schema compiler: Cube does not compile `orders.YAML`.
+        if !rel.ends_with(".yml") && !rel.ends_with(".yaml") {
             continue;
         }
 
@@ -904,7 +904,12 @@ mod tests {
             "model/cubes/orders.yml",
             "cubes:\n  - name: orders\n",
         );
-        write(&root, "model/views/sales.YAML", "views:\n  - name: sales\n");
+        write(&root, "model/views/sales.yaml", "views:\n  - name: sales\n");
+        write(
+            &root,
+            "model/views/legacy.YAML",
+            "views:\n  - name: legacy\n",
+        );
         write(&root, "docker-compose.yml", "services:\n  cube: {}\n");
         write(&root, "cube.js", "module.exports = {};\n");
         write(&root, ".github/workflows/ci.yml", "cubes: []\n");
@@ -917,7 +922,7 @@ mod tests {
         let files = model_files(&root).unwrap();
         assert_eq!(
             files.keys().collect::<Vec<_>>(),
-            vec!["model/cubes/orders.yml", "model/views/sales.YAML"]
+            vec!["model/cubes/orders.yml", "model/views/sales.yaml"]
         );
 
         let empty = scratch("from-dir-empty");
