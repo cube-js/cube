@@ -5,11 +5,11 @@ expression: result
 orders__status | orders__amount_by_category
 ---------------+---------------------------
 cancelled      | 50.00                     
-cancelled      | 50.00                     
 cancelled      | 100.00                    
+cancelled      | 50.00                     
+completed      | 300.00                    
 completed      | 600.00                    
 completed      | 500.00                    
-completed      | 300.00                    
-pending        | 100.00                    
 pending        | 180.00                    
-pending        | 370.00
+pending        | 370.00                    
+pending        | 100.00

@@ -1,0 +1,15 @@
+---
+source: cubesqlplanner/src/tests/integration/multi_stage/order_limit.rs
+expression: result
+---
+orders__status | orders__created_at_month | orders__amount_prev_month | orders__rolling_sum_3m
+---------------+--------------------------+---------------------------+-----------------------
+cancelled      | 2024-01-01 00:00:00      | NULL                      | 50.00                 
+cancelled      | 2024-02-01 00:00:00      | 50.00                     | 100.00                
+cancelled      | 2024-03-01 00:00:00      | 50.00                     | 200.00                
+completed      | 2024-01-01 00:00:00      | NULL                      | 300.00                
+completed      | 2024-02-01 00:00:00      | 300.00                    | 800.00                
+completed      | 2024-03-01 00:00:00      | 500.00                    | 1400.00               
+pending        | 2024-01-01 00:00:00      | NULL                      | 150.00                
+pending        | 2024-02-01 00:00:00      | 150.00                    | 350.00                
+pending        | 2024-03-01 00:00:00      | 200.00                    | 650.00

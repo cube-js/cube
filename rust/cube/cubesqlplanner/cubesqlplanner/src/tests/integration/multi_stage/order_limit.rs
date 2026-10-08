@@ -127,6 +127,7 @@ async fn test_multi_stage_ctes_are_not_ordered() {
               - "2024-03-31"
         order:
           - id: orders.status
+          - id: orders.created_at
         row_limit: "10"
     "#};
 
