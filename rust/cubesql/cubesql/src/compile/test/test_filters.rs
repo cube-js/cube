@@ -799,3 +799,53 @@ GROUP BY dim_str0
         );
     }
 }
+
+/// https://github.com/cube-js/cube/issues/10581
+/// Metabase "Contains" filter emits `ESCAPE '\'`. `\` is the default LIKE
+/// escape character in PostgreSQL, so this must rewrite exactly like the
+/// variant without ESCAPE (a `contains` filter on the CubeScan).
+#[tokio::test]
+async fn test_issue_10581_metabase_like_escape_backslash_contains() {
+    if !Rewriter::sql_push_down_enabled() {
+        return;
+    }
+    init_testing_logger();
+
+    let expected = V1LoadRequestQuery {
+        measures: Some(vec!["KibanaSampleDataEcommerce.count".to_string()]),
+        dimensions: Some(vec![]),
+        segments: Some(vec![]),
+        order: Some(vec![]),
+        limit: Some(10),
+        filters: Some(vec![V1LoadRequestQueryFilterItem {
+            member: Some("KibanaSampleDataEcommerce.customer_gender".to_string()),
+            operator: Some("contains".to_string()),
+            values: Some(vec!["female".to_string()]),
+            or: None,
+            and: None,
+        }]),
+        ungrouped: Some(true),
+        ..Default::default()
+    };
+
+    for escape in ["", r" ESCAPE '\'"] {
+        let query_plan = convert_select_to_query_plan(
+            format!(
+                r#"
+SELECT "public"."KibanaSampleDataEcommerce"."count" AS "count"
+FROM "public"."KibanaSampleDataEcommerce"
+WHERE lower("public"."KibanaSampleDataEcommerce"."customer_gender") LIKE '%female%'{escape}
+LIMIT 10
+"#
+            ),
+            DatabaseProtocol::PostgreSQL,
+        )
+        .await;
+
+        assert_eq!(
+            query_plan.as_logical_plan().find_cube_scan().request,
+            expected,
+            "escape: {escape:?}"
+        );
+    }
+}
