@@ -49,6 +49,9 @@ pub trait NativeStruct<IT: InnerTypes>: NativeType<IT> {
     /// Own enumerable string-keyed properties with their values, read in one pass.
     fn entries(&self) -> Result<Vec<(String, NativeObjectHandle<IT>)>, CubeError>;
     /// `entries` restricted to `fields`; values of other properties are not read.
+    ///
+    /// Undeclared keys never reach the serde visitor, so a struct deserialized through this
+    /// (`deserialize_struct`) can't honour `#[serde(deny_unknown_fields)]`.
     fn entries_for_fields(
         &self,
         fields: &'static [&'static str],

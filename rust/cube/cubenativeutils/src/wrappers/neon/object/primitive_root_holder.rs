@@ -109,7 +109,8 @@ impl NeonPrimitiveMapping for JsUndefined {
 }
 
 /// Neon's `JsString::value` makes two N-API calls, the first of which walks the whole string
-/// just to compute its UTF-8 length. The UTF-16 length is O(1) and bounds the UTF-8 one.
+/// just to compute its UTF-8 length. The UTF-16 length is O(1) and is the exact UTF-8 length of
+/// an ASCII string, so ASCII strings are read with a single copy; others fall back to neon's way.
 pub(crate) fn read_js_string<'cx, C: Context<'cx>>(
     cx: &mut C,
     value: Handle<'cx, JsString>,
@@ -145,12 +146,16 @@ pub(crate) fn read_js_string<'cx, C: Context<'cx>>(
     // SAFETY: N-API initialized the first `written` bytes.
     unsafe { buf.set_len(written) };
     if written != utf16_len || !buf.is_ascii() {
-        // A UTF-16 unit takes at most 3 UTF-8 bytes (a lone surrogate becomes U+FFFD).
-        buf = Vec::with_capacity(utf16_len * 3 + 1);
+        // Sized exactly rather than at the `3 * utf16_len` worst case: measured faster, and the
+        // string is not left with a 3x allocation.
+        let mut utf8_len = 0usize;
+        // SAFETY: a null buffer asks N-API only for the UTF-8 length, written to `utf8_len`.
+        unsafe { napi::get_value_string_utf8(env, raw, std::ptr::null_mut(), 0, &mut utf8_len) }
+            .expect("napi_get_value_string_utf8 on a string");
+        buf = Vec::with_capacity(utf8_len + 1);
         let written = read(&mut buf);
         // SAFETY: N-API initialized the first `written` bytes.
         unsafe { buf.set_len(written) };
-        buf.shrink_to_fit();
     }
     // SAFETY: N-API writes valid UTF-8 (lone surrogates are replaced) and only truncates on a
     // character boundary; neon's own `JsString::value` relies on the same.

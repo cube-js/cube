@@ -19,6 +19,13 @@ for (let i = 0; i < 1000; i += 1) {
   wideStrings[`member_${i}`] = `"orders".amount_${i} * 100 / NULLIF("orders".count, 0)`;
 }
 
+// Non-ASCII strings skip the read_js_string ASCII fast path.
+const wideNonAscii: Record<string, string> = {};
+
+for (let i = 0; i < 1000; i += 1) {
+  wideNonAscii[`member_${i}`] = `"orders".montant_payé_${i} * 100 / NULLIF("orders".count, 0)`;
+}
+
 const numbers = Array.from({ length: 10_000 }, (_, i) => (i % 3 === 0 ? i + 0.5 : i));
 
 const nestedObjects = Array.from({ length: 200 }, (_, i) => ({
@@ -78,6 +85,9 @@ describe('NativeSerdeDeserializer', () => {
   benchmarkSuite('generic shapes', {
     'wide object, 1000 string fields': () => {
       loop('json', wideStrings, 1);
+    },
+    'wide object, 1000 non-ASCII string fields': () => {
+      loop('json', wideNonAscii, 1);
     },
     'array of 10k numbers': () => {
       loop('json', numbers, 1);
