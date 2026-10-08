@@ -281,7 +281,10 @@ fn status_label(status: &Value) -> String {
 fn ended_without_result(id: &str, status: &Value) -> Option<anyhow::Error> {
     match util::status_of(status, "status").as_str() {
         FAILED => {
-            let error = util::one_line(&output::field(status, "error"), util::REASON_LIMIT);
+            let error = util::one_line(
+                &util::printable(&output::field(status, "error")),
+                util::REASON_LIMIT,
+            );
             let reason = if util::is_blank(&error) {
                 "(no reason reported)"
             } else {
@@ -955,6 +958,16 @@ mod tests {
         assert_eq!(
             failed.to_string(),
             "Ossie conversion c-1 failed: sandbox timed out"
+        );
+        // Server text cannot drive the terminal, here or in `status_label`.
+        let escaped = ended_without_result(
+            "c-1",
+            &json!({"status": "FAILED", "error": "\u{1b}]0;pwned\u{7}boom"}),
+        )
+        .unwrap();
+        assert_eq!(
+            escaped.to_string(),
+            "Ossie conversion c-1 failed: ]0;pwnedboom"
         );
         assert!(ended_without_result("c-1", &json!({"status": "FAILED"}))
             .unwrap()
