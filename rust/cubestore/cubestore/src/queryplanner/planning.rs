@@ -211,7 +211,7 @@ pub async fn choose_index_ext(
     }
 
     let p = if disjoint_union_aggregate {
-        push_aggregate_into_disjoint_union(p, &indices)?
+        push_aggregate_into_disjoint_union(p, &indices, limit_pushdown)?
     } else {
         p
     };
@@ -758,7 +758,7 @@ fn get_original_name(may_be_alias: &String, input: &LogicalPlan) -> String {
 /// non-column expr or mixed asc/desc). The real `nulls_first` is carried through so the worker
 /// top-k cut honors the query's explicit `NULLS FIRST/LAST` instead of re-deriving it from the
 /// sort direction (which would disagree with the router select and drop groups at the limit).
-fn sort_to_column_names(
+pub(crate) fn sort_to_column_names(
     sort_exprs: &Vec<SortExpr>,
     input: &LogicalPlan,
 ) -> (Vec<String>, bool, Vec<bool>) {
@@ -799,7 +799,10 @@ fn sort_to_column_names(
 
 /// Column names of the group-by keys, or `None` if any key is not a plain column (then we can't
 /// relate the grouping to the index sort key).
-fn group_expr_to_column_names(group_expr: &Vec<Expr>, input: &LogicalPlan) -> Option<Vec<String>> {
+pub(crate) fn group_expr_to_column_names(
+    group_expr: &Vec<Expr>,
+    input: &LogicalPlan,
+) -> Option<Vec<String>> {
     let mut names = Vec::with_capacity(group_expr.len());
     for expr in group_expr {
         match expr {

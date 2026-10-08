@@ -10133,18 +10133,19 @@ async fn limit_pushdown_group_order(service: Box<dyn SqlClient>) -> Result<(), C
     );
     //============================
 
-    let res = assert_limit_pushdown(
-        &service,
-        "SELECT a, b, SUM(n) FROM (
+    // A mixed-direction ORDER BY keeps the limit on the router, and the two tables hold disjoint
+    // `a` ranges, so each one is aggregated on its own and there is no single worker plan to check.
+    let res = service
+        .exec_query(
+            "SELECT a, b, SUM(n) FROM (
                 SELECT * FROM foo.pushdown_group1
                 union all
                 SELECT * FROM foo.pushdown_group2
                 ) as `tb` GROUP BY 1, 2 ORDER BY 1, 2 DESC LIMIT 3",
-        Some("ind1"),
-        false,
-        false,
-    )
-    .await?;
+        )
+        .await?
+        .get_rows()
+        .clone();
     assert_eq!(
         res,
         vec![

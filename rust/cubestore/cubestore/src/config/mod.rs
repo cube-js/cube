@@ -615,7 +615,8 @@ pub trait ConfigObj: DIService {
     fn group_by_limit_per_partition(&self) -> bool;
 
     /// Aggregate each `UNION ALL` branch on its own when the partition and chunk min/max prove that
-    /// no group spans two branches. Router-only: it rewrites the logical plan before index choice.
+    /// no group spans two branches. Router-only: it rewrites the logical plan once partitions are
+    /// picked.
     fn disjoint_union_aggregate(&self) -> bool;
 
     /// Push the query's `LIMIT` into the workers for `GROUP BY ... ORDER BY ... LIMIT`. Off makes
@@ -2064,7 +2065,7 @@ impl Config {
                 ),
                 group_by_limit_factor: env_parse_lenient("CUBESTORE_GROUP_BY_LIMIT_FACTOR", 2),
                 group_by_limit_per_partition: env_flag("CUBESTORE_GROUP_BY_LIMIT_PER_PARTITION", true),
-                disjoint_union_aggregate: env_flag("CUBESTORE_DISJOINT_UNION_AGGREGATE", false),
+                disjoint_union_aggregate: env_flag("CUBESTORE_DISJOINT_UNION_AGGREGATE", true),
                 limit_pushdown: env_flag("CUBESTORE_LIMIT_PUSHDOWN", true),
                 coalesce_under_hash_aggregate: env_flag("CUBESTORE_COALESCE_UNDER_HASH_AGGREGATE", false),
                 union_planning_rewrites: env_flag("CUBESTORE_UNION_PLANNING_REWRITES", true),
@@ -2335,7 +2336,7 @@ impl Config {
                 repartition_check_overlapping_children: false,
                 group_by_limit_factor: 2,
                 group_by_limit_per_partition: true,
-                disjoint_union_aggregate: false,
+                disjoint_union_aggregate: true,
                 limit_pushdown: true,
                 coalesce_under_hash_aggregate: false,
                 union_planning_rewrites: true,

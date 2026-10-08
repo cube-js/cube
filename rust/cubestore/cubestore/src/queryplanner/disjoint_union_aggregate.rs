@@ -8,6 +8,7 @@
 //! final value and the aggregate above the union is not needed.
 
 use crate::queryplanner::optimizations::rewrite_plan::{rewrite_plan, PlanRewriter};
+use crate::queryplanner::planning::{group_expr_to_column_names, sort_to_column_names};
 use crate::queryplanner::serialized_plan::IndexSnapshot;
 use crate::queryplanner::CubeTableLogical;
 use crate::table::{Row, TableValue, TimestampValue};
@@ -18,8 +19,8 @@ use datafusion::datasource::DefaultTableSource;
 use datafusion::error::DataFusionError;
 use datafusion::logical_expr::expr::ScalarFunction;
 use datafusion::logical_expr::{
-    Aggregate, ColumnarValue, Expr, Filter, LogicalPlan, Projection, ScalarFunctionArgs, ScalarUDF,
-    SubqueryAlias, TableScan, Union,
+    Aggregate, ColumnarValue, Expr, FetchType, Filter, LogicalPlan, Projection, ScalarFunctionArgs,
+    ScalarUDF, Sort, SubqueryAlias, TableScan, Union,
 };
 use std::cmp::Ordering;
 use std::sync::Arc;
@@ -29,35 +30,106 @@ use std::sync::Arc;
 pub fn push_aggregate_into_disjoint_union(
     p: LogicalPlan,
     indices: &[IndexSnapshot],
+    limit_pushdown: bool,
 ) -> Result<LogicalPlan, DataFusionError> {
     let mut r = DisjointUnionAggregate {
         indices,
+        limit_pushdown,
         next_scan: 0,
     };
-    rewrite_plan(p, &0, &mut r)
+    rewrite_plan(p, &Scope::default(), &mut r)
 }
 
 struct DisjointUnionAggregate<'a> {
     indices: &'a [IndexSnapshot],
+    limit_pushdown: bool,
     next_scan: usize,
 }
 
-impl PlanRewriter for DisjointUnionAggregate<'_> {
+// Mirrors what `ChooseIndex` reads to push a `LIMIT` into the workers. That pushdown stops each
+// worker after the first `n` groups, which beats aggregating every branch in full.
+#[derive(Clone, Default)]
+struct Scope {
     // Ordinal of the first cube table scan below the nearest aggregate.
-    type Context = usize;
+    first_scan: usize,
+    limit: bool,
+    // Set once an aggregate takes the limit, so a deeper aggregate does not see it.
+    limit_claimed: bool,
+    having: bool,
+    sort: Vec<String>,
+    // An ORDER BY that is not a list of columns in one direction.
+    unusable_sort: bool,
+}
 
-    fn enter_node(&mut self, n: &LogicalPlan, _c: &usize) -> Option<usize> {
-        match n {
-            LogicalPlan::Aggregate(_) => Some(self.next_scan),
-            _ => None,
+impl Scope {
+    fn unrelated(&self) -> Scope {
+        Scope {
+            first_scan: self.first_scan,
+            ..Scope::default()
         }
     }
 
-    fn rewrite(
-        &mut self,
-        n: LogicalPlan,
-        first_scan: &usize,
-    ) -> Result<LogicalPlan, DataFusionError> {
+    fn limit_reaches_workers(&self, agg: &Aggregate) -> bool {
+        if !self.limit || self.having || self.unusable_sort {
+            return false;
+        }
+        let Some(group) = group_expr_to_column_names(&agg.group_expr, &agg.input) else {
+            return false;
+        };
+        !group.is_empty() && self.sort.iter().all(|s| group.contains(s))
+    }
+}
+
+impl PlanRewriter for DisjointUnionAggregate<'_> {
+    type Context = Scope;
+
+    fn enter_node(&mut self, n: &LogicalPlan, c: &Scope) -> Option<Scope> {
+        match n {
+            LogicalPlan::Limit(limit) => match limit.get_fetch_type().ok()? {
+                FetchType::Literal(Some(_)) => Some(Scope {
+                    limit: true,
+                    ..c.clone()
+                }),
+                FetchType::Literal(None) => None,
+                FetchType::UnsupportedExpr => Some(c.unrelated()),
+            },
+            LogicalPlan::Sort(Sort { expr, input, fetch }) => {
+                if fetch.is_none() && c.limit_claimed {
+                    return Some(c.unrelated());
+                }
+                let (names, _, _) = sort_to_column_names(expr, input);
+                Some(Scope {
+                    limit: c.limit || fetch.is_some(),
+                    unusable_sort: names.is_empty() && !expr.is_empty(),
+                    sort: names,
+                    ..c.clone()
+                })
+            }
+            LogicalPlan::Filter(_) => Some(Scope {
+                having: true,
+                ..c.clone()
+            }),
+            LogicalPlan::Aggregate(_) => {
+                let outer = if c.limit_claimed {
+                    c.unrelated()
+                } else {
+                    c.clone()
+                };
+                Some(Scope {
+                    first_scan: self.next_scan,
+                    limit_claimed: true,
+                    ..outer
+                })
+            }
+            LogicalPlan::Projection(_)
+            | LogicalPlan::SubqueryAlias(_)
+            | LogicalPlan::Union(_)
+            | LogicalPlan::TableScan(_) => None,
+            _ => Some(c.unrelated()),
+        }
+    }
+
+    fn rewrite(&mut self, n: LogicalPlan, c: &Scope) -> Result<LogicalPlan, DataFusionError> {
         match n {
             LogicalPlan::TableScan(ref scan) => {
                 if is_cube_table_scan(scan) {
@@ -66,7 +138,10 @@ impl PlanRewriter for DisjointUnionAggregate<'_> {
                 Ok(n)
             }
             LogicalPlan::Aggregate(agg) => {
-                let Some(scans) = self.indices.get(*first_scan..self.next_scan) else {
+                if self.limit_pushdown && c.limit_reaches_workers(&agg) {
+                    return Ok(LogicalPlan::Aggregate(agg));
+                }
+                let Some(scans) = self.indices.get(c.first_scan..self.next_scan) else {
                     return Ok(LogicalPlan::Aggregate(agg));
                 };
                 match try_push_down(&agg, scans)? {
@@ -255,6 +330,10 @@ fn branches_disjoint(
         };
         mapped.push((min, max));
     }
+    // Empty branches hold no group; with fewer than two loaded ones there is nothing to split.
+    if mapped.len() < 2 {
+        return false;
+    }
     let mut failed = false;
     mapped.sort_by(|a, b| {
         cmp_values(&a.0, &b.0).unwrap_or_else(|| {
@@ -374,9 +453,12 @@ fn apply(
 
 #[cfg(test)]
 mod tests {
+    use super::cmp_values;
     use crate::config::{Config, CubeServices};
     use crate::sql::{timestamp_from_string, SqlService};
     use crate::table::{Row, TableValue};
+    use crate::util::decimal::{Decimal, Decimal96};
+    use crate::util::int96::Int96;
     use crate::CubeError;
     use std::future::Future;
     use std::sync::Arc;
@@ -523,6 +605,42 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn limit_on_group_order_stays_with_workers() {
+        run(
+            "disjoint_union_aggregate_group_order_limit",
+            |service| async move {
+                create_month_tables(&service).await?;
+                for order in ["ORDER BY 1, 2", "ORDER BY 2", ""] {
+                    let sql = format!(
+                        "SELECT m, k, sum(v) s FROM ({}) t GROUP BY 1, 2 {} LIMIT 2",
+                        UNION3, order
+                    );
+                    assert!(!pushed_down(&logical_plan(&service, &sql).await), "{}", sql);
+                }
+                let sql = format!(
+                    "SELECT m, k, sum(v) s FROM ({}) t GROUP BY 1, 2 ORDER BY 1, 2 LIMIT 2",
+                    UNION3
+                );
+                assert_eq!(
+                    exec(&service, &sql).await?,
+                    vec![
+                        row("2024-01-01T00:00:00.000Z", "a", 3),
+                        row("2024-01-01T00:00:00.000Z", "b", 21),
+                    ]
+                );
+                let having = format!(
+                    "SELECT m, k, sum(v) s FROM ({}) t GROUP BY 1, 2 HAVING sum(v) < 5 \
+                 ORDER BY 1 LIMIT 2",
+                    UNION3
+                );
+                assert!(pushed_down(&logical_plan(&service, &having).await));
+                Ok(())
+            },
+        )
+        .await;
+    }
+
+    #[tokio::test]
     async fn overlapping_branches_keep_union_aggregate() {
         run("disjoint_union_aggregate_overlap", |service| async move {
             create_month_tables(&service).await?;
@@ -544,6 +662,15 @@ mod tests {
             let same_table = "SELECT k, sum(v) FROM \
                 (SELECT * FROM s.t1 UNION ALL SELECT * FROM s.t1) t GROUP BY 1 ORDER BY 1";
             assert!(!pushed_down(&logical_plan(&service, same_table).await));
+
+            exec(
+                &service,
+                "CREATE TABLE s.empty (m timestamp, k text, v int)",
+            )
+            .await?;
+            let one_loaded = "SELECT m, sum(v) FROM \
+                (SELECT * FROM s.t1 UNION ALL SELECT * FROM s.empty) t GROUP BY 1 ORDER BY 1";
+            assert!(!pushed_down(&logical_plan(&service, one_loaded).await));
             Ok(())
         })
         .await;
@@ -570,46 +697,50 @@ mod tests {
         .await;
     }
 
+    // DDL `decimal96` keeps its min/max as plain `Decimal`, so the ranges still prove disjointness.
     #[tokio::test]
-    async fn wide_numeric_leading_column() {
-        run("disjoint_union_aggregate_wide_numeric", |service| async move {
+    async fn decimal96_leading_column() {
+        run("disjoint_union_aggregate_decimal96", |service| async move {
             exec(&service, "CREATE SCHEMA s").await?;
-            for ty in ["int96", "decimal96"] {
-                for (t, base) in [("a", 1), ("b", 100)] {
-                    exec(&service, &format!("CREATE TABLE s.{t}_{ty} (d {ty}, v int)")).await?;
-                    exec(
-                        &service,
-                        &format!(
-                            "INSERT INTO s.{t}_{ty} (d, v) VALUES ({base}, 1), ({base}, 2), ({}, 3)",
-                            base + 1
-                        ),
-                    )
-                    .await?;
-                }
-                let sql = format!(
-                    "SELECT d, sum(v) FROM \
-                     (SELECT * FROM s.a_{ty} UNION ALL SELECT * FROM s.b_{ty}) t \
-                     GROUP BY 1 ORDER BY 1"
-                );
-                let rows = exec(&service, &sql).await?;
-                let sums = rows
-                    .iter()
-                    .map(|r| r.values()[1].clone())
-                    .collect::<Vec<_>>();
-                assert_eq!(
-                    sums,
-                    vec![
-                        TableValue::Int(3),
-                        TableValue::Int(3),
-                        TableValue::Int(3),
-                        TableValue::Int(3)
-                    ],
-                    "{}",
-                    ty
-                );
+            for (t, base) in [("a", 1), ("b", 100)] {
+                exec(
+                    &service,
+                    &format!("CREATE TABLE s.{t} (d decimal96(2), v int)"),
+                )
+                .await?;
+                exec(
+                    &service,
+                    &format!(
+                        "INSERT INTO s.{t} (d, v) VALUES ({base}, 1), ({base}, 2), ({}, 3)",
+                        base + 1
+                    ),
+                )
+                .await?;
             }
+            let sql = "SELECT d, sum(v) FROM \
+                       (SELECT * FROM s.a UNION ALL SELECT * FROM s.b) t GROUP BY 1 ORDER BY 1";
+            assert!(pushed_down(&logical_plan(&service, sql).await));
+            let sums = exec(&service, sql)
+                .await?
+                .iter()
+                .map(|r| r.values()[1].clone())
+                .collect::<Vec<_>>();
+            assert_eq!(sums, vec![TableValue::Int(3); 4]);
             Ok(())
         })
         .await;
+    }
+
+    #[test]
+    fn unordered_values_back_off() {
+        let int96 = TableValue::Int96(Int96::new(1));
+        let decimal96 = TableValue::Decimal96(Decimal96::new(1));
+        assert_eq!(cmp_values(&int96, &int96), None);
+        assert_eq!(cmp_values(&decimal96, &decimal96), None);
+        assert_eq!(cmp_values(&TableValue::Null, &TableValue::Int(1)), None);
+        assert_eq!(
+            cmp_values(&TableValue::Int(1), &TableValue::Decimal(Decimal::new(1))),
+            None
+        );
     }
 }

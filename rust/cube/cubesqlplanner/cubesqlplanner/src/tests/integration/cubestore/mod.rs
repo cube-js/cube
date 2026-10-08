@@ -2,13 +2,8 @@ mod basic;
 mod partitioned_rollup;
 mod switch_rolling;
 
-/// Engine-independent form of a result table. CubeStore renders timestamps as
-/// `...T00:00:00.000Z` where Postgres uses `... 00:00:00` — matched on that
-/// shape, so a string cell like the `YTD` calc-group value is left alone — and
-/// ratios are
-/// computed in f64 against Postgres' NUMERIC, so the two differ in the last
-/// digit (`2.4285714285714284` vs `...86`); numbers are therefore compared
-/// rounded. Everything else must match cell for cell.
+/// Engine-independent form of a result table: CubeStore timestamps rewritten to
+/// Postgres' shape, numbers rounded (f64 vs NUMERIC differ in the last digit).
 pub(super) fn normalize(table: &str) -> String {
     fn normalize_cell(cell: &str) -> String {
         let cell = cell.trim();
