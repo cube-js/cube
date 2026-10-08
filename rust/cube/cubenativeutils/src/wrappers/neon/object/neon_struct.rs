@@ -148,18 +148,6 @@ impl<C: Context<'static> + 'static> NativeStruct<NeonInnerTypes<C>> for NeonStru
         self.object
             .map_neon_object::<_, _>(|cx, object| object.set(cx, field_name, value))
     }
-    fn get_own_property_names(
-        &self,
-    ) -> Result<Vec<NativeObjectHandle<NeonInnerTypes<C>>>, CubeError> {
-        self.object
-            .map_neon_object(|cx, neon_object| {
-                let neon_array = neon_object.get_own_property_names(cx)?;
-                neon_array.to_vec(cx)
-            })?
-            .into_iter()
-            .map(|o| Ok(o.into_neon_object(self.object.get_context())?.into()))
-            .collect()
-    }
     fn call_method(
         &self,
         method: &str,

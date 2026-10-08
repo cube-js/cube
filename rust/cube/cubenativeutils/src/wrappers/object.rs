@@ -59,7 +59,6 @@ pub trait NativeStruct<IT: InnerTypes>: NativeType<IT> {
     fn set_field(&self, field_name: &str, value: NativeObjectHandle<IT>)
         -> Result<bool, CubeError>;
     fn has_field(&self, field_name: &str) -> Result<bool, CubeError>;
-    fn get_own_property_names(&self) -> Result<Vec<NativeObjectHandle<IT>>, CubeError>;
 
     fn call_method(
         &self,
