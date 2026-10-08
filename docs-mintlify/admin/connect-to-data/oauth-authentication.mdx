@@ -6,7 +6,7 @@ description: Configure Cube to authenticate each user with their own OAuth token
 <Note>
 
 This feature is in beta. Reach out to your account manager to have it
-enabled for your Cube Cloud deployment.
+enabled for your Cube deployment.
 
 </Note>
 
@@ -44,7 +44,9 @@ checks, background operations, and queries from users without an active
 token, who see whatever the service account can access. Grant it the
 minimum permissions necessary — ideally read-only access to the required
 schemas — to limit exposure. To reject those queries instead, make
-`driver_factory` fail closed, as in the
+`driver_factory` fail closed by returning a non-empty token the warehouse
+rejects; an empty `token` makes the Databricks driver read the service
+account token from the environment. See the
 [per-user OIDC token example][ref-oidc-per-user].
 
 </Warning>
@@ -52,13 +54,13 @@ schemas — to limit exposure. To reject those queries instead, make
 ## Set up the OAuth app
 
 Before configuring Cube to use per-user OAuth, register your data
-source as an OAuth app in Cube Cloud:
+source as an OAuth app in Cube:
 
 <Steps>
 
 <Step title="Open the OAuth apps settings">
 
-In Cube Cloud, go to **Admin → Integrations → OAuth apps** and click
+In Cube, go to **Admin → Integrations → OAuth apps** and click
 **Add**.
 
 <Frame>
@@ -136,6 +138,10 @@ CUBEJS_DB_DATABRICKS_ACCEPT_POLICY=true
 # Optional: specify a catalog
 CUBEJS_DB_DATABRICKS_CATALOG=my_catalog
 ```
+
+Use a token for the service account. If
+`CUBEJS_DB_DATABRICKS_OAUTH_CLIENT_ID` is set, the driver authenticates as
+that service principal and ignores the per-user `token`.
 
 </Tab>
 
