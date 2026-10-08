@@ -77,6 +77,15 @@ cubes:
                     - member: orders.created_at
                       operator: inDateRange
                       values: ["2025-03-01", "2025-03-03"]
+          - name: count_all_week
+            type: number
+            multi_stage: true
+            sql: "{count}"
+            filter:
+                include:
+                    - member: orders.created_at
+                      operator: inDateRange
+                      values: ["2025-03-01", "2025-03-08"]
           - name: count_late_week
             type: number
             multi_stage: true

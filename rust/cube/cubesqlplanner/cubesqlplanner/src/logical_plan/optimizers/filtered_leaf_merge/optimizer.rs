@@ -8,19 +8,10 @@ use crate::planner::MemberSymbol;
 use std::collections::{HashMap, HashSet};
 use std::rc::Rc;
 
-/// Folds multi-stage measures that are one base measure read over different
-/// rows of the same rollup — `sql: "{base}"` with a `filter.include` on a time
-/// dimension — into a single scan. Each measure becomes a conditional
-/// aggregate of the base measure under its own leaf's time filter, and the
-/// scan keeps the rows any of them reads.
-///
-/// The folded measures leave the full-key aggregate of the root query as one
-/// subquery instead of one per measure, so no key grid and no join is planned
-/// between them. A key with no rows under a measure's filter still reads NULL
-/// for it, as it did through the join.
-///
-/// Must run after pre-aggregations are matched: it only folds leaves that read
-/// a rollup, and keeps the usage whose partitions cover every folded leaf.
+/// Folds `sql: "{base}"` multi-stage measures whose leaves read one rollup
+/// under different time filters into one scan of conditional aggregates; a key
+/// with no rows in a measure's window still reads NULL. Runs after
+/// pre-aggregation matching: it only folds leaves that read a rollup.
 pub struct FilteredLeafMergeOptimizer<'a> {
     /// Date range of every usage that states one, by usage index.
     usage_ranges: HashMap<usize, (String, String)>,
@@ -167,11 +158,8 @@ impl<'a> FilteredLeafMergeOptimizer<'a> {
         (optimized, folded_usages)
     }
 
-    // When one folded scan is all the root query reads, the root query
-    // becomes that scan: its grouping, order and limit then sit on one select
-    // over the rollup. Behind a CTE or a subquery Cube Store aggregates every
-    // key before ordering; on the scan itself it reads the rollup in index
-    // order and stops once the limit is met.
+    // Cube Store applies TopK only when ORDER BY and LIMIT sit directly on
+    // the rollup scan, not on a CTE or subquery over it.
     fn inline_sole_scan(
         root: &Rc<RootQuery>,
         ctes: &[Rc<LogicalMultiStageMember>],

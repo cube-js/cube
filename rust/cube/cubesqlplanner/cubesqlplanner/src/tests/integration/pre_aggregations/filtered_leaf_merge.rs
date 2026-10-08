@@ -267,18 +267,45 @@ async fn test_approximate_distinct_windows_do_not_fold() {
 #[tokio::test(flavor = "multi_thread")]
 async fn test_windows_read_by_another_stage() {
     // Two of the windows are read by a ratio over them as well as by the
-    // query itself.
+    // query itself, so they keep scans of their own; the two windows only the
+    // query reads still fold.
     let query = indoc! {"
         measures:
           - orders.early_week_share
-          - orders.amount_mid_week
           - orders.amount_all_week
+          - orders.amount_mid_week
+          - orders.count_all_week
         dimensions:
           - orders.status
         order:
           - id: orders.status
     "};
-    assert_folding_agrees(&pg_ctx(), query, true).await;
+    let sql = assert_folding_agrees(&pg_ctx(), query, true).await;
+    assert_eq!(sql.matches("CASE WHEN").count(), 2, "{sql}");
+    // One scan for each shared window, one for the folded pair.
+    assert_eq!(
+        sql.matches("FROM  orders__orders_by_status_size_day")
+            .count(),
+        3,
+        "{sql}"
+    );
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_windows_without_a_covering_window_do_not_fold() {
+    // Neither window's usage covers the other's partitions, so no scan can
+    // serve both.
+    let query = indoc! {"
+        measures:
+          - orders.amount_early_week
+          - orders.max_amount_late_week
+        dimensions:
+          - orders.status
+        order:
+          - id: orders.status
+    "};
+    let sql = assert_folding_agrees(&pg_ctx(), query, true).await;
+    assert!(!sql.contains("CASE WHEN"), "{sql}");
 }
 
 #[tokio::test(flavor = "multi_thread")]
@@ -299,6 +326,10 @@ async fn test_ungrouped_windows() {
     let merged = ctx.build_sql(&with_merge(query, true));
     let separate = ctx.build_sql(&with_merge(query, false));
     assert_eq!(merged.is_ok(), separate.is_ok(), "{merged:?}");
+    // An ungrouped leaf has no aggregate to gate.
+    if let Ok(sql) = &merged {
+        assert!(!sql.contains("CASE WHEN"), "{sql}");
+    }
     if separate.is_ok() {
         assert_eq!(
             ctx.try_execute(&with_merge(query, true), SEED).await,
