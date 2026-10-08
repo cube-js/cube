@@ -592,3 +592,133 @@ impl MetaStoreFs for BaseRocksStoreFs {
 }
 
 crate::di_service!(BaseRocksStoreFs, [MetaStoreFs]);
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::config::Config;
+    use crate::di_service;
+    use crate::remotefs::{LocalDirRemoteFs, RemoteFile, RemoteFs};
+    use std::sync::atomic::{AtomicUsize, Ordering};
+    use std::time::Duration;
+
+    /// Remote fs which records the maximum number of uploads in flight at once.
+    #[derive(Debug)]
+    struct ConcurrencyTrackingFs {
+        base_fs: Arc<LocalDirRemoteFs>,
+        in_flight: AtomicUsize,
+        max_in_flight: AtomicUsize,
+    }
+
+    di_service!(ConcurrencyTrackingFs, [RemoteFs, ExtendedRemoteFs]);
+
+    #[async_trait]
+    impl RemoteFs for ConcurrencyTrackingFs {
+        async fn temp_upload_path(&self, remote_path: String) -> Result<String, CubeError> {
+            self.base_fs.temp_upload_path(remote_path).await
+        }
+
+        async fn uploads_dir(&self) -> Result<String, CubeError> {
+            self.base_fs.uploads_dir().await
+        }
+
+        async fn check_upload_file(
+            &self,
+            remote_path: String,
+            expected_size: u64,
+        ) -> Result<(), CubeError> {
+            self.base_fs
+                .check_upload_file(remote_path, expected_size)
+                .await
+        }
+
+        async fn upload_file(
+            &self,
+            local_upload_path: String,
+            _remote_path: String,
+        ) -> Result<u64, CubeError> {
+            let now = self.in_flight.fetch_add(1, Ordering::SeqCst) + 1;
+            self.max_in_flight.fetch_max(now, Ordering::SeqCst);
+            tokio::time::sleep(Duration::from_millis(50)).await;
+            self.in_flight.fetch_sub(1, Ordering::SeqCst);
+            Ok(fs::metadata(local_upload_path).await?.len())
+        }
+
+        async fn download_file(
+            &self,
+            remote_path: String,
+            expected_file_size: Option<u64>,
+        ) -> Result<String, CubeError> {
+            self.base_fs
+                .download_file(remote_path, expected_file_size)
+                .await
+        }
+
+        async fn delete_file(&self, remote_path: String) -> Result<(), CubeError> {
+            self.base_fs.delete_file(remote_path).await
+        }
+
+        async fn list(&self, remote_prefix: String) -> Result<Vec<String>, CubeError> {
+            self.base_fs.list(remote_prefix).await
+        }
+
+        async fn list_with_metadata(
+            &self,
+            remote_prefix: String,
+        ) -> Result<Vec<RemoteFile>, CubeError> {
+            self.base_fs.list_with_metadata(remote_prefix).await
+        }
+
+        async fn local_path(&self) -> Result<String, CubeError> {
+            self.base_fs.local_path().await
+        }
+
+        async fn local_file(&self, remote_path: String) -> Result<String, CubeError> {
+            self.base_fs.local_file(remote_path).await
+        }
+    }
+
+    #[async_trait]
+    impl ExtendedRemoteFs for ConcurrencyTrackingFs {}
+
+    /// https://github.com/cube-js/cube/issues/12173
+    #[tokio::test]
+    async fn checkpoint_upload_respects_upload_concurrency() {
+        let config = Config::test("checkpoint_upload_respects_upload_concurrency").update_config(
+            |mut c| {
+                c.upload_concurrency = 2;
+                c
+            },
+        );
+        let local_dir = std::env::temp_dir().join("checkpoint_upload_respects_upload_concurrency");
+        let _ = std::fs::remove_dir_all(&local_dir);
+        let remote_path = "metastore-1".to_string();
+        let checkpoint_path = local_dir.join(&remote_path);
+        std::fs::create_dir_all(&checkpoint_path).unwrap();
+        for i in 0..10 {
+            std::fs::write(checkpoint_path.join(format!("{:06}.sst", i)), b"data").unwrap();
+        }
+
+        let remote_fs = Arc::new(ConcurrencyTrackingFs {
+            base_fs: LocalDirRemoteFs::new_noop(local_dir.clone()),
+            in_flight: AtomicUsize::new(0),
+            max_in_flight: AtomicUsize::new(0),
+        });
+        let store_fs = BaseRocksStoreFs::new_for_metastore(remote_fs.clone(), config.config_obj());
+
+        let uploaded = store_fs
+            .upload_snapsots_files(&remote_path, &checkpoint_path)
+            .await
+            .unwrap();
+        let _ = std::fs::remove_dir_all(&local_dir);
+
+        assert_eq!(uploaded.len(), 10);
+        let max_in_flight = remote_fs.max_in_flight.load(Ordering::SeqCst);
+        assert!(
+            max_in_flight as u64 <= config.config_obj().upload_concurrency(),
+            "checkpoint upload ran {} file uploads concurrently, CUBESTORE_MAX_ACTIVE_UPLOADS is {}",
+            max_in_flight,
+            config.config_obj().upload_concurrency()
+        );
+    }
+}
