@@ -212,6 +212,25 @@ data loss. If any cluster node is down, it'll lead to a complete cluster outage.
 If Cube Store replication and high availability are required, please consider
 using Cube Cloud.
 
+### High availability with redundant clusters
+
+You can still make a Cube Core deployment highly available by running two or
+more fully independent Cube clusters and balancing traffic between them:
+
+- Each cluster has its own Cube Store router and workers, its own Refresh
+  Worker, and its own API instances. Run several API instance pods per cluster.
+- Give each Cube Store cluster its own persistent storage location, e.g., a
+  different `CUBESTORE_REMOTE_DIR` or bucket path. Clusters must never share
+  metadata or pre-aggregation files.
+- Put a load balancer in front of the API instances of all clusters and use the
+  [`/readyz`][ref-api-readyz] endpoint as its health check, so traffic is routed
+  away from a cluster whose Cube Store router is unreachable.
+
+Each Refresh Worker builds pre-aggregations for its own cluster, so your data
+source receives refresh queries from every cluster. Clusters refresh on their
+own schedules, so results may differ slightly between them until both have
+refreshed.
+
 ## Storage
 
 Cube Store cluster uses both persistent and scratch storage.
@@ -429,6 +448,7 @@ It's not supported by Cube or the vendor.
 [link-wsl2]: https://docs.microsoft.com/en-us/windows/wsl/install-win10
 [ref-caching-partitioning]: /docs/pre-aggregations/using-pre-aggregations#partitioning
 [ref-config-env]: /reference/configuration/environment-variables
+[ref-api-readyz]: /reference/core-data-apis/rest-api/reference#readyz
 [link-parquet-encryption]: https://parquet.apache.org/docs/file-format/data-pages/encryption/
 [link-aes]: https://en.wikipedia.org/wiki/Advanced_Encryption_Standard
 [ref-cmk]: /admin/deployment/encryption-keys
