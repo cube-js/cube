@@ -30,7 +30,38 @@ const nestedObjects = Array.from({ length: 200 }, (_, i) => ({
   granularities: [{ name: 'fiscal_year', interval: '1 year', offset: '3 months' }],
 }));
 
-function loop(kind: 'json' | 'sqlTemplates', value: unknown, iterations: number) {
+// Shape of a compiled cube (`CubeEvaluator.cubeFromPath`): 13 own properties, of which
+// CubeDefinitionStatic declares only `name`.
+const measure = (i: number) => ({
+  type: 'sum',
+  sql: () => `amount_${i}`,
+  title: `Total ${i}`,
+  format: 'currency',
+  meta: { a: i },
+  ownedByCube: true,
+});
+
+const cube = {
+  allDefinitions: () => ({}),
+  rawFolders: () => [],
+  rawCubes: () => [],
+  preAggregations: { main: { type: 'rollup' } },
+  joins: [{ name: 'users', relationship: 'many_to_one', sql: () => '' }],
+  measures: Object.fromEntries(Array.from({ length: 30 }, (_, i) => [`m${i}`, measure(i)])),
+  dimensions: Object.fromEntries(
+    Array.from({ length: 30 }, (_, i) => [`d${i}`, { sql: () => `d${i}`, type: 'string', ownedByCube: true }])
+  ),
+  segments: {},
+  hierarchies: {},
+  accessPolicy: undefined,
+  sql: () => 'select * from orders',
+  name: 'orders',
+  fileName: 'orders.js',
+};
+
+type LoopKind = 'json' | 'sqlTemplates' | 'cubeStatic' | 'measureStatic';
+
+function loop(kind: LoopKind, value: unknown, iterations: number) {
   native.__testBridgeDeserializeLoop(kind, value, iterations);
 }
 
@@ -53,6 +84,15 @@ describe('NativeSerdeDeserializer', () => {
     },
     '200 nested member-like objects': () => {
       loop('json', nestedObjects, 1);
+    },
+  });
+
+  benchmarkSuite('static bridge structs', {
+    'CubeDefinitionStatic from a compiled cube (x100 in Rust)': () => {
+      loop('cubeStatic', cube, 100);
+    },
+    'MeasureDefinitionStatic from a measure (x100 in Rust)': () => {
+      loop('measureStatic', measure(1), 100);
     },
   });
 });

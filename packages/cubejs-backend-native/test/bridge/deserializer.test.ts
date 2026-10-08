@@ -121,6 +121,21 @@ describeBridge('bridge: NativeSerdeDeserializer', () => {
       expect(() => deserializeJson(input)).toThrow('boom from element');
     });
 
+    it('skips non-enumerable properties, like JSON.stringify', () => {
+      const input = { visible: 1 };
+      Object.defineProperty(input, 'hidden', { value: 2, enumerable: false });
+      expect(deserializeJson(input)).toEqual({ visible: 1 });
+    });
+
+    it('rethrows the exception of a throwing ownKeys trap', () => {
+      const input = new Proxy({}, {
+        ownKeys() {
+          throw new Error('boom from ownKeys');
+        },
+      });
+      expect(() => deserializeJson(input)).toThrow('boom from ownKeys');
+    });
+
     it('wide object', () => {
       const input: Record<string, string> = {};
 
@@ -200,6 +215,16 @@ describeBridge('bridge: NativeSerdeDeserializer', () => {
     it('rejects a missing required field', () => {
       const { name: _name, ...rest } = base;
       expect(() => deserializeTyped(rest)).toThrow('missing field `name`');
+    });
+
+    it('does not read fields the struct does not declare', () => {
+      const input = {
+        ...base,
+        get unknown() {
+          throw new Error('must not be read');
+        },
+      };
+      expect(deserializeTyped(input)).toEqual(base);
     });
 
     it('ignores unknown fields', () => {

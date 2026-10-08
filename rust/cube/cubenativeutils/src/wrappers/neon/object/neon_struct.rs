@@ -1,4 +1,7 @@
-use super::{primitive_root_holder::read_js_string, NeonObject, ObjectNeonTypeHolder, RootHolder};
+use super::{
+    primitive_root_holder::{read_js_string, read_js_string_into},
+    NeonObject, ObjectNeonTypeHolder, RootHolder,
+};
 use crate::wrappers::{
     neon::{inner_types::NeonInnerTypes, object::IntoNeonObject},
     object::{NativeStruct, NativeType},
@@ -6,6 +9,32 @@ use crate::wrappers::{
 };
 use crate::CubeError;
 use neon::prelude::*;
+use neon::thread::LocalKey;
+
+/// `Object.keys`, looked up once per addon instance.
+static OBJECT_KEYS: LocalKey<Root<JsFunction>> = LocalKey::new();
+
+/// Own enumerable string keys, as `Object.keys` returns them. N-API's
+/// `napi_get_all_property_names` always collects keys through V8's slow `KeyAccumulator` (a hash
+/// set per call); `Object.keys` copies the enum cache of the object's map instead.
+fn object_keys<C: Context<'static>>(
+    cx: &mut C,
+    object: Handle<'static, JsObject>,
+) -> NeonResult<Handle<'static, JsArray>> {
+    let keys_fn = OBJECT_KEYS
+        .get_or_try_init(cx, |cx| {
+            let object_ctor = cx.global::<JsFunction>("Object")?;
+            let keys_fn = object_ctor.get::<JsFunction, _, _>(cx, "keys")?;
+            NeonResult::Ok(keys_fn.root(cx))
+        })?
+        .to_inner(cx);
+    let undefined = cx.undefined();
+    let keys = keys_fn.call(cx, undefined, [object.upcast::<JsValue>()])?;
+    // SAFETY: `Object.keys` always returns an array.
+    Ok(unsafe { JsArray::from_raw(&*cx, keys.to_raw()) })
+}
+
+type Entries<K, C> = Vec<(K, NativeObjectHandle<NeonInnerTypes<C>>)>;
 
 pub struct NeonStruct<C: Context<'static>> {
     object: ObjectNeonTypeHolder<C, JsObject>,
@@ -14,6 +43,52 @@ pub struct NeonStruct<C: Context<'static>> {
 impl<C: Context<'static> + 'static> NeonStruct<C> {
     pub fn new(object: ObjectNeonTypeHolder<C, JsObject>) -> Self {
         Self { object }
+    }
+
+    /// Own string-keyed properties whose key `select` maps to `Some`, read in one `with_context`;
+    /// values of skipped keys are never read.
+    fn collect_entries<K: std::fmt::Display>(
+        &self,
+        mut select: impl FnMut(&mut C, Handle<'static, JsString>) -> Option<K>,
+    ) -> Result<Entries<K, C>, CubeError> {
+        let context = self.object.get_context();
+        // The key whose value failed to read, so the error can name it.
+        let mut failed_key = None;
+        self.object
+            .map_neon_object(|cx, object| {
+                let names = object_keys(cx, *object)?;
+                let len = names.len(cx);
+                let mut entries = Vec::with_capacity(len as usize);
+                for idx in 0..len {
+                    let key = names.get_value(cx, idx)?;
+                    // SAFETY: `Object.keys` returns strings only, alive for as long as `names` is.
+                    let key = unsafe { JsString::from_raw(&*cx, key.to_raw()) };
+                    let Some(name) = select(cx, key) else {
+                        continue;
+                    };
+                    // Looked up by the original key handle: a fresh JsString built from `name`
+                    // would be re-internalized by V8 on every lookup.
+                    let value = match object
+                        .get_value(cx, key)
+                        .map_err(CubeError::from)
+                        .and_then(|value| RootHolder::new_in(cx, &context, value))
+                    {
+                        Ok(value) => value,
+                        Err(err) => {
+                            failed_key = Some(name.to_string());
+                            return Ok(Err(err));
+                        }
+                    };
+                    entries.push((name, NeonObject::from_root(value).into()));
+                }
+                Ok(Ok(entries))
+            })?
+            .map_err(|mut err| {
+                if let Some(key) = failed_key {
+                    err.message = format!("field `{key}`: failed to read value: {}", err.message);
+                }
+                err
+            })
     }
 }
 
@@ -47,43 +122,25 @@ impl<C: Context<'static> + 'static> NativeStruct<NeonInnerTypes<C>> for NeonStru
     }
 
     fn entries(&self) -> Result<Vec<(String, NativeObjectHandle<NeonInnerTypes<C>>)>, CubeError> {
-        let context = self.object.get_context();
-        // The key whose value failed to read, so the error can name it.
-        let mut failed_key = None;
-        self.object
-            .map_neon_object(|cx, object| {
-                let names = object.get_own_property_names(cx)?;
-                let len = names.len(cx);
-                let mut entries = Vec::with_capacity(len as usize);
-                for idx in 0..len {
-                    let key = names.get_value(cx, idx)?;
-                    // SAFETY: neon requests the names with `SKIP_SYMBOLS` and `NumbersToStrings`,
-                    // so every element is a string, alive for as long as `names` is.
-                    let key = unsafe { JsString::from_raw(&*cx, key.to_raw()) };
-                    let name = read_js_string(cx, key);
-                    // Looked up by the original key handle: a fresh JsString built from `name`
-                    // would be re-internalized by V8 on every lookup.
-                    let value = match object
-                        .get_value(cx, key)
-                        .map_err(CubeError::from)
-                        .and_then(|value| RootHolder::new_in(cx, &context, value))
-                    {
-                        Ok(value) => value,
-                        Err(err) => {
-                            failed_key = Some(name);
-                            return Ok(Err(err));
-                        }
-                    };
-                    entries.push((name, NeonObject::from_root(value).into()));
-                }
-                Ok(Ok(entries))
-            })?
-            .map_err(|mut err| {
-                if let Some(key) = failed_key {
-                    err.message = format!("field `{key}`: failed to read value: {}", err.message);
-                }
-                err
-            })
+        self.collect_entries(|cx, key| Some(read_js_string(cx, key)))
+    }
+
+    fn entries_for_fields(
+        &self,
+        fields: &'static [&'static str],
+    ) -> Result<Vec<(&'static str, NativeObjectHandle<NeonInnerTypes<C>>)>, CubeError> {
+        self.collect_entries(|cx, key| {
+            let mut buf = [0u8; 128];
+            let written = read_js_string_into(cx, key, &mut buf);
+            // N-API stops on a character boundary, so a key within 4 bytes of the end may be cut.
+            if written + 4 < buf.len() {
+                let key = &buf[..written];
+                fields.iter().copied().find(|field| field.as_bytes() == key)
+            } else {
+                let key = read_js_string(cx, key);
+                fields.iter().copied().find(|field| *field == key)
+            }
+        })
     }
 
     fn has_field(&self, field_name: &str) -> Result<bool, CubeError> {

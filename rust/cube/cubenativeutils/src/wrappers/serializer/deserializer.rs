@@ -35,29 +35,7 @@ impl<'de, IT: InnerTypes> Deserializer<'de> for NativeSerdeDeserializer<IT> {
     where
         V: Visitor<'de>,
     {
-        match self.input.into_typed()? {
-            NativeTypedObject::Null | NativeTypedObject::Undefined => visitor.visit_unit(),
-            NativeTypedObject::Boolean(val) => visitor.visit_bool(val.value()?),
-            NativeTypedObject::String(val) => visitor.visit_string(val.into_value()?),
-            NativeTypedObject::Number(val) => {
-                let num = val.value()?;
-                // Self-describing consumers like FilterValue expect whole numbers as ints.
-                if num.fract() == 0.0 && num.is_finite() {
-                    visitor.visit_i64(num as i64)
-                } else {
-                    visitor.visit_f64(num)
-                }
-            }
-            NativeTypedObject::Array(val) => {
-                visitor.visit_seq(NativeSeqDeserializer::<IT>::new(val)?)
-            }
-            NativeTypedObject::Struct(val) => {
-                visitor.visit_map(NativeMapDeserializer::<IT>::new(val)?)
-            }
-            NativeTypedObject::Function(_) | NativeTypedObject::RustBox(_) => Err(
-                NativeObjSerializerError::Message("deserializer is not implemented".to_string()),
-            ),
-        }
+        visit_typed(self.input.into_typed()?, visitor)
     }
     fn deserialize_option<V>(self, visitor: V) -> Result<V::Value, Self::Error>
     where
@@ -103,6 +81,25 @@ impl<'de, IT: InnerTypes> Deserializer<'de> for NativeSerdeDeserializer<IT> {
         todo!()
     }
 
+    fn deserialize_struct<V>(
+        self,
+        _name: &'static str,
+        fields: &'static [&'static str],
+        visitor: V,
+    ) -> Result<V::Value, Self::Error>
+    where
+        V: Visitor<'de>,
+    {
+        // `fields` lists every name the struct accepts (aliases included); without
+        // `deny_unknown_fields` the rest would be read only to be ignored.
+        match self.input.into_typed()? {
+            NativeTypedObject::Struct(val) => visitor.visit_map(
+                NativeMapDeserializer::<IT, _>::new(val.entries_for_fields(fields)?),
+            ),
+            typed => visit_typed(typed, visitor),
+        }
+    }
+
     fn deserialize_ignored_any<V>(self, visitor: V) -> Result<V::Value, Self::Error>
     where
         V: Visitor<'de>,
@@ -113,7 +110,7 @@ impl<'de, IT: InnerTypes> Deserializer<'de> for NativeSerdeDeserializer<IT> {
     forward_to_deserialize_any! {
        <V: Visitor<'de>>
         bool i8 i16 i32 i64 i128 u8 u16 u32 u64 u128 char str string
-        unit unit_struct seq tuple tuple_struct map struct identifier
+        unit unit_struct seq tuple tuple_struct map identifier
         newtype_struct
     }
 
@@ -141,6 +138,33 @@ impl<'de, IT: InnerTypes> Deserializer<'de> for NativeSerdeDeserializer<IT> {
                 "JS Number expected for f64 field".to_string(),
             ))
         }
+    }
+}
+
+fn visit_typed<'de, IT: InnerTypes, V: Visitor<'de>>(
+    typed: NativeTypedObject<IT>,
+    visitor: V,
+) -> Result<V::Value, NativeObjSerializerError> {
+    match typed {
+        NativeTypedObject::Null | NativeTypedObject::Undefined => visitor.visit_unit(),
+        NativeTypedObject::Boolean(val) => visitor.visit_bool(val.value()?),
+        NativeTypedObject::String(val) => visitor.visit_string(val.into_value()?),
+        NativeTypedObject::Number(val) => {
+            let num = val.value()?;
+            // Self-describing consumers like FilterValue expect whole numbers as ints.
+            if num.fract() == 0.0 && num.is_finite() {
+                visitor.visit_i64(num as i64)
+            } else {
+                visitor.visit_f64(num)
+            }
+        }
+        NativeTypedObject::Array(val) => visitor.visit_seq(NativeSeqDeserializer::<IT>::new(val)?),
+        NativeTypedObject::Struct(val) => {
+            visitor.visit_map(NativeMapDeserializer::<IT, _>::new(val.entries()?))
+        }
+        NativeTypedObject::Function(_) | NativeTypedObject::RustBox(_) => Err(
+            NativeObjSerializerError::Message("deserializer is not implemented".to_string()),
+        ),
     }
 }
 
@@ -177,33 +201,33 @@ impl<'de, IT: InnerTypes> SeqAccess<'de> for NativeSeqDeserializer<IT> {
     }
 }
 
-struct NativeMapDeserializer<IT: InnerTypes> {
-    entries: std::vec::IntoIter<(String, NativeObjectHandle<IT>)>,
+struct NativeMapDeserializer<IT: InnerTypes, K: AsRef<str>> {
+    entries: std::vec::IntoIter<(K, NativeObjectHandle<IT>)>,
     // Set in `next_key_seed`; the key stays here for the error context of its value.
-    current: Option<(String, NativeObjectHandle<IT>)>,
+    current: Option<(K, NativeObjectHandle<IT>)>,
 }
 
-impl<IT: InnerTypes> NativeMapDeserializer<IT> {
-    pub fn new(input: IT::Struct) -> Result<Self, NativeObjSerializerError> {
-        Ok(Self {
-            entries: input.entries()?.into_iter(),
+impl<IT: InnerTypes, K: AsRef<str>> NativeMapDeserializer<IT, K> {
+    fn new(entries: Vec<(K, NativeObjectHandle<IT>)>) -> Self {
+        Self {
+            entries: entries.into_iter(),
             current: None,
-        })
+        }
     }
 }
 
-impl<'de, IT: InnerTypes> MapAccess<'de> for NativeMapDeserializer<IT> {
+impl<'de, IT: InnerTypes, K: AsRef<str>> MapAccess<'de> for NativeMapDeserializer<IT, K> {
     type Error = NativeObjSerializerError;
-    fn next_key_seed<K>(&mut self, seed: K) -> Result<Option<K::Value>, Self::Error>
+    fn next_key_seed<S>(&mut self, seed: S) -> Result<Option<S::Value>, Self::Error>
     where
-        K: DeserializeSeed<'de>,
+        S: DeserializeSeed<'de>,
     {
         let Some(entry) = self.entries.next() else {
             return Ok(None);
         };
         let (key, _) = self.current.insert(entry);
         // By `&str`: struct field identifiers only need to compare it.
-        seed.deserialize(key.as_str().into_deserializer()).map(Some)
+        seed.deserialize(key.as_ref().into_deserializer()).map(Some)
     }
 
     fn next_value_seed<V>(&mut self, seed: V) -> Result<V::Value, Self::Error>
@@ -216,7 +240,7 @@ impl<'de, IT: InnerTypes> MapAccess<'de> for NativeMapDeserializer<IT> {
             )
         })?;
         seed.deserialize(NativeSerdeDeserializer::new(value))
-            .map_err(|err| err.context(format!("field `{key}`")))
+            .map_err(|err| err.context(format!("field `{}`", key.as_ref())))
     }
 
     fn size_hint(&self) -> Option<usize> {

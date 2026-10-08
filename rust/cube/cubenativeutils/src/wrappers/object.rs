@@ -48,6 +48,11 @@ pub trait NativeStruct<IT: InnerTypes>: NativeType<IT> {
     fn get_field(&self, field_name: &str) -> Result<NativeObjectHandle<IT>, CubeError>;
     /// Own enumerable string-keyed properties with their values, read in one pass.
     fn entries(&self) -> Result<Vec<(String, NativeObjectHandle<IT>)>, CubeError>;
+    /// `entries` restricted to `fields`; values of other properties are not read.
+    fn entries_for_fields(
+        &self,
+        fields: &'static [&'static str],
+    ) -> Result<Vec<(&'static str, NativeObjectHandle<IT>)>, CubeError>;
     fn set_field(&self, field_name: &str, value: NativeObjectHandle<IT>)
         -> Result<bool, CubeError>;
     fn has_field(&self, field_name: &str) -> Result<bool, CubeError>;

@@ -157,6 +157,28 @@ pub(crate) fn read_js_string<'cx, C: Context<'cx>>(
     unsafe { String::from_utf8_unchecked(buf) }
 }
 
+/// Copies the string into `buf` with one N-API call and returns the number of bytes written.
+/// If the string doesn't fit, it is cut on a character boundary.
+pub(crate) fn read_js_string_into<'cx, C: Context<'cx>>(
+    cx: &mut C,
+    value: Handle<'cx, JsString>,
+    buf: &mut [u8],
+) -> usize {
+    let mut written = 0usize;
+    // SAFETY: `buf` is writable for `buf.len()` bytes, which N-API never exceeds (NUL included).
+    unsafe {
+        napi::get_value_string_utf8(
+            cx.to_raw(),
+            value.to_raw(),
+            buf.as_mut_ptr().cast(),
+            buf.len(),
+            &mut written,
+        )
+    }
+    .expect("napi_get_value_string_utf8 on a string");
+    written
+}
+
 pub struct PrimitiveNeonTypeHolder<C: Context<'static>, V: NeonPrimitiveMapping + 'static> {
     context: ContextHolder<C>,
     value: V::NativeType,
