@@ -30,7 +30,7 @@ Cube hosts an MCP server endpoint. MCP clients connect over HTTPS and authentica
 - **Endpoint:** `https://cubecloud.dev/mcp`
 - **OAuth flow:** Authorization Code + PKCE, scope = `mcp-agent-access`. Most clients discover OAuth automatically and use the public client ID `cube-mcp-client`. Microsoft 365 Copilot requires a separate [OAuth setup](#connect-to-microsoft-365-copilot).
 - **Account selection:** You sign in to Cube as part of the OAuth flow and, if you belong to more than one account, choose which one to connect.
-- **Stateless:** Cube MCP is stateless and follows the 2026-07-28 MCP specification. Each request carries everything the server needs, so no server-side session has to be kept between requests.
+- **Stateless:** Cube MCP is stateless and follows the [2026-07-28 MCP specification](https://modelcontextprotocol.io/specification/2026-07-28). Each request carries everything the server needs, so no server-side session has to be kept between requests.
 - **Deployment selection:** On connect, the client lands on the tenant **default deployment** set by your admin (or the first deployment you can access). Clients can also target a specific deployment and agent per request — see [Select a deployment and agent](#select-a-deployment-and-agent).
 
 ### One endpoint for everyone

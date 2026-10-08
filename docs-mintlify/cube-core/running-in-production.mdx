@@ -224,12 +224,17 @@ more fully independent Cube clusters and balancing traffic between them:
   metadata or pre-aggregation files.
 - Put a load balancer in front of the API instances of all clusters and use the
   [`/readyz`][ref-api-readyz] endpoint as its health check, so traffic is routed
-  away from a cluster whose Cube Store router is unreachable.
+  away from a cluster whose Cube Store router is unreachable. `/readyz` also
+  tests the connection to the data source unless the API instances run in
+  rollup-only mode, so a data source outage marks every cluster unhealthy.
+  Set [`CUBEJS_ROLLUP_ONLY`][ref-rollup-only] to `true` on the API instances
+  (they then serve only queries that match pre-aggregations), or configure the
+  load balancer to fail open when all backends are unhealthy.
 
 Each Refresh Worker builds pre-aggregations for its own cluster, so your data
 source receives refresh queries from every cluster. Clusters refresh on their
-own schedules, so results may differ slightly between them until both have
-refreshed.
+own schedules, so results may differ slightly between them until all of them
+have refreshed.
 
 ## Storage
 
@@ -449,6 +454,7 @@ It's not supported by Cube or the vendor.
 [ref-caching-partitioning]: /docs/pre-aggregations/using-pre-aggregations#partitioning
 [ref-config-env]: /reference/configuration/environment-variables
 [ref-api-readyz]: /reference/core-data-apis/rest-api/reference#readyz
+[ref-rollup-only]: /reference/configuration/environment-variables#cubejs_rollup_only
 [link-parquet-encryption]: https://parquet.apache.org/docs/file-format/data-pages/encryption/
 [link-aes]: https://en.wikipedia.org/wiki/Advanced_Encryption_Standard
 [ref-cmk]: /admin/deployment/encryption-keys
