@@ -160,6 +160,12 @@ export type DriverOptions = {
 
 export type DriverConfig = {
   type: DatabaseType,
+  /**
+   * When the credential this configuration carries stops being usable — epoch ms or s,
+   * ISO 8601, or a `Date`. The driver is replaced once it elapses; not part of the
+   * configuration's identity, so a fresh deadline per call is not a change.
+   */
+  expiresAt?: number | string | Date,
 } & DriverOptions;
 
 export type DriverFactoryFn = (context: DriverContext) =>
