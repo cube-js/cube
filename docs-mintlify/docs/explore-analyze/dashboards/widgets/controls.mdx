@@ -503,6 +503,8 @@ A substring condition takes `caseSensitive` the same way: with `true` the match 
 
 Outside `between`, a `value` may still be a list, and what a condition makes of one differs. `is` and `is not` read its entries as alternatives — `f_orders.status={"value":["shipped","processing"]}` — on a time dimension as much as a string or number one. A substring condition matches the entries joined with commas into one term, so `{"type":"contains","value":["ship","proc"]}` matches `%ship,proc%` and neither entry on its own. Every other condition reads exactly one value — the comparisons, and the `in the …` and `not in the …` family — and a list in their `value` leaves the widget unable to build its query at all.
 
+A parameter can also clear a control. A filter whose JSON has an empty `value` (`[]` or `""`) and no `type`, such as `f_orders.status={"value":[]}`, opens that filter cleared, and so does an empty granularity, `tg_orders.created_at=`. The control's default does not fill it back in. Only a missing `type` clears. With any `type` written out, `equals` included, the filter opens on that condition: one that reads a `value`, such as `{"type":"equals","value":[]}` or `{"type":"contains","value":""}`, then has none, so it filters nothing and the default stays out as it does for a clear, with that condition picked; one that takes no value applies as usual, so `{"type":"is_null","value":""}` is `is null`. A viewer's own clear still drops the parameter, as described below; this form comes from a hand-written link, or from the link a [scheduled refresh][ref-schedule-control-values] sends for a control it clears.
+
 What travels in the link, and what wins when a link value arrives:
 
 - **Only what the viewer chose.** Values that came from the control's own configuration — a static default, a [default granularity](#default-granularity), a filter default [resolved from the data](#defaults-resolved-from-the-data) — are not written into the URL. Every viewer already gets those from the dashboard itself, and leaving them out means a link stays correct after the dashboard's defaults change.
@@ -512,7 +514,7 @@ What travels in the link, and what wins when a link value arrives:
 - **A link value wins at load.** A parent opening on its own resolved option leaves alone any control the link claimed, so the recipient sees the shared value rather than what that option maps. For a child the link carries nothing for, their own option decides: the same option as the sharer's re-applies that clear or reset, a different one does whatever it maps, and a parent resolving no option leaves the control on its own default. Picking an option by hand afterwards applies it, link or no link.
 - **Written out on published dashboards only.** Reading these parameters works anywhere, including [embedded][ref-embed-url-filters] dashboards; it's the writing that is published-only. In the dashboard builder the URL is left to the editing session, so changing a control there doesn't rewrite it.
 
-When a dashboard opens with these parameters, they are applied on top of whatever defaults the controls carry. A parameter is ignored when nothing on the dashboard can honor it — there is no matching control for that member, the requested granularity isn't in the switcher's [allowed granularities](#allowed-granularities), or the selected member is one the field switcher doesn't offer — its **Alternatives**, plus the replaced member.
+When a dashboard opens with these parameters, they are applied on top of whatever defaults the controls carry. A parameter is ignored when nothing on the dashboard can honor it — there is no matching control for that member, the requested granularity isn't in the switcher's [allowed granularities](#allowed-granularities), or the selected member is one the field switcher doesn't offer — its **Alternatives**, plus the replaced member. An `f_` parameter is also ignored when its filter's [visibility](#visibility) is **Disabled**: the filter opens on the value it would have without the link. A time granularity switcher or field switcher set to **Disabled** still takes its `tg_` or `ms_` value.
 
 ## Visibility
 
@@ -585,3 +587,4 @@ For filter, time granularity, and field switcher controls — the three that map
 [ref-charts]: /docs/explore-analyze/dashboards/widgets/charts
 [ref-granularities]: /docs/data-modeling/dimensions
 [ref-user-attributes]: /admin/users-and-permissions/user-attributes
+[ref-schedule-control-values]: /docs/explore-analyze/scheduled-refreshes#control-values

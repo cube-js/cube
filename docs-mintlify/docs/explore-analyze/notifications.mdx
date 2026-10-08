@@ -17,6 +17,11 @@ for distributing regular updates to stakeholders without requiring them to log i
 They can optionally carry a short [AI-generated summary](#ai-summary) of what
 changed since the previous notification.
 
+By default a notification shows the dashboard the way it opens. To send one
+slice of it instead, set the schedule's [control values][ref-control-values]:
+the screenshot, the AI summary, and the dashboard link in the message all use
+them.
+
 ## Creating a notification
 
 Notifications are configured as part of a [scheduled refresh][ref-scheduled-refreshes].
@@ -183,3 +188,4 @@ workspace has access to.
 [ref-subscribe]: /docs/explore-analyze/scheduled-refreshes#subscribing-to-notifications
 [ref-agents]: /admin/ai
 [ref-ai-widget]: /docs/explore-analyze/dashboards/widgets/ai-summary
+[ref-control-values]: /docs/explore-analyze/scheduled-refreshes#control-values
