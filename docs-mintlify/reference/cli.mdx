@@ -179,6 +179,7 @@ Run `cube <command> --help` for the full options of any command.
 | `data-model` | Data model files and Git workflow: `list`, `get`, `put`, `delete`, `rename`, `file-hashes`, `branches`, `create-branch`, `delete-branch`, `enable-branch`/`disable-branch`, `dev-mode`, `commit`, `pull`, `merge`, `merge-to-default` |
 | `dbt` | dbt sync: `sync` (`--ref` or `--manifest`, `--wait`), `generate` (`--manifest`, `--out`, `--check`), `status`, `result`, `logs`, `history` (`--status`, `--trigger`), `cancel` |
 | `evals` | Agent evals: `run` (`--branch`, `--agent`, `--file`, `--wait`), `status` (`--wait`), `results` (`--first`, `--after`) |
+| `ossie` | [Apache Ossie](#apache-ossie) conversion: `export` (`--view`, `--from-dir`, `--wait`, `--out`), `import` (`--file`, `--out`, `--check`), `status` (`--wait`), `result` (`--out`), `cancel` |
 | `environments` | Deployment environments and environment tokens |
 | `variables` | Deployment environment variables |
 | `folders`, `workbooks`, `reports`, `workspace` | Workspace content management |
@@ -626,6 +627,50 @@ A successful gate prunes both branches it creates: the sync branch and its perso
 cleanup commands if the connected Git provider branch should also be deleted.
 
 </Info>
+
+## Apache Ossie
+
+Convert a Cube data model to and from [Apache Ossie](/docs/integrations/apache-ossie).
+Conversion runs in Cube and changes nothing in the deployment.
+
+Export the YAML data model of the deployment's latest successful build to `ossie.yaml`:
+
+```bash
+cube ossie export DEPLOYMENT_ID --wait
+```
+
+`--view NAME` exports one view, `--out FILE` picks the output file (`-` for standard
+output), and `--from-dir .` converts your local project instead of the deployed model.
+`--from-dir` uploads only the YAML files with a top-level `cubes:` or `views:`, so
+the paths match the deployed ones when you pass the project root. `--strict-fanout`
+fails on a measure whose value a join fan-out could change instead of converting it with
+a warning; a view export does so by default, and `--strict-fanout=false` turns it off.
+
+Import an Ossie model as Cube data model files:
+
+```bash
+cube ossie import DEPLOYMENT_ID --file ossie.yaml --out .
+```
+
+Like [`dbt generate`](#generate-cubes-without-committing-them), `--out` is the root of
+your data model project, since the generated paths are project-relative
+(`model/cubes/…`). `--file -` reads the model from standard input, and `--dialect`
+picks the warehouse SQL to take from it, defaulting to the dialect of the deployment's
+data source. `--check` compares the files with what is on disk instead of writing them.
+
+Both commands print the conversion's counts and issues. They exit non-zero when the
+conversion fails, has an `ERROR` issue, or, with `--check`, finds a missing or different
+file. With `--json`, they print one document with `conversionId`, `status`, `outcome`,
+`counts`, `issues`, and `outputPath` for an export or `files` (and `differing` with
+`--check`) for an import.
+
+Without `--wait`, `export` returns a `conversionId` you can follow yourself:
+
+```bash
+cube ossie status DEPLOYMENT_ID CONVERSION_ID --wait
+cube ossie result DEPLOYMENT_ID CONVERSION_ID --out ossie.yaml
+cube ossie cancel DEPLOYMENT_ID CONVERSION_ID
+```
 
 ## Environment variables
 

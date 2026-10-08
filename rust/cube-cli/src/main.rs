@@ -138,6 +138,8 @@ enum Command {
     DataModel(commands::data_model::Args),
     /// Run a deployment's dbt sync (pull dbt models in as cubes)
     Dbt(commands::dbt::Args),
+    /// Convert between a Cube data model and Apache Ossie
+    Ossie(commands::ossie::Args),
     /// Run and inspect AI agent evals
     Evals(commands::evals::Args),
     /// Manage deployment environments and environment tokens
@@ -231,6 +233,7 @@ impl Command {
             Github(_) => "github",
             DataModel(_) => "data-model",
             Dbt(_) => "dbt",
+            Ossie(_) => "ossie",
             Evals(_) => "evals",
             Environments(_) => "environments",
             Variables(_) => "variables",
@@ -343,6 +346,7 @@ async fn run(global: GlobalArgs, command: Command) -> Result<()> {
         Github(args) => commands::github::command(args, &ctx).await,
         DataModel(args) => commands::data_model::command(args, &ctx).await,
         Dbt(args) => commands::dbt::command(args, &ctx).await,
+        Ossie(args) => commands::ossie::command(args, &ctx).await,
         Evals(args) => commands::evals::command(args, &ctx).await,
         Environments(args) => commands::environments::command(args, &ctx).await,
         Variables(args) => commands::variables::command(args, &ctx).await,

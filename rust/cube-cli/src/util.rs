@@ -1,9 +1,11 @@
 use std::io::Read;
+use std::path::{Component, Path, PathBuf};
 
 use anyhow::{bail, Context as _, Result};
 use serde_json::{Map, Value};
 
 use crate::client::Query;
+use crate::output;
 
 /// Parse a `--data` argument into a JSON object.
 ///
@@ -415,6 +417,126 @@ pub fn parse_duration(s: &str) -> Result<std::time::Duration, String> {
         .ok_or_else(|| format!("`{s}` is longer than this can represent"))?;
 
     Ok(std::time::Duration::from_secs(seconds))
+}
+
+/// Read `what` from `path`, or from stdin for `-`; returns the text and where it came from.
+pub fn read_text(path: &str, what: &str) -> Result<(String, String)> {
+    if path == "-" {
+        let mut raw = String::new();
+        std::io::stdin()
+            .read_to_string(&mut raw)
+            .with_context(|| format!("failed to read {what} from stdin"))?;
+        return Ok((raw, "stdin".to_string()));
+    }
+
+    let raw = std::fs::read_to_string(path)
+        .with_context(|| format!("failed to read {what} from {path}"))?;
+    Ok((raw, path.to_string()))
+}
+
+/// Resolve a server-supplied path beneath `root`, refusing anything that would land
+/// outside it. Lexical only, deliberately: the check is about what the SERVER can
+/// name, not about what already exists, so symlinks are not resolved.
+pub fn resolve_within(root: &Path, raw: &str) -> Result<PathBuf> {
+    let candidate = Path::new(raw);
+    if candidate.is_absolute() {
+        bail!("refusing to write the absolute path {raw} returned by the server");
+    }
+
+    for component in candidate.components() {
+        match component {
+            Component::Normal(_) => {}
+            Component::CurDir => {}
+            _ => bail!(
+                "refusing to write {raw}: it points outside {}",
+                root.display()
+            ),
+        }
+    }
+
+    if candidate.components().next().is_none() {
+        bail!("the server returned an empty file path");
+    }
+
+    Ok(root.join(candidate))
+}
+
+/// Write server-named files beneath `root` and return where each landed. Every path is
+/// resolved BEFORE any is written, so a rejected path cannot leave a half-written tree.
+pub fn write_files(root: &Path, files: &[(String, String)]) -> Result<Vec<PathBuf>> {
+    let targets = files
+        .iter()
+        .map(|(path, content)| resolve_within(root, path).map(|t| (t, content)))
+        .collect::<Result<Vec<_>>>()?;
+
+    for (target, content) in &targets {
+        if let Some(parent) = target.parent() {
+            std::fs::create_dir_all(parent)
+                .with_context(|| format!("could not create {}", parent.display()))?;
+        }
+
+        std::fs::write(target, content)
+            .with_context(|| format!("could not write {}", target.display()))?;
+    }
+
+    Ok(targets.into_iter().map(|(target, _)| target).collect())
+}
+
+/// The files that do not match what is beneath `root`, as (path, "missing" | "differs").
+pub fn differing_files(
+    root: &Path,
+    files: &[(String, String)],
+) -> Result<Vec<(String, &'static str)>> {
+    let mut differing = Vec::new();
+    for (path, content) in files {
+        let target = resolve_within(root, path)?;
+        match std::fs::read_to_string(&target) {
+            Ok(on_disk) if &on_disk == content => {}
+            Ok(_) => differing.push((path.clone(), "differs")),
+            // Only NotFound is "not committed yet". A permissions error or a
+            // directory in the way reported as "missing" would send the reader
+            // to re-run the write, which fails the same way.
+            Err(err) if err.kind() == std::io::ErrorKind::NotFound => {
+                differing.push((path.clone(), "missing"))
+            }
+            Err(err) => {
+                return Err(
+                    anyhow::Error::new(err).context(format!("could not read {}", target.display()))
+                );
+            }
+        }
+    }
+
+    Ok(differing)
+}
+
+/// Read the (path, content) pairs out of a generated-files payload.
+///
+/// `content` is taken as a REQUIRED string rather than through `output::field`,
+/// which yields `""` for an absent key. A file arriving without content would
+/// otherwise be written as a zero-byte file over the committed one, and the
+/// command would exit 0 — destroying working-copy content it was asked to
+/// produce. An absent key is a protocol error; `what` names the job in that error.
+pub fn read_generated_files(payload: &Value, what: &str) -> Result<Vec<(String, String)>> {
+    output::items(payload)
+        .iter()
+        .map(|file| {
+            let path = output::field(file, "path");
+            let Some(content) = file.get("content").and_then(Value::as_str) else {
+                bail!(
+                    "{what} returned a file with no content{}. Refusing to \
+                     write it, since doing so would empty a file you are about to commit",
+                    if path.is_empty() {
+                        String::new()
+                    } else {
+                        format!(" ({path})")
+                    }
+                );
+            };
+
+            Ok((path, content.to_string()))
+        })
+        .collect()
 }
 
 #[cfg(test)]
@@ -950,5 +1072,125 @@ mod tests {
             .to_string();
         assert!(err.contains("--limit/--page"), "got: {err}");
         assert!(err.contains("--first/--after"), "got: {err}");
+    }
+
+    #[test]
+    fn a_file_with_no_content_is_refused_rather_than_written_empty() {
+        // `output::field` yields "" for an absent key, so without an explicit read
+        // this item would be written as a zero-byte file OVER the committed one,
+        // and the command would exit 0 reporting success.
+        let payload = json!({"items": [
+            {"path": "model/cubes/dbt/orders.yml", "content": "cubes: []\n"},
+            {"path": "model/cubes/dbt/customers.yml"}
+        ]});
+
+        let err = read_generated_files(&payload, "dbt sync job-1")
+            .unwrap_err()
+            .to_string();
+        assert!(err.contains("no content"), "{err}");
+        assert!(err.contains("customers.yml"), "{err}");
+    }
+
+    #[test]
+    fn files_read_back_as_the_pairs_they_arrived_as() {
+        let payload = json!({"items": [
+            {"path": "model/cubes/dbt/orders.yml", "content": "cubes:\n  - name: orders\n"}
+        ]});
+
+        assert_eq!(
+            read_generated_files(&payload, "dbt sync job-1").unwrap(),
+            vec![(
+                "model/cubes/dbt/orders.yml".to_string(),
+                "cubes:\n  - name: orders\n".to_string()
+            )]
+        );
+    }
+
+    #[test]
+    fn generated_paths_stay_under_the_output_directory() {
+        let root = Path::new("/tmp/project");
+
+        assert_eq!(
+            resolve_within(root, "model/cubes/dbt/orders.yml").unwrap(),
+            Path::new("/tmp/project/model/cubes/dbt/orders.yml")
+        );
+
+        // The server names these paths, and this is the only place the CLI writes a
+        // remote-supplied path, so each of these would otherwise put a file wherever
+        // the shell user can write.
+        for hostile in [
+            "../outside.yml",
+            "model/../../outside.yml",
+            "/etc/passwd",
+            "",
+        ] {
+            assert!(
+                resolve_within(root, hostile).is_err(),
+                "{hostile} should have been refused"
+            );
+        }
+    }
+
+    /// A fresh directory for one test, removed first in case an earlier run left it.
+    fn scratch(name: &str) -> PathBuf {
+        let dir = std::env::temp_dir().join(format!("cube-cli-util-{name}-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        dir
+    }
+
+    fn write(root: &Path, path: &str, content: &str) {
+        let target = root.join(path);
+        std::fs::create_dir_all(target.parent().unwrap()).unwrap();
+        std::fs::write(target, content).unwrap();
+    }
+
+    #[test]
+    fn a_hostile_path_writes_nothing_at_all() {
+        let root = scratch("hostile");
+        let files = vec![
+            (
+                "model/cubes/orders.yml".to_string(),
+                "cubes: []\n".to_string(),
+            ),
+            ("../outside.yml".to_string(), "x".to_string()),
+        ];
+
+        assert!(write_files(&root, &files).is_err());
+        // Every path is resolved before any is written, so the safe one was not written either.
+        assert!(!root.join("model").exists());
+
+        let _ = std::fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn check_reports_missing_and_differing_files() {
+        let root = scratch("check");
+        write(&root, "model/cubes/orders.yml", "cubes: []\n");
+        write(&root, "model/cubes/users.yml", "old\n");
+
+        let files = vec![
+            (
+                "model/cubes/orders.yml".to_string(),
+                "cubes: []\n".to_string(),
+            ),
+            ("model/cubes/users.yml".to_string(), "new\n".to_string()),
+            (
+                "model/views/sales.yml".to_string(),
+                "views: []\n".to_string(),
+            ),
+        ];
+        assert_eq!(
+            differing_files(&root, &files).unwrap(),
+            vec![
+                ("model/cubes/users.yml".to_string(), "differs"),
+                ("model/views/sales.yml".to_string(), "missing"),
+            ]
+        );
+
+        write_files(&root, &files).unwrap();
+        assert!(differing_files(&root, &files).unwrap().is_empty());
+
+        let _ = std::fs::remove_dir_all(root);
     }
 }

@@ -34,7 +34,11 @@ pub struct Args {
 /// Collect deployable files as (posix relative path, absolute path).
 /// Same filter as the legacy CLI: dotfiles are skipped (except .gitignore),
 /// as are node_modules and dashboard-app directories.
-fn collect_files(root: &Path, dir: &Path, out: &mut Vec<(String, PathBuf)>) -> Result<()> {
+pub(crate) fn collect_files(
+    root: &Path,
+    dir: &Path,
+    out: &mut Vec<(String, PathBuf)>,
+) -> Result<()> {
     for entry in
         std::fs::read_dir(dir).with_context(|| format!("failed to read {}", dir.display()))?
     {
