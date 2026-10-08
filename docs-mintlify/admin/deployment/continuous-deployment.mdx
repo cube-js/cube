@@ -11,15 +11,15 @@ Each Cube deployment is configured to use one of the following deploy modes:
   production build.
 - **Deploy with CLI** — you push your project to Cube Cloud from your local
   machine or CI/CD pipeline by running the `cubejs-cli deploy` command. The
-  production branch is **never** built automatically; it only changes when
-  somebody explicitly runs `cubejs-cli deploy`.
+  production deployment is **not** updated by GitHub pushes or UI merges; it
+  changes when somebody explicitly runs `cubejs-cli deploy`.
 
 You can change the deploy mode at any time on the **Build & Deploy** tab of
 the **Settings** screen.
 
 Independently of the deploy mode, you can [connect a GitHub
 repository](#deploy-with-github) to the deployment. Non-production branches
-pushed to GitHub are then auto-synced into Cube. The production branch follows
+already added to Cube sync when pushed to GitHub. Production deployment follows
 the deploy mode: it auto-deploys in Git mode and stays manual in CLI mode.
 
 ## Deploy with Git
@@ -112,7 +112,7 @@ content to GitHub; creating a repository does not itself generate a data model.
 For an organization repository, Cube creates it using the app installation and
 does not add you as a collaborator. The organization owns the repository. If you
 cannot find or access it, ask an organization owner to grant you or your team
-access. A repository's contributor list is based on commits, not access rights.
+access.
 
 </Warning>
 
@@ -132,25 +132,26 @@ after generating the model.
 
 ## Keeping your repository in sync
 
-GitHub push webhooks trigger repository synchronization. Receiving a webhook and
-making the model available for queries are separate steps: production may need a
-build, and [staging][ref-environments-staging] or [development][ref-environments-dev]
-environments start when you use them. Connecting an existing repository clones it
-before completing the connection; it does not start every environment. Initial
-clone time depends on repository size, and a suspended environment needs time to
-resume when opened.
+GitHub push webhooks synchronize branches already added to Cube. Git
+synchronization and environment activation are separate: see
+[deployment environments][ref-environments] for when staging and development
+environments are available and how suspension works.
 
-Existing branches do not require another push after connection to become
-available. Select the intended branch before comparing the IDE or **Cubes &
-Views** in Explore with GitHub. If you are already in development mode, use
+When connecting an existing repository, Cube clones it before completing the
+connection. A successful connection does not mean the initial production build
+has finished.
+
+Users with permission to edit the model can select an existing GitHub branch in
+the branch switcher to add it to Cube; no new push is required. Select the
+intended branch before comparing the IDE or **Cubes & Views** in Explore with
+GitHub. If you are already in development mode, use
 [pull from remote][ref-dev-mode-pull] to update your personal working copy with
 changes pushed to GitHub.
 
 If a pushed change does not appear:
 
 - Check the repository, branch, and project directory in **Settings → Build &
-  Deploy**. A production build only runs in Git deploy mode and only for changes
-  affecting the Cube project.
+  Deploy** and confirm the [deploy mode](#deploy-with-github).
 - In GitHub's repository **Settings → Webhooks**, check that the Cube webhook is
   active and inspect the push delivery and response. Fix any access or delivery
   error before redelivering a failed event.
@@ -194,9 +195,9 @@ regenerate the token if it needs to be rotated.
 
 Cube Cloud still maintains an internal Git repository for the deployment so
 that features such as [development mode][ref-dev-mode] and branching can work.
-This internal repository is overwritten on every successful CLI deploy — only
-the contents of your most recent `cubejs-cli deploy` invocation are used to
-build and run production.
+CLI production builds use the uploaded project, independently of the Git
+content used for development and branching. GitHub commits and UI merges are
+not automatically included in that upload.
 
 </Note>
 
@@ -205,10 +206,10 @@ build and run production.
 You can still [connect a GitHub repository](#deploy-with-github) to a CLI
 deployment. When you do:
 
-- Pushes to **non-production branches** (typically feature branches) are
-  picked up by the GitHub webhook and automatically synced into Cube.
+- Pushes to **non-production branches already added to Cube** are picked up by
+  the GitHub webhook and automatically synced.
 - Pushes to the **production branch** are intentionally **not**
-  auto-deployed in CLI mode. The production branch only changes when
+  auto-deployed in CLI mode. Production deployment only changes when
   somebody runs `cubejs-cli deploy` against the deployment.
 
 This gives you GitHub-driven previews for feature work while keeping the
@@ -230,9 +231,9 @@ redeploy**. Specifically:
 - Merging a branch into the production branch from the Cube Cloud UI updates
   the production branch in the internal repository but **does not** rebuild
   or redeploy the [production environment][ref-environments-prod].
-- Any changes made through the UI are **overwritten on the next
-  `cubejs-cli deploy`**, which uploads the contents of your local project to
-  Cube Cloud and triggers a production build.
+- The next `cubejs-cli deploy` builds from your local project. Include any
+  changes made through the UI in that local project if you want them in
+  production.
 
 In other words, a CLI-mode deployment will not change production just because
 somebody pressed **Enter Development Mode** and merged a work-in-progress
@@ -246,9 +247,9 @@ automatically, switch the deployment to [Deploy with Git](#deploy-with-git).
 [ref-dev-mode]: /docs/data-modeling/dev-mode
 [ref-environments-dev]: /admin/deployment/environments#development-environments
 [ref-environments-prod]: /admin/deployment/environments#production-environment
-[ref-environments-staging]: /admin/deployment/environments#staging-environments
 [ref-cli]: /reference/cli
 [ref-import-ssh]: /docs/getting-started/migrate-from-core/import-git-repository-via-ssh
 [ref-import-ssh-webhooks]: /docs/getting-started/migrate-from-core/import-git-repository-via-ssh#webhook-format
 [ref-support]: /admin/account-billing/support
 [ref-dev-mode-pull]: /docs/data-modeling/dev-mode#updating-the-branch
+[ref-environments]: /admin/deployment/environments
