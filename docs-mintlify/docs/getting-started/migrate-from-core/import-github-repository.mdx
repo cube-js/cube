@@ -32,14 +32,8 @@ Microsoft Azure is available on [Enterprise plan](https://cube.dev/pricing).
 
 ## Step 3: Import repository from GitHub
 
-Before importing, install the Cube Cloud GitHub app on the **account that owns
-the repository** (your personal account or organization), and grant it access to
-that repository. Complete any required organization-owner approval first. See
-[GitHub App permissions][ref-continuous-deployment] for access requirements and
-[creating a repository][ref-create-repository] for the new-repository flow.
-
-Next, click **Import from a GitHub repository** and complete GitHub authorization.
-After authorizing Cube to access your repository, you should see this screen:
+Click **Import from a GitHub repository** and complete any requested GitHub
+authorization. After authorization, you should see this screen:
 
 <div style={{ textAlign: "center" }}>
   <img
@@ -49,6 +43,14 @@ After authorizing Cube to access your repository, you should see this screen:
     width="100%"
   />
 </div>
+
+Select the **account that owns the repository** (your personal account or
+organization). If it is missing, choose **Add new organization** in the account
+selector to open GitHub's app installation dialog. Install the Cube Cloud GitHub
+app on that account and grant it access to the repository. Complete any required
+organization-owner approval before selecting the repository. See
+[GitHub App permissions][ref-continuous-deployment] for access requirements and
+[creating a repository][ref-create-repository] for the new-repository flow.
 
 Select your repository and the desired branch to use as the default. If the
 repository is a monorepo, you should also provide the path to the Cube project
