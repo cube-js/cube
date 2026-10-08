@@ -660,9 +660,9 @@ data source. `--check` compares the files with what is on disk instead of writin
 
 Both commands print the conversion's counts and issues. They exit non-zero when the
 conversion fails, has an `ERROR` issue, or, with `--check`, finds a missing or different
-file. With `--json`, they print one document with `conversionId`, `status`, `outcome`,
-`counts`, `issues`, and `outputPath` for an export or `files` (and `differing` with
-`--check`) for an import.
+file. With `--json`, they print one document with `conversionId`, `status`, `error`,
+`outcome`, `counts`, `issues`, and `outputPath` for an export or `files` (and `differing`
+with `--check`) for an import.
 
 Without `--wait`, `export` returns a `conversionId` you can follow yourself:
 
