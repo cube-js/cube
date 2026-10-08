@@ -18,8 +18,8 @@ Apache Ossie Cube converter:
   latest successful build, or YAML files you upload, such as a local checkout.
 - **Import** converts an Ossie model to Cube data model files.
 
-Conversion runs in Cube through the [Platform API](/api-reference/introduction). It does not change your deployment: an import returns
-files for you to add to your data model.
+Conversion runs in Cube through the [Platform API](/api-reference/introduction). It does not change
+your deployment: an import returns files for you to add to your data model.
 
 ## What converts
 
@@ -99,7 +99,7 @@ auth="Authorization: Bearer $CUBE_API_TOKEN"
 
 conversion=$(curl --fail --silent --show-error -X POST -H "$auth" \
   -H 'Content-Type: application/json' -d '{"direction": "export"}' "$api")
-id=$(jq -r '.conversionId' <<<"$conversion")
+id=$(jq -er '.conversionId' <<<"$conversion")
 
 while :; do
   status=$(curl --fail --silent --show-error -H "$auth" "$api/$id" | jq -r '.status')
@@ -107,7 +107,10 @@ while :; do
   sleep 5
 done
 
-[[ "$status" == COMPLETED ]] || { curl --fail --silent --show-error -H "$auth" "$api/$id" | jq '{status, error}'; exit 1; }
+if [[ "$status" != COMPLETED ]]; then
+  curl --fail --silent --show-error -H "$auth" "$api/$id" | jq '{status, error}'
+  exit 1
+fi
 
 result=$(curl --fail --silent --show-error -H "$auth" "$api/$id/result")
 jq '{outcome, counts, issues}' <<<"$result"
