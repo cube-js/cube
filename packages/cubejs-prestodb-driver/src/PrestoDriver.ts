@@ -279,7 +279,7 @@ export class PrestoDriver extends BaseDriver implements DriverInterface {
           headers,
           data: (error: any, data: any[], columns: TableStructure) => {
             const normalData = this.normalizeResultOverColumns(data, columns);
-            fullData = concat(normalData, fullData);
+            fullData = concat(fullData, normalData);
           },
           success: () => {
             resolve(fullData);
