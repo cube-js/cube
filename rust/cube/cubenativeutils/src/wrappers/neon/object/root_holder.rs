@@ -128,20 +128,18 @@ impl<C: Context<'static> + 'static> RootHolder<C> {
             // A box's type tag is checked by neon's downcast, so it isn't built from `raw`.
             napi::ValueType::External => match value.downcast::<JsBox<NativeRustHandle>, _>(cx) {
                 Ok(boxed) => Self::RustBox(ObjectNeonTypeHolder::new(context.clone(), boxed, cx)),
-                Err(_) => return Err(Self::unsupported(cx, value)),
+                Err(_) => return Err(Self::unsupported(value_type)),
             },
             napi::ValueType::Symbol | napi::ValueType::BigInt => {
-                return Err(Self::unsupported(cx, value))
+                return Err(Self::unsupported(value_type))
             }
         };
         Ok(holder)
     }
 
-    fn unsupported(cx: &mut C, value: Handle<'static, JsValue>) -> CubeError {
-        let description = cx
-            .try_catch(|cx| Ok(value.to_string(cx)?.value(cx)))
-            .unwrap_or_else(|_| "<unprintable>".to_string());
-        CubeError::internal(format!("Unsupported JsValue: {description}"))
+    // By type: coercing the value to a string throws for a Symbol.
+    fn unsupported(value_type: napi::ValueType) -> CubeError {
+        CubeError::internal(format!("Unsupported JsValue of type {value_type:?}"))
     }
 
     pub fn from_typed<T: Upcast<C>>(typed_holder: T) -> Self {

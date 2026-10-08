@@ -29,9 +29,10 @@ fn object_keys<C: Context<'static>>(
         })?
         .to_inner(cx);
     let undefined = cx.undefined();
-    let keys = keys_fn.call(cx, undefined, [object.upcast::<JsValue>()])?;
-    // SAFETY: `Object.keys` always returns an array.
-    Ok(unsafe { JsArray::from_raw(&*cx, keys.to_raw()) })
+    // Checked rather than trusted: `Object.keys` may have been replaced by a polyfill.
+    keys_fn
+        .call(cx, undefined, [object.upcast::<JsValue>()])?
+        .downcast_or_throw::<JsArray, _>(cx)
 }
 
 type Entries<K, C> = Vec<(K, NativeObjectHandle<NeonInnerTypes<C>>)>;
@@ -57,9 +58,7 @@ impl<C: Context<'static> + 'static> NeonStruct<C> {
             let len = names.len(cx);
             let mut entries = Vec::with_capacity(len as usize);
             for idx in 0..len {
-                let key = names.get_value(cx, idx)?;
-                // SAFETY: `Object.keys` returns strings only, alive for as long as `names` is.
-                let key = unsafe { JsString::from_raw(&*cx, key.to_raw()) };
+                let key = names.get::<JsString, _, _>(cx, idx)?;
                 let Some(name) = select(cx, key) else {
                     continue;
                 };

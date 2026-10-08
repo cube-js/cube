@@ -162,8 +162,10 @@ describeBridge('bridge: NativeSerdeDeserializer', () => {
     });
 
     it('rejects a symbol and a bigint', () => {
-      expect(() => deserializeJson({ s: Symbol('s') })).toThrow('field `s`: failed to read value');
-      expect(() => deserializeJson([BigInt(1)])).toThrow('element 0: failed to read value');
+      expect(() => deserializeJson({ s: Symbol('s') }))
+        .toThrow('field `s`: failed to read value: Unsupported JsValue of type Symbol');
+      expect(() => deserializeJson([BigInt(1)]))
+        .toThrow('element 0: failed to read value: Unsupported JsValue of type BigInt');
     });
 
     it('names the offending element', () => {
