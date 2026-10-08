@@ -658,7 +658,8 @@ your data model project, since the generated paths are project-relative
 picks the warehouse SQL to take from it, defaulting to the dialect of the deployment's
 data source. `--base-cube NAME` roots the generated view at that cube when the Ossie
 relationships don't determine one. `--check` compares the files with what is on disk
-instead of writing them.
+instead of writing them. An import writes files in the converter's form, without comments, so
+`--check` reports hand-written files as different until your project holds imported files.
 
 Both commands print the conversion's counts and issues. They exit non-zero when the
 conversion fails, has an `ERROR` issue, or, with `--check`, finds a missing or different
