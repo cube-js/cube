@@ -138,7 +138,11 @@ Check the **Scheduled** page of each deployment you work in to find them.
 
 ## Managing tasks
 
-Anyone who can use the deployment can see its tasks. Creating one needs the
+A task is visible only to its creator, to admins, and to the people and
+groups it's shared with. The creator or an admin shares it with the **Share**
+button on its detail page. Sharing is view-only: the people it's shared with
+see the task, its schedule, and its run history, and its detail page shows
+a **Shared with you** tag in place of its actions. Creating a task needs the
 **Create scheduled tasks**
 [permission](/admin/users-and-permissions/custom-roles#deployment-permissions),
 which every built-in role grants. Users without it, for example those whose
@@ -146,8 +150,8 @@ only role is a custom role that leaves it out, get no **New task** button, and
 the agent and the Platform API refuse to create a task for them; tasks they
 already created stay theirs to manage. Only a task's creator, or a user with
 the **Admin** [role](/admin/users-and-permissions/roles-and-permissions), can
-edit, pause, run, check, or delete it, because every run executes as the
-creator (see [Reading the output](#reading-the-output)).
+edit, pause, run, check, share, or delete it, because every run executes as
+the creator (see [Reading the output](#reading-the-output)).
 
 The admin exception carries the creator's data access with it: an admin who edits
 another user's task changes what runs under that user's access. A run's chat
