@@ -355,7 +355,7 @@ export class BigqueryQuery extends BaseQuery {
     // truncating toward zero, matching PostgreSQL (DIV(12, -7) = -1)
     templates.expressions.int_division = 'DIV({{ left }}, {{ right }})';
     // Postgres DOW is 0-based (Sunday = 0), BigQuery DAYOFWEEK is 1-based
-    templates.expressions.extract = '{% if date_part|upper == \'DOW\' %}(EXTRACT(DAYOFWEEK FROM {{ expr }}) - 1){% elif date_part|upper == \'DOY\' %}EXTRACT(DAYOFYEAR FROM {{ expr }}){% else %}EXTRACT({{ date_part }} FROM {{ expr }}){% endif %}';
+    templates.expressions.extract = '{% if date_part == \'dow\' %}(EXTRACT(DAYOFWEEK FROM {{ expr }}) - 1){% elif date_part == \'doy\' %}EXTRACT(DAYOFYEAR FROM {{ expr }}){% else %}EXTRACT({{ date_part }} FROM {{ expr }}){% endif %}';
     templates.expressions.timestamp_literal = 'TIMESTAMP(\'{{ value }}\')';
     templates.expressions.rolling_window_expr_timestamp_cast = 'TIMESTAMP({{ value }})';
     templates.expressions.ilike = 'LOWER({{ expr }}) {% if negated %}NOT {% endif %}LIKE LOWER({{ pattern }})';

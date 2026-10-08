@@ -203,7 +203,7 @@ export class DatabricksQuery extends BaseQuery {
     // part of the division as BIGINT (truncation toward zero), matching PostgreSQL
     templates.expressions.int_division = '({{ left }} div {{ right }})';
     // Postgres DOW is 0-based (Sunday = 0), Spark DOW is 1-based (Sunday = 1)
-    templates.expressions.extract = '{% if date_part|lower == "epoch" %}unix_timestamp({{ expr }}){% elif date_part|lower == "dow" %}(EXTRACT(DOW FROM {{ expr }}) - 1){% else %}EXTRACT({{ date_part }} FROM {{ expr }}){% endif %}';
+    templates.expressions.extract = '{% if date_part == "epoch" %}unix_timestamp({{ expr }}){% elif date_part == "dow" %}(EXTRACT(DOW FROM {{ expr }}) - 1){% else %}EXTRACT({{ date_part }} FROM {{ expr }}){% endif %}';
     templates.expressions.interval_single_date_part = 'INTERVAL \'{{ num }}\' {{ date_part }}';
     templates.quotes.identifiers = '`';
     templates.quotes.escape = '``';
