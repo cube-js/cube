@@ -5268,3 +5268,58 @@ async fn test_aggregate_over_limited_ungrouped_scan() {
         ])
     );
 }
+
+/// SQL templates receive the date part as written in the plan, so they can only compare it
+/// against one spelling (BigQuery maps `dow` to `DAYOFWEEK`). Whatever case or synonym the
+/// client used, the date part must reach them lowercase and in its standard form.
+#[tokio::test]
+async fn test_wrapper_date_part_reaches_templates_normalized() {
+    if !Rewriter::sql_push_down_enabled() {
+        return;
+    }
+    init_testing_logger();
+
+    let query_plan = convert_select_to_query_plan(
+        // language=PostgreSQL
+        r#"
+        SELECT
+            EXTRACT(DOW FROM order_date) AS dow_upper,
+            extract(Doy FROM order_date) AS doy_mixed,
+            DATEDIFF('QUARTER', order_date, last_mod) AS quarter_upper,
+            DATEDIFF('qtr', order_date, last_mod) AS quarter_synonym,
+            DATEDIFF('Day', order_date, last_mod) AS day_mixed
+        FROM KibanaSampleDataEcommerce
+        GROUP BY 1, 2, 3, 4, 5
+        "#
+        .to_string(),
+        DatabaseProtocol::PostgreSQL,
+    )
+    .await;
+
+    let sql = query_plan
+        .as_logical_plan()
+        .find_cube_scan_wrapped_sql_deep()
+        .wrapped_sql
+        .sql;
+    for expected in [
+        "EXTRACT(dow FROM",
+        "EXTRACT(doy FROM",
+        "DATEDIFF(quarter,",
+        "DATEDIFF(day,",
+    ] {
+        assert!(
+            sql.contains(expected),
+            "no {} in generated SQL: {}",
+            expected,
+            sql
+        );
+    }
+    for unexpected in ["DOW", "Doy", "QUARTER", "qtr", "Day,"] {
+        assert!(
+            !sql.contains(unexpected),
+            "{} reached the templates as written, generated SQL: {}",
+            unexpected,
+            sql
+        );
+    }
+}
