@@ -18,7 +18,7 @@ Apache Ossie Cube converter:
   latest successful build, or YAML files you upload, such as a local checkout.
 - **Import** converts an Ossie model to Cube data model files.
 
-Conversion runs in Cube through the REST API. It does not change your deployment: an import returns
+Conversion runs in Cube through the [Platform API](/api-reference/introduction). It does not change your deployment: an import returns
 files for you to add to your data model.
 
 ## What converts
@@ -51,8 +51,8 @@ Every conversion returns a list of issues:
   and longitude fields.
 
 A measure such as `sum` or `avg`, read through a join that fans out, converts with a warning, since
-an Ossie expression cannot carry Cube's fan-out correction. Set `strictFanout` to `true` to fail
-instead. A view export does so by default.
+an Ossie expression cannot carry Cube's fan-out correction. Set `strictFanout` to `true` in the
+conversion request to fail instead. It defaults to `true` for a view export.
 
 ## Limits
 
@@ -61,10 +61,10 @@ instead. A view export does so by default.
   Ossie model is at most 2 MiB.
 - Each conversion has 60 seconds to run. Conversions and their results are kept for at most
   one day.
-- Each user can run two conversions at a time. Over capacity, the API answers `429` with a
-  `Retry-After` header.
+- Each user can run two conversions at a time and start six a minute. Over either limit, the API
+  answers `429` with a `Retry-After` header.
 
-## Convert with the REST API
+## Convert with the Platform API
 
 Use a [Platform API key](/api-reference/authentication) with `SchemaRead` or `SchemaUpdate`
 access to the deployment. The endpoints are under
@@ -73,8 +73,8 @@ access to the deployment. The endpoints are under
 Start a conversion with `POST`. For an export of the deployment's data model, send
 `{"direction": "export"}`, and add `"view": "<name>"` to export one view. To export your own files,
 send `"source": "files"` and `files`, a map of relative paths to YAML. For an import, send
-`{"direction": "import", "ossieYaml": "<document>"}`. `dialect` picks the warehouse SQL taken from
-the Ossie model, and defaults to the dialect of the deployment's default data source.
+`{"direction": "import", "ossieYaml": "<document>"}`. On import, `dialect` picks which warehouse SQL
+to take from the Ossie model, and defaults to the dialect of the deployment's default data source.
 
 The response is `202` with a `conversionId`, a `statusUrl` and a `resultUrl`. Poll `GET` on the
 `statusUrl` until the status is no longer `QUEUED` or `RUNNING`:
@@ -104,5 +104,5 @@ while :; do
 done
 
 curl --fail --silent --show-error -H "$auth" "$api/$id/result" | jq '{outcome, counts, issues}'
-curl --fail --silent --show-error -H "$auth" "$api/$id/files" | jq -r '.items[0].content' > ossie.yaml
+curl --fail --silent --show-error -H "$auth" "$api/$id/files" | jq -er '.items[0].content' > ossie.yaml
 ```
