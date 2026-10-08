@@ -242,7 +242,9 @@ impl QueryPlanner for QueryPlannerImpl {
                 &self.meta_store.as_ref(),
                 self.config.enable_topk(),
                 self.config.limit_pushdown(),
-                self.config.disjoint_union_aggregate(),
+                self.config
+                    .disjoint_union_aggregate()
+                    .then(|| self.config.disjoint_union_aggregate_min_rows_per_branch()),
             )
             .await?;
             let workers = compute_workers(

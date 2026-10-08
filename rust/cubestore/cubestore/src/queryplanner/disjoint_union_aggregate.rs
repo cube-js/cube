@@ -31,10 +31,12 @@ pub fn push_aggregate_into_disjoint_union(
     p: LogicalPlan,
     indices: &[IndexSnapshot],
     limit_pushdown: bool,
+    min_rows_per_branch: u64,
 ) -> Result<LogicalPlan, DataFusionError> {
     let mut r = DisjointUnionAggregate {
         indices,
         limit_pushdown,
+        min_rows_per_branch,
         next_scan: 0,
     };
     rewrite_plan(p, &Scope::default(), &mut r)
@@ -43,6 +45,7 @@ pub fn push_aggregate_into_disjoint_union(
 struct DisjointUnionAggregate<'a> {
     indices: &'a [IndexSnapshot],
     limit_pushdown: bool,
+    min_rows_per_branch: u64,
     next_scan: usize,
 }
 
@@ -144,7 +147,7 @@ impl PlanRewriter for DisjointUnionAggregate<'_> {
                 let Some(scans) = self.indices.get(c.first_scan..self.next_scan) else {
                     return Ok(LogicalPlan::Aggregate(agg));
                 };
-                match try_push_down(&agg, scans)? {
+                match try_push_down(&agg, scans, self.min_rows_per_branch)? {
                     Some(p) => Ok(p),
                     None => Ok(LogicalPlan::Aggregate(agg)),
                 }
@@ -170,6 +173,7 @@ fn is_cube_table_scan(scan: &TableScan) -> bool {
 fn try_push_down(
     agg: &Aggregate,
     scans: &[IndexSnapshot],
+    min_rows_per_branch: u64,
 ) -> Result<Option<LogicalPlan>, DataFusionError> {
     if agg.group_expr.is_empty() {
         return Ok(None);
@@ -188,6 +192,11 @@ fn try_push_down(
         || branches.len() != scans.len()
         || !branches.iter().all(|b| is_single_cube_scan_branch(b))
     {
+        return Ok(None);
+    }
+    // Every branch becomes its own `ClusterSend`; that only pays off on large enough branches.
+    let rows: u64 = scans.iter().map(row_count).sum();
+    if rows < min_rows_per_branch.saturating_mul(scans.len() as u64) {
         return Ok(None);
     }
     let mut ranges = Vec::with_capacity(scans.len());
@@ -345,6 +354,19 @@ fn branches_disjoint(
         && mapped
             .windows(2)
             .all(|w| cmp_values(&w[0].1, &w[1].0) == Some(Ordering::Less))
+}
+
+fn row_count(s: &IndexSnapshot) -> u64 {
+    s.partitions
+        .iter()
+        .map(|p| {
+            p.partition.get_row().main_table_row_count()
+                + p.chunks
+                    .iter()
+                    .map(|c| c.get_row().get_row_count())
+                    .sum::<u64>()
+        })
+        .sum()
 }
 
 // Min and max of the leading sort column over the scanned partitions and their chunks. `Some(None)`
@@ -507,6 +529,7 @@ mod tests {
             .update_config(|mut c| {
                 c.partition_split_threshold = 2;
                 c.disjoint_union_aggregate = true;
+                c.disjoint_union_aggregate_min_rows_per_branch = 0;
                 c
             })
             .start_test(async move |services: CubeServices| test(services.sql_service).await)
@@ -638,6 +661,46 @@ mod tests {
             },
         )
         .await;
+    }
+
+    #[tokio::test]
+    async fn small_branches_keep_union_aggregate() {
+        Config::test("disjoint_union_aggregate_small_branches")
+            .update_config(|mut c| {
+                c.partition_split_threshold = 2;
+                c.disjoint_union_aggregate = true;
+                c.disjoint_union_aggregate_min_rows_per_branch = 7;
+                c
+            })
+            .start_test(async move |services: CubeServices| {
+                let service = services.sql_service;
+                create_month_tables(&service).await?;
+                let sql = |n: usize| {
+                    let tables = ["s.t1", "s.t2", "s.t3"][..n]
+                        .iter()
+                        .map(|t| format!("SELECT * FROM {}", t))
+                        .collect::<Vec<_>>()
+                        .join(" UNION ALL ");
+                    format!("SELECT m, k, sum(v) FROM ({}) t GROUP BY 1, 2", tables)
+                };
+                // Six rows per table: below the threshold of seven.
+                assert!(!pushed_down(&logical_plan(&service, &sql(3)).await));
+                exec(
+                    &service,
+                    "INSERT INTO s.t1 (m, k, v) VALUES ('2024-01-02T00:00:00.000Z', 'a', 1), \
+                     ('2024-01-03T00:00:00.000Z', 'a', 1)",
+                )
+                .await?;
+                exec(
+                    &service,
+                    "INSERT INTO s.t2 (m, k, v) VALUES ('2024-02-02T00:00:00.000Z', 'a', 1)",
+                )
+                .await?;
+                // Eight and seven rows: seven and a half on average.
+                assert!(pushed_down(&logical_plan(&service, &sql(2)).await));
+                Ok(())
+            })
+            .await;
     }
 
     #[tokio::test]

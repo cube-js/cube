@@ -619,6 +619,11 @@ pub trait ConfigObj: DIService {
     /// picked.
     fn disjoint_union_aggregate(&self) -> bool;
 
+    /// [`ConfigObj::disjoint_union_aggregate`] backs off when the branches hold fewer rows than
+    /// this on average: each branch gets its own `ClusterSend`, which costs more than it saves on
+    /// small tables.
+    fn disjoint_union_aggregate_min_rows_per_branch(&self) -> u64;
+
     /// Push the query's `LIMIT` into the workers for `GROUP BY ... ORDER BY ... LIMIT`. Off makes
     /// every worker emit all of its groups and leaves the cut to the router. Node-local and not in
     /// [`PlanningFlags`]: the worker receives the router's plan, descriptor included.
@@ -806,6 +811,7 @@ pub struct ConfigObjImpl {
     pub group_by_limit_factor: usize,
     pub group_by_limit_per_partition: bool,
     pub disjoint_union_aggregate: bool,
+    pub disjoint_union_aggregate_min_rows_per_branch: u64,
     pub limit_pushdown: bool,
     pub coalesce_under_hash_aggregate: bool,
     pub union_planning_rewrites: bool,
@@ -1179,6 +1185,10 @@ impl ConfigObj for ConfigObjImpl {
 
     fn disjoint_union_aggregate(&self) -> bool {
         self.disjoint_union_aggregate
+    }
+
+    fn disjoint_union_aggregate_min_rows_per_branch(&self) -> u64 {
+        self.disjoint_union_aggregate_min_rows_per_branch
     }
 
     fn limit_pushdown(&self) -> bool {
@@ -2066,6 +2076,10 @@ impl Config {
                 group_by_limit_factor: env_parse_lenient("CUBESTORE_GROUP_BY_LIMIT_FACTOR", 2),
                 group_by_limit_per_partition: env_flag("CUBESTORE_GROUP_BY_LIMIT_PER_PARTITION", true),
                 disjoint_union_aggregate: env_flag("CUBESTORE_DISJOINT_UNION_AGGREGATE", true),
+                disjoint_union_aggregate_min_rows_per_branch: env_parse_lenient(
+                    "CUBESTORE_DISJOINT_UNION_AGGREGATE_MIN_ROWS_PER_BRANCH",
+                    10_000,
+                ),
                 limit_pushdown: env_flag("CUBESTORE_LIMIT_PUSHDOWN", true),
                 coalesce_under_hash_aggregate: env_flag("CUBESTORE_COALESCE_UNDER_HASH_AGGREGATE", false),
                 union_planning_rewrites: env_flag("CUBESTORE_UNION_PLANNING_REWRITES", true),
@@ -2337,6 +2351,7 @@ impl Config {
                 group_by_limit_factor: 2,
                 group_by_limit_per_partition: true,
                 disjoint_union_aggregate: true,
+                disjoint_union_aggregate_min_rows_per_branch: 10_000,
                 limit_pushdown: true,
                 coalesce_under_hash_aggregate: false,
                 union_planning_rewrites: true,

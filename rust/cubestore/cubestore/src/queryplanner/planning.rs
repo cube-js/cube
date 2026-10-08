@@ -88,7 +88,7 @@ pub async fn choose_index(
 ) -> Result<(LogicalPlan, PlanningMeta), DataFusionError> {
     choose_index_ext(
         p, metastore, /* enable_topk */ true, /* limit_pushdown */ true,
-        /* disjoint_union_aggregate */ false,
+        /* disjoint_union_min_rows */ None,
     )
     .await
 }
@@ -129,7 +129,8 @@ pub async fn choose_index_ext(
     metastore: &dyn PlanIndexStore,
     enable_topk: bool,
     limit_pushdown: bool,
-    disjoint_union_aggregate: bool,
+    // Rows per branch below which the disjoint `UNION ALL` rewrite backs off; `None` disables it.
+    disjoint_union_min_rows: Option<u64>,
 ) -> Result<(LogicalPlan, PlanningMeta), DataFusionError> {
     // Prepare information to choose the index.
     let mut collector = CollectConstraints::default();
@@ -210,8 +211,8 @@ pub async fn choose_index_ext(
         i.partitions = pick_partitions(i, c, ps)?;
     }
 
-    let p = if disjoint_union_aggregate {
-        push_aggregate_into_disjoint_union(p, &indices, limit_pushdown)?
+    let p = if let Some(min_rows) = disjoint_union_min_rows {
+        push_aggregate_into_disjoint_union(p, &indices, limit_pushdown, min_rows)?
     } else {
         p
     };
@@ -3104,7 +3105,7 @@ pub mod tests {
             indices,
             /* enable_topk */ true,
             limit_pushdown,
-            false,
+            None,
         )
         .await
         .unwrap()
