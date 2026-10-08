@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.8.2](https://github.com/cube-js/cube/compare/v1.8.1...v1.8.2) (2026-10-08)
+
+### Bug Fixes
+
+- **schema-compiler:** Stop join-hint enrichment looping on a cyclic join tree ([#12149](https://github.com/cube-js/cube/issues/12149)) ([ba1736f](https://github.com/cube-js/cube/commit/ba1736fa1ceda261d3fcc97c90eaf79ad44903e0)), closes [#9696](https://github.com/cube-js/cube/issues/9696)
+- **tesseract:** Mask masked members read from pre-aggregations ([#12152](https://github.com/cube-js/cube/issues/12152)) ([bbbaea4](https://github.com/cube-js/cube/commit/bbbaea4def64939adb200aeec73143fd1ae0f627))
+
+### Features
+
+- **tesseract:** Anchor rolling windows on multi-stage include date ranges ([#12165](https://github.com/cube-js/cube/issues/12165)) ([1694da0](https://github.com/cube-js/cube/commit/1694da0ad32354d61b713fa4c5eb1497be3a7050))
+
 ## [1.8.1](https://github.com/cube-js/cube/compare/v1.8.0...v1.8.1) (2026-10-07)
 
 ### Bug Fixes

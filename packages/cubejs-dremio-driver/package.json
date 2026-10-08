@@ -2,7 +2,7 @@
   "name": "@cubejs-backend/dremio-driver",
   "description": "Cube Dremio driver",
   "author": "Cube Dev, Inc.",
-  "version": "1.8.1",
+  "version": "1.8.2",
   "repository": {
     "type": "git",
     "url": "https://github.com/cube-js/cube.git",
@@ -21,14 +21,14 @@
     "integration:dremio": "NODE_OPTIONS=--experimental-vm-modules jest --verbose dist/test"
   },
   "dependencies": {
-    "@cubejs-backend/base-driver": "1.8.1",
-    "@cubejs-backend/schema-compiler": "1.8.1",
-    "@cubejs-backend/shared": "1.8.1",
+    "@cubejs-backend/base-driver": "1.8.2",
+    "@cubejs-backend/schema-compiler": "1.8.2",
+    "@cubejs-backend/shared": "1.8.2",
     "axios": "^1.8.3"
   },
   "devDependencies": {
-    "@cubejs-backend/linter": "1.8.1",
-    "@cubejs-backend/testing-shared": "1.8.1",
+    "@cubejs-backend/linter": "1.8.2",
+    "@cubejs-backend/testing-shared": "1.8.2",
     "@types/jest": "^29",
     "@types/node": "^22",
     "jest": "^29"

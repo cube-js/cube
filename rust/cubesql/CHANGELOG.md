@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.8.2](https://github.com/cube-js/cube/compare/v1.8.1...v1.8.2) (2026-10-08)
+
+### Bug Fixes
+
+- **cubesql:** Keep filters above limited CubeScan ([#12071](https://github.com/cube-js/cube/issues/12071)) ([4b3b59d](https://github.com/cube-js/cube/commit/4b3b59d6c4b35c0ebb731b410851d3fa3295115f))
+
 ## [1.8.1](https://github.com/cube-js/cube/compare/v1.8.0...v1.8.1) (2026-10-07)
 
 **Note:** Version bump only for package @cubejs-backend/cubesql

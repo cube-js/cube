@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.8.2](https://github.com/cube-js/cube/compare/v1.8.1...v1.8.2) (2026-10-08)
+
+### Performance Improvements
+
+- **cubestore:** Speed up UNION ALL planning over rollup partitions ([#12144](https://github.com/cube-js/cube/issues/12144)) ([3404938](https://github.com/cube-js/cube/commit/34049384bf5401e41975f0eac7042f9d07ee7f08))
+
 ## [1.8.1](https://github.com/cube-js/cube/compare/v1.8.0...v1.8.1) (2026-10-07)
 
 **Note:** Version bump only for package @cubejs-backend/cubestore

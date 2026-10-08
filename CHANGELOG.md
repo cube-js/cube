@@ -3,6 +3,24 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.8.2](https://github.com/cube-js/cube/compare/v1.8.1...v1.8.2) (2026-10-08)
+
+### Bug Fixes
+
+- **cubesql:** Keep filters above limited CubeScan ([#12071](https://github.com/cube-js/cube/issues/12071)) ([4b3b59d](https://github.com/cube-js/cube/commit/4b3b59d6c4b35c0ebb731b410851d3fa3295115f))
+- **schema-compiler:** Stop join-hint enrichment looping on a cyclic join tree ([#12149](https://github.com/cube-js/cube/issues/12149)) ([ba1736f](https://github.com/cube-js/cube/commit/ba1736fa1ceda261d3fcc97c90eaf79ad44903e0)), closes [#9696](https://github.com/cube-js/cube/issues/9696)
+- **tesseract:** Mask masked members read from pre-aggregations ([#12152](https://github.com/cube-js/cube/issues/12152)) ([bbbaea4](https://github.com/cube-js/cube/commit/bbbaea4def64939adb200aeec73143fd1ae0f627))
+
+### Features
+
+- **tesseract:** Anchor rolling windows on multi-stage include date ranges ([#12165](https://github.com/cube-js/cube/issues/12165)) ([1694da0](https://github.com/cube-js/cube/commit/1694da0ad32354d61b713fa4c5eb1497be3a7050))
+
+### Performance Improvements
+
+- **cubestore:** Speed up UNION ALL planning over rollup partitions ([#12144](https://github.com/cube-js/cube/issues/12144)) ([3404938](https://github.com/cube-js/cube/commit/34049384bf5401e41975f0eac7042f9d07ee7f08))
+- **native:** Speed up NativeSerdeDeserializer ([#12155](https://github.com/cube-js/cube/issues/12155)) ([22fc5eb](https://github.com/cube-js/cube/commit/22fc5eb8037d7b5928dedc7ad2ee11c63902d40f))
+- **tesseract:** Memoize plan SQL templates per query ([#12154](https://github.com/cube-js/cube/issues/12154)) ([264c32f](https://github.com/cube-js/cube/commit/264c32ff34935aedc18900587e7719d30a4826f1))
+
 ## [1.8.1](https://github.com/cube-js/cube/compare/v1.8.0...v1.8.1) (2026-10-07)
 
 ### Bug Fixes
