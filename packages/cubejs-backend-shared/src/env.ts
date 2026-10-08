@@ -495,6 +495,9 @@ const variables: Record<string, (...args: any) => any> = {
 
     return enabled;
   },
+  tesseractMultiStageLeafMerge: () => get('CUBEJS_TESSERACT_MULTI_STAGE_LEAF_MERGE')
+    .default('false')
+    .asBoolStrict(),
   transpilationWorkerThreads: () => {
     const enabled = get('CUBEJS_TRANSPILATION_WORKER_THREADS')
       .default('true')

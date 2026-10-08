@@ -1,4 +1,6 @@
+use super::filter::render_filter_item;
 use super::{evaluate_with_context, QualifiedColumnName, VisitorContext};
+use crate::planner::filter::FilterItem;
 use crate::planner::sql_templates::PlanSqlTemplates;
 use crate::planner::MemberSymbol;
 use cubenativeutils::CubeError;
@@ -43,6 +45,7 @@ pub struct FunctionExpression {
 #[derive(Clone)]
 pub enum Expr {
     Null,
+    ConditionalMeasure(MemberExpression, FilterItem),
     Member(MemberExpression),
     Reference(QualifiedColumnName),
     GroupAny(QualifiedColumnName),
@@ -70,6 +73,13 @@ impl Expr {
                 "CAST(NULL as {})",
                 templates.nullable_type("integer")?
             )),
+            Self::ConditionalMeasure(measure, condition) => {
+                let condition = render_filter_item(&context, condition, templates)?;
+                let visitor = context
+                    .make_visitor(context.query_tools())
+                    .with_measure_row_condition(Some(condition));
+                visitor.apply(&measure.member, context.node_processor(), templates)
+            }
             Self::Member(member) => {
                 let context = if let Some(self_context) = &member.context {
                     self_context.clone()

@@ -35,8 +35,11 @@ impl SqlNode for MeasureFilterSqlNode {
     ) -> Result<String, CubeError> {
         let ev = node.as_measure()?;
         let measure_filters = ev.measure_filters();
-        Ok(if !measure_filters.is_empty() {
-            let inner_visitor = visitor.with_arg_needs_paren_safe(false);
+        let row_condition = visitor.measure_row_condition().cloned();
+        Ok(if !measure_filters.is_empty() || row_condition.is_some() {
+            let inner_visitor = visitor
+                .with_arg_needs_paren_safe(false)
+                .with_measure_row_condition(None);
             let input = self.input.to_sql(
                 &inner_visitor,
                 node,
@@ -57,6 +60,7 @@ impl SqlNode for MeasureFilterSqlNode {
                         )?
                     ))
                 })
+                .chain(row_condition.map(|condition| Ok(format!("({})", condition))))
                 .collect::<Result<Vec<_>, _>>()?
                 .join(" AND ");
             let result = if input.as_str() == "*" {

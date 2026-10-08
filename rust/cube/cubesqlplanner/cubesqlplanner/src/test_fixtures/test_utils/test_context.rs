@@ -546,6 +546,7 @@ impl TestContext {
                 )
                 .total_query(yaml_options.total_query)
                 .cubestore_support_multistage(yaml_options.cubestore_support_multistage)
+                .multi_stage_leaf_merge(yaml_options.multi_stage_leaf_merge)
                 .max_multi_stage_depth(yaml_options.max_multi_stage_depth)
                 .max_multi_stage_stages(yaml_options.max_multi_stage_stages)
                 .max_member_resolution_depth(yaml_options.max_member_resolution_depth)

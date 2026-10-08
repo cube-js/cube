@@ -214,6 +214,8 @@ pub struct BaseQueryOptionsStatic {
     pub total_query: Option<bool>,
     #[serde(rename = "cubestoreSupportMultistage")]
     pub cubestore_support_multistage: Option<bool>,
+    #[serde(rename = "multiStageLeafMerge")]
+    pub multi_stage_leaf_merge: Option<bool>,
     #[serde(rename = "maxMultiStageDepth")]
     pub max_multi_stage_depth: Option<usize>,
     #[serde(rename = "maxMultiStageStages")]

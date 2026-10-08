@@ -37,7 +37,11 @@ fn same_evaluation_context(a: &EvaluationContext, b: &EvaluationContext) -> bool
 // destructured the way the rest are. A field added to either has to be added
 // here by hand, or two scans that read differently start comparing equal.
 fn same_query_rows(a: &Query, b: &Query) -> bool {
-    same_grain(a.schema(), b.schema())
+    // A conditional measure aggregates only some of the rows the scan reads,
+    // so two scans carrying any are never taken for the same.
+    a.conditional_measures().is_empty()
+        && b.conditional_measures().is_empty()
+        && same_grain(a.schema(), b.schema())
         && same_filter(a.filter(), b.filter())
         && same_modifiers(a.modifers(), b.modifers())
         && same_source(a.source(), b.source())
@@ -71,7 +75,7 @@ fn same_filter(a: &LogicalFilter, b: &LogicalFilter) -> bool {
         && same_filter_items(segments, &b.segments)
 }
 
-fn same_filter_items(a: &[FilterItem], b: &[FilterItem]) -> bool {
+pub fn same_filter_items(a: &[FilterItem], b: &[FilterItem]) -> bool {
     a.len() == b.len()
         && a.iter()
             .zip(b.iter())

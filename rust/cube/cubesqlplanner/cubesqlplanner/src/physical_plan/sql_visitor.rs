@@ -22,6 +22,10 @@ pub struct SqlEvaluatorVisitor {
     /// the rendered expression to be safe for embedding next to operators —
     /// i.e. a compound top-level result should be wrapped in parentheses.
     arg_needs_paren_safe: bool,
+    /// Rendered predicate the measure being rendered aggregates its rows
+    /// under, on top of its own `measure_filters`. Consumed by the measure
+    /// node it is set for; its inputs render without it.
+    measure_row_condition: Option<String>,
 }
 
 impl SqlEvaluatorVisitor {
@@ -37,7 +41,18 @@ impl SqlEvaluatorVisitor {
             filter_params_time_shifts: FilterParamsTimeShifts::default(),
             ignore_tz_convert: false,
             arg_needs_paren_safe: false,
+            measure_row_condition: None,
         }
+    }
+
+    pub fn with_measure_row_condition(&self, condition: Option<String>) -> Self {
+        let mut self_copy = self.clone();
+        self_copy.measure_row_condition = condition;
+        self_copy
+    }
+
+    pub fn measure_row_condition(&self) -> Option<&String> {
+        self.measure_row_condition.as_ref()
     }
 
     pub fn with_filter_params_time_shifts(&self, shifts: FilterParamsTimeShifts) -> Self {
