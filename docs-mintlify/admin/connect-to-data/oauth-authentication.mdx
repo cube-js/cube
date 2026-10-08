@@ -13,7 +13,7 @@ enabled for your Cube Cloud deployment.
 ## Use case
 
 You want each user's queries to run under their own database identity
-using OAuth tokens managed by Cube Cloud. When a user has no active
+using OAuth tokens managed by Cube. When a user has no active
 token, for example because they haven't authorized yet, Cube falls back
 to a service account, which also runs connectivity checks and background
 operations.
@@ -180,8 +180,8 @@ def driver_factory(ctx: dict) -> dict:
     )
 
     # Only use the OAuth token when the credential status is "active".
-    # Otherwise (not authorized yet, expired, or revoked), fall back to
-    # the service account.
+    # Otherwise ("missing", "expired", or "error"), fall back to the
+    # service account.
     oauth_token = (
         databricks_creds.get("accessToken")
         if databricks_creds.get("status") == "active"
@@ -225,8 +225,8 @@ module.exports = {
       securityContext?.cubeCloud?.userCredentials?.databricks ?? {};
 
     // Only use the OAuth token when the credential status is "active".
-    // Otherwise (not authorized yet, expired, or revoked), fall back to
-    // the service account.
+    // Otherwise ("missing", "expired", or "error"), fall back to the
+    // service account.
     const oauthToken =
       databricksCreds.status === "active"
         ? databricksCreds.accessToken
