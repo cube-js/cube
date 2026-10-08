@@ -1,3 +1,4 @@
+import { execFileSync } from 'child_process';
 import fs from 'fs';
 import path from 'path';
 
@@ -136,6 +137,24 @@ describeBridge('bridge: NativeSerdeDeserializer', () => {
       expect(() => deserializeJson(input)).toThrow('boom from ownKeys');
     });
 
+    it.each([
+      ['no array', "() => 'not an array'"],
+      ['non-string keys', '() => [1]'],
+    ])('rejects a replaced Object.keys that returns %s', (_name, fake) => {
+      // `Object.keys` is cached on first use per addon instance, so each case needs a fresh process.
+      const script = `
+        const native = require(${JSON.stringify(path.join(__dirname, '..', '..', 'js'))}).loadNative();
+        Object.keys = ${fake};
+        try {
+          native.__testBridgeDeserializeJson({ a: 1 });
+          process.stdout.write('no error');
+        } catch (e) {
+          process.stdout.write(e.constructor.name);
+        }
+      `;
+      expect(execFileSync(process.execPath, ['-e', script], { encoding: 'utf8' })).toBe('TypeError');
+    });
+
     it('wide object', () => {
       const input: Record<string, string> = {};
 
@@ -227,6 +246,13 @@ describeBridge('bridge: NativeSerdeDeserializer', () => {
         },
       };
       expect(deserializeTyped(input)).toEqual(base);
+    });
+
+    it('handles keys longer than the stack buffer used to match fields', () => {
+      const long = 'x'.repeat(200);
+      // 125 UTF-8 bytes: fits the 128-byte buffer, but too close to its end to be trusted.
+      const nearBoundary = `${'é'.repeat(62)}a`;
+      expect(deserializeTyped({ ...base, [long]: 1, [nearBoundary]: 2 })).toEqual(base);
     });
 
     it('ignores unknown fields', () => {

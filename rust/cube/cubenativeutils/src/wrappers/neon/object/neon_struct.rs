@@ -123,8 +123,9 @@ impl<C: Context<'static> + 'static> NativeStruct<NeonInnerTypes<C>> for NeonStru
         self.collect_entries(|cx, key| {
             let mut buf = [0u8; 128];
             let written = read_js_string_into(cx, key, &mut buf);
-            // N-API stops on a character boundary, so a key within 4 bytes of the end may be cut.
-            if written + 4 < buf.len() {
+            // N-API stops on a character boundary, so a key that ends within one character of
+            // the buffer end may have been cut.
+            if written + char::MAX_LEN_UTF8 < buf.len() {
                 let key = &buf[..written];
                 fields.iter().copied().find(|field| field.as_bytes() == key)
             } else {
