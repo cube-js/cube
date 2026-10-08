@@ -19,10 +19,8 @@ the **Settings** screen.
 
 Independently of the deploy mode, you can [connect a GitHub
 repository](#deploy-with-github) to the deployment. Non-production branches
-pushed to GitHub are then auto-synced into Cube Cloud and reflected in their
-[staging environments][ref-environments-staging]. The production branch
-follows the deploy mode: it auto-deploys in Git mode and stays manual in CLI
-mode.
+pushed to GitHub are then auto-synced into Cube. The production branch follows
+the deploy mode: it auto-deploys in Git mode and stays manual in CLI mode.
 
 ## Deploy with Git
 
@@ -158,11 +156,10 @@ If a pushed change does not appear:
   error before redelivering a failed event.
 - Check the build status, then open the intended environment. If the change is
   still missing, [contact support][ref-support] with the deployment, branch,
-  commit SHA, and webhook delivery result. A delay lasting until the next day
-  should be investigated rather than treated as normal initialization.
+  commit SHA, and webhook delivery result.
 
-For generic SSH integrations, webhook setup is manual and rapid pushes can receive
-`429` responses. See [webhook setup and response codes][ref-import-ssh-webhooks].
+For generic SSH integrations, rapid pushes can receive `429` responses. See
+[webhook response codes][ref-import-ssh-webhooks].
 
 ## Deploy with CLI
 
@@ -209,9 +206,7 @@ You can still [connect a GitHub repository](#deploy-with-github) to a CLI
 deployment. When you do:
 
 - Pushes to **non-production branches** (typically feature branches) are
-  picked up by the GitHub webhook and automatically synced into Cube Cloud,
-  so the corresponding [staging environments][ref-environments-staging]
-  reflect the latest commits without any manual step.
+  picked up by the GitHub webhook and automatically synced into Cube.
 - Pushes to the **production branch** are intentionally **not**
   auto-deployed in CLI mode. The production branch only changes when
   somebody runs `cubejs-cli deploy` against the deployment.
