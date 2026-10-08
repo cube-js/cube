@@ -1,0 +1,210 @@
+---
+title: Reviews
+description: Require a reviewer to approve dashboard changes before they are published, then publish exactly the version they approved.
+---
+
+A review lets a teammate check changes to a [dashboard][ref-dashboards] before
+they go live. When a dashboard requires review, nobody can publish it directly:
+an editor requests a review, reviewers look at a frozen copy of the changes, and
+the dashboard is published only after a reviewer approves them. What goes live
+is exactly the copy the reviewers approved.
+
+<Info>
+  Reviews are turned on for each account by Cube. If you don't see **Review
+  settings…** in the dashboard builder, contact Cube support.
+</Info>
+
+{/* TODO: screenshot — a review page with the review panel open on the Activity tab, status "Approved" */}
+
+## Requiring review
+
+Review is set up per dashboard, by a user with **Full access** to its workbook,
+once the dashboard has been published at least once.
+
+1. Open the dashboard in the dashboard builder.
+2. Click the arrow (▾) next to **Publish** and choose **Review settings…**.
+3. Turn on **Require review before publishing**.
+4. Optionally, add **default reviewers**: search for users by name or email and
+   pick them. Remove one with its **×**.
+5. Click **Save**.
+
+Once review is required, the builder's **Publish** button reads **Request
+review**. Turn the setting off in the same dialog to publish directly again.
+
+With default reviewers, every review request goes to them, and the person
+requesting a review can't change the list. A requester who is one of the
+default reviewers is left out of their own request. Without default reviewers,
+the requester picks the reviewers each time.
+
+<Info>
+  A dashboard that requires review is published only from its review. Publishing
+  it through the [REST API][ref-publish-api], the [Workbook
+  Agent][ref-workbook-agent] or a [workbook promotion][ref-promotion] is refused
+  with the message "This dashboard requires review before publishing". The API
+  answers `400`.
+</Info>
+
+## Requesting a review
+
+You need **Can edit** or **Full access** on the workbook to request a review.
+
+1. Make your changes in the dashboard builder.
+2. Click **Request review**.
+3. Pick reviewers, or check the default reviewers the dialog lists. You can't
+   pick yourself, and **Send request** stays disabled until the request has at
+   least one reviewer.
+4. Optionally, describe what changed under **Message (optional)**.
+5. Click **Send request**.
+
+The request freezes the draft as **revision 1** of the review: its widgets and
+layout, the dashboard's title and description, and the current version of every
+chart's report, including charts inside [layout containers][ref-layout]. Later
+edits to the draft or to a report don't change what reviewers see.
+
+In the builder, a **Review** button replaces **Draft** and links to the review
+page. A dot on it shows the review's status, which its tooltip names. While the
+draft matches the latest revision, the main button reads **Publish** again (see
+[Publishing](#publishing)). With no review open, **Request review** is greyed
+out until the draft differs from the published version.
+
+### Reviewers without access
+
+A reviewer has to be able to view the dashboard. When you pick someone who
+can't:
+
+- With **Full access**, the person's row is marked **Will get view access**.
+  When you send the request, or save the review settings, they get **Can view**
+  on the workbook, through the same sharing you'd use in the
+  [Share dialog][ref-sharing]. If you cancel, nothing is shared. A reviewer who
+  already has access keeps the level they have.
+- With **Can edit**, the person's row is greyed out and marked **No access**,
+  with the hint **Ask someone with full access to share this dashboard first**.
+
+A default reviewer who has lost access shows as **No access** in the request,
+too. A requester with **Full access** can share with them; a requester with
+**Can edit** has to ask someone with full access first. The request never
+leaves such a reviewer out on its own.
+
+## The review page
+
+Reviewers and anyone who can edit the workbook can open a review. While a
+review is open, they see a **Review** button in the header of the published
+dashboard that opens it. Other people who can only view the dashboard don't
+see the button and can't open the review.
+
+The review page shows the revision's frozen widgets the way the published
+dashboard would show them, with the review's status:
+
+| Status | Meaning |
+| --- | --- |
+| **Pending approval** | No reviewer has approved or requested changes on the latest revision yet. |
+| **Changes requested** | A reviewer's latest verdict on the latest revision is a change request. |
+| **Approved** | At least one reviewer approved the latest revision, and no reviewer's latest verdict on it is a change request. |
+| **Published** | The approved revision was published. |
+| **Cancelled** | The review was cancelled. |
+
+Click **Review** in the page header to show or hide the review panel. It has
+two tabs:
+
+- **Changes** lists the widgets the revision adds, updates and removes, and
+  whether the layout moved, compared with the version that is published now. A
+  chart whose report was edited counts as updated.
+- **Activity** lists the request, every new revision, comment, approval and
+  change request, in the order they happened, each with its author.
+
+## Commenting, approving and requesting changes
+
+While a review is open, anyone who can open it can leave a comment in the
+review panel.
+Reviewers also have **Approve** and **Request changes**, each with an optional
+message. The person who requested the review can't approve or request changes
+on it.
+
+A reviewer can change their verdict: only each reviewer's latest verdict counts.
+A reviewer who requested changes and later approves lifts their block.
+
+Review comments stay on the review. They don't appear in the dashboard's
+[Comments][ref-comments] panel or its counts, and they work whether or not
+dashboard comments are turned on.
+
+## Updating a review
+
+When you edit the draft after requesting a review, the builder shows **Draft**
+and **Request review** again. Request review again to add the current draft to
+the same review as the next revision. It goes to the review's reviewers, and the
+Activity tab shows **Updated to revision 2**.
+
+<Warning>
+  A new revision clears every approval and change request on the earlier ones.
+  The review returns to **Pending approval**, and reviewers approve the new
+  revision again.
+</Warning>
+
+A dashboard has at most one open review. If nothing changed since the latest
+revision, Cube refuses a new request.
+
+## Publishing
+
+When the review is **Approved**, anyone who can edit the workbook can click
+**Publish** on the review page. While the draft matches the latest revision,
+the builder's **Publish** button does the same. **Publish** stays greyed out
+until the review is approved.
+
+Publishing makes the approved revision the live version, exactly as reviewers
+saw it: the same widgets, layout and chart reports. Edits you made to the draft
+after the request stay in the draft. The dashboard keeps the workbook's
+current title and description, so renaming the workbook during a review is not
+undone. The review becomes **Published**.
+
+## Cancelling a review
+
+The person who requested a review, or anyone with **Full access** to the
+workbook, can cancel it: choose **Cancel review** from the arrow (▾) next to
+the builder's main button, or click **Cancel review** on the review page.
+
+<Warning>
+  A cancelled review can't be approved or reopened, and nothing is published.
+  The draft stays in the workbook. To continue, request a new review. To keep
+  the review, click **Keep review** instead.
+</Warning>
+
+## Notifications
+
+Everyone taking part in a review gets a notification when something happens on
+it: the requester, the reviewers and anyone who commented. The person who acted
+doesn't get one. Notifications are sent when:
+
+- a review or a new revision is requested;
+- someone comments;
+- a reviewer approves;
+- a reviewer requests changes;
+- the review is published.
+
+Each one arrives by email and in the in-app inbox, and links to the review page.
+The notification for a published review links to the published dashboard.
+People who can no longer view the dashboard don't get notifications.
+
+## Version history
+
+The builder's [revision history][ref-revision-history] lists the revisions of
+each review next to the published versions, each with an **Open review** button
+that opens its review page. A review's latest revision shows the review's
+status: **In review**, **Published** or **Cancelled**. Every earlier revision
+shows **Superseded**.
+
+## Limitations
+
+- A dashboard must be published once before review can be required or
+  requested.
+- Reviews are available in the Cube app only, not on [embedded
+  dashboards][ref-embedding].
+
+[ref-dashboards]: /docs/explore-analyze/dashboards
+[ref-revision-history]: /docs/explore-analyze/dashboards#revision-history
+[ref-layout]: /docs/explore-analyze/dashboards/widgets/layout
+[ref-comments]: /docs/explore-analyze/dashboards/comments
+[ref-sharing]: /docs/organize-content/sharing#sharing-with-users-and-groups
+[ref-publish-api]: /api-reference/workbooks/publish-dashboard
+[ref-workbook-agent]: /docs/explore-analyze/workbooks/workbook-agent
+[ref-promotion]: /docs/explore-analyze/workbooks#promoting-workbooks-to-another-deployment
+[ref-embedding]: /embedding/iframe/dashboards
