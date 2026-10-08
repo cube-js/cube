@@ -89,9 +89,7 @@ impl<'de, IT: InnerTypes> Deserializer<'de> for NativeSerdeDeserializer<IT> {
     ) -> Result<V::Value, Self::Error>
     where
         V: Visitor<'de>,
-    {
-        // `fields` lists every name the struct accepts (aliases included), so the rest would be
-        // read only to be ignored. It also means `#[serde(deny_unknown_fields)]` is not honoured:
+        // `fields` lists every name the struct accepts, so the rest would be read only to be ignored.
         // unknown keys are dropped before the visitor could reject them.
         match self.input.into_typed()? {
             NativeTypedObject::Struct(val) => visitor.visit_map(
