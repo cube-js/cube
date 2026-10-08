@@ -92,7 +92,7 @@ OAuth app to how long a user can go before authorizing again.
 
 <Step title="Authorize the app">
 
-Each user does this once for their own account. An admin's token is
+Each user does this for their own account. An admin's token is
 never used for other users.
 
 Open the sidebar and go to **Connected apps**. Find your OAuth app
@@ -119,8 +119,9 @@ The configuration uses two options from the
 - [`driver_factory`][ref-driver-factory] — dynamically selects the
   authentication credential per request
 - [`context_to_orchestrator_id`][ref-context-to-orchestrator-id] — gives
-  each user their own query orchestrator instance (database connections,
-  execution queues, pre-aggregation table caches)
+  each user, and each of their tokens, a separate query orchestrator
+  instance (database connections, execution queues, pre-aggregation table
+  caches)
 
 ### Environment variables
 
@@ -286,7 +287,9 @@ module.exports = {
    where `<app_name>` is the **Name** of the OAuth app, as
    `{ status, accessToken, accessTokenExpiresAt, issuedAt }`. `issuedAt`
    changes whenever the token is replaced. Requests that aren't tied to a
-   Cube user carry no user credentials.
+   Cube user carry no user credentials, so they also fall back to the
+   service account — including requests authenticated with your own JWT
+   or `checkAuth`.
 
 2. **`driver_factory` resolves the credential** — If the credential status
    is `active`, the user's OAuth token is used. Otherwise — the user hasn't
