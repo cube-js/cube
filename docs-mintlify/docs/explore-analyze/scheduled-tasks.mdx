@@ -108,11 +108,15 @@ the condition's measure, time dimension, period, or rule, or pausing the
 task, starts over: the next check that finds the condition holding notifies.
 Editing only the name, instructions, or schedule doesn't.
 
-A check that finds the condition not holding, or that can't decide (for
+A check that finds the condition not holding, that can't decide (for
 example, the measure is no longer in the data model, or the previous period
-was 0, so there is no % change), runs no agent, creates no thread, and sends
-nothing. It doesn't appear in **History**; the task's
-[Last check](#task-detail-page) shows what it read and why nothing was sent.
+was 0, so there is no % change), or that can't read the metric at all (for
+example, the query fails) runs no agent, creates no thread, and sends nothing.
+It doesn't appear in **History**; the task's [Last check](#task-detail-page)
+shows what it read and why nothing was sent. A check that can't decide or
+can't read the metric also leaves the condition's state as it was: on a task
+that has already notified, the next check that finds the condition still
+holding sends nothing.
 
 Every scheduled run of a conditional task checks the condition. A **Manual**
 task's condition is checked only when you press **Check now**, which checks it
@@ -196,7 +200,11 @@ The page shows:
   the value it read with the comparison it made, and, when nothing was
   sent, why. While a check runs, it reads **Checking…**. After a
   **Condition met — notified** check, the agent run it started appears in
-  **History** on the same page.
+  **History** on the same page. The check reads the metric with the
+  creator's data access, so only the creator sees the values it read and
+  the error behind a **Check failed**. Anyone else who can open the task, an
+  admin included, sees when it ran, its result, and why nothing was sent,
+  for example *"The metric could not be read. Nothing sent."*
 - **History** — the task's runs, newest first. Each entry is a timestamped
   link that opens that run's chat thread, if you can
   [access it](#managing-tasks). Currently-executing runs
@@ -259,10 +267,10 @@ task"*.
 The agent manages task definitions: when listing tasks, it can report each
 task's id, name, description, schedule, timezone, enabled state, next run
 time, **Notify me when a run finishes** setting, and condition with its last
-check. It can also add, change, or remove a task's
-[condition](#conditional-tasks) — for example, *"tell me when monthly orders
-change by 5% or more."* A task's run history lives on its
-[detail page](#task-detail-page). The agent follows the same
+check (the check's values and error text only to the task's creator). It can
+also add, change, or remove a task's [condition](#conditional-tasks) — for
+example, *"tell me when monthly orders change by 5% or more."* A task's run
+history lives on its [detail page](#task-detail-page). The agent follows the same
 [limits](#limits) and permissions as the **Scheduled** page, and a scheduled
 run can't create or change tasks itself.
 
@@ -275,6 +283,7 @@ default, only admins can
 Scheduled Tasks endpoints follow the same [limits](#limits) and
 [permissions](#managing-tasks) as the **Scheduled** page. A task's optional
 `condition` field holds its [condition](#conditional-tasks) (`null` on an
-update removes it), and `lastConditionCheck` holds its latest check. See the
+update removes it), and `lastConditionCheck` holds its latest check, whose
+values and error text are returned only to the task's creator. See the
 [API reference](/api-reference/scheduled-tasks/list-scheduled-tasks) for the
 endpoints, fields, and responses.
