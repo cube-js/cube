@@ -85,7 +85,8 @@ The response is `202` with a `conversionId`, a `statusUrl` and a `resultUrl`. Po
 
 `GET` on the `resultUrl` returns the counts and issues, and `GET …/{conversionId}/files` returns
 the files: `ossie.yaml` for an export, or the Cube data model files for an import. Both answer
-`409` unless the status is `COMPLETED`.
+`409` until the conversion's result is available, which can be a moment after the status first
+reads `COMPLETED`, so retry a `409` briefly.
 
 This example exports the deployment's data model and requires `curl` and `jq`. Set `CUBE_API_URL`
 to your tenant host without a trailing slash, `DEPLOYMENT_ID` to the deployment, and
@@ -112,9 +113,15 @@ if [[ "$status" != COMPLETED ]]; then
   exit 1
 fi
 
-result=$(curl --fail --silent --show-error -H "$auth" "$api/$id/result")
-jq '{outcome, counts, issues}' <<<"$result"
-[[ $(jq -r '.outcome' <<<"$result") == success ]] || exit 1
+for _ in {1..15}; do
+  code=$(curl --silent --show-error -o result.json -w '%{http_code}' -H "$auth" "$api/$id/result")
+  [[ "$code" == 409 ]] || break
+  sleep 2
+done
+[[ "$code" == 200 ]] || { cat result.json; exit 1; }
+
+jq '{outcome, counts, issues}' result.json
+[[ $(jq -r '.outcome' result.json) == success ]] || exit 1
 
 content=$(curl --fail --silent --show-error -H "$auth" "$api/$id/files" | jq -er '.items[0].content')
 printf '%s\n' "$content" > ossie.yaml
