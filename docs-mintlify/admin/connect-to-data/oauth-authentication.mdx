@@ -50,6 +50,10 @@ account token only for the refresh worker's context, as in the
 non-empty token the warehouse rejects: an empty `token` makes the
 Databricks driver read the service account token from the environment.
 
+Anyone who can sign tokens with the deployment's API secret can set
+`cubeCloud.username` and query as that user, with that user's OAuth
+token. Protect the API secret like your users' credentials.
+
 </Warning>
 
 ## Set up the OAuth app
