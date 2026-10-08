@@ -28,6 +28,10 @@ for (let i = 0; i < 1000; i += 1) {
 
 const numbers = Array.from({ length: 10_000 }, (_, i) => (i % 3 === 0 ? i + 0.5 : i));
 
+const longAscii = Array.from({ length: 100 }, (_, i) => `${i}${'x'.repeat(4096)}`);
+const longUnicode = Array.from({ length: 100 }, (_, i) => `${i}${'世界🙂'.repeat(512)}`);
+const mediumStrings = Array.from({ length: 1000 }, (_, i) => `${'x'.repeat(120 + i % 12)}🙂`);
+
 const nestedObjects = Array.from({ length: 200 }, (_, i) => ({
   name: `cube_${i}.member_${i}`,
   type: i % 2 === 0 ? 'number' : 'string',
@@ -38,7 +42,7 @@ const nestedObjects = Array.from({ length: 200 }, (_, i) => ({
 }));
 
 // Shape of a compiled cube (`CubeEvaluator.cubeFromPath`): 13 own properties, of which
-// CubeDefinitionStatic declares only `name`.
+// only `name` is a CubeDefinitionStatic field present in this fixture.
 const measure = (i: number) => ({
   type: 'sum',
   sql: () => `amount_${i}`,
@@ -91,6 +95,15 @@ describe('NativeSerdeDeserializer', () => {
     },
     'array of 10k numbers': () => {
       loop('json', numbers, 1);
+    },
+    'array of 100 long ASCII strings': () => {
+      loop('json', longAscii, 1);
+    },
+    'array of 100 long Unicode strings': () => {
+      loop('json', longUnicode, 1);
+    },
+    'array of 1000 Unicode strings around 128 UTF-8 bytes': () => {
+      loop('json', mediumStrings, 1);
     },
     '200 nested member-like objects': () => {
       loop('json', nestedObjects, 1);

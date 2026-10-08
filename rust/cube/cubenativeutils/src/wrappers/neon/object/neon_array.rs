@@ -39,26 +39,23 @@ impl<C: Context<'static> + 'static> NativeArray<NeonInnerTypes<C>> for NeonArray
     }
     fn to_vec(&self) -> Result<Vec<NativeObjectHandle<NeonInnerTypes<C>>>, CubeError> {
         let context = self.object.get_context();
-        self.object.map_neon_object(|cx, object| {
+        self.object.map_neon_object_with_error(|cx, object| {
             let len = object.len(cx);
             let mut items = Vec::with_capacity(len as usize);
             for idx in 0..len {
-                let item = match object
+                let item = object
                     .get_value(cx, idx)
                     .map_err(CubeError::from)
                     .and_then(|value| RootHolder::new_in(cx, &context, value))
-                {
-                    Ok(item) => item,
-                    Err(mut err) => {
+                    .map_err(|mut err| {
                         err.message =
                             format!("element {idx}: failed to read value: {}", err.message);
-                        return Ok(Err(err));
-                    }
-                };
+                        err
+                    })?;
                 items.push(NeonObject::from_root(item).into());
             }
-            Ok(Ok(items))
-        })?
+            Ok(items)
+        })
     }
     fn set(
         &self,

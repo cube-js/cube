@@ -31,10 +31,18 @@ impl<C: Context<'static> + 'static, V: Object + 'static> ObjectNeonTypeHolder<C,
     where
         F: FnOnce(&mut C, &Handle<'static, V>) -> NeonResult<T>,
     {
-        Ok(self.context.with_context(|cx| {
+        self.map_neon_object_with_error(|cx, object| Ok(f(cx, object)?))
+    }
+
+    /// Maps an object with a callback that can also return native errors.
+    pub fn map_neon_object_with_error<T, F>(&self, f: F) -> Result<T, CubeError>
+    where
+        F: FnOnce(&mut C, &Handle<'static, V>) -> Result<T, CubeError>,
+    {
+        self.context.with_context(|cx| {
             let object = self.value_ref().to_inner(cx);
             f(cx, &object)
-        })??)
+        })?
     }
 
     pub fn clone_to_context<CC: Context<'static> + 'static>(

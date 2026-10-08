@@ -50,13 +50,14 @@ impl<C: Context<'static> + 'static> NeonStruct<C> {
     /// values of skipped keys are never read.
     fn collect_entries<K: std::fmt::Display>(
         &self,
+        capacity_limit: usize,
         mut select: impl FnMut(&mut C, Handle<'static, JsString>) -> Option<K>,
     ) -> Result<Entries<K, C>, CubeError> {
         let context = self.object.get_context();
-        self.object.map_neon_object(|cx, object| {
+        self.object.map_neon_object_with_error(|cx, object| {
             let names = object_keys(cx, *object)?;
             let len = names.len(cx);
-            let mut entries = Vec::with_capacity(len as usize);
+            let mut entries = Vec::with_capacity((len as usize).min(capacity_limit));
             for idx in 0..len {
                 let key = names.get::<JsString, _, _>(cx, idx)?;
                 let Some(name) = select(cx, key) else {
@@ -64,22 +65,19 @@ impl<C: Context<'static> + 'static> NeonStruct<C> {
                 };
                 // Looked up by the original key handle: a fresh JsString built from `name`
                 // would be re-internalized by V8 on every lookup.
-                let value = match object
+                let value = object
                     .get_value(cx, key)
                     .map_err(CubeError::from)
                     .and_then(|value| RootHolder::new_in(cx, &context, value))
-                {
-                    Ok(value) => value,
-                    Err(mut err) => {
+                    .map_err(|mut err| {
                         err.message =
                             format!("field `{name}`: failed to read value: {}", err.message);
-                        return Ok(Err(err));
-                    }
-                };
+                        err
+                    })?;
                 entries.push((name, NeonObject::from_root(value).into()));
             }
-            Ok(Ok(entries))
-        })?
+            Ok(entries)
+        })
     }
 }
 
@@ -113,14 +111,14 @@ impl<C: Context<'static> + 'static> NativeStruct<NeonInnerTypes<C>> for NeonStru
     }
 
     fn entries(&self) -> Result<Vec<(String, NativeObjectHandle<NeonInnerTypes<C>>)>, CubeError> {
-        self.collect_entries(|cx, key| Some(read_js_string(cx, key)))
+        self.collect_entries(usize::MAX, |cx, key| Some(read_js_string(cx, key)))
     }
 
     fn entries_for_fields(
         &self,
         fields: &'static [&'static str],
     ) -> Result<Vec<(&'static str, NativeObjectHandle<NeonInnerTypes<C>>)>, CubeError> {
-        self.collect_entries(|cx, key| {
+        self.collect_entries(fields.len(), |cx, key| {
             let mut buf = [0u8; 128];
             let written = read_js_string_into(cx, key, &mut buf);
             // N-API stops on a character boundary, so a key that ends within one character of
