@@ -1,11 +1,7 @@
-/* eslint-disable no-restricted-syntax */
 import { PassThrough, Readable } from 'stream';
 
 import { BigQueryDriver } from '../../src';
 
-// Regression tests for #10875: errors from the BigQuery source stream must
-// reach the returned rowStream instead of crashing the process, and
-// destroying rowStream must tear down the source.
 describe('BigQueryDriver.stream — lifecycle propagation (issue #10875)', () => {
   function newDriverWithMockSource(mockSource: Readable): BigQueryDriver {
     const driver = new BigQueryDriver({});

@@ -350,11 +350,10 @@ export class BigQueryDriver extends BaseDriver implements DriverInterface {
 
     const rowStream = new HydrationStream();
 
-    // pipeline() instead of pipe(): pipe() doesn't forward source errors,
-    // so mid-stream BigQuery errors would crash the process, see #10875.
-    // Errors are propagated to rowStream, which consumers listen on.
+    // Not pipe(): it doesn't forward source errors, so a mid-stream
+    // BigQuery error crashed the process (#10875).
     pipeline(stream, rowStream, () => {
-      // pipeline already destroys rowStream with the error
+      // The error reaches consumers through rowStream's 'error' event
     });
 
     return {
