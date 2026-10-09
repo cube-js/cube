@@ -1178,6 +1178,25 @@
                 ]
               },
               {
+                "group": "Chat History",
+                "openapi": "/api-reference/api.yaml",
+                "pages": [
+                  "GET /api/v1/deployments/{deploymentId}/chat-history/threads",
+                  "GET /api/v1/deployments/{deploymentId}/chat-history/threads/{chatId}"
+                ]
+              },
+              {
+                "group": "Ossie Conversion",
+                "openapi": "/api-reference/api.yaml",
+                "pages": [
+                  "POST /api/v1/deployments/{deploymentId}/ossie-conversions",
+                  "GET /api/v1/deployments/{deploymentId}/ossie-conversions/{conversionId}",
+                  "DELETE /api/v1/deployments/{deploymentId}/ossie-conversions/{conversionId}",
+                  "GET /api/v1/deployments/{deploymentId}/ossie-conversions/{conversionId}/files",
+                  "GET /api/v1/deployments/{deploymentId}/ossie-conversions/{conversionId}/result"
+                ]
+              },
+              {
                 "group": "Report Deliveries",
                 "openapi": "/api-reference/api.yaml",
                 "pages": [
