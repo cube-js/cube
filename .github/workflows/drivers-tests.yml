@@ -312,8 +312,6 @@ jobs:
             use_tesseract_sql_planner: false
           - database: snowflake
             use_tesseract_sql_planner: false
-          - database: redshift
-            use_tesseract_sql_planner: false
           - database: bigquery-export-bucket-gcs
             use_tesseract_sql_planner: false
           - database: athena-export-bucket-s3
