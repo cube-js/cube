@@ -51,28 +51,27 @@ export async function extractUnloadedFilesFromS3(
   // It looks that different driver configurations use different formats
   // for the bucket - some expect only names, some - full url-like names.
   // So we unify this.
-  bucketName = bucketName.replace(/^[a-zA-Z]+:\/\//, '');
+  bucketName = bucketName.replace(/^[a-zA-Z][a-zA-Z0-9+.-]*:\/\//, '');
 
-  const list = await storage.listObjectsV2({
-    Bucket: bucketName,
-    Prefix: prefix,
-  });
-  if (list) {
-    if (!list.Contents) {
-      return [];
-    } else {
-      const csvFiles = await Promise.all(
-        list.Contents.map(async (file) => {
-          const command = new GetObjectCommand({
-            Bucket: bucketName,
-            Key: file.Key,
-          });
-          return getSignedUrl(storage, command, { expiresIn: 3600 });
-        })
-      );
-      return csvFiles;
+  // A single ListObjectsV2 call returns at most 1000 keys
+  const keys: string[] = [];
+  let continuationToken: string | undefined;
+  do {
+    const list = await storage.listObjectsV2({
+      Bucket: bucketName,
+      Prefix: prefix,
+      ContinuationToken: continuationToken,
+    });
+    for (const file of list.Contents ?? []) {
+      keys.push(file.Key!);
     }
-  }
+    continuationToken = list.IsTruncated ? list.NextContinuationToken : undefined;
+  } while (continuationToken);
 
-  throw new Error('Unable to retrieve list of files from S3 storage after unloading.');
+  return Promise.all(
+    keys.map((key) => getSignedUrl(storage, new GetObjectCommand({
+      Bucket: bucketName,
+      Key: key,
+    }), { expiresIn: 3600 }))
+  );
 }

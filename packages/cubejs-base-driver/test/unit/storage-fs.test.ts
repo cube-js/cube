@@ -2,7 +2,7 @@ import { S3 } from '@aws-sdk/client-s3';
 import { Storage } from '@google-cloud/storage';
 import { DefaultAzureCredential } from '@azure/identity';
 
-import { normalizeS3ClientConfig } from '../../src/storage-fs/aws.fs';
+import { extractUnloadedFilesFromS3, normalizeS3ClientConfig } from '../../src/storage-fs/aws.fs';
 import { hasGCSCredentials } from '../../src/storage-fs/gcs.fs';
 
 describe('storage-fs credential normalization', () => {
@@ -89,6 +89,42 @@ describe('storage-fs credential normalization', () => {
       const opts = { clientId: 'c', tenantId: 't', tokenFilePath: undefined };
       expect(() => new DefaultAzureCredential({})).not.toThrow();
       expect(() => new DefaultAzureCredential(opts)).not.toThrow();
+    });
+  });
+
+  describe('extractUnloadedFilesFromS3', () => {
+    afterEach(() => {
+      jest.restoreAllMocks();
+    });
+
+    test('follows continuation tokens past the 1000-key page limit', async () => {
+      const listObjectsV2 = jest.spyOn(S3.prototype, 'listObjectsV2').mockImplementation(async (input: any) => (
+        input.ContinuationToken
+          ? { Contents: [{ Key: 'exports/t/part-2.gz' }], IsTruncated: false }
+          : { Contents: [{ Key: 'exports/t/part-0.gz' }, { Key: 'exports/t/part-1.gz' }], IsTruncated: true, NextContinuationToken: 'page-2' }
+      ) as any);
+
+      const urls = await extractUnloadedFilesFromS3(
+        { credentials: { accessKeyId: 'AKIA', secretAccessKey: 'secret' }, region: 'us-east-1' },
+        's3://bucket',
+        'exports/t/',
+      );
+
+      expect(listObjectsV2.mock.calls.map(([input]) => input)).toEqual([
+        { Bucket: 'bucket', Prefix: 'exports/t/', ContinuationToken: undefined },
+        { Bucket: 'bucket', Prefix: 'exports/t/', ContinuationToken: 'page-2' },
+      ]);
+      expect(urls.map((url) => new URL(url).pathname)).toEqual([
+        '/exports/t/part-0.gz',
+        '/exports/t/part-1.gz',
+        '/exports/t/part-2.gz',
+      ]);
+    });
+
+    test('returns no files for an empty prefix', async () => {
+      jest.spyOn(S3.prototype, 'listObjectsV2').mockImplementation(async () => ({ IsTruncated: false }) as any);
+
+      await expect(extractUnloadedFilesFromS3({ region: 'us-east-1' }, 'bucket', 'exports/t/')).resolves.toEqual([]);
     });
   });
 });

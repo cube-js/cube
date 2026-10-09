@@ -501,7 +501,7 @@ export class AthenaDriver extends BaseDriver implements DriverInterface {
     const types = await this.queryColumnTypes(sql, params);
     const unloadSql = `
       UNLOAD (${sql})
-      TO '${this.config.exportBucket}/${location}'
+      TO '${this.config.exportBucket}/${location}/'
       WITH (
         format = 'TEXTFILE',
         compression='GZIP'
@@ -532,7 +532,7 @@ export class AthenaDriver extends BaseDriver implements DriverInterface {
     const columns = types.map(t => t.name).join(', ');
     const unloadSql = `
       UNLOAD (SELECT ${columns} FROM ${tableName})
-      TO '${this.config.exportBucket}/${tableName}'
+      TO '${this.config.exportBucket}/${tableName}/'
       WITH (
         format = 'TEXTFILE',
         compression='GZIP'
@@ -568,8 +568,9 @@ export class AthenaDriver extends BaseDriver implements DriverInterface {
    * Returns an array of signed URLs of the unloaded csv files.
    */
   private async getCsvFiles(location: string): Promise<string[]> {
+    // The trailing slash keeps a location from matching another one it prefixes
     const { bucket, prefix } = AthenaDriver.splitS3Path(
-      `${this.config.exportBucket}/${location}`
+      `${this.config.exportBucket}/${location}/`
     );
 
     return this.extractUnloadedFilesFromS3(
