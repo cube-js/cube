@@ -88,6 +88,7 @@ Global permissions are org-wide. Check any number of them on the **Global permis
 | Customization                        | Manage dashboard themes             | Create and edit org-wide dashboard themes.                |
 | Integrations / Network               | Manage OAuth integrations           | Configure OAuth integrations and clients.                 |
 | Integrations / Network               | Issue OAuth tokens                  | Mint OAuth tokens for integrations.                       |
+| Integrations / Network               | Manage MCP server and connectors    | Set up the [MCP server][ref-mcp-server] and [MCP Connectors][ref-mcp-connectors]. Choosing which deployments MCP clients can reach stays with admins. |
 | Deployment management (account-wide) | Manage deployments (account-wide)   | Create and list deployments across the account.           |
 
 ### Deployment permissions
@@ -139,6 +140,8 @@ A custom role saved before **Create scheduled tasks** existed holds it on every 
 [ref-data-download-controls]: /admin/users-and-permissions/roles-and-permissions#restricting-data-downloads
 [ref-scheduled-tasks]: /docs/explore-analyze/scheduled-tasks
 [ref-pre-aggregations-page]: /admin/monitoring/pre-aggregations
+[ref-mcp-server]: /docs/integrations/mcp-server
+[ref-mcp-connectors]: /admin/ai/mcp-connectors
 
 ## Walkthroughs
 
@@ -247,6 +250,7 @@ This section lists every action a custom role can grant. The internal action nam
 | `DashboardThemesManage`        | Manage dashboard themes           |
 | `OAuthIntegrationsManage`      | Manage OAuth integrations         |
 | `OAuthIntegrationsIssueTokens` | Issue OAuth tokens                |
+| `McpToolsManage`               | Manage MCP server and connectors  |
 | `DeploymentsManage`            | Manage deployments (account-wide) |
 
 ### Deployment-scoped actions

@@ -56,7 +56,8 @@ client to reach a deployment's region directly without passing through the contr
 
 Before enabling MCP, make sure you have:
 
-- **Admin privileges** in your Cube instance
+- **Admin privileges** in your Cube instance, or a [custom role][ref-custom-roles] with the
+  **Manage MCP server and connectors** permission
 - An active Cube tenant
 
 ### 1) Check the MCP page
@@ -66,6 +67,8 @@ ready-made setup snippets for each supported client. If it reads “MCP configur
 unavailable,” the MCP server host isn’t configured for the account yet.
 
 ### 2) Configure deployment access
+
+This step requires admin privileges; the section is hidden from other users.
 
 Go to **Admin → MCP Server** and use the **Deployment Access** section to control which
 deployments MCP clients can reach and where they connect by default:
@@ -600,6 +603,7 @@ and friends) are set.
 - **`Deployment <id> is not available via MCP for this account` (403)**: The requested deployment is excluded by the deployment-access allow-list or by the user's permissions. Call `listDeployments` to see which deployments are reachable, or adjust the allow-list in **Admin → MCP Server → Deployment Access**.
 
 [ref-roles]: /admin/users-and-permissions/roles-and-permissions
+[ref-custom-roles]: /admin/users-and-permissions/custom-roles#global-permissions
 [ref-pre-aggregations]: /docs/pre-aggregations/using-pre-aggregations
 [ref-sql-api]: /reference/core-data-apis/sql-api
 [ref-workbooks]: /docs/explore-analyze/workbooks
