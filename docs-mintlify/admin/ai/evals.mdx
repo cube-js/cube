@@ -111,6 +111,15 @@ or `SchemaUpdate` access to poll it and read its results.
 This capability is currently in preview. Contact Cube support to activate it
 for your account.
 
+To evaluate under a specific [security context](/docs/data-modeling/access-control/context),
+pass it with the CLI's `--security-context` or the API's `securityContext`. It
+is merged over your own security context and applies to the ground-truth
+queries and, for agents defined in [`agents/config.yml`](/admin/ai/multi-agent),
+to the agent's queries; the default `auto` agent keeps your own context.
+Passing it requires `DeploymentUpdate` or `DeploymentsManage` access, or an
+admin. Only an admin can set its `cubeCloud` key, and only `groups` and
+`userAttributes` under it take effect. Otherwise the request returns `403`.
+
 #### With the Cube CLI
 
 Set `CUBE_CLI_VERSION` to the Cube CLI release you have tested, then install
@@ -254,10 +263,10 @@ steps:
       if-no-files-found: ignore
 ```
 
-The `POST` body also accepts `agentName` and `questionFile`. Omitting the
-pagination parameters on the results request returns the complete result set;
-if `pageInfo.hasNextPage` is anything other than `false`, do not use that page
-as a CI verdict.
+The `POST` body also accepts `agentName`, `questionFile`, and
+`securityContext`. Omitting the pagination parameters on the results request
+returns the complete result set; if `pageInfo.hasNextPage` is anything other
+than `false`, do not use that page as a CI verdict.
 
 Both recipes require every selected question to return `pass`. A `review`
 verdict, including one caused by missing ground truth, fails the CI gate. Keep
