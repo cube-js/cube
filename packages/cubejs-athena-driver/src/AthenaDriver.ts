@@ -479,7 +479,7 @@ export class AthenaDriver extends BaseDriver implements DriverInterface {
    */
   public async unload(tableName: string, options: UnloadOptions): Promise<DownloadTableCSVData> {
     if (options.query) {
-      return this.unloadFromQuery(options.query.sql, options.query.params, { ...options, tableName });
+      return this.unloadFromQuery(options.query.sql, options.query.params, { ...options, prefix: tableName });
     }
     if (!this.config.exportBucket) {
       throw new Error('Export bucket is not configured.');
@@ -495,9 +495,9 @@ export class AthenaDriver extends BaseDriver implements DriverInterface {
     if (!this.config.exportBucket) {
       throw new Error('Export bucket is not configured.');
     }
-    // UNLOAD fails on a non-empty location; the versioned table name is unique
-    // per build, a direct call without one gets a random prefix instead
-    const location = options.tableName ?? crypto.randomUUID();
+    // UNLOAD fails on a non-empty location, so without a prefix from the caller
+    // every unload gets a random one
+    const location = options.prefix ?? crypto.randomUUID();
     const types = await this.queryColumnTypes(sql, params);
     const unloadSql = `
       UNLOAD (${sql})

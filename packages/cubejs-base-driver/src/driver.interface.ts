@@ -168,8 +168,8 @@ export type UnloadOptions = {
   maxFileSize: number,
   query?: UnloadQuery;
   requestId?: string;
-  // Target pre-aggregation table, lets `unloadFromQuery` name its export location
-  tableName?: string;
+  // Location within the export bucket to unload into, unique per build
+  prefix?: string;
 };
 
 export type QueryOptions = {

@@ -801,7 +801,7 @@ export class PreAggregationLoader {
         client.unloadFromQuery(
           sql,
           params,
-          { ...this.getUnloadOptions(), tableName: targetTableName },
+          { ...this.getUnloadOptions(), prefix: targetTableName },
         )
       ).catch((error: any) => {
         this.logger('Downloading external pre-aggregation via query error', {
