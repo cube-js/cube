@@ -64,14 +64,14 @@ tab. The toggle is disabled — with a tooltip explaining why — unless the tab
 least two row dimensions and no column pivot. You can also ask [Analytics
 Chat](/docs/explore-analyze/analytics-chat) to group the table's rows.
 
-With grouping on, every row dimension except the innermost generally becomes a group
-level: rows nest one header per level, kept contiguous by that dimension's
-first-appearance order, with the header showing the dimension's value once instead of
-on every row underneath.
+With grouping on, every row dimension except the innermost becomes a group level, with
+the exceptions below. Rows nest one header per level, kept contiguous by that
+dimension's first-appearance order, with the header showing the dimension's value once
+instead of on every row underneath.
 
 A dimension stays on the row instead of becoming a group level when no dimension after
-it adds rows. A dimension adds rows when it has more than one value for the same values
-of the dimensions before it. For example, in a table grouped by
+it adds rows. A dimension adds rows when, for at least one combination of values of the
+dimensions before it, it has more than one value. For example, in a table grouped by
 `category › product › sku`, where every product has exactly one SKU, grouping stops at
 `category`: each row shows its product and SKU side by side, rather than every product
 getting a header with a single row under it. The outermost row dimension always
