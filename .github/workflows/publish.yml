@@ -27,7 +27,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v7
       - name: Install Rust
-        uses: actions-rust-lang/setup-rust-toolchain@v1
+        uses: actions-rust-lang/setup-rust-toolchain@v2
         with:
           toolchain: 1.98.1
           # override: true # this is by default on
@@ -114,7 +114,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v7
       - name: Install Rust
-        uses: actions-rust-lang/setup-rust-toolchain@v1
+        uses: actions-rust-lang/setup-rust-toolchain@v2
         with:
           toolchain: 1.98.1
           # override: true # this is by default on
@@ -203,7 +203,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v7
       - name: Install Rust
-        uses: actions-rust-lang/setup-rust-toolchain@v1
+        uses: actions-rust-lang/setup-rust-toolchain@v2
         with:
           toolchain: 1.98.1
           # override: true # this is by default on
@@ -278,7 +278,7 @@ jobs:
         run: rustup set auto-self-update disable
         shell: bash
       - name: Install Rust
-        uses: actions-rust-lang/setup-rust-toolchain@v1
+        uses: actions-rust-lang/setup-rust-toolchain@v2
         with:
           toolchain: 1.98.1
           # override: true # this is by default on
@@ -639,7 +639,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
       - name: Setup Rust toolchain
-        uses: actions-rust-lang/setup-rust-toolchain@v1
+        uses: actions-rust-lang/setup-rust-toolchain@v2
         with:
           toolchain: nightly-2025-08-01
           target: ${{ matrix.target }}
@@ -733,7 +733,7 @@ jobs:
         if: contains(runner.os, 'windows')
         shell: bash
       - name: Setup Rust toolchain
-        uses: actions-rust-lang/setup-rust-toolchain@v1
+        uses: actions-rust-lang/setup-rust-toolchain@v2
         with:
           toolchain: nightly-2025-08-01
           target: ${{ matrix.target }}
@@ -824,7 +824,7 @@ jobs:
         if: endsWith(matrix.target, '-musl')
         run: sudo apt-get update && sudo apt-get install -y musl-tools
       - name: Setup Rust toolchain
-        uses: actions-rust-lang/setup-rust-toolchain@v1
+        uses: actions-rust-lang/setup-rust-toolchain@v2
         with:
           target: ${{ matrix.target }}
           cache-workspaces: rust/cube-cli
