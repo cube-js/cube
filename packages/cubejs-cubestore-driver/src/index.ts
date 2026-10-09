@@ -18,4 +18,5 @@ export * from './CubeStoreCacheDriver';
 export * from './CubeStoreDriver';
 export * from './CubeStoreDevDriver';
 export * from './CubeStoreQueueDriver';
+export { MessageTooLargeError, ResultTooLargeError } from './errors';
 export * from './rexport';
