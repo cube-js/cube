@@ -142,8 +142,8 @@ here][ref-caching-using-preaggs-build-strats].
 
 | Feature       | Works with read-only mode? | Is default? |
 | ------------- | :------------------------: | :---------: |
-| Batching      |             ❌             |     ✅      |
-| Export Bucket |             ❌             |     ❌      |
+| Batching      |             ✅             |     ✅      |
+| Export Bucket |             ✅             |     ❌      |
 
 By default, AWS Athena uses a [batching][self-preaggs-batching] strategy to
 build pre-aggregations.
@@ -154,9 +154,11 @@ No extra configuration is required to configure batching for AWS Athena.
 
 <Info>
 
-Batching builds pre-aggregations inside Athena via `CREATE TABLE AS SELECT`, the
-only case needing more than read-only access: `glue:CreateTable` on the
-pre-aggregations schema plus `s3:PutObject` on its S3 location.
+Batching reads the pre-aggregation query results page by page with
+`GetQueryResults`, so it needs no write access. Only pre-aggregations with
+`external: false`, which are stored inside Athena, are built via
+`CREATE TABLE AS SELECT` and need `glue:CreateTable` on the pre-aggregations
+schema plus `s3:PutObject` on its S3 location.
 
 </Info>
 
@@ -182,6 +184,10 @@ writes to the export bucket in S3.
 The export bucket strategy uses Athena's `UNLOAD` to write directly to the
 bucket — no temporary tables, no Glue Data Catalog writes. The only extra
 permission beyond read-only querying is `s3:PutObject` on the export bucket.
+
+Cube does not delete the exported files: each build writes them under a prefix
+named after the pre-aggregation table. Add an S3 lifecycle rule that expires
+objects in the export bucket (e.g., after one day) to keep it from growing.
 
 </Info>
 

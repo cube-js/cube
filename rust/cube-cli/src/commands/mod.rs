@@ -22,6 +22,7 @@ pub mod logs;
 pub mod meta;
 pub mod notifications;
 pub mod oidc;
+pub mod ossie;
 pub mod policies;
 pub mod regions;
 pub mod reports;

@@ -40,6 +40,7 @@ const BRIDGES: BridgeSpec[] = [
       'convert_tz_for_raw_time_dimension',
       'cube_evaluator',
       'cubestore_support_multistage',
+      'cubestore_union_full_key_aggregate',
       'dimensions',
       'disable_external_pre_aggregations',
       'export_annotated_sql',

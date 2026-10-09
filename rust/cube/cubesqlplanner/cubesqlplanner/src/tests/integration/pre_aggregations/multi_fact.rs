@@ -135,6 +135,7 @@ async fn test_fact_plus_multiplied_separate_pre_aggs() {
           - orders.status
         order:
           - id: orders.status
+        cubestore_union_full_key_aggregate: true
     "};
 
     let (_sql, pre_aggrs) = ctx.build_sql_with_used_pre_aggregations(query).unwrap();

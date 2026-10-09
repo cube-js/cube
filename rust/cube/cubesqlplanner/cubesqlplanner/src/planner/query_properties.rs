@@ -178,6 +178,9 @@ pub struct QueryProperties {
     /// Folds multi-stage leaves that read one rollup under different filters into one scan.
     #[builder(default)]
     multi_stage_leaf_merge: bool,
+    /// Lets Cube Store combine multi-stage results with `UNION ALL` instead of joins.
+    #[builder(default)]
+    cubestore_union_full_key_aggregate: bool,
     /// Multi-stage members one dependency path may carry before planning refuses the query.
     #[builder(default = DEFAULT_MAX_MULTI_STAGE_DEPTH)]
     max_multi_stage_depth: usize,
@@ -370,6 +373,10 @@ impl QueryProperties {
 
     pub fn multi_stage_leaf_merge(&self) -> bool {
         self.multi_stage_leaf_merge
+    }
+
+    pub fn cubestore_union_full_key_aggregate(&self) -> bool {
+        self.cubestore_union_full_key_aggregate
     }
 
     fn extract_dimensions_from_order(&self) -> Vec<Rc<MemberSymbol>> {
@@ -1287,6 +1294,7 @@ impl PartialEq for QueryProperties {
             use_original_sql_pre_aggregations_in_pre_aggregation,
             total_query,
             multi_stage_leaf_merge,
+            cubestore_union_full_key_aggregate,
             // A server-side safety budget, not something the query asks for: two requests that
             // differ only in it render the same SQL, or one of them is refused outright.
             max_multi_stage_depth: _,
@@ -1320,6 +1328,7 @@ impl PartialEq for QueryProperties {
                 == other.use_original_sql_pre_aggregations_in_pre_aggregation
             && *total_query == other.total_query
             && *multi_stage_leaf_merge == other.multi_stage_leaf_merge
+            && *cubestore_union_full_key_aggregate == other.cubestore_union_full_key_aggregate
             && *allow_multi_stage == other.allow_multi_stage
             && *disable_external_pre_aggregations == other.disable_external_pre_aggregations
             && *pre_aggregation_id == other.pre_aggregation_id

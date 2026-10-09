@@ -338,6 +338,10 @@ export class CubeStoreQuery extends BaseQuery {
     delete templates.join_types.full;
     delete templates.join_types.right;
     delete templates.functions.WIDTH_BUCKET;
+    // Multi-stage results are combined as UNION ALL + GROUP BY instead of a keys
+    // grid LEFT JOINed to every measure subquery: CTEs are inlined, so the grid
+    // would read each of them twice. A bare NULL unifies with any column type.
+    templates.tesseract.full_key_aggregate_union_null = 'NULL';
     return templates;
   }
 }

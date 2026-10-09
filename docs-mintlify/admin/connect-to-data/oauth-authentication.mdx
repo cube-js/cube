@@ -1,26 +1,27 @@
 ---
 title: Set up per-user OAuth
-description: Configure Cube to authenticate each user with their own OAuth token, falling back to a service account for liveness checks.
+description: Configure Cube to authenticate each user with their own OAuth token, falling back to a service account when a user has no active token.
 ---
 
 <Note>
 
 This feature is in beta. Reach out to your account manager to have it
-enabled for your Cube Cloud deployment.
+enabled for your Cube deployment.
 
 </Note>
 
 ## Use case
 
 You want each user's queries to run under their own database identity
-using OAuth tokens managed by Cube Cloud. When a user's token is
-unavailable or expired, Cube falls back to a service account so that
-connectivity checks and background operations still work.
+using OAuth tokens managed by Cube. When a user has no active
+token, for example because they haven't authorized yet, Cube falls back
+to a service account, which also runs background operations such as
+pre-aggregation builds.
 
 This pattern applies to any data source that supports OAuth, including
 [Databricks][ref-databricks-jdbc] and [Snowflake][ref-snowflake]. The
-examples below use Databricks; switch the `userCredentials` key and
-driver options for any other OAuth-capable data source.
+examples below use Databricks; for any other OAuth-capable data
+source, update the driver options.
 
 Because every user connects with different credentials, you also need
 per-user query orchestrator state. Without this, one user's cached
@@ -28,32 +29,44 @@ connection could leak to another.
 
 ## Prerequisites
 
-- A [Cube Cloud][ref-cube-cloud] deployment connected to an
+- A [Cube][ref-cube-cloud] deployment connected to an
   OAuth-capable data source
-- OAuth configured in your data source so that Cube Cloud can
+- OAuth configured in your data source so that Cube can
   obtain per-user tokens (via the **User Credentials** feature)
 - A service account credential (token or password) stored as an
-  environment variable for fallback connectivity
+  environment variable, used for background operations and for users
+  without an active token
 
 <Warning>
 
-The service account credential is used only as a fallback for Cube's
-internal liveness checks and background operations. Grant it the minimum
-permissions necessary — ideally read-only access to the required schemas —
-to limit exposure if the credential is compromised.
+The service account credential is used for background operations, such
+as pre-aggregation builds, and for queries from users without an active
+token, who see whatever the service account can access. Grant it the
+minimum permissions necessary — ideally read-only access to the required
+schemas — to limit exposure. To reject those queries instead, make
+`driver_factory` fail closed for user requests and keep the service
+account token only for the refresh worker's context, as in the
+[per-user OIDC token example][ref-oidc-per-user]. Fail closed with a
+non-empty token the warehouse rejects: an empty token makes the
+Databricks and Snowflake drivers read a credential from the environment
+instead.
+
+Anyone who can sign tokens with the deployment's API secret can set
+`cubeCloud.username` and query as that user, with that user's OAuth
+token. Protect the API secret like your users' credentials.
 
 </Warning>
 
 ## Set up the OAuth app
 
 Before configuring Cube to use per-user OAuth, register your data
-source as an OAuth app in Cube Cloud:
+source as an OAuth app in Cube:
 
 <Steps>
 
 <Step title="Open the OAuth apps settings">
 
-In Cube Cloud, go to **Admin → Integrations → OAuth apps** and click
+In Cube, go to **Admin → Integrations → OAuth apps** and click
 **Add**.
 
 <Frame>
@@ -70,6 +83,12 @@ required **Scopes**. Copy the **Redirect URI** shown in this form and
 register it with your data source's OAuth provider, then click
 **Create**.
 
+Request a refresh token so users don't have to authorize again each time
+the access token expires. For Databricks, add `offline_access` to
+**Scopes** and to the Databricks OAuth app, and set
+`token_access_policy.refresh_token_ttl_in_minutes` on the Databricks
+OAuth app to how long a user can go before authorizing again.
+
 <Frame>
   <img src="/images/admin/connect-to-data/oauth-fill-fields.png" alt="New OAuth app form with fields for Name, Auth URL, Token URL, Client ID, Client Secret, Scopes, and Redirect URI" />
 </Frame>
@@ -78,10 +97,16 @@ register it with your data source's OAuth provider, then click
 
 <Step title="Authorize the app">
 
+Each user does this for their own account. An admin's token is
+never used for other users.
+
 Open the sidebar and go to **Connected apps**. Find your OAuth app
 and click **Authorize** to generate an access token.
 
-You'll need to repeat this step whenever the token expires.
+Cube refreshes the access token automatically as long as the provider
+issues a refresh token. A user needs to authorize again only if the
+refresh token expires or is revoked; **Connected apps** shows the
+current status.
 
 <Frame>
   <img src="/images/admin/connect-to-data/oauth-authorize.png" alt="Connected apps page showing the OAuth integration with an Authorize action" />
@@ -99,8 +124,9 @@ The configuration uses two options from the
 - [`driver_factory`][ref-driver-factory] — dynamically selects the
   authentication credential per request
 - [`context_to_orchestrator_id`][ref-context-to-orchestrator-id] — gives
-  each user their own query orchestrator instance (database connections,
-  execution queues, pre-aggregation table caches)
+  each user, and each of their tokens, a separate query orchestrator
+  instance (database connections, execution queues, pre-aggregation table
+  caches)
 
 ### Environment variables
 
@@ -119,6 +145,10 @@ CUBEJS_DB_DATABRICKS_ACCEPT_POLICY=true
 # Optional: specify a catalog
 CUBEJS_DB_DATABRICKS_CATALOG=my_catalog
 ```
+
+Use a token for the service account. If
+`CUBEJS_DB_DATABRICKS_OAUTH_CLIENT_ID` is set, the driver authenticates as
+that service principal and ignores the per-user `token`.
 
 </Tab>
 
@@ -140,10 +170,11 @@ CUBEJS_DB_SNOWFLAKE_ROLE=MY_ROLE
 
 ### Configuration file
 
-The examples below use Databricks. To target a different data source,
-swap `userCredentials.databricks` for the matching key (for example,
-`userCredentials.snowflake`) and update the `driver_factory` return
-value with the correct `type` and driver-specific options. See the
+The examples below use Databricks with an OAuth app named `databricks`.
+`userCredentials` is keyed by the **Name** of the OAuth app, so replace
+`databricks` with the name of your app. To target a different data
+source, also update the `driver_factory` return value with the correct
+`type` and driver-specific options. See the
 [data sources reference][ref-data-sources] for available drivers.
 
 <Tabs>
@@ -157,9 +188,9 @@ import os
 
 @config("driver_factory")
 def driver_factory(ctx: dict) -> dict:
-    # Extract the Cube Cloud security context, which contains
+    # Extract the Cube security context, which contains
     # per-user OAuth credentials when available.
-    # For other data sources, swap "databricks" for "snowflake", etc.
+    # "databricks" is the Name of the OAuth app.
     databricks_creds = (
         ctx
         .get("securityContext", {})
@@ -169,7 +200,8 @@ def driver_factory(ctx: dict) -> dict:
     )
 
     # Only use the OAuth token when the credential status is "active".
-    # An expired or revoked token falls back to the service account.
+    # Otherwise ("missing", "expired", or "error"), fall back to the
+    # service account.
     oauth_token = (
         databricks_creds.get("accessToken")
         if databricks_creds.get("status") == "active"
@@ -189,14 +221,17 @@ def driver_factory(ctx: dict) -> dict:
 @config("context_to_orchestrator_id")
 def context_to_orchestrator_id(ctx: dict) -> str:
     # Give each user a separate orchestrator instance (DB connections,
-    # execution queues, pre-aggregation caches)
-    username = (
-        ctx
-        .get("securityContext", {})
-        .get("cubeCloud", {})
-        .get("username", "default")
+    # execution queues, pre-aggregation caches). The driver is cached per
+    # orchestrator, so the key also changes with the user's token.
+    cube_cloud = ctx.get("securityContext", {}).get("cubeCloud", {})
+    username = cube_cloud.get("username", "default")
+    databricks_creds = cube_cloud.get("userCredentials", {}).get("databricks", {})
+    token_key = (
+        databricks_creds.get("issuedAt")
+        if databricks_creds.get("status") == "active"
+        else "fallback"
     )
-    return f"CUBE_APP_{username}"
+    return f"CUBE_APP_{username}_{token_key}"
 ```
 
 </Tab>
@@ -206,14 +241,15 @@ def context_to_orchestrator_id(ctx: dict) -> str:
 ```javascript cube.js
 module.exports = {
   driverFactory: ({ securityContext }) => {
-    // Extract the Cube Cloud security context, which contains
+    // Extract the Cube security context, which contains
     // per-user OAuth credentials when available.
-    // For other data sources, swap `databricks` for `snowflake`, etc.
+    // `databricks` is the Name of the OAuth app.
     const databricksCreds =
       securityContext?.cubeCloud?.userCredentials?.databricks ?? {};
 
     // Only use the OAuth token when the credential status is "active".
-    // An expired or revoked token falls back to the service account.
+    // Otherwise ("missing", "expired", or "error"), fall back to the
+    // service account.
     const oauthToken =
       databricksCreds.status === "active"
         ? databricksCreds.accessToken
@@ -230,10 +266,17 @@ module.exports = {
   },
 
   // Give each user a separate orchestrator instance (DB connections,
-  // execution queues, pre-aggregation caches)
+  // execution queues, pre-aggregation caches). The driver is cached per
+  // orchestrator, so the key also changes with the user's token.
   contextToOrchestratorId: ({ securityContext }) => {
     const username = securityContext?.cubeCloud?.username ?? "default";
-    return `CUBE_APP_${username}`;
+    const databricksCreds =
+      securityContext?.cubeCloud?.userCredentials?.databricks ?? {};
+    const tokenKey =
+      databricksCreds.status === "active"
+        ? databricksCreds.issuedAt
+        : "fallback";
+    return `CUBE_APP_${username}_${tokenKey}`;
   },
 };
 ```
@@ -244,13 +287,21 @@ module.exports = {
 
 ## How it works
 
-1. **User makes a request** — Cube Cloud attaches the user's OAuth
-   credentials to `securityContext.cubeCloud.userCredentials.<data_source>`
-   (for example, `.databricks` or `.snowflake`).
+1. **User makes a request** — Cube attaches the user's own OAuth
+   credentials to `securityContext.cubeCloud.userCredentials.<app_name>`,
+   where `<app_name>` is the **Name** of the OAuth app, as
+   `{ status, accessToken, accessTokenExpiresAt, issuedAt }`. `issuedAt`
+   changes whenever the token is replaced. Requests that aren't tied to a
+   Cube user carry no user credentials, so they also fall back to the
+   service account. This includes requests authenticated with your own JWT
+   or `checkAuth`, unless their security context sets
+   `cubeCloud.username`.
 
 2. **`driver_factory` resolves the credential** — If the credential status
-   is `active`, the user's OAuth token is used. Otherwise, Cube falls back
-   to the service account credential stored in environment variables.
+   is `active`, the user's OAuth token is used. Otherwise — the user hasn't
+   authorized (`missing`), or the token is `expired` or in `error` — Cube
+   falls back to the service account credential stored in environment
+   variables.
 
 3. **Per-user orchestrator** —
    [`context_to_orchestrator_id`][ref-context-to-orchestrator-id] returns
@@ -258,11 +309,18 @@ module.exports = {
    connection pool, execution queues, and pre-aggregation table cache.
    Without this, Cube would share a single cached connection across all
    users, causing one user's credentials to be reused for another user's
-   queries.
+   queries. Cube builds the driver once per orchestrator, so the key also
+   includes the token's `issuedAt`: when a user authorizes or their token
+   is refreshed, Cube builds a new connection with the current token. The
+   trade-off: each refresh starts the user on a new orchestrator with an
+   empty cache and new connections, and superseded orchestrators keep
+   theirs, which the liveness probe keeps testing, until they are evicted
+   from the orchestrator cache.
 
 [ref-config]: /reference/configuration/config
 [ref-driver-factory]: /reference/configuration/config#driver_factory
 [ref-context-to-orchestrator-id]: /reference/configuration/config#context_to_orchestrator_id
+[ref-oidc-per-user]: /admin/deployment/oidc#per-user-tokens
 [ref-databricks-jdbc]: /admin/connect-to-data/data-sources/databricks-jdbc
 [ref-snowflake]: /admin/connect-to-data/data-sources/snowflake
 [ref-data-sources]: /admin/connect-to-data/data-sources

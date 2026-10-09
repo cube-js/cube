@@ -46,6 +46,7 @@ pub struct FunctionExpression {
 pub enum Expr {
     Null,
     ConditionalMeasure(MemberExpression, FilterItem),
+    UnionPaddingNull,
     Member(MemberExpression),
     Reference(QualifiedColumnName),
     GroupAny(QualifiedColumnName),
@@ -80,6 +81,7 @@ impl Expr {
                     .with_measure_row_condition(Some(condition));
                 visitor.apply(&measure.member, context.node_processor(), templates)
             }
+            Self::UnionPaddingNull => templates.full_key_aggregate_union_null(),
             Self::Member(member) => {
                 let context = if let Some(self_context) = &member.context {
                     self_context.clone()

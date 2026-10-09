@@ -81,8 +81,11 @@ impl TopLevelPlanner {
         };
 
         let templates = self.query_tools.plan_sql_templates(is_external)?;
-        let physical_plan_builder =
-            PhysicalPlanBuilder::new(self.query_tools.query_tools().clone(), templates.clone());
+        let physical_plan_builder = PhysicalPlanBuilder::new(
+            self.query_tools.query_tools().clone(),
+            templates.clone(),
+            self.request.cubestore_union_full_key_aggregate(),
+        );
 
         // Substitute a cube's base SQL with its `originalSql` pre-aggregation table when:
         // reading (regular query), or building a rollup that opted in via

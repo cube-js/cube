@@ -155,6 +155,15 @@ impl SelectBuilder {
             .add_column(SchemaColumn::new(alias, Some(measure.clone())));
     }
 
+    pub fn add_union_padding_null_projection(&mut self, member: &Rc<MemberSymbol>, alias: String) {
+        self.projection_columns.push(AliasedExpr {
+            expr: Expr::UnionPaddingNull,
+            alias: alias.clone(),
+        });
+        self.result_schema
+            .add_column(SchemaColumn::new(alias, Some(member.clone())));
+    }
+
     pub fn add_count_all(&mut self, alias: String) {
         let func = Expr::Function(FunctionExpression {
             function: "COUNT".to_string(),
