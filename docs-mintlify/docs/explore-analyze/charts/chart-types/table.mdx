@@ -74,10 +74,13 @@ it adds rows. A dimension adds rows when, for at least one combination of values
 dimensions before it, it has more than one value. For example, in a table grouped by
 `category › product › sku`, where every product has exactly one SKU, grouping stops at
 `category`: each row shows its product and SKU side by side, rather than every product
-getting a header with a single row under it. The outermost row dimension always
-groups. If the result hits the query's row limit, every dimension except the innermost
-groups, because a partial result can't show which dimensions add rows. Because this
-depends on the data, a refresh or a filter change can add or remove group levels.
+getting a header with a single row under it.
+
+- The outermost row dimension always groups.
+- If the result hits the query's row limit, every dimension except the innermost
+  groups, since a partial result can't show which dimensions add rows.
+- Since this depends on the data, a refresh or a filter change can add or remove group
+  levels.
 
 Turning it on also adds a **Row grouping** section to the **Style** tab, with:
 
