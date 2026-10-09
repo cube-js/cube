@@ -8,7 +8,7 @@ use crate::queryplanner::topk::{
 };
 use crate::queryplanner::udfs::HllCardinality;
 use datafusion::arrow::compute::SortOptions;
-use datafusion::arrow::datatypes::{DataType, Schema};
+use datafusion::arrow::datatypes::{DataType, Schema, SchemaRef};
 use datafusion::common::tree_node::{Transformed, TreeNode};
 use datafusion::error::DataFusionError;
 use datafusion::execution::SessionState;
@@ -22,6 +22,7 @@ use datafusion::physical_plan::coalesce_partitions::CoalescePartitionsExec;
 use datafusion::physical_plan::expressions::{Column, PhysicalSortExpr};
 use datafusion::physical_plan::filter::FilterExec;
 use datafusion::physical_plan::sorts::sort::SortExec;
+use datafusion::physical_plan::udaf::AggregateFunctionExpr;
 use datafusion::physical_plan::{ExecutionPlan, PhysicalExpr};
 
 use datafusion::common::{DFSchema, DFSchemaRef, Spans};
@@ -627,6 +628,8 @@ pub fn plan_topk(
             upper_node,
             lower_node,
             aggregate,
+            initial_aggregate_expr,
+            physical_input_schema,
             group_expr_len,
             &agg_fun,
             ctx,
@@ -763,6 +766,8 @@ fn plan_topk_full_merge(
     upper_node: &ClusterAggregateTopKUpper,
     lower_node: &ClusterAggregateTopKLower,
     aggregate: Arc<dyn ExecutionPlan>,
+    aggregate_expr: Vec<Arc<AggregateFunctionExpr>>,
+    aggregate_input_schema: SchemaRef,
     group_expr_len: usize,
     agg_fun: &[(TopKAggregateFunction, &Vec<Expr>)],
     ctx: &SessionState,
@@ -779,7 +784,6 @@ fn plan_topk_full_merge(
         /*required_input_ordering*/ None,
     )?;
     let cluster_schema = cluster.schema();
-    let cluster_dfschema = DFSchema::try_from(cluster_schema.as_ref().clone())?;
 
     // Group by the key columns of the cluster output.
     let reagg_group = PhysicalGroupBy::new_single(
@@ -794,52 +798,20 @@ fn plan_topk_full_merge(
             .collect(),
     );
 
-    // Re-aggregate each value column with its own function: the worker emits final values, and
-    // sum-of-sum / min-of-min / max-of-max reproduces the global aggregate. Reuse the original
-    // aggregate UDFs, just repointed at the corresponding cluster output column.
-    let reagg_logical = lower_node
-        .aggregate_expr
-        .iter()
-        .enumerate()
-        .map(|(i, e)| {
-            let mut af = e.clone();
-            if let Expr::AggregateFunction(AggregateFunction { params, .. }) = &mut af {
-                let col_name = cluster_schema.field(group_expr_len + i).name().clone();
-                params.args = vec![Expr::Column(datafusion::common::Column::new(
-                    None::<TableReference>,
-                    col_name,
-                ))];
-            }
-            // Keep the original aggregate's output name so the physical schema matches the logical
-            // ClusterAggregateTopKUpper schema (else DF rejects the extension plan).
-            let out_name = lower_node.schema.field(group_expr_len + i).name().clone();
-            af.alias(out_name)
-        })
-        .collect_vec();
-    let reagg_exprs = reagg_logical
-        .iter()
-        .map(|e| {
-            create_aggregate_expr_and_maybe_filter(
-                e,
-                &cluster_dfschema,
-                &cluster_schema,
-                ctx.execution_props(),
-            )
-            .map(|(expr, _, _)| expr)
-        })
-        .collect::<Result<Vec<_>, DataFusionError>>()?;
-
-    // The Single-mode re-aggregate requires a single input partition. ClusterSend produces N>1
+    // The Final-mode re-aggregate requires a single input partition. ClusterSend produces N>1
     // partitions and EnforceDistribution is disabled in CubeStore, so fan the workers in explicitly
     // (otherwise SanityCheckPlan rejects the plan with a SinglePartition distribution error).
     let coalesced = Arc::new(CoalescePartitionsExec::new(cluster));
+    // Final mode is valid only because sum/min/max emit their accumulator state as the final
+    // value; re-running sum() over worker output would widen decimal precision a second time
+    // and break HAVING, which is typed against the single-sum type.
     let reagg = Arc::new(AggregateExec::try_new(
-        AggregateMode::Single,
+        AggregateMode::Final,
         reagg_group,
-        reagg_exprs,
+        aggregate_expr,
         vec![None; agg_fun.len()],
         coalesced,
-        cluster_schema.clone(),
+        aggregate_input_schema,
     )?);
     let reagg_schema = reagg.schema();
 
