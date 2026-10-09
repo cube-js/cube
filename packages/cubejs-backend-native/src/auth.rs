@@ -120,10 +120,22 @@ impl SqlAuthService for NodeBridgeAuthService {
 
         let request_id = Uuid::new_v4().to_string();
 
+        let meta = if request.database.is_some() {
+            let mut m = LoadRequestMeta::new(
+                "postgres".to_string(),
+                "sql".to_string(),
+                None,
+            );
+            m.set_database(request.database.clone());
+            Some(m)
+        } else {
+            None
+        };
+
         let extra = serde_json::to_string(&CheckSQLAuthTransportRequest {
             request: TransportAuthRequest {
                 id: format!("{}-span-1", request_id),
-                meta: None,
+                meta,
                 protocol: request.protocol,
                 method: request.method,
             },
