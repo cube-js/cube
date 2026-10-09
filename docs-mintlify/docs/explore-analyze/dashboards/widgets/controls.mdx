@@ -97,7 +97,7 @@ Empty, `null`, or unresolvable attribute values are skipped — the filter falls
 
 The user attribute default only seeds the filter's *initial* value. Viewers can still change the filter unless its [visibility](#visibility) is set to **Disabled**, in which case the resolved attribute value is locked against their own edits. Values passed via URL parameters also take precedence over user attribute defaults, so deep links continue to work.
 
-If a [parent control](#parent) drives this filter, the option the viewer is on decides it — unless the link they opened carries a value for this filter, which [wins at load](#sharing-the-current-selection). One that [keeps the filter as-is](#children) lets the attribute seed it, and one set to **Reset to default** returns the filter to the value it opens on *for that viewer* — the attribute value when one resolves, otherwise its own static default; with neither, its default is no value, so the reset clears it. One set to **Clear** empties it and the attribute does *not* seed it back: the filter stays unfiltered until the viewer sets it or a value arrives [in the URL](#sharing-the-current-selection).
+If a [parent control](#parent) drives this filter, the preset the viewer is on decides it — unless the link they opened carries a value for this filter, which [wins at load](#sharing-the-current-selection). One that [keeps the filter as-is](#children) lets the attribute seed it, and one set to **Reset to default** returns the filter to the value it opens on *for that viewer* — the attribute value when one resolves, otherwise its own static default; with neither, its default is no value, so the reset clears it. One set to **Clear** empties it and the attribute does *not* seed it back: the filter stays unfiltered until the viewer sets it or a value arrives [in the URL](#sharing-the-current-selection).
 
 #### Defaults resolved from the data
 
@@ -129,12 +129,12 @@ A filter with a default resolved from the data cannot be changed by hand — in 
 
 A muted note right after the filter's title, on the same line, names the source of its value, such as *First value of Status* or *Max by Count*. When the title leaves it too little room, the note is cut off with an ellipsis, and hovering it shows the whole note. On a published dashboard, the information icon at the end of the title line says the same: *This filter's value comes from First value of Status. Change it in the filter's settings.*
 
-The value is resolved for each viewer and never saved on the dashboard, so a published dashboard keeps following the data without being republished. A value set elsewhere still wins: a filter value passed [in the URL](#sharing-the-current-selection) replaces the resolved one, and so does a [parent control](#parent) option that sets this filter to a value. The resolved value itself is never written into the URL.
+The value is resolved for each viewer and never saved on the dashboard, so a published dashboard keeps following the data without being republished. A value set elsewhere still wins: a filter value passed [in the URL](#sharing-the-current-selection) replaces the resolved one, and so does a preset of a [parent control](#parent) that sets this filter to a value. The resolved value itself is never written into the URL.
 
-A parent control option set to [**Reset to default**](#children) returns the filter to the value the data resolves to, as if the dashboard had just opened. One set to **Clear** does not:
+A parent control's preset set to [**Reset to default**](#children) returns the filter to the value the data resolves to, as if the dashboard had just opened. One set to **Clear** does not:
 
 <Warning>
-Moving the parent to an option that sets or resets this filter gives it a value again. Until then, a parent option set to **Clear** leaves a filter with a default resolved from the data empty: the default is not resolved again, and because the filter cannot be changed by hand, the viewer cannot fill it either. Its charts stay unfiltered while that option is on.
+Moving the parent to a preset that sets or resets this filter gives it a value again. Until then, a parent preset set to **Clear** leaves a filter with a default resolved from the data empty: the default is not resolved again, and because the filter cannot be changed by hand, the viewer cannot fill it either. Its charts stay unfiltered while that preset is on.
 </Warning>
 
 A [faceted filter](#faceted-filters) resolves its default inside its facet scope, so the default is always a value its own value list offers, and it resolves again when a sibling filter changes. For a measure of another view, each sibling's condition is carried over to that view's matching dimension, and a condition with no match there leaves the filter with no value rather than resolving over rows its value list excludes. The warning icon described below names that case.
@@ -261,7 +261,7 @@ A value that isn't one of the switcher's [allowed granularities](#allowed-granul
 The attribute is resolved for the viewer, not baked into the dashboard. Editing the attribute's value changes what that viewer opens on the next time the dashboard loads; it never rewrites the published dashboard, so the default granularity you set in the builder stays intact for everyone else.
 </Note>
 
-Viewers can still switch granularities unless the control's [visibility](#visibility) is set to **Disabled**, and their own pick outranks the attribute for the rest of the session. A granularity passed [in the URL](#sharing-the-current-selection) outranks both, so deep links continue to work. If a [parent control](#parent) drives this switcher and the option the viewer is on maps a granularity to it, that mapping decides the granularity — a mapping the author made for that arrangement is more specific than a per-viewer starting point — unless a granularity for this switcher came [in the link](#sharing-the-current-selection), which wins at load. An option that [keeps the switcher as-is](#children) has no opinion, so the attribute still seeds it. One set to **Reset to default** returns the switcher to the granularity it opens on *for that viewer* — the attribute granularity when one resolves, otherwise the saved [default granularity](#default-granularity) — and clears it when neither resolves, a grain control's default being no grain. An option set to **Clear** empties the switcher and the attribute does *not* seed it back: it stays empty until the viewer picks a granularity or one arrives [in the URL](#sharing-the-current-selection), so each chart falls to the granularity it was built with.
+Viewers can still switch granularities unless the control's [visibility](#visibility) is set to **Disabled**, and their own pick outranks the attribute for the rest of the session. A granularity passed [in the URL](#sharing-the-current-selection) outranks both, so deep links continue to work. If a [parent control](#parent) drives this switcher and the preset the viewer is on maps a granularity to it, that mapping decides the granularity — a mapping the author made for that arrangement is more specific than a per-viewer starting point — unless a granularity for this switcher came [in the link](#sharing-the-current-selection), which wins at load. A preset that [keeps the switcher as-is](#children) has no opinion, so the attribute still seeds it. One set to **Reset to default** returns the switcher to the granularity it opens on *for that viewer* — the attribute granularity when one resolves, otherwise the saved [default granularity](#default-granularity) — and clears it when neither resolves, a grain control's default being no grain. A preset set to **Clear** empties the switcher and the attribute does *not* seed it back: it stays empty until the viewer picks a granularity or one arrives [in the URL](#sharing-the-current-selection), so each chart falls to the granularity it was built with.
 
 ## Field switcher
 
@@ -323,44 +323,44 @@ A chart with a [period comparison][ref-charts] is a narrower case: the compariso
 
 ## Parent
 
-A parent control is a dropdown of options you define. Picking one re-points a whole row of other controls at once — so a viewer makes a single choice instead of adjusting three or four filters by hand.
+A parent control is a dropdown of presets you define. Picking one re-points a whole row of other controls at once — so a viewer makes a single choice instead of adjusting three or four filters by hand.
 
 Unlike the other control types, a parent control targets no member and never touches a chart query directly. It applies values to the controls it *drives* — its **children** — and those children then apply themselves to charts exactly as if the viewer had operated each one. Filters, time granularity switchers and [field switchers](#field-switcher) can all be children; a parent control cannot be a child of another parent control.
 
-For example, an **Analysis** parent with the options `Retail`, `Wholesale` and `Promo` can set a **Channel** filter, a **Minimum order value** filter, and a **Date range** filter to a different combination for each option. Viewers see one dropdown; you can [hide](#visibility) the children if the individual values aren't worth showing.
+For example, an **Analysis** parent with the presets `Retail`, `Wholesale` and `Promo` can set a **Channel** filter, a **Minimum order value** filter, and a **Date range** filter to a different combination for each preset. Viewers see one dropdown; you can [hide](#visibility) the children if the individual values aren't worth showing.
 
-In the [dashboard builder][ref-workbooks], open the **Add Controls** menu in the toolbar and choose **Parent**, then click **Configure Parent** to set it up. The editor gives each option its own tab, and lists every filter, time granularity switcher and [field switcher](#field-switcher) on the dashboard inside it — so one tab is one complete arrangement, and you can read off what an option does to the whole row at a glance.
+In the [dashboard builder][ref-workbooks], open the **Add Controls** menu in the toolbar and choose **Parent**, then click **Configure Parent** to set it up — or let [**Add to Parent control**](#save-preset) create one from the values the controls hold. The editor gives each preset its own tab, and lists every filter, time granularity switcher and [field switcher](#field-switcher) on the dashboard inside it — so one tab is one complete arrangement, and you can read off what a preset does to the whole row at a glance.
 
 <Info>
 A parent added to an empty dashboard has nothing to drive yet. A control added later appears in the tabs by itself, but is not driven until you save the parent's settings again.
 </Info>
 
-### Options
+### Presets
 
-Each option is a tab across the top of the editor. Add one with **+** at the end of the tab strip, double-click a tab's title to rename it — or press <kbd>F2</kbd> with the tab focused — and delete one with the ✕ that appears on it when you hover. The first tab cannot be deleted. A parent control can hold up to 50 options.
+Each preset is a tab across the top of the editor. Add one with **+** at the end of the tab strip; it is named **Preset**, or **Preset 2**, **Preset 3** and so on when that name is taken. Double-click a tab's title to rename it — or press <kbd>F2</kbd> with the tab focused — and delete one from the **⋮** menu that appears on the tab when you hover, which offers **Rename** and **Delete preset**. A parent control needs at least one preset, so **Delete preset** is greyed out while only one is left. A parent control can hold up to 50 presets.
 
-A parent control created without options opens on a single tab named **Default**. That is a real option — saved with the control and offered in the viewer's dropdown like any other — so rename it if that label isn't what viewers should see.
+A parent control created without presets opens on a single tab named **Default**. That is a real preset — saved with the control and offered in the viewer's dropdown like any other — so rename it if that label isn't what viewers should see.
 
-Renaming an option later doesn't disturb the values you've mapped to it, so you can reword a label without redoing the mapping — but if the control has a [user attribute default](#parent-user-attribute-default), that match is by label, so rename the attribute's values with it.
+Renaming a preset later doesn't disturb the values you've mapped to it, so you can reword a label without redoing the mapping — but if the control has a [user attribute default](#parent-user-attribute-default), that match is by label, so rename the attribute's values with it.
 
 ### Children
 
-Each control on an option's tab carries a dropdown saying what that option does to it. Every option/child pair is in one of four states:
+Each control on a preset's tab carries a dropdown saying what that preset does to it. Every preset/child pair is in one of four states:
 
-| State | What happens when the viewer picks that option |
+| State | What happens when the viewer picks that preset |
 |---|---|
 | **Set to** | The child is set to the value you choose. The row renders *that child's own control* — a time granularity switcher shows its granularity picker, limited to the granularities that switcher allows; a filter shows its operator and value inputs; a field switcher shows its member picker, limited to the members that switcher offers — its **Alternatives**, plus the replaced member. So the values you can offer are exactly the ones a viewer could pick in the child itself. |
 | **Clear** | The child stops applying, as if the viewer had cleared it: a filter leaves its charts unfiltered, a time granularity switcher hands each chart back to the granularity it was built with. Offered for filters and time granularity switchers only — a field switcher always resolves to some member, so it has no cleared state. |
 | **Reset to default** | The child is put back to the value it opens on *for that viewer*. When the child takes its default from a user attribute — a [filter](#user-attribute-default)'s, a [time granularity switcher](#time-granularity-user-attribute-default)'s, or a [field switcher](#field-switcher-user-attribute-default)'s — that's the attribute value; for a filter whose default is [resolved from the data](#defaults-resolved-from-the-data), it's the value the data resolves to; otherwise it's the child's own static default: a filter's [default value](#default-values), a time granularity switcher's [default granularity](#default-granularity), a field switcher's [default option](#field-switcher-default-option) — and where the child has none, its default *is* no value, so the reset clears it: the filter stops filtering, the time granularity switcher stops imposing a granularity. (A field switcher never ends up empty: with no default option it resets to the member it replaces.) |
-| **Keep as-is** | The child is left alone — it keeps whatever value the viewer already had. Use this deliberately when an option shouldn't have an opinion about a particular child. |
+| **Keep as-is** | The child is left alone — it keeps whatever value the viewer already had. Use this deliberately when a preset shouldn't have an opinion about a particular child. |
 
-A control you haven't touched on a tab still reads as one of these: the **first** tab starts every control on **Reset to default**, and every later tab starts them on **Keep as-is**, so a new option changes only what you actually set. The first tab's displayed defaults become real mappings when you save — see [what a save writes](#mapping-status-on-child-controls).
+A control you haven't touched on a tab still reads as one of these: the **first** tab starts every control on **Reset to default**, and every later tab starts them on **Keep as-is**, so a new preset changes only what you actually set. The first tab's displayed defaults become real mappings when you save — see [what a save writes](#mapping-status-on-child-controls).
 
 While the parent's settings are open, the controls it drives are outlined on the canvas, so you can see the scope of the mapping at a glance.
 
 ### One parent per child
 
-A control can be driven by only one parent control at a time. Saving a parent **moves** onto it every control it drives, rather than sharing them — and that includes rows you never touched on the **first** option's tab, since [the save](#mapping-status-on-child-controls) writes the **Reset to default** they display. The row names the parent that currently owns it, on any row this parent would drive. A row left **Keep as-is** is the exception: it's the one state that doesn't drive, so it moves nothing.
+A control can be driven by only one parent control at a time. Saving a parent **moves** onto it every control it drives, rather than sharing them — and that includes rows you never touched on the **first** preset's tab, since [the save](#mapping-status-on-child-controls) writes the **Reset to default** they display. The row names the parent that currently owns it, on any row this parent would drive. A row left **Keep as-is** is the exception: it's the one state that doesn't drive, so it moves nothing.
 
 ### Mapping status on child controls
 
@@ -368,17 +368,17 @@ Once a dashboard has at least one parent control, every filter, time granularity
 
 | Status | Meaning |
 |---|---|
-| **Fully driven** | Every option of the owning parent drives this control. |
-| **Partly driven** | Only some of the owning parent's options drive this control; the rest keep it as-is. |
-| **Not driven** | No parent control drives this one — the parent hasn't been saved since this control was added, every option keeps it as-is, or it was detached with [**Driven by parent** → **None**](#driven-by-parent). |
+| **Fully driven** | Every preset of the owning parent drives this control. |
+| **Partly driven** | Only some of the owning parent's presets drive this control; the rest keep it as-is. |
+| **Not driven** | No parent control drives this one — the parent hasn't been saved since this control was added, every preset keeps it as-is, or it was detached with [**Driven by parent** → **None**](#driven-by-parent). |
 
-**Set to**, **Clear** and **Reset to default** all count as driving — each is something the option does to the control; only **Keep as-is** doesn't.
+**Set to**, **Clear** and **Reset to default** all count as driving — each is something the preset does to the control; only **Keep as-is** doesn't.
 
-Saving the parent's settings fills in the **first** option's tab: every row there with no mapping yet is written as the [**Reset to default** it displays](#children), and no later tab is touched. So a parent that still has only its first option drives *every* control on the dashboard the moment you save it, each reading **Fully driven** before you have mapped anything by hand. Add a second option and saving moves them the other way: it leaves untouched controls as-is, so those same controls read **Partly driven** until that option drives them too.
+Saving the parent's settings fills in the **first** preset's tab: every row there with no mapping yet is written as the [**Reset to default** it displays](#children), and no later tab is touched. So a parent that still has only its first preset drives *every* control on the dashboard the moment you save it, each reading **Fully driven** before you have mapped anything by hand. Add a second preset and saving moves them the other way: it leaves untouched controls as-is, so those same controls read **Partly driven** until that preset drives them too.
 
 This reaches controls another parent already drove. [Only one parent drives a control](#one-parent-per-child), so saving a second parent takes them over.
 
-The [**Keep as-is** exception](#one-parent-per-child) is how you keep a control with its original parent: set it to **Keep as-is** on the second parent's first option, so its save writes nothing for that control — and leave the control alone on that parent's other options, since any one of them driving it claims the control anyway.
+The [**Keep as-is** exception](#one-parent-per-child) is how you keep a control with its original parent: set it to **Keep as-is** on the second parent's first preset, so its save writes nothing for that control — and leave the control alone on that parent's other presets, since any one of them driving it claims the control anyway.
 
 So on a dashboard with more than one parent control, map the one you are editing deliberately rather than saving it to dismiss the dialog — the [owner note](#one-parent-per-child) tells you which controls a save would claim, but only if you read the rows.
 
@@ -386,17 +386,17 @@ Click the indicator to open that control's own settings, at its **Driven by pare
 
 ### Driven by parent
 
-Once a dashboard has a parent control, every filter, time granularity switcher and [field switcher](#field-switcher) carries a **Driven by parent** section in its own settings. It names the parent driving the control, or offers only **None** when nothing drives it yet, so you can see what drives a control without opening the parent. Picking **None** detaches a driven control: the parent's mappings for it are dropped on every option, so it stops driving, and the control keeps whatever value it is showing.
+Once a dashboard has a parent control, every filter, time granularity switcher and [field switcher](#field-switcher) carries a **Driven by parent** section in its own settings. It names the parent driving the control, or offers only **None** when nothing drives it yet, so you can see what drives a control without opening the parent. Picking **None** detaches a driven control: the parent's mappings for it are dropped on every preset, so it stops driving, and the control keeps whatever value it is showing.
 
-That detachment is not durable on its own: it holds only until the parent's settings are next saved, which drives the control again. To survive that parent's own saves, set the control to **Keep as-is** on the parent's **first** option — that is a mapping of its own, and [the save](#mapping-status-on-child-controls) fills in only controls that have none. The later options need nothing, since **None** has already cleared their mappings and untouched means **Keep as-is** there. That binds only the parent you set it in — a *different* parent claims the control on its own save unless you set it to **Keep as-is** on that parent's first option too.
+That detachment is not durable on its own: it holds only until the parent's settings are next saved, which drives the control again. To survive that parent's own saves, set the control to **Keep as-is** on the parent's **first** preset — that is a mapping of its own, and [the save](#mapping-status-on-child-controls) fills in only controls that have none. The later presets need nothing, since **None** has already cleared their mappings and untouched means **Keep as-is** there. That binds only the parent you set it in — a *different* parent claims the control on its own save unless you set it to **Keep as-is** on that parent's first preset too.
 
-Mapping is the one thing you cannot do from here — the values belong to the parent's options. To map a control, or hand it to a different parent, open that parent's settings and set the control's row on each option's tab.
+Mapping is the one thing you cannot do from here — the values belong to the parent's presets. To map a control, or hand it to a different parent, open that parent's settings and set the control's row on each preset's tab.
 
-### Default option
+### Default preset {#default-option}
 
-A parent control's default is set the same way a filter's static default is — by interacting with the control in the dashboard builder. The option you select is saved on the widget and applied to every viewer when the dashboard loads; there's no static default field in the parent's settings.
+A parent control's default is set the same way a filter's static default is — by interacting with the control in the dashboard builder. The preset you select is saved on the widget and applied to every viewer when the dashboard loads; there's no static default field in the parent's settings.
 
-Picking in the builder also applies that option to the children and saves the result, so a published dashboard opens in a consistent state. What each state saves:
+Picking in the builder also applies that preset to the children and saves the result, so a published dashboard opens in a consistent state. What each state saves:
 
 | State | What picking it in the builder saves |
 |---|---|
@@ -407,13 +407,13 @@ Picking in the builder also applies that option to the children and saves the re
 
 A reset that resolved its value from *your* [user attribute](#user-attribute-default) saves the child empty, so your own value is never pinned onto everyone and each viewer re-seeds from their own attribute. That clears the child's saved default too: a viewer whose attribute doesn't resolve then has nothing to fall back on, so re-set that default by hand if you want it kept.
 
-If you never pick an option, the parent opens with nothing selected and the children use their own defaults. [Clearing the parent](#clearing-and-resetting) later leaves the children where they are. So a parent that opens on nothing is not the same as children on their original defaults: pick an option in the builder and then clear the parent, and the children keep the defaults that option wrote. Set them by hand if that isn't what you want to publish. Deleting the option that was serving as the default clears it, and the parent goes back to opening on nothing.
+If you never pick a preset, the parent opens with nothing selected and the children use their own defaults. [Clearing the parent](#clearing-and-resetting) later leaves the children where they are. So a parent that opens on nothing is not the same as children on their original defaults: pick a preset in the builder and then clear the parent, and the children keep the defaults that preset wrote. Set them by hand if that isn't what you want to publish. Deleting the preset that was serving as the default clears it, and the parent goes back to opening on nothing.
 
 #### User attribute default {#parent-user-attribute-default}
 
-The default above is one arrangement for everyone. To give each viewer their own, set **Default value** to **From user attribute** in the parent control's settings and pick a [user attribute][ref-user-attributes]. When the dashboard loads, Cube reads that attribute for the current viewer and opens the control on the option it names — and drives the children with it, exactly as if the viewer had picked that option themselves.
+The default above is one arrangement for everyone. To give each viewer their own, set **Default value** to **From user attribute** in the parent control's settings and pick a [user attribute][ref-user-attributes]. When the dashboard loads, Cube reads that attribute for the current viewer and opens the control on the preset it names — and drives the children with it, exactly as if the viewer had picked that preset themselves.
 
-This is how you ship one dashboard that opens differently per audience: a **Reporting period** parent whose options are `Month` and `Quarter`, opening on whichever one the viewer's `reporting_period` attribute says, with every control behind it already set to match.
+This is how you ship one dashboard that opens differently per audience: a **Reporting period** parent whose presets are `Month` and `Quarter`, opening on whichever one the viewer's `reporting_period` attribute says, with every control behind it already set to match.
 
 To configure it:
 
@@ -422,31 +422,63 @@ To configure it:
    In the dashboard builder, click **Configure Parent** on the control.
  </Step>
  <Step title="Choose From user attribute">
-   Below the option tabs — next to **Visibility** — set the **Default value** dropdown to **From user attribute**.
+   Below the preset tabs — next to **Visibility** — set the **Default value** dropdown to **From user attribute**.
  </Step>
  <Step title="Pick the attribute">
    Select the [user attribute][ref-user-attributes] to resolve. Only attributes defined in your account appear in the picker.
  </Step>
 </Steps>
 
-The attribute value is matched against the **option labels**, ignoring case and surrounding spaces — an attribute reading `quarter` selects the option labelled `Quarter`. Give the options the labels your attribute already uses, or adjust the attribute values to match.
+The attribute value is matched against the **preset labels**, ignoring case and surrounding spaces — an attribute reading `quarter` selects the preset labelled `Quarter`. Give the presets the labels your attribute already uses, or adjust the attribute values to match.
 
 <Warning>
-Renaming an option leaves its child mappings intact, but the attribute match is by label — so a rename that moves a label away from the values your attribute holds silently stops it resolving, with no error. The control falls back to the option you picked as the default. Rename labels and attribute values together.
+Renaming a preset leaves its child mappings intact, but the attribute match is by label — so a rename that moves a label away from the values your attribute holds silently stops it resolving, with no error. The control falls back to the preset you picked as the default. Rename labels and attribute values together.
 </Warning>
 
 | Attribute type | How it's applied |
 |---|---|
-| **String**, **Number** | Matched against the option labels as a single value. |
-| **String array**, **Number array** | The first entry that names an option wins. A parent control is single-select, so the rest are ignored. |
+| **String**, **Number** | Matched against the preset labels as a single value. |
+| **String array**, **Number array** | The first entry that names a preset wins. A parent control is single-select, so the rest are ignored. |
 
-If the value matches no option — or is empty, `null`, or unresolvable — the control falls back to the [default option](#default-option) you picked, and the children keep the arrangement that goes with it.
+If the value matches no preset — or is empty, `null`, or unresolvable — the control falls back to the [default preset](#default-option) you picked, and the children keep the arrangement that goes with it.
 
 <Note>
 The attribute is resolved for the viewer, not baked into the dashboard. Editing the attribute's value changes what that viewer opens on the next time the dashboard loads; it never rewrites the published dashboard, so the default you picked in the builder stays intact for everyone else.
 </Note>
 
-Viewers can still switch to another option unless the control's [visibility](#visibility) is set to **Disabled**, and their own pick outranks the attribute for the rest of the session. A shared link never changes which option the recipient opens on: a parent control has no parameter of its own, so they resolve their own attribute, or the [default option](#default-option), exactly as they would without a link. What a link does carry is the children of an option the sharer picked **by hand** — the values of the ones it **Set to** — and [those win at load](#sharing-the-current-selection) over what the recipient's own option would have set. An option that resolved from the sharer's own attribute puts [nothing in the link](#sharing-the-current-selection), children included, so the recipient's own option decides every child it drives. A control the sharer set by hand still travels by the ordinary rules.
+Viewers can still switch to another preset unless the control's [visibility](#visibility) is set to **Disabled**, and their own pick outranks the attribute for the rest of the session. A shared link never changes which preset the recipient opens on: a parent control has no parameter of its own, so they resolve their own attribute, or the [default preset](#default-option), exactly as they would without a link. What a link does carry is the children of a preset the sharer picked **by hand** — the values of the ones it **Set to** — and [those win at load](#sharing-the-current-selection) over what the recipient's own preset would have set. A preset that resolved from the sharer's own attribute puts [nothing in the link](#sharing-the-current-selection), children included, so the recipient's own preset decides every child it drives. A control the sharer set by hand still travels by the ordinary rules.
+
+### Adding the controls' values as a preset {#save-preset}
+
+Instead of mapping a preset row by row, you can set the controls on the dashboard itself and add what they hold to a parent control. In the [dashboard builder][ref-workbooks] of a published dashboard, pick values in its filters, time granularity switchers and field switchers. As soon as a control holds a value other than the one it was published with — a value you cleared, or one a parent control's preset moved, counts too — a **Control values changed** button appears in the toolbar, after **Add Other Widgets**. It follows the control values only: adding, moving or editing a widget neither shows nor hides it, and a control added since the last publish has no published value to differ from. Before the dashboard's first publish it never shows.
+
+Its menu offers two actions. Either one closes the menu and puts every control back on its published value, so the button goes away:
+
+- **Reset to published defaults** does only that, and keeps every other change in the draft. When the values were the draft's only change, the [version button][ref-publishing] goes back to the published version.
+- **Add to Parent control** first saves the values the controls hold as a new preset, described below.
+
+**Add to Parent control** names the new preset **Preset**, or **Preset 2** and so on when that name is taken, and adds it according to what drives the controls:
+
+| The dashboard has | What Add to Parent control does |
+|---|---|
+| No parent control driving any control | Adds a parent control titled **Presets** at the top of the dashboard, beside the other controls, with two presets: **Default**, which resets every control, and **Preset**. **Default** is its [default preset](#default-option). |
+| One parent control driving every filter, time granularity switcher and field switcher on the dashboard (each reads [**Fully driven** or **Partly driven**](#mapping-status-on-child-controls)) | Adds **Preset** to that parent, and adds **Default** before it when none of its presets resets every control. |
+
+On the new preset's tab, each control whose value you changed is **Set to** the value it now holds (**Clear**, for a filter or time granularity switcher you cleared), and each control you left alone is **Reset to default**, so it still opens on its own default for each viewer, a [user attribute](#user-attribute-default) value included.
+
+<Info>
+One **Undo** reverses either action and gives the controls back the values you picked; after **Add to Parent control** it also removes the new parent control or preset. Otherwise those values are gone from the controls: **Add to Parent control** keeps them only in the new preset, and puts the parent back on the preset it was published on (**Default**, for a parent it creates).
+</Info>
+
+So the dashboard still opens on its published values, and the preset is one pick away: once you publish, viewers choose **Preset** in the parent control to switch to the values you saved. The parent's settings open on the new preset's tab, so you can [rename it](#presets) and check its rows. The preset is already part of the draft: **Cancel** closes the settings and keeps it.
+
+When **Add to Parent control** can't add a preset, it stays in the menu, greyed out, and hovering it says why. **Reset to published defaults** still works:
+
+| Tooltip | When |
+|---|---|
+| **A Parent control drives only some of the controls.** | More than one parent control drives controls on the dashboard, or the one that does leaves some of them **Not driven**. |
+| **A preset already sets these values.** | The controls hold exactly what one of the driving parent's presets sets, so a new preset would repeat it — as after picking that preset in the builder, which [saves its children's values](#default-option). |
+| **The controls hold their published values; only the Parent control's pick changed.** | Only the parent control's own pick differs from the published version: the preset you picked leaves every control on its published value. |
 
 ## Clearing and resetting
 
@@ -465,7 +497,7 @@ This is the control's *own* published value, which is not always what a [parent 
 
 On a published dashboard, clearing or resetting changes only what that viewer sees, and writes nothing back to the dashboard. [Neither action is recorded in the URL](#sharing-the-current-selection), so a reload reopens the control on whatever it opens on for that viewer. A control whose [visibility](#visibility) is **Disabled** greys out whichever action it shows, so a viewer can see the state without changing it.
 
-In the [dashboard builder][ref-workbooks] both write the draft. **Reset to default** returns the control to the published value, so that control has no unsaved change left on it. **Clear** removes the control's saved default, which viewers see once you publish; clearing a [parent control](#parent) removes its own saved option and leaves the children's saved defaults alone.
+In the [dashboard builder][ref-workbooks] both write the draft. **Reset to default** returns the control to the published value, so that control has no unsaved change left on it. **Clear** removes the control's saved default, which viewers see once you publish; clearing a [parent control](#parent) removes the preset saved as its default and leaves the children's saved defaults alone.
 
 ## Sharing the current selection
 
@@ -506,10 +538,10 @@ Outside `between`, a `value` may still be a list, and what a condition makes of 
 What travels in the link, and what wins when a link value arrives:
 
 - **Only what the viewer chose.** Values that came from the control's own configuration — a static default, a [default granularity](#default-granularity), a filter default [resolved from the data](#defaults-resolved-from-the-data) — are not written into the URL. Every viewer already gets those from the dashboard itself, and leaving them out means a link stays correct after the dashboard's defaults change.
-- **Never a personalized default.** A value resolved from a [user attribute](#user-attribute-default) stays out of the link — whether it seeded a filter, a [time granularity switcher](#time-granularity-user-attribute-default) or a [field switcher](#field-switcher-user-attribute-default) directly, or reached one through a [parent control](#parent) opening on the viewer's own option. Sharing a dashboard never pins your attribute value onto the recipient; they see it through their own attributes.
-- **Every control's pick, together.** Picking in several controls puts them all in the link, including when a [parent control](#parent) sets several children at once — filters, time granularity switchers and [field switchers](#field-switcher) alike. A parent control isn't serialized itself — the link carries the values the **Set to** children of an option the sharer *picked* ended up with, while the parent dropdown opens on whatever default it resolves for the recipient, which may not be that option. An option the sharer never picked, resolved from the default or their own attribute, seeds its children as defaults and puts nothing in the link. What happens to children the option cleared or reset is the bullet below.
-- **Neither a clear nor a reset.** [Clearing or resetting](#clearing-and-resetting) a control drops its parameter rather than recording the result, so the control is indistinguishable in the link from one nobody touched and the recipient opens it on whatever it opens on for them. The same holds for [what a parent option did](#children) to its children: of the four states, only **Set to** puts a value in the link by way of the option. **Clear** leaves the child empty, and **Reset to default** lands it on a configuration or attribute value — or clears it where the child has no default — none of which go in the URL, by **Only what the viewer chose** and **Never a personalized default** above. So for either state the link carries nothing for that child. A child left **Keep as-is** is untouched by the option, so it travels or not by the rules above: the viewer's own earlier pick is in the link, a default is not.
-- **A link value wins at load.** A parent opening on its own resolved option leaves alone any control the link claimed, so the recipient sees the shared value rather than what that option maps. For a child the link carries nothing for, their own option decides: the same option as the sharer's re-applies that clear or reset, a different one does whatever it maps, and a parent resolving no option leaves the control on its own default. Picking an option by hand afterwards applies it, link or no link.
+- **Never a personalized default.** A value resolved from a [user attribute](#user-attribute-default) stays out of the link — whether it seeded a filter, a [time granularity switcher](#time-granularity-user-attribute-default) or a [field switcher](#field-switcher-user-attribute-default) directly, or reached one through a [parent control](#parent) opening on the viewer's own preset. Sharing a dashboard never pins your attribute value onto the recipient; they see it through their own attributes.
+- **Every control's pick, together.** Picking in several controls puts them all in the link, including when a [parent control](#parent) sets several children at once — filters, time granularity switchers and [field switchers](#field-switcher) alike. A parent control isn't serialized itself — the link carries the values the **Set to** children of a preset the sharer *picked* ended up with, while the parent dropdown opens on whatever default it resolves for the recipient, which may not be that preset. A preset the sharer never picked, resolved from the default or their own attribute, seeds its children as defaults and puts nothing in the link. What happens to children the preset cleared or reset is the bullet below.
+- **Neither a clear nor a reset.** [Clearing or resetting](#clearing-and-resetting) a control drops its parameter rather than recording the result, so the control is indistinguishable in the link from one nobody touched and the recipient opens it on whatever it opens on for them. The same holds for [what a parent preset did](#children) to its children: of the four states, only **Set to** puts a value in the link by way of the preset. **Clear** leaves the child empty, and **Reset to default** lands it on a configuration or attribute value — or clears it where the child has no default — none of which go in the URL, by **Only what the viewer chose** and **Never a personalized default** above. So for either state the link carries nothing for that child. A child left **Keep as-is** is untouched by the preset, so it travels or not by the rules above: the viewer's own earlier pick is in the link, a default is not.
+- **A link value wins at load.** A parent opening on its own resolved preset leaves alone any control the link claimed, so the recipient sees the shared value rather than what that preset maps. For a child the link carries nothing for, their own preset decides: the same preset as the sharer's re-applies that clear or reset, a different one does whatever it maps, and a parent resolving no preset leaves the control on its own default. Picking a preset by hand afterwards applies it, link or no link.
 - **Written out on published dashboards only.** Reading these parameters works anywhere, including [embedded][ref-embed-url-filters] dashboards; it's the writing that is published-only. In the dashboard builder the URL is left to the editing session, so changing a control there doesn't rewrite it.
 
 When a dashboard opens with these parameters, they are applied on top of whatever defaults the controls carry. A parameter is ignored when nothing on the dashboard can honor it — there is no matching control for that member, the requested granularity isn't in the switcher's [allowed granularities](#allowed-granularities), or the selected member is one the field switcher doesn't offer — its **Alternatives**, plus the replaced member.
@@ -582,6 +614,7 @@ For filter, time granularity, and field switcher controls — the three that map
 [ref-print-version]: /docs/explore-analyze/dashboards#print-version
 
 [ref-workbooks]: /docs/explore-analyze/workbooks
+[ref-publishing]: /docs/explore-analyze/dashboards#publishing-and-versions
 [ref-charts]: /docs/explore-analyze/dashboards/widgets/charts
 [ref-granularities]: /docs/data-modeling/dimensions
 [ref-user-attributes]: /admin/users-and-permissions/user-attributes
