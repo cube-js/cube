@@ -10,8 +10,7 @@ use std::rc::Rc;
 
 /// Folds `sql: "{base}"` multi-stage measures whose leaves read one rollup
 /// under different time filters into one scan of conditional aggregates; a key
-/// with no rows in a measure's window still reads NULL. Runs after
-/// pre-aggregation matching: it only folds leaves that read a rollup.
+/// with no rows in a measure's window still reads NULL.
 pub struct FilteredLeafMergeOptimizer<'a> {
     /// Date range of every usage that states one, by usage index.
     usage_ranges: HashMap<usize, (String, String)>,

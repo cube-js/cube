@@ -1,8 +1,5 @@
-//! Multi-stage measures that read one base measure over different date
-//! windows of the same rollup, folded into one scan of it. Every query runs
-//! folded, unfolded (one scan per window) and over the source tables with
-//! pre-aggregations switched off. Folding is an optimization, so all three
-//! must agree.
+//! Windowed multi-stage measures folded into one rollup scan. Every query
+//! runs folded, unfolded and over the source tables; all three must agree.
 //!
 //! With the rollup in CubeStore the unfolded query is left out of the
 //! comparison: it joins the windows on their keys, and CubeStore drops the
@@ -234,10 +231,9 @@ async fn test_folded_scan_keeps_order_limit_and_measure_filter() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn test_windows_by_day_in_non_utc_timezone() {
-    // The query reads the stored days in another zone: each window's
-    // condition must render against the stored column the way the scan's
-    // filter does. The fixture builds the rollup in UTC, so only the folded
-    // and unfolded queries are compared.
+    // Each window's condition must render against the stored column the way
+    // the scan's filter does. The rollup is built in UTC, so the source tables
+    // are left out of the comparison.
     for tz in [Tz::America__Los_Angeles, Tz::Asia__Kamchatka] {
         let ctx = TestContext::new_with_timezone(schema_with_rollup(false), tz).unwrap();
         let query = indoc! {"
@@ -364,10 +360,8 @@ async fn test_ungrouped_windows() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn test_masked_windows_do_not_fold() {
-    // A constant mask replaces the whole aggregate, so a folded measure would
-    // read the mask, not NULL, for a key with no rows in its window. Through
-    // a view the mask may sit on the view member or on the cube member it
-    // reads.
+    // A folded measure would read the mask, not NULL, for a key with no rows
+    // in its window. Through a view the mask may sit on either member.
     let cases = [
         ("orders", "orders.total_amount"),
         ("orders", "orders.amount_mid_week"),
@@ -461,9 +455,8 @@ async fn test_view_windows() {
 
 #[test]
 fn test_folded_scan_reads_only_the_widest_usage() {
-    // Each window matched the rollup with its own date range. The folded scan
-    // reads the usage whose range covers all of them, and only that usage is
-    // reported: the others would have their partitions loaded for nothing.
+    // The folded scan reads the usage whose range covers every window, and only
+    // that usage is reported, so no other partitions are loaded for nothing.
     let ctx = pg_ctx();
     let (sql, usages) = ctx
         .build_sql_with_used_pre_aggregations(&with_merge(WINDOWS_BY_STATUS_SIZE, true))
