@@ -1211,7 +1211,7 @@ describe('Refresh Scheduler', () => {
   test('Exponential backoff', async () => {
     process.env.CUBEJS_EXTERNAL_DEFAULT = 'false';
     process.env.CUBEJS_SCHEDULED_REFRESH_DEFAULT = 'true';
-    // Also the TTL of the backoff key, so it must outlive the whole test (>15s on a loaded CI runner)
+    // Also the TTL of the backoff key, so it must outlive the whole test run
     process.env.CUBEJS_PRE_AGGREGATIONS_BACKOFF_MAX_TIME = '600';
 
     const {
@@ -1276,7 +1276,7 @@ describe('Refresh Scheduler', () => {
     // Initial backoff multiplier is 1 second
     expect(backoffData!.backoffMultiplier).toBeGreaterThanOrEqual(1);
 
-    // Step 1: Immediate retry - should skip due to backoff (1-second window after the first failure)
+    // Step 1: further runs advance past the failed partition; only not-yet-failed foo_first partitions are attempted
     const beforeSkipAttempts = mockDriver.queryAttempts;
     const immediateRetryCount = 5;
 
@@ -1289,11 +1289,11 @@ describe('Refresh Scheduler', () => {
           queryIteratorState,
         });
       } catch (e) {
-        // Expected to skip due to backoff
+        // Expected to fail on the next foo_first partitions
       }
     }
 
-    // Query attempts should not increase significantly (skipped due to backoff)
+    // Query attempts grow only by the newly attempted foo_first partitions
     // Allow some margin for other pre-aggregations processed by scheduler
     expect(mockDriver.queryAttempts).toBeLessThanOrEqual(beforeSkipAttempts + 2);
 
