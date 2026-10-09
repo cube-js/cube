@@ -701,9 +701,9 @@ reviews and their notification emails:
 2. Expand **Review notifications** and enable **Skip unchanged webhook syncs**.
 3. Click **Save dbt settings**.
 
-This setting is **off by default**. When enabled, Cube still parses the dbt project
-and converts the selected models. It then compares the generated file paths and
-contents with the deployment's **default branch**, using the configured output path.
+When enabled, Cube still parses the dbt project and converts the selected models.
+It then compares the generated file paths and contents with the deployment's
+**default branch**, using the configured output path.
 An added file, changed file content, or deletion of a file for a removed dbt model
 creates a review branch and sends the usual review notification. Files outside the
 output path and preserved cubes for models outside the pull's selection do not count
@@ -711,8 +711,9 @@ as changes.
 
 Otherwise, the run appears in sync history as **COMPLETED**, without a review branch
 link or notification email — for example, after a push that only changes a README,
-CI configuration, or an unselected dbt model. Changes awaiting review on an unmerged
-branch still count as differences.
+CI configuration, or an unselected dbt model. While the generated changes remain
+unmerged, subsequent webhook syncs create another review branch and send another
+email because those changes are still absent from the default branch.
 
 The saved setting applies only to webhook syncs. Manual pulls, Analytics Chat pulls,
 and CLI/API syncs keep their existing behavior. Files-only generation
@@ -1066,9 +1067,8 @@ If **Skip unchanged webhook syncs** is enabled under **Review notifications**, C
 creates a branch only when generated cube files differ from the deployment's default
 branch. Run `cube dbt history DEPLOYMENT_ID --trigger webhook` to find the sync: an
 unchanged run appears as **COMPLETED**, confirming the webhook triggered it. If no
-matching run appears, check the webhook configuration and delivery using the
-previous section. Turn the setting off if you want a review branch for every webhook
-sync.
+matching run appears, follow **A webhook push doesn't trigger a sync** above. Turn
+the setting off if you want a review branch for every webhook sync.
 
 </Accordion>
 
