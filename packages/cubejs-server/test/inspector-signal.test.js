@@ -12,7 +12,7 @@ describe('toggleInspector', () => {
   });
 
   test('opens the inspector on loopback, then closes it on the next call', () => {
-    jest.spyOn(console, 'log').mockImplementation(() => {});
+    jest.spyOn(console, 'log').mockImplementation(() => undefined);
 
     // Port 0 lets the OS pick a free port, so the test does not depend on 9229 being free
     toggleInspector(0);
@@ -28,8 +28,8 @@ describe('toggleInspector', () => {
   });
 
   test('reports a busy port instead of claiming the inspector is open', async () => {
-    jest.spyOn(console, 'log').mockImplementation(() => {});
-    jest.spyOn(console, 'error').mockImplementation(() => {});
+    jest.spyOn(console, 'log').mockImplementation(() => undefined);
+    jest.spyOn(console, 'error').mockImplementation(() => undefined);
 
     const server = net.createServer();
     await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
