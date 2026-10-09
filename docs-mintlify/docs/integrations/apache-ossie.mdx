@@ -64,6 +64,21 @@ conversion request to fail instead. It defaults to `true` for a view export and 
 - Each user can run two conversions at a time and start six a minute. Over either limit, the API
   answers `429` with a `Retry-After` header.
 
+## Convert with the CLI
+
+The [Cube CLI](/reference/cli#apache-ossie) runs a conversion through these endpoints, waits for
+it, prints its counts and issues, and writes the files:
+
+```bash
+cube ossie export DEPLOYMENT_ID --wait --out ossie.yaml
+cube ossie export DEPLOYMENT_ID --from-dir . --wait --out ossie.yaml
+cube ossie import DEPLOYMENT_ID --file ossie.yaml --out .
+```
+
+`--from-dir` exports your local project instead of the deployed model, `--view` exports one view,
+and `--strict-fanout` sets `strictFanout`. `import --check` compares the files with what is on
+disk instead of writing them, and exits non-zero on any difference, for use in CI.
+
 ## Convert with the Platform API
 
 Use a [Platform API key](/api-reference/authentication) with `SchemaRead` or `SchemaUpdate`

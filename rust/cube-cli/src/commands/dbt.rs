@@ -1,5 +1,4 @@
-use std::io::Read;
-use std::path::{Component, Path, PathBuf};
+use std::path::Path;
 use std::time::{Duration, Instant};
 
 use anyhow::{bail, Context as _, Result};
@@ -151,19 +150,7 @@ fn base(deployment: i64) -> String {
 /// Read locally so the API receives a JSON object rather than a string containing JSON.
 /// The server owns dbt artifact and schema-version validation.
 fn read_manifest(path: &str) -> Result<Value> {
-    let (raw, source) = if path == "-" {
-        let mut raw = String::new();
-        std::io::stdin()
-            .read_to_string(&mut raw)
-            .context("failed to read dbt manifest from stdin")?;
-        (raw, "stdin".to_string())
-    } else {
-        (
-            std::fs::read_to_string(path)
-                .with_context(|| format!("failed to read dbt manifest from {path}"))?,
-            path.to_string(),
-        )
-    };
+    let (raw, source) = util::read_text(path, "dbt manifest")?;
 
     parse_manifest(&raw, &source)
 }
@@ -223,33 +210,6 @@ fn ensure_nothing_was_committed(started: &Value) -> Result<()> {
     )
 }
 
-/// Resolve a server-supplied path beneath `root`, refusing anything that would land
-/// outside it. Lexical only, deliberately: the check is about what the SERVER can
-/// name, not about what already exists, so symlinks are not resolved.
-fn resolve_within(root: &Path, raw: &str) -> Result<PathBuf> {
-    let candidate = Path::new(raw);
-    if candidate.is_absolute() {
-        bail!("refusing to write the absolute path {raw} returned by the server");
-    }
-
-    for component in candidate.components() {
-        match component {
-            Component::Normal(_) => {}
-            Component::CurDir => {}
-            _ => bail!(
-                "refusing to write {raw}: it points outside {}",
-                root.display()
-            ),
-        }
-    }
-
-    if candidate.components().next().is_none() {
-        bail!("the server returned an empty file path");
-    }
-
-    Ok(root.join(candidate))
-}
-
 /// The files a generate run produced, as (path, content) in the order returned.
 ///
 /// Polled because a run that has just reported COMPLETED is still closing and can
@@ -284,7 +244,7 @@ async fn fetch_generated_files(
     )
     .await?;
 
-    let files = read_generated_files(&payload, sync_job_id)?;
+    let files = util::read_generated_files(&payload, &format!("dbt sync {sync_job_id}"))?;
 
     if files.is_empty() {
         bail!(
@@ -341,36 +301,6 @@ fn generate_json(
     }
 
     Value::Object(doc)
-}
-
-/// Read the (path, content) pairs out of a generated-files payload.
-///
-/// `content` is taken as a REQUIRED string rather than through `output::field`,
-/// which yields `""` for an absent key. A file arriving without content would
-/// otherwise be written as a zero-byte file over the committed one, and the
-/// command would exit 0 — destroying working-copy content it was asked to
-/// produce. An absent key is a protocol error, the way `sync` treats a blank
-/// `syncJobId` as one.
-fn read_generated_files(payload: &Value, sync_job_id: &str) -> Result<Vec<(String, String)>> {
-    output::items(payload)
-        .iter()
-        .map(|file| {
-            let path = output::field(file, "path");
-            let Some(content) = file.get("content").and_then(Value::as_str) else {
-                bail!(
-                    "dbt sync {sync_job_id} returned a file with no content{}. Refusing to \
-                     write it, since doing so would empty a file you are about to commit",
-                    if path.is_empty() {
-                        String::new()
-                    } else {
-                        format!(" ({path})")
-                    }
-                );
-            };
-
-            Ok((path, content.to_string()))
-        })
-        .collect()
 }
 
 /// A pre-manifest server accepts the unknown fields, then silently starts a Git sync.
@@ -1017,24 +947,7 @@ pub async fn command(args: Args, ctx: &Ctx) -> Result<()> {
             let root = Path::new(&out);
 
             if check {
-                let mut differing = Vec::new();
-                for (path, content) in &files {
-                    let target = resolve_within(root, path)?;
-                    match std::fs::read_to_string(&target) {
-                        Ok(on_disk) if &on_disk == content => {}
-                        Ok(_) => differing.push((path.clone(), "differs")),
-                        // Only NotFound is "not committed yet". A permissions error or a
-                        // directory in the way reported as "missing" would send the reader
-                        // to re-run the write, which fails the same way.
-                        Err(err) if err.kind() == std::io::ErrorKind::NotFound => {
-                            differing.push((path.clone(), "missing"))
-                        }
-                        Err(err) => {
-                            return Err(anyhow::Error::new(err)
-                                .context(format!("could not read {}", target.display())));
-                        }
-                    }
-                }
+                let differing = util::differing_files(root, &files)?;
 
                 if !differing.is_empty() {
                     if ctx.json {
@@ -1075,22 +988,7 @@ pub async fn command(args: Args, ctx: &Ctx) -> Result<()> {
                 return Ok(());
             }
 
-            // Resolve every path BEFORE writing any of them, so a rejected path
-            // cannot leave a half-written tree behind.
-            let targets = files
-                .iter()
-                .map(|(path, content)| resolve_within(root, path).map(|t| (t, content)))
-                .collect::<Result<Vec<_>>>()?;
-
-            for (target, content) in &targets {
-                if let Some(parent) = target.parent() {
-                    std::fs::create_dir_all(parent)
-                        .with_context(|| format!("could not create {}", parent.display()))?;
-                }
-
-                std::fs::write(target, content)
-                    .with_context(|| format!("could not write {}", target.display()))?;
-            }
+            let targets = util::write_files(root, &files)?;
 
             if ctx.json {
                 output::print_json(&generate_json(&started, &out, &files, "written", &[]));
@@ -1100,7 +998,7 @@ pub async fn command(args: Args, ctx: &Ctx) -> Result<()> {
                     targets.len(),
                     root.display()
                 ));
-                for (target, _) in &targets {
+                for target in &targets {
                     println!("  {}", target.display());
                 }
                 println!(
@@ -1448,38 +1346,6 @@ mod tests {
     }
 
     #[test]
-    fn a_file_with_no_content_is_refused_rather_than_written_empty() {
-        // `output::field` yields "" for an absent key, so without an explicit read
-        // this item would be written as a zero-byte file OVER the committed one,
-        // and the command would exit 0 reporting success.
-        let payload = json!({"items": [
-            {"path": "model/cubes/dbt/orders.yml", "content": "cubes: []\n"},
-            {"path": "model/cubes/dbt/customers.yml"}
-        ]});
-
-        let err = read_generated_files(&payload, "job-1")
-            .unwrap_err()
-            .to_string();
-        assert!(err.contains("no content"), "{err}");
-        assert!(err.contains("customers.yml"), "{err}");
-    }
-
-    #[test]
-    fn files_read_back_as_the_pairs_they_arrived_as() {
-        let payload = json!({"items": [
-            {"path": "model/cubes/dbt/orders.yml", "content": "cubes:\n  - name: orders\n"}
-        ]});
-
-        assert_eq!(
-            read_generated_files(&payload, "job-1").unwrap(),
-            vec![(
-                "model/cubes/dbt/orders.yml".to_string(),
-                "cubes:\n  - name: orders\n".to_string()
-            )]
-        );
-    }
-
-    #[test]
     fn the_generate_json_document_carries_the_file_list() {
         // The machine path must not print strictly less than the human one: a CI
         // step parses this to `git add` exactly what was generated.
@@ -1505,31 +1371,6 @@ mod tests {
             drifted["differing"],
             json!([{"path": "model/cubes/dbt/orders.yml", "status": "differs"}])
         );
-    }
-
-    #[test]
-    fn generated_paths_stay_under_the_output_directory() {
-        let root = Path::new("/tmp/project");
-
-        assert_eq!(
-            resolve_within(root, "model/cubes/dbt/orders.yml").unwrap(),
-            Path::new("/tmp/project/model/cubes/dbt/orders.yml")
-        );
-
-        // The server names these paths, and this is the only place the CLI writes a
-        // remote-supplied path, so each of these would otherwise put a file wherever
-        // the shell user can write.
-        for hostile in [
-            "../outside.yml",
-            "model/../../outside.yml",
-            "/etc/passwd",
-            "",
-        ] {
-            assert!(
-                resolve_within(root, hostile).is_err(),
-                "{hostile} should have been refused"
-            );
-        }
     }
 
     #[test]
