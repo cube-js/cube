@@ -715,8 +715,9 @@ CI configuration, or an unselected dbt model. While the generated changes remain
 unmerged, subsequent webhook syncs create another review branch and send another
 email because those changes are still absent from the default branch.
 
-The saved setting applies only to webhook syncs. Manual pulls, Analytics Chat pulls,
-and CLI/API syncs keep their existing behavior. Files-only generation
+The saved setting applies only to webhook syncs. Manual pulls write to your active
+development branch. Analytics Chat pulls and CLI/API syncs create review branches
+even when the generated files are unchanged. Files-only generation
 (`cube dbt generate` or `"output": "files"`) already creates no branch or notification.
 
 ### Trigger from Analytics Chat
