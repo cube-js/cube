@@ -579,6 +579,7 @@ export class CubejsServerCore {
           allowJsDuplicatePropsInSchema: this.options.allowJsDuplicatePropsInSchema,
           allowNodeRequire: this.options.allowNodeRequire,
           fastReload: this.options.fastReload,
+          onCompiled: () => this.evictCompilersOverMemberBudget(appId),
         },
       );
 
@@ -587,6 +588,63 @@ export class CubejsServerCore {
 
     compilerApi.schemaVersion = currentSchemaVersion;
     return compilerApi;
+  }
+
+  /**
+   * Drops least-recently-used compiled models until the cache is back inside
+   * `maxCompiledMembers`. The count bound (`compilerCacheSize`) is the LRU's
+   * own; this is the memory-shaped one, because a model's member count tracks
+   * what it costs to hold while a count of models does not.
+   *
+   * `keepAppId` -- the app that just compiled -- is never dropped, so the cache
+   * always keeps at least the model in use. Without that floor a single model
+   * larger than the whole budget would be evicted the instant it compiled, and
+   * every request for it would recompile.
+   */
+  protected evictCompilersOverMemberBudget(keepAppId: string): void {
+    const budget = this.options.maxCompiledMembers;
+
+    if (!budget) {
+      return;
+    }
+
+    let total = 0;
+
+    for (const api of this.compilerCache.values()) {
+      total += api.compiledMemberCount;
+    }
+
+    if (total <= budget) {
+      return;
+    }
+
+    const evicted: string[] = [];
+
+    // rkeys() walks least-recently-used first, so the models that go are the
+    // ones longest unused. peek() rather than get(), which would mark the
+    // model as freshly used and reorder the very list being walked.
+    for (const appId of [...this.compilerCache.rkeys()]) {
+      if (total <= budget) {
+        break;
+      }
+
+      const api = appId === keepAppId ? undefined : this.compilerCache.peek(appId);
+
+      if (api) {
+        total -= api.compiledMemberCount;
+        this.compilerCache.delete(appId);
+        evicted.push(appId);
+      }
+    }
+
+    if (evicted.length) {
+      this.logger('Compiler cache member budget exceeded', {
+        budget,
+        membersAfterEviction: total,
+        evictedAppIds: evicted.length,
+        compiledAppIds: this.compilerCache.size,
+      });
+    }
   }
 
   public async resetInstanceState() {

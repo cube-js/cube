@@ -46,6 +46,8 @@ export interface CompilerApiOptions {
   sqlCache?: boolean;
   standalone?: boolean;
   compilerCacheSize?: number;
+  /** Called once a compile succeeds, so the owner can re-check its member budget. */
+  onCompiled?: () => void;
   maxCompilerCacheKeepAlive?: number;
   updateCompilerCacheKeepAlive?: boolean;
   /**
@@ -230,6 +232,12 @@ export class CompilerApi {
     return new NativeInstance();
   }
 
+  /**
+   * Members (measures, dimensions, segments) this app's last successful compile
+   * produced, across every cube and view. Zero until it first compiles.
+   */
+  public compiledMemberCount: number = 0;
+
   public async getCompilers(options: { requestId?: string } = {}): Promise<Compiler> {
     let compilerVersion = (
       this.schemaVersion && await this.schemaVersion() ||
@@ -272,6 +280,24 @@ export class CompilerApi {
     });
   }
 
+  /**
+   * Members across every cube and view the compile produced. Views are counted
+   * too: they are where a wide model's members usually are, and each one is a
+   * full copy held per app id.
+   */
+  private static countMembers(compilers: Compiler): number {
+    const cubeList = (compilers as any)?.cubeEvaluator?.cubeList;
+
+    if (!Array.isArray(cubeList)) {
+      return 0;
+    }
+
+    return cubeList.reduce((total: number, cube: any) => total
+      + Object.keys(cube?.measures || {}).length
+      + Object.keys(cube?.dimensions || {}).length
+      + Object.keys(cube?.segments || {}).length, 0);
+  }
+
   public async compileSchema(compilerVersion: string, requestId?: string): Promise<Compiler> {
     const startCompilingTime = new Date().getTime();
 
@@ -293,6 +319,8 @@ export class CompilerApi {
         compiledYamlCache: this.compiledYamlCache,
       });
       this.queryFactory = await this.createQueryFactory(compilers);
+      this.compiledMemberCount = CompilerApi.countMembers(compilers);
+      this.options.onCompiled?.();
 
       this.logger('Compiling schema completed', {
         version: compilerVersion,

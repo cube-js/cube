@@ -193,6 +193,24 @@ which takes precedence over this environment variable. The SQL API compiler
 cache reads this environment variable only, so the configuration option does not
 affect it.
 
+## `CUBEJS_MAX_COMPILED_MEMBERS`
+
+The maximum number of compiled members — measures, dimensions and segments
+across every cube and view — to keep in the in-memory compiler cache. When the
+total is exceeded, the least recently used data models are dropped until it
+fits again. The data model currently in use is never dropped, so a single model
+larger than the budget stays cached rather than recompiling on every request.
+
+Use this alongside [`CUBEJS_COMPILER_CACHE_SIZE`](#cubejs_compiler_cache_size),
+which bounds the same cache by a count of data models. Whichever limit is
+reached first evicts. A count alone cannot be converted into a memory budget,
+because one tenant's data model can be many times the size of another's; member
+count tracks what a model costs to hold.
+
+| Possible Values   | Default in Development | Default in Production |
+| ----------------- | ---------------------- | --------------------- |
+| A positive number | No limit               | No limit              |
+
 ## `CUBEJS_COMPILER_MULTI_TENANT_SHARING`
 
 If `true`, data models of different tenants in one process share what they

@@ -477,6 +477,32 @@ const variables: Record<string, (...args: any) => any> = {
     return size;
   },
   /**
+   * Total compiled members -- measures, dimensions and segments across every
+   * cube and view -- the compiler cache may hold. Members stand in for memory
+   * in a way a count of models cannot: one tenant's model can be tens of times
+   * another's, so CUBEJS_COMPILER_CACHE_SIZE alone bounds the cache at a size
+   * nobody can convert into a heap budget. Unset leaves only that count bound.
+   */
+  maxCompiledMembers: (): number | undefined => {
+    if (!get('CUBEJS_MAX_COMPILED_MEMBERS').asString()) {
+      return undefined;
+    }
+
+    const members = get('CUBEJS_MAX_COMPILED_MEMBERS').asIntPositive();
+
+    // asIntPositive() lets 0 through, and a zero budget would evict every model
+    // the moment it compiled, turning every request into a recompile.
+    if (members === 0) {
+      throw new InvalidConfiguration(
+        'CUBEJS_MAX_COMPILED_MEMBERS',
+        members,
+        'Must be a positive integer. The compiler cache can not be disabled.',
+      );
+    }
+
+    return members;
+  },
+  /**
    * Experimental: compiled apps share one VM realm, process-wide script/YAML caches and interned strings.
    */
   compilerMultiTenantSharing: () => get('CUBEJS_COMPILER_MULTI_TENANT_SHARING')
