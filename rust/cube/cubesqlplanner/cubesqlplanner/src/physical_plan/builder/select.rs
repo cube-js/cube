@@ -138,6 +138,23 @@ impl SelectBuilder {
             .add_column(SchemaColumn::new(alias.clone(), Some(member.clone())));
     }
 
+    /// Projects `measure` under its own alias, computed as `base`
+    /// aggregated over the rows `condition` keeps.
+    pub fn add_projection_conditional_measure(
+        &mut self,
+        measure: &Rc<MemberSymbol>,
+        base: &Rc<MemberSymbol>,
+        condition: crate::planner::filter::FilterItem,
+    ) {
+        let alias = measure.alias();
+        self.projection_columns.push(AliasedExpr {
+            expr: Expr::ConditionalMeasure(MemberExpression::new(base.clone()), condition),
+            alias: alias.clone(),
+        });
+        self.result_schema
+            .add_column(SchemaColumn::new(alias, Some(measure.clone())));
+    }
+
     pub fn add_union_padding_null_projection(&mut self, member: &Rc<MemberSymbol>, alias: String) {
         self.projection_columns.push(AliasedExpr {
             expr: Expr::UnionPaddingNull,

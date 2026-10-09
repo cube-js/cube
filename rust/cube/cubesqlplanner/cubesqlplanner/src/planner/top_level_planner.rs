@@ -2,6 +2,7 @@ use super::planners::multi_stage::{check_multi_stage_depth, PlanningScope};
 use super::planners::QueryPlanner;
 use super::state::State;
 use super::QueryProperties;
+use crate::logical_plan::FilteredLeafMergeOptimizer;
 use crate::logical_plan::OriginalSqlCollector;
 use crate::logical_plan::PreAggregationOptimizer;
 use crate::logical_plan::PreAggregationUsage;
@@ -64,6 +65,14 @@ impl TopLevelPlanner {
         // a model storing one rollup per rolling measure silently falls back to
         // the fact table for all of them.
         let optimized_plan = RollingBaseScanOptimizer::new().optimize(optimized_plan);
+        let (optimized_plan, usages) = if self.request.multi_stage_leaf_merge() {
+            let (plan, folded_usages) =
+                FilteredLeafMergeOptimizer::new(&usages, self.query_tools.query_tools())
+                    .optimize(optimized_plan);
+            (plan, folded_usages.apply(usages))
+        } else {
+            (optimized_plan, usages)
+        };
 
         let is_external = if !usages.is_empty() {
             usages.iter().all(|usage| usage.pre_aggregation.external())

@@ -7,6 +7,7 @@ use crate::physical_plan::{
 };
 use crate::physical_plan_builder::PhysicalPlanBuilder;
 use crate::planner::collectors::collect_calc_group_dims_from_nodes;
+use crate::planner::query_properties::member_chain_eq;
 use crate::planner::symbols::transforms;
 use crate::planner::symbols::transforms::get_filtered_values;
 use crate::planner::{MeasureRenderModifier, MemberSymbol, OrderByItem};
@@ -43,6 +44,7 @@ impl<'a> LogicalNodeProcessor<'a, Query> for QueryProcessor<'a> {
         let query_tools = self.builder.query_tools();
         let mut context_factory = context.make_sql_nodes_factory()?;
         let mut context = context.clone();
+        let mut conditional_measures = logical_plan.conditional_measures().clone();
 
         context.remove_multi_stage_dimensions();
 
@@ -148,6 +150,12 @@ impl<'a> LogicalNodeProcessor<'a, Query> for QueryProcessor<'a> {
                 schema = logical_transforms::mark_tz_converted_at_source_in_schema(&schema)?;
                 filter = transforms::map_filter_symbols(filter, &mark_tz_converted)?;
                 having = transforms::map_filter_symbols(having, &mark_tz_converted)?;
+                for conditional in conditional_measures.iter_mut() {
+                    conditional.condition = transforms::map_filter_item_symbols(
+                        &conditional.condition,
+                        &mark_tz_converted,
+                    )?;
+                }
                 context_factory.set_use_local_tz_in_date_range(true);
 
                 for (name, column) in pre_aggregation.all_dimensions_refererences().into_iter() {
@@ -205,7 +213,21 @@ impl<'a> LogicalNodeProcessor<'a, Query> for QueryProcessor<'a> {
         }
 
         for (measure, exists) in self.builder.measures_for_query(&schema.measures, &context) {
-            if exists {
+            if let Some(conditional) = conditional_measures
+                .iter()
+                .find(|c| member_chain_eq(&c.measure, &measure))
+            {
+                references_builder.resolve_references_for_member(
+                    conditional.base.clone(),
+                    &None,
+                    context_factory.render_references_mut(),
+                )?;
+                select_builder.add_projection_conditional_measure(
+                    &measure,
+                    &conditional.base,
+                    conditional.condition.clone(),
+                );
+            } else if exists {
                 references_builder.resolve_references_for_member(
                     measure.clone(),
                     &None,

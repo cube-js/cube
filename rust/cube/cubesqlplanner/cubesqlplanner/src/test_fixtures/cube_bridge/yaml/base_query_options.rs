@@ -36,6 +36,8 @@ pub struct YamlBaseQueryOptions {
     #[serde(default)]
     pub cubestore_support_multistage: Option<bool>,
     #[serde(default)]
+    pub multi_stage_leaf_merge: Option<bool>,
+    #[serde(default)]
     pub cubestore_union_full_key_aggregate: Option<bool>,
     pub max_multi_stage_depth: Option<usize>,
     pub max_multi_stage_stages: Option<usize>,

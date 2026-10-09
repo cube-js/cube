@@ -74,6 +74,27 @@ impl PreAggregation {
     pub fn usage_index(&self) -> Option<usize> {
         self.usage_index
     }
+
+    /// The same usage of the rollup, reading `measures` from it.
+    pub fn with_measures(
+        &self,
+        measures: Vec<Rc<MemberSymbol>>,
+        schema: Rc<LogicalSchema>,
+    ) -> Self {
+        Self {
+            name: self.name.clone(),
+            schema,
+            measures,
+            dimensions: self.dimensions.clone(),
+            time_dimensions: self.time_dimensions.clone(),
+            segments: self.segments.clone(),
+            external: self.external,
+            granularity: self.granularity.clone(),
+            source: self.source.clone(),
+            cube_name: self.cube_name.clone(),
+            usage_index: self.usage_index,
+        }
+    }
 }
 
 impl LogicalNode for PreAggregation {

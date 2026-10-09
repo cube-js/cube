@@ -1,6 +1,7 @@
 mod calendar;
 mod calendar_stored_shift;
 mod external_split;
+mod filtered_leaf_merge;
 mod hub_spoke_join_path;
 mod masked_members;
 mod multi_fact;

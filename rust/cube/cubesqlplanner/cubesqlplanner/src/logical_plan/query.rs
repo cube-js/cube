@@ -1,4 +1,6 @@
 use super::*;
+use crate::planner::filter::FilterItem;
+use crate::planner::MemberSymbol;
 use cubenativeutils::CubeError;
 use std::rc::Rc;
 use typed_builder::TypedBuilder;
@@ -16,6 +18,17 @@ pub struct Query {
     filter: Rc<LogicalFilter>,
     modifers: Rc<LogicalQueryModifiers>,
     source: QuerySource,
+    /// Schema measures rendered as `base` aggregated over the rows `condition`
+    /// keeps; the query's filter must keep every row any condition needs.
+    #[builder(default)]
+    conditional_measures: Vec<ConditionalMeasure>,
+}
+
+#[derive(Clone, Debug)]
+pub struct ConditionalMeasure {
+    pub measure: Rc<MemberSymbol>,
+    pub base: Rc<MemberSymbol>,
+    pub condition: FilterItem,
 }
 
 impl Query {
@@ -27,6 +40,9 @@ impl Query {
     }
     pub fn modifers(&self) -> &Rc<LogicalQueryModifiers> {
         &self.modifers
+    }
+    pub fn conditional_measures(&self) -> &Vec<ConditionalMeasure> {
+        &self.conditional_measures
     }
     pub fn source(&self) -> &QuerySource {
         &self.source
@@ -54,6 +70,7 @@ impl LogicalNode for Query {
             filter: self.filter.clone(),
             modifers: self.modifers.clone(),
             source: self.source.with_plan_node(source.clone())?,
+            conditional_measures: self.conditional_measures.clone(),
         }))
     }
 
@@ -79,6 +96,17 @@ impl PrettyPrint for Query {
         self.schema.pretty_print(result, &details_state);
         result.println("filters:", &state);
         self.filter.pretty_print(result, &details_state);
+        for conditional in self.conditional_measures.iter() {
+            result.println(
+                &format!(
+                    "conditional measure: {} = {} where:",
+                    conditional.measure.full_name(),
+                    conditional.base.full_name(),
+                ),
+                &state,
+            );
+            pretty_print_filter_item(result, &details_state, &conditional.condition);
+        }
         self.modifers.pretty_print(result, &state);
 
         result.println("source:", &state);

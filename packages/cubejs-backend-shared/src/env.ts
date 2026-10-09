@@ -495,6 +495,9 @@ const variables: Record<string, (...args: any) => any> = {
 
     return enabled;
   },
+  tesseractMultiStageLeafMerge: () => get('CUBEJS_TESSERACT_MULTI_STAGE_LEAF_MERGE')
+    .default('false')
+    .asBoolStrict(),
   tesseractCubeStoreUnionFullKeyAggregate: () => get('CUBEJS_TESSERACT_CUBESTORE_UNION_FULL_KEY_AGGREGATE')
     .default('false')
     .asBoolStrict(),

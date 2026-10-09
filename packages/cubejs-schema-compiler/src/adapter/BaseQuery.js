@@ -1041,6 +1041,7 @@ export class BaseQuery {
       totalQuery: this.options.totalQuery,
       joinHints: this.options.joinHints,
       cubestoreSupportMultistage: this.options.cubestoreSupportMultistage ?? getEnv('cubeStoreRollingWindowJoin'),
+      multiStageLeafMerge: this.options.multiStageLeafMerge ?? getEnv('tesseractMultiStageLeafMerge'),
       cubestoreUnionFullKeyAggregate: this.options.cubestoreUnionFullKeyAggregate ?? getEnv('tesseractCubeStoreUnionFullKeyAggregate'),
       maxMultiStageDepth: this.options.maxMultiStageDepth ?? getEnv('maxMultiStageDepth'),
       maxMultiStageStages: this.options.maxMultiStageStages ?? getEnv('maxMultiStageStages'),

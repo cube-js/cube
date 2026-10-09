@@ -55,6 +55,25 @@ impl SqlNode for FinalPreAggregationMeasureSqlNode {
                             templates.quote_identifier(&column_name.name())?
                         );
                         let rollup_kind = ev.rollup_kind();
+                        let pre_aggregation_measure =
+                            if let Some(condition) = visitor.measure_row_condition() {
+                                match rollup_kind.pre_aggregate_wrap() {
+                                    AggregateWrap::Function(_) | AggregateWrap::PassThrough => {
+                                        format!(
+                                            "CASE WHEN ({}) THEN {} END",
+                                            condition, pre_aggregation_measure
+                                        )
+                                    }
+                                    _ => {
+                                        return Err(CubeError::internal(format!(
+                                            "Row condition is not supported for rollup measure {}",
+                                            node.full_name()
+                                        )))
+                                    }
+                                }
+                            } else {
+                                pre_aggregation_measure
+                            };
                         match rollup_kind.pre_aggregate_wrap() {
                             // The rollup column holds an HLL state, so it
                             // must be merged, not recomputed. Keep the
