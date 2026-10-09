@@ -58,7 +58,7 @@ export const timestampTzTypeParser = (val: string): string => {
   let ms = 0;
   if (tzIdx > 19) {
     // val[19] is '.'; fractional digits run from index 20 up to tzIdx.
-    ms = parseInt(`${val.slice(20, 23)}00`.slice(0, 3), 10);
+    ms = parseInt(`${val.slice(20, tzIdx)}00`.slice(0, 3), 10);
   }
 
   // `Date.UTC(year, ...)` maps years 0-99 to 1900+year for legacy reasons,
