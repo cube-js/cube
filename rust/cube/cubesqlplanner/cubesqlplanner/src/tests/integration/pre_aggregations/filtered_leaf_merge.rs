@@ -138,70 +138,98 @@ async fn test_windows_fold_over_cubestore_rollup() {
     assert!(sql.contains("CASE WHEN"), "{sql}");
 }
 
-const ORDER_LIMIT_AND_FILTER_QUERIES: [&str; 4] = [
-    indoc! {"
-        measures:
-          - orders.amount_all_week
-          - orders.amount_mid_week
-        dimensions:
-          - orders.status
-          - orders.size
-        order:
-          - id: orders.amount_mid_week
-            desc: true
-          - id: orders.status
-        limit: 2
-    "},
-    indoc! {"
-        measures:
-          - orders.amount_all_week
-          - orders.amount_mid_week
-        dimensions:
-          - orders.status
-          - orders.size
-        order:
-          - id: orders.status
-          - id: orders.size
-        limit: 1
-        offset: 1
-    "},
-    indoc! {"
-        measures:
-          - orders.amount_all_week
-          - orders.amount_early_week
-        dimensions:
-          - orders.status
-          - orders.size
-        filters:
-          - member: orders.amount_early_week
-            operator: gt
-            values: ['60']
-        order:
-          - id: orders.status
-          - id: orders.size
-    "},
-    indoc! {"
-        measures:
-          - orders.amount_all_week
-          - orders.amount_early_week
-        dimensions:
-          - orders.status
-          - orders.size
-        filters:
-          - member: orders.status
-            operator: equals
-            values: ['completed']
-        order:
-          - id: orders.size
-    "},
+/// Each query with whether the folded scan must be inlined into it, so that
+/// ORDER BY / LIMIT sit directly on the rollup read.
+const ORDER_LIMIT_AND_FILTER_QUERIES: [(&str, bool); 4] = [
+    (
+        indoc! {"
+            measures:
+              - orders.amount_all_week
+              - orders.amount_mid_week
+            dimensions:
+              - orders.status
+              - orders.size
+            order:
+              - id: orders.amount_mid_week
+                desc: true
+              - id: orders.status
+            limit: 2
+        "},
+        true,
+    ),
+    (
+        indoc! {"
+            measures:
+              - orders.amount_all_week
+              - orders.amount_mid_week
+            dimensions:
+              - orders.status
+              - orders.size
+            order:
+              - id: orders.status
+              - id: orders.size
+            limit: 1
+            offset: 1
+        "},
+        true,
+    ),
+    (
+        indoc! {"
+            measures:
+              - orders.amount_all_week
+              - orders.amount_early_week
+            dimensions:
+              - orders.status
+              - orders.size
+            filters:
+              - member: orders.amount_early_week
+                operator: gt
+                values: ['60']
+            order:
+              - id: orders.status
+              - id: orders.size
+        "},
+        false,
+    ),
+    (
+        indoc! {"
+            measures:
+              - orders.amount_all_week
+              - orders.amount_early_week
+            dimensions:
+              - orders.status
+              - orders.size
+            filters:
+              - member: orders.status
+                operator: equals
+                values: ['completed']
+            order:
+              - id: orders.size
+        "},
+        true,
+    ),
 ];
 
 #[tokio::test(flavor = "multi_thread")]
 async fn test_folded_scan_keeps_order_limit_and_measure_filter() {
-    for query in ORDER_LIMIT_AND_FILTER_QUERIES {
-        assert_folding_agrees(&pg_ctx(), query, true).await;
-        assert_folding_agrees(&cubestore_ctx(), query, false).await;
+    for (query, inlined) in ORDER_LIMIT_AND_FILTER_QUERIES {
+        for sql in [
+            assert_folding_agrees(&pg_ctx(), query, true).await,
+            assert_folding_agrees(&cubestore_ctx(), query, false).await,
+        ] {
+            assert!(sql.contains("CASE WHEN"), "{sql}");
+            // Inlined, the rollup read is the only SELECT and carries the
+            // query's ORDER BY / LIMIT; a measure filter needs the folded
+            // scan in a CTE so it can filter its aggregates.
+            assert_eq!(!sql.contains("WITH"), inlined, "{sql}");
+            assert_eq!(sql.matches("SELECT").count() == 1, inlined, "{sql}");
+        }
     }
+    let (query, _) = ORDER_LIMIT_AND_FILTER_QUERIES[0];
+    insta::assert_snapshot!(
+        "folded_scan_inlined_with_order_limit",
+        pg_ctx().build_sql(&with_merge(query, true)).unwrap()
+    );
 }
 
 #[tokio::test(flavor = "multi_thread")]
@@ -323,19 +351,15 @@ async fn test_ungrouped_windows() {
         ungrouped: true
     "};
     let ctx = pg_ctx();
-    let merged = ctx.build_sql(&with_merge(query, true));
-    let separate = ctx.build_sql(&with_merge(query, false));
-    assert_eq!(merged.is_ok(), separate.is_ok(), "{merged:?}");
-    // An ungrouped leaf has no aggregate to gate.
-    if let Ok(sql) = &merged {
-        assert!(!sql.contains("CASE WHEN"), "{sql}");
-    }
-    if separate.is_ok() {
-        assert_eq!(
-            ctx.try_execute(&with_merge(query, true), SEED).await,
-            ctx.try_execute(&with_merge(query, false), SEED).await
-        );
-    }
+    let merged = ctx.build_sql(&with_merge(query, true)).unwrap();
+    let separate = ctx.build_sql(&with_merge(query, false)).unwrap();
+    // An ungrouped leaf has no aggregate to gate, so nothing folds.
+    assert!(!merged.contains("CASE WHEN"), "{merged}");
+    assert_eq!(merged, separate);
+    assert_eq!(
+        ctx.try_execute(&with_merge(query, true), SEED).await,
+        ctx.try_execute(&with_merge(query, false), SEED).await
+    );
 }
 
 #[tokio::test(flavor = "multi_thread")]

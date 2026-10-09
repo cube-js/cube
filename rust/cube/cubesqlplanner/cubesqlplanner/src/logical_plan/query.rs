@@ -18,10 +18,8 @@ pub struct Query {
     filter: Rc<LogicalFilter>,
     modifers: Rc<LogicalQueryModifiers>,
     source: QuerySource,
-    /// Schema measures rendered as their base measure aggregated over the
-    /// rows a condition keeps, instead of from their own definition. They
-    /// let one scan stand in for several that differ only in which rows they
-    /// read; the query's filter keeps the rows any of them needs.
+    /// Schema measures rendered as `base` aggregated over the rows `condition`
+    /// keeps; the query's filter must keep every row any condition needs.
     #[builder(default)]
     conditional_measures: Vec<ConditionalMeasure>,
 }
