@@ -709,16 +709,13 @@ creates a review branch and sends the usual review notification. Files outside t
 output path and preserved cubes for models outside the pull's selection do not count
 as changes.
 
-If the files match and no deletions are needed, the run completes successfully and
-appears in sync history as **COMPLETED**, without a review branch link or notification
-email. For example, a push that only changes a README, CI configuration, or an
-unselected dbt model can finish this way. The comparison is against the deployment's
-default branch, so changes awaiting review on another branch still count until they
-are merged.
+Otherwise, the run appears in sync history as **COMPLETED**, without a review branch
+link or notification email — for example, after a push that only changes a README,
+CI configuration, or an unselected dbt model. Changes awaiting review on an unmerged
+branch still count as differences.
 
-The saved setting applies only to webhook syncs with an automatically generated
-branch name. Manual pulls, Analytics Chat pulls, CLI/API syncs, and syncs with an
-explicit branch name keep their existing behavior. Files-only generation
+The saved setting applies only to webhook syncs. Manual pulls, Analytics Chat pulls,
+and CLI/API syncs keep their existing behavior. Files-only generation
 (`cube dbt generate` or `"output": "files"`) already creates no branch or notification.
 
 ### Trigger from Analytics Chat
@@ -1067,9 +1064,11 @@ Check that:
 
 If **Skip unchanged webhook syncs** is enabled under **Review notifications**, Cube
 creates a branch only when generated cube files differ from the deployment's default
-branch. An unchanged run still appears in sync history as **COMPLETED**. Check the
-run's history and logs to distinguish this from a webhook that never triggered a
-sync. Turn the setting off if you want a review branch for every webhook sync.
+branch. Run `cube dbt history DEPLOYMENT_ID --trigger webhook` to find the sync: an
+unchanged run appears as **COMPLETED**, confirming the webhook triggered it. If no
+matching run appears, check the webhook configuration and delivery using the
+previous section. Turn the setting off if you want a review branch for every webhook
+sync.
 
 </Accordion>
 
