@@ -22,8 +22,8 @@ is exactly the copy the reviewers approved.
 
 ## Requiring review
 
-Review is set up per dashboard, by a user with **Full access** to its workbook,
-once the dashboard has been published at least once.
+Review is set up per dashboard, by a user with **Full access** to its workbook.
+It can be set up before the dashboard is first published, too.
 
 1. Open the dashboard in the dashboard builder.
 2. Click the arrow (▾) next to **Publish** and choose **Review settings…**.
@@ -71,6 +71,10 @@ draft matches the latest revision, the main button reads **Publish** again (see
 [Publishing](#publishing)). With no review open, **Request review** is greyed
 out until the draft differs from the published version.
 
+On a dashboard that was never published, **Request review** is available right
+away. The dashboard stays unpublished while the review is open: publishing the
+approved review publishes its first version.
+
 ### Reviewers without access
 
 A reviewer has to be able to view the dashboard. When you pick someone who
@@ -94,7 +98,12 @@ leaves such a reviewer out on its own.
 Reviewers and anyone who can edit the workbook can open a review. While a
 review is open, they see a **Review** button in the header of the published
 dashboard that opens it. Other people who can only view the dashboard don't
-see the button and can't open the review.
+see the button and can't open the review. A review of a dashboard that was
+never published opens from the builder's **Review** button or from its
+[notification](#notifications).
+
+Anyone who can edit the dashboard also sees an **Edit** button in the review
+page's header. It opens the dashboard in the dashboard builder.
 
 The review page shows the revision's frozen widgets the way the published
 dashboard would show them, with the review's status:
@@ -110,11 +119,17 @@ dashboard would show them, with the review's status:
 The review panel is hidden when the page opens. Click **Review** in the page
 header to show or hide it. It opens on the first of its two tabs:
 
-- **Activity** lists the request, every new revision, comment, approval and
-  change request, in the order they happened, each with its author.
+- **Activity** lists the request, every new revision, comment, approval,
+  change request and cancellation, in the order they happened, each with its
+  author. It covers this review and every earlier review of the dashboard
+  since its last publish, such as a review that was cancelled. A tag on each
+  entry names its revision: **Revision 2** for this review, **Earlier review ·
+  revision 1** for an earlier one. An approval or change request also carries
+  an **Approved** or **Changes requested** tag.
 - **Changes** lists the widgets the revision adds, updates and removes, and
   whether the layout moved, compared with the version that is published now. A
-  chart whose report was edited counts as updated.
+  chart whose report was edited counts as updated. On a dashboard that was
+  never published, every widget is listed as added.
 
 ## Commenting, approving and requesting changes
 
@@ -127,7 +142,7 @@ on it.
 A reviewer can change their verdict: only each reviewer's latest verdict counts.
 A reviewer who requested changes and later approves lifts their block.
 
-Review comments stay on the review. They don't appear in the dashboard's
+Review comments stay in reviews. They don't appear in the dashboard's
 [Comments][ref-comments] panel or its counts, and they work whether or not
 dashboard comments are turned on.
 
@@ -196,12 +211,13 @@ that opens its review page. A review's latest revision shows the review's
 status: **In review**, **Published** or **Cancelled**. Every earlier revision
 shows **Superseded**.
 
+Select a revision to preview the dashboard as that revision froze it, the same
+way you preview a published version. A revision can't be restored.
+
 ## Limitations
 
-- A dashboard must be published once before review can be required or
-  requested.
-- Reviews are available in the Cube app only, not on [embedded
-  dashboards][ref-embedding].
+Reviews are available in the Cube app only, not on [embedded
+dashboards][ref-embedding].
 
 [ref-dashboards]: /docs/explore-analyze/dashboards
 [ref-revision-history]: /docs/explore-analyze/dashboards#revision-history
