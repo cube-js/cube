@@ -19,6 +19,7 @@ import {
   ColumnInfo,
   StartQueryExecutionCommandInput,
 } from '@aws-sdk/client-athena';
+import * as crypto from 'crypto';
 import * as stream from 'stream';
 import {
   BaseDriver,
@@ -208,8 +209,9 @@ export class AthenaDriver extends BaseDriver implements DriverInterface {
     }
 
     if (typeof this.config.readOnly === 'undefined') {
-      // If Export bucket configuration is in place we want to always use it instead of batching
-      this.config.readOnly = !this.isUnloadSupported();
+      // Pre-aggregations are built straight from the query (UNLOAD to the
+      // export bucket or a paginated download), never via a table in Athena
+      this.config.readOnly = true;
     }
 
     this.athena = new Athena(this.config);
@@ -481,13 +483,41 @@ export class AthenaDriver extends BaseDriver implements DriverInterface {
    * export bucket data.
    */
   public async unload(tableName: string, options: UnloadOptions): Promise<DownloadTableCSVData> {
+    if (options.query) {
+      return this.unloadFromQuery(options.query.sql, options.query.params, options);
+    }
     if (!this.config.exportBucket) {
       throw new Error('Export bucket is not configured.');
     }
-    const types = options.query
-      ? await this.unloadWithSql(tableName, options)
-      : await this.unloadWithTable(tableName);
-    const csvFile = await this.getCsvFiles(tableName);
+    const types = await this.unloadWithTable(tableName);
+    return this.unloadResult(tableName, types);
+  }
+
+  /**
+   * Unload data from a SQL query to an export bucket.
+   */
+  public async unloadFromQuery(sql: string, params: unknown[], _options: UnloadOptions): Promise<DownloadTableCSVData> {
+    if (!this.config.exportBucket) {
+      throw new Error('Export bucket is not configured.');
+    }
+    // UNLOAD fails on a non-empty location, so every unload gets its own prefix
+    const location = crypto.randomUUID();
+    const types = await this.queryColumnTypes(sql, params);
+    const unloadSql = `
+      UNLOAD (${sql})
+      TO '${this.config.exportBucket}/${location}'
+      WITH (
+        format = 'TEXTFILE',
+        compression='GZIP'
+      )`;
+    const qid = await this.startQuery(unloadSql, params);
+    await this.waitForSuccess(qid);
+    await this.athena.getQueryResults(qid);
+    return this.unloadResult(location, types);
+  }
+
+  private async unloadResult(location: string, types: TableStructure): Promise<DownloadTableCSVData> {
+    const csvFile = await this.getCsvFiles(location);
     return {
       exportBucketCsvEscapeSymbol: this.config.exportBucketCsvEscapeSymbol,
       csvFile,
@@ -496,27 +526,6 @@ export class AthenaDriver extends BaseDriver implements DriverInterface {
       csvDelimiter: '^A',
       csvDisableQuoting: true,
     };
-  }
-
-  /**
-   * Unload data from a SQL query to an export bucket.
-   */
-  private async unloadWithSql(
-    tableName: string,
-    unloadOptions: UnloadOptions,
-  ): Promise<TableStructure> {
-    const columns = await this.queryColumnTypes(unloadOptions.query!.sql, unloadOptions.query!.params);
-    const unloadSql = `
-      UNLOAD (${unloadOptions.query!.sql})
-      TO '${this.config.exportBucket}/${tableName}'
-      WITH (
-        format = 'TEXTFILE',
-        compression='GZIP'
-      )`;
-    const qid = await this.startQuery(unloadSql, unloadOptions.query!.params);
-    await this.waitForSuccess(qid);
-    await this.athena.getQueryResults(qid);
-    return columns;
   }
 
   /**
@@ -562,9 +571,9 @@ export class AthenaDriver extends BaseDriver implements DriverInterface {
   /**
    * Returns an array of signed URLs of the unloaded csv files.
    */
-  private async getCsvFiles(tableName: string): Promise<string[]> {
+  private async getCsvFiles(location: string): Promise<string[]> {
     const { bucket, prefix } = AthenaDriver.splitS3Path(
-      `${this.config.exportBucket}/${tableName}`
+      `${this.config.exportBucket}/${location}`
     );
 
     return this.extractUnloadedFilesFromS3(

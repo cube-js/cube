@@ -142,8 +142,8 @@ here][ref-caching-using-preaggs-build-strats].
 
 | Feature       | Works with read-only mode? | Is default? |
 | ------------- | :------------------------: | :---------: |
-| Batching      |             ❌             |     ✅      |
-| Export Bucket |             ❌             |     ❌      |
+| Batching      |             ✅             |     ✅      |
+| Export Bucket |             ✅             |     ❌      |
 
 By default, AWS Athena uses a [batching][self-preaggs-batching] strategy to
 build pre-aggregations.
@@ -154,9 +154,11 @@ No extra configuration is required to configure batching for AWS Athena.
 
 <Info>
 
-Batching builds pre-aggregations inside Athena via `CREATE TABLE AS SELECT`, the
-only case needing more than read-only access: `glue:CreateTable` on the
-pre-aggregations schema plus `s3:PutObject` on its S3 location.
+Batching reads the pre-aggregation query results page by page with
+`GetQueryResults`, so it needs no write access. Only pre-aggregations with
+`external: false`, which are stored inside Athena, are built via
+`CREATE TABLE AS SELECT` and need `glue:CreateTable` on the pre-aggregations
+schema plus `s3:PutObject` on its S3 location.
 
 </Info>
 
