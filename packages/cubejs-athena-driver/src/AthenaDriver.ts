@@ -477,39 +477,82 @@ export class AthenaDriver extends BaseDriver implements DriverInterface {
    * Returns to the Cubestore an object with links to unloaded to the
    * export bucket data.
    */
-  public async unload(tableName: string, options: UnloadOptions): Promise<DownloadTableCSVData> {
+  public unload(tableName: string, options: UnloadOptions): MaybeCancelablePromise<DownloadTableCSVData> {
     if (options.query) {
       return this.unloadFromQuery(options.query.sql, options.query.params, { ...options, prefix: tableName });
     }
-    if (!this.config.exportBucket) {
-      throw new Error('Export bucket is not configured.');
-    }
-    const types = await this.unloadWithTable(tableName);
-    return this.unloadResult(tableName, types);
+    return this.cancelable(async (run) => {
+      if (!this.config.exportBucket) {
+        throw new Error('Export bucket is not configured.');
+      }
+      const types = await this.unloadWithTable(tableName, run);
+      return this.unloadResult(tableName, types);
+    });
   }
 
   /**
    * Unload data from a SQL query to an export bucket.
+   * Returns a cancelable promise that will stop the Athena query on cancel.
    */
-  public async unloadFromQuery(sql: string, params: unknown[], options: UnloadOptions): Promise<DownloadTableCSVData> {
-    if (!this.config.exportBucket) {
-      throw new Error('Export bucket is not configured.');
-    }
-    // UNLOAD fails on a non-empty location, so without a prefix from the caller
-    // every unload gets a random one
-    const location = options.prefix ?? crypto.randomUUID();
-    const types = await this.queryColumnTypes(sql, params);
-    const unloadSql = `
-      UNLOAD (${sql})
-      TO '${this.config.exportBucket}/${location}'
-      WITH (
-        format = 'TEXTFILE',
-        compression='GZIP'
-      )`;
-    const qid = await this.startQuery(unloadSql, params);
-    await this.waitForSuccess(qid);
-    await this.athena.getQueryResults(qid);
-    return this.unloadResult(location, types);
+  public unloadFromQuery(
+    sql: string,
+    params: unknown[],
+    options: UnloadOptions,
+  ): MaybeCancelablePromise<DownloadTableCSVData> {
+    return this.cancelable(async (run) => {
+      if (!this.config.exportBucket) {
+        throw new Error('Export bucket is not configured.');
+      }
+      // UNLOAD fails on a non-empty location, so without a prefix from the caller
+      // every unload gets a random one
+      const location = options.prefix ?? crypto.randomUUID();
+      const types = await this.columnTypesOf(await run(`${sql} LIMIT 0`, params));
+      const unloadSql = `
+        UNLOAD (${sql})
+        TO '${this.config.exportBucket}/${location}'
+        WITH (
+          format = 'TEXTFILE',
+          compression='GZIP'
+        )`;
+      const qid = await run(unloadSql, params);
+      await this.athena.getQueryResults(qid);
+      return this.unloadResult(location, types);
+    });
+  }
+
+  /**
+   * Runs `fn` as one cancelable operation: cancel stops whichever Athena
+   * query `run` currently waits on and fails every later `run`.
+   */
+  private cancelable<T>(
+    fn: (run: (query: string, values: unknown[]) => Promise<AthenaQueryId>) => Promise<T>,
+  ): MaybeCancelablePromise<T> {
+    let qid: AthenaQueryId | null = null;
+    let cancelled = false;
+
+    const run = async (query: string, values: unknown[]) => {
+      if (cancelled) {
+        throw new Error('Query was cancelled');
+      }
+      qid = await this.startQuery(query, values);
+      if (cancelled) {
+        await this.stopQuery(qid);
+        throw new Error('Query was cancelled');
+      }
+      await this.waitForSuccess(qid, () => cancelled);
+      return qid;
+    };
+
+    const promise: any = fn(run);
+
+    promise.cancel = async () => {
+      cancelled = true;
+      if (qid) {
+        await this.stopQuery(qid);
+      }
+    };
+
+    return promise;
   }
 
   private async unloadResult(location: string, types: TableStructure): Promise<DownloadTableCSVData> {
@@ -527,7 +570,10 @@ export class AthenaDriver extends BaseDriver implements DriverInterface {
   /**
    * Unload data from a temp table to an export bucket.
    */
-  private async unloadWithTable(tableName: string): Promise<TableStructure> {
+  private async unloadWithTable(
+    tableName: string,
+    run: (query: string, values: unknown[]) => Promise<AthenaQueryId>,
+  ): Promise<TableStructure> {
     const types = await this.tableColumnTypes(tableName);
     const columns = types.map(t => t.name).join(', ');
     const unloadSql = `
@@ -537,8 +583,7 @@ export class AthenaDriver extends BaseDriver implements DriverInterface {
         format = 'TEXTFILE',
         compression='GZIP'
       )`;
-    const qid = await this.startQuery(unloadSql, []);
-    await this.waitForSuccess(qid);
+    await run(unloadSql, []);
     return types;
   }
 
@@ -549,6 +594,10 @@ export class AthenaDriver extends BaseDriver implements DriverInterface {
     const unloadSql = `${sql} LIMIT 0`;
     const qid = await this.startQuery(unloadSql, params || []);
     await this.waitForSuccess(qid);
+    return this.columnTypesOf(qid);
+  }
+
+  private async columnTypesOf(qid: AthenaQueryId): Promise<TableStructure> {
     const results = await this.athena.getQueryResults(qid);
     const columns = this.mapTypes(
       <ColumnInfo[]>results.ResultSet?.ResultSetMetadata?.ColumnInfo,
