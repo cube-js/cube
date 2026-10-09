@@ -486,6 +486,10 @@ larger `--first` returns 100 with `pageInfo.hasNextPage` set. `logs` takes no pa
 flags — one sync's timeline is one page, and each line carries the phase it belongs
 to and how long that phase took.
 
+With [Skip unchanged webhook syncs](/docs/integrations/dbt#skip-unchanged-webhook-syncs)
+enabled, webhook runs that produce no changes appear in `history` as `COMPLETED`,
+with an empty `BRANCH` column.
+
 Both need only `SchemaRead`. Durations are the server's own single-clock figure, so
 they never disagree with the run they describe. `--json` carries the rest of each
 record — the dbt ref that was synced, the phase that failed, per-phase timings and
