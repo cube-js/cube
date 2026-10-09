@@ -81,6 +81,23 @@ describe('getEnv', () => {
     expect(getEnv('refreshWorkerMode')).toBe(false);
   });
 
+  test('refreshWorkerModeExplicit ignores the NODE_ENV default', () => {
+    process.env.NODE_ENV = 'development';
+    delete process.env.CUBEJS_REFRESH_WORKER;
+    delete process.env.CUBEJS_SCHEDULED_REFRESH;
+    delete process.env.CUBEJS_SCHEDULED_REFRESH_TIMER;
+    expect(getEnv('refreshWorkerModeExplicit')).toBe(undefined);
+    expect(getEnv('refreshWorkerMode')).toBe(true);
+
+    process.env.CUBEJS_SCHEDULED_REFRESH_TIMER = '60';
+    expect(getEnv('refreshWorkerModeExplicit')).toBe(60);
+
+    delete process.env.CUBEJS_SCHEDULED_REFRESH_TIMER;
+    process.env.CUBEJS_REFRESH_WORKER = 'false';
+    expect(getEnv('refreshWorkerModeExplicit')).toBe(false);
+    delete process.env.CUBEJS_REFRESH_WORKER;
+  });
+
   test('refreshWorkerMode(exception)', () => {
     process.env.CUBEJS_SCHEDULED_REFRESH_TIMER = '11fffffff';
 
