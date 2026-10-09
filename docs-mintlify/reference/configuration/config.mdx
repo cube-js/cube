@@ -251,7 +251,8 @@ affect.
 
 Maximum number of compiled members — measures, dimensions and segments across
 every cube and view — to keep in the compiler cache. Least recently used data
-models are dropped until the total fits; the model in use is never dropped.
+models are dropped until the total fits; the model that was just compiled is
+never dropped.
 Bounds the same cache as [`compiler_cache_size`](#compiler_cache_size) by size
 rather than by count, and whichever limit is reached first evicts. Unset by
 default, leaving only the count bound.

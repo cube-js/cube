@@ -477,11 +477,7 @@ const variables: Record<string, (...args: any) => any> = {
     return size;
   },
   /**
-   * Total compiled members -- measures, dimensions and segments across every
-   * cube and view -- the compiler cache may hold. Members stand in for memory
-   * in a way a count of models cannot: one tenant's model can be tens of times
-   * another's, so CUBEJS_COMPILER_CACHE_SIZE alone bounds the cache at a size
-   * nobody can convert into a heap budget. Unset leaves only that count bound.
+   * Total measures/dimensions/segments the compiler cache may hold; unset leaves only CUBEJS_COMPILER_CACHE_SIZE.
    */
   maxCompiledMembers: (): number | undefined => {
     if (!get('CUBEJS_MAX_COMPILED_MEMBERS').asString()) {

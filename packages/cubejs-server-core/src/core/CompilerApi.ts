@@ -280,22 +280,12 @@ export class CompilerApi {
     });
   }
 
-  /**
-   * Members across every cube and view the compile produced. Views are counted
-   * too: they are where a wide model's members usually are, and each one is a
-   * full copy held per app id.
-   */
+  /** Members across every cube and view, views included: that is where a wide model's usually are. */
   private static countMembers(compilers: Compiler): number {
-    const cubeList = (compilers as any)?.cubeEvaluator?.cubeList;
-
-    if (!Array.isArray(cubeList)) {
-      return 0;
-    }
-
-    return cubeList.reduce((total: number, cube: any) => total
-      + Object.keys(cube?.measures || {}).length
-      + Object.keys(cube?.dimensions || {}).length
-      + Object.keys(cube?.segments || {}).length, 0);
+    return compilers.cubeEvaluator.cubeList.reduce((total, cube) => total
+      + Object.keys(cube.measures || {}).length
+      + Object.keys(cube.dimensions || {}).length
+      + Object.keys(cube.segments || {}).length, 0);
   }
 
   public async compileSchema(compilerVersion: string, requestId?: string): Promise<Compiler> {

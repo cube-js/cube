@@ -198,8 +198,9 @@ affect it.
 The maximum number of compiled members — measures, dimensions and segments
 across every cube and view — to keep in the in-memory compiler cache. When the
 total is exceeded, the least recently used data models are dropped until it
-fits again. The data model currently in use is never dropped, so a single model
-larger than the budget stays cached rather than recompiling on every request.
+fits again. The data model that was just compiled is never dropped, so a single
+model larger than the budget stays cached rather than recompiling on every
+request.
 
 Use this alongside [`CUBEJS_COMPILER_CACHE_SIZE`](#cubejs_compiler_cache_size),
 which bounds the same cache by a count of data models. Whichever limit is

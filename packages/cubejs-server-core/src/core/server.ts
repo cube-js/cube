@@ -590,17 +590,7 @@ export class CubejsServerCore {
     return compilerApi;
   }
 
-  /**
-   * Drops least-recently-used compiled models until the cache is back inside
-   * `maxCompiledMembers`. The count bound (`compilerCacheSize`) is the LRU's
-   * own; this is the memory-shaped one, because a model's member count tracks
-   * what it costs to hold while a count of models does not.
-   *
-   * `keepAppId` -- the app that just compiled -- is never dropped, so the cache
-   * always keeps at least the model in use. Without that floor a single model
-   * larger than the whole budget would be evicted the instant it compiled, and
-   * every request for it would recompile.
-   */
+  /** Never evicts `keepAppId`: a model alone over budget would otherwise recompile on every request. */
   protected evictCompilersOverMemberBudget(keepAppId: string): void {
     const budget = this.options.maxCompiledMembers;
 
