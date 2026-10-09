@@ -786,8 +786,9 @@ export class PreAggregationLoader {
     invalidationKeys: InvalidationKeys
   ) {
     const [sql, params] = this.preAggregation.sql;
+    const targetTableName = this.targetTableName(newVersionEntry);
 
-    const queryOptions = this.queryOptions(invalidationKeys, sql, params, this.targetTableName(newVersionEntry), newVersionEntry);
+    const queryOptions = this.queryOptions(invalidationKeys, sql, params, targetTableName, newVersionEntry);
     this.logExecutingSql(queryOptions);
     this.logger('Downloading external pre-aggregation via query', queryOptions);
     const externalDriver = await this.externalDriverFactory();
@@ -800,7 +801,7 @@ export class PreAggregationLoader {
         client.unloadFromQuery(
           sql,
           params,
-          this.getUnloadOptions(),
+          { ...this.getUnloadOptions(), tableName: targetTableName },
         )
       ).catch((error: any) => {
         this.logger('Downloading external pre-aggregation via query error', {
