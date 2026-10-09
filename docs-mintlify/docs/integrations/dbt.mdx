@@ -693,7 +693,7 @@ to the branch you're syncing.
 #### Skip unchanged webhook syncs
 
 By default, each webhook sync creates a review branch even when the generated cube
-files are identical to those on the deployment's default branch. To avoid empty
+files are identical to those on your Cube data model's default branch. To avoid empty
 reviews and their notification emails:
 
 1. Go to **Settings → Data Sources**, edit the **default data source**, and expand
@@ -702,8 +702,8 @@ reviews and their notification emails:
 3. Click **Save dbt settings**.
 
 When enabled, Cube still parses the dbt project and converts the selected models.
-It then compares the generated file paths and contents with the deployment's
-**default branch**, using the configured output path.
+It then compares the generated file paths and contents with the **default branch of
+your Cube data model**, using the configured output path.
 An added file, changed file content, or deletion of a file for a removed dbt model
 creates a review branch and sends the usual review notification. Files outside the
 output path and preserved cubes for models outside the pull's selection do not count
@@ -1061,13 +1061,10 @@ Check that:
 
 <Accordion title="A webhook sync completed but has no review branch or email">
 
-If **Skip unchanged webhook syncs** is enabled under **Review notifications**, Cube
-creates a branch only when generated cube files differ from the deployment's default
-branch. Run `cube dbt history DEPLOYMENT_ID --trigger webhook` to find the sync: an
-unchanged run has status **COMPLETED** and an empty **BRANCH** column. In the UI,
-sync history shows no review branch link for that run. If no matching run appears,
-follow **A webhook push doesn't trigger a sync** above. Turn
-the setting off if you want a review branch for every webhook sync.
+[Skip unchanged webhook syncs](#skip-unchanged-webhook-syncs) may have found no changes.
+Run `cube dbt history DEPLOYMENT_ID --trigger webhook`: an unchanged run has status
+**COMPLETED** and an empty **BRANCH** column. If no matching run appears, follow
+**A webhook push doesn't trigger a sync** above.
 
 </Accordion>
 
