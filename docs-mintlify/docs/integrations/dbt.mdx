@@ -709,8 +709,8 @@ creates a review branch and sends the usual review notification. Files outside t
 output path and preserved cubes for models outside the pull's selection do not count
 as changes.
 
-Otherwise, the run appears in sync history as **COMPLETED**, without a review branch
-link or notification email — for example, after a push that only changes a README,
+If nothing changed, the run appears in sync history as **COMPLETED**, without a
+review branch link or notification email — for example, after a push that only changes a README,
 CI configuration, or an unselected dbt model. While the generated changes remain
 unmerged, subsequent webhook syncs create another review branch and send another
 email because those changes are still absent from the default branch.
@@ -734,9 +734,6 @@ straight to the review. No one has to poll the UI to notice that dbt changed. Re
 who can edit the data model land on the branch in [development
 mode](/docs/data-modeling/dev-mode), ready to make changes; recipients without edit access
 see a read-only diff instead.
-
-Enable [Skip unchanged webhook syncs](#skip-unchanged-webhook-syncs) to send these
-emails only when a webhook sync produces changes to the generated cube files.
 
 ## What gets generated
 
@@ -1066,8 +1063,9 @@ Check that:
 If **Skip unchanged webhook syncs** is enabled under **Review notifications**, Cube
 creates a branch only when generated cube files differ from the deployment's default
 branch. Run `cube dbt history DEPLOYMENT_ID --trigger webhook` to find the sync: an
-unchanged run appears as **COMPLETED**, confirming the webhook triggered it. If no
-matching run appears, follow **A webhook push doesn't trigger a sync** above. Turn
+unchanged run has status **COMPLETED** and an empty **BRANCH** column. In the UI,
+sync history shows no review branch link for that run. If no matching run appears,
+follow **A webhook push doesn't trigger a sync** above. Turn
 the setting off if you want a review branch for every webhook sync.
 
 </Accordion>
