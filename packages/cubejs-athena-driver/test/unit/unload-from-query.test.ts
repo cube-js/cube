@@ -24,6 +24,22 @@ class TestAthenaDriver extends AthenaDriver {
   }
 }
 
+// The integration job runs this suite with CUBEJS_DB_EXPORT_BUCKET exported,
+// which the driver falls back to when the config has no export bucket
+const envExportBucket = process.env.CUBEJS_DB_EXPORT_BUCKET;
+
+beforeEach(() => {
+  delete process.env.CUBEJS_DB_EXPORT_BUCKET;
+});
+
+afterEach(() => {
+  if (envExportBucket === undefined) {
+    delete process.env.CUBEJS_DB_EXPORT_BUCKET;
+  } else {
+    process.env.CUBEJS_DB_EXPORT_BUCKET = envExportBucket;
+  }
+});
+
 const createDriver = (config: Record<string, unknown> = {}) => {
   const driver = new TestAthenaDriver({
     region: 'us-east-1',
