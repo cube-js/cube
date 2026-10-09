@@ -7,6 +7,7 @@ import {
   DEFAULT_CONFIG,
   JEST_AFTER_ALL_DEFAULT_TIMEOUT,
   JEST_BEFORE_ALL_DEFAULT_TIMEOUT,
+  stopIfStarted,
 } from './smoke-tests';
 
 // AOV end to end: the numerator (sales dollars, day/item/location grain) and
@@ -54,7 +55,7 @@ describe('multi-fact derived measure', () => {
   }, JEST_BEFORE_ALL_DEFAULT_TIMEOUT);
 
   afterAll(async () => {
-    await birdbox.stop();
+    await stopIfStarted('birdbox', birdbox);
   }, JEST_AFTER_ALL_DEFAULT_TIMEOUT);
 
   // Numeric measures come back as strings or numbers depending on the type and

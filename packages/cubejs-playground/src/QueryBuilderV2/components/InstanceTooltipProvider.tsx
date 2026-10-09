@@ -64,7 +64,7 @@ export function InstanceTooltipProvider(props: InstanceTooltipProviderProps) {
 
   return (
     <TooltipProvider
-      title={
+      title={(
         <>
           <TooltipWrapper>
             {type && <div data-element="Type">{type}</div>}
@@ -73,7 +73,7 @@ export function InstanceTooltipProvider(props: InstanceTooltipProviderProps) {
             <div data-element="Description">{description}</div>
           </TooltipWrapper>
         </>
-      }
+      )}
       width="max-content"
       delay={1000}
       placement="right"

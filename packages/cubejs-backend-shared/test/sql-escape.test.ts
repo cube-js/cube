@@ -28,6 +28,7 @@ function decodeAnsiLiteral(literal: string): string {
 
   const body = literal.slice(1, -1);
   let decoded = '';
+
   for (let i = 0; i < body.length; i++) {
     if (body[i] === "'") {
       if (body[i + 1] !== "'") {
@@ -53,6 +54,7 @@ function decodeMySqlLiteral(literal: string): string {
 
   const body = literal.slice(1, -1);
   let decoded = '';
+
   for (let i = 0; i < body.length; i++) {
     const char = body[i];
     if (char === "'" || char === '\\') {
@@ -81,6 +83,7 @@ function decodeSparkLiteral(literal: string): string {
 
   const body = literal.slice(1, -1);
   let decoded = '';
+
   for (let i = 0; i < body.length; i++) {
     const char = body[i];
     if (char === "'") {

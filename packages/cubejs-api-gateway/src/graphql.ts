@@ -31,7 +31,7 @@ import {
 } from 'graphql-scalars';
 
 import gql from 'graphql-tag';
-import { QueryType, MemberType } from './types/enums';
+import { QueryTypeEnum, MemberTypeEnum } from './types/enums';
 
 const DateTimeScalar = asNexusMethod(DateTimeResolver, 'date');
 
@@ -259,7 +259,7 @@ function getMemberType(metaConfig: any, cubeName: string, memberName: string) {
   const cubeConfig = metaConfig.find(cube => (cube.config.name === cubeName) || cube.config.name === capitalize(cubeName));
   if (!cubeConfig) return undefined;
 
-  return [MemberType.MEASURES, MemberType.DIMENSIONS].find((memberType) => (cubeConfig.config[memberType]
+  return [MemberTypeEnum.MEASURES, MemberTypeEnum.DIMENSIONS].find((memberType) => (cubeConfig.config[memberType]
     .findIndex(entry => entry.name === `${cubeName}.${memberName}` || entry.name === `${capitalize(cubeName)}.${memberName}`) !== -1
   ));
 }
@@ -416,9 +416,9 @@ export function getJsonQuery(metaConfig: any, args: Record<string, any>, infos: 
       const memberType = getMemberType(metaConfig, cubeName, memberName);
       const key = `${cubeName}.${memberName}`;
 
-      if (memberType === MemberType.MEASURES) {
+      if (memberType === MemberTypeEnum.MEASURES) {
         measures.push(key);
-      } else if (memberType === MemberType.DIMENSIONS) {
+      } else if (memberType === MemberTypeEnum.DIMENSIONS) {
         const granularityNodes = getFieldNodeChildren(memberNode, infos);
         if (granularityNodes.length > 0) {
           granularityNodes.forEach(granularityNode => {
@@ -475,6 +475,7 @@ export function getJsonQueryFromGraphQLQuery(query: string, metaConfig: any, var
   const fieldNodes = operation?.selectionSet.selections;
 
   let args = {};
+
   for (const argument of fieldNodes[0].arguments) {
     args = { ...args, [argument.name.value]: parseArgumentValue(argument.value, variableValues) };
   }
@@ -650,7 +651,7 @@ export function makeSchema(metaConfig: any): GraphQLSchema {
           const results = await new Promise<any>((resolve, reject) => {
             apiGateway.load({
               query,
-              queryType: QueryType.REGULAR_QUERY,
+              queryType: QueryTypeEnum.REGULAR_QUERY,
               ...(query.cache ? { cache: query.cache } : {}),
               context: req.context,
               res: async (message) => {
@@ -675,6 +676,7 @@ export function makeSchema(metaConfig: any): GraphQLSchema {
           res.extensions = {
             annotation: results.annotation,
             lastRefreshTime: results.lastRefreshTime,
+            usedPreAggregations: results.usedPreAggregations,
           };
 
           return results.data.map(entry => R.toPairs(entry)

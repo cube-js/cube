@@ -28,11 +28,11 @@ export function DrilldownModal({ query, onClose, pivotConfig }) {
       visible={isOpen}
       onCancel={handleCancel}
       width="auto"
-      footer={
+      footer={(
         <Button key="close" onClick={handleCancel}>
           Close
         </Button>
-      }
+      )}
       afterClose={onClose}
       centered
     >

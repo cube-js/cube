@@ -5,6 +5,7 @@ import {
   ContinueWaitError,
   DriverFactoryByDataSource,
   DriverType,
+  Query,
   QueryBody,
   QueryOrchestrator,
   QueryOrchestratorOptions,
@@ -240,11 +241,23 @@ export class OrchestratorApi {
   }
 
   public async release() {
-    return Promise.all([
-      ...Object.keys(this.seenDataSources).map(ds => this.releaseDriver(this.driverFactory, ds)),
-      this.releaseDriver(this.options.externalDriverFactory),
-      this.orchestrator.cleanup()
-    ]);
+    try {
+      return await Promise.all([
+        ...Object.keys(this.seenDataSources).map(ds => this.releaseDriver(this.driverFactory, ds)),
+        this.releaseDriver(this.options.externalDriverFactory),
+        this.orchestrator.cleanup()
+      ]);
+    } catch (error) {
+      // `OrchestratorStorage` swallows this so that one orchestrator failing to
+      // close cannot fail shutdown, which leaves this as the only place an
+      // operator learns that a connection was not closed after all.
+      this.logger('Orchestrator Release Error', {
+        orchestratorId: this.options.redisPrefix,
+        error: (error as Error).stack || String(error),
+      });
+
+      throw error;
+    }
   }
 
   protected async releaseDriver(driverFn?: DriverFactoryByDataSource, dataSource: string = 'default') {
@@ -272,7 +285,7 @@ export class OrchestratorApi {
     return this.orchestrator.getPreAggregationPreview(context.requestId, preAggregation);
   }
 
-  public async expandPartitionsInPreAggregations(queryBody) {
+  public async expandPartitionsInPreAggregations(queryBody: Query) {
     try {
       return await this.orchestrator.expandPartitionsInPreAggregations(queryBody);
     } catch (err) {
@@ -285,7 +298,7 @@ export class OrchestratorApi {
     }
   }
 
-  public async checkPartitionsBuildRangeCache(queryBody) {
+  public async checkPartitionsBuildRangeCache(queryBody: QueryBody) {
     return this.orchestrator.checkPartitionsBuildRangeCache(queryBody);
   }
 

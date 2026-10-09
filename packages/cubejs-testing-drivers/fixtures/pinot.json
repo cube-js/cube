@@ -221,6 +221,8 @@
     "querying BigECommerce: rolling window YTD without date range",
     "querying custom granularities ECommerce: count by two_mo_by_feb + no dimension + rollingCountByLeading without date range",
     "querying BigECommerce with Retail Calendar: totalCountRetailYearAgo",
+    "querying BigECommerce with Retail Calendar: prior year and month by week (no pre-aggregation)",
+    "querying BigECommerce with Retail Calendar: prior year and month by week (pre-aggregation in CubeStore)",
     "querying BigECommerce with Retail Calendar: totalCountRetailMonthAgo",
     "querying BigECommerce with Retail Calendar: totalCountRetailWeekAgo",
     "Tesseract: querying BigECommerce with Retail Calendar: totalCountRetailMonthAgo",
@@ -262,7 +264,19 @@
     "    a literal percent sign - are answered by Pinot and are vacuous: each",
     "    expects an empty result, which is what Pinot returns for everything.",
     "    They still discriminate on every other engine, which is why they stay.",
-    "filtering Products: contains a literal underscore (no pre-aggregation)"
+    "filtering Products: contains a literal underscore (no pre-aggregation)",
+
+    "---------------------------------------",
+    "Requires Tesseract.                    ",
+    "---------------------------------------",
+    "    A custom granularity origin on a single-unit interval only reaches the grouping under Tesseract.",
+    "querying custom granularities ECommerce: count by fiscal_year_by_1st_april + no dimension",
+    "querying custom granularities ECommerce: count by fiscal_year_by_15th_april + no dimension",
+    "querying custom granularities ECommerce: count by monthly_from_15th + no dimension",
+    "---- Time-shifted measure rolled up from a rollup: native planner, Postgres and BigQuery only ----",
+    "querying RetailOrders: named prior month by category for one day (pre-aggregation in CubeStore)",
+    "querying RetailOrders: named prior month by category over two months (pre-aggregation in CubeStore)",
+    "SQL API: named prior month by category for one day"
   ],
   "tesseractSkip": [
     "---------------------------------------",
@@ -337,6 +351,13 @@
     "    a literal percent sign - are answered by Pinot and are vacuous: each",
     "    expects an empty result, which is what Pinot returns for everything.",
     "    They still discriminate on every other engine, which is why they stay.",
-    "filtering Products: contains a literal underscore (no pre-aggregation)"
+    "filtering Products: contains a literal underscore (no pre-aggregation)",
+    "---- Calendar-shifted measure stored in a rollup: covered on Postgres only for now ----",
+    "querying BigECommerce with Retail Calendar: prior year and month by week (no pre-aggregation)",
+    "querying BigECommerce with Retail Calendar: prior year and month by week (pre-aggregation in CubeStore)",
+    "---- Time-shifted measure rolled up from a rollup: native planner, Postgres and BigQuery only ----",
+    "querying RetailOrders: named prior month by category for one day (pre-aggregation in CubeStore)",
+    "querying RetailOrders: named prior month by category over two months (pre-aggregation in CubeStore)",
+    "SQL API: named prior month by category for one day"
   ]
 }

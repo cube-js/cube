@@ -1,4 +1,5 @@
 import R from 'ramda';
+import { splitSqlInterval } from '@cubejs-backend/shared';
 
 import { BaseQuery } from './BaseQuery';
 import { BaseFilter } from './BaseFilter';
@@ -39,15 +40,23 @@ export class HiveQuery extends BaseQuery {
   }
 
   public subtractInterval(date, interval) {
-    const [number, type] = this.parseInterval(interval);
-
-    return `(${date} - INTERVAL '${number}' ${type})`;
+    return this.applyInterval('-', date, interval);
   }
 
   public addInterval(date, interval) {
-    const [number, type] = this.parseInterval(interval);
+    return this.applyInterval('+', date, interval);
+  }
 
-    return `(${date} + INTERVAL '${number}' ${type})`;
+  /**
+   * Hive INTERVAL literals carry a single unit, so a compound interval is applied one unit at a
+   * time, coarsest first.
+   */
+  private applyInterval(operator: '+' | '-', date: string, interval: string): string {
+    return splitSqlInterval(interval).reduce((acc, part) => {
+      const [number, type] = this.parseInterval(part);
+
+      return `(${acc} ${operator} INTERVAL '${number}' ${type})`;
+    }, date);
   }
 
   public timeGroupedColumn(granularity, dimension) {

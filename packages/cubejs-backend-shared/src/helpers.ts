@@ -40,6 +40,7 @@ export async function executeCommand(
 // Executes `command` in `dir`, returns the error code. Preserves working directory.
 export function execInDir(dir: string, command: string): number {
   const crtDir = process.cwd();
+
   try {
     process.chdir(dir);
     const result = shell.exec(command);
@@ -63,6 +64,7 @@ export function checkNonNullable<T>(name: string, x: T): NonNullable<T> {
 
 export async function streamToArray<T>(stream: Readable): Promise<T[]> {
   const result: T[] = [];
+
   for await (const x of stream) {
     result.push(x);
   }

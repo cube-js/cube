@@ -1,10 +1,11 @@
-use super::planners::multi_stage::PlanningScope;
+use super::planners::multi_stage::{check_multi_stage_depth, PlanningScope};
 use super::planners::QueryPlanner;
 use super::state::State;
 use super::QueryProperties;
 use crate::logical_plan::OriginalSqlCollector;
 use crate::logical_plan::PreAggregationOptimizer;
 use crate::logical_plan::PreAggregationUsage;
+use crate::logical_plan::RollingBaseScanOptimizer;
 use crate::logical_plan::RootQuery;
 use crate::physical_plan_builder::PhysicalPlanBuilder;
 use cubenativeutils::CubeError;
@@ -31,6 +32,11 @@ impl TopLevelPlanner {
     }
 
     pub fn plan(&self) -> Result<(String, Vec<PreAggregationUsage>), CubeError> {
+        check_multi_stage_depth(
+            &self.request.all_used_symbols()?,
+            self.request.max_multi_stage_depth(),
+        )?;
+
         let query_planner = QueryPlanner::new(self.request.clone(), self.query_tools.clone());
         let mut scope = PlanningScope::new();
         let query = query_planner.plan(&mut scope)?;
@@ -52,6 +58,13 @@ impl TopLevelPlanner {
             return Ok((String::new(), usages));
         }
 
+        // Ordering is load-bearing: merging is only safe once rollups have been
+        // matched, because a scan carrying two measures can no longer be served
+        // by a rollup holding one of them. Moved above `try_pre_aggregations`,
+        // a model storing one rollup per rolling measure silently falls back to
+        // the fact table for all of them.
+        let optimized_plan = RollingBaseScanOptimizer::new().optimize(optimized_plan);
+
         let is_external = if !usages.is_empty() {
             usages.iter().all(|usage| usage.pre_aggregation.external())
         } else {
@@ -59,8 +72,11 @@ impl TopLevelPlanner {
         };
 
         let templates = self.query_tools.plan_sql_templates(is_external)?;
-        let physical_plan_builder =
-            PhysicalPlanBuilder::new(self.query_tools.query_tools().clone(), templates.clone());
+        let physical_plan_builder = PhysicalPlanBuilder::new(
+            self.query_tools.query_tools().clone(),
+            templates.clone(),
+            self.request.cubestore_union_full_key_aggregate(),
+        );
 
         // Substitute a cube's base SQL with its `originalSql` pre-aggregation table when:
         // reading (regular query), or building a rollup that opted in via
@@ -94,6 +110,7 @@ impl TopLevelPlanner {
         let result = if !self.request.is_pre_aggregation_query() {
             let mut pre_aggregation_optimizer = PreAggregationOptimizer::new(
                 self.query_tools.clone(),
+                self.request.query_join_hints().clone(),
                 self.cubestore_support_multistage,
             );
             let disable_external_pre_aggregations =

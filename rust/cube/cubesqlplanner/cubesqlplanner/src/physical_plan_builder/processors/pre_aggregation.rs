@@ -11,8 +11,8 @@ use crate::physical_plan::{
 };
 use crate::physical_plan_builder::PhysicalPlanBuilder;
 use crate::planner::sql_templates::PlanSqlTemplates;
-use crate::planner::MemberSymbol;
 use crate::planner::SqlJoinCondition;
+use crate::planner::{CubeId, MemberSymbol};
 use cubenativeutils::CubeError;
 use std::rc::Rc;
 
@@ -83,16 +83,14 @@ impl PreAggregationProcessor<'_> {
         branch_members: &[Rc<MemberSymbol>],
         branch_cube_name: &str,
     ) -> Result<Rc<MemberSymbol>, CubeError> {
-        if let Some(member) = branch_members
-            .iter()
-            .find(|m| m.full_name() == lambda_member.full_name())
-        {
+        if let Some(member) = branch_members.iter().find(|m| m.id() == lambda_member.id()) {
             return Ok(member.clone());
         }
         let short_name = lambda_member.name();
+        let branch_cube = CubeId::cube(branch_cube_name);
         if let Some(member) = branch_members
             .iter()
-            .find(|m| m.name() == short_name && m.cube_name() == branch_cube_name)
+            .find(|m| m.name() == short_name && m.cube_id() == branch_cube)
         {
             return Ok(member.clone());
         }

@@ -147,6 +147,72 @@ describe('SubscriptionServer', () => {
     });
   });
 
+  describe('Request ID', () => {
+    it('should reject a requestId with forbidden characters', async () => {
+      const { mockApiGateway, mockSubscriptionStore, mockSendMessage, mockContextAcceptor } = createMocks();
+      const server = new SubscriptionServer(mockApiGateway, mockSendMessage, mockSubscriptionStore, mockContextAcceptor);
+
+      await server.processMessage('conn-1', JSON.stringify({
+        method: 'load',
+        messageId: 'msg-1',
+        requestId: 'my req\n',
+        params: { query: { measures: ['Orders.count'] } },
+      }));
+
+      expect(mockApiGateway.contextByReq).not.toHaveBeenCalled();
+      expect(mockApiGateway.load).not.toHaveBeenCalled();
+      expect(mockApiGateway.handleError).toHaveBeenCalled();
+    });
+
+    it('should reject a messageId with forbidden characters when requestId is omitted', async () => {
+      const { mockApiGateway, mockSubscriptionStore, mockSendMessage, mockContextAcceptor } = createMocks();
+      const server = new SubscriptionServer(mockApiGateway, mockSendMessage, mockSubscriptionStore, mockContextAcceptor);
+
+      await server.processMessage('conn-1', JSON.stringify({
+        method: 'load',
+        messageId: "x' OR 1;--",
+        params: { query: { measures: ['Orders.count'] } },
+      }));
+
+      expect(mockApiGateway.contextByReq).not.toHaveBeenCalled();
+      expect(mockApiGateway.load).not.toHaveBeenCalled();
+      expect(mockApiGateway.handleError).toHaveBeenCalled();
+    });
+
+    it('should accept a requestId of up to 128 characters', async () => {
+      const { mockApiGateway, mockSubscriptionStore, mockSendMessage, mockContextAcceptor } = createMocks();
+      const server = new SubscriptionServer(mockApiGateway, mockSendMessage, mockSubscriptionStore, mockContextAcceptor);
+
+      const send = (requestId: string) => server.processMessage('conn-1', JSON.stringify({
+        method: 'load',
+        messageId: 'msg-1',
+        requestId,
+        params: { query: { measures: ['Orders.count'] } },
+      }));
+
+      await send('a'.repeat(128));
+      expect(mockApiGateway.contextByReq).toHaveBeenCalledTimes(1);
+
+      await send('a'.repeat(129));
+      expect(mockApiGateway.contextByReq).toHaveBeenCalledTimes(1);
+      expect(mockApiGateway.handleError).toHaveBeenCalled();
+    });
+
+    it('should pass a valid requestId through', async () => {
+      const { mockApiGateway, mockSubscriptionStore, mockSendMessage, mockContextAcceptor } = createMocks();
+      const server = new SubscriptionServer(mockApiGateway, mockSendMessage, mockSubscriptionStore, mockContextAcceptor);
+
+      await server.processMessage('conn-1', JSON.stringify({
+        method: 'load',
+        messageId: 'msg-1',
+        requestId: 'client-req-1',
+        params: { query: { measures: ['Orders.count'] } },
+      }));
+
+      expect(mockApiGateway.contextByReq.mock.calls[0][2]).toMatch(/^client-req-1-span-[0-9a-f-]{36}$/);
+    });
+  });
+
   describe('Auth Flow', () => {
     it('should complete successful authorization handshake', async () => {
       const { mockApiGateway, mockSubscriptionStore, mockSendMessage, mockContextAcceptor, sentMessages } = createMocks();

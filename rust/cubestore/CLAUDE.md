@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Repository Overview
 
-CubeStore is the Rust-based distributed OLAP storage engine for Cube.js, designed to store and serve pre-aggregations at scale. It's part of the larger Cube.js monorepo and serves as the materialized cache store for rollup tables.
+CubeStore is the Rust-based distributed OLAP storage engine for Cube, designed to store and serve pre-aggregations at scale. It's part of the larger Cube monorepo and serves as the materialized cache store for rollup tables.
 
 ## Architecture Overview
 

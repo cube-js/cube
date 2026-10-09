@@ -1,4 +1,9 @@
+import asyncio
+import contextvars
+import functools
+import inspect
 import os
+import threading
 from typing import Union, Callable, Dict, Any
 
 
@@ -180,7 +185,7 @@ class TemplateContext:
         if not callable(func):
             raise TemplateException("function registration must be used with functions, actual: '%s'" % type(func).__name__)
 
-        self.functions[name] = func
+        self.functions[name] = _in_template_context(self, func)
 
     def add_variable(self, name, val):
         if name in self.functions:
@@ -192,7 +197,7 @@ class TemplateContext:
         if not callable(func):
             raise TemplateException("function registration must be used with functions, actual: '%s'" % type(func).__name__)
 
-        self.filters[name] = func
+        self.filters[name] = _in_template_context(self, func)
 
     def function(self, func):
         if isinstance(func, str):
@@ -233,6 +238,180 @@ class TemplateFilterRef:
         self.context.add_filter(self.attribute, func)
         return func
 
+# Kept when the runtime runs this module again for the next compilation: calls still running hold
+# tokens of it
+_template_context = globals().get('_template_context') or contextvars.ContextVar('cube_template_context', default=None)
+
+
+def _memo_key(args, kwargs):
+    """The key of a call: equal arguments of the same type make the same key. It holds hashable
+    arguments; other unhashable objects, keyed by id(), are returned to keep with the entry, as a
+    freed object's id can be reused by another."""
+    pinned = []
+    # The containers being walked, so one that contains itself doesn't recurse forever
+    path = set()
+
+    def by_identity(value):
+        pinned.append(value)
+        return ('object', id(value))
+
+    def plain(value):
+        kind = type(value)
+        # Only the built-in containers: their equality is known to be by items
+        if kind in (list, tuple, dict, set, frozenset):
+            if id(value) in path:
+                return by_identity(value)
+            path.add(id(value))
+            try:
+                if kind is dict:
+                    return ('dict', frozenset((plain(k), plain(v)) for k, v in value.items()))
+                if kind in (set, frozenset):
+                    return ('set', frozenset(plain(item) for item in value))
+                return (kind.__name__, tuple(plain(item) for item in value))
+            finally:
+                path.discard(id(value))
+        if isinstance(value, float) and value != value:
+            # Every NaN is unequal to itself
+            return (float, 'nan')
+        try:
+            hash(value)
+        except TypeError:
+            return by_identity(value)
+        # Matched by its own equality, with the type keeping 1, 1.0 and True apart. Objects without
+        # their own __eq__, e.g. the `self` of a memoized method, match only themselves
+        return (kind, value)
+
+    return (plain(args), tuple(sorted((name, plain(value)) for name, value in kwargs.items()))), pinned
+
+
+def memo(func):
+    """Calls `func` once per set of arguments and returns that result to every later call made while a
+    template function runs, with a cache per `TemplateContext`: each data model compilation creates
+    one anew by loading `globals.py`. Other calls, with no compilation to cache for, just call `func`."""
+    if not callable(func):
+        raise TemplateException("memo must be used with functions, actual: '%s'" % type(func).__name__)
+
+    # The cache of each compilation lives on its TemplateContext: what the results reference (a
+    # traceback's frames, a task's copied contextvars) leads back to it, which makes a cycle the
+    # GC frees with the context rather than a reference keeping the context alive
+    owner = object()
+    # Held only to look entries up: a call runs under the lock of its own key and context, so
+    # other compilations and other arguments don't wait for it
+    lock = threading.Lock()
+
+    def results(context):
+        caches = context.__dict__.setdefault('_cube_memo_caches', {})
+        stored = caches.get(owner)
+        if stored is None:
+            stored = caches[owner] = {}
+        return stored
+
+    def key_lock(context, key, pinned):
+        with lock:
+            stored = results(context)
+            entry = stored.get(key)
+            if entry is None:
+                entry = stored[key] = {'lock': threading.RLock(), 'pinned': pinned}
+            return entry
+
+    def settle(stored, key, entry, task):
+        # Only the outcome stays, not the task and its event loop
+        with lock:
+            if stored.get(key) is entry:
+                if task.cancelled():
+                    del stored[key]
+                else:
+                    stored[key] = (None, task.result(), entry[2])
+
+    if inspect.iscoroutinefunction(func):
+        async def call(*args, **kwargs):
+            # The task returns the exception instead of raising it: re-raising it from the task
+            # would extend its traceback with every call before Python 3.11
+            try:
+                return True, await func(*args, **kwargs)
+            except Exception as e:
+                return False, (e, e.__traceback__)
+
+        @functools.wraps(func)
+        async def async_wrapper(*args, **kwargs):
+            context = _template_context.get()
+            if context is None:
+                return await func(*args, **kwargs)
+            key, pinned = _memo_key(args, kwargs)
+            loop = asyncio.get_running_loop()
+            with lock:
+                stored = results(context)
+                entry = stored.get(key)
+                if entry is None or (entry[0] is not None and entry[0] is not loop and not entry[1].done()):
+                    # A task, so concurrent calls on the loop share one invocation
+                    task = asyncio.ensure_future(call(*args, **kwargs))
+                    entry = stored[key] = (loop, task, pinned)
+                    task.add_done_callback(functools.partial(settle, stored, key, entry))
+            if entry[0] is None:
+                ok, value = entry[1]
+            else:
+                task = entry[1]
+                # Shielded: cancelling one caller mustn't cancel the task the others share
+                ok, value = task.result() if task.done() else await asyncio.shield(task)
+            if not ok:
+                error, tb = value
+                raise error.with_traceback(tb)
+            return value
+
+        return async_wrapper
+
+    @functools.wraps(func)
+    def wrapper(*args, **kwargs):
+        context = _template_context.get()
+        if context is None:
+            return func(*args, **kwargs)
+        key, pinned = _memo_key(args, kwargs)
+        entry = key_lock(context, key, pinned)
+        with entry['lock']:
+            if 'result' not in entry:
+                try:
+                    entry['result'] = (True, func(*args, **kwargs))
+                except Exception as e:
+                    # With its own traceback: raising the instance again would extend it each time
+                    entry['result'] = (False, (e, e.__traceback__))
+            ok, value = entry['result']
+        if not ok:
+            error, tb = value
+            raise error.with_traceback(tb)
+        return value
+
+    return wrapper
+
+
+def _in_template_context(context, func):
+    # The TemplateContext of the compilation whose templates call `func`: memoized functions it
+    # calls, also those of modules globals.py imports, cache their results per compilation
+    if not inspect.isfunction(func):
+        return func
+
+    if inspect.iscoroutinefunction(func):
+        # The native side leaves frames of functions with these names out of error tracebacks
+        @functools.wraps(func)
+        async def _cube_template_call_async(*args, **kwargs):
+            token = _template_context.set(context)
+            try:
+                return await func(*args, **kwargs)
+            finally:
+                _template_context.reset(token)
+
+        return _cube_template_call_async
+
+    @functools.wraps(func)
+    def _cube_template_call(*args, **kwargs):
+        token = _template_context.set(context)
+        try:
+            return func(*args, **kwargs)
+        finally:
+            _template_context.reset(token)
+
+    return _cube_template_call
+
+
 def context_func(func):
     func.cube_context_func = True
     return func
@@ -245,6 +424,7 @@ class SafeString(str):
 
 __all__ = [
     'context_func',
+    'memo',
     'TemplateContext',
     'SafeString',
 ]

@@ -69,6 +69,14 @@ pub struct MockBaseQueryOptions {
     total_query: Option<bool>,
     #[builder(default)]
     cubestore_support_multistage: Option<bool>,
+    #[builder(default)]
+    cubestore_union_full_key_aggregate: Option<bool>,
+    #[builder(default)]
+    max_multi_stage_depth: Option<usize>,
+    #[builder(default)]
+    max_multi_stage_stages: Option<usize>,
+    #[builder(default)]
+    max_member_resolution_depth: Option<usize>,
     #[builder(default = false)]
     disable_external_pre_aggregations: bool,
     #[builder(default)]
@@ -98,6 +106,10 @@ impl_static_data!(
     use_original_sql_pre_aggregations_in_pre_aggregation,
     total_query,
     cubestore_support_multistage,
+    cubestore_union_full_key_aggregate,
+    max_multi_stage_depth,
+    max_multi_stage_stages,
+    max_member_resolution_depth,
     disable_external_pre_aggregations,
     pre_aggregation_id,
     convert_tz_for_raw_time_dimension,

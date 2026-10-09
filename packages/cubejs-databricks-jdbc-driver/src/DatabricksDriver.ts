@@ -22,8 +22,9 @@ import { DatabricksQuery } from './DatabricksQuery';
 import {
   extractAndRemoveUidPwdFromJdbcUrl,
   parseDatabricksJdbcUrl,
-  resolveJDBCDriver
+  validateAndRemoveGeoSpatialSupportFromJdbcUrl
 } from './helpers';
+import { resolveJDBCDriver } from './installer';
 
 const SUPPORTED_BUCKET_TYPES = ['s3', 'gcs', 'azure'];
 
@@ -219,7 +220,8 @@ export class DatabricksDriver extends JDBCDriver {
       url = url.replace('jdbc:spark://', 'jdbc:databricks://');
     }
 
-    const [uid, pwd, cleanedUrl] = extractAndRemoveUidPwdFromJdbcUrl(url);
+    const [uid, pwd, urlWithoutCredentials] = extractAndRemoveUidPwdFromJdbcUrl(url);
+    const cleanedUrl = validateAndRemoveGeoSpatialSupportFromJdbcUrl(urlWithoutCredentials);
     const passwd = conf?.token ||
           getEnv('databricksToken', { dataSource, preAggregations }) ||
           pwd;
@@ -263,6 +265,9 @@ export class DatabricksDriver extends JDBCDriver {
       properties: {
         ...authProps,
         UserAgentEntry: 'CubeDev_Cube',
+        // 3.4.1 turned geospatial support on by default, which returns GEOMETRY/GEOGRAPHY columns
+        // as Java objects instead of EWKT strings.
+        EnableGeoSpatialSupport: '0',
       },
       catalog:
         conf?.catalog ||
@@ -463,9 +468,11 @@ export class DatabricksDriver extends JDBCDriver {
     if (schema) {
       return schema;
     } else {
-      const devMode =
-        process.env.NODE_ENV !== 'production' || getEnv('devMode');
-      return devMode
+      // A driver cannot see CreateOptions.devServer, so this can disagree with the
+      // schema server-core resolved. server-core writes that schema into
+      // CUBEJS_PRE_AGGREGATIONS_SCHEMA whenever it has one string to write, which the
+      // branch above then reads — a per-tenant preAggregationsSchema function is the gap
+      return getEnv('devMode')
         ? 'dev_pre_aggregations'
         : 'prod_pre_aggregations';
     }
@@ -522,7 +529,7 @@ export class DatabricksDriver extends JDBCDriver {
   /**
    * Returns the list of the tables for the specified schema.
    */
-  public async getTablesQuery(schemaName: string): Promise<{ 'table_name': string }[]> {
+  public async getTablesQuery(schemaName: string): Promise<{ table_name: string }[]> {
     const response = await this.query(
       `SHOW TABLES IN ${this.getSchemaFullName(schemaName)}`,
       [],
@@ -701,7 +708,7 @@ export class DatabricksDriver extends JDBCDriver {
     const result = [];
 
     // eslint-disable-next-line camelcase
-    const response = await this.query<{col_name: string; data_type: string}>(
+    const response = await this.query<{ col_name: string; data_type: string }>(
       `DESCRIBE QUERY ${sql}`,
       params || []
     );

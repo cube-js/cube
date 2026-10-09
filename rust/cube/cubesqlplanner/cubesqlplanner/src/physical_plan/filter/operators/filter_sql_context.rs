@@ -1,6 +1,7 @@
 use crate::cube_bridge::base_query_options::FilterValue;
 use crate::planner::query_tools::QueryTools;
 use crate::planner::sql_templates::{PlanSqlTemplates, TemplateProjectionColumn};
+use crate::planner::time_dimension::{SeriesSpan, UNBOUNDED_INTERVAL};
 use crate::planner::QueryDateTimeHelper;
 use crate::utils::sql_expression_scanner::{ends_in_line_comment, is_top_level_compound};
 use cubenativeutils::CubeError;
@@ -143,6 +144,19 @@ impl<'a> FilterSqlContext<'a> {
         bound: DateBound,
         cast: bool,
     ) -> Result<String, CubeError> {
+        self.format_and_allocate_date_impl(value, bound, cast, true)
+    }
+
+    /// `in_db_time_zone` false leaves the date in the query's own timezone, for
+    /// a caller comparing it against a member that is converted into that
+    /// timezone rather than read raw.
+    fn format_and_allocate_date_impl(
+        &self,
+        value: &str,
+        bound: DateBound,
+        cast: bool,
+        in_db_time_zone: bool,
+    ) -> Result<String, CubeError> {
         let allocate = |value: &str| {
             if cast {
                 self.allocate_timestamp_param(value)
@@ -161,8 +175,12 @@ impl<'a> FilterSqlContext<'a> {
             DateBound::From => QueryDateTimeHelper::format_from_date(value, precision)?,
             DateBound::To => QueryDateTimeHelper::format_to_date(value, precision)?,
         };
-        let with_tz = self.apply_db_time_zone(formatted)?;
-        allocate(&with_tz)
+        let formatted = if in_db_time_zone {
+            self.apply_db_time_zone(formatted)?
+        } else {
+            formatted
+        };
+        allocate(&formatted)
     }
 
     fn is_partition_range(&self, value: &str) -> bool {
@@ -181,32 +199,69 @@ impl<'a> FilterSqlContext<'a> {
         self.plan_templates.convert_tz(field.to_string())
     }
 
+    /// The rolling window's series bounds as literal parameters, or `None`
+    /// when they can only be read back off the series itself.
+    ///
+    /// Left in the query's own timezone: a rolling filter compares them against
+    /// the member converted into that timezone, and the series places its
+    /// points there too.
+    ///
+    /// Raw values are spliced into pre-aggregation SQL verbatim rather than
+    /// allocated as parameters, which a bound cannot be rendered as.
+    pub fn date_range_literals(
+        &self,
+        span: &Option<SeriesSpan>,
+    ) -> Result<Option<(String, String)>, CubeError> {
+        let Some(span) = span else {
+            return Ok(None);
+        };
+        if self.use_raw_values {
+            return Ok(None);
+        }
+        Ok(Some((
+            self.format_and_allocate_date_impl(&span.from, DateBound::From, true, false)?,
+            self.format_and_allocate_date_impl(
+                self.series_span_end(span)?,
+                DateBound::To,
+                true,
+                false,
+            )?,
+        )))
+    }
+
+    /// Upper bound of `span` for the series shape this dialect renders.
+    pub fn series_span_end<'s>(&self, span: &'s SeriesSpan) -> Result<&'s String, CubeError> {
+        span.end(self.plan_templates)
+    }
+
     pub fn date_range_from_time_series(&self) -> Result<(String, String), CubeError> {
-        let from_expr = format!(
-            "min({})",
-            self.plan_templates.quote_identifier("date_from")?
+        Ok((
+            self.time_series_bound("min", "date_from")?,
+            self.time_series_bound("max", "date_to")?,
+        ))
+    }
+
+    /// Scalar sub-select of `aggregate(column)` over the time series driving
+    /// this rolling window.
+    pub fn time_series_bound(&self, aggregate: &str, column: &str) -> Result<String, CubeError> {
+        let expr = format!(
+            "{}({})",
+            aggregate,
+            self.plan_templates.quote_identifier(column)?
         );
-        let to_expr = format!("max({})", self.plan_templates.quote_identifier("date_to")?);
-        let from_expr = self.plan_templates.series_bounds_cast(&from_expr)?;
-        let to_expr = self.plan_templates.series_bounds_cast(&to_expr)?;
+        let expr = self.plan_templates.series_bounds_cast(&expr)?;
         let alias = "value".to_string();
-        let time_series_cte_name = "time_series".to_string();
 
-        let from_column = TemplateProjectionColumn {
-            expr: from_expr.clone(),
+        let projection = TemplateProjectionColumn {
+            expr: expr.clone(),
             alias: alias.clone(),
-            aliased: self.plan_templates.column_aliased(&from_expr, &alias)?,
-        };
-        let to_column = TemplateProjectionColumn {
-            expr: to_expr.clone(),
-            alias: alias.clone(),
-            aliased: self.plan_templates.column_aliased(&to_expr, &alias)?,
+            aliased: self.plan_templates.column_aliased(&expr, &alias)?,
         };
 
-        let from = self.plan_templates.select(
+        let select = self.plan_templates.select(
             vec![],
-            &time_series_cte_name,
-            vec![from_column],
+            "time_series",
+            vec![projection],
             None,
             vec![],
             None,
@@ -216,20 +271,27 @@ impl<'a> FilterSqlContext<'a> {
             false,
             false,
         )?;
-        let to = self.plan_templates.select(
-            vec![],
-            &time_series_cte_name,
-            vec![to_column],
-            None,
-            vec![],
-            None,
-            vec![],
-            None,
-            None,
-            false,
-            false,
-        )?;
-        Ok((format!("({})", from), format!("({})", to)))
+        Ok(format!("({})", select))
+    }
+
+    /// A date normalised to the dialect's precision, without allocating it —
+    /// for a caller that still has arithmetic to do on it.
+    pub fn format_from_date(&self, value: &str) -> Result<String, CubeError> {
+        let precision = self.plan_templates.timestamp_precision()?;
+        QueryDateTimeHelper::format_from_date(value, precision)
+    }
+
+    pub fn format_to_date(&self, value: &str) -> Result<String, CubeError> {
+        let precision = self.plan_templates.timestamp_precision()?;
+        QueryDateTimeHelper::format_to_date(value, precision)
+    }
+
+    /// The bound, unless its side reaches without limit — which no date states.
+    pub fn keep_bounded(bound: String, interval: &Option<String>) -> Option<String> {
+        match interval.as_deref() {
+            Some(UNBOUNDED_INTERVAL) => None,
+            _ => Some(bound),
+        }
     }
 
     pub fn extend_date_range_bound(
@@ -239,7 +301,7 @@ impl<'a> FilterSqlContext<'a> {
         is_sub: bool,
     ) -> Result<Option<String>, CubeError> {
         match interval {
-            Some(interval) if interval != "unbounded" => {
+            Some(interval) if interval != UNBOUNDED_INTERVAL => {
                 if is_sub {
                     Ok(Some(
                         self.plan_templates

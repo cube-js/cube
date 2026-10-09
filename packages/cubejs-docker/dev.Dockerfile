@@ -1,4 +1,4 @@
-FROM node:24.18.0-trixie-slim AS base
+FROM node:24.21.0-trixie-slim AS base
 
 ARG IMAGE_VERSION=dev
 
@@ -23,6 +23,8 @@ RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | \
 
 ENV CUBESTORE_SKIP_POST_INSTALL=true
 ENV NODE_ENV=development
+# Use the image's Node headers to avoid concurrent node-gyp downloads and copies.
+ENV npm_config_nodedir=/usr/local
 
 WORKDIR /cubejs
 

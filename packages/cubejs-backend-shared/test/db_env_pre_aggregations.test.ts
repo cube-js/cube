@@ -135,7 +135,6 @@ describe('Pre-aggregation env vars (multi datasource)', () => {
       .toEqual('default-host');
   });
 
-
   test('keyByDataSource with preAggregations for named datasource', () => {
     expect(keyByDataSource('CUBEJS_DB_HOST', 'analytics', true))
       .toEqual('CUBEJS_DS_ANALYTICS_PRE_AGGREGATIONS_DB_HOST');

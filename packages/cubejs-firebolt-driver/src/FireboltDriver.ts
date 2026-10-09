@@ -199,6 +199,7 @@ export class FireboltDriver extends BaseDriver implements DriverInterface {
 
   private hydrateRow = (row: Row, meta: Meta[]) => {
     const hydratedRow: Record<string, unknown> = {};
+
     for (let index = 0; index < meta.length; index++) {
       const column = meta[index];
       const key = column.name;
@@ -306,7 +307,7 @@ export class FireboltDriver extends BaseDriver implements DriverInterface {
   /* eslint-disable camelcase */
   public async getTablesQuery(): Promise<
     { table_name?: string; TABLE_NAME?: string }[]
-    > {
+  > {
     const data = await this.query<{ table_name: string }>('SHOW TABLES', []);
     return data.map(({ table_name }) => ({ table_name }));
   }

@@ -13,7 +13,7 @@ impl<IT: InnerTypes, T: DeserializeOwned + Sized> NativeDeserialize<IT> for T {
     fn from_native(v: NativeObjectHandle<IT>) -> Result<Self, CubeError> {
         NativeSerdeDeserializer::new(v)
             .deserialize()
-            .map_err(|e| CubeError::internal(format!("Failed to deserialize: {}", e)))
+            .map_err(|e| e.into_cube_error("Failed to deserialize"))
     }
 }
 

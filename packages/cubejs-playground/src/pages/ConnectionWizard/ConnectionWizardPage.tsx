@@ -89,8 +89,7 @@ export function ConnectionWizardPage({ history }) {
   const [isTestConnectionLoading, setTestConnectionLoading] = useState(false);
   const [testConnectionResult, setTestConnectionResult] = useState<any>(null);
   const [db, selectDatabase] = useState<Database | null>(null);
-  const [isDriverInstallationInProgress, setDriverInstallationInProgress] =
-    useState<boolean>(false);
+  const [isDriverInstallationInProgress, setDriverInstallationInProgress] = useState<boolean>(false);
   const [dependencyName, setDependencyName] = useState<string | null>(null);
   const [installationError, setInstallationError] = useState<string | null>(
     null
@@ -104,8 +103,7 @@ export function ConnectionWizardPage({ history }) {
     if (playgroundContext?.dbType && !playgroundContext?.isDocker) {
       selectDatabase(
         databases.find(
-          (currentDb) =>
-            currentDb.driver.toLowerCase() === playgroundContext.dbType
+          (currentDb) => currentDb.driver.toLowerCase() === playgroundContext.dbType
         ) || null
       );
     }
@@ -149,24 +147,24 @@ export function ConnectionWizardPage({ history }) {
     setHostname('');
   }, [db?.driver]);
 
-  function handleDatabaseSelect(db: Database) {
+  function handleDatabaseSelect(selectedDb: Database) {
     return async () => {
       if (playgroundContext?.isDocker) {
-        return selectDatabase(db);
+        return selectDatabase(selectedDb);
       }
 
       {
         const response = await fetch(
-          `/playground/driver?driver=${db.driver || ''}`
+          `/playground/driver?driver=${selectedDb.driver || ''}`
         );
         const { status, error } = await response.json();
 
         if (response.ok) {
           if (status === STATUS.INSTALLED) {
-            return selectDatabase(db);
+            return selectDatabase(selectedDb);
           } else if (status === STATUS.INSTALLING) {
             setDriverInstallationInProgress(true);
-            selectDatabase(db);
+            selectDatabase(selectedDb);
           }
         } else {
           setInstallationError(error);
@@ -180,7 +178,7 @@ export function ConnectionWizardPage({ history }) {
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({
-            driver: db.driver,
+            driver: selectedDb.driver,
           }),
         });
 
@@ -189,7 +187,7 @@ export function ConnectionWizardPage({ history }) {
         if (response.ok) {
           setDependencyName(dependency);
           setDriverInstallationInProgress(true);
-          selectDatabase(db);
+          selectDatabase(selectedDb);
         } else {
           setInstallationError(error);
         }
@@ -245,16 +243,14 @@ export function ConnectionWizardPage({ history }) {
               ) : (
                 <Typography.Paragraph>
                   Enter database credentials to connect to your database. <br />
-                  Cube will store your credentials into the <code>
-                    .env
-                  </code>{' '}
+                  Cube will store your credentials into the <code>.env</code>{' '}
                   file for future use.
                 </Typography.Paragraph>
               )}
 
               <Alert
                 type="info"
-                message={
+                message={(
                   <>
                     For advanced configuration, use the <b>cube.js</b> or{' '}
                     <b>.env</b> configuration files in your Cube project.
@@ -262,14 +258,14 @@ export function ConnectionWizardPage({ history }) {
                     Docker.
                     <br />
                     <Typography.Link
-                      href="https://cube.dev/cube-core/getting-started/create-a-project"
+                      href="https://docs.cube.dev/cube-core/getting-started/create-a-project"
                       target="_blank"
                     >
                       Learn more about connecting to databases in the
                       documentation.
                     </Typography.Link>
                   </>
-                }
+                )}
               />
 
               {db.title === 'MongoDB' ? (
@@ -339,10 +335,10 @@ export function ConnectionWizardPage({ history }) {
               {['MySQL', 'PostgreSQL', 'Druid', 'ClickHouse', 'Crate'].includes(
                 db?.title || ''
               ) && playgroundContext?.isDocker ? (
-                <Col span={12}>
-                  <LocalhostTipBox onHostnameCopy={setHostname} />
-                </Col>
-              ) : null}
+                  <Col span={12}>
+                    <LocalhostTipBox onHostnameCopy={setHostname} />
+                  </Col>
+                ) : null}
             </Row>
           </Space>
         </>
@@ -351,10 +347,10 @@ export function ConnectionWizardPage({ history }) {
           <Paragraph>Select a database type</Paragraph>
 
           <Row gutter={[12, 12]}>
-            {databases.map((db) => (
-              <Col xl={8} lg={8} md={12} sm={24} xs={24} key={db.title}>
-                <DatabaseCardWrapper onClick={handleDatabaseSelect(db)}>
-                  <DatabaseCard db={db} />
+            {databases.map((databaseOption) => (
+              <Col xl={8} lg={8} md={12} sm={24} xs={24} key={databaseOption.title}>
+                <DatabaseCardWrapper onClick={handleDatabaseSelect(databaseOption)}>
+                  <DatabaseCard db={databaseOption} />
                 </DatabaseCardWrapper>
               </Col>
             ))}

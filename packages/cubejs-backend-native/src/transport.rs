@@ -16,7 +16,7 @@ use async_trait::async_trait;
 use cubeorchestrator::query_result_transform::RequestResultData;
 use cubesql::compile::engine::df::scan::{
     build_response_schema, convert_transport_response, transform_response, CacheMode, MemberField,
-    RecordBatch, SchemaRef,
+    RecordBatch, ResultMetadata, SchemaRef,
 };
 use cubesql::compile::engine::df::wrapper::SqlQuery;
 use cubesql::transport::{
@@ -444,6 +444,7 @@ impl TransportService for NodeBridgeTransport {
 
                             wrapper.last_refresh_time = result_data.last_refresh_time;
                             wrapper.external = result_data.external.unwrap_or(false);
+                            wrapper.used_pre_aggregations = result_data.used_pre_aggregations;
 
                             native_wrapped_results.push(wrapper);
                         }
@@ -462,7 +463,7 @@ impl TransportService for NodeBridgeTransport {
             .await;
 
             if let Err(e) = &result {
-                if e.message.to_lowercase().contains("continue wait") {
+                if e.is_continue_wait() {
                     if throw_continue_wait {
                         return Err(CubeError::continue_wait());
                     }
@@ -532,8 +533,11 @@ impl TransportService for NodeBridgeTransport {
                         .map(|mut wrapper| {
                             let updated_schema = build_response_schema(
                                 &schema,
-                                wrapper.last_refresh_time.clone(),
-                                wrapper.external,
+                                &ResultMetadata {
+                                    last_refresh_time: wrapper.last_refresh_time.clone(),
+                                    external: wrapper.external,
+                                    used_pre_aggregations: wrapper.used_pre_aggregations.clone(),
+                                },
                             );
 
                             transform_response(&mut wrapper, updated_schema, &member_fields)
@@ -605,7 +609,7 @@ impl TransportService for NodeBridgeTransport {
             .await;
 
             if let Err(e) = &res {
-                if e.message.to_lowercase().contains("continue wait") {
+                if e.is_continue_wait() {
                     if throw_continue_wait {
                         return Err(CubeError::continue_wait());
                     }
@@ -667,10 +671,21 @@ impl TransportService for NodeBridgeTransport {
             .expect("Unable to cast AuthContext to NativeAuthContext");
 
         let mut request_id = span_id
+            .as_ref()
             .map(|s| s.span_id.clone())
             .unwrap_or_else(|| Uuid::new_v4().to_string());
         if !request_id.contains("-span-") {
             request_id = format!("{}-span-1", request_id);
+        }
+        // The redacted twin of the span's query travels beside `query`: the log
+        // sink swaps it in, APM events keep the statement as sent
+        let mut properties = properties;
+        if let Some(redacted_query) = span_id.as_ref().and_then(|s| s.redacted_query_key.clone()) {
+            if let Some(object) = properties.as_object_mut() {
+                if object.contains_key("query") {
+                    object.insert("redactedQuery".to_string(), redacted_query);
+                }
+            }
         }
         call_raw_js_with_channel_as_callback(
             self.channel.clone(),

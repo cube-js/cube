@@ -54,6 +54,7 @@ describe('Test Speed', () => {
       .replace(/"([^"]+)":/g, '$1:');
 
     const startTime = +new Date();
+
     for (let i = 0; i < 10; i++) {
       const { compiler, joinGraph, cubeEvaluator } = prepareJsCompiler(cubeString);
       const result = await compiler.compile();

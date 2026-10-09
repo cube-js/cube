@@ -280,6 +280,7 @@ export class AthenaDriver extends BaseDriver implements DriverInterface {
       const iter = this.lazyRowIterator(qid, query, true);
       const types = <TableStructure><unknown>((await iter.next()).value);
       const rows: Row[] = [];
+
       for await (const row of iter) {
         if (cancelled) throw new Error('Query was cancelled');
         rows.push(<Row>row);
@@ -362,6 +363,7 @@ export class AthenaDriver extends BaseDriver implements DriverInterface {
       }
       await this.waitForSuccess(qid, () => cancelled);
       const rows: R[] = [];
+
       for await (const row of this.lazyRowIterator<R>(qid, query)) {
         if (cancelled) throw new Error('Query was cancelled');
         rows.push(row);
@@ -390,6 +392,7 @@ export class AthenaDriver extends BaseDriver implements DriverInterface {
   ): AsyncGenerator<R> {
     let isFirstBatch = true;
     let columnInfo: { Name: string }[] = [];
+
     for (
       let results: GetQueryResultsCommandOutput | undefined =
         await this.athena.getQueryResults(qid);
@@ -415,6 +418,7 @@ export class AthenaDriver extends BaseDriver implements DriverInterface {
             results.ResultSet?.ResultSetMetadata?.ColumnInfo,
           ).map(info => ({ Name: checkNonNullable('Name', info.Name) }));
       }
+
       for (const row of rows) {
         const fields: Record<string, any> = {};
         columnInfo
@@ -623,6 +627,7 @@ export class AthenaDriver extends BaseDriver implements DriverInterface {
 
   protected async waitForSuccess(qid: AthenaQueryId, isCancelled?: () => boolean): Promise<void> {
     const startedTime = Date.now();
+
     for (let i = 0; Date.now() - startedTime <= this.config.pollTimeout; i++) {
       if (isCancelled?.()) {
         throw new Error('Query was cancelled');

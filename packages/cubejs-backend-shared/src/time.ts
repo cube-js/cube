@@ -139,6 +139,28 @@ export function parseSqlInterval(intervalStr: SqlInterval): ParsedInterval {
   return interval;
 }
 
+/**
+ * SQL interval units, coarsest first.
+ */
+export const SQL_INTERVAL_UNITS: unitOfTime.DurationConstructor[] = [
+  'year', 'quarter', 'month', 'week', 'day', 'hour', 'minute', 'second'
+];
+
+/**
+ * Splits an interval into one single-unit interval string per component, coarsest first.
+ * Units outside SQL_INTERVAL_UNITS are kept, so a caller that can not render one still sees it.
+ */
+export function splitSqlInterval(intervalStr: SqlInterval): string[] {
+  const parsed = parseSqlInterval(intervalStr);
+  const units = Object.keys(parsed) as unitOfTime.DurationConstructor[];
+  const ordered = [
+    ...SQL_INTERVAL_UNITS.filter(unit => units.includes(unit)),
+    ...units.filter(unit => !SQL_INTERVAL_UNITS.includes(unit)),
+  ];
+
+  return ordered.map(unit => `${parsed[unit]} ${unit}`);
+}
+
 export function addInterval(date: moment.Moment, interval: ParsedInterval): moment.Moment {
   const res = date.clone();
 
@@ -234,10 +256,7 @@ export const timeSeriesFromCustomInterval = (intervalStr: string, [startStr, end
   return dates;
 };
 
-/**
- * Returns array of date ranges for a predefined granularity aligned with the start of the year as pivot point
- */
-export const timeSeries = (granularity: string, dateRange: QueryDateRange, options: TimeSeriesOptions = { timestampPrecision: 3 }): QueryDateRange[] => {
+function checkTimeSeries(granularity: string, dateRange: QueryDateRange, options: TimeSeriesOptions): void {
   if (!TIME_SERIES[granularity]) {
     throw new Error(`Unsupported time granularity: ${granularity}`);
   }
@@ -247,11 +266,38 @@ export const timeSeries = (granularity: string, dateRange: QueryDateRange, optio
   }
 
   checkSeriesForDateRange(`1 ${granularity}`, dateRange);
+}
+
+/**
+ * Returns array of date ranges for a predefined granularity aligned with the start of the year as pivot point
+ */
+export const timeSeries = (granularity: string, dateRange: QueryDateRange, options: TimeSeriesOptions = { timestampPrecision: 3 }): QueryDateRange[] => {
+  checkTimeSeries(granularity, dateRange, options);
 
   // moment.range works with strings
   const range = moment.range(<any>dateRange[0], <any>dateRange[1]);
 
   return TIME_SERIES[granularity](range, options.timestampPrecision);
+};
+
+/**
+ * Returns the first and last ranges of timeSeries() without materializing the ones in between.
+ * The input range is still validated against the same partition count limit.
+ */
+export const timeSeriesBoundaries = (granularity: string, dateRange: QueryDateRange, options: TimeSeriesOptions = { timestampPrecision: 3 }): [QueryDateRange | undefined, QueryDateRange | undefined] => {
+  checkTimeSeries(granularity, dateRange, options);
+
+  const range = moment.range(<any>dateRange[0], <any>dateRange[1]);
+  if (!range.start.isValid() || !range.end.isValid() || range.start.isAfter(range.end)) {
+    const series = timeSeries(granularity, dateRange, options);
+    return [series[0], series[series.length - 1]];
+  }
+
+  const generate = TIME_SERIES[granularity];
+  return [
+    generate(moment.range(range.start, range.start), options.timestampPrecision)[0],
+    generate(moment.range(range.end, range.end), options.timestampPrecision)[0],
+  ];
 };
 
 export const isPredefinedGranularity = (granularity: string): boolean => !!TIME_SERIES[granularity];

@@ -3,6 +3,155 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.8.2](https://github.com/cube-js/cube/compare/v1.8.1...v1.8.2) (2026-10-08)
+
+**Note:** Version bump only for package @cubejs-backend/query-orchestrator
+
+## [1.8.1](https://github.com/cube-js/cube/compare/v1.8.0...v1.8.1) (2026-10-07)
+
+### Bug Fixes
+
+- **tesseract:** Load the partitions a multi-stage rolling window reads ([#12147](https://github.com/cube-js/cube/issues/12147)) ([e0fd1e6](https://github.com/cube-js/cube/commit/e0fd1e6ea99bc67d422a69c5b6600f7e59aa519b))
+
+# [1.8.0](https://github.com/cube-js/cube/compare/v1.7.50...v1.8.0) (2026-10-07)
+
+### Bug Fixes
+
+- **schema-compiler,query-orchestrator:** Bound the rollupLambda source query ([#11708](https://github.com/cube-js/cube/issues/11708)) ([d403e7a](https://github.com/cube-js/cube/commit/d403e7a096920e04d96b15b52bb108e46030f4d9)), closes [#11682](https://github.com/cube-js/cube/issues/11682)
+
+## [1.7.50](https://github.com/cube-js/cube/compare/v1.7.49...v1.7.50) (2026-10-02)
+
+**Note:** Version bump only for package @cubejs-backend/query-orchestrator
+
+## [1.7.49](https://github.com/cube-js/cube/compare/v1.7.48...v1.7.49) (2026-10-02)
+
+**Note:** Version bump only for package @cubejs-backend/query-orchestrator
+
+## [1.7.48](https://github.com/cube-js/cube/compare/v1.7.47...v1.7.48) (2026-10-01)
+
+**Note:** Version bump only for package @cubejs-backend/query-orchestrator
+
+## [1.7.47](https://github.com/cube-js/cube/compare/v1.7.46...v1.7.47) (2026-09-29)
+
+### Bug Fixes
+
+- **query-orchestrator:** Don't clip partition builds to the query date range ([#12027](https://github.com/cube-js/cube/issues/12027)) ([52d4712](https://github.com/cube-js/cube/commit/52d4712d5d71bfbee9abeb7d4055a92a6b2b33d6)), closes [#11317](https://github.com/cube-js/cube/issues/11317)
+- **query-orchestrator:** Wait continueWaitTimeout seconds for a queued stream, not 10x ([#12029](https://github.com/cube-js/cube/issues/12029)) ([ec35e19](https://github.com/cube-js/cube/commit/ec35e195aac3fa2d4a87795d9d9ff87ecef00439)), closes [#7501](https://github.com/cube-js/cube/issues/7501)
+
+### Features
+
+- **server-core:** make dev mode opt-in and stop respecting NODE_ENV ([#11959](https://github.com/cube-js/cube/issues/11959)) ([4034a90](https://github.com/cube-js/cube/commit/4034a90bb1c59a815e0558daffa1d0625c40b7aa))
+
+## [1.7.46](https://github.com/cube-js/cube/compare/v1.7.45...v1.7.46) (2026-09-26)
+
+### Features
+
+- **query-orchestrator:** honour refreshKeyRenewalThreshold on locally evaluated refresh keys ([#11720](https://github.com/cube-js/cube/issues/11720)) ([935e094](https://github.com/cube-js/cube/commit/935e0948104476631bbe15aa787065aa7ee45ba2))
+
+## [1.7.45](https://github.com/cube-js/cube/compare/v1.7.44...v1.7.45) (2026-09-25)
+
+**Note:** Version bump only for package @cubejs-backend/query-orchestrator
+
+## [1.7.44](https://github.com/cube-js/cube/compare/v1.7.43...v1.7.44) (2026-09-24)
+
+### Bug Fixes
+
+- **query-orchestrator:** Bound cached pre-aggregation partition plans ([#11896](https://github.com/cube-js/cube/issues/11896)) ([555e710](https://github.com/cube-js/cube/commit/555e7105d471e67f1c01b8cfc26c25ff9f77937d)), closes [#11860](https://github.com/cube-js/cube/issues/11860)
+- **query-orchestrator:** don't report a cancelled query as a query error ([#11759](https://github.com/cube-js/cube/issues/11759)) ([9070984](https://github.com/cube-js/cube/commit/9070984043e57d79b82e70c0a5dbe7a20b8e0e66))
+
+## [1.7.43](https://github.com/cube-js/cube/compare/v1.7.42...v1.7.43) (2026-09-21)
+
+### Bug Fixes
+
+- **query-orchestrator:** don't report failed pre-agg build jobs as done ([#11629](https://github.com/cube-js/cube/issues/11629)) ([42bfe75](https://github.com/cube-js/cube/commit/42bfe75a5628b9a9f882362a63771239a0c6d1a9))
+
+## [1.7.42](https://github.com/cube-js/cube/compare/v1.7.41...v1.7.42) (2026-09-18)
+
+**Note:** Version bump only for package @cubejs-backend/query-orchestrator
+
+## [1.7.41](https://github.com/cube-js/cube/compare/v1.7.40...v1.7.41) (2026-09-18)
+
+**Note:** Version bump only for package @cubejs-backend/query-orchestrator
+
+## [1.7.40](https://github.com/cube-js/cube/compare/v1.7.39...v1.7.40) (2026-09-16)
+
+### Performance Improvements
+
+- **query-orchestrator:** Compute only build range boundary partitions ([#11876](https://github.com/cube-js/cube/issues/11876)) ([1bf7138](https://github.com/cube-js/cube/commit/1bf7138ad144ba6e9ee2387084eaacde525bfb98))
+
+## [1.7.39](https://github.com/cube-js/cube/compare/v1.7.38...v1.7.39) (2026-09-15)
+
+### Features
+
+- **server-core:** Redact query values in log events ([#11854](https://github.com/cube-js/cube/issues/11854)) ([99cceac](https://github.com/cube-js/cube/commit/99cceac77f00c8c0a13c0f2c0f4b237b4d97460f))
+
+## [1.7.38](https://github.com/cube-js/cube/compare/v1.7.37...v1.7.38) (2026-09-14)
+
+### Performance Improvements
+
+- **query-orchestrator:** Reuse SQL tuples for full partitions ([#11866](https://github.com/cube-js/cube/issues/11866)) ([1fd87a3](https://github.com/cube-js/cube/commit/1fd87a3b3157ec97b8108986c539d83ad1496c87))
+- **query-orchestrator:** reuse UTC partition range boundaries ([#11867](https://github.com/cube-js/cube/issues/11867)) ([49e2dec](https://github.com/cube-js/cube/commit/49e2dec428589a25a4f3b9503f8c465397631bf2))
+
+## [1.7.37](https://github.com/cube-js/cube/compare/v1.7.35...v1.7.37) (2026-09-10)
+
+### Features
+
+- Migrate to TypeScript 6.0.3 (prepare for 7) ([#11767](https://github.com/cube-js/cube/issues/11767)) ([98ac580](https://github.com/cube-js/cube/commit/98ac58039be36e7392ac617562d0dad03f17de3c))
+
+## [1.7.36](https://github.com/cube-js/cube/compare/v1.7.35...v1.7.36) (2026-09-09)
+
+### Features
+
+- Migrate to TypeScript 6.0.3 (prepare for 7) ([#11767](https://github.com/cube-js/cube/issues/11767)) ([98ac580](https://github.com/cube-js/cube/commit/98ac58039be36e7392ac617562d0dad03f17de3c))
+
+## [1.7.35](https://github.com/cube-js/cube/compare/v1.7.34...v1.7.35) (2026-09-07)
+
+**Note:** Version bump only for package @cubejs-backend/query-orchestrator
+
+## [1.7.34](https://github.com/cube-js/cube/compare/v1.7.33...v1.7.34) (2026-09-04)
+
+**Note:** Version bump only for package @cubejs-backend/query-orchestrator
+
+## [1.7.33](https://github.com/cube-js/cube/compare/v1.7.32...v1.7.33) (2026-09-03)
+
+### Bug Fixes
+
+- **query-orchestrator:** drop duplicate `preAggregationId`/`type` declarations ([#11726](https://github.com/cube-js/cube/issues/11726)) ([596571c](https://github.com/cube-js/cube/commit/596571ca39308422aec84f22020ca5ae149f3d62))
+
+### Features
+
+- **api-gateway:** Expose `usedPreAggregations` on data responses ([#11591](https://github.com/cube-js/cube/issues/11591)) ([4931901](https://github.com/cube-js/cube/commit/49319017f5ecc556f38859f008c478d8799a4aa9))
+- **clickhouse-driver:** Pass the X-Request-ID as ClickHouse query_id ([#11739](https://github.com/cube-js/cube/issues/11739)) ([01abee3](https://github.com/cube-js/cube/commit/01abee39b12d0662f47e80dca614cd0f5c8cfc81))
+
+## [1.7.32](https://github.com/cube-js/cube/compare/v1.7.31...v1.7.32) (2026-09-01)
+
+### Bug Fixes
+
+- **query-orchestrator:** keep Interactive priority on user query paths ([#11715](https://github.com/cube-js/cube/issues/11715)) ([39d3b20](https://github.com/cube-js/cube/commit/39d3b20d114d6003562e0cdad0e98389056bb3a5))
+
+## [1.7.31](https://github.com/cube-js/cube/compare/v1.7.30...v1.7.31) (2026-08-31)
+
+### Bug Fixes
+
+- **query-orchestrator:** key refresh key cache entries consistently ([#11607](https://github.com/cube-js/cube/issues/11607)) ([5bc6308](https://github.com/cube-js/cube/commit/5bc6308326500e847feb23eb2ed56f81ad904cab))
+
+### Features
+
+- Support local computeing for interval refresh keys (behind flag) ([#11614](https://github.com/cube-js/cube/issues/11614)) ([d2b43a4](https://github.com/cube-js/cube/commit/d2b43a4accd2c5d116342f9ad5be648920197a7e))
+
+## [1.7.30](https://github.com/cube-js/cube/compare/v1.7.29...v1.7.30) (2026-08-28)
+
+### Bug Fixes
+
+- **query-orchestrator:** Dual race in cold-cache renewal path ([#11674](https://github.com/cube-js/cube/issues/11674)) ([b0136b3](https://github.com/cube-js/cube/commit/b0136b3139019ee26ddf8646271c422c4d42fbe1))
+
+## [1.7.29](https://github.com/cube-js/cube/compare/v1.7.28...v1.7.29) (2026-08-27)
+
+### Bug Fixes
+
+- **api-gateway:** Make pre-agg build job status per-entry and data-source aware ([#11666](https://github.com/cube-js/cube/issues/11666)) ([694955f](https://github.com/cube-js/cube/commit/694955f864375515d84d463e9e7ee89a156a4a2b))
+- **query-orchestrator:** initialize missing data source queue in isPartitionExist, thanks [@dochernyshov](https://github.com/dochernyshov) ([#11617](https://github.com/cube-js/cube/issues/11617)) ([ab48039](https://github.com/cube-js/cube/commit/ab48039f1a3d46d890367b0fc898d9ebf1322786))
+
 ## [1.7.28](https://github.com/cube-js/cube/compare/v1.7.27...v1.7.28) (2026-08-26)
 
 **Note:** Version bump only for package @cubejs-backend/query-orchestrator

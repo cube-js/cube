@@ -1321,6 +1321,8 @@ impl SqlService for SqlServiceImpl {
                 .await?
                 .into()),
             CubeStoreStatement::Statement(Statement::Query(q)) => {
+                app_metrics::DATA_QUERIES_INCOMING.increment();
+
                 let logical_plan_time_start = SystemTime::now();
                 let logical_plan = self
                     .query_planner
@@ -2568,6 +2570,197 @@ mod tests {
         Ok(())
     }
 
+    /// A single-threaded runtime: if acquiring a planning permit blocked the thread instead of
+    /// parking the task, the first query would never release it.
+    #[tokio::test]
+    async fn planning_throttle_does_not_deadlock() -> Result<(), CubeError> {
+        Config::test("planning_throttle_does_not_deadlock")
+            .update_config(|mut c| {
+                c.max_concurrent_query_plans = 1;
+                c.max_queued_query_plans = 0;
+                c
+            })
+            .start_test(async move |services| {
+                let service = services.sql_service;
+                create_values_table(&service).await;
+
+                let queries = (0..20).map(|_| {
+                    let service = service.clone();
+                    async move {
+                        service
+                            .exec_query("SELECT sum(id) FROM foo.values")
+                            .await?
+                            .collect()
+                            .await
+                    }
+                });
+                for result in join_all(queries).await {
+                    assert_eq!(
+                        result.unwrap().get_rows()[0],
+                        Row::new(vec![TableValue::Int(6)])
+                    );
+                }
+
+                Ok::<(), CubeError>(())
+            })
+            .await;
+        Ok(())
+    }
+
+    /// A table imported from a location is published only after the import
+    /// succeeds, so a failed import can't leave a queryable empty table behind
+    /// that would shadow the previous version of a pre-aggregation partition.
+    #[tokio::test]
+    async fn failed_location_import_leaves_no_table() -> Result<(), CubeError> {
+        Config::test("failed_location_import_leaves_no_table")
+            .start_test(async move |services| {
+                let service = services.sql_service;
+
+                let path = env::temp_dir().join("failed_location_import.csv.gz");
+                // Not a gzip stream, so the import job fails while reading it
+                fs::write(&path, b"this is not a gzip stream").unwrap();
+
+                service
+                    .exec_query("CREATE SCHEMA foo")
+                    .await?
+                    .collect()
+                    .await?;
+
+                let res = service
+                    .exec_query(&format!(
+                        "CREATE TABLE foo.orders (id int, amount int) LOCATION '{}'",
+                        path.to_string_lossy()
+                    ))
+                    .await;
+                assert!(res.is_err(), "Expected import to fail, got {:?}", res.err());
+
+                let tables = service
+                    .exec_query(
+                        "SELECT table_name FROM information_schema.tables \
+                         WHERE table_schema = 'foo'",
+                    )
+                    .await?
+                    .collect()
+                    .await?;
+                assert_eq!(tables.get_rows(), &Vec::<Row>::new());
+
+                // Not published and not left behind in any state
+                let all_tables = services.meta_store.get_tables_with_path(true).await?;
+                assert!(
+                    all_tables.is_empty(),
+                    "Expected no tables left after a failed import, got {:?}",
+                    all_tables
+                );
+
+                fs::remove_file(&path).unwrap();
+                Ok::<(), CubeError>(())
+            })
+            .await;
+        Ok(())
+    }
+
+    /// A table created without a location becomes queryable right away, before
+    /// any rows are inserted into it. Anything that treats table existence as
+    /// proof of a finished import has to account for this window.
+    #[tokio::test]
+    async fn table_without_location_is_visible_while_empty() -> Result<(), CubeError> {
+        Config::test("table_without_location_is_visible_while_empty")
+            .start_test(async move |services| {
+                let service = services.sql_service;
+
+                service
+                    .exec_query("CREATE SCHEMA foo")
+                    .await?
+                    .collect()
+                    .await?;
+                service
+                    .exec_query("CREATE TABLE foo.orders (id int, amount int)")
+                    .await?
+                    .collect()
+                    .await?;
+
+                let tables = service
+                    .exec_query(
+                        "SELECT table_name FROM information_schema.tables \
+                         WHERE table_schema = 'foo'",
+                    )
+                    .await?
+                    .collect()
+                    .await?;
+                assert_eq!(
+                    tables.get_rows(),
+                    &vec![Row::new(vec![TableValue::String("orders".to_string())])]
+                );
+
+                let count = service
+                    .exec_query("SELECT count(*) FROM foo.orders")
+                    .await?
+                    .collect()
+                    .await?;
+                assert_eq!(count.get_rows(), &vec![Row::new(vec![TableValue::Int(0)])]);
+
+                Ok::<(), CubeError>(())
+            })
+            .await;
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn planning_throttle_rejects_over_queue_depth() -> Result<(), CubeError> {
+        Config::test("planning_throttle_rejects_over_queue_depth")
+            .update_config(|mut c| {
+                c.max_concurrent_query_plans = 1;
+                c.max_queued_query_plans = 1;
+                c
+            })
+            .start_test(async move |services| {
+                let service = services.sql_service;
+                create_values_table(&service).await;
+
+                let queries = (0..20).map(|_| {
+                    let service = service.clone();
+                    async move {
+                        service
+                            .exec_query("SELECT sum(id) FROM foo.values")
+                            .await?
+                            .collect()
+                            .await
+                    }
+                });
+                let results = join_all(queries).await;
+                let rejected = results
+                    .iter()
+                    .filter(|r| match r {
+                        Err(e) => e.message.contains("waiting to be planned"),
+                        Ok(_) => false,
+                    })
+                    .count();
+                assert!(rejected > 0, "the queue depth of 1 rejected nothing");
+                for result in results.into_iter().filter(|r| r.is_ok()) {
+                    assert_eq!(
+                        result.unwrap().get_rows()[0],
+                        Row::new(vec![TableValue::Int(6)])
+                    );
+                }
+
+                Ok::<(), CubeError>(())
+            })
+            .await;
+        Ok(())
+    }
+
+    async fn create_values_table(service: &Arc<dyn SqlService>) {
+        service.exec_query("CREATE SCHEMA foo").await.unwrap();
+        service
+            .exec_query("CREATE TABLE foo.values (id int)")
+            .await
+            .unwrap();
+        service
+            .exec_query("INSERT INTO foo.values (id) VALUES (1), (2), (3)")
+            .await
+            .unwrap();
+    }
+
     #[tokio::test]
     async fn decimal() -> Result<(), CubeError> {
         Config::test("decimal").update_config(|mut c| {
@@ -3333,17 +3526,22 @@ mod tests {
                                 \n    Aggregate\
                                 \n      ClusterSend, indices: [[1, 2, 3, 4, 2]]\
                                 \n        SubqueryAlias\
-                                \n          Union, schema: fields:[foo.a.a, foo.a.b, foo.a.c], metadata:{}\
-                                \n            Filter\
-                                \n              Scan foo.a, source: CubeTable(index: default:1:[1]:sort_on[a, b]), fields: *\
-                                \n            Filter\
-                                \n              Scan foo.b, source: CubeTable(index: default:2:[2]:sort_on[a, b]), fields: *\
-                                \n            Filter\
-                                \n              Scan foo.a1, source: CubeTable(index: default:3:[3]:sort_on[a, b]), fields: *\
-                                \n            Filter\
-                                \n              Scan foo.b1, source: CubeTable(index: default:4:[4]:sort_on[a, b]), fields: *\
-                                \n            Filter\
-                                \n              Scan foo.b, source: CubeTable(index: default:2:[2]:sort_on[a, b]), fields: *"
+                                \n          Union, schema: fields:[lambda.a, lambda.b, lambda.c], metadata:{}\
+                                \n            SubqueryAlias\
+                                \n              Filter\
+                                \n                Scan foo.a, source: CubeTable(index: default:1:[1]:sort_on[a, b]), fields: *\
+                                \n            SubqueryAlias\
+                                \n              Filter\
+                                \n                Scan foo.b, source: CubeTable(index: default:2:[2]:sort_on[a, b]), fields: *\
+                                \n            SubqueryAlias\
+                                \n              Filter\
+                                \n                Scan foo.a1, source: CubeTable(index: default:3:[3]:sort_on[a, b]), fields: *\
+                                \n            SubqueryAlias\
+                                \n              Filter\
+                                \n                Scan foo.b1, source: CubeTable(index: default:4:[4]:sort_on[a, b]), fields: *\
+                                \n            SubqueryAlias\
+                                \n              Filter\
+                                \n                Scan foo.b, source: CubeTable(index: default:2:[2]:sort_on[a, b]), fields: *"
 
                                );
                 }
@@ -3372,15 +3570,19 @@ mod tests {
                                 \n    Aggregate\
                                 \n      ClusterSend, indices: [[1, 3, 4, 2]]\
                                 \n        SubqueryAlias\
-                                \n          Union, schema: fields:[foo.a.a, foo.a.b, foo.a.c], metadata:{}\
-                                \n            Filter\
-                                \n              Scan foo.a, source: CubeTable(index: default:1:[1]:sort_on[a, b]), fields: *\
-                                \n            Filter\
-                                \n              Scan foo.a1, source: CubeTable(index: default:3:[3]:sort_on[a, b]), fields: *\
-                                \n            Filter\
-                                \n              Scan foo.b1, source: CubeTable(index: default:4:[4]:sort_on[a, b]), fields: *\
-                                \n            Filter\
-                                \n              Scan foo.b, source: CubeTable(index: default:2:[2]:sort_on[a, b]), fields: *"
+                                \n          Union, schema: fields:[lambda.a, lambda.b, lambda.c], metadata:{}\
+                                \n            SubqueryAlias\
+                                \n              Filter\
+                                \n                Scan foo.a, source: CubeTable(index: default:1:[1]:sort_on[a, b]), fields: *\
+                                \n            SubqueryAlias\
+                                \n              Filter\
+                                \n                Scan foo.a1, source: CubeTable(index: default:3:[3]:sort_on[a, b]), fields: *\
+                                \n            SubqueryAlias\
+                                \n              Filter\
+                                \n                Scan foo.b1, source: CubeTable(index: default:4:[4]:sort_on[a, b]), fields: *\
+                                \n            SubqueryAlias\
+                                \n              Filter\
+                                \n                Scan foo.b, source: CubeTable(index: default:2:[2]:sort_on[a, b]), fields: *"
 
                                );
                 }
@@ -3413,12 +3615,15 @@ mod tests {
                                 \n          Union, schema: fields:[foo.a.a, foo.a.b, foo.a.c], metadata:{}\
                                 \n            Filter\
                                 \n              Scan foo.a, source: CubeTable(index: default:1:[1]:sort_on[a, b]), fields: *\
-                                \n            Filter\
-                                \n              Scan foo.a1, source: CubeTable(index: default:3:[3]:sort_on[a, b]), fields: *\
-                                \n            Filter\
-                                \n              Scan foo.b1, source: CubeTable(index: default:4:[4]:sort_on[a, b]), fields: *\
-                                \n            Filter\
-                                \n              Scan foo.b, source: CubeTable(index: default:2:[2]:sort_on[a, b]), fields: *"
+                                \n            SubqueryAlias\
+                                \n              Filter\
+                                \n                Scan foo.a1, source: CubeTable(index: default:3:[3]:sort_on[a, b]), fields: *\
+                                \n            SubqueryAlias\
+                                \n              Filter\
+                                \n                Scan foo.b1, source: CubeTable(index: default:4:[4]:sort_on[a, b]), fields: *\
+                                \n            SubqueryAlias\
+                                \n              Filter\
+                                \n                Scan foo.b, source: CubeTable(index: default:2:[2]:sort_on[a, b]), fields: *"
 
                                );
                 }
@@ -3451,13 +3656,16 @@ mod tests {
                                 \n      ClusterSend, indices: [[3, 4, 2]]\
                                 \n        SubqueryAlias\
                                 \n          Projection, [foo.a.a:a, foo.a.b:b, foo.a.c:c]\
-                                \n            Union, schema: fields:[foo.a1.a, foo.a1.b, foo.a1.c], metadata:{}\
-                                \n              Filter\
-                                \n                Scan foo.a1, source: CubeTable(index: default:3:[3]:sort_on[a, b]), fields: *\
-                                \n              Filter\
-                                \n                Scan foo.b1, source: CubeTable(index: default:4:[4]:sort_on[a, b]), fields: *\
-                                \n              Filter\
-                                \n                Scan foo.b, source: CubeTable(index: default:2:[2]:sort_on[a, b]), fields: *"
+                                \n            Union, schema: fields:[lambda.a, lambda.b, lambda.c], metadata:{}\
+                                \n              SubqueryAlias\
+                                \n                Filter\
+                                \n                  Scan foo.a1, source: CubeTable(index: default:3:[3]:sort_on[a, b]), fields: *\
+                                \n              SubqueryAlias\
+                                \n                Filter\
+                                \n                  Scan foo.b1, source: CubeTable(index: default:4:[4]:sort_on[a, b]), fields: *\
+                                \n              SubqueryAlias\
+                                \n                Filter\
+                                \n                  Scan foo.b, source: CubeTable(index: default:2:[2]:sort_on[a, b]), fields: *"
                                 );
                 }
                 _ => assert!(false),
@@ -3469,15 +3677,135 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn topk_full_merge() -> Result<(), CubeError> {
-        // The full-merge strategy replaces the streaming top-k node with a router-side
-        // re-aggregation + fetch-limited sort. Exercise it end-to-end (UNION -> multi-partition
-        // ClusterSend, which is what required the explicit CoalescePartitions fan-in) and check it
-        // returns the same top-k as the default streaming merge across Sum/Min/Max, both directions,
-        // and HAVING.
-        Config::test("topk_full_merge")
+    async fn union_rewrites_keep_columns() -> Result<(), CubeError> {
+        Config::test("union_rewrites_keep_columns").start_test(async move |services| {
+            let service = services.sql_service;
+            let _ = service.exec_query("CREATE SCHEMA foo").await?.collect().await?;
+            let _ = service.exec_query("CREATE TABLE foo.a (a int, b int, c int)").await?.collect().await?;
+            let _ = service.exec_query("CREATE TABLE foo.b (a int, b int, c int)").await?.collect().await?;
+            let _ = service.exec_query("CREATE TABLE foo.x (x int, y int, z int)").await?.collect().await?;
+            service.exec_query("INSERT INTO foo.a (a, b, c) VALUES (1, 2, 3)").await?.collect().await?;
+            service.exec_query("INSERT INTO foo.b (a, b, c) VALUES (10, 20, 30)").await?.collect().await?;
+            service.exec_query("INSERT INTO foo.x (x, y, z) VALUES (100, 200, 300)").await?.collect().await?;
+
+            let values = |r: &DataFrame| {
+                r.get_rows()
+                    .iter()
+                    .map(|r| r.values().clone())
+                    .collect::<Vec<_>>()
+            };
+            let int = |v: i64| TableValue::Int(v);
+
+            // `BY NAME` inputs keep their own column order, so they must not be narrowed or flattened by
+            // position. DataFusion itself still reads reordered `BY NAME` inputs by position, so only
+            // planning and the row count are checked here.
+            for (sql, rows) in [
+                ("SELECT c FROM (SELECT c, a FROM foo.a UNION ALL BY NAME SELECT a, c FROM foo.b) AS o", 2),
+                ("SELECT b FROM (SELECT b, a, c FROM foo.a UNION ALL BY NAME SELECT a, c, b FROM foo.b) AS o", 2),
+                ("SELECT c FROM ((SELECT c, a FROM foo.a UNION ALL BY NAME SELECT a, c FROM foo.b) \
+                  UNION ALL SELECT a, c FROM foo.a) AS o", 3),
+            ] {
+                let r = service.exec_query(sql).await?.collect().await?;
+                assert_eq!(r.get_rows().len(), rows, "{}", sql);
+            }
+
+            // Inputs with other column names keep the projection that renames them.
+            let r = service.exec_query(
+                "SELECT a, sum(c) FROM (SELECT * FROM foo.a UNION ALL SELECT * FROM foo.x) AS o GROUP BY 1 ORDER BY 1"
+            ).await?.collect().await?;
+            assert_eq!(values(&r), vec![vec![int(1), int(3)], vec![int(100), int(300)]]);
+            let r = service.exec_query(
+                "EXPLAIN SELECT a, sum(c) FROM (SELECT * FROM foo.a UNION ALL SELECT * FROM foo.x) AS o GROUP BY 1"
+            ).await?.collect().await?;
+            assert_eq!(
+                r.get_rows()[0].values()[0],
+                TableValue::String(
+                    "Aggregate\
+                    \n  ClusterSend, indices: [[1, 3]]\
+                    \n    SubqueryAlias\
+                    \n      Union, schema: fields:[foo.a.a, foo.a.c], metadata:{}\
+                    \n        Scan foo.a, source: CubeTable(index: default:1:[1]:sort_on[a]), fields: [a, c]\
+                    \n        Projection, [a, c]\
+                    \n          Scan foo.x, source: CubeTable(index: default:3:[3]), fields: [x, z]"
+                        .to_string()
+                )
+            );
+
+            // Inputs of different types are coerced level by level: `1` reaches text via `Float64`.
+            let r = service.exec_query(
+                "SELECT 1 AS x UNION ALL SELECT 2.5 AS x UNION ALL SELECT 'a' AS x"
+            ).await?.collect().await?;
+            assert_eq!(
+                values(&r),
+                vec![
+                    vec![TableValue::String("1.0".to_string())],
+                    vec![TableValue::String("2.5".to_string())],
+                    vec![TableValue::String("a".to_string())],
+                ]
+            );
+
+            Ok::<(), CubeError>(())
+        }).await;
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn union_planning_rewrites_off() -> Result<(), CubeError> {
+        Config::test("union_planning_rewrites_off")
             .update_config(|mut c| {
-                c.topk_aggregate_strategy = crate::config::TopKAggregateStrategy::FullMerge;
+                c.union_planning_rewrites = false;
+                c
+            })
+            .start_test(async move |services| {
+                let service = services.sql_service;
+                let _ = service.exec_query("CREATE SCHEMA foo").await?.collect().await?;
+                let _ = service.exec_query("CREATE TABLE foo.a (a int, b int, c int)").await?.collect().await?;
+                let _ = service.exec_query("CREATE TABLE foo.b (a int, b int, c int)").await?.collect().await?;
+                service.exec_query("INSERT INTO foo.a (a, b, c) VALUES (1, 2, 3)").await?.collect().await?;
+                service.exec_query("INSERT INTO foo.b (a, b, c) VALUES (10, 20, 30)").await?.collect().await?;
+
+                let sql = "SELECT a, sum(c) FROM (SELECT * FROM foo.a UNION ALL SELECT * FROM foo.b) AS o \
+                           GROUP BY 1 ORDER BY 1";
+                let r = service.exec_query(sql).await?.collect().await?;
+                assert_eq!(
+                    r.get_rows().iter().map(|r| r.values().clone()).collect::<Vec<_>>(),
+                    vec![
+                        vec![TableValue::Int(1), TableValue::Int(3)],
+                        vec![TableValue::Int(10), TableValue::Int(30)],
+                    ]
+                );
+                let r = service.exec_query(&format!("EXPLAIN {}", sql)).await?.collect().await?;
+                // No alias on the union inputs: the rewrites did not run.
+                assert_eq!(
+                    r.get_rows()[0].values()[0],
+                    TableValue::String(
+                        "Sort\
+                        \n  Aggregate\
+                        \n    ClusterSend, indices: [[1, 2]]\
+                        \n      SubqueryAlias\
+                        \n        Union, schema: fields:[foo.a.a, foo.a.c], metadata:{}\
+                        \n          Scan foo.a, source: CubeTable(index: default:1:[1]:sort_on[a]), fields: [a, c]\
+                        \n          Scan foo.b, source: CubeTable(index: default:2:[2]:sort_on[a]), fields: [a, c]"
+                            .to_string()
+                    )
+                );
+
+                Ok::<(), CubeError>(())
+            })
+            .await;
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn topk_streaming_merge() -> Result<(), CubeError> {
+        // The streaming strategy keeps the per-row top-k node instead of the default router-side
+        // re-aggregation + fetch-limited sort, and is what an operator falls back to. Exercise it
+        // end-to-end (UNION -> multi-partition ClusterSend, which is what required the explicit
+        // CoalescePartitions fan-in) and check it returns the same top-k as the default full merge
+        // across Sum/Min/Max, both directions, and HAVING.
+        Config::test("topk_streaming_merge")
+            .update_config(|mut c| {
+                c.topk_aggregate_strategy = crate::config::TopKAggregateStrategy::Streaming;
                 c
             })
             .start_test(async move |services| {
@@ -3665,6 +3993,426 @@ mod tests {
             Ok::<(), CubeError>(())
         }).await;
         Ok(())
+    }
+
+    /// The limit pushdown is an optimization: turning it off may only cost time, never change a
+    /// row. Runs the same queries with `CUBESTORE_LIMIT_PUSHDOWN` on and off and requires the two
+    /// results to be identical, which catches a pushdown applied to a relation whose rows the
+    /// limit does not count without having to know the right answer in advance.
+    #[tokio::test]
+    async fn limit_pushdown_differential() -> Result<(), CubeError> {
+        const QUERIES: &[&str] = &[
+            // Nested aggregate: the limit counts the outer groups, not the inner rows.
+            "SELECT a, sum(v) FROM (SELECT a, b, sum(v) v FROM s.d GROUP BY 1, 2) i GROUP BY 1 ORDER BY 1 ASC LIMIT 3",
+            "WITH i AS (SELECT a, b, sum(v) v FROM s.d GROUP BY 1, 2) SELECT a, sum(v) FROM i GROUP BY 1 ORDER BY 1 ASC LIMIT 3",
+            // Expression in the inner group key, so the inner keys are not captured as columns.
+            "SELECT k, sum(v) FROM (SELECT a + 1 k, b, sum(v) v FROM s.d GROUP BY 1, 2) i GROUP BY 1 ORDER BY 1 ASC LIMIT 3",
+            // Aggregate inside a join branch.
+            "SELECT x.a, sum(x.v) FROM (SELECT a, sum(v) v FROM s.d GROUP BY 1) x JOIN s.d y ON x.a = y.a GROUP BY 1 ORDER BY 1 ASC LIMIT 3",
+            // DISTINCT over a UNION ALL feeding an outer aggregate -- the multi-stage key grid.
+            "SELECT b, count(*) FROM (SELECT DISTINCT a, b FROM (SELECT a, b FROM s.d UNION ALL SELECT a, b FROM s.d) u) g GROUP BY 1 ORDER BY 1 ASC LIMIT 3",
+            // Single-level shapes, where the pushdown is legitimate and must not change anything.
+            "SELECT a, sum(v) FROM s.d GROUP BY 1 ORDER BY 1 ASC LIMIT 3",
+            "SELECT a, b, sum(v) FROM s.d GROUP BY 1, 2 ORDER BY 2 ASC LIMIT 3",
+            "SELECT a, sum(v) FROM s.d GROUP BY 1 HAVING sum(v) > 2 ORDER BY 1 ASC LIMIT 3",
+            "SELECT a, sum(v) FROM s.d GROUP BY 1 LIMIT 3",
+        ];
+
+        async fn run(name: &'static str, limit_pushdown: bool) -> Vec<String> {
+            let out = Arc::new(tokio::sync::Mutex::new(Vec::new()));
+            let collected = out.clone();
+            Config::test(name)
+                .update_config(move |mut c| {
+                    c.limit_pushdown = limit_pushdown;
+                    c
+                })
+                .start_test(async move |services| {
+                    let service = services.sql_service;
+                    service
+                        .exec_query("CREATE SCHEMA s")
+                        .await?
+                        .collect()
+                        .await?;
+                    service
+                        .exec_query("CREATE TABLE s.d (a int, b int, v int)")
+                        .await?
+                        .collect()
+                        .await?;
+                    let values = (1..=5)
+                        .flat_map(|a| (1..=4).map(move |b| format!("({}, {}, 1)", a, b)))
+                        .join(", ");
+                    service
+                        .exec_query(&format!("INSERT INTO s.d (a, b, v) VALUES {}", values))
+                        .await?
+                        .collect()
+                        .await?;
+                    for q in QUERIES {
+                        let r = service.exec_query(q).await?.collect().await?;
+                        // Compared as a multiset: several of these order by a column with ties, and
+                        // which of the tied rows a plan returns is not part of the answer. What must
+                        // not move is the set of rows -- a truncated or duplicated relation shows up
+                        // here whatever the order.
+                        let mut rows = r
+                            .get_rows()
+                            .iter()
+                            .map(|r| format!("{:?}", r))
+                            .collect::<Vec<_>>();
+                        rows.sort();
+                        collected
+                            .lock()
+                            .await
+                            .push(format!("{}\n  => {:?}", q, rows));
+                    }
+                    Ok::<(), CubeError>(())
+                })
+                .await;
+            let r = out.lock().await.clone();
+            r
+        }
+
+        let with = run("limit_pushdown_differential_on", true).await;
+        let without = run("limit_pushdown_differential_off", false).await;
+        assert_eq!(with.len(), QUERIES.len());
+        assert_eq!(without.len(), QUERIES.len());
+        for (a, b) in with.iter().zip(without.iter()) {
+            assert_eq!(a, b, "result changed when the limit pushdown was disabled");
+        }
+        Ok(())
+    }
+
+    /// Regression test for https://github.com/cube-js/cube/issues/11545, reduced.
+    ///
+    /// A `SELECT DISTINCT` over a `UNION ALL` stops deduplicating when the query also
+    /// carries a top-level `ORDER BY ... LIMIT` and the input crosses a record batch
+    /// (> 2048 rows): duplicate keys survive the DISTINCT, so a `count(*)` over the key
+    /// set exceeds the number of distinct keys -- which this query's algebra cannot produce.
+    ///
+    /// The issue was reported against a Tesseract `multi_stage` measure whose plan joins
+    /// two per-key leaf aggregations back to such a key set, but neither the join nor the
+    /// multi-stage shape is required -- a bare `count(*)` over the deduplicated key set
+    /// reproduces it. Removing either the `ORDER BY` or the `LIMIT` returns correct
+    /// values, which points at the sort/limit pushdown into `ClusterSend`
+    /// (`pull_up_cluster_send`'s `LogicalPlan::Sort` branch) rather than at the join.
+    ///
+    /// Cube emits `ORDER BY 1 ASC LIMIT 10000` on every query, so this is reachable from
+    /// any query over a pre-aggregation whose plan deduplicates a key set.
+    #[test]
+    fn distinct_over_union_with_sort_and_limit() {
+        // Planning this shape recurses deeply enough to overflow libtest's default 2 MiB
+        // stack in a debug build (production gives select workers 4 MiB via
+        // CUBESTORE_SELECT_WORKER_STACK_SIZE). Unrelated to the corruption under test.
+        std::thread::Builder::new()
+            .stack_size(32 * 1024 * 1024)
+            .spawn(|| {
+                tokio::runtime::Builder::new_multi_thread()
+                    .enable_all()
+                    .thread_stack_size(32 * 1024 * 1024)
+                    .build()
+                    .unwrap()
+                    .block_on(async {
+                        Config::test("distinct_over_union_with_sort_and_limit")
+                            .update_config(|mut c| {
+                                // Keep it in a single partition, as an unpartitioned
+                                // pre-aggregation table is.
+                                c.partition_split_threshold = 1000000;
+                                c.compaction_chunks_count_threshold = 50;
+                                c
+                            })
+                            .start_test(async move |services| {
+                                let service = services.sql_service;
+
+                                service
+                                    .exec_query("CREATE SCHEMA pre_aggregations")
+                                    .await?
+                                    .collect()
+                                    .await?;
+                                service
+                                    .exec_query(
+                                        "CREATE TABLE pre_aggregations.order_slices (
+                                             sale_orders__id int,
+                                             dates__date_day timestamp,
+                                             base_sales__sale int)",
+                                    )
+                                    .await?
+                                    .collect()
+                                    .await?;
+
+                                // 1100 orders in each of two months -- 2200 distinct
+                                // (order, month) keys, just over the 2048-row record
+                                // batch. Ids interleave across the months so scan order
+                                // (by id) and the leaves' ORDER BY (by month) disagree,
+                                // as they do for real order ids.
+                                const ORDERS_PER_MONTH: usize = 1100;
+                                let mut rows = Vec::with_capacity(ORDERS_PER_MONTH * 2);
+                                let mut id = 1;
+                                for i in 0..ORDERS_PER_MONTH {
+                                    for (month, days) in [("02", 28), ("03", 31)] {
+                                        rows.push(format!(
+                                            "({}, '2026-{}-{:02}T00:00:00.000', 100)",
+                                            id,
+                                            month,
+                                            1 + (i % days)
+                                        ));
+                                        id += 1;
+                                    }
+                                }
+                                for chunk in rows.chunks(1000) {
+                                    service
+                                        .exec_query(&format!(
+                                            "INSERT INTO pre_aggregations.order_slices (sale_orders__id, dates__date_day, base_sales__sale) VALUES {}",
+                                            chunk.iter().join(", ")
+                                        ))
+                                        .await?
+                                        .collect()
+                                        .await?;
+                                }
+
+                                let query = |suffix: &str| {
+                                    format!(
+                                        r#"WITH
+cte_0 AS (SELECT "sale_orders__id", date_trunc('month', "dates__date_day") "m", sum("base_sales__sale") "s"
+  FROM pre_aggregations.order_slices
+  GROUP BY 1, 2
+  ORDER BY 2 ASC),
+cte_1 AS (SELECT "sale_orders__id", date_trunc('month', "dates__date_day") "m", sum("base_sales__sale") "s"
+  FROM pre_aggregations.order_slices
+  GROUP BY 1, 2
+  ORDER BY 2 ASC),
+keys AS (SELECT DISTINCT "sale_orders__id", "m"
+  FROM (SELECT "sale_orders__id", "m" FROM cte_0
+        UNION ALL
+        SELECT "sale_orders__id", "m" FROM cte_1) AS "u")
+SELECT "m", count(*) "keys" FROM keys GROUP BY 1{}"#,
+                                        suffix
+                                    )
+                                };
+
+                                let counts = |result: &DataFrame| -> Vec<i64> {
+                                    result
+                                        .get_rows()
+                                        .iter()
+                                        .map(|row| match &row.values()[1] {
+                                            TableValue::Int(v) => *v,
+                                            v => panic!("unexpected count value: {:?}", v),
+                                        })
+                                        .collect()
+                                };
+
+                                let expected =
+                                    vec![ORDERS_PER_MONTH as i64, ORDERS_PER_MONTH as i64];
+
+                                // Controls: each alone deduplicates correctly.
+                                for suffix in [" ORDER BY 1 ASC", " LIMIT 10000", ""] {
+                                    let result =
+                                        service.exec_query(&query(suffix)).await?.collect().await?;
+                                    assert_eq!(counts(&result), expected, "suffix: {:?}", suffix);
+                                }
+
+                                // Both clauses together -- the case the controls above isolate.
+                                let result = service
+                                    .exec_query(&query(" ORDER BY 1 ASC LIMIT 10000"))
+                                    .await?
+                                    .collect()
+                                    .await?;
+                                assert_eq!(counts(&result), expected);
+
+                                Ok::<(), CubeError>(())
+                            })
+                            .await;
+                    });
+            })
+            .unwrap()
+            .join()
+            // Re-raise the original panic so the assertion diff is what gets reported.
+            .unwrap_or_else(|e| std::panic::resume_unwind(e));
+    }
+
+    /// Regression test for https://github.com/cube-js/cube/issues/11545.
+    ///
+    /// Cube's Tesseract planner emits this shape for a `multi_stage` measure whose SQL
+    /// gates one base measure on another (`CASE WHEN {a} > 0 THEN {b} END` with
+    /// `add_group_by`): two per-key leaf aggregations over the same rollup table, a
+    /// DISTINCT key set built from their UNION ALL, a LEFT JOIN back to each leaf, and a
+    /// top-level `ORDER BY ... LIMIT`.
+    ///
+    /// Each month holds 1100 orders, so each must return 1100 whatever date range is asked for.
+    /// The sum can only exceed the number of keys feeding it if the key set carries duplicates,
+    /// which happens when the CTEs are reordered under a merge planned against another ordering
+    /// and the streaming DISTINCT above it stops seeing equal keys adjacent.
+    ///
+    /// The shape needs BOTH the top-level ORDER BY and the LIMIT: the LIMIT is what makes a
+    /// descriptor exist at all, the ORDER BY is what makes it a non-trivial permutation of the
+    /// group key. Neither may be dropped when trimming this query.
+    #[test]
+    fn multi_stage_gated_join_with_sort_and_limit() {
+        // Planning this query recurses deeply enough to overflow libtest's default 2 MiB
+        // stack in a debug build (production gives select workers 4 MiB via
+        // CUBESTORE_SELECT_WORKER_STACK_SIZE, and release frames are much smaller), so run
+        // it on a thread sized for debug frames. Unrelated to the corruption below.
+        std::thread::Builder::new()
+            .stack_size(32 * 1024 * 1024)
+            .spawn(|| {
+        tokio::runtime::Builder::new_multi_thread()
+            .enable_all()
+            .thread_stack_size(32 * 1024 * 1024)
+            .build()
+            .unwrap()
+            .block_on(async {
+        Config::test("multi_stage_gated_join_with_sort_and_limit")
+            .update_config(|mut c| {
+                // Keep the rollup in a single partition, as a real unpartitioned
+                // pre-aggregation table is.
+                c.partition_split_threshold = 1000000;
+                c.compaction_chunks_count_threshold = 50;
+                c
+            })
+            .start_test(async move |services| {
+                let service = services.sql_service;
+
+                service
+                    .exec_query("CREATE SCHEMA pre_aggregations")
+                    .await?
+                    .collect()
+                    .await?;
+
+                // Column layout of a Cube rollup keyed on (client, order, staff, store, day).
+                service
+                    .exec_query(
+                        "CREATE TABLE pre_aggregations.order_slices (
+                             clients__id int,
+                             sale_orders__id int,
+                             staff__name text,
+                             stores__name text,
+                             dates__date_day timestamp,
+                             base_sales__sale int,
+                             base_sales__ticket_fraction int)",
+                    )
+                    .await?
+                    .collect()
+                    .await?;
+
+                // 1100 orders in each of two months -- 2200 distinct (order, month) keys,
+                // just over the 2048-row record batch. Order ids interleave across the two
+                // months, so scan order (by id) and the leaves' ORDER BY (by month) disagree,
+                // as they do for real order ids.
+                const ORDERS_PER_MONTH: usize = 1100;
+                let mut rows = Vec::with_capacity(ORDERS_PER_MONTH * 2);
+                let mut id = 1;
+                for i in 0..ORDERS_PER_MONTH {
+                    for (month, days) in [("02", 28), ("03", 31)] {
+                        rows.push(format!(
+                            "(1033, {}, 'Staff', 'Store', '2026-{}-{:02}T00:00:00.000', 100, 1)",
+                            id,
+                            month,
+                            1 + (i % days)
+                        ));
+                        id += 1;
+                    }
+                }
+                for chunk in rows.chunks(1000) {
+                    service
+                        .exec_query(&format!(
+                            "INSERT INTO pre_aggregations.order_slices (clients__id, sale_orders__id, staff__name, stores__name, dates__date_day, base_sales__sale, base_sales__ticket_fraction) VALUES {}",
+                            chunk.iter().join(", ")
+                        ))
+                        .await?
+                        .collect()
+                        .await?;
+                }
+
+                // Verbatim from Cube's /v1/sql for {measures: ["store_day.tickets"],
+                // timeDimensions: [{dimension: "store_day.date", granularity: "month",
+                // dateRange: [from, to]}]}, with the rollup table name substituted in.
+                let tickets_by_month = |from: &str, to: &str| {
+                    format!(
+                        r#"WITH
+cte_0 AS (  SELECT "sale_orders__id" "sale_orders__id", date_trunc('month', "dates__date_day") "store_day__date_month", sum("base_sales__sale") "base_sales__sale"
+  FROM  pre_aggregations.order_slices  AS "base_sales__order_slices"
+  WHERE ("dates__date_day" >= CAST('{from}' as TIMESTAMP) AND "dates__date_day" <= CAST('{to}' as TIMESTAMP)) AND ("clients__id" = '1033')
+  GROUP BY 1, 2
+  ORDER BY  2  ASC),
+cte_1 AS (  SELECT "sale_orders__id" "sale_orders__id", date_trunc('month', "dates__date_day") "store_day__date_month", sum("base_sales__ticket_fraction") "base_sales__ticket_fraction"
+  FROM  pre_aggregations.order_slices  AS "base_sales__order_slices"
+  WHERE ("dates__date_day" >= CAST('{from}' as TIMESTAMP) AND "dates__date_day" <= CAST('{to}' as TIMESTAMP)) AND ("clients__id" = '1033')
+  GROUP BY 1, 2
+  ORDER BY  2  ASC),
+cte_2 AS (  SELECT "fk_aggregate_keys"."store_day__date_month" "store_day__date_month", CASE WHEN "q_0"."base_sales__sale" > 0 THEN "q_1"."base_sales__ticket_fraction" END "sale_orders__order_slice_gated"
+  FROM (SELECT DISTINCT "sale_orders__id" "sale_orders__id", "store_day__date_month" "store_day__date_month"
+  FROM (SELECT DISTINCT "sale_orders__id" "sale_orders__id", "store_day__date_month" "store_day__date_month"
+  FROM  cte_0  AS "cte_0"
+   UNION ALL
+  SELECT DISTINCT "sale_orders__id" "sale_orders__id", "store_day__date_month" "store_day__date_month"
+  FROM  cte_1  AS "cte_1") AS "fk_aggregate_keys_source") AS "fk_aggregate_keys"
+  LEFT JOIN  cte_0  AS "q_0" ON (("fk_aggregate_keys"."sale_orders__id" IS NOT DISTINCT FROM "q_0"."sale_orders__id")) AND (("fk_aggregate_keys"."store_day__date_month" IS NOT DISTINCT FROM "q_0"."store_day__date_month"))
+  LEFT JOIN  cte_1  AS "q_1" ON (("fk_aggregate_keys"."sale_orders__id" IS NOT DISTINCT FROM "q_1"."sale_orders__id")) AND (("fk_aggregate_keys"."store_day__date_month" IS NOT DISTINCT FROM "q_1"."store_day__date_month"))),
+cte_3 AS (  SELECT "fk_aggregate"."store_day__date_month" "store_day__date_month", sum("fk_aggregate"."sale_orders__order_slice_gated") "sale_orders__tickets"
+  FROM  cte_2  AS "fk_aggregate"
+  GROUP BY 1
+  ORDER BY  1  ASC)
+SELECT "fk_aggregate"."store_day__date_month" "store_day__date_month", "fk_aggregate"."sale_orders__tickets" "store_day__tickets"
+FROM  cte_3  AS "fk_aggregate"
+ORDER BY  1  ASC
+LIMIT 10000"#,
+                        from = from,
+                        to = to
+                    )
+                };
+
+                let tickets = |result: &DataFrame| -> Vec<i64> {
+                    result
+                        .get_rows()
+                        .iter()
+                        .map(|row| match &row.values()[1] {
+                            TableValue::Int(v) => *v,
+                            v => panic!("unexpected tickets value: {:?}", v),
+                        })
+                        .collect()
+                };
+
+                let february = service
+                    .exec_query(&tickets_by_month(
+                        "2026-02-01T00:00:00.000",
+                        "2026-02-28T23:59:59.999",
+                    ))
+                    .await?
+                    .collect()
+                    .await?;
+                assert_eq!(tickets(&february), vec![ORDERS_PER_MONTH as i64]);
+
+                let march = service
+                    .exec_query(&tickets_by_month(
+                        "2026-03-01T00:00:00.000",
+                        "2026-03-31T23:59:59.999",
+                    ))
+                    .await?
+                    .collect()
+                    .await?;
+                assert_eq!(tickets(&march), vec![ORDERS_PER_MONTH as i64]);
+
+                // Same table and query as the two cases above; the range width is the only
+                // difference, and it is what pushes the key set across a record batch.
+                let both_months = service
+                    .exec_query(&tickets_by_month(
+                        "2026-02-01T00:00:00.000",
+                        "2026-03-31T23:59:59.999",
+                    ))
+                    .await?
+                    .collect()
+                    .await?;
+                assert_eq!(
+                    tickets(&both_months),
+                    vec![ORDERS_PER_MONTH as i64, ORDERS_PER_MONTH as i64]
+                );
+
+                Ok::<(), CubeError>(())
+            })
+            .await;
+            });
+            })
+            .unwrap()
+            .join()
+            // Re-raise the original panic so the assertion diff is what gets reported.
+            .unwrap_or_else(|e| std::panic::resume_unwind(e));
     }
 
     #[tokio::test]
@@ -4040,16 +4788,17 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn repartition_concurrent_download_keeps_data_consistent() -> Result<(), CubeError> {
-        // PerPartition merge with concurrent chunk download enabled must drain and keep
-        // data consistent end-to-end (real concurrent downloads in the merge group build).
-        Config::test("repartition_concurrent_download_keeps_data_consistent")
+    async fn repartition_sequential_download_keeps_data_consistent() -> Result<(), CubeError> {
+        // Concurrent chunk download is the default, so this covers the fallback: a PerPartition
+        // merge downloading its group one chunk at a time must drain and keep data consistent
+        // end-to-end.
+        Config::test("repartition_sequential_download_keeps_data_consistent")
             .update_config(|mut c| {
                 c.partition_split_threshold = 20;
                 c.compaction_chunks_count_threshold = 10;
                 c.repartition_strategy = crate::config::RepartitionStrategy::PerPartition;
                 c.repartition_merge_max_input_files = 4;
-                c.repartition_concurrent_download = true;
+                c.repartition_concurrent_download = false;
                 c
             })
             .start_test(async move |services| {
@@ -4877,13 +5626,24 @@ mod tests {
                     config.max_partition_split_threshold = 200;
                     config
                 }).start_test_worker(async move |_| {
-                    let url = "https://data.wprdc.org/dataset/0b584c84-7e35-4f4d-a5a2-b01697470c0f/resource/e95dd941-8e47-4460-9bd8-1e51c194370b/download/bikepghpublic.csv";
+                    // The threshold is derived from the size of the location,
+                    // not from its contents: see ImportServiceImpl::estimate_rows.
+                    // Rows are padded so the estimate lands above
+                    // max_partition_split_threshold per select worker, which is
+                    // what makes the cap observable.
+                    let path = env::temp_dir().join(format!("{}.csv", test_name));
+                    let padding = "x".repeat(256);
+                    let mut csv = "Response ID,Start Date,End Date\n".to_string();
+                    for id in 0..813 {
+                        csv += &format!("{},2020-01-01T00:00:00.000Z,{}\n", id, padding);
+                    }
+                    tokio::fs::write(&path, csv).await?;
 
                     service
                         .exec_query("CREATE SCHEMA IF NOT EXISTS foo")
                         .await?.collect().await?;
 
-                    let create_table_sql = format!("CREATE TABLE foo.bikes (`Response ID` int, `Start Date` text, `End Date` text) LOCATION '{}'", url);
+                    let create_table_sql = format!("CREATE TABLE foo.bikes (`Response ID` int, `Start Date` text, `End Date` text) LOCATION '{}'", path.to_string_lossy());
 
                     service.exec_query(&create_table_sql).await?.collect().await?;
 
@@ -6615,6 +7375,10 @@ mod tests {
 
     #[tokio::test]
     async fn worker_sort_and_limit_cluster() -> Result<(), CubeError> {
+        // The workers run the group-by-limit trim with `group_by_limit_per_partition` off, the
+        // non-default "over merge" shape: one hash table per worker over the coalesced input.
+        // Both shapes must return the same rows, and the default one is what the rest of the
+        // suite runs.
         Config::test("worker_sort_limit_router")
             .update_config(|mut config| {
                 config.select_workers = vec![
@@ -6623,6 +7387,7 @@ mod tests {
                 ];
                 config.metastore_bind_address = Some("127.0.0.1:25106".to_string());
                 config.compaction_chunks_count_threshold = 0;
+                config.group_by_limit_per_partition = false;
                 config
             })
             .start_test(async move |services| {
@@ -6642,6 +7407,7 @@ mod tests {
                             ),
                         };
                         config.compaction_chunks_count_threshold = 0;
+                        config.group_by_limit_per_partition = false;
                         config
                     })
                     .start_test_worker(async move |_| {
@@ -6660,6 +7426,7 @@ mod tests {
                                     ),
                                 };
                                 config.compaction_chunks_count_threshold = 0;
+                                config.group_by_limit_per_partition = false;
                                 config
                             })
                             .start_test_worker(async move |_| {

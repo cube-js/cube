@@ -20,7 +20,10 @@ data model properties can be dynamically updated through an API, for example.
 
 <Warning>
 
-Each `asyncModule` call will be invoked only once per data model compilation.
+A data model is compiled in several stages, and the data model files are
+evaluated, with their `asyncModule` callbacks, once per stage. Wrap API calls
+and other costly operations in [`memo()`](#caching-with-memo) so they run only
+once per compilation.
 
 </Warning>
 
@@ -141,6 +144,51 @@ asyncModule(async () => {
   });
 });
 ```
+
+## Caching with `memo`
+
+`memo(key, fn)` calls `fn` only the first time a `key` is seen during a data
+model compilation and returns its result, the same promise for an async `fn`,
+on every later call, in every stage and from every data model file. `key` is a
+string or a JSON-serializable value, such as an array. Results are not shared
+between compilations, so each recompilation, e.g., after a
+[`schema_version`](#usage-with-schema_version) change, fetches fresh data:
+
+```javascript
+// model/cubes/DynamicDataModel.js
+const fetch = require("node-fetch");
+
+asyncModule(async () => {
+  const dynamicCubes = await memo("dynamicCubes", async () =>
+    (await fetch("http://your-api-endpoint/dynamicCubes")).json()
+  );
+
+  dynamicCubes.forEach((dynamicCube) => {
+    // ...
+  });
+});
+```
+
+The key can be omitted: `memo(fn)` gets a key made of the file name and the
+position of the call, so each call site is cached on its own:
+
+```javascript
+const dynamicCubes = await memo(async () =>
+  (await fetch("http://your-api-endpoint/dynamicCubes")).json()
+);
+```
+
+Pass a key explicitly to share one result between several call sites or files,
+or when the call is in a function or a loop: its result likely depends on the
+arguments, e.g., `memo(["columns", table], fn)`. A keyless `memo(fn)` that runs
+more than once per compilation stage is an error.
+
+The function passed to `memo()` should only fetch and return data. Calling
+`cube()`, `view()`, `context()`, `view_group()` or `asyncModule()` from it is an error, as the
+function doesn't run again in later compilation stages. Define the model objects
+from the returned data outside of `memo()`, as in the example above. Every
+stage gets the same returned object, so don't mutate it or pass it to `cube()`
+as is: build new definitions from it instead.
 
 ## Usage with `schema_version`
 
@@ -265,13 +313,13 @@ asyncModule(async () => {
 
 ```javascript
 // cube.js
-const MySQLDriver = require("@cubejs-backend/mysql-driver");
-const PostgresDriver = require("@cubejs-backend/postgres-driver");
+const { MySqlDriver } = require("@cubejs-backend/mysql-driver");
+const { PostgresDriver } = require("@cubejs-backend/postgres-driver");
 
 module.exports = {
   driverFactory: ({ dataSource }) => {
     if (dataSource === "mysql") {
-      return new MySQLDriver({ database: dataSource });
+      return new MySqlDriver({ database: dataSource });
     }
 
     return new PostgresDriver({ database: dataSource });

@@ -4,6 +4,7 @@ import R from 'ramda';
 import {
   AccessPolicyDefinition,
   CubeDefinitionExtended,
+  CubeRefreshKey,
   CubeSymbols,
   Folder,
   FolderInclude,
@@ -21,6 +22,7 @@ import { BaseQuery, PreAggregationDefinitionExtended } from '../adapter';
 import type { CubeValidator } from './CubeValidator';
 import type { ErrorReporter } from './ErrorReporter';
 import { FinishedJoinTree } from './JoinGraph';
+import { internStringsDeep } from './StringInterning';
 
 export type SegmentDefinition = {
   type: string;
@@ -80,6 +82,7 @@ export type DimensionDefinition = {
   sql(): string;
   primaryKey?: true;
   ownedByCube: boolean;
+  included?: boolean;
   fieldType?: string;
   multiStage?: boolean;
   shiftInterval?: string;
@@ -111,6 +114,7 @@ export type MeasureDefinition = {
   aggType?: string,
   sql(): string;
   ownedByCube: boolean;
+  included?: boolean;
   rollingWindow?: any
   filters?: any
   filter?: MultiStageFilterDirective;
@@ -160,6 +164,7 @@ export type PreAggregationInfo = {
   preAggregationName: string,
   preAggregation: any,
   cube: string,
+  dataSource: string,
   references: PreAggregationReferences,
   refreshKey: unknown,
   indexesReferences: unknown,
@@ -198,6 +203,28 @@ export type EvaluatedCube = {
   isView?: boolean;
   includedMembers?: ViewIncludedMember[];
   defaultFilters?: ViewDefaultValueFilter[];
+  refreshKey?: CubeRefreshKey;
+};
+
+const INTERNED_CUBE_COLLECTIONS = ['measures', 'dimensions', 'segments', 'hierarchies', 'preAggregations', 'joins'] as const;
+
+// Deliberately broad: any date-filter value that isn't an absolute date is
+// treated as relative, so a form Tesseract learns later is still recompiled.
+const DATE_OPERATORS = ['inDateRange', 'notInDateRange', 'beforeDate', 'beforeOrOnDate', 'afterDate', 'afterOrOnDate', 'onTheDate'];
+// The forms Tesseract parses: a date, or a date and time with seconds and an
+// optional `Z` / `±HH:MM` offset.
+const ABSOLUTE_DATE = /^\d{4}-\d{2}-\d{2}([T ]\d{2}:\d{2}:\d{2}(\.\d+)?(Z|[+-]\d{2}:\d{2})?)?$/;
+
+const hasRelativeDateValue = (item: any): boolean => {
+  if (!item) {
+    return false;
+  }
+  const group = item.or || item.and;
+  if (group) {
+    return group.some(hasRelativeDateValue);
+  }
+  return DATE_OPERATORS.includes(item.operator) && Array.isArray(item.values) &&
+    item.values.some((value: unknown) => typeof value === 'string' && !ABSOLUTE_DATE.test(value.trim()));
 };
 
 export class CubeEvaluator extends CubeSymbols {
@@ -209,13 +236,21 @@ export class CubeEvaluator extends CubeSymbols {
 
   private isRbacEnabledCache: boolean | null = null;
 
+  /**
+   * Cubes with a multi-stage `filter.include` on a relative date range. Their
+   * SQL depends on the current time.
+   */
+  public relativeDateFilterCubes: Set<string> = new Set();
+
   public constructor(
-    protected readonly cubeValidator: CubeValidator
+    protected readonly cubeValidator: CubeValidator,
+    protected readonly options: { internStrings?: boolean } = {},
   ) {
     super(true);
   }
 
   public compile(cubes: any[], errorReporter: ErrorReporter) {
+    this.relativeDateFilterCubes = new Set();
     super.compile(cubes, errorReporter);
     const validCubes = this.cubeList.filter(cube => this.cubeValidator.isCubeValid(cube)).sort((a, b) => {
       if (a.isView) {
@@ -231,6 +266,14 @@ export class CubeEvaluator extends CubeSymbols {
       this.evaluatedCubes[cube.name] = this.prepareCube(cube, errorReporter);
     }
 
+    if (this.options.internStrings) {
+      for (const cube of validCubes) {
+        this.internCubeStrings(cube);
+      }
+      // Member definitions resolved for references, a second copy of the members' strings
+      internStringsDeep(this.symbols);
+    }
+
     this.byFileName = R.groupBy(v => v.fileName || v.name, validCubes);
     this.primaryKeys = R.fromPairs(
       validCubes.map((v) => {
@@ -242,6 +285,15 @@ export class CubeEvaluator extends CubeSymbols {
         return [v.name, primaryKeyNamesToSymbols];
       })
     );
+  }
+
+  private internCubeStrings(cube: CubeDefinitionExtended) {
+    internStringsDeep(cube);
+
+    // The walk skips accessors: read the memoized member maps here
+    for (const collection of INTERNED_CUBE_COLLECTIONS) {
+      internStringsDeep(cube[collection]);
+    }
   }
 
   protected prepareCube(cube, errorReporter: ErrorReporter): EvaluatedCube {
@@ -334,6 +386,7 @@ export class CubeEvaluator extends CubeSymbols {
           { originalSorting: true }
         );
         const resolvedUnless: string[] = [];
+
         for (const ref of rawUnless) {
           const r = resolveViewMember('unless', ref);
           if (r !== null) {
@@ -660,6 +713,9 @@ export class CubeEvaluator extends CubeSymbols {
           if (typeof filter.keepOnly === 'function') {
             filter.keepOnlyReferences = this.evaluateReferences(cubeName, filter.keepOnly);
           }
+          if (Array.isArray(filter.include) && filter.include.some(hasRelativeDateValue)) {
+            this.relativeDateFilterCubes.add(cubeName);
+          }
           member.filter = filter;
         }
         if (member.grain) {
@@ -963,6 +1019,7 @@ export class CubeEvaluator extends CubeSymbols {
               preAggregationName,
               preAggregation: preAggregations[preAggregationName],
               cube,
+              dataSource: this.evaluatedCubes[cube].dataSource || 'default',
               references: this.evaluatePreAggregationReferences(cube, preAggregations[preAggregationName]),
               refreshKey,
               indexesReferences: indexes && Object.keys(indexes).reduce((obj, indexName) => {

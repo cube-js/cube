@@ -1,13 +1,13 @@
 # Motivation
 
-We want to make it easier for everyone to Cube.js, and we are adopting a
-Developer's Certificate of Origin (DCO) for contributions. Unlike Contributor
-License Agreements (CLA), we believe that the DCO is a lot more
+We want to make it easier for everyone to contribute to Cube, and we are
+adopting a Developer's Certificate of Origin (DCO) for contributions. Unlike
+Contributor License Agreements (CLA), we believe that the DCO is a lot more
 developer-friendly as it doesn't require lengthy legal reviews.
 
 The DCO indicates that contributors are responsible for the code that they
 contribute and that they understand that the contribution is under the terms of
-the [Cube.js project licenses][link-licenses].
+the [Cube project licenses][link-licenses].
 
 [link-licenses]:
   https://github.com/cube-js/cube/blob/master/README.md#license
@@ -17,7 +17,7 @@ the [Cube.js project licenses][link-licenses].
 By contributing to Cube Dev, Inc., You accept and agree to the terms and
 conditions in the [Developer Certificate of Origin][link-dco] below for Your
 present and future Contributions submitted to Cube Dev, Inc. Your contribution
-includes any submissions to the [Cube.js repository][link-cubejs-repo] when you
+includes any submissions to the [Cube repository][link-cubejs-repo] when you
 click on such buttons as `Propose changes` or `Create pull request`. Except for
 the licenses granted herein, You reserve all right, title, and interest in and
 to Your Contributions.

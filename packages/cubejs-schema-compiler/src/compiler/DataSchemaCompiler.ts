@@ -15,13 +15,214 @@ import { UserError } from './UserError';
 import { ErrorReporter, ErrorReporterOptions, SyntaxErrorInterface } from './ErrorReporter';
 import { CONTEXT_SYMBOLS, CubeDefinition, CubeSymbols } from './CubeSymbols';
 import { ViewCompilationGate } from './ViewCompilationGate';
-import { TranspilerInterface } from './transpilers';
+import { MemoKeyTranspiler, TranspilerInterface } from './transpilers';
 import { CompilerInterface } from './PrepareCompiler';
 import { YamlCompiler } from './YamlCompiler';
 import { CubeDictionary } from './CubeDictionary';
 import { CompilerCache } from './CompilerCache';
 
 const ctxFileStorage = new AsyncLocalStorage<FileContent>();
+// Set while the function passed to `memo` runs, including its async continuations
+const memoFnStorage = new AsyncLocalStorage<string>();
+
+// For memo() keys: objects compare by their keys whatever the property order, and NaN and
+// Infinity don't encode as null
+const memoKeyReplacer = (_key: string, value: unknown) => {
+  if (typeof value === 'number' && !Number.isFinite(value)) {
+    return { $memoNumber: String(value) };
+  }
+  if (value && typeof value === 'object' && !Array.isArray(value)) {
+    return Object.fromEntries(Object.keys(value).sort().map((k) => [k, value[k]]));
+  }
+  return value;
+};
+
+// Shared realm: closures bind the running compile's scope lexically through `with`, so lazy reads
+// (sql reading COMPILE_CONTEXT) keep resolving it after the compile; the inner function keeps
+// top-level declarations off the shared global and gets the compile's own global as `this`.
+const SHARED_SCOPE_GETTER = '__cubejsCompileScope';
+const sharedScriptPrefix = (strict: boolean) => `with (${SHARED_SCOPE_GETTER}(${strict})) { (function () {`;
+const SHARED_SCRIPT_SUFFIX = '\n}).call(globalThis); }';
+// Whether the source opens with a 'use strict' directive, after whitespace and comments.
+// A linear scan: a regex over repeated comments can backtrack exponentially.
+function hasUseStrictDirective(source: string): boolean {
+  let i = 0;
+  while (i < source.length) {
+    if (/\s/.test(source[i])) {
+      i++;
+    } else if (source.startsWith('//', i)) {
+      const end = source.indexOf('\n', i);
+      if (end === -1) return false;
+      i = end + 1;
+    } else if (source.startsWith('/*', i)) {
+      const end = source.indexOf('*/', i + 2);
+      if (end === -1) return false;
+      i = end + 2;
+    } else {
+      break;
+    }
+  }
+  return source.startsWith("'use strict'", i) || source.startsWith('"use strict"', i);
+}
+
+// UMD wrappers probe these with `typeof`: read as undefined, not as a ReferenceError
+const PROBED_GLOBALS = new Set(['module', 'exports', 'define']);
+
+type SharedCompileScope = {
+  // The `with` object: claims every name, so model code never reaches the realm global
+  scope: object;
+  // For strict code: claims only names the compile or the realm has, so assigning an undeclared
+  // name throws a ReferenceError as it does at global scope
+  strictScope: object;
+  vars: Record<PropertyKey, any>;
+};
+
+const sharedScopeStorage = new AsyncLocalStorage<SharedCompileScope>();
+let sharedVmContext: vm.Context | null = null;
+let sharedRealmGlobal: Record<PropertyKey, any> | null = null;
+
+const getSharedVmContext = (): vm.Context => {
+  if (!sharedVmContext) {
+    const sandbox = {};
+    Object.defineProperty(sandbox, SHARED_SCOPE_GETTER, {
+      value: (strict: boolean) => {
+        const compile = sharedScopeStorage.getStore();
+        if (!compile) {
+          throw new Error('No compile scope stored in context');
+        }
+        return strict ? compile.strictScope : compile.scope;
+      },
+      writable: false,
+      enumerable: false,
+      configurable: false,
+    });
+
+    const refuse = (key: PropertyKey): never => {
+      // The realm's own TypeError, as model code would catch it
+      throw new sharedRealmGlobal!.TypeError(
+        `Cannot set global '${String(key)}': data models share one realm with CUBEJS_COMPILER_MULTI_TENANT_SHARING`
+      );
+    };
+    // What still reaches the real global (`this` of a nested sloppy function) fails loudly: a
+    // value stored there would be every tenant's.
+    sharedVmContext = vm.createContext(new Proxy(sandbox, {
+      set: (_t, key) => refuse(key),
+      defineProperty: (_t, key) => refuse(key),
+      deleteProperty: (_t, key) => refuse(key),
+    }));
+    sharedRealmGlobal = vm.runInContext('globalThis', sharedVmContext);
+  }
+  return sharedVmContext;
+};
+
+// Names the compile assigns (implicit globals, `globalThis.x`, `this.x`, even `JSON = ...`) land
+// in `vars`; reads fall back to the realm's built-ins. Unknown names throw a ReferenceError, also
+// under `typeof` (except PROBED_GLOBALS).
+const createSharedCompileScope = (globals: Record<string, any>): SharedCompileScope => {
+  getSharedVmContext();
+  const realm = sharedRealmGlobal!;
+  const vars: Record<PropertyKey, any> = Object.assign(Object.create(null), globals);
+  // Built-ins this compile deleted from its global
+  const deleted = new Set<PropertyKey>();
+  const builtIn = (key: PropertyKey) => key !== SHARED_SCOPE_GETTER && !deleted.has(key) && key in realm;
+
+  const read = (key: PropertyKey) => {
+    if (key in vars) {
+      return vars[key];
+    }
+    if (builtIn(key)) {
+      return realm[key];
+    }
+    if (typeof key !== 'string' || PROBED_GLOBALS.has(key)) {
+      return undefined;
+    }
+    throw new realm.ReferenceError(`${key} is not defined`);
+  };
+
+  const remove = (key: PropertyKey) => {
+    const removed = Reflect.deleteProperty(vars, key);
+    if (removed && builtIn(key)) {
+      deleted.add(key);
+    }
+    return removed;
+  };
+
+  // The compile's `globalThis` and top-level `this`: its own properties are `vars` (the target, so
+  // defining, deleting and reflecting on them behave as on an ordinary object), then the built-ins
+  const realmOwn = (key: PropertyKey) => builtIn(key) && Object.prototype.hasOwnProperty.call(realm, key);
+  const compileGlobal = new Proxy(vars, {
+    get: (t, key) => (key in t || builtIn(key) ? read(key) : undefined),
+    has: (t, key) => key in t || builtIn(key),
+    // Without it, OrdinarySet would copy the built-in's attributes through getOwnPropertyDescriptor
+    set: (t, key, value) => {
+      t[key] = value;
+      deleted.delete(key);
+      return true;
+    },
+    defineProperty: (t, key, descriptor) => {
+      // Redefining a built-in keeps the attributes the descriptor leaves out, as on a global
+      const base: PropertyDescriptor = !Object.prototype.hasOwnProperty.call(t, key) && realmOwn(key)
+        ? { ...Reflect.getOwnPropertyDescriptor(realm, key), configurable: true }
+        : {};
+      const accessor = 'get' in descriptor || 'set' in descriptor;
+      const merged = accessor || 'get' in base
+        ? { enumerable: base.enumerable, configurable: base.configurable, ...descriptor }
+        : { ...base, ...descriptor };
+      deleted.delete(key);
+      return Reflect.defineProperty(t, key, merged);
+    },
+    deleteProperty: (_t, key) => remove(key),
+    ownKeys: (t) => [...new Set([
+      ...Reflect.ownKeys(t),
+      ...Reflect.ownKeys(realm).filter((key) => realmOwn(key)),
+    ])],
+    getOwnPropertyDescriptor: (t, key) => {
+      if (Object.prototype.hasOwnProperty.call(t, key) || !realmOwn(key)) {
+        return Reflect.getOwnPropertyDescriptor(t, key);
+      }
+      // A built-in the compile hasn't shadowed: reported configurable, as the target lacks it
+      return { ...Reflect.getOwnPropertyDescriptor(realm, key), configurable: true };
+    },
+  });
+  Object.defineProperty(vars, 'globalThis', { value: compileGlobal, writable: true, configurable: true, enumerable: false });
+
+  const scopeTraps = {
+    get: (_t, key) => read(key),
+    set: (t, key, value) => {
+      t[key] = value;
+      deleted.delete(key);
+      return true;
+    },
+    deleteProperty: (_t, key) => remove(key),
+  };
+  const scope = new Proxy(vars, {
+    ...scopeTraps,
+    has: (_t, key) => typeof key === 'string' && key !== SHARED_SCOPE_GETTER,
+  });
+  const strictScope = new Proxy(vars, {
+    ...scopeTraps,
+    has: (t, key) => typeof key === 'string' && (key in t || builtIn(key)),
+  });
+
+  // `new Function(...)` / `Function(...)` compile their body in this compile's scope, as they would
+  // at the global scope of a realm of its own. The result is an ordinary function of the realm.
+  const RealmFunction = realm.Function;
+  const compileFunction = function Function(...args: unknown[]) {
+    const body = args.length > 0 ? String(args[args.length - 1]) : '';
+    const params = args.slice(0, -1).map(String).join(',');
+    // Parse params and body on their own first, so malformed input throws the realm's SyntaxError
+    // instead of closing the wrapper below early.
+    RealmFunction(...args);
+    const factory = RealmFunction('scope', `with (scope) { return function anonymous(${params}\n) {\n${body}\n}; }`);
+    return factory(hasUseStrictDirective(body) ? strictScope : scope);
+  };
+  compileFunction.prototype = RealmFunction.prototype;
+  Object.setPrototypeOf(compileFunction, RealmFunction.prototype);
+  Object.defineProperty(compileFunction, 'length', { value: 1 });
+  Object.defineProperty(vars, 'Function', { value: compileFunction, writable: true, configurable: true, enumerable: false });
+
+  return { scope, strictScope, vars };
+};
 
 const NATIVE_IS_SUPPORTED = isNativeSupported();
 
@@ -52,6 +253,7 @@ const splitFilesToChunks = (files: FileContent[], chunksCount: number): FileCont
   } else {
     const baseSize = Math.floor(files.length / chunksCount);
     chunks = [];
+
     for (let i = 0; i < chunksCount; i++) {
       // For the last part, we take the remaining files so we don't lose the extra ones.
       const start = i * baseSize;
@@ -91,6 +293,10 @@ export type DataSchemaCompilerOptions = {
   compiledScriptCache: LRUCache<string, vm.Script>;
   compiledYamlCache: LRUCache<string, string>;
   compiledJinjaCache: LRUCache<string, string>;
+  /**
+   * Evaluate data model files in one realm shared by all compiles (prepareCompiler resolves it)
+   */
+  sharedVmContext?: boolean;
 };
 
 export type TranspileOptions = {
@@ -182,6 +388,11 @@ export class DataSchemaCompiler {
 
   private compileV8ContextCache: vm.Context | null = null;
 
+  private readonly sharedVmContext: boolean;
+
+  // Flag on: per-compile `with` scope evaluated inside the shared realm.
+  private compileScope: SharedCompileScope | null = null;
+
   // FIXME: Is public only because of tests, should be private
   public compilePromise: any;
 
@@ -218,6 +429,7 @@ export class DataSchemaCompiler {
     this.compiledScriptCache = options.compiledScriptCache;
     this.compiledYamlCache = options.compiledYamlCache;
     this.compiledJinjaCache = options.compiledJinjaCache;
+    this.sharedVmContext = !!options.sharedVmContext;
   }
 
   public compileObjects(compileServices: CompilerInterface[], objects, errorsReport: ErrorReporter) {
@@ -371,7 +583,7 @@ export class DataSchemaCompiler {
 
         results = (await Promise.all(jsFilesTasks)).flat();
       } else {
-        results = await Promise.all(toCompile.map(f => this.transpileJsFile(f, errorsReport, { cubeNames, cubeSymbols, transpilerNames })));
+        results = await this.transpileJsFilesWorkerBulk(toCompile, errorsReport, { cubeNames, cubeSymbols, transpilerNames });
       }
 
       return results.filter(f => !!f) as FileContent[];
@@ -384,6 +596,25 @@ export class DataSchemaCompiler {
     let compiledFiles: Record<string, boolean> = {};
     let asyncModules: CallableFunction[] = [];
     let transpiledFiles: FileContent[] = [];
+    // Results of `memo` calls. Unlike the objects above it survives between the compile stages:
+    // the model is evaluated once per stage, and `memo` makes it do a costly call (an API request
+    // from an `asyncModule`, say) only once per compile.
+    const memoResults = new Map<string, { value: unknown } | { error: unknown }>();
+    // Stage that last looked up each key MemoKeyTranspiler generated
+    const memoCallSiteStages = new Map<string, number>();
+    let memoStage = -1;
+
+    // Model objects go to the current stage only, while a memoized function runs in the first stage
+    // that asks for its key: objects defined from there would be missing from all later stages.
+    const assertOutsideMemo = (globalName: string) => {
+      const memoCall = memoFnStorage.getStore();
+      if (memoCall !== undefined) {
+        throw new UserError(
+          `${globalName}() can't be called from the function passed to ${memoCall}: ` +
+          'return the data from memo() and define model objects outside of it'
+        );
+      }
+    };
 
     const cleanup = () => {
       cubes = [];
@@ -394,11 +625,14 @@ export class DataSchemaCompiler {
       asyncModules = [];
     };
 
-    this.compileV8ContextCache = vm.createContext({
+    const compileGlobals = {
       view: (name, cube) => {
         const file = ctxFileStorage.getStore();
         if (!file) {
           throw new Error('No file stored in context');
+        }
+        if (cube) {
+          assertOutsideMemo('view');
         }
         return !cube ?
           this.cubeFactory({ ...name, fileName: file.fileName, isView: true }) :
@@ -409,6 +643,9 @@ export class DataSchemaCompiler {
         if (!file) {
           throw new Error('No file stored in context');
         }
+        if (cube) {
+          assertOutsideMemo('cube');
+        }
         return !cube ?
           this.cubeFactory({ ...name, fileName: file.fileName }) :
           cubes.push({ ...cube, name, fileName: file.fileName });
@@ -418,6 +655,7 @@ export class DataSchemaCompiler {
         if (!file) {
           throw new Error('No file stored in context');
         }
+        assertOutsideMemo('context');
         return contexts.push({ ...context, name, fileName: file.fileName });
       },
       view_group: (name: string, viewGroup) => {
@@ -425,8 +663,13 @@ export class DataSchemaCompiler {
         if (!file) {
           throw new Error('No file stored in context');
         }
+        assertOutsideMemo('view_group');
         viewGroups.push({ ...viewGroup, name, fileName: file.fileName });
-        this.compileV8ContextCache![name] = name;
+        if (this.sharedVmContext) {
+          this.compileScope!.vars[name] = name;
+        } else {
+          this.compileV8ContextCache![name] = name;
+        }
         return name;
       },
       addExport: (obj) => {
@@ -449,10 +692,65 @@ export class DataSchemaCompiler {
         if (!file) {
           throw new Error('No file stored in context');
         }
+        assertOutsideMemo('asyncModule');
         // We need to run async module code in the context of the original data model file
         // where it was defined. So we pass the same file to the async context.
         // @see https://nodejs.org/api/async_context.html#class-asynclocalstorage
         asyncModules.push(async () => ctxFileStorage.run(file, () => fn()));
+      },
+      memo: (key: unknown, fn: () => unknown) => {
+        if (typeof key === 'function' && fn === undefined) {
+          // MemoKeyTranspiler gives `memo(fn)` its key: this call didn't go through it
+          throw new Error('memo() expects a key as its first argument: memo(key, fn)');
+        }
+        if (typeof fn !== 'function') {
+          throw new Error('memo() expects a function as its second argument');
+        }
+        // Strings are encoded too, or `memo('1', ...)` would share the result of `memo(1, ...)`
+        let cacheKey: string | undefined;
+
+        try {
+          cacheKey = JSON.stringify(key, memoKeyReplacer);
+        } catch {
+          // BigInt or a cyclic structure
+        }
+        if (typeof cacheKey !== 'string') {
+          throw new Error('memo() expects a string or a JSON-serializable key as its first argument');
+        }
+        const callSite = MemoKeyTranspiler.callSiteOf(key);
+        // For errors: the key as the code would write it
+        const label = callSite !== undefined ? `memo() at ${callSite}` : `memo(${cacheKey})`;
+        if (memoStage < 0 || !ctxFileStorage.getStore()) {
+          // Called from a member (`sql: () => memo(...)`) evaluated by a compiler or a query, not
+          // from a model file: it may run any number of times, so there's no stage to cache for
+          return memoFnStorage.run(label, fn);
+        }
+        if (callSite !== undefined) {
+          // A top-level call site runs once per stage: twice means it's in a function or a loop,
+          // where the one key would give every call the result of the first one
+          if (memoCallSiteStages.get(cacheKey) === memoStage) {
+            throw new UserError(
+              `memo() at ${callSite} is called more than once per compile stage: as it's in a function or a loop, ` +
+              'its result may depend on the arguments: pass a key that does, e.g. memo([\'table\', name], fn)'
+            );
+          }
+          memoCallSiteStages.set(cacheKey, memoStage);
+        }
+        let result = memoResults.get(cacheKey);
+        if (!result) {
+          // A promise is stored as is, so concurrent and later calls share one invocation.
+          // A throw is stored too: every stage has to see the same outcome.
+          try {
+            result = { value: memoFnStorage.run(label, fn) };
+          } catch (error) {
+            result = { error };
+          }
+          memoResults.set(cacheKey, result);
+        }
+        if ('error' in result) {
+          throw result.error;
+        }
+        return result.value;
       },
       require: (extensionName: string) => {
         const file = ctxFileStorage.getStore();
@@ -486,11 +784,18 @@ export class DataSchemaCompiler {
         }
       },
       COMPILE_CONTEXT: this.standalone ? this.standaloneCompileContextProxy() : this.cloneCompileContextWithGetterAlias(this.compileContext || {}),
-    });
+    };
+
+    if (this.sharedVmContext) {
+      this.compileScope = createSharedCompileScope(compileGlobals);
+    } else {
+      this.compileV8ContextCache = vm.createContext(compileGlobals);
+    }
 
     const compilePhaseFirst = async (compilers: CompileCubeFilesCompilers, stage: 0 | 1 | 2 | 3) => {
       // clear the objects for the next phase
       cleanup();
+      memoStage = stage;
       transpiledFiles = await transpilePhaseFirst(stage);
 
       // We render jinja and transpile yaml only once on first phase and then use resulting JS for these files
@@ -504,12 +809,13 @@ export class DataSchemaCompiler {
     const compilePhase = async (compilers: CompileCubeFilesCompilers, stage: 0 | 1 | 2 | 3) => {
       // clear the objects for the next phase
       cleanup();
+      memoStage = stage;
       transpiledFiles = await transpilePhase(stage);
 
       return this.compileCubeFiles(cubes, contexts, viewGroups, compiledFiles, asyncModules, compilers, transpiledFiles, errorsReport);
     };
 
-    return compilePhaseFirst({ cubeCompilers: this.cubeNameCompilers }, 0)
+    const compileAll = () => compilePhaseFirst({ cubeCompilers: this.cubeNameCompilers }, 0)
       .then(() => compilePhase({ cubeCompilers: this.preTranspileCubeCompilers.concat([this.viewCompilationGate]) }, 1))
       .then(() => (this.viewCompilationGate.shouldCompileViews() ?
         compilePhase({ cubeCompilers: this.viewCompilers }, 2)
@@ -525,6 +831,12 @@ export class DataSchemaCompiler {
         cleanup();
         transpiledFiles = [];
         toCompile = [];
+        // The functions put into the compile context (cube, view, require, ...) close over
+        // this scope, and member functions keep that context alive as long as the compiled
+        // model lives: drop the model files' contents here, or they stay retained with it.
+        originalJsFiles.length = 0;
+        jinjaTemplatedFiles.length = 0;
+        yamlFiles.length = 0;
 
         if (transpilationNative) {
           // Clean up cache
@@ -541,7 +853,19 @@ export class DataSchemaCompiler {
         } else if (this.workerPool) {
           this.workerPool.terminate();
         }
+      })
+      // A failed compile mustn't keep the fetched data either
+      .finally(() => {
+        memoStage = -1;
+        memoResults.clear();
+        memoCallSiteStages.clear();
+        // These hold the globals.py TemplateContext, where the Python @memo caches live
+        this.pythonContext = null;
+        this.yamlCompiler.free();
       });
+
+    // Every continuation of the compile (asyncModule callbacks included) sees its scope
+    return this.compileScope ? sharedScopeStorage.run(this.compileScope, compileAll) : compileAll();
   }
 
   public compile() {
@@ -553,6 +877,7 @@ export class DataSchemaCompiler {
 
         // Free unneeded resources
         this.compileV8ContextCache = null;
+        this.compileScope = null;
         this.cubeDictionary.free();
         this.cubeOnlySymbols.free();
         this.cubeAndViewSymbols.free();
@@ -598,6 +923,7 @@ export class DataSchemaCompiler {
     }
 
     const hash = crypto.createHash('md5');
+
     for (const f of macroFiles) {
       hash.update(f.fileName);
       hash.update('\0');
@@ -692,6 +1018,59 @@ export class DataSchemaCompiler {
     });
   }
 
+  /**
+   * Worker pool counterpart of transpileJsFilesNativeBulk: files go to the workers in chunks
+   * because every message carries all cube symbols, and cloning them for each file costs
+   * files x members.
+   */
+  private async transpileJsFilesWorkerBulk(
+    files: FileContent[],
+    errorsReport: ErrorReporter,
+    options: TranspileOptions
+  ): Promise<(FileContent | undefined)[]> {
+    const { cubeNames, cubeSymbols, transpilerNames } = options;
+    if (!files.length) {
+      return [];
+    }
+
+    // More chunks than workers, so one chunk of large files doesn't hold up the rest
+    const chunkCount = Math.min(files.length, (this.workerPool!.maxWorkers || 1) * 4);
+    const chunkSize = Math.ceil(files.length / chunkCount);
+    const chunks: FileContent[][] = [];
+    for (let i = 0; i < files.length; i += chunkSize) {
+      chunks.push(files.slice(i, i + chunkSize));
+    }
+
+    const results = await Promise.all(chunks.map(async (chunk) => {
+      let res: ({ content: string; errors: any[]; warnings: any[] } | null)[];
+      try {
+        res = await this.workerPool!.exec('transpileJsBulk', [{
+          files: chunk.map(({ fileName, content }) => ({ fileName, content })),
+          transpilers: transpilerNames,
+          cubeNames,
+          cubeSymbols,
+        }]);
+      } catch {
+        // The whole chunk failed (the worker died, say): the per-file path reports it file by file
+        res = chunk.map(() => null);
+      }
+
+      return Promise.all(chunk.map(async (file, i) => {
+        const fileRes = res[i];
+        if (!fileRes) {
+          return this.transpileJsFile(file, errorsReport, options);
+        }
+
+        errorsReport.addErrors(fileRes.errors, file.fileName);
+        errorsReport.addWarnings(fileRes.warnings);
+
+        return { ...file, content: fileRes.content };
+      }));
+    }));
+
+    return results.flat();
+  }
+
   private async transpileYamlFilesNativeBulk(
     files: FileContent[],
     errorsReport: ErrorReporter,
@@ -782,6 +1161,8 @@ export class DataSchemaCompiler {
     errorsReport: ErrorReporter,
     { cubeNames, cubeSymbols, compilerId, jinjaUsed }: TranspileOptions
   ): Promise<(FileContent | undefined)> {
+    // The YAML to JS output only depends on the content: YAML is transpiled once, in the
+    // first phase, before any cube symbols are known. So the key is safe to share between apps.
     const cacheKey = crypto.createHash('md5').update(file.content).digest('hex');
 
     if (this.compiledYamlCache.has(cacheKey)) {
@@ -805,7 +1186,10 @@ export class DataSchemaCompiler {
       errorsReport.addWarnings(res[0].warnings as unknown as SyntaxErrorInterface[]);
       errorsReport.exitFile();
 
-      this.compiledYamlCache.set(cacheKey, res[0].code);
+      // A hit doesn't replay errors, so a failed transpilation must not be cached
+      if (!res[0].errors?.length) {
+        this.compiledYamlCache.set(cacheKey, res[0].code);
+      }
 
       return { ...file, content: res[0].code };
     } else {
@@ -822,7 +1206,9 @@ export class DataSchemaCompiler {
       errorsReport.addErrors(res.errors, file.fileName);
       errorsReport.addWarnings(res.warnings);
 
-      this.compiledYamlCache.set(cacheKey, res.content);
+      if (!res.errors?.length) {
+        this.compiledYamlCache.set(cacheKey, res.content);
+      }
 
       return { ...file, content: res.content };
     }
@@ -922,13 +1308,40 @@ export class DataSchemaCompiler {
   }
 
   private getJsScript(file: FileContent): vm.Script {
-    const cacheKey = crypto.createHash('md5').update(file.content).digest('hex');
+    // The script carries its file name (stack traces), and the cache may be shared between apps
+    const cacheKey = crypto.createHash('md5')
+      .update(file.fileName)
+      .update('\0')
+      .update(file.content)
+      .digest('hex');
 
     if (this.compiledScriptCache.has(cacheKey)) {
       return this.compiledScriptCache.get(cacheKey)!;
     }
 
     const script = new vm.Script(file.content, { filename: file.fileName });
+    this.compiledScriptCache.set(cacheKey, script);
+    return script;
+  }
+
+  private getSharedJsScript(file: FileContent): vm.Script {
+    // Not the source getJsScript compiles (the wrapper), hence the prefix
+    const cacheKey = `shared:${crypto.createHash('md5')
+      .update(file.fileName)
+      .update('\0')
+      .update(file.content)
+      .digest('hex')}`;
+
+    if (this.compiledScriptCache.has(cacheKey)) {
+      return this.compiledScriptCache.get(cacheKey)!;
+    }
+
+    // The prefix is on line 1, so a negative column offset keeps positions in stack traces intact.
+    const prefix = sharedScriptPrefix(hasUseStrictDirective(file.content));
+    const script = new vm.Script(`${prefix}${file.content}${SHARED_SCRIPT_SUFFIX}`, {
+      filename: file.fileName,
+      columnOffset: -prefix.length,
+    });
     this.compiledScriptCache.set(cacheKey, script);
     return script;
   }
@@ -949,6 +1362,17 @@ export class DataSchemaCompiler {
     }
 
     try {
+      if (this.sharedVmContext) {
+        const script = this.getSharedJsScript(file);
+        const scope = this.compileScope!;
+        ctxFileStorage.run(file, () => {
+          sharedScopeStorage.run(scope, () => {
+            script.runInContext(getSharedVmContext(), { timeout: 15000 });
+          });
+        });
+        return;
+      }
+
       const script = this.getJsScript(file);
 
       // We use AsyncLocalStorage to store the current file context
@@ -974,7 +1398,7 @@ export class DataSchemaCompiler {
   private standaloneCompileContextProxy() {
     return new Proxy({}, {
       get: () => {
-        throw new UserError('COMPILE_CONTEXT can\'t be used unless contextToAppId is defined. Please see https://cube.dev/docs/config#options-reference-context-to-app-id.');
+        throw new UserError('COMPILE_CONTEXT can\'t be used unless contextToAppId is defined. Please see https://docs.cube.dev/reference/configuration/config#context_to_app_id.');
       }
     });
   }

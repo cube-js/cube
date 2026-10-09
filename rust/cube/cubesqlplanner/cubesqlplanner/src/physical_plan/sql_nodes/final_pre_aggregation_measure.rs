@@ -11,7 +11,8 @@ use std::any::Any;
 use std::rc::Rc;
 
 /// Substitutes a measure with the matching pre-aggregation column
-/// reference (rolled up via the measure's `pre_aggregate_wrap`),
+/// reference (rolled up via the `pre_aggregate_wrap` of the measure's
+/// `rollup_kind`),
 /// or falls through to `input` when the measure has no
 /// pre-aggregation entry.
 pub struct FinalPreAggregationMeasureSqlNode {
@@ -38,63 +39,55 @@ impl SqlNode for FinalPreAggregationMeasureSqlNode {
         node_processor: Rc<dyn SqlNode>,
         templates: &PlanSqlTemplates,
     ) -> Result<String, CubeError> {
-        let res = match node.as_ref() {
-            MemberSymbol::Measure(ev) => {
-                if let Some(reference) = self.references.get(&node.full_name()) {
-                    match reference {
-                        RenderReferencesType::QualifiedColumnName(column_name) => {
-                            let table_ref = if let Some(table_name) = column_name.source() {
-                                format!("{}.", templates.quote_identifier(table_name)?)
-                            } else {
-                                format!("")
-                            };
-                            let pre_aggregation_measure = format!(
-                                "{}{}",
-                                table_ref,
-                                templates.quote_identifier(&column_name.name())?
-                            );
-                            match ev.kind().pre_aggregate_wrap() {
-                                // The rollup column holds an HLL state, so it
-                                // must be merged, not recomputed. Keep the
-                                // merged state when this query itself feeds a
-                                // further aggregation; otherwise take its
-                                // cardinality.
-                                AggregateWrap::CountDistinctApproxState => {
-                                    templates.hll_merge(pre_aggregation_measure)?
-                                }
-                                AggregateWrap::CountDistinctApprox => {
-                                    templates.hll_cardinality_merge(pre_aggregation_measure)?
-                                }
-                                AggregateWrap::Function(name) => {
-                                    format!("{}({})", name, pre_aggregation_measure)
-                                }
-                                AggregateWrap::PassThrough | AggregateWrap::CountDistinct => {
-                                    format!("sum({})", pre_aggregation_measure)
-                                }
+        let ev = node.as_measure()?;
+        Ok(
+            if let Some(reference) = self.references.get(&node.full_name()) {
+                match reference {
+                    RenderReferencesType::QualifiedColumnName(column_name) => {
+                        let table_ref = if let Some(table_name) = column_name.source() {
+                            format!("{}.", templates.quote_identifier(table_name)?)
+                        } else {
+                            format!("")
+                        };
+                        let pre_aggregation_measure = format!(
+                            "{}{}",
+                            table_ref,
+                            templates.quote_identifier(&column_name.name())?
+                        );
+                        let rollup_kind = ev.rollup_kind();
+                        match rollup_kind.pre_aggregate_wrap() {
+                            // The rollup column holds an HLL state, so it
+                            // must be merged, not recomputed. Keep the
+                            // merged state when this query itself feeds a
+                            // further aggregation; otherwise take its
+                            // cardinality.
+                            AggregateWrap::CountDistinctApproxState => {
+                                templates.hll_merge(pre_aggregation_measure)?
+                            }
+                            AggregateWrap::CountDistinctApprox => {
+                                templates.hll_cardinality_merge(pre_aggregation_measure)?
+                            }
+                            AggregateWrap::Function(name) => {
+                                format!("{}({})", name, pre_aggregation_measure)
+                            }
+                            AggregateWrap::PassThrough | AggregateWrap::CountDistinct => {
+                                format!("sum({})", pre_aggregation_measure)
                             }
                         }
-                        RenderReferencesType::LiteralValue(value) => {
-                            templates.quote_string(value)?
-                        }
-                        RenderReferencesType::RawReferenceValue(value) => value.clone(),
                     }
-                } else {
-                    self.input.to_sql(
-                        visitor,
-                        node,
-                        query_tools.clone(),
-                        node_processor.clone(),
-                        templates,
-                    )?
+                    RenderReferencesType::LiteralValue(value) => templates.quote_string(value)?,
+                    RenderReferencesType::RawReferenceValue(value) => value.clone(),
                 }
-            }
-            _ => {
-                return Err(CubeError::internal(format!(
-                    "final preaggregation measure node processor called for wrong node",
-                )));
-            }
-        };
-        Ok(res)
+            } else {
+                self.input.to_sql(
+                    visitor,
+                    node,
+                    query_tools.clone(),
+                    node_processor.clone(),
+                    templates,
+                )?
+            },
+        )
     }
 
     fn as_any(self: Rc<Self>) -> Rc<dyn Any> {

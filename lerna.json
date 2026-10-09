@@ -1,11 +1,7 @@
 {
-  "version": "1.7.28",
+  "version": "1.8.2",
   "npmClient": "yarn",
   "command": {
-    "bootstrap": {
-      "npmClient": "yarn",
-      "npmClientArgs": ["--frozen-lockfile"]
-    },
     "version": {
       "allowBranch": ["master", "lts/*", "release/*"]
     }

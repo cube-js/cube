@@ -19,9 +19,14 @@ import {
   getRealType,
   hasPreAggregationsEnvVars,
   internalExceptions,
+  INVALID_REQUEST_ID_MESSAGE,
+  isValidRequestId,
+  pinPreAggregationsSchema,
+  releasePreAggregationsSchemaPin,
   track,
   FileRepository,
   SchemaFileRepository,
+  withLogRedaction,
 } from '@cubejs-backend/shared';
 
 import type { Application as ExpressApplication } from 'express';
@@ -130,6 +135,13 @@ export class CubejsServerCore {
 
   protected readonly orchestratorStorage: OrchestratorStorage = new OrchestratorStorage();
 
+  /**
+   * In-flight orchestrator api builds, by id. Concurrent callers of a cold id must
+   * share one build: `OrchestratorStorage` releases a replaced entry, so a second
+   * build closes the Cube Store connection of the api the first caller is using.
+   */
+  protected readonly buildingOrchestratorApis: Map<string, Promise<OrchestratorApi>> = new Map();
+
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   protected repositoryFactory: ((context: RequestContext) => SchemaFileRepository) | (() => FileRepository);
 
@@ -144,6 +156,12 @@ export class CubejsServerCore {
   protected readonly contextToCubeStoreRouterId: ContextToCubeStoreRouterIdFn | null;
 
   protected readonly preAggregationsSchema: PreAggregationsSchemaFn;
+
+  /**
+   * This instance's share of the process-wide pre-aggregation schema pin, when it took
+   * one. Undefined when it did not, or once shutdown has released it.
+   */
+  private heldPreAggregationsSchemaPin: symbol | undefined;
 
   protected readonly scheduledRefreshTimeZones: ScheduledRefreshTimeZonesFn;
 
@@ -184,10 +202,18 @@ export class CubejsServerCore {
   ) {
     this.coreServerVersion = version;
 
-    this.logger = opts.logger || createLogger(
-      process.env.NODE_ENV === 'production',
+    // Same resolution the gateway and OptsHandler do, so a `devServer: true` embedder
+    // gets the dev logger and unredacted SQL, and a `devServer: false` one gets neither
+    // from the env var alone
+    const devMode = opts.devServer ?? getEnv('devMode');
+
+    const logger = opts.logger || createLogger(
+      !devMode,
       getEnv('logLevel'),
     );
+    // Wraps the log sink only: the agent and telemetry wrappers installed below
+    // sit outside it and forward the original params
+    this.logger = getEnv('logRedaction', devMode) ? withLogRedaction(logger) : logger;
 
     this.optsHandler = new OptsHandler(this, opts, systemOptions);
     this.options = this.optsHandler.getCoreInitializedOptions();
@@ -292,7 +318,7 @@ export class CubejsServerCore {
           msg === 'Cube SQL Error'
         ) {
           const props = {
-            error: params.error,
+            error: params.redactedError ?? params.error,
             ...(params.apiType ? { apiType: params.apiType } : {}),
             ...(params.protocol ? { protocol: params.protocol } : {}),
             ...(params.appName ? { appName: params.appName } : {}),
@@ -321,7 +347,7 @@ export class CubejsServerCore {
           }
         } else if (msg === 'Cube SQL Error') {
           const props = {
-            error: params.error,
+            error: params.redactedError ?? params.error,
             apiType: params.apiType,
             protocol: params.protocol,
             ...(params.appName ? { appName: params.appName } : {}),
@@ -343,6 +369,13 @@ export class CubejsServerCore {
       }
 
       this.event('Server Start');
+    }
+
+    // Last in the constructor, so anything that throws above takes no pin; shutdown
+    // releases it
+    if (typeof this.options.preAggregationsSchema === 'string') {
+      this.heldPreAggregationsSchemaPin =
+        pinPreAggregationsSchema(this.options.preAggregationsSchema);
     }
   }
 
@@ -446,7 +479,7 @@ export class CubejsServerCore {
     } else {
       app.get('/', (req, res) => {
         res.status(200)
-          .send('<html><body>Cube.js server is running in production mode. <a href="https://cube.dev/docs/deployment/production-checklist">Learn more about production mode</a>.</body></html>');
+          .send('<html><body>Cube server is running in production mode. <a href="https://docs.cube.dev/cube-core/deployment#production-checklist">Learn more about production mode</a>.</body></html>');
       });
     }
   }
@@ -473,6 +506,7 @@ export class CubejsServerCore {
       this.logger,
       {
         standalone: this.standalone,
+        devServer: this.options.devServer,
         dataSourceStorage: this.orchestratorStorage,
         basePath: this.options.basePath,
         contextRejectionMiddleware: this.contextRejectionMiddleware.bind(this),
@@ -559,6 +593,10 @@ export class CubejsServerCore {
     await this.orchestratorStorage.releaseConnections();
 
     this.orchestratorStorage.clear();
+    // A build still in flight would otherwise keep handing its pre-reset api --
+    // built from the pre-reset context and the env this is about to reload -- to
+    // every caller arriving until it settles.
+    this.buildingOrchestratorApis.clear();
     this.compilerCache.clear();
 
     this.reloadEnvVariables();
@@ -576,6 +614,31 @@ export class CubejsServerCore {
       return this.orchestratorStorage.get(orchestratorId);
     }
 
+    const building = this.buildingOrchestratorApis.get(orchestratorId);
+
+    if (building) {
+      return building;
+    }
+
+    // Registered before the first `await` in the build, so nothing can interleave
+    // between the miss above and this line.
+    const pending = this.buildOrchestratorApi(orchestratorId, context)
+      .finally(() => {
+        // Dropped once settled: a success is in the cache by now, and a failure must
+        // not become the cached answer for this id. Identity-checked because
+        // `resetInstanceState()` clears the map mid-build, after which the entry
+        // belongs to a later caller's build rather than to this one.
+        if (this.buildingOrchestratorApis.get(orchestratorId) === pending) {
+          this.buildingOrchestratorApis.delete(orchestratorId);
+        }
+      });
+
+    this.buildingOrchestratorApis.set(orchestratorId, pending);
+
+    return pending;
+  }
+
+  protected async buildOrchestratorApi(orchestratorId: string, context: RequestContext): Promise<OrchestratorApi> {
     /**
      * Hash table to store promises which will be resolved with the
      * datasource drivers. DriverFactoryByDataSource function is closure
@@ -738,6 +801,7 @@ export class CubejsServerCore {
           this.options.allowUngroupedWithoutPrimaryKey ||
           getEnv('allowUngroupedWithoutPrimaryKey'),
       convertTzForRawTimeDimension: getEnv('convertTzForRawTimeDimension'),
+      localRefreshKey: getEnv('refreshKeyLocalTime'),
       compileContext: options.context,
       dialectClass: options.dialectClass,
       externalDialectClass: options.externalDialectClass,
@@ -851,6 +915,13 @@ export class CubejsServerCore {
       }
     }
 
+    // Comes from server config, so only warn: rejecting it would stop the tenant's refresh
+    if (result?.requestId && !isValidRequestId(result.requestId)) {
+      this.logger('Refresh Scheduler Warning', {
+        warning: `Invalid requestId ${JSON.stringify(result.requestId)} in scheduled refresh context. ${INVALID_REQUEST_ID_MESSAGE}`,
+      });
+    }
+
     return result;
   }
 
@@ -929,7 +1000,7 @@ export class CubejsServerCore {
     console.error(e.stack || e);
 
     if (e.message && e.message.indexOf('Redis connection to') !== -1) {
-      console.log('🛑 Cube.js Server requires locally running Redis instance to connect to');
+      console.log('🛑 Cube Server requires locally running Redis instance to connect to');
       if (process.platform.indexOf('win') === 0) {
         console.log('💾 To install Redis on Windows please use https://github.com/MicrosoftArchive/redis/releases');
       } else if (process.platform.indexOf('darwin') === 0) {
@@ -952,6 +1023,15 @@ export class CubejsServerCore {
 
   public async shutdown() {
     this.compilerCache.clear();
+
+    // Undefined when this instance never took a share, and cleared here because this
+    // method is public and unguarded: a second call must not release the share again
+    if (this.heldPreAggregationsSchemaPin !== undefined) {
+      const holder = this.heldPreAggregationsSchemaPin;
+
+      this.heldPreAggregationsSchemaPin = undefined;
+      releasePreAggregationsSchemaPin(holder);
+    }
 
     if (this.devServer) {
       if (!process.env.CI) {

@@ -236,6 +236,39 @@ describe('OracleQuery', () => {
     expect(sql).not.toContain('LIMIT');
   });
 
+  it('renders rowLimit: 0 as FETCH NEXT 0 ROWS ONLY', async () => {
+    await compiler.compile();
+
+    const query = new OracleQuery({ joinGraph, cubeEvaluator, compiler }, {
+      measures: [
+        'visitors.count'
+      ],
+      timezone: 'UTC',
+      rowLimit: 0
+    });
+
+    const sql = query.buildSqlAndParams()[0];
+
+    expect(sql).toContain('FETCH NEXT 0 ROWS ONLY');
+    // A truthy check on rowLimit used to fall back to the default limit here
+    expect(sql).not.toContain('10000');
+    expect(query.groupByDimensionLimit()).toEqual(' FETCH NEXT 0 ROWS ONLY');
+  });
+
+  it('keeps the documented null policy for rowLimit', async () => {
+    await compiler.compile();
+
+    const newQuery = (rowLimit?: number | null) => new OracleQuery(
+      { joinGraph, cubeEvaluator, compiler },
+      { measures: ['visitors.count'], timezone: 'UTC', ...(rowLimit === undefined ? {} : { rowLimit }) }
+    );
+
+    // An absent rowLimit keeps the historical default, an explicit null means no limit
+    expect(newQuery().groupByDimensionLimit()).toEqual(' FETCH NEXT 10000 ROWS ONLY');
+    expect(newQuery(null).groupByDimensionLimit()).toEqual('');
+    expect(newQuery(0).groupByDimensionLimit()).toEqual(' FETCH NEXT 0 ROWS ONLY');
+  });
+
   it('uses FETCH NEXT syntax with subqueries and rolling windows', async () => {
     await compiler.compile();
 

@@ -197,7 +197,17 @@ export type TransformedQuery = {
 export type PreAggregationType = 'rollup' | 'rollupJoin' | 'rollupLambda' | 'originalSql';
 
 export type UsedPreAggregation = {
-  targetTableName: string;
+  /**
+   * Identity of the pre-aggregation in the data model, e.g. `Orders.main`.
+   * Stable across rebuilds, unlike `targetTableName`.
+   */
+  preAggregationId?: string;
+  /**
+   * Physical table of one specific build, content and structure versions
+   * included. Returned in dev mode and to the Playground only.
+   */
+  targetTableName?: string;
+  lastUpdatedAt?: number;
   type: PreAggregationType;
 };
 
@@ -210,6 +220,11 @@ export type LoadResponseResult<T> = {
   dbType: string;
   extDbType: string;
   requestId?: string;
+  /**
+   * Pre-aggregations this result was served from, keyed by pre-aggregation
+   * table name. Absent when the query hit none. Only carries identity fields;
+   * `refreshKeyValues` is added in dev mode and for the Playground.
+   */
   usedPreAggregations?: Record<string, UsedPreAggregation>;
   transformedQuery?: TransformedQuery;
   total?: number;

@@ -1,75 +1,38 @@
-import fs from 'fs';
-import path from 'path';
+import { parseJdbcUrl } from '@cubejs-backend/jdbc-driver';
 
-import { downloadJDBCDriver, OSS_DRIVER_VERSION } from './installer';
 import type { ParsedConnectionProperties } from './DatabricksDriver';
 
-async function fileExistsOr(
-  fsPath: string,
-  fn: () => Promise<string>,
-): Promise<string> {
-  if (fs.existsSync(fsPath)) {
-    return fsPath;
-  }
-  return fn();
-}
-
-export async function resolveJDBCDriver(): Promise<string> {
-  return fileExistsOr(
-    path.join(process.cwd(), `databricks-jdbc-${OSS_DRIVER_VERSION}-oss.jar`),
-    async () => fileExistsOr(
-      path.join(__dirname, '..', 'download', `databricks-jdbc-${OSS_DRIVER_VERSION}-oss.jar`),
-      async () => {
-        const pathOrNull = await downloadJDBCDriver();
-        if (pathOrNull) {
-          return pathOrNull;
-        }
-        throw new Error(
-          `Please download and place databricks-jdbc-${OSS_DRIVER_VERSION}-oss.jar inside your ` +
-          'project directory'
-        );
-      }
-    )
-  );
-}
-
 /**
- * Extract if exist UID and PWD from URL and return UID, PWD and URL without these params.
- * New Databricks OSS driver throws an error if any parameter is provided in the URL and as a separate param
- * passed to the driver instance. That's why we strip them out from the URL if they exist there.
- * @param jdbcUrl
+ * The OSS driver throws if a parameter is passed both in the URL and as a separate property, so the
+ * credentials are stripped from the URL and handed over as properties instead.
  */
 export function extractAndRemoveUidPwdFromJdbcUrl(jdbcUrl: string): [uid: string, pwd: string, cleanedUrl: string] {
-  const uidMatch = jdbcUrl.match(/UID=([^;]*)/i);
-  const pwdMatch = jdbcUrl.match(/PWD=([^;]*)/i);
+  const parsed = parseJdbcUrl(jdbcUrl);
 
-  const uid = uidMatch?.[1] || 'token';
-  const pwd = pwdMatch?.[1] || '';
+  const uid = parsed.get('UID')?.value || 'token';
+  const pwd = parsed.get('PWD')?.value || '';
 
-  const cleanedUrl = jdbcUrl
-    .replace(/;?UID=[^;]*/i, '')
-    .replace(/;?PWD=[^;]*/i, '')
-    .replace(/;?AuthMech=[^;]*/i, '');
+  return [uid, pwd, parsed.without(['UID', 'PWD', 'AuthMech']).toString()];
+}
 
-  return [uid, pwd, cleanedUrl];
+export function validateAndRemoveGeoSpatialSupportFromJdbcUrl(jdbcUrl: string): string {
+  const parsed = parseJdbcUrl(jdbcUrl);
+
+  if (parsed.getAll('EnableGeoSpatialSupport').some(({ value }) => value === '1')) {
+    throw new Error(
+      'Unsupported configuration: EnableGeoSpatialSupport=1. Cube reads GEOMETRY/GEOGRAPHY columns ' +
+      'as EWKT strings, please remove this parameter from the Databricks connection URL.'
+    );
+  }
+
+  return parsed.without(['EnableGeoSpatialSupport']).toString();
 }
 
 export function parseDatabricksJdbcUrl(jdbcUrl: string): ParsedConnectionProperties {
-  const jdbcPrefix = 'jdbc:databricks://';
-  const urlWithoutPrefix = jdbcUrl.slice(jdbcPrefix.length);
+  const parsed = parseJdbcUrl(jdbcUrl);
+  const [host] = parsed.base.slice('jdbc:databricks://'.length).split(':');
 
-  const [hostPortAndPath, ...params] = urlWithoutPrefix.split(';');
-  const [host] = hostPortAndPath.split(':');
-
-  const paramMap = new Map<string, string>();
-  for (const param of params) {
-    const [key, value] = param.split('=');
-    if (key && value) {
-      paramMap.set(key, value);
-    }
-  }
-
-  const httpPath = paramMap.get('httpPath');
+  const httpPath = parsed.get('httpPath')?.value;
   if (!httpPath) {
     throw new Error('Missing httpPath in JDBC URL');
   }
@@ -79,7 +42,5 @@ export function parseDatabricksJdbcUrl(jdbcUrl: string): ParsedConnectionPropert
     throw new Error('Could not extract warehouseId from httpPath');
   }
 
-  const warehouseId = warehouseMatch[1];
-
-  return { host, warehouseId };
+  return { host, warehouseId: warehouseMatch[1] };
 }

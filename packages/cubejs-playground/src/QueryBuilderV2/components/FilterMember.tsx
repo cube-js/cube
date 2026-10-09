@@ -24,6 +24,7 @@ import {
 import { useDeepMemo, useEvent } from '../hooks';
 import { OPERATOR_LABELS, OPERATORS, OPERATORS_BY_TYPE, UNARY_OPERATORS } from '../values';
 import { MemberViewType } from '../types';
+import { uniqArray } from '../utils';
 
 import { ValuesInput } from './ValuesInput';
 import { TimeDateRangeSelector } from './TimeDateRangeSelector';
@@ -89,13 +90,11 @@ function OperatorSelector(props: OperatorSelectorProps) {
       selectedKey={value}
       onSelectionChange={(operator: Key) => onChange(operator as UnaryOperator | BinaryOperator)}
     >
-      {OPERATORS_BY_TYPE[type || 'all']?.map((operator) => {
-        return (
-          <Item key={operator} textValue={OPERATOR_LABELS[operator]}>
-            <Text preset="t3m">{OPERATOR_LABELS[operator]}</Text>
-          </Item>
-        );
-      })}
+      {OPERATORS_BY_TYPE[type || 'all']?.map((operator) => (
+        <Item key={operator} textValue={OPERATOR_LABELS[operator]}>
+          <Text preset="t3m">{OPERATOR_LABELS[operator]}</Text>
+        </Item>
+      ))}
     </Select>
   );
 }
@@ -138,7 +137,7 @@ export function FilterMember(props: FilterMemberProps) {
     const updatedFilter = {
       values: [],
       ...filter,
-      operator: operator,
+      operator,
     } as BinaryFilter | UnaryFilter;
 
     if (type === 'time') {
@@ -157,26 +156,25 @@ export function FilterMember(props: FilterMemberProps) {
   });
 
   const onValuesChange = useEvent((values?: string[]) => {
-    onChange({ ...filter, values: values } as Filter);
+    onChange({ ...filter, values } as Filter);
   });
 
-  const wrapFilter = useEvent((type: 'and' | 'or') => {
-    onChange({ [type]: [filter] } as LogicalAndFilter | LogicalOrFilter);
+  const wrapFilter = useEvent((wrapType: 'and' | 'or') => {
+    onChange({ [wrapType]: [filter] } as LogicalAndFilter | LogicalOrFilter);
   });
 
   const inputs = useDeepMemo(() => {
-    const operator = filter.operator;
+    const { operator } = filter;
 
     if (
-      !('member' in filter) ||
-      UNARY_OPERATORS.includes(filter.operator) ||
-      !OPERATORS.includes(filter.operator)
+      !('member' in filter)
+      || UNARY_OPERATORS.includes(filter.operator)
+      || !OPERATORS.includes(filter.operator)
     ) {
       return null;
     }
 
-    const allowSuggestions =
-      type === 'string' && (operator === 'equals' || operator === 'notEquals');
+    const allowSuggestions = type === 'string' && (operator === 'equals' || operator === 'notEquals');
 
     switch (type) {
       case 'number':
@@ -235,9 +233,8 @@ export function FilterMember(props: FilterMemberProps) {
           );
         }
       default:
-        return filter.values?.map((value: string, i: number) => {
-          return <ValueTag key={i}>{value}</ValueTag>;
-        });
+        return filter.values
+          && uniqArray(filter.values).map((value: string) => <ValueTag key={value}>{value}</ValueTag>);
     }
   }, [filter, type]);
 
@@ -279,6 +276,7 @@ export function FilterMember(props: FilterMemberProps) {
       case 'wrapWithOr':
         wrapFilter('or');
         break;
+      // no default
     }
   });
 
@@ -314,16 +312,16 @@ export function FilterMember(props: FilterMemberProps) {
                   name={filter.member}
                 />
               ) : null}
-              {
-                <OperatorSelector
-                  isDisabled={
-                    !type || ('operator' in filter && !OPERATORS.includes(filter.operator))
-                  }
-                  type={type}
-                  value={'operator' in filter ? filter.operator : undefined}
-                  onChange={onOperatorChange}
-                />
-              }
+              
+              <OperatorSelector
+                isDisabled={
+                  !type || ('operator' in filter && !OPERATORS.includes(filter.operator))
+                }
+                type={type}
+                value={'operator' in filter ? filter.operator : undefined}
+                onChange={onOperatorChange}
+              />
+              
             </MemberContainer>
 
             {isExtraCompact ? inputs : <div>{inputs}</div>}

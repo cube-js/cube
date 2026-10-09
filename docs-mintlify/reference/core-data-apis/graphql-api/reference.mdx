@@ -31,6 +31,9 @@ object with query metadata:
   `annotation` field of the [REST API][ref-rest-api] response.
 - `lastRefreshTime` — an ISO 8601 timestamp indicating when the data was last
   refreshed.
+- `usedPreAggregations` — the pre-aggregations the result was served from, the
+  same as the `usedPreAggregations` field of the [REST API][ref-rest-api]
+  response. Absent when the query hit no pre-aggregation.
 
 ## `CubeQueryArgs`
 

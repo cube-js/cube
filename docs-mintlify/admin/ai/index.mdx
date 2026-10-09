@@ -43,6 +43,9 @@ accessible_views:
   - orders_view
   - customers_view
 memory_mode: user
+suggestions:
+  - What were the top 5 products last quarter?
+  - Show revenue by region
 ```
 
 ### Properties
@@ -54,6 +57,7 @@ memory_mode: user
 | `runtime`           | string           | `plain`                  | [Runtime mode](#runtime) — `plain` or `reasoning`.                                                                      |
 | `accessible_views`  | array            | _all views_              | List of view names exposed to the agent as context guidance for which views to query. This is not a security control — if omitted or empty, all views are exposed. Use [access policies](/reference/data-modeling/data-access-policies) to enforce actual access restrictions. |
 | `memory_mode`       | string           | `space`                  | [Memory isolation mode](#memory) — `space`, `user`, or `disabled`.                                                      |
+| `suggestions`       | array            | _none_                   | [Starter prompts](#suggestions) offered on the agent's empty chat screen.                                               |
 
 Rules and certified queries have their own dedicated pages:
 
@@ -90,8 +94,14 @@ To pin a specific model, set the `llm` property to one of the predefined models:
 - `gpt_5_mini`
 - `gpt_5_3`
 - `gpt_5_4`
+- `gpt_5_6_sol`
+- `gpt_5_6_terra`
 - `o3`
 - `o4_mini`
+
+**Fireworks:**
+- `glm_5_3`
+- `kimi_k3`
 
 To use your own model, see [Bring your own model](/admin/ai/bring-your-own-model).
 
@@ -128,6 +138,19 @@ The `memory_mode` property controls how the agent persists context across conver
 | `disabled`  | The agent does not persist memory between conversations.                                     |
 
 See [Memories](/admin/ai/memory-isolation) for details on how memories are stored and used.
+
+## Suggestions
+
+The `suggestions` property lists starter prompts shown as buttons on the agent's
+empty chat screen. Pressing one puts that text in the chat input ready to send,
+so write each entry as a whole question rather than a title:
+
+```yaml
+# agents/config.yml
+suggestions:
+  - What were the top 5 products last quarter?
+  - How many orders shipped yesterday?
+```
 
 ## Customize the agent
 

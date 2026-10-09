@@ -3,8 +3,8 @@ use crate::planner::filter::{BaseFilter, FilterGroupOperator, FilterItem};
 use crate::planner::query_tools::QueryTools;
 use crate::planner::DimensionSymbol;
 use crate::planner::GranularityHelper;
-use crate::planner::MemberSymbol;
 use crate::planner::TimeDimensionSymbol;
+use crate::planner::{MemberId, MemberSymbol};
 use cubenativeutils::CubeError;
 use std::collections::HashMap;
 use std::rc::Rc;
@@ -31,9 +31,9 @@ impl MatchState {
 pub struct DimensionMatcher<'a> {
     query_tools: Rc<QueryTools>,
     pre_aggregation: &'a CompiledPreAggregation,
-    pre_aggregation_dimensions: HashMap<String, bool>,
-    pre_aggregation_time_dimensions: HashMap<String, Vec<(Rc<TimeDimensionSymbol>, bool)>>,
-    pre_aggregation_segments: HashMap<String, bool>,
+    pre_aggregation_dimensions: HashMap<MemberId, bool>,
+    pre_aggregation_time_dimensions: HashMap<MemberId, Vec<(Rc<TimeDimensionSymbol>, bool)>>,
+    pre_aggregation_segments: HashMap<MemberId, bool>,
     result: MatchState,
 }
 
@@ -42,13 +42,13 @@ impl<'a> DimensionMatcher<'a> {
         let pre_aggregation_dimensions = pre_aggregation
             .dimensions
             .iter()
-            .map(|d| (d.full_name(), false))
+            .map(|d| (d.peel_refs().id().clone(), false))
             .collect();
         let mut pre_aggregation_time_dimensions =
-            HashMap::<String, Vec<(Rc<TimeDimensionSymbol>, bool)>>::new();
+            HashMap::<MemberId, Vec<(Rc<TimeDimensionSymbol>, bool)>>::new();
         for dim in pre_aggregation.time_dimensions.iter() {
             if let Ok(td) = dim.as_time_dimension() {
-                let key = td.base_symbol().full_name();
+                let key = td.base_symbol().peel_refs().id().clone();
                 pre_aggregation_time_dimensions
                     .entry(key)
                     .or_default()
@@ -58,7 +58,7 @@ impl<'a> DimensionMatcher<'a> {
         let pre_aggregation_segments = pre_aggregation
             .segments
             .iter()
-            .map(|s| (s.full_name(), false))
+            .map(|s| (s.id().clone(), false))
             .collect();
         Self {
             query_tools,
@@ -145,6 +145,12 @@ impl<'a> DimensionMatcher<'a> {
         self.result
     }
 
+    /// Whether the pre-aggregation can provide the member, without marking
+    /// any of its dimensions as used.
+    pub fn match_symbol(&mut self, symbol: &Rc<MemberSymbol>) -> Result<MatchState, CubeError> {
+        self.try_match_symbol(symbol, false)
+    }
+
     fn try_match_symbol(
         &mut self,
         symbol: &Rc<MemberSymbol>,
@@ -158,7 +164,7 @@ impl<'a> DimensionMatcher<'a> {
                 self.try_match_time_dimension(time_dimension, add_to_matched_dimension)
             }
             MemberSymbol::MemberExpression(me) => {
-                if let Some(found) = self.pre_aggregation_segments.get_mut(&me.full_name()) {
+                if let Some(found) = self.pre_aggregation_segments.get_mut(me.id()) {
                     if add_to_matched_dimension {
                         *found = true;
                     }
@@ -181,7 +187,21 @@ impl<'a> DimensionMatcher<'a> {
                     }
                 }
             }
-            _ => Ok(MatchState::NotMatched),
+            MemberSymbol::Ref(_) => {
+                if symbol.is_measure() || symbol.is_multi_stage() {
+                    return Ok(MatchState::NotMatched);
+                }
+                let mut result = MatchState::Full;
+                for dep in symbol.get_dependencies() {
+                    let dep_match = self.try_match_symbol(&dep, add_to_matched_dimension)?;
+                    if dep_match == MatchState::NotMatched {
+                        return Ok(MatchState::NotMatched);
+                    }
+                    result = result.combine(&dep_match);
+                }
+                Ok(result)
+            }
+            MemberSymbol::Measure(_) => Ok(MatchState::NotMatched),
         }
     }
 
@@ -190,10 +210,7 @@ impl<'a> DimensionMatcher<'a> {
         dimension: &DimensionSymbol,
         add_to_matched_dimension: bool,
     ) -> Result<MatchState, CubeError> {
-        if let Some(found) = self
-            .pre_aggregation_dimensions
-            .get_mut(&dimension.full_name())
-        {
+        if let Some(found) = self.pre_aggregation_dimensions.get_mut(dimension.id()) {
             if add_to_matched_dimension {
                 *found = true;
             }
@@ -239,21 +256,50 @@ impl<'a> DimensionMatcher<'a> {
         time_dimension: &TimeDimensionSymbol,
         add_to_matched_dimension: bool,
     ) -> Result<MatchState, CubeError> {
+        // Read from a stored column rather than computed, so nothing derives
+        // it from another bucket.
+        let is_sql_granularity = |td: &TimeDimensionSymbol| {
+            td.granularity_obj()
+                .as_ref()
+                .is_some_and(|granularity_obj| granularity_obj.calendar_sql().is_some())
+        };
+        let is_sql_defined_granularity = is_sql_granularity(time_dimension);
+
         let granularity = if self.pre_aggregation.allow_non_strict_date_range_match {
             time_dimension.granularity().clone()
         } else {
             time_dimension.rollup_granularity(self.query_tools.clone())?
         };
-        let base_symbol_name = time_dimension.base_symbol().full_name();
+
+        // Demoted, i.e. the range needs a finer grain than this one.
+        if is_sql_defined_granularity && granularity != *time_dimension.granularity() {
+            return Ok(MatchState::NotMatched);
+        }
+
+        // Stored time dimensions are keyed by the member a view member
+        // references.
+        let base_symbol_id = time_dimension.base_symbol().peel_refs().id().clone();
 
         if let Some(entries) = self
             .pre_aggregation_time_dimensions
-            .get_mut(&base_symbol_name)
+            .get_mut(&base_symbol_id)
         {
-            // First, look for exact granularity match
-            let exact_match = entries
-                .iter_mut()
-                .find(|(td, _)| granularity.is_none() || td.granularity() == &granularity);
+            // Stored columns are addressed by the member alone, so several
+            // granularities of one dimension are indistinguishable here, and
+            // whichever is left standing may be a `sql` one read as is.
+            if entries.len() > 1
+                && (is_sql_defined_granularity
+                    || entries.iter().any(|(td, _)| is_sql_granularity(td)))
+            {
+                return Ok(MatchState::NotMatched);
+            }
+            // First, look for exact granularity match. A stored `sql` grain is
+            // only ever itself: a default grain sharing its name is not it.
+            let exact_match = entries.iter_mut().find(|(td, _)| {
+                granularity.is_none()
+                    || (td.granularity() == &granularity
+                        && is_sql_granularity(td) == is_sql_defined_granularity)
+            });
             if let Some((_, matched)) = exact_match {
                 if add_to_matched_dimension {
                     *matched = true;
@@ -261,11 +307,15 @@ impl<'a> DimensionMatcher<'a> {
                 return Ok(MatchState::Full);
             }
 
+            if is_sql_defined_granularity {
+                return Ok(MatchState::NotMatched);
+            }
+
             // No exact match — find the finest pre-agg granularity that covers the query
             let mut best_match = MatchState::NotMatched;
             for (pre_agg_td, matched) in entries.iter_mut() {
                 let pre_aggr_granularity = pre_agg_td.granularity();
-                if pre_aggr_granularity.is_none() {
+                if pre_aggr_granularity.is_none() || is_sql_granularity(pre_agg_td) {
                     continue;
                 }
                 let min_granularity = GranularityHelper::min_granularity_for_time_dimensions(
@@ -361,6 +411,7 @@ mod tests {
     use crate::logical_plan::optimizers::pre_aggregation::{
         PreAggregationFullName, PreAggregationsCompiler,
     };
+    use crate::planner::CubeId;
     use crate::test_fixtures::cube_bridge::{
         MockMemberExpressionDefinition, MockMemberSql, MockSchema,
     };
@@ -395,7 +446,7 @@ mod tests {
         query_yaml: &str,
         extra_segments: Vec<OptionsMember>,
     ) -> MatchState {
-        let cube_names = vec!["orders".to_string()];
+        let cube_names = vec![CubeId::cube("orders")];
         let mut compiler =
             PreAggregationsCompiler::try_new(ctx.query_tools().clone(), &cube_names).unwrap();
         let name = PreAggregationFullName::new("orders".to_string(), pre_agg_name.to_string());

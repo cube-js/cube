@@ -448,6 +448,24 @@ cubes:
     }
   });
 
+  it.each([
+    ['a null list item', 'drill_members: [id, ~]'],
+    ['a number list item', 'drill_members: [id, 1]'],
+  ])('reports %s as a parse error in the file', async (_, member) => {
+    const { compiler } = prepareYamlCompiler(
+      `cubes:
+      - name: Products
+        sql: select * from tbl
+        measures:
+          - name: count
+            type: count
+            ${member}
+    `
+    );
+
+    await expect(compiler.compile()).rejects.toThrow(/main\.yml[\s\S]*Failed to parse Python expression/);
+  });
+
   it('unnamed measure', async () => {
     const { compiler } = prepareYamlCompiler(
       `cubes:

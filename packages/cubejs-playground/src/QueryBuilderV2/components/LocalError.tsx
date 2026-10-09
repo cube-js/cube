@@ -6,9 +6,8 @@ type Props = {
 };
 
 export function LocalError({ error }: Props) {
-  const message = useMemo(() => {
-    return error?.message ?? String(error) ?? 'Something went wrong.';
-  }, [error]);
+  const message = useMemo(() => error?.message ?? String(error) ?? 'Something went wrong.',
+    [error]);
 
   return (
     <Alert theme="danger">

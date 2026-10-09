@@ -1,0 +1,14 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "module": "commonjs",
+    // keeps jest-preset-angular on transpile-only: the sources of
+    // @cubejs-client/core are pulled in through moduleNameMapper and must not be
+    // type checked against this package's tsconfig
+    "isolatedModules": true,
+    "moduleResolution": "node",
+    "esModuleInterop": true,
+    "types": ["jest"]
+  },
+  "include": ["src/**/*.ts", "test/**/*.ts"]
+}

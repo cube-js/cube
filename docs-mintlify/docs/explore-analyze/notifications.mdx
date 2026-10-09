@@ -14,6 +14,8 @@ on the workbook to set up notifications.
 Notifications let you send email or Slack messages with a screenshot of a
 dashboard after each [scheduled refresh][ref-scheduled-refreshes]. This is useful
 for distributing regular updates to stakeholders without requiring them to log in.
+They can optionally carry a short [AI-generated summary](#ai-summary) of what
+changed since the previous notification.
 
 ## Creating a notification
 
@@ -31,12 +33,11 @@ scratch — the copy carries over the source schedule's notification settings.
 
 ### Delivery channel
 
-Toggle between two delivery channels:
+A schedule delivers to one channel, not both. Pick it with the **Send via**
+radio buttons:
 
-- **Email** — select recipients using a searchable picker with checkboxes. The
-  picker is grouped into **Users** and **User groups** sections, so you can add
-  individual workspace users, entire [user groups][ref-user-groups], or a mix of
-  both.
+- **Email** — sends to the [recipients](#recipients) you choose: individual
+  workspace users, [user groups][ref-user-groups], or a mix of both.
 - **Slack** — select a Slack channel to post to. Requires connecting your Slack
   workspace first (one-time OAuth flow via **Connect to Slack**). Once
   connected, select a channel from a searchable picker.
@@ -52,7 +53,51 @@ Select the format using the **Attach screenshot as** option. The same
 formats are available for ad-hoc [downloads from the dashboard
 header][ref-download].
 
-[ref-download]: /docs/explore-analyze/dashboards#download-as-png-or-pdf
+### AI summary
+
+Turn on **Include AI summary** to add a short "what changed" note to the body of
+the email or Slack message, above the screenshot. It is off by default.
+
+The note is written by the configured [AI agent][ref-agents] and is deliberately
+short — an opening line naming the most important change, then two to four
+bullets, each with a real number and its movement. It is meant to be read in a
+few seconds to decide whether to open the dashboard at all:
+
+```text
+WHAT CHANGED
+Order growth accelerated this week, driven mainly by a surge in returns
+outpacing overall gains.
+- Weekly orders: 416 last full week, up 20% from 346 the week before.
+- Returned orders: 42 last week, up 40% week over week (from 30).
+- Completed orders: 202 last week, up 13% week over week (from 179).
+```
+
+**What it compares against.** Where possible the note describes what changed
+since the *previous notification* for that recipient, rather than what changed
+inside the data — so a daily notification does not repeat the same sentence
+every morning. On the first send, or when there is no earlier note to compare
+with, it falls back to comparing recent periods (week over week, month over
+month) and says so rather than inventing a comparison.
+
+<Note>
+
+Each recipient's note is generated under **their own data access**, so it only
+describes rows that recipient is allowed to see. That also means it costs one
+agent run per recipient per send, which is why the option is off by default.
+
+</Note>
+
+If the summary can't be generated — the agent is unavailable, or the run takes
+too long — the notification is still delivered, without the note.
+
+<Tip>
+
+This is not the same as the [AI summary widget][ref-ai-widget], which lives on
+the dashboard, takes a prompt you write, and is cached for everyone who views
+it. The notification summary uses a fixed brief, is generated per recipient, and
+is never shown on the dashboard.
+
+</Tip>
 
 ### Removing a notification
 
@@ -75,16 +120,43 @@ from the published dashboard.
 
 ### Recipients
 
-The recipient picker is split into two sections:
+Under the **Recipients** heading there are two separate controls:
 
-- **Users** — individual workspace users.
-- **User groups** — [user groups][ref-user-groups]. A group is expanded to its
-  current members each time the notification is sent, so adding or removing
-  members takes effect on the next run without editing the schedule. The **User
-  groups** section only appears when your workspace has at least one user group.
+- **Users** — a searchable picker for individual workspace users.
+- **User groups** — a dropdown holding an expandable checklist of
+  [user groups][ref-user-groups] and their members. It appears only when your
+  workspace has at least one user group.
+
+A group is expanded to its current members each time the notification is sent,
+so adding or removing members takes effect on the next run without editing the
+schedule. The number beside a group's name counts the members it can currently
+email, so a group can show fewer than its full membership — anyone without an
+email address is left out of both the count and the list.
 
 A recipient who is selected individually and also belongs to a selected group is
 emailed only once.
+
+#### Excluding individual group members
+
+Tick a group to notify everyone in it, then expand it and untick anyone who
+should be skipped. Those people are stored as exceptions to that group on this
+schedule — the group stays selected and keeps picking up new members, but the
+excluded members are left out of every run.
+
+One search box filters both levels at once, so typing a person's name narrows
+the list to the groups that would notify them, with that person shown under
+each.
+
+Exceptions are saved with the rest of the form, not applied as you click. A few
+details worth knowing:
+
+- Unticking a group's **last** remaining member unticks the whole group.
+- Exceptions belong to one schedule and one group. Excluding someone from a
+  group here does not affect the group anywhere else, or any other schedule.
+- An exception is not a block on the person. If they are **also** selected under
+  **Users**, or have [subscribed themselves][ref-subscribe], they still get the
+  email — a direct recipient row and group membership are independent, and
+  either one alone delivers.
 
 ## Slack notifications
 
@@ -103,8 +175,11 @@ Before you can send Slack notifications, connect your Slack workspace:
 This is a one-time setup. Once connected, you can select any channel your Slack
 workspace has access to.
 
+[ref-download]: /docs/explore-analyze/dashboards#download-as-png-or-pdf
 [ref-roles]: /admin/users-and-permissions/roles-and-permissions
 [ref-scheduled-refreshes]: /docs/explore-analyze/scheduled-refreshes
 [ref-duplicate]: /docs/explore-analyze/scheduled-refreshes#duplicating-a-schedule
 [ref-user-groups]: /admin/users-and-permissions/user-groups
 [ref-subscribe]: /docs/explore-analyze/scheduled-refreshes#subscribing-to-notifications
+[ref-agents]: /admin/ai
+[ref-ai-widget]: /docs/explore-analyze/dashboards/widgets/ai-summary

@@ -6,13 +6,12 @@ import { useEvent } from './event';
 
 export function useRawFilter() {
   const collator = useMemo(
-    () =>
-      new Intl.Collator('US-en', {
-        usage: 'search',
-        sensitivity: 'base',
-        ignorePunctuation: true,
-        localeMatcher: 'lookup',
-      }),
+    () => new Intl.Collator('US-en', {
+      usage: 'search',
+      sensitivity: 'base',
+      ignorePunctuation: true,
+      localeMatcher: 'lookup',
+    }),
     []
   );
 

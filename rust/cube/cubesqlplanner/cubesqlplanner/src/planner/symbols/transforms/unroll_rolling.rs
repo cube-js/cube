@@ -44,3 +44,17 @@ pub fn unroll_rolling(measure: &MeasureSymbol) -> Rc<MeasureSymbol> {
         render_modifier: None,
     })
 }
+
+/// Returns a copy of the measure with the rolling window dropped and
+/// the rest of its definition — aggregation kind, multi-stage grain —
+/// left in place. What remains is the measure as it would have been
+/// declared without a window, which is what a window that resolves to
+/// a single bucket computes.
+pub fn strip_rolling_window(measure: &MeasureSymbol) -> Rc<MeasureSymbol> {
+    let mut result = measure.clone();
+    result.rolling_window = None;
+    // The render modifier is stamped against the rolling form and has
+    // nothing to modify once the window is gone.
+    result.render_modifier = None;
+    Rc::new(result)
+}

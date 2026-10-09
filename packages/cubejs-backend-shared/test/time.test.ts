@@ -2,6 +2,10 @@ import moment from 'moment-timezone';
 import {
   localTimestampToUtc,
   timeSeries,
+  timeSeriesBoundaries,
+  TIME_SERIES,
+  QueryDateRange,
+  TimeSeriesOptions,
   isPredefinedGranularity,
   timeSeriesFromCustomInterval,
   parseUtcIntoLocalDate,
@@ -250,6 +254,99 @@ describe('timeSeries', () => {
     expect(() => {
       timeSeriesFromCustomInterval('10 minutes 15 seconds', ['1970-01-01', '2021-01-02'], moment('2021-02-01 09:59:45'));
     }).toThrowError(/The count of generated date ranges.*for the request.*is over limit/);
+  });
+});
+
+describe('timeSeriesBoundaries', () => {
+  const granularities = Object.keys(TIME_SERIES);
+  const ranges: QueryDateRange[] = [
+    ['2024-02-29T12:34:56.123456', '2024-02-29T12:34:56.123456'],
+    ['2024-01-31T23:59:58.123456', '2024-02-01T00:00:01.999999'],
+    ['2024-02-28T23:59:58.123456', '2024-02-29T00:00:01.999999'],
+    ['2024-02-29T23:59:58.123456', '2024-03-01T00:00:01.999999'],
+    ['2024-03-31T23:59:58.123456', '2024-04-01T00:00:01.999999'],
+    ['2024-12-31T23:59:58.123456', '2025-01-01T00:00:01.999999'],
+  ];
+
+  describe.each([3, 6])('precision %i', (timestampPrecision) => {
+    it.each(granularities)('matches full series for %s across calendar boundaries', (granularity) => {
+      for (const dateRange of ranges) {
+        const options = { timestampPrecision };
+        const series = timeSeries(granularity, dateRange, options);
+        expect(timeSeriesBoundaries(granularity, dateRange, options)).toEqual([series[0], series[series.length - 1]]);
+      }
+    });
+
+    it.each(granularities)('matches full series for %s over multiple partitions', (granularity) => {
+      const start = moment('2023-12-15T12:34:56.123');
+      const dateRange: QueryDateRange = [start.format(), start.clone().add(25, granularity as moment.unitOfTime.DurationConstructor).format()];
+      const options = { timestampPrecision };
+      const series = timeSeries(granularity, dateRange, options);
+      expect(series.length).toBeGreaterThan(1);
+      expect(timeSeriesBoundaries(granularity, dateRange, options)).toEqual([series[0], series[series.length - 1]]);
+    });
+  });
+
+  it('defaults to millisecond precision', () => {
+    const series = timeSeries('day', ranges[0]);
+    expect(timeSeriesBoundaries('day', ranges[0])).toEqual([series[0], series[0]]);
+  });
+
+  it.each([
+    ['decade', ['2020-01-01', '2030-01-01'], { timestampPrecision: 3 }],
+    ['day', ['2021-01-01', '2021-01-02'], { timestampPrecision: 0 }],
+    ['day', ['2021-01-01', '2021-01-02'], {}],
+    ['second', ['1970-01-01', '2021-01-02'], { timestampPrecision: 3 }],
+    ['day', ['1800-01-01', '2024-01-01'], { timestampPrecision: 6 }],
+  ] as [string, QueryDateRange, TimeSeriesOptions][])('preserves validation errors: %s %j %j', (granularity, dateRange, options) => {
+    let error: Error;
+
+    try {
+      timeSeries(granularity, dateRange, options);
+    } catch (e) {
+      error = e as Error;
+    }
+    expect(error!).toBeInstanceOf(Error);
+    expect(() => timeSeriesBoundaries(granularity, dateRange, options)).toThrow(error!);
+  });
+
+  it('preserves the existing limit calculation at exactly 50,000 intervals', () => {
+    const dateRange: QueryDateRange = ['2024-01-01T00:00:00', '2024-01-01T13:53:20'];
+    const series = timeSeries('second', dateRange);
+    expect(series).toHaveLength(50001);
+    expect(timeSeriesBoundaries('second', dateRange)).toEqual([series[0], series[50000]]);
+    expect(() => timeSeriesBoundaries('second', [dateRange[0], '2024-01-01T13:53:21'])).toThrow(/over limit/);
+  });
+
+  it.each(granularities)('preserves reversed and invalid ranges for %s', (granularity) => {
+    const unusualRanges: QueryDateRange[] = [
+      ['2024-03-01', '2024-02-28'],
+      ['2024-02-29T12:34:56.999', '2024-02-29T12:34:56.001'],
+      ['2024-02-30', '2024-03-01'],
+      ['2024-02-28', '2024-02-30'],
+      ['2024-02-30', '2024-02-30'],
+    ];
+
+    for (const dateRange of unusualRanges) {
+      const series = timeSeries(granularity, dateRange);
+      expect(timeSeriesBoundaries(granularity, dateRange)).toEqual([series[0], series[series.length - 1]]);
+    }
+  });
+
+  it('generates only the two endpoint partitions for a long range', () => {
+    const generate = jest.spyOn(TIME_SERIES, 'day');
+
+    try {
+      timeSeriesBoundaries('day', ['2021-01-01', '2024-01-05']);
+      expect(generate).toHaveBeenCalledTimes(2);
+
+      for (const [range] of generate.mock.calls) {
+        expect(range.start.valueOf()).toBe(range.end.valueOf());
+      }
+      expect(generate.mock.results.map(result => result.value.length)).toEqual([1, 1]);
+    } finally {
+      generate.mockRestore();
+    }
   });
 });
 

@@ -222,6 +222,8 @@ When Cube token authentication is used:
 | `sessionSettings.userAttributes` | array | No | Array of `{name, value}` pairs for row-level security. Not allowed with `internalId`. |
 | `sessionSettings.groups` | string[] | No | Array of group names the user belongs to. Not allowed with `internalId`. |
 | `sessionSettings.securityContext` | object | No | Custom security context object passed to Cube queries. Not allowed with `internalId`. |
+| `sessionSettings.allowChatWorkspaceAuthoring` | boolean | No | Restricts this session from creating or modifying persistent workspace content when set to `false`. Ad-hoc analysis and inline tables/charts remain available, but the agent cannot save or update standalone explorations/reports, create or modify workbooks, or create or publish dashboards. Omitted or `true` preserves the user's role-derived authoring capabilities and never grants more. |
+| `sessionSettings.timezone` | string | No | IANA time zone of this session's user, e.g. `America/New_York`. Queries the agent runs are executed in it. Must be set explicitly — never inferred from `securityContext` or `userAttributes`. Omitted or unusable falls back to the deployment's default time zone rather than failing the session. |
 | `activeBranchName` | string | No | Name of a development branch to use for the chat session. When provided, queries run against the specified branch instead of the main branch. |
 | `isDefaultBranch` | boolean | No | Whether the specified `activeBranchName` is the default branch. Defaults to `true` when `activeBranchName` is not set, and `false` when it is. Set to `true` if passing the main/production branch name. |
 
@@ -319,7 +321,8 @@ is still active on the thread, the API resubscribes the new request to the
 existing stream instead of starting a new one. This is useful for retrying
 after a dropped connection: the client can replay the same request and resume
 receiving the stream from the current point without producing duplicate
-assistant messages.
+assistant messages. If the message was [suspended](#suspended-runs) by a server
+restart, the same request resumes it.
 
 Without a matching `messageId`, sending a new message to a thread that is
 already streaming returns a `Streaming for thread is in progress` error.
@@ -327,13 +330,14 @@ already streaming returns a `Streaming for thread is in progress` error.
 ## Response Format
 
 <Info>
-The API returns streaming JSON responses. Each line contains a separate JSON object representing a chat message or state update.
+The API returns streaming JSON responses. Each line contains a separate JSON object representing a chat message, a state update, or a usage frame.
 </Info>
 
 ### Response Fields
 
-- **`id`** (string): Unique message identifier
-- **`role`** (string): Message sender: `"user"` or `"assistant"`
+- **`id`** (string): Unique message identifier. Sentinel values: `__cutoff__`, `__state__`, `__aborted__`, `__suspended__`, and `__usage__`
+- **`role`** (string): Message sender: `"user"` or `"assistant"`. Absent on error lines and on the `__usage__` frame
+- **`error`** (string): Present on the `__aborted__` and `__suspended__` frames, and on error lines — mid-stream failures arrive as a standalone `{ "error": "<message>" }` line rather than a non-200 status, and such a line carries no message fields
 - **`content`** (string): Message content (streamed incrementally for assistant messages)
 - **`thinking`** (string): Agent's internal reasoning process (visible in development mode)
 - **`toolCall`** (object): Information about tool calls made by the agent during processing
@@ -343,10 +347,15 @@ The API returns streaming JSON responses. Each line contains a separate JSON obj
 - **`graphPath`** (string[]): Identifies which node of the agent graph produced this message. For example, `["cube_data_analyst_agent"]` for the main agent node or `["cube_data_analyst_agent", "tools"]` for tool calls. Messages with `graphPath[0] === "final"` represent the final consolidated answer.
 - **`isDelta`** (boolean): Whether this is an incremental content update
 - **`isInProcess`** (boolean): Whether the message is still being generated
-- **`sort`** (number): Message ordering sequence number
+- **`sort`** (number): Message ordering sequence number. Absent on the `__usage__` frame
 - **`state`** (object): Current streaming state information
+- **`type`** (string): Present only on a terminal sentinel: `"abort"` on `__aborted__`, `"suspend"` on `__suspended__`, `"usage"` on `__usage__`
+- **`code`** (string): Present only on the `__aborted__` (`"chat_aborted"`) and `__suspended__` (`"chat_suspended"`) frames
+- **`retryable`** (boolean): Present only on the `__suspended__` frame, always `true`
+- **`messageId`** (string): Present only on the `__suspended__` frame — the `messageId` of the suspended turn, to resend
+- **`usage`** (object): Present only on the `__usage__` frame — `models` (string[]), `llmCalls`, `inputTokens`, `outputTokens`, `cacheWriteTokens`, `cacheReadTokens`, `totalTokens` (numbers)
 
-
+The stream always ends with one additional frame, `id: "__usage__"` (see the Usage Message example below). Treat it like the `__cutoff__`, `__state__`, `__aborted__` and `__suspended__` frames: filter it out of anything rendered as a chat message.
 
 ### Response Examples
 
@@ -505,7 +514,7 @@ The API returns a series of JSON objects, each on a separate line. Here's what a
 }
 ```
 
-**Final State Update:**
+**Thread State Snapshot:**
 ```json
 {
   "id": "__state__",
@@ -523,6 +532,97 @@ The API returns a series of JSON objects, each on a separate line. Here's what a
   "isDelta": false,
   "sort": 10
 }
+```
+
+**Usage Message:**
+```json
+{
+  "id": "__usage__",
+  "type": "usage",
+  "usage": {
+    "models": ["claude-sonnet-5"],
+    "llmCalls": 7,
+    "inputTokens": 18412,
+    "outputTokens": 2280,
+    "cacheWriteTokens": 31006,
+    "cacheReadTokens": 264118,
+    "totalTokens": 315816
+  }
+}
+```
+
+This is always the last frame on the stream, sent whether the run completed, was aborted, or errored — when the request is rejected before any LLM call, the counts are all `0` and `models` is empty. `usage.models` lists the distinct models used, and for a [BYOM](/admin/ai/bring-your-own-model) model is normalized to strip infrastructure detail (e.g. a Bedrock inference-profile ARN is reduced to its model name) rather than the raw configured identifier. The frame reports tokens only — there is no cost field.
+
+### Suspended Runs
+
+When the server running a chat shuts down (for example, during a deployment or
+a scale-down), the run is stopped at the next step boundary with its progress
+saved, and the stream emits a `__suspended__` frame before it closes:
+
+```json
+{
+  "id": "__suspended__",
+  "type": "suspend",
+  "code": "chat_suspended",
+  "retryable": true,
+  "messageId": "1732512345678-message",
+  "error": "The server restarted before the agent finished responding; retry the same request to resume"
+}
+```
+
+The HTTP status is still `200`, and the content received so far is partial.
+Scan the stream for this frame rather than checking only the last line — the
+`__usage__` frame still follows it.
+
+To continue the turn, resend the **same** request — the same `chatId`, `input`
+and `messageId`. If the original request had no `chatId`, add the one returned
+as `state.chatId` on its `__cutoff__` frame. The run picks up where it stopped
+instead of starting over: the response replays the thread and then streams the
+rest of the turn. `input`
+may be omitted — `chatId` plus the suspended `messageId` is enough. Sending a
+different message instead ends the suspended turn, and the new run builds on
+what that turn already did. A suspended turn stays resumable for 24 hours.
+After that, resending the request neither reruns the turn nor fails: it returns
+the thread as it stands, with the partial turn, and a new message continues
+from there.
+
+A read of the thread (a request with `chatId` but no `input` and no
+`messageId`) reports a pending suspension as `state.suspended.messageId` on the
+`__cutoff__` frame, so a client that lost the stream can still find the turn to
+resume.
+
+<Tip>
+
+Always send a `messageId` (see [Idempotency](#idempotency)) so a suspended turn
+can be resumed with the exact same request.
+
+</Tip>
+
+```javascript
+async function streamChat(body) {
+  const response = await fetch(CHAT_API_URL, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Authorization: `Api-Key ${API_KEY}` },
+    body: JSON.stringify(body),
+  });
+
+  let suspended = null;
+  for await (const line of readLines(response.body)) {
+    if (!line) continue;
+    const msg = JSON.parse(line);
+    // A new thread's id arrives on __cutoff__; keep it so a resend resumes that thread
+    if (msg.id === "__cutoff__" && msg.state?.chatId) body.chatId = msg.state.chatId;
+    if (msg.id === "__suspended__") suspended = msg;
+    // ...handle other messages. A resumed response replays the thread first,
+    // so upsert by `id` (don't append) before rendering
+  }
+  return suspended;
+}
+
+const body = { input: "What is our revenue last month?", messageId: `${Date.now()}-message`, sessionSettings };
+// Resend the same body until the turn completes (a few attempts at most)
+let attempts = 0;
+while ((await streamChat(body)) && ++attempts < 3) {}
 ```
 
 ### Getting the Final Assistant Message
@@ -992,11 +1092,26 @@ Supports the same authentication methods as the Chat API: an
 
 <Info>
 
-A successful cancellation is indicated solely by the `204 No Content` status —
+The abort endpoint answers `204 No Content` as soon as the abort is published;
 the response has no body. The aborted `stream-chat-state` request itself does
-not fail with an HTTP error: the streaming response already returned `200 OK`
-when the stream opened, so treat the abort endpoint's `204` as the
-confirmation that the stream was aborted.
+not fail with an HTTP error — the streaming response already returned `200 OK`
+when the stream opened. Instead, that stream emits a terminal frame before it
+closes:
+
+```json
+{
+  "id": "__aborted__",
+  "type": "abort",
+  "code": "chat_aborted",
+  "error": "Chat streaming was aborted before the agent finished responding"
+}
+```
+
+Its presence means the content received is partial. Scan the stream for it
+rather than checking only the last line — the run winds down concurrently, so
+a late message, the `__state__` snapshot and the `__usage__` frame can still
+follow it. Calling the abort endpoint again, or on a finished chat, also
+answers `204`.
 
 </Info>
 

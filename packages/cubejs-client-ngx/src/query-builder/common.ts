@@ -1,17 +1,17 @@
 import { BehaviorSubject } from 'rxjs';
 
 export class StateSubject<T = any> {
-  subject: BehaviorSubject<T>;
+  public subject: BehaviorSubject<T>;
 
-  constructor(value: T) {
+  public constructor(value: T) {
     this.subject = new BehaviorSubject(value);
   }
 
-  get() {
+  public get() {
     return this.subject.getValue();
   }
 
-  set(value: T) {
+  public set(value: T) {
     this.subject.next(value);
   }
 }

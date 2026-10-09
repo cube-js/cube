@@ -23,27 +23,24 @@ type QueryBuilderProps = {
   | 'schemaVersion'
   | 'onSchemaChange'
   | 'extra'
-> &
-  Pick<SecurityContextProps, 'onTokenPayloadChange'> &
-  Pick<SecurityContextProviderProps, 'tokenUpdater'> &
-  Pick<QueryTabsProps, 'onTabChange'>;
+>
+  & Pick<SecurityContextProps, 'onTokenPayloadChange'>
+  & Pick<SecurityContextProviderProps, 'tokenUpdater'>
+  & Pick<QueryTabsProps, 'onTabChange'>;
 
 export const QueryBuilder = memo(
-  function QueryBuilder(props: QueryBuilderProps) {
-    return (
-      <PlaygroundWrapper
-        identifier={props.identifier}
-        token={props.token}
-        apiUrl={props.apiUrl}
-        tokenUpdater={props.tokenUpdater}
-        playgroundContext={props.playgroundContext}
-        onTokenPayloadChange={props.onTokenPayloadChange}
-      >
-        <QueryBuilderContainer {...props} />
-      </PlaygroundWrapper>
-    );
-  },
-  (prevProps, nextProps) => {
-    return equals(prevProps, nextProps);
-  }
+  (props: QueryBuilderProps) => (
+    <PlaygroundWrapper
+      identifier={props.identifier}
+      token={props.token}
+      apiUrl={props.apiUrl}
+      tokenUpdater={props.tokenUpdater}
+      playgroundContext={props.playgroundContext}
+      onTokenPayloadChange={props.onTokenPayloadChange}
+    >
+      <QueryBuilderContainer {...props} />
+    </PlaygroundWrapper>
+  ),
+  (prevProps, nextProps) => equals(prevProps, nextProps)
+  
 );

@@ -138,6 +138,8 @@ enum Command {
     DataModel(commands::data_model::Args),
     /// Run a deployment's dbt sync (pull dbt models in as cubes)
     Dbt(commands::dbt::Args),
+    /// Run and inspect AI agent evals
+    Evals(commands::evals::Args),
     /// Manage deployment environments and environment tokens
     #[command(alias = "environment", alias = "envs")]
     Environments(commands::environments::Args),
@@ -229,6 +231,7 @@ impl Command {
             Github(_) => "github",
             DataModel(_) => "data-model",
             Dbt(_) => "dbt",
+            Evals(_) => "evals",
             Environments(_) => "environments",
             Variables(_) => "variables",
             Folders(_) => "folders",
@@ -340,6 +343,7 @@ async fn run(global: GlobalArgs, command: Command) -> Result<()> {
         Github(args) => commands::github::command(args, &ctx).await,
         DataModel(args) => commands::data_model::command(args, &ctx).await,
         Dbt(args) => commands::dbt::command(args, &ctx).await,
+        Evals(args) => commands::evals::command(args, &ctx).await,
         Environments(args) => commands::environments::command(args, &ctx).await,
         Variables(args) => commands::variables::command(args, &ctx).await,
         Folders(args) => commands::folders::command(args, &ctx).await,

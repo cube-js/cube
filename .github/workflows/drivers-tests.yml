@@ -5,6 +5,7 @@ on:
     branches:
       - 'master'
     paths:
+      - '.github/actions/setup-yarn-1/**'
       - '.github/workflows/drivers-tests.yml'
 
       - 'packages/cubejs-testing-drivers/**'
@@ -37,6 +38,7 @@ on:
       - 'rust/cube/**'
   pull_request:
     paths:
+      - '.github/actions/setup-yarn-1/**'
       - '.github/workflows/drivers-tests.yml'
 
       - 'packages/cubejs-testing-drivers/**'
@@ -78,13 +80,16 @@ on:
           - 'true'
           - 'false'
 
+permissions:
+  contents: read
+
 jobs:
   latest-tag-sha:
     runs-on: ubuntu-24.04
     outputs:
       sha: ${{ steps.get-tag.outputs.sha }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
       - id: git-log
@@ -108,32 +113,32 @@ jobs:
     name: Build native Linux ${{ matrix.node-version }} ${{ matrix.target }} Python ${{ matrix.python-version }}
     strategy:
       matrix:
-        node-version: [ 24.18.0 ]
+        node-version: [ 24.21.0 ]
         python-version: [ "fallback" ]
         target: [ "x86_64-unknown-linux-gnu" ]
       fail-fast: false
     container:
-      image: cubejs/rust-cross:${{ matrix.target }}-31072025
+      image: cubejs/rust-cross:${{ matrix.target }}-08092026
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
       - name: Install Rust
         uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
-          toolchain: 1.90.0
+          toolchain: 1.98.1
           # override: true # this is by default on
           rustflags: ""
           components: rustfmt
           target: ${{ matrix.target }}
       - name: Install Node.js ${{ matrix.node-version }}
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
           node-version: ${{ matrix.node-version }}
       - name: Install Yarn
         run: npm install -g yarn
       - name: Set Yarn version
-        run: yarn policies set-version v1.22.22
+        uses: ./.github/actions/setup-yarn-1
       - name: Install cargo-cp-artifact
         run: npm install -g cargo-cp-artifact@0.1
       - uses: Swatinem/rust-cache@v2
@@ -148,9 +153,7 @@ jobs:
         run: cd packages/cubejs-backend-native && npm run native:build-release
       - name: Setup cross compilation
         if: (matrix.target == 'aarch64-unknown-linux-gnu')
-        uses: allenevans/set-env@v4.0.0
-        with:
-          PYO3_CROSS_PYTHON_VERSION: ${{ matrix.python-version }}
+        run: echo "PYO3_CROSS_PYTHON_VERSION=${{ matrix.python-version }}" >> "$GITHUB_ENV"
       - name: Build native (with Python)
         if: (matrix.python-version != 'fallback')
         env:
@@ -158,7 +161,7 @@ jobs:
           CARGO_BUILD_TARGET: ${{ matrix.target }}
         run: cd packages/cubejs-backend-native && npm run native:build-release-python
       - name: Upload native build
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: backend-native
           path: packages/cubejs-backend-native/index.node
@@ -172,19 +175,19 @@ jobs:
       DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
     steps:
       - name: Check out the repo
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       # Building docker
       - name: Login to DockerHub
-        uses: docker/login-action@v3
+        uses: docker/login-action@v4
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
         if: (env.DOCKERHUB_USERNAME != '')
       - name: Set up QEMU
-        uses: docker/setup-qemu-action@v3
+        uses: docker/setup-qemu-action@v4
       - name: Download native build
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: backend-native
           path: packages/cubejs-backend-native
@@ -194,12 +197,21 @@ jobs:
           grep -v -E "packages/cubejs-backend-native/((native)|(index.node))" .dockerignore > .dockerignore.tmp
           mv .dockerignore.tmp .dockerignore
       - name: Build and push
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           context: .
           file: ./packages/cubejs-docker/testing-drivers.Dockerfile
           tags: cubejs/cube:testing-drivers
           push: ${{ (env.DOCKERHUB_USERNAME != '') }}
+      - name: Verify JDBC runtime
+        timeout-minutes: 1
+        run: |
+          docker run --rm --network none --workdir /cubejs --entrypoint node cubejs/cube:testing-drivers -e '
+            const java = require("java");
+            console.log("Java version:", java.callStaticMethodSync("java.lang.System", "getProperty", "java.version"));
+            // JVM threads keep Node alive after the check.
+            process.exit(0);
+          '
       - name: Save Docker image as artifact
         run: |
           IMAGE_TAG=cubejs/cube:testing-drivers
@@ -207,7 +219,7 @@ jobs:
           gzip image.tar
         continue-on-error: true
       - name: Upload Docker image artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: docker-image
           path: image.tar.gz
@@ -218,7 +230,7 @@ jobs:
       id-token: write   # Needed for OIDC+AWS
       contents: read
 
-    timeout-minutes: 30
+    timeout-minutes: 40
     needs: [latest-tag-sha, build]
     if: (needs['latest-tag-sha'].outputs.sha != github.sha)
     env:
@@ -237,7 +249,6 @@ jobs:
         redshift
         redshift-export-bucket-s3
         snowflake
-        snowflake-encrypted-pk
         snowflake-export-bucket-s3
         snowflake-export-bucket-s3-via-storage-integration-iam-roles
         snowflake-export-bucket-s3-prefix
@@ -284,7 +295,6 @@ jobs:
           - redshift
           - redshift-export-bucket-s3
           - snowflake
-          - snowflake-encrypted-pk
           - snowflake-export-bucket-s3
           - snowflake-export-bucket-s3-via-storage-integration-iam-roles
           - snowflake-export-bucket-s3-prefix
@@ -326,15 +336,15 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Install Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
           node-version-file: '.nvmrc'
 
       - name: Configure `yarn`
-        run: yarn policies set-version v1.22.22
+        uses: ./.github/actions/setup-yarn-1
 
       - name: Get yarn cache directory path
         id: yarn-cache-dir-path
@@ -342,7 +352,7 @@ jobs:
         shell: bash
       - name: Restore yarn cache
         # We don't want to save it on finish, restore only!
-        uses: actions/cache/restore@v4
+        uses: actions/cache/restore@v6
         with:
           path: ${{ steps.yarn-cache-dir-path.outputs.dir }}
           key: ${{ runner.os }}-yarn-${{ hashFiles('**/yarn.lock') }}
@@ -350,14 +360,14 @@ jobs:
             ${{ runner.os }}-yarn-
 
       - name: Install dependencies
-        uses: nick-fields/retry@v3
+        uses: nick-fields/retry@v4
         env:
           CUBESTORE_SKIP_POST_INSTALL: true
         with:
           max_attempts: 3
-          retry_on: error
+          retry_on: any
           retry_wait_seconds: 15
-          timeout_minutes: 20
+          timeout_minutes: 10
           command: yarn install --frozen-lockfile
 
       - name: Build client
@@ -372,7 +382,7 @@ jobs:
           yarn tsc
 
       - name: Download Docker image artifact
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: docker-image
 
@@ -382,7 +392,7 @@ jobs:
           docker load -i image.tar
 
       - name: Configure AWS credentials via IRSA
-        uses: aws-actions/configure-aws-credentials@v4
+        uses: aws-actions/configure-aws-credentials@v6
         with:
           role-to-assume: ${{ secrets.DRIVERS_TESTS_AWS_ROLE_ARN_FOR_SNOWFLAKE }}
           aws-region: us-west-1
@@ -391,7 +401,7 @@ jobs:
           env.DRIVERS_TESTS_ATHENA_CUBEJS_AWS_KEY != '' && matrix.database == 'snowflake-export-bucket-s3-via-storage-integration-iam-roles'
 
       - name: Run tests
-        uses: nick-fields/retry@v3
+        uses: nick-fields/retry@v4
         # It's enough to test for any one secret because they are set all at once or not set all
         if: |
           (contains(env.CLOUD_DATABASES, matrix.database) && env.DRIVERS_TESTS_ATHENA_CUBEJS_AWS_KEY != '') ||
@@ -429,7 +439,6 @@ jobs:
 
           # Snowflake
           DRIVERS_TESTS_CUBEJS_DB_SNOWFLAKE_USER: ${{ secrets.DRIVERS_TESTS_CUBEJS_DB_SNOWFLAKE_USER }}
-          DRIVERS_TESTS_CUBEJS_DB_SNOWFLAKE_PASS: ${{ secrets.DRIVERS_TESTS_CUBEJS_DB_SNOWFLAKE_PASS }}
           DRIVERS_TESTS_CUBEJS_DB_SNOWFLAKE_PRIVATE_KEY: ${{ secrets.DRIVERS_TESTS_CUBEJS_DB_SNOWFLAKE_PRIVATE_KEY }}
           DRIVERS_TESTS_CUBEJS_DB_SNOWFLAKE_PRIVATE_KEY_PASS: ${{ secrets.DRIVERS_TESTS_CUBEJS_DB_SNOWFLAKE_PRIVATE_KEY_PASS }}
         with:

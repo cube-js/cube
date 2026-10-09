@@ -178,6 +178,58 @@ pub fn nonempty_ref(s: &str) -> Result<String, String> {
     Ok(s.to_string())
 }
 
+/// Reject a supplied-but-empty file path while preserving meaningful whitespace in
+/// names that really contain it. `-` remains valid for commands that use it as stdin.
+pub fn nonempty_path(s: &str) -> Result<String, String> {
+    if s.trim().is_empty() {
+        return Err(format!(
+            "{EMPTY_VALUE_REFUSED} names no file to read — pass a path or `-` for stdin"
+        ));
+    }
+
+    Ok(s.to_string())
+}
+
+/// Reject an empty path that is interpreted by the server rather than read locally.
+pub fn nonempty_repo_path(s: &str) -> Result<String, String> {
+    if s.trim().is_empty() {
+        return Err(format!(
+            "{EMPTY_VALUE_REFUSED} names no file in the deployment's data model repository"
+        ));
+    }
+
+    Ok(s.to_string())
+}
+
+/// `nonempty` with a message specific to a LIST FILTER — `dbt history --status`, and
+/// anything that follows it — where an empty value is neither a filter nor nothing at
+/// all: `push` sends `status=`, and every runs / no runs / a complaint are three answers
+/// a server could reasonably give it.
+///
+/// The reachable case is the same one the two above were written for: a CI script whose
+/// `$STATUS` did not expand, where the run this refuses would otherwise have listed
+/// whatever the server made of an empty field.
+///
+/// Padding is TRIMMED here, where the two above deliberately keep it — see
+/// `branch_or_placeholder` for why they must. The difference is what the value is: a
+/// branch name is the caller's own, `--branch '  x  '` can name a branch that really
+/// exists, and only the caller knows. A filter is one word out of a vocabulary the
+/// server publishes, and no member of it has a space in it — so padding cannot be
+/// meaningful, and passing it on lands in the very failure this argument's help text
+/// was written to prevent: an empty table that reads as an answer rather than as a
+/// value nothing could match. `$(jq -r …)` and a value read out of a file are the
+/// ordinary ways to acquire it.
+pub fn nonempty_filter(s: &str) -> Result<String, String> {
+    if s.trim().is_empty() {
+        return Err(format!(
+            "{EMPTY_VALUE_REFUSED} selects nothing — and it is not dropped, but sent as an \
+             empty filter, leaving what that matches to the server rather than to you"
+        ));
+    }
+
+    Ok(s.trim().to_string())
+}
+
 /// A branch name to PRINT, when the payload might not have carried one.
 ///
 /// Only for prose and suggested commands, never for a JSON document: a gate reading
@@ -233,6 +285,22 @@ pub const COMPLAINT_LIMIT: usize = 120;
 /// runs well past 120 characters, and cutting it there would leave a gate's log saying
 /// that something failed without saying what.
 pub const REASON_LIMIT: usize = 800;
+
+/// Server text as a terminal may safely show it. Newlines and tabs survive for
+/// multi-line log output; other control characters, including ESC, do not.
+pub fn printable(text: &str) -> String {
+    text.chars()
+        .filter(|character| !character.is_control() || *character == '\n' || *character == '\t')
+        .collect()
+}
+
+/// How much of one server-supplied value a table cell keeps.
+pub const CELL_LIMIT: usize = 120;
+
+/// One bounded, printable line of server text for table cells and progress labels.
+pub fn one_cell(text: &str) -> String {
+    one_line(&printable(text), CELL_LIMIT)
+}
 
 /// Squash arbitrary server text into a single line.
 ///
@@ -368,6 +436,14 @@ mod tests {
         let cut = one_line(&long, 10);
         assert_eq!(cut.chars().count(), 11, "10 chars plus the ellipsis");
         assert!(cut.starts_with("xxxxxxxxxx"));
+    }
+
+    #[test]
+    fn table_cells_are_single_line_and_terminal_safe() {
+        assert_eq!(one_cell("first\n\u{1b}[2Jsecond"), "first [2Jsecond");
+        let bounded = one_cell(&"x".repeat(200));
+        assert_eq!(bounded.chars().count(), CELL_LIMIT + 1);
+        assert!(bounded.ends_with('…'));
     }
 
     #[test]
@@ -525,6 +601,31 @@ mod tests {
         assert!(nonempty_ref("main").is_ok());
         assert!(nonempty_ref("").is_err());
         assert!(nonempty_ref("\t").is_err());
+        assert_eq!(nonempty_path("manifest.json").unwrap(), "manifest.json");
+        assert_eq!(nonempty_path("-").unwrap(), "-");
+        assert!(nonempty_path("").is_err());
+        assert!(nonempty_path("  ").is_err());
+        assert_eq!(
+            nonempty_repo_path("eval_questions/a.yml").unwrap(),
+            "eval_questions/a.yml"
+        );
+        assert!(nonempty_repo_path("").is_err());
+        assert!(nonempty_repo_path("  ").is_err());
+        assert_eq!(nonempty_filter("FAILED").unwrap(), "FAILED");
+        assert!(nonempty_filter("").is_err());
+        assert!(nonempty_filter("  ").is_err());
+        // A filter is trimmed and a branch name is not, and the divergence is the point:
+        // no value in the server's filter vocabulary has a space in it, so ` FAILED`
+        // could only ever match nothing — while `--branch '  x  '` can name a branch that
+        // exists, and the messages carrying that name also carry a command addressing it.
+        assert_eq!(nonempty_filter(" FAILED\n").unwrap(), "FAILED");
+        assert_eq!(nonempty("  main  ").unwrap(), "  main  ");
+        assert_eq!(nonempty_ref("  main  ").unwrap(), "  main  ");
+        // All three open with the phrase the command-tree walk partitions on, so a guard
+        // that ends up on a branch argument is recognised as one wherever it came from.
+        for refusal in [nonempty(""), nonempty_ref(""), nonempty_filter("")] {
+            assert!(refusal.unwrap_err().contains(EMPTY_VALUE_REFUSED));
+        }
     }
 
     #[test]
@@ -534,6 +635,17 @@ mod tests {
         for args in [
             vec!["cube", "dbt", "sync", "1", "--timeout", "1h"],
             vec!["cube", "dbt", "status", "1", "job", "--poll", "1s"],
+            vec![
+                "cube",
+                "evals",
+                "run",
+                "1",
+                "--branch",
+                "x",
+                "--timeout",
+                "1h",
+            ],
+            vec!["cube", "evals", "status", "1", "2", "--poll", "1s"],
             vec![
                 "cube",
                 "deployments",
@@ -552,6 +664,8 @@ mod tests {
         for args in [
             vec!["cube", "dbt", "sync", "1"],
             vec!["cube", "dbt", "status", "1", "job"],
+            vec!["cube", "evals", "run", "1", "--branch", "x"],
+            vec!["cube", "evals", "status", "1", "2"],
             vec!["cube", "deployments", "build-status", "1"],
         ] {
             assert!(crate::Cli::try_parse_from(args).is_ok());
@@ -716,6 +830,9 @@ mod tests {
                 // accepting an explicit empty value for them.
                 "cube dbt sync --branch",
                 "cube dbt sync --ref",
+                // An eval gate must never turn an unset pull-request branch variable
+                // into a run against an unnamed server-selected branch.
+                "cube evals run --branch",
             ],
             "the set of branch arguments refusing an empty value changed. Adding one is \
              `value_parser = util::nonempty` on the declaration; dropping one means a \

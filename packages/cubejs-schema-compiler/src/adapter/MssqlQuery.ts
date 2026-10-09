@@ -152,6 +152,11 @@ export class MssqlQuery extends BaseQuery {
 
   // TODO replace with limitOffsetClause override
   public groupByDimensionLimit() {
+    // T-SQL requires FETCH NEXT to be greater than zero, so a zero row limit is
+    // rendered as `TOP 0` by topLimit() instead, and OFFSET is redundant for it
+    if (this.parsedRowLimit() === 0) {
+      return '';
+    }
     if (this.rowLimit) {
       return this.offset ? ` OFFSET ${parseInt(this.offset, 10)} ROWS FETCH NEXT ${parseInt(this.rowLimit, 10)} ROWS ONLY` : '';
     } else {
@@ -160,10 +165,32 @@ export class MssqlQuery extends BaseQuery {
   }
 
   public topLimit() {
+    // Deliberately a strict null check: an explicit `rowLimit: null` means "no limit",
+    // while an absent one keeps the historical TOP 10000 default below, since T-SQL has
+    // no LIMIT clause to fall back on
+    if (this.rowLimit === null) {
+      return '';
+    }
+    const rowLimit = this.parsedRowLimit();
+    // `TOP 0` is the only way to express an empty result in T-SQL, and it takes
+    // precedence over the offset branch below: OFFSET without FETCH would return rows
+    if (rowLimit === 0) {
+      return ' TOP 0';
+    }
     if (this.offset) {
       return '';
     }
-    return this.rowLimit === null ? '' : ` TOP ${this.rowLimit && parseInt(this.rowLimit, 10) || 10000}`;
+    return ` TOP ${rowLimit ?? 10000}`;
+  }
+
+  /**
+   * The legacy rollup query in `PreAggregations` renders no `topLimit()`, so a zero row
+   * limit would otherwise emit no row-limiting clause there at all (groupByDimensionLimit()
+   * cannot express it: FETCH NEXT must be >= 1 in T-SQL) and scan the whole rollup.
+   * @override
+   */
+  public zeroRowLimitTopClause() {
+    return this.parsedRowLimit() === 0 ? ' TOP 0' : '';
   }
 
   /**
@@ -278,12 +305,14 @@ export class MssqlQuery extends BaseQuery {
     // PERCENTILE_CONT works but requires PARTITION BY
     delete templates.functions.PERCENTILECONT;
     delete templates.functions.WIDTH_BUCKET;
+    // T-SQL has every other SQL:2003 window function, but no NTH_VALUE
+    delete templates.functions.NTH_VALUE;
     templates.expressions.like = '{{ expr }} {% if negated %}NOT {% endif %}LIKE {{ pattern }}{% if default_escape %} ESCAPE \'\\\'{% endif %}';
     delete templates.expressions.ilike;
     // MSSQL uses + for string concatenation instead of ||
     templates.expressions.concat_strings = '{{ strings | join(\' + \' ) }}';
     // NOTE: this template contains a comma; two order expressions are being generated
-    templates.expressions.sort = '{{ expr }} IS NULL {% if nulls_first %}DESC{% else %}ASC{% endif %}, {{ expr }} {% if asc %}ASC{% else %}DESC{% endif %}';
+    templates.expressions.sort = 'CASE WHEN {{ expr }} IS NULL THEN 1 ELSE 0 END {% if nulls_first %}DESC{% else %}ASC{% endif %}, {{ expr }} {% if asc %}ASC{% else %}DESC{% endif %}';
     // Timestamp constants arrive as ISO-8601 UTC strings ('2021-01-01T00:00:00.000Z');
     // CONVERT style 127 is defined as exactly this format (yyyy-mm-ddThh:mi:ss.mmmZ,
     // "ISO8601 with time zone Z"). The base template renders the value bare, which is
@@ -291,6 +320,12 @@ export class MssqlQuery extends BaseQuery {
     templates.expressions.timestamp_literal = 'CONVERT(DATETIME2, \'{{ value }}\', 127)';
     templates.types.string = 'VARCHAR';
     templates.types.boolean = 'BIT';
+    templates.expressions.true = 'CAST(1 AS BIT)';
+    templates.expressions.false = 'CAST(0 AS BIT)';
+    // SQL API expressions distinguish stored BIT values from SQL predicates.
+    // Keep UNKNOWN when a predicate is projected or used as a scalar operand.
+    templates.expressions.scalar_to_predicate = '({{ expr }} = CAST(1 AS BIT))';
+    templates.expressions.predicate_to_scalar = 'CAST(CASE WHEN {{ expr }} THEN 1 WHEN NOT ({{ expr }}) THEN 0 ELSE NULL END AS BIT)';
     templates.types.integer = 'INT';
     templates.types.float = 'FLOAT(24)';
     templates.types.double = 'FLOAT(53)';
@@ -313,15 +348,15 @@ export class MssqlQuery extends BaseQuery {
       '{% endfor %}' +
       ') AS dates (date_from, date_to)';
     // MSSQL uses recursive CTE for time series generation.
-    // The template body becomes content of `time_series AS (...)` CTE,
-    // so it self-references `time_series` for recursion.
+    // The template body becomes content of the series CTE, so it
+    // self-references that CTE (`series_name`) for recursion.
     templates.statements.generated_time_series_select =
       'SELECT CAST({{ start }} AS DATETIME2) AS date_from,\n' +
       '       DATEADD(MILLISECOND, -1, DATEADD({{ minimal_time_unit }}, 1, CAST({{ start }} AS DATETIME2))) AS date_to\n' +
       'UNION ALL\n' +
       'SELECT DATEADD({{ minimal_time_unit }}, 1, date_from),\n' +
       '       DATEADD(MILLISECOND, -1, DATEADD({{ minimal_time_unit }}, 1, DATEADD({{ minimal_time_unit }}, 1, date_from)))\n' +
-      'FROM time_series\n' +
+      'FROM {{ series_name }}\n' +
       'WHERE DATEADD({{ minimal_time_unit }}, 1, date_from) <= CAST({{ end }} AS DATETIME2)';
 
     templates.statements.generated_time_series_with_cte_range_source =
@@ -333,7 +368,7 @@ export class MssqlQuery extends BaseQuery {
       'SELECT DATEADD({{ minimal_time_unit }}, 1, date_from),\n' +
       '       DATEADD(MILLISECOND, -1, DATEADD({{ minimal_time_unit }}, 1, DATEADD({{ minimal_time_unit }}, 1, date_from))),\n' +
       '       max_date\n' +
-      'FROM time_series\n' +
+      'FROM {{ series_name }}\n' +
       'WHERE DATEADD({{ minimal_time_unit }}, 1, date_from) <= max_date';
 
     // MSSQL uses OFFSET/FETCH instead of LIMIT/OFFSET
@@ -346,18 +381,25 @@ export class MssqlQuery extends BaseQuery {
     templates.statements.select = '{% if ctes %} WITH \n' +
       '{{ ctes | join(\',\n\') }}\n' +
       '{% endif %}' +
-      'SELECT {% if limit is not none and not order_by %}TOP {{ limit }} {% endif %}{% if distinct %}DISTINCT {% endif %}' +
+      // T-SQL clause order is SELECT [ALL | DISTINCT] [TOP (expr)], so DISTINCT has to come
+      // first: `SELECT TOP 0 DISTINCT ...` is a syntax error. A param limit (a string
+      // placeholder) needs the parenthesized `TOP (@_1)` form.
+      'SELECT {% if distinct %}DISTINCT {% endif %}{% if limit is not none and (not order_by or limit == 0) %}TOP {% if limit is string %}({{ limit }}){% else %}{{ limit }}{% endif %} {% endif %}' +
       '{{ select_concat | map(attribute=\'aliased\') | join(\', \') }} {% if from %}\n' +
       'FROM (\n' +
       '{{ from | indent(2, true) }}\n' +
       ') AS {{ from_alias }}{% elif from_prepared %}\n' +
       'FROM {{ from_prepared }}' +
       '{% endif %}' +
+      '{% for join in joins %}\n{{ join }}{% endfor %}' +
       '{% if filter %}\nWHERE {{ filter }}{% endif %}' +
       '{% if group_by %}\nGROUP BY {{ group_by }}{% endif %}' +
       '{% if having %}\nHAVING {{ having }}{% endif %}' +
-      '{% if order_by %}\nORDER BY {{ order_by | map(attribute=\'expr\') | join(\', \') }}\nOFFSET {% if offset is not none %}{{ offset }}{% else %}0{% endif %} ROWS' +
-      '\nFETCH NEXT {% if limit is not none %}{{ limit }}{% else %}2147483647{% endif %} ROWS ONLY{% endif %}' +
+      '{% if order_by %}\nORDER BY {{ order_by | map(attribute=\'expr\') | join(\', \') }}' +
+      // `limit` may be a param placeholder string, so don't guard with `limit | int`:
+      // `none | int` is 0 and would drop the 2147483647 fallback below
+      '{% if limit != 0 %}\nOFFSET {% if offset is not none %}{{ offset }}{% else %}0{% endif %} ROWS' +
+      '\nFETCH NEXT {% if limit is not none %}{{ limit }}{% else %}2147483647{% endif %} ROWS ONLY{% endif %}{% endif %}' +
       '{% if ctes %}\nOPTION (MAXRECURSION 0){% endif %}';
     // T-SQL has no LIMIT, and neither TOP nor OFFSET/FETCH can be attached to a set
     // operation directly (OFFSET/FETCH also requires an ORDER BY), so a bounded set

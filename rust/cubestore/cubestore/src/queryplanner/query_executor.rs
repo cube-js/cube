@@ -47,7 +47,7 @@ use datafusion::datasource::{TableProvider, TableType};
 use datafusion::error::DataFusionError;
 use datafusion::error::Result as DFResult;
 use datafusion::execution::memory_pool::{MemoryPool, MemoryReservation};
-use datafusion::execution::runtime_env::RuntimeEnvBuilder;
+use datafusion::execution::runtime_env::{RuntimeEnv, RuntimeEnvBuilder};
 use datafusion::execution::TaskContext;
 use datafusion::logical_expr::{Expr, LogicalPlan};
 use datafusion::physical_expr;
@@ -234,9 +234,13 @@ crate::di_service!(QueryExecutorImpl, [QueryExecutor]);
 impl QueryExecutorImpl {
     fn execution_context(&self) -> Result<Arc<SessionContext>, CubeError> {
         // This is supposed to be identical to QueryImplImpl::execution_context.
-        Ok(Arc::new(QueryPlannerImpl::make_execution_context(
-            self.metadata_cache_factory.make_session_config(),
-        )))
+        Ok(Arc::new(
+            QueryPlannerImpl::make_execution_context_with_runtime(
+                self.metadata_cache_factory.make_session_config(),
+                Arc::new(RuntimeEnv::default()),
+                self.config.union_planning_rewrites(),
+            ),
+        ))
     }
 }
 
@@ -272,6 +276,7 @@ impl QueryExecutor for QueryExecutorImpl {
         let session_context = Arc::new(QueryPlannerImpl::make_execution_context_with_runtime(
             config,
             runtime_env,
+            self.config.union_planning_rewrites(),
         ));
         {
             let _g = crate::trace::OpGuard::start_wrapper(
@@ -406,6 +411,7 @@ impl QueryExecutor for QueryExecutorImpl {
                 Arc::new(QueryPlannerImpl::make_execution_context_with_runtime(
                     self.metadata_cache_factory.make_session_config(),
                     runtime,
+                    self.config.union_planning_rewrites(),
                 ))
             }
             None => self.execution_context()?,
@@ -469,6 +475,7 @@ impl QueryExecutor for QueryExecutorImpl {
             HashMap::new(),
             HashMap::new(),
             NoopParquetMetadataCache::new(),
+            self.config.max_query_plan_depth(),
         )?;
         let pre_serialized_plan = Arc::new(pre_serialized_plan);
         let ctx = self.router_context(cluster.clone(), pre_serialized_plan.clone())?;
@@ -495,6 +502,7 @@ impl QueryExecutor for QueryExecutorImpl {
             remote_to_local_names,
             chunk_id_to_record_batches,
             self.parquet_metadata_cache.cache().clone(),
+            self.config.max_query_plan_depth(),
         )?;
         let pre_serialized_plan = Arc::new(pre_serialized_plan);
         let ctx = self.worker_context(
@@ -580,9 +588,12 @@ impl QueryExecutorImpl {
         data_loaded_size: Option<Arc<DataLoadedSize>>,
     ) -> Result<Arc<SessionContext>, CubeError> {
         // A sender that does not send the flags planned from its own configuration, and this
-        // node's configuration reproduces it as long as the value is unset (both binaries default
-        // to the same one) or set on every node. A value set on the router alone is the one case
-        // it cannot reproduce, so keep such a value set cluster-wide until every node sends flags.
+        // node's configuration reproduces it when the value is set on every node, or when it is
+        // unset and both binaries default to the same one. The defaults changed once since the
+        // flags were introduced, so an upgrade that reaches this binary from one older than the
+        // flags -- skipping the release that introduced them -- must pin CUBESTORE_TOPK_STRATEGY
+        // and CUBESTORE_GROUP_BY_LIMIT_FACTOR cluster-wide for the duration, or the two halves of
+        // a split plan get planned from different values and the query returns wrong rows.
         let planning_flags = worker_planning_params
             .flags
             .unwrap_or_else(|| PlanningFlags::from_config(self.config.as_ref()));
@@ -2570,6 +2581,7 @@ mod tests {
                 pushable_chunk_filters: Vec::new(),
             },
             None,
+            crate::config::DEFAULT_MAX_QUERY_PLAN_DEPTH,
         )?;
         let exec = ClusterSendExec {
             properties: ClusterSendExec::compute_properties(input.properties(), 2),

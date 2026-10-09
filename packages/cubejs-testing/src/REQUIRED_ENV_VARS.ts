@@ -2,7 +2,7 @@
  * Environment variables that cannot be hardcoded, and instead must be specified via the cli.
  * Usually cloud db config & auth variables.
  */
-export const REQUIRED_ENV_VARS: {[key: string]: string[]} = {
+export const REQUIRED_ENV_VARS: { [key: string]: string[] } = {
   athena: [
     'CUBEJS_AWS_KEY',
     'CUBEJS_AWS_SECRET',
@@ -17,7 +17,7 @@ export const REQUIRED_ENV_VARS: {[key: string]: string[]} = {
   ],
   snowflake: [
     'CUBEJS_DB_USER',
-    'CUBEJS_DB_PASS',
+    'CUBEJS_DB_SNOWFLAKE_PRIVATE_KEY',
     'CUBEJS_DB_NAME',
     'CUBEJS_DB_SNOWFLAKE_ACCOUNT',
     'CUBEJS_DB_SNOWFLAKE_REGION',

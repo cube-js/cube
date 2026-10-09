@@ -27,9 +27,9 @@ export function ExplorePage() {
 
   useDeepEffect(() => {
     if (
-      basePath &&
-      (livePreviewContext === null ||
-        !livePreviewContext.statusLivePreview.active)
+      basePath
+      && (livePreviewContext === null
+        || !livePreviewContext.statusLivePreview.active)
     ) {
       setContext({
         token: securityContextToken || cubejsToken,
@@ -39,8 +39,8 @@ export function ExplorePage() {
         ),
       });
     } else if (
-      livePreviewContext?.statusLivePreview.active &&
-      livePreviewContext.credentials
+      livePreviewContext?.statusLivePreview.active
+      && livePreviewContext.credentials
     ) {
       const { token, apiUrl } = livePreviewContext.credentials;
       setContext({

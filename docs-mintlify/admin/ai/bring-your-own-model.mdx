@@ -25,6 +25,8 @@ how you manage AI costs.
 | **GCP Vertex AI** | Yes | No |
 | **Databricks** | Yes | No |
 | **Snowflake Cortex** | Yes | No |
+| **Custom OpenAI-compatible** | Yes | No |
+| **Custom Anthropic-compatible** | Yes | No |
 
 ## Configuration
 
@@ -84,7 +86,9 @@ directly by your model provider based on their pricing.
 This means:
 
 - No Cube token quota is deducted for BYOM chat requests
-- No token usage is tracked in the AI Tokens Usage dashboard for BYOM requests
+- Administrators can see BYOM requests with their token counts, at no cost,
+  in the **AI Tokens Usage** tab, and they're recorded in the
+  **AI Calls & Cost** view in [Usage Analytics][ref-usage-analytics]
 - Per-seat token grants and token packages do not apply
 
 See [AI Tokens][ref-ai-tokens] for details on how token billing works with
@@ -119,6 +123,42 @@ Supports two authentication methods:
 - JWT authentication
 - Key-pair authentication (requires an encrypted PKCS#8 PEM private key)
 
+### Custom OpenAI-compatible
+
+Points an agent at any endpoint that implements the OpenAI chat completions
+API — for example, an internal LLM gateway.
+
+- **Model** and **base URL** are free text; the base URL must use `http` or
+  `https` and may not target a loopback or link-local host
+- The base URL is the API root, including the version segment: requests go
+  to `<base URL>/chat/completions`, so use e.g. `https://gateway.acme.com/v1`
+- The same model serves every request an agent makes, including lightweight
+  background calls that built-in models route to a smaller model
+- **API key** is optional — leave it blank if your endpoint authenticates
+  requests some other way, such as a custom header
+- You can add custom HTTP headers sent with every request. Header values may
+  include placeholders resolved per request from the caller's identity:
+  `{{userId}}`, `{{userExternalId}}`, `{{email}}`, `{{username}}`,
+  `{{tenantId}}`, `{{tenantName}}`, `{{tenantUrl}}`, `{{deploymentId}}`, and
+  `{{agentId}}`. A placeholder with no value for a request — `{{userExternalId}}`
+  for a user who did not arrive through signed embedding, for example — is sent
+  through as literal text
+
+### Custom Anthropic-compatible
+
+Points an agent at any endpoint that implements the Anthropic messages API.
+Configuration is the same as [Custom OpenAI-compatible](#custom-openai-compatible):
+a free-text model and base URL, an optional API key, and optional custom
+headers with the same placeholders.
+
+As with Custom OpenAI-compatible, the same model serves every request an
+agent makes, including lightweight background calls.
+
+Unlike the OpenAI-compatible provider, requests go to `<base URL>/v1/messages`,
+so leave out the version segment — use `https://gateway.acme.com`, not
+`https://gateway.acme.com/v1`. The API key, when set, is sent in the
+`x-api-key` header. Extended thinking is not available for this provider.
+
 ## Troubleshooting
 
 ### Rate limit errors
@@ -137,3 +177,4 @@ Ensure the model ID configured in Cube matches a valid model offered by your
 provider. Model availability may vary by region.
 
 [ref-ai-tokens]: /admin/account-billing/ai-tokens
+[ref-usage-analytics]: /admin/monitoring/usage-analytics

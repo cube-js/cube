@@ -179,6 +179,7 @@
     "SQL API: SQL push down push to cube quoted alias",
     "SQL API: powerbi min max ungrouped flag",
     "SQL API: Window function over measure (running total)",
+    "SQL API: EXTRACT DOW from column reference in SQL push down",
     "SQL API: Timeshift measure from cube",
 
     "---------------------------------------",
@@ -208,11 +209,17 @@
     "---------------------------------------",
     "Requires Tesseract.                    ",
     "---------------------------------------",
+    "    A custom granularity origin on a single-unit interval only reaches the grouping under Tesseract.",
+    "querying custom granularities ECommerce: count by fiscal_year_by_1st_april + no dimension",
+    "querying custom granularities ECommerce: count by fiscal_year_by_15th_april + no dimension",
+    "querying custom granularities ECommerce: count by monthly_from_15th + no dimension",
     "querying BigECommerce: rolling window by 2 day without date range",
     "querying BigECommerce: rolling window by 2 month without date range",
     "querying BigECommerce: rolling window YTD without date range",
     "querying custom granularities ECommerce: count by two_mo_by_feb + no dimension + rollingCountByLeading without date range",
     "querying BigECommerce with Retail Calendar: totalCountRetailYearAgo",
+    "querying BigECommerce with Retail Calendar: prior year and month by week (no pre-aggregation)",
+    "querying BigECommerce with Retail Calendar: prior year and month by week (pre-aggregation in CubeStore)",
     "querying BigECommerce with Retail Calendar: totalCountRetailMonthAgo",
     "querying BigECommerce with Retail Calendar: totalCountRetailWeekAgo",
     "Tesseract: querying BigECommerce with Retail Calendar: totalCountRetailMonthAgo",
@@ -224,7 +231,11 @@
     "querying SwitchSourceTest: filter by switch dimensions",
     "querying BigECommerce: SeveralMultiStageMeasures",
     "querying BigECommerce: two multi-stage branches sharing one pre-aggregation",
-    "querying BigECommerce: base measure plus multi-stage over non-partitioned pre-aggregation"
+    "querying BigECommerce: base measure plus multi-stage over non-partitioned pre-aggregation",
+    "---- Time-shifted measure rolled up from a rollup: native planner, Postgres and BigQuery only ----",
+    "querying RetailOrders: named prior month by category for one day (pre-aggregation in CubeStore)",
+    "querying RetailOrders: named prior month by category over two months (pre-aggregation in CubeStore)",
+    "SQL API: named prior month by category for one day"
   ],
   "tesseractSkip": [
     "querying Products: dimensions -- doesn't work wo ordering",
@@ -254,6 +265,7 @@
     "SQL API: Rolling Window YTD (year + month + day + date_trunc IN)",
     "SQL API: Rolling Window YTD (year + month + day + date_trunc equal)",
     "SQL API: Window function over measure (running total)",
+    "SQL API: EXTRACT DOW from column reference in SQL push down",
     "SQL API: powerbi min max ungrouped flag",
 
     "---------------------------------------",
@@ -295,6 +307,13 @@
     "CubeSQL planner (drop the redundant CTE-internal ORDER BY); ordering by expression",
     "instead regresses ~40 ordinary queries, so it cannot be fixed in the dialect.",
     "---------------------------------------",
-    "querying SwitchSourceTest: full cross join"
+    "querying SwitchSourceTest: full cross join",
+    "---- Calendar-shifted measure stored in a rollup: covered on Postgres only for now ----",
+    "querying BigECommerce with Retail Calendar: prior year and month by week (no pre-aggregation)",
+    "querying BigECommerce with Retail Calendar: prior year and month by week (pre-aggregation in CubeStore)",
+    "---- Time-shifted measure rolled up from a rollup: native planner, Postgres and BigQuery only ----",
+    "querying RetailOrders: named prior month by category for one day (pre-aggregation in CubeStore)",
+    "querying RetailOrders: named prior month by category over two months (pre-aggregation in CubeStore)",
+    "SQL API: named prior month by category for one day"
   ]
 }

@@ -142,6 +142,21 @@
               "name": "three_months_by_march",
               "interval": "3 month 3 days 3 hours",
               "origin": "2020-03-15"
+            },
+            {
+              "name": "fiscal_year_by_1st_april",
+              "interval": "1 year",
+              "origin": "2024-04-01"
+            },
+            {
+              "name": "fiscal_year_by_15th_april",
+              "interval": "1 year",
+              "origin": "2024-04-15"
+            },
+            {
+              "name": "monthly_from_15th",
+              "interval": "1 month",
+              "origin": "2024-01-15"
             }
           ]
         },
@@ -410,7 +425,27 @@
           }]
         },
         {
+          "name": "totalCountRetailYearAgoNoPreAgg",
+          "type": "number",
+          "sql": "{count}",
+          "multi_stage": true,
+          "time_shift": [{
+            "interval": "1 year",
+            "type": "prior"
+          }]
+        },
+        {
           "name": "totalCountRetailMonthAgo",
+          "type": "number",
+          "sql": "{count}",
+          "multi_stage": true,
+          "time_shift": [{
+            "interval": "1 month",
+            "type": "prior"
+          }]
+        },
+        {
+          "name": "totalCountRetailMonthAgoNoPreAgg",
           "type": "number",
           "sql": "{count}",
           "multi_stage": true,
@@ -427,6 +462,28 @@
           "time_shift": [{
             "interval": "1 week",
             "type": "prior"
+          }]
+        },
+        {
+          "name": "retailOrderCount",
+          "type": "count"
+        },
+        {
+          "name": "retailOrderCountPriorMonth",
+          "type": "number",
+          "sql": "{retailOrderCount}",
+          "multi_stage": true,
+          "time_shift": [{
+            "name": "retail_prior_month"
+          }]
+        },
+        {
+          "name": "retailOrderCountPriorMonthNoPreAgg",
+          "type": "number",
+          "sql": "{retailOrderCount}",
+          "multi_stage": true,
+          "time_shift": [{
+            "name": "retail_prior_month"
           }]
         },
         {
@@ -573,6 +630,10 @@
               "sql": "{CUBE}.retail_date_prev_month"
             },
             {
+              "name": "retail_prior_month",
+              "sql": "{CUBE}.retail_date_prev_month"
+            },
+            {
               "interval": "1 quarter",
               "type": "prior",
               "sql": "{CUBE}.retail_date_prev_quarter"
@@ -588,6 +649,26 @@
     }
   ],
   "views": [
+    {
+      "name": "RetailOrders",
+      "cubes": [
+        {
+          "join_path": "BigECommerce",
+          "includes": [
+            "category",
+            "subCategory",
+            "productName",
+            "retailOrderCount",
+            "retailOrderCountPriorMonth",
+            "retailOrderCountPriorMonthNoPreAgg"
+          ]
+        },
+        {
+          "join_path": "BigECommerce.RetailCalendar",
+          "includes": ["retail_date"]
+        }
+      ]
+    },
     {
       "name": "SwitchSourceTest",
       "dimensions": [

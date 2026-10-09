@@ -1,5 +1,8 @@
+import crypto from 'crypto';
 import Joi from 'joi';
+import { LRUCache } from 'lru-cache';
 import cronParser from 'cron-parser';
+import { isPredefinedGranularity, TIME_SERIES } from '@cubejs-backend/shared';
 
 import { CubeSymbols, CubeDefinition, ToString } from './CubeSymbols';
 import type { ErrorReporter } from './ErrorReporter';
@@ -105,9 +108,11 @@ const everyCronTimeZone = Joi.string().custom((value, helper) => {
     cronParser.parseExpression('0 * * * *', { currentDate: '2020-01-01 00:00:01', tz: value });
     return value;
   } catch (e) {
-    return helper.message({ custom: `(${formatStatePath(helper.state)} = ${value}) unknown timezone. Take a look here https://cube.dev/docs/schema/reference/cube#supported-timezones to get available time zones` });
+    return helper.message({ custom: `(${formatStatePath(helper.state)} = ${value}) unknown timezone. Take a look here https://docs.cube.dev/admin/time-zones#valid-time-zone-values to get available time zones` });
   }
 });
+
+const PREDEFINED_GRANULARITY_NAMES = Object.keys(TIME_SERIES).sort();
 
 const GranularityInterval = Joi.string().pattern(/^\d+\s+(second|minute|hour|day|week|month|quarter|year)s?(\s\d+\s+(second|minute|hour|day|week|month|quarter|year)s?){0,7}$/, 'granularity interval');
 // Do not allow negative intervals for granularities, while offsets could be negative
@@ -328,6 +333,7 @@ const LinkItemSchema = Joi.object().keys({
 const LinksSchema = Joi.array().items(LinkItemSchema).custom((value, helpers) => {
   const names = value.map((link: any) => (typeof link.name === 'function' ? link.name() : link.name));
   const seen = new Set<string>();
+
   for (const name of names) {
     if (seen.has(name)) {
       return helpers.error('any.custom', { message: `Duplicate link name '${name}'` });
@@ -1016,7 +1022,12 @@ const SwitchDimension = Joi.object({
 const DimensionsSchema = Joi.object().pattern(identifierRegex, Joi.alternatives().conditional(Joi.ref('.type'), {
   is: 'switch',
   then: SwitchDimension,
+  // Alternatives are tried in order and each miss builds a full error report, so the plain `sql`
+  // dimension, which most dimensions are, goes first. Order does not change what passes.
   otherwise: Joi.alternatives().try(
+    inherit(BaseDimension, {
+      sql: Joi.func().required(),
+    }),
     inherit(BaseDimensionWithoutSubQuery, {
       case: CaseVariants.required(),
       multiStage: Joi.boolean().strict(),
@@ -1028,9 +1039,6 @@ const DimensionsSchema = Joi.object().pattern(identifierRegex, Joi.alternatives(
       longitude: Joi.object().keys({
         sql: Joi.func().required()
       }).required()
-    }),
-    inherit(BaseDimension, {
-      sql: Joi.func().required(),
     }),
     inherit(BaseDimension, {
       multiStage: Joi.boolean().valid(true),
@@ -1110,7 +1118,13 @@ const MemberLevelPolicySchema = Joi.object().keys({
   ]),
   includesMembers: Joi.array().items(Joi.string().required()),
   excludesMembers: Joi.array().items(Joi.string().required()),
-});
+})
+  // `includes` defaults to '*' in CubeEvaluator.prepareAccessPolicy, so an empty
+  // memberLevel grants every member — the opposite of how it reads.
+  .or('includes', 'excludes')
+  .messages({
+    'object.missing': '{{#label}} must define either includes or excludes. An empty memberLevel grants access to all members: spell that out with includes: \'*\', or use excludes to grant all but some. A member granted by memberLevel is unmasked on every row the policy grants, so a member that must always be masked belongs in excludes'
+  });
 
 const MemberMaskingPolicySchema = Joi.object().keys({
   includes: Joi.alternatives([
@@ -1396,6 +1410,67 @@ export function functionFieldsPatterns(): string[] {
   return Array.from(functionPatterns);
 }
 
+// Model objects come from the VM context, whose Object.prototype isn't this realm's, so the
+// prototype walk stops at whichever realm's Object.prototype it reaches
+const isRootPrototype = (o: object) => Object.getPrototypeOf(o) === null && Object.prototype.hasOwnProperty.call(o, 'hasOwnProperty');
+
+/**
+ * Everything the schema can see: inherited and non-enumerable keys, getter values, and function
+ * source. Keys are sorted because Jinja doesn't keep their order stable.
+ */
+function definitionFingerprint(definition: unknown): string {
+  const hash = crypto.createHash('sha1');
+  const path = new Set<object>();
+
+  const write = (value: unknown) => {
+    if (typeof value === 'function') {
+      const source = value.toString();
+      hash.update(`f${source.length}:${source}`);
+    } else if (value === null || typeof value !== 'object') {
+      const text = String(value);
+      hash.update(`${value === null ? 'null' : typeof value}${text.length}:${text}`);
+    } else if (!Array.isArray(value) && Object.prototype.toString.call(value) !== '[object Object]') {
+      // Dates, regexps and the like carry their state outside own properties
+      const text = `${Object.prototype.toString.call(value)}${String(value)}`;
+      hash.update(`o${text.length}:${text}`);
+    } else if (path.has(value)) {
+      hash.update('cycle;');
+    } else {
+      path.add(value);
+      if (Array.isArray(value)) {
+        hash.update(`[${value.length}`);
+        value.forEach(write);
+        hash.update(']');
+      } else {
+        hash.update('{');
+        // A key shadowed further down the chain reads the same value, so it is hashed once, at
+        // the depth it first appears
+        const seen = new Set<string>();
+        let depth = 0;
+        for (let o: object | null = value; o && !isRootPrototype(o); o = Object.getPrototypeOf(o), depth++) {
+          for (const key of Object.getOwnPropertyNames(o).sort()) {
+            if (!seen.has(key)) {
+              seen.add(key);
+              hash.update(`${depth}.${key.length}:${key}=`);
+              write((value as Record<string, unknown>)[key]);
+            }
+          }
+        }
+        hash.update('}');
+      }
+      path.delete(value);
+    }
+  };
+
+  write(definition);
+  return hash.digest('hex');
+}
+
+// Fingerprints of definitions that passed the schema. Validation depends on nothing else, so
+// tenants compiling the same model, and recompiles of an unchanged cube, skip it. Failures are
+// always validated again so their errors are reported afresh.
+const validDefinitions = new LRUCache<string, true>({ max: 50000 });
+
 export class CubeValidator implements CompilerInterface {
   protected readonly validCubes: Map<string, boolean> = new Map();
 
@@ -1415,20 +1490,57 @@ export class CubeValidator implements CompilerInterface {
       nonEnumerables: true,
       abortEarly: false, // This will allow all errors to be reported, not just the first one
     };
-    const result = cube.isView ? viewSchema.validate(cube, options) : cubeSchema.validate(cube, options);
+    const fingerprint = definitionFingerprint(cube);
+    let result: Joi.ValidationResult;
+    if (validDefinitions.get(fingerprint)) {
+      result = { value: cube, error: undefined };
+    } else {
+      result = cube.isView ? viewSchema.validate(cube, options) : cubeSchema.validate(cube, options);
+      if (result.error == null) {
+        validDefinitions.set(fingerprint, true);
+      }
+    }
+
+    let valid = result.error == null;
 
     if (cube.isView) {
       // We need to verify that leaf cubes in view are present only once
       this.validateUniqueLeafCubes(cube.name, cube.cubes, errorReporter);
+    } else if (!this.validateGranularitySql(cube, errorReporter)) {
+      valid = false;
     }
 
     if (result.error != null) {
       errorReporter.error(formatErrorMessage(result.error));
-    } else {
+    }
+
+    if (valid) {
       this.validCubes.set(cube.name, true);
     }
 
     return result;
+  }
+
+  // Reported outside the cube schema so the message stands on its own: a
+  // granularity rejected by the schema is listed among the reasons every other
+  // dimension alternative failed, which buries it.
+  private validateGranularitySql(cube, errorReporter: ErrorReporter): boolean {
+    let valid = true;
+
+    for (const [dimensionName, dimension] of Object.entries<any>(cube.dimensions || {})) {
+      for (const [name, granularity] of Object.entries<any>(dimension?.granularities || {})) {
+        // Predefined names are resolved case-insensitively, so `Week` names a
+        // granularity that resolves and must keep doing so.
+        if (granularity?.sql && !isPredefinedGranularity(name.toLowerCase())) {
+          errorReporter.error(
+            `dimensions.${dimensionName}.granularities.${name}: a granularity defined with 'sql' must be named after one of the predefined granularities (${PREDEFINED_GRANULARITY_NAMES.join(', ')}). Define '${name}' with 'interval' instead`
+          );
+          valid = false;
+        }
+      }
+    }
+
+    return valid;
   }
 
   public validateViewGroup(viewGroup, errorReporter: ErrorReporter) {

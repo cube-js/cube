@@ -125,7 +125,9 @@ function kebab(s) {
   return mintSlugify(normalizeTypography(String(s).trim()));
 }
 // Longest shared path prefix (by segment) across a tag's paths — the "Resource"
-// column value. Falls back to the single path when a tag has just one.
+// column value. Falls back to the single path when a tag has just one. A `/*`
+// suffix marks a prefix that is not itself one of the tag's paths, so the row
+// reads as a sub-resource group rather than implying a callable endpoint.
 function commonPathPrefix(pathList) {
   const split = pathList.map((p) => p.split('/'));
   const first = split[0];
@@ -133,8 +135,21 @@ function commonPathPrefix(pathList) {
   for (; i < first.length; i++) {
     if (!split.every((s) => s[i] === first[i])) break;
   }
-  return split.length === 1 ? first.join('/') : first.slice(0, i).join('/') || '/';
+  const prefix = split.length === 1 ? first.join('/') : first.slice(0, i).join('/') || '/';
+  if (split.length > 1 && prefix !== '/' && !pathList.includes(prefix)) {
+    return `${prefix}/*`;
+  }
+  return prefix;
 }
+
+// A shared parent can be too broad when a tag spans sibling collections.
+const SNOWFLAKE_RESOURCE_ROOT = '/api/v1/deployments/{deploymentId}/snowflake-semantic-view-';
+const RESOURCE_PATH_OVERRIDES = {
+  'Snowflake Semantic View Sync': {
+    display: `${SNOWFLAKE_RESOURCE_ROOT}{pulls,syncs}`,
+    prefixes: [`${SNOWFLAKE_RESOURCE_ROOT}pulls`, `${SNOWFLAKE_RESOURCE_ROOT}syncs`],
+  },
+};
 
 // The v1 REST API, on both path families it is served under: /api/v1/… on the
 // main console-server pods, and /build/api/v1/… routed to the build pods (which
@@ -168,11 +183,35 @@ const EXCLUDE_OPERATIONS = new Set([
   'PUT /api/v1/resource-policies/group',
   'PUT /api/v1/resource-policies/user',
   'GET /api/v1/app-theme',
-  'GET /api/v1/ai-engineer/active-region',
   'GET /api/v1/ai-engineer/settings',
   // Report folders listing — not part of the public docs surface.
   'GET /api/v1/deployments/{deploymentId}/report-folders',
+  // Access-test is not in the preview API reference yet (CUB-4443). Remove once
+  // it is documented.
+  'POST /api/v1/deployments/{deploymentId}/databricks-metric-view-integrations/{dataSourceName}/access-test',
+  // Evaluations (CUB-3667): every operation's own description says "This
+  // capability is currently in preview — reach out to the Cube support team to
+  // activate it for your account", not GA. Remove once the feature ships.
+  'POST /api/v1/deployments/{deploymentId}/evaluations',
+  'GET /api/v1/deployments/{deploymentId}/evaluations/{evaluationId}',
+  'GET /api/v1/deployments/{deploymentId}/evaluations/{evaluationId}/results',
 ]);
+
+// Cube-staff-only operations (provisioning real cloud infrastructure — Regions,
+// PrivateLinks, and anything else gated the same way) are excluded automatically
+// rather than via a hand-maintained EXCLUDE_OPERATIONS list: console-server's
+// `superAdminOnlyDescription()` (packages/console-server/src/api/middlewares/
+// validate-admin-access.ts in cubejs-enterprise) prefixes every such operation's
+// OpenAPI `description` with this exact marker text before ANY other processing
+// touches it, so matching on it here catches staff-only operations that didn't
+// exist yet when this list was last updated — not just the ones someone
+// remembered to add. No reader of these docs can call them (tenant admins are
+// rejected server-side), so nothing customer-facing is lost.
+//
+// A short, stable anchor rather than the full marker sentence — less brittle against
+// upstream rewrapping/rewording, and the residual scan below (which matches even more
+// loosely) is the real safety net if this ever stops matching.
+const SUPER_ADMIN_ONLY_MARKER = 'Cube super admin only';
 
 // Explicit display names for tags whose auto-cleaned form would be unclear or
 // collide. Everything else is cleaned by cleanTag() below.
@@ -193,12 +232,14 @@ const TAG_MAP = {
 const TAG_ORDER = [
   'Deployments', 'Deployment Creation', 'Environments', 'Env Variables', 'Regions',
   'Data Model', 'Data Model Uploads', 'GitHub', 'GitHub Connection', 'dbt Sync',
-  'Folders', 'Reports', 'Workbooks', 'Notifications', 'Workspace', 'Agents', 'Metadata',
-  'Users', 'Users Admin', 'Groups', 'User Groups',
+  'Databricks Metric View Publication', 'Databricks Metric View Integration',
+  'Snowflake Semantic View Sync',
+  'Folders', 'Reports', 'External Documents', 'Workbooks', 'Workbook Promotions', 'Dashboard Exports', 'Notifications', 'Scheduled Tasks', 'Workspace', 'Agents', 'Metadata',
+  'Users', 'Users Admin', 'Groups', 'User Groups', 'API Keys',
   'User Attributes', 'User Attribute Values', 'Resource Policies', 'Tenant Settings',
   'OAuth Integrations', 'User OAuth Tokens', 'OIDC Token Configs',
   'App Theme', 'AI Engineer', 'Embed', 'Embed Tenants', 'Dashboard Embed Access',
-  'OpenAPI Spec',
+  'Usage Analytics', 'OpenAPI Spec',
 ];
 
 // Mintlify renders the OpenAPI operation `description` as a plain-text node — it
@@ -248,6 +289,7 @@ const ACRONYMS = [
   [/\boidc\b/gi, 'OIDC'],
   [/\bscim\b/gi, 'SCIM'],
   [/\bai\b/gi, 'AI'],
+  [/\bapi\b/gi, 'API'],
   // Product spelling: lowercase, even at the start of a tag or summary.
   [/\bdbt\b/gi, 'dbt'],
 ];
@@ -267,6 +309,9 @@ const src = yaml.load(fs.readFileSync(SRC, 'utf8'));
 //    trailing slash — a trailing slash breaks Mintlify dev), and clean tags +
 //    operationIds.
 const paths = {};
+const operationIds = new Map();
+const matchedExcludes = new Set();
+let autoExcludedCount = 0;
 for (const [key, val] of Object.entries(src.paths)) {
   if (!INCLUDE_PREFIXES.some((prefix) => key.startsWith(prefix))) continue;
   let newKey = key.length > 1 ? key.replace(/\/$/, '') : key; // drop trailing slash
@@ -274,7 +319,15 @@ for (const [key, val] of Object.entries(src.paths)) {
   for (const m of METHODS) {
     if (!val[m]) continue;
     // Drop explicitly hidden operations before they reach the spec or nav.
-    if (EXCLUDE_OPERATIONS.has(`${m.toUpperCase()} ${newKey}`)) {
+    const excludeKey = `${m.toUpperCase()} ${newKey}`;
+    if (EXCLUDE_OPERATIONS.has(excludeKey)) {
+      matchedExcludes.add(excludeKey);
+      delete val[m];
+      continue;
+    }
+    // Drop Cube-staff-only operations automatically — see SUPER_ADMIN_ONLY_MARKER above.
+    if (typeof val[m].description === 'string' && val[m].description.includes(SUPER_ADMIN_ONLY_MARKER)) {
+      autoExcludedCount++;
       delete val[m];
       continue;
     }
@@ -295,6 +348,15 @@ for (const [key, val] of Object.entries(src.paths)) {
     // strip "XxxController." prefix from operationId for clean page slugs
     if (typeof val[m].operationId === 'string') {
       val[m].operationId = val[m].operationId.replace(/^[^.]*\./, '');
+      const prior = operationIds.get(val[m].operationId);
+      if (prior) {
+        console.error(
+          `Aborting: operationId collision after normalization: ${val[m].operationId} ` +
+            `(${prior} and ${m.toUpperCase()} ${newKey}).`
+        );
+        process.exit(1);
+      }
+      operationIds.set(val[m].operationId, `${m.toUpperCase()} ${newKey}`);
     }
   }
   if (!kept) continue; // every operation on this path was excluded
@@ -307,6 +369,59 @@ for (const [key, val] of Object.entries(src.paths)) {
 
 if (!Object.keys(paths).length) {
   console.error(`Aborting: no paths matched ${INCLUDE_PREFIXES.join(' / ')}. Check the source spec.`);
+  process.exit(1);
+}
+
+// An EXCLUDE_OPERATIONS entry that matches nothing was likely renamed or moved
+// upstream — silently letting it through would re-publish whatever it was meant
+// to hide (some entries there exist specifically to keep staff-only operations
+// out of the public docs), and `--check` can't catch this: both the committed
+// and freshly generated output would contain the leak.
+const unmatchedExcludes = [...EXCLUDE_OPERATIONS].filter((op) => !matchedExcludes.has(op));
+if (unmatchedExcludes.length) {
+  console.error(
+    'Aborting: EXCLUDE_OPERATIONS entries matched nothing (renamed upstream?):\n  ' +
+      unmatchedExcludes.join('\n  ')
+  );
+  process.exit(1);
+}
+
+// The SUPER_ADMIN_ONLY_MARKER auto-detection above is an exact-substring match against
+// text authored in a different repo — it fails OPEN, not closed, if that text drifts
+// (rewording, a dropped 🔒, a punctuation change). Two guards restore a fail-closed
+// default without depending on the marker staying exact:
+//
+// Floor: the marker matched nothing at all. Today's spec always has staff-only
+// operations, so zero is almost certainly "the marker stopped matching," not "there
+// are none" — and if that ever becomes a real, deliberate zero, dropping this guard
+// is a one-line edit made by a human looking at exactly this message.
+if (!autoExcludedCount) {
+  console.error(
+    'Aborting: SUPER_ADMIN_ONLY_MARKER matched no operation. Did the marker text change upstream ' +
+      '(packages/console-server/src/api/middlewares/validate-admin-access.ts in cubejs-enterprise)?'
+  );
+  process.exit(1);
+}
+// Residual scan: catch staff-only prose that slipped past the exact marker match —
+// worded more loosely than the marker itself (just "super admin"/"super-admin", not
+// the full sentence) so it still fires even when SUPER_ADMIN_ONLY_MARKER no longer
+// matches. Covers a *partial* drift too: if only a newly-added operation is reworded
+// while existing ones keep today's wording, autoExcludedCount stays non-zero and the
+// floor guard above can't catch it — this scan is what does.
+// NB: "super admin"/"super-admin" specifically, not the bare 🔒 — the same lock emoji
+// also opens the unrelated (and legitimately public) ADMIN_ONLY_DOC_MARKER ("🔒 Admin only.").
+const leakedStaffOnly = [];
+for (const [p, ops] of Object.entries(paths)) {
+  for (const m of METHODS) {
+    const text = ops[m]?.['x-mint']?.content ?? ops[m]?.description ?? '';
+    if (/super[-\s]?admins?\b/i.test(text)) leakedStaffOnly.push(`${m.toUpperCase()} ${p}`);
+  }
+}
+if (leakedStaffOnly.length) {
+  console.error(
+    'Aborting: staff-only prose survived exclusion (SUPER_ADMIN_ONLY_MARKER stopped matching?):\n  ' +
+      leakedStaffOnly.join('\n  ')
+  );
   process.exit(1);
 }
 
@@ -346,6 +461,60 @@ if (missing.length) {
   );
   process.exit(1);
 }
+
+// 2b. Hoist `description`/`deprecated` off a nullable field's non-null `oneOf`
+// branch, where class-validator-jsonschema puts them. Renderers read both off the
+// property schema, not a branch, so they otherwise never render. Scoped to exactly
+// a two-branch, one-bare-null shape, so a genuine polymorphic oneOf — several real
+// alternatives, each with its own description — is left alone.
+function hoistNullableMeta(node) {
+  if (Array.isArray(node)) { node.forEach(hoistNullableMeta); return; }
+  if (!node || typeof node !== 'object') return;
+  const branches = node.oneOf;
+  if (Array.isArray(branches) && branches.length === 2) {
+    const isBareNull = (b) => b && Object.keys(b).length === 1 && b.type === 'null';
+    const branch = isBareNull(branches[0]) ? branches[1] : isBareNull(branches[1]) ? branches[0] : null;
+    if (branch && typeof branch === 'object') {
+      if (branch.description !== undefined && node.description === undefined) {
+        node.description = branch.description;
+        delete branch.description;
+      }
+      if (branch.deprecated !== undefined && node.deprecated === undefined) {
+        node.deprecated = branch.deprecated;
+        delete branch.deprecated;
+      }
+    }
+  }
+  for (const v of Object.values(node)) hoistNullableMeta(v);
+}
+// Per-user OIDC subjects (`subjectType`, the `{user_*}` sub placeholders) are
+// gated behind the `useUserOidcTokens` tenant flag, not generally available.
+// Strip them from the generated schemas. Remove once the feature ships.
+{
+  for (const [name, def] of Object.entries(schemas)) {
+    if (/SubjectType$/.test(name) && Array.isArray(def.enum) && def.enum.includes('user')) {
+      delete schemas[name];
+      continue;
+    }
+    delete def.properties?.subjectType;
+    if (Array.isArray(def.required)) def.required = def.required.filter((r) => r !== 'subjectType');
+    for (const alt of def.properties?.subFormat?.oneOf ?? []) {
+      if (typeof alt.pattern === 'string') {
+        alt.pattern = alt.pattern.replace('|user_email|username|user_id', '').replace('.@+', '');
+      }
+    }
+  }
+}
+
+// Fail closed: abort if the flagged OIDC fields survive (upstream pattern changed)
+// or a `$ref` to a deleted `*SubjectType` schema is left dangling.
+if (/subjectType|SubjectType|user_email|\{user_|\.@\+/.test(JSON.stringify({ paths, schemas }))) {
+  console.error('Aborting: per-user OIDC fields survived stripping (did the upstream spec change?)');
+  process.exit(1);
+}
+
+hoistNullableMeta(paths);
+hoistNullableMeta(schemas);
 
 // 3. Determine tag set + order (preferred order first, then any extras A–Z).
 const presentTags = new Set();
@@ -401,8 +570,44 @@ const out = {
   },
 };
 
-writeOrCheck(OUT, yaml.dump(out, { lineWidth: 100, noRefs: true }));
-console.log('paths:', Object.keys(paths).length, '| schemas:', Object.keys(schemas).length, '| tags:', orderedTags.length);
+// Prose throughout `out` is authored in cubejs-enterprise, whose contributors can't see
+// this site's routes, so a hyperlink to the pre-#11851 `cube.dev/docs/<path>` scheme can
+// resurface anywhere in the document on any regeneration; scanning must happen here,
+// pre-serialization, since a `yaml.dump` line-wrap can split a markdown link across lines.
+const LEGACY_LINK_REWRITES = [
+  ['https://cube.dev/docs/product/apis-integrations/rest-api', '/reference/core-data-apis/rest-api'],
+];
+const leakedLegacyLinks = [];
+function rewriteString(s, loc) {
+  let out = s;
+  for (const [from, to] of LEGACY_LINK_REWRITES) out = out.split(from).join(to);
+  if (/https?:\/\/cube\.dev\/docs\//.test(out)) leakedLegacyLinks.push(loc);
+  return out;
+}
+function rewriteLegacyLinks(node, loc) {
+  if (Array.isArray(node)) {
+    node.forEach((n, i) => {
+      const at = `${loc}[${i}]`;
+      if (typeof n === 'string') node[i] = rewriteString(n, at);
+      else rewriteLegacyLinks(n, at);
+    });
+    return;
+  }
+  if (!node || typeof node !== 'object') return;
+  for (const [k, v] of Object.entries(node)) {
+    const at = `${loc}.${k}`;
+    if (typeof v === 'string') node[k] = rewriteString(v, at);
+    else rewriteLegacyLinks(v, at);
+  }
+}
+rewriteLegacyLinks(out, 'out');
+if (leakedLegacyLinks.length) {
+  console.error(
+    'Aborting: legacy cube.dev/docs/ hyperlink(s) survived rewriting — add a LEGACY_LINK_REWRITES entry:\n  ' +
+      leakedLegacyLinks.join('\n  ')
+  );
+  process.exit(1);
+}
 
 // 5. Group operations by tag (pages in source order within a tag) and capture,
 //    per tag, its paths + the first operation's summary — used to build both the
@@ -418,6 +623,25 @@ for (const [p, val] of Object.entries(paths)) {
     if (!(pathsForTag[tag] || []).includes(p)) (pathsForTag[tag] = pathsForTag[tag] || []).push(p);
     (summariesForTag[tag] = summariesForTag[tag] || []).push(val[m].summary || '');
   }
+}
+
+for (const [tag, { prefixes }] of Object.entries(RESOURCE_PATH_OVERRIDES)) {
+  const tagPaths = pathsForTag[tag];
+  const covered = (prefix, path) => path === prefix || path.startsWith(`${prefix}/`);
+  if (
+    !tagPaths?.length ||
+    !tagPaths.every((path) => prefixes.some((prefix) => covered(prefix, path))) ||
+    !prefixes.every((prefix) => tagPaths.some((path) => covered(prefix, path)))
+  ) {
+    console.error(`Aborting: RESOURCE_PATH_OVERRIDES entry for ${tag} does not match its paths.`);
+    process.exit(1);
+  }
+}
+
+writeOrCheck(OUT, yaml.dump(out, { lineWidth: 100, noRefs: true }));
+console.log('paths:', Object.keys(paths).length, '| schemas:', Object.keys(schemas).length, '| tags:', orderedTags.length);
+if (autoExcludedCount) {
+  console.log(`(${autoExcludedCount} Cube-staff-only operation(s) auto-excluded via SUPER_ADMIN_ONLY_MARKER)`);
 }
 
 // The tag's representative page for the intro table: its first operation, unless
@@ -474,7 +698,7 @@ const rows = groups
   .map(
     (g) =>
       `| [${g.group}](/api-reference/${kebab(g.group)}/${kebab(linkSummaryForTag(g.group))}) ` +
-      `| \`${commonPathPrefix(pathsForTag[g.group])}\` | v1 |`
+      `| \`${RESOURCE_PATH_OVERRIDES[g.group]?.display ?? commonPathPrefix(pathsForTag[g.group])}\` | v1 |`
   )
   .join('\n');
 const table = [INTRO_TABLE_HEAD, rows, INTRO_SCIM_ROWS].join('\n');

@@ -102,13 +102,18 @@ impl LogicalNode for PreAggregation {
     }
 }
 
+// Stored columns are named after the members the rollup lists, and keyed by
+// the member a listed view member references, which is what queries render.
 impl PreAggregation {
     pub fn all_dimensions_refererences(&self) -> HashMap<String, QualifiedColumnName> {
         let mut res = HashMap::new();
 
         for dim in self.dimensions().iter() {
             let alias = dim.alias();
-            res.insert(dim.full_name(), QualifiedColumnName::new(None, alias));
+            res.insert(
+                dim.peel_refs().full_name(),
+                QualifiedColumnName::new(None, alias),
+            );
         }
         for dim in self.time_dimensions().iter() {
             let (base_symbol, granularity) = if let Ok(td) = dim.as_time_dimension() {
@@ -123,7 +128,7 @@ impl PreAggregation {
             };
             let alias = format!("{}{}", base_symbol.alias(), suffix);
             res.insert(
-                base_symbol.full_name(),
+                base_symbol.peel_refs().full_name(),
                 QualifiedColumnName::new(None, alias),
             );
         }
@@ -136,8 +141,10 @@ impl PreAggregation {
         if let PreAggregationSource::Join(join) = self.source().as_ref() {
             for item in join.items.iter() {
                 for member in item.from_members.iter().chain(item.to_members.iter()) {
-                    let alias = member.alias();
-                    res.insert(member.full_name(), QualifiedColumnName::new(None, alias));
+                    res.insert(
+                        member.symbol.peel_refs().full_name(),
+                        QualifiedColumnName::new(None, member.column.clone()),
+                    );
                 }
             }
         }
@@ -149,7 +156,10 @@ impl PreAggregation {
             .iter()
             .map(|measure| {
                 let alias = measure.alias();
-                (measure.full_name(), QualifiedColumnName::new(None, alias))
+                (
+                    measure.peel_refs().full_name(),
+                    QualifiedColumnName::new(None, alias),
+                )
             })
             .collect()
     }
@@ -196,8 +206,7 @@ impl PrettyPrint for PreAggregation {
         result.println(
             &format!(
                 "-time_dimensions: {}",
-                &self
-                    .time_dimensions()
+                self.time_dimensions()
                     .iter()
                     .map(|d| d.full_name())
                     .join(", ")

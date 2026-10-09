@@ -232,6 +232,43 @@ cube('Bar', {
   ]),
 };
 
+const repositoryWithRefreshKeys: SchemaFileRepository = {
+  localPath: () => __dirname,
+  dataSchemaFiles: () => Promise.resolve([
+    {
+      fileName: 'main.js', content: `
+cube('Interval', {
+  sql: 'select * from interval_cube',
+
+  refreshKey: {
+    every: '1 hour'
+  },
+
+  measures: {
+    count: {
+      type: 'count'
+    }
+  }
+});
+
+cube('Sql', {
+  sql: 'select * from sql_cube',
+
+  refreshKey: {
+    sql: 'SELECT MAX(updated_at) AS refresh_key FROM sql_cube_refresh'
+  },
+
+  measures: {
+    count: {
+      type: 'count'
+    }
+  }
+});
+`,
+    },
+  ]),
+};
+
 class MockDriver extends BaseDriver {
   public tables: any[] = [];
 
@@ -271,6 +308,10 @@ class MockDriver extends BaseDriver {
 
     let promise: any = Promise.resolve([query]);
     promise = promise.then((res) => new Promise(resolve => setTimeout(() => resolve(res), 150)));
+
+    if (query.includes('sql_cube_refresh')) {
+      promise = promise.then(() => [{ refresh_key: 'sql-key' }]);
+    }
 
     // Simulate query failure for backoff testing
     if (this.shouldFailQuery && this.failQueryPattern && query.match(this.failQueryPattern)) {
@@ -350,10 +391,11 @@ class MockDriver extends BaseDriver {
 
 let testCounter = 1;
 
-const setupScheduler = ({ repository, useOriginalSqlPreAggregations, skipAssertSecurityContext }: {
+const setupScheduler = ({ repository, useOriginalSqlPreAggregations, skipAssertSecurityContext, refreshKeyRenewalThreshold }: {
   repository: SchemaFileRepository,
   useOriginalSqlPreAggregations?: boolean,
-  skipAssertSecurityContext?: true
+  skipAssertSecurityContext?: true,
+  refreshKeyRenewalThreshold?: number
 }) => {
   const mockDriver = new MockDriver();
   const externalDriver = new MockDriver();
@@ -390,6 +432,7 @@ const setupScheduler = ({ repository, useOriginalSqlPreAggregations, skipAssertS
         queueOptions: () => ({
           concurrency: 2,
         }),
+        ...(refreshKeyRenewalThreshold !== undefined && { refreshKeyRenewalThreshold }),
       },
       preAggregationsOptions: {
         queueOptions: () => ({
@@ -427,6 +470,7 @@ describe('Refresh Scheduler', () => {
     delete process.env.CUBEJS_DROP_PRE_AGG_WITHOUT_TOUCH;
     delete process.env.CUBEJS_TOUCH_PRE_AGG_TIMEOUT;
     delete process.env.CUBEJS_DB_QUERY_TIMEOUT;
+    delete process.env.CUBEJS_REFRESH_KEY_LOCAL_TIME;
   });
 
   afterAll(async () => {
@@ -683,6 +727,7 @@ describe('Refresh Scheduler', () => {
                 external: false,
               },
               cube: 'Foo',
+              dataSource: 'default',
               references: {
                 dimensions: [],
                 measures: ['Foo.count'],
@@ -902,6 +947,13 @@ describe('Refresh Scheduler', () => {
       const buildJobs = await refreshScheduler.getCachedBuildJobs(ctx, jobs);
       const allTokensExist = jobs.every(token => buildJobs.some(job => job.token === token));
       expect(allTokensExist).toBeTruthy();
+
+      // Not only the first entry: every entry of a posted job is its own poll token.
+      // https://github.com/cube-js/cube/issues/11615
+      buildJobs.forEach(({ job }) => {
+        expect(job?.dataSource).toEqual('default');
+        expect(['UTC', 'America/Los_Angeles']).toContain(job?.timezone);
+      });
     });
 
     test('Only `first` pre-aggregation', async () => {
@@ -1093,7 +1145,7 @@ describe('Refresh Scheduler', () => {
       await refreshScheduler.runScheduledRefresh({
         securityContext: undefined,
         authInfo: null,
-        requestId: 'Empty security context'
+        requestId: 'empty-security-context'
       }, {
         concurrency: 1,
         workerIndices: [0],
@@ -1102,12 +1154,31 @@ describe('Refresh Scheduler', () => {
     await refreshScheduler.runScheduledRefresh({
       securityContext: undefined,
       authInfo: null,
-      requestId: 'Empty security context'
+      requestId: 'empty-security-context'
     }, {
       concurrency: 1,
       workerIndices: [0],
       throwErrors: true
     });
+  });
+
+  test('Invalid requestId in context only warns', async () => {
+    const { serverCore } = setupScheduler({
+      repository: repositoryWithoutPreAggregations,
+      skipAssertSecurityContext: true,
+    });
+    const logger = jest.spyOn(serverCore, 'logger');
+    // Not in UserBackgroundContext, but JS configs pass it and it reaches the scheduler
+    const ctx = { securityContext: {}, requestId: 'tenant 1' };
+
+    await serverCore.runScheduledRefresh(ctx, { concurrency: 1, workerIndices: [0], throwErrors: true });
+
+    expect(logger).toHaveBeenCalledWith('Refresh Scheduler Warning', expect.objectContaining({
+      warning: expect.stringContaining('"tenant 1"'),
+    }));
+    expect(logger).toHaveBeenCalledWith('Refresh Scheduler Run', expect.objectContaining({
+      requestId: 'scheduler-tenant 1',
+    }));
   });
 
   test('rollupJoin scheduledRefresh', async () => {
@@ -1116,6 +1187,7 @@ describe('Refresh Scheduler', () => {
       refreshScheduler
     } = setupScheduler({ repository: repositoryWithRollupJoin, useOriginalSqlPreAggregations: true });
     const ctx = { authInfo: { tenantId: 'tenant1' }, securityContext: { tenantId: 'tenant1' }, requestId: 'XXX' };
+
     for (let i = 0; i < 1000; i++) {
       try {
         // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -1159,6 +1231,7 @@ describe('Refresh Scheduler', () => {
     // Run refresh until it tries to create foo_first table and fails
     const queryIteratorState = {};
     const maxIterations = 100;
+
     for (let i = 0; i < maxIterations; i++) {
       try {
         await refreshScheduler.runScheduledRefresh(ctx, {
@@ -1208,6 +1281,7 @@ describe('Refresh Scheduler', () => {
     // Step 1: Immediate retry - should skip due to backoff (10-second window)
     const beforeSkipAttempts = mockDriver.queryAttempts;
     const immediateRetryCount = 5;
+
     for (let i = 0; i < immediateRetryCount; i++) {
       try {
         await refreshScheduler.runScheduledRefresh(ctx, {
@@ -1231,5 +1305,68 @@ describe('Refresh Scheduler', () => {
     expect(backoffDataStillActive).not.toBeNull();
     // backoffDataStillActive exists, which means backoff is still in place
     // (nextTimestamp may be close to current time due to test execution delays)
+  });
+
+  describe('Local refresh key', () => {
+    const ctx = { authInfo: { tenantId: 'tenant1' }, securityContext: { tenantId: 'tenant1' }, requestId: 'local-refresh-key' };
+
+    const runRefresh = async (refreshKeyRenewalThreshold?: number) => {
+      const { refreshScheduler, mockDriver, serverCore, compilerApi } = setupScheduler({
+        repository: repositoryWithRefreshKeys,
+        refreshKeyRenewalThreshold,
+      });
+
+      const orchestrator = await serverCore.getOrchestratorApi(ctx);
+      const queryCache = orchestrator.getQueryOrchestrator().getQueryCache();
+      const intervalQuery = await compilerApi.getSql({ measures: ['Interval.count'], timezone: 'UTC' });
+      const intervalKeys = new Set<string>(intervalQuery.cacheKeyQueries.map(q => queryCache.refreshKeyCacheKey(q, intervalQuery.dataSource)));
+      const set = jest.spyOn(queryCache.getCacheDriver(), 'set');
+      let localEntries;
+
+      try {
+        await refreshScheduler.runScheduledRefresh(ctx, {
+          concurrency: 1,
+          workerIndices: [0],
+          throwErrors: true,
+          timezones: ['UTC'],
+        });
+        localEntries = set.mock.calls.filter(([key]) => intervalKeys.has(key));
+      } finally {
+        set.mockRestore();
+      }
+
+      return {
+        localEntries,
+        intervalKeyQueries: mockDriver.executedQueries.filter(q => intervalQuery.cacheKeyQueries.some(([sql]) => sql === q)),
+        sqlKeyQueries: mockDriver.executedQueries.filter(q => q.match(/sql_cube_refresh/)),
+      };
+    };
+
+    test('warms both kinds of refresh key with the flag off', async () => {
+      const { intervalKeyQueries, sqlKeyQueries } = await runRefresh();
+
+      expect(intervalKeyQueries.length).toBeGreaterThan(0);
+      expect(sqlKeyQueries.length).toBeGreaterThan(0);
+    });
+
+    test.each([undefined, 0])('skips uncached local interval keys (threshold=%s)', async threshold => {
+      process.env.CUBEJS_REFRESH_KEY_LOCAL_TIME = 'true';
+
+      const { intervalKeyQueries, sqlKeyQueries, localEntries } = await runRefresh(threshold);
+
+      expect(localEntries).toEqual([]);
+      expect(intervalKeyQueries).toEqual([]);
+      expect(sqlKeyQueries.length).toBeGreaterThan(0);
+    });
+
+    test('warms local refresh key entries without SQL when refreshKeyRenewalThreshold is set', async () => {
+      process.env.CUBEJS_REFRESH_KEY_LOCAL_TIME = 'true';
+
+      const { intervalKeyQueries, sqlKeyQueries, localEntries } = await runRefresh(120);
+
+      expect(localEntries.length).toBeGreaterThan(0);
+      expect(intervalKeyQueries).toEqual([]);
+      expect(sqlKeyQueries.length).toBeGreaterThan(0);
+    });
   });
 });

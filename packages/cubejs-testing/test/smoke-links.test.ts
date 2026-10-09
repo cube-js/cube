@@ -10,6 +10,7 @@ import {
   DEFAULT_CONFIG,
   JEST_AFTER_ALL_DEFAULT_TIMEOUT,
   JEST_BEFORE_ALL_DEFAULT_TIMEOUT,
+  stopIfStarted,
 } from './smoke-tests';
 
 describe('links through views', () => {
@@ -41,8 +42,8 @@ describe('links through views', () => {
   }, JEST_BEFORE_ALL_DEFAULT_TIMEOUT);
 
   afterAll(async () => {
-    await birdbox.stop();
-    await db.stop();
+    await stopIfStarted('birdbox', birdbox);
+    await stopIfStarted('db', db);
   }, JEST_AFTER_ALL_DEFAULT_TIMEOUT);
 
   test('meta exposes link synthetic dimensions on view with explicit includes', async () => {

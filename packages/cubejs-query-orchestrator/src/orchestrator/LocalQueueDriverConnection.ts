@@ -1,4 +1,3 @@
-import R from 'ramda';
 import {
   QueueDriverConnectionInterface,
   QueryKey,
@@ -19,10 +18,13 @@ import {
   LocalQueueDriver
 } from './LocalQueueDriver';
 
-export interface QueueItem {
-  order: number;
-  key: QueryKeyHash;
-  queueId: QueueId;
+/**
+ * `Pending -> Active`, then removed outright by an ack or a cancel. `Active` is the only lock
+ * there is: retrieveForProcessing sets it atomically.
+ */
+export enum LocalQueueItemStatus {
+  Pending = 'pending',
+  Active = 'active',
 }
 
 export interface QueryDefObject {
@@ -36,66 +38,191 @@ export interface QueryDefObject {
   addedToQueueTime: number;
 }
 
+export interface LocalQueueItem {
+  /**
+   * Starts at 1, never 0: callers fall back to a key lookup on a falsy queueId.
+   */
+  id: number;
+  key: QueryKeyHash;
+  status: LocalQueueItemStatus;
+  priority: number;
+  created: number;
+  heartbeat: number | null;
+  /**
+   * Absolute deadline in ms, not a duration. Pushed forward by every addToQueue of the same
+   * key, so a query somebody is still waiting for doesn't get orphaned behind a long backlog.
+   */
+  orphaned: number;
+  payload: QueryDefObject;
+  /**
+   * Written only by optimisticQueryUpdate, kept out of the payload so that a concurrent
+   * update cannot mutate the def other connections are holding.
+   */
+  extra: Record<string, any> | null;
+}
+
 export interface PromiseWithResolve<T = any> extends Promise<T> {
   resolve?: (value: T) => void;
   resolved?: boolean;
 }
 
+/**
+ * Queue items indexed by key and by id, both indexes are only ever updated together.
+ */
+export class LocalQueueItems {
+  /**
+   * A Map because insertion order matches id order, which is the order active items are
+   * reported in. A plain object would reorder them.
+   */
+  protected readonly byKey: Map<QueryKeyHash, LocalQueueItem> = new Map();
+
+  protected readonly byId: Map<number, LocalQueueItem> = new Map();
+
+  protected idSequence: number = 0;
+
+  public nextId(): number {
+    this.idSequence += 1;
+
+    return this.idSequence;
+  }
+
+  public getByKey(key: QueryKeyHash): LocalQueueItem | null {
+    return this.byKey.get(key) || null;
+  }
+
+  public getById(id: number): LocalQueueItem | null {
+    return this.byId.get(id) || null;
+  }
+
+  public has(key: QueryKeyHash): boolean {
+    return this.byKey.has(key);
+  }
+
+  public add(item: LocalQueueItem): void {
+    this.byKey.set(item.key, item);
+    this.byId.set(item.id, item);
+  }
+
+  public remove(item: LocalQueueItem): void {
+    this.byKey.delete(item.key);
+    this.byId.delete(item.id);
+  }
+
+  public values(): IterableIterator<LocalQueueItem> {
+    return this.byKey.values();
+  }
+}
+
 export class LocalQueueDriverConnectionState {
-  public resultPromises: Record<QueryKeyHash, PromiseWithResolve> = {};
+  public readonly resultPromises: Record<string, PromiseWithResolve> = {};
 
-  public queryDef: Record<QueryKeyHash, QueryDefObject> = {};
-
-  public toProcess: Record<QueryKeyHash, QueueItem> = {};
-
-  public recent: Record<QueryKeyHash, QueueItem> = {};
-
-  public active: Record<QueryKeyHash, QueueItem> = {};
-
-  public heartBeat: Record<QueryKeyHash, QueueItem> = {};
+  public readonly items: LocalQueueItems = new LocalQueueItems();
 }
 
 export class LocalQueueDriverConnection implements QueueDriverConnectionInterface {
-  private redisQueuePrefix: string;
+  private readonly redisQueuePrefix: string;
 
-  private continueWaitTimeout: number;
+  private readonly continueWaitTimeout: number;
 
-  private heartBeatTimeout: number;
+  private readonly orphanedTimeout: number;
 
-  private concurrency: number;
+  private readonly heartBeatTimeout: number;
 
-  private orphanedTimeout: number;
+  private readonly concurrency: number;
 
-  private driver: LocalQueueDriver;
+  private readonly driver: LocalQueueDriver;
 
-  private state: LocalQueueDriverConnectionState;
+  private readonly state: LocalQueueDriverConnectionState;
 
   public constructor(driver: LocalQueueDriver, state: LocalQueueDriverConnectionState, options: QueueDriverOptions) {
     this.redisQueuePrefix = options.redisQueuePrefix;
     this.continueWaitTimeout = options.continueWaitTimeout;
+    this.orphanedTimeout = options.orphanedTimeout;
     this.heartBeatTimeout = options.heartBeatTimeout;
     this.concurrency = options.concurrency;
-    this.orphanedTimeout = options.orphanedTimeout;
     this.driver = driver;
     this.state = state;
   }
 
-  public async getQueriesToCancel(): Promise<QueryKeysTuple[]> {
-    const [stalled, orphaned] = await Promise.all([
-      this.getStalledQueries(),
-      this.getOrphanedQueries(),
-    ]);
+  /**
+   * There is deliberately no key fallback once an id is supplied: a stale id has to miss,
+   * otherwise an in-flight query would never notice that it was cancelled and re-added
+   * under a new id.
+   */
+  protected resolveItem(queryKeyHash: QueryKeyHash, queueId?: QueueId | null): LocalQueueItem | null {
+    if (queueId) {
+      const item = this.state.items.getById(Number(queueId));
+      // An id never resolves to an item under a different key
+      return item?.key === queryKeyHash ? item : null;
+    }
 
-    return stalled.concat(orphaned);
+    return this.state.items.getByKey(queryKeyHash);
+  }
+
+  protected mergeDef(item: LocalQueueItem): QueryDef {
+    if (item.extra) {
+      return { ...item.payload, ...item.extra };
+    }
+
+    return { ...item.payload };
+  }
+
+  /**
+   * FIFO within a priority band. The id breaks ties between items added in the same millisecond.
+   */
+  protected sortedItems(): LocalQueueItem[] {
+    return Array.from(this.state.items.values()).sort((a, b) => {
+      if (a.priority !== b.priority) {
+        return b.priority - a.priority;
+      }
+
+      if (a.created !== b.created) {
+        return a.created - b.created;
+      }
+
+      return a.id - b.id;
+    });
+  }
+
+  protected pendingItems(): LocalQueueItem[] {
+    return this.sortedItems().filter((item) => item.status === LocalQueueItemStatus.Pending);
+  }
+
+  /**
+   * Deliberately not priority sorted, unlike pendingItems: active items are reported in id order.
+   */
+  protected activeItems(): LocalQueueItem[] {
+    return Array.from(this.state.items.values()).filter((item) => item.status === LocalQueueItemStatus.Active);
+  }
+
+  protected countPending(): number {
+    let count = 0;
+
+    for (const item of this.state.items.values()) {
+      if (item.status === LocalQueueItemStatus.Pending) {
+        count += 1;
+      }
+    }
+
+    return count;
+  }
+
+  protected asTuple(items: LocalQueueItem[]): QueryKeysTuple[] {
+    return items.map((item): QueryKeysTuple => [item.key, item.id]);
+  }
+
+  public async getQueriesToCancel(): Promise<QueryKeysTuple[]> {
+    const now = Date.now();
+
+    return this.asTuple(
+      Array.from(this.state.items.values()).filter((item) => this.isOrphaned(item, now) || this.isStalled(item, now))
+    );
   }
 
   public async getActiveAndToProcess(): Promise<GetActiveAndToProcessResponse> {
-    const activeQueries = this.queueArrayAsTuple(this.state.active);
-    const toProcessQueries = this.queueArrayAsTuple(this.state.toProcess);
-
     return [
-      activeQueries,
-      toProcessQueries
+      this.asTuple(this.activeItems()),
+      this.asTuple(this.pendingItems()),
     ];
   }
 
@@ -113,7 +240,9 @@ export class LocalQueueDriverConnection implements QueueDriverConnectionInterfac
 
   public async getResultBlocking(queryKeyHash: QueryKeyHash, _queueId?: QueueId): Promise<any> {
     const resultListKey = this.resultListKey(queryKeyHash);
-    if (!this.state.queryDef[queryKeyHash] && !this.state.resultPromises[resultListKey]) {
+    // With neither an item nor a result there is nothing that could ever resolve, so don't
+    // make the caller wait out the timeout
+    if (!this.state.items.has(queryKeyHash) && !this.state.resultPromises[resultListKey]) {
       return null;
     }
     const timeoutPromise = (timeout: number) => new Promise((resolve) => setTimeout(() => resolve(null), timeout));
@@ -138,90 +267,84 @@ export class LocalQueueDriverConnection implements QueueDriverConnectionInterfac
     return null;
   }
 
-  protected queueArray(queueObj: Record<QueryKeyHash, QueueItem>, orderFilterLessThan?: number): string[] {
-    return R.pipe(
-      R.values,
-      R.filter(orderFilterLessThan ? (q: QueueItem) => q.order < orderFilterLessThan : R.identity),
-      R.sortBy((q: QueueItem) => q.order),
-      R.map((q: QueueItem) => q.key)
-    )(queueObj);
-  }
-
-  protected queueArrayAsTuple(queueObj: Record<QueryKeyHash, QueueItem>, orderFilterLessThan?: number): QueryKeysTuple[] {
-    return R.pipe(
-      R.values,
-      R.filter(orderFilterLessThan ? (q: QueueItem) => q.order < orderFilterLessThan : R.identity),
-      R.sortBy((q: QueueItem) => q.order),
-      R.map((q: QueueItem): QueryKeysTuple => [q.key, q.queueId])
-    )(queueObj);
-  }
-
-  public async addToQueue(queryKey: QueryKey, queryHandler: string, query: AddToQueueQuery, priority: QueuePriority, options: AddToQueueOptions): Promise<AddToQueueResponse> {
-    const time = new Date().getTime();
-    const queryQueueObj: QueryDefObject = {
-      queueId: options.queueId,
-      queryHandler,
-      query,
-      queryKey,
-      stageQueryKey: options.stageQueryKey,
-      priority,
-      requestId: options.requestId,
-      addedToQueueTime: time
-    };
-
+  public async addToQueue(
+    queryKey: QueryKey,
+    queryHandler: string,
+    query: AddToQueueQuery,
+    priority: QueuePriority,
+    options: AddToQueueOptions
+  ): Promise<AddToQueueResponse> {
     const key = this.redisHash(queryKey);
+    const pending = this.countPending();
 
-    if (!this.state.queryDef[key]) {
-      this.state.queryDef[key] = queryQueueObj;
+    // A dedupe has to hand back the existing id: lookups by id have no key fallback, so a
+    // fresh one would miss the queued item (e.g. getQueryDef right after a dedupe in QueryQueue).
+    const existing = this.state.items.getByKey(key);
+    if (existing) {
+      existing.orphaned = Math.max(existing.orphaned, this.orphanedDeadline(Date.now(), options));
+
+      return [
+        0,
+        existing.id,
+        pending,
+        existing.payload.addedToQueueTime,
+        null,
+      ];
     }
 
-    let added = 0;
+    const created = Date.now();
+    const id = this.state.items.nextId();
 
-    if (!this.state.toProcess[key] && !this.state.active[key]) {
-      this.state.toProcess[key] = {
-        // Highest priority first, oldest first within a priority
-        order: time + (10000 - priority) * 1E14,
-        queueId: options.queueId,
-        key
-      };
-
-      added = 1;
-    }
-
-    this.state.recent[key] = {
-      order: time + ((options.orphanedTimeout ?? this.orphanedTimeout) * 1000),
+    const item: LocalQueueItem = {
+      id,
       key,
-      queueId: options.queueId,
+      status: LocalQueueItemStatus.Pending,
+      priority,
+      created,
+      heartbeat: null,
+      orphaned: this.orphanedDeadline(created, options),
+      payload: {
+        queueId: id,
+        queryHandler,
+        query,
+        queryKey,
+        stageQueryKey: options.stageQueryKey,
+        priority,
+        requestId: options.requestId,
+        addedToQueueTime: created,
+      },
+      extra: null,
     };
+
+    this.state.items.add(item);
 
     return [
-      added,
-      queryQueueObj.queueId,
-      Object.keys(this.state.toProcess).length,
-      queryQueueObj.addedToQueueTime,
+      1,
+      id,
+      pending + 1,
+      created,
       // There is no round-trip to save in memory, the item is left for reconcile to pick up
-      null
+      null,
     ];
   }
 
   public async getToProcessQueries(): Promise<QueryKeysTuple[]> {
-    return this.queueArrayAsTuple(this.state.toProcess);
+    return this.asTuple(this.pendingItems());
   }
 
   public async getActiveQueries(): Promise<QueryKeysTuple[]> {
-    return this.queueArrayAsTuple(this.state.active);
+    return this.asTuple(this.activeItems());
   }
 
-  public async getQueryAndRemove(queryKeyHash: QueryKeyHash, _queueId?: QueueId | null): Promise<[QueryDef]> {
-    const query = this.state.queryDef[queryKeyHash];
+  public async getQueryAndRemove(queryKeyHash: QueryKeyHash, queueId?: QueueId | null): Promise<[QueryDef]> {
+    const item = this.resolveItem(queryKeyHash, queueId);
+    if (!item) {
+      return [null];
+    }
 
-    delete this.state.active[queryKeyHash];
-    delete this.state.heartBeat[queryKeyHash];
-    delete this.state.toProcess[queryKeyHash];
-    delete this.state.recent[queryKeyHash];
-    delete this.state.queryDef[queryKeyHash];
+    this.state.items.remove(item);
 
-    return [query];
+    return [this.mergeDef(item)];
   }
 
   public async cancelQuery(queryKey: QueryKey, queueId?: QueueId | null): Promise<QueryDef | null> {
@@ -230,17 +353,15 @@ export class LocalQueueDriverConnection implements QueueDriverConnectionInterfac
   }
 
   public async setResultAndRemoveQuery(queryKeyHash: QueryKeyHash, executionResult: any, queueId: QueueId): Promise<boolean> {
-    if (this.state.active[queryKeyHash]?.queueId !== queueId) {
+    const item = this.resolveItem(queryKeyHash, queueId);
+    // The item was cancelled or orphaned while it was executing, so the result is dropped
+    if (item?.status !== LocalQueueItemStatus.Active) {
       return false;
     }
 
-    const promise = this.getResultPromise(this.resultListKey(queryKeyHash));
+    this.state.items.remove(item);
 
-    delete this.state.active[queryKeyHash];
-    delete this.state.heartBeat[queryKeyHash];
-    delete this.state.toProcess[queryKeyHash];
-    delete this.state.recent[queryKeyHash];
-    delete this.state.queryDef[queryKeyHash];
+    const promise = this.getResultPromise(this.resultListKey(item.key));
 
     promise.resolved = true;
     if (promise.resolve) {
@@ -250,65 +371,110 @@ export class LocalQueueDriverConnection implements QueueDriverConnectionInterfac
     return true;
   }
 
+  protected isOrphaned(item: LocalQueueItem, now: number): boolean {
+    return item.status === LocalQueueItemStatus.Pending && item.orphaned < now;
+  }
+
+  /**
+   * options.orphanedTimeout is in seconds and overrides the driver level one.
+   */
+  protected orphanedDeadline(now: number, options: AddToQueueOptions): number {
+    return now + (options.orphanedTimeout ?? this.orphanedTimeout) * 1000;
+  }
+
+  protected isStalled(item: LocalQueueItem, now: number): boolean {
+    if (item.status !== LocalQueueItemStatus.Active) {
+      return false;
+    }
+
+    if (item.heartbeat === null) {
+      return false;
+    }
+
+    return now - item.heartbeat > this.heartBeatTimeout * 1000;
+  }
+
   public async getOrphanedQueries(): Promise<QueryKeysTuple[]> {
-    return this.queueArrayAsTuple(this.state.recent, new Date().getTime());
+    const now = Date.now();
+
+    return this.asTuple(this.pendingItems().filter((item) => this.isOrphaned(item, now)));
   }
 
   public async getStalledQueries(): Promise<QueryKeysTuple[]> {
-    return this.queueArrayAsTuple(this.state.heartBeat, new Date().getTime() - this.heartBeatTimeout * 1000);
+    const now = Date.now();
+
+    return this.asTuple(this.activeItems().filter((item) => this.isStalled(item, now)));
   }
 
   public async getQueryStageState(onlyKeys: boolean): Promise<QueryStageStateResponse> {
-    return [this.queueArray(this.state.active), this.queueArray(this.state.toProcess), onlyKeys ? {} : R.clone(this.state.queryDef)];
+    const defs: Record<string, QueryDef> = {};
+
+    if (!onlyKeys) {
+      for (const item of this.state.items.values()) {
+        defs[item.key] = this.mergeDef(item);
+      }
+    }
+
+    return [
+      this.activeItems().map((item) => item.key),
+      this.pendingItems().map((item) => item.key),
+      defs,
+    ];
   }
 
-  public async getQueryDef(queryKeyHash: QueryKeyHash, _queueId?: QueueId | null): Promise<QueryDef | null> {
-    return this.state.queryDef[queryKeyHash] || null;
+  public async getQueryDef(queryKeyHash: QueryKeyHash, queueId?: QueueId | null): Promise<QueryDef | null> {
+    const item = this.resolveItem(queryKeyHash, queueId);
+
+    return item ? this.mergeDef(item) : null;
   }
 
   public async updateHeartBeat(queryKeyHash: QueryKeyHash, queueId?: QueueId | null): Promise<void> {
-    if (this.state.heartBeat[queryKeyHash]) {
-      this.state.heartBeat[queryKeyHash] = { key: queryKeyHash, order: new Date().getTime(), queueId: queueId || this.state.heartBeat[queryKeyHash].queueId };
+    const item = this.resolveItem(queryKeyHash, queueId);
+    if (item) {
+      item.heartbeat = Date.now();
     }
   }
 
   public async retrieveForProcessing(queryKeyHash: QueryKeyHash, queueId: QueueId): Promise<RetrieveForProcessingSuccess | null> {
-    const query = this.state.queryDef[queryKeyHash];
-    const activeKeys = this.queueArray(this.state.active) as QueryKeyHash[];
+    // Keep this method free of `await`: activation is only atomic while the whole
+    // read-modify-write below stays a single synchronous block.
+    const active = this.activeItems().map((item) => item.key);
 
-    if (
-      !query ||
-      query.queueId !== queueId ||
-      this.state.toProcess[queryKeyHash]?.queueId !== queueId ||
-      this.state.active[queryKeyHash] ||
-      activeKeys.length >= this.concurrency
-    ) {
+    // Every rejection below happens before anything is mutated, so a caller that fails
+    // here has nothing to roll back.
+    if (active.length >= this.concurrency) {
       return null;
     }
 
-    this.state.active[queryKeyHash] = { key: queryKeyHash, order: Number(queueId), queueId };
-    delete this.state.toProcess[queryKeyHash];
+    const item = this.resolveItem(queryKeyHash, queueId);
+    if (item?.status !== LocalQueueItemStatus.Pending) {
+      return null;
+    }
 
-    this.state.heartBeat[queryKeyHash] = { key: queryKeyHash, order: new Date().getTime(), queueId };
+    item.status = LocalQueueItemStatus.Active;
+    item.heartbeat = Date.now();
+    active.push(item.key);
 
     return {
-      active: this.queueArray(this.state.active) as QueryKeyHash[],
-      queueSize: Object.keys(this.state.toProcess).length,
-      def: query,
+      active,
+      queueSize: this.countPending(),
+      def: this.mergeDef(item),
     };
   }
 
   public async optimisticQueryUpdate(queryKeyHash: QueryKeyHash, toUpdate: any, queueId: QueueId): Promise<boolean> {
-    if (this.state.active[queryKeyHash]?.queueId !== queueId || !this.state.queryDef[queryKeyHash]) {
+    const item = this.resolveItem(queryKeyHash, queueId);
+    if (item?.status !== LocalQueueItemStatus.Active) {
       return false;
     }
 
-    this.state.queryDef[queryKeyHash] = { ...this.state.queryDef[queryKeyHash], ...toUpdate };
+    item.extra = { ...(item.extra ?? {}), ...toUpdate };
+
     return true;
   }
 
   public release(): void {
-    // Empty implementation as required by interface
+    // nothing to release
   }
 
   public queryRedisKey(queryKey: QueryKey, suffix: string): string {

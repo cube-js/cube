@@ -50,6 +50,7 @@ Files placed under a `rules/` directory are treated as rules automatically — n
 | `description` | string | No       | Required for `agent_requested` rules — used by the agent to decide when the rule applies. Optional and unused for `always` rules. |
 | `type`        | string | Yes      | Either `always` or `agent_requested`.                                                                                            |
 | `prompt`      | string | No       | Rule prompt. Falls back to the Markdown body if omitted.                                                                         |
+| `conditions`  | list   | No       | Applies the rule only to users who meet all of them. See [Limiting a rule to some users](#limiting-a-rule-to-some-users).        |
 
 ### Inlining rules in YAML
 
@@ -68,11 +69,41 @@ rules:
     type: agent_requested
 ```
 
-Inline rules accept the same properties as Markdown rules — `name`, `description`, `prompt` (required), and `type` (required).
+Inline rules accept the same properties as Markdown rules — `name`, `description`, `prompt` (required), `type` (required), and `conditions`.
 
 <Note>
 Rules inlined at the root of `agents/config.yml` are attached to the implicit `auto` space and applied to the default agent in a [single-agent setup](/admin/ai). In a [multi-agent setup](/admin/ai/multi-agent), attach rules to a specific space by inlining them under that space's `rules` key (or by placing Markdown files under `agents/rules/<space-name>/`).
 </Note>
+
+## Limiting a rule to some users
+
+By default, a rule applies to every user of the agent. Add `conditions` to apply it only to users who meet all of them — for example, one client's naming conventions in a deployment that serves several clients through [signed embedding](/embedding/iframe/auth/signed).
+
+```markdown
+<!-- agents/rules/acme-campaigns.md -->
+---
+type: always
+conditions:
+  - user_attribute: marketplace_id
+    values: ["acme", "acme-eu"]
+  - groups: [analysts, managers]
+---
+Campaigns named `us#...` are US campaigns.
+```
+
+| Condition                             | Holds when                                                                                  |
+|---------------------------------------|---------------------------------------------------------------------------------------------|
+| `user_attribute` + `values`           | The user's [attribute](/admin/users-and-permissions/user-attributes) equals one of `values`. |
+| `group`                               | The user is in this [group](/admin/users-and-permissions/user-groups).                      |
+| `groups`                              | The user is in any of these groups.                                                         |
+
+- Conditions see the same user attributes and groups as [access policies](/docs/data-modeling/data-access-policies). A user without the attribute or group doesn't get the rule.
+- `values` are strings. Quote numbers and booleans (`"00123"`, `"true"`) — YAML would read an unquoted `00123` as `123`.
+- Only `conditions` limits a rule. Any other key on a rule without `conditions`, such as `marketplace_id: acme`, is ignored, and the rule applies to everyone.
+
+<Warning>
+Conditions decide which instructions the agent receives; they don't restrict data. Use [access policies](/docs/data-modeling/data-access-policies) to control what each user can query.
+</Warning>
 
 ## Writing effective rules
 

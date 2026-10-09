@@ -1,4 +1,4 @@
-use super::ParamsAllocator;
+use super::{CubeId, ParamsAllocator};
 use crate::cube_bridge::base_query_options::{FilterValue, MaskedMemberItem};
 use crate::cube_bridge::base_tools::BaseTools;
 use crate::cube_bridge::evaluator::CubeEvaluator;
@@ -11,7 +11,6 @@ use crate::planner::join_hints::JoinHints;
 use crate::planner::sql_templates::PlanSqlTemplates;
 use chrono_tz::Tz;
 use cubenativeutils::CubeError;
-use itertools::Itertools;
 use std::cell::RefCell;
 use std::collections::{HashMap, HashSet};
 use std::rc::Rc;
@@ -20,6 +19,20 @@ use std::rc::Rc;
 pub struct JoinKey {
     root: String,
     joins: Vec<JoinItemStatic>,
+}
+
+impl JoinKey {
+    /// Whether all of this key's joins appear in `other`, which walks from the
+    /// same root and holds strictly more of them.
+    ///
+    /// Containment of the edge set, not of a path: `other` may extend this key
+    /// along a sibling branch rather than along the same walk. That is still a
+    /// tree this key's rows survive in, which is all the caller needs.
+    pub fn is_nested_in(&self, other: &JoinKey) -> bool {
+        self.root == other.root
+            && self.joins.len() < other.joins.len()
+            && self.joins.iter().all(|item| other.joins.contains(item))
+    }
 }
 
 pub struct QueryTools {
@@ -38,6 +51,10 @@ pub struct QueryTools {
     // so this cache forms no reference cycle. It stays here only until the
     // early-compilation refactor resolves mask filters up front.
     member_mask_filters: RefCell<HashMap<String, FilterItem>>,
+    // Building templates re-fetches them from JS and recompiles them, and the
+    // planner asks for them several times per query.
+    plan_sql_templates: RefCell<Option<PlanSqlTemplates>>,
+    external_plan_sql_templates: RefCell<Option<PlanSqlTemplates>>,
 }
 
 impl QueryTools {
@@ -81,6 +98,8 @@ impl QueryTools {
             convert_tz_for_raw_time_dimension,
             masked_members: masked_set,
             member_mask_filters: RefCell::new(HashMap::new()),
+            plan_sql_templates: RefCell::new(None),
+            external_plan_sql_templates: RefCell::new(None),
         }))
     }
 
@@ -110,8 +129,24 @@ impl QueryTools {
     }
 
     pub fn plan_sql_templates(&self, external: bool) -> Result<PlanSqlTemplates, CubeError> {
+        let cache = if external {
+            &self.external_plan_sql_templates
+        } else {
+            &self.plan_sql_templates
+        };
+        if let Some(templates) = cache.borrow().as_ref() {
+            return Ok(templates.clone());
+        }
         let driver_tools = self.base_tools.driver_tools(external)?;
-        PlanSqlTemplates::try_new(driver_tools, external)
+        let templates = if external {
+            PlanSqlTemplates::try_new(driver_tools, true)?
+        } else {
+            // `driverTools(false)` is the base query itself, whose templates
+            // `try_new` already fetched.
+            PlanSqlTemplates::new(self.templates_render.clone(), driver_tools, false)
+        };
+        *cache.borrow_mut() = Some(templates.clone());
+        Ok(templates)
     }
 
     pub fn base_tools(&self) -> &Rc<dyn BaseTools> {
@@ -137,15 +172,35 @@ impl QueryTools {
         let join = self
             .base_tools
             .join_tree_for_hints(hints.items().to_vec())?;
-        let join_key = JoinKey {
+        Ok((Self::join_key(&join)?, join))
+    }
+
+    /// Like `join_for_hints`, but `None` when the join graph has no path
+    /// covering `hints`.
+    pub fn try_join_for_hints(
+        &self,
+        hints: &JoinHints,
+    ) -> Result<Option<(JoinKey, Rc<dyn JoinDefinition>)>, CubeError> {
+        let Some(join) = self
+            .base_tools
+            .try_join_tree_for_hints(hints.items().to_vec())?
+            .into_iter()
+            .next()
+        else {
+            return Ok(None);
+        };
+        Ok(Some((Self::join_key(&join)?, join)))
+    }
+
+    fn join_key(join: &Rc<dyn JoinDefinition>) -> Result<JoinKey, CubeError> {
+        Ok(JoinKey {
             root: join.static_data().root.to_string(),
             joins: join
                 .joins()?
                 .iter()
                 .map(|i| i.static_data().clone())
                 .collect(),
-        };
-        Ok((join_key, join))
+        })
     }
 
     pub fn alias_name(&self, name: &str) -> String {
@@ -160,24 +215,14 @@ impl QueryTools {
         }
     }
 
-    pub fn parse_member_path(&self, name: &str) -> Result<(String, String), CubeError> {
-        let path = name.split('.').collect_vec();
-        if path.len() == 2 {
-            Ok((path[0].to_string(), path[1].to_string()))
-        } else {
-            Err(CubeError::internal(format!(
-                "Invalid member name: '{}'",
-                name
-            )))
-        }
-    }
-
-    pub fn alias_for_cube(&self, cube_name: &String) -> Result<String, CubeError> {
-        let cube_definition = self.cube_evaluator().cube_from_path(cube_name.clone())?;
+    pub fn alias_for_cube(&self, cube_id: &CubeId) -> Result<String, CubeError> {
+        let cube_definition = self
+            .cube_evaluator()
+            .cube_from_path(cube_id.target().to_string())?;
         let res = if let Some(sql_alias) = &cube_definition.static_data().sql_alias {
             sql_alias.clone()
         } else {
-            cube_name.clone()
+            cube_id.to_string()
         };
         Ok(res)
     }

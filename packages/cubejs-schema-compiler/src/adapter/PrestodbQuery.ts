@@ -1,4 +1,4 @@
-import { parseSqlInterval } from '@cubejs-backend/shared';
+import { parseSqlInterval, splitSqlInterval } from '@cubejs-backend/shared';
 import { BaseQuery } from './BaseQuery';
 import { BaseFilter } from './BaseFilter';
 
@@ -110,6 +110,25 @@ export class PrestodbQuery extends BaseQuery {
     return `date_trunc('${GRANULARITY_TO_INTERVAL[granularity]}', ${dimension})`;
   }
 
+  public subtractInterval(date: string, interval: string): string {
+    return this.applyInterval('-', date, interval);
+  }
+
+  public addInterval(date: string, interval: string): string {
+    return this.applyInterval('+', date, interval);
+  }
+
+  /**
+   * A Presto INTERVAL literal carries a single unit, so a compound interval is applied one unit at
+   * a time, coarsest first.
+   */
+  private applyInterval(operator: '+' | '-', date: string, interval: string): string {
+    return splitSqlInterval(interval).reduce(
+      (acc, part) => `${acc} ${operator} interval ${this.intervalString(part)}`,
+      date
+    );
+  }
+
   public intervalString(interval: string): string {
     const [intervalValue, intervalUnit] = interval.split(' ');
     return `'${intervalValue}' ${intervalUnit}`;
@@ -169,7 +188,12 @@ export class PrestodbQuery extends BaseQuery {
     templates.functions.UTCTIMESTAMP = 'CAST(NOW() AT TIME ZONE \'UTC\' AS TIMESTAMP)';
     templates.functions.TRUNC = 'TRUNCATE({{ args_concat }})';
     templates.functions.STRING_AGG = 'ARRAY_JOIN(ARRAY_AGG({% if distinct %}DISTINCT {% endif %}{{ args[0] }}), COALESCE({{ args[1] }}, \'\'))';
+    // Presto has no exact percentile aggregate, so PERCENTILE_CONT cannot be pushed
+    // down. APPROX_PERCENTILE is the approximate one it does have, and it is the only
+    // way to evaluate a median here - including the one DataFusion rewrites
+    // APPROX_MEDIAN(expr) into, APPROXPERCENTILECONT(expr, 0.5).
     delete templates.functions.PERCENTILECONT;
+    templates.functions.APPROXPERCENTILECONT = 'APPROX_PERCENTILE({{ args_concat }})';
     templates.statements.select = '{% if ctes %} WITH \n' +
           '{{ ctes | join(\',\n\') }}\n' +
           '{% endif %}' +

@@ -6,6 +6,9 @@ title: Workbooks
 Workbooks allow you to build reports and explore data with AI agents, organize the results of your
 analysis, and share trusted insights with your team.
 
+A report inside a workbook and a standalone [exploration](/docs/explore-analyze/explore#saving-explorations)
+are the same kind of object — the only difference is whether it's filed inside a workbook.
+
 ## Tabs
 
 Workbooks can contain one or more tabs, each providing a different way to query and analyze your data. Tabs enable you to organize multiple analyses within a single workbook, making it easy to explore different aspects of your data or combine insights from different sources.
@@ -129,8 +132,46 @@ and paste it as a new tab in any workbook using the same workflow.
 ## Duplicating workbooks
 
 You can duplicate a workbook by selecting **Duplicate** from the row
-actions menu on the workspace page. This creates a full copy of the
-workbook, including all its tabs, reports, and any published dashboard.
+actions menu on the workspace page, from the workbook menu while the
+workbook is open, or from a published dashboard's options menu. This
+creates a full copy of the workbook, including all its tabs, reports, and
+any published dashboard.
+
+A duplicate does not carry the original's sharing over by default. The
+copy is visible only to you, plus anyone with access to the folder it is
+created in.
+
+If the original is shared — with people, with groups, with your whole
+organization, or through signed embedding — the duplicate dialog offers
+**Copy sharing and embedding settings**. Selecting it gives the copy the
+same audience. The option appears only if you have **Full access** to the
+original, since copying its sharing means granting that access again. See
+[Duplicates][ref-sharing-duplicates] for what does and doesn't carry over.
+
+## Promoting workbooks to another deployment
+
+You can copy a workbook from one deployment to another deployment in the same account —
+for example, to ship a dashboard built and validated in development to production
+without rebuilding it by hand. The workbook must already have a published dashboard;
+Cube asks you to publish it first otherwise.
+
+From the workbook's row actions menu on the workspace page (not available in
+[Creator Mode](/embedding/iframe/creator-mode)), select **Copy to another deployment**
+and choose the target deployment. Cube previews what will change before you apply it.
+The first promotion to a given deployment creates a linked copy there and publishes the
+dashboard; every later promotion to the same deployment updates that copy, instead of
+creating another one, and republishes the dashboard.
+
+You need read access to the source workbook and access to the target deployment; once a
+linked copy exists there, you also need edit access to it. If the destination copy was
+edited since the last promotion, applying the promotion is blocked until you choose to
+override those edits, replacing them with the source's. Sharing, embedding, and
+ownership settings on the destination copy are never changed by a promotion — set them
+separately there. A promoted workbook can still fail at query time if the destination's
+data model differs from the source's.
+
+You can also promote workbooks programmatically with the
+[Workbook Promotions API][ref-promotions-api].
 
 ## Workbook versions
 
@@ -151,4 +192,6 @@ has not been published will be lost.
 </Warning>
 
 [ref-dashboards]: /docs/explore-analyze/dashboards
+[ref-sharing-duplicates]: /docs/organize-content/sharing#duplicates
+[ref-promotions-api]: /api-reference/workbook-promotions/promote-and-publish-a-workbook
 

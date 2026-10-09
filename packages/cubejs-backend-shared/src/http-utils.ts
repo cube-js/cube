@@ -1,5 +1,5 @@
 import * as tar from 'tar';
-import extractZip from 'extract-zip';
+import StreamZip from 'node-stream-zip';
 import fetch, { Headers, Request, Response } from 'node-fetch';
 import bytes from 'bytes';
 import { throttle } from 'throttle-debounce';
@@ -13,6 +13,8 @@ import { gunzipSync } from 'zlib';
 
 import { internalExceptions } from './errors';
 import { getHttpAgentForProxySettings } from './proxy';
+
+const StreamZipAsync = StreamZip.async;
 
 type ByteProgressCallback = (info: { progress: number; eta: number; speed: string }) => void;
 
@@ -65,31 +67,20 @@ export async function streamWithProgress(
 }
 
 /**
- * Options shared by every `tar.x` call here.
- *
- * `preserveOwner` defaults to true when running as root, which is the normal case
- * inside the Cube image; extracted files would then take whatever uid/gid the
- * tarball recorded. Writing as the current user matches how this path has always
- * behaved.
+ * `preserveOwner` defaults to true when running as root, the normal case inside the
+ * Cube image, and extracted files would then take whatever uid/gid the tarball
+ * recorded.
  *
  * `onwarn` is load-bearing: tar *drops* unsafe entries with a warning rather than
- * failing, so an archive consisting only of `../evil` would extract to nothing and
- * resolve successfully, leaving the caller to fail later on a confusing
- * missing-file error.
+ * failing, so an archive of nothing but `../evil` would extract to nothing and
+ * resolve successfully, leaving the caller on a confusing missing-file error later.
  *
- * Only `TAR_ENTRY_ERROR` goes through `internalExceptions`, deliberately: that
- * helper calls `process.exit(1)` under `CUBEJS_INTERNAL_EXCEPTIONS=exit`, and tar
- * also warns about benign conditions (unsupported entry types such as fifos and
- * devices, `TAR_ENTRY_INVALID`, failed utime/chown). Routing those through it
- * would let one odd entry in a third-party tarball take the process down
- * mid-download, where previously it extracted and carried on.
- *
- * `TAR_ENTRY_ERROR` is not only the path-rejection code — measured, tar reports
- * per-entry write failures through it too (a read-only target raises it once per
- * entry, same as a `..` name does). Both belong on this side of the split: a
- * half-extracted install is a real failure, and escalating it is what the opt-in
- * `exit` setting asks for. Everything else is logged and ignored, as tar treats
- * it.
+ * Only `TAR_ENTRY_ERROR` is escalated, because `internalExceptions` calls
+ * `process.exit(1)` under `CUBEJS_INTERNAL_EXCEPTIONS=exit` and tar also warns about
+ * benign conditions (fifos and devices, `TAR_ENTRY_INVALID`, failed utime/chown) —
+ * one odd entry in a third-party tarball should not take the process down. tar
+ * reports per-entry write failures through `TAR_ENTRY_ERROR` too, not just path
+ * rejections, and both mean a half-extracted install.
  */
 const tarOptions = {
   preserveOwner: false,
@@ -106,6 +97,74 @@ const tarOptions = {
   },
 };
 
+/** A zip records the unix mode in the high half of the external attributes. */
+function zipEntryMode(entry: StreamZip.ZipEntry): number {
+  // eslint-disable-next-line no-bitwise
+  return entry.attr >>> 16;
+}
+
+/**
+ * The same mode, but only when the "version made by" host byte is 3; with the DOS
+ * default of 0 those bits are DOS attribute flags, and applying them as a mode would
+ * invent permissions.
+ */
+function zipEntryUnixMode(entry: StreamZip.ZipEntry): number | undefined {
+  // eslint-disable-next-line no-bitwise
+  if ((entry.verMade >> 8) !== 3) {
+    return undefined;
+  }
+
+  return zipEntryMode(entry) || undefined;
+}
+
+const S_IFMT = 0o170000;
+const S_IFLNK = 0o120000;
+const S_IXUGO = 0o111;
+
+async function extractZipArchive(archivePath: string, dir: string): Promise<void> {
+  // `skipEntryNameValidation` is the default, and passed explicitly because it is what
+  // rejects `..`, a leading `/`, a drive letter or a backslash while the central
+  // directory is read — before a byte is written. Flip it and Zip Slip is back.
+  const zip = new StreamZipAsync({ file: archivePath, skipEntryNameValidation: false });
+
+  try {
+    const entries = Object.values(await zip.entries())
+      .map((entry) => ({ entry, mode: zipEntryUnixMode(entry) }));
+
+    // Policy, not containment: `node-stream-zip` never creates symlinks, so the entry
+    // would land as a file holding the target path — a silently broken install, worth
+    // failing loudly over. Ungated by the host byte, which a producer may report as DOS.
+    for (const { entry } of entries) {
+      // eslint-disable-next-line no-bitwise
+      if ((zipEntryMode(entry) & S_IFMT) === S_IFLNK) {
+        throw new Error(
+          `Refusing to extract "${entry.name}": symlink entries in zip archives are not allowed.`
+        );
+      }
+    }
+
+    await zip.extract(null, dir);
+
+    // `node-stream-zip` applies no entry modes, so a zipped binary arrives unrunnable.
+    // Only the exec bit is restored, because honouring the whole mode would let an
+    // archive widen its own permissions.
+    for (const { entry, mode } of entries) {
+      // eslint-disable-next-line no-bitwise
+      if (entry.isFile && mode !== undefined && (mode & S_IXUGO)) {
+        const target = path.join(dir, entry.name);
+        const { mode: current } = await fs.promises.stat(target);
+
+        // eslint-disable-next-line no-bitwise
+        await fs.promises.chmod(target, current | (mode & S_IXUGO));
+      }
+    }
+  } finally {
+    // Swallowed: a rejection here would replace whatever the `try` threw, and the
+    // symlink refusal is the one error whose text a caller needs.
+    await zip.close().catch(() => undefined);
+  }
+}
+
 /**
  * Extract a downloaded archive into `cwd`, which is created if missing.
  *
@@ -113,19 +172,15 @@ const tarOptions = {
  * dispatch on: `streamWithProgress` saves downloads as
  * `crypto.randomBytes(16).toString('hex')`, with no extension.
  *
- * Handles gzip (`.tar.gz` / `.tgz`), uncompressed tar and zip. Two gaps are
- * deliberate and both throw a named error rather than failing obscurely: bzip2,
- * and pre-POSIX v7 tars, which carry no `ustar` magic at offset 257 to detect them
- * by.
+ * Two gaps are deliberate, and both throw a named error rather than failing
+ * obscurely: bzip2, and pre-POSIX v7 tars, which carry no magic to detect them by.
  *
- * Neither backend writes outside `cwd`: `tar` strips a leading `/` on extraction and
- * drops entries containing `..`, and `extract-zip` rejects entries that resolve outside
- * the target.
+ * Neither backend writes outside `cwd`.
  */
 export async function extractArchive(archivePath: string, cwd: string): Promise<void> {
-  // `extract-zip` creates its target but `tar.x` throws `CwdError` when it is
-  // missing, so without this the contract would depend on the archive's format —
-  // which callers cannot know in advance, that being the point of magic-byte dispatch.
+  // Neither backend creates its target — `tar.x` throws `CwdError`, the zip backend
+  // opens files in a directory it expects to exist — so without this the contract
+  // would depend on the archive's format, which callers cannot know in advance.
   mkdirpSync(cwd);
 
   // 262 bytes: enough for the `ustar` magic a plain tar carries at offset 257.
@@ -142,20 +197,19 @@ export async function extractArchive(archivePath: string, cwd: string): Promise<
 
   const startsWith = (...magic: number[]) => bytesRead >= magic.length && magic.every((byte, i) => header[i] === byte);
 
-  // gzip (1f 8b) covers .tar.gz/.tgz; `tar.x` gunzips transparently.
+  // gzip covers .tar.gz/.tgz; `tar.x` gunzips transparently.
   if (startsWith(0x1f, 0x8b)) {
     await tar.x({ file: archivePath, cwd, ...tarOptions });
     return;
   }
 
-  // zip: the two-byte "PK" prefix, shared by a local file header and by the
+  // "PK" only: the rest of the signature differs between a local file header and the
   // end-of-central-directory record that an empty archive consists of.
   if (startsWith(0x50, 0x4b)) {
-    await extractZip(archivePath, { dir: path.resolve(cwd) });
+    await extractZipArchive(archivePath, path.resolve(cwd));
     return;
   }
 
-  // Uncompressed tar: "ustar" at offset 257.
   if (bytesRead >= 262 && header.subarray(257, 262).toString('latin1') === 'ustar') {
     await tar.x({ file: archivePath, cwd, ...tarOptions });
     return;

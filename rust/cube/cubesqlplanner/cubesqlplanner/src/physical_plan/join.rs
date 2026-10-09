@@ -1,4 +1,4 @@
-use super::{Expr, SingleAliasedSource, VisitorContext};
+use super::{Expr, SingleAliasedSource, TimeSeries, VisitorContext};
 use crate::planner::query_tools::QueryTools;
 use crate::planner::sql_templates::PlanSqlTemplates;
 use crate::planner::{BaseJoinCondition, Granularity};
@@ -127,7 +127,17 @@ impl ToDateRollingWindowJoinCondition {
             templates.column_reference(&Some(self.time_series_source.clone()), "date_to")?;
         let date_from = templates.rolling_window_expr_timestamp_cast(&date_from)?;
         let date_to = templates.rolling_window_expr_timestamp_cast(&date_to)?;
-        let grouped_from = self.granularity.apply_to_input_sql(templates, date_from)?;
+        // A calendar period cannot be derived from a timestamp — the series
+        // carries the boundary it read off the calendar cube.
+        let grouped_from = if self.granularity.calendar_sql().is_some() {
+            let period_start = templates.column_reference(
+                &Some(self.time_series_source.clone()),
+                &TimeSeries::period_start_column(self.granularity.granularity()),
+            )?;
+            templates.rolling_window_expr_timestamp_cast(&period_start)?
+        } else {
+            self.granularity.apply_to_input_sql(templates, date_from)?
+        };
         let result = format!("{date_column} >= {grouped_from} and {date_column} <= {date_to}");
         Ok(result)
     }

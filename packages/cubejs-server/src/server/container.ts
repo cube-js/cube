@@ -1,7 +1,7 @@
 import path from 'path';
+import { pathToFileURL } from 'url';
 import fs from 'fs';
 import fsAsync from 'fs/promises';
-import vm from 'vm';
 import color from '@oclif/color';
 import dotenv from '@cubejs-backend/dotenv';
 import { parse as semverParse, SemVer, compare as semverCompare } from 'semver';
@@ -9,7 +9,8 @@ import {
   displayCLIWarning,
   getEnv,
   isDockerImage, isNativeSupported,
-  packageExists,
+  markDevModeResolvedByCaller,
+  dropPreAggregationsSchemaPin,
   PackageManifest,
   resolveBuiltInPackageVersion,
 } from '@cubejs-backend/shared';
@@ -19,12 +20,11 @@ import { isFallbackBuild, pythonLoadConfig } from '@cubejs-backend/native';
 import {
   getMajorityVersion,
   isCubeNotServerPackage,
-  isDevPackage,
+  isCubePackage,
   isSimilarPackageRelease, parseNpmLock,
   parseYarnLock, ProjectLock,
 } from './utils';
 import { CreateOptions, CubejsServer } from '../server';
-import type { TypescriptCompiler as TypescriptCompilerType } from './typescript-compiler';
 
 function safetyParseSemver(version: string | null) {
   if (version) {
@@ -35,24 +35,14 @@ function safetyParseSemver(version: string | null) {
 }
 
 export class ServerContainer {
-  protected isCubeConfigEmpty: boolean = true;
+  // Left undefined until `lookupConfiguration` measures it, so an override that does not
+  // call super falls back to measuring what it returned rather than inheriting a stale
+  // `true` — which would tell server-core a fully configured project is unconfigured
+  protected isCubeConfigEmpty: boolean | undefined;
 
   public constructor(
-    protected readonly configuration: { debug: boolean }
+    protected readonly configuration: { debug: boolean, devMode?: boolean }
   ) {
-  }
-
-  protected getTypeScriptCompiler(): TypescriptCompilerType {
-    if (packageExists('typescript', isDockerImage())) {
-      // eslint-disable-next-line global-require
-      const { TypescriptCompiler } = require('./typescript-compiler');
-
-      return new TypescriptCompiler();
-    }
-
-    throw new Error(
-      'Typescript dependency not found. Please run this command from project directory.'
-    );
   }
 
   protected compareBuiltInAndUserVersions(builtInVersion: SemVer, userVersion: SemVer) {
@@ -75,7 +65,7 @@ export class ServerContainer {
 
     if (compareResult === 1) {
       console.log(
-        `${color.yellow('warning')} You are using old Cube.js packages (${getMajorityVersion(userVersion, true)}) `
+        `${color.yellow('warning')} You are using old Cube packages (${getMajorityVersion(userVersion, true)}) `
         + `with new Docker image (${getMajorityVersion(builtInVersion, true)})`
       );
     }
@@ -146,6 +136,7 @@ export class ServerContainer {
       const depsToCompareVersions = Object.keys(manifest.devDependencies).filter(
         isCubeNotServerPackage
       );
+
       // eslint-disable-next-line no-restricted-syntax
       for (const pkgName of depsToCompareVersions) {
         const pkgVersion = safetyParseSemver(
@@ -182,7 +173,7 @@ export class ServerContainer {
     if (manifest.dependencies) {
       // eslint-disable-next-line no-restricted-syntax
       for (const [pkgName] of Object.entries(manifest.dependencies)) {
-        if (isDevPackage(pkgName) && !deepsToIgnore.includes(pkgName)) {
+        if (isCubePackage(pkgName) && !deepsToIgnore.includes(pkgName)) {
           displayCLIWarning(`"${pkgName}" package must be installed in devDependencies`);
         }
       }
@@ -257,15 +248,60 @@ export class ServerContainer {
   }
 
   public async lookupConfiguration(override: boolean = false): Promise<CreateOptions> {
+    // A reload builds a second CubejsServerCore, and the schema it resolves has to reach
+    // the drivers; the pin from the previous one would otherwise refuse to move. Before
+    // dotenv, so a CUBEJS_PRE_AGGREGATIONS_SCHEMA added to `.env` is the user's and stays
+    if (override) {
+      dropPreAggregationsSchemaPin();
+    }
+
     dotenv.config({
       override,
       multiline: 'line-breaks'
     });
 
-    const devMode = getEnv('devMode');
-    if (devMode) {
+    // CUBEJS_DEV_MODE also gates the SQL API's default port and its password check,
+    // neither of which `cubejs dev-server` turned on before, so it asks for dev mode
+    // through CreateOptions.devServer instead. Read after dotenv, so a .env value wins
+    const devServer = this.configuration.devMode && process.env.CUBEJS_DEV_MODE === undefined
+      ? true
+      : undefined;
+
+    if (devServer) {
+      markDevModeResolvedByCaller();
+    }
+
+    // Written before `cube.js` is loaded so that file sees it, which is what master did;
+    // the config it exports can still overrule the command, and the sync follows below
+    const nodeEnv = process.env.NODE_ENV;
+    const wroteNodeEnv = !!(devServer ?? getEnv('devMode'));
+
+    if (wroteNodeEnv) {
       process.env.NODE_ENV = 'development';
     }
+
+    // `{ devServer: true }` is not empty, and server-core reads emptiness as "nothing is
+    // configured yet" - measure the user's own config before folding the default in
+    const measureAndApplyDevServer = (userConfig: CreateOptions): CreateOptions => {
+      this.isCubeConfigEmpty = Object.keys(userConfig).length === 0;
+
+      const config = devServer ? { devServer, ...userConfig } : userConfig;
+
+      // Scoped to the value written above, so a `cube.js` that chose its own NODE_ENV keeps it
+      if (
+        wroteNodeEnv &&
+        !(config.devServer ?? getEnv('devMode')) &&
+        process.env.NODE_ENV === 'development'
+      ) {
+        if (nodeEnv === undefined) {
+          delete process.env.NODE_ENV;
+        } else {
+          process.env.NODE_ENV = nodeEnv;
+        }
+      }
+
+      return config;
+    };
 
     if (fs.existsSync(path.join(process.cwd(), 'cube.py'))) {
       const supported = isNativeSupported();
@@ -283,54 +319,24 @@ export class ServerContainer {
         );
       }
 
-      return this.loadConfigurationFromPythonFile();
-    }
-
-    if (fs.existsSync(path.join(process.cwd(), 'cube.ts'))) {
-      return this.loadConfigurationFromMemory(
-        this.getTypeScriptCompiler().compileConfiguration()
-      );
+      return measureAndApplyDevServer(await this.loadConfigurationFromPythonFile());
     }
 
     if (fs.existsSync(path.join(process.cwd(), 'cube.js'))) {
-      return this.loadConfigurationFromFile();
+      return measureAndApplyDevServer(await this.loadConfigurationFromFile());
+    }
+
+    if (fs.existsSync(path.join(process.cwd(), 'cube.ts'))) {
+      throw new Error(
+        'Configuration in cube.ts is no longer supported. Please use cube.js or cube.py instead.'
+      );
     }
 
     displayCLIWarning(
       'There is no cube.js file. Continue with environment variables'
     );
 
-    return {};
-  }
-
-  protected async loadConfigurationFromMemory(content: string): Promise<CreateOptions> {
-    if (this.configuration.debug) {
-      console.log('Loaded configuration from memory', content);
-    }
-
-    const exports: Record<string, any> = {};
-
-    const script = new vm.Script(content);
-    script.runInNewContext(
-      {
-        require,
-        console,
-        // Workaround for ES5 exports
-        exports
-      },
-      {
-        filename: 'cube.js',
-        displayErrors: true,
-      }
-    );
-
-    if (exports.default) {
-      return exports.default;
-    }
-
-    throw new Error(
-      'Configure file must export configuration as default.'
-    );
+    return measureAndApplyDevServer({});
   }
 
   protected async loadConfigurationFromPythonFile(): Promise<CreateOptions> {
@@ -355,16 +361,17 @@ export class ServerContainer {
   }
 
   protected async loadConfigurationFromFile(): Promise<CreateOptions> {
-    const file = await import(
-      path.join(process.cwd(), 'cube.js')
-    );
+    const file = await import(pathToFileURL(path.join(process.cwd(), 'cube.js')).href);
 
     if (this.configuration.debug) {
       console.log('Loaded js configuration file', file);
     }
 
-    if (file.default) {
-      return file.default;
+    const exported = file.default;
+    const config = exported?.__esModule ? exported.default : exported;
+
+    if (config) {
+      return config;
     }
 
     throw new Error(
@@ -373,7 +380,7 @@ export class ServerContainer {
   }
 
   /**
-   * @param embedded Cube.js will start without https/ws/graceful shutdown + without timers
+   * @param embedded Cube will start without https/ws/graceful shutdown + without timers
    */
   public async start(embedded: boolean = false) {
     const makeInstance = async (override: boolean) => {
@@ -388,7 +395,9 @@ export class ServerContainer {
       const server = await this.runServerInstance(
         configuration,
         embedded,
-        Object.keys(userConfig).length === 0
+        // `??` so an overridden `lookupConfiguration` that never measured still gets the
+        // computation this had before the devServer default existed
+        this.isCubeConfigEmpty ?? Object.keys(userConfig).length === 0
       );
 
       return {

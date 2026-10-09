@@ -177,7 +177,8 @@ Run `cube <command> --help` for the full options of any command.
 | `regions` | List available deployment regions |
 | `github` (`gh`) | GitHub integration: `status`, `installations`, `repos`, `branches`, `connect` |
 | `data-model` | Data model files and Git workflow: `list`, `get`, `put`, `delete`, `rename`, `file-hashes`, `branches`, `create-branch`, `delete-branch`, `enable-branch`/`disable-branch`, `dev-mode`, `commit`, `pull`, `merge`, `merge-to-default` |
-| `dbt` | dbt sync: `sync` (`--ref`, `--wait`), `status`, `result`, `cancel` |
+| `dbt` | dbt sync: `sync` (`--ref` or `--manifest`, `--wait`), `generate` (`--manifest`, `--out`, `--check`), `status`, `result`, `logs`, `history` (`--status`, `--trigger`), `cancel` |
+| `evals` | Agent evals: `run` (`--branch`, `--agent`, `--file`, `--wait`), `status` (`--wait`), `results` (`--first`, `--after`) |
 | `environments` | Deployment environments and environment tokens |
 | `variables` | Deployment environment variables |
 | `folders`, `workbooks`, `reports`, `workspace` | Workspace content management |
@@ -331,15 +332,71 @@ cube data-model enable-branch DEPLOYMENT_ID my-branch
 cube data-model disable-branch DEPLOYMENT_ID my-branch
 ```
 
+## Agent evals
+
+Run an agent's benchmark questions against a branch:
+
+```bash
+cube evals run DEPLOYMENT_ID --branch my-branch --agent auto --wait
+```
+
+Omit `--agent` to use the auto agent. Pass
+`--file eval_questions/revenue.yml` to run only that question file. Without
+`--wait`, the command returns immediately; use the returned id to inspect the
+run later:
+
+```bash
+cube evals status DEPLOYMENT_ID EVAL_RUN_ID --wait
+cube evals results DEPLOYMENT_ID EVAL_RUN_ID
+```
+
+Both waiting commands exit non-zero when the run fails, when no question
+results are returned, or when any question has a verdict other than `pass`.
+They also fail closed if the API does not return a complete result set. This
+makes the eval suite usable as a CI gate. With `--json`, the waiting commands
+print the terminal eval run and its per-question results as one JSON document
+when the result set is complete, before returning the same exit code.
+
+`--timeout` bounds the run-status wait. If the run finishes at that deadline,
+the CLI allows up to five additional seconds to fetch its terminal results.
+
+See [Run evals from CI](/admin/ai/evals#run-evals-from-ci) for complete GitHub
+Actions recipes using either the CLI or the public Platform API.
+
 ## dbt sync
 
-Pull a dbt project's models in as cubes. The repository, credential and
-warehouse settings come from the deployment's dbt integration, so a sync needs
-only the deployment:
+Pull a dbt project's models in as cubes. By default, Cube clones the repository
+configured on the deployment's dbt integration and runs dbt to produce a
+manifest, so a Git-based sync needs only the deployment:
 
 ```bash
 cube dbt sync DEPLOYMENT_ID --wait
 ```
+
+In CI, upload the manifest the dbt job already produced instead:
+
+```bash
+dbt parse
+cube dbt sync DEPLOYMENT_ID --manifest target/manifest.json --wait
+```
+
+`--manifest` parses the file as JSON and uploads it with the sync request. Cube
+converts that exact artifact without cloning the dbt repository, using a repository
+credential, provisioning a sandbox, or running dbt. This makes the sync faster and
+also works when the deployment has no dbt Git integration. Any dbt command that
+parses the project can produce `target/manifest.json`, including `dbt parse`, `dbt
+compile`, `dbt run`, and `dbt build`. Use `--manifest -` to read it from standard
+input. Manifest upload requests must be no larger than 50 MiB; use the Git-based sync
+path for larger projects.
+After starting the sync, the CLI reads its history row to confirm the tenant honored
+the `manifest` source instead of silently falling back to Git, so `--manifest` requires
+both `SchemaUpdate` and `SchemaRead` access.
+
+The server validates that the upload is a supported dbt manifest, rather than another
+dbt artifact such as `catalog.json` or `run_results.json`. Saved conversion settings
+are still applied when the deployment has them; otherwise their defaults are used.
+Settings that require Cube to execute dbt, such as the model selector and catalog type
+inference, apply only to Git-based syncs.
 
 Each sync creates a **new branch** for the generated cubes and prints its name.
 `--wait` polls until the sync finishes, reporting each stage, then prints the
@@ -352,9 +409,8 @@ cube dbt result DEPLOYMENT_ID SYNC_JOB_ID
 cube dbt cancel DEPLOYMENT_ID SYNC_JOB_ID
 ```
 
-`--ref` syncs a specific branch or tag of the dbt repository instead of the one
-saved on the integration — which is what makes a pull-request gate meaningful,
-since otherwise every run would compile the tracked branch:
+For a Git-based sync, `--ref` syncs a specific branch or tag of the dbt repository
+instead of the one saved on the integration:
 
 ```bash
 cube dbt sync DEPLOYMENT_ID --ref feature/orders-model --wait
@@ -362,16 +418,107 @@ cube dbt sync DEPLOYMENT_ID --ref feature/orders-model --wait
 
 <Note>
 
-`--ref` takes a branch or tag, not a commit SHA. Syncs are not free — each one
-provisions a sandbox and parses the project — so prefer one per push over one per
-commit.
+`--ref` takes a branch or tag, not a commit SHA, and can't be combined with
+`--manifest`: the uploaded manifest already identifies the exact dbt state to convert.
+Git-based syncs provision a sandbox and parse the project, so prefer one per push over
+one per commit. Manifest syncs skip those phases.
+
+</Note>
+
+### Generate cubes without committing them
+
+`sync` commits the generated cubes to a Cube branch for review. `generate` does
+the opposite: it converts your manifest and writes the files to your working
+copy, committing nothing and creating no branch, so your own pipeline commits
+them through its normal review.
+
+```bash
+dbt parse
+cube dbt generate DEPLOYMENT_ID --manifest target/manifest.json --out .
+```
+
+`--out` is the **root of your data model project**, not the cube folder: the
+generated paths are project-relative (`model/cubes/dbt/…`) and are written
+beneath it as they come, so the output path configured on your dbt integration
+keeps deciding where the cubes live. `--out` defaults to the current directory.
+
+Cube never touches git on this path — no branch is created, nothing is written to
+the Cube data model, and the "dbt sync is ready for review" notification does not
+fire. That last one matters when the command runs on every pull request.
+
+`--check` compares the generated cubes against what is already on disk and exits
+non-zero if any of them is missing or differs, without writing. It walks the files
+the run generated, so it detects a cube that is out of date or absent — but not a
+cube left behind by a dbt model that was deleted, which neither `--check` nor the
+write path removes. Use it to fail a PR whose committed cubes no longer match the
+models its dbt project still has:
+
+```bash
+cube dbt generate DEPLOYMENT_ID --manifest target/manifest.json --out . --check
+```
+
+<Note>
+
+`generate` needs a deployment and an API key, because the conversion runs in Cube
+using that deployment's saved pull options — which is what keeps its output
+identical to the managed pull's. It does **not** need access to your dbt
+repository.
+
+</Note>
+
+### Sync history and logs
+
+`history` lists a deployment's recent syncs — how each one was triggered, whether its
+source was `git` or `manifest`, how it ended, and how long it took — and `logs` prints
+one sync's phase timeline, including the text a failed phase produced:
+
+```bash
+cube dbt history DEPLOYMENT_ID
+cube dbt logs DEPLOYMENT_ID SYNC_JOB_ID
+```
+
+`history` narrows with `--status` (`RUNNING`, `COMPLETED`, `FAILED`, `CANCELLED`,
+`UNKNOWN`) and `--trigger` (`manual`, `api`, `webhook`, `agent`, `unknown`) — both
+case-sensitive as spelled here — and pages with `--first`/`--after`, taking the cursor
+from `pageInfo.endCursor` in `--json` output. A page holds at most 100 runs, so a
+larger `--first` returns 100 with `pageInfo.hasNextPage` set. `logs` takes no paging
+flags — one sync's timeline is one page, and each line carries the phase it belongs
+to and how long that phase took.
+
+Both need only `SchemaRead`. Durations are the server's own single-clock figure, so
+they never disagree with the run they describe. `--json` carries the rest of each
+record — the dbt ref that was synced, the phase that failed, per-phase timings and
+manifest counts. When the manifest provides them, `stats.dbtVersion` and
+`stats.manifestGeneratedAt` identify the dbt version and when the artifact itself was
+generated.
+
+`logs` is what turns a red CI step into something self-explaining: a failed
+`--wait` reports the reason, and the timeline says which phase produced it.
+
+```bash
+cube dbt sync "$DEPLOYMENT_ID" --ref "$GITHUB_HEAD_REF" --wait --json > sync.json || {
+  SYNC_JOB_ID=$(jq -r '.syncJobId // empty' sync.json)
+  [ -n "$SYNC_JOB_ID" ] && cube dbt logs "$DEPLOYMENT_ID" "$SYNC_JOB_ID"
+  exit 1
+}
+```
+
+A failed `--wait --json` still writes its document before exiting non-zero, which
+is what leaves the `syncJobId` there to follow up on.
+
+<Note>
+
+A cancelled sync is listed as `CANCELLED` by `history`, but reported as a failure by
+`status` and by `sync --wait` — a gate polling for a terminal answer needs one, and the
+reason it prints says the sync was cancelled.
 
 </Note>
 
 ### dbt sync as a CI test gate
 
-Sync the branch under review, compile it, query it, and fail the job if any step
-breaks — without touching production:
+Parse the dbt project under review, upload that exact manifest, compile the generated
+Cube model, query it, and fail the job if any step breaks — without touching
+production or granting Cube access to the dbt repository:
 
 ```yaml
 # Dev mode is per credential, so two runs of this gate on one deployment would
@@ -387,10 +534,15 @@ env:
   DEPLOYMENT_ID: ${{ vars.CUBE_DEPLOYMENT_ID }}
 
 steps:
-  - name: Sync the dbt branch under review
+  # If an earlier step already ran dbt compile, run, or build, reuse the
+  # target/manifest.json it produced and omit this step.
+  - name: Parse the dbt project under review
+    run: dbt parse
+
+  - name: Upload the dbt manifest
     shell: bash
     run: |
-      cube dbt sync "$DEPLOYMENT_ID" --ref "$GITHUB_HEAD_REF" --wait --json > sync.json
+      cube dbt sync "$DEPLOYMENT_ID" --manifest target/manifest.json --wait --json > sync.json
       BRANCH=$(jq -er '.branchName | select(length > 0)' sync.json)
       echo "BRANCH=$BRANCH" >> "$GITHUB_ENV"
 
@@ -431,9 +583,11 @@ steps:
 ```
 
 With `--wait --json`, the sync returns the generated branch and terminal result in one
-document. The query must use the deployment's `deploymentUrl`, and the loop must retry
-[`Continue wait`][ref-rest-api-continue-wait] responses until data arrives. Replace
-`dbt_fct_orders.count` with a measure generated by the sync.
+document. Uploading the artifact produced in the preceding dbt step ensures Cube
+converts the same project state the job validated, even if the remote branch moves
+while the job is running. The query must use the deployment's `deploymentUrl`, and the
+loop must retry [`Continue wait`][ref-rest-api-continue-wait] responses until data
+arrives. Replace `dbt_fct_orders.count` with a measure generated by the sync.
 
 <Warning>
 
@@ -456,9 +610,7 @@ successful `jq` process.
 New dbt inputs such as `dbt sync --ref` reject an empty value, as do required branch
 arguments such as `data-model dev-mode` and `delete-branch`. Existing optional flags keep
 their previous behavior: `deployments build-status --branch ''` is still accepted for a
-one-shot status request, but is rejected with the new `--wait` gate. Note that
-`$GITHUB_HEAD_REF` is only set on `pull_request` events; on any other trigger `--ref`
-gets an empty string, which is why the run stops there.
+one-shot status request, but is rejected with the new `--wait` gate.
 
 Other existing optional `--branch` flags may accept an empty value for compatibility;
 omit them when you want the documented default.

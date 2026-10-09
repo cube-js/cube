@@ -55,13 +55,13 @@ export function AppContextProvider({
     contextProps || null
   );
   
-  const setContext = useCallback<(context: Partial<ContextProps> | null) => any>((context) => {
+  const setContext = useCallback<(context: Partial<ContextProps> | null) => any>((nextContext) => {
     setContextState((currentContext) => ({
       ...currentContext,
-      ...context,
+      ...nextContext,
       playgroundContext: {
         ...currentContext?.playgroundContext,
-        ...context?.playgroundContext,
+        ...nextContext?.playgroundContext,
       }
     }));
   }, []);

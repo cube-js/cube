@@ -9,7 +9,7 @@ import {
   QueryKey
 } from '@cubejs-backend/base-driver';
 
-import { QueryCache, QueryBody, TempTable, PreAggTableToTempTable, QueryWithParams, CacheKey } from './QueryCache';
+import { QueryCache, Query, QueryBody, TempTable, PreAggTableToTempTable, QueryWithParams, CacheKey } from './QueryCache';
 import { PreAggregations, PreAggregationDescription, getLastUpdatedAtTimestamp } from './PreAggregations';
 import { DriverFactory, DriverFactoryByDataSource } from './DriverFactory';
 import { QueryStream } from './QueryStream';
@@ -52,6 +52,9 @@ function detectQueueAndCacheDriver(options: QueryOrchestratorOptions): CacheAndQ
     return 'redis';
   }
 
+  // Deliberately NOT the dev mode decision: 'cubestore' throws without a
+  // cubeStoreDriverFactory, so aligning this on getEnv('devMode') would fail startup
+  // for instances that have no Cube Store configured
   if (getEnv('nodeEnv') === 'production') {
     return 'cubestore';
   }
@@ -97,7 +100,7 @@ export class QueryOrchestrator {
         throw new Error('It`s not possible to use Cube Store as queue/cache driver without using it as external');
       }
 
-      throw new Error('Cube Store was specified as queue/cache driver. Please set CUBEJS_CUBESTORE_HOST and CUBEJS_CUBESTORE_PORT variables. Please see https://cube.dev/docs/deployment/production-checklist#set-up-cube-store to learn more.');
+      throw new Error('Cube Store was specified as queue/cache driver. Please set CUBEJS_CUBESTORE_HOST and CUBEJS_CUBESTORE_PORT variables. Please see https://docs.cube.dev/cube-core/deployment#set-up-cube-store to learn more.');
     } : undefined;
 
     this.queryCache = new QueryCache(
@@ -232,6 +235,8 @@ export class QueryOrchestrator {
         targetTableName: pa.targetTableName,
         refreshKeyValues: pa.refreshKeyValues,
         lastUpdatedAt: pa.lastUpdatedAt,
+        preAggregationId: pa.preAggregationId,
+        type: pa.type,
       })),
     )(preAggregationsTablesToTempTables);
 
@@ -252,7 +257,7 @@ export class QueryOrchestrator {
       // /cubejs-system/v1/pre-aggregations/jobs endpoint).
       if (queryBody.isJob) {
         return preAggregationsTablesToTempTables.map((pa) => ({
-          preAggregation: queryBody.preAggregations[0].preAggregationId,
+          preAggregation: pa[1].preAggregationId || queryBody.preAggregations[0].preAggregationId,
           tableName: pa[0],
           ...pa[1],
         }));
@@ -288,11 +293,11 @@ export class QueryOrchestrator {
     };
   }
 
-  public async loadRefreshKeys(query) {
+  public async loadRefreshKeys(query: QueryBody) {
     return this.queryCache.loadRefreshKeysFromQuery(query);
   }
 
-  public async queryStage(queryBody: any) {
+  public async queryStage(queryBody: QueryBody) {
     const preAggregationsQueryStageStateByDataSource = {};
 
     const preAggregationsQueryStageState = async (dataSource) => {
@@ -340,7 +345,7 @@ export class QueryOrchestrator {
     }
   }
 
-  public resultFromCacheIfExists(queryBody: any) {
+  public resultFromCacheIfExists(queryBody: QueryBody) {
     return this.queryCache.resultFromCacheIfExists(queryBody);
   }
 
@@ -359,7 +364,7 @@ export class QueryOrchestrator {
   }
 
   public async getPreAggregationVersionEntries(
-    preAggregations: { preAggregation: any, partitions: any[]}[],
+    preAggregations: { preAggregation: any, partitions: any[] }[],
     preAggregationsSchema: string,
     requestId: string,
   ) {
@@ -419,11 +424,11 @@ export class QueryOrchestrator {
     return data || [];
   }
 
-  public async expandPartitionsInPreAggregations(queryBody) {
+  public async expandPartitionsInPreAggregations(queryBody: Query) {
     return this.preAggregations.expandPartitionsInPreAggregations(queryBody);
   }
 
-  public async checkPartitionsBuildRangeCache(queryBody) {
+  public async checkPartitionsBuildRangeCache(queryBody: QueryBody) {
     return this.preAggregations.checkPartitionsBuildRangeCache(queryBody);
   }
 

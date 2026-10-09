@@ -2,7 +2,6 @@ use super::state::State;
 use super::top_level_planner::TopLevelPlanner;
 use super::{QueryProperties, QueryPropertiesCompiler};
 use crate::cube_bridge::base_query_options::BaseQueryOptions;
-use crate::cube_bridge::pre_aggregation_obj::NativePreAggregationObj;
 use crate::logical_plan::PreAggregationUsage;
 use cubenativeutils::wrappers::inner_types::InnerTypes;
 use cubenativeutils::wrappers::object::NativeArray;
@@ -19,6 +18,21 @@ use std::rc::Rc;
 struct UsageDateRange {
     #[serde(skip_serializing_if = "Option::is_none")]
     date_range: Option<Vec<String>>,
+    /// No partition can be ruled out for the usage.
+    #[serde(skip_serializing_if = "std::ops::Not::not")]
+    unbounded: bool,
+}
+
+impl UsageDateRange {
+    fn from_usage(usage: &PreAggregationUsage) -> Self {
+        Self {
+            date_range: usage
+                .date_range
+                .as_ref()
+                .map(|(from, to)| vec![from.clone(), to.clone()]),
+            unbounded: usage.unbounded,
+        }
+    }
 }
 
 #[derive(Serialize)]
@@ -59,6 +73,7 @@ impl<IT: InnerTypes> BaseQuery<IT> {
                 .unwrap_or(false),
             options.static_data().masked_members.clone(),
             options.static_data().member_to_alias.clone(),
+            options.static_data().max_member_resolution_depth,
         )?;
 
         let request = QueryPropertiesCompiler::new(query_tools.clone()).build(options)?;
@@ -89,8 +104,10 @@ impl<IT: InnerTypes> BaseQuery<IT> {
         let templates = self.query_tools.plan_sql_templates(is_external)?;
         let (result_sql, params) = self.query_tools.build_sql_and_params(&sql, &templates)?;
 
-        // For single usage, strip __usage_N suffix from SQL to maintain backward compat
-        let final_sql = if usages.len() == 1 {
+        // A lone usage reads the table under its plain name, as it always has:
+        // the name keys `usedPreAggregations` and appears in `/sql` output.
+        let single_usage = usages.len() == 1;
+        let final_sql = if single_usage {
             result_sql.replace(&format!("__usage_{}", usages[0].index), "")
         } else {
             result_sql
@@ -100,31 +117,22 @@ impl<IT: InnerTypes> BaseQuery<IT> {
         res.set(0, final_sql.to_native(self.context.clone())?)?;
         res.set(1, params.to_native(self.context.clone())?)?;
 
-        if usages.len() > 1 {
-            // Multiple usages: group by (cubeName, name), return array of grouped infos
-            let grouped = Self::group_usages(&usages);
+        if !usages.is_empty() {
+            // Grouped by (cubeName, name), with the dates each usage reads.
+            let grouped = Self::group_usages(&usages, single_usage);
             res.set(2, grouped.to_native(self.context.clone())?)?;
-        } else if let Some(usage) = usages.first() {
-            // Single usage: return old-style pre-aggregation object for backward compat
-            let pre_aggregation_obj = self.query_tools.base_tools().get_pre_aggregation_by_name(
-                usage.pre_aggregation.cube_name().clone(),
-                usage.pre_aggregation.name().clone(),
-            )?;
-            res.set(
-                2,
-                pre_aggregation_obj
-                    .as_any()
-                    .downcast::<NativePreAggregationObj<IT>>()
-                    .unwrap()
-                    .to_native(self.context.clone())?,
-            )?;
         }
 
         let result = NativeObjectHandle::new(res.into_object());
         Ok(result)
     }
 
-    fn group_usages(usages: &[PreAggregationUsage]) -> Vec<GroupedPreAggregationInfo> {
+    /// `unsuffixed` keys the usages by an empty suffix, for SQL whose table
+    /// names carry none.
+    fn group_usages(
+        usages: &[PreAggregationUsage],
+        unsuffixed: bool,
+    ) -> Vec<GroupedPreAggregationInfo> {
         let mut groups: HashMap<(String, String), GroupedPreAggregationInfo> = HashMap::new();
 
         for usage in usages {
@@ -133,7 +141,11 @@ impl<IT: InnerTypes> BaseQuery<IT> {
             let name = pre_agg.name().clone();
             let key = (cube_name.clone(), name.clone());
 
-            let suffix = format!("__usage_{}", usage.index);
+            let suffix = if unsuffixed {
+                String::new()
+            } else {
+                format!("__usage_{}", usage.index)
+            };
 
             let group = groups
                 .entry(key)
@@ -144,15 +156,9 @@ impl<IT: InnerTypes> BaseQuery<IT> {
                     usages: HashMap::new(),
                 });
 
-            group.usages.insert(
-                suffix,
-                UsageDateRange {
-                    date_range: usage
-                        .date_range
-                        .as_ref()
-                        .map(|(from, to)| vec![from.clone(), to.clone()]),
-                },
-            );
+            group
+                .usages
+                .insert(suffix, UsageDateRange::from_usage(usage));
         }
 
         let mut result: Vec<_> = groups.into_values().collect();

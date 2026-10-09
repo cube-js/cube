@@ -181,3 +181,181 @@ async fn test_numeric_math_scalar() {
             .unwrap()
     );
 }
+
+#[tokio::test]
+async fn test_case_with_heterogeneous_then_types() {
+    init_testing_logger();
+
+    insta::assert_snapshot!(execute_query(
+        // language=PostgreSQL
+        r#"
+                SELECT
+                    i,
+                    CASE WHEN i > 1 THEN 0 WHEN i > 0 THEN i END AS c
+                FROM (
+                    SELECT 0::int4 AS i
+                    UNION ALL
+                    SELECT 1::int4 AS i
+                    UNION ALL
+                    SELECT 2::int4 AS i
+                ) AS t
+                ORDER BY i
+                "#
+        .to_string(),
+        DatabaseProtocol::PostgreSQL,
+    )
+    .await
+    .unwrap());
+}
+
+/// The common type has to be picked across all branches, not from the first one: an int4
+/// THEN followed by an int8 THEN must widen to int8, or the int8 value gets truncated.
+#[tokio::test]
+async fn test_case_with_heterogeneous_then_types_widening() {
+    init_testing_logger();
+
+    insta::assert_snapshot!(execute_query(
+        // language=PostgreSQL
+        r#"
+                SELECT
+                    i,
+                    CASE WHEN i > 1 THEN i WHEN i > 0 THEN 3000000000::int8 END AS c
+                FROM (
+                    SELECT 0::int4 AS i
+                    UNION ALL
+                    SELECT 1::int4 AS i
+                    UNION ALL
+                    SELECT 2::int4 AS i
+                ) AS t
+                ORDER BY i
+                "#
+        .to_string(),
+        DatabaseProtocol::PostgreSQL,
+    )
+    .await
+    .unwrap());
+}
+
+#[tokio::test]
+async fn test_case_with_heterogeneous_then_types_over_pg_catalog() {
+    init_testing_logger();
+
+    insta::assert_snapshot!(execute_query(
+        // language=PostgreSQL
+        r#"
+                SELECT
+                    t.typname,
+                    CASE WHEN t.typtype = 'd' THEN 0
+                         WHEN t.typtype = 'b' THEN t.typbasetype
+                         ELSE 0 END AS base
+                FROM pg_catalog.pg_type t
+                WHERE t.typname IN ('int4', 'text')
+                ORDER BY t.typname
+                "#
+        .to_string(),
+        DatabaseProtocol::PostgreSQL,
+    )
+    .await
+    .unwrap());
+}
+
+#[tokio::test]
+async fn test_case_with_null_then_before_typed_then() {
+    init_testing_logger();
+
+    insta::assert_snapshot!(execute_query(
+        // language=PostgreSQL
+        r#"
+                SELECT
+                    i,
+                    CASE WHEN i > 1 THEN NULL WHEN i > 0 THEN i END AS c
+                FROM (
+                    SELECT 0::int4 AS i
+                    UNION ALL
+                    SELECT 1::int4 AS i
+                    UNION ALL
+                    SELECT 2::int4 AS i
+                ) AS t
+                ORDER BY i
+                "#
+        .to_string(),
+        DatabaseProtocol::PostgreSQL,
+    )
+    .await
+    .unwrap());
+}
+
+/// Branches that have no common type have to fail to plan, rather than reach execution
+/// and panic there.
+#[tokio::test]
+async fn test_case_with_uncoercible_then_types() {
+    init_testing_logger();
+
+    insta::assert_snapshot!(execute_query(
+        // language=PostgreSQL
+        r#"
+                SELECT
+                    CASE WHEN i > 1 THEN true ELSE DATE '2022-01-01' END AS c
+                FROM (SELECT 1::int4 AS i) AS t
+                "#
+        .to_string(),
+        DatabaseProtocol::PostgreSQL,
+    )
+    .await
+    .unwrap_err()
+    .to_string());
+}
+
+/// Filters over subqueries of literal SELECTs become column-free after being rewritten
+/// over the literal projection, and must not be lost during filter push down.
+#[tokio::test]
+async fn test_filter_over_literal_subquery() {
+    init_testing_logger();
+
+    let queries = [
+        "SELECT x FROM (SELECT 1 x) t WHERE x = 2",
+        "SELECT x FROM (SELECT 1 x) t WHERE x = 1",
+        "SELECT x FROM (SELECT 1 x) t WHERE x + 0 = 2",
+        "SELECT g FROM (SELECT 'a' g UNION ALL SELECT 'b') t WHERE g = 'b'",
+        "SELECT x FROM (SELECT 1 x UNION SELECT 2) t WHERE x = 2",
+        "SELECT 1 x WHERE 1 = 2",
+        "SELECT x FROM (SELECT 1 x) t WHERE x = NULL",
+        "SELECT x FROM (SELECT 1 x) t WHERE x + NULL = 1",
+    ];
+
+    let mut results = vec![];
+    for query in queries {
+        let result = execute_query(query.to_string(), DatabaseProtocol::PostgreSQL)
+            .await
+            .unwrap();
+        results.push(format!("{query}\n{result}"));
+    }
+    insta::assert_snapshot!(results.join("\n"));
+}
+
+/// Same as above, but the literal projection sits on top of a system table scan,
+/// and column-free predicates are mixed with ones referencing a column.
+#[tokio::test]
+async fn test_filter_over_literal_column_of_table_scan() {
+    init_testing_logger();
+
+    let subquery = "SELECT 'a' AS c, oid FROM pg_catalog.pg_namespace";
+    let predicates = [
+        "c = 'b'",
+        "c = 'b' AND oid > 0",
+        "c = 'a' AND oid > 0",
+        "c = 'a' AND oid < 0",
+        "c = 'b' OR oid < 0",
+        "c = 'b' OR oid > 0",
+    ];
+
+    let mut results = vec![];
+    for predicate in predicates {
+        let query = format!("SELECT c, oid FROM ({subquery}) AS t WHERE {predicate} ORDER BY oid");
+        let result = execute_query(query.clone(), DatabaseProtocol::PostgreSQL)
+            .await
+            .unwrap();
+        results.push(format!("{query}\n{result}"));
+    }
+    insta::assert_snapshot!(results.join("\n"));
+}

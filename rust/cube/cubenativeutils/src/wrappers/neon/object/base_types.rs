@@ -25,8 +25,11 @@ impl<C: Context<'static> + 'static> NativeType<NeonInnerTypes<C>> for NeonString
 
 impl<C: Context<'static> + 'static> NativeString<NeonInnerTypes<C>> for NeonString<C> {
     fn value(&self) -> Result<String, CubeError> {
-        self.holder
-            .map_neon_object::<_, _>(|cx, object| Ok(object.value(cx)))
+        Ok(self.holder.value_ref().clone())
+    }
+
+    fn into_value(self) -> Result<String, CubeError> {
+        Ok(self.holder.into_value())
     }
 }
 
@@ -49,8 +52,7 @@ impl<C: Context<'static> + 'static> NativeType<NeonInnerTypes<C>> for NeonNumber
 
 impl<C: Context<'static> + 'static> NativeNumber<NeonInnerTypes<C>> for NeonNumber<C> {
     fn value(&self) -> Result<f64, CubeError> {
-        self.holder
-            .map_neon_object::<_, _>(|cx, object| Ok(object.value(cx)))
+        Ok(*self.holder.value_ref())
     }
 }
 
@@ -73,7 +75,6 @@ impl<C: Context<'static> + 'static> NativeType<NeonInnerTypes<C>> for NeonBoolea
 
 impl<C: Context<'static> + 'static> NativeBoolean<NeonInnerTypes<C>> for NeonBoolean<C> {
     fn value(&self) -> Result<bool, CubeError> {
-        self.holder
-            .map_neon_object::<_, _>(|cx, object| Ok(object.value(cx)))
+        Ok(*self.holder.value_ref())
     }
 }

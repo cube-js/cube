@@ -4,7 +4,6 @@ import {
   Card,
   Checkbox,
   Col,
-  DatePicker,
   Form,
   Input,
   Radio,
@@ -20,7 +19,6 @@ import { useEffect, useMemo, useState } from 'react';
 import styled from 'styled-components';
 
 import { Flex } from '../../grid';
-import { ucfirst } from '../../shared/helpers';
 import { timeZones } from '../../shared/time-zones';
 import { flatten } from '../utils';
 
@@ -44,7 +42,7 @@ const partionGranularities = GRANULARITIES.filter(
   return granularity;
 });
 
-type BuildRange = {
+type BuildRangeValue = {
   sql: string;
 };
 
@@ -63,8 +61,8 @@ type RefreshKey = {
 export type RollupSettings = {
   refreshKey?: RefreshKey;
   partitionGranularity?: any;
-  buildRangeStart?: BuildRange;
-  buildRangeEnd?: BuildRange;
+  buildRangeStart?: BuildRangeValue;
+  buildRangeEnd?: BuildRangeValue;
   indexes?: Record<string, RollupIndexColumns>;
 };
 
@@ -150,11 +148,11 @@ export function Settings({
       form={form}
       validateTrigger="onBlur"
       initialValues={flatten(initialValues)}
-      onValuesChange={(values) => {
+      onValuesChange={(formValues) => {
         setValues((prevValues) => {
-          onChange({ ...prevValues, ...values, 'refreshKey.isCron': isCron });
+          onChange({ ...prevValues, ...formValues, 'refreshKey.isCron': isCron });
 
-          Object.keys(values).forEach((field) => {
+          Object.keys(formValues).forEach((field) => {
             const error = form.getFieldError(field);
 
             if (!error.length) {
@@ -169,7 +167,7 @@ export function Settings({
             ]);
           });
 
-          return { ...prevValues, ...values };
+          return { ...prevValues, ...formValues };
         });
       }}
     >
@@ -237,8 +235,8 @@ export function Settings({
                         {
                           validator: (_, value, callback) => {
                             if (
-                              value &&
-                              !isValidCron(value, { seconds: true })
+                              value
+                              && !isValidCron(value, { seconds: true })
                             ) {
                               onCronExpressionValidityChange(false);
                               callback('Cron expression is invalid');
@@ -263,7 +261,7 @@ export function Settings({
                         <Typography.Paragraph>
                           <Typography.Link
                             target="_blank"
-                            href="https://cube.dev/reference/data-modeling/pre-aggregations#refresh_key"
+                            href="https://docs.cube.dev/reference/data-modeling/pre-aggregations#refresh_key"
                           >
                             See how to format your cron expression
                           </Typography.Link>
@@ -396,53 +394,6 @@ export function Settings({
         </Card>
       </Wrapper>
     </Form>
-  );
-}
-
-type BuildRangeProps = {
-  time: string;
-};
-
-function BuildRange({ time }: BuildRangeProps) {
-  const name = (key) => `buildRange.${time}.${key}`;
-
-  return (
-    <Row>
-      <Col flex="60px">{ucfirst(time)}</Col>
-
-      <Col flex="auto">
-        <Form.Item name={`buildRange.${time}.option`} noStyle>
-          <Radio.Group>
-            <Flex direction="column" gap={2}>
-              <Space>
-                <Radio value="relative" />
-
-                <Form.Item name={name('number')} noStyle>
-                  <Input type="number" min={0} style={{ maxWidth: 80 }} />
-                </Form.Item>
-
-                <Form.Item name={name('granularity')} noStyle>
-                  <GranularitySelect />
-                </Form.Item>
-              </Space>
-
-              <Space>
-                <Radio value="fixed" />
-
-                <Form.Item name={name('fixedDate')} noStyle>
-                  <DatePicker
-                    placeholder="Fixed date"
-                    style={{ width: '100%' }}
-                  />
-                </Form.Item>
-              </Space>
-
-              <Radio value="now">Now</Radio>
-            </Flex>
-          </Radio.Group>
-        </Form.Item>
-      </Col>
-    </Row>
   );
 }
 

@@ -41,6 +41,23 @@ impl AggregationType {
         matches!(self, Self::CountDistinct | Self::CountDistinctApprox)
     }
 
+    /// Whether feeding a row more than once leaves the result unchanged.
+    ///
+    /// A distinct count collapses repeats by definition, and a minimum or a
+    /// maximum does not move when a value it has already seen arrives again.
+    /// `sum`, `avg`, `count` and `numberAgg` all count every row they are
+    /// given, so a repeated row shows up in the answer.
+    ///
+    /// Not the same question as `is_additive`, which asks whether partial
+    /// results can be rolled up further: `sum` is additive but sensitive to
+    /// repeats, `countDistinct` is insensitive to them but not additive.
+    pub fn is_duplicate_insensitive(&self) -> bool {
+        matches!(
+            self,
+            Self::Min | Self::Max | Self::CountDistinct | Self::CountDistinctApprox
+        )
+    }
+
     pub fn as_str(&self) -> &'static str {
         match self {
             Self::Sum => "sum",
@@ -123,6 +140,17 @@ mod tests {
         assert!(!AggregationType::CountDistinct.is_additive());
         assert!(AggregationType::CountDistinctApprox.is_additive());
         assert!(!AggregationType::NumberAgg.is_additive());
+    }
+
+    #[test]
+    fn test_is_duplicate_insensitive() {
+        assert!(AggregationType::Min.is_duplicate_insensitive());
+        assert!(AggregationType::Max.is_duplicate_insensitive());
+        assert!(AggregationType::CountDistinct.is_duplicate_insensitive());
+        assert!(AggregationType::CountDistinctApprox.is_duplicate_insensitive());
+        assert!(!AggregationType::Sum.is_duplicate_insensitive());
+        assert!(!AggregationType::Avg.is_duplicate_insensitive());
+        assert!(!AggregationType::NumberAgg.is_duplicate_insensitive());
     }
 
     #[test]

@@ -93,8 +93,7 @@ export class CubeSQLConverter {
   ) {
     for (const cube of meta.cubes) {
       for (const dimension of cube.dimensions) {
-        this.pathToKind[dimension.name] =
-          dimension.type !== 'time' ? MemberKind.Dimension : MemberKind.TimeDimension;
+        this.pathToKind[dimension.name] = dimension.type !== 'time' ? MemberKind.Dimension : MemberKind.TimeDimension;
       }
 
       for (const measure of cube.measures) {
@@ -114,19 +113,15 @@ export class CubeSQLConverter {
   }
 
   protected decompose() {
-    this.query.dimensions?.forEach((name) =>
-      this.members.push({
-        name,
-        kind: MemberKind.Dimension,
-      })
-    );
+    this.query.dimensions?.forEach((name) => this.members.push({
+      name,
+      kind: MemberKind.Dimension,
+    }));
 
-    this.query.segments?.forEach((name) =>
-      this.members.push({
-        name,
-        kind: MemberKind.Segment,
-      })
-    );
+    this.query.segments?.forEach((name) => this.members.push({
+      name,
+      kind: MemberKind.Segment,
+    }));
 
     this.query.timeDimensions?.forEach((td) => {
       if (td.dateRange) {
@@ -148,12 +143,10 @@ export class CubeSQLConverter {
       });
     });
 
-    this.query.measures?.forEach((name) =>
-      this.members.push({
-        name,
-        kind: MemberKind.Measure,
-      })
-    );
+    this.query.measures?.forEach((name) => this.members.push({
+      name,
+      kind: MemberKind.Measure,
+    }));
 
     this.query.filters?.forEach((filter) => {
       this.filters.push(filter);
@@ -276,12 +269,10 @@ export class CubeSQLConverter {
 
   protected makeJoins() {
     if (this.tables.length > 1) {
-      const [_, ...otherTables] = this.tables;
+      const otherTables = this.tables.slice(1);
 
       return otherTables
-        .map((tableName) => {
-          return `CROSS JOIN ${tableName}`;
-        })
+        .map((tableName) => `CROSS JOIN ${tableName}`)
         .join('  \n');
     }
 
@@ -294,9 +285,9 @@ export class CubeSQLConverter {
 
   protected makeFilter(filter: BinaryFilter | UnaryFilter): string {
     if (
-      isBinaryFilter(filter) &&
-      isBinaryOperator(filter.operator) &&
-      operatorAliases[filter.operator]
+      isBinaryFilter(filter)
+      && isBinaryOperator(filter.operator)
+      && operatorAliases[filter.operator]
     ) {
       const operator = operatorAliases[filter.operator];
       if (operator) {

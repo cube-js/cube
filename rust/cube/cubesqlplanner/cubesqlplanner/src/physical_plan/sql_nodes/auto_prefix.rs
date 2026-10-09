@@ -3,7 +3,7 @@ use crate::physical_plan::Schema;
 use crate::physical_plan::SqlEvaluatorVisitor;
 use crate::planner::query_tools::QueryTools;
 use crate::planner::sql_templates::PlanSqlTemplates;
-use crate::planner::MemberSymbol;
+use crate::planner::{CubeId, MemberSymbol};
 use cubenativeutils::CubeError;
 use lazy_static::lazy_static;
 use regex::Regex;
@@ -16,12 +16,12 @@ use std::rc::Rc;
 /// single identifier — those already carry their own qualification.
 pub struct AutoPrefixSqlNode {
     input: Rc<dyn SqlNode>,
-    cube_references: HashMap<String, String>,
+    cube_references: HashMap<CubeId, String>,
     schema: Rc<Schema>,
 }
 
 impl AutoPrefixSqlNode {
-    pub fn new(input: Rc<dyn SqlNode>, cube_references: HashMap<String, String>) -> Rc<Self> {
+    pub fn new(input: Rc<dyn SqlNode>, cube_references: HashMap<CubeId, String>) -> Rc<Self> {
         Rc::new(Self {
             input,
             cube_references,
@@ -31,7 +31,7 @@ impl AutoPrefixSqlNode {
 
     pub fn new_with_schema(
         input: Rc<dyn SqlNode>,
-        cube_references: HashMap<String, String>,
+        cube_references: HashMap<CubeId, String>,
         schema: Rc<Schema>,
     ) -> Rc<Self> {
         Rc::new(Self {
@@ -49,15 +49,15 @@ impl AutoPrefixSqlNode {
         &self.schema
     }
 
-    pub fn cube_references(&self) -> &HashMap<String, String> {
+    pub fn cube_references(&self) -> &HashMap<CubeId, String> {
         &self.cube_references
     }
 
-    fn resolve_cube_alias(&self, name: &String) -> String {
+    fn resolve_cube_alias(&self, name: &CubeId) -> String {
         if let Some(alias) = self.cube_references.get(name) {
             alias.clone()
         } else {
-            name.clone()
+            name.to_string()
         }
     }
 
@@ -101,14 +101,16 @@ impl SqlNode for AutoPrefixSqlNode {
         )?;
         let res = match node.as_ref() {
             MemberSymbol::Dimension(ev) => {
-                let cube_alias = self.resolve_cube_alias(&ev.cube_name());
+                let cube_alias = self.resolve_cube_alias(&ev.cube_id());
                 self.auto_prefix_with_cube_name(&cube_alias, &input, templates)?
             }
             MemberSymbol::Measure(ev) => {
-                let cube_alias = self.resolve_cube_alias(&ev.cube_name());
+                let cube_alias = self.resolve_cube_alias(&ev.cube_id());
                 self.auto_prefix_with_cube_name(&cube_alias, &input, templates)?
             }
-            _ => input,
+            MemberSymbol::TimeDimension(_)
+            | MemberSymbol::MemberExpression(_)
+            | MemberSymbol::Ref(_) => input,
         };
         Ok(res)
     }

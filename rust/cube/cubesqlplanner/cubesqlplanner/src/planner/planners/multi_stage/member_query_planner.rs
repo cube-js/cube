@@ -9,6 +9,7 @@ use crate::planner::symbols::transforms;
 use crate::planner::GranularityHelper;
 use crate::planner::MemberSymbol;
 use crate::planner::MultiStageGrain;
+use crate::planner::TimeDimensionSymbol;
 use crate::planner::{OrderByItem, QueryProperties};
 
 use cubenativeutils::CubeError;
@@ -60,7 +61,7 @@ impl MultiStageMemberQueryPlanner {
             MultiStageMemberType::Leaf(node) => match node {
                 super::MultiStageLeafMemberType::Measure => self.plan_for_leaf_cte_query(scope),
                 super::MultiStageLeafMemberType::TimeSeries(time_dimension) => {
-                    self.plan_time_series_query(time_dimension.clone())
+                    self.plan_time_series_query(time_dimension.clone(), scope)
                 }
                 super::MultiStageLeafMemberType::TimeSeriesGetRange(time_dimension) => {
                     self.plan_time_series_get_range_query(time_dimension.clone(), scope)
@@ -112,17 +113,98 @@ impl MultiStageMemberQueryPlanner {
     fn plan_time_series_query(
         &self,
         time_series_description: Rc<TimeSeriesDescription>,
+        scope: &mut PlanningScope,
     ) -> Result<Rc<LogicalMultiStageMember>, CubeError> {
         let time_dimension = time_series_description.time_dimension.clone();
+        let period_dimensions = self.calendar_period_dimensions(&time_series_description)?;
+        let calendar_source = if period_dimensions.is_empty() {
+            None
+        } else {
+            Some(self.plan_calendar_period_source(&time_dimension, &period_dimensions, scope)?)
+        };
         let result = MultiStageTimeSeries::builder()
+            .name(self.description.alias().clone())
             .time_dimension(time_dimension.clone())
             .date_range(time_dimension.as_time_dimension()?.date_range_vec())
             .get_date_range_multistage_ref(time_series_description.date_range_cte.clone())
+            .calendar_source(calendar_source)
+            .period_dimensions(period_dimensions)
             .build();
         Ok(Rc::new(LogicalMultiStageMember {
             name: self.description.alias().clone(),
             member_type: MultiStageMemberLogicalType::TimeSeries(Rc::new(result)),
         }))
+    }
+
+    /// The series time dimension re-granularized to each calendar granularity
+    /// a `to_date` window on this series bounds itself by.
+    fn calendar_period_dimensions(
+        &self,
+        time_series_description: &Rc<TimeSeriesDescription>,
+    ) -> Result<Vec<Rc<MemberSymbol>>, CubeError> {
+        let time_dimension = time_series_description.time_dimension.as_time_dimension()?;
+        let granularities = time_series_description
+            .calendar_period_granularities
+            .borrow();
+
+        let evaluator_compiler_cell = self.query_tools.compiler().clone();
+        let mut evaluator_compiler = evaluator_compiler_cell.borrow_mut();
+
+        granularities
+            .iter()
+            .map(|granularity| {
+                let granularity_obj = GranularityHelper::make_granularity_obj(
+                    self.query_tools.cube_evaluator().clone(),
+                    &mut evaluator_compiler,
+                    &time_dimension.cube_id(),
+                    &time_dimension.name(),
+                    Some(granularity.clone()),
+                )?;
+                Ok(MemberSymbol::new_time_dimension(TimeDimensionSymbol::new(
+                    time_dimension.base_symbol().clone(),
+                    Some(granularity.clone()),
+                    granularity_obj,
+                    time_dimension
+                        .date_range_vec()
+                        .map(|range| (range[0].clone(), range[1].clone())),
+                )))
+            })
+            .collect()
+    }
+
+    /// A query over the calendar cube pairing every point of the series with
+    /// the period it falls into, so a `to_date` window can bound itself by the
+    /// calendar instead of by interval math.
+    fn plan_calendar_period_source(
+        &self,
+        time_dimension: &Rc<MemberSymbol>,
+        period_dimensions: &[Rc<MemberSymbol>],
+        scope: &mut PlanningScope,
+    ) -> Result<Rc<Query>, CubeError> {
+        // The series may already be granularized to the period a window bounds
+        // itself by; projecting it twice makes the column ambiguous.
+        let mut time_dimensions = vec![time_dimension.clone()];
+        for period_dimension in period_dimensions {
+            if !time_dimensions
+                .iter()
+                .any(|dimension| dimension.id() == period_dimension.id())
+            {
+                time_dimensions.push(period_dimension.clone());
+            }
+        }
+
+        // Left unfiltered on purpose: the series restricts itself to the query
+        // range only after it has read each period's end off the next point.
+        let cte_query_properties = QueryProperties::builder()
+            .query_tools(self.query_tools.clone())
+            .time_dimensions(time_dimensions)
+            .ignore_cumulative(true)
+            .disable_external_pre_aggregations(
+                self.query_properties.disable_external_pre_aggregations(),
+            )
+            .build()?;
+
+        SimpleQueryPlanner::new(self.query_tools.clone(), cte_query_properties).plan(scope)
     }
 
     /// Builds the rolling-window CTE that combines a time-series
@@ -153,7 +235,7 @@ impl MultiStageMemberQueryPlanner {
                 let Some(granularity_obj) = GranularityHelper::make_granularity_obj(
                     self.query_tools.cube_evaluator().clone(),
                     &mut evaluator_compiler,
-                    &time_dimension.cube_name(),
+                    &time_dimension.cube_id(),
                     &time_dimension.name(),
                     Some(query_granularity.clone()),
                 )?
@@ -337,26 +419,12 @@ impl MultiStageMemberQueryPlanner {
         let mut time_dimensions = self.description.state().time_dimensions().clone();
         let mut measures = vec![];
         let cte_member = self.description.member().evaluation_node();
-        match cte_member.as_ref() {
-            MemberSymbol::Dimension(_) => {
-                if !dimensions.iter().any(|d| {
-                    d.clone().resolve_reference_chain()
-                        == cte_member.clone().resolve_reference_chain()
-                }) {
-                    dimensions.push(cte_member.clone())
-                }
-            }
-            MemberSymbol::TimeDimension(_) => {
-                if !time_dimensions.iter().any(|d| {
-                    d.clone().resolve_reference_chain()
-                        == cte_member.clone().resolve_reference_chain()
-                }) {
-                    time_dimensions.push(cte_member.clone())
-                }
-            }
-            MemberSymbol::Measure(_) => measures.push(cte_member.clone()),
-            _ => {}
-        }
+        add_member_by_kind(
+            cte_member,
+            &mut dimensions,
+            &mut time_dimensions,
+            &mut measures,
+        );
         // We add all non–multi-stage dimensions from the underlying states because
         // they’re needed to join a multi-stage dimension into the measure query
         let (all_dependend_dimensions, all_dependend_time_dimensions) =
@@ -365,11 +433,11 @@ impl MultiStageMemberQueryPlanner {
         time_dimensions.extend(all_dependend_time_dimensions.iter().cloned());
         dimensions = dimensions
             .into_iter()
-            .unique_by(|d| d.full_name())
+            .unique_by(|d| d.id().clone())
             .collect_vec();
         time_dimensions = time_dimensions
             .into_iter()
-            .unique_by(|d| d.full_name())
+            .unique_by(|d| d.id().clone())
             .collect_vec();
 
         let schema = LogicalSchema::default()
@@ -439,26 +507,12 @@ impl MultiStageMemberQueryPlanner {
         let mut time_dimensions = self.description.state().time_dimensions().clone();
         let mut measures = vec![];
         if !self.description.member().is_without_member_leaf() {
-            match member_node.as_ref() {
-                MemberSymbol::Dimension(_) => {
-                    if !dimensions.iter().any(|d| {
-                        d.clone().resolve_reference_chain()
-                            == member_node.clone().resolve_reference_chain()
-                    }) {
-                        dimensions.push(member_node.clone())
-                    }
-                }
-                MemberSymbol::TimeDimension(_) => {
-                    if !time_dimensions.iter().any(|d| {
-                        d.clone().resolve_reference_chain()
-                            == member_node.clone().resolve_reference_chain()
-                    }) {
-                        time_dimensions.push(member_node.clone())
-                    }
-                }
-                MemberSymbol::Measure(_) => measures.push(member_node.clone()),
-                _ => {}
-            }
+            add_member_by_kind(
+                member_node,
+                &mut dimensions,
+                &mut time_dimensions,
+                &mut measures,
+            );
         }
 
         let mut measures_filters = self.description.state().measures_filters().clone();
@@ -528,14 +582,14 @@ impl MultiStageMemberQueryPlanner {
             .input()
             .iter()
             .flat_map(|descr| descr.state().dimensions().iter().cloned())
-            .unique_by(|dim| dim.full_name())
+            .unique_by(|dim| dim.id().clone())
             .collect_vec();
         let time_dimensions = self
             .description
             .input()
             .iter()
             .flat_map(|descr| descr.state().time_dimensions().iter().cloned())
-            .unique_by(|dim| dim.full_name())
+            .unique_by(|dim| dim.id().clone())
             .collect_vec();
 
         LogicalSchema::default()
@@ -595,5 +649,39 @@ impl MultiStageMemberQueryPlanner {
             &measures,
         );
         Ok(order_items)
+    }
+}
+
+/// Adds `member` to the schema list of its kind, skipping a dimension already
+/// present under another name of the same reference chain.
+fn add_member_by_kind(
+    member: &Rc<MemberSymbol>,
+    dimensions: &mut Vec<Rc<MemberSymbol>>,
+    time_dimensions: &mut Vec<Rc<MemberSymbol>>,
+    measures: &mut Vec<Rc<MemberSymbol>>,
+) {
+    let same_chain = |d: &Rc<MemberSymbol>| {
+        d.clone().resolve_reference_chain() == member.clone().resolve_reference_chain()
+    };
+    match member.as_ref() {
+        MemberSymbol::Dimension(_) => {
+            if !dimensions.iter().any(same_chain) {
+                dimensions.push(member.clone())
+            }
+        }
+        MemberSymbol::TimeDimension(_) => {
+            if !time_dimensions.iter().any(same_chain) {
+                time_dimensions.push(member.clone())
+            }
+        }
+        MemberSymbol::Measure(_) => measures.push(member.clone()),
+        MemberSymbol::Ref(_) => {
+            if member.is_measure() {
+                measures.push(member.clone())
+            } else if member.is_dimension() && !dimensions.iter().any(same_chain) {
+                dimensions.push(member.clone())
+            }
+        }
+        MemberSymbol::MemberExpression(_) => {}
     }
 }

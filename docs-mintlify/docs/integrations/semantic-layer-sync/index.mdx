@@ -85,7 +85,7 @@ def semantic_layer_sync(ctx: dict) -> list[dict]:
         'user': 'mail@example.com',
         'password': '4dceae-606a03-93ae6dc7',
         'url': 'superset.example.com',
-        'database': 'Cube Cloud: staging-deployment'
+        'database': 'Cube: staging-deployment'
       }
     }
   ]
@@ -103,7 +103,7 @@ module.exports = {
           user: "mail@example.com",
           password: "4dceae-606a03-93ae6dc7",
           url: "superset.example.com",
-          database: "Cube Cloud: staging-deployment"
+          database: "Cube: staging-deployment"
         }
       }
     ]
@@ -123,7 +123,7 @@ If multiple security contexts are defined via the
 
 By default, multitenancy support in `semanticLayerSync` is disabled. Please
 contact support to enable multitenancy support in `semanticLayerSync` for your
-Cube Cloud account.
+Cube account.
 
 </Warning>
 
@@ -151,7 +151,7 @@ def semantic_layer_sync(ctx: dict) -> list[dict]:
         'user': 'mail@example.com',
         'password': '4dceae-606a03-93ae6dc7',
         'url': 'superset.example.com',
-        'database': f"Cube Cloud: {department}",
+        'database': f"Cube: {department}",
       }
     }
   ]
@@ -170,7 +170,7 @@ module.exports = {
           user: "mail@example.com",
           password: "4dceae-606a03-93ae6dc7",
           url: "superset.example.com",
-          database: `Cube Cloud: ${department}`
+          database: `Cube: ${department}`
         }
       }
     ]
@@ -199,7 +199,7 @@ def semantic_layer_sync(ctx: dict) -> list[dict]:
           'user': 'mail@example.com',
           'password': '4dceae-606a03-93ae6dc7',
           'url': 'superset.example.com',
-          'database': 'Cube Cloud: sls-test (admin)'
+          'database': 'Cube: sls-test (admin)'
         }
       },
       {
@@ -209,7 +209,7 @@ def semantic_layer_sync(ctx: dict) -> list[dict]:
           'api_token': '07988f63-c200-499e-97c9-ba137d8918aa',
           'api_secret': 'c19fbab4fd4945899795d32898f2e1165bef8e5ee653',
           'workspace_url': '12345678.us1a.app.preset.io',
-          'database': 'Cube Cloud: sls-test (admin)'
+          'database': 'Cube: sls-test (admin)'
         }
       }
     ]
@@ -231,7 +231,7 @@ module.exports = {
             user: "mail@example.com",
             password: "4dceae-606a03-93ae6dc7",
             url: "superset.example.com",
-            database: "Cube Cloud: sls-test (admin)"
+            database: "Cube: sls-test (admin)"
           }
         },
         {
@@ -241,7 +241,7 @@ module.exports = {
             api_token: "07988f63-c200-499e-97c9-ba137d8918aa",
             api_secret: "c19fbab4fd4945899795d32898f2e1165bef8e5ee653",
             workspace_url: "12345678.us1a.app.preset.io",
-            database: "Cube Cloud: sls-test (admin)"
+            database: "Cube: sls-test (admin)"
           }
         }
             ]
@@ -276,7 +276,7 @@ If data model is updated dynamically and the
 [`schema_version`][ref-config-schemaversion] configuration option is used to
 track data model changes, syncs will not automatically run. This behavior is
 disabled by default. Please contact support to enable running syncs when the
-data model is updated dynamically for your Cube Cloud account.
+data model is updated dynamically for your Cube account.
 
 </Warning>
 
@@ -303,7 +303,7 @@ def semantic_layer_sync(ctx: dict) -> list[dict]:
         'user': 'mail@example.com',
         'password': '4dceae-606a03-93ae6dc7',
         'url': 'superset.example.com',
-        'database': 'Cube Cloud: staging-deployment',
+        'database': 'Cube: staging-deployment',
         'scheduleInterval': 'every 10 minutes'
       }
     }
@@ -322,7 +322,7 @@ module.exports = {
           user: "mail@example.com",
           password: "4dceae-606a03-93ae6dc7",
           url: "superset.example.com",
-          database: "Cube Cloud: staging-deployment",
+          database: "Cube: staging-deployment",
           scheduleInterval: "every 10 minutes"
         }
       }
@@ -351,6 +351,29 @@ You can also run a sync manually by navigating to **IDE → Integrations**
 and clicking **Start Sync** next to a relevant sync. This is convenient for working in the
 [development mode][ref-dev-mode].
 
+## Data access policies
+
+Syncs that run on build or on schedule don't run as any user, unless
+[multitenancy](#multitenancy) is enabled. With multitenancy, each of these syncs
+publishes what its security context can see. Otherwise, when a cube or view is
+available only to specific groups through [data access policies][ref-dap],
+these syncs publish the members that any of those groups can see. They leave out
+members granted only by policies whose conditions depend on the user, and skip
+such cubes and views altogether when groups come from a
+[custom mapping][ref-dap-mapping].
+
+A manual sync publishes what the user who starts it can see. Outside
+[development mode][ref-dev-mode], it updates the same database as the syncs on
+build and on schedule, so it replaces what they published.
+
+Everyone who can open the synced dataset or data source in the BI tool sees the
+names and descriptions of the published members. Queries still go through the
+SQL API, which applies data access policies to the user the BI tool queries as.
+
+To hide such members from some users of the BI tool, restrict their access to
+the synced database, or move these members to a separate view and restrict
+access to its synced dataset or data source in the BI tool.
+
 ## Viewing history
 
 You can view the history of runs for a particular sync by navigating to
@@ -372,3 +395,5 @@ on, i.e., your development mode branch, shared branch, or main branch.
 [ref-config-schemaversion]: /reference/configuration/config#schema_version
 [ref-dev-mode]: /docs/data-modeling/dev-mode
 [ref-auto-sus]: /admin/deployment/auto-suspension
+[ref-dap]: /docs/data-modeling/data-access-policies
+[ref-dap-mapping]: /docs/data-modeling/data-access-policies#custom-mapping

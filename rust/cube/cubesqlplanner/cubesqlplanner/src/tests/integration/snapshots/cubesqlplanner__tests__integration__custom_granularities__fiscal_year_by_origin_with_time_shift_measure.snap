@@ -1,0 +1,8 @@
+---
+source: cubesqlplanner/src/tests/integration/custom_granularities.rs
+expression: result
+---
+orders__created_at_fiscal_year_by_1st_april | orders__total_amount | orders__total_amount_prior_year
+--------------------------------------------+----------------------+--------------------------------
+2024-04-01 00:00:00                         | 150.00               | 20.00                          
+2025-04-01 00:00:00                         | 210.00               | 150.00

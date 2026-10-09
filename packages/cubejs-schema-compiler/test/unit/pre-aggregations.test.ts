@@ -1,5 +1,6 @@
 import fs from 'fs';
 import path from 'path';
+import { FROM_PARTITION_RANGE, MAX_SOURCE_ROW_LIMIT } from '@cubejs-backend/shared';
 import { prepareJsCompiler, prepareYamlCompiler } from './PrepareCompiler';
 import { createECommerceSchema, createSchemaYaml } from './utils';
 import { PostgresQuery, queryClass, QueryFactory } from '../../src';
@@ -222,6 +223,217 @@ describe('pre-aggregations', () => {
     expect(preAggregationsDescription.length).toEqual(2);
     expect(preAggregationsDescription[0].preAggregationId).toEqual('Orders.simple1');
     expect(preAggregationsDescription[1].preAggregationId).toEqual('Orders.simple2');
+  });
+
+  // @link https://github.com/cube-js/cube/issues/11682
+  describe('rollupLambda unionWithSourceData source query', () => {
+    const compileEvents = () => prepareJsCompiler(
+      `
+        cube('Events', {
+          sql: \`SELECT * FROM public.events\`,
+
+          preAggregations: {
+            eventsLambda: {
+              type: \`rollupLambda\`,
+              unionWithSourceData: true,
+              rollups: [CUBE.eventsRollup],
+            },
+            eventsRollup: {
+              measures: [CUBE.count],
+              timeDimension: CUBE.ts,
+              granularity: \`day\`,
+              partitionGranularity: \`month\`,
+              buildRangeStart: {
+                sql: \`SELECT DATE '2024-01-01'\`,
+              },
+              buildRangeEnd: {
+                sql: \`SELECT CURRENT_DATE\`,
+              },
+            },
+          },
+
+          measures: {
+            count: {
+              type: \`count\`,
+            },
+          },
+
+          dimensions: {
+            id: {
+              sql: \`id\`,
+              type: \`number\`,
+              primaryKey: true,
+            },
+            ts: {
+              sql: \`ts\`,
+              type: \`time\`,
+            },
+          },
+        });
+      `
+    );
+
+    const lambdaQueryFor = async (timeDimensions: any[], timezone: string = 'UTC') => {
+      const { compiler, cubeEvaluator, joinGraph } = compileEvents();
+      await compiler.compile();
+
+      const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+        measures: ['Events.count'],
+        timeDimensions,
+        timezone,
+      });
+
+      const lambdaQueries: any = query.buildLambdaQuery();
+      const [lambdaQuery] = Object.values<any>(lambdaQueries);
+      expect(lambdaQuery).toBeDefined();
+
+      return lambdaQuery;
+    };
+
+    it('is bounded by the requested date range', async () => {
+      const { sqlAndParams: [lambdaSql, lambdaParams] } = await lambdaQueryFor([{
+        dimension: 'Events.ts',
+        dateRange: ['2024-02-01', '2024-02-29'],
+      }]);
+
+      expect(lambdaParams).toContain(FROM_PARTITION_RANGE);
+      expect(lambdaParams).toContain('2024-02-29T23:59:59.999Z');
+      expect(lambdaParams).toContain('2024-02-01T00:00:00.000Z');
+      expect(lambdaSql).toMatch(/<=/);
+    });
+
+    it('converts the bound out of the query timezone', async () => {
+      const { sqlAndParams: [, lambdaParams] } = await lambdaQueryFor([{
+        dimension: 'Events.ts',
+        dateRange: ['2024-02-01', '2024-02-29'],
+      }], 'America/Los_Angeles');
+
+      // matchedTimeDimensionDateRange is local and offset-free, so an unconverted bound would
+      // cut the source query off 8 hours early. February is still PST, DST starts March 10.
+      expect(lambdaParams).toContain('2024-03-01T07:59:59.999Z');
+      expect(lambdaParams).toContain('2024-02-01T08:00:00.000Z');
+    });
+
+    it('stays unbounded above without a requested date range', async () => {
+      const { sqlAndParams: [lambdaSql, lambdaParams] } = await lambdaQueryFor([{
+        dimension: 'Events.ts',
+        granularity: 'day',
+      }]);
+
+      // With lambda-view we observe all 'fresh' data, with no partition/buildRange limit.
+      expect(lambdaParams).toEqual([FROM_PARTITION_RANGE, MAX_SOURCE_ROW_LIMIT]);
+      expect(lambdaSql).not.toMatch(/<=/);
+    });
+
+    it('exposes the source bound for the orchestrator to skip on', async () => {
+      const { sourceDateRange } = await lambdaQueryFor([{
+        dimension: 'Events.ts',
+        dateRange: ['2024-02-01', '2024-02-29'],
+      }]);
+
+      expect(sourceDateRange).toEqual(['2024-02-01T00:00:00.000', '2024-02-29T23:59:59.999']);
+    });
+
+    describe('lambdaSourceDateRange', () => {
+      const requestedRange = [{
+        dimension: 'Events.ts',
+        dateRange: ['2024-02-01', '2024-02-29'],
+      }];
+      const requestedBounds = ['2024-02-01T00:00:00.000', '2024-02-29T23:59:59.999'];
+
+      const usageInfo = (overrides: any = {}) => ({
+        cubeName: 'Events',
+        preAggregationName: 'eventsLambda',
+        external: true,
+        usages: {},
+        ...overrides,
+      });
+
+      const sourceDateRangeFor = async (timeDimensions: any[], usageInfos?: any[]) => {
+        const { compiler, cubeEvaluator, joinGraph } = compileEvents();
+        await compiler.compile();
+
+        const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+          measures: ['Events.count'],
+          timeDimensions,
+          timezone: 'UTC',
+        });
+
+        const { preAggregations } = query;
+        const rollupLambda: any = preAggregations.findPreAggregationForQuery();
+        expect(rollupLambda).toBeDefined();
+        const [lambdaPreAgg] = rollupLambda.referencedPreAggregations.slice(-1);
+
+        // findPreAggregationForQuery() fills these on the native path, so override afterwards.
+        if (usageInfos) {
+          preAggregations.preAggregationUsageInfos = usageInfos;
+        }
+
+        return preAggregations.lambdaSourceDateRange(lambdaPreAgg, rollupLambda);
+      };
+
+      it('is the requested range when the query has no usages', async () => {
+        expect(await sourceDateRangeFor(requestedRange)).toEqual(requestedBounds);
+      });
+
+      it('is undefined when nothing bounds the request', async () => {
+        expect(await sourceDateRangeFor([{ dimension: 'Events.ts', granularity: 'day' }])).toBeUndefined();
+      });
+
+      it('widens to a usage reaching past the request', async () => {
+        // A forward time_shift usage reads partitions past the requested range, so bounding the
+        // source query by the request alone would drop the rows that usage needs.
+        const range = await sourceDateRangeFor(requestedRange, [
+          usageInfo({ usages: { main: { dateRange: ['2024-02-01T00:00:00.000', '2024-03-31T23:59:59.999'] } } }),
+        ]);
+
+        expect(range).toEqual(['2024-02-01T00:00:00.000', '2024-03-31T23:59:59.999']);
+      });
+
+      it('unions every usage of the same rollupLambda', async () => {
+        const range = await sourceDateRangeFor(requestedRange, [
+          usageInfo({ usages: { main: { dateRange: ['2024-02-01T00:00:00.000', '2024-02-29T23:59:59.999'] } } }),
+          usageInfo({ usages: { shifted: { dateRange: ['2024-01-01T00:00:00.000', '2024-03-31T23:59:59.999'] } } }),
+        ]);
+
+        expect(range).toEqual(['2024-01-01T00:00:00.000', '2024-03-31T23:59:59.999']);
+      });
+
+      it('ignores usages of another pre-aggregation', async () => {
+        const range = await sourceDateRangeFor(requestedRange, [
+          usageInfo({
+            preAggregationName: 'otherLambda',
+            usages: { main: { dateRange: ['2024-01-01T00:00:00.000', '2024-03-31T23:59:59.999'] } },
+          }),
+        ]);
+
+        expect(range).toEqual(requestedBounds);
+      });
+
+      it('bounds nothing when a usage range is unknown', async () => {
+        const range = await sourceDateRangeFor(requestedRange, [
+          usageInfo({ usages: { main: {} } }),
+        ]);
+
+        expect(range).toBeUndefined();
+      });
+
+      it('bounds nothing when a usage is unbounded', async () => {
+        const range = await sourceDateRangeFor(requestedRange, [
+          usageInfo({ usages: { main: { unbounded: true } } }),
+        ]);
+
+        expect(range).toBeUndefined();
+      });
+
+      it('bounds nothing when one of several usages has an unknown range', async () => {
+        const range = await sourceDateRangeFor(requestedRange, [
+          usageInfo({ usages: { main: { dateRange: requestedBounds }, undated: {} } }),
+        ]);
+
+        expect(range).toBeUndefined();
+      });
+    });
   });
 
   // @link https://github.com/cube-js/cube/issues/6623
@@ -735,6 +947,259 @@ describe('pre-aggregations', () => {
     expect(preAggregationsDescription[0].preAggregationId).toEqual('orders.orders_external');
   });
 
+  describe('pre-aggregation time dimension date range', () => {
+    const compileEvents = () => prepareJsCompiler(
+      `
+        cube('Events', {
+          sql: \`SELECT * FROM public.events\`,
+
+          joins: {
+            Users: {
+              relationship: \`many_to_one\`,
+              sql: \`\${CUBE}.user_id = \${Users}.id\`,
+            },
+          },
+
+          preAggregations: {
+            partitioned: {
+              measures: [CUBE.count],
+              dimensions: [CUBE.status],
+              timeDimension: CUBE.ts,
+              granularity: \`day\`,
+              partitionGranularity: \`month\`,
+            },
+            unpartitioned: {
+              measures: [CUBE.count],
+              dimensions: [CUBE.status],
+              timeDimension: CUBE.ts,
+              granularity: \`day\`,
+            },
+            byUserSignup: {
+              measures: [CUBE.count],
+              timeDimension: CUBE.Users.signedUpAt,
+              granularity: \`day\`,
+              partitionGranularity: \`month\`,
+            },
+          },
+
+          measures: {
+            count: {
+              type: \`count\`,
+            },
+            runningCount: {
+              type: \`count\`,
+              rollingWindow: {
+                trailing: \`unbounded\`,
+              },
+            },
+          },
+
+          dimensions: {
+            id: {
+              sql: \`id\`,
+              type: \`number\`,
+              primaryKey: true,
+            },
+            status: {
+              sql: \`status\`,
+              type: \`string\`,
+            },
+            ts: {
+              sql: \`ts\`,
+              type: \`time\`,
+            },
+            createdAt: {
+              sql: \`created_at\`,
+              type: \`time\`,
+            },
+          },
+        });
+
+        cube('Users', {
+          sql: \`SELECT * FROM public.users\`,
+
+          dimensions: {
+            id: {
+              sql: \`id\`,
+              type: \`number\`,
+              primaryKey: true,
+            },
+            signedUpAt: {
+              sql: \`signed_up_at\`,
+              type: \`time\`,
+            },
+          },
+        });
+
+        view('events_view', {
+          cubes: [{
+            join_path: Events,
+            includes: '*',
+          }],
+        });
+      `
+    );
+
+    const preAggregationsFor = async (query: Record<string, any>, preAggregationName: string) => {
+      const { compiler, cubeEvaluator, joinGraph } = compileEvents();
+      await compiler.compile();
+
+      const { preAggregations } = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+        measures: ['Events.count'],
+        timezone: 'UTC',
+        ...query,
+      });
+      const foundPreAggregation: any = preAggregations.getRollupPreAggregationByName('Events', preAggregationName);
+
+      return { preAggregations, foundPreAggregation };
+    };
+
+    const inDateRange = (member: string, values: string[]) => ({ member, operator: 'inDateRange', values });
+
+    const january = ['2024-01-01T00:00:00.000', '2024-01-31T23:59:59.999'];
+    const february = ['2024-02-01T00:00:00.000', '2024-02-29T23:59:59.999'];
+
+    describe('dateRangeFiltersFor', () => {
+      const dateRangesOf = async (filters: any[], preAggregationName: string = 'partitioned') => {
+        const { preAggregations, foundPreAggregation } = await preAggregationsFor({ filters }, preAggregationName);
+
+        return preAggregations.dateRangeFiltersFor(foundPreAggregation).map(f => f.formattedDateRange());
+      };
+
+      it('finds nothing without filters', async () => {
+        expect(await dateRangesOf([])).toEqual([]);
+      });
+
+      it('finds a single inDateRange filter', async () => {
+        expect(await dateRangesOf([
+          inDateRange('Events.ts', ['2024-01-01', '2024-01-31']),
+        ])).toEqual([january]);
+      });
+
+      it('finds every inDateRange filter in query order', async () => {
+        expect(await dateRangesOf([
+          inDateRange('Events.ts', ['2024-02-01', '2024-02-29']),
+          { member: 'Events.status', operator: 'equals', values: ['active'] },
+          inDateRange('Events.ts', ['2024-01-01', '2024-01-31']),
+        ])).toEqual([february, january]);
+      });
+
+      it('skips inDateRange filters on other dimensions', async () => {
+        expect(await dateRangesOf([
+          inDateRange('Events.createdAt', ['2024-02-01', '2024-02-29']),
+          inDateRange('Events.ts', ['2024-01-01', '2024-01-31']),
+        ])).toEqual([january]);
+      });
+
+      it('skips date operators other than inDateRange', async () => {
+        expect(await dateRangesOf([
+          { member: 'Events.ts', operator: 'afterDate', values: ['2024-01-01'] },
+          { member: 'Events.ts', operator: 'beforeDate', values: ['2024-01-31'] },
+          { member: 'Events.ts', operator: 'notInDateRange', values: ['2024-01-01', '2024-01-31'] },
+        ])).toEqual([]);
+      });
+
+      it('skips inDateRange filters nested in a logical group', async () => {
+        expect(await dateRangesOf([{
+          or: [
+            inDateRange('Events.ts', ['2024-01-01', '2024-01-31']),
+            { member: 'Events.status', operator: 'equals', values: ['active'] },
+          ],
+        }])).toEqual([]);
+      });
+
+      it('resolves view members', async () => {
+        expect(await dateRangesOf([
+          inDateRange('events_view.ts', ['2024-01-01', '2024-01-31']),
+        ])).toEqual([january]);
+      });
+
+      it('matches a time dimension referenced through a join path', async () => {
+        expect(await dateRangesOf([
+          inDateRange('Users.signedUpAt', ['2024-01-01', '2024-01-31']),
+        ], 'byUserSignup')).toEqual([january]);
+      });
+    });
+
+    describe('matchedTimeDimensionDateRangeFor', () => {
+      const dateRangeFor = async (query: Record<string, any>, preAggregationName: string = 'partitioned') => {
+        const { preAggregations, foundPreAggregation } = await preAggregationsFor(query, preAggregationName);
+
+        return preAggregations.matchedTimeDimensionDateRangeFor(foundPreAggregation);
+      };
+
+      it('is undefined with no time dimension and no filters', async () => {
+        expect(await dateRangeFor({})).toBeUndefined();
+      });
+
+      it('is undefined for a pre-aggregation without partitions', async () => {
+        expect(await dateRangeFor({
+          filters: [inDateRange('Events.ts', ['2024-01-01', '2024-01-31'])],
+        }, 'unpartitioned')).toBeUndefined();
+      });
+
+      it('takes the requested time dimension range', async () => {
+        expect(await dateRangeFor({
+          timeDimensions: [{ dimension: 'Events.ts', granularity: 'day', dateRange: ['2024-01-01', '2024-01-31'] }],
+        })).toEqual(january);
+      });
+
+      it('ignores a time dimension without a date range', async () => {
+        expect(await dateRangeFor({
+          timeDimensions: [{ dimension: 'Events.ts', granularity: 'day' }],
+        })).toBeUndefined();
+      });
+
+      it('ignores a time dimension range on another dimension', async () => {
+        expect(await dateRangeFor({
+          timeDimensions: [{ dimension: 'Events.createdAt', dateRange: ['2024-01-01', '2024-01-31'] }],
+        })).toBeUndefined();
+      });
+
+      it('takes the first of several inDateRange filters', async () => {
+        // Not intersected yet, see the TODO in matchedTimeDimensionDateRangeFor().
+        expect(await dateRangeFor({
+          filters: [
+            inDateRange('Events.ts', ['2024-02-01', '2024-02-29']),
+            inDateRange('Events.ts', ['2024-01-01', '2024-01-31']),
+          ],
+        })).toEqual(february);
+      });
+
+      it('prefers the time dimension range over a filter', async () => {
+        expect(await dateRangeFor({
+          timeDimensions: [{ dimension: 'Events.ts', granularity: 'day', dateRange: ['2024-01-01', '2024-01-31'] }],
+          filters: [inDateRange('Events.ts', ['2024-02-01', '2024-02-29'])],
+        })).toEqual(january);
+      });
+
+      it('falls back to a filter when cumulative measures make the time dimension range unusable', async () => {
+        expect(await dateRangeFor({
+          measures: ['Events.runningCount'],
+          timeDimensions: [{ dimension: 'Events.ts', granularity: 'day', dateRange: ['2024-01-01', '2024-01-31'] }],
+          filters: [inDateRange('Events.ts', ['2024-02-01', '2024-02-29'])],
+        })).toEqual(february);
+      });
+
+      it('resolves view members', async () => {
+        expect(await dateRangeFor({
+          measures: ['events_view.count'],
+          timeDimensions: [{ dimension: 'events_view.ts', granularity: 'day', dateRange: ['2024-01-01', '2024-01-31'] }],
+        })).toEqual(january);
+      });
+
+      it('matches a time dimension referenced through a join path', async () => {
+        expect(await dateRangeFor({
+          timeDimensions: [{ dimension: 'Users.signedUpAt', granularity: 'day', dateRange: ['2024-01-01', '2024-01-31'] }],
+        }, 'byUserSignup')).toEqual(january);
+
+        expect(await dateRangeFor({
+          filters: [inDateRange('Users.signedUpAt', ['2024-01-01', '2024-01-31'])],
+        }, 'byUserSignup')).toEqual(january);
+      });
+    });
+  });
+
   describe('rollup with multiplied measure', () => {
     let compiler;
     let cubeEvaluator;
@@ -1153,6 +1618,428 @@ describe('pre-aggregations', () => {
       // Must not throw while determining the matching pre-aggregation.
       expect(query.preAggregations?.preAggregationsDescription()).toEqual([]);
       expect(query.buildSqlAndParams()[0]).toMatch(/orders/);
+    });
+  });
+  // `users` and `line_items` have no join between them — only `base_orders` joins both —
+  // so the query's joinHints are the only thing naming a root; dropping them while
+  // matching throws "Can't find join path to join 'users', 'line_items'".
+  describe('a rollup that cannot serve the query does not change how it is planned', () => {
+    const { compiler, joinGraph, cubeEvaluator } = prepareYamlCompiler(`
+cubes:
+  - name: base_orders
+    sql: SELECT * FROM orders
+    joins:
+      - name: line_items
+        sql: "{CUBE.id} = {line_items.order_id}"
+        relationship: one_to_many
+      - name: users
+        sql: "{CUBE.user_id} = {users.id}"
+        relationship: many_to_one
+    dimensions:
+      - name: id
+        sql: id
+        type: number
+        primary_key: true
+      - name: user_id
+        sql: user_id
+        type: number
+    measures:
+      - name: count
+        type: count
+    pre_aggregations:
+      - name: orders_and_line_items_of_users
+        measures:
+          - count
+          - base_orders.line_items.count
+          - base_orders.line_items.sum_price
+        dimensions:
+          - base_orders.users.gender
+          - base_orders.users.state
+
+  - name: line_items
+    sql: SELECT * FROM line_items
+    joins:
+      - name: products
+        sql: "{CUBE.product_id} = {products.id}"
+        relationship: many_to_one
+    dimensions:
+      - name: id
+        sql: id
+        type: number
+        primary_key: true
+      - name: order_id
+        sql: order_id
+        type: number
+      - name: product_id
+        sql: product_id
+        type: number
+    measures:
+      - name: count
+        type: count
+      - name: sum_price
+        sql: price
+        type: sum
+
+  - name: users
+    sql: SELECT * FROM users
+    dimensions:
+      - name: id
+        sql: id
+        type: number
+        primary_key: true
+      - name: gender
+        sql: gender
+        type: string
+      - name: state
+        sql: state
+        type: string
+
+  - name: products
+    sql: SELECT * FROM products
+    dimensions:
+      - name: id
+        sql: id
+        type: number
+        primary_key: true
+      - name: name
+        sql: name
+        type: string
+`);
+
+    beforeAll(async () => {
+      await compiler.compile();
+    });
+
+    describe.each([
+      ['legacy planner', false],
+      ['native planner', true],
+    ])('%s', (_name, useNativeSqlPlanner) => {
+      it('plans a multi-cube query along its own join hints', async () => {
+        const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+          measures: ['base_orders.count', 'line_items.count'],
+          dimensions: ['users.state'],
+          joinHints: [
+            ['base_orders', 'users'],
+            ['base_orders', 'line_items'],
+          ],
+          timezone: 'UTC',
+          preAggregationsSchema: '',
+          useNativeSqlPlanner,
+        });
+
+        const [sql] = query.buildSqlAndParams();
+
+        expect(query.preAggregations?.preAggregationForQuery).toBeFalsy();
+        expect(sql).toMatch(/FROM\s+orders\s+AS/);
+        expect(sql).toMatch(/LEFT JOIN\s+line_items/);
+      });
+    });
+  });
+
+  // A rollupJoin resolves hop by hop, and each hop needs a leg rollup carrying that hop's key
+  // on each side. That is a requirement on every leg rollup, not a limit on how many cubes the
+  // chain spans — an interior rollup needs the upstream hop's key too, which no query selects.
+  describe('rollupJoin over a join chain', () => {
+    const chainSchema = (interiorRollupDimensions: string) => `
+      cube('cube_w', {
+        sql: \`SELECT 0 as id, 'a' as dim_w\`,
+        joins: { cube_x: { relationship: 'many_to_one', sql: \`\${CUBE.dim_w} = \${cube_x.dim_w}\` } },
+        dimensions: {
+          id: { sql: 'id', type: 'string', primary_key: true },
+          dim_w: { sql: 'dim_w', type: 'string' },
+        },
+        pre_aggregations: {
+          www: { dimensions: [dim_w] },
+          chainRollupJoin: {
+            type: 'rollupJoin',
+            dimensions: [dim_w, cube_x.dim_x, cube_y.dim_y, cube_z.dim_z],
+            rollups: [www, cube_x.xxx, cube_y.yyy, cube_z.zzz]
+          }
+        }
+      });
+      cube('cube_x', {
+        sql: \`SELECT 1 as id, 'a' as dim_w, 'b' as dim_x\`,
+        joins: { cube_y: { relationship: 'many_to_one', sql: \`\${CUBE.dim_x} = \${cube_y.dim_x}\` } },
+        dimensions: {
+          id: { sql: 'id', type: 'string', primary_key: true },
+          dim_w: { sql: 'dim_w', type: 'string' },
+          dim_x: { sql: 'dim_x', type: 'string' },
+        },
+        pre_aggregations: { xxx: { dimensions: [${interiorRollupDimensions}] } }
+      });
+      cube('cube_y', {
+        sql: \`SELECT 2 as id, 'b' as dim_x, 'c' as dim_y\`,
+        joins: { cube_z: { relationship: 'many_to_one', sql: \`\${CUBE.dim_y} = \${cube_z.dim_y}\` } },
+        dimensions: {
+          id: { sql: 'id', type: 'string', primary_key: true },
+          dim_x: { sql: 'dim_x', type: 'string' },
+          dim_y: { sql: 'dim_y', type: 'string' },
+        },
+        pre_aggregations: { yyy: { dimensions: [dim_x, dim_y] } }
+      });
+      cube('cube_z', {
+        sql: \`SELECT 3 as id, 'c' as dim_y, 'd' as dim_z\`,
+        dimensions: {
+          id: { sql: 'id', type: 'string', primary_key: true },
+          dim_y: { sql: 'dim_y', type: 'string' },
+          dim_z: { sql: 'dim_z', type: 'string' },
+        },
+        pre_aggregations: { zzz: { dimensions: [dim_y, dim_z] } }
+      });
+    `;
+
+    const chainQuery = async (schema: string) => {
+      const { compiler, joinGraph, cubeEvaluator } = prepareJsCompiler(schema);
+      await compiler.compile();
+      return new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+        measures: [],
+        dimensions: ['cube_w.dim_w', 'cube_x.dim_x', 'cube_y.dim_y', 'cube_z.dim_z'],
+        timezone: 'UTC',
+        preAggregationsSchema: '',
+        useNativeSqlPlanner: true,
+      } as any);
+    };
+
+    it('matches a four-cube chain when every leg rollup declares its own keys', async () => {
+      const query = await chainQuery(chainSchema('dim_w, dim_x'));
+
+      // A matched rollupJoin is described by its leg rollups, which are what get built; the
+      // join itself is named on preAggregationForQuery.
+      const description: any = query.preAggregations?.preAggregationsDescription();
+      expect(description.map((p: any) => p.preAggregationId).sort()).toEqual(
+        ['cube_w.www', 'cube_x.xxx', 'cube_y.yyy', 'cube_z.zzz']
+      );
+      expect(query.preAggregations?.preAggregationForQuery?.preAggregationName).toEqual('chainRollupJoin');
+      expect(query.buildSqlAndParams()[0]).toMatch(/"cube_w__dim_w" = "cube_x__dim_w"/);
+    });
+
+    it('names the hop an interior rollup has no key for', async () => {
+      const query = await chainQuery(chainSchema('dim_x'));
+
+      // Without the hop, the member and the rollupJoin, the author has nothing to act on —
+      // which is what makes this look like a chain-depth limitation.
+      for (const expected of [/from "cube_w"/, /to "cube_x"/, /cube_x\.dim_w/, /chainRollupJoin/]) {
+        expect(() => query.preAggregations?.preAggregationsDescription()).toThrow(expected);
+      }
+    });
+  });
+
+  // A rollup stores a time dimension truncated to its granularity, so two legs that declare
+  // the join key at different granularities hold values that can't be compared.
+  describe('rollupJoin whose legs truncate the join key differently', () => {
+    const { compiler, joinGraph, cubeEvaluator } = prepareJsCompiler(
+      `
+        cube('td_dates', {
+          sql: \`SELECT '2026-01-01'::timestamp as day, 'Q1' as quarter_label\`,
+          joins: { td_facts: { relationship: 'one_to_many', sql: \`\${CUBE.day} = \${td_facts.day}\` } },
+          dimensions: {
+            day: { sql: 'day', type: 'time', primary_key: true },
+            quarter_label: { sql: 'quarter_label', type: 'string' },
+          },
+          pre_aggregations: {
+            td_dates_rollup: { dimensions: [quarter_label], timeDimension: day, granularity: 'month' },
+            td_rollup_join: {
+              type: 'rollupJoin',
+              measures: [td_facts.total_amount],
+              dimensions: [quarter_label],
+              timeDimension: td_facts.day,
+              granularity: 'day',
+              rollups: [td_dates_rollup, td_facts.td_facts_rollup]
+            }
+          }
+        });
+        cube('td_facts', {
+          sql: \`SELECT 1 as id, '2026-01-01'::timestamp as day, 10 as amount\`,
+          dimensions: {
+            id: { sql: 'id', type: 'number', primary_key: true },
+            day: { sql: 'day', type: 'time' },
+          },
+          measures: { total_amount: { sql: 'amount', type: 'sum' } },
+          pre_aggregations: {
+            td_facts_rollup: { measures: [total_amount], timeDimension: day, granularity: 'day' }
+          }
+        });
+      `
+    );
+
+    beforeAll(async () => {
+      await compiler.compile();
+    });
+
+    it('rejects the join instead of comparing differently truncated columns', async () => {
+      const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+        measures: ['td_facts.total_amount'],
+        dimensions: ['td_dates.quarter_label'],
+        timeDimensions: [{ dimension: 'td_facts.day', granularity: 'day' }],
+        timezone: 'UTC',
+        preAggregationsSchema: '',
+        useNativeSqlPlanner: true,
+      } as any);
+
+      for (const expected of [
+        /td_dates\.td_dates_rollup stores td_dates\.day truncated to month/,
+        /td_facts\.td_facts_rollup stores td_facts\.day truncated to day/,
+        /td_rollup_join/,
+      ]) {
+        expect(() => query.preAggregations?.preAggregationsDescription()).toThrow(expected);
+      }
+    });
+  });
+
+  describe('cubes joined only through a hub', () => {
+    // `entities` is reachable only through `hub`, so the members of `ledger`, `categories` and
+    // `entities` have no join root on their own.
+    const { compiler, joinGraph, cubeEvaluator } = prepareYamlCompiler(`
+cubes:
+  - name: hub
+    sql: "SELECT 1 AS id, 'o1' AS org_id, 'e1' AS entity_id, 'm1' AS management_id"
+    joins:
+      - name: ledger
+        relationship: one_to_many
+        sql: "{CUBE.management_id} = {ledger.management_id}"
+      - name: entities
+        relationship: many_to_one
+        sql: "{CUBE.entity_id} = {entities.id}"
+    dimensions:
+      - name: id
+        sql: id
+        type: number
+        primary_key: true
+      - name: org_id
+        sql: org_id
+        type: string
+      - name: entity_id
+        sql: entity_id
+        type: string
+      - name: management_id
+        sql: management_id
+        type: string
+    measures:
+      - name: count
+        type: count
+    pre_aggregations:
+      - name: hub_rollup
+        dimensions:
+          - id
+          - org_id
+          - entity_id
+          - management_id
+      - name: income_by_category
+        measures:
+          - count
+          - ledger.amount
+        dimensions:
+          - ledger.category_id
+          - categories.name
+          - entities.name
+      - name: spoke_only_join
+        type: rollup_join
+        measures:
+          - ledger.amount
+        dimensions:
+          - ledger.category_id
+          - categories.name
+          - entities.name
+        rollups:
+          - hub.hub_rollup
+          - ledger.ledger_rollup
+          - categories.categories_rollup
+          - entities.entities_rollup
+
+  - name: ledger
+    sql: "SELECT 1 AS id, 'm1' AS management_id, 'c1' AS category_id, 10 AS amount"
+    joins:
+      - name: categories
+        relationship: many_to_one
+        sql: "{CUBE.category_id} = {categories.id}"
+    dimensions:
+      - name: id
+        sql: id
+        type: number
+        primary_key: true
+      - name: management_id
+        sql: management_id
+        type: string
+      - name: category_id
+        sql: category_id
+        type: string
+    measures:
+      - name: amount
+        sql: amount
+        type: sum
+    pre_aggregations:
+      - name: ledger_rollup
+        measures:
+          - amount
+        dimensions:
+          - management_id
+          - category_id
+
+  - name: categories
+    sql: "SELECT 'c1' AS id, 'Fees' AS name"
+    dimensions:
+      - name: id
+        sql: id
+        type: string
+        primary_key: true
+      - name: name
+        sql: name
+        type: string
+    pre_aggregations:
+      - name: categories_rollup
+        dimensions:
+          - id
+          - name
+
+  - name: entities
+    sql: "SELECT 'e1' AS id, 'Entity' AS name"
+    dimensions:
+      - name: id
+        sql: id
+        type: string
+        primary_key: true
+      - name: name
+        sql: name
+        type: string
+    pre_aggregations:
+      - name: entities_rollup
+        dimensions:
+          - id
+          - name
+`);
+
+    beforeAll(async () => {
+      await compiler.compile();
+    });
+
+    const sqlFor = (useNativeSqlPlanner: boolean, query: Record<string, unknown>) => new PostgresQuery(
+      { joinGraph, cubeEvaluator, compiler },
+      { ...query, timezone: 'UTC', preAggregationsSchema: '', useNativeSqlPlanner } as any
+    ).buildSqlAndParams()[0];
+
+    for (const useNativeSqlPlanner of [true, false]) {
+      const planner = useNativeSqlPlanner ? 'tesseract' : 'legacy';
+
+      it(`[${planner}] serves a rollup whose only hub member is a measure`, () => {
+        const sql = sqlFor(useNativeSqlPlanner, {
+          measures: ['hub.count', 'ledger.amount'],
+          dimensions: ['ledger.category_id', 'categories.name', 'entities.name'],
+        });
+        expect(sql).toMatch(/hub_income_by_category/);
+      });
+
+      it(`[${planner}] is not failed by a pre-aggregation whose members can't be joined`, () => {
+        const sql = sqlFor(useNativeSqlPlanner, { dimensions: ['hub.org_id'] });
+        expect(sql).toMatch(/hub_hub_rollup/);
+      });
+    }
+
+    it('[tesseract] reports a pre-aggregation that can\'t be joined when it is asked for by id', () => {
+      expect(() => sqlFor(true, {
+        measures: ['ledger.amount'],
+        dimensions: ['ledger.category_id', 'categories.name', 'entities.name'],
+        preAggregationId: 'hub.spoke_only_join',
+      })).toThrow(/Can't find join path to join 'ledger', 'categories', 'entities'/);
     });
   });
 });

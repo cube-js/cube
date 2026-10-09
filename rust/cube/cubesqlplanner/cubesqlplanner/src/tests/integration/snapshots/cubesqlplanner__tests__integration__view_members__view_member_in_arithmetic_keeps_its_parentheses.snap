@@ -1,0 +1,8 @@
+---
+source: cubesqlplanner/cubesqlplanner/src/tests/integration/view_members.rs
+expression: result
+---
+orders_view__status | orders_view__half_amount_plus_100
+--------------------+----------------------------------
+completed           | 625.0000000000000000             
+pending             | 162.5000000000000000

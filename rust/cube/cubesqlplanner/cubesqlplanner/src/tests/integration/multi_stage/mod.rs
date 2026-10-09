@@ -17,6 +17,7 @@ mod order_limit;
 mod plan_optimizers;
 mod rank;
 mod reduce_by;
+mod rolling_window_grain;
 mod time_shift_basic;
 mod time_shift_mixed;
 mod timezone;

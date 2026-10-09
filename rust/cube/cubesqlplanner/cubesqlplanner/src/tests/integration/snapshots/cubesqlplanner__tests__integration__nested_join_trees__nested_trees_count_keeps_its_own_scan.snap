@@ -1,0 +1,8 @@
+---
+source: cubesqlplanner/cubesqlplanner/src/tests/integration/nested_join_trees.rs
+expression: result
+---
+sites__country | carts__count | checkouts__unique_msid
+---------------+--------------+-----------------------
+DE             | 1            | 0                     
+US             | 3            | 2

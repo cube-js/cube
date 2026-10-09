@@ -12577,6 +12577,21 @@ Array [
 ]
 `;
 
+exports[`Queries with the @cubejs-backend/postgres-driver SQL API: named prior month by category for one day 1`] = `
+Array [
+  Object {
+    "category": "Office Supplies",
+    "order_count": null,
+    "prior_month": 1,
+  },
+  Object {
+    "category": "Technology",
+    "order_count": "2",
+    "prior_month": 1,
+  },
+]
+`;
+
 exports[`Queries with the @cubejs-backend/postgres-driver SQL API: post-aggregate percentage of total 1`] = `
 Array [
   Object {
@@ -15401,6 +15416,534 @@ exports[`Queries with the @cubejs-backend/postgres-driver pre-aggregations Custo
 Array [
   Object {
     "Customers.runningTotal": "41",
+  },
+]
+`;
+
+exports[`Queries with the @cubejs-backend/postgres-driver querying BigECommerce with Retail Calendar: prior year and month by week (no pre-aggregation) 1`] = `
+Array [
+  Object {
+    "BigECommerce.count": "1",
+    "BigECommerce.totalCountRetailMonthAgoNoPreAgg": "1",
+    "BigECommerce.totalCountRetailYearAgoNoPreAgg": null,
+    "RetailCalendar.retail_date": "2020-02-16T00:00:00.000",
+    "RetailCalendar.retail_date.week": "2020-02-16T00:00:00.000",
+  },
+  Object {
+    "BigECommerce.count": "1",
+    "BigECommerce.totalCountRetailMonthAgoNoPreAgg": "1",
+    "BigECommerce.totalCountRetailYearAgoNoPreAgg": null,
+    "RetailCalendar.retail_date": "2020-03-15T00:00:00.000",
+    "RetailCalendar.retail_date.week": "2020-03-15T00:00:00.000",
+  },
+  Object {
+    "BigECommerce.count": "1",
+    "BigECommerce.totalCountRetailMonthAgoNoPreAgg": null,
+    "BigECommerce.totalCountRetailYearAgoNoPreAgg": null,
+    "RetailCalendar.retail_date": "2020-03-22T00:00:00.000",
+    "RetailCalendar.retail_date.week": "2020-03-22T00:00:00.000",
+  },
+  Object {
+    "BigECommerce.count": "1",
+    "BigECommerce.totalCountRetailMonthAgoNoPreAgg": null,
+    "BigECommerce.totalCountRetailYearAgoNoPreAgg": null,
+    "RetailCalendar.retail_date": "2020-04-05T00:00:00.000",
+    "RetailCalendar.retail_date.week": "2020-04-05T00:00:00.000",
+  },
+  Object {
+    "BigECommerce.count": null,
+    "BigECommerce.totalCountRetailMonthAgoNoPreAgg": "1",
+    "BigECommerce.totalCountRetailYearAgoNoPreAgg": null,
+    "RetailCalendar.retail_date": "2020-04-19T00:00:00.000",
+    "RetailCalendar.retail_date.week": "2020-04-19T00:00:00.000",
+  },
+  Object {
+    "BigECommerce.count": null,
+    "BigECommerce.totalCountRetailMonthAgoNoPreAgg": "1",
+    "BigECommerce.totalCountRetailYearAgoNoPreAgg": null,
+    "RetailCalendar.retail_date": "2020-04-26T00:00:00.000",
+    "RetailCalendar.retail_date.week": "2020-04-26T00:00:00.000",
+  },
+  Object {
+    "BigECommerce.count": null,
+    "BigECommerce.totalCountRetailMonthAgoNoPreAgg": "1",
+    "BigECommerce.totalCountRetailYearAgoNoPreAgg": null,
+    "RetailCalendar.retail_date": "2020-05-03T00:00:00.000",
+    "RetailCalendar.retail_date.week": "2020-05-03T00:00:00.000",
+  },
+  Object {
+    "BigECommerce.count": "3",
+    "BigECommerce.totalCountRetailMonthAgoNoPreAgg": null,
+    "BigECommerce.totalCountRetailYearAgoNoPreAgg": null,
+    "RetailCalendar.retail_date": "2020-05-10T00:00:00.000",
+    "RetailCalendar.retail_date.week": "2020-05-10T00:00:00.000",
+  },
+  Object {
+    "BigECommerce.count": "2",
+    "BigECommerce.totalCountRetailMonthAgoNoPreAgg": null,
+    "BigECommerce.totalCountRetailYearAgoNoPreAgg": null,
+    "RetailCalendar.retail_date": "2020-05-24T00:00:00.000",
+    "RetailCalendar.retail_date.week": "2020-05-24T00:00:00.000",
+  },
+  Object {
+    "BigECommerce.count": "1",
+    "BigECommerce.totalCountRetailMonthAgoNoPreAgg": null,
+    "BigECommerce.totalCountRetailYearAgoNoPreAgg": null,
+    "RetailCalendar.retail_date": "2020-05-31T00:00:00.000",
+    "RetailCalendar.retail_date.week": "2020-05-31T00:00:00.000",
+  },
+  Object {
+    "BigECommerce.count": "2",
+    "BigECommerce.totalCountRetailMonthAgoNoPreAgg": "3",
+    "BigECommerce.totalCountRetailYearAgoNoPreAgg": null,
+    "RetailCalendar.retail_date": "2020-06-07T00:00:00.000",
+    "RetailCalendar.retail_date.week": "2020-06-07T00:00:00.000",
+  },
+  Object {
+    "BigECommerce.count": "2",
+    "BigECommerce.totalCountRetailMonthAgoNoPreAgg": null,
+    "BigECommerce.totalCountRetailYearAgoNoPreAgg": null,
+    "RetailCalendar.retail_date": "2020-06-14T00:00:00.000",
+    "RetailCalendar.retail_date.week": "2020-06-14T00:00:00.000",
+  },
+  Object {
+    "BigECommerce.count": "2",
+    "BigECommerce.totalCountRetailMonthAgoNoPreAgg": "2",
+    "BigECommerce.totalCountRetailYearAgoNoPreAgg": null,
+    "RetailCalendar.retail_date": "2020-06-21T00:00:00.000",
+    "RetailCalendar.retail_date.week": "2020-06-21T00:00:00.000",
+  },
+  Object {
+    "BigECommerce.count": null,
+    "BigECommerce.totalCountRetailMonthAgoNoPreAgg": "1",
+    "BigECommerce.totalCountRetailYearAgoNoPreAgg": null,
+    "RetailCalendar.retail_date": "2020-07-05T00:00:00.000",
+    "RetailCalendar.retail_date.week": "2020-07-05T00:00:00.000",
+  },
+  Object {
+    "BigECommerce.count": null,
+    "BigECommerce.totalCountRetailMonthAgoNoPreAgg": "2",
+    "BigECommerce.totalCountRetailYearAgoNoPreAgg": null,
+    "RetailCalendar.retail_date": "2020-07-12T00:00:00.000",
+    "RetailCalendar.retail_date.week": "2020-07-12T00:00:00.000",
+  },
+  Object {
+    "BigECommerce.count": null,
+    "BigECommerce.totalCountRetailMonthAgoNoPreAgg": "2",
+    "BigECommerce.totalCountRetailYearAgoNoPreAgg": null,
+    "RetailCalendar.retail_date": "2020-07-19T00:00:00.000",
+    "RetailCalendar.retail_date.week": "2020-07-19T00:00:00.000",
+  },
+  Object {
+    "BigECommerce.count": null,
+    "BigECommerce.totalCountRetailMonthAgoNoPreAgg": "2",
+    "BigECommerce.totalCountRetailYearAgoNoPreAgg": null,
+    "RetailCalendar.retail_date": "2020-07-26T00:00:00.000",
+    "RetailCalendar.retail_date.week": "2020-07-26T00:00:00.000",
+  },
+  Object {
+    "BigECommerce.count": "2",
+    "BigECommerce.totalCountRetailMonthAgoNoPreAgg": null,
+    "BigECommerce.totalCountRetailYearAgoNoPreAgg": null,
+    "RetailCalendar.retail_date": "2020-08-30T00:00:00.000",
+    "RetailCalendar.retail_date.week": "2020-08-30T00:00:00.000",
+  },
+  Object {
+    "BigECommerce.count": "1",
+    "BigECommerce.totalCountRetailMonthAgoNoPreAgg": null,
+    "BigECommerce.totalCountRetailYearAgoNoPreAgg": null,
+    "RetailCalendar.retail_date": "2020-09-06T00:00:00.000",
+    "RetailCalendar.retail_date.week": "2020-09-06T00:00:00.000",
+  },
+  Object {
+    "BigECommerce.count": "2",
+    "BigECommerce.totalCountRetailMonthAgoNoPreAgg": null,
+    "BigECommerce.totalCountRetailYearAgoNoPreAgg": null,
+    "RetailCalendar.retail_date": "2020-09-13T00:00:00.000",
+    "RetailCalendar.retail_date.week": "2020-09-13T00:00:00.000",
+  },
+  Object {
+    "BigECommerce.count": "1",
+    "BigECommerce.totalCountRetailMonthAgoNoPreAgg": null,
+    "BigECommerce.totalCountRetailYearAgoNoPreAgg": null,
+    "RetailCalendar.retail_date": "2020-09-20T00:00:00.000",
+    "RetailCalendar.retail_date.week": "2020-09-20T00:00:00.000",
+  },
+  Object {
+    "BigECommerce.count": null,
+    "BigECommerce.totalCountRetailMonthAgoNoPreAgg": "2",
+    "BigECommerce.totalCountRetailYearAgoNoPreAgg": null,
+    "RetailCalendar.retail_date": "2020-10-04T00:00:00.000",
+    "RetailCalendar.retail_date.week": "2020-10-04T00:00:00.000",
+  },
+  Object {
+    "BigECommerce.count": "1",
+    "BigECommerce.totalCountRetailMonthAgoNoPreAgg": "1",
+    "BigECommerce.totalCountRetailYearAgoNoPreAgg": null,
+    "RetailCalendar.retail_date": "2020-10-11T00:00:00.000",
+    "RetailCalendar.retail_date.week": "2020-10-11T00:00:00.000",
+  },
+  Object {
+    "BigECommerce.count": "2",
+    "BigECommerce.totalCountRetailMonthAgoNoPreAgg": "2",
+    "BigECommerce.totalCountRetailYearAgoNoPreAgg": null,
+    "RetailCalendar.retail_date": "2020-10-18T00:00:00.000",
+    "RetailCalendar.retail_date.week": "2020-10-18T00:00:00.000",
+  },
+  Object {
+    "BigECommerce.count": "1",
+    "BigECommerce.totalCountRetailMonthAgoNoPreAgg": "1",
+    "BigECommerce.totalCountRetailYearAgoNoPreAgg": null,
+    "RetailCalendar.retail_date": "2020-10-25T00:00:00.000",
+    "RetailCalendar.retail_date.week": "2020-10-25T00:00:00.000",
+  },
+  Object {
+    "BigECommerce.count": "3",
+    "BigECommerce.totalCountRetailMonthAgoNoPreAgg": null,
+    "BigECommerce.totalCountRetailYearAgoNoPreAgg": null,
+    "RetailCalendar.retail_date": "2020-11-01T00:00:00.000",
+    "RetailCalendar.retail_date.week": "2020-11-01T00:00:00.000",
+  },
+  Object {
+    "BigECommerce.count": "2",
+    "BigECommerce.totalCountRetailMonthAgoNoPreAgg": "1",
+    "BigECommerce.totalCountRetailYearAgoNoPreAgg": null,
+    "RetailCalendar.retail_date": "2020-11-08T00:00:00.000",
+    "RetailCalendar.retail_date.week": "2020-11-08T00:00:00.000",
+  },
+  Object {
+    "BigECommerce.count": "3",
+    "BigECommerce.totalCountRetailMonthAgoNoPreAgg": "2",
+    "BigECommerce.totalCountRetailYearAgoNoPreAgg": null,
+    "RetailCalendar.retail_date": "2020-11-15T00:00:00.000",
+    "RetailCalendar.retail_date.week": "2020-11-15T00:00:00.000",
+  },
+  Object {
+    "BigECommerce.count": "1",
+    "BigECommerce.totalCountRetailMonthAgoNoPreAgg": "1",
+    "BigECommerce.totalCountRetailYearAgoNoPreAgg": null,
+    "RetailCalendar.retail_date": "2020-11-22T00:00:00.000",
+    "RetailCalendar.retail_date.week": "2020-11-22T00:00:00.000",
+  },
+  Object {
+    "BigECommerce.count": "3",
+    "BigECommerce.totalCountRetailMonthAgoNoPreAgg": "3",
+    "BigECommerce.totalCountRetailYearAgoNoPreAgg": null,
+    "RetailCalendar.retail_date": "2020-11-29T00:00:00.000",
+    "RetailCalendar.retail_date.week": "2020-11-29T00:00:00.000",
+  },
+  Object {
+    "BigECommerce.count": null,
+    "BigECommerce.totalCountRetailMonthAgoNoPreAgg": "2",
+    "BigECommerce.totalCountRetailYearAgoNoPreAgg": null,
+    "RetailCalendar.retail_date": "2020-12-06T00:00:00.000",
+    "RetailCalendar.retail_date.week": "2020-12-06T00:00:00.000",
+  },
+  Object {
+    "BigECommerce.count": "2",
+    "BigECommerce.totalCountRetailMonthAgoNoPreAgg": "3",
+    "BigECommerce.totalCountRetailYearAgoNoPreAgg": null,
+    "RetailCalendar.retail_date": "2020-12-13T00:00:00.000",
+    "RetailCalendar.retail_date.week": "2020-12-13T00:00:00.000",
+  },
+  Object {
+    "BigECommerce.count": "2",
+    "BigECommerce.totalCountRetailMonthAgoNoPreAgg": "1",
+    "BigECommerce.totalCountRetailYearAgoNoPreAgg": null,
+    "RetailCalendar.retail_date": "2020-12-20T00:00:00.000",
+    "RetailCalendar.retail_date.week": "2020-12-20T00:00:00.000",
+  },
+  Object {
+    "BigECommerce.count": null,
+    "BigECommerce.totalCountRetailMonthAgoNoPreAgg": null,
+    "BigECommerce.totalCountRetailYearAgoNoPreAgg": "1",
+    "RetailCalendar.retail_date": "2020-12-27T00:00:00.000",
+    "RetailCalendar.retail_date.week": "2020-12-27T00:00:00.000",
+  },
+  Object {
+    "BigECommerce.count": null,
+    "BigECommerce.totalCountRetailMonthAgoNoPreAgg": "3",
+    "BigECommerce.totalCountRetailYearAgoNoPreAgg": null,
+    "RetailCalendar.retail_date": "2021-01-03T00:00:00.000",
+    "RetailCalendar.retail_date.week": "2021-01-03T00:00:00.000",
+  },
+  Object {
+    "BigECommerce.count": null,
+    "BigECommerce.totalCountRetailMonthAgoNoPreAgg": "2",
+    "BigECommerce.totalCountRetailYearAgoNoPreAgg": "1",
+    "RetailCalendar.retail_date": "2021-01-17T00:00:00.000",
+    "RetailCalendar.retail_date.week": "2021-01-17T00:00:00.000",
+  },
+  Object {
+    "BigECommerce.count": null,
+    "BigECommerce.totalCountRetailMonthAgoNoPreAgg": "2",
+    "BigECommerce.totalCountRetailYearAgoNoPreAgg": null,
+    "RetailCalendar.retail_date": "2021-01-24T00:00:00.000",
+    "RetailCalendar.retail_date.week": "2021-01-24T00:00:00.000",
+  },
+]
+`;
+
+exports[`Queries with the @cubejs-backend/postgres-driver querying BigECommerce with Retail Calendar: prior year and month by week (pre-aggregation in CubeStore) 1`] = `
+Array [
+  Object {
+    "BigECommerce.count": "1",
+    "BigECommerce.totalCountRetailMonthAgo": "1",
+    "BigECommerce.totalCountRetailYearAgo": null,
+    "RetailCalendar.retail_date": "2020-02-16T00:00:00.000",
+    "RetailCalendar.retail_date.week": "2020-02-16T00:00:00.000",
+  },
+  Object {
+    "BigECommerce.count": "1",
+    "BigECommerce.totalCountRetailMonthAgo": "1",
+    "BigECommerce.totalCountRetailYearAgo": null,
+    "RetailCalendar.retail_date": "2020-03-15T00:00:00.000",
+    "RetailCalendar.retail_date.week": "2020-03-15T00:00:00.000",
+  },
+  Object {
+    "BigECommerce.count": "1",
+    "BigECommerce.totalCountRetailMonthAgo": null,
+    "BigECommerce.totalCountRetailYearAgo": null,
+    "RetailCalendar.retail_date": "2020-03-22T00:00:00.000",
+    "RetailCalendar.retail_date.week": "2020-03-22T00:00:00.000",
+  },
+  Object {
+    "BigECommerce.count": "1",
+    "BigECommerce.totalCountRetailMonthAgo": null,
+    "BigECommerce.totalCountRetailYearAgo": null,
+    "RetailCalendar.retail_date": "2020-04-05T00:00:00.000",
+    "RetailCalendar.retail_date.week": "2020-04-05T00:00:00.000",
+  },
+  Object {
+    "BigECommerce.count": null,
+    "BigECommerce.totalCountRetailMonthAgo": "1",
+    "BigECommerce.totalCountRetailYearAgo": null,
+    "RetailCalendar.retail_date": "2020-04-19T00:00:00.000",
+    "RetailCalendar.retail_date.week": "2020-04-19T00:00:00.000",
+  },
+  Object {
+    "BigECommerce.count": null,
+    "BigECommerce.totalCountRetailMonthAgo": "1",
+    "BigECommerce.totalCountRetailYearAgo": null,
+    "RetailCalendar.retail_date": "2020-04-26T00:00:00.000",
+    "RetailCalendar.retail_date.week": "2020-04-26T00:00:00.000",
+  },
+  Object {
+    "BigECommerce.count": null,
+    "BigECommerce.totalCountRetailMonthAgo": "1",
+    "BigECommerce.totalCountRetailYearAgo": null,
+    "RetailCalendar.retail_date": "2020-05-03T00:00:00.000",
+    "RetailCalendar.retail_date.week": "2020-05-03T00:00:00.000",
+  },
+  Object {
+    "BigECommerce.count": "3",
+    "BigECommerce.totalCountRetailMonthAgo": null,
+    "BigECommerce.totalCountRetailYearAgo": null,
+    "RetailCalendar.retail_date": "2020-05-10T00:00:00.000",
+    "RetailCalendar.retail_date.week": "2020-05-10T00:00:00.000",
+  },
+  Object {
+    "BigECommerce.count": "2",
+    "BigECommerce.totalCountRetailMonthAgo": null,
+    "BigECommerce.totalCountRetailYearAgo": null,
+    "RetailCalendar.retail_date": "2020-05-24T00:00:00.000",
+    "RetailCalendar.retail_date.week": "2020-05-24T00:00:00.000",
+  },
+  Object {
+    "BigECommerce.count": "1",
+    "BigECommerce.totalCountRetailMonthAgo": null,
+    "BigECommerce.totalCountRetailYearAgo": null,
+    "RetailCalendar.retail_date": "2020-05-31T00:00:00.000",
+    "RetailCalendar.retail_date.week": "2020-05-31T00:00:00.000",
+  },
+  Object {
+    "BigECommerce.count": "2",
+    "BigECommerce.totalCountRetailMonthAgo": "3",
+    "BigECommerce.totalCountRetailYearAgo": null,
+    "RetailCalendar.retail_date": "2020-06-07T00:00:00.000",
+    "RetailCalendar.retail_date.week": "2020-06-07T00:00:00.000",
+  },
+  Object {
+    "BigECommerce.count": "2",
+    "BigECommerce.totalCountRetailMonthAgo": null,
+    "BigECommerce.totalCountRetailYearAgo": null,
+    "RetailCalendar.retail_date": "2020-06-14T00:00:00.000",
+    "RetailCalendar.retail_date.week": "2020-06-14T00:00:00.000",
+  },
+  Object {
+    "BigECommerce.count": "2",
+    "BigECommerce.totalCountRetailMonthAgo": "2",
+    "BigECommerce.totalCountRetailYearAgo": null,
+    "RetailCalendar.retail_date": "2020-06-21T00:00:00.000",
+    "RetailCalendar.retail_date.week": "2020-06-21T00:00:00.000",
+  },
+  Object {
+    "BigECommerce.count": null,
+    "BigECommerce.totalCountRetailMonthAgo": "1",
+    "BigECommerce.totalCountRetailYearAgo": null,
+    "RetailCalendar.retail_date": "2020-07-05T00:00:00.000",
+    "RetailCalendar.retail_date.week": "2020-07-05T00:00:00.000",
+  },
+  Object {
+    "BigECommerce.count": null,
+    "BigECommerce.totalCountRetailMonthAgo": "2",
+    "BigECommerce.totalCountRetailYearAgo": null,
+    "RetailCalendar.retail_date": "2020-07-12T00:00:00.000",
+    "RetailCalendar.retail_date.week": "2020-07-12T00:00:00.000",
+  },
+  Object {
+    "BigECommerce.count": null,
+    "BigECommerce.totalCountRetailMonthAgo": "2",
+    "BigECommerce.totalCountRetailYearAgo": null,
+    "RetailCalendar.retail_date": "2020-07-19T00:00:00.000",
+    "RetailCalendar.retail_date.week": "2020-07-19T00:00:00.000",
+  },
+  Object {
+    "BigECommerce.count": null,
+    "BigECommerce.totalCountRetailMonthAgo": "2",
+    "BigECommerce.totalCountRetailYearAgo": null,
+    "RetailCalendar.retail_date": "2020-07-26T00:00:00.000",
+    "RetailCalendar.retail_date.week": "2020-07-26T00:00:00.000",
+  },
+  Object {
+    "BigECommerce.count": "2",
+    "BigECommerce.totalCountRetailMonthAgo": null,
+    "BigECommerce.totalCountRetailYearAgo": null,
+    "RetailCalendar.retail_date": "2020-08-30T00:00:00.000",
+    "RetailCalendar.retail_date.week": "2020-08-30T00:00:00.000",
+  },
+  Object {
+    "BigECommerce.count": "1",
+    "BigECommerce.totalCountRetailMonthAgo": null,
+    "BigECommerce.totalCountRetailYearAgo": null,
+    "RetailCalendar.retail_date": "2020-09-06T00:00:00.000",
+    "RetailCalendar.retail_date.week": "2020-09-06T00:00:00.000",
+  },
+  Object {
+    "BigECommerce.count": "2",
+    "BigECommerce.totalCountRetailMonthAgo": null,
+    "BigECommerce.totalCountRetailYearAgo": null,
+    "RetailCalendar.retail_date": "2020-09-13T00:00:00.000",
+    "RetailCalendar.retail_date.week": "2020-09-13T00:00:00.000",
+  },
+  Object {
+    "BigECommerce.count": "1",
+    "BigECommerce.totalCountRetailMonthAgo": null,
+    "BigECommerce.totalCountRetailYearAgo": null,
+    "RetailCalendar.retail_date": "2020-09-20T00:00:00.000",
+    "RetailCalendar.retail_date.week": "2020-09-20T00:00:00.000",
+  },
+  Object {
+    "BigECommerce.count": null,
+    "BigECommerce.totalCountRetailMonthAgo": "2",
+    "BigECommerce.totalCountRetailYearAgo": null,
+    "RetailCalendar.retail_date": "2020-10-04T00:00:00.000",
+    "RetailCalendar.retail_date.week": "2020-10-04T00:00:00.000",
+  },
+  Object {
+    "BigECommerce.count": "1",
+    "BigECommerce.totalCountRetailMonthAgo": "1",
+    "BigECommerce.totalCountRetailYearAgo": null,
+    "RetailCalendar.retail_date": "2020-10-11T00:00:00.000",
+    "RetailCalendar.retail_date.week": "2020-10-11T00:00:00.000",
+  },
+  Object {
+    "BigECommerce.count": "2",
+    "BigECommerce.totalCountRetailMonthAgo": "2",
+    "BigECommerce.totalCountRetailYearAgo": null,
+    "RetailCalendar.retail_date": "2020-10-18T00:00:00.000",
+    "RetailCalendar.retail_date.week": "2020-10-18T00:00:00.000",
+  },
+  Object {
+    "BigECommerce.count": "1",
+    "BigECommerce.totalCountRetailMonthAgo": "1",
+    "BigECommerce.totalCountRetailYearAgo": null,
+    "RetailCalendar.retail_date": "2020-10-25T00:00:00.000",
+    "RetailCalendar.retail_date.week": "2020-10-25T00:00:00.000",
+  },
+  Object {
+    "BigECommerce.count": "3",
+    "BigECommerce.totalCountRetailMonthAgo": null,
+    "BigECommerce.totalCountRetailYearAgo": null,
+    "RetailCalendar.retail_date": "2020-11-01T00:00:00.000",
+    "RetailCalendar.retail_date.week": "2020-11-01T00:00:00.000",
+  },
+  Object {
+    "BigECommerce.count": "2",
+    "BigECommerce.totalCountRetailMonthAgo": "1",
+    "BigECommerce.totalCountRetailYearAgo": null,
+    "RetailCalendar.retail_date": "2020-11-08T00:00:00.000",
+    "RetailCalendar.retail_date.week": "2020-11-08T00:00:00.000",
+  },
+  Object {
+    "BigECommerce.count": "3",
+    "BigECommerce.totalCountRetailMonthAgo": "2",
+    "BigECommerce.totalCountRetailYearAgo": null,
+    "RetailCalendar.retail_date": "2020-11-15T00:00:00.000",
+    "RetailCalendar.retail_date.week": "2020-11-15T00:00:00.000",
+  },
+  Object {
+    "BigECommerce.count": "1",
+    "BigECommerce.totalCountRetailMonthAgo": "1",
+    "BigECommerce.totalCountRetailYearAgo": null,
+    "RetailCalendar.retail_date": "2020-11-22T00:00:00.000",
+    "RetailCalendar.retail_date.week": "2020-11-22T00:00:00.000",
+  },
+  Object {
+    "BigECommerce.count": "3",
+    "BigECommerce.totalCountRetailMonthAgo": "3",
+    "BigECommerce.totalCountRetailYearAgo": null,
+    "RetailCalendar.retail_date": "2020-11-29T00:00:00.000",
+    "RetailCalendar.retail_date.week": "2020-11-29T00:00:00.000",
+  },
+  Object {
+    "BigECommerce.count": null,
+    "BigECommerce.totalCountRetailMonthAgo": "2",
+    "BigECommerce.totalCountRetailYearAgo": null,
+    "RetailCalendar.retail_date": "2020-12-06T00:00:00.000",
+    "RetailCalendar.retail_date.week": "2020-12-06T00:00:00.000",
+  },
+  Object {
+    "BigECommerce.count": "2",
+    "BigECommerce.totalCountRetailMonthAgo": "3",
+    "BigECommerce.totalCountRetailYearAgo": null,
+    "RetailCalendar.retail_date": "2020-12-13T00:00:00.000",
+    "RetailCalendar.retail_date.week": "2020-12-13T00:00:00.000",
+  },
+  Object {
+    "BigECommerce.count": "2",
+    "BigECommerce.totalCountRetailMonthAgo": "1",
+    "BigECommerce.totalCountRetailYearAgo": null,
+    "RetailCalendar.retail_date": "2020-12-20T00:00:00.000",
+    "RetailCalendar.retail_date.week": "2020-12-20T00:00:00.000",
+  },
+  Object {
+    "BigECommerce.count": null,
+    "BigECommerce.totalCountRetailMonthAgo": null,
+    "BigECommerce.totalCountRetailYearAgo": "1",
+    "RetailCalendar.retail_date": "2020-12-27T00:00:00.000",
+    "RetailCalendar.retail_date.week": "2020-12-27T00:00:00.000",
+  },
+  Object {
+    "BigECommerce.count": null,
+    "BigECommerce.totalCountRetailMonthAgo": "3",
+    "BigECommerce.totalCountRetailYearAgo": null,
+    "RetailCalendar.retail_date": "2021-01-03T00:00:00.000",
+    "RetailCalendar.retail_date.week": "2021-01-03T00:00:00.000",
+  },
+  Object {
+    "BigECommerce.count": null,
+    "BigECommerce.totalCountRetailMonthAgo": "2",
+    "BigECommerce.totalCountRetailYearAgo": "1",
+    "RetailCalendar.retail_date": "2021-01-17T00:00:00.000",
+    "RetailCalendar.retail_date.week": "2021-01-17T00:00:00.000",
+  },
+  Object {
+    "BigECommerce.count": null,
+    "BigECommerce.totalCountRetailMonthAgo": "2",
+    "BigECommerce.totalCountRetailYearAgo": null,
+    "RetailCalendar.retail_date": "2021-01-24T00:00:00.000",
+    "RetailCalendar.retail_date.week": "2021-01-24T00:00:00.000",
   },
 ]
 `;
@@ -22468,6 +23011,41 @@ Array [
 ]
 `;
 
+exports[`Queries with the @cubejs-backend/postgres-driver querying RetailOrders: named prior month by category for one day (pre-aggregation in CubeStore) 1`] = `
+Array [
+  Object {
+    "RetailOrders.category": "Office Supplies",
+    "RetailOrders.retailOrderCount": null,
+    "RetailOrders.retailOrderCountPriorMonth": "1",
+  },
+  Object {
+    "RetailOrders.category": "Technology",
+    "RetailOrders.retailOrderCount": "2",
+    "RetailOrders.retailOrderCountPriorMonth": "1",
+  },
+]
+`;
+
+exports[`Queries with the @cubejs-backend/postgres-driver querying RetailOrders: named prior month by category over two months (pre-aggregation in CubeStore) 1`] = `
+Array [
+  Object {
+    "RetailOrders.category": "Furniture",
+    "RetailOrders.retailOrderCount": "5",
+    "RetailOrders.retailOrderCountPriorMonth": "7",
+  },
+  Object {
+    "RetailOrders.category": "Office Supplies",
+    "RetailOrders.retailOrderCount": "4",
+    "RetailOrders.retailOrderCountPriorMonth": "3",
+  },
+  Object {
+    "RetailOrders.category": "Technology",
+    "RetailOrders.retailOrderCount": "7",
+    "RetailOrders.retailOrderCountPriorMonth": "3",
+  },
+]
+`;
+
 exports[`Queries with the @cubejs-backend/postgres-driver querying SwitchSourceTest: filter by switch dimensions 1`] = `
 Array [
   Object {
@@ -22792,6 +23370,36 @@ Array [
     "ECommerce.orderDate": "2021-01-01T00:00:00.000",
     "ECommerce.orderDate.half_year": "2021-01-01T00:00:00.000",
     "ECommerce.totalQuantity": "103",
+  },
+]
+`;
+
+exports[`Queries with the @cubejs-backend/postgres-driver querying custom granularities ECommerce: count by fiscal_year_by_1st_april + no dimension 1`] = `
+Array [
+  Object {
+    "ECommerce.count": "5",
+    "ECommerce.customOrderDateNoPreAgg": "2019-04-01T00:00:00.000",
+    "ECommerce.customOrderDateNoPreAgg.fiscal_year_by_1st_april": "2019-04-01T00:00:00.000",
+  },
+  Object {
+    "ECommerce.count": "39",
+    "ECommerce.customOrderDateNoPreAgg": "2020-04-01T00:00:00.000",
+    "ECommerce.customOrderDateNoPreAgg.fiscal_year_by_1st_april": "2020-04-01T00:00:00.000",
+  },
+]
+`;
+
+exports[`Queries with the @cubejs-backend/postgres-driver querying custom granularities ECommerce: count by fiscal_year_by_15th_april + no dimension 1`] = `
+Array [
+  Object {
+    "ECommerce.count": "6",
+    "ECommerce.customOrderDateNoPreAgg": "2019-04-15T00:00:00.000",
+    "ECommerce.customOrderDateNoPreAgg.fiscal_year_by_15th_april": "2019-04-15T00:00:00.000",
+  },
+  Object {
+    "ECommerce.count": "38",
+    "ECommerce.customOrderDateNoPreAgg": "2020-04-15T00:00:00.000",
+    "ECommerce.customOrderDateNoPreAgg.fiscal_year_by_15th_april": "2020-04-15T00:00:00.000",
   },
 ]
 `;
@@ -23208,6 +23816,71 @@ Array [
     "ECommerce.count": "19",
     "ECommerce.customOrderDateNoPreAgg": "2020-10-01T00:00:00.000",
     "ECommerce.customOrderDateNoPreAgg.half_year_by_1st_april": "2020-10-01T00:00:00.000",
+  },
+]
+`;
+
+exports[`Queries with the @cubejs-backend/postgres-driver querying custom granularities ECommerce: count by monthly_from_15th + no dimension 1`] = `
+Array [
+  Object {
+    "ECommerce.count": "1",
+    "ECommerce.customOrderDateNoPreAgg": "2019-12-15T00:00:00.000",
+    "ECommerce.customOrderDateNoPreAgg.monthly_from_15th": "2019-12-15T00:00:00.000",
+  },
+  Object {
+    "ECommerce.count": "1",
+    "ECommerce.customOrderDateNoPreAgg": "2020-01-15T00:00:00.000",
+    "ECommerce.customOrderDateNoPreAgg.monthly_from_15th": "2020-01-15T00:00:00.000",
+  },
+  Object {
+    "ECommerce.count": "1",
+    "ECommerce.customOrderDateNoPreAgg": "2020-02-15T00:00:00.000",
+    "ECommerce.customOrderDateNoPreAgg.monthly_from_15th": "2020-02-15T00:00:00.000",
+  },
+  Object {
+    "ECommerce.count": "3",
+    "ECommerce.customOrderDateNoPreAgg": "2020-03-15T00:00:00.000",
+    "ECommerce.customOrderDateNoPreAgg.monthly_from_15th": "2020-03-15T00:00:00.000",
+  },
+  Object {
+    "ECommerce.count": "3",
+    "ECommerce.customOrderDateNoPreAgg": "2020-04-15T00:00:00.000",
+    "ECommerce.customOrderDateNoPreAgg.monthly_from_15th": "2020-04-15T00:00:00.000",
+  },
+  Object {
+    "ECommerce.count": "5",
+    "ECommerce.customOrderDateNoPreAgg": "2020-05-15T00:00:00.000",
+    "ECommerce.customOrderDateNoPreAgg.monthly_from_15th": "2020-05-15T00:00:00.000",
+  },
+  Object {
+    "ECommerce.count": "4",
+    "ECommerce.customOrderDateNoPreAgg": "2020-06-15T00:00:00.000",
+    "ECommerce.customOrderDateNoPreAgg.monthly_from_15th": "2020-06-15T00:00:00.000",
+  },
+  Object {
+    "ECommerce.count": "3",
+    "ECommerce.customOrderDateNoPreAgg": "2020-08-15T00:00:00.000",
+    "ECommerce.customOrderDateNoPreAgg.monthly_from_15th": "2020-08-15T00:00:00.000",
+  },
+  Object {
+    "ECommerce.count": "4",
+    "ECommerce.customOrderDateNoPreAgg": "2020-09-15T00:00:00.000",
+    "ECommerce.customOrderDateNoPreAgg.monthly_from_15th": "2020-09-15T00:00:00.000",
+  },
+  Object {
+    "ECommerce.count": "8",
+    "ECommerce.customOrderDateNoPreAgg": "2020-10-15T00:00:00.000",
+    "ECommerce.customOrderDateNoPreAgg.monthly_from_15th": "2020-10-15T00:00:00.000",
+  },
+  Object {
+    "ECommerce.count": "9",
+    "ECommerce.customOrderDateNoPreAgg": "2020-11-15T00:00:00.000",
+    "ECommerce.customOrderDateNoPreAgg.monthly_from_15th": "2020-11-15T00:00:00.000",
+  },
+  Object {
+    "ECommerce.count": "2",
+    "ECommerce.customOrderDateNoPreAgg": "2020-12-15T00:00:00.000",
+    "ECommerce.customOrderDateNoPreAgg.monthly_from_15th": "2020-12-15T00:00:00.000",
   },
 ]
 `;

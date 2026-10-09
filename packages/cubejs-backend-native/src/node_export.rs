@@ -1,9 +1,11 @@
+use cubesql::compile::engine::df::scan::parse_used_pre_aggregations;
 use cubesql::compile::parser::parse_sql_to_statement;
 use cubesql::compile::{convert_statement_to_cube_query, get_df_batches};
 use cubesql::config::processing_loop::ShutdownMode;
+use cubesql::config::ConfigObj;
 use cubesql::sql::dataframe::arrow_to_column_type;
 use cubesql::sql::ColumnType;
-use cubesql::sql::Session;
+use cubesql::sql::{redact_error_message, redact_sql_literals, redacted_query_key, Session};
 use cubesql::transport::{SpanId, TransportService};
 use futures::StreamExt;
 
@@ -112,6 +114,15 @@ fn register_interface<C: NodeConfiguration>(mut cx: FunctionContext) -> JsResult
         None
     };
 
+    let dev_mode_handle = options.get_value(&mut cx, "devServer")?;
+    let dev_mode = if dev_mode_handle.is_a::<JsBoolean, _>(&mut cx) {
+        let value = dev_mode_handle.downcast_or_throw::<JsBoolean, _>(&mut cx)?;
+
+        Some(value.value(&mut cx))
+    } else {
+        None
+    };
+
     let (deferred, promise) = cx.promise();
     let channel = cx.channel();
 
@@ -138,6 +149,7 @@ fn register_interface<C: NodeConfiguration>(mut cx: FunctionContext) -> JsResult
         let config = C::new(NodeConfigurationFactoryOptions {
             gateway_port,
             pg_port,
+            dev_mode,
         });
 
         runtime.block_on(async move {
@@ -275,11 +287,7 @@ enum SqlQueryOutcome {
 /// request - a polling client opens further attempts under the same request id,
 /// and CUB-4099 has one that ran 44 minutes over six of them - but it does give
 /// this attempt an end.
-async fn log_continue_wait(
-    session: &Arc<Session>,
-    span_id: &Option<Arc<SpanId>>,
-    sql_query: &str,
-) -> Result<(), CubeError> {
+async fn log_continue_wait(session: &Arc<Session>, span_id: &Arc<SpanId>) -> Result<(), CubeError> {
     let Some(auth_context) = session.state.auth_context() else {
         return Ok(());
     };
@@ -289,16 +297,14 @@ async fn log_continue_wait(
         .server
         .transport
         .log_load_state(
-            span_id.clone(),
+            Some(span_id.clone()),
             auth_context,
             session.state.get_load_request_meta("sql"),
             "Continue wait".to_string(),
             serde_json::json!({
-                "query": {
-                    "sql": sql_query,
-                },
+                "query": span_id.query_key.clone(),
                 "apiType": "sql",
-                "duration": span_id.as_ref().map(|span_id| span_id.duration()),
+                "duration": span_id.duration(),
             }),
         )
         .await
@@ -315,10 +321,17 @@ async fn handle_sql_query(
     throw_continue_wait: bool,
     request_id: Option<String>,
 ) -> Result<SqlQueryOutcome, CubeError> {
-    let span_id = Some(Arc::new(SpanId::new(
-        request_id.unwrap_or_else(|| Uuid::new_v4().to_string()),
-        serde_json::json!({ "sql": sql_query }),
-    )));
+    let config = services
+        .injector()
+        .get_service_typed::<dyn ConfigObj>()
+        .await;
+    let span_id = Arc::new(
+        SpanId::new(
+            request_id.unwrap_or_else(|| Uuid::new_v4().to_string()),
+            serde_json::json!({ "sql": sql_query }),
+        )
+        .with_redacted_query_key(redacted_query_key(sql_query, config.log_redaction())),
+    );
 
     let transport_service = services
         .injector()
@@ -332,12 +345,12 @@ async fn handle_sql_query(
                 .server
                 .transport
                 .log_load_state(
-                    span_id.clone(),
+                    Some(span_id.clone()),
                     auth_context,
                     session.state.get_load_request_meta("sql"),
                     "Load Request".to_string(),
                     serde_json::json!({
-                        "query": span_id.as_ref().unwrap().query_key,
+                        "query": span_id.query_key,
                     }),
                 )
                 .await?;
@@ -392,7 +405,7 @@ async fn handle_sql_query(
                 meta_context.clone(),
                 session,
                 &mut None,
-                span_id_clone,
+                Some(span_id_clone),
             )
             .await?;
 
@@ -462,16 +475,17 @@ async fn handle_sql_query(
             // branch and never calls `load_data`, so neither the span nor the
             // stream schema carries the metadata and the header omits it.
             //
-            // Both values take the same precedence: whatever the span reported
+            // Every value takes the same precedence: whatever the span reported
             // wins outright, and the schema is consulted only when the span was
             // silent. `external` must not be OR-ed with the schema — a span that
             // folded to `false` because only some of its loads were external
             // would then be overridden back to `true`, undoing the conservative
             // fold in `SpanId::set_external`.
-            let (span_last_refresh_time, span_external) = match span_id_for_schema.as_ref() {
-                Some(span_id) => (span_id.last_refresh_time().await, span_id.external().await),
-                None => (None, None),
-            };
+            let (span_last_refresh_time, span_external, span_used_pre_aggregations) = (
+                span_id_for_schema.last_refresh_time().await,
+                span_id_for_schema.external().await,
+                span_id_for_schema.used_pre_aggregations().await,
+            );
 
             let last_refresh_time = span_last_refresh_time.or_else(|| {
                 stream
@@ -497,6 +511,22 @@ async fn handle_sql_query(
             });
             if external {
                 schema_response.insert("external".into(), serde_json::Value::Bool(true));
+            }
+
+            // Names the pre-aggregations behind the result so a client can join
+            // it to the build it is watching. Same precedence as above; the
+            // span already holds the union across every scan of the plan, while
+            // the stream schema only ever describes the last one.
+            let used_pre_aggregations = span_used_pre_aggregations.or_else(|| {
+                stream
+                    .schema()
+                    .metadata()
+                    .get("usedPreAggregations")
+                    .map(String::as_str)
+                    .and_then(parse_used_pre_aggregations)
+            });
+            if let Some(used_pre_aggregations) = used_pre_aggregations {
+                schema_response.insert("usedPreAggregations".into(), used_pre_aggregations);
             }
 
             write_jsonl_message(
@@ -560,7 +590,7 @@ async fn handle_sql_query(
             Ok(SqlQueryOutcome::ClientDisconnected) => {
                 log::debug!(
                     "Client disconnected before the result was fully written, span id: {}",
-                    span_id.as_ref().map(|s| s.span_id.as_str()).unwrap_or("-")
+                    span_id.span_id
                 );
 
                 // Usually nothing else reports this outcome, so without this
@@ -571,7 +601,7 @@ async fn handle_sql_query(
                 // `SqlQueryOutcome::ClientDisconnected` for why it is not gated
                 // on `throw_continue_wait`, and the `Err` arm below for why a
                 // real continue wait deliberately does not log here.
-                log_continue_wait(&session_clone, &span_id, sql_query).await?;
+                log_continue_wait(&session_clone, &span_id).await?;
             }
             Ok(SqlQueryOutcome::Completed) => {
                 session_clone
@@ -579,18 +609,16 @@ async fn handle_sql_query(
                     .server
                     .transport
                     .log_load_state(
-                        span_id.clone(),
+                        Some(span_id.clone()),
                         session_clone.state.auth_context().unwrap(),
                         session_clone.state.get_load_request_meta("sql"),
                         "Load Request Success".to_string(),
                         serde_json::json!({
-                            "query": {
-                                "sql": sql_query,
-                            },
+                            "query": span_id.query_key.clone(),
                             "apiType": "sql",
-                            "duration": span_id.as_ref().unwrap().duration(),
-                            "isDataQuery": span_id.as_ref().unwrap().is_data_query().await,
-                            "lastRefreshTime": span_id.as_ref().unwrap().last_refresh_time().await,
+                            "duration": span_id.duration(),
+                            "isDataQuery": span_id.is_data_query().await,
+                            "lastRefreshTime": span_id.last_refresh_time().await,
                         }),
                     )
                     .await?;
@@ -606,24 +634,35 @@ async fn handle_sql_query(
                 // the promise it was awaiting is abandoned rather than
                 // cancelled, and only reports if it later rejects - which is
                 // why that one does log.
-                if !err.message.eq_ignore_ascii_case("continue wait") {
+                // Matched on the error's cause, falling back to the message split
+                // into its `:`- and newline-delimited parts: a continue wait that
+                // came back through a `RepartitionExec` has been flattened to a
+                // string and reads `Execution error: Continue wait`, so the
+                // equality check this replaces let it through and reported the
+                // queue signal as a failed request in query history.
+                if !err.is_continue_wait() {
+                    // A compilation error can quote the statement whole; its
+                    // redacted twin travels beside it for the log sink
+                    let mut properties = serde_json::json!({
+                        "query": span_id.query_key.clone(),
+                        "apiType": "sql",
+                        "duration": span_id.duration(),
+                        "error": err.message,
+                    });
+                    if config.log_redaction() {
+                        properties["redactedError"] =
+                            serde_json::json!(redact_error_message(&err.message, sql_query));
+                    }
                     session_clone
                         .session_manager
                         .server
                         .transport
                         .log_load_state(
-                            span_id.clone(),
+                            Some(span_id.clone()),
                             session_clone.state.auth_context().unwrap(),
                             session_clone.state.get_load_request_meta("sql"),
                             "Cube SQL Error".to_string(),
-                            serde_json::json!({
-                                "query": {
-                                    "sql": sql_query
-                                },
-                                "apiType": "sql",
-                                "duration": span_id.as_ref().unwrap().duration(),
-                                "error": err.message,
-                            }),
+                            properties,
                         )
                         .await?;
                 }
@@ -800,6 +839,14 @@ fn exec_sql(mut cx: FunctionContext) -> JsResult<JsValue> {
     Ok(promise.upcast::<JsValue>())
 }
 
+/// The statement with its string literals replaced, for a JS producer that logs a
+/// SQL API statement itself (the REST `/v1/cubesql` endpoint) and wants the same
+/// `redactedQuery` twin cubesql attaches.
+fn redact_sql_literals_js(mut cx: FunctionContext) -> JsResult<JsString> {
+    let sql = cx.argument::<JsString>(0)?.value(&mut cx);
+    Ok(cx.string(redact_sql_literals(&sql)))
+}
+
 fn is_fallback_build(mut cx: FunctionContext) -> JsResult<JsBoolean> {
     #[cfg(feature = "python")]
     {
@@ -948,6 +995,7 @@ pub fn register_module_exports<C: NodeConfiguration + 'static>(
     cx.export_function("sql4sql", sql4sql)?;
     cx.export_function("rest4sql", rest4sql)?;
     cx.export_function("isFallbackBuild", is_fallback_build)?;
+    cx.export_function("redactSqlLiterals", redact_sql_literals_js)?;
     cx.export_function("__js_to_clrepr_to_js", debug_js_to_clrepr_to_js)?;
 
     //============ sql planner exports ===================

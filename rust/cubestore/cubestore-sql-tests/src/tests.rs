@@ -1,4 +1,4 @@
-use crate::files::write_tmp_file;
+use crate::files::{serve_file, write_tmp_file};
 use crate::rows::{rows, NULL};
 use crate::SqlClient;
 use async_compression::tokio::write::GzipEncoder;
@@ -350,8 +350,16 @@ pub fn sql_tests(prefix: &str) -> Vec<(&'static str, TestFn)> {
             "queue_result_ack_multiple_with_external_id",
             queue_result_ack_multiple_with_external_id,
         ),
+        t(
+            "nested_aggregate_limit_does_not_truncate",
+            nested_aggregate_limit_does_not_truncate,
+        ),
         t("limit_pushdown_group", limit_pushdown_group),
         t("limit_pushdown_group_having", limit_pushdown_group_having),
+        t(
+            "limit_pushdown_group_having_ordered",
+            limit_pushdown_group_having_ordered,
+        ),
         t(
             "limit_pushdown_group_nonprefix_order",
             limit_pushdown_group_nonprefix_order,
@@ -469,6 +477,8 @@ lazy_static::lazy_static! {
         "queue_add_and_retrieve",
         "queue_add_and_retrieve_backlog",
         "queue_add_external_id_max_len",
+        "nested_aggregate_limit_does_not_truncate",
+        "limit_pushdown_group_having_ordered",
     ].into_iter().map(ToOwned::to_owned).collect();
 }
 
@@ -2469,8 +2479,15 @@ async fn create_table_with_csv_no_header_and_quotes(
 }
 
 async fn create_table_with_url(service: Box<dyn SqlClient>) -> Result<(), CubeError> {
-    // TODO serve this data ourselves
-    let url = "https://data.wprdc.org/dataset/0b584c84-7e35-4f4d-a5a2-b01697470c0f/resource/e95dd941-8e47-4460-9bd8-1e51c194370b/download/bikepghpublic.csv";
+    let mut csv = "Response ID,Start Date,End Date\n".to_string();
+    for id in 0..813 {
+        csv += &format!("{},2020-01-01T00:00:00.000Z,2020-01-02T00:00:00.000Z\n", id);
+    }
+    // The body is held back because the query below has to run against a table
+    // whose import has not finished: only ready tables are visible to the
+    // planner.
+    let server = serve_file(csv, Duration::from_millis(500)).await?;
+    let url = server.url("bikepghpublic.csv");
 
     service
         .exec_query("CREATE SCHEMA IF NOT EXISTS foo")
@@ -3600,28 +3617,32 @@ async fn planning_inplace_aggregate2(service: Box<dyn SqlClient>) -> Result<(), 
     verbose.show_sort_by = true;
     assert_eq!(
         pp_phys_plan_ext(p.router.as_ref(), &verbose),
-        "Projection, [url, sum(Data.hits)@1:hits]\
-           \n  AggregateTopK, limit: 10, sortBy: [2 desc nulls last]\
-           \n    ClusterSend, partitions: [[1, 2]], sort_order: [1]"
+        "Projection, [url, sum(Data.hits)@1:hits], sort_order: [1]\
+           \n  Sort, by: [sum(Data.hits)@1 desc nulls last], fetch: 10, sort_order: [1]\
+           \n    LinearSingleAggregate\
+           \n      CoalescePartitions\
+           \n        ClusterSend, partitions: [[1, 2]]"
     );
     assert_eq!(
         pp_phys_plan_ext(p.worker.as_ref(), &verbose),
-        "Projection, [url, sum(Data.hits)@1:hits]\
-           \n  AggregateTopK, limit: 10, sortBy: [2 desc nulls last]\
-           \n    Worker, sort_order: [1]\
-           \n      Sort, by: [sum(Data.hits)@1 desc nulls last], sort_order: [1]\
-           \n        LinearSingleAggregate\
+        "Projection, [url, sum(Data.hits)@1:hits], sort_order: [1]\
+           \n  Sort, by: [sum(Data.hits)@1 desc nulls last], fetch: 10, sort_order: [1]\
+           \n    LinearSingleAggregate\
+           \n      CoalescePartitions\
+           \n        Worker\
            \n          CoalescePartitions\
-           \n            Union\
-           \n              Filter\
-           \n                Scan, index: default:1:[1]:sort_on[allowed, site_id, url], fields: *, sort_order: [0, 1, 2, 3, 4]\
-           \n                  Sort, by: [allowed@0, site_id@1, url@2, day@3, hits@4], sort_order: [0, 1, 2, 3, 4]\
-           \n                    Empty\
+           \n            LinearSingleAggregate\
            \n              CoalescePartitions\
-           \n                Filter\
-           \n                  Scan, index: default:2:[2]:sort_on[allowed, site_id, url], fields: *, sort_order: [0, 1, 2, 3, 4]\
-           \n                    Sort, by: [allowed@0, site_id@1, url@2, day@3, hits@4], sort_order: [0, 1, 2, 3, 4]\
-           \n                      Empty"
+           \n                Union\
+           \n                  Filter\
+           \n                    Scan, index: default:1:[1]:sort_on[allowed, site_id, url], fields: *, sort_order: [0, 1, 2, 3, 4]\
+           \n                      Sort, by: [allowed@0, site_id@1, url@2, day@3, hits@4], sort_order: [0, 1, 2, 3, 4]\
+           \n                        Empty\
+           \n                  CoalescePartitions\
+           \n                    Filter\
+           \n                      Scan, index: default:2:[2]:sort_on[allowed, site_id, url], fields: *, sort_order: [0, 1, 2, 3, 4]\
+           \n                        Sort, by: [allowed@0, site_id@1, url@2, day@3, hits@4], sort_order: [0, 1, 2, 3, 4]\
+           \n                          Empty"
     );
     Ok(())
 }
@@ -4491,21 +4512,47 @@ async fn planning_topk_having(service: Box<dyn SqlClient>) -> Result<(), CubeErr
         .await?;
     let mut show_hints = PPOptions::default();
     show_hints.show_filters = true;
+    // The full-merge top-k re-aggregates on the router over a coalesce of the worker streams. On a
+    // multi-node cluster that coalesce fans in one stream per worker, so the plan carries an extra
+    // merge -- the shape worth pinning, since it is where the router must not claim an ordering the
+    // fan-in does not preserve.
+    let expected_worker_plan = if service.prefix() == "cluster" {
+        "Projection, [url, sum(Data.hits)@1:hits]\
+        \n  Sort, fetch: 3\
+        \n    Filter, predicate: sum(Data.hits)@1 > 10\
+        \n      SortedSingleAggregate\
+        \n        CoalescePartitions\
+        \n          MergeSort\
+        \n            Worker\
+        \n              SortedSingleAggregate\
+        \n                MergeSort\
+        \n                  Union\
+        \n                    Scan, index: default:1:[1]:sort_on[url], fields: [url, hits]\
+        \n                      Sort\
+        \n                        Empty\
+        \n                    Scan, index: default:2:[2]:sort_on[url], fields: [url, hits]\
+        \n                      Sort\
+        \n                        Empty"
+    } else {
+        "Projection, [url, sum(Data.hits)@1:hits]\
+        \n  Sort, fetch: 3\
+        \n    Filter, predicate: sum(Data.hits)@1 > 10\
+        \n      SortedSingleAggregate\
+        \n        CoalescePartitions\
+        \n          Worker\
+        \n            SortedSingleAggregate\
+        \n              MergeSort\
+        \n                Union\
+        \n                  Scan, index: default:1:[1]:sort_on[url], fields: [url, hits]\
+        \n                    Sort\
+        \n                      Empty\
+        \n                  Scan, index: default:2:[2]:sort_on[url], fields: [url, hits]\
+        \n                    Sort\
+        \n                      Empty"
+    };
     assert_eq!(
         pp_phys_plan_ext(p.worker.as_ref(), &show_hints),
-        "Projection, [url, sum(Data.hits)@1:hits]\
-        \n  AggregateTopK, limit: 3, having: sum(Data.hits)@1 > 10\
-        \n    Worker\
-        \n      Sort\
-        \n        SortedSingleAggregate\
-        \n          MergeSort\
-        \n            Union\
-        \n              Scan, index: default:1:[1]:sort_on[url], fields: [url, hits]\
-        \n                Sort\
-        \n                  Empty\
-        \n              Scan, index: default:2:[2]:sort_on[url], fields: [url, hits]\
-        \n                Sort\
-        \n                  Empty"
+        expected_worker_plan
     );
 
     let query = "SELECT `url` `url`, SUM(`hits`) `hits`, CARDINALITY(MERGE(`uhits`)) `uhits` \
@@ -9274,6 +9321,115 @@ async fn build_range_end(service: Box<dyn SqlClient>) -> Result<(), CubeError> {
     Ok(())
 }
 
+// A LIMIT bounds the rows of the relation it sits on. With an aggregate nested under another
+// aggregate, the worker pushdown lands on the INNER one -- whose rows the limit does not count --
+// and truncates the outer aggregate's input, so both the values and the row count come out wrong.
+// Plain SQL: no Cube, no multi-stage, no join. The same defect reaches the inner aggregate whether
+// it is written as a derived table or as a CTE.
+async fn nested_aggregate_limit_does_not_truncate(
+    service: Box<dyn SqlClient>,
+) -> Result<(), CubeError> {
+    service.exec_query("CREATE SCHEMA s").await?;
+    service
+        .exec_query("CREATE TABLE s.na (a int, b int, v int)")
+        .await?;
+    // 5 values of `a` x 4 of `b`, so the inner aggregate has 20 rows and each `a` sums to 4. The
+    // index sorts on (a, b, v), so ORDER BY a is an index prefix and the limit rides the index --
+    // which is exactly what must not happen below the outer aggregate.
+    let mut values = Vec::new();
+    for a in 1..=5 {
+        for b in 1..=4 {
+            values.push(format!("({}, {}, 1)", a, b));
+        }
+    }
+    service
+        .exec_query(&format!(
+            "INSERT INTO s.na (a, b, v) VALUES {}",
+            values.join(", ")
+        ))
+        .await?;
+
+    let expected = vec![
+        Row::new(vec![TableValue::Int(1), TableValue::Int(4)]),
+        Row::new(vec![TableValue::Int(2), TableValue::Int(4)]),
+        Row::new(vec![TableValue::Int(3), TableValue::Int(4)]),
+    ];
+
+    // LIMIT 3 counts the outer aggregate's groups, of which there are 5; the inner aggregate's 20
+    // rows all contribute and none of them may be cut.
+    // Neither pushdown may fire here, so both mechanisms' markers are listed.
+    const NO_PUSHDOWN: &[&str] = &[
+        "GlobalLimit",
+        "InlinePartialAggregate, limit:",
+        "GroupByLimitAggregate",
+    ];
+    let derived = assert_limit_pushdown_using_search_strings(
+        &service,
+        "SELECT a, sum(v) FROM \
+         (SELECT a, b, sum(v) v FROM s.na GROUP BY 1, 2) i \
+         GROUP BY 1 ORDER BY 1 ASC LIMIT 3",
+        None,
+        false,
+        NO_PUSHDOWN,
+    )
+    .await?;
+    assert_eq!(derived, expected);
+
+    let cte = assert_limit_pushdown_using_search_strings(
+        &service,
+        "WITH i AS (SELECT a, b, sum(v) v FROM s.na GROUP BY 1, 2) \
+         SELECT a, sum(v) FROM i GROUP BY 1 ORDER BY 1 ASC LIMIT 3",
+        None,
+        false,
+        NO_PUSHDOWN,
+    )
+    .await?;
+    assert_eq!(cte, expected);
+
+    // The result may not depend on the limit: every one of these asks for all 5 groups or fewer,
+    // and the sums are the same either way.
+    for limit in [3, 4, 5, 100] {
+        let r = service
+            .exec_query(&format!(
+                "SELECT a, sum(v) FROM \
+                 (SELECT a, b, sum(v) v FROM s.na GROUP BY 1, 2) i \
+                 GROUP BY 1 ORDER BY 1 ASC LIMIT {}",
+                limit
+            ))
+            .await?;
+        let expected_len = std::cmp::min(limit, 5);
+        assert_eq!(
+            r.get_rows().len(),
+            expected_len,
+            "LIMIT {} returned {:?}",
+            limit,
+            r.get_rows()
+        );
+        for row in r.get_rows() {
+            assert_eq!(
+                row.values()[1],
+                TableValue::Int(4),
+                "LIMIT {} returned {:?}",
+                limit,
+                r.get_rows()
+            );
+        }
+    }
+
+    // Guard: with a single aggregate the limit does own the relation, so it still rides the index.
+    let single = assert_limit_pushdown(
+        &service,
+        "SELECT a, sum(v) FROM s.na GROUP BY 1 ORDER BY 1 ASC LIMIT 3",
+        None,
+        true,
+        false,
+    )
+    .await?;
+    assert_eq!(single, expected);
+
+    Ok(())
+}
+
 async fn assert_limit_pushdown_using_search_strings(
     service: &Box<dyn SqlClient>,
     query: &str,
@@ -9348,7 +9504,12 @@ async fn assert_limit_pushdown(
             &["TailLimit"]
         } else {
             // The worker limit is either a plain row limit or, for a partial aggregate running
-            // per partition below the merge, a group limit on the aggregate.
+            // per partition below the merge, a group limit on the aggregate. Deliberately not
+            // `GroupByLimitAggregate`: that is the other pushdown (the sort-and-limit descriptor),
+            // and the two are independent -- `limit_pushdown_unique_key` has a case where the row
+            // limit correctly stays away while the bounded worker sort correctly fires. A test that
+            // needs "no pushdown of any kind" passes the full list to
+            // [assert_limit_pushdown_using_search_strings].
             &["GlobalLimit", "InlinePartialAggregate, limit:"]
         },
     )
@@ -9635,6 +9796,42 @@ async fn limit_pushdown_group_having(service: Box<dyn SqlClient>) -> Result<(), 
     let res = assert_limit_pushdown(
         &service,
         "SELECT id, SUM(n) FROM foo.having GROUP BY 1 HAVING SUM(n) > 50 LIMIT 3",
+        None,
+        false,
+        false,
+    )
+    .await?;
+
+    assert_eq!(
+        res,
+        vec![
+            Row::new(vec![TableValue::Int(1), TableValue::Int(100)]),
+            Row::new(vec![TableValue::Int(3), TableValue::Int(100)]),
+            Row::new(vec![TableValue::Int(5), TableValue::Int(100)]),
+        ]
+    );
+    Ok(())
+}
+
+// Same as [limit_pushdown_group_having] but with an ORDER BY on the index sort prefix, which takes
+// a different branch of get_limit_for_pushdown. That branch checked only the index prefix and not
+// the HAVING, so the worker truncated before the router dropped groups.
+async fn limit_pushdown_group_having_ordered(service: Box<dyn SqlClient>) -> Result<(), CubeError> {
+    service.exec_query("CREATE SCHEMA foo").await?;
+    service
+        .exec_query("CREATE TABLE foo.having_ord (id int, n int)")
+        .await?;
+    let values = (1..=10).map(|id| format!("({}, {})", id, if id % 2 == 1 { 100 } else { 1 }));
+    service
+        .exec_query(&format!(
+            "INSERT INTO foo.having_ord (id, n) VALUES {}",
+            values.collect::<Vec<_>>().join(", ")
+        ))
+        .await?;
+
+    let res = assert_limit_pushdown(
+        &service,
+        "SELECT id, SUM(n) FROM foo.having_ord GROUP BY 1 HAVING SUM(n) > 50 ORDER BY 1 LIMIT 3",
         None,
         false,
         false,
@@ -11190,7 +11387,7 @@ async fn queue_latest_result_v1(service: Box<dyn SqlClient>) -> Result<(), CubeE
         );
 
         let blocking_res = service
-            .exec_query(r#"QUEUE RESULT_BLOCKING 5000 "STANDALONE#queue:1""#)
+            .exec_query(r#"QUEUE RESULT "STANDALONE#queue:1""#)
             .await?;
         assert_eq!(
             blocking_res.get_rows(),
@@ -11562,7 +11759,7 @@ async fn queue_full_workflow_v1(service: Box<dyn SqlClient>) -> Result<(), CubeE
         let service_to_move = service.clone();
         let blocking = async move {
             service_to_move
-                .exec_query(r#"QUEUE RESULT_BLOCKING 5000 "STANDALONE#queue:queue_key_3""#)
+                .exec_query(r#"QUEUE RESULT_BLOCKING 5000 3"#)
                 .await
                 .unwrap()
         };
@@ -12625,17 +12822,19 @@ async fn queue_multiple_result_blocking(service: Box<dyn SqlClient>) -> Result<(
     {
         let id_clone = id.clone();
         let service_to_move = service.clone();
+        let id_to_move = id.clone();
         let blocking1 = async move {
             service_to_move
-                .exec_query(r#"QUEUE RESULT_BLOCKING 5000 "STANDALONE#queue:12345""#)
+                .exec_query(&format!("QUEUE RESULT_BLOCKING 5000 {}", id_to_move))
                 .await
                 .unwrap()
         };
 
         let service_to_move = service.clone();
+        let id_to_move = id.clone();
         let blocking2 = async move {
             service_to_move
-                .exec_query(r#"QUEUE RESULT_BLOCKING 5000 "STANDALONE#queue:12345""#)
+                .exec_query(&format!("QUEUE RESULT_BLOCKING 5000 {}", id_to_move))
                 .await
                 .unwrap()
         };

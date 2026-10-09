@@ -47,4 +47,15 @@ describe('MongoBiDriver', () => {
     `, []);
     expect(result).toEqual([{ number: 1 }]);
   });
+
+  // Covers the typeCast hook in MongoBIDriver: DATETIME must reach the caller as
+  // the string mongosqld sent, not as a driver-parsed Date.
+  test('should select datetime as string', async () => {
+    const result = await driver.query(`
+      SELECT created
+      FROM mycol
+      LIMIT 1
+    `, []);
+    expect(result).toEqual([{ created: '1998-08-02 00:00:00' }]);
+  });
 });

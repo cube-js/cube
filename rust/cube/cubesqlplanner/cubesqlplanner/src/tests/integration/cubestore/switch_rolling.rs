@@ -6,8 +6,6 @@
 //! Requires `--features integration-cubestore` and a `cubestored` binary;
 //! without them both paths return `None` and only matching is asserted.
 //!
-//! One shape is `#[ignore]`d for a CubeStore limitation unrelated to the
-//! calc-group grain — see the note on it; run it with `--ignored` to reproduce.
 //! Two defects these tests were originally written against are fixed: the
 //! rolling-rewrite schema widening in #11410 and the aggregating-index decimal
 //! cast in #11413.
@@ -398,17 +396,7 @@ async fn test_growth_case_entrypoint() {
 }
 
 /// Four switch entrypoints at once — the dashboard shape, and the deepest
-/// FullKeyAggregate plan this model produces. CubeStore cannot decode a
-/// serialized plan this deep:
-///
-/// ```text
-/// Error during planning: Error decoding expr as protobuf: failed to decode
-/// Protobuf message: ... recursion limit reached
-/// ```
-///
-/// Unrelated to the calc-group grain — the plan is valid and the raw half of
-/// this test returns the expected rows.
-#[ignore = "CubeStore cannot decode a serialized plan this deep (protobuf recursion limit)"]
+/// FullKeyAggregate plan this model produces.
 #[tokio::test(flavor = "multi_thread")]
 async fn test_four_entrypoints_in_one_query() {
     run_both(

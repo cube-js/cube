@@ -1,5 +1,5 @@
 import moment from 'moment-timezone';
-import { getEnv, parseSqlInterval } from '@cubejs-backend/shared';
+import { getEnv, parseSqlInterval, splitSqlInterval } from '@cubejs-backend/shared';
 import { BaseQuery } from './BaseQuery';
 import { BaseFilter } from './BaseFilter';
 import { UserError } from '../compiler/UserError';
@@ -65,11 +65,22 @@ export class MysqlQuery extends BaseQuery {
   }
 
   public subtractInterval(date: string, interval: string) {
-    return `DATE_SUB(${date}, INTERVAL ${this.formatInterval(interval)})`;
+    return this.applyInterval('DATE_SUB', date, interval);
   }
 
   public addInterval(date: string, interval: string) {
-    return `DATE_ADD(${date}, INTERVAL ${this.formatInterval(interval)})`;
+    return this.applyInterval('DATE_ADD', date, interval);
+  }
+
+  /**
+   * MySQL compound INTERVAL units only cover contiguous unit ranges (DAY_HOUR, HOUR_SECOND, ...),
+   * so an interval it can not spell in one go is applied one unit at a time, coarsest first.
+   */
+  private applyInterval(fn: string, date: string, interval: string): string {
+    const whole = this.tryFormatInterval(interval);
+    const parts = whole ? [whole] : splitSqlInterval(interval).map(part => this.formatInterval(part));
+
+    return parts.reduce((acc, part) => `${fn}(${acc}, INTERVAL ${part})`, date);
   }
 
   public timeGroupedColumn(granularity: string, dimension) {
@@ -103,6 +114,19 @@ export class MysqlQuery extends BaseQuery {
    * @see https://dev.mysql.com/doc/refman/8.4/en/expressions.html#temporal-intervals
    */
   private formatInterval(interval: string): string {
+    const formatted = this.tryFormatInterval(interval);
+
+    if (!formatted) {
+      throw new Error(`Cannot transform interval expression "${interval}" to MySQL dialect`);
+    }
+
+    return formatted;
+  }
+
+  /**
+   * The formatted interval, or undefined when MySQL has no single INTERVAL spelling for it.
+   */
+  private tryFormatInterval(interval: string): string | undefined {
     const intervalParsed = parseSqlInterval(interval);
     const intKeys = Object.keys(intervalParsed).length;
 
@@ -141,7 +165,7 @@ export class MysqlQuery extends BaseQuery {
       return `${intervalParsed.millisecond * 1000} MICROSECOND`;
     }
 
-    throw new Error(`Cannot transform interval expression "${interval}" to MySQL dialect`);
+    return undefined;
   }
 
   public escapeColumnName(name: string): string {
@@ -236,8 +260,8 @@ export class MysqlQuery extends BaseQuery {
     // planner falls back to the portable VALUES/UNION ALL `time_series_select`
     // template, which also works on MySQL 5.6/5.7.
     //
-    // The template body becomes the content of `time_series AS (...)` CTE, so
-    // it self-references `time_series` for recursion (no nested WITH). The
+    // The template body becomes the content of the series CTE, so it
+    // self-references that CTE (`series_name`) for recursion (no nested WITH). The
     // outer WITH is emitted as `WITH RECURSIVE` because the
     // `generated_time_series_recursive` marker below is present.
     if (this.useGeneratedTimeSeries) {
@@ -247,7 +271,7 @@ export class MysqlQuery extends BaseQuery {
         'UNION ALL\n' +
         'SELECT DATE_ADD(date_from, INTERVAL {{ granularity }}),\n' +
         '       CAST(DATE_SUB(DATE_ADD(DATE_ADD(date_from, INTERVAL {{ granularity }}), INTERVAL {{ granularity }}), INTERVAL 1000 MICROSECOND) AS DATETIME(6))\n' +
-        'FROM time_series\n' +
+        'FROM {{ series_name }}\n' +
         'WHERE DATE_ADD(date_from, INTERVAL {{ granularity }}) <= TIMESTAMP({{ end }})';
 
       templates.statements.generated_time_series_with_cte_range_source =
@@ -259,7 +283,7 @@ export class MysqlQuery extends BaseQuery {
         'SELECT DATE_ADD(date_from, INTERVAL {{ granularity }}),\n' +
         '       CAST(DATE_SUB(DATE_ADD(DATE_ADD(date_from, INTERVAL {{ granularity }}), INTERVAL {{ granularity }}), INTERVAL 1000 MICROSECOND) AS DATETIME(6)),\n' +
         '       max_date\n' +
-        'FROM time_series\n' +
+        'FROM {{ series_name }}\n' +
         'WHERE DATE_ADD(date_from, INTERVAL {{ granularity }}) <= max_date';
 
       // Marker (presence-only) telling the Tesseract planner that the generated

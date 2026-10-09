@@ -15,5 +15,6 @@ module.exports = {
   // `yarn test:bridge` (see jest-bridge.config.js); excluding them here keeps
   // `yarn unit` working with a regular debug build.
   testPathIgnorePatterns: ['/dist/test/bridge/'],
+  globalSetup: '<rootDir>/test/globalSetup.js',
   snapshotResolver: '<rootDir>/test/snapshotResolver.js',
 };
