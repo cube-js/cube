@@ -1297,12 +1297,9 @@ describe('Refresh Scheduler', () => {
     // Allow some margin for other pre-aggregations processed by scheduler
     expect(mockDriver.queryAttempts).toBeLessThanOrEqual(beforeSkipAttempts + 2);
 
-    // Step 2: Verify backoff persists - pre-aggregation is still in backoff after 500ms
-    await mockDriver.delay(500);
-    const backoffDataStillActive = await preAggsInstance.getPreAggBackoff(targetTableName!);
-    expect(backoffDataStillActive).not.toBeNull();
-    // backoffDataStillActive exists, which means backoff is still in place
-    // (nextTimestamp may be close to current time due to test execution delays)
+    // Step 2: the retries skipped the target partition, so its backoff record was not bumped
+    const backoffAfterRetries = await preAggsInstance.getPreAggBackoff(targetTableName!);
+    expect(backoffAfterRetries).toEqual(backoffData);
   });
 
   describe('Local refresh key', () => {
