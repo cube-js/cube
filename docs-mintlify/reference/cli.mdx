@@ -178,7 +178,7 @@ Run `cube <command> --help` for the full options of any command.
 | `github` (`gh`) | GitHub integration: `status`, `installations`, `repos`, `branches`, `connect` |
 | `data-model` | Data model files and Git workflow: `list`, `get`, `put`, `delete`, `rename`, `file-hashes`, `branches`, `create-branch`, `delete-branch`, `enable-branch`/`disable-branch`, `dev-mode`, `commit`, `pull`, `merge`, `merge-to-default` |
 | `dbt` | dbt sync: `sync` (`--ref` or `--manifest`, `--wait`), `generate` (`--manifest`, `--out`, `--check`), `status`, `result`, `logs`, `history` (`--status`, `--trigger`), `cancel` |
-| `evals` | Agent evals: `run` (`--branch`, `--agent`, `--file`, `--wait`), `status` (`--wait`), `results` (`--first`, `--after`) |
+| `evals` | Agent evals: `run` (`--branch`, `--agent`, `--file`, `--security-context`, `--wait`), `status` (`--wait`), `results` (`--first`, `--after`) |
 | `ossie` | [Apache Ossie](#apache-ossie) conversion: `export` (`--view`, `--strict-fanout`, `--from-dir`, `--wait`, `--out`), `import` (`--file`, `--dialect`, `--base-cube`, `--out`, `--check`), `status` (`--wait`), `result` (`--out`), `cancel` |
 | `environments` | Deployment environments and environment tokens |
 | `variables` | Deployment environment variables |
@@ -342,9 +342,12 @@ cube evals run DEPLOYMENT_ID --branch my-branch --agent auto --wait
 ```
 
 Omit `--agent` to use the auto agent. Pass
-`--file eval_questions/revenue.yml` to run only that question file. Without
-`--wait`, the command returns immediately; use the returned id to inspect the
-run later:
+`--file eval_questions/revenue.yml` to run only that question file. Pass
+`--security-context` with a JSON object (inline, `@file`, or `-` for stdin) to
+evaluate under that security context; see
+[Run evals from CI](/admin/ai/evals#run-evals-from-ci) for which queries it
+applies to and the access it requires. Without `--wait`, the command returns
+immediately; use the returned id to inspect the run later:
 
 ```bash
 cube evals status DEPLOYMENT_ID EVAL_RUN_ID --wait

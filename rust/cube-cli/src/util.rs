@@ -7,14 +7,19 @@ use serde_json::{Map, Value};
 use crate::client::Query;
 use crate::output;
 
-/// Parse a `--data` argument into a JSON object.
-///
-/// Accepts inline JSON (`'{"name": "x"}'`), `@path/to/file.json`, or `-`
-/// to read from stdin — the same convention as `gh api` / `curl -d`.
+/// Parse a `--data` argument into a JSON object; see [`parse_json_object`].
 pub fn parse_data(data: Option<&str>) -> Result<Map<String, Value>> {
     let Some(data) = data else {
         return Ok(Map::new());
     };
+    parse_json_object("--data", data)
+}
+
+/// Parse a JSON-object flag value, naming `flag` in errors.
+///
+/// Accepts inline JSON (`'{"name": "x"}'`), `@path/to/file.json`, or `-`
+/// to read from stdin — the same convention as `gh api` / `curl -d`.
+pub fn parse_json_object(flag: &str, data: &str) -> Result<Map<String, Value>> {
     let raw = if data == "-" {
         let mut buf = String::new();
         std::io::stdin().read_to_string(&mut buf)?;
@@ -24,10 +29,11 @@ pub fn parse_data(data: Option<&str>) -> Result<Map<String, Value>> {
     } else {
         data.to_string()
     };
-    let value: Value = serde_json::from_str(&raw).context("--data is not valid JSON")?;
+    let value: Value =
+        serde_json::from_str(&raw).with_context(|| format!("{flag} is not valid JSON"))?;
     match value {
         Value::Object(map) => Ok(map),
-        _ => bail!("--data must be a JSON object"),
+        _ => bail!("{flag} must be a JSON object"),
     }
 }
 
@@ -699,6 +705,17 @@ mod tests {
         assert!(parse_data(Some("[1, 2]")).is_err());
         assert!(parse_data(Some("not json")).is_err());
         assert!(parse_data(None).unwrap().is_empty());
+    }
+
+    #[test]
+    fn parse_json_object_errors_name_the_flag() {
+        let not_object = parse_json_object("--security-context", "[1]").unwrap_err();
+        assert_eq!(
+            not_object.to_string(),
+            "--security-context must be a JSON object"
+        );
+        let not_json = parse_json_object("--security-context", "nope").unwrap_err();
+        assert_eq!(not_json.to_string(), "--security-context is not valid JSON");
     }
 
     #[test]

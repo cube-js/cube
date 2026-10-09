@@ -170,7 +170,10 @@ pub async fn command(args: Args, ctx: &Ctx) -> Result<()> {
             let mut body = serde_json::Map::new();
             body.insert(
                 "security_context".to_string(),
-                serde_json::Value::Object(util::parse_data(Some(&security_context))?),
+                serde_json::Value::Object(util::parse_json_object(
+                    "--security-context",
+                    &security_context,
+                )?),
             );
             util::set(&mut body, "expires_in", &expires_in);
             if !scope.is_empty() {

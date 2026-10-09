@@ -49,6 +49,9 @@ enum Cmd {
         /// Run one file under agents/, e.g. eval_questions/revenue.yml
         #[arg(long, value_name = "PATH", value_parser = util::nonempty_repo_path)]
         file: Option<String>,
+        /// Security context to evaluate under, merged over yours, as JSON (inline, @file, or - for stdin)
+        #[arg(long)]
+        security_context: Option<String>,
         /// Wait for the run and exit non-zero unless every question passes
         #[arg(long)]
         wait: bool,
@@ -102,13 +105,21 @@ fn results_path(deployment: i64, evaluation: i64) -> String {
     format!("{}/results", run_path(deployment, evaluation))
 }
 
-fn start_body(branch: &str, agent: &Option<String>, file: &Option<String>) -> Value {
+fn start_body(
+    branch: &str,
+    agent: &Option<String>,
+    file: &Option<String>,
+    security_context: Option<Value>,
+) -> Value {
     let mut body = json!({ "branchName": branch });
     if let Some(agent) = agent {
         body["agentName"] = json!(agent);
     }
     if let Some(file) = file {
         body["questionFile"] = json!(file);
+    }
+    if let Some(security_context) = security_context {
+        body["securityContext"] = security_context;
     }
     body
 }
@@ -287,11 +298,15 @@ pub async fn command(args: Args, ctx: &Ctx) -> Result<()> {
             branch,
             agent,
             file,
+            security_context,
             wait,
             timeout,
             poll,
         } => {
-            let body = start_body(&branch, &agent, &file);
+            let security_context = security_context
+                .map(|raw| util::parse_json_object("--security-context", &raw).map(Value::Object))
+                .transpose()?;
+            let body = start_body(&branch, &agent, &file, security_context);
             let started = api.post(&base(deployment), Some(&body)).await?;
             let evaluation = output::field(&started, "id")
                 .parse::<i64>()
@@ -372,21 +387,39 @@ mod tests {
     #[test]
     fn start_body_omits_unspecified_options() {
         assert_eq!(
-            start_body("feature", &None, &None),
+            start_body("feature", &None, &None, None),
             json!({ "branchName": "feature" })
         );
         assert_eq!(
             start_body(
                 "feature",
                 &Some("sales-agent".to_string()),
-                &Some("eval_questions/revenue.yml".to_string())
+                &Some("eval_questions/revenue.yml".to_string()),
+                Some(json!({ "tenant_id": 7 }))
             ),
             json!({
                 "branchName": "feature",
                 "agentName": "sales-agent",
-                "questionFile": "eval_questions/revenue.yml"
+                "questionFile": "eval_questions/revenue.yml",
+                "securityContext": { "tenant_id": 7 }
             })
         );
+    }
+
+    #[test]
+    fn security_context_accepts_stdin() {
+        use clap::Parser as _;
+        assert!(crate::Cli::try_parse_from([
+            "cube",
+            "evals",
+            "run",
+            "1",
+            "--branch",
+            "x",
+            "--security-context",
+            "-"
+        ])
+        .is_ok());
     }
 
     #[test]
