@@ -493,6 +493,12 @@ manifest counts. When the manifest provides them, `stats.dbtVersion` and
 `stats.manifestGeneratedAt` identify the dbt version and when the artifact itself was
 generated.
 
+Webhook runs can complete without a review branch when
+[Skip unchanged webhook syncs](/docs/integrations/dbt#skip-unchanged-webhook-syncs)
+is enabled and the generated cube files match the deployment's default branch. They
+still appear in `history` with status `COMPLETED`. The setting does not suppress
+branches for `cube dbt sync` calls.
+
 `logs` is what turns a red CI step into something self-explaining: a failed
 `--wait` reports the reason, and the timeline says which phase produced it.
 
