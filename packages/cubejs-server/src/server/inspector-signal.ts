@@ -1,15 +1,6 @@
 import inspector from 'inspector';
 
-/**
- * Opens the Node.js inspector on 127.0.0.1, or closes it when it is already open.
- *
- * Node.js opens the inspector on SIGUSR1 by default, but Cube binds SIGUSR1 to a server
- * reload, so the container binds this to SIGUSR2 instead. It lets a running process be
- * profiled (heap snapshots, sampling heap profiler) without a restart that would discard
- * the very heap being investigated.
- *
- * Never throws: it runs from a signal handler, where an exception would kill the process.
- */
+/** Never throws: it runs from a signal handler, where an exception would kill the process. */
 export function toggleInspector(port: number = process.debugPort): void {
   try {
     if (inspector.url()) {
