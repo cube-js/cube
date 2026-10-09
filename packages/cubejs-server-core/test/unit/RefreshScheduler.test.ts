@@ -1297,7 +1297,7 @@ describe('Refresh Scheduler', () => {
     // Allow some margin for other pre-aggregations processed by scheduler
     expect(mockDriver.queryAttempts).toBeLessThanOrEqual(beforeSkipAttempts + 2);
 
-    // Step 2: the retries skipped the target partition, so its backoff record was not bumped
+    // Step 2: the iterator does not revisit a partition within one pass, so the record is untouched
     const backoffAfterRetries = await preAggsInstance.getPreAggBackoff(targetTableName!);
     expect(backoffAfterRetries).toEqual(backoffData);
   });
