@@ -15,7 +15,8 @@ Notifications let you send email or Slack messages with a screenshot of a
 dashboard after each [scheduled refresh][ref-scheduled-refreshes]. This is useful
 for distributing regular updates to stakeholders without requiring them to log in.
 They can optionally carry a short [AI-generated summary](#ai-summary) of what
-changed since the previous notification.
+changed since the previous notification. To send them only when a value on the
+dashboard meets a condition, add a [data alert][ref-data-alerts] to the schedule.
 
 ## Creating a notification
 
@@ -90,6 +91,9 @@ agent run per recipient per send, which is why the option is off by default.
 If the summary can't be generated — the agent is unavailable, or the run takes
 too long — the notification is still delivered, without the note.
 
+On a schedule with a [data alert][ref-data-alerts], the summary is generated
+only on the runs where the alert fires.
+
 <Tip>
 
 This is not the same as the [AI summary widget][ref-ai-widget], which lives on
@@ -107,7 +111,8 @@ notification card header before saving.
 ## Email notifications
 
 Email notifications are sent to the selected recipients after a scheduled
-refresh completes. Each recipient receives a message with a link to the
+refresh completes — or, on a schedule with a [data alert][ref-data-alerts], only
+when the alert fires. Each recipient receives a message with a link to the
 dashboard and the attached screenshot.
 
 <Tip>
@@ -183,3 +188,4 @@ workspace has access to.
 [ref-subscribe]: /docs/explore-analyze/scheduled-refreshes#subscribing-to-notifications
 [ref-agents]: /admin/ai
 [ref-ai-widget]: /docs/explore-analyze/dashboards/widgets/ai-summary
+[ref-data-alerts]: /docs/explore-analyze/data-alerts
