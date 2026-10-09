@@ -359,3 +359,35 @@ async fn test_filter_over_literal_column_of_table_scan() {
     }
     insta::assert_snapshot!(results.join("\n"));
 }
+
+/// See https://github.com/cube-js/cube/issues/12192
+#[tokio::test]
+async fn test_timestamp_plus_interval_plus_interval() {
+    init_testing_logger();
+
+    // language=PostgreSQL
+    let query = r#"
+        SELECT (DATE_TRUNC('day', CURRENT_TIMESTAMP AT TIME ZONE 'Africa/Johannesburg')
+            + (-6 || ' day')::INTERVAL) + (7 || ' day')::INTERVAL AS boundary
+        "#;
+
+    execute_query(query.to_string(), DatabaseProtocol::PostgreSQL)
+        .await
+        .unwrap();
+}
+
+#[tokio::test]
+async fn test_timestamp_literal_plus_interval_plus_interval() {
+    init_testing_logger();
+
+    // language=PostgreSQL
+    let query = r#"
+        SELECT TIMESTAMP '2026-10-01 00:00:00' + INTERVAL '1 day' + INTERVAL '1 day' AS boundary
+        "#;
+
+    insta::assert_snapshot!(
+        execute_query(query.to_string(), DatabaseProtocol::PostgreSQL)
+            .await
+            .unwrap()
+    );
+}
