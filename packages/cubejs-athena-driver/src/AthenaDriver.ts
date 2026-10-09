@@ -171,6 +171,7 @@ export class AthenaDriver extends BaseDriver implements DriverInterface {
     this.config = {
       // If no credentials are provided, the SDK will use the default chain
       ...(credentials && { credentials }),
+      readOnly: true,
       ...restConfig,
       region:
         config.region ||
@@ -206,12 +207,6 @@ export class AthenaDriver extends BaseDriver implements DriverInterface {
     if (this.config.exportBucket) {
       this.config.exportBucket =
         AthenaDriver.normalizeS3Path(this.config.exportBucket);
-    }
-
-    if (typeof this.config.readOnly === 'undefined') {
-      // Pre-aggregations are built straight from the query (UNLOAD to the
-      // export bucket or a paginated download), never via a table in Athena
-      this.config.readOnly = true;
     }
 
     this.athena = new Athena(this.config);
