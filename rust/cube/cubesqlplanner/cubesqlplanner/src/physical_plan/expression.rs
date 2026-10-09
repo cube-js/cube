@@ -43,6 +43,7 @@ pub struct FunctionExpression {
 #[derive(Clone)]
 pub enum Expr {
     Null,
+    UnionPaddingNull,
     Member(MemberExpression),
     Reference(QualifiedColumnName),
     GroupAny(QualifiedColumnName),
@@ -70,6 +71,7 @@ impl Expr {
                 "CAST(NULL as {})",
                 templates.nullable_type("integer")?
             )),
+            Self::UnionPaddingNull => templates.full_key_aggregate_union_null(),
             Self::Member(member) => {
                 let context = if let Some(self_context) = &member.context {
                     self_context.clone()

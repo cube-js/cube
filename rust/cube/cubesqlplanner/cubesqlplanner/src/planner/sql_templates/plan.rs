@@ -560,6 +560,19 @@ impl PlanSqlTemplates {
         ))
     }
 
+    /// The dialect opts into assembling multi-stage results with UNION ALL +
+    /// GROUP BY by giving the NULL that pads the union branches. It must unify
+    /// with a column of any type, so it is untyped where the dialect allows it.
+    pub fn supports_union_full_key_aggregate(&self) -> bool {
+        self.render
+            .contains_template("tesseract/full_key_aggregate_union_null")
+    }
+
+    pub fn full_key_aggregate_union_null(&self) -> Result<String, CubeError> {
+        self.render
+            .render_template("tesseract/full_key_aggregate_union_null", context! {})
+    }
+
     pub fn supports_full_join(&self) -> bool {
         self.render.contains_template("tesseract/join_types_full")
     }
