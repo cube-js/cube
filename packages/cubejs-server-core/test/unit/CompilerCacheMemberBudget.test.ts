@@ -154,6 +154,19 @@ describe('evictCompilersOverMemberBudget', () => {
     expect([...core.cache.keys()]).toEqual(['big']);
   });
 
+  test('leaves a model that is still compiling alone', () => {
+    const core = coreWithBudget(100);
+    const compiling = cachedModel(0);
+    core.cache.set('compiling', compiling);
+    core.cache.set('big', cachedModel(5_000));
+
+    core.evict('big');
+
+    // Dropping it would free nothing and restart a compile already in flight.
+    expect([...core.cache.keys()].sort()).toEqual(['big', 'compiling']);
+    expect(compiling.dispose).not.toHaveBeenCalled();
+  });
+
   test('clears the rest around an oversized model rather than giving up', () => {
     const core = coreWithBudget(100);
     core.cache.set('a', cachedModel(50));

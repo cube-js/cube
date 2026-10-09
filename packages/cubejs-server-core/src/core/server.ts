@@ -630,7 +630,10 @@ export class CubejsServerCore {
 
       const api = appId === keepAppId ? undefined : this.compilerCache.peek(appId);
 
-      if (api) {
+      // A model still compiling has no member count yet. Dropping one frees
+      // nothing, and disposing a compile in flight only makes its tenant
+      // start over -- so skip anything with nothing to free.
+      if (api?.compiledMemberCount) {
         total -= api.compiledMemberCount;
         this.compilerCache.delete(appId);
         evicted.push(appId);
