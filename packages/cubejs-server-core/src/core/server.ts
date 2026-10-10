@@ -864,6 +864,7 @@ export class CubejsServerCore {
       compilerCacheSize: this.options.compilerCacheSize || 250,
       maxCompilerCacheKeepAlive: this.options.maxCompilerCacheKeepAlive,
       updateCompilerCacheKeepAlive: this.options.updateCompilerCacheKeepAlive,
+      onCompiled: options.onCompiled,
     };
   }
 

@@ -1,7 +1,7 @@
 import { FileContent, SchemaFileRepository } from '@cubejs-backend/shared';
 import { CompilerApi } from '../../src/core/CompilerApi';
 import { CubejsServerCore } from '../../src/core/server';
-import { DbTypeInternalFn } from '../../src/core/types';
+import { DbTypeInternalFn, RequestContext } from '../../src/core/types';
 
 const dbType: DbTypeInternalFn = async () => 'postgres';
 
@@ -130,8 +130,7 @@ describe('compiled member counting', () => {
     await api.getCompilers();
 
     // What the cache does to an evicted entry. A request that already holds
-    // this instance comes back to getCompilers(), and before dispose() cleared
-    // the version it was handed the proxy, which throws on `.then`.
+    // this instance comes back to getCompilers() and must get a model, not the proxy.
     api.dispose();
 
     await expect(api.getCompilers()).resolves.toBeDefined();
@@ -140,6 +139,28 @@ describe('compiled member counting', () => {
 
   test('is zero before anything has compiled', () => {
     expect(compilerApiFor([]).compiledMemberCount).toBe(0);
+  });
+});
+
+describe('member budget, end to end', () => {
+  const contextFor = (app: string): RequestContext => ({ securityContext: { app }, requestId: app });
+
+  test('a compile through getCompilerApi evicts the model over budget', async () => {
+    // Each app compiles a 7-member model, so a budget of 10 holds only one.
+    const core = new CoreOpen(<any>{
+      apiSecret: 'secret',
+      driverFactory: () => ({ type: 'postgres' }),
+      maxCompiledMembers: 10,
+      logger: jest.fn(),
+      contextToAppId: ({ securityContext }: RequestContext) => securityContext.app,
+      repositoryFactory: () => repository([{ fileName: 'orders.js', content: cubeOf('orders', 3) }]),
+    });
+
+    await (await core.getCompilerApi(contextFor('a'))).getCompilers();
+    await (await core.getCompilerApi(contextFor('b'))).getCompilers();
+
+    // Only reachable if createCompilerApiOptions hands onCompiled to CompilerApi.
+    expect([...core.cache.keys()]).toEqual(['b']);
   });
 });
 
