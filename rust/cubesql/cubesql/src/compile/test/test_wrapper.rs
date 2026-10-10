@@ -2951,8 +2951,8 @@ async fn test_wrapper_cte_aggregate_then_date_filter() {
 
 /// `DATEADD` is rewritten to `date_add`, and the dialect template renders it from the
 /// `date_part` and `interval` variables rather than from the arguments. The rewrite maps
-/// every unit onto one of three parts - sub-day units become `MILLISECOND`, `day` and
-/// `week` become `DAY`, and `month`, `quarter` and `year` become `MONTH` - so each dialect
+/// every unit onto one of three parts - sub-day units become `millisecond`, `day` and
+/// `week` become `day`, and `month`, `quarter` and `year` become `month` - so each dialect
 /// has to render all three. These are the real templates from the query classes; the ones
 /// used elsewhere in these tests take `args_concat` and would not catch a wrong unit.
 #[tokio::test]
@@ -2967,46 +2967,46 @@ async fn test_wrapper_date_add_dialect_templates() {
             // PostgresQuery, RedshiftQuery inherits it, DuckDBQuery repeats it
             "({{ args[0] }} + '{{ interval }} {{ date_part }}'::interval)",
             [
-                "(CURRENT_DATE() + '7200000 MILLISECOND'::interval)",
-                "(CURRENT_DATE() + '14 DAY'::interval)",
-                "(CURRENT_DATE() + '24 MONTH'::interval)",
+                "(CURRENT_DATE() + '7200000 millisecond'::interval)",
+                "(CURRENT_DATE() + '14 day'::interval)",
+                "(CURRENT_DATE() + '24 month'::interval)",
             ],
         ),
         (
             // SnowflakeQuery, MssqlQuery, RedshiftQuery
             "DATEADD({{ date_part }}, {{ interval }}, {{ args[0] }})",
             [
-                "DATEADD(MILLISECOND, 7200000, CURRENT_DATE())",
-                "DATEADD(DAY, 14, CURRENT_DATE())",
-                "DATEADD(MONTH, 24, CURRENT_DATE())",
+                "DATEADD(millisecond, 7200000, CURRENT_DATE())",
+                "DATEADD(day, 14, CURRENT_DATE())",
+                "DATEADD(month, 24, CURRENT_DATE())",
             ],
         ),
         (
             // MysqlQuery: MySQL has no MILLISECOND unit, so those become microseconds
-            "DATE_ADD({{ args[0] }}, INTERVAL {% if date_part == \"MILLISECOND\" %}\
+            "DATE_ADD({{ args[0] }}, INTERVAL {% if date_part == \"millisecond\" %}\
              {{ interval }}000 MICROSECOND{% else %}{{ interval }} {{ date_part }}{% endif %})",
             [
                 "DATE_ADD(CURRENT_DATE(), INTERVAL 7200000000 MICROSECOND)",
-                "DATE_ADD(CURRENT_DATE(), INTERVAL 14 DAY)",
-                "DATE_ADD(CURRENT_DATE(), INTERVAL 24 MONTH)",
+                "DATE_ADD(CURRENT_DATE(), INTERVAL 14 day)",
+                "DATE_ADD(CURRENT_DATE(), INTERVAL 24 month)",
             ],
         ),
         (
             // ClickHouseQuery, DatabricksQuery
             "({{ args[0] }} + INTERVAL {{ interval }} {{ date_part }})",
             [
-                "(CURRENT_DATE() + INTERVAL 7200000 MILLISECOND)",
-                "(CURRENT_DATE() + INTERVAL 14 DAY)",
-                "(CURRENT_DATE() + INTERVAL 24 MONTH)",
+                "(CURRENT_DATE() + INTERVAL 7200000 millisecond)",
+                "(CURRENT_DATE() + INTERVAL 14 day)",
+                "(CURRENT_DATE() + INTERVAL 24 month)",
             ],
         ),
         (
             // PrestodbQuery, TrinoQuery and AthenaQuery inherit it
             "DATE_ADD('{{ date_part }}', {{ interval }}, {{ args[0] }})",
             [
-                "DATE_ADD('MILLISECOND', 7200000, CURRENT_DATE())",
-                "DATE_ADD('DAY', 14, CURRENT_DATE())",
-                "DATE_ADD('MONTH', 24, CURRENT_DATE())",
+                "DATE_ADD('millisecond', 7200000, CURRENT_DATE())",
+                "DATE_ADD('day', 14, CURRENT_DATE())",
+                "DATE_ADD('month', 24, CURRENT_DATE())",
             ],
         ),
     ];
@@ -3073,19 +3073,19 @@ async fn test_wrapper_date_add_negative_and_out_of_range_intervals() {
     .await;
 
     let cases = [
-        ("hour", "-2", Some("DATEADD(MILLISECOND, -7200000, ")),
-        ("minute", "-30", Some("DATEADD(MILLISECOND, -1800000, ")),
-        ("second", "-90", Some("DATEADD(MILLISECOND, -90000, ")),
-        ("day", "-2", Some("DATEADD(DAY, -2, ")),
-        ("week", "-2", Some("DATEADD(DAY, -14, ")),
-        ("month", "-12", Some("DATEADD(MONTH, -12, ")),
-        ("year", "-1", Some("DATEADD(MONTH, -12, ")),
+        ("hour", "-2", Some("DATEADD(millisecond, -7200000, ")),
+        ("minute", "-30", Some("DATEADD(millisecond, -1800000, ")),
+        ("second", "-90", Some("DATEADD(millisecond, -90000, ")),
+        ("day", "-2", Some("DATEADD(day, -2, ")),
+        ("week", "-2", Some("DATEADD(day, -14, ")),
+        ("month", "-12", Some("DATEADD(month, -12, ")),
+        ("year", "-1", Some("DATEADD(month, -12, ")),
         // The last span the millisecond half can hold on its own, and the first one past
         // it, which is day aligned and so is carried into the other half
-        ("hour", "596", Some("DATEADD(MILLISECOND, 2145600000, ")),
-        ("hour", "720", Some("DATEADD(DAY, 30, ")),
-        ("hour", "-720", Some("DATEADD(DAY, -30, ")),
-        ("minute", "43200", Some("DATEADD(DAY, 30, ")),
+        ("hour", "596", Some("DATEADD(millisecond, 2145600000, ")),
+        ("hour", "720", Some("DATEADD(day, 30, ")),
+        ("hour", "-720", Some("DATEADD(day, -30, ")),
+        ("minute", "43200", Some("DATEADD(day, 30, ")),
         // Neither day aligned nor small enough to count in milliseconds. The rewrite is
         // skipped, which leaves the `dateadd` stub to report `NotImplemented` at
         // execution rather than answering with a different date
@@ -5267,4 +5267,59 @@ async fn test_aggregate_over_limited_ungrouped_scan() {
             "KibanaSampleDataEcommerce.taxful_total_price".to_string(),
         ])
     );
+}
+
+/// SQL templates receive the date part as written in the plan, so they can only compare it
+/// against one spelling (BigQuery maps `dow` to `DAYOFWEEK`). Whatever case or synonym the
+/// client used, the date part must reach them lowercase and in its standard form.
+#[tokio::test]
+async fn test_wrapper_date_part_reaches_templates_normalized() {
+    if !Rewriter::sql_push_down_enabled() {
+        return;
+    }
+    init_testing_logger();
+
+    let query_plan = convert_select_to_query_plan(
+        // language=PostgreSQL
+        r#"
+        SELECT
+            EXTRACT(DOW FROM order_date) AS dow_upper,
+            extract(Doy FROM order_date) AS doy_mixed,
+            DATEDIFF('QUARTER', order_date, last_mod) AS quarter_upper,
+            DATEDIFF('qtr', order_date, last_mod) AS quarter_synonym,
+            DATEDIFF('Day', order_date, last_mod) AS day_mixed
+        FROM KibanaSampleDataEcommerce
+        GROUP BY 1, 2, 3, 4, 5
+        "#
+        .to_string(),
+        DatabaseProtocol::PostgreSQL,
+    )
+    .await;
+
+    let sql = query_plan
+        .as_logical_plan()
+        .find_cube_scan_wrapped_sql_deep()
+        .wrapped_sql
+        .sql;
+    for expected in [
+        "EXTRACT(dow FROM",
+        "EXTRACT(doy FROM",
+        "DATEDIFF(quarter,",
+        "DATEDIFF(day,",
+    ] {
+        assert!(
+            sql.contains(expected),
+            "no {} in generated SQL: {}",
+            expected,
+            sql
+        );
+    }
+    for unexpected in ["DOW", "Doy", "QUARTER", "qtr", "Day,"] {
+        assert!(
+            !sql.contains(unexpected),
+            "{} reached the templates as written, generated SQL: {}",
+            unexpected,
+            sql
+        );
+    }
 }
