@@ -4857,6 +4857,8 @@ export class BaseQuery {
         series_bounds_cast: '{{ expr }}',
         bool_param_cast: '{{ expr }}',
         number_param_cast: '{{ expr }}',
+        time_in_list_column_cast: '{{ expr }}',
+        time_in_list_param_cast: '{{ expr }}',
         // Tesseract uses its own join type templates, decoupled from `join_types`
         // which are used by the SQL API push down. FULL is opt-in per dialect.
         join_types_inner: 'INNER',
