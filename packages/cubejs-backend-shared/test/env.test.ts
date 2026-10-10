@@ -333,10 +333,10 @@ describe('getEnv(maxCompiledMembers)', () => {
     expect(getEnv('maxCompiledMembers')).toBe(5000);
   });
 
-  test('throws on zero, which would recompile on every request', () => {
+  test('throws on zero rather than reading it as unset', () => {
     process.env.CUBEJS_MAX_COMPILED_MEMBERS = '0';
     expect(() => getEnv('maxCompiledMembers')).toThrowError(
-      'Value "0" is not valid for CUBEJS_MAX_COMPILED_MEMBERS. Must be a positive integer. The compiler cache can not be disabled.'
+      'Value "0" is not valid for CUBEJS_MAX_COMPILED_MEMBERS. Must be a positive integer. Unset it to disable the member budget.'
     );
   });
 

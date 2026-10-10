@@ -486,13 +486,12 @@ const variables: Record<string, (...args: any) => any> = {
 
     const members = get('CUBEJS_MAX_COMPILED_MEMBERS').asIntPositive();
 
-    // asIntPositive() lets 0 through, and a zero budget would evict every model
-    // the moment it compiled, turning every request into a recompile.
+    // asIntPositive() lets 0 through; reject it rather than read it as "unset".
     if (members === 0) {
       throw new InvalidConfiguration(
         'CUBEJS_MAX_COMPILED_MEMBERS',
         members,
-        'Must be a positive integer. The compiler cache can not be disabled.',
+        'Must be a positive integer. Unset it to disable the member budget.',
       );
     }
 

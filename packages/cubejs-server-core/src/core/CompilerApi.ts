@@ -218,6 +218,11 @@ export class CompilerApi {
     this.compilers = disposedProxy('compilers', 'disposed CompilerApi instance');
     this.queryFactory = disposedProxy('queryFactory', 'disposed CompilerApi instance');
     this.graphqlSchema = undefined;
+
+    // A request can still hold this instance -- the gateway keeps one across
+    // several awaits. Clearing the version makes its next getCompilers()
+    // recompile rather than hand back the proxy, which throws on `.then`.
+    this.compilerVersion = undefined;
   }
 
   public setGraphQLSchema(schema: GraphQLSchema): void {

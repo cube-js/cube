@@ -125,6 +125,19 @@ describe('compiled member counting', () => {
     expect(api.compiledMemberCount).toBe(7);
   });
 
+  test('recompiles after eviction instead of handing back a disposed proxy', async () => {
+    const api = compilerApiFor([{ fileName: 'orders.js', content: cubeOf('orders', 3) }]);
+    await api.getCompilers();
+
+    // What the cache does to an evicted entry. A request that already holds
+    // this instance comes back to getCompilers(), and before dispose() cleared
+    // the version it was handed the proxy, which throws on `.then`.
+    api.dispose();
+
+    await expect(api.getCompilers()).resolves.toBeDefined();
+    expect(api.compiledMemberCount).toBe(7);
+  });
+
   test('is zero before anything has compiled', () => {
     expect(compilerApiFor([]).compiledMemberCount).toBe(0);
   });
