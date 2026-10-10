@@ -1,4 +1,5 @@
 import { SchemaFileRepository } from '@cubejs-backend/shared';
+import { BaseQuery } from '@cubejs-backend/schema-compiler';
 import type { Compiler, QueryFactory } from '@cubejs-backend/schema-compiler';
 import { CompilerApi } from '../../src/core/CompilerApi';
 import { DbTypeInternalFn } from '../../src/core/types';
@@ -199,6 +200,78 @@ views:
     test('absolute date ranges keep the cached SQL', async () => {
       const { first, nextMinute } = await sqlInTwoMinutes(compilerApiFor('["2026-10-01", "2026-10-07"]'));
       expect(nextMinute).toBe(first);
+    });
+  });
+
+  describe('getSql', () => {
+    const repository: SchemaFileRepository = {
+      localPath: () => '/mock/path',
+      dataSchemaFiles: () => Promise.resolve([
+        {
+          fileName: 'visits.js',
+          content: `
+            cube('visits', {
+              sql: "SELECT 1 AS id, 'a' AS source, 'b' AS browser",
+              measures: { count: { type: 'count' } },
+              dimensions: {
+                id: { sql: 'id', type: 'number', primaryKey: true },
+                source: { sql: 'source', type: 'string' },
+                browser: { sql: 'browser', type: 'string' },
+              },
+              preAggregations: {
+                bySource: { measures: [CUBE.count], dimensions: [CUBE.source] },
+              },
+            });
+          `
+        }
+      ])
+    };
+
+    let compilerApi: CompilerApi;
+    let matchOnlyRun: jest.SpyInstance;
+
+    beforeEach(() => {
+      compilerApi = new CompilerApi(repository, async () => 'postgres', {
+        logger: () => {}, // eslint-disable-line @typescript-eslint/no-empty-function
+        externalDbType: 'cubestore',
+      });
+      matchOnlyRun = jest.spyOn(BaseQuery.prototype, 'findPreAggregationForQueryRust');
+    });
+
+    afterEach(() => {
+      matchOnlyRun.mockRestore();
+      compilerApi.dispose();
+    });
+
+    const getSql = (dimension: string, options = {}) => compilerApi.getSql(
+      { measures: ['visits.count'], dimensions: [dimension], timezone: 'UTC' } as any,
+      options,
+    );
+
+    // Tesseract matches pre-aggregations while building the SQL, so a separate match-only
+    // planner run would only repeat that work
+    test('takes the pre-aggregation match from the build on a hit', async () => {
+      const result = await getSql('visits.source');
+
+      expect(result.external).toEqual(true);
+      expect(result.preAggregations.map((p: any) => p.preAggregationId)).toEqual(['visits.bySource']);
+      expect(matchOnlyRun).not.toHaveBeenCalled();
+    });
+
+    test('takes the pre-aggregation match from the build on a miss', async () => {
+      const result = await getSql('visits.browser');
+
+      expect(result.external).toEqual(false);
+      expect(result.preAggregations).toEqual([]);
+      expect(matchOnlyRun).not.toHaveBeenCalled();
+    });
+
+    test('matches once without a build for preAggregationsOnly', async () => {
+      const result = await getSql('visits.source', { preAggregationsOnly: true });
+
+      expect(result.sql).toBeNull();
+      expect(result.preAggregations.map((p: any) => p.preAggregationId)).toEqual(['visits.bySource']);
+      expect(matchOnlyRun).toHaveBeenCalledTimes(1);
     });
   });
 });

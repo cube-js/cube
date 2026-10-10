@@ -2042,4 +2042,69 @@ cubes:
       })).toThrow(/Can't find join path to join 'ledger', 'categories', 'entities'/);
     });
   });
+
+  // `getSql` builds the query first and reads everything else off that build; the native
+  // build already matches pre-aggregations, so nothing after it may plan again just to match.
+  describe('native planner reuses the build\'s pre-aggregation match', () => {
+    const { compiler, joinGraph, cubeEvaluator } = prepareJsCompiler(`
+      cube('visits', {
+        sql: \`SELECT 1 AS id, 'a' AS source, 'b' AS browser\`,
+        measures: { count: { type: 'count' } },
+        dimensions: {
+          id: { sql: 'id', type: 'number', primaryKey: true },
+          source: { sql: 'source', type: 'string' },
+          browser: { sql: 'browser', type: 'string' },
+        },
+        preAggregations: {
+          bySource: { measures: [CUBE.count], dimensions: [CUBE.source], external: true },
+        },
+      });
+    `);
+
+    beforeAll(async () => {
+      await compiler.compile();
+    });
+
+    const getSqlSequence = (dimension: string) => {
+      const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+        measures: ['visits.count'],
+        dimensions: [dimension],
+        timezone: 'UTC',
+        preAggregationsSchema: '',
+        externalQueryClass: PostgresQuery,
+        useNativeSqlPlanner: true,
+      } as any);
+      const matchOnlyRun = jest.spyOn(query, 'findPreAggregationForQueryRust');
+
+      // Same order as CompilerApi.getSql
+      const [sql] = query.buildSqlAndParams();
+      const result = {
+        sql,
+        external: query.externalPreAggregationQuery(),
+        preAggregations: query.preAggregations.preAggregationsDescription(),
+      };
+      query.buildLambdaQuery();
+      query.cacheKeyQueries();
+
+      return { ...result, matchOnlyRuns: matchOnlyRun.mock.calls.length };
+    };
+
+    it('on a hit', () => {
+      const { sql, external, preAggregations, matchOnlyRuns } = getSqlSequence('visits.source');
+
+      expect(sql).toContain('visits_by_source');
+      expect(external).toEqual(true);
+      expect(preAggregations.map((p: any) => p.preAggregationId)).toEqual(['visits.bySource']);
+      expect(matchOnlyRuns).toEqual(0);
+    });
+
+    it('on a miss', () => {
+      const { sql, external, preAggregations, matchOnlyRuns } = getSqlSequence('visits.browser');
+
+      expect(sql).not.toContain('visits_by_source');
+      expect(external).toEqual(false);
+      expect(preAggregations).toEqual([]);
+      expect(matchOnlyRuns).toEqual(0);
+    });
+  });
 });

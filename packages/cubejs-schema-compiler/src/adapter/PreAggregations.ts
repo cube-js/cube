@@ -122,7 +122,8 @@ export class PreAggregations {
 
   private allBackAliasMembersValue: Record<string, string> | undefined = undefined;
 
-  public preAggregationForQuery: PreAggregationForQuery | undefined = undefined;
+  // undefined: not matched yet, null: matched and nothing fits
+  private preAggregationMatch: PreAggregationForQuery | null | undefined = undefined;
 
   public preAggregationUsageInfos: PreAggregationUsageInfo[] | undefined = undefined;
 
@@ -970,18 +971,34 @@ export class PreAggregations {
    * pre-aggs appear in the schema file.
    */
   public findPreAggregationForQuery(): PreAggregationForQuery | undefined {
-    if (!this.preAggregationForQuery) {
+    if (this.preAggregationMatch === undefined) {
       if (this.query.useNativeSqlPlanner && this.query.canUseNativeSqlPlannerPreAggregation) {
-        this.preAggregationForQuery = this.query.findPreAggregationForQueryRust();
+        this.preAggregationMatch = this.query.findPreAggregationForQueryRust() ?? null;
       } else {
-        this.preAggregationForQuery =
+        this.preAggregationMatch =
           this
             .rollupMatchResults()
             // Refresh worker can access specific pre-aggregations even in case those hidden by others
-            .find(p => p.canUsePreAggregation && (!this.query.options.preAggregationId || p.preAggregationId === this.query.options.preAggregationId));
+            .find(p => p.canUsePreAggregation && (!this.query.options.preAggregationId || p.preAggregationId === this.query.options.preAggregationId)) ?? null;
       }
     }
     return this.preAggregationForQuery;
+  }
+
+  public get preAggregationForQuery(): PreAggregationForQuery | undefined {
+    return this.preAggregationMatch ?? undefined;
+  }
+
+  /**
+   * Records the pre-aggregations the native planner matched while planning this query, so
+   * `findPreAggregationForQuery` doesn't run the planner a second time just to match.
+   */
+  public setNativePreAggregationResult(
+    usageInfos: PreAggregationUsageInfo[] | undefined,
+    preAggregationForQuery: PreAggregationForQuery | undefined,
+  ): void {
+    this.preAggregationUsageInfos = usageInfos;
+    this.preAggregationMatch = preAggregationForQuery ?? null;
   }
 
   private findAutoRollupPreAggregationsForCube(cube: string, preAggregations: PreAggregationDefinitions): PreAggregationForQuery[] {

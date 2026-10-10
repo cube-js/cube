@@ -1127,11 +1127,18 @@ export class BaseQuery {
   }
 
   applyNativePreAggResult(preAggResult) {
-    if (!preAggResult) return;
-    this.preAggregations.preAggregationUsageInfos = preAggResult;
+    // The planner doesn't match rollups while building a pre-aggregation's own SQL, so an
+    // empty result there isn't a miss
+    if (this.options.preAggregationQuery) return;
+    if (!preAggResult?.length) {
+      this.preAggregations.setNativePreAggregationResult(undefined, undefined);
+      return;
+    }
     const first = preAggResult[0];
-    this.preAggregations.preAggregationForQuery =
-      this.getPreAggregationByName(first.cubeName, first.preAggregationName);
+    this.preAggregations.setNativePreAggregationResult(
+      preAggResult,
+      this.getPreAggregationByName(first.cubeName, first.preAggregationName),
+    );
   }
 
   allCubeMembers(path) {
