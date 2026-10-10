@@ -24,7 +24,11 @@ describe('toggleInspector', () => {
     toggleInspector(0);
 
     expect(inspector.url()).toBeUndefined();
-    expect(console.log).toHaveBeenCalledWith('Inspector closed');
+    // The first line has to come before close(), which can block on an attached client
+    expect(console.log.mock.calls.slice(-2)).toEqual([
+      ['Closing inspector, waiting for attached DevTools clients to disconnect'],
+      ['Inspector closed'],
+    ]);
   });
 
   test('reports a busy port instead of claiming the inspector is open', async () => {
