@@ -1,7 +1,11 @@
 import { BigqueryQuery } from '../../src/adapter/BigqueryQuery';
+import { ClickHouseQuery } from '../../src/adapter/ClickHouseQuery';
 import { PostgresQuery } from '../../src/adapter/PostgresQuery';
 import { allDialects } from './allDialects';
 import { prepareJsCompiler } from './PrepareCompiler';
+
+// A regex literal with question marks that are not placeholders
+const CODE_REGEX = '\'(.*?)(?:-?[0-9]{2})\'';
 
 // `?` placeholders are positional: a value referenced from two places in the
 // generated SQL needs one entry in the params array per placeholder. A security
@@ -26,6 +30,10 @@ const model = [
   '    createdAt: {',
   '      sql: `created_at`,',
   '      type: `time`',
+  '    },',
+  '    code: {',
+  `      sql: \`extract(code, ${CODE_REGEX})\`,`,
+  '      type: `string`',
   '    }',
   '  },',
   '  preAggregations: {',
@@ -33,7 +41,9 @@ const model = [
   '      measures: [CUBE.count],',
   '      timeDimension: CUBE.createdAt,',
   '      granularity: `day`,',
-  '      partitionGranularity: `month`',
+  '      partitionGranularity: `month`,',
+  // ClickHouse requires an index on pre-aggregations
+  '      indexes: { byCreatedAt: { columns: [CUBE.createdAt.day] } }',
   '    }',
   '  }',
   '});',
@@ -60,6 +70,10 @@ function bigQueryFor(useNativeSqlPlanner: boolean, options = {}) {
 
 function placeholdersCount(sql: string) {
   return (sql.match(/\?/g) || []).length;
+}
+
+function clickHouseTokens(sql: string) {
+  return sql.match(/___ClickHouseParam_\d+___/g) || [];
 }
 
 describe('positional params', () => {
@@ -116,6 +130,36 @@ describe('positional params', () => {
       const [loadSql, params] = description.loadSql;
 
       expect(placeholdersCount(loadSql)).toEqual(params.length);
+      expect(params).toEqual(['acme', 'acme', '__FROM_PARTITION_RANGE', '__TO_PARTITION_RANGE']);
+    });
+
+    // ClickHouse binds params by token, so a literal `?` in member SQL is not a placeholder
+    it('renders ClickHouse params as indexed tokens', async () => {
+      const query = await queryFor(ClickHouseQuery, useNativeSqlPlanner, {
+        dimensions: ['orders.code'],
+        filters: [{ member: 'orders.code', operator: 'equals', values: ['x'] }],
+      });
+      const [sql, params] = query.buildSqlAndParams();
+
+      expect(sql).toContain(CODE_REGEX);
+      expect(placeholdersCount(sql.split(CODE_REGEX).join(''))).toEqual(0);
+      expect(clickHouseTokens(sql)).toEqual(params.map((_, i) => `___ClickHouseParam_${i}___`));
+      expect(params).toEqual(['acme', 'acme', 'x']);
+    });
+
+    it('renders ClickHouse params as indexed tokens in a pre-aggregation build query', async () => {
+      const query = await queryFor(ClickHouseQuery, useNativeSqlPlanner, {
+        timeDimensions: [{
+          dimension: 'orders.createdAt',
+          granularity: 'day',
+          dateRange: ['2024-01-01', '2024-01-31'],
+        }],
+      });
+      const [description]: any = query.preAggregations?.preAggregationsDescription();
+      const [loadSql, params] = description.loadSql;
+
+      expect(placeholdersCount(loadSql)).toEqual(0);
+      expect(clickHouseTokens(loadSql)).toEqual(params.map((_, i) => `___ClickHouseParam_${i}___`));
       expect(params).toEqual(['acme', 'acme', '__FROM_PARTITION_RANGE', '__TO_PARTITION_RANGE']);
     });
   });
