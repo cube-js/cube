@@ -1211,7 +1211,8 @@ describe('Refresh Scheduler', () => {
   test('Exponential backoff', async () => {
     process.env.CUBEJS_EXTERNAL_DEFAULT = 'false';
     process.env.CUBEJS_SCHEDULED_REFRESH_DEFAULT = 'true';
-    process.env.CUBEJS_PRE_AGGREGATIONS_BACKOFF_MAX_TIME = '10'; // 10 seconds max backoff
+    // Also the TTL of the backoff key, so it must outlive the whole test run
+    process.env.CUBEJS_PRE_AGGREGATIONS_BACKOFF_MAX_TIME = '600';
 
     const {
       refreshScheduler, mockDriver, serverCore
@@ -1253,9 +1254,6 @@ describe('Refresh Scheduler', () => {
     const initialAttempts = mockDriver.queryAttempts;
     expect(initialAttempts).toBeGreaterThan(0);
 
-    // Wait for backoff to be set in storage (increased delay for async Redis writes)
-    await mockDriver.delay(1000);
-
     // Find which foo_first partition has backoff set
     // Scheduler may process different partitions (20201231, 20201230, etc.)
     const possiblePartitions = ['20201231', '20201230', '20201229', '20201228', '20201227'];
@@ -1278,7 +1276,7 @@ describe('Refresh Scheduler', () => {
     // Initial backoff multiplier is 1 second
     expect(backoffData!.backoffMultiplier).toBeGreaterThanOrEqual(1);
 
-    // Step 1: Immediate retry - should skip due to backoff (10-second window)
+    // Step 1: further runs advance past the failed partition; only not-yet-failed foo_first partitions are attempted
     const beforeSkipAttempts = mockDriver.queryAttempts;
     const immediateRetryCount = 5;
 
@@ -1291,20 +1289,17 @@ describe('Refresh Scheduler', () => {
           queryIteratorState,
         });
       } catch (e) {
-        // Expected to skip due to backoff
+        // Expected to fail on the next foo_first partitions
       }
     }
 
-    // Query attempts should not increase significantly (skipped due to backoff)
+    // Query attempts grow only by the newly attempted foo_first partitions
     // Allow some margin for other pre-aggregations processed by scheduler
     expect(mockDriver.queryAttempts).toBeLessThanOrEqual(beforeSkipAttempts + 2);
 
-    // Step 2: Verify backoff persists - pre-aggregation is still in backoff after 500ms
-    await mockDriver.delay(500);
-    const backoffDataStillActive = await preAggsInstance.getPreAggBackoff(targetTableName!);
-    expect(backoffDataStillActive).not.toBeNull();
-    // backoffDataStillActive exists, which means backoff is still in place
-    // (nextTimestamp may be close to current time due to test execution delays)
+    // Step 2: the iterator does not revisit a partition within one pass, so the record is untouched
+    const backoffAfterRetries = await preAggsInstance.getPreAggBackoff(targetTableName!);
+    expect(backoffAfterRetries).toEqual(backoffData);
   });
 
   describe('Local refresh key', () => {
