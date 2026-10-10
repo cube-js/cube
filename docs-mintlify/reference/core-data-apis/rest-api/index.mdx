@@ -273,6 +273,12 @@ should be unique for each separate request. `spanId` should define user
 interaction span such us `Continue wait` retry cycle and it's value shouldn't
 change during one single interaction.
 
+A request ID must be 1 to 128 characters long and may contain only letters,
+digits, and the characters `+ / = . _ : @ ~ -`. Requests with an invalid
+`x-request-id` are rejected with a `400` status code. If `x-request-id` is not
+provided, the [W3C `traceparent`](https://www.w3.org/TR/trace-context/) header
+is used as the request ID, subject to the same rules.
+
 ## Cache control
 
 [`/v1/load`][ref-ref-load] and [`/v1/cubesql`][ref-ref-cubesql] endpoints of the REST (JSON) API
