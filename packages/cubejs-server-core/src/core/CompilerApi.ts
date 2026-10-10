@@ -151,6 +151,15 @@ export class CompilerApi {
 
   protected queryFactory?: QueryFactory;
 
+  /**
+   * Each compile's own factory. A request holds `compilers` across awaits, and
+   * reading `this.queryFactory` then could pair them with a newer model's
+   * factory or, after eviction, with the disposed proxy.
+   */
+  private readonly queryFactories = new WeakMap<Compiler, QueryFactory>();
+
+  protected memberCount: number = 0;
+
   public constructor(repository: SchemaFileRepository, dbType: DbTypeInternalFn, options: CompilerApiOptions) {
     this.repository = repository;
     this.dbType = dbType;
@@ -241,7 +250,9 @@ export class CompilerApi {
    * Members (measures, dimensions, segments) this app's last successful compile
    * produced, across every cube and view. Zero until it first compiles.
    */
-  public compiledMemberCount: number = 0;
+  public get compiledMemberCount(): number {
+    return this.memberCount;
+  }
 
   public async getCompilers(options: { requestId?: string } = {}): Promise<Compiler> {
     let compilerVersion = (
@@ -299,7 +310,7 @@ export class CompilerApi {
     // A recompile replaces `compilers` with the new promise, so the previous
     // model is no longer held here -- and counting it would let the budget walk
     // evict this entry while the compile it would throw away is still running.
-    this.compiledMemberCount = 0;
+    this.memberCount = 0;
 
     try {
       this.logger(this.compilers ? 'Recompiling schema' : 'Compiling schema', {
@@ -319,10 +330,11 @@ export class CompilerApi {
         compiledYamlCache: this.compiledYamlCache,
       });
       this.queryFactory = await this.createQueryFactory(compilers);
+      this.queryFactories.set(compilers, this.queryFactory);
       // A compile that a newer version superseded, or that finished on an
       // evicted instance, no longer describes what this entry holds.
       if (this.compilerVersion === compilerVersion) {
-        this.compiledMemberCount = CompilerApi.countMembers(compilers);
+        this.memberCount = CompilerApi.countMembers(compilers);
         this.options.onCompiled?.();
       }
 
@@ -1037,7 +1049,7 @@ export class CompilerApi {
         allowUngroupedWithoutPrimaryKey: this.allowUngroupedWithoutPrimaryKey,
         convertTzForRawTimeDimension: this.convertTzForRawTimeDimension,
         localRefreshKey: this.localRefreshKey,
-        queryFactory: this.queryFactory,
+        queryFactory: this.queryFactories.get(compilers) ?? this.queryFactory,
       }
     );
   }

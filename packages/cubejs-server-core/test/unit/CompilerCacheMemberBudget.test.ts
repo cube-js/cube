@@ -1,4 +1,5 @@
 import { FileContent, SchemaFileRepository } from '@cubejs-backend/shared';
+import { QueryFactory } from '@cubejs-backend/schema-compiler';
 import { CompilerApi } from '../../src/core/CompilerApi';
 import { CubejsServerCore } from '../../src/core/server';
 import { DbTypeInternalFn, RequestContext } from '../../src/core/types';
@@ -55,7 +56,23 @@ const compilerApiFor = (files: FileContent[]) => new CompilerApi(
  * A core whose compiler cache and budget pass are reachable from the test,
  * rather than casting the instance to `any`.
  */
+/**
+ * Every core this file builds. Each starts a scheduled refresh timer, which
+ * keeps firing after the file's environment is torn down and fails whichever
+ * suite runs next, so all of them are shut down after each test.
+ */
+const cores: CubejsServerCore[] = [];
+
+afterEach(async () => {
+  await Promise.all(cores.splice(0).map((core) => core.shutdown()));
+});
+
 class CoreOpen extends CubejsServerCore {
+  public constructor(...args: ConstructorParameters<typeof CubejsServerCore>) {
+    super(...args);
+    cores.push(this);
+  }
+
   public get cache() {
     return this.compilerCache;
   }
@@ -195,6 +212,18 @@ describe('compiled member counting', () => {
 
     await expect(api.getCompilers()).resolves.toBeDefined();
     expect(api.compiledMemberCount).toBe(7);
+  });
+
+  test('a request holding compilers across eviction still builds queries', async () => {
+    const api = compilerApiFor([{ fileName: 'orders.js', content: cubeOf('orders', 3) }]);
+    const compilers = await api.getCompilers();
+
+    // Evicted while the request awaits something else, e.g. its dbType lookup.
+    api.dispose();
+
+    const query = await api.createQueryByDataSource(compilers, {});
+    // The disposed proxy throws on any access, `instanceof` included.
+    expect(query.options.queryFactory).toBeInstanceOf(QueryFactory);
   });
 
   test('is zero before anything has compiled', () => {
