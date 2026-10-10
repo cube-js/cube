@@ -1,0 +1,59 @@
+---
+source: cubesql/src/compile/test/test_wrapper.rs
+expression: sql
+---
+SELECT 
+  "a"."customer_gender" "customer_gender", "a"."amount_1" "amount_1"
+  
+FROM (
+  SELECT 
+    "a"."customer_gender" "customer_gender", "a"."amount" "amount", "b"."customer_gender" "customer_gender_1", "b"."amount" "amount_1"
+    
+  FROM (
+    SELECT * FROM {
+      "query": {
+        "measures": [],
+        "dimensions": [
+          "KibanaSampleDataEcommerce.customer_gender",
+          "KibanaSampleDataEcommerce.taxful_total_price"
+        ],
+        "segments": [],
+        "order": [],
+        "limit": 5000,
+        "ungrouped": true
+      },
+      "meta": {
+        "protocol": "postgres",
+        "apiType": "sql",
+        "appName": "NULL"
+      },
+      "member_to_alias": {
+        "KibanaSampleDataEcommerce.customer_gender": "customer_gender",
+        "KibanaSampleDataEcommerce.taxful_total_price": "amount"
+      }
+    }
+  ) AS "a" 
+  LEFT JOIN (SELECT * FROM {
+    "query": {
+      "measures": [],
+      "dimensions": [
+        "KibanaSampleDataEcommerce.customer_gender",
+        "KibanaSampleDataEcommerce.taxful_total_price"
+      ],
+      "segments": [],
+      "order": [],
+      "limit": 5000,
+      "ungrouped": true
+    },
+    "meta": {
+      "protocol": "postgres",
+      "apiType": "sql",
+      "appName": "NULL"
+    },
+    "member_to_alias": {
+      "KibanaSampleDataEcommerce.customer_gender": "customer_gender",
+      "KibanaSampleDataEcommerce.taxful_total_price": "amount"
+    }
+  }) AS "b" ON ("a"."customer_gender" = "b"."customer_gender")
+) AS "a" 
+LIMIT 50000

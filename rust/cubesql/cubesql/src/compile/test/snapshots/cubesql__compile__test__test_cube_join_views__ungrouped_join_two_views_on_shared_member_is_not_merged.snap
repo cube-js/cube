@@ -1,0 +1,53 @@
+---
+source: cubesql/src/compile/test/test_cube_join_views.rs
+expression: sql
+---
+SELECT 
+  "c"."customer_city" "customer_city", "c"."customer_city_1" "customer_city_1"
+  
+FROM (
+  SELECT 
+    "c"."customer_city" "customer_city", "o"."customer_city" "customer_city_1"
+    
+  FROM (
+    SELECT * FROM {
+      "query": {
+        "measures": [],
+        "dimensions": [
+          "customers_view.customer_city"
+        ],
+        "segments": [],
+        "order": [],
+        "ungrouped": true
+      },
+      "meta": {
+        "protocol": "postgres",
+        "apiType": "sql",
+        "appName": "NULL"
+      },
+      "member_to_alias": {
+        "customers_view.customer_city": "customer_city"
+      }
+    }
+  ) AS "c" 
+  LEFT JOIN (SELECT * FROM {
+    "query": {
+      "measures": [],
+      "dimensions": [
+        "orders_view.customer_city"
+      ],
+      "segments": [],
+      "order": [],
+      "ungrouped": true
+    },
+    "meta": {
+      "protocol": "postgres",
+      "apiType": "sql",
+      "appName": "NULL"
+    },
+    "member_to_alias": {
+      "orders_view.customer_city": "customer_city"
+    }
+  }) AS "o" ON ("c"."customer_city" = "o"."customer_city")
+) AS "c" 
+LIMIT 50000
