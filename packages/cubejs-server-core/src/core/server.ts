@@ -579,6 +579,7 @@ export class CubejsServerCore {
           allowJsDuplicatePropsInSchema: this.options.allowJsDuplicatePropsInSchema,
           allowNodeRequire: this.options.allowNodeRequire,
           fastReload: this.options.fastReload,
+          onCompiled: () => this.evictCompilersOverMemberBudget(appId),
         },
       );
 
@@ -587,6 +588,56 @@ export class CubejsServerCore {
 
     compilerApi.schemaVersion = currentSchemaVersion;
     return compilerApi;
+  }
+
+  /** Never evicts `keepAppId`: a model alone over budget would otherwise recompile on every request. */
+  protected evictCompilersOverMemberBudget(keepAppId: string): void {
+    const budget = this.options.maxCompiledMembers;
+
+    if (!budget) {
+      return;
+    }
+
+    let total = 0;
+
+    for (const api of this.compilerCache.values()) {
+      total += api.compiledMemberCount;
+    }
+
+    if (total <= budget) {
+      return;
+    }
+
+    const evicted: string[] = [];
+
+    // rkeys() walks least-recently-used first, so the models that go are the
+    // ones longest unused. peek() rather than get(), which would mark the
+    // model as freshly used and reorder the very list being walked.
+    for (const appId of [...this.compilerCache.rkeys()]) {
+      if (total <= budget) {
+        break;
+      }
+
+      const api = appId === keepAppId ? undefined : this.compilerCache.peek(appId);
+
+      // A model still compiling has no member count yet. Dropping one frees
+      // nothing, and disposing a compile in flight only makes its tenant
+      // start over -- so skip anything with nothing to free.
+      if (api?.compiledMemberCount) {
+        total -= api.compiledMemberCount;
+        this.compilerCache.delete(appId);
+        evicted.push(appId);
+      }
+    }
+
+    if (evicted.length) {
+      this.logger('Compiler cache member budget exceeded', {
+        budget,
+        membersAfterEviction: total,
+        evictedAppIds: evicted.length,
+        compiledAppIds: this.compilerCache.size,
+      });
+    }
   }
 
   public async resetInstanceState() {
@@ -813,6 +864,7 @@ export class CubejsServerCore {
       compilerCacheSize: this.options.compilerCacheSize || 250,
       maxCompilerCacheKeepAlive: this.options.maxCompilerCacheKeepAlive,
       updateCompilerCacheKeepAlive: this.options.updateCompilerCacheKeepAlive,
+      onCompiled: options.onCompiled,
     };
   }
 

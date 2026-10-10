@@ -46,6 +46,8 @@ export interface CompilerApiOptions {
   sqlCache?: boolean;
   standalone?: boolean;
   compilerCacheSize?: number;
+  /** Called once a compile succeeds, so the owner can re-check its member budget. */
+  onCompiled?: () => void;
   maxCompilerCacheKeepAlive?: number;
   updateCompilerCacheKeepAlive?: boolean;
   /**
@@ -149,6 +151,15 @@ export class CompilerApi {
 
   protected queryFactory?: QueryFactory;
 
+  /**
+   * Each compile's own factory. A request holds `compilers` across awaits, and
+   * reading `this.queryFactory` then could pair them with a newer model's
+   * factory or, after eviction, with the disposed proxy.
+   */
+  private readonly queryFactories = new WeakMap<Compiler, QueryFactory>();
+
+  protected memberCount: number = 0;
+
   public constructor(repository: SchemaFileRepository, dbType: DbTypeInternalFn, options: CompilerApiOptions) {
     this.repository = repository;
     this.dbType = dbType;
@@ -216,6 +227,11 @@ export class CompilerApi {
     this.compilers = disposedProxy('compilers', 'disposed CompilerApi instance');
     this.queryFactory = disposedProxy('queryFactory', 'disposed CompilerApi instance');
     this.graphqlSchema = undefined;
+
+    // A request can still hold this instance -- the gateway keeps one across
+    // several awaits. Clearing the version makes its next getCompilers()
+    // recompile rather than hand back the proxy, which throws on `.then`.
+    this.compilerVersion = undefined;
   }
 
   public setGraphQLSchema(schema: GraphQLSchema): void {
@@ -228,6 +244,14 @@ export class CompilerApi {
 
   public createNativeInstance(): NativeInstance {
     return new NativeInstance();
+  }
+
+  /**
+   * Members (measures, dimensions, segments) this app's last successful compile
+   * produced, across every cube and view. Zero until it first compiles.
+   */
+  public get compiledMemberCount(): number {
+    return this.memberCount;
   }
 
   public async getCompilers(options: { requestId?: string } = {}): Promise<Compiler> {
@@ -272,8 +296,21 @@ export class CompilerApi {
     });
   }
 
+  /** Members across every cube and view, views included: that is where a wide model's usually are. */
+  private static countMembers(compilers: Compiler): number {
+    return compilers.cubeEvaluator.cubeList.reduce((total, cube) => total
+      + Object.keys(cube.measures || {}).length
+      + Object.keys(cube.dimensions || {}).length
+      + Object.keys(cube.segments || {}).length, 0);
+  }
+
   public async compileSchema(compilerVersion: string, requestId?: string): Promise<Compiler> {
     const startCompilingTime = new Date().getTime();
+
+    // A recompile replaces `compilers` with the new promise, so the previous
+    // model is no longer held here -- and counting it would let the budget walk
+    // evict this entry while the compile it would throw away is still running.
+    this.memberCount = 0;
 
     try {
       this.logger(this.compilers ? 'Recompiling schema' : 'Compiling schema', {
@@ -293,6 +330,13 @@ export class CompilerApi {
         compiledYamlCache: this.compiledYamlCache,
       });
       this.queryFactory = await this.createQueryFactory(compilers);
+      this.queryFactories.set(compilers, this.queryFactory);
+      // A compile that a newer version superseded, or that finished on an
+      // evicted instance, no longer describes what this entry holds.
+      if (this.compilerVersion === compilerVersion) {
+        this.memberCount = CompilerApi.countMembers(compilers);
+        this.options.onCompiled?.();
+      }
 
       this.logger('Compiling schema completed', {
         version: compilerVersion,
@@ -1005,7 +1049,7 @@ export class CompilerApi {
         allowUngroupedWithoutPrimaryKey: this.allowUngroupedWithoutPrimaryKey,
         convertTzForRawTimeDimension: this.convertTzForRawTimeDimension,
         localRefreshKey: this.localRefreshKey,
-        queryFactory: this.queryFactory,
+        queryFactory: this.queryFactories.get(compilers) ?? this.queryFactory,
       }
     );
   }

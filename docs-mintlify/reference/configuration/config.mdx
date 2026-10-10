@@ -247,6 +247,35 @@ environment variable, and takes precedence over it. Note that the environment
 variable also sizes the SQL API's compiler cache, which this option does not
 affect.
 
+### `max_compiled_members`
+
+Maximum number of compiled members — measures, dimensions and segments across
+every cube and view — to keep in the compiler cache. Least recently used data
+models are dropped until the total fits; the model that was just compiled is
+never dropped.
+Bounds the same cache as [`compiler_cache_size`](#compiler_cache_size) by size
+rather than by count, and whichever limit is reached first evicts. Unset by
+default, leaving only the count bound.
+
+<CodeGroup>
+
+```python title="Python"
+from cube import config
+
+config.max_compiled_members = 20000
+```
+
+```javascript title="JavaScript"
+module.exports = {
+  maxCompiledMembers: 20000
+}
+```
+
+</CodeGroup>
+
+This configuration option can also be set using the [`CUBEJS_MAX_COMPILED_MEMBERS`](/reference/configuration/environment-variables#cubejs_max_compiled_members)
+environment variable, and takes precedence over it.
+
 ### `max_compiler_cache_keep_alive`
 
 Maximum length of time in ms to keep compiled data models in memory. Default
