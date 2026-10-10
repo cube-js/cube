@@ -544,6 +544,13 @@ impl RocksCacheStore {
             .await
     }
 
+    async fn queue_result_exists(&self, id: u64) -> Result<bool, CubeError> {
+        self.read_operation_queue("queue_result_exists", move |db_ref| {
+            Ok(QueueResultRocksTable::new(db_ref).get_row(id)?.is_some())
+        })
+        .await
+    }
+
     /// This method should be called when we are sure that we return data to the consumer
     async fn queue_result_ready_to_delete(
         &self,
@@ -1788,21 +1795,26 @@ impl CacheStore for RocksCacheStore {
 
         // It's important to open listener at the beginning to protect race condition
         // it will fix the position (subscribe) of a broadcast channel
-        let listener = self.get_listener().await;
+        let mut listener = self.get_listener().await;
 
         let store_in_result = self.lookup_queue_result_by_key(key.clone(), None).await?;
         if store_in_result.is_some() {
             return Ok(store_in_result);
         }
 
-        let fut = tokio::time::timeout(
-            Duration::from_millis(timeout),
-            listener.wait_for_queue_ack_by_id(id),
-        );
+        let wait = async {
+            loop {
+                let Some(ack_event) = listener.wait_for_queue_ack_by_id(id).await? else {
+                    // After a lag the receiver resumes from the oldest retained event, so an ack
+                    // that is not in the store yet is still ahead of us on the channel
+                    // Every lagged waiter gets here at once, so look before taking the write path
+                    if self.queue_result_exists(id).await? {
+                        return self.queue_result_ready_to_delete(id).await;
+                    }
+                    continue;
+                };
 
-        if let Ok(res) = fut.await {
-            match res {
-                Ok(Some(ack_event)) => match ack_event.result {
+                return match ack_event.result {
                     QueueResultAckEventResult::Empty => Ok(Some(QueueResultResponse::Success {
                         value: None,
                         id: ack_event.id,
@@ -1811,12 +1823,13 @@ impl CacheStore for RocksCacheStore {
                     QueueResultAckEventResult::WithResult => {
                         self.queue_result_ready_to_delete(ack_event.id).await
                     }
-                },
-                Ok(None) => Ok(None),
-                Err(e) => Err(e),
+                };
             }
-        } else {
-            Ok(None)
+        };
+
+        match tokio::time::timeout(Duration::from_millis(timeout), wait).await {
+            Ok(res) => res,
+            Err(_) => Ok(None),
         }
     }
 
@@ -3201,6 +3214,75 @@ mod tests {
         assert!(err.message.contains("was removed"), "{}", err.message);
 
         RocksCacheStore::cleanup_test_cachestore("test_queue_result_blocking_by_path_removed");
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_queue_result_blocking_lagged_before_ack() -> Result<(), CubeError> {
+        init_test_logger().await;
+
+        let (_, cachestore) = RocksCacheStore::prepare_test_cachestore(
+            "test_queue_result_blocking_lagged_before_ack",
+            Config::test("test_queue_result_blocking_lagged_before_ack"),
+        );
+        // Capacity of 1 lets the test overflow the channel with a couple of events
+        let (sender, _receiver) = tokio::sync::broadcast::channel(1);
+        cachestore.add_listener(sender.clone()).await;
+
+        let id = cachestore
+            .queue_add(queue_add_payload("prefix:path1"))
+            .await?
+            .id;
+
+        let overflow_channel = || {
+            for _ in 0..2 {
+                sender
+                    .send(MetaStoreEvent::AckQueueItem(QueueResultAckEvent {
+                        id: id + 1000,
+                        result: QueueResultAckEventResult::Empty,
+                    }))
+                    .unwrap();
+            }
+        };
+
+        let waiter = {
+            let cachestore = cachestore.clone();
+            tokio::spawn(async move {
+                cachestore
+                    .queue_result_blocking(QueueKey::ById(id), 5000)
+                    .await
+            })
+        };
+
+        tokio::time::sleep(std::time::Duration::from_millis(200)).await;
+        // Lag while the query is still running: nothing in the store yet, so keep waiting
+        overflow_channel();
+
+        tokio::time::sleep(std::time::Duration::from_millis(200)).await;
+        assert!(!waiter.is_finished(), "waiter gave up before the timeout");
+
+        // queue_ack sends its event and returns without yielding, so on the current_thread
+        // runtime the overflow drops the ack before the waiter is polled. The result can
+        // only be found in the store.
+        cachestore
+            .queue_ack(QueueKey::ById(id), Some("result".to_string()))
+            .await?;
+        overflow_channel();
+
+        assert_eq!(
+            queue_result_value(waiter.await.unwrap()?),
+            Some("result".to_string())
+        );
+        // Consumed by the waiter, even though it never saw the ack
+        assert_eq!(
+            cachestore
+                .queue_result(QueueKey::ByPath("prefix:path1".to_string()), None)
+                .await?,
+            None
+        );
+
+        RocksCacheStore::cleanup_test_cachestore("test_queue_result_blocking_lagged_before_ack");
 
         Ok(())
     }
