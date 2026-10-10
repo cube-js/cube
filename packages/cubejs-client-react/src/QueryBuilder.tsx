@@ -660,9 +660,10 @@ export default class QueryBuilder extends React.Component<QueryBuilderProps, Que
 
     handleVizStateChange(finalState);
 
+    const dryRunFields = ['measures', 'dimensions', 'timeDimensions', 'segments', 'filters'];
     const shouldFetchDryRun = !equals(
-      pick(['measures', 'dimensions', 'timeDimensions'], stateQuery),
-      pick(['measures', 'dimensions', 'timeDimensions'], finalState.query)
+      pick(dryRunFields, stateQuery),
+      pick(dryRunFields, finalState.query)
     );
 
     if (shouldFetchDryRun && isQueryPresent(finalState.query) && finalState.missingMembers.length === 0) {
