@@ -273,6 +273,12 @@ should be unique for each separate request. `spanId` should define user
 interaction span such us `Continue wait` retry cycle and it's value shouldn't
 change during one single interaction.
 
+A request id must be 1 to 128 characters long and may contain only letters, digits,
+and the characters `+ / = . _ : @ ~ -`. A request with an `x-request-id` (or, if it is
+not set, `traceparent`) header that doesn't meet this rule is rejected with a `400`
+error. If the header is repeated, the first value is used. The same rule applies to the
+`requestId` field of WebSocket messages.
+
 ## Cache control
 
 [`/v1/load`][ref-ref-load] and [`/v1/cubesql`][ref-ref-cubesql] endpoints of the REST (JSON) API
