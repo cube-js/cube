@@ -291,6 +291,11 @@ export class CompilerApi {
   public async compileSchema(compilerVersion: string, requestId?: string): Promise<Compiler> {
     const startCompilingTime = new Date().getTime();
 
+    // A recompile replaces `compilers` with the new promise, so the previous
+    // model is no longer held here -- and counting it would let the budget walk
+    // evict this entry while the compile it would throw away is still running.
+    this.compiledMemberCount = 0;
+
     try {
       this.logger(this.compilers ? 'Recompiling schema' : 'Compiling schema', {
         version: compilerVersion,

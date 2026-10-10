@@ -5,6 +5,12 @@ import { DbTypeInternalFn } from '../../src/core/types';
 
 const dbType: DbTypeInternalFn = async () => 'postgres';
 
+/**
+ * What `includes: "*"` copies onto the view: orders' 3 measures, its 3
+ * dimensions and its segment. Pinned so a change in view expansion is visible.
+ */
+const VIEW_MEMBERS = 7;
+
 const repository = (files: FileContent[]): SchemaFileRepository => ({
   localPath: () => __dirname,
   dataSchemaFiles: () => Promise.resolve(files.map((f) => ({ ...f }))),
@@ -28,6 +34,15 @@ ${Array.from({ length: members - 1 }, (_, i) => `    d${i}: { sql: 'd${i}', type
     s0: { sql: \`\${CUBE}.id > 0\` },
   },
 });
+`;
+
+/** A view holds its own copy of the members it includes, on its own cubeList entry. */
+const ordersView = `
+views:
+  - name: orders_view
+    cubes:
+      - join_path: orders
+        includes: "*"
 `;
 
 const compilerApiFor = (files: FileContent[]) => new CompilerApi(
@@ -78,6 +93,36 @@ describe('compiled member counting', () => {
 
     // orders: 3 measures + 3 dimensions + 1 segment, users: 2 + 2 + 1
     expect(api.compiledMemberCount).toBe(12);
+  });
+
+  test("counts a view's members, which is where a wide model's usually are", async () => {
+    const cubes = [{ fileName: 'orders.js', content: cubeOf('orders', 3) }];
+
+    const withoutView = compilerApiFor(cubes);
+    await withoutView.getCompilers();
+
+    const withView = compilerApiFor([...cubes, { fileName: 'orders_view.yml', content: ordersView }]);
+    await withView.getCompilers();
+
+    // Views are counted only because applyIncludeMembers writes the included
+    // members onto the view's own definition. If that ever stops, a view-heavy
+    // model would read as near-empty and the budget would stop bounding it.
+    expect(withView.compiledMemberCount - withoutView.compiledMemberCount).toBe(VIEW_MEMBERS);
+  });
+
+  test('reports zero while a recompile is in flight', async () => {
+    const api = compilerApiFor([{ fileName: 'orders.js', content: cubeOf('orders', 3) }]);
+    await api.getCompilers();
+    expect(api.compiledMemberCount).toBe(7);
+
+    const recompiling = api.compileSchema('v2');
+
+    // Still carrying the old count here would let the budget walk evict the
+    // entry and throw away the compile that is running.
+    expect(api.compiledMemberCount).toBe(0);
+
+    await recompiling;
+    expect(api.compiledMemberCount).toBe(7);
   });
 
   test('is zero before anything has compiled', () => {
