@@ -24,6 +24,7 @@ import {
   isSimilarPackageRelease, parseNpmLock,
   parseYarnLock, ProjectLock,
 } from './utils';
+import { toggleInspector } from './inspector-signal';
 import { CreateOptions, CubejsServer } from '../server';
 
 function safetyParseSemver(version: string | null) {
@@ -479,6 +480,8 @@ export class ServerContainer {
 
         instance = await makeInstance(true);
       });
+
+      process.addListener('SIGUSR2', () => toggleInspector());
     }
   }
 }
