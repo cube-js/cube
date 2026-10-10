@@ -38,6 +38,7 @@ use crate::metastore::table::{Table, TablePath};
 use crate::metastore::{
     AggregateFunction, Chunk, Column, IdRow, Index, IndexType, MetaStore, Partition, Schema,
 };
+use crate::queryplanner::disjoint_union_aggregate::push_aggregate_into_disjoint_union;
 use crate::queryplanner::metadata_cache::NoopParquetMetadataCache;
 use crate::queryplanner::optimizations::rewrite_plan::{rewrite_plan, PlanRewriter};
 use crate::queryplanner::panic::PanicWorkerSerialized;
@@ -87,6 +88,7 @@ pub async fn choose_index(
 ) -> Result<(LogicalPlan, PlanningMeta), DataFusionError> {
     choose_index_ext(
         p, metastore, /* enable_topk */ true, /* limit_pushdown */ true,
+        /* disjoint_union_min_rows */ None,
     )
     .await
 }
@@ -127,6 +129,8 @@ pub async fn choose_index_ext(
     metastore: &dyn PlanIndexStore,
     enable_topk: bool,
     limit_pushdown: bool,
+    // Rows per branch below which the disjoint `UNION ALL` rewrite backs off; `None` disables it.
+    disjoint_union_min_rows: Option<u64>,
 ) -> Result<(LogicalPlan, PlanningMeta), DataFusionError> {
     // Prepare information to choose the index.
     let mut collector = CollectConstraints::default();
@@ -206,6 +210,12 @@ pub async fn choose_index_ext(
     {
         i.partitions = pick_partitions(i, c, ps)?;
     }
+
+    let p = if let Some(min_rows) = disjoint_union_min_rows {
+        push_aggregate_into_disjoint_union(p, &indices, limit_pushdown, min_rows)?
+    } else {
+        p
+    };
 
     // Precompute, per index scan, the dedup-safe pushable predicate so the worker can
     // trim in-memory chunks before IPC without re-deriving it from the plan. Encoding
@@ -790,7 +800,10 @@ fn sort_to_column_names(
 
 /// Column names of the group-by keys, or `None` if any key is not a plain column (then we can't
 /// relate the grouping to the index sort key).
-fn group_expr_to_column_names(group_expr: &Vec<Expr>, input: &LogicalPlan) -> Option<Vec<String>> {
+pub(crate) fn group_expr_to_column_names(
+    group_expr: &Vec<Expr>,
+    input: &LogicalPlan,
+) -> Option<Vec<String>> {
     let mut names = Vec::with_capacity(group_expr.len());
     for expr in group_expr {
         match expr {
@@ -854,7 +867,7 @@ struct ChooseIndex<'a> {
 }
 
 #[derive(Debug, Default, Clone)]
-struct ChooseIndexContext {
+pub(crate) struct ChooseIndexContext {
     limit: Option<usize>,
     sort: Option<Vec<String>>,
     sort_is_asc: bool,
@@ -925,31 +938,9 @@ impl ChooseIndexContext {
         }
     }
 
-    /// The context for a relation the enclosing query's `LIMIT` does not count the rows of. Nothing
-    /// describing that query's output survives, [single_value_filtered_cols] included: a predicate
-    /// above the boundary does not constrain the relation below it, and that set drops columns from
-    /// both sides of the index-prefix check.
-    fn for_unrelated_relation() -> Self {
-        Self::default()
-    }
-    fn mark_filter_above(&self) -> Self {
-        Self {
-            filter_above: true,
-            ..self.clone()
-        }
-    }
-    fn mark_unusable_sort(&self) -> Self {
-        Self {
-            unusable_sort: true,
-            ..self.clone()
-        }
-    }
-}
-
-impl PlanRewriter for ChooseIndex<'_> {
-    type Context = ChooseIndexContext;
-
-    fn enter_node(&mut self, n: &LogicalPlan, context: &Self::Context) -> Option<Self::Context> {
+    /// The context for the subtree under `n`; `None` keeps the current one.
+    pub(crate) fn enter(&self, n: &LogicalPlan) -> Option<Self> {
+        let context = self;
         // TODO upgrade DF: This might be broken, or very sensitive to planning behavior.  For
         // example we handle skips, but don't remove limit when we see a Filter.  It might have been
         // so before the DF upgrade too.
@@ -1066,6 +1057,51 @@ impl PlanRewriter for ChooseIndex<'_> {
             // context produced here.
             _ => Some(ChooseIndexContext::for_unrelated_relation()),
         }
+    }
+
+    /// Whether the aggregate this context was entered for will get its `LIMIT` pushed to the
+    /// workers, by the index order or by the bounded worker sort. Both need the ORDER BY, if any,
+    /// to name only group columns and no `HAVING` between the aggregate and the limit.
+    pub(crate) fn group_limit_reaches_workers(&self) -> bool {
+        let Some(group_by) = self.group_by.as_ref().filter(|g| !g.is_empty()) else {
+            return false;
+        };
+        self.limit.is_some()
+            && !self.group_by_has_having
+            && !self.unusable_sort
+            && self
+                .sort
+                .iter()
+                .flatten()
+                .all(|name| group_by.contains(name))
+    }
+
+    /// The context for a relation the enclosing query's `LIMIT` does not count the rows of. Nothing
+    /// describing that query's output survives, [single_value_filtered_cols] included: a predicate
+    /// above the boundary does not constrain the relation below it, and that set drops columns from
+    /// both sides of the index-prefix check.
+    fn for_unrelated_relation() -> Self {
+        Self::default()
+    }
+    fn mark_filter_above(&self) -> Self {
+        Self {
+            filter_above: true,
+            ..self.clone()
+        }
+    }
+    fn mark_unusable_sort(&self) -> Self {
+        Self {
+            unusable_sort: true,
+            ..self.clone()
+        }
+    }
+}
+
+impl PlanRewriter for ChooseIndex<'_> {
+    type Context = ChooseIndexContext;
+
+    fn enter_node(&mut self, n: &LogicalPlan, context: &Self::Context) -> Option<Self::Context> {
+        context.enter(n)
     }
 
     fn rewrite(
@@ -3087,10 +3123,16 @@ pub mod tests {
         limit_pushdown: bool,
     ) -> Vec<String> {
         let plan = initial_plan(sql, indices);
-        let plan = choose_index_ext(plan, indices, /* enable_topk */ true, limit_pushdown)
-            .await
-            .unwrap()
-            .0;
+        let plan = choose_index_ext(
+            plan,
+            indices,
+            /* enable_topk */ true,
+            limit_pushdown,
+            None,
+        )
+        .await
+        .unwrap()
+        .0;
         let mut opts = PPOptions::none();
         opts.show_limit_pushdown = true;
         pretty_printers::pp_plan_ext(&plan, &opts)
