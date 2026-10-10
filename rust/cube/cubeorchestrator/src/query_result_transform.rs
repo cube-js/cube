@@ -709,7 +709,7 @@ fn compute_vanilla_granularity_track<'a>(
 }
 
 /// Source for one output column when materializing the [`TransformedData::Columnar`] result.
-pub(crate) enum ColumnarColumnSource {
+pub enum ColumnarColumnSource {
     /// Pull `db_row[index]` from every input row and run [`transform_value`].
     DbColumn { index: usize },
     /// Constant value replicated across every output row (e.g. the synthetic
@@ -720,9 +720,40 @@ pub(crate) enum ColumnarColumnSource {
     NullFilled,
 }
 
-pub(crate) struct ColumnarColumnPlan<'a> {
-    member_type: &'a str,
-    source: ColumnarColumnSource,
+pub struct ColumnarColumnPlan<'a> {
+    pub member_type: &'a str,
+    pub source: ColumnarColumnSource,
+}
+
+/// Resolves the output members of a [`TransformedData::Columnar`] result and
+/// where each column comes from, without materializing any cell. Lets callers
+/// that only read the columns (the SQL API scan) borrow `cube_store_result`
+/// instead of copying it via [`TransformedData::transform`].
+pub fn columnar_plan<'a>(
+    request_data: &'a TransformDataRequest,
+    cube_store_result: &QueryResult,
+) -> Result<(Vec<String>, Vec<ColumnarColumnPlan<'a>>)> {
+    let query = &request_data.query;
+    let query_type = request_data.query_type.clone().unwrap_or_default();
+
+    let (members_to_alias_map, members) = get_members(
+        &query_type,
+        query,
+        cube_store_result,
+        &request_data.alias_to_member_name_map,
+        &request_data.annotation,
+    )?;
+
+    let plan = build_columnar_plan(
+        &members,
+        &members_to_alias_map,
+        &request_data.annotation,
+        &cube_store_result.columns_pos,
+        &query_type,
+        query.time_dimensions.as_ref(),
+    )?;
+
+    Ok((members, plan))
 }
 
 fn build_columnar_plan<'a>(
@@ -1012,6 +1043,12 @@ impl TransformedData {
         let query_type = &request_data.query_type.clone().unwrap_or_default();
         let res_type = request_data.res_type.clone();
 
+        if let Some(ResultType::Columnar) = res_type {
+            let (members, plan) = columnar_plan(request_data, cube_store_result)?;
+            let columns = build_columnar_columns(&plan, cube_store_result);
+            return Ok(TransformedData::Columnar { members, columns });
+        }
+
         let (members_to_alias_map, members) = get_members(
             query_type,
             query,
@@ -1035,18 +1072,6 @@ impl TransformedData {
                     .map(|row_idx| get_compact_row(&plan, row_idx))
                     .collect();
                 Ok(TransformedData::Compact { members, dataset })
-            }
-            Some(ResultType::Columnar) => {
-                let plan = build_columnar_plan(
-                    &members,
-                    &members_to_alias_map,
-                    annotation,
-                    &cube_store_result.columns_pos,
-                    query_type,
-                    query.time_dimensions.as_ref(),
-                )?;
-                let columns = build_columnar_columns(&plan, cube_store_result);
-                Ok(TransformedData::Columnar { members, columns })
             }
             _ => {
                 let plan = build_vanilla_plan(
@@ -3546,6 +3571,56 @@ mod tests {
                 );
             }
         }
+        Ok(())
+    }
+
+    /// `columnar_plan` lets callers read cells in place (the SQL API's
+    /// `ResultWrapper`) instead of materializing them. Reading the plan that
+    /// way must yield exactly the `TransformedData::Columnar` columns.
+    fn assert_columnar_plan_matches_transform(fixture: &str) -> Result<()> {
+        let mut test_data = TEST_SUITE_DATA.get(fixture).unwrap().clone();
+        test_data.request.res_type = Some(ResultType::Columnar);
+        let raw_data = QueryResult::from_js_raw_data(test_data.query_result.clone())?;
+
+        let TransformedData::Columnar { members, columns } =
+            TransformedData::transform(&test_data.request, &raw_data)?
+        else {
+            panic!("expected Columnar");
+        };
+
+        let (plan_members, plan) = columnar_plan(&test_data.request, &raw_data)?;
+        assert_eq!(members, plan_members);
+
+        for (entry, expected) in plan.iter().zip(&columns) {
+            let actual: Vec<DBResponsePrimitive> = match &entry.source {
+                ColumnarColumnSource::DbColumn { index } => raw_data
+                    .column(*index)?
+                    .iter()
+                    .map(|cell| transform_value(cell.clone(), entry.member_type))
+                    .collect(),
+                ColumnarColumnSource::Constant(value) => vec![value.clone(); raw_data.row_count()],
+                ColumnarColumnSource::NullFilled => {
+                    vec![DBResponsePrimitive::Null; raw_data.row_count()]
+                }
+            };
+            assert_eq!(actual.as_slice(), expected.as_slice());
+        }
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_columnar_plan_matches_transform() -> Result<()> {
+        for fixture in [
+            "regular_discount_by_city",
+            "regular_profit_by_postal_code",
+            "compare_date_range_count_by_order_date",
+            "blending_query_avg_discount_by_date_range_for_the_first_and_standard_ship_mode",
+            "blending_query_multiple_granularities",
+        ] {
+            assert_columnar_plan_matches_transform(fixture)?;
+        }
+
         Ok(())
     }
 
