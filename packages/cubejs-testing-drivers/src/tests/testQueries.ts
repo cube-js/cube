@@ -2827,6 +2827,55 @@ from
       expect(res.rows).toMatchSnapshot('ungrouped_pre_agg');
     });
 
+    if (type === 'mssql') {
+      executePg('SQL API: MSSQL space-trimmed NULL and blank filters', async (connection) => {
+        // Existing synthetic customer keys keep this fixture independent of tables
+        // outside the provider suite. Select keys rather than boolean projections.
+        const source = `(
+          SELECT "customerId" AS id,
+            CASE "customerId"
+              WHEN 'AH-10465' THEN NULL
+              WHEN 'AJ-10780' THEN ''
+              WHEN 'AS-10225' THEN '   '
+              WHEN 'AW-10840' THEN '  a@example.test  '
+              ELSE 'b@example.test'
+            END AS email
+          FROM Customers
+          WHERE "customerId" IN ('AH-10465', 'AJ-10780', 'AS-10225', 'AW-10840', 'BB-11545')
+        ) AS contacts`;
+        const keys = async (predicate: string) => {
+          const result = await connection.query(`SELECT id FROM ${source} WHERE ${predicate} LIMIT 10`);
+          return result.rows.map((row) => row.id).sort();
+        };
+        const blank = ['AH-10465', 'AJ-10780', 'AS-10225'];
+        expect(await keys('email IS NULL')).toEqual(['AH-10465']);
+        expect(await keys("TRIM(email) = ''")).toEqual(['AJ-10780', 'AS-10225']);
+        expect(await keys("NULLIF(TRIM(email), '') IS NULL")).toEqual(blank);
+        expect(await keys("email IS NULL OR TRIM(email) = ''")).toEqual(blank);
+        expect(await keys("TRIM(email) = 'a@example.test'")).toEqual(['AW-10840']);
+        const limited = await connection.query(`SELECT id FROM ${source} WHERE NULLIF(TRIM(email), '') IS NULL LIMIT 1`);
+        expect(limited.rows).toHaveLength(1);
+        expect(blank).toContain(limited.rows[0].id);
+        const result = await connection.query(`SELECT id, email, TRIM(email) AS trimmed FROM ${source} LIMIT 10`);
+        expect(result.rows.sort((a, b) => a.id.localeCompare(b.id))).toEqual([
+          { id: 'AH-10465', email: null, trimmed: null },
+          { id: 'AJ-10780', email: '', trimmed: '' },
+          { id: 'AS-10225', email: '   ', trimmed: '' },
+          { id: 'AW-10840', email: '  a@example.test  ', trimmed: 'a@example.test' },
+          { id: 'BB-11545', email: 'b@example.test', trimmed: 'b@example.test' },
+        ]);
+        const whitespace = await connection.query(`
+          SELECT "customerId" AS id,
+            TRIM(CASE "customerId" WHEN 'AH-10465' THEN ' \t ' ELSE ' \u00a0 ' END) AS trimmed
+          FROM Customers WHERE "customerId" IN ('AH-10465', 'AJ-10780') LIMIT 10
+        `);
+        expect(whitespace.rows.sort((a, b) => a.id.localeCompare(b.id))).toEqual([
+          { id: 'AH-10465', trimmed: '\t' },
+          { id: 'AJ-10780', trimmed: '\u00a0' },
+        ]);
+      });
+    }
+
     executePg('SQL API: post-aggregate percentage of total', async (connection) => {
       const res = await connection.query(`
     select
