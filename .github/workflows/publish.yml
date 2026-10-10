@@ -489,36 +489,116 @@ jobs:
           build-args: |
             IMAGE_VERSION=${{ steps.prep.outputs.version }}
 
+  docker-cubestore-prepare:
+    name: Cube Store Docker (prepare)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    outputs:
+      version: ${{ steps.prep.outputs.version }}
+      created: ${{ steps.prep.outputs.created }}
+    steps:
+      - name: Prepare
+        id: prep
+        run: |
+          VERSION=noop
+
+          if [ "${{ github.event_name }}" = "schedule" ]; then
+            VERSION=nightly
+          elif [[ $GITHUB_REF == refs/tags/* ]]; then
+            VERSION=${GITHUB_REF#refs/tags/}
+          fi
+
+          {
+            echo "version=${VERSION}"
+            echo "created=$(date -u +'%Y-%m-%dT%H:%M:%SZ')"
+          } >> "$GITHUB_OUTPUT"
+
   docker-cubestore:
     name: Cube Store Docker
     runs-on: ${{ matrix.os }}
-    needs: [detect_branch]
+    needs: [docker-cubestore-prepare]
     strategy:
       fail-fast: false
       matrix:
+        # Pushed by digest and merged into one multi-arch manifest by
+        # docker-cubestore-manifest.
         include:
           - os: ubuntu-24.04
-            target: x86_64-unknown-linux-gnu
+            arch: amd64
             platforms: linux/amd64
             build-args: WITH_AVX2=1
-            postfix: ""
-            tag: "latest"
           - os: ubuntu-24.04-arm
-            target: aarch64-unknown-linux-gnu
+            arch: arm64
             platforms: linux/arm64
             build-args: WITH_AVX2=0
-            postfix: "-arm64v8"
-            tag: "arm64v8"
-          # Non AVX build
+    timeout-minutes: 60
+    steps:
+      - name: Check out the repo
+        uses: actions/checkout@v7
+      - name: Repo metadata
+        id: repo
+        uses: actions/github-script@v9
+        with:
+          script: |
+            const { data } = await github.rest.repos.get(context.repo)
+            const reg = new RegExp('📊 ', 'ug');
+            data.description = data.description.replace(reg, "")
+            return data
+      - name: Login to DockerHub
+        uses: docker/login-action@v4
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4
+      - name: Push to Docker Hub
+        id: build
+        uses: docker/build-push-action@v7
+        with:
+          context: ./rust/
+          file: ./rust/cubestore/Dockerfile
+          platforms: ${{ matrix.platforms }}
+          build-args: ${{ matrix.build-args }}
+          outputs: type=image,name=cubejs/cubestore,push-by-digest=true,name-canonical=true,push=true
+          cache-from: type=gha,scope=cubestore-${{ matrix.arch }}
+          cache-to: type=gha,mode=max,scope=cubestore-${{ matrix.arch }}
+          labels: |
+            org.opencontainers.image.title=${{ fromJson(steps.repo.outputs.result).name }}
+            org.opencontainers.image.description=${{ fromJson(steps.repo.outputs.result).description }}
+            org.opencontainers.image.url=${{ fromJson(steps.repo.outputs.result).html_url }}
+            org.opencontainers.image.source=${{ fromJson(steps.repo.outputs.result).clone_url }}
+            org.opencontainers.image.version=${{ needs.docker-cubestore-prepare.outputs.version }}
+            org.opencontainers.image.created=${{ needs.docker-cubestore-prepare.outputs.created }}
+            org.opencontainers.image.revision=${{ github.sha }}
+            org.opencontainers.image.licenses=${{ fromJson(steps.repo.outputs.result).license.spdx_id }}
+      - name: Export digest
+        env:
+          DIGEST: ${{ steps.build.outputs.digest }}
+        run: |
+          mkdir -p "${{ runner.temp }}/digests"
+          touch "${{ runner.temp }}/digests/${DIGEST#sha256:}"
+      - name: Upload digest
+        uses: actions/upload-artifact@v7
+        with:
+          name: cubestore-digests-${{ matrix.arch }}
+          path: ${{ runner.temp }}/digests/*
+          if-no-files-found: error
+          retention-days: 1
+
+  docker-cubestore-non-avx:
+    name: Cube Store Docker (non-AVX)
+    runs-on: ${{ matrix.os }}
+    needs: [docker-cubestore-prepare, detect_branch]
+    strategy:
+      matrix:
+        include:
           - os: ubuntu-24.04
-            target: x86_64-unknown-linux-gnu
+            arch: amd64-non-avx
             platforms: linux/amd64
             build-args: WITH_AVX2=0
             postfix: "-non-avx"
             tag: "non-avx"
     timeout-minutes: 60
-    permissions:
-      contents: write
     steps:
       - name: Check out the repo
         uses: actions/checkout@v7
@@ -533,17 +613,9 @@ jobs:
             return data
       - name: Prepare
         id: prep
-        env:
-          GITHUB_SHA: ${{ github.sha }}
         run: |
           DOCKER_IMAGE=cubejs/cubestore
-          VERSION=noop
-
-          if [ "${{ github.event_name }}" = "schedule" ]; then
-            VERSION=nightly
-          elif [[ $GITHUB_REF == refs/tags/* ]]; then
-            VERSION=${GITHUB_REF#refs/tags/}
-          fi
+          VERSION="${{ needs.docker-cubestore-prepare.outputs.version }}"
 
           TAGS="${DOCKER_IMAGE}:${VERSION}${{ matrix.postfix }}"
 
@@ -557,11 +629,7 @@ jobs:
             TAGS="$TAGS,${DOCKER_IMAGE}:${{ matrix.tag }}"
           fi
 
-          {
-            echo "version=${VERSION}"
-            echo "tags=${TAGS}"
-            echo "created=$(date -u +'%Y-%m-%dT%H:%M:%SZ')"
-          } >> "$GITHUB_OUTPUT"
+          echo "tags=${TAGS}" >> "$GITHUB_OUTPUT"
       - name: Login to DockerHub
         uses: docker/login-action@v4
         with:
@@ -578,18 +646,82 @@ jobs:
           build-args: ${{ matrix.build-args }}
           push: true
           tags: ${{ steps.prep.outputs.tags }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          cache-from: type=gha,scope=cubestore-${{ matrix.arch }}
+          cache-to: type=gha,mode=max,scope=cubestore-${{ matrix.arch }}
           labels: |
             org.opencontainers.image.title=${{ fromJson(steps.repo.outputs.result).name }}
             org.opencontainers.image.description=${{ fromJson(steps.repo.outputs.result).description }}
             org.opencontainers.image.url=${{ fromJson(steps.repo.outputs.result).html_url }}
             org.opencontainers.image.source=${{ fromJson(steps.repo.outputs.result).clone_url }}
-            org.opencontainers.image.version=${{ steps.prep.outputs.version }}
-            org.opencontainers.image.created=${{ steps.prep.outputs.created }}
+            org.opencontainers.image.version=${{ needs.docker-cubestore-prepare.outputs.version }}
+            org.opencontainers.image.created=${{ needs.docker-cubestore-prepare.outputs.created }}
             org.opencontainers.image.revision=${{ github.sha }}
             org.opencontainers.image.licenses=${{ fromJson(steps.repo.outputs.result).license.spdx_id }}
+
+  docker-cubestore-manifest:
+    name: Cube Store Docker (multi-arch manifest)
+    runs-on: ubuntu-24.04
+    needs: [docker-cubestore-prepare, docker-cubestore, detect_branch]
+    timeout-minutes: 15
+    strategy:
+      matrix:
+        # -arm64v8 tags used to be a separate arm64-only image, keep publishing
+        # them as aliases of the same multi-arch manifest.
+        include:
+          - postfix: ""
+            tag: "latest"
+          - postfix: "-arm64v8"
+            tag: "arm64v8"
+    steps:
+      - name: Check out the repo
+        uses: actions/checkout@v7
+      - name: Download digests
+        uses: actions/download-artifact@v8
+        with:
+          path: ${{ runner.temp }}/digests
+          pattern: cubestore-digests-*
+          merge-multiple: true
+      - name: Prepare
+        id: prep
+        run: |
+          DOCKER_IMAGE=cubejs/cubestore
+          VERSION="${{ needs.docker-cubestore-prepare.outputs.version }}"
+
+          TAGS="${DOCKER_IMAGE}:${VERSION}${{ matrix.postfix }}"
+
+          if [[ $VERSION =~ ^v[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}$ ]]; then
+            MINOR=${VERSION%.*}
+            MAJOR=${MINOR%.*}
+            TAGS="$TAGS,${DOCKER_IMAGE}:${MINOR}${{ matrix.postfix }},${DOCKER_IMAGE}:${MAJOR}${{ matrix.postfix }}"
+          fi
+
+          if [ "${{ needs['detect_branch'].outputs.is_master }}" = "true" ]; then
+            TAGS="$TAGS,${DOCKER_IMAGE}:${{ matrix.tag }}"
+          fi
+
+          {
+            echo "image=${DOCKER_IMAGE}"
+            echo "tags=${TAGS}"
+          } >> "$GITHUB_OUTPUT"
+      - name: Login to DockerHub
+        uses: docker/login-action@v4
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4
+      - name: Create manifest list and push
+        working-directory: ${{ runner.temp }}/digests
+        env:
+          IMAGE: ${{ steps.prep.outputs.image }}
+          TAGS: ${{ steps.prep.outputs.tags }}
+        run: |
+          # shellcheck disable=SC2046,SC2086
+          docker buildx imagetools create $(printf -- '-t %s ' ${TAGS//,/ }) $(printf "${IMAGE}@sha256:%s " *)
+      - name: Inspect image
+        run: docker buildx imagetools inspect ${{ steps.prep.outputs.image }}:${{ needs.docker-cubestore-prepare.outputs.version }}${{ matrix.postfix }}
       - name: Update repo description
+        if: matrix.postfix == ''
         uses: peter-evans/dockerhub-description@v5
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
