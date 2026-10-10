@@ -174,6 +174,7 @@ pub fn sql_tests(prefix: &str) -> Vec<(&'static str, TestFn)> {
         ),
         t("topk_query", topk_query),
         t("topk_having", topk_having),
+        t("topk_conditional_aggregates", topk_conditional_aggregates),
         t("topk_decimals", topk_decimals),
         t("planning_topk_having", planning_topk_having),
         t("planning_topk_hll", planning_topk_hll),
@@ -4451,6 +4452,83 @@ async fn topk_having(service: Box<dyn SqlClient>) -> Result<(), CubeError> {
         )
         .await?;
     assert_eq!(to_rows(&r), rows(&[("b", 55), ("d", 43)]));
+    Ok(())
+}
+
+async fn topk_conditional_aggregates(service: Box<dyn SqlClient>) -> Result<(), CubeError> {
+    // Sums gated by a date window, with the bounds as literal casts: the simplifier folds them and
+    // aliases each aggregate to keep its name. Such aggregates must still plan as a top-k, and a
+    // group with no rows in a window must read NULL there.
+    service.exec_query("CREATE SCHEMA s").await?;
+    for table in ["Data1", "Data2"] {
+        service
+            .exec_query(&format!(
+                "CREATE TABLE s.{}(url text, hits int, t timestamp)",
+                table
+            ))
+            .await?;
+    }
+    service
+        .exec_query(
+            "INSERT INTO s.Data1(url, hits, t) VALUES \
+             ('a', 10, '2024-01-01T00:00:00.000Z'), ('a', 5, '2024-01-03T00:00:00.000Z'), \
+             ('b', 20, '2024-01-02T00:00:00.000Z'), ('c', 7, '2024-01-04T00:00:00.000Z'), \
+             ('d', 1, '2024-01-03T00:00:00.000Z')",
+        )
+        .await?;
+    service
+        .exec_query(
+            "INSERT INTO s.Data2(url, hits, t) VALUES \
+             ('a', 1, '2024-01-04T00:00:00.000Z'), ('b', 30, '2024-01-03T00:00:00.000Z'), \
+             ('c', 8, '2024-01-01T00:00:00.000Z'), ('e', 100, '2024-01-01T00:00:00.000Z')",
+        )
+        .await?;
+
+    let query = |order_by: &str, limit: usize| {
+        format!(
+            "SELECT `url` `url`, \
+                    SUM(CASE WHEN t >= CAST('2024-01-03T00:00:00.000' AS TIMESTAMP) \
+                              AND t <= CAST('2024-01-04T23:59:59.999' AS TIMESTAMP) THEN hits END) `late`, \
+                    SUM(CASE WHEN t >= CAST('2024-01-01T00:00:00.000' AS TIMESTAMP) \
+                              AND t <= CAST('2024-01-02T23:59:59.999' AS TIMESTAMP) THEN hits END) `early` \
+             FROM (SELECT * FROM s.Data1 UNION ALL SELECT * FROM s.Data2) AS `Data` \
+             GROUP BY 1 ORDER BY {} LIMIT {}",
+            order_by, limit
+        )
+    };
+
+    let explain = service
+        .exec_query(&format!("EXPLAIN {}", query("2 DESC NULLS LAST", 3)))
+        .await?;
+    let plan = format!("{:?}", to_rows(&explain));
+    assert!(
+        plan.contains("ClusterAggregateTopK"),
+        "expected a top-k plan:\n{}",
+        plan
+    );
+
+    let r = service.exec_query(&query("2 DESC NULLS LAST", 3)).await?;
+    assert_eq!(
+        to_rows(&r),
+        rows(&[
+            ("b", Some(30), Some(20)),
+            ("c", Some(7), Some(8)),
+            ("a", Some(6), Some(10))
+        ])
+    );
+
+    // DESC puts NULLs first: e has no rows in the late window.
+    let r = service.exec_query(&query("2 DESC", 2)).await?;
+    assert_eq!(
+        to_rows(&r),
+        rows(&[("e", None, Some(100)), ("b", Some(30), Some(20))])
+    );
+
+    let r = service.exec_query(&query("3 DESC NULLS LAST", 2)).await?;
+    assert_eq!(
+        to_rows(&r),
+        rows(&[("e", None, Some(100)), ("b", Some(30), Some(20))])
+    );
     Ok(())
 }
 
