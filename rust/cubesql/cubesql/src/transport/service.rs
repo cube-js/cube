@@ -944,6 +944,18 @@ impl SqlTemplates {
         )
     }
 
+    pub fn float_literal_expr(&self, value: String) -> Result<String, CubeError> {
+        if self.contains_template("expressions/float_literal") {
+            let is_int32 = value.parse::<i32>().is_ok();
+            self.render_template(
+                "expressions/float_literal",
+                context! { value => value, is_int32 => is_int32 },
+            )
+        } else {
+            Ok(value)
+        }
+    }
+
     pub fn in_list_expr(
         &self,
         expr: String,

@@ -3363,14 +3363,38 @@ impl WrappedSelectNode {
                 sql_query,
             ),
             ScalarValue::Float32(f) => (
-                f.map(|f| format!("{f}")).map_or_else(
+                f.map(|f| {
+                    sql_generator
+                        .get_sql_templates()
+                        .float_literal_expr(format!("{f}"))
+                        .map_err(|e| {
+                            DataFusionError::Internal(format!(
+                                "Can't generate SQL for literal float: {}",
+                                e
+                            ))
+                        })
+                })
+                .transpose()?
+                .map_or_else(
                     || Self::generate_null_for_literal(sql_generator, &literal),
                     Ok,
                 )?,
                 sql_query,
             ),
             ScalarValue::Float64(f) => (
-                f.map(|f| format!("{f}")).map_or_else(
+                f.map(|f| {
+                    sql_generator
+                        .get_sql_templates()
+                        .float_literal_expr(format!("{f}"))
+                        .map_err(|e| {
+                            DataFusionError::Internal(format!(
+                                "Can't generate SQL for literal float: {}",
+                                e
+                            ))
+                        })
+                })
+                .transpose()?
+                .map_or_else(
                     || Self::generate_null_for_literal(sql_generator, &literal),
                     Ok,
                 )?,
@@ -5035,6 +5059,96 @@ mod tests {
     };
     use datafusion::logical_plan::DFField;
     use std::collections::HashMap;
+
+    #[test]
+    fn test_mssql_integral_float_literal_rendering() {
+        use crate::compile::test::sql_generator;
+
+        for (literal, original, mssql) in [
+            (
+                ScalarValue::Float32(Some(100.0)),
+                "100",
+                "CAST(100 AS DECIMAL(10, 0))",
+            ),
+            (ScalarValue::Float32(Some(0.1)), "0.1", "0.1"),
+            (
+                ScalarValue::Float64(Some(100.0)),
+                "100",
+                "CAST(100 AS DECIMAL(10, 0))",
+            ),
+            (
+                ScalarValue::Float64(Some(-100.0)),
+                "-100",
+                "CAST(-100 AS DECIMAL(10, 0))",
+            ),
+            (
+                ScalarValue::Float64(Some(0.0)),
+                "0",
+                "CAST(0 AS DECIMAL(10, 0))",
+            ),
+            (
+                ScalarValue::Float64(Some(-0.0)),
+                "-0",
+                "CAST(-0 AS DECIMAL(10, 0))",
+            ),
+            (ScalarValue::Float64(Some(100.1)), "100.1", "100.1"),
+            (
+                ScalarValue::Float64(Some(2_147_483_647.0)),
+                "2147483647",
+                "CAST(2147483647 AS DECIMAL(10, 0))",
+            ),
+            (
+                ScalarValue::Float64(Some(-2_147_483_648.0)),
+                "-2147483648",
+                "CAST(-2147483648 AS DECIMAL(10, 0))",
+            ),
+            (
+                ScalarValue::Float64(Some(2_147_483_648.0)),
+                "2147483648",
+                "2147483648",
+            ),
+            (
+                ScalarValue::Float32(Some(2_147_483_648.0)),
+                "2147483600",
+                "CAST(2147483600 AS DECIMAL(10, 0))",
+            ),
+            (
+                ScalarValue::Float64(Some(1e37)),
+                "10000000000000000000000000000000000000",
+                "10000000000000000000000000000000000000",
+            ),
+            (
+                ScalarValue::Float32(None),
+                "CAST(NULL AS FLOAT)",
+                "CAST(NULL AS FLOAT)",
+            ),
+            (
+                ScalarValue::Float64(None),
+                "CAST(NULL AS DOUBLE)",
+                "CAST(NULL AS DOUBLE)",
+            ),
+            (ScalarValue::Int64(Some(100)), "100", "100"),
+        ] {
+            for (templates, expected) in [
+                (vec![], original),
+                (
+                    vec![(
+                        "expressions/float_literal".into(),
+                        "{% if is_int32 %}CAST({{ value }} AS DECIMAL(10, 0)){% else %}{{ value }}{% endif %}".into(),
+                    )],
+                    mssql,
+                ),
+            ] {
+                let (sql, _) = WrappedSelectNode::generate_sql_for_literal(
+                    SqlQuery::new(String::new(), vec![]),
+                    sql_generator(templates),
+                    literal.clone(),
+                )
+                .unwrap();
+                assert_eq!(sql, expected, "{literal:?}");
+            }
+        }
+    }
 
     /// Each entry is a cube with one dimension, on a data source of its own.
     fn meta_context_with_cubes(cubes: &[(&str, &str, &str)]) -> MetaContext {
