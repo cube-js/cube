@@ -110,19 +110,79 @@ describe('compiled member counting', () => {
     expect(withView.compiledMemberCount - withoutView.compiledMemberCount).toBe(VIEW_MEMBERS);
   });
 
+  /**
+   * Version `v1` serves 7 members and `v2` serves 5. The first read is served
+   * at once; later ones wait for `release`, so a test decides which compile
+   * finishes first (each compile reads the files exactly once).
+   */
+  const versionedApi = () => {
+    let version = 'v1';
+    let reads = 0;
+    let release: () => void = () => undefined;
+    const gate = new Promise<void>((resolve) => { release = resolve; });
+    const onCompiled = jest.fn();
+
+    const api = new CompilerApi(
+      {
+        localPath: () => __dirname,
+        dataSchemaFiles: async () => {
+          reads += 1;
+          if (reads > 1) {
+            await gate;
+          }
+          return [{ fileName: 'orders.js', content: cubeOf('orders', version === 'v1' ? 3 : 2) }];
+        },
+      },
+      dbType,
+      { logger: jest.fn(), onCompiled },
+    );
+    api.schemaVersion = () => version;
+
+    return {
+      api,
+      onCompiled,
+      release: () => release(),
+      setVersion: (v: string) => { version = v; },
+    };
+  };
+
   test('reports zero while a recompile is in flight', async () => {
-    const api = compilerApiFor([{ fileName: 'orders.js', content: cubeOf('orders', 3) }]);
+    const { api, release, setVersion } = versionedApi();
     await api.getCompilers();
     expect(api.compiledMemberCount).toBe(7);
 
-    const recompiling = api.compileSchema('v2');
+    setVersion('v2');
+    const recompiling = api.getCompilers();
+    // getCompilers() awaits schemaVersion() before it starts the compile.
+    await new Promise((resolve) => { setImmediate(resolve); });
 
     // Still carrying the old count here would let the budget walk evict the
     // entry and throw away the compile that is running.
     expect(api.compiledMemberCount).toBe(0);
 
+    release();
     await recompiling;
-    expect(api.compiledMemberCount).toBe(7);
+    expect(api.compiledMemberCount).toBe(5);
+  });
+
+  test('a superseded compile neither sets the count nor runs the budget', async () => {
+    const { api, onCompiled, release, setVersion } = versionedApi();
+    const first = api.getCompilers();
+    // Let the first compile pick up `v1` before the version moves on.
+    await new Promise((resolve) => { setImmediate(resolve); });
+
+    setVersion('v2');
+    const second = api.getCompilers();
+    await first;
+
+    // `v1` finished while `v2` is still compiling: it is not what the entry holds.
+    expect(api.compiledMemberCount).toBe(0);
+    expect(onCompiled).not.toHaveBeenCalled();
+
+    release();
+    await second;
+    expect(api.compiledMemberCount).toBe(5);
+    expect(onCompiled).toHaveBeenCalledTimes(1);
   });
 
   test('recompiles after eviction instead of handing back a disposed proxy', async () => {

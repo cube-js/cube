@@ -319,8 +319,12 @@ export class CompilerApi {
         compiledYamlCache: this.compiledYamlCache,
       });
       this.queryFactory = await this.createQueryFactory(compilers);
-      this.compiledMemberCount = CompilerApi.countMembers(compilers);
-      this.options.onCompiled?.();
+      // A compile that a newer version superseded, or that finished on an
+      // evicted instance, no longer describes what this entry holds.
+      if (this.compilerVersion === compilerVersion) {
+        this.compiledMemberCount = CompilerApi.countMembers(compilers);
+        this.options.onCompiled?.();
+      }
 
       this.logger('Compiling schema completed', {
         version: compilerVersion,
