@@ -3,6 +3,23 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.8.3](https://github.com/cube-js/cube/compare/v1.8.2...v1.8.3) (2026-10-10)
+
+### Bug Fixes
+
+- **bigquery-driver:** Align DOW numbering for SQL API, thanks [@tlangton3](https://github.com/tlangton3) ([#10678](https://github.com/cube-js/cube/issues/10678)) ([2f951c1](https://github.com/cube-js/cube/commit/2f951c188d44e84361c4f5664e3eb8b7ad47fd0f)), closes [#10644](https://github.com/cube-js/cube/issues/10644)
+
+### Features
+
+- **athena-driver:** Support readOnly mode with export bucket via UNLOAD ([#12196](https://github.com/cube-js/cube/issues/12196)) ([9a6f893](https://github.com/cube-js/cube/commit/9a6f893c60d3c32fd89c8be97d4ccf78b5239945))
+- **cube-cli:** Add `cube ossie` to convert Cube ⇄ Apache Ossie (CUB-5419) ([#12179](https://github.com/cube-js/cube/issues/12179)) ([1399b13](https://github.com/cube-js/cube/commit/1399b1333bf5ccb2a4389f52b3b59dfee4c02afe)), closes [#12157](https://github.com/cube-js/cube/issues/12157)
+- **tesseract:** Add an opt-in UNION ALL combine for multi-stage results on Cube Store ([#12182](https://github.com/cube-js/cube/issues/12182)) ([67d7d74](https://github.com/cube-js/cube/commit/67d7d74584f13d8789622afe8053ff4e5a034773))
+- **tesseract:** Fold windowed multi-stage measures into one rollup scan ([#12189](https://github.com/cube-js/cube/issues/12189)) ([b162d11](https://github.com/cube-js/cube/commit/b162d11cc48a681b77c6d9cb9e957662bfa06251)), closes [#12183](https://github.com/cube-js/cube/issues/12183) [#12182](https://github.com/cube-js/cube/issues/12182) [#12183](https://github.com/cube-js/cube/issues/12183)
+
+### Performance Improvements
+
+- **native:** Cut N-API round-trips in NativeSerdeDeserializer ([#12170](https://github.com/cube-js/cube/issues/12170)) ([7f6d197](https://github.com/cube-js/cube/commit/7f6d1977cedaf1a84dff9119bb52297e23c56065))
+
 ## [1.8.2](https://github.com/cube-js/cube/compare/v1.8.1...v1.8.2) (2026-10-08)
 
 ### Bug Fixes
