@@ -182,6 +182,15 @@ pub fn sql_tests(prefix: &str) -> Vec<(&'static str, TestFn)> {
         t("offset", offset),
         t("having", having),
         t("rolling_window_join", rolling_window_join),
+        t(
+            "rolling_window_join_exclusive_upper_bound",
+            rolling_window_join_exclusive_upper_bound,
+        ),
+        t("create_table_only_hll_column", create_table_only_hll_column),
+        t(
+            "drop_table_quoted_identifiers",
+            drop_table_quoted_identifiers,
+        ),
         t("rolling_window_query", rolling_window_query),
         t("rolling_window_exprs", rolling_window_exprs),
         t(
@@ -4979,6 +4988,89 @@ async fn rolling_window_join(service: Box<dyn SqlClient>) -> Result<(), CubeErro
             ])
         );
     }
+    Ok(())
+}
+
+/// https://github.com/cube-js/cube/issues/8580
+/// Tesseract renders a rolling window with `offset: start` as a join on
+/// `day >= date_from - interval AND day < date_from`. The current period's own
+/// bucket must not be included: the upper bound is exclusive.
+async fn rolling_window_join_exclusive_upper_bound(
+    service: Box<dyn SqlClient>,
+) -> Result<(), CubeError> {
+    service.exec_query("CREATE SCHEMA s").await?;
+    service
+        .exec_query("CREATE TABLE s.Data(day timestamp, n int)")
+        .await?;
+    service
+        .exec_query(
+            "INSERT INTO s.Data(day, n) VALUES ('2020-01-01T01:00:00.000', 1), \
+                                               ('2020-01-02T01:00:00.000', 10), \
+                                               ('2020-01-03T01:00:00.000', 100)",
+        )
+        .await?;
+
+    let series = "SELECT to_timestamp('2020-01-01T00:00:00.000') date_from, \
+                         to_timestamp('2020-01-01T23:59:59.999') date_to \
+                  UNION ALL \
+                  SELECT to_timestamp('2020-01-02T00:00:00.000') date_from, \
+                         to_timestamp('2020-01-02T23:59:59.999') date_to \
+                  UNION ALL \
+                  SELECT to_timestamp('2020-01-03T00:00:00.000') date_from, \
+                         to_timestamp('2020-01-03T23:59:59.999') date_to";
+    let source = "SELECT date_trunc('day', day) `day`, sum(n) `n` FROM s.Data GROUP BY 1";
+
+    let mut jan = (1..=3)
+        .map(|d| timestamp_from_string(&format!("2020-01-{:02}T00:00:00.000", d)).unwrap())
+        .collect_vec();
+    jan.insert(0, jan[1]); // jan[i] will correspond to i-th day of the month.
+
+    // Trailing 2 days, offset start: [date_from - 2 day, date_from).
+    let expected = rows(&[(jan[1], None), (jan[2], Some(1)), (jan[3], Some(11))]);
+
+    // The aggregate is aliased, as Cube does it, which makes the planner
+    // rewrite the join into a rolling window aggregate.
+    let r = service
+        .exec_query(&format!(
+            "SELECT `Series`.date_from `d`, sum(`Table`.n) `n` FROM ({series}) AS `Series` \
+             LEFT JOIN ({source}) AS `Table` \
+             ON `Table`.day >= `Series`.date_from - interval '2 day' \
+             AND `Table`.day < `Series`.date_from \
+             GROUP BY 1 ORDER BY 1"
+        ))
+        .await?;
+    assert_eq!(to_rows(&r), expected);
+    Ok(())
+}
+
+/// https://github.com/cube-js/cube/issues/8916
+/// A pre-aggregation with only `count_distinct_approx` measures creates a table
+/// whose only column is an HLL column.
+async fn create_table_only_hll_column(service: Box<dyn SqlClient>) -> Result<(), CubeError> {
+    service.exec_query("CREATE SCHEMA s").await?;
+    service
+        .exec_query("CREATE TABLE s.only_hll (my_cube__mes HYPERLOGLOG)")
+        .await?;
+    service
+        .exec_query("CREATE TABLE s.only_bytes (my_cube__mes BYTES)")
+        .await?;
+    Ok(())
+}
+
+/// https://github.com/cube-js/cube/issues/11212
+/// DROP TABLE must accept quoted schema and table names, like every other statement.
+async fn drop_table_quoted_identifiers(service: Box<dyn SqlClient>) -> Result<(), CubeError> {
+    service.exec_query("CREATE SCHEMA s").await?;
+    service.exec_query("CREATE TABLE s.t1 (a int)").await?;
+    service.exec_query("CREATE TABLE s.t2 (a int)").await?;
+
+    service.exec_query("DROP TABLE `s`.`t1`").await?;
+    service.exec_query("DROP TABLE \"s\".\"t2\"").await?;
+
+    let r = service
+        .exec_query("SELECT table_name FROM information_schema.tables WHERE table_schema = 's'")
+        .await?;
+    assert_eq!(to_rows(&r), Vec::<Vec<TableValue>>::new());
     Ok(())
 }
 
