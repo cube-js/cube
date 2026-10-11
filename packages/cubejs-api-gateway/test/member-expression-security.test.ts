@@ -54,6 +54,8 @@ describe('assertSafeMemberExpressionSql', () => {
       ['${}', ['Orders']],
       // reference with no cube params available at all
       ['${Orders.amount}', []],
+      // unterminated interpolation
+      ['${Orders.amount', ['Orders']],
     ];
 
     test.each(cases)('%s', (sql, cubeParams) => {

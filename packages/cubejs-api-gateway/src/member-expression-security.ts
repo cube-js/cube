@@ -5,10 +5,6 @@ const IDENTIFIER_RE = /^[A-Za-z_$][A-Za-z0-9_$]*$/;
 // Property names that expose the prototype chain / Function constructor.
 const FORBIDDEN_SEGMENTS = new Set(['constructor', '__proto__', 'prototype']);
 
-// `[^}]*` stops at the first `}`: a legitimate reference never contains a brace,
-// so anything that does fails closed below.
-const INTERPOLATION_RE = /\$\{([^}]*)\}/g;
-
 // An unescaped backtick (even number of preceding backslashes) closes the
 // `return \`...\`` template literal; a trailing odd run of backslashes escapes
 // its closing backtick. Either one breaks out into arbitrary JS.
@@ -49,10 +45,29 @@ export function assertSafeMemberExpressionSql(sql: string, cubeParams: string[])
 
   const allowedRoots = new Set(cubeParams);
 
-  for (const [, rawBody] of sql.matchAll(INTERPOLATION_RE)) {
-    const segments = rawBody.trim().split('.');
+  // Scan for `${...}` interpolations with a linear manual walk. A regex such as
+  // /\$\{[^}]*\}/g backtracks per start position and is polynomial on hostile
+  // input (e.g. `${` followed by many `{`); `indexOf` is linear.
+  let searchFrom = 0;
+
+  for (;;) {
+    const open = sql.indexOf('${', searchFrom);
+
+    if (open === -1) {
+      break;
+    }
+
+    const close = sql.indexOf('}', open + 2);
+
+    if (close === -1) {
+      // A legitimate reference is always closed; an unterminated `${` is not one.
+      throw new UserError('Unsafe member expression: unterminated interpolation in SQL');
+    }
+
+    const body = sql.slice(open + 2, close).trim();
+    const segments = body.split('.');
     const isSafeReference =
-      rawBody.trim().length > 0 &&
+      body.length > 0 &&
       allowedRoots.has(segments[0]) &&
       segments.every((segment) => IDENTIFIER_RE.test(segment) && !FORBIDDEN_SEGMENTS.has(segment));
 
@@ -61,5 +76,7 @@ export function assertSafeMemberExpressionSql(sql: string, cubeParams: string[])
         'Unsafe member expression: only cube member references are allowed in SQL interpolations'
       );
     }
+
+    searchFrom = close + 1;
   }
 }
