@@ -232,10 +232,13 @@ policies the flags build are appended to it.
 <Warning>
 
 `roles update` sends `policies` whenever it is given `--tier`, `--deployment` or
-`--data`, and the API replaces the role's policies outright rather than merging.
-Adding a second deployment with `--deployment` alone therefore drops the tier
-and every other scope. Read the role first and pass the full set with `--data`,
-or re-state the flags you want kept.
+a `--data` carrying a `policies` key, and the API replaces the role's policies
+outright rather than merging. Adding a second deployment with `--deployment`
+alone therefore drops the tier and every other scope — read the role first and
+pass the full set with `--data`, or re-state the flags you want kept.
+
+A `--data` without a `policies` key does not send the field at all, so editing
+just the name or description leaves the role's grants untouched.
 
 </Warning>
 
