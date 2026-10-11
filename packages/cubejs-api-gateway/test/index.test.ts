@@ -941,8 +941,9 @@ describe('API Gateway', () => {
     });
 
     // Gateway-level rejection cases: the eval-sink guard must reject these at both call sites.
+    type RejectedMembers = (string | Record<string, unknown>)[];
     const rejectedMemberExpression = (
-      members: { measures?: string[], dimensions?: string[] }
+      members: { measures?: RejectedMembers, dimensions?: RejectedMembers }
     ): QueryRequest => ({
       res(message) {
         const errorMessage = message as { error: string };
@@ -1019,45 +1020,13 @@ describe('API Gateway', () => {
     test('rejects an object-form member expression at the eval sink', async () => {
       expect.assertions(1);
       const { apiGateway } = await createApiGateway();
-      const request: QueryRequest = {
-        res(message) {
-          const errorMessage = message as { error: string };
-          expect(errorMessage.error).toMatch(/Unsafe member expression/);
-        },
-        query: {
-          measures: [],
-          dimensions: [
-            // eslint-disable-next-line no-template-curly-in-string
-            '{"cubeName":"sales","alias":"users_age","expr":{"type":"SqlFunction","cubeParams":["sales"],"sql":"${sales.users_age}"},"groupingSet":null}',
-            {
-              cubeName: 'sales',
-              name: 'x',
-              expressionName: 'x',
-              definition: 'x',
-              expression: ['return process.version'],
-            },
-          ],
-          segments: [],
-          order: []
-        },
-        expressionParams: [],
-        exportAnnotatedSql: true,
-        memberExpressions: true,
-        disableExternalPreAggregations: true,
-        queryType: 'multi',
-        disableLimitEnforcing: true,
-        context: {
-          securityContext: {},
-          signedWithPlaygroundAuthSecret: false,
-          requestId: 'd592f44e-9c26-4187-aa09-e9d39ca19a88-span-1',
-          protocol: 'postgres',
-          apiType: 'sql',
-          appName: 'NULL'
-        },
-        apiType: 'sql'
-      };
-
-      await apiGateway.sql(request);
+      await apiGateway.sql(rejectedMemberExpression({
+        dimensions: [
+          // eslint-disable-next-line no-template-curly-in-string
+          '{"cubeName":"sales","alias":"users_age","expr":{"type":"SqlFunction","cubeParams":["sales"],"sql":"${sales.users_age}"},"groupingSet":null}',
+          { cubeName: 'sales', name: 'x', expressionName: 'x', definition: 'x', expression: ['return process.version'] },
+        ]
+      }));
     });
   });
 
