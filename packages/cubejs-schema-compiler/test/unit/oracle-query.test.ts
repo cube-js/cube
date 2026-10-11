@@ -942,3 +942,34 @@ describe('OracleQuery', () => {
     expect(params).toEqual(['2024-01-01T00:00:00.000Z', '2024-12-31T23:59:59.999Z']);
   });
 });
+
+describe('OracleQuery in-database pre-aggregations (#3127)', () => {
+  const { compiler, joinGraph, cubeEvaluator } = prepareJsCompiler(`
+    cube('visitors', {
+      sql: 'select * from visitors',
+      measures: { count: { type: 'count' } },
+      dimensions: {
+        id: { sql: 'id', type: 'number', primaryKey: true },
+        source: { sql: 'source', type: 'string' },
+      },
+      preAggregations: {
+        inDb: { external: false, measures: [CUBE.count], dimensions: [CUBE.source] },
+      },
+    })
+  `, { adapter: 'oracle' });
+
+  it('uses CREATE TABLE ... AS SELECT in pre-aggregation load SQL', async () => {
+    await compiler.compile();
+
+    const query = new OracleQuery({ joinGraph, cubeEvaluator, compiler }, {
+      measures: ['visitors.count'],
+      dimensions: ['visitors.source'],
+      timezone: 'UTC',
+      preAggregationsSchema: 'dev_pre_aggregations',
+    });
+
+    const [desc]: any = query.preAggregations?.preAggregationsDescription();
+    // Oracle requires AS in CTAS: "CREATE TABLE t SELECT ..." fails with ORA-00922
+    expect(desc.loadSql[0]).toMatch(/^CREATE TABLE dev_pre_aggregations\.visitors_in_db\s+AS\s+SELECT/);
+  });
+});
