@@ -83,7 +83,7 @@ import {
 } from './interfaces';
 import { getRequestIdFromRequest, requestParser } from './request-parser';
 import { UserError } from './user-error';
-import { assertSafeMemberExpressionSql, assertSafeCompiledMemberExpression } from './member-expression-security';
+import { assertSafeCompiledMemberExpression } from './member-expression-security';
 import { CubejsHandlerError } from './cubejs-handler-error';
 import { SubscriptionServer, WebSocketSendMessageFn } from './ws/subscription-server';
 import { LocalSubscriptionStore } from './ws/local-subscription-store';
@@ -1628,7 +1628,9 @@ class ApiGateway {
       let expression: ParsedMemberExpression['expression'];
       switch (obj.expr.type) {
         case 'SqlFunction':
-          assertSafeMemberExpressionSql(obj.expr.sql, obj.expr.cubeParams);
+          // Not validated here: the compiled expression is checked at the sink
+          // (assertSafeCompiledMemberExpression in evalMemberExpression), which
+          // also covers members that arrive already parsed as objects.
           expression = [
             ...obj.expr.cubeParams,
             `return \`${obj.expr.sql}\``,
@@ -1639,13 +1641,10 @@ class ApiGateway {
             type: 'PatchMeasure',
             sourceMeasure: obj.expr.sourceMeasure,
             replaceAggregationType: obj.expr.replaceAggregationType,
-            addFilters: obj.expr.addFilters.map(filter => {
-              assertSafeMemberExpressionSql(filter.sql, filter.cubeParams);
-              return [
-                ...filter.cubeParams,
-                `return \`${filter.sql}\``,
-              ];
-            }),
+            addFilters: obj.expr.addFilters.map(filter => [
+              ...filter.cubeParams,
+              `return \`${filter.sql}\``,
+            ]),
           };
           break;
         default:

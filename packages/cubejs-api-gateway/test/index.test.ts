@@ -940,7 +940,7 @@ describe('API Gateway', () => {
       await apiGateway.sql(request);
     });
 
-    // Gateway-level rejection cases covering the parse-time and eval-sink guards.
+    // Gateway-level rejection cases: the eval-sink guard must reject these at both call sites.
     const rejectedMemberExpression = (
       members: { measures?: string[], dimensions?: string[] }
     ): QueryRequest => ({
