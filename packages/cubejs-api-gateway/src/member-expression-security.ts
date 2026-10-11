@@ -30,10 +30,24 @@ const FORBIDDEN_SEGMENTS = new Set(['constructor', '__proto__', 'prototype']);
 const INTERPOLATION_RE = /\$\{([^}]*)\}/g;
 
 /**
- * Throws a {@link UserError} if `sql` contains a template interpolation that is
- * not a plain reference to one of `cubeParams`.
+ * Throws a {@link UserError} if a member expression is not safe to splice into
+ * the evaluated template:
+ *   - `cubeParams` is spliced into `Function(...)` as raw parameter *source*
+ *     (see `evalMemberExpression` in `gateway.ts`), so an entry that is not a
+ *     plain identifier can carry executable code through a default-value or
+ *     destructuring parameter, e.g. `[a = process.version] = []` or `x = <expr>`.
+ *   - `sql` is spliced into a template literal, so every `${...}` must be a plain
+ *     reference rooted at one of `cubeParams`.
  */
 export function assertSafeMemberExpressionSql(sql: string, cubeParams: string[]): void {
+  for (const param of cubeParams) {
+    if (!IDENTIFIER_RE.test(param) || FORBIDDEN_SEGMENTS.has(param)) {
+      throw new UserError(
+        'Unsafe member expression: cube param is not a valid identifier'
+      );
+    }
+  }
+
   const allowedRoots = new Set(cubeParams);
   const interpolationRe = new RegExp(INTERPOLATION_RE.source, 'g');
 

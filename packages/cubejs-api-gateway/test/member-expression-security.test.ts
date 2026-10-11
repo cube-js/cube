@@ -60,4 +60,26 @@ describe('assertSafeMemberExpressionSql', () => {
       );
     });
   });
+
+  describe('rejects executable code smuggled through cubeParams', () => {
+    // cubeParams entries are spliced into `Function(...)` as raw parameter
+    // source, so a non-identifier entry can carry a default-value expression
+    // that runs when the function is invoked, even when `sql` has no `${...}`.
+    const cases: [string, string[]][] = [
+      ['1', ['[a = process.mainModule.require("child_process").execSync("id")] = []']],
+      ['1', ['[a = process.version] = []']],
+      ['1', ['Orders', 'x = 1']],
+      ['1', ['Orders', 'x = process.version']],
+      ['${Orders.amount}', ['Orders', 'y = (() => {})()']],
+      ['1', ['constructor']],
+      ['1', ['a.b']],
+      ['1', ['a b']],
+    ];
+
+    test.each(cases)('%s / %j', (sql, cubeParams) => {
+      expect(() => assertSafeMemberExpressionSql(sql, cubeParams)).toThrow(
+        /Unsafe member expression/
+      );
+    });
+  });
 });
