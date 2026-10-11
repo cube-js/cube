@@ -56,6 +56,8 @@ tags:
   - name: Dashboard Embed Access
   - name: Usage Analytics
   - name: OpenAPI Spec
+  - name: Chat History
+  - name: Ossie Conversion
   - name: Report Deliveries
 paths:
   /api/v1/api-keys:
@@ -354,6 +356,267 @@ paths:
       summary: Latest build/compile status for a branch (production build or dev-mode)
       tags:
         - Deployments
+  /api/v1/deployments/{deploymentId}/chat-history/threads:
+    get:
+      operationId: listChatHistoryThreads
+      parameters:
+        - in: path
+          name: deploymentId
+          required: true
+          schema:
+            type: integer
+        - in: query
+          name: createdAfter
+          schema:
+            description: Only threads whose `createdAt` is at or after this ISO 8601 date or date-time.
+            oneOf:
+              - pattern: ^\d{4}-\d{2}-\d{2}(?:T\d{2}:\d{2}(?::\d{2}(?:\.\d+)?)?(?:Z|[+-]\d{2}:?\d{2})?)?$
+                type: string
+              - type: 'null'
+        - in: query
+          name: createdBefore
+          schema:
+            description: >-
+              Only threads whose `createdAt` is at or before this ISO 8601 date-time. A date alone
+              (`2026-10-01`) includes that whole day, UTC.
+            oneOf:
+              - pattern: ^\d{4}-\d{2}-\d{2}(?:T\d{2}:\d{2}(?::\d{2}(?:\.\d+)?)?(?:Z|[+-]\d{2}:?\d{2})?)?$
+                type: string
+              - type: 'null'
+        - in: query
+          name: updatedAfter
+          schema:
+            description: >-
+              Only threads whose `updatedAt` is at or after this ISO 8601 date or date-time. A
+              thread is updated by every new turn, so this is the filter for incremental exports.
+            oneOf:
+              - pattern: ^\d{4}-\d{2}-\d{2}(?:T\d{2}:\d{2}(?::\d{2}(?:\.\d+)?)?(?:Z|[+-]\d{2}:?\d{2})?)?$
+                type: string
+              - type: 'null'
+        - in: query
+          name: updatedBefore
+          schema:
+            description: >-
+              Only threads whose `updatedAt` is at or before this ISO 8601 date-time. A date alone
+              (`2026-10-01`) includes that whole day, UTC.
+            oneOf:
+              - pattern: ^\d{4}-\d{2}-\d{2}(?:T\d{2}:\d{2}(?::\d{2}(?:\.\d+)?)?(?:Z|[+-]\d{2}:?\d{2})?)?$
+                type: string
+              - type: 'null'
+        - in: query
+          name: userId
+          schema:
+            description: Cube user ids. Repeat the parameter to match any of several values, up to 100.
+            oneOf:
+              - items:
+                  type: integer
+                type: array
+                maxItems: 100
+              - type: 'null'
+        - in: query
+          name: userEmail
+          schema:
+            description: >-
+              User emails, matched case-insensitively against Cube users and against the email an
+              embedded user signed in with. Repeat the parameter to match any of several values, up
+              to 100.
+            oneOf:
+              - items:
+                  type: string
+                type: array
+                maxItems: 100
+              - type: 'null'
+        - in: query
+          name: externalUserId
+          schema:
+            description: >-
+              External ids of embedded-analytics users, as your application passed them. Repeat the
+              parameter to match any of several values, up to 100.
+            oneOf:
+              - items:
+                  type: string
+                type: array
+                maxItems: 100
+              - type: 'null'
+        - in: query
+          name: userType
+          schema:
+            description: >-
+              `internal` for Cube users, `external` for embedded-analytics users. Combines with the
+              user filters above, which match any of their values.
+            oneOf:
+              - $ref: '#/components/schemas/ChatHistoryThreadsQueryUserType'
+              - type: 'null'
+        - in: query
+          name: source
+          schema:
+            description: >-
+              Where the thread was started: `web` (the Cube app or embedded analytics), `api` (the
+              Chat API), `mcp`, `slack` or `scheduled` (a scheduled task). Repeat the parameter to
+              match any of several values, up to 100.
+            oneOf:
+              - items:
+                  type: string
+                  enum:
+                    - web
+                    - api
+                    - mcp
+                    - slack
+                    - scheduled
+                type: array
+                maxItems: 100
+              - type: 'null'
+        - in: query
+          name: initialContext
+          schema:
+            description: >-
+              The surface inside the app the thread began on. Repeat the parameter to match any of
+              several values, up to 100.
+            oneOf:
+              - items:
+                  type: string
+                  enum:
+                    - chat
+                    - workbook
+                    - model
+                    - dashboard
+                    - external
+                    - mcp
+                    - ai-widget
+                    - onboarding
+                    - explore
+                    - connection_setup
+                    - slack_dm
+                    - published-dashboard
+                    - sheets
+                type: array
+                maxItems: 100
+              - type: 'null'
+        - in: query
+          name: agentId
+          schema:
+            description: >-
+              Agent ids; `-1` selects the Auto agent. Repeat the parameter to match any of several
+              values, up to 100.
+            oneOf:
+              - items:
+                  type: integer
+                type: array
+                maxItems: 100
+              - type: 'null'
+        - in: query
+          name: search
+          schema:
+            description: Case-insensitive match on the thread title or its chat id.
+            oneOf:
+              - type: string
+              - type: 'null'
+        - in: query
+          name: sortBy
+          schema:
+            description: Defaults to `updatedAt`.
+            oneOf:
+              - $ref: '#/components/schemas/ChatHistoryThreadsQuerySortBy'
+              - type: 'null'
+        - in: query
+          name: sortOrder
+          schema:
+            description: Defaults to `desc`.
+            oneOf:
+              - $ref: '#/components/schemas/ChatHistoryThreadsQuerySortOrder'
+              - type: 'null'
+        - in: query
+          name: includeTurns
+          schema:
+            description: >-
+              Return every thread with its turns. Pages then default to 20 threads and hold at most
+              50.
+            oneOf:
+              - type: boolean
+              - type: 'null'
+        - in: query
+          name: after
+          schema:
+            type: string
+        - in: query
+          name: first
+          schema:
+            minimum: 1
+            type: integer
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ChatHistoryThreadListResponse'
+          description: ''
+      summary: List chat threads
+      tags:
+        - Chat History
+      x-mint:
+        content: >-
+          **🔒 Admin only.** Requires administrator privileges — the authenticated principal (API
+          key, embed JWT, or any bearer token) must belong to a user with the admin role.
+
+
+          Every user's AI chat threads in the deployment, most recently updated first, for analyzing
+          how people use the agent. Filters combine with AND; a filter given several values matches
+          any of them.
+
+
+          Set `includeTurns=true` to get each thread's turns in the same response. A turn is one
+          prompt and everything the agent did to answer it: the final answer, the tools it called,
+          and each query it ran with its SQL, status, row count and any thumbs-up/down feedback.
+          Query result rows are never included. A prompt, answer or SQL longer than 20,000
+          characters, or an error longer than 2,000, is cut and ends in `…`. A page holds up to 200
+          threads, or 50 with turns; a larger `first` is lowered to that.
+
+
+          For an incremental export, keep the newest `updatedAt` you have seen and pass it as
+          `updatedAfter` next time.
+
+
+          Chat history export is in preview: when it is not enabled for the account, `404` is
+          returned.
+  /api/v1/deployments/{deploymentId}/chat-history/threads/{chatId}:
+    get:
+      operationId: getChatHistoryThread
+      parameters:
+        - in: path
+          name: deploymentId
+          required: true
+          schema:
+            type: integer
+        - in: path
+          name: chatId
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ChatHistoryThread'
+          description: ''
+      summary: Get a chat thread
+      tags:
+        - Chat History
+      x-mint:
+        content: >-
+          **🔒 Admin only.** Requires administrator privileges — the authenticated principal (API
+          key, embed JWT, or any bearer token) must belong to a user with the admin role.
+
+
+          One chat thread with all of its turns, oldest first. A turn is one prompt and everything
+          the agent did to answer it: the final answer, the tools it called, and each query it ran
+          with its SQL, status, row count and any thumbs-up/down feedback. Query result rows are
+          never included. A prompt, answer or SQL longer than 20,000 characters, or an error longer
+          than 2,000, is cut and ends in `…`.
+
+
+          Chat history export is in preview: when it is not enabled for the account, `404` is
+          returned.
   /api/v1/deployments/{deploymentId}/creation-step/advance:
     post:
       operationId: advanceCreationStep
@@ -2065,6 +2328,161 @@ paths:
           `400` before anything is written. The operation is idempotent: the response buckets each
           recipient into `createdRecipients`, `updatedRecipients` (an existing recipient whose embed
           properties changed), or `unchangedRecipients`.
+  /api/v1/deployments/{deploymentId}/ossie-conversions:
+    post:
+      operationId: startConversion
+      parameters:
+        - in: path
+          name: deploymentId
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OssieConversionInput'
+        description: OssieConversionInput
+        required: true
+      responses:
+        '202':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OssieConversionStartResponse'
+          description: ''
+      summary: Start an Apache Ossie conversion
+      tags:
+        - Ossie Conversion
+      x-mint:
+        content: >-
+          Converts between a Cube data model and an [Apache Ossie (Open Semantic
+          Interchange)](https://github.com/apache/ossie) model, and returns polling URLs
+          immediately. An export converts the YAML data model of the deployment's latest successful
+          build, or uploaded YAML files, to one Ossie model; an import converts an uploaded Ossie
+          model to Cube data model files. Neither changes the deployment. Only static YAML model
+          files are converted; JavaScript models and Jinja-templated files are skipped. Uploads are
+          limited to 512 files of at most 2 MiB each and 20 MiB in total. Requests and results are
+          kept for at most one day. Requires `SchemaRead` or `SchemaUpdate` access. This is
+          currently in preview — reach out to the Cube support team to activate it for your account.
+  /api/v1/deployments/{deploymentId}/ossie-conversions/{conversionId}:
+    delete:
+      operationId: cancelConversion
+      parameters:
+        - in: path
+          name: deploymentId
+          required: true
+          schema:
+            type: integer
+        - in: path
+          name: conversionId
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          content:
+            application/json: {}
+          description: Successful response
+        '204':
+          description: Cancelled, or already finished.
+      summary: Cancel an Apache Ossie conversion
+      tags:
+        - Ossie Conversion
+    get:
+      operationId: conversionStatus
+      parameters:
+        - in: path
+          name: deploymentId
+          required: true
+          schema:
+            type: integer
+        - in: path
+          name: conversionId
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OssieConversionStatusResponse'
+          description: ''
+      summary: Get an Apache Ossie conversion status
+      tags:
+        - Ossie Conversion
+  /api/v1/deployments/{deploymentId}/ossie-conversions/{conversionId}/files:
+    get:
+      operationId: conversionFiles
+      parameters:
+        - in: path
+          name: deploymentId
+          required: true
+          schema:
+            type: integer
+        - in: path
+          name: conversionId
+          required: true
+          schema:
+            type: string
+        - in: query
+          name: after
+          schema:
+            oneOf:
+              - type: string
+              - type: 'null'
+        - in: query
+          name: first
+          schema:
+            oneOf:
+              - minimum: 1
+                type: integer
+              - type: 'null'
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OssieConversionFilesListResponse'
+          description: ''
+      summary: Get the files of an Apache Ossie conversion
+      tags:
+        - Ossie Conversion
+      x-mint:
+        content: >-
+          Returns `ossie.yaml` for an export, or the generated Cube data model files for an import;
+          empty when the conversion failed. Returns 409 while the conversion is still running or if
+          it ended without a result.
+  /api/v1/deployments/{deploymentId}/ossie-conversions/{conversionId}/result:
+    get:
+      operationId: conversionResult
+      parameters:
+        - in: path
+          name: deploymentId
+          required: true
+          schema:
+            type: integer
+        - in: path
+          name: conversionId
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OssieConversionResultResponse'
+          description: ''
+      summary: Get an Apache Ossie conversion result
+      tags:
+        - Ossie Conversion
+      x-mint:
+        content: >-
+          Returns the outcome, counts, issues and converter versions of a completed conversion.
+          Returns 409 while the conversion is still running or if it ended without a result. Read
+          the converted files from `/files`.
   /api/v1/deployments/{deploymentId}/pods:
     get:
       operationId: pods
@@ -7683,6 +8101,235 @@ components:
         - ACTIVATE
         - DELETE
       type: string
+    ChatHistoryQuery:
+      properties:
+        dataSource:
+          description: The data source a `runSql` query ran on.
+          oneOf:
+            - type: string
+            - type: 'null'
+        error:
+          oneOf:
+            - type: string
+            - type: 'null'
+        feedback:
+          description: The latest thumbs up or down on this query, if any.
+          oneOf:
+            - $ref: '#/components/schemas/ChatHistoryQueryFeedback'
+            - type: 'null'
+        messageId:
+          description: The tool-call message id.
+          type: string
+        rowCount:
+          description: Rows the query returned. The rows themselves are never included.
+          oneOf:
+            - type: integer
+            - type: 'null'
+        sql:
+          description: The SQL the agent generated.
+          oneOf:
+            - type: string
+            - type: 'null'
+        status:
+          $ref: '#/components/schemas/ChatHistoryQueryStatus'
+          description: '`incomplete` when the query never returned: the turn was stopped or failed.'
+        title:
+          oneOf:
+            - type: string
+            - type: 'null'
+        tool:
+          description: >-
+            `cubeSqlApi` for a query against the semantic layer, `runSql` for one against a
+            warehouse data source.
+          type: string
+      required:
+        - messageId
+        - tool
+        - status
+      type: object
+    ChatHistoryQueryFeedback:
+      properties:
+        createdAt:
+          type: string
+        isPositive:
+          type: boolean
+        userId:
+          description: Who rated the query.
+          oneOf:
+            - type: integer
+            - type: 'null'
+      required:
+        - isPositive
+        - createdAt
+      type: object
+    ChatHistoryQueryStatus:
+      enum:
+        - success
+        - error
+        - incomplete
+      type: string
+    ChatHistoryThread:
+      properties:
+        agentId:
+          description: Null for the Auto agent.
+          oneOf:
+            - type: integer
+            - type: 'null'
+        chatId:
+          description: The thread id, as used in chat URLs and the Chat API.
+          type: string
+        createdAt:
+          type: string
+        initialContext:
+          description: The surface inside the app the thread began on; null when it was not recorded.
+          oneOf:
+            - type: string
+            - type: 'null'
+        source:
+          description: Where the thread was started; null for a source this API does not name.
+          oneOf:
+            - $ref: '#/components/schemas/ChatHistoryThreadSource'
+            - type: 'null'
+        title:
+          oneOf:
+            - type: string
+            - type: 'null'
+        turns:
+          description: Oldest first. Present on a single thread, and on a list with `includeTurns=true`.
+          oneOf:
+            - items:
+                $ref: '#/components/schemas/ChatHistoryTurn'
+              type: array
+            - type: 'null'
+        updatedAt:
+          description: When the thread last changed, normally its latest turn.
+          type: string
+        user:
+          $ref: '#/components/schemas/ChatHistoryUser'
+      required:
+        - chatId
+        - user
+        - createdAt
+        - updatedAt
+      type: object
+    ChatHistoryThreadListResponse:
+      properties:
+        items:
+          items:
+            $ref: '#/components/schemas/ChatHistoryThread'
+          type: array
+        pageInfo:
+          $ref: '#/components/schemas/PageInfo'
+      required:
+        - items
+        - pageInfo
+      type: object
+    ChatHistoryThreadSource:
+      enum:
+        - web
+        - api
+        - mcp
+        - slack
+        - scheduled
+      type: string
+    ChatHistoryThreadsQuerySortBy:
+      enum:
+        - createdAt
+        - updatedAt
+      type: string
+    ChatHistoryThreadsQuerySortOrder:
+      enum:
+        - asc
+        - desc
+      type: string
+    ChatHistoryThreadsQueryUserType:
+      enum:
+        - internal
+        - external
+      type: string
+    ChatHistoryTurn:
+      properties:
+        endedAt:
+          description: >-
+            The agent's last write in the turn. Null for turns recorded before Cube stored turn
+            times.
+          oneOf:
+            - type: string
+            - type: 'null'
+        files:
+          description: Names of files the user attached. Their content is never included.
+          items:
+            type: string
+          type: array
+        finalAnswer:
+          description: The agent's last text reply in the turn; null when it answered only with a chart.
+          oneOf:
+            - type: string
+            - type: 'null'
+        index:
+          description: Position in the thread, from 0.
+          type: integer
+        messageId:
+          description: The id of the user message that opened the turn.
+          type: string
+        prompt:
+          description: What the user asked, as they typed it.
+          type: string
+        queries:
+          items:
+            $ref: '#/components/schemas/ChatHistoryQuery'
+          type: array
+        startedAt:
+          description: When the user sent the prompt. Null for turns recorded before Cube stored turn times.
+          oneOf:
+            - type: string
+            - type: 'null'
+        tools:
+          description: Every tool the agent called in the turn, in first-call order.
+          items:
+            type: string
+          type: array
+      required:
+        - index
+        - messageId
+        - prompt
+        - files
+        - tools
+        - queries
+      type: object
+    ChatHistoryUser:
+      properties:
+        email:
+          description: Null when the Cube user was deleted, or the embedded user had no email.
+          oneOf:
+            - type: string
+            - type: 'null'
+        externalId:
+          description: Embedded users only.
+          oneOf:
+            - type: string
+            - type: 'null'
+        id:
+          description: >-
+            For a Cube user, their user id. For an embedded user, an id in a separate number space:
+            identify them by `externalId`.
+          type: integer
+        name:
+          description: Cube users only.
+          oneOf:
+            - type: string
+            - type: 'null'
+        type:
+          $ref: '#/components/schemas/ChatHistoryUserType'
+      required:
+        - id
+        - type
+      type: object
+    ChatHistoryUserType:
+      enum:
+        - internal
+        - external
+      type: string
     ColumnFormatOverride:
       properties:
         decimalPlaces:
@@ -12759,6 +13406,313 @@ components:
         - createdAt
         - updatedAt
       type: object
+    OssieConversionCounts:
+      properties:
+        cubes:
+          description: Cube cubes.
+          type: integer
+        datasets:
+          description: Ossie datasets.
+          type: integer
+        fields:
+          description: Ossie dataset fields.
+          type: integer
+        files:
+          description: Cube data model files.
+          type: integer
+        issues:
+          $ref: '#/components/schemas/OssieConversionIssueCounts'
+        metrics:
+          description: Ossie metrics.
+          type: integer
+        relationships:
+          description: Ossie relationships.
+          type: integer
+        views:
+          description: Cube views.
+          type: integer
+      required:
+        - datasets
+        - relationships
+        - fields
+        - metrics
+        - cubes
+        - views
+        - files
+        - issues
+      type: object
+    OssieConversionFile:
+      properties:
+        content:
+          type: string
+        path:
+          description: >-
+            For an export, `ossie.yaml`. For an import, the path of the generated file within the
+            data model project.
+          type: string
+      required:
+        - path
+        - content
+      type: object
+    OssieConversionFilesListResponse:
+      properties:
+        items:
+          description: The converted files, empty when the conversion failed.
+          items:
+            $ref: '#/components/schemas/OssieConversionFile'
+          type: array
+        pageInfo:
+          $ref: '#/components/schemas/PageInfo'
+      required:
+        - items
+        - pageInfo
+      type: object
+    OssieConversionInput:
+      properties:
+        baseCube:
+          description: >-
+            Import only. The dataset the generated view is rooted at, for an Ossie model whose
+            relationships do not determine one.
+          oneOf:
+            - type: string
+            - type: 'null'
+        dialect:
+          description: >-
+            Import only. The warehouse dialect whose expressions are preferred where the Ossie model
+            has several; ANSI_SQL is always the fallback. Defaults to the dialect of the
+            deployment's default data source, or ANSI_SQL.
+          oneOf:
+            - $ref: '#/components/schemas/OssieConversionInputDialect'
+            - type: 'null'
+        direction:
+          $ref: '#/components/schemas/OssieConversionInputDirection'
+          description: >-
+            'export' converts a Cube data model to an Ossie model; 'import' converts an Ossie model
+            to Cube data model files.
+        files:
+          description: >-
+            Export with source 'files' only. Relative `.yml`/`.yaml` paths mapped to their contents,
+            such as a local checkout of the data model. Other files are not accepted.
+          oneOf:
+            - type: object
+              additionalProperties:
+                type: string
+            - type: 'null'
+        ossieYaml:
+          description: Import only. The Ossie YAML document to convert.
+          oneOf:
+            - type: string
+            - type: 'null'
+        source:
+          description: >-
+            Export only. 'deployment' (the default) converts the YAML data model of the deployment's
+            latest successful build; 'files' converts the `files` sent with the request.
+          oneOf:
+            - $ref: '#/components/schemas/OssieConversionInputSource'
+            - type: 'null'
+        strictFanout:
+          description: >-
+            Export only. Refuse a metric whose value join fan-out could change, instead of
+            converting it with a warning. Defaults to false for a whole-model export and true for a
+            view export.
+          oneOf:
+            - type: boolean
+            - type: 'null'
+        view:
+          description: Export only. Convert just this view's public members instead of the whole model.
+          oneOf:
+            - type: string
+            - type: 'null'
+      required:
+        - direction
+      type: object
+    OssieConversionInputDialect:
+      enum:
+        - ANSI_SQL
+        - SNOWFLAKE
+        - DATABRICKS
+        - BIGQUERY
+      type: string
+    OssieConversionInputDirection:
+      enum:
+        - export
+        - import
+      type: string
+    OssieConversionInputSource:
+      enum:
+        - deployment
+        - files
+      type: string
+    OssieConversionIssue:
+      properties:
+        code:
+          description: The converter issue type, such as DROPPED_MEASURE or CONVERSION_FAILED.
+          type: string
+        element:
+          description: The model element the issue is about.
+          oneOf:
+            - type: string
+            - type: 'null'
+        message:
+          type: string
+        severity:
+          $ref: '#/components/schemas/OssieConversionIssueSeverity'
+          description: >-
+            ERROR fails the conversion. WARNING marks something dropped or changed. INFO marks
+            something kept in another form.
+      required:
+        - code
+        - severity
+        - message
+      type: object
+    OssieConversionIssueCounts:
+      properties:
+        error:
+          type: integer
+        info:
+          type: integer
+        warning:
+          type: integer
+      required:
+        - error
+        - warning
+        - info
+      type: object
+    OssieConversionIssueSeverity:
+      enum:
+        - ERROR
+        - WARNING
+        - INFO
+      type: string
+    OssieConversionResultResponse:
+      properties:
+        completedAt:
+          pattern: \d{4}-[01]\d-[0-3]\dT[0-2]\d:[0-5]\d:[0-5]\d.\d+Z?
+          type: string
+        conversionId:
+          type: string
+        counts:
+          $ref: '#/components/schemas/OssieConversionCounts'
+        deploymentId:
+          type: integer
+        direction:
+          $ref: '#/components/schemas/OssieConversionResultResponseDirection'
+        durationMs:
+          type: integer
+        issues:
+          items:
+            $ref: '#/components/schemas/OssieConversionIssue'
+          type: array
+        outcome:
+          $ref: '#/components/schemas/OssieConversionResultResponseOutcome'
+          description: '''failed'' exactly when an issue has severity ERROR.'
+        runtime:
+          $ref: '#/components/schemas/OssieConversionRuntime'
+        sourceSha256:
+          description: SHA-256 of the converted input.
+          type: string
+      required:
+        - conversionId
+        - deploymentId
+        - direction
+        - outcome
+        - completedAt
+        - durationMs
+        - sourceSha256
+        - counts
+        - issues
+        - runtime
+      type: object
+    OssieConversionResultResponseDirection:
+      enum:
+        - export
+        - import
+      type: string
+    OssieConversionResultResponseOutcome:
+      enum:
+        - success
+        - failed
+      type: string
+    OssieConversionRuntime:
+      properties:
+        cubeConverterVersion:
+          type: string
+        ossieCommit:
+          description: The apache/ossie commit the converter was built from.
+          type: string
+        ossieCoreVersion:
+          type: string
+      required:
+        - ossieCommit
+        - ossieCoreVersion
+        - cubeConverterVersion
+      type: object
+    OssieConversionStartResponse:
+      properties:
+        conversionId:
+          type: string
+        resultUrl:
+          type: string
+        status:
+          $ref: '#/components/schemas/OssieConversionStartResponseStatus'
+        statusUrl:
+          type: string
+      required:
+        - conversionId
+        - status
+        - statusUrl
+        - resultUrl
+      type: object
+    OssieConversionStartResponseStatus:
+      enum:
+        - QUEUED
+      type: string
+    OssieConversionStatusResponse:
+      properties:
+        conversionId:
+          type: string
+        deploymentId:
+          type: integer
+        direction:
+          $ref: '#/components/schemas/OssieConversionStatusResponseDirection'
+        error:
+          description: Why the job ended without a result.
+          oneOf:
+            - type: string
+            - type: 'null'
+        startedAt:
+          pattern: \d{4}-[01]\d-[0-3]\dT[0-2]\d:[0-5]\d:[0-5]\d.\d+Z?
+          type: string
+        status:
+          $ref: '#/components/schemas/OssieConversionStatusResponseStatus'
+          description: >-
+            One of QUEUED, RUNNING, COMPLETED, FAILED or CANCELLED. COMPLETED means a result is
+            available, even when the conversion itself failed; read its outcome. FAILED means the
+            job ended without a result.
+        updatedAt:
+          pattern: \d{4}-[01]\d-[0-3]\dT[0-2]\d:[0-5]\d:[0-5]\d.\d+Z?
+          type: string
+      required:
+        - conversionId
+        - deploymentId
+        - direction
+        - status
+        - startedAt
+        - updatedAt
+      type: object
+    OssieConversionStatusResponseDirection:
+      enum:
+        - export
+        - import
+      type: string
+    OssieConversionStatusResponseStatus:
+      enum:
+        - QUEUED
+        - RUNNING
+        - COMPLETED
+        - FAILED
+        - CANCELLED
+      type: string
     PageInfo:
       properties:
         endCursor:
