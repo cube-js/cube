@@ -1628,9 +1628,6 @@ class ApiGateway {
       let expression: ParsedMemberExpression['expression'];
       switch (obj.expr.type) {
         case 'SqlFunction':
-          // Not validated here: the compiled expression is checked at the sink
-          // (assertSafeCompiledMemberExpression in evalMemberExpression), which
-          // also covers members that arrive already parsed as objects.
           expression = [
             ...obj.expr.cubeParams,
             `return \`${obj.expr.sql}\``,

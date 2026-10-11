@@ -81,10 +81,8 @@ export function assertSafeMemberExpressionSql(sql: string, cubeParams: string[])
 const COMPILED_BODY_RE = /^return `([\s\S]*)`$/;
 
 /**
- * Guard the compiled `[...cubeParams, body]` array at the actual sink
- * (`Function.constructor` in `evalMemberExpression`). This also covers member
- * expressions that arrive already parsed as objects and so never pass through
- * `parseMemberExpression` / {@link assertSafeMemberExpressionSql}.
+ * Validates the compiled `[...cubeParams, body]` right before `Function.constructor`
+ * (in `evalMemberExpression`), so object-form members are covered too.
  */
 export function assertSafeCompiledMemberExpression(expression: string[]): void {
   if (!Array.isArray(expression) || expression.length < 1) {
