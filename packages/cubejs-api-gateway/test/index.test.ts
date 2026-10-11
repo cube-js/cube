@@ -940,10 +940,7 @@ describe('API Gateway', () => {
       await apiGateway.sql(request);
     });
 
-    // Drive malicious member expressions through the gateway (not just the
-    // assertSafeMemberExpressionSql helper) so that removing the guard call in
-    // parseMemberExpression would fail these. Covers both wiring sites:
-    // the SqlFunction branch and the PatchMeasure addFilters branch.
+    // Fails if the guard call in parseMemberExpression is removed.
     const rejectedMemberExpression = (
       members: { measures?: string[], dimensions?: string[] }
     ): QueryRequest => ({
