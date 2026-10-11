@@ -1012,6 +1012,95 @@ describe('API Gateway', () => {
 
       await apiGateway.sql(request);
     });
+
+    // Gateway-level rejection cases: the eval-sink guard must reject these at both call sites.
+    type RejectedMembers = (string | Record<string, unknown>)[];
+    const rejectedMemberExpression = (
+      members: { measures?: RejectedMembers, dimensions?: RejectedMembers }
+    ): QueryRequest => ({
+      res(message) {
+        const errorMessage = message as { error: string };
+        expect(errorMessage.error).toMatch(/Unsafe member expression/);
+      },
+      query: {
+        measures: members.measures ?? [],
+        dimensions: members.dimensions ?? [],
+        segments: [],
+        order: []
+      },
+      expressionParams: [],
+      exportAnnotatedSql: true,
+      memberExpressions: true,
+      disableExternalPreAggregations: true,
+      queryType: 'multi',
+      disableLimitEnforcing: true,
+      context: {
+        securityContext: {},
+        signedWithPlaygroundAuthSecret: false,
+        requestId: 'd592f44e-9c26-4187-aa09-e9d39ca19a88-span-1',
+        protocol: 'postgres',
+        apiType: 'sql',
+        appName: 'NULL'
+      },
+      apiType: 'sql'
+    });
+
+    test('rejects arbitrary JS in a SqlFunction expression', async () => {
+      expect.assertions(1);
+      const { apiGateway } = await createApiGateway();
+      await apiGateway.sql(rejectedMemberExpression({
+        dimensions: [
+          // eslint-disable-next-line no-template-curly-in-string
+          '{"cubeName":"sales","alias":"x","expr":{"type":"SqlFunction","cubeParams":["sales"],"sql":"${process.version}"},"groupingSet":null}'
+        ]
+      }));
+    });
+
+    test('rejects a non-identifier cubeParams entry', async () => {
+      expect.assertions(1);
+      const { apiGateway } = await createApiGateway();
+      await apiGateway.sql(rejectedMemberExpression({
+        measures: [
+          '{"cubeName":"sales","alias":"x","expr":{"type":"SqlFunction","cubeParams":["[a = process.version] = []"],"sql":"1"},"groupingSet":null}'
+        ]
+      }));
+    });
+
+    test('rejects a template-literal breakout via backtick', async () => {
+      expect.assertions(1);
+      const { apiGateway } = await createApiGateway();
+      await apiGateway.sql(rejectedMemberExpression({
+        dimensions: [
+          '{"cubeName":"sales","alias":"x","expr":{"type":"SqlFunction","cubeParams":["sales"],"sql":"` + process.version + `"},"groupingSet":null}'
+        ]
+      }));
+    });
+
+    test('rejects arbitrary JS in a PatchMeasure addFilters expression', async () => {
+      expect.assertions(1);
+      const { apiGateway } = await createApiGateway();
+      await apiGateway.sql(rejectedMemberExpression({
+        measures: [
+          // eslint-disable-next-line no-template-curly-in-string
+          '{"cubeName":"sales","alias":"pm","expr":{"type":"PatchMeasure","sourceMeasure":"sales.count","replaceAggregationType":null,"addFilters":[{"cubeParams":["sales"],"sql":"${process.version}"}]}}'
+        ]
+      }));
+    });
+
+    // Only the eval-sink guard closes this: an object-form member skips
+    // parseMemberExpression, and a sibling string expression flips
+    // hasExpressionsInQuery on so it still reaches evalMemberExpression.
+    test('rejects an object-form member expression at the eval sink', async () => {
+      expect.assertions(1);
+      const { apiGateway } = await createApiGateway();
+      await apiGateway.sql(rejectedMemberExpression({
+        dimensions: [
+          // eslint-disable-next-line no-template-curly-in-string
+          '{"cubeName":"sales","alias":"users_age","expr":{"type":"SqlFunction","cubeParams":["sales"],"sql":"${sales.users_age}"},"groupingSet":null}',
+          { cubeName: 'sales', name: 'x', expressionName: 'x', definition: 'x', expression: ['return process.version'] },
+        ]
+      }));
+    });
   });
 
   describe('transformed query', () => {
