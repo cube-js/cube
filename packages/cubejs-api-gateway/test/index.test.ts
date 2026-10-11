@@ -940,7 +940,7 @@ describe('API Gateway', () => {
       await apiGateway.sql(request);
     });
 
-    // Fails if the guard call in parseMemberExpression is removed.
+    // Gateway-level rejection cases covering the parse-time and eval-sink guards.
     const rejectedMemberExpression = (
       members: { measures?: string[], dimensions?: string[] }
     ): QueryRequest => ({
@@ -1011,6 +1011,53 @@ describe('API Gateway', () => {
           '{"cubeName":"sales","alias":"pm","expr":{"type":"PatchMeasure","sourceMeasure":"sales.count","replaceAggregationType":null,"addFilters":[{"cubeParams":["sales"],"sql":"${process.version}"}]}}'
         ]
       }));
+    });
+
+    // Only the eval-sink guard closes this: an object-form member skips
+    // parseMemberExpression, and a sibling string expression flips
+    // hasExpressionsInQuery on so it still reaches evalMemberExpression.
+    test('rejects an object-form member expression at the eval sink', async () => {
+      expect.assertions(1);
+      const { apiGateway } = await createApiGateway();
+      const request: QueryRequest = {
+        res(message) {
+          const errorMessage = message as { error: string };
+          expect(errorMessage.error).toMatch(/Unsafe member expression/);
+        },
+        query: {
+          measures: [],
+          dimensions: [
+            // eslint-disable-next-line no-template-curly-in-string
+            '{"cubeName":"sales","alias":"users_age","expr":{"type":"SqlFunction","cubeParams":["sales"],"sql":"${sales.users_age}"},"groupingSet":null}',
+            {
+              cubeName: 'sales',
+              name: 'x',
+              expressionName: 'x',
+              definition: '',
+              expression: ['return process.version'],
+            },
+          ],
+          segments: [],
+          order: []
+        },
+        expressionParams: [],
+        exportAnnotatedSql: true,
+        memberExpressions: true,
+        disableExternalPreAggregations: true,
+        queryType: 'multi',
+        disableLimitEnforcing: true,
+        context: {
+          securityContext: {},
+          signedWithPlaygroundAuthSecret: false,
+          requestId: 'd592f44e-9c26-4187-aa09-e9d39ca19a88-span-1',
+          protocol: 'postgres',
+          apiType: 'sql',
+          appName: 'NULL'
+        },
+        apiType: 'sql'
+      };
+
+      await apiGateway.sql(request);
     });
   });
 
