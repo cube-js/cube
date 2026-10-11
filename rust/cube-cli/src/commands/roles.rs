@@ -1,8 +1,26 @@
 use anyhow::{bail, Result};
-use clap::Subcommand;
+use clap::{Subcommand, ValueEnum};
 use serde_json::{json, Map, Value};
 
 use crate::{output, util, Ctx};
+
+/// The license tier a role confers, as the console's Base Role field.
+#[derive(Clone, Copy, ValueEnum)]
+enum Tier {
+    View,
+    Explore,
+    Develop,
+}
+
+impl Tier {
+    fn action(self) -> &'static str {
+        match self {
+            Tier::View => "AIBIView",
+            Tier::Explore => "AIBIExplore",
+            Tier::Develop => "AIBIDevelop",
+        }
+    }
+}
 
 #[derive(clap::Args)]
 pub struct Args {
@@ -30,13 +48,18 @@ enum Cmd {
         /// Role description
         #[arg(long)]
         description: Option<String>,
+        /// License tier the role confers (the console's Base Role). Without one its
+        /// holders have no tier and cannot use the product
+        #[arg(long, value_enum)]
+        tier: Option<Tier>,
         /// Deployment id to scope the role to, or All; repeat for several
         #[arg(long = "deployment")]
         deployments: Vec<String>,
         /// Action to grant on those deployments, e.g. DeploymentRead; repeat for several
         #[arg(long = "action")]
         actions: Vec<String>,
-        /// Extra request body fields as JSON (inline, @file, or - for stdin)
+        /// Extra request body fields as JSON (inline, @file, or - for stdin). The flags
+        /// above win over the same key here; a policy they build is appended to these
         #[arg(long, short = 'd')]
         data: Option<String>,
     },
@@ -55,13 +78,20 @@ enum Cmd {
         /// New description
         #[arg(long)]
         description: Option<String>,
-        /// Deployment id to scope the role to, or All; repeat for several
+        /// License tier to set (the console's Base Role). REPLACES every policy the role
+        /// has, as --deployment does
+        #[arg(long, value_enum)]
+        tier: Option<Tier>,
+        /// Deployment to scope the role to, or All; repeat for several. REPLACES every
+        /// policy the role already has, tier included — read the role first and pass the
+        /// full set with --data to keep them
         #[arg(long = "deployment")]
         deployments: Vec<String>,
         /// Action to grant on those deployments, e.g. DeploymentRead; repeat for several
         #[arg(long = "action")]
         actions: Vec<String>,
-        /// Extra request body fields as JSON (inline, @file, or - for stdin)
+        /// Extra request body fields as JSON (inline, @file, or - for stdin). The flags
+        /// above win over the same key here; a policy they build is appended to these
         #[arg(long, short = 'd')]
         data: Option<String>,
     },
@@ -112,13 +142,16 @@ fn deployment_policy(deployments: &[String], actions: &[String]) -> Result<Optio
 
 /// The policies to send, or `None` to leave the field out.
 ///
-/// A policy built from the flags is appended to whatever `--data` carried, so
+/// `--tier` becomes the `Global` policy the console calls the Base Role, and
+/// the deployment flags the `Deployment` one; both are appended to whatever
+/// `--data` carried, so
 /// the two compose instead of overwriting each other. `required_empty` is for
 /// create, where the server requires `policies`: with nothing to send it
 /// becomes `[]`, a role that grants nothing yet. Update omits it instead,
 /// because there a `[]` would strip the role's existing grants.
 fn policies_for(
     data: &Map<String, Value>,
+    tier: Option<Tier>,
     deployments: &[String],
     actions: &[String],
     required_empty: bool,
@@ -128,11 +161,21 @@ fn policies_for(
         Some(_) => bail!("policies in --data must be an array"),
         None => Vec::new(),
     };
+    let tier_policy = tier.map(|tier| {
+        json!({
+            "resourceType": "Global",
+            "actions": [tier.action()],
+            "resources": ["All"],
+        })
+    });
     let from_flags = deployment_policy(deployments, actions)?;
     let had_data = data.contains_key("policies");
+    if let Some(policy) = tier_policy {
+        policies.push(policy);
+    }
     if let Some(policy) = from_flags {
         policies.push(policy);
-    } else if !had_data {
+    } else if policies.is_empty() && !had_data {
         return Ok(required_empty.then(|| json!([])));
     }
     Ok(Some(Value::Array(policies)))
@@ -159,12 +202,13 @@ pub async fn command(args: Args, ctx: &Ctx) -> Result<()> {
         Cmd::Create {
             name,
             description,
+            tier,
             deployments,
             actions,
             data,
         } => {
             let mut body = util::parse_data(data.as_deref())?;
-            let policies = policies_for(&body, &deployments, &actions, true)?;
+            let policies = policies_for(&body, tier, &deployments, &actions, true)?;
             body.insert("name".to_string(), json!(name));
             util::set(&mut body, "description", &description);
             if let Some(policies) = policies {
@@ -183,12 +227,13 @@ pub async fn command(args: Args, ctx: &Ctx) -> Result<()> {
             role,
             name,
             description,
+            tier,
             deployments,
             actions,
             data,
         } => {
             let mut body = util::parse_data(data.as_deref())?;
-            let policies = policies_for(&body, &deployments, &actions, false)?;
+            let policies = policies_for(&body, tier, &deployments, &actions, false)?;
             util::set(&mut body, "name", &name);
             util::set(&mut body, "description", &description);
             if let Some(policies) = policies {
@@ -243,6 +288,7 @@ mod tests {
     fn scoping_a_role_to_deployments_builds_one_deployment_policy() {
         let policies = policies_for(
             &Map::new(),
+            None,
             &["42".to_string(), "43".to_string()],
             &["DeploymentRead".to_string()],
             true,
@@ -266,6 +312,7 @@ mod tests {
         // numeric ids, so neither can be parsed as a number on the way in.
         let policies = policies_for(
             &Map::new(),
+            None,
             &["All".to_string()],
             &["DeploymentRead".to_string()],
             true,
@@ -281,8 +328,8 @@ mod tests {
         let deployments = ["42".to_string()];
         let actions = ["DeploymentRead".to_string()];
 
-        assert!(policies_for(&Map::new(), &deployments, &[], true).is_err());
-        assert!(policies_for(&Map::new(), &[], &actions, true).is_err());
+        assert!(policies_for(&Map::new(), None, &deployments, &[], true).is_err());
+        assert!(policies_for(&Map::new(), None, &[], &actions, true).is_err());
     }
 
     #[test]
@@ -290,10 +337,13 @@ mod tests {
         // The server requires `policies` on create, but on update a `[]` would
         // strip the role's grants — so the same absence has to mean each.
         assert_eq!(
-            policies_for(&Map::new(), &[], &[], true).unwrap(),
+            policies_for(&Map::new(), None, &[], &[], true).unwrap(),
             Some(json!([]))
         );
-        assert_eq!(policies_for(&Map::new(), &[], &[], false).unwrap(), None);
+        assert_eq!(
+            policies_for(&Map::new(), None, &[], &[], false).unwrap(),
+            None
+        );
     }
 
     #[test]
@@ -303,6 +353,7 @@ mod tests {
         );
         let policies = policies_for(
             &body,
+            None,
             &["42".to_string()],
             &["DeploymentRead".to_string()],
             true,
@@ -323,15 +374,60 @@ mod tests {
         // An explicit `[]` in --data is a request to clear them, so it has to reach
         // the server rather than be read as "nothing to send".
         assert_eq!(
-            policies_for(&body, &[], &[], false).unwrap(),
+            policies_for(&body, None, &[], &[], false).unwrap(),
             Some(json!([]))
         );
+    }
+
+    #[test]
+    fn a_tier_becomes_the_global_policy_the_console_calls_a_base_role() {
+        let policies = policies_for(&Map::new(), Some(Tier::Develop), &[], &[], true)
+            .unwrap()
+            .unwrap();
+
+        assert_eq!(
+            policies,
+            json!([{
+                "resourceType": "Global",
+                "actions": ["AIBIDevelop"],
+                "resources": ["All"],
+            }])
+        );
+    }
+
+    #[test]
+    fn a_tier_and_a_deployment_scope_are_sent_as_two_policies() {
+        // The pair the ticket's pipeline needs: a role that both licenses its
+        // holder and scopes them, without reaching for --data.
+        let policies = policies_for(
+            &Map::new(),
+            Some(Tier::Explore),
+            &["42".to_string()],
+            &["DeploymentRead".to_string()],
+            true,
+        )
+        .unwrap()
+        .unwrap();
+
+        let policies = policies.as_array().unwrap();
+        assert_eq!(policies.len(), 2);
+        assert_eq!(policies[0]["actions"], json!(["AIBIExplore"]));
+        assert_eq!(policies[1]["resourceType"], "Deployment");
+    }
+
+    #[test]
+    fn a_tier_alone_is_enough_to_send_policies_on_update() {
+        // Update omits an absent `policies`, but a tier is something to send, so
+        // it must not be swallowed by that rule.
+        assert!(policies_for(&Map::new(), Some(Tier::View), &[], &[], false)
+            .unwrap()
+            .is_some());
     }
 
     #[test]
     fn a_non_array_policies_in_data_is_rejected() {
         let body = data(r#"{"policies": "DeploymentRead"}"#);
 
-        assert!(policies_for(&body, &[], &[], true).is_err());
+        assert!(policies_for(&body, None, &[], &[], true).is_err());
     }
 }

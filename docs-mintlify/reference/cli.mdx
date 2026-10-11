@@ -207,6 +207,7 @@ DEPLOYMENT=$(cube deployments create --name analytics --region aws-us-east-1-2 |
 
 ROLE=$(cube roles create \
   --name "Analytics team" \
+  --tier develop \
   --deployment "$DEPLOYMENT" \
   --action DeploymentRead \
   --action SchemaRead | jq -r '.id')
@@ -214,18 +215,29 @@ ROLE=$(cube roles create \
 cube roles assign "$ROLE" 42
 ```
 
+`--tier` is the [Base Role](/admin/users-and-permissions/custom-roles#base-role)
+— it sets the license tier, and a role created without one leaves its holders
+unable to use the product, with nothing saying so until they sign in. Pick a
+tier that covers the actions you grant: `view`, `explore`, or `develop`.
+
 `--deployment` and `--action` build one `Deployment` policy together, so each
 needs the other — neither is defaulted, because guessing one would grant
 something you did not ask for. Repeat either flag for several values, and pass
 `--deployment All` for every deployment in the account.
 
-For a policy the flags do not cover — a `Global` one, or several resource types
-at once — pass the full `policies` array with `--data`; a policy built from the
-flags is appended to it rather than replacing it.
+For a policy the flags do not cover — several resource types at once, or global
+actions beyond the tier — pass the full `policies` array with `--data`; the
+policies the flags build are appended to it.
 
-`roles update` replaces a role's policies outright when it is given any, and
-leaves them untouched when it is not, so a partial update cannot strip a role's
-grants by accident.
+<Warning>
+
+`roles update` sends `policies` whenever it is given `--tier`, `--deployment` or
+`--data`, and the API replaces the role's policies outright rather than merging.
+Adding a second deployment with `--deployment` alone therefore drops the tier
+and every other scope. Read the role first and pass the full set with `--data`,
+or re-state the flags you want kept.
+
+</Warning>
 
 ## Changing the Cube version
 
