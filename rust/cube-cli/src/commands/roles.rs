@@ -65,12 +65,14 @@ enum Cmd {
     },
     /// Show a single custom role
     Get {
-        /// Role id
+        /// Role id (a built-in role's id is negative)
+        #[arg(allow_negative_numbers = true)]
         role: i64,
     },
     /// Update a custom role
     Update {
-        /// Role id
+        /// Role id (a built-in role's id is negative)
+        #[arg(allow_negative_numbers = true)]
         role: i64,
         /// New role name
         #[arg(long)]
@@ -98,19 +100,22 @@ enum Cmd {
     /// Delete a custom role
     #[command(alias = "rm")]
     Delete {
-        /// Role id
+        /// Role id (a built-in role's id is negative)
+        #[arg(allow_negative_numbers = true)]
         role: i64,
     },
     /// Grant a role to a user
     Assign {
-        /// Role id
+        /// Role id (a built-in role's id is negative)
+        #[arg(allow_negative_numbers = true)]
         role: i64,
         /// User id
         user: i64,
     },
     /// Revoke a role from a user
     Unassign {
-        /// Role id
+        /// Role id (a built-in role's id is negative)
+        #[arg(allow_negative_numbers = true)]
         role: i64,
         /// User id
         user: i64,
