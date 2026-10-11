@@ -939,6 +939,82 @@ describe('API Gateway', () => {
 
       await apiGateway.sql(request);
     });
+
+    // Drive malicious member expressions through the gateway (not just the
+    // assertSafeMemberExpressionSql helper) so that removing the guard call in
+    // parseMemberExpression would fail these. Covers both wiring sites:
+    // the SqlFunction branch and the PatchMeasure addFilters branch.
+    const rejectedMemberExpression = (
+      members: { measures?: string[], dimensions?: string[] }
+    ): QueryRequest => ({
+      res(message) {
+        const errorMessage = message as { error: string };
+        expect(errorMessage.error).toMatch(/Unsafe member expression/);
+      },
+      query: {
+        measures: members.measures ?? [],
+        dimensions: members.dimensions ?? [],
+        segments: [],
+        order: []
+      },
+      expressionParams: [],
+      exportAnnotatedSql: true,
+      memberExpressions: true,
+      disableExternalPreAggregations: true,
+      queryType: 'multi',
+      disableLimitEnforcing: true,
+      context: {
+        securityContext: {},
+        signedWithPlaygroundAuthSecret: false,
+        requestId: 'd592f44e-9c26-4187-aa09-e9d39ca19a88-span-1',
+        protocol: 'postgres',
+        apiType: 'sql',
+        appName: 'NULL'
+      },
+      apiType: 'sql'
+    });
+
+    test('rejects arbitrary JS in a SqlFunction expression', async () => {
+      expect.assertions(1);
+      const { apiGateway } = await createApiGateway();
+      await apiGateway.sql(rejectedMemberExpression({
+        dimensions: [
+          // eslint-disable-next-line no-template-curly-in-string
+          '{"cubeName":"sales","alias":"x","expr":{"type":"SqlFunction","cubeParams":["sales"],"sql":"${process.version}"},"groupingSet":null}'
+        ]
+      }));
+    });
+
+    test('rejects a non-identifier cubeParams entry', async () => {
+      expect.assertions(1);
+      const { apiGateway } = await createApiGateway();
+      await apiGateway.sql(rejectedMemberExpression({
+        measures: [
+          '{"cubeName":"sales","alias":"x","expr":{"type":"SqlFunction","cubeParams":["[a = process.version] = []"],"sql":"1"},"groupingSet":null}'
+        ]
+      }));
+    });
+
+    test('rejects a template-literal breakout via backtick', async () => {
+      expect.assertions(1);
+      const { apiGateway } = await createApiGateway();
+      await apiGateway.sql(rejectedMemberExpression({
+        dimensions: [
+          '{"cubeName":"sales","alias":"x","expr":{"type":"SqlFunction","cubeParams":["sales"],"sql":"` + process.version + `"},"groupingSet":null}'
+        ]
+      }));
+    });
+
+    test('rejects arbitrary JS in a PatchMeasure addFilters expression', async () => {
+      expect.assertions(1);
+      const { apiGateway } = await createApiGateway();
+      await apiGateway.sql(rejectedMemberExpression({
+        measures: [
+          // eslint-disable-next-line no-template-curly-in-string
+          '{"cubeName":"sales","alias":"pm","expr":{"type":"PatchMeasure","sourceMeasure":"sales.count","replaceAggregationType":null,"addFilters":[{"cubeParams":["sales"],"sql":"${process.version}"}]}}'
+        ]
+      }));
+    });
   });
 
   describe('/v1/sql endpoint dataSource', () => {

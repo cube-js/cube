@@ -25,12 +25,8 @@ function hasTemplateBreakout(sql: string): boolean {
 }
 
 /**
- * Member expressions from the SQL API are spliced into `return \`${sql}\`` and
- * evaluated with `Function.constructor` (see `evalMemberExpression`). Reject any
- * input that could execute arbitrary JS there: a `cubeParams` entry that is not
- * a plain identifier (it becomes raw `Function` parameter source, e.g.
- * `[a = <expr>] = []`), a template breakout in `sql` (backtick / trailing
- * backslash), or a `${...}` that is not a reference rooted at one of `cubeParams`.
+ * `cubeParams` and `sql` are spliced into `Function(...cubeParams, \`return \`${sql}\`\`)`
+ * (see `evalMemberExpression`); reject anything that could execute JS there.
  */
 export function assertSafeMemberExpressionSql(sql: string, cubeParams: string[]): void {
   for (const param of cubeParams) {
