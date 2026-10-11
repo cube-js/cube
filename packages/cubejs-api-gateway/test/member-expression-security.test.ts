@@ -22,6 +22,8 @@ describe('assertSafeMemberExpressionSql', () => {
       ['1 + 2', []],
       // bare param reference
       ['${Orders}', ['Orders']],
+      // an escaped backtick (as CubeSQL emits) is literal text, not a breakout
+      ['${Orders.col} = \\`x\\`', ['Orders']],
     ];
 
     test.each(cases)('%s', (sql, cubeParams) => {
@@ -77,6 +79,26 @@ describe('assertSafeMemberExpressionSql', () => {
     ];
 
     test.each(cases)('%s / %j', (sql, cubeParams) => {
+      expect(() => assertSafeMemberExpressionSql(sql, cubeParams)).toThrow(
+        /Unsafe member expression/
+      );
+    });
+  });
+
+  describe('rejects template-literal breakout in sql', () => {
+    // sql is spliced into `return `<sql>``, so an unescaped backtick closes the
+    // literal and a trailing odd backslash escapes its closing backtick.
+    const cases: [string, string[]][] = [
+      ['` + process.version + `', ['Orders']],
+      ['${Orders.col}` + process.mainModule + `', ['Orders']],
+      // escaped backtick is fine, but a further bare backtick is not
+      ['\\`x` + process.version + `', ['Orders']],
+      // trailing odd backslash escapes the closing backtick
+      ['${Orders.col}\\', ['Orders']],
+      ['abc\\\\\\', ['Orders']],
+    ];
+
+    test.each(cases)('%j', (sql, cubeParams) => {
       expect(() => assertSafeMemberExpressionSql(sql, cubeParams)).toThrow(
         /Unsafe member expression/
       );
