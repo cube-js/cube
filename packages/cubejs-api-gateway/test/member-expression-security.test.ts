@@ -2,7 +2,10 @@
 // (the member-expression interpolation syntax). They are intentionally plain
 // strings, not template literals.
 /* eslint-disable no-template-curly-in-string */
-import { assertSafeMemberExpressionSql } from '../src/member-expression-security';
+import {
+  assertSafeMemberExpressionSql,
+  assertSafeCompiledMemberExpression,
+} from '../src/member-expression-security';
 
 describe('assertSafeMemberExpressionSql', () => {
   describe('accepts the references the planner actually emits', () => {
@@ -102,6 +105,45 @@ describe('assertSafeMemberExpressionSql', () => {
 
     test.each(cases)('%j', (sql, cubeParams) => {
       expect(() => assertSafeMemberExpressionSql(sql, cubeParams)).toThrow(
+        /Unsafe member expression/
+      );
+    });
+  });
+});
+
+describe('assertSafeCompiledMemberExpression', () => {
+  describe('accepts the compiled arrays parseMemberExpression builds', () => {
+    const cases: string[][] = [
+      ['sales', 'return `${sales.amount}`'],
+      ['A', 'B', 'return `${A.x} + ${B.y}`'],
+      // constant expression, no params
+      ['return `1 + 2`'],
+    ];
+
+    test.each(cases.map((c) => [c]))('%j', (expression) => {
+      expect(() => assertSafeCompiledMemberExpression(expression)).not.toThrow();
+    });
+  });
+
+  describe('rejects compiled arrays that could execute JS (object-form bypass)', () => {
+    const cases: string[][] = [
+      // body not wrapped in the `return \`...\`` template
+      ['return process.version'],
+      ['return process.mainModule.require("child_process").execSync("id")'],
+      // non-identifier param (raw Function parameter source)
+      ['[a = process.version] = []', 'return `1`'],
+      ['sales', 'x = process.version', 'return `${sales.amount}`'],
+      // arbitrary JS / globals inside the wrapped body
+      ['sales', 'return `${process.version}`'],
+      ['return `${7 * 191}`'],
+      // backtick breakout inside the wrapped body
+      ['sales', 'return `a` + process.version + `b`'],
+      // malformed
+      [],
+    ];
+
+    test.each(cases.map((c) => [c]))('%j', (expression) => {
+      expect(() => assertSafeCompiledMemberExpression(expression)).toThrow(
         /Unsafe member expression/
       );
     });

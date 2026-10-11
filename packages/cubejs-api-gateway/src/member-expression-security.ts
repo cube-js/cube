@@ -76,3 +76,28 @@ export function assertSafeMemberExpressionSql(sql: string, cubeParams: string[])
     searchFrom = close + 1;
   }
 }
+
+// The exact body `parseMemberExpression` builds: `return \`<sql>\``.
+const COMPILED_BODY_RE = /^return `([\s\S]*)`$/;
+
+/**
+ * Guard the compiled `[...cubeParams, body]` array at the actual sink
+ * (`Function.constructor` in `evalMemberExpression`). This also covers member
+ * expressions that arrive already parsed as objects and so never pass through
+ * `parseMemberExpression` / {@link assertSafeMemberExpressionSql}.
+ */
+export function assertSafeCompiledMemberExpression(expression: string[]): void {
+  if (!Array.isArray(expression) || expression.length < 1) {
+    throw new UserError('Unsafe member expression: malformed compiled expression');
+  }
+
+  const params = expression.slice(0, -1);
+  const body = expression[expression.length - 1];
+  const match = typeof body === 'string' ? COMPILED_BODY_RE.exec(body) : null;
+
+  if (!match) {
+    throw new UserError('Unsafe member expression: unexpected compiled body');
+  }
+
+  assertSafeMemberExpressionSql(match[1], params);
+}
