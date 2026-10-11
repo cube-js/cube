@@ -1686,8 +1686,7 @@ class ApiGateway {
     }
 
     if (Array.isArray(memberExpression.expression)) {
-      // Guard at the sink: covers member expressions that arrived already parsed
-      // as objects and so bypassed parseMemberExpression's validation.
+      // The only guard before eval: string-form and object-form members both land here.
       assertSafeCompiledMemberExpression(memberExpression.expression);
       return {
         ...memberExpression,

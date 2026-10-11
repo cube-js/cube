@@ -1033,7 +1033,7 @@ describe('API Gateway', () => {
               cubeName: 'sales',
               name: 'x',
               expressionName: 'x',
-              definition: '',
+              definition: 'x',
               expression: ['return process.version'],
             },
           ],
