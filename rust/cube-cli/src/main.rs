@@ -173,6 +173,9 @@ enum Command {
     /// Manage user attributes and their values
     #[command(alias = "attribute")]
     Attributes(commands::attributes::Args),
+    /// Manage custom roles
+    #[command(alias = "role")]
+    Roles(commands::roles::Args),
     /// Manage resource access policies
     #[command(alias = "policy")]
     Policies(commands::policies::Args),
@@ -245,6 +248,7 @@ impl Command {
             Users(_) => "users",
             Groups(_) => "groups",
             Attributes(_) => "attributes",
+            Roles(_) => "roles",
             Policies(_) => "policies",
             Tenant(_) => "tenant",
             Embed(_) => "embed",
@@ -358,6 +362,7 @@ async fn run(global: GlobalArgs, command: Command) -> Result<()> {
         Users(args) => commands::users::command(args, &ctx).await,
         Groups(args) => commands::groups::command(args, &ctx).await,
         Attributes(args) => commands::attributes::command(args, &ctx).await,
+        Roles(args) => commands::roles::command(args, &ctx).await,
         Policies(args) => commands::policies::command(args, &ctx).await,
         Tenant(args) => commands::tenant::command(args, &ctx).await,
         Embed(args) => commands::embed::command(args, &ctx).await,

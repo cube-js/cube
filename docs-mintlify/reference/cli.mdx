@@ -183,6 +183,7 @@ Run `cube <command> --help` for the full options of any command.
 | `environments` | Deployment environments and environment tokens |
 | `variables` | Deployment environment variables |
 | `folders`, `workbooks`, `reports`, `workspace` | Workspace content management |
+| `roles` (`role`) | Custom roles: `list`, `create` (`--name`, `--deployment`, `--action`), `get`, `update`, `delete`, `assign`, `unassign` — see [Scoping a role to a deployment](#scoping-a-role-to-a-deployment) |
 | `users`, `groups`, `attributes`, `policies` | Users, groups, and access control |
 | `tenant`, `notifications`, `integrations`, `oidc`, `api-keys` | Account administration |
 | `embed` | Embed sessions, tokens, embed tenants; `enable-dashboard`/`disable-dashboard` toggle signed embedding for a dashboard |
@@ -194,6 +195,37 @@ Run `cube <command> --help` for the full options of any command.
 
 List commands print tables by default; pass `--json` anywhere for raw JSON
 output, suitable for piping to `jq`.
+
+## Scoping a role to a deployment
+
+A deployment and the access to it can be provisioned in one run: `deployments
+create` returns the new deployment, and `roles create` takes its id as the
+resource a policy is scoped to.
+
+```bash
+DEPLOYMENT=$(cube deployments create --name analytics --region aws-us-east-1-2 | jq -r '.id')
+
+ROLE=$(cube roles create \
+  --name "Analytics team" \
+  --deployment "$DEPLOYMENT" \
+  --action DeploymentRead \
+  --action SchemaRead | jq -r '.id')
+
+cube roles assign "$ROLE" 42
+```
+
+`--deployment` and `--action` build one `Deployment` policy together, so each
+needs the other — neither is defaulted, because guessing one would grant
+something you did not ask for. Repeat either flag for several values, and pass
+`--deployment All` for every deployment in the account.
+
+For a policy the flags do not cover — a `Global` one, or several resource types
+at once — pass the full `policies` array with `--data`; a policy built from the
+flags is appended to it rather than replacing it.
+
+`roles update` replaces a role's policies outright when it is given any, and
+leaves them untouched when it is not, so a partial update cannot strip a role's
+grants by accident.
 
 ## Changing the Cube version
 
