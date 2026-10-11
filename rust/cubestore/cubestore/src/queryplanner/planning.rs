@@ -2715,6 +2715,25 @@ pub mod tests {
            \n    Scan s.Orders, source: CubeTable(index: by_customer:3:[]:sort_on[order_customer]), fields: [order_customer, order_amount]"
         );
 
+        // An aggregate whose arguments the simplifier rewrites (here, folding literal casts in a CASE)
+        // comes back aliased to its original name, and is still a top-k.
+        let plan = initial_plan(
+            "SELECT order_customer `customer`, \
+                    SUM(CASE WHEN CAST('2024-01-01T00:00:00.000' AS TIMESTAMP) \
+                                  <= CAST('2024-02-01T00:00:00.000' AS TIMESTAMP) \
+                              AND order_city >= 5 THEN order_amount END) `amount` \
+             FROM s.Orders \
+             GROUP BY 1 ORDER BY 2 DESC LIMIT 10",
+            &indices,
+        );
+        let plan = choose_index(plan, &indices).await.unwrap().0;
+        assert_eq!(
+            pretty_printers::pp_plan(&plan),
+            "Projection, [customer, amount]\
+           \n  ClusterAggregateTopK, limit: 10\
+           \n    Scan s.Orders, source: CubeTable(index: by_customer:3:[]:sort_on[order_customer]), fields: [order_customer, order_amount, order_city]"
+        );
+
         // Should not introduce TopK by mistake in unsupported cases.
         // No 'order by'.
         let plan = initial_plan(

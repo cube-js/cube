@@ -205,9 +205,19 @@ fn materialize_topk_under_limit_sort(
     Ok(None)
 }
 
+/// The aggregate under the alias the simplifier puts on it. When it rewrites an aggregate's
+/// arguments (folding the literals of a `CASE` condition, say), it aliases the result to keep the
+/// column name the rest of the plan refers to.
+fn without_alias(e: &Expr) -> &Expr {
+    match e {
+        Expr::Alias(Alias { expr, .. }) => without_alias(expr),
+        _ => e,
+    }
+}
+
 fn aggr_exprs_allow_topk(agg_exprs: &[Expr]) -> bool {
     for a in agg_exprs {
-        match a {
+        match without_alias(a) {
             // TODO: Maybe topk could support filter
             Expr::AggregateFunction(AggregateFunction {
                 func,
@@ -292,7 +302,7 @@ fn fun_topk_type(f: &datafusion::logical_expr::AggregateUDF) -> Option<TopKAggre
 }
 
 fn extract_aggregate_fun(e: &Expr) -> Option<(TopKAggregateFunction, &Vec<Expr>)> {
-    match e {
+    match without_alias(e) {
         Expr::AggregateFunction(AggregateFunction {
             func,
             params:
@@ -802,7 +812,7 @@ fn plan_topk_full_merge(
         .iter()
         .enumerate()
         .map(|(i, e)| {
-            let mut af = e.clone();
+            let mut af = without_alias(e).clone();
             if let Expr::AggregateFunction(AggregateFunction { params, .. }) = &mut af {
                 let col_name = cluster_schema.field(group_expr_len + i).name().clone();
                 params.args = vec![Expr::Column(datafusion::common::Column::new(
