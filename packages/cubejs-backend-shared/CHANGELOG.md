@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.8.4](https://github.com/cube-js/cube/compare/v1.8.3...v1.8.4) (2026-10-12)
+
+### Features
+
+- **tesseract:** Enable multi-stage leaf merge and union by default ([#12220](https://github.com/cube-js/cube/issues/12220)) ([c1367cf](https://github.com/cube-js/cube/commit/c1367cf6dbe4027568a73f48fca39d60a5a10ad1)), closes [#12182](https://github.com/cube-js/cube/issues/12182) [#10268](https://github.com/cube-js/cube/issues/10268) [#12182](https://github.com/cube-js/cube/issues/12182)
+
 ## [1.8.3](https://github.com/cube-js/cube/compare/v1.8.2...v1.8.3) (2026-10-10)
 
 ### Features

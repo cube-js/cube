@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.8.4](https://github.com/cube-js/cube/compare/v1.8.3...v1.8.4) (2026-10-12)
+
+### Bug Fixes
+
+- **api-gateway:** Guard member-expression SQL eval against JS injection ([#12207](https://github.com/cube-js/cube/issues/12207)) ([3c09976](https://github.com/cube-js/cube/commit/3c09976522024961fa43afac958b9dad348ee40b))
+
 ## [1.8.3](https://github.com/cube-js/cube/compare/v1.8.2...v1.8.3) (2026-10-10)
 
 **Note:** Version bump only for package @cubejs-backend/api-gateway

@@ -3,6 +3,19 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.8.4](https://github.com/cube-js/cube/compare/v1.8.3...v1.8.4) (2026-10-12)
+
+### Bug Fixes
+
+- **api-gateway:** Guard member-expression SQL eval against JS injection ([#12207](https://github.com/cube-js/cube/issues/12207)) ([3c09976](https://github.com/cube-js/cube/commit/3c09976522024961fa43afac958b9dad348ee40b))
+- **client:** Fix stale useCubeQuery state, missed dry runs and dropped granularity ([#12217](https://github.com/cube-js/cube/issues/12217)) ([7a67afb](https://github.com/cube-js/cube/commit/7a67afbe17b10f25c2342215db7fa21c9df1bb03)), closes [#3473](https://github.com/cube-js/cube/issues/3473) [#3552](https://github.com/cube-js/cube/issues/3552) [#12204](https://github.com/cube-js/cube/issues/12204) [#5289](https://github.com/cube-js/cube/issues/5289) [#9985](https://github.com/cube-js/cube/issues/9985) [#7379](https://github.com/cube-js/cube/issues/7379) [#3473](https://github.com/cube-js/cube/issues/3473) [#3552](https://github.com/cube-js/cube/issues/3552) [#5289](https://github.com/cube-js/cube/issues/5289) [#9985](https://github.com/cube-js/cube/issues/9985) [#7379](https://github.com/cube-js/cube/issues/7379)
+- **cubestore:** Don't widen decimal sums twice in full-merge top-k ([#12188](https://github.com/cube-js/cube/issues/12188)) ([31edcf4](https://github.com/cube-js/cube/commit/31edcf42ae99430767637b74872836b9134f139a))
+
+### Features
+
+- **cube-cli:** Manage custom roles from the CLI (CUB-4361) ([#11894](https://github.com/cube-js/cube/issues/11894)) ([46e7928](https://github.com/cube-js/cube/commit/46e7928b411533413c35e3be367c0e5fb5be57a9)), closes [cubedevinc/cubejs-enterprise#15056](https://github.com/cubedevinc/cubejs-enterprise/issues/15056)
+- **tesseract:** Enable multi-stage leaf merge and union by default ([#12220](https://github.com/cube-js/cube/issues/12220)) ([c1367cf](https://github.com/cube-js/cube/commit/c1367cf6dbe4027568a73f48fca39d60a5a10ad1)), closes [#12182](https://github.com/cube-js/cube/issues/12182) [#10268](https://github.com/cube-js/cube/issues/10268) [#12182](https://github.com/cube-js/cube/issues/12182)
+
 ## [1.8.3](https://github.com/cube-js/cube/compare/v1.8.2...v1.8.3) (2026-10-10)
 
 ### Bug Fixes
