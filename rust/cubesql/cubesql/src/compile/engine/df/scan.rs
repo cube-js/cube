@@ -256,10 +256,12 @@ impl ExtensionPlanner for CubeScanExtensionPlanner {
                     find_cube_scans_deep_search(wrapped_sql_node.wrapped_plan.clone(), false)
                         .into_iter()
                         .next()
-                        .ok_or(DataFusionError::Internal(format!(
-                            "No cube scans found in wrapper node: {:?}",
-                            wrapped_sql_node
-                        )))?;
+                        .ok_or_else(|| {
+                            DataFusionError::Internal(format!(
+                                "No cube scans found in wrapper node: {:?}",
+                                wrapped_sql_node
+                            ))
+                        })?;
 
                 let schema = SchemaRef::new(wrapped_sql_node.schema().as_ref().into());
                 Some(Arc::new(CubeScanExecutionPlan {
