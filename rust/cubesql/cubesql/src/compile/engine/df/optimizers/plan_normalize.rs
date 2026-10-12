@@ -1028,7 +1028,7 @@ fn expr_normalize_cold_path(
 
         Expr::ScalarUDF { fun, args } => {
             let fun = Arc::clone(fun);
-            let args = args
+            let mut args = args
                 .iter()
                 .map(|arg| {
                     expr_normalize_stacked(
@@ -1040,6 +1040,13 @@ fn expr_normalize_cold_path(
                     )
                 })
                 .collect::<Result<Vec<_>>>()?;
+
+            if (fun.name.eq_ignore_ascii_case("datediff")
+                || fun.name.eq_ignore_ascii_case("dateadd"))
+                && !args.is_empty()
+            {
+                date_part_literal_normalize(&mut args[0]);
+            }
 
             Ok(Box::new(Expr::ScalarUDF { fun, args }))
         }
@@ -1249,24 +1256,28 @@ fn scalar_function_normalize(
         })
         .collect::<Result<Vec<_>>>()?;
 
-    // If the function is `DatePart` or `DateTrunc` and the first argument is a literal string,
-    // normalize the granularity by parsing it and replacing with standartized granularity.
-    // If it cannot be parsed, simply convert it to lowercase.
     if matches!(
         fun,
         BuiltinScalarFunction::DatePart | BuiltinScalarFunction::DateTrunc
     ) && args.len() > 0
     {
-        if let Expr::Literal(ScalarValue::Utf8(Some(granularity))) = &mut args[0] {
-            if let Ok(parsed_granularity) = granularity.parse::<DatePartToken>() {
-                *granularity = parsed_granularity.as_str().to_string();
-            } else {
-                *granularity = granularity.to_ascii_lowercase();
-            }
-        }
+        date_part_literal_normalize(&mut args[0]);
     }
 
     Ok(Box::new(Expr::ScalarFunction { fun, args }))
+}
+
+/// Replaces a literal date part with its standard spelling (`qtr` -> `quarter`), or lowercases
+/// it when it can't be parsed. SQL templates receive the date part as-is, so this is what lets
+/// them rely on a single (lowercase) form.
+fn date_part_literal_normalize(arg: &mut Expr) {
+    if let Expr::Literal(ScalarValue::Utf8(Some(granularity))) = arg {
+        if let Ok(parsed_granularity) = granularity.parse::<DatePartToken>() {
+            *granularity = parsed_granularity.as_str().to_string();
+        } else {
+            *granularity = granularity.to_ascii_lowercase();
+        }
+    }
 }
 
 /// Recursively normalizes grouping sets.

@@ -3673,9 +3673,9 @@ impl WrappedSelectNode {
                     let ms = (*interval & 0xFFFF_FFFF) as i32;
 
                     if days != 0 && ms == 0 {
-                        Ok(Some("DAY".to_string()))
+                        Ok(Some("day".to_string()))
                     } else if ms != 0 && days == 0 {
-                        Ok(Some("MILLISECOND".to_string()))
+                        Ok(Some("millisecond".to_string()))
                     } else {
                         Err(DataFusionError::Internal(format!(
                             "Unsupported mixed IntervalDayTime: days = {days}, ms = {ms}"
@@ -3683,7 +3683,7 @@ impl WrappedSelectNode {
                     }
                 }
                 Expr::Literal(ScalarValue::IntervalYearMonth(Some(_months))) => {
-                    Ok(Some("MONTH".to_string()))
+                    Ok(Some("month".to_string()))
                 }
                 Expr::Literal(ScalarValue::IntervalMonthDayNano(Some(interval))) => {
                     let months = (interval >> 96) as i32;
@@ -3691,11 +3691,11 @@ impl WrappedSelectNode {
                     let nanos = *interval as i64;
 
                     if months != 0 && days == 0 && nanos == 0 {
-                        Ok(Some("MONTH".to_string()))
+                        Ok(Some("month".to_string()))
                     } else if days != 0 && months == 0 && nanos == 0 {
-                        Ok(Some("DAY".to_string()))
+                        Ok(Some("day".to_string()))
                     } else if nanos != 0 && months == 0 && days == 0 {
-                        Ok(Some("NANOSECOND".to_string()))
+                        Ok(Some("nanosecond".to_string()))
                     } else {
                         Err(DataFusionError::Internal(format!(
                                     "Unsupported mixed IntervalMonthDayNano: months = {months}, days = {days}, nanos = {nanos}"

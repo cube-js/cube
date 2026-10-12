@@ -214,7 +214,7 @@ export class MysqlQuery extends BaseQuery {
     // DATEADD is being rewritten to DATE_ADD, which reports sub-day intervals in
     // milliseconds. MySQL has no MILLISECOND unit, so those are scaled to microseconds
     templates.functions.DATE_ADD = 'DATE_ADD({{ args[0] }}, INTERVAL '
-      + '{% if date_part == "MILLISECOND" %}{{ interval }}000 MICROSECOND'
+      + '{% if date_part == "millisecond" %}{{ interval }}000 MICROSECOND'
       + '{% else %}{{ interval }} {{ date_part }}{% endif %})';
     // PERCENTILE_CONT works but requires PARTITION BY
     delete templates.functions.PERCENTILECONT;

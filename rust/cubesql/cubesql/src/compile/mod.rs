@@ -15176,7 +15176,7 @@ ORDER BY "source"."str0" ASC
             .to_string(),
             DatabaseProtocol::PostgreSQL,
             vec![
-                ("functions/DATETRUNC".to_string(), "DATETIME_TRUNC(CAST({{ args[1] }} AS DATETIME), {% if date_part|upper == \'WEEK\' %}{{ \'WEEK(MONDAY)\' }}{% else %}{{ date_part }}{% endif %})".to_string()),
+                ("functions/DATETRUNC".to_string(), "DATETIME_TRUNC(CAST({{ args[1] }} AS DATETIME), {% if date_part == \'week\' %}{{ \'WEEK(MONDAY)\' }}{% else %}{{ date_part }}{% endif %})".to_string()),
             ]
         )
         .await;
@@ -15341,7 +15341,7 @@ ORDER BY "source"."str0" ASC
         assert!(sql.contains("INTERVAL '7 DAY')"));
 
         // BigQuery + Postgres DATE_ADD + DAYS
-        let bq_templates = vec![("functions/DATE_ADD".to_string(), "{% if date_part|upper in ['YEAR', 'MONTH', 'QUARTER'] %}TIMESTAMP(DATETIME_ADD(DATETIME({{ args[0] }}), INTERVAL {{ interval }} {{ date_part }})){% else %}TIMESTAMP_ADD({{ args[0] }}, INTERVAL {{ interval }} {{ date_part }}){% endif %}".to_string())];
+        let bq_templates = vec![("functions/DATE_ADD".to_string(), "{% if date_part in ['year', 'month', 'quarter'] %}TIMESTAMP(DATETIME_ADD(DATETIME({{ args[0] }}), INTERVAL {{ interval }} {{ date_part }})){% else %}TIMESTAMP_ADD({{ args[0] }}, INTERVAL {{ interval }} {{ date_part }}){% endif %}".to_string())];
         let query_plan = convert_select_to_query_plan_customized(
             "
             SELECT DATE_ADD(order_date, INTERVAL '7 DAYS') AS d
@@ -15365,10 +15365,10 @@ ORDER BY "source"."str0" ASC
         let logical_plan = query_plan.as_logical_plan();
         let sql = logical_plan.find_cube_scan_wrapped_sql().wrapped_sql.sql;
         assert!(sql.contains("TIMESTAMP_ADD("));
-        assert!(sql.contains("INTERVAL 7 DAY)"));
+        assert!(sql.contains("INTERVAL 7 day)"));
 
         // BigQuery + Redshift DATEADD + DAYS
-        let bq_templates = vec![("functions/DATE_ADD".to_string(), "{% if date_part|upper in ['YEAR', 'MONTH', 'QUARTER'] %}TIMESTAMP(DATETIME_ADD(DATETIME({{ args[0] }}), INTERVAL {{ interval }} {{ date_part }})){% else %}TIMESTAMP_ADD({{ args[0] }}, INTERVAL {{ interval }} {{ date_part }}){% endif %}".to_string())];
+        let bq_templates = vec![("functions/DATE_ADD".to_string(), "{% if date_part in ['year', 'month', 'quarter'] %}TIMESTAMP(DATETIME_ADD(DATETIME({{ args[0] }}), INTERVAL {{ interval }} {{ date_part }})){% else %}TIMESTAMP_ADD({{ args[0] }}, INTERVAL {{ interval }} {{ date_part }}){% endif %}".to_string())];
         let query_plan = convert_select_to_query_plan_customized(
             "
             SELECT DATEADD(DAY, 7, order_date) AS d
@@ -15392,7 +15392,7 @@ ORDER BY "source"."str0" ASC
         let logical_plan = query_plan.as_logical_plan();
         let sql = logical_plan.find_cube_scan_wrapped_sql().wrapped_sql.sql;
         assert!(sql.contains("TIMESTAMP_ADD("));
-        assert!(sql.contains("INTERVAL 7 DAY)"));
+        assert!(sql.contains("INTERVAL 7 day)"));
 
         // BigQuery + Postgres DATE_ADD + MONTHS
         let query_plan = convert_select_to_query_plan_customized(
@@ -15418,10 +15418,10 @@ ORDER BY "source"."str0" ASC
         let logical_plan = query_plan.as_logical_plan();
         let sql = logical_plan.find_cube_scan_wrapped_sql().wrapped_sql.sql;
         assert!(sql.contains("TIMESTAMP(DATETIME_ADD(DATETIME("));
-        assert!(sql.contains("INTERVAL 7 MONTH)"));
+        assert!(sql.contains("INTERVAL 7 month)"));
 
         // BigQuery + Redshift DATEADD + MONTHS
-        let bq_templates = vec![("functions/DATE_ADD".to_string(), "{% if date_part|upper in ['YEAR', 'MONTH', 'QUARTER'] %}TIMESTAMP(DATETIME_ADD(DATETIME({{ args[0] }}), INTERVAL {{ interval }} {{ date_part }})){% else %}TIMESTAMP_ADD({{ args[0] }}, INTERVAL {{ interval }} {{ date_part }}){% endif %}".to_string())];
+        let bq_templates = vec![("functions/DATE_ADD".to_string(), "{% if date_part in ['year', 'month', 'quarter'] %}TIMESTAMP(DATETIME_ADD(DATETIME({{ args[0] }}), INTERVAL {{ interval }} {{ date_part }})){% else %}TIMESTAMP_ADD({{ args[0] }}, INTERVAL {{ interval }} {{ date_part }}){% endif %}".to_string())];
         let query_plan = convert_select_to_query_plan_customized(
             "
             SELECT DATEADD(MONTH, 7, order_date) AS d
@@ -15445,7 +15445,7 @@ ORDER BY "source"."str0" ASC
         let logical_plan = query_plan.as_logical_plan();
         let sql = logical_plan.find_cube_scan_wrapped_sql().wrapped_sql.sql;
         assert!(sql.contains("TIMESTAMP(DATETIME_ADD(DATETIME("));
-        assert!(sql.contains("INTERVAL 7 MONTH)"));
+        assert!(sql.contains("INTERVAL 7 month)"));
 
         // Postgres DATE_ADD
         let query_plan = convert_select_to_query_plan_customized(
@@ -17068,7 +17068,7 @@ LIMIT {{ limit }}{% endif %}"#.to_string(),
             DatabaseProtocol::PostgreSQL,
             vec![
                 ("expressions/timestamp_literal".to_string(), "from_utc_timestamp('{{ value }}', 'UTC')".to_string()),
-                ("expressions/extract".to_string(), "{% if date_part|lower == \"epoch\" %}unix_timestamp({{ expr }}){% else %}EXTRACT({{ date_part }} FROM {{ expr }}){% endif %}".to_string()),
+                ("expressions/extract".to_string(), "{% if date_part == \"epoch\" %}unix_timestamp({{ expr }}){% else %}EXTRACT({{ date_part }} FROM {{ expr }}){% endif %}".to_string()),
             ],
         )
         .await;
