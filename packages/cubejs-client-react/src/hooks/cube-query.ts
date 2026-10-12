@@ -239,7 +239,7 @@ export function useCubeQuery(
     context,
   ]));
 
-  // The effect below only catches up with a changed query after this render,
+  // The effect above only catches up with a changed query after this render,
   // so don't hand out the previous query's state in the meantime
   const isQueryChanged = !options.skip
     && isQueryPresent(query)
@@ -250,7 +250,7 @@ export function useCubeQuery(
   return {
     isLoading: isLoading || isQueryChanged,
     resultSet: shouldResetResultSet ? null : resultSet,
-    error,
+    error: isQueryChanged ? null : error,
     progress,
     previousQuery: currentQuery,
     refetch: fetch

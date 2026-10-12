@@ -662,8 +662,9 @@ export default {
           return;
         }
         // like the initial query, a query passed in by the parent is taken as is:
-        // heuristics would otherwise rewrite it, e.g. drop an explicit granularity
-        this.skipHeuristics = true;
+        // heuristics would otherwise rewrite it, e.g. drop an explicit granularity.
+        // An empty query never re-enables heuristics, so don't skip them for it.
+        this.skipHeuristics = isQueryPresent(query);
         this.copyQueryFromProps(query);
       },
     },

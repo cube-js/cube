@@ -59,4 +59,28 @@ describe('issue #5289: useCubeQuery stale result with resetResultSetOnChange', (
       expect(result.isLoading).toBe(true);
     }
   });
+
+  it('never returns the previous query error for a changed query', async () => {
+    const cubeApi = {
+      load: jest.fn()
+        .mockRejectedValueOnce(new Error('first failed'))
+        .mockReturnValueOnce(new Promise(() => undefined)),
+    };
+    const firstQuery = { measures: ['Orders.count'] };
+    const secondQuery = { measures: ['Orders.total'] };
+
+    await act(async () => {
+      root.render(<TestComponent query={firstQuery} cubeApi={cubeApi} />);
+    });
+    expect(renders[renders.length - 1].result.error?.message).toBe('first failed');
+
+    const firstRenderAfterChange = renders.length;
+    await act(async () => {
+      root.render(<TestComponent query={secondQuery} cubeApi={cubeApi} />);
+    });
+
+    for (const { result } of renders.slice(firstRenderAfterChange)) {
+      expect(result.error).toBeNull();
+    }
+  });
 });

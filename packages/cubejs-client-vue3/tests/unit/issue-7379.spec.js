@@ -72,4 +72,14 @@ describe('issue #7379: vue3 QueryBuilder keeps timeDimensions granularity', () =
       { dimension: 'Orders.createdAt', granularity: 'day' },
     ]);
   });
+
+  it('still applies heuristics to user edits after the query prop is cleared', async () => {
+    const { wrapper } = setup(issueQuery);
+    await flushPromises();
+
+    await wrapper.setProps({ query: {} });
+    await flushPromises();
+
+    expect(wrapper.vm.skipHeuristics).toBe(false);
+  });
 });
