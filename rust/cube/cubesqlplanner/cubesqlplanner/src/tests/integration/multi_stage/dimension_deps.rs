@@ -113,6 +113,38 @@ async fn test_undeclared_string_dimension_read_is_reported() {
         "The error must name both the member and the dimension it reads:\n{}",
         message
     );
+    assert!(
+        message.contains("reads dimension orders.status, which is not part")
+            && message
+                .contains("computes the member at (orders.created_at (month), orders.status)"),
+        "The error must spell out the grain the declaration results in:\n{}",
+        message
+    );
+}
+
+/// The member reads two dimensions outside its grain; both are reported in one
+/// error, together with the grain declaring them would compute the member at.
+#[tokio::test(flavor = "multi_thread")]
+async fn test_every_undeclared_dimension_read_is_reported_at_once() {
+    let message = expect_error("completed_amount_first_half_of_month");
+
+    assert!(
+        message.contains("reads dimensions orders.status, orders.created_at,"),
+        "The error must name every dimension the sql reads outside the grain:\n{}",
+        message
+    );
+    assert!(
+        message.contains(
+            "computes the member at (orders.created_at (month), orders.status, orders.created_at)"
+        ),
+        "The error must spell out the grain the declaration results in:\n{}",
+        message
+    );
+    assert!(
+        message.contains("non-additive") && message.contains("plain (non-multi-stage) measure"),
+        "The error must say the declaration changes the value and name the alternative:\n{}",
+        message
+    );
 }
 
 /// Declaring the grain the sql needs is what makes the model plan: the leaf
