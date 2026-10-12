@@ -256,6 +256,18 @@ views:
       - name: Managers
         includes:
           - join_path: orders.manager
+  - name: partial_view
+    cubes:
+      - join_path: orders.customer
+        prefix: true
+        includes:
+          - city
+          - geo
+      - join_path: orders.manager
+        prefix: true
+        includes: "*"
+        excludes:
+          - city
 `);
     const view = compilers.cubeEvaluator.cubeFromPath('staff_view') as any;
     expect(view.evaluatedHierarchies.map(h => [h.name, h.levels])).toEqual([
@@ -264,6 +276,12 @@ views:
     ]);
     expect(view.defaultFilters.map(f => f.memberReference)).toEqual(['staff_view.manager_city']);
     expect(view.folders[0].includes.map(m => m.name)).toEqual(['manager_geo', 'manager_city']);
+
+    // A level included through another alias is not this instance's level
+    const partial = compilers.cubeEvaluator.cubeFromPath('partial_view') as any;
+    expect(partial.evaluatedHierarchies.map(h => [h.name, h.levels])).toEqual([
+      ['customer_geo', ['partial_view.customer_city']],
+    ]);
   });
 
   it('keeps a view join map to cube names, up to the first alias', async () => {

@@ -637,11 +637,20 @@ export class CubeEvaluator extends CubeSymbols {
       const hierarchyIncludes = cube.includedMembers.filter(it => it.type === 'hierarchies');
       const includedHierarchyNames = hierarchyIncludes.map(it => it.memberPath.split('.')[1]);
       // The instance a member is included through: a cube may be included
-      // once per join alias, and a hierarchy's levels come from its own instance
+      // once per join alias, and a hierarchy reached through one reads its
+      // levels from that instance or the cubes it joins, never another instance
       const instanceOf = (member: ViewIncludedMember) => member.path?.split('.').slice(0, -1).join('.');
-      const levelMember = (level: string, instance?: string) => (instance !== undefined &&
-        cube.includedMembers.find(m => m.memberPath === level && instanceOf(m) === instance)) ||
-        cube.includedMembers.find(m => m.memberPath === level);
+      const levelMember = (level: string, instance?: string) => {
+        if (instance === undefined) {
+          return cube.includedMembers.find(m => m.memberPath === level && m.path === undefined) ??
+            cube.includedMembers.find(m => m.memberPath === level);
+        }
+        return cube.includedMembers.find(m => {
+          const memberInstance = instanceOf(m);
+          return m.memberPath === level && memberInstance !== undefined &&
+            (memberInstance === instance || memberInstance.startsWith(`${instance}.`));
+        });
+      };
 
       const includedHierarchies: any[] = [];
       for (const cubeName of includedCubeNames) {
@@ -666,7 +675,7 @@ export class CubeEvaluator extends CubeSymbols {
                     const memberName = level.split('.')[1] || level;
                     errorReporter.error(`Only dimensions can be part of a hierarchy. Please remove the '${memberName}' member from the '${it.name}' hierarchy.`);
                   } else if (member) {
-                    return includedMemberPaths.includes(level);
+                    return true;
                   }
 
                   return null;
