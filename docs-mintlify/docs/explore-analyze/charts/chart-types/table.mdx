@@ -13,7 +13,7 @@ Hide a column with the eye button on its row in the **Fields** section of the **
 
 ## Reordering columns
 
-The table shows its columns in the order of the **Pivot** section of the **Fields** tab: the dimensions in **Rows** first, then the measures in **Values**. Drag a field within a list, or to another list, to reorder the columns.
+The table shows its columns in the order of the **Pivot** section of the **Fields** tab: the dimensions in **Rows** first, then the measures in **Values**. Drag a field within its list to reorder the columns. Moving a field to another list changes the [pivot](#pivots).
 
 ## Sorting
 
@@ -133,7 +133,6 @@ Configure individual columns in the **Columns** section of the **Style** tab (or
 | **Word wrap** | Allow cell content to wrap to multiple lines |
 | **Width** | **Flex** (a weight) or **Fix** (pixels) — see [Column width](#column-width) |
 | **Freeze** | Keep the column and every column to its left in view on horizontal scroll — see [Freezing columns](#freezing-columns) |
-| **Hide** | Show or hide the column |
 
 When a cell's value is too long for its column and word wrap is off, the value is truncated with an ellipsis. Hover over a truncated cell to see its full value in a tooltip.
 
@@ -196,8 +195,9 @@ frozen columns print as ordinary columns.
 
 By default, a table with a [column pivot](#pivots) freezes all of its row-header columns, and a
 table without one freezes nothing. Under a column pivot, only the row-header columns can be
-frozen: a measure there spans one column per pivot value, so its pin is disabled. The same holds
-for measures placed in rows.
+frozen: a measure there spans one column per pivot value, so its pin is disabled. When the
+**Measures** placeholder is in **Rows**, the pins of the measures are disabled too. The
+measure-name column then freezes together with the row-header columns.
 
 With [per-group subtotals](#per-group-subtotals) on, the row-header columns freeze and unfreeze
 together, because a group's label spans all of them.
