@@ -107,7 +107,7 @@ From the list, you can:
 - **Edit** an existing task's instructions, schedule, or details.
 - **Enable / Pause** a scheduled task to control whether it runs on schedule.
 - **Run now** — trigger a one-off run immediately. This works for both manual
-  and scheduled tasks. Triggering a run shows a notification with a **View**
+  and scheduled tasks. Triggering a run shows a toast with a **View**
   link straight to the run's chat thread, and the thread appears in the
   Recent Chats sidebar immediately.
 - **Delete** a task. Deleting removes its schedule and stops all future runs.
@@ -160,9 +160,8 @@ to get an [inbox](/docs/inbox) notification when a run finishes or fails. The
 toggle is on by default for a task that you create in the dialog. It applies
 to both scheduled runs and **Run now**.
 
-The notification goes to the task's creator, also when an admin edits or runs
-the task. It shows the start of the agent's answer, or the error for a failed
-run, and links to the run's chat thread.
+The notification goes to the task's creator, even when an admin edits or runs
+the task. See [Inbox](/docs/inbox#notification-types) for what it shows.
 
 A task that you create with the agent or the Platform API has notifications
 off, unless you ask for them: for example, *"schedule a daily summary of
