@@ -2043,8 +2043,8 @@ cubes:
     });
   });
 
-  // `getSql` builds the query first and reads everything else off that build; the native
-  // build already matches pre-aggregations, so nothing after it may plan again just to match.
+  // The native build already matches pre-aggregations, so asking for the match after it
+  // must not run the planner again. The call order in `getSql` is covered by CompilerApi.test.
   describe('native planner reuses the build\'s pre-aggregation match', () => {
     const { compiler, joinGraph, cubeEvaluator } = prepareJsCompiler(`
       cube('visits', {
@@ -2065,7 +2065,7 @@ cubes:
       await compiler.compile();
     });
 
-    const getSqlSequence = (dimension: string) => {
+    const buildThenMatch = (dimension: string) => {
       const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
         measures: ['visits.count'],
         dimensions: [dimension],
@@ -2076,34 +2076,31 @@ cubes:
       } as any);
       const matchOnlyRun = jest.spyOn(query, 'findPreAggregationForQueryRust');
 
-      // Same order as CompilerApi.getSql
       const [sql] = query.buildSqlAndParams();
-      const result = {
-        sql,
-        external: query.externalPreAggregationQuery(),
-        preAggregations: query.preAggregations.preAggregationsDescription(),
-      };
-      query.buildLambdaQuery();
-      query.cacheKeyQueries();
 
-      return { ...result, matchOnlyRuns: matchOnlyRun.mock.calls.length };
+      return {
+        sql,
+        match: query.preAggregations.findPreAggregationForQuery(),
+        external: query.externalPreAggregationQuery(),
+        matchOnlyRuns: matchOnlyRun.mock.calls.length,
+      };
     };
 
     it('on a hit', () => {
-      const { sql, external, preAggregations, matchOnlyRuns } = getSqlSequence('visits.source');
+      const { sql, match, external, matchOnlyRuns } = buildThenMatch('visits.source');
 
       expect(sql).toContain('visits_by_source');
+      expect(match?.preAggregationId).toEqual('visits.bySource');
       expect(external).toEqual(true);
-      expect(preAggregations.map((p: any) => p.preAggregationId)).toEqual(['visits.bySource']);
       expect(matchOnlyRuns).toEqual(0);
     });
 
     it('on a miss', () => {
-      const { sql, external, preAggregations, matchOnlyRuns } = getSqlSequence('visits.browser');
+      const { sql, match, external, matchOnlyRuns } = buildThenMatch('visits.browser');
 
       expect(sql).not.toContain('visits_by_source');
+      expect(match).toBeUndefined();
       expect(external).toEqual(false);
-      expect(preAggregations).toEqual([]);
       expect(matchOnlyRuns).toEqual(0);
     });
   });
