@@ -5268,3 +5268,87 @@ async fn test_aggregate_over_limited_ungrouped_scan() {
         ])
     );
 }
+
+/// Members that the plan for `query` asks Cube for: the members of the pushed down
+/// request, or of the plain CubeScan when nothing is pushed down. The test templates are
+/// extended with the trim functions which the default Cube SQL templates (BaseQuery.js)
+/// define: BTRIM, LTRIM and RTRIM.
+async fn issue_10712_requested_members(query: &str) -> Vec<String> {
+    let context = TestContext::with_custom_templates(
+        DatabaseProtocol::PostgreSQL,
+        vec![
+            (
+                "functions/BTRIM".to_string(),
+                "BTRIM({{ args_concat }})".to_string(),
+            ),
+            (
+                "functions/LTRIM".to_string(),
+                "LTRIM({{ args_concat }})".to_string(),
+            ),
+            (
+                "functions/RTRIM".to_string(),
+                "RTRIM({{ args_concat }})".to_string(),
+            ),
+        ],
+    )
+    .await;
+    let query_plan = context
+        .convert_sql_to_cube_query(query)
+        .await
+        .unwrap_or_else(|err| panic!("query must be planned: {}\n{:?}", query, err));
+    let logical_plan = query_plan.as_logical_plan();
+    println!("{}", logical_plan.display_indent());
+
+    let request = logical_plan.find_cube_scan_wrapped_sql_deep().request;
+    let mut members = request.measures.unwrap_or_default();
+    members.extend(request.dimensions.unwrap_or_default());
+    println!("Requested members ({}): {:?}", members.len(), members);
+
+    members
+}
+
+/// https://github.com/cube-js/cube/issues/10712
+/// TRIM over a dimension must stay as narrow as LTRIM(RTRIM(...)): two measures and one
+/// dimension expression, instead of widening the scan to all members of the cube.
+#[tokio::test]
+async fn test_issue_10712_trim_does_not_widen_query() {
+    if !Rewriter::sql_push_down_enabled() {
+        return;
+    }
+    init_testing_logger();
+
+    let control = issue_10712_requested_members(
+        r#"
+        SELECT
+            LTRIM(RTRIM(customer_gender)) AS customer_gender,
+            MEASURE(sumPrice),
+            MEASURE(count)
+        FROM KibanaSampleDataEcommerce
+        GROUP BY 1
+        ORDER BY 2 DESC
+        LIMIT 10
+        "#,
+    )
+    .await;
+    assert_eq!(
+        control.len(),
+        3,
+        "unexpected control request: {:?}",
+        control
+    );
+
+    let trim = issue_10712_requested_members(
+        r#"
+        SELECT
+            TRIM(customer_gender) AS customer_gender,
+            MEASURE(sumPrice),
+            MEASURE(count)
+        FROM KibanaSampleDataEcommerce
+        GROUP BY 1
+        ORDER BY 2 DESC
+        LIMIT 10
+        "#,
+    )
+    .await;
+    assert_eq!(trim.len(), 3, "unexpected TRIM request: {:?}", trim);
+}

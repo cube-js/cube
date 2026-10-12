@@ -998,3 +998,93 @@ async fn test_copy_from_stdin_character_types() -> Result<(), CubeError> {
 
     Ok(())
 }
+
+/// https://github.com/cube-js/cube/issues/10962
+/// When Parse fails, the backend must discard every extended-query message up to Sync,
+/// Bind included: PostgreSQL answers a Parse/Bind/Describe/Execute/Sync batch with a bad
+/// query by ErrorResponse and ReadyForQuery only. A BindComplete in between desyncs
+/// clients which pipeline the batch, such as npgsql.
+#[tokio::test]
+async fn test_issue_10962_bind_after_failed_parse_is_skipped() {
+    async fn read_message(socket: &mut TcpStream) -> (u8, Vec<u8>) {
+        let read = async {
+            let tag = socket.read_u8().await.expect("must read a message tag");
+            let length = socket.read_u32().await.expect("must read a message length") as usize;
+            let mut body = vec![0; length - 4];
+            socket
+                .read_exact(&mut body)
+                .await
+                .expect("must read a message body");
+
+            (tag, body)
+        };
+
+        tokio::time::timeout(Duration::from_secs(10), read)
+            .await
+            .expect("server must answer")
+    }
+
+    fn message(tag: u8, payload: &[u8]) -> BytesMut {
+        let mut message = BytesMut::new();
+        message.put_u8(tag);
+        message.put_u32(4 + payload.len() as u32);
+        message.extend_from_slice(payload);
+        message
+    }
+
+    let port = serve_session().await;
+    let mut socket = TcpStream::connect(("127.0.0.1", port))
+        .await
+        .expect("must connect");
+
+    let parameters: &[u8] = b"user\0test\0database\0db\0\0";
+    let mut startup = BytesMut::new();
+    startup.put_u32(4 + 4 + parameters.len() as u32);
+    // Protocol version 3.0
+    startup.put_u32(196608);
+    startup.extend_from_slice(parameters);
+    socket.write_all(&startup).await.expect("must write");
+
+    let (tag, _) = read_message(&mut socket).await;
+    assert_eq!(tag, b'R', "server must ask for authentication");
+    socket
+        .write_all(&message(b'p', b"test\0"))
+        .await
+        .expect("must write");
+    while read_message(&mut socket).await.0 != b'Z' {}
+
+    // Parse (unnamed statement, no parameter types) of an invalid query
+    let mut parse = BytesMut::new();
+    parse.put_u8(0);
+    parse.extend_from_slice(b"SELEC 1 FROM bad sql\0");
+    parse.put_i16(0);
+    // Bind the unnamed portal to the unnamed statement, without parameters
+    let mut bind = BytesMut::new();
+    bind.extend_from_slice(b"\0\0");
+    bind.put_i16(0);
+    bind.put_i16(0);
+    bind.put_i16(0);
+    // Execute the unnamed portal without a row limit
+    let mut execute = BytesMut::new();
+    execute.put_u8(0);
+    execute.put_i32(0);
+
+    let mut batch = BytesMut::new();
+    batch.extend_from_slice(&message(b'P', &parse));
+    batch.extend_from_slice(&message(b'B', &bind));
+    batch.extend_from_slice(&message(b'D', b"P\0"));
+    batch.extend_from_slice(&message(b'E', &execute));
+    batch.extend_from_slice(&message(b'S', b""));
+    socket.write_all(&batch).await.expect("must write");
+
+    let mut tags = vec![];
+    loop {
+        let (tag, _) = read_message(&mut socket).await;
+        tags.push(tag as char);
+        if tag == b'Z' {
+            break;
+        }
+    }
+
+    assert_eq!(tags, vec!['E', 'Z']);
+}
