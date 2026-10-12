@@ -707,23 +707,6 @@ jobs:
         run: |
           grep -v -E "packages/cubejs-backend-native/((native)|(index.node))" .dockerignore > .dockerignore.tmp
           mv .dockerignore.tmp .dockerignore
-      # Disabled for now: the ~2-3GB yarn cache entry rotates out too fast under GitHub's 10GB
-      # per-repo cache limit, and restore + inject/extract costs 76-87s per job vs ~25s of fetch it saves.
-      # - name: Restore Docker yarn cache
-      #   uses: actions/cache@v6
-      #   id: yarn-docker-cache
-      #   with:
-      #     path: yarn-docker-cache
-      #     key: yarn-docker-${{ hashFiles('yarn.lock') }}
-      #     restore-keys: |
-      #       yarn-docker-
-      # # Moves the cache in and out of the RUN --mount=type=cache in the Dockerfile, which actions/cache can't reach.
-      # - name: Inject yarn cache into Docker
-      #   uses: reproducible-containers/buildkit-cache-dance@v3
-      #   with:
-      #     cache-map: |
-      #       { "yarn-docker-cache": "/usr/local/share/.cache/yarn" }
-      #     skip-extraction: ${{ steps.yarn-docker-cache.outputs.cache-hit }}
       - name: Build image
         uses: docker/build-push-action@v7
         timeout-minutes: 30
