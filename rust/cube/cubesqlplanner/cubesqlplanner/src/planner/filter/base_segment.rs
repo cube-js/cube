@@ -34,19 +34,25 @@ impl BaseSegment {
         is_member_expression: bool,
     ) -> Result<Rc<Self>, CubeError> {
         let cube_id = cube_symbol.cube_id().clone();
-        let member_expression_symbol = MemberExpressionSymbol::try_new(
-            cube_symbol,
-            name.clone(),
-            MemberExpressionExpression::SqlCall(expression),
-            None,
-            None,
-            vec![cube_id.clone()],
-        )?;
-        let id = if is_member_expression {
-            member_expression_symbol.compiled_path().id().clone()
+        let member_expression_symbol = if is_member_expression {
+            MemberExpressionSymbol::try_new(
+                cube_symbol,
+                name.clone(),
+                MemberExpressionExpression::SqlCall(expression),
+                None,
+                None,
+                vec![cube_id.clone()],
+            )?
         } else {
-            MemberId::member(cube_id.clone(), name.clone())
+            MemberExpressionSymbol::try_new_segment(
+                cube_symbol,
+                name.clone(),
+                expression,
+                None,
+                vec![cube_id.clone()],
+            )?
         };
+        let id = member_expression_symbol.compiled_path().id().clone();
         let member_evaluator = MemberSymbol::new_member_expression(member_expression_symbol);
 
         Ok(Rc::new(Self {
@@ -81,9 +87,7 @@ impl BaseSegment {
             if symbol.as_member_expression().is_err() {
                 return false;
             }
-            // A segment symbol lives in the `expr:` namespace, so the path is
-            // reassembled from the cube and member names it was compiled under.
-            if format!("{}.{}", symbol.cube_id(), symbol.name()) == member {
+            if symbol.full_name() == member {
                 return true;
             }
             current = symbol.reference_member();

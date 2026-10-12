@@ -337,13 +337,16 @@ impl QueryProperties {
             .add_filters(&self.dimensions_filters)
             .add_filters(&self.segments)
             .build(&self.all_used_measures()?)?;
-        // An ungrouped query returns raw rows rather than aggregates, so the
-        // replication the wider join tree introduces would reach the result
-        // directly. A pre-aggregation query describes the rollup to build, and
-        // matching compares its groups against the query's, so both sides have
-        // to be grouped the same way.
-        if self.ungrouped || self.pre_aggregation_query {
+        // A pre-aggregation query describes the rollup to build, and matching
+        // compares its groups against the query's, so both sides have to be
+        // grouped the same way.
+        if self.pre_aggregation_query {
             MultiFactJoinGroups::try_new(self.query_tools.clone(), measures_join_hints)
+        } else if self.ungrouped {
+            MultiFactJoinGroups::try_new_merging_nested_raw_rows(
+                self.query_tools.clone(),
+                measures_join_hints,
+            )
         } else {
             MultiFactJoinGroups::try_new_merging_nested(
                 self.query_tools.clone(),
@@ -634,26 +637,33 @@ impl QueryProperties {
                     .single_join()?
                     .expect("No join groups returned for single measure multi-fact join group");
                 for item in collect_multiplied_measures(m, &join)? {
-                    if !item.multiplied {
+                    // Without aggregation an expression over dimensions is a
+                    // per-row value: there is nothing for a multiplied
+                    // subquery to deduplicate, only rows it would collapse.
+                    let raw_row_expression =
+                        self.ungrouped && item.measure.as_member_expression().is_ok();
+                    if !item.multiplied || raw_row_expression {
                         result.regular_measures.push(item.measure.clone());
                         continue;
                     }
-                    let measure = item.measure.as_measure().ok();
+                    // An expression over dimensions has no other form: it
+                    // moves to a multiplied subquery as it is.
+                    let Ok(measure) = item.measure.as_measure() else {
+                        result
+                            .multiplied_measures
+                            .push(MultipliedMeasure::new(item.measure.clone(), item.cube_id));
+                        continue;
+                    };
                     // The leaf's render form (a distinct `MultipliedCount`
                     // for a count) — the same symbol whether it stays in the
                     // main query or moves to a multiplied subquery.
-                    let rendered = match measure
-                        .as_ref()
-                        .and_then(|m| transforms::regular_in_multiplied(m))
-                    {
+                    let rendered = match transforms::regular_in_multiplied(&measure) {
                         Some(regular) => {
                             result.regular_measures.push(regular.clone());
                             regular
                         }
                         None => {
-                            let rendered = measure
-                                .map(|m| transforms::into_multiplied(&m))
-                                .unwrap_or_else(|| item.measure.clone());
+                            let rendered = transforms::into_multiplied(&measure);
                             result
                                 .multiplied_measures
                                 .push(MultipliedMeasure::new(rendered.clone(), item.cube_id));

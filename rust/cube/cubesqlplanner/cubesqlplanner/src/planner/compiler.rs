@@ -1,4 +1,4 @@
-use super::symbols::{MemberExpressionExpression, MemberExpressionSymbol, MemberSymbol};
+use super::symbols::{MemberExpressionSymbol, MemberSymbol};
 use super::SymbolPath;
 use super::SymbolPathType;
 use super::{
@@ -238,11 +238,10 @@ impl Compiler {
             )
         });
         let cube_symbol = self.add_cube_table_evaluator(path.cube_id().clone(), vec![])?;
-        let symbol = MemberExpressionSymbol::try_new(
+        let symbol = MemberExpressionSymbol::try_new_segment(
             cube_symbol,
             path.symbol_name().clone(),
-            MemberExpressionExpression::SqlCall(sql_call),
-            None,
+            sql_call,
             Some(alias),
             path.path().clone(),
         )?;

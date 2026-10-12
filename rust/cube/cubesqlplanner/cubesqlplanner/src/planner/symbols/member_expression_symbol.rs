@@ -76,6 +76,40 @@ impl MemberExpressionSymbol {
         path: Vec<CubeId>,
     ) -> Result<Rc<Self>, CubeError> {
         let id = MemberId::expression(cube.cube_id().clone(), name.clone());
+        Self::try_new_with_id(cube, id, name, expression, definition, alias, path)
+    }
+
+    /// A `segments:` entry of the data model. It is declared there, so it is
+    /// identified like the cube's other members rather than in the `expr:`
+    /// namespace, where a query expression of the same name would share its id.
+    pub fn try_new_segment(
+        cube: Rc<CubeTableSymbol>,
+        name: String,
+        sql_call: Rc<SqlCall>,
+        alias: Option<String>,
+        path: Vec<CubeId>,
+    ) -> Result<Rc<Self>, CubeError> {
+        let id = MemberId::member(cube.cube_id().clone(), name.clone());
+        Self::try_new_with_id(
+            cube,
+            id,
+            name,
+            MemberExpressionExpression::SqlCall(sql_call),
+            None,
+            alias,
+            path,
+        )
+    }
+
+    fn try_new_with_id(
+        cube: Rc<CubeTableSymbol>,
+        id: MemberId,
+        name: String,
+        expression: MemberExpressionExpression,
+        definition: Option<String>,
+        alias: Option<String>,
+        path: Vec<CubeId>,
+    ) -> Result<Rc<Self>, CubeError> {
         let alias = alias.unwrap_or_else(|| PlanSqlTemplates::alias_name(&name));
         let is_reference = match &expression {
             MemberExpressionExpression::SqlCall(sql_call) => sql_call.is_direct_reference(),
