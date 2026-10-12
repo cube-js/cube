@@ -65,13 +65,13 @@ enum Cmd {
     },
     /// Show a single custom role
     Get {
-        /// Role id (a built-in role's id is negative)
+        /// Role id
         #[arg(allow_negative_numbers = true)]
         role: i64,
     },
     /// Update a custom role
     Update {
-        /// Role id (a built-in role's id is negative)
+        /// Role id
         #[arg(allow_negative_numbers = true)]
         role: i64,
         /// New role name
@@ -100,7 +100,7 @@ enum Cmd {
     /// Delete a custom role
     #[command(alias = "rm")]
     Delete {
-        /// Role id (a built-in role's id is negative)
+        /// Role id
         #[arg(allow_negative_numbers = true)]
         role: i64,
     },
@@ -149,11 +149,11 @@ fn deployment_policy(deployments: &[String], actions: &[String]) -> Result<Optio
 ///
 /// `--tier` becomes the `Global` policy the console calls the Base Role, and
 /// the deployment flags the `Deployment` one; both are appended to whatever
-/// `--data` carried, so
-/// the two compose instead of overwriting each other. `required_empty` is for
-/// create, where the server requires `policies`: with nothing to send it
-/// becomes `[]`, a role that grants nothing yet. Update omits it instead,
-/// because there a `[]` would strip the role's existing grants.
+/// `--data` carried, so the two compose instead of overwriting each other.
+/// `required_empty` is for create, where the server requires `policies`: with
+/// nothing to send it becomes `[]`, a role that grants nothing yet. Update
+/// omits it instead, because there a `[]` would strip the role's existing
+/// grants.
 fn policies_for(
     data: &Map<String, Value>,
     tier: Option<Tier>,
