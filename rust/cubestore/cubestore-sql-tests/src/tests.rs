@@ -3113,6 +3113,43 @@ async fn xirr(service: Box<dyn SqlClient>) -> Result<(), CubeError> {
         )
         .await?;
     assert_eq!(to_rows(&r), rows(&["12345.0"]));
+
+    let r = service
+        .exec_query(
+            r#"
+        SELECT LEFT(XIRR(payment, date, 0.1, NULL::double)::varchar, 10) AS xirr
+        FROM (
+            SELECT '2014-01-01'::date AS date, 10000.0 AS payment
+            UNION ALL
+            SELECT '2014-03-01'::date AS date, 2750.0 AS payment
+            UNION ALL
+            SELECT '2015-04-01'::date AS date, 2750.0 AS payment
+        ) AS "t"
+        "#,
+        )
+        .await?;
+    assert_eq!(to_rows(&r), rows(&[()]));
+
+    // NPV can't get below an absolute tolerance in float64 at this scale.
+    let r = service
+        .exec_query(
+            r#"
+        SELECT LEFT(XIRR(payment * 1e9, date, 0.1, NULL::double)::varchar, 10) AS xirr
+        FROM (
+            SELECT '2014-01-01'::date AS date, -10000.0 AS payment
+            UNION ALL
+            SELECT '2014-03-01'::date AS date, 2750.0 AS payment
+            UNION ALL
+            SELECT '2014-10-30'::date AS date, 4250.0 AS payment
+            UNION ALL
+            SELECT '2015-02-15'::date AS date, 3250.0 AS payment
+            UNION ALL
+            SELECT '2015-04-01'::date AS date, 2750.0 AS payment
+        ) AS "t"
+        "#,
+        )
+        .await?;
+    assert_eq!(to_rows(&r), rows(&["0.37485859"]));
     Ok(())
 }
 
