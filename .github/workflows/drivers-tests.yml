@@ -83,6 +83,11 @@ on:
 permissions:
   contents: read
 
+# Cancelling a superseded PR run also drops its jobs queued in `redshift-global`.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
   latest-tag-sha:
     runs-on: ubuntu-24.04
