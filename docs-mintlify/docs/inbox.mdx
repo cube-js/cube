@@ -1,6 +1,6 @@
 ---
 title: Inbox
-description: Get in-app notifications about comment mentions, alerts, budgets, scheduled task runs, new Cube versions, and the changelog.
+description: Get in-app notifications about mentions, alerts, scheduled task runs, failed builds and refreshes, shared content, model syncs, and more.
 ---
 
 The inbox collects notifications about events in Cube that concern you: a
@@ -42,6 +42,14 @@ New notifications appear as they arrive. You don't need to reload the page.
 | Budget | Usage crosses a [budget][ref-budgets] threshold | Users who get the budget's notifications and have a Cube account | No **Open** button |
 | Scheduled task run | A run of a [scheduled task][ref-scheduled-tasks] finishes or fails, if the task has [notifications][ref-scheduled-task-notifications] on | The task's creator | The run's chat thread. If the run failed before it started a thread, the task's page. |
 | New Cube version | A deployment runs an older version than the latest one on its [update channel][ref-update-channels] | Admins | The deployment's **Settings** page |
+| End of support | A deployment runs a Cube version that is about to reach end of support. You get one notification with each end-of-support email. | Admins | The deployment's **Settings** page |
+| Production build failed | A build of a deployment's production branch fails | The user who started the build. If no user started it, for example a Git push, or that user is deactivated: admins | The build and its logs |
+| Scheduled refresh failed | A [scheduled refresh][ref-scheduled-refreshes] of a dashboard fails, or its [notifications][ref-notifications] don't reach some or all recipients | The user who created the schedule | The dashboard |
+| Shared with you | Someone shares a workbook, a folder, or a chat with you, or gives you more access to one, directly or through a group | The user, or each member of the group, except the person who shared it | The workbook, or its dashboard if it is published. The folder or the chat. |
+| Model sync | A [dbt][ref-dbt] pull or push, a [Snowflake semantic view][ref-snowflake] pull or push, or a [Databricks metric view][ref-databricks] publish finishes or fails | The user who started the sync. For an automated dbt sync, the users on its notification list. Otherwise: admins | The [IDE][ref-ide]. If the sync made a branch to review, the changes on that branch. |
+| AI tokens | The account runs out of [AI tokens][ref-ai-tokens], or an automatic AI tokens top-up fails | Admins | The **Billing** page |
+| Invite accepted | A user [accepts your invite][ref-invites] and joins the account | The admin who sent the invite | The new user's page |
+| Google Sheets delivery | A [Google Sheets delivery][ref-sheets-deliveries] fails or starts working again | The owner of the delivery, if the delivery has **Inbox** notifications on. While the owner's Google account can't open the spreadsheet, also admins, at most once a day, whatever the delivery's settings | The delivery |
 | Changelog | Cube publishes a new changelog entry | All users | Usually no **Open** button, since the entry shows in full in the right pane. If the entry is no longer in Cube, **Open** goes to the public Cube changelog. |
 
 A scheduled task run notification has the task name in the title, for
@@ -51,7 +59,10 @@ example when the run only built a chart, it shows how the run started and how
 long it took. For a failed run, it shows the error.
 
 The inbox does not send notifications by email or Slack. Alerts and budgets send
-their own email, as set up on the alert or budget.
+their own email, as set up on the alert or budget, and end-of-support notices
+come with their own email. A Google Sheets delivery can also notify its owner by
+email or Slack, and emails admins while the owner's Google account can't open
+the spreadsheet.
 
 ## Read and unread
 
@@ -84,3 +95,11 @@ Cube asks you to confirm both actions. You can't undo a delete.
 [ref-scheduled-tasks]: /docs/explore-analyze/scheduled-tasks
 [ref-scheduled-task-notifications]: /docs/explore-analyze/scheduled-tasks#getting-notified-when-a-run-finishes
 [ref-update-channels]: /admin/deployment#update-channels
+[ref-scheduled-refreshes]: /docs/explore-analyze/scheduled-refreshes
+[ref-dbt]: /docs/integrations/dbt
+[ref-snowflake]: /docs/integrations/snowflake-semantic-views
+[ref-databricks]: /docs/integrations/databricks-metric-views
+[ref-ide]: /docs/data-modeling/data-model-ide
+[ref-ai-tokens]: /admin/account-billing/ai-tokens
+[ref-invites]: /admin/users-and-permissions/manage-users#inviting-users
+[ref-sheets-deliveries]: /docs/explore-analyze/google-sheets-deliveries#notifications
