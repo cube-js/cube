@@ -44,7 +44,7 @@ New notifications appear as they arrive. You don't need to reload the page.
 | New Cube version | A deployment runs an older version than the latest one on its [update channel][ref-update-channels] | Admins | The deployment's **Settings** page |
 | End of support | A deployment runs a Cube version that is about to reach end of support. You get one notification with each end-of-support email. | Admins | The deployment's **Settings** page |
 | Production build failed | A build of a deployment's production branch fails | The user who started the build. If no user started it, for example a Git push, or that user is deactivated: admins | The build and its logs |
-| Scheduled refresh failed | A [scheduled refresh][ref-scheduled-refreshes] of a dashboard fails, or its [notifications][ref-notifications] don't reach some or all recipients | The owner of the schedule | The dashboard |
+| Scheduled refresh failed | A [scheduled refresh][ref-scheduled-refreshes] of a dashboard fails, or its [notifications][ref-notifications] don't reach some or all recipients | The user who created the schedule | The dashboard |
 | Shared with you | Someone shares a workbook, a folder, or a chat with you, or gives you more access to one, directly or through a group | The user, or each member of the group, except the person who shared it | The workbook, or its dashboard if it is published. The folder or the chat. |
 | Model sync | A [dbt][ref-dbt] pull or push, a [Snowflake semantic view][ref-snowflake] pull or push, or a [Databricks metric view][ref-databricks] publish finishes or fails | The user who started the sync. For an automated dbt sync, the users on its notification list. Otherwise: admins | The [IDE][ref-ide]. If the sync made a branch to review, the changes on that branch. |
 | AI tokens | The account runs out of [AI tokens][ref-ai-tokens], or an automatic AI tokens top-up fails | Admins | The **Billing** page |
@@ -59,8 +59,10 @@ example when the run only built a chart, it shows how the run started and how
 long it took. For a failed run, it shows the error.
 
 The inbox does not send notifications by email or Slack. Alerts and budgets send
-their own email, as set up on the alert or budget. A Google Sheets delivery can
-also notify its owner by email or Slack.
+their own email, as set up on the alert or budget, and end-of-support notices
+come with their own email. A Google Sheets delivery can also notify its owner by
+email or Slack, and emails admins while the owner's Google account can't open
+the spreadsheet.
 
 ## Read and unread
 
