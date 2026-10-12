@@ -248,3 +248,23 @@ async fn test_powerbi_max_case_over_number_measure_is_dropped() {
         sql
     );
 }
+
+/// https://github.com/cube-js/cube/issues/5512
+/// Chartbrew (Sequelize) sets the session time zone as an interval offset on connect.
+/// PostgreSQL accepts `SET TIME ZONE INTERVAL '+00:00' HOUR TO MINUTE`; CubeSQL rejects it
+/// with "Unsupported TimeZone value", so the client cannot connect.
+#[tokio::test]
+async fn test_issue_5512_set_time_zone_interval() {
+    init_testing_logger();
+
+    let result = crate::compile::test::execute_queries_with_flags(
+        vec![
+            "SET client_min_messages TO warning".to_string(),
+            "SET TIME ZONE INTERVAL '+00:00' HOUR TO MINUTE".to_string(),
+        ],
+        DatabaseProtocol::PostgreSQL,
+    )
+    .await;
+
+    assert!(result.is_ok(), "{:?}", result.err());
+}

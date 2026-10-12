@@ -799,3 +799,56 @@ GROUP BY dim_str0
         );
     }
 }
+
+/// https://github.com/cube-js/cube/issues/7006
+/// `DATE(col) BETWEEN DATE('a') AND DATE('b')` must keep every row of day `b`, exactly like
+/// the equivalent `DATE(col) >= DATE('a') AND DATE(col) <= DATE('b')` does
+/// (dateRange end `b T23:59:59.999`). The "filter-domo-date-column-between" rule drops the
+/// `date()` wrapper but keeps the upper bound as midnight of `b`, so the rest of that day is lost.
+#[tokio::test]
+async fn test_issue_7006_date_between_date_literals() {
+    init_testing_logger();
+
+    let between = convert_select_to_query_plan(
+        // language=PostgreSQL
+        r#"
+        SELECT customer_gender, order_date
+        FROM KibanaSampleDataEcommerce
+        WHERE DATE(order_date) BETWEEN DATE('2023-12-01') AND DATE('2023-12-20')
+        "#
+        .to_string(),
+        DatabaseProtocol::PostgreSQL,
+    )
+    .await
+    .as_logical_plan()
+    .find_cube_scan()
+    .request;
+
+    let range = convert_select_to_query_plan(
+        // language=PostgreSQL
+        r#"
+        SELECT customer_gender, order_date
+        FROM KibanaSampleDataEcommerce
+        WHERE DATE(order_date) >= DATE('2023-12-01') AND DATE(order_date) <= DATE('2023-12-20')
+        "#
+        .to_string(),
+        DatabaseProtocol::PostgreSQL,
+    )
+    .await
+    .as_logical_plan()
+    .find_cube_scan()
+    .request;
+
+    assert_eq!(
+        range.time_dimensions,
+        Some(vec![V1LoadRequestQueryTimeDimension {
+            dimension: "KibanaSampleDataEcommerce.order_date".to_string(),
+            granularity: None,
+            date_range: Some(serde_json::json!([
+                "2023-12-01T00:00:00.000Z",
+                "2023-12-20T23:59:59.999Z"
+            ])),
+        }])
+    );
+    assert_eq!(between.time_dimensions, range.time_dimensions);
+}

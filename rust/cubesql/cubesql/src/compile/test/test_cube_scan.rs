@@ -337,3 +337,71 @@ async fn cubescan_empty_group_by_tuple() {
         }
     );
 }
+
+/// https://github.com/cube-js/cube/issues/6182
+/// A `number` dimension holding a UInt64 value (e.g. ClickHouse `farmHash64`) comes back from
+/// the load API as an exact string, but the SQL API types `number` dimensions as Float64 and
+/// parses the value into an f64, so the low digits are lost.
+#[tokio::test]
+async fn test_issue_6182_uint64_number_dimension_is_not_truncated() {
+    use serde_json::json;
+
+    use crate::compile::test::TestContext;
+
+    init_testing_logger();
+
+    let context = TestContext::new(DatabaseProtocol::PostgreSQL).await;
+
+    // language=PostgreSQL
+    let query = r#"
+        SELECT dim_num0
+        FROM MultiTypeCube
+        GROUP BY 1
+    "#;
+
+    let expected_cube_scan = V1LoadRequestQuery {
+        measures: Some(vec![]),
+        segments: Some(vec![]),
+        dimensions: Some(vec!["MultiTypeCube.dim_num0".to_string()]),
+        order: Some(vec![]),
+        ..Default::default()
+    };
+
+    assert_eq!(
+        context
+            .convert_sql_to_cube_query(query)
+            .await
+            .unwrap()
+            .as_logical_plan()
+            .find_cube_scan()
+            .request,
+        expected_cube_scan,
+    );
+
+    context
+        .add_cube_load_mock(
+            expected_cube_scan,
+            crate::compile::tests::simple_load_response(
+                vec!["MultiTypeCube.dim_num0"],
+                vec![vec![
+                    json!("8307928136669839578"),
+                    json!("12604678624050644212"),
+                ]],
+            ),
+        )
+        .await;
+
+    let output = context.execute_query(query).await.unwrap();
+    println!("{}", output);
+
+    assert!(
+        output.contains("8307928136669839578"),
+        "UInt64 value was truncated:\n{}",
+        output
+    );
+    assert!(
+        output.contains("12604678624050644212"),
+        "UInt64 value was truncated:\n{}",
+        output
+    );
+}

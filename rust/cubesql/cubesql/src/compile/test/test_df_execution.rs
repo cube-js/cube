@@ -359,3 +359,25 @@ async fn test_filter_over_literal_column_of_table_scan() {
     }
     insta::assert_snapshot!(results.join("\n"));
 }
+
+/// https://github.com/cube-js/cube/issues/6332
+/// Subtracting an interval from a timestamp column of a subquery fails, while the same
+/// expression on a literal (inside the subquery) works.
+#[tokio::test]
+async fn test_issue_6332_timestamp_column_minus_interval() {
+    init_testing_logger();
+
+    let result = execute_query(
+        // language=PostgreSQL
+        r#"
+        SELECT *, startdate - interval '1 day' AS prev
+        FROM (SELECT CAST('2023-03-03 00:00:00' AS timestamp) startdate) t
+        "#
+        .to_string(),
+        DatabaseProtocol::PostgreSQL,
+    )
+    .await
+    .unwrap();
+
+    assert!(result.contains("2023-03-02T00:00:00.000"), "{}", result);
+}
