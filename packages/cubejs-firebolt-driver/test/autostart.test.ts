@@ -24,7 +24,8 @@ async function waitWhileTransitioning(engine: {
 describe('FireboltDriver autostart', () => {
   let tests: DriverTests;
   let driver: any;
-  jest.setTimeout(10 * 60 * 1000);
+  // Two 5 min waits for the engine to stop, plus the driver's 2 min connection timeout.
+  jest.setTimeout(15 * 60 * 1000);
 
   afterAll(async () => {
     await tests.release();
@@ -83,7 +84,7 @@ describe('FireboltDriver autostart', () => {
       await driver.testConnection();
     } finally {
       await waitWhileTransitioning(engine);
-      await engine.start();
+      await engine.startAndWait();
     }
   });
 });
