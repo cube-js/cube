@@ -118,8 +118,11 @@ fn test_segment_column_on_view_ungrouped() {
     assert!(sql.contains("IS NOT NULL"), "{sql}");
 }
 
+// Guards the planning only: a grouped query with a non-aggregated column in
+// `measures` has no valid SQL, and the SQL API sends such a column as a
+// dimension instead.
 #[test]
-fn test_segment_column_on_view_grouped() {
+fn test_segment_column_on_view_grouped_plans() {
     let sql = build(false);
     assert!(sql.contains("IS NOT NULL"), "{sql}");
 }

@@ -248,9 +248,7 @@ impl MultiFactJoinGroups {
     }
 
     /// Like `try_new_merging_nested`, for an ungrouped query: a group only
-    /// moves into a wider tree that does not replicate any of its rows. Kept
-    /// apart, the groups would be joined back on the dimension values, pairing
-    /// every row of one with every row of the other that shares them.
+    /// moves into a wider tree that does not replicate any of its rows.
     pub fn try_new_merging_nested_raw_rows(
         query_tools: Rc<State>,
         measures_join_hints: MeasuresJoinHints,

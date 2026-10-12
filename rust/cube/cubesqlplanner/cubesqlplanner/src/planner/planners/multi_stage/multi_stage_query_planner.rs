@@ -1755,17 +1755,6 @@ fn multi_stage_filter_directive(member: &Rc<MemberSymbol>) -> Option<MultiStageF
 //    restricts the switch dimension, case branches are pruned at symbol
 //    level; the subsequent `mode: fixed` reset cannot un-prune them.
 //
-// Segment references compile to an `expr:` id while a `BaseSegment` keeps the
-// plain member id; `exclude`/`keep_only` must match both.
-fn filter_directive_match_ids(symbol: &Rc<MemberSymbol>) -> Vec<MemberId> {
-    let id = symbol.id().clone();
-    if let Some(named) = id.named_member() {
-        vec![id, named]
-    } else {
-        vec![id]
-    }
-}
-
 // True when `narrowed` lost a *query-level* filter that `base` restricts the
 // grid by. Three conditions per filter: `base` has it, the query asked for it,
 // and `narrowed` doesn't have it.
@@ -1817,17 +1806,11 @@ fn apply_filter_directive_to_state(
     state: &mut QueryProperties,
 ) -> Result<(), CubeError> {
     if let Some(exclude) = &filter.exclude {
-        let names: Vec<MemberId> = exclude
-            .iter()
-            .flat_map(|s| filter_directive_match_ids(s))
-            .collect();
+        let names: Vec<MemberId> = exclude.iter().map(|s| s.id().clone()).collect();
         state.remove_filters_for_members(&names);
     }
     if let Some(keep_only) = &filter.keep_only {
-        let names: Vec<MemberId> = keep_only
-            .iter()
-            .flat_map(|s| filter_directive_match_ids(s))
-            .collect();
+        let names: Vec<MemberId> = keep_only.iter().map(|s| s.id().clone()).collect();
         state.keep_only_filters_for_members(&names);
     }
     if !filter.include_dimension.is_empty() {

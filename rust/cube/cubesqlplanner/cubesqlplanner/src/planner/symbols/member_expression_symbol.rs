@@ -37,10 +37,10 @@ impl SymbolDeps for MemberExpressionExpression {
     }
 }
 
-/// `MemberSymbol::MemberExpression` body: a synthetic member built
-/// at query time from a SQL expression or from another member with
-/// query-time modifications. Not declared in the data model. Its
-/// full name lives in the `expr:` namespace.
+/// `MemberSymbol::MemberExpression` body: a member built from a SQL
+/// expression or from another member with query-time modifications.
+/// Query expressions live in the `expr:` namespace; a data-model segment
+/// compiled into one keeps its plain member id.
 #[derive(Clone)]
 pub struct MemberExpressionSymbol {
     pub(super) compiled_path: CompiledMemberPath,
@@ -158,8 +158,8 @@ impl MemberExpressionSymbol {
         &self.compiled_path
     }
 
-    /// Full unique identifier of the symbol; lives in the `expr:`
-    /// namespace to keep it disjoint from data-model member names.
+    /// Full unique identifier of the symbol; see the type doc for which
+    /// namespace it lives in.
     pub fn full_name(&self) -> String {
         self.compiled_path.full_name().clone()
     }
