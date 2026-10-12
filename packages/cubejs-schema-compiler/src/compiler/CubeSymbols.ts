@@ -278,6 +278,19 @@ export const CONTEXT_SYMBOLS = {
 
 export const CURRENT_CUBE_CONSTANTS = ['CUBE', 'TABLE'];
 
+const INHERITED_SCALAR_PARAMS: [string, string][] = [
+  ['sqlAlias', 'sql_alias'],
+  ['dataSource', 'data_source'],
+  ['refreshKey', 'refresh_key'],
+  ['rewriteQueries', 'rewrite_queries'],
+  ['calendar', 'calendar'],
+  ['public', 'public'],
+  ['shown', 'shown'],
+  ['title', 'title'],
+  ['description', 'description'],
+  ['meta', 'meta'],
+];
+
 export class CubeSymbols implements TranspilerSymbolResolver, CompilerInterface {
   public symbols: Record<string | symbol, CubeSymbolsDefinition>;
 
@@ -547,6 +560,24 @@ export class CubeSymbols implements TranspilerSymbolResolver, CompilerInterface 
         cubeObject.sql = undefined;
       } else if (cubeDefinition.sql && (parentCube.sqlTable || parentCube.sql_table)) {
         cubeObject.sqlTable = undefined;
+      }
+
+      // The native planner reads only own properties of a cube definition,
+      // so inherited scalar parameters are exposed as own accessors.
+      const parent = parentCube as unknown as Record<string, unknown>;
+      for (const [key, rawKey] of INHERITED_SCALAR_PARAMS) {
+        const isOwn = Object.prototype.hasOwnProperty.call(cubeObject, key) ||
+          Object.prototype.hasOwnProperty.call(cubeObject, rawKey);
+        if (!isOwn && (parent[key] !== undefined || parent[rawKey] !== undefined)) {
+          Object.defineProperty(cubeObject, key, {
+            enumerable: true,
+            configurable: true,
+            get: () => parent[key] ?? parent[rawKey],
+            set(v) {
+              Object.defineProperty(this, key, { value: v, enumerable: true, configurable: true, writable: true });
+            },
+          });
+        }
       }
     }
 
