@@ -49,7 +49,8 @@ enum Cmd {
         /// Run one file under agents/, e.g. eval_questions/revenue.yml
         #[arg(long, value_name = "PATH", value_parser = util::nonempty_repo_path)]
         file: Option<String>,
-        /// Security context to evaluate under, merged over yours, as JSON (inline, @file, or - for stdin)
+        /// Security context to evaluate under, as JSON (inline, @file, or - for stdin); merged over
+        /// yours, and not applied to the auto agent's own queries
         #[arg(long)]
         security_context: Option<String>,
         /// Wait for the run and exit non-zero unless every question passes
