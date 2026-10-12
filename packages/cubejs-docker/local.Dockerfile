@@ -11,6 +11,8 @@ ENV CUBEJS_DOCKER_IMAGE_TAG=latest
 RUN DEBIAN_FRONTEND=noninteractive \
     && apt-get update \
     && apt-get install -y --no-install-recommends libssl3t64 python3.13 libpython3.13-dev ca-certificates \
+    # Required for node-oracledb to buld on ARM64
+    && apt-get install -y gcc g++ make cmake \
     && update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.13 1 \
     && update-alternatives --install /usr/bin/python python /usr/bin/python3.13 1 \
     && rm -rf /var/lib/apt/lists/*
@@ -18,6 +20,11 @@ RUN DEBIAN_FRONTEND=noninteractive \
 ENV NODE_ENV=production
 
 WORKDIR /cube
+
+RUN yarn policies set-version v1.22.22
+# Yarn v1 uses aggressive timeouts with summing time spending on fs, https://github.com/yarnpkg/yarn/issues/4890
+RUN yarn config set network-timeout 120000 -g
+
 COPY . .
 # Unlike latest.Dockerfile, this one doesn't install the latest cubejs from
 # npm, but rather copies all the artifacts from the dev image and links them to
@@ -25,15 +32,6 @@ COPY . .
 COPY --from=build /cubejs /cube-build
 RUN cd /cube-build && yarn run link:dev
 COPY package.json.local package.json
-
-RUN yarn policies set-version v1.22.22
-# Yarn v1 uses aggressive timeouts with summing time spending on fs, https://github.com/yarnpkg/yarn/issues/4890
-RUN yarn config set network-timeout 120000 -g
-
-# Required for node-oracledb to buld on ARM64
-RUN apt-get update \
-    && apt-get install -y gcc g++ make cmake \
-    && rm -rf /var/lib/apt/lists/*
 
 # We are copying root yarn.lock file to the context folder during the Publish GH
 # action. So, a process will use the root lock file here.
