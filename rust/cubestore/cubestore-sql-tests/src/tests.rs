@@ -389,6 +389,14 @@ pub fn sql_tests(prefix: &str) -> Vec<(&'static str, TestFn)> {
         t("sys_cachestore_healthcheck", sys_cachestore_healthcheck),
         t("join_multi_partition_small", join_multi_partition_small),
         t("join_multi_partition_large", join_multi_partition_large),
+        t(
+            "issue_8580_rolling_window_offset_start",
+            issue_8580_rolling_window_offset_start,
+        ),
+        t(
+            "issue_8916_create_table_only_hll_columns",
+            issue_8916_create_table_only_hll_columns,
+        ),
     ];
 
     let test_list = if prefix == "migration" {
@@ -13539,4 +13547,104 @@ fn dec5f1(i: i64, f: u64) -> Decimal {
     assert!(f < 10);
     let f = if i < 0 { -(f as i64) } else { f as i64 };
     Decimal::new((i * 100_000 + 10_000 * f) as i128)
+}
+
+/// https://github.com/cube-js/cube/issues/8580
+/// A `trailing: 3 month, offset: start` rolling window served from a rollup.
+/// Cube renders the window join with a strict upper bound
+/// (`day >= date_from - interval '3 month' AND day < date_from`), so a month
+/// must not count its own bucket. The query below is the SQL the legacy
+/// planner generates for the issue's query against Cube Store, with parameters
+/// inlined (Tesseract renders the same join condition, wrapped in CTEs).
+/// Cube Store's rolling window rewrite drops the strictness of `< date_from`,
+/// so every month also counts its own bucket (the `offset: end` numbers).
+async fn issue_8580_rolling_window_offset_start(
+    service: Box<dyn SqlClient>,
+) -> Result<(), CubeError> {
+    service
+        .exec_query("CREATE SCHEMA stb_pre_aggregations")
+        .await?;
+    service
+        .exec_query(
+            "CREATE TABLE stb_pre_aggregations.order_rolling_main \
+             (order_rolling__date_day timestamp, order_rolling__current_month_sum int)",
+        )
+        .await?;
+    service
+        .exec_query(
+            "INSERT INTO stb_pre_aggregations.order_rolling_main \
+             (order_rolling__date_day, order_rolling__current_month_sum) VALUES \
+             ('2023-11-01T00:00:00.000', 10), ('2023-12-01T00:00:00.000', 10), \
+             ('2024-01-01T00:00:00.000', 10), ('2024-02-01T00:00:00.000', 30), \
+             ('2024-03-01T00:00:00.000', 50), ('2024-04-01T00:00:00.000', 80)",
+        )
+        .await?;
+
+    let series = (1..=9)
+        .map(|i| {
+            let (y, m) = if i <= 2 {
+                (2023, 10 + i)
+            } else {
+                (2024, i - 2)
+            };
+            let to = match m {
+                2 => 29,
+                4 | 6 | 9 | 11 => 30,
+                _ => 31,
+            };
+            format!(
+                "select to_timestamp('{y}-{m:02}-01T00:00:00.000') date_from, \
+                 to_timestamp('{y}-{m:02}-{to}T23:59:59.999') date_to"
+            )
+        })
+        .join(" UNION ALL ");
+
+    let legacy = format!(
+        "SELECT q_0.`order_rolling__date_month`, `order_rolling__current_month_sum` `order_rolling__current_month_sum` FROM (\
+           SELECT `order_rolling.date_series`.`date_from` `order_rolling__date_month`, sum(`order_rolling__current_month_sum`) `order_rolling__current_month_sum` \
+           FROM ({series}) AS `order_rolling.date_series` \
+           LEFT JOIN (SELECT date_trunc('month', `order_rolling__date_day`) `order_rolling__date_month`, sum(`order_rolling__current_month_sum`) `order_rolling__current_month_sum` \
+             FROM stb_pre_aggregations.order_rolling_main AS `main` \
+             WHERE (`order_rolling__date_day` >= to_timestamp('2023-11-01T00:00:00.000') - interval '3 month' AND `order_rolling__date_day` < to_timestamp('2024-07-31T23:59:59.999')) \
+             GROUP BY 1) AS `base` \
+           ON `base`.`order_rolling__date_month` >= `order_rolling.date_series`.`date_from` - interval '3 month' \
+             AND `base`.`order_rolling__date_month` < `order_rolling.date_series`.`date_from` \
+           GROUP BY 1) AS q_0 ORDER BY 1 ASC"
+    );
+
+    let month =
+        |y: i32, m: u32| timestamp_from_string(&format!("{y}-{m:02}-01T00:00:00.000")).unwrap();
+    // Each month sums the three months before it, never its own.
+    let expected = vec![
+        vec![TableValue::Timestamp(month(2023, 11)), TableValue::Null],
+        vec![TableValue::Timestamp(month(2023, 12)), TableValue::Int(10)],
+        vec![TableValue::Timestamp(month(2024, 1)), TableValue::Int(20)],
+        vec![TableValue::Timestamp(month(2024, 2)), TableValue::Int(30)],
+        vec![TableValue::Timestamp(month(2024, 3)), TableValue::Int(50)],
+        vec![TableValue::Timestamp(month(2024, 4)), TableValue::Int(90)],
+        vec![TableValue::Timestamp(month(2024, 5)), TableValue::Int(160)],
+        vec![TableValue::Timestamp(month(2024, 6)), TableValue::Int(130)],
+        vec![TableValue::Timestamp(month(2024, 7)), TableValue::Int(80)],
+    ];
+
+    let r = service.exec_query(&legacy).await?;
+    assert_eq!(to_rows(&r), expected);
+    Ok(())
+}
+
+/// https://github.com/cube-js/cube/issues/8916
+/// A rollup holding only `count_distinct_approx` measures becomes a table whose
+/// only columns are HLL / bytes columns. Creating it fails with
+/// `Sort key size can't be 0 for default`, as the default index skips such columns.
+async fn issue_8916_create_table_only_hll_columns(
+    service: Box<dyn SqlClient>,
+) -> Result<(), CubeError> {
+    service.exec_query("CREATE SCHEMA s").await?;
+    service
+        .exec_query("CREATE TABLE s.only_bytes (my_cube_test__mes BYTES)")
+        .await?;
+    service
+        .exec_query("CREATE TABLE s.only_hll (my_cube_test__mes HLL_POSTGRES)")
+        .await?;
+    Ok(())
 }
