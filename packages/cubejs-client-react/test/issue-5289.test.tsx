@@ -13,8 +13,12 @@ describe('issue #5289: useCubeQuery stale result with resetResultSetOnChange', (
   let root: Root;
   const renders: Array<{ query: ReadonlyQueryInput; result: UseCubeQueryInternalResult }> = [];
 
-  function TestComponent({ query, cubeApi }: { query: ReadonlyQueryInput; cubeApi: any }) {
-    const result = useCubeQuery(query, { cubeApi, resetResultSetOnChange: true });
+  function TestComponent({
+    query,
+    cubeApi,
+    resetResultSetOnChange = true,
+  }: { query: ReadonlyQueryInput; cubeApi: any; resetResultSetOnChange?: boolean }) {
+    const result = useCubeQuery(query, { cubeApi, resetResultSetOnChange });
     renders.push({ query, result });
     return null;
   }
@@ -80,6 +84,34 @@ describe('issue #5289: useCubeQuery stale result with resetResultSetOnChange', (
     });
 
     for (const { result } of renders.slice(firstRenderAfterChange)) {
+      expect(result.error).toBeNull();
+    }
+  });
+
+  it('keeps the previous result for a changed query without resetResultSetOnChange', async () => {
+    const firstResult = { request: 'first' };
+    const cubeApi = {
+      load: jest.fn()
+        .mockResolvedValueOnce(firstResult)
+        .mockReturnValueOnce(new Promise(() => undefined)),
+    };
+    const firstQuery = { measures: ['Orders.count'] };
+    const secondQuery = { measures: ['Orders.total'] };
+
+    await act(async () => {
+      root.render(<TestComponent query={firstQuery} cubeApi={cubeApi} resetResultSetOnChange={false} />);
+    });
+
+    const firstRenderAfterChange = renders.length;
+    await act(async () => {
+      root.render(<TestComponent query={secondQuery} cubeApi={cubeApi} resetResultSetOnChange={false} />);
+    });
+
+    const afterChange = renders.slice(firstRenderAfterChange);
+    expect(afterChange.length).toBeGreaterThan(0);
+    for (const { result } of afterChange) {
+      expect(result.resultSet).toBe(firstResult);
+      expect(result.isLoading).toBe(true);
       expect(result.error).toBeNull();
     }
   });

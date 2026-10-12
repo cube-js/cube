@@ -5,8 +5,8 @@ import QueryBuilder from '../../src/QueryBuilder';
 import { createCubeApi } from './utils';
 
 // https://github.com/cube-js/cube/issues/7379
-// granularity is dropped from timeDimensions when the query has a filter on the
-// same time dimension and the query prop is set/changed after mount.
+// Guards against heuristics dropping an explicit timeDimensions granularity from a
+// query that the parent sets or changes through the query prop after mount.
 const issueQuery = {
   measures: ['Orders.count'],
   dimensions: ['Orders.status'],
@@ -80,6 +80,12 @@ describe('issue #7379: vue3 QueryBuilder keeps timeDimensions granularity', () =
     await wrapper.setProps({ query: {} });
     await flushPromises();
 
-    expect(wrapper.vm.skipHeuristics).toBe(false);
+    wrapper.vm.addMember('measures', 'Orders.count');
+    await flushPromises();
+
+    // the "first measure added" heuristic adds the measure's default time dimension
+    expect(wrapper.vm.validatedQuery.timeDimensions).toEqual([
+      { dimension: 'Orders.createdAt', granularity: 'day' },
+    ]);
   });
 });

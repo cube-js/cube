@@ -10,9 +10,9 @@ import type { ReadonlyQueryInput } from '../src/types';
   .IS_REACT_ACT_ENVIRONMENT = true;
 
 // https://github.com/cube-js/cube/issues/3473
-// HttpTransport mutates the shared `headers` object (adds Content-Type) on POST,
-// so a re-render with an otherwise identical Cube API client no longer deep-equals
-// the memoized deps and useCubeQuery issues a duplicate request.
+// Guards against HttpTransport writing Content-Type into the shared `headers` object
+// on POST: a re-render with an otherwise identical Cube API client then no longer
+// deep-equals the memoized deps, and useCubeQuery issues a duplicate request.
 describe('issue #3473: useCubeQuery duplicate POST requests', () => {
   let root: Root;
   const fetchMock = jest.fn(() => new Promise<Response>(() => undefined));

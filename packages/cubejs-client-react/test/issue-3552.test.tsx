@@ -10,8 +10,8 @@ import QueryBuilder from '../src/QueryBuilder';
   .IS_REACT_ACT_ENVIRONMENT = true;
 
 // https://github.com/cube-js/cube/issues/3552
-// QueryBuilder only re-runs dryRun when measures/dimensions/timeDimensions change,
-// so after updateFilters the validatedQuery / dryRunResponse stay stale.
+// Guards against QueryBuilder re-running dryRun only on measures/dimensions/timeDimensions
+// changes, which left validatedQuery / dryRunResponse stale after updateFilters.
 describe('issue #3552: QueryBuilder dry run on filter change', () => {
   let root: Root;
 
