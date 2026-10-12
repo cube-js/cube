@@ -73,7 +73,23 @@ You can use filters to find queries by various criteria:
 - cache status,
 - whether the query was accelerated with pre-aggregations,
 - whether the query yielded an error,
-- API type.
+- API type,
+- source.
+
+The **Source** filter shows the product that sent the query:
+
+| Source | Queries |
+| --- | --- |
+| Cube | Workbooks, Explore, dashboards, and dashboard exports in the Cube Cloud workspace |
+| Cube (SQL Runner) | [SQL Runner][ref-workspace-sqlrunner] |
+| Cube (Playground) | Playground |
+| Embedding | [Embedded][ref-embedding] apps, both signed and private embedding |
+| Cube for Excel | The [Cube for Excel][ref-excel] add-in |
+| Cube for Sheets | The [Cube for Sheets][ref-sheets] add-on |
+| AI agents | Analytics Chat, the Chat API, Slack, the MCP server, and scheduled report deliveries |
+| Other | All other queries, e.g., queries that your applications send with their own API tokens |
+
+The request details page also shows the source of the query.
 
 <Frame>
   <img src="https://ucarecdn.com/951a2a64-bc9b-4277-b2fe-4cc88dbf4f49/" />
@@ -239,3 +255,6 @@ while the query is in the query execution queue:
 [ref-multitenancy]: /embedding/multitenancy
 [ref-apis]: /reference
 [ref-query-history-export]: /admin/monitoring/monitoring-integrations#query-history-export
+[ref-embedding]: /embedding
+[ref-excel]: /docs/integrations/microsoft-excel
+[ref-sheets]: /docs/integrations/google-sheets
