@@ -125,6 +125,12 @@ fn start_body(
     body
 }
 
+/// The auto agent queries under the caller's own context, so an override would reach only the
+/// ground truth and grade the two under different contexts.
+fn override_skips_agent(agent: &Option<String>, security_context: &Option<Value>) -> bool {
+    security_context.is_some() && matches!(agent.as_deref(), None | Some("auto"))
+}
+
 async fn wait_for_run(
     api: &Client,
     deployment: i64,
@@ -307,6 +313,13 @@ pub async fn command(args: Args, ctx: &Ctx) -> Result<()> {
             let security_context = security_context
                 .map(|raw| util::parse_json_object("--security-context", &raw).map(Value::Object))
                 .transpose()?;
+            if override_skips_agent(&agent, &security_context) {
+                eprintln!(
+                    "warning: the auto agent ignores --security-context, so only the ground truth \
+                     runs under it; pass --agent with an agent from agents/config.yml to apply it \
+                     to both"
+                );
+            }
             let body = start_body(&branch, &agent, &file, security_context);
             let started = api.post(&base(deployment), Some(&body)).await?;
             let evaluation = output::field(&started, "id")
@@ -405,6 +418,18 @@ mod tests {
                 "securityContext": { "tenant_id": 7 }
             })
         );
+    }
+
+    #[test]
+    fn warns_when_the_override_skips_the_agent() {
+        let ctx = Some(json!({ "tenant_id": 7 }));
+        assert!(override_skips_agent(&None, &ctx));
+        assert!(override_skips_agent(&Some("auto".to_string()), &ctx));
+        assert!(!override_skips_agent(
+            &Some("sales-agent".to_string()),
+            &ctx
+        ));
+        assert!(!override_skips_agent(&None, &None));
     }
 
     #[test]
