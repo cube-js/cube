@@ -162,6 +162,9 @@ export type ViewIncludedMember = {
   type: string;
   memberPath: string;
   name: string;
+  // The member's path through the view's join path, when it goes through a
+  // join alias: `orders.customer.city`
+  path?: string;
 };
 
 export type FolderJoinPathMember = {
@@ -904,7 +907,9 @@ export class CubeSymbols implements TranspilerSymbolResolver, CompilerInterface 
 
         if (!seen.has(key)) {
           seen.add(key);
-          additions.push({ type, memberPath, name });
+          const joinPath = parts.slice(0, -1);
+          const aliased = this.joinPathBeforeAlias(joinPath).length < joinPath.length;
+          additions.push({ type, memberPath, name, ...(aliased ? { path: member } : {}) });
         }
       }
 
@@ -1461,6 +1466,7 @@ export class CubeSymbols implements TranspilerSymbolResolver, CompilerInterface 
    */
   public resolveJoinPathTarget(path: string[]): string {
     let current = path[0];
+
     for (const segment of path.slice(1)) {
       current = this.joinAliasTarget(current, segment) ?? segment;
     }
@@ -1607,7 +1613,9 @@ export class CubeSymbols implements TranspilerSymbolResolver, CompilerInterface 
           return {
             toString: () => this.withSymbolsCallContext(
               () => sqlResolveFn(cube[refProperty], cubeName, refProperty, propertyName),
-              { ...this.resolveSymbolsCallContext, joinHints, joinAlias: segment },
+              segment ?
+                { ...this.resolveSymbolsCallContext, joinHints, joinAlias: segment } :
+                { ...this.resolveSymbolsCallContext },
             ),
           };
         }

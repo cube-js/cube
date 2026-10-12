@@ -356,8 +356,9 @@ export class CubeEvaluator extends CubeSymbols {
         }
       }
 
+      // A path through a join alias names one instance of the cube it reaches
       const match = lookupPath
-        ? included.find((m) => m.memberPath === lookupPath)
+        ? included.find((m) => m.path === lookupPath) ?? included.find((m) => m.memberPath === lookupPath)
         : included.find((m) => m.name === lookupName);
 
       if (!match) {
@@ -496,7 +497,9 @@ export class CubeEvaluator extends CubeSymbols {
     const fullPath = this.evaluateReferences(null, joinPath, { collectJoinHints: true });
 
     const pathParts = fullPath.split('.');
-    const pathCubeName = pathParts[pathParts.length - 1];
+    // A path through a join alias reaches one instance of the cube it ends at
+    const pathCubeName = this.resolveJoinPathTarget(pathParts);
+    const aliased = pathCubeName !== pathParts[pathParts.length - 1];
 
     if (!this.evaluatedCubes[pathCubeName]) {
       errorReporter.error(
@@ -526,6 +529,9 @@ export class CubeEvaluator extends CubeSymbols {
 
     if (cube.includedMembers) {
       return cube.includedMembers.filter((m: ViewIncludedMember) => {
+        if (aliased) {
+          return m.path?.split('.').slice(0, -1).join('.') === fullPath;
+        }
         const memberPathParts = m.memberPath.split('.');
         const memberCubeName = memberPathParts[0];
 
@@ -628,13 +634,16 @@ export class CubeEvaluator extends CubeSymbols {
       const includedMemberPaths: string[] = R.uniq(cube.includedMembers.map(it => it.memberPath));
       const includedCubeNames: string[] = R.uniq(includedMemberPaths.map(it => it.split('.')[0]));
 
-      // Path to name (which can be prefixed or aliased) map for hierarchy
-      const hierarchyPathToName = cube.includedMembers.filter(it => it.type === 'hierarchies').reduce((acc, it) => ({
-        ...acc,
-        [it.memberPath]: it.name
-      }), {});
-      const includedHierarchyNames = cube.includedMembers.filter(it => it.type === 'hierarchies').map(it => it.memberPath.split('.')[1]);
+      const hierarchyIncludes = cube.includedMembers.filter(it => it.type === 'hierarchies');
+      const includedHierarchyNames = hierarchyIncludes.map(it => it.memberPath.split('.')[1]);
+      // The instance a member is included through: a cube may be included
+      // once per join alias, and a hierarchy's levels come from its own instance
+      const instanceOf = (member: ViewIncludedMember) => member.path?.split('.').slice(0, -1).join('.');
+      const levelMember = (level: string, instance?: string) => (instance !== undefined &&
+        cube.includedMembers.find(m => m.memberPath === level && instanceOf(m) === instance)) ||
+        cube.includedMembers.find(m => m.memberPath === level);
 
+      const includedHierarchies: any[] = [];
       for (const cubeName of includedCubeNames) {
         // As views come after cubes in the list, we can safely assume that cube is already evaluated
         const { evaluatedHierarchies: hierarchies } = this.evaluatedCubes[cubeName] || {};
@@ -642,54 +651,60 @@ export class CubeEvaluator extends CubeSymbols {
         if (Array.isArray(hierarchies) && hierarchies.length) {
           const filteredHierarchies = hierarchies
             .filter(it => includedHierarchyNames.includes(it.name))
-            .map(it => {
-              const levels = it.levels.filter(level => {
-                const member = cube.includedMembers.find(m => m.memberPath === level);
-                if (member && member.type !== 'dimensions') {
-                  const memberName = level.split('.')[1] || level;
-                  errorReporter.error(`Only dimensions can be part of a hierarchy. Please remove the '${memberName}' member from the '${it.name}' hierarchy.`);
-                } else if (member) {
-                  return includedMemberPaths.includes(level);
-                }
-
-                return null;
-              })
-                .filter(Boolean);
-
+            .flatMap(it => {
               const aliasMember = [cubeName, it.name].join('.');
-
-              const name = hierarchyPathToName[aliasMember];
-              if (!name) {
+              const includes = hierarchyIncludes.filter(include => include.memberPath === aliasMember);
+              if (!includes.length) {
                 throw new UserError(`Hierarchy '${it.name}' not found in cube '${cubeName}'`);
               }
 
-              return {
-                // Title might be overridden in the view
-                title: cube.hierarchies?.[it.name]?.override?.title || it.title,
-                ...it,
-                aliasMember,
-                name,
-                levels
-              };
+              return includes.map(include => {
+                const instance = instanceOf(include);
+                const levels = it.levels.filter(level => {
+                  const member = levelMember(level, instance);
+                  if (member && member.type !== 'dimensions') {
+                    const memberName = level.split('.')[1] || level;
+                    errorReporter.error(`Only dimensions can be part of a hierarchy. Please remove the '${memberName}' member from the '${it.name}' hierarchy.`);
+                  } else if (member) {
+                    return includedMemberPaths.includes(level);
+                  }
+
+                  return null;
+                })
+                  .filter(Boolean)
+                  .map(level => [cube.name, levelMember(level, instance)!.name].join('.'));
+
+                return {
+                  // Title might be overridden in the view
+                  title: cube.hierarchies?.[it.name]?.override?.title || it.title,
+                  ...it,
+                  aliasMember,
+                  name: include.name,
+                  levels
+                };
+              });
             })
             .filter(it => it.levels.length);
 
-          cube.evaluatedHierarchies = [...(cube.evaluatedHierarchies || []), ...filteredHierarchies];
+          includedHierarchies.push(...filteredHierarchies);
         }
       }
 
-      cube.evaluatedHierarchies = (cube.evaluatedHierarchies || []).map((hierarchy) => ({
-        ...hierarchy,
-        levels: hierarchy.levels.map((level) => {
-          const member = cube.includedMembers.find(m => m.memberPath === level);
+      cube.evaluatedHierarchies = [
+        ...(cube.evaluatedHierarchies || []).map((hierarchy) => ({
+          ...hierarchy,
+          levels: hierarchy.levels.map((level) => {
+            const member = levelMember(level);
 
-          if (!member) {
-            return null;
-          }
+            if (!member) {
+              return null;
+            }
 
-          return [cube.name, member.name].join('.');
-        }).filter(Boolean)
-      }));
+            return [cube.name, member.name].join('.');
+          }).filter(Boolean)
+        })),
+        ...includedHierarchies,
+      ];
     }
   }
 

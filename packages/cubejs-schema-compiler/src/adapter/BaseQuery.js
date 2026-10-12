@@ -3501,6 +3501,13 @@ export class BaseQuery {
         { memberInstance: this.aliasedMemberInstance(aliasPath, cubeName), memberInstanceAliasPath: aliasPath }
       );
     }
+    const joinedInstance = this.joinedMemberInstance(cubeName);
+    if (joinedInstance) {
+      return this.evaluateSymbolSqlWithContext(
+        () => this.evaluateSymbolSql(cubeName, name, symbol, memberExpressionType, subPropertyName),
+        { memberInstance: joinedInstance }
+      );
+    }
     const isMemberExpr = !!memberExpressionType;
     if (!memberExpressionType) {
       this.pushMemberNameForCollectionIfNecessary(cubeName, name);
@@ -3997,6 +4004,22 @@ export class BaseQuery {
         { memberInstance: { path: resolved.instancePath, cube: resolved.targetCube } }
       );
     })));
+  }
+
+  /**
+   * The cube instance a member of `cubeName` read inside the instance being
+   * evaluated belongs to, when the instance's cube joins `cubeName` without an
+   * alias: every join below an alias reaches an instance of its own.
+   */
+  joinedMemberInstance(cubeName) {
+    const instance = this.safeEvaluateSymbolContext().memberInstance;
+    if (!instance || instance.cube === cubeName) {
+      return undefined;
+    }
+    const joins = this.cubeEvaluator.cubeFromPath(instance.cube).joins || [];
+    return joins.some(j => !j.alias && j.name === cubeName) ?
+      { path: `${instance.path}.${cubeName}`, cube: cubeName } :
+      undefined;
   }
 
   /**

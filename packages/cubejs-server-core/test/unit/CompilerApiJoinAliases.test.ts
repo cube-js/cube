@@ -48,6 +48,9 @@ cubes:
       - name: department_head_city
         sql: "{departments.head_city}"
         type: string
+      - name: department_region_code
+        sql: "{departments.region_code}"
+        type: string
     measures:
       - name: count
         type: count
@@ -59,6 +62,7 @@ cubes:
             - city
             - count
             - department_head_city
+            - department_region_code
         member_masking:
           includes:
             - email
@@ -75,6 +79,9 @@ cubes:
         alias: head
         sql: "{CUBE}.head_id = {users}.id"
         relationship: many_to_one
+      - name: regions
+        sql: "{CUBE}.region_id = {regions}.id"
+        relationship: many_to_one
     dimensions:
       - name: id
         sql: id
@@ -86,6 +93,38 @@ cubes:
       - name: head_city
         sql: "{head.city}"
         type: string
+      - name: region_code
+        sql: "{regions.code}"
+        type: string
+
+  - name: regions
+    sql_table: regions
+    dimensions:
+      - name: id
+        sql: id
+        type: number
+        primary_key: true
+      - name: name
+        sql: name
+        type: string
+      - name: code
+        sql: code
+        type: string
+        mask: "'XX'"
+    access_policy:
+      - group: "*"
+        member_level:
+          includes:
+            - id
+            - name
+        member_masking:
+          includes:
+            - code
+        row_level:
+          filters:
+            - member: "{CUBE}.name"
+              operator: equals
+              values: ["EU"]
 
 views:
   - name: orders_view
@@ -211,5 +250,23 @@ describe('CompilerApi row level security through join aliases', () => {
 
     const { sql } = await compilerApi.getSql(query as any);
     expect(sql[0]).toContain('"orders__customer__departments__head".city = $');
+  });
+
+  test('constrains a cube two plain joins below an alias by its own instance', async () => {
+    const { query, denied } = await applyRls({
+      measures: ['orders.count'],
+      dimensions: ['orders.customer.department_region_code'],
+    });
+    expect(denied).toBe(false);
+    const rendered = JSON.stringify(query.filters);
+    expect(rendered).toContain('"member":"orders.customer.departments.regions.name","operator":"equals","values":["EU"]');
+    expect(rendered).not.toContain('"regions.name"');
+    expect((query as any).maskedMembers).toEqual(expect.arrayContaining([
+      expect.objectContaining({ member: 'orders.customer.departments.regions.code' }),
+    ]));
+
+    const { sql } = await compilerApi.getSql(query as any);
+    expect(sql[0]).toContain('"orders__customer__departments__regions".name = $');
+    expect(sql[0]).toContain("'XX'");
   });
 });

@@ -230,6 +230,42 @@ describe('Join aliases in the data model', () => {
     expect(sql).toContain('AS "orders__customer__departments" ON "orders__customer".department_id = "orders__customer__departments".id');
   });
 
+  it('keeps hierarchies, default filters and folders of a view to their own instance', async () => {
+    const compilers = await compile(`${model.replace(
+      '    segments:\n      - name: berliners',
+      '    hierarchies:\n      - name: geo\n        levels:\n          - city\n    segments:\n      - name: berliners'
+    )}
+views:
+  - name: staff_view
+    cubes:
+      - join_path: orders.customer
+        prefix: true
+        includes:
+          - city
+          - geo
+      - join_path: orders.manager
+        prefix: true
+        includes:
+          - city
+          - geo
+    default_filters:
+      - member: "{orders.manager.city}"
+        operator: equals
+        values: ["Berlin"]
+    folders:
+      - name: Managers
+        includes:
+          - join_path: orders.manager
+`);
+    const view = compilers.cubeEvaluator.cubeFromPath('staff_view') as any;
+    expect(view.evaluatedHierarchies.map(h => [h.name, h.levels])).toEqual([
+      ['customer_geo', ['staff_view.customer_city']],
+      ['manager_geo', ['staff_view.manager_city']],
+    ]);
+    expect(view.defaultFilters.map(f => f.memberReference)).toEqual(['staff_view.manager_city']);
+    expect(view.folders[0].includes.map(m => m.name)).toEqual(['manager_geo', 'manager_city']);
+  });
+
   it('keeps a view join map to cube names, up to the first alias', async () => {
     const compilers = await compile(`${model}
 views:
@@ -424,6 +460,12 @@ cubes:
   it.each([
     ['contains a double underscore', 'alias: customer\n', 'alias: buyer__vip\n', /contains '__'/],
     ['reads like another after snake-casing', 'alias: manager\n', 'alias: Customer\n', /renders under the same name as the alias 'customer'/],
+    [
+      'renders its members like a member of the cube',
+      '    dimensions:\n      - name: id\n        sql: id\n        type: number\n        primary_key: true\n    measures:\n      - name: count',
+      '    dimensions:\n      - name: id\n        sql: id\n        type: number\n        primary_key: true\n      - name: customer__city\n        sql: city\n        type: string\n    measures:\n      - name: count',
+      /alias 'customer', whose members would render under the same name as the member 'customer__city'/,
+    ],
   ])('rejects an alias that %s', async (_, from, to, expected) => {
     const { compiler } = prepareYamlCompiler(model.replace(from, to));
     await expect(compiler.compile()).rejects.toThrow(expected);

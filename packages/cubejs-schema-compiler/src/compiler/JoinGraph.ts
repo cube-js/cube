@@ -236,6 +236,13 @@ export class JoinGraph implements CompilerInterface {
         problem = `which is the name of the cube '${join.alias}' and would hide it from the members of '${cube.name}'`;
       } else if (this.renderedCubeNames.has(`${renderedCube}__${sqlName(join.alias)}`)) {
         problem = `which renders under the same name as the cube '${this.renderedCubeNames.get(`${renderedCube}__${sqlName(join.alias)}`)}'`;
+      } else {
+        // Members of the instance render as `<alias>__<member>` after the cube
+        const prefix = `${sqlName(join.alias)}__`;
+        const clashing = [...memberNames].find(member => sqlName(member).startsWith(prefix));
+        if (clashing) {
+          problem = `whose members would render under the same name as the member '${clashing}'`;
+        }
       }
       sqlNames.set(sqlName(join.alias), join.alias);
       if (problem) {

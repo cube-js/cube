@@ -60,6 +60,14 @@ describe('Member paths through joins', () => {
       .toThrow(/'orders.products.name' goes through joins that are not join aliases. Query it as 'products.name'/);
   });
 
+  it.each([
+    ['filters', { filters: [{ and: [{ member: 'orders.created_at.day', operator: 'set' }] }] }],
+    ['measures', { measures: ['orders.created_at.day'] }],
+  ])('rejects a granularity in %s', (_, query) => {
+    expect(() => gateway.checkMemberPaths(query as unknown as NormalizedQuery, resolve))
+      .toThrow(/'orders.created_at.day' names the 'day' granularity of 'orders.created_at'/);
+  });
+
   it('rejects a cube hop before an alias', () => {
     const query = { dimensions: ['products.orders.customer.city'] } as unknown as NormalizedQuery;
     expect(() => gateway.checkMemberPaths(query, resolve)).toThrow(/Query it as 'orders.customer.city'/);

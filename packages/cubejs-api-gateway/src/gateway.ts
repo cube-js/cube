@@ -1638,9 +1638,10 @@ class ApiGateway {
   }
 
   /**
-   * The member paths a query names, in its raw or normalized form.
+   * The member paths a query names, in its raw or normalized form. Only
+   * `order` may name a time dimension with a granularity.
    */
-  private memberPaths(query: Query | NormalizedQuery): unknown[] {
+  private memberPaths(query: Query | NormalizedQuery): { members: unknown[], order: unknown[] } {
     const filterMembers = (filters: any[] = []): unknown[] => filters.flatMap(
       f => (f.and || f.or ? filterMembers(f.and || f.or) : [f.member ?? f.dimension])
     );
@@ -1648,14 +1649,16 @@ class ApiGateway {
     const orderMembers = Array.isArray(order)
       ? order.map(o => (Array.isArray(o) ? o[0] : o?.id))
       : Object.keys(order || {});
-    return [
-      ...(query.measures || []),
-      ...(query.dimensions || []),
-      ...(query.segments || []),
-      ...(query.timeDimensions || []).map(td => td.dimension),
-      ...filterMembers(query.filters),
-      ...orderMembers,
-    ];
+    return {
+      members: [
+        ...(query.measures || []),
+        ...(query.dimensions || []),
+        ...(query.segments || []),
+        ...(query.timeDimensions || []).map(td => td.dimension),
+        ...filterMembers(query.filters),
+      ],
+      order: orderMembers,
+    };
   }
 
   /**
@@ -1663,7 +1666,8 @@ class ApiGateway {
    * which takes the data model to read.
    */
   protected hasLongMemberPaths(query: Query | NormalizedQuery): boolean {
-    return this.memberPaths(query).some(path => typeof path === 'string' && path.split('.').length > 2);
+    const { members, order } = this.memberPaths(query);
+    return [...members, ...order].some(path => typeof path === 'string' && path.split('.').length > 2);
   }
 
   /**
@@ -1675,11 +1679,16 @@ class ApiGateway {
       return query;
     }
 
-    for (const path of this.memberPaths(query)) {
+    const { members, order } = this.memberPaths(query);
+
+    for (const path of [...members, ...order]) {
       const resolved = typeof path === 'string' ? resolve(path) : null;
       const memberPath = resolved && `${resolved.instancePath}.${resolved.member}`;
       if (resolved && resolved.fullPath !== memberPath) {
         throw new UserError(`'${path}' goes through joins that are not join aliases. Query it as '${memberPath}'`);
+      }
+      if (resolved?.granularity && members.includes(path)) {
+        throw new UserError(`'${path}' names the '${resolved.granularity}' granularity of '${resolved.fullPath}'. Only dimensions and order can name a granularity; filter on '${resolved.fullPath}' instead`);
       }
     }
     return query;
