@@ -103,7 +103,16 @@ dashboard, embedded or not, and are applied only if a matching control for that
 member already exists on the dashboard; a granularity outside the switcher's
 allowed list is ignored, as is a member the field switcher doesn't offer — its
 [**Alternatives**](/docs/explore-analyze/dashboards/widgets/controls#field-switcher),
-plus the member it replaces.
+plus the member it replaces. An `f_` is also ignored for a filter whose
+[visibility](/docs/explore-analyze/dashboards/widgets/controls#visibility) is
+**Disabled**, which opens on the value it would have without the link; a
+switcher set to **Disabled** still takes its `tg_` or `ms_`.
+
+An empty value clears a control instead of setting it: `f_` with an empty
+`value` and no `type` (`{"value":[]}`), or an empty `tg_`
+(`tg_orders_transactions.created_at=`), opens that control cleared, and its
+default does not fill it back in. See [Controls → Sharing the current
+selection](/docs/explore-analyze/dashboards/widgets/controls#sharing-the-current-selection).
 
 The reverse direction is published-only: when a viewer changes a control — or
 switches a tab — the new value is written back into the dashboard's own URL, so
