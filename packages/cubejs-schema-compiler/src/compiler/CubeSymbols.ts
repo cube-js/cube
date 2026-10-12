@@ -1461,6 +1461,14 @@ export class CubeSymbols implements TranspilerSymbolResolver, CompilerInterface 
   }
 
   /**
+   * Whether the cube `cubeName` joins `name` without an alias.
+   */
+  public joinsWithoutAlias(cubeName: string, name: string): boolean {
+    const joins = this.symbols[cubeName]?.cubeObj?.()?.joins;
+    return Array.isArray(joins) && joins.some(join => !join.alias && join.name === name);
+  }
+
+  /**
    * The cube a join path ends at: each step follows the joins of the cube
    * before it, so an aliased step leads to the cube that alias joins.
    */
@@ -1630,6 +1638,10 @@ export class CubeSymbols implements TranspilerSymbolResolver, CompilerInterface 
         const aliasTarget = typeof propertyName === 'string' ? self.joinAliasTarget(cubeName, propertyName) : undefined;
         if (aliasTarget) {
           return this.cubeReferenceProxy(aliasTarget, joinHints ?? [cubeName], undefined, propertyName as string);
+        }
+        // Every join below a join alias reaches a cube instance of its own
+        if (segment && typeof propertyName === 'string' && self.joinsWithoutAlias(cubeName, propertyName)) {
+          return this.cubeReferenceProxy(propertyName, joinHints, undefined, propertyName);
         }
         if (self.symbols[propertyName]) {
           return this.cubeReferenceProxy(propertyName, joinHints);

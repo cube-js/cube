@@ -602,3 +602,21 @@ fn test_one_to_many_below_an_alias_multiplies_the_root() {
         "{sql}"
     );
 }
+
+#[test]
+fn test_measure_of_an_instance_reading_a_cube_below_it() {
+    let sql = sql(indoc! {r#"
+        measures:
+          - orders.customer.department_ids
+        dimensions:
+          - orders.status
+    "#});
+
+    // The measure is aggregated per customer over the customer's own joins,
+    // not over the orders the customer is reached from.
+    assert!(
+        sql.contains(r#"FROM  users  AS "orders__customer"
+  LEFT JOIN  departments  AS "orders__customer__departments" ON "orders__customer".department_id = "orders__customer__departments".id) AS"#),
+        "{sql}"
+    );
+}

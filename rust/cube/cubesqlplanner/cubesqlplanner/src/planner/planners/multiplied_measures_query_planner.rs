@@ -201,6 +201,7 @@ impl MultipliedMeasuresQueryPlanner {
         let source = if should_build_join_for_measure_select {
             let measure_subquery = self.aggregate_subquery_measure(
                 key_join.clone(),
+                key_cube,
                 &measures,
                 &primary_keys_dimensions,
                 scope,
@@ -266,6 +267,11 @@ impl MultipliedMeasuresQueryPlanner {
         join_hints: &JoinHints,
         key_cube: &CubeId,
     ) -> Result<bool, CubeError> {
+        if key_cube.is_joined() {
+            let (_, join) = JoinTreeBuilder::new(self.query_tools.clone())
+                .build_rooted_at(key_cube, join_hints)?;
+            return Ok(join.is_multiplied(key_cube));
+        }
         let (graph_hints, joined) = join_hints.split_joined();
         if joined.is_empty() {
             let join = self.query_tools.join_graph().build_join(graph_hints)?;
@@ -283,6 +289,7 @@ impl MultipliedMeasuresQueryPlanner {
     fn aggregate_subquery_measure(
         &self,
         key_join: Rc<JoinTree>,
+        key_cube: &CubeId,
         measures: &Vec<Rc<MemberSymbol>>,
         primary_keys_dimensions: &Vec<Rc<MemberSymbol>>,
         scope: &mut PlanningScope,
@@ -296,10 +303,17 @@ impl MultipliedMeasuresQueryPlanner {
         let subquery_dimension_queries =
             dimension_subquery_planner.plan_queries(&subquery_dimensions, scope)?;
         let measure_join_hints = collect_join_hints_for_measures(&measures)?;
-        let source = self.join_planner.make_join_logical_plan_with_join_hints(
-            measure_join_hints,
-            subquery_dimension_queries,
-        )?;
+        let source = if key_cube.is_joined() {
+            let (_, join) = JoinTreeBuilder::new(self.query_tools.clone())
+                .build_rooted_at(key_cube, &measure_join_hints)?;
+            self.join_planner
+                .make_join_logical_plan(&join, subquery_dimension_queries)
+        } else {
+            self.join_planner.make_join_logical_plan_with_join_hints(
+                measure_join_hints,
+                subquery_dimension_queries,
+            )?
+        };
 
         let schema = LogicalSchema::default()
             .set_dimensions(primary_keys_dimensions.clone())

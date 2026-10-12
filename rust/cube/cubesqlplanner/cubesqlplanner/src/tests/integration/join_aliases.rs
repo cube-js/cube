@@ -325,3 +325,22 @@ async fn test_root_measure_next_to_a_one_to_many_below_an_alias() {
         insta::assert_snapshot!(result);
     }
 }
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_measure_of_an_instance_reading_a_cube_below_it() {
+    let ctx = create_context();
+    let query = indoc! {r#"
+        measures:
+          - orders.customer.department_ids
+        dimensions:
+          - orders.status
+        order:
+          - id: orders.status
+    "#};
+
+    ctx.build_sql(query).unwrap();
+
+    if let Some(result) = ctx.try_execute_pg(query, SEED).await {
+        insta::assert_snapshot!(result);
+    }
+}

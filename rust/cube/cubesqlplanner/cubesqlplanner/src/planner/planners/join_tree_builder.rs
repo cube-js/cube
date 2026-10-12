@@ -54,6 +54,48 @@ impl JoinTreeBuilder {
         Ok(Some((JoinKey::from_tree(&tree), tree)))
     }
 
+    /// The tree of `hints` rooted at the cube instance `root`: the instance and
+    /// the instances below it, without the cubes it is reached from. A measure
+    /// of an instance aggregates over that tree, as a measure of a cube does
+    /// over the tree its own joins form.
+    pub fn build_rooted_at(
+        &self,
+        root: &CubeId,
+        hints: &JoinHints,
+    ) -> Result<(JoinKey, Rc<JoinTree>), CubeError> {
+        let mut joins: Vec<JoinTreeItem> = vec![];
+        for cube in hints.iter().flat_map(|hint| hint.cubes()) {
+            let chain = cube.joined_chain();
+            let below_root = chain.contains(root) && cube != root;
+            let above_root = root.joined_chain().contains(cube) || cube == root.root();
+            if !(below_root || above_root || cube == root) {
+                return Err(CubeError::user(format!(
+                    "`{}` reads `{}`, which is not joined below it",
+                    root, cube
+                )));
+            }
+            if below_root {
+                for instance in chain
+                    .iter()
+                    .skip_while(|instance| *instance != root)
+                    .skip(1)
+                {
+                    if !joins.iter().any(|item| item.cube().cube_id() == instance) {
+                        let item = self.joined_item(instance, root, &joins)?;
+                        joins.push(item);
+                    }
+                }
+            }
+        }
+        let multiplication_factor = Self::multiplication_factor(hints, &joins);
+        let tree = JoinTree::new(
+            self.utils.cube_from_path(root)?,
+            joins,
+            multiplication_factor,
+        );
+        Ok((JoinKey::from_tree(&tree), tree))
+    }
+
     fn build(
         &self,
         join: Rc<dyn JoinDefinition>,

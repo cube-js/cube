@@ -101,6 +101,9 @@ cubes:
       - name: total_score
         type: sum
         sql: score
+      - name: department_ids
+        type: sum
+        sql: "{departments.id}"
       - name: berlin_score
         type: sum
         sql: "{CUBE.total_score}"

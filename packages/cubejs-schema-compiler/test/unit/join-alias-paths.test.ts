@@ -284,6 +284,16 @@ views:
     ]);
   });
 
+  it('keeps a folder to the instance a plain join below an alias reaches', async () => {
+    const compilers = await compile(`${modelWithAliasReferences}    folders:
+      - name: Manager departments
+        includes:
+          - join_path: orders.manager.departments
+`);
+    const view = compilers.cubeEvaluator.cubeFromPath('orders_view') as any;
+    expect(view.folders[0].includes.map(m => m.name)).toEqual(['departments_name']);
+  });
+
   it('keeps a view join map to cube names, up to the first alias', async () => {
     const compilers = await compile(`${model}
 views:

@@ -270,3 +270,161 @@ describe('CompilerApi row level security through join aliases', () => {
     expect(sql[0]).toContain("'XX'");
   });
 });
+
+const plainJoinsBelowAliasModel = `
+cubes:
+  - name: orders
+    sql_table: orders
+    joins:
+      - name: users
+        alias: customer
+        sql: "{CUBE}.customer_id = {users}.id"
+        relationship: many_to_one
+      - name: users
+        alias: manager
+        sql: "{CUBE}.manager_id = {users}.id"
+        relationship: many_to_one
+    dimensions:
+      - name: id
+        sql: id
+        type: number
+        primary_key: true
+      - name: customer_department_code
+        sql: "{customer.departments.code}"
+        type: string
+    measures:
+      - name: count
+        type: count
+
+  - name: users
+    sql_table: users
+    joins:
+      - name: departments
+        sql: "{CUBE}.department_id = {departments}.id"
+        relationship: many_to_one
+    dimensions:
+      - name: id
+        sql: id
+        type: number
+        primary_key: true
+      - name: region_code
+        sql: "{departments.regions.code}"
+        type: string
+
+  - name: departments
+    sql_table: departments
+    joins:
+      - name: regions
+        sql: "{CUBE}.region_id = {regions}.id"
+        relationship: many_to_one
+    dimensions:
+      - name: id
+        sql: id
+        type: number
+        primary_key: true
+      - name: name
+        sql: name
+        type: string
+      - name: code
+        sql: code
+        type: string
+        mask: "'XX'"
+    access_policy:
+      - group: "*"
+        member_level:
+          includes:
+            - id
+            - name
+        member_masking:
+          includes:
+            - code
+        row_level:
+          filters:
+            - member: "{CUBE}.name"
+              operator: equals
+              values: ["Sales"]
+
+  - name: regions
+    sql_table: regions
+    dimensions:
+      - name: id
+        sql: id
+        type: number
+        primary_key: true
+      - name: name
+        sql: name
+        type: string
+      - name: code
+        sql: code
+        type: string
+        mask: "'YY'"
+    access_policy:
+      - group: "*"
+        member_level:
+          includes:
+            - id
+            - name
+        member_masking:
+          includes:
+            - code
+        row_level:
+          filters:
+            - member: "{CUBE}.name"
+              operator: equals
+              values: ["EU"]
+
+views:
+  - name: staff_view
+    cubes:
+      - join_path: orders
+        includes:
+          - count
+      - join_path: orders.manager.departments
+        prefix: true
+        includes:
+          - name
+          - code
+`;
+
+describe('CompilerApi row level security through plain joins below a join alias', () => {
+  let compilerApi: CompilerApi;
+
+  const repository: SchemaFileRepository = {
+    localPath: () => '/mock/path',
+    dataSchemaFiles: () => Promise.resolve([{ fileName: 'model.yml', content: plainJoinsBelowAliasModel }]),
+  };
+  const dbType: DbTypeInternalFn = async () => 'postgres';
+  const context: any = { securityContext: {}, requestId: 'test' };
+
+  beforeEach(() => {
+    compilerApi = new CompilerApi(repository, dbType, {
+      logger: () => {}, // eslint-disable-line @typescript-eslint/no-empty-function
+      contextToGroups: async () => [],
+    });
+  });
+
+  afterEach(() => compilerApi.dispose());
+
+  const applyRls = async (query: any) => {
+    const normalized = { timezone: 'UTC', filters: [], ...query };
+    return compilerApi.applyRowLevelSecurity(normalized, normalized, context);
+  };
+
+  test.each([
+    ['a view join path', ['staff_view.departments_code'], 'orders.manager.departments', '"orders__manager__departments"'],
+    ['member SQL of the declaring cube', ['orders.customer_department_code'], 'orders.customer.departments', '"orders__customer__departments"'],
+    ['member SQL read inside an instance', ['orders.customer.region_code'], 'orders.customer.departments.regions', '"orders__customer__departments__regions"'],
+  ])('constrains the instance %s reaches', async (_, dimensions, instance, tableAlias) => {
+    const { query, denied } = await applyRls({ measures: ['orders.count'], dimensions });
+    expect(denied).toBe(false);
+    const rendered = JSON.stringify(query.filters);
+    expect(rendered).toContain(`"member":"${instance}.name"`);
+    expect(rendered).not.toMatch(/"member":"(departments|regions)\.name"/);
+    expect((query as any).maskedMembers).toEqual(expect.arrayContaining([
+      expect.objectContaining({ member: `${instance}.code` }),
+    ]));
+
+    const { sql } = await compilerApi.getSql(query as any);
+    expect(sql[0]).toContain(`${tableAlias}.name = $`);
+  });
+});

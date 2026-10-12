@@ -144,6 +144,18 @@ cubes:
     measures:
       - name: count
         type: count
+  - name: shops
+    sql: SELECT * FROM shops
+    joins:
+      - name: orders
+        alias: latest_order
+        sql: "{CUBE}.latest_order_id = {latest_order}.id"
+        relationship: many_to_one
+    dimensions:
+      - name: id
+        sql: id
+        type: number
+        primary_key: true
 
 views:
   - name: orders_view
@@ -189,6 +201,11 @@ views:
 
     test('a view over a relative date range is compiled again in the next minute', async () => {
       const { first, nextMinute } = await sqlInTwoMinutes(compilerApiFor('[today]'), 'orders_view.amount_in_range');
+      expect(nextMinute).not.toBe(first);
+    });
+
+    test('a cube instance over a relative date range is compiled again in the next minute', async () => {
+      const { first, nextMinute } = await sqlInTwoMinutes(compilerApiFor('[today]'), 'shops.latest_order.amount_in_range');
       expect(nextMinute).not.toBe(first);
     });
 

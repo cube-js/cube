@@ -4008,18 +4008,26 @@ export class BaseQuery {
 
   /**
    * The cube instance a member of `cubeName` read inside the instance being
-   * evaluated belongs to, when the instance's cube joins `cubeName` without an
-   * alias: every join below an alias reaches an instance of its own.
+   * evaluated belongs to, when the reference reaches `cubeName` through joins
+   * without an alias: every join below an alias reaches an instance of its own.
    */
   joinedMemberInstance(cubeName) {
     const instance = this.safeEvaluateSymbolContext().memberInstance;
     if (!instance || instance.cube === cubeName) {
       return undefined;
     }
-    const joins = this.cubeEvaluator.cubeFromPath(instance.cube).joins || [];
-    return joins.some(j => !j.alias && j.name === cubeName) ?
-      { path: `${instance.path}.${cubeName}`, cube: cubeName } :
-      undefined;
+    const hints = this.cubeEvaluator.joinHints() || [];
+    const steps = hints[hints.length - 1] === cubeName ? hints : [cubeName];
+    let current = instance;
+    for (const step of steps) {
+      if (step !== current.cube) {
+        if (!this.cubeEvaluator.joinsWithoutAlias(current.cube, step)) {
+          return undefined;
+        }
+        current = { path: `${current.path}.${step}`, cube: step };
+      }
+    }
+    return current;
   }
 
   /**
