@@ -14,13 +14,6 @@ RUN DEBIAN_FRONTEND=noninteractive \
     && update-alternatives --install /usr/bin/python python /usr/bin/python3.13 1 \
     && rm -rf /var/lib/apt/lists/*
 
-ENV RUSTUP_HOME=/usr/local/rustup
-ENV CARGO_HOME=/usr/local/cargo
-ENV PATH=/usr/local/cargo/bin:$PATH
-
-RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | \
-    sh -s -- --profile minimal --default-toolchain nightly-2022-03-08 -y
-
 ENV CUBESTORE_SKIP_POST_INSTALL=true
 ENV NODE_ENV=development
 # Use the image's Node headers to avoid concurrent node-gyp downloads and copies.
