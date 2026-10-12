@@ -21,40 +21,42 @@ class ClickHouseFilter extends BaseFilter {
     return `${column} ${not ? 'NOT' : ''} ILIKE CONCAT('${p}', ${this.allocateParam(param)}, '${s}')`;
   }
 
+  // ClickHouse rejects an ISO-8601 string ('2025-06-30T00:00:00.000Z') where it converts it to
+  // a date/time type itself, so a time member gets its values parsed. Parsing keeps the value's
+  // offset and milliseconds, and a comparison takes the DateTime64 against any date/time type.
   public castParameter() {
     if (this.measure || this.definition().type === 'number') {
       // TODO here can be measure type of string actually
       return 'toFloat64(?)';
     }
+    if (this.definition().type === 'time') {
+      return 'parseDateTime64BestEffort(?, 3)';
+    }
     return '?';
   }
 
-  // ClickHouse converts the elements of an IN set to the type of its left side and rejects an
-  // ISO-8601 string ('2025-06-30T00:00:00.000Z') for every date/time type, so a time member is
-  // compared with each parsed value on its own. An equality takes a DateTime64 against any
-  // date/time type, and parsing keeps the value's offset and milliseconds.
+  // An IN set converts its elements to the type of its left side, which a parsed DateTime64
+  // fails as well, so a time member is compared with each value on its own
   public inWhere(column) {
     if (!this.isTimeMember()) {
       return super.inWhere(column);
     }
-    return `(${this.timeValues().map(v => `${column} = ${v}`).join(' OR ')})${this.orIsNullCheck(column, false)}`;
+    return `(${this.castParams().map(v => `${column} = ${v}`).join(' OR ')})${this.orIsNullCheck(column, false)}`;
   }
 
   public notInWhere(column) {
     if (!this.isTimeMember()) {
       return super.notInWhere(column);
     }
-    return `(${this.timeValues().map(v => `${column} <> ${v}`).join(' AND ')})${this.orIsNullCheck(column, true)}`;
+    return `(${this.castParams().map(v => `${column} <> ${v}`).join(' AND ')})${this.orIsNullCheck(column, true)}`;
   }
 
   private isTimeMember(): boolean {
     return !this.measure && this.definition().type === 'time';
   }
 
-  private timeValues(): string[] {
-    return this.filterParams().map(
-      p => this.query.paramAllocator.allocateParamsForQuestionString('parseDateTime64BestEffort(?, 3)', [p])
-    );
+  private castParams(): string[] {
+    return this.filterParams().map(p => this.allocateCastParam(p));
   }
 }
 
@@ -330,10 +332,11 @@ export class ClickHouseQuery extends BaseQuery {
     // toward zero, matching PostgreSQL (intDiv(-7, 2) = -3 despite docs saying
     // "rounded down")
     templates.expressions.int_division = 'intDiv({{ left }}, {{ right }})';
-    // A time member compares with each value on its own, see ClickHouseFilter.inWhere
-    templates.filters.time_in = '({% for value in values %}{{ column }} = parseDateTime64BestEffort({{ value }}, 3)' +
+    // A time member is compared with each parsed value on its own, see ClickHouseFilter
+    templates.tesseract.time_param_cast = 'parseDateTime64BestEffort({{ expr }}, 3)';
+    templates.filters.time_in = '({% for value in values %}{{ column }} = {{ value }}' +
       '{% if not loop.last %} OR {% endif %}{% endfor %}){{ is_null_check }}';
-    templates.filters.time_not_in = '({% for value in values %}{{ column }} <> parseDateTime64BestEffort({{ value }}, 3)' +
+    templates.filters.time_not_in = '({% for value in values %}{{ column }} <> {{ value }}' +
       '{% if not loop.last %} AND {% endif %}{% endfor %}){{ is_null_check }}';
 
     templates.statements.time_series_select = 'SELECT parseDateTimeBestEffort(dates.f) date_from, parseDateTimeBestEffort(dates.t) date_to \n' +

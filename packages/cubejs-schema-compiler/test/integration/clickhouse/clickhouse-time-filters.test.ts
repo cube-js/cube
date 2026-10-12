@@ -2,11 +2,8 @@ import { prepareYamlCompiler } from '../../unit/PrepareCompiler';
 import { ClickHouseQuery } from '../../../src/adapter/ClickHouseQuery';
 import { ClickHouseDbRunner } from './ClickHouseDbRunner';
 
-// A multi-value filter on a time dimension arrives with ISO-8601 values
-// ('2025-06-30T00:00:00.000Z'), which is what the SQL API sends for a Power BI
-// multi-select of dates. ClickHouse converts the elements of an IN set to the
-// type of its left side and rejects that form for every date/time type, so the
-// whole query fails before it reads a row.
+// Time filters arrive with ISO-8601 values ('2025-06-30T00:00:00.000Z'), as the SQL API sends for
+// a Power BI date selection, and ClickHouse rejects that form where it converts the value itself.
 describe('ClickHouse time dimension value filters', () => {
   jest.setTimeout(200000);
 
@@ -77,6 +74,13 @@ cubes:
       operator: 'notEquals',
       values: ['2025-06-30T00:00:00.000Z', '2025-12-31T00:00:00.000Z'],
     })).toEqual([2]);
+  });
+
+  it.each(['days.day', 'days.day_time', 'days.at'])('selects and excludes a single day of %s', async (member) => {
+    const values = member === 'days.at' ? ['2025-06-30T00:00:00.123Z'] : ['2025-06-30T00:00:00.000Z'];
+
+    expect(await idsFor({ member, operator: 'equals', values })).toEqual([1]);
+    expect(await idsFor({ member, operator: 'notEquals', values })).toEqual([2, 3]);
   });
 
   it('compares a DateTime64 member with the milliseconds of each value', async () => {
