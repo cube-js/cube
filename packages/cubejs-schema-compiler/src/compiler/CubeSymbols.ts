@@ -660,7 +660,9 @@ export class CubeSymbols implements TranspilerSymbolResolver, CompilerInterface 
   }
 
   protected generateSyntheticLinkDimensions(cube: any) {
-    if (!cube.dimensions) return;
+    if (!cube.dimensions) {
+      return;
+    }
 
     const dims = cube.dimensions;
 
@@ -669,7 +671,9 @@ export class CubeSymbols implements TranspilerSymbolResolver, CompilerInterface 
       if (dimDef.links && Array.isArray(dimDef.links)) {
         for (const link of dimDef.links) {
           const linkName = typeof link.name === 'function' ? link.name() : link.name;
-          if (!linkName) return;
+          if (!linkName) {
+            return;
+          }
           const syntheticName = `${dimName}___link_${linkName}_url`;
           if (dims[syntheticName] && !dims[syntheticName].synthetic) {
             throw new Error(`Link '${linkName}' on dimension '${dimName}' conflicts with existing dimension '${syntheticName}'`);
@@ -974,7 +978,9 @@ export class CubeSymbols implements TranspilerSymbolResolver, CompilerInterface 
             includedMemberName
           );
 
-          if (!resolved) return undefined;
+          if (!resolved) {
+            return undefined;
+          }
 
           memberSets.resolvedMembers.add(name);
 
@@ -1700,7 +1706,9 @@ export class CubeSymbols implements TranspilerSymbolResolver, CompilerInterface 
     // when the security context is empty during compilation/dep resolution.
     const undefinedChainableHandler: ProxyHandler<any> = {
       get: (target, name) => {
-        if (name in target || typeof name === 'symbol') return target[name];
+        if (name in target || typeof name === 'symbol') {
+          return target[name];
+        }
         return new Proxy(methods(undefined), undefinedChainableHandler);
       }
     };
@@ -1709,7 +1717,9 @@ export class CubeSymbols implements TranspilerSymbolResolver, CompilerInterface 
       get: (target, name) => {
         const propValue = target[name];
         const methodOnTarget = methods(target)[name];
-        if (methodOnTarget) return methodOnTarget;
+        if (methodOnTarget) {
+          return methodOnTarget;
+        }
 
         if (typeof propValue === 'object' && propValue !== null) {
           return CubeSymbols.contextSymbolsProxyFrom(propValue, allocateParam);

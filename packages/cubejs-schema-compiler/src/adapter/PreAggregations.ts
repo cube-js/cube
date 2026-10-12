@@ -591,11 +591,15 @@ export class PreAggregations {
       )(measures);
 
     function allValuesEq1(map) {
-      if (!map) return false;
+      if (!map) {
+        return false;
+      }
 
       // eslint-disable-next-line no-restricted-syntax
       for (const v of map?.values()) {
-        if (v !== 1) return false;
+        if (v !== 1) {
+          return false;
+        }
       }
       return true;
     }
@@ -694,7 +698,9 @@ export class PreAggregations {
         map.set(f.expressionPath(), Math.min(map.get(f.expressionPath()) || 2, f.values.length));
       } else if (f.operator === 'and') {
         const res = this.collectFilterDimensionsWithSingleValueEqual(f.values, map);
-        if (res == null) return null;
+        if (res == null) {
+          return null;
+        }
       } else {
         return null;
       }
@@ -924,7 +930,9 @@ export class PreAggregations {
         transformedQuery.leafMeasureAdditive && !transformedQuery.hasMultipliedMeasures && !transformedQuery.hasMultiStage || transformedQuery.ungrouped
       ) ? ((r: PreAggregationReferences): CanUsePreAggregationResult => {
           const leaf = canUsePreAggregationLeafMeasureAdditive(r);
-          if (leaf.canUse) return leaf;
+          if (leaf.canUse) {
+            return leaf;
+          }
           return canUsePreAggregationNotAdditive(r);
         })
         : canUsePreAggregationNotAdditive;

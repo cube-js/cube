@@ -154,7 +154,9 @@ export default function MemberMenu({
                 return;
               }
 
-              if (document.activeElement === searchInputRef.current?.input) return;
+              if (document.activeElement === searchInputRef.current?.input) {
+                return;
+              }
 
               searchInputRef.current?.focus({ preventScroll: true });
             }}

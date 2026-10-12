@@ -38,7 +38,9 @@ class PinotTimeDimension extends BaseTimeDimension {
   }
 
   public timeSeries(): string[][] {
-    if (!this.granularity) return super.timeSeries();
+    if (!this.granularity) {
+      return super.timeSeries();
+    }
 
     return super.timeSeries().map(([from, to]) => ([from.replace('T', ' '), to.replace('T', ' ')]));
   }

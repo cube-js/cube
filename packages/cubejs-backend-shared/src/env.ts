@@ -104,7 +104,9 @@ export function assertDataSource(dataSource = 'default'): string {
  * Returns data source specific environment variable name.
  */
 export function keyByDataSource(origin: string, dataSource?: string, preAggregations?: boolean): string {
-  if (dataSource) assertDataSource(dataSource);
+  if (dataSource) {
+    assertDataSource(dataSource);
+  }
 
   let key: string;
 

@@ -102,18 +102,24 @@ export class DeployController {
 
     const files = Object.keys(fileHashes);
     const fileHashesPosix: Record<string, any> = {};
-    if (this.hooks.onStart) this.hooks.onStart(deploymentName, files);
+    if (this.hooks.onStart) {
+      this.hooks.onStart(deploymentName, files);
+    }
 
     try {
       for (let i = 0; i < files.length; i++) {
         const file = files[i];
-        if (this.hooks.onUpdate) this.hooks.onUpdate(i, { file });
+        if (this.hooks.onUpdate) {
+          this.hooks.onUpdate(i, { file });
+        }
 
         const filePosix = file.split(path.sep).join(path.posix.sep);
         fileHashesPosix[filePosix] = fileHashes[file];
 
         if (!upstreamHashes[filePosix] || upstreamHashes[filePosix].hash !== fileHashes[file].hash) {
-          if (this.hooks.onUpload) this.hooks.onUpload(files, file);
+          if (this.hooks.onUpload) {
+            this.hooks.onUpload(files, file);
+          }
           await this.cubeCloudClient.uploadFile({
             transaction,
             fileName: filePosix,
@@ -124,7 +130,9 @@ export class DeployController {
       
       result = await this.cubeCloudClient.finishUpload({ transaction, files: fileHashesPosix });
     } finally {
-      if (this.hooks.onFinally) this.hooks.onFinally();
+      if (this.hooks.onFinally) {
+        this.hooks.onFinally();
+      }
     }
 
     return result || {};
