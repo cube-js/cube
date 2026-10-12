@@ -11,18 +11,16 @@ const STOP_WAIT_INTERVAL_MS = 5000;
 const STOP_WAIT_ATTEMPTS = 60;
 const STOP_WAIT_MAX_MS = STOP_WAIT_INTERVAL_MS * STOP_WAIT_ATTEMPTS;
 
-async function waitWhileTransitioning(engine: {
-  refreshStatus(): Promise<void>;
-  current_status_summary: EngineStatusSummary;
-}) {
+async function waitWhileTransitioning(getStatus: () => Promise<EngineStatusSummary>) {
+  let status: EngineStatusSummary | undefined;
   for (let i = 0; i < STOP_WAIT_ATTEMPTS; i++) {
-    await engine.refreshStatus();
-    if (![EngineStatusSummary.STOPPING, EngineStatusSummary.DRAINING].includes(engine.current_status_summary)) {
+    status = await getStatus();
+    if (![EngineStatusSummary.STOPPING, EngineStatusSummary.DRAINING].includes(status)) {
       return;
     }
     await new Promise((resolve) => setTimeout(resolve, STOP_WAIT_INTERVAL_MS));
   }
-  throw new Error(`Engine is still ${engine.current_status_summary} after ${STOP_WAIT_MAX_MS / 1000} s`);
+  throw new Error(`Engine is still ${status} after ${STOP_WAIT_MAX_MS / 1000} s`);
 }
 
 describe('FireboltDriver autostart', () => {
@@ -79,15 +77,16 @@ describe('FireboltDriver autostart', () => {
     });
 
     const engine = await firebolt.resourceManager.engine.getByName(engineName);
+    const getStatus = async () => (await firebolt.resourceManager.engine.getByName(engineName)).current_status_summary;
 
     try {
       await engine.stop();
-      await waitWhileTransitioning(engine);
+      await waitWhileTransitioning(getStatus);
 
       driver = new FireboltDriver({});
       await driver.testConnection();
     } finally {
-      await waitWhileTransitioning(engine);
+      await waitWhileTransitioning(getStatus);
       await engine.startAndWait();
     }
   });
