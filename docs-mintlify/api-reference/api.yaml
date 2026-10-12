@@ -6052,9 +6052,11 @@ paths:
           are the deployment ids as strings. A role usually also needs a `Global` policy naming the
           holder's license tier — `AIBIView`, `AIBIExplore` or `AIBIDevelop` — which is what the
           console calls the role's Base Role. Pick a tier that covers the deployment actions you
-          grant: the console forces Developer (`AIBIDevelop`) for every deployment action except
-          `DeploymentRead`, `DeploymentAgentRead`, `DownloadData` and `ChatHistoryRead`, so a lower
-          tier here produces a role its role builder would not have let you save:
+          grant: apart from the handful of actions available at every tier, the console forces
+          Developer (`AIBIDevelop`), so a lower tier here produces a role its role builder would not
+          have let you save. The current list of those actions is in [Auto-bump to
+          Developer](https://docs.cube.dev/admin/users-and-permissions/custom-roles#auto-bump-to-developer).
+          For example:
 
 
           ```json

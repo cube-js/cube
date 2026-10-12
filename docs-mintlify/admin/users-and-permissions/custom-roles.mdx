@@ -50,7 +50,7 @@ In the role builder, every custom role has exactly one **Base Role**. It sets th
 | Explorer   | Viewer's work, plus creating and editing workbooks and running queries. |
 | Developer  | Explorer's work, plus editing the data model.                |
 
-The built-in roles of the same names carry deployment policies of their own. Viewer and Explorer get `DeploymentRead`, `DeploymentAgentRead` and `DownloadData` over every deployment; Developer gets every deployment action, data-model ones included, except **Access chat history**, plus account-wide deployment management as a [Global permission](#global-permissions). A custom role starts with none of it. A role with Base Role **Viewer** and no deployment policy is licensed for viewer-level work and reaches no deployment; a role meant to work like Developer has to grant the deployment actions itself. **Full access** (`All`) is the bulk shortcut, and unlike the built-in Developer it takes chat history as well.
+The built-in roles of the same names carry deployment policies of their own. Viewer and Explorer get `DeploymentRead`, `DeploymentAgentRead`, `DownloadData` and `ScheduledTasksCreate` over every deployment; Developer gets every deployment action, data-model ones included, except **Access chat history**, plus account-wide deployment management as a [Global permission](#global-permissions). A custom role starts with none of it. A role with Base Role **Viewer** and no deployment policy is licensed for viewer-level work and reaches no deployment; a role meant to work like Developer has to grant the deployment actions itself. **Full access** (`All`) is the bulk shortcut, and unlike the built-in Developer it takes chat history as well.
 
 The tier is hierarchical, so a higher one satisfies a requirement for a lower:
 
@@ -120,7 +120,7 @@ Either grant **Full access** (a shortcut that enables every current and future d
 | Data Model  | Edit data model on dev branches     | Edit the data model only on non-default branches. Blocks any write that targets the main/deploy branch (including merging to main).                                       |
 | Data Model  | Access SQL Runner                   | Open the SQL Runner and execute queries in it.                                                                                                                            |
 | AI          | Access AI agents                    | Use the agent in Analytics Chat, workbooks, the IDE, and dashboards.                                                                                                      |
-| AI          | Create scheduled tasks              | Create [scheduled tasks][ref-scheduled-tasks] in the deployment, from the **Scheduled** page, by asking the agent, or with the Platform API. Editing, pausing, running, and deleting a task stay with its creator or an admin. Granted by default to the built-in Viewer, Explorer, and Developer roles. |
+| AI          | Create scheduled tasks              | Create [scheduled tasks][ref-scheduled-tasks] in the deployment, from the **Scheduled** page, by asking the agent, or with the Platform API. Editing, pausing, running, and deleting a task stay with its creator or an admin. |
 | Monitoring  | Access query history                | View deployment query history, performance, and traces.                                                                                                                   |
 | Monitoring  | Access chat history                 | View other users' chat conversations for the deployment, including Analytics Chat and the Excel/Google Sheets add-in panes (**Admin → Chats History**). |
 | Data Export | Download data                       | Download query results as CSV from workbooks, Analytics Chat, and published dashboards. See [Data download controls][ref-data-download-controls]. |
@@ -160,14 +160,14 @@ A common pattern: someone who consumes dashboards and chats but never edits anyt
     Select **Viewer**.
   </Step>
   <Step title="Add a deployment policy">
-    Click **Add deployment policy**, leave **Scope** on **All deployments**, and check **Access deployment** under General. Check **Access AI agents** and **Create scheduled tasks** under AI if the user should chat with the agent and schedule tasks. The Base Role carries none of these, and all three are [exempt from the auto-bump](#auto-bump-to-developer), so the role stays a Viewer.
+    Click **Add deployment policy**, leave **Scope** on **All deployments**, and check **Access deployment** under General and **Download data** under Data Export. Check **Access AI agents** and **Create scheduled tasks** under AI if the user should chat with the agent and schedule tasks. The Base Role carries none of these, and all four are [exempt from the auto-bump](#auto-bump-to-developer), so the role stays a Viewer.
   </Step>
   <Step title="Save">
     Click **Create**.
   </Step>
 </Steps>
 
-With all three actions checked, `Org Viewer` gives the same tier and the same deployment access as the built-in Viewer. What makes it worth writing as a custom role is what you change from here: narrow **Scope** to specific deployments, or add a [Global permission](#global-permissions) the built-in does not carry.
+With all four actions checked, `Org Viewer` gives the same tier and the same deployment access as the built-in Viewer. What makes it worth writing as a custom role is what you change from here: narrow **Scope** to specific deployments, or add a [Global permission](#global-permissions) the built-in does not carry.
 
 ### Create an Explorer for a single deployment
 
