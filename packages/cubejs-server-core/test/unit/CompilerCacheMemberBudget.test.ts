@@ -56,11 +56,7 @@ const compilerApiFor = (files: FileContent[]) => new CompilerApi(
  * A core whose compiler cache and budget pass are reachable from the test,
  * rather than casting the instance to `any`.
  */
-/**
- * Every core this file builds. Each starts a scheduled refresh timer, which
- * keeps firing after the file's environment is torn down and fails whichever
- * suite runs next, so all of them are shut down after each test.
- */
+/** Every core this file builds, shut down after each test to release connections. */
 const cores: CubejsServerCore[] = [];
 
 afterEach(async () => {
@@ -85,6 +81,8 @@ class CoreOpen extends CubejsServerCore {
 const coreWithBudget = (maxCompiledMembers?: number) => new CoreOpen(<any>{
   apiSecret: 'secret',
   driverFactory: () => ({ type: 'postgres' }),
+  // Its interval outlives this file and fails whichever suite runs next.
+  scheduledRefreshTimer: false,
   maxCompiledMembers,
   logger: jest.fn(),
 });
@@ -226,6 +224,24 @@ describe('compiled member counting', () => {
     expect(query.options.queryFactory).toBeInstanceOf(QueryFactory);
   });
 
+  test('a budget pass that throws does not fail the compile it follows', async () => {
+    const logger = jest.fn();
+    const api = new CompilerApi(
+      repository([{ fileName: 'orders.js', content: cubeOf('orders', 3) }]),
+      dbType,
+      {
+        logger,
+        onCompiled: () => {
+          throw new Error('eviction failed');
+        },
+      },
+    );
+
+    await expect(api.getCompilers()).resolves.toBeDefined();
+    expect(api.compiledMemberCount).toBe(7);
+    expect(logger).toHaveBeenCalledWith('Compiler cache member budget pass failed', expect.anything());
+  });
+
   test('is zero before anything has compiled', () => {
     expect(compilerApiFor([]).compiledMemberCount).toBe(0);
   });
@@ -239,6 +255,7 @@ describe('member budget, end to end', () => {
     const core = new CoreOpen(<any>{
       apiSecret: 'secret',
       driverFactory: () => ({ type: 'postgres' }),
+      scheduledRefreshTimer: false,
       maxCompiledMembers: 10,
       logger: jest.fn(),
       contextToAppId: ({ securityContext }: RequestContext) => securityContext.app,

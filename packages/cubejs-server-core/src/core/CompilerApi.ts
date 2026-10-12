@@ -335,7 +335,16 @@ export class CompilerApi {
       // evicted instance, no longer describes what this entry holds.
       if (this.compilerVersion === compilerVersion) {
         this.memberCount = CompilerApi.countMembers(compilers);
-        this.options.onCompiled?.();
+
+        // Housekeeping for other entries: if it fails, this compile still stands.
+        try {
+          this.options.onCompiled?.();
+        } catch (e: any) {
+          this.logger('Compiler cache member budget pass failed', {
+            requestId,
+            error: (e.stack || e).toString(),
+          });
+        }
       }
 
       this.logger('Compiling schema completed', {
