@@ -590,7 +590,10 @@ export class CubejsServerCore {
     return compilerApi;
   }
 
-  /** Never evicts `keepAppId`: a model alone over budget would otherwise recompile on every request. */
+  /**
+   * Never evicts `keepAppId`, nor the last model holding members, whatever its size:
+   * a model alone over budget would otherwise recompile on every request.
+   */
   protected evictCompilersOverMemberBudget(keepAppId: string): void {
     const budget = this.options.maxCompiledMembers;
 
@@ -599,9 +602,11 @@ export class CubejsServerCore {
     }
 
     let total = 0;
+    let models = 0;
 
     for (const api of this.compilerCache.values()) {
       total += api.compiledMemberCount;
+      models += api.compiledMemberCount ? 1 : 0;
     }
 
     if (total <= budget) {
@@ -624,7 +629,15 @@ export class CubejsServerCore {
       // nothing, and disposing a compile in flight only makes its tenant
       // start over -- so skip anything with nothing to free.
       if (api?.compiledMemberCount) {
+        // The floor `keepAppId` gives fails when that app is no longer cached,
+        // e.g. an evicted instance recompiling. Walking LRU first, this keeps
+        // the most recently used model.
+        if (models <= 1) {
+          break;
+        }
+
         total -= api.compiledMemberCount;
+        models -= 1;
         this.compilerCache.delete(appId);
         evicted.push(appId);
       }

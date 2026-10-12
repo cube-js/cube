@@ -335,6 +335,28 @@ describe('evictCompilersOverMemberBudget', () => {
     expect(compiling.dispose).not.toHaveBeenCalled();
   });
 
+  test('keeps the last model even when the one that compiled is not cached', () => {
+    const core = coreWithBudget(100);
+    core.cache.set('big', cachedModel(5_000));
+
+    // An evicted instance recompiling reports an app id the cache no longer
+    // holds, so the just-compiled floor protects nothing here.
+    core.evict('gone');
+
+    // Emptying the cache frees the memory but makes every request recompile.
+    expect([...core.cache.keys()]).toEqual(['big']);
+  });
+
+  test('down to one model, keeps the most recently used', () => {
+    const core = coreWithBudget(100);
+    core.cache.set('older', cachedModel(5_000));
+    core.cache.set('newer', cachedModel(5_000));
+
+    core.evict('gone');
+
+    expect([...core.cache.keys()]).toEqual(['newer']);
+  });
+
   test('clears the rest around an oversized model rather than giving up', () => {
     const core = coreWithBudget(100);
     core.cache.set('a', cachedModel(50));

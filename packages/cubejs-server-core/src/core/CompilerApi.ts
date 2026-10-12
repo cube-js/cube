@@ -247,8 +247,8 @@ export class CompilerApi {
   }
 
   /**
-   * Members (measures, dimensions, segments) this app's last successful compile
-   * produced, across every cube and view. Zero until it first compiles.
+   * Members (measures, dimensions, segments) of the model this entry holds, across
+   * every cube and view. Zero while a compile is in flight or after one failed.
    */
   public get compiledMemberCount(): number {
     return this.memberCount;
