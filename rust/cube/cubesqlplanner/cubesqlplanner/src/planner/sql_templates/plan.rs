@@ -782,6 +782,36 @@ impl PlanSqlTemplates {
         )
     }
 
+    /// The dialect's own form of an IN list over a time member, for a dialect
+    /// that cannot compare one with a plain IN. `None` when the dialect has
+    /// none and the generic IN applies.
+    pub fn time_in_where(
+        &self,
+        column: String,
+        values: Vec<String>,
+        is_null_check: bool,
+        negated: bool,
+    ) -> Result<Option<String>, CubeError> {
+        let template = if negated {
+            "filters/time_not_in"
+        } else {
+            "filters/time_in"
+        };
+        if !self.render.contains_template(template) {
+            return Ok(None);
+        }
+        self.render
+            .render_template(
+                template,
+                context! {
+                    is_null_check => self.additional_null_check(is_null_check, &column)?,
+                    values => values,
+                    column => column,
+                },
+            )
+            .map(Some)
+    }
+
     pub fn or_is_null_check(&self, column: String) -> Result<String, CubeError> {
         self.render.render_template(
             &"filters/or_is_null_check",

@@ -19,6 +19,17 @@ impl FilterOperationSql for InListOp {
                 .collect::<Result<Vec<_>, _>>()?;
         }
 
+        if self.member_type.as_deref() == Some("time") {
+            if let Some(sql) = ctx.plan_templates.time_in_where(
+                column.clone(),
+                allocated.clone(),
+                need_null_check,
+                self.negated,
+            )? {
+                return Ok(sql);
+            }
+        }
+
         // The null check reads the cast column too: an unparseable value casts to NULL
         // and is treated as not set, the same way by IN and NOT IN.
         if self.negated {

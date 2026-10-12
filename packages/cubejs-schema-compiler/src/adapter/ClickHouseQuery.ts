@@ -28,6 +28,34 @@ class ClickHouseFilter extends BaseFilter {
     }
     return '?';
   }
+
+  // ClickHouse converts the elements of an IN set to the type of its left side and rejects an
+  // ISO-8601 string ('2025-06-30T00:00:00.000Z') for every date/time type, so a time member is
+  // compared with each parsed value on its own. An equality takes a DateTime64 against any
+  // date/time type, and parsing keeps the value's offset and milliseconds.
+  public inWhere(column) {
+    if (!this.isTimeMember()) {
+      return super.inWhere(column);
+    }
+    return `(${this.timeValues().map(v => `${column} = ${v}`).join(' OR ')})${this.orIsNullCheck(column, false)}`;
+  }
+
+  public notInWhere(column) {
+    if (!this.isTimeMember()) {
+      return super.notInWhere(column);
+    }
+    return `(${this.timeValues().map(v => `${column} <> ${v}`).join(' AND ')})${this.orIsNullCheck(column, true)}`;
+  }
+
+  private isTimeMember(): boolean {
+    return !this.measure && this.definition().type === 'time';
+  }
+
+  private timeValues(): string[] {
+    return this.filterParams().map(
+      p => this.query.paramAllocator.allocateParamsForQuestionString('parseDateTime64BestEffort(?, 3)', [p])
+    );
+  }
 }
 
 export class ClickHouseQuery extends BaseQuery {
@@ -302,6 +330,11 @@ export class ClickHouseQuery extends BaseQuery {
     // toward zero, matching PostgreSQL (intDiv(-7, 2) = -3 despite docs saying
     // "rounded down")
     templates.expressions.int_division = 'intDiv({{ left }}, {{ right }})';
+    // A time member compares with each value on its own, see ClickHouseFilter.inWhere
+    templates.filters.time_in = '({% for value in values %}{{ column }} = parseDateTime64BestEffort({{ value }}, 3)' +
+      '{% if not loop.last %} OR {% endif %}{% endfor %}){{ is_null_check }}';
+    templates.filters.time_not_in = '({% for value in values %}{{ column }} <> parseDateTime64BestEffort({{ value }}, 3)' +
+      '{% if not loop.last %} AND {% endif %}{% endfor %}){{ is_null_check }}';
 
     templates.statements.time_series_select = 'SELECT parseDateTimeBestEffort(dates.f) date_from, parseDateTimeBestEffort(dates.t) date_to \n' +
     'FROM (\n' +
