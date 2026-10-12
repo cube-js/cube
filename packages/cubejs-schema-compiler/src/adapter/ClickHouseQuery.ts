@@ -21,16 +21,16 @@ class ClickHouseFilter extends BaseFilter {
     return `${column} ${not ? 'NOT' : ''} ILIKE CONCAT('${p}', ${this.allocateParam(param)}, '${s}')`;
   }
 
-  // ClickHouse rejects an ISO-8601 string ('2025-06-30T00:00:00.000Z') where it converts it to
-  // a date/time type itself, so a time member gets its values parsed. Parsing keeps the value's
-  // offset and milliseconds, and a comparison takes the DateTime64 against any date/time type.
+  // ClickHouse rejects an ISO-8601 string ('2025-06-30T00:00:00.000Z') where it converts it to a
+  // date/time type itself, so time values are parsed, keeping offset and milliseconds. A value with
+  // no offset is UTC, as for date ranges, and pinning it keeps a Date matching off a UTC server.
   public castParameter() {
     if (this.measure || this.definition().type === 'number') {
       // TODO here can be measure type of string actually
       return 'toFloat64(?)';
     }
     if (this.definition().type === 'time') {
-      return 'parseDateTime64BestEffort(?, 3)';
+      return 'parseDateTime64BestEffort(?, 3, \'UTC\')';
     }
     return '?';
   }
@@ -333,7 +333,7 @@ export class ClickHouseQuery extends BaseQuery {
     // "rounded down")
     templates.expressions.int_division = 'intDiv({{ left }}, {{ right }})';
     // A time member is compared with each parsed value on its own, see ClickHouseFilter
-    templates.tesseract.time_param_cast = 'parseDateTime64BestEffort({{ expr }}, 3)';
+    templates.tesseract.time_param_cast = 'parseDateTime64BestEffort({{ expr }}, 3, \'UTC\')';
     templates.filters.time_in = '({% for value in values %}{{ column }} = {{ value }}' +
       '{% if not loop.last %} OR {% endif %}{% endfor %}){{ is_null_check }}';
     templates.filters.time_not_in = '({% for value in values %}{{ column }} <> {{ value }}' +
