@@ -10,7 +10,7 @@ Controls are widgets that let dashboard viewers change what's shown without leav
 - [Field switcher](#field-switcher) — Swap which dimension or measure the charts are built on
 - [Parent](#parent) — Re-point several other controls at once from a single dropdown
 
-The first three each target a member from your semantic model, and apply the viewer's choice to every [chart][ref-charts] on the dashboard whose query references that member. Filters and time granularity switchers change *how a member is queried* — which rows come back, which buckets they fall into. A field switcher goes further and changes *which member is queried at all*. A parent control works one level up: it targets no member of its own and drives *other controls* instead.
+The first three each target a member from your semantic model, and apply the viewer's choice to every [chart][ref-charts] on the dashboard built on that member's semantic view. Filters and time granularity switchers change *how a member is queried* — which rows come back, which buckets they fall into. A field switcher goes further and changes *which member is queried at all*. A parent control works one level up: it targets no member of its own and drives *other controls* instead.
 
 ## Filter
 
@@ -520,7 +520,7 @@ Set the visibility from the **Visibility** dropdown when editing the control. **
 
 This section applies to filters, time granularity switchers and field switchers. A [parent control](#parent) has no member of its own and never applies to a chart itself, so it doesn't appear in any chart's [Controls mapping](#controls-mapping) — it acts only through the children it drives, and it's those children that show up here.
 
-When a control is added to a dashboard, it's automatically wired up to every [chart][ref-charts] built on the same semantic view as the control's member. Charts built on other semantic views are left alone, so a dashboard can mix scoped and unscoped views by default. Filters and time granularity switchers always target a dimension; a [field switcher](#field-switcher) targets a dimension or a measure depending on its **Field Type**, and scopes on whichever it is set to. You can override this default per chart from its [Controls mapping](#controls-mapping) — disable the control for that chart, or remap it onto a different member.
+When a control is added to a dashboard, it's automatically wired up to every [chart][ref-charts] built on the same semantic view as the control's member. Charts built on other semantic views are left alone, so a dashboard can mix scoped and unscoped charts by default. Filters and time granularity switchers always target a dimension; a [field switcher](#field-switcher) targets a dimension or a measure depending on its **Field Type**, and scopes on whichever it is set to. You can override this default per chart from its [Controls mapping](#controls-mapping) — disable the control for that chart, or remap it onto a different member.
 
 Adding a chart built on a different semantic view is the case where this needs attention. If at least one control has a [mapping suggestion](#controls-mapping) on the new chart's view, a prompt appears with **Review…**, which opens the chart's [Controls mapping](#controls-mapping) with the suggestions pre-selected, and **Dismiss**, which leaves the mappings as they are. If no control has a suggestion, no prompt appears, and you map controls to the chart by hand.
 
