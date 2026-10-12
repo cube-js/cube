@@ -42,6 +42,9 @@ cubes:
       - name: at
         sql: "{CUBE}.at"
         type: time
+      - name: day_or_null
+        sql: "if({CUBE}.id = 4, NULL, {CUBE}.day)"
+        type: time
       - name: at_micros
         sql: "toDateTime64({CUBE}.at, 6, 'UTC') + toIntervalMicrosecond(456)"
         type: time
@@ -57,7 +60,7 @@ cubes:
     await compilers.compiler.compile();
   });
 
-  const idsFor = async (filter: { member: string, operator: string, values: string[] }) => {
+  const idsFor = async (filter: { member: string, operator: string, values: (string | null)[] }) => {
     const query = new ClickHouseQuery(compilers, {
       dimensions: ['days.id'],
       filters: [filter],
@@ -90,6 +93,20 @@ cubes:
 
     expect(await idsFor({ member, operator: 'equals', values })).toEqual([1]);
     expect(await idsFor({ member, operator: 'notEquals', values })).toEqual([2, 3, 4]);
+  });
+
+  it('compares a time member with a value', async () => {
+    const values = ['2025-09-30T00:00:00.000Z'];
+
+    expect(await idsFor({ member: 'days.day', operator: 'gt', values })).toEqual([3, 4]);
+    expect(await idsFor({ member: 'days.day', operator: 'lte', values })).toEqual([1, 2]);
+  });
+
+  it('selects and excludes the NULL among the values of a nullable member', async () => {
+    const values = ['2025-06-30T00:00:00.000Z', '2025-12-31T00:00:00.000Z', null];
+
+    expect(await idsFor({ member: 'days.day_or_null', operator: 'equals', values })).toEqual([1, 3, 4]);
+    expect(await idsFor({ member: 'days.day_or_null', operator: 'notEquals', values })).toEqual([2]);
   });
 
   it('compares a DateTime64 member with the milliseconds of each value', async () => {
