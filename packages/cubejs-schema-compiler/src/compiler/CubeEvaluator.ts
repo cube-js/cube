@@ -645,17 +645,26 @@ export class CubeEvaluator extends CubeSymbols {
         if (instance === undefined) {
           return plainMember(level);
         }
-        // A cube joined below the instance is read through it, but the
-        // hierarchy's own cube is only ever the instance itself
+        // A cube the instance joins without an alias is read through it, but
+        // the hierarchy's own cube is only ever the instance itself
         const levelCube = level.split('.')[0];
+        const plainlyBelow = (memberInstance: string) => {
+          let current = hierarchyCube;
+          return memberInstance.slice(instance.length + 1).split('.').every(step => {
+            const joined = this.joinsWithoutAlias(current, step);
+            current = step;
+            return joined;
+          });
+        };
         return cube.includedMembers.find(m => {
           const memberInstance = instanceOf(m);
           return m.memberPath === level && memberInstance !== undefined && (memberInstance === instance ||
-            (levelCube !== hierarchyCube && memberInstance.startsWith(`${instance}.`)));
+            (levelCube !== hierarchyCube && memberInstance.startsWith(`${instance}.`) && plainlyBelow(memberInstance)));
         });
       };
 
       const includedHierarchies: any[] = [];
+
       for (const cubeName of includedCubeNames) {
         // As views come after cubes in the list, we can safely assume that cube is already evaluated
         const { evaluatedHierarchies: hierarchies } = this.evaluatedCubes[cubeName] || {};
@@ -1216,6 +1225,7 @@ export class CubeEvaluator extends CubeSymbols {
     let instancePath = parts[0];
     let targetCube = parts[0];
     let aliased = false;
+
     for (let i = 1; i < parts.length; i++) {
       const part = parts[i];
       const rest = parts.length - i - 1;

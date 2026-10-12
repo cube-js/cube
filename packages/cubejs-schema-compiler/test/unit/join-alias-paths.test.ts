@@ -284,6 +284,88 @@ views:
     ]);
   });
 
+  it('reads a hierarchy level of another cube only through plain joins below the instance', async () => {
+    const compilers = await compile(`
+cubes:
+  - name: orders
+    sql_table: orders
+    joins:
+      - name: users
+        alias: customer
+        sql: "{CUBE}.customer_id = {customer}.id"
+        relationship: many_to_one
+    dimensions:
+      - name: id
+        sql: id
+        type: number
+        primary_key: true
+
+  - name: users
+    sql_table: users
+    joins:
+      - name: teams
+        sql: "{CUBE}.team_id = {teams}.id"
+        relationship: many_to_one
+      - name: departments
+        alias: hq
+        sql: "{CUBE}.hq_id = {hq}.id"
+        relationship: many_to_one
+    dimensions:
+      - name: id
+        sql: id
+        type: number
+        primary_key: true
+      - name: city
+        sql: city
+        type: string
+    hierarchies:
+      - name: geo
+        levels:
+          - city
+          - departments.name
+
+  - name: teams
+    sql_table: teams
+    joins:
+      - name: departments
+        sql: "{CUBE}.department_id = {departments}.id"
+        relationship: many_to_one
+    dimensions:
+      - name: id
+        sql: id
+        type: number
+        primary_key: true
+
+  - name: departments
+    sql_table: departments
+    dimensions:
+      - name: id
+        sql: id
+        type: number
+        primary_key: true
+      - name: name
+        sql: name
+        type: string
+
+views:
+  - name: geo_view
+    cubes:
+      - join_path: orders.customer
+        prefix: true
+        includes:
+          - city
+          - geo
+      - join_path: orders.customer.hq
+        prefix: true
+        includes:
+          - name
+`);
+    const view = compilers.cubeEvaluator.cubeFromPath('geo_view') as any;
+    expect(view.evaluatedHierarchies.map(h => [h.name, h.levels])).toEqual([
+      ['customer_geo', ['geo_view.customer_city']],
+    ]);
+  });
+
   it('keeps a folder to the instance a plain join below an alias reaches', async () => {
     const compilers = await compile(`${modelWithAliasReferences}    folders:
       - name: Manager departments

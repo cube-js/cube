@@ -55,9 +55,7 @@ impl JoinTreeBuilder {
     }
 
     /// The tree of `hints` rooted at the cube instance `root`: the instance and
-    /// the instances below it, without the cubes it is reached from. A measure
-    /// of an instance aggregates over that tree, as a measure of a cube does
-    /// over the tree its own joins form.
+    /// the instances below it, without the cubes it is reached from.
     pub fn build_rooted_at(
         &self,
         root: &CubeId,
