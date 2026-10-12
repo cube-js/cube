@@ -1748,7 +1748,7 @@ cubes:
 
         const [sql] = query.buildSqlAndParams();
 
-        expect(query.preAggregations.preAggregationMatch).toBeFalsy();
+        expect(query.preAggregations.preAggregationMatch).toBeNull();
         expect(sql).toMatch(/FROM\s+orders\s+AS/);
         expect(sql).toMatch(/LEFT JOIN\s+line_items/);
       });
