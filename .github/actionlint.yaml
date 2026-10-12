@@ -1,5 +1,0 @@
-paths:
-  .github/workflows/drivers-tests.yml:
-    ignore:
-      # actionlint 1.7.12 doesn't know `concurrency.queue` yet
-      - 'unexpected key "queue" for "concurrency" section'

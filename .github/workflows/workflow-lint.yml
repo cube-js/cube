@@ -20,9 +20,11 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v7
+      # rhysd/actionlint is unmaintained and misses newer syntax such as `concurrency.queue`,
+      # so we use an active fork: https://github.com/rhysd/actionlint/issues/719
       - name: Download actionlint
         id: get_actionlint
-        run: bash <(curl https://raw.githubusercontent.com/rhysd/actionlint/main/scripts/download-actionlint.bash)
+        run: bash <(curl --fail --silent --show-error --location https://raw.githubusercontent.com/kjanat/actionlint/v1.17.0/scripts/download-actionlint.bash) 1.17.0
         shell: bash
       - name: Check workflow files
         run: ${{ steps.get_actionlint.outputs.executable }} -color
