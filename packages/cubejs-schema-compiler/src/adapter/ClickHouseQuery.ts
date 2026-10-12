@@ -37,6 +37,14 @@ class ClickHouseFilter extends BaseFilter {
 
   // An IN set converts its elements to the left side's type, which a parsed DateTime64 fails too,
   // and ClickHouse rewrites three `=` or more into IN, so each value is a closed range of its own
+  public equalsWhere(column) {
+    if (!this.isTimeMember() || this.isArrayValues() || this.valuesContainNull()) {
+      return super.equalsWhere(column);
+    }
+    // Even a single value: an OR group of single equalities would form the same chain
+    return this.inWhere(column);
+  }
+
   public inWhere(column) {
     if (!this.isTimeMember()) {
       return super.inWhere(column);

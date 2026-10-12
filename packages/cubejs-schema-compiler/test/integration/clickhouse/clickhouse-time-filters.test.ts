@@ -60,7 +60,9 @@ cubes:
     await compilers.compiler.compile();
   });
 
-  const idsFor = async (filter: { member: string, operator: string, values: (string | null)[] }) => {
+  type Filter = { member: string, operator: string, values: (string | null)[] } | { or: Filter[] };
+
+  const idsFor = async (filter: Filter) => {
     const query = new ClickHouseQuery(compilers, {
       dimensions: ['days.id'],
       filters: [filter],
@@ -93,6 +95,14 @@ cubes:
 
     expect(await idsFor({ member, operator: 'equals', values })).toEqual([1]);
     expect(await idsFor({ member, operator: 'notEquals', values })).toEqual([2, 3, 4]);
+  });
+
+  it.each(['days.day', 'days.day_time'])('keeps the days of an OR group of single equalities on %s', async (member) => {
+    // Three or more, as ClickHouse rewrites an OR chain of equalities into IN
+    expect(await idsFor({
+      or: ['2025-06-30T00:00:00.000Z', '2025-12-31T00:00:00.000Z', '2026-03-31T00:00:00.000Z']
+        .map(value => ({ member, operator: 'equals', values: [value] })),
+    })).toEqual([1, 3, 4]);
   });
 
   it('compares a time member with a value', async () => {
