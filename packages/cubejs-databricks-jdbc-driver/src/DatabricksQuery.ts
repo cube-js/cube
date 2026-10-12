@@ -14,6 +14,35 @@ const GRANULARITY_TO_INTERVAL: Record<string, string> = {
 };
 
 class DatabricksFilter extends BaseFilter {
+  // Spark compares `ts IN ('...')` as strings, where an ISO value never matches
+  // the rendered timestamp, so both sides of a time list are cast explicitly.
+  public inPlaceholders() {
+    if (!this.isTimeDimension()) {
+      return super.inPlaceholders();
+    }
+    const params = this.filterParams().map(
+      p => this.query.paramAllocator.allocateParamsForQuestionString(this.query.timeStampCast('?'), [p])
+    );
+    return `(${params.join(', ')})`;
+  }
+
+  public inWhere(column: string) {
+    return `${this.inListColumn(column)} IN ${this.inPlaceholders()}${this.orIsNullCheck(column, false)}`;
+  }
+
+  public notInWhere(column: string) {
+    return `${this.inListColumn(column)} NOT IN ${this.inPlaceholders()}${this.orIsNullCheck(column, true)}`;
+  }
+
+  private inListColumn(column: string) {
+    // try_cast: a malformed value in a string-backed column must not fail the query
+    return this.isTimeDimension() ? `try_cast(${column} AS TIMESTAMP)` : column;
+  }
+
+  private isTimeDimension() {
+    return !this.measure && this.definition().type === 'time';
+  }
+
   public likeIgnoreCase(column: any, not: any, param: any, type: string) {
     const p = (!type || type === 'contains' || type === 'ends') ? '%' : '';
     const s = (!type || type === 'contains' || type === 'starts') ? '%' : '';
@@ -199,6 +228,8 @@ export class DatabricksQuery extends BaseQuery {
       "'DDD', '@DOY@'), 'Day', 'EEEE'), 'Dy', 'EEE'), 'DD', 'dd'), '@DOY@', 'DDD'), " +
       "'AM', 'a'), 'PM', 'a'))";
     templates.expressions.timestamp_literal = 'from_utc_timestamp(\'{{ value }}\', \'UTC\')';
+    templates.tesseract.time_in_list_column_cast = 'try_cast({{ expr }} AS TIMESTAMP)';
+    templates.tesseract.time_in_list_param_cast = this.timeStampCast('{{ expr }}');
     // Spark `/` returns DOUBLE for integer operands; `div` returns the integral
     // part of the division as BIGINT (truncation toward zero), matching PostgreSQL
     templates.expressions.int_division = '({{ left }} div {{ right }})';

@@ -391,6 +391,14 @@ impl MockSqlTemplatesRender {
             "tesseract/number_param_cast".to_string(),
             "{{ expr }}::numeric".to_string(),
         );
+        templates.insert(
+            "tesseract/time_in_list_column_cast".to_string(),
+            "{{ expr }}".to_string(),
+        );
+        templates.insert(
+            "tesseract/time_in_list_param_cast".to_string(),
+            "{{ expr }}".to_string(),
+        );
 
         // Filters - based on BaseQuery.js:4398-4414
         templates.insert(

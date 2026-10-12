@@ -751,6 +751,7 @@ impl PlanSqlTemplates {
     pub fn in_where(
         &self,
         column: String,
+        null_check_column: String,
         values: Vec<String>,
         is_null_check: bool,
     ) -> Result<String, CubeError> {
@@ -758,7 +759,7 @@ impl PlanSqlTemplates {
         self.render.render_template(
             &"filters/in",
             context! {
-                is_null_check => self.additional_null_check(is_null_check, &column)?,
+                is_null_check => self.additional_null_check(is_null_check, &null_check_column)?,
                 values_concat => values_concat,
                 column => column,
             },
@@ -768,6 +769,7 @@ impl PlanSqlTemplates {
     pub fn not_in_where(
         &self,
         column: String,
+        null_check_column: String,
         values: Vec<String>,
         is_null_check: bool,
     ) -> Result<String, CubeError> {
@@ -775,7 +777,7 @@ impl PlanSqlTemplates {
         self.render.render_template(
             &"filters/not_in",
             context! {
-                is_null_check => self.additional_null_check(is_null_check, &column)?,
+                is_null_check => self.additional_null_check(is_null_check, &null_check_column)?,
                 values_concat => values_concat,
                 column => column,
             },
@@ -866,6 +868,20 @@ impl PlanSqlTemplates {
     pub fn number_param_cast(&self, expr: &str) -> Result<String, CubeError> {
         self.render
             .render_template(&"tesseract/number_param_cast", context! { expr => expr })
+    }
+
+    pub fn time_in_list_column_cast(&self, expr: &str) -> Result<String, CubeError> {
+        self.render.render_template(
+            &"tesseract/time_in_list_column_cast",
+            context! { expr => expr },
+        )
+    }
+
+    pub fn time_in_list_param_cast(&self, expr: &str) -> Result<String, CubeError> {
+        self.render.render_template(
+            &"tesseract/time_in_list_param_cast",
+            context! { expr => expr },
+        )
     }
 
     pub fn like_escape_char(&self) -> Result<Option<char>, CubeError> {
