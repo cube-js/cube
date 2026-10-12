@@ -1127,7 +1127,9 @@ export class BaseQuery {
   }
 
   applyNativePreAggResult(preAggResult) {
-    if (!preAggResult) return;
+    if (!preAggResult) {
+      return;
+    }
     this.preAggregations.preAggregationUsageInfos = preAggResult;
     const first = preAggResult[0];
     this.preAggregations.preAggregationForQuery =
@@ -3760,9 +3762,13 @@ export class BaseQuery {
   }
 
   maskFilterToSql(filter) {
-    if (!filter) return null;
+    if (!filter) {
+      return null;
+    }
     const filterItems = this.extractFiltersAsTree([filter]);
-    if (!filterItems.length) return null;
+    if (!filterItems.length) {
+      return null;
+    }
     const initialized = filterItems.map(this.initFilter.bind(this));
     if (initialized.length === 1) {
       return initialized[0].filterToWhere();
@@ -5793,7 +5799,9 @@ export class BaseQuery {
           return true;
         }
 
-        if (visited.has(node)) return false;
+        if (visited.has(node)) {
+          return false;
+        }
         visited.add(node);
 
         const neighbors = query.joinGraphPaths[node] || [];
@@ -5824,7 +5832,9 @@ export class BaseQuery {
 
     return (member) => {
       const [cube, field] = member.split('.');
-      if (!cube || !field) return member;
+      if (!cube || !field) {
+        return member;
+      }
 
       if (cube === queryJoinRoot?.root) {
         return member;

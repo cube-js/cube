@@ -24,10 +24,14 @@ let pos = 0;
 let eof = false;
 
 const fill = () => {
-  if (pos < bufLen || eof) return;
+  if (pos < bufLen || eof) {
+    return;
+  }
   bufLen = fs.readSync(fd, buf, 0, CHUNK, null);
   pos = 0;
-  if (bufLen === 0) eof = true;
+  if (bufLen === 0) {
+    eof = true;
+  }
 };
 
 const peekByte = () => {
@@ -41,11 +45,15 @@ const skipPast = (token) => {
   let matched = 0;
   for (;;) {
     const b = peekByte();
-    if (b < 0) throw new Error(`token ${token} not found`);
+    if (b < 0) {
+      throw new Error(`token ${token} not found`);
+    }
     pos++;
     if (b === t[matched]) {
       matched++;
-      if (matched === t.length) return;
+      if (matched === t.length) {
+        return;
+      }
     } else {
       matched = b === t[0] ? 1 : 0;
     }
@@ -62,7 +70,9 @@ const readHeader = () => {
     head.push(b);
     if (b === t[matched]) {
       matched++;
-      if (matched === t.length) break;
+      if (matched === t.length) {
+        break;
+      }
     } else {
       matched = b === t[0] ? 1 : 0;
     }
@@ -79,7 +89,9 @@ const readInts = (out) => {
   let inNum = false;
   for (;;) {
     fill();
-    if (eof) throw new Error('unexpected eof');
+    if (eof) {
+      throw new Error('unexpected eof');
+    }
     const end = bufLen;
     while (pos < end) {
       const b = buf[pos++];
@@ -92,7 +104,9 @@ const readInts = (out) => {
           cur = 0;
           inNum = false;
         }
-        if (b === 93) return n;
+        if (b === 93) {
+          return n;
+        }
       }
     }
   }
@@ -107,9 +121,13 @@ const readStrings = () => {
   let start = 0;
   for (;;) {
     fill();
-    if (eof) throw new Error('unexpected eof in strings');
+    if (eof) {
+      throw new Error('unexpected eof in strings');
+    }
     const end = bufLen;
-    if (inStr) start = pos;
+    if (inStr) {
+      start = pos;
+    }
     while (pos < end) {
       const b = buf[pos++];
       if (!inStr) {
@@ -134,7 +152,9 @@ const readStrings = () => {
         parts = null;
       }
     }
-    if (inStr) parts.push(Buffer.from(buf.subarray(start, end)));
+    if (inStr) {
+      parts.push(Buffer.from(buf.subarray(start, end)));
+    }
   }
 };
 
@@ -161,11 +181,15 @@ const WEAK = edgeTypes.indexOf('weak');
 const SHORTCUT = edgeTypes.indexOf('shortcut');
 
 const nodes = new Uint32Array(header.node_count * NF);
-if (readInts(nodes) !== nodes.length) throw new Error('node count mismatch');
+if (readInts(nodes) !== nodes.length) {
+  throw new Error('node count mismatch');
+}
 skipPast('"edges":[');
 const edges = new Uint32Array(header.edge_count * EF);
 const edgeLen = readInts(edges);
-if (edgeLen !== edges.length) throw new Error('edge count mismatch');
+if (edgeLen !== edges.length) {
+  throw new Error('edge count mismatch');
+}
 skipPast('"strings":[');
 const strings = readStrings();
 fs.closeSync(fd);
@@ -224,7 +248,9 @@ for (let i = 0; i < nodeCount; i++) {
   entry.count++;
   entry.self += size;
   byCat.set(cat, entry);
-  if (nameOf(i).startsWith('system / NativeContext')) nativeContexts.push(i);
+  if (nameOf(i).startsWith('system / NativeContext')) {
+    nativeContexts.push(i);
+  }
 }
 
 // --- dominators (Cooper-Harvey-Kennedy), root = node 0, weak/shortcut edges ignored ---
@@ -271,22 +297,32 @@ const postIndex = new Int32Array(nodeCount).fill(-1);
 // Predecessors in post-order index space (CSR).
 const predCount = new Uint32Array(reachable + 1);
 for (let n = 0; n < nodeCount; n++) {
-  if (postIndex[n] < 0) continue;
+  if (postIndex[n] < 0) {
+    continue;
+  }
   for (let e = firstEdge[n]; e < firstEdge[n + 1]; e += EF) {
-    if (!followEdge(e)) continue;
+    if (!followEdge(e)) {
+      continue;
+    }
     const to = postIndex[edges[e + E_TO] / NF];
     predCount[to + 1]++;
   }
 }
-for (let i = 1; i <= reachable; i++) predCount[i] += predCount[i - 1];
+for (let i = 1; i <= reachable; i++) {
+  predCount[i] += predCount[i - 1];
+}
 const preds = new Uint32Array(predCount[reachable]);
 {
   const fillPos = predCount.slice(0, reachable);
   for (let n = 0; n < nodeCount; n++) {
     const from = postIndex[n];
-    if (from < 0) continue;
+    if (from < 0) {
+      continue;
+    }
     for (let e = firstEdge[n]; e < firstEdge[n + 1]; e += EF) {
-      if (!followEdge(e)) continue;
+      if (!followEdge(e)) {
+        continue;
+      }
       const to = postIndex[edges[e + E_TO] / NF];
       preds[fillPos[to]++] = from;
     }
@@ -306,15 +342,21 @@ while (changed) {
     let newIdom = UNDEF;
     for (let p = predCount[b]; p < predCount[b + 1]; p++) {
       const pred = preds[p];
-      if (idom[pred] === UNDEF) continue;
+      if (idom[pred] === UNDEF) {
+        continue;
+      }
       if (newIdom === UNDEF) {
         newIdom = pred;
       } else {
         let f1 = pred;
         let f2 = newIdom;
         while (f1 !== f2) {
-          while (f1 < f2) f1 = idom[f1];
-          while (f2 < f1) f2 = idom[f2];
+          while (f1 < f2) {
+            f1 = idom[f1];
+          }
+          while (f2 < f1) {
+            f2 = idom[f2];
+          }
         }
         newIdom = f1;
       }
@@ -327,9 +369,13 @@ while (changed) {
 }
 
 const retained = new Float64Array(reachable);
-for (let b = 0; b < reachable; b++) retained[b] += sizeOf(postOrder[b]);
+for (let b = 0; b < reachable; b++) {
+  retained[b] += sizeOf(postOrder[b]);
+}
 for (let b = 0; b < rootPo; b++) {
-  if (idom[b] !== UNDEF) retained[idom[b]] += retained[b];
+  if (idom[b] !== UNDEF) {
+    retained[idom[b]] += retained[b];
+  }
 }
 
 // --- duplicated strings: same value held by several string nodes ---
@@ -344,7 +390,9 @@ if (STRINGS_TOP > 0) {
   const retainerEdge = new Int32Array(nodeCount).fill(-1);
   for (let n = 0; n < nodeCount; n++) {
     for (let e = firstEdge[n]; e < firstEdge[n + 1]; e += EF) {
-      if (!followEdge(e)) continue;
+      if (!followEdge(e)) {
+        continue;
+      }
       const to = edges[e + E_TO] / NF;
       if (retainer[to] < 0) {
         retainer[to] = n;
@@ -354,16 +402,24 @@ if (STRINGS_TOP > 0) {
   }
   const edgeLabel = (e) => {
     const t = edges[e + E_TYPE];
-    if (t === ELEMENT) return '[]';
-    if (t === PROPERTY || t === INTERNAL || edgeTypes[t] === 'context') return `.${strings[edges[e + E_NAME]]}`;
+    if (t === ELEMENT) {
+      return '[]';
+    }
+    if (t === PROPERTY || t === INTERNAL || edgeTypes[t] === 'context') {
+      return `.${strings[edges[e + E_NAME]]}`;
+    }
     return `(${edgeTypes[t]})`;
   };
   const retainerLabel = (i) => {
     const r = retainer[i];
-    if (r < 0) return '(none)';
+    if (r < 0) {
+      return '(none)';
+    }
     const rt = typeOf(r);
     let holder = rt === 'object' || rt === 'native' ? nameOf(r) : `(${rt})`;
-    if (holder.startsWith('system / ')) holder = holder.replace(/ \/.*$/, '');
+    if (holder.startsWith('system / ')) {
+      holder = holder.replace(/ \/.*$/, '');
+    }
     return `${holder}${edgeLabel(retainerEdge[i])}`;
   };
 
@@ -382,10 +438,14 @@ if (STRINGS_TOP > 0) {
   const consByRetainer = new Map();
   let consBytes = 0;
   for (let i = 0; i < nodeCount; i++) {
-    if (typeOf(i) !== 'concatenated string' || postIndex[i] < 0) continue;
+    if (typeOf(i) !== 'concatenated string' || postIndex[i] < 0) {
+      continue;
+    }
     consBytes += sizeOf(i);
     const r = retainer[i];
-    if (r >= 0 && typeOf(r) === 'concatenated string') continue;
+    if (r >= 0 && typeOf(r) === 'concatenated string') {
+      continue;
+    }
     const label = retainerLabel(i);
     const entry = consByRetainer.get(label) || { roots: 0, retained: 0, sample: i };
     entry.roots++;
@@ -397,11 +457,15 @@ if (STRINGS_TOP > 0) {
   let stringNodes = 0;
   let stringBytes = 0;
   for (let i = 0; i < nodeCount; i++) {
-    if (!isString(i) || postIndex[i] < 0) continue;
+    if (!isString(i) || postIndex[i] < 0) {
+      continue;
+    }
     const type = typeOf(i);
     // A cons/sliced string's own size is its header, and its name is the flattened value:
     // group only flat strings, so each value's bytes are counted once.
-    if (type !== 'string') continue;
+    if (type !== 'string') {
+      continue;
+    }
     stringNodes++;
     const size = sizeOf(i);
     stringBytes += size;
@@ -419,7 +483,9 @@ if (STRINGS_TOP > 0) {
   let dupExtraBytes = 0;
   const byRetainer = new Map();
   for (const [, entry] of byValue) {
-    if (entry.count < 2) continue;
+    if (entry.count < 2) {
+      continue;
+    }
     dupValues++;
     dupExtraCopies += entry.count - 1;
     dupExtraBytes += entry.bytes - entry.size;
@@ -427,10 +493,14 @@ if (STRINGS_TOP > 0) {
   // Retainer of each extra copy (second pass over nodes, only for duplicated values).
   const seenOnce = new Set();
   for (let i = 0; i < nodeCount; i++) {
-    if (typeOf(i) !== 'string' || postIndex[i] < 0) continue;
+    if (typeOf(i) !== 'string' || postIndex[i] < 0) {
+      continue;
+    }
     const value = nameOf(i);
     const entry = byValue.get(value);
-    if (entry.count < 2) continue;
+    if (entry.count < 2) {
+      continue;
+    }
     if (!seenOnce.has(value)) {
       seenOnce.add(value);
       continue;

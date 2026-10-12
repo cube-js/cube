@@ -13,7 +13,9 @@ describe('HttpTransport', () => {
   const queryJson = '{"query":{"measures":["Orders.count"],"dimensions":["Users.country"]}}';
 
   const ids = [];
-  for (let i = 0; i < 40; i++) ids.push('a40b2052-4137-11eb-b378-0242ac130002');
+  for (let i = 0; i < 40; i++) {
+    ids.push('a40b2052-4137-11eb-b378-0242ac130002');
+  }
   const LargeQuery = {
     measures: ['Orders.count'],
     dimensions: ['Users.country'],

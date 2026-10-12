@@ -678,7 +678,9 @@ export class CompilerApi {
           const hasFullAccess = !policy.memberLevel ||
             (policy.memberLevel.includesMembers.includes(memberName) &&
              !policy.memberLevel.excludesMembers.includes(memberName));
-          if (hasFullAccess) return true;
+          if (hasFullAccess) {
+            return true;
+          }
 
           if (policy.memberMasking) {
             return policy.memberMasking.includesMembers.includes(memberName) &&

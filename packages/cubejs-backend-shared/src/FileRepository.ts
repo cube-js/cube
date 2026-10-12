@@ -39,7 +39,9 @@ export class FileRepository implements SchemaFileRepository {
       const stat = await fs.stat(path.join(this.localPath(), dir, file));
       if (stat.isDirectory()) {
         fileList = await this.getFiles(path.join(dir, file), fileList);
-      } else fileList.push(path.join(dir, file));
+      } else {
+        fileList.push(path.join(dir, file));
+      }
     }
 
     return fileList;

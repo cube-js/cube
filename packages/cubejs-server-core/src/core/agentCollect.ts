@@ -191,17 +191,25 @@ export const agentCollect = async (event: LoggerFnParams, endpointUrl: string, l
         new HttpTransport(endpointUrl) :
         new WebSocketTransport(endpointUrl, logger, clearTransport);
     }
-    if (!toFlush.length) return false;
-    if (retries == null) retries = 3;
+    if (!toFlush.length) {
+      return false;
+    }
+    if (retries == null) {
+      retries = 3;
+    }
 
     try {
       const sentAt = new Date().toJSON();
       const result = await transport.send(toFlush.map(r => ({ ...r, sentAt })));
-      if (!result && retries > 0) return flush(toFlush, retries - 1);
+      if (!result && retries > 0) {
+        return flush(toFlush, retries - 1);
+      }
 
       return true;
     } catch (e: any) {
-      if (retries > 0) return flush(toFlush, retries - 1);
+      if (retries > 0) {
+        return flush(toFlush, retries - 1);
+      }
       logger('Agent Error', { error: (e.stack || e).toString() });
     }
 
