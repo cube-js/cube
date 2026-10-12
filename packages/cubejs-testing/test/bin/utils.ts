@@ -20,7 +20,8 @@ export async function withRetries<T>(label: string, fn: () => Promise<T>, attemp
     try {
       return await fn();
     } catch (e: any) {
-      if (attempt >= attempts) {
+      // A 4xx (e.g. a file missing at DATASET_VERSION) will not go away; network errors carry no status.
+      if (attempt >= attempts || (e.status !== undefined && e.status < 500)) {
         throw e;
       }
 
@@ -36,7 +37,10 @@ export async function getDataSetDescription(name: string): Promise<DataSetSchema
   const dataSets: DataSetSchema[] = await withRetries('dataset.json', async () => {
     const response = await fetch(url);
     if (!response.ok) {
-      throw new Error(`unexpected response ${response.status} ${response.statusText} (${url})`);
+      throw Object.assign(
+        new Error(`unexpected response ${response.status} ${response.statusText} (${url})`),
+        { status: response.status },
+      );
     }
 
     return response.json();
