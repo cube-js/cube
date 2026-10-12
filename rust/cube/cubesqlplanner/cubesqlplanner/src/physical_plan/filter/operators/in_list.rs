@@ -7,8 +7,7 @@ impl FilterOperationSql for InListOp {
         let has_null = self.values.iter().any(|v| v.is_null());
         let need_null_check = if self.negated { !has_null } else { has_null };
         let mut allocated = ctx.allocate_and_cast_values(&self.values, &self.member_type)?;
-        let member_sql = ctx.member_sql().to_string();
-        let mut column = member_sql.clone();
+        let mut column = ctx.member_sql().to_string();
 
         // Some dialects resolve a list of mixed types by comparing as strings, so
         // both sides of a time list are brought to the same type explicitly.
@@ -20,12 +19,14 @@ impl FilterOperationSql for InListOp {
                 .collect::<Result<Vec<_>, _>>()?;
         }
 
+        // The null check reads the cast column too: an unparseable value casts to NULL
+        // and is treated as not set, the same way by IN and NOT IN.
         if self.negated {
             ctx.plan_templates
-                .not_in_where(column, member_sql, allocated, need_null_check)
+                .not_in_where(column, allocated, need_null_check)
         } else {
             ctx.plan_templates
-                .in_where(column, member_sql, allocated, need_null_check)
+                .in_where(column, allocated, need_null_check)
         }
     }
 }
