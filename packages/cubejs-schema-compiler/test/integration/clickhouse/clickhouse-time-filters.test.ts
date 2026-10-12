@@ -25,6 +25,8 @@ cubes:
       SELECT 2 AS id, toDate('2025-09-30') AS day, toDateTime64('2025-09-30 00:00:00.000', 3, 'UTC') AS at
       UNION ALL
       SELECT 3 AS id, toDate('2025-12-31') AS day, toDateTime64('2025-12-31 00:00:00.000', 3, 'UTC') AS at
+      UNION ALL
+      SELECT 4 AS id, toDate('2026-03-31') AS day, toDateTime64('2026-03-31 00:00:00.000', 3, 'UTC') AS at
     dimensions:
       - name: id
         sql: "{CUBE}.id"
@@ -67,15 +69,16 @@ cubes:
     expect(await idsFor({
       member,
       operator: 'equals',
-      values: ['2025-06-30T00:00:00.000Z', '2025-12-31T00:00:00.000Z'],
-    })).toEqual([1, 3]);
+      // Three values, as ClickHouse rewrites an OR chain of three or more equalities into IN
+      values: ['2025-06-30T00:00:00.000Z', '2025-12-31T00:00:00.000Z', '2026-03-31T00:00:00.000Z'],
+    })).toEqual([1, 3, 4]);
   });
 
   it.each(['days.day', 'days.day_time'])('excludes the selected days of %s', async (member) => {
     expect(await idsFor({
       member,
       operator: 'notEquals',
-      values: ['2025-06-30T00:00:00.000Z', '2025-12-31T00:00:00.000Z'],
+      values: ['2025-06-30T00:00:00.000Z', '2025-12-31T00:00:00.000Z', '2026-03-31T00:00:00.000Z'],
     })).toEqual([2]);
   });
 
@@ -83,7 +86,7 @@ cubes:
     const values = member === 'days.at' ? ['2025-06-30T00:00:00.123Z'] : ['2025-06-30T00:00:00.000Z'];
 
     expect(await idsFor({ member, operator: 'equals', values })).toEqual([1]);
-    expect(await idsFor({ member, operator: 'notEquals', values })).toEqual([2, 3]);
+    expect(await idsFor({ member, operator: 'notEquals', values })).toEqual([2, 3, 4]);
   });
 
   it('compares a DateTime64 member with the milliseconds of each value', async () => {
