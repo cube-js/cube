@@ -38,7 +38,6 @@ the columns. The **Pivot** section holds:
 Pivot behavior:
 - Pivot columns can be sorted by clicking the column header, including the totals column.
 - Pivot columns can also be sorted by row values — click a row number to sort by that row, including the totals row.
-- Pivoted columns can be hidden, but hiding is indexed to the specific value (e.g. hiding `status: returned`), not position.
 
 ### Pivot presets
 
@@ -192,8 +191,8 @@ its header:
 
 A line on the right edge of the last frozen column shows where the scrolling part starts. The
 row-number column freezes along with the frozen columns. The freeze is saved with the chart, so
-it also applies on published and embedded dashboards and in snapshots. The print layout prints
-the table without frozen columns.
+it also applies on published and embedded dashboards and in snapshots. In the print layout,
+frozen columns print as ordinary columns.
 
 By default, a table with a [column pivot](#pivots) freezes all of its row-header columns, and a
 table without one freezes nothing. Under a column pivot, only the row-header columns can be
