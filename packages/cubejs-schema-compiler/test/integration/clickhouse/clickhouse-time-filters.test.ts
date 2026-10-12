@@ -40,6 +40,9 @@ cubes:
       - name: at
         sql: "{CUBE}.at"
         type: time
+      - name: at_new_york
+        sql: "toTimeZone({CUBE}.at, 'America/New_York')"
+        type: time
     measures:
       - name: count
         type: count
@@ -95,6 +98,14 @@ cubes:
       member: 'days.at',
       operator: 'equals',
       values: ['2025-06-30T00:00:00.000Z', '2025-09-30T00:00:00.000Z'],
+    })).toEqual([2]);
+  });
+
+  it('reads a value without an offset as UTC, whatever the zone of the member', async () => {
+    expect(await idsFor({
+      member: 'days.at_new_york',
+      operator: 'equals',
+      values: ['2025-09-30 00:00:00'],
     })).toEqual([2]);
   });
 
