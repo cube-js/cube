@@ -181,6 +181,16 @@ impl MeasuresJoinHints {
     }
 }
 
+/// Whether and how `build_groups` folds nested groups together.
+#[derive(Clone, Copy, PartialEq)]
+enum NestedMerge {
+    Off,
+    /// The query aggregates: replication is fine for a measure immune to it.
+    Aggregated,
+    /// The query returns raw rows: any replication reaches the result.
+    RawRows,
+}
+
 /// One group while it is still being assembled: the measures gathered so far
 /// plus what it takes to rebuild their join tree - the `JoinKey` to compare
 /// trees by and the hints to resolve a merged tree from.
@@ -219,7 +229,7 @@ impl MultiFactJoinGroups {
         query_tools: Rc<State>,
         measures_join_hints: MeasuresJoinHints,
     ) -> Result<Self, CubeError> {
-        Self::build(query_tools, measures_join_hints, false)
+        Self::build(query_tools, measures_join_hints, NestedMerge::Off)
     }
 
     /// Like `try_new`, but additionally folds a group into another one whose
@@ -234,7 +244,18 @@ impl MultiFactJoinGroups {
         query_tools: Rc<State>,
         measures_join_hints: MeasuresJoinHints,
     ) -> Result<Self, CubeError> {
-        Self::build(query_tools, measures_join_hints, true)
+        Self::build(query_tools, measures_join_hints, NestedMerge::Aggregated)
+    }
+
+    /// Like `try_new_merging_nested`, for an ungrouped query: a group only
+    /// moves into a wider tree that does not replicate any of its rows. Kept
+    /// apart, the groups would be joined back on the dimension values, pairing
+    /// every row of one with every row of the other that shares them.
+    pub fn try_new_merging_nested_raw_rows(
+        query_tools: Rc<State>,
+        measures_join_hints: MeasuresJoinHints,
+    ) -> Result<Self, CubeError> {
+        Self::build(query_tools, measures_join_hints, NestedMerge::RawRows)
     }
 
     /// Like `try_new`, but tells apart members the join graph has no path for:
@@ -244,7 +265,7 @@ impl MultiFactJoinGroups {
         measures_join_hints: MeasuresJoinHints,
     ) -> Result<Result<Self, CubeError>, CubeError> {
         Ok(
-            Self::build_if_joinable(query_tools, measures_join_hints, false)?
+            Self::build_if_joinable(query_tools, measures_join_hints, NestedMerge::Off)?
                 .map_err(|hints| Self::no_join_path_error(&hints)),
         )
     }
@@ -252,7 +273,7 @@ impl MultiFactJoinGroups {
     fn build(
         query_tools: Rc<State>,
         measures_join_hints: MeasuresJoinHints,
-        merge_nested: bool,
+        merge_nested: NestedMerge,
     ) -> Result<Self, CubeError> {
         Self::build_if_joinable(query_tools, measures_join_hints, merge_nested)?
             .map_err(|hints| Self::no_join_path_error(&hints))
@@ -262,7 +283,7 @@ impl MultiFactJoinGroups {
     fn build_if_joinable(
         query_tools: Rc<State>,
         measures_join_hints: MeasuresJoinHints,
-        merge_nested: bool,
+        merge_nested: NestedMerge,
     ) -> Result<Result<Self, JoinHints>, CubeError> {
         let groups = match Self::build_groups(&query_tools, &measures_join_hints, merge_nested)? {
             Ok(groups) => groups,
@@ -282,14 +303,14 @@ impl MultiFactJoinGroups {
     /// the shared `base_hints`.
     pub fn for_measures(&self, measures: &[Rc<MemberSymbol>]) -> Result<Self, CubeError> {
         let new_hints = self.measures_join_hints.for_measures(measures)?;
-        Self::build(self.query_tools.clone(), new_hints, false)
+        Self::build(self.query_tools.clone(), new_hints, NestedMerge::Off)
     }
 
     /// The inner error is the hint set the join graph has no path for.
     fn build_groups(
         query_tools: &Rc<State>,
         hints: &MeasuresJoinHints,
-        merge_nested: bool,
+        merge_nested: NestedMerge,
     ) -> Result<Result<Vec<(Rc<JoinTree>, Vec<Rc<MemberSymbol>>)>, JoinHints>, CubeError> {
         let join_tree_builder = JoinTreeBuilder::new(query_tools.clone());
         let try_resolve =
@@ -366,11 +387,18 @@ impl MultiFactJoinGroups {
 
         // Cheapest question first: without a nested pair there is nothing to
         // merge, and the pre-aggregation scan crosses the bridge once per cube.
-        if merge_nested
-            && Self::has_nested_pair(&groups)
-            && !Self::any_cube_has_pre_aggregations(query_tools, &groups)?
-        {
-            Self::merge_nested_groups(&mut groups, &try_resolve)?;
+        // Raw rows merge regardless of rollups: groups kept apart would answer
+        // a different set of rows, not just cost more.
+        let merge = match merge_nested {
+            NestedMerge::Off => false,
+            NestedMerge::Aggregated => {
+                Self::has_nested_pair(&groups)
+                    && !Self::any_cube_has_pre_aggregations(query_tools, &groups)?
+            }
+            NestedMerge::RawRows => Self::has_nested_pair(&groups),
+        };
+        if merge {
+            Self::merge_nested_groups(&mut groups, &try_resolve, merge_nested)?;
         }
 
         Ok(Ok(groups
@@ -460,6 +488,7 @@ impl MultiFactJoinGroups {
     fn merge_nested_groups(
         groups: &mut Vec<GroupBuild>,
         try_resolve: &impl Fn(&JoinHints) -> Result<Option<(JoinKey, Rc<JoinTree>)>, CubeError>,
+        mode: NestedMerge,
     ) -> Result<(), CubeError> {
         loop {
             let mut merged = None;
@@ -479,7 +508,7 @@ impl MultiFactJoinGroups {
                     if key != other.key {
                         continue;
                     }
-                    if Self::group_survives_join(&group.measures, &tree)? {
+                    if Self::group_survives_join(&group.measures, &tree, mode)? {
                         merged = Some((i, j, tree));
                         break 'outer;
                     }
@@ -503,7 +532,8 @@ impl MultiFactJoinGroups {
     ///
     /// Only measures built out of plain aggregated measures qualify, leaf by
     /// leaf: a leaf whose cube `join` does not multiply reads its own rows
-    /// anyway, a multiplied one has to be immune to replication. A key-based
+    /// anyway, a multiplied one has to be immune to replication - and for raw
+    /// rows nothing is, since every copy is a row of its own. A key-based
     /// count is not accepted - staying correct would mean switching it to the
     /// distinct `MultipliedCount` form, decided from the measure's own tree
     /// elsewhere.
@@ -517,6 +547,7 @@ impl MultiFactJoinGroups {
     fn group_survives_join(
         measures: &[Rc<MemberSymbol>],
         join: &Rc<JoinTree>,
+        mode: NestedMerge,
     ) -> Result<bool, CubeError> {
         for measure in measures.iter() {
             if has_multi_stage_members(measure, false)?
@@ -534,7 +565,9 @@ impl MultiFactJoinGroups {
                 let Ok(leaf) = item.measure.as_measure() else {
                     return Ok(false);
                 };
-                if item.multiplied && !leaf.kind().survives_row_multiplication() {
+                if item.multiplied
+                    && (mode == NestedMerge::RawRows || !leaf.kind().survives_row_multiplication())
+                {
                     return Ok(false);
                 }
             }

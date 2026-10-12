@@ -1139,7 +1139,7 @@ mod tests {
                 .iter()
                 .map(|sg| sg.full_name())
                 .collect_vec(),
-            vec!["expr:orders.completed".to_string()]
+            vec!["orders.completed".to_string()]
         );
         assert_eq!(compiled.time_dimensions.len(), 1);
         assert_eq!(
@@ -1548,10 +1548,7 @@ mod tests {
 
         // Check segments
         assert_eq!(compiled.segments.len(), 1);
-        assert_eq!(
-            compiled.segments[0].full_name(),
-            "expr:orders.high_priority"
-        );
+        assert_eq!(compiled.segments[0].full_name(), "orders.high_priority");
 
         // Check measures
         assert_eq!(compiled.measures.len(), 2);
