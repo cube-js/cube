@@ -35,20 +35,20 @@ class ClickHouseFilter extends BaseFilter {
     return '?';
   }
 
-  // An IN set converts its elements to the type of its left side, which a parsed DateTime64
-  // fails as well, so a time member is compared with each value on its own
+  // An IN set converts its elements to the left side's type, which a parsed DateTime64 fails too,
+  // and ClickHouse rewrites three `=` or more into IN, so each value is a closed range of its own
   public inWhere(column) {
     if (!this.isTimeMember()) {
       return super.inWhere(column);
     }
-    return `(${this.castParams().map(v => `${column} = ${v}`).join(' OR ')})${this.orIsNullCheck(column, false)}`;
+    return `(${this.castParams().map(v => `(${column} >= ${v} AND ${column} <= ${v})`).join(' OR ')})${this.orIsNullCheck(column, false)}`;
   }
 
   public notInWhere(column) {
     if (!this.isTimeMember()) {
       return super.notInWhere(column);
     }
-    return `(${this.castParams().map(v => `${column} <> ${v}`).join(' AND ')})${this.orIsNullCheck(column, true)}`;
+    return `(${this.castParams().map(v => `(${column} < ${v} OR ${column} > ${v})`).join(' AND ')})${this.orIsNullCheck(column, true)}`;
   }
 
   private isTimeMember(): boolean {
@@ -334,9 +334,9 @@ export class ClickHouseQuery extends BaseQuery {
     templates.expressions.int_division = 'intDiv({{ left }}, {{ right }})';
     // A time member is compared with each parsed value on its own, see ClickHouseFilter
     templates.tesseract.time_param_cast = 'parseDateTime64BestEffort({{ expr }}, 6, \'UTC\')';
-    templates.filters.time_in = '({% for value in values %}{{ column }} = {{ value }}' +
+    templates.filters.time_in = '({% for value in values %}({{ column }} >= {{ value }} AND {{ column }} <= {{ value }})' +
       '{% if not loop.last %} OR {% endif %}{% endfor %}){{ is_null_check }}';
-    templates.filters.time_not_in = '({% for value in values %}{{ column }} <> {{ value }}' +
+    templates.filters.time_not_in = '({% for value in values %}({{ column }} < {{ value }} OR {{ column }} > {{ value }})' +
       '{% if not loop.last %} AND {% endif %}{% endfor %}){{ is_null_check }}';
 
     templates.statements.time_series_select = 'SELECT parseDateTimeBestEffort(dates.f) date_from, parseDateTimeBestEffort(dates.t) date_to \n' +
