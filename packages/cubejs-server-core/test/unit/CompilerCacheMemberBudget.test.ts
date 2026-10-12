@@ -52,10 +52,6 @@ const compilerApiFor = (files: FileContent[]) => new CompilerApi(
   { logger: jest.fn() },
 );
 
-/**
- * A core whose compiler cache and budget pass are reachable from the test,
- * rather than casting the instance to `any`.
- */
 /** Every core this file builds, shut down after each test to release connections. */
 const cores: CubejsServerCore[] = [];
 
@@ -63,6 +59,10 @@ afterEach(async () => {
   await Promise.all(cores.splice(0).map((core) => core.shutdown()));
 });
 
+/**
+ * A core whose compiler cache and budget pass are reachable from the test,
+ * rather than casting the instance to `any`.
+ */
 class CoreOpen extends CubejsServerCore {
   public constructor(...args: ConstructorParameters<typeof CubejsServerCore>) {
     super(...args);
