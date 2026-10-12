@@ -172,13 +172,13 @@ describe('useCubeQuery', () => {
     expect(hookResult.isLoading).toBe(false);
   });
 
-  it('preserves the initial loading state for an empty query', () => {
+  it('is not loading for an empty query', () => {
     const cubeApi = { load: jest.fn() };
 
     render({}, { cubeApi: cubeApi as never });
 
     expect(cubeApi.load).not.toHaveBeenCalled();
-    expect(hookResult.isLoading).toBe(true);
+    expect(hookResult.isLoading).toBe(false);
   });
 
   it('ignores callbacks from a superseded subscription', () => {

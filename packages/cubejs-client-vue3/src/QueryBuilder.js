@@ -661,6 +661,9 @@ export default {
           // copyQueryFromProps and will therefore update anyway.
           return;
         }
+        // like the initial query, a query passed in by the parent is taken as is:
+        // heuristics would otherwise rewrite it, e.g. drop an explicit granularity
+        this.skipHeuristics = true;
         this.copyQueryFromProps(query);
       },
     },
