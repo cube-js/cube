@@ -219,15 +219,16 @@ jobs:
           '
       - name: Save Docker image as artifact
         run: |
-          IMAGE_TAG=cubejs/cube:testing-drivers
-          docker save -o image.tar $IMAGE_TAG
-          gzip image.tar
+          set -o pipefail
+          docker save cubejs/cube:testing-drivers | zstd -T0 -3 -o image.tar.zst
         continue-on-error: true
       - name: Upload Docker image artifact
         uses: actions/upload-artifact@v7
         with:
           name: docker-image
-          path: image.tar.gz
+          path: image.tar.zst
+          # Already zstd-compressed; re-zipping it only burns CPU.
+          compression-level: 0
 
   tests:
     runs-on: ubuntu-24.04
@@ -393,8 +394,8 @@ jobs:
 
       - name: Load Docker image into Docker Daemon
         run: |
-          gunzip image.tar.gz
-          docker load -i image.tar
+          set -o pipefail
+          zstd -dc image.tar.zst | docker load
 
       - name: Configure AWS credentials via IRSA
         uses: aws-actions/configure-aws-credentials@v6
