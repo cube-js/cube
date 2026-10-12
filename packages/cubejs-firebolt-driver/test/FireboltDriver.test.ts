@@ -30,16 +30,6 @@ describe('FireboltDriver', () => {
     process.env.CUBEJS_DB_QUERY_TIMEOUT = '2';
     const driver = new FireboltDriver({});
 
-    let timedOut = false;
-
-    try {
-      await driver.query(slowQuery);
-    } catch (e) {
-      if (String(e).toLowerCase().includes('timeout expired (2000 ms)')) {
-        timedOut = true;
-      }
-    }
-
-    expect(timedOut).toBe(true);
+    await expect(driver.query(slowQuery)).rejects.toThrow(/timeout expired \(2000 ms\)/i);
   }, 10000);
 });
