@@ -6,7 +6,8 @@ use crate::physical_plan::{
     SelectBuilder,
 };
 use crate::physical_plan_builder::PhysicalPlanBuilder;
-use crate::planner::collectors::collect_calc_group_dims_from_nodes;
+use crate::planner::collectors::{collect_calc_group_dims_from_nodes, has_multi_stage_members};
+use crate::planner::filter::Filter;
 use crate::planner::query_properties::member_chain_eq;
 use crate::planner::symbols::transforms;
 use crate::planner::symbols::transforms::get_filtered_values;
@@ -27,6 +28,26 @@ impl QueryProcessor<'_> {
             QuerySource::PreAggregation(_) => false,
             QuerySource::LogicalJoin(_) => false,
         }
+    }
+
+    fn multi_stage_dimension_filters(filter: Option<Filter>) -> Result<Option<Filter>, CubeError> {
+        let Some(filter) = filter else {
+            return Ok(None);
+        };
+        let mut items = Vec::new();
+        for item in filter.items {
+            let mut has_multi_stage = false;
+            for member in item.all_member_evaluators() {
+                if has_multi_stage_members(&member, true)? {
+                    has_multi_stage = true;
+                    break;
+                }
+            }
+            if has_multi_stage {
+                items.push(item);
+            }
+        }
+        Ok((!items.is_empty()).then_some(Filter { items }))
     }
 }
 
@@ -164,6 +185,12 @@ impl<'a> LogicalNodeProcessor<'a, Query> for QueryProcessor<'a> {
                 for (name, column) in pre_aggregation.all_measures_refererences().into_iter() {
                     context_factory.add_pre_aggregation_measure_reference(name, column);
                 }
+            }
+            QuerySource::FullKeyAggregate(fk) if fk.is_empty() => {
+                // The select reads only multi-stage dimension CTEs. Filters on
+                // plain members were applied inside them and the base cube is
+                // out of scope here; only multi-stage dimension filters remain.
+                filter = Self::multi_stage_dimension_filters(filter)?;
             }
             QuerySource::FullKeyAggregate(_) => {}
         }
