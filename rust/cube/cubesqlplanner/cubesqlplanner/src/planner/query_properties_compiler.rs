@@ -106,14 +106,11 @@ impl QueryPropertiesCompiler {
             .max_multi_stage_stages
             .unwrap_or(DEFAULT_MAX_MULTI_STAGE_STAGES);
         let total_query = options.static_data().total_query.unwrap_or(false);
-        let multi_stage_leaf_merge = options
-            .static_data()
-            .multi_stage_leaf_merge
-            .unwrap_or(false);
+        let multi_stage_leaf_merge = options.static_data().multi_stage_leaf_merge.unwrap_or(true);
         let cubestore_union_full_key_aggregate = options
             .static_data()
             .cubestore_union_full_key_aggregate
-            .unwrap_or(false);
+            .unwrap_or(true);
         let disable_external_pre_aggregations =
             options.static_data().disable_external_pre_aggregations;
         let pre_aggregation_id = options.static_data().pre_aggregation_id.clone();
