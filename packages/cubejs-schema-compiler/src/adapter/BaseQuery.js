@@ -1127,11 +1127,6 @@ export class BaseQuery {
   }
 
   applyNativePreAggResult(preAggResult) {
-    // The planner doesn't match rollups while building a pre-aggregation's own SQL, so an
-    // empty result there isn't a miss
-    if (this.options.preAggregationQuery) {
-      return undefined;
-    }
     if (!preAggResult?.length) {
       this.preAggregations.setNativePreAggregationResult(undefined, undefined);
       return undefined;
