@@ -2033,13 +2033,15 @@ export class BaseQuery {
               for (const granularityName of Object.keys(td.granularities)) {
                 const granularity = this.cubeEvaluator.resolveGranularity([cube, tdName, 'granularities', granularityName]);
 
-                // A granularity that only overrides the SQL of its time dimension has no
-                // interval to derive a hierarchy from. Such a granularity can only be
-                // matched by a rollup declaring it by name, which is what a missing
-                // hierarchy entry already means.
+                // A granularity that overrides the SQL of its time dimension cannot be
+                // derived from finer buckets, even when named after a predefined one.
+                // Such a granularity can only be matched by a rollup declaring it by
+                // name, which is what a missing hierarchy entry already means.
                 // An unresolvable granularity is a different matter and keeps
                 // reporting itself from the constructor below.
-                if (!granularity || granularity.interval) {
+                if (granularity?.sql) {
+                  delete hierarchies[`${dimensionKey}.${granularityName}`];
+                } else if (!granularity || granularity.interval) {
                   const grObj = new Granularity(this, { dimension: dimensionKey, granularity: granularityName });
                   hierarchies[`${dimensionKey}.${granularityName}`] = [
                     granularityName,

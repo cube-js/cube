@@ -3,7 +3,7 @@ import { prepareYamlCompiler } from './PrepareCompiler';
 
 describe('Calendar cube granularities defined with sql', () => {
   // language=YAML
-  const modelWith = (granularity: string) => `
+  const modelWith = (granularity: string, preAggregations = '') => `
 cubes:
   - name: fiscal_calendar
     calendar: true
@@ -37,13 +37,14 @@ ${granularity}
       - name: total_amount
         sql: amount
         type: sum
+${preAggregations}
 `;
 
   const sqlOverride = (name: string) => `          - name: ${name}
             sql: "{CUBE}.wk_start_dt"`;
 
-  const compile = async (granularity: string) => {
-    const compilers = prepareYamlCompiler(modelWith(granularity));
+  const compile = async (granularity: string, preAggregations = '') => {
+    const compilers = prepareYamlCompiler(modelWith(granularity, preAggregations));
     await compilers.compiler.compile();
     return compilers;
   };
@@ -85,6 +86,39 @@ ${granularity}
 
       expect(() => query.preAggregations.canUseTransformedQuery()).not.toThrow();
       expect(() => query.buildSqlAndParams()).not.toThrow();
+    });
+
+    const rollupAt = (granularity: string) => `    pre_aggregations:
+      - name: rollup_a
+        measures: [total_amount]
+        time_dimension: fiscal_calendar.date
+        granularity: ${granularity}`;
+
+    const weekQuery = (compilers: any) => newQuery(compilers, {
+      measures: ['sales.total_amount'],
+      timeDimensions: [{ dimension: 'fiscal_calendar.date', granularity: 'week' }],
+    });
+
+    it('does not serve the overridden granularity from a finer rollup', async () => {
+      const compilers = await compile(sqlOverride('week'), rollupAt('day'));
+
+      expect(weekQuery(compilers).preAggregations.findPreAggregationForQuery()).toBeUndefined();
+    });
+
+    it('serves the overridden granularity from a rollup declaring it', async () => {
+      const compilers = await compile(sqlOverride('week'), rollupAt('week'));
+      const preAggregation: any = weekQuery(compilers).preAggregations.findPreAggregationForQuery();
+
+      expect(preAggregation?.preAggregationName).toEqual('rollup_a');
+    });
+
+    it('keeps the default hierarchy only for granularities that are not overridden', async () => {
+      const compilers = await compile(sqlOverride('week'));
+      const hierarchies = newQuery(compilers, { measures: ['sales.total_amount'] }).granularityHierarchies();
+
+      expect(hierarchies['fiscal_calendar.date.week']).toBeUndefined();
+      expect(hierarchies['fiscal_calendar.date.month']).toEqual(['month', 'day', 'hour', 'minute', 'second']);
+      expect(hierarchies['fiscal_calendar.date_key.week']).toEqual(['week', 'day', 'hour', 'minute', 'second']);
     });
 
     it('keeps hierarchies of interval based granularities', async () => {
