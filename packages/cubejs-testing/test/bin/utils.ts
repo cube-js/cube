@@ -11,10 +11,7 @@ export function datasetUrl(file: string): string {
   return `https://raw.githubusercontent.com/cube-js/testing-fixtures/${DATASET_VERSION}/${file}`;
 }
 
-/**
- * GitHub's raw file CDN intermittently answers 502/504, see the "Gateway Time-out" failures
- * of `dataset:minimal` on CI.
- */
+/** Retries 5xx, 429 and status-less (network / truncated body) failures with exponential backoff. */
 export async function withRetries<T>(label: string, fn: () => Promise<T>, attempts: number = 5): Promise<T> {
   for (let attempt = 1; ; attempt++) {
     try {
