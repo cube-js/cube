@@ -264,10 +264,12 @@ jobs:
       DRIVERS_TESTS_ATHENA_CUBEJS_AWS_KEY: ${{ secrets.DRIVERS_TESTS_ATHENA_CUBEJS_AWS_KEY }}
 
     # redshift Test Serverless Instance is so tiny that it can't serve a few test suites at once,
-    # so we constrain it to 1 test suite at time.
+    # so we constrain it to 1 test suite at time. `queue: max` makes extra suites wait instead of
+    # replacing each other: by default a group keeps one pending job and cancels the rest.
     concurrency:
       group: ${{ contains(matrix.database, 'redshift') && 'redshift-global' || format('drivers-tests-{0}-{1}', matrix.database, github.run_id) }}
       cancel-in-progress: false
+      queue: max
 
     strategy:
       matrix:
