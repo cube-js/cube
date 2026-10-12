@@ -5,6 +5,25 @@ import { prepareJsCompiler, prepareYamlCompiler } from './PrepareCompiler';
 import { createECommerceSchema, createSchemaYaml } from './utils';
 import { PostgresQuery, queryClass, QueryFactory } from '../../src';
 import { RedshiftQuery } from '../../src/adapter/RedshiftQuery';
+import {
+  PreAggregationForQuery,
+  PreAggregations,
+  PreAggregationUsageInfo,
+} from '../../src/adapter/PreAggregations';
+
+class OpenedPreAggregations extends PreAggregations {
+  public declare preAggregationMatch: PreAggregationForQuery | null | undefined;
+
+  public declare preAggregationUsageInfos: PreAggregationUsageInfo[] | undefined;
+}
+
+class OpenedPostgresQuery extends PostgresQuery {
+  public declare preAggregations: OpenedPreAggregations;
+
+  public newPreAggregations() {
+    return new OpenedPreAggregations(this, this.options.historyQueries || [], this.options.cubeLatticeCache);
+  }
+}
 
 describe('pre-aggregations', () => {
   it('rollupJoin scheduledRefresh', async () => {
@@ -353,7 +372,7 @@ describe('pre-aggregations', () => {
         const { compiler, cubeEvaluator, joinGraph } = compileEvents();
         await compiler.compile();
 
-        const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+        const query = new OpenedPostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
           measures: ['Events.count'],
           timeDimensions,
           timezone: 'UTC',
@@ -1519,7 +1538,7 @@ describe('pre-aggregations', () => {
         const preAggregationsDescription: any = query.preAggregations?.preAggregationsDescription();
         const ids = (preAggregationsDescription || []).map((d: any) => d.preAggregationId);
         expect(ids).toContain('visitors.partitionedRolling');
-        expect(query.preAggregations?.preAggregationForQuery?.canUsePreAggregation).toEqual(true);
+        expect(query.preAggregations?.findPreAggregationForQuery()?.canUsePreAggregation).toEqual(true);
       });
     });
   });
@@ -1715,7 +1734,7 @@ cubes:
       ['native planner', true],
     ])('%s', (_name, useNativeSqlPlanner) => {
       it('plans a multi-cube query along its own join hints', async () => {
-        const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+        const query = new OpenedPostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
           measures: ['base_orders.count', 'line_items.count'],
           dimensions: ['users.state'],
           joinHints: [
@@ -1729,7 +1748,7 @@ cubes:
 
         const [sql] = query.buildSqlAndParams();
 
-        expect(query.preAggregations?.preAggregationForQuery).toBeFalsy();
+        expect(query.preAggregations.preAggregationMatch).toBeFalsy();
         expect(sql).toMatch(/FROM\s+orders\s+AS/);
         expect(sql).toMatch(/LEFT JOIN\s+line_items/);
       });
@@ -1791,7 +1810,7 @@ cubes:
     const chainQuery = async (schema: string) => {
       const { compiler, joinGraph, cubeEvaluator } = prepareJsCompiler(schema);
       await compiler.compile();
-      return new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+      return new OpenedPostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
         measures: [],
         dimensions: ['cube_w.dim_w', 'cube_x.dim_x', 'cube_y.dim_y', 'cube_z.dim_z'],
         timezone: 'UTC',
@@ -1804,12 +1823,12 @@ cubes:
       const query = await chainQuery(chainSchema('dim_w, dim_x'));
 
       // A matched rollupJoin is described by its leg rollups, which are what get built; the
-      // join itself is named on preAggregationForQuery.
+      // join itself is named on the match.
       const description: any = query.preAggregations?.preAggregationsDescription();
       expect(description.map((p: any) => p.preAggregationId).sort()).toEqual(
         ['cube_w.www', 'cube_x.xxx', 'cube_y.yyy', 'cube_z.zzz']
       );
-      expect(query.preAggregations?.preAggregationForQuery?.preAggregationName).toEqual('chainRollupJoin');
+      expect(query.preAggregations.preAggregationMatch?.preAggregationName).toEqual('chainRollupJoin');
       expect(query.buildSqlAndParams()[0]).toMatch(/"cube_w__dim_w" = "cube_x__dim_w"/);
     });
 

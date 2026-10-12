@@ -1071,6 +1071,7 @@ export class BaseQuery {
   }
 
   // FIXME Temporary solution
+  /** @returns {import('./PreAggregations').PreAggregationForQuery | undefined} */
   findPreAggregationForQueryRust() {
     let optionsOrder = this.options.order;
     if (optionsOrder && !Array.isArray(optionsOrder)) {
@@ -1122,25 +1123,23 @@ export class BaseQuery {
     const buildResult = nativeBuildSqlAndParams(queryParams);
 
     const [, , preAggResult] = buildResult;
-    this.applyNativePreAggResult(preAggResult);
-    return this.preAggregations.preAggregationForQuery;
+    return this.applyNativePreAggResult(preAggResult);
   }
 
   applyNativePreAggResult(preAggResult) {
     // The planner doesn't match rollups while building a pre-aggregation's own SQL, so an
     // empty result there isn't a miss
     if (this.options.preAggregationQuery) {
-      return;
+      return undefined;
     }
     if (!preAggResult?.length) {
       this.preAggregations.setNativePreAggregationResult(undefined, undefined);
-      return;
+      return undefined;
     }
     const first = preAggResult[0];
-    this.preAggregations.setNativePreAggregationResult(
-      preAggResult,
-      this.getPreAggregationByName(first.cubeName, first.preAggregationName),
-    );
+    const preAggregationForQuery = this.getPreAggregationByName(first.cubeName, first.preAggregationName);
+    this.preAggregations.setNativePreAggregationResult(preAggResult, preAggregationForQuery);
+    return preAggregationForQuery;
   }
 
   allCubeMembers(path) {

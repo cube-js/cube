@@ -110,22 +110,22 @@ export type PreAggregationUsageInfo = {
 };
 
 export class PreAggregations {
-  private readonly query: BaseQuery;
+  protected readonly query: BaseQuery;
 
-  private readonly historyQueries: any;
+  protected readonly historyQueries: any;
 
-  private readonly cubeLatticeCache: any;
+  protected readonly cubeLatticeCache: any;
 
-  private readonly cubeLattices: {};
+  protected readonly cubeLattices: {};
 
-  private hasCumulativeMeasuresValue: boolean = false;
+  protected hasCumulativeMeasuresValue: boolean = false;
 
-  private allBackAliasMembersValue: Record<string, string> | undefined = undefined;
+  protected allBackAliasMembersValue: Record<string, string> | undefined = undefined;
 
   // undefined: not matched yet, null: matched and nothing fits
-  private preAggregationMatch: PreAggregationForQuery | null | undefined = undefined;
+  protected preAggregationMatch: PreAggregationForQuery | null | undefined = undefined;
 
-  public preAggregationUsageInfos: PreAggregationUsageInfo[] | undefined = undefined;
+  protected preAggregationUsageInfos: PreAggregationUsageInfo[] | undefined = undefined;
 
   public constructor(query: BaseQuery, historyQueries, cubeLatticeCache) {
     this.query = query;
@@ -990,10 +990,6 @@ export class PreAggregations {
             .find(p => p.canUsePreAggregation && (!this.query.options.preAggregationId || p.preAggregationId === this.query.options.preAggregationId)) ?? null;
       }
     }
-    return this.preAggregationForQuery;
-  }
-
-  public get preAggregationForQuery(): PreAggregationForQuery | undefined {
     return this.preAggregationMatch ?? undefined;
   }
 
