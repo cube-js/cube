@@ -243,7 +243,7 @@ export async function downloadAndExtractFile(url: string, { cwd, skipExtract, ds
 
   const response = await fetch(request);
   if (!response.ok) {
-    throw new Error(`unexpected response ${response.statusText}`);
+    throw new Error(`unexpected response ${response.status} ${response.statusText} (${url})`);
   }
 
   const bar = new SingleBar({
