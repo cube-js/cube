@@ -20,8 +20,9 @@ export async function withRetries<T>(label: string, fn: () => Promise<T>, attemp
     try {
       return await fn();
     } catch (e: any) {
-      // A 4xx (e.g. a file missing at DATASET_VERSION) will not go away; network errors carry no status.
-      if (attempt >= attempts || (e.status !== undefined && e.status < 500)) {
+      // A 4xx (e.g. a file missing at DATASET_VERSION) will not go away, except a 429 rate limit;
+      // network errors carry no status.
+      if (attempt >= attempts || (e.status !== undefined && e.status < 500 && e.status !== 429)) {
         throw e;
       }
 
