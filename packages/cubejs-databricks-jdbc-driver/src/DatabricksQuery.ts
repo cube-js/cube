@@ -26,12 +26,14 @@ class DatabricksFilter extends BaseFilter {
     return `(${params.join(', ')})`;
   }
 
+  // The null check reads the cast column too: an unparseable value casts to NULL
+  // and is treated as not set, the same way by IN and NOT IN.
   public inWhere(column: string) {
-    return `${this.inListColumn(column)} IN ${this.inPlaceholders()}${this.orIsNullCheck(column, false)}`;
+    return super.inWhere(this.inListColumn(column));
   }
 
   public notInWhere(column: string) {
-    return `${this.inListColumn(column)} NOT IN ${this.inPlaceholders()}${this.orIsNullCheck(column, true)}`;
+    return super.notInWhere(this.inListColumn(column));
   }
 
   private inListColumn(column: string) {

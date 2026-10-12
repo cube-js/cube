@@ -393,11 +393,11 @@ impl MockSqlTemplatesRender {
         );
         templates.insert(
             "tesseract/time_in_list_column_cast".to_string(),
-            "{{ expr }}".to_string(),
+            "CAST({{ expr }} AS timestamp)".to_string(),
         );
         templates.insert(
             "tesseract/time_in_list_param_cast".to_string(),
-            "{{ expr }}".to_string(),
+            "{{ expr }}::timestamp".to_string(),
         );
 
         // Filters - based on BaseQuery.js:4398-4414

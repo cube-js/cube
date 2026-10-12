@@ -98,13 +98,26 @@ cube(\`sales\`, {
       expect(sql).toContain(`try_cast(\`sales\`.sold_day AS TIMESTAMP) IN ${CAST_PARAMS}`);
     });
 
-    it('checks the uncast column for null', () => {
+    it.each([
+      ['in', [...ISO_VALUES, null], 'IN'],
+      ['notIn', ISO_VALUES, 'NOT IN'],
+    ])('checks the cast column for null with %s', (operator, values, keyword) => {
       const [sql] = buildSqlAndParams(
-        [{ member: 'sales.soldAt', operator: 'in', values: [...ISO_VALUES, null] }],
+        [{ member: 'sales.soldDay', operator, values }],
         useNativeSqlPlanner,
       );
 
-      expect(sql).toContain(`IN ${CAST_PARAMS} OR \`sales\`.sold_at IS NULL`);
+      expect(sql).toContain(`${keyword} ${CAST_PARAMS} OR try_cast(\`sales\`.sold_day AS TIMESTAMP) IS NULL`);
+    });
+
+    it('adds no null check to a notIn list that contains null', () => {
+      const [sql] = buildSqlAndParams(
+        [{ member: 'sales.soldDay', operator: 'notIn', values: [...ISO_VALUES, null] }],
+        useNativeSqlPlanner,
+      );
+
+      expect(sql).toContain(`NOT IN ${CAST_PARAMS}`);
+      expect(sql).not.toContain('IS NULL');
     });
 
     it('leaves a single-value time dimension equals as is', () => {
