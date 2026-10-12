@@ -42,6 +42,9 @@ cubes:
       - name: at
         sql: "{CUBE}.at"
         type: time
+      - name: at_micros
+        sql: "toDateTime64({CUBE}.at, 6, 'UTC') + toIntervalMicrosecond(456)"
+        type: time
       - name: at_new_york
         sql: "toTimeZone({CUBE}.at, 'America/New_York')"
         type: time
@@ -102,6 +105,21 @@ cubes:
       operator: 'equals',
       values: ['2025-06-30T00:00:00.000Z', '2025-09-30T00:00:00.000Z'],
     })).toEqual([2]);
+  });
+
+  it('compares a DateTime64(6) member with the microseconds of each value', async () => {
+    expect(await idsFor({
+      member: 'days.at_micros',
+      operator: 'equals',
+      values: ['2025-06-30T00:00:00.123456Z', '2025-09-30T00:00:00.000456Z'],
+    })).toEqual([1, 2]);
+
+    // The same instant cut to milliseconds is a different value
+    expect(await idsFor({
+      member: 'days.at_micros',
+      operator: 'equals',
+      values: ['2025-06-30T00:00:00.123Z'],
+    })).toEqual([]);
   });
 
   it('reads a value without an offset as UTC, whatever the zone of the member', async () => {
