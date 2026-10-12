@@ -25,7 +25,7 @@ ENV CUBESTORE_SKIP_POST_INSTALL=true
 ENV NODE_ENV=development
 # Use the image's Node headers to avoid concurrent node-gyp downloads and copies.
 ENV npm_config_nodedir=/usr/local
-# Pinned so the BuildKit cache mounts below (and the CI cache restored into them) share one path.
+# Pinned so the BuildKit cache mounts below share one path.
 ENV YARN_CACHE_FOLDER=/usr/local/share/.cache/yarn
 
 WORKDIR /cubejs
