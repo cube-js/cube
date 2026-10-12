@@ -307,7 +307,7 @@ Cube applies the switch in two places: to the SQL that runs, and to the query de
 
 When only one half can take it, the chart keeps rendering the member it was built on and shows a notice reading **"The Field switcher could not be applied to this chart"**. The usual reason is a query Cube can't read back as semantic members — a hand-written one, or one built with a `JOIN` or `UNION`. The rest of the dashboard still switches.
 
-A chart whose query doesn't use the replaced member at all is a different case: it is simply out of the control's scope, exactly as it would be for a filter, and shows no notice.
+A chart whose query doesn't use the replaced member at all is a different case: it is simply out of the control's scope and shows no notice.
 
 A chart with a [period comparison][ref-charts] is a narrower case: the comparison can't follow a member switch, so the chart applies the switch and drops the comparison, saying so in its own notice rather than silently showing a comparison that no longer matches the data.
 
