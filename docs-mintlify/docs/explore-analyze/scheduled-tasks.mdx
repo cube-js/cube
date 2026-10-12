@@ -39,6 +39,12 @@ A task has:
   each execution.
 - **Schedule** — how often the task runs (see below).
 - **Enabled** — a toggle to activate or pause a scheduled task.
+- **Notify me when a run finishes** — when on, the task's creator gets a
+  notification in the in-app inbox each time a run finishes, whether it
+  succeeded or failed. A successful run's notification previews the start of
+  the agent's answer and links to the run's chat thread. The toggle is on by
+  default in the create dialog; tasks created through the API have it off
+  unless you set `notificationEnabled` to `true`.
 
 ## Schedule options
 
