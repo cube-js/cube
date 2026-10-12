@@ -102,15 +102,15 @@ RUN --mount=type=cache,target=/usr/local/share/.cache/yarn,sharing=locked \
 # Databricks driver dependencies                                     #
 ######################################################################
 FROM base AS prod_base_dependencies
-# Binding a file from deps only orders this after the full install, which warms the cache for --offline.
+# Binding a file from deps only orders this after the full install, which warms the cache; --prefer-offline still downloads if the mount was evicted.
 RUN --mount=type=cache,target=/usr/local/share/.cache/yarn,sharing=locked \
     --mount=type=bind,from=deps,source=/cubejs/yarn.lock,target=/tmp/deps-installed \
-    yarn install --prod --offline
+    yarn install --prod --prefer-offline
 
 FROM prod_base_dependencies AS prod_dependencies
 COPY packages/cubejs-databricks-jdbc-driver/bin packages/cubejs-databricks-jdbc-driver/bin
 RUN --mount=type=cache,target=/usr/local/share/.cache/yarn,sharing=locked \
-    yarn install --prod --ignore-scripts --offline
+    yarn install --prod --ignore-scripts --prefer-offline
 
 ######################################################################
 # Build dependencies                                                 #
