@@ -26,6 +26,7 @@ pub mod ossie;
 pub mod policies;
 pub mod regions;
 pub mod reports;
+pub mod roles;
 pub mod scim;
 pub mod spec;
 pub mod tenant;

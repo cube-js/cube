@@ -183,6 +183,7 @@ Run `cube <command> --help` for the full options of any command.
 | `environments` | Deployment environments and environment tokens |
 | `variables` | Deployment environment variables |
 | `folders`, `workbooks`, `reports`, `workspace` | Workspace content management |
+| `roles` (`role`) | Custom roles: `list`, `create` (`--name`, `--tier`, `--deployment`, `--action`), `get`, `update`, `delete`, `assign`, `unassign` — see [Scoping a role to a deployment](#scoping-a-role-to-a-deployment) |
 | `users`, `groups`, `attributes`, `policies` | Users, groups, and access control |
 | `tenant`, `notifications`, `integrations`, `oidc`, `api-keys` | Account administration |
 | `embed` | Embed sessions, tokens, embed tenants; `enable-dashboard`/`disable-dashboard` toggle signed embedding for a dashboard |
@@ -194,6 +195,52 @@ Run `cube <command> --help` for the full options of any command.
 
 List commands print tables by default; pass `--json` anywhere for raw JSON
 output, suitable for piping to `jq`.
+
+## Scoping a role to a deployment
+
+A deployment and the access to it can be provisioned in one run: `deployments
+create` returns the new deployment, and `roles create` takes its id as the
+resource a policy is scoped to.
+
+```bash
+DEPLOYMENT=$(cube deployments create --name analytics --region aws-us-east-1-2 | jq -r '.id')
+
+ROLE=$(cube roles create \
+  --name "Analytics team" \
+  --tier develop \
+  --deployment "$DEPLOYMENT" \
+  --action DeploymentRead \
+  --action SchemaRead | jq -r '.id')
+
+cube roles assign "$ROLE" 42
+```
+
+`--tier` is the [Base Role](/admin/users-and-permissions/custom-roles#base-role)
+— it sets the license tier, and a role created without one leaves its holders
+unable to use the product, with nothing saying so until they sign in. Pick a
+tier that covers the actions you grant: `view`, `explore`, or `develop`.
+
+`--deployment` and `--action` build one `Deployment` policy together, so each
+needs the other — neither is defaulted, because guessing one would grant
+something you did not ask for. Repeat either flag for several values, and pass
+`--deployment All` for every deployment in the account.
+
+For a policy the flags do not cover — several resource types at once, or global
+actions beyond the tier — pass the full `policies` array with `--data`; the
+policies the flags build are appended to it.
+
+<Warning>
+
+`roles update` sends `policies` whenever it is given `--tier`, `--deployment` or
+a `--data` carrying a `policies` key, and the API replaces the role's policies
+outright rather than merging. Adding a second deployment with `--deployment`
+alone therefore drops the tier and every other scope — read the role first and
+pass the full set with `--data`, or re-state the flags you want kept.
+
+A `--data` without a `policies` key does not send the field at all, so editing
+just the name or description leaves the role's grants untouched.
+
+</Warning>
 
 ## Changing the Cube version
 
