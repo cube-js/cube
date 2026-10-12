@@ -7,25 +7,29 @@ import { FireboltDriver } from '../src';
 
 // STOP ENGINE returns while the engine is still stopping, and a START ENGINE
 // issued before it has fully stopped fails, so wait for a settled status.
+const STOP_WAIT_INTERVAL_MS = 5000;
+const STOP_WAIT_ATTEMPTS = 60;
+const STOP_WAIT_MAX_MS = STOP_WAIT_INTERVAL_MS * STOP_WAIT_ATTEMPTS;
+
 async function waitWhileTransitioning(engine: {
   refreshStatus(): Promise<void>;
   current_status_summary: EngineStatusSummary;
 }) {
-  for (let i = 0; i < 60; i++) {
+  for (let i = 0; i < STOP_WAIT_ATTEMPTS; i++) {
     await engine.refreshStatus();
     if (![EngineStatusSummary.STOPPING, EngineStatusSummary.DRAINING].includes(engine.current_status_summary)) {
       return;
     }
-    await new Promise((resolve) => setTimeout(resolve, 5000));
+    await new Promise((resolve) => setTimeout(resolve, STOP_WAIT_INTERVAL_MS));
   }
-  throw new Error(`Engine is still ${engine.current_status_summary} after 5 minutes`);
+  throw new Error(`Engine is still ${engine.current_status_summary} after ${STOP_WAIT_MAX_MS / 1000} s`);
 }
 
 describe('FireboltDriver autostart', () => {
   let tests: DriverTests;
   let driver: any;
-  // Two 5 min waits for the engine to stop, plus the driver's 2 min connection timeout.
-  jest.setTimeout(15 * 60 * 1000);
+  // Two waits for the engine to stop, plus the driver's 2 min connection timeout and slack.
+  jest.setTimeout(2 * STOP_WAIT_MAX_MS + 5 * 60 * 1000);
 
   afterAll(async () => {
     await tests.release();
