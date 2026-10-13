@@ -505,10 +505,8 @@ export type ModelContext = { readonly __brand: 'ModelContext' };
 export const newModelContext = (): ModelContext => loadNative().newModelContext();
 
 /**
- * Mirrors `BaseQueryOptions` in `cubesqlplanner/src/cube_bridge/base_query_options.rs`.
- * Nested structures are `unknown`: their shape is validated by the planner on deserialization,
- * and the schema-compiler objects (`cubeEvaluator`, `joinGraph`, …) can't be typed here since
- * this package can't depend on schema-compiler.
+ * Mirrors `BaseQueryOptions` in `cubesqlplanner/src/cube_bridge/base_query_options.rs`. Nested
+ * structures and schema-compiler objects are `unknown`: the planner validates them on deserialization.
  */
 export type NativeQueryOptions = {
   /** Member names or member expression definitions. */
