@@ -61,7 +61,7 @@ when it can't validate the chain against its trusted roots, for example when
 the chain ends in a root CA that isn't in that library yet. If a certificate
 renewal then changes the certificates the issuer serves, federation fails
 with `OpenIDConnect provider's HTTPS certificate doesn't match configured
-thumbprint`. See [Verifying the setup](#verifying-the-setup) for the fix.
+thumbprint`. See [Refreshing the provider thumbprint](#refreshing-the-provider-thumbprint) for the fix.
 
 </Note>
 
@@ -708,6 +708,11 @@ If the test fails:
 | `OpenIDConnect provider's HTTPS certificate doesn't match configured thumbprint` | The certificate chain your tenant serves has changed since the provider was registered, and AWS fell back to the stored thumbprint. Refresh the provider's thumbprint list as shown [below](#refreshing-the-provider-thumbprint). |
 | `An error occurred ... InvalidIdentityToken`                   | Trying to use `sts:ExternalId`. Remove it — federated assume-role doesn't accept it.                                                                  |
 
+`AssumeRoleWithWebIdentity` events show up in CloudTrail with the deployment
+subject in the `userIdentity.webIdFederationData.federatedProvider` and
+`...attributes` fields — useful for auditing which deployments are
+authenticating against which roles.
+
 ### Refreshing the provider thumbprint
 
 Print the certificates your tenant serves, save each CA certificate (every PEM
@@ -733,11 +738,6 @@ aws iam update-open-id-connect-provider-thumbprint \
 AWS accepts up to five thumbprints. The list only holds until the certificate
 authority switches to a different intermediate or root, so repeat this step if
 the error returns.
-
-`AssumeRoleWithWebIdentity` events show up in CloudTrail with the deployment
-subject in the `userIdentity.webIdFederationData.federatedProvider` and
-`...attributes` fields — useful for auditing which deployments are
-authenticating against which roles.
 
 [ref-oidc-overview]: /admin/deployment/oidc
 [ref-sub-editor]: /admin/deployment/oidc#subject-claim-format
