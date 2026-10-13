@@ -1066,7 +1066,10 @@ impl CubeScanWrapperNode {
             .fields()
             .iter()
             .next()
-            .and_then(|f| f.qualifier().cloned());
+            .and_then(|f| f.qualifier().cloned())
+            // A literal leading a scan over several cubes has no qualifier, and an empty
+            // alias is a syntax error, so alias the scan by a cube it reads
+            .or_else(|| node.used_cubes.first().cloned());
         let mut remapper = Remapper::new(from_alias.clone(), true);
         let mut member_to_alias = HashMap::new();
         // Probably it should just use member expression for all MemberField::Literal
@@ -1154,6 +1157,12 @@ impl CubeScanWrapperNode {
                 new_sql = sql;
             }
 
+            let Some(subquery_alias) = from_alias.clone() else {
+                return Err(CubeError::internal(format!(
+                    "Can't generate SQL for CubeScan in wrapped select: subquery has no alias: {node:?}"
+                )));
+            };
+
             // Use SQL from Cube as FROM, and prepared expressions as projection
             let resulting_sql = generator
                 .get_sql_templates()
@@ -1165,7 +1174,7 @@ impl CubeScanWrapperNode {
                     vec![],
                     vec![],
                     vec![],
-                    from_alias.clone().unwrap_or("".to_string()),
+                    subquery_alias,
                     None,
                     None,
                     vec![],
@@ -4905,6 +4914,10 @@ impl WrappedSelectNode {
             )));
         }
 
+        // A subquery over no table, like a select of literals, has nothing to be named after,
+        // and an empty alias is a syntax error. Its columns are unqualified, so any name works
+        let from_alias = from_alias.unwrap_or_else(|| "subquery".to_string());
+
         let resulting_sql = generator
             .get_sql_templates()
             .select(
@@ -4915,7 +4928,7 @@ impl WrappedSelectNode {
                 group_descs,
                 aggregate.into_iter().map(|(m, _)| m).collect(),
                 window.into_iter().map(|(m, _)| m).collect(),
-                from_alias.unwrap_or("".to_string()),
+                from_alias,
                 if !filter.is_empty() {
                     Some(filter.iter().map(|(f, _)| f.expr.to_string()).join(" AND "))
                 } else {
