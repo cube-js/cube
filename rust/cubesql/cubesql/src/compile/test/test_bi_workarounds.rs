@@ -248,3 +248,41 @@ async fn test_powerbi_max_case_over_number_measure_is_dropped() {
         sql
     );
 }
+
+/// Metabase "by day" bucketing emits `CAST(CAST(col AS date) AS timestamp)`.
+/// It must be planned as a regular CubeScan with `granularity: day` (so it can
+/// hit pre-aggregations), the same as `date_trunc('day', col)`, not as SQL pushdown.
+/// https://github.com/cube-js/cube/issues/12240
+#[tokio::test]
+async fn test_metabase_cast_cast_date_timestamp_day_bucketing() {
+    init_testing_logger();
+
+    let logical_plan = convert_select_to_query_plan(
+        r#"
+        SELECT
+          CAST(CAST("public"."KibanaSampleDataEcommerce"."order_date" AS date) AS timestamp) AS "order_date",
+          SUM("public"."KibanaSampleDataEcommerce"."sumPrice") AS "sum"
+        FROM "public"."KibanaSampleDataEcommerce"
+        GROUP BY CAST(CAST("public"."KibanaSampleDataEcommerce"."order_date" AS date) AS timestamp)
+        ORDER BY CAST(CAST("public"."KibanaSampleDataEcommerce"."order_date" AS date) AS timestamp) ASC
+        ;"#
+        .to_string(),
+        DatabaseProtocol::PostgreSQL,
+    )
+    .await
+    .as_logical_plan();
+
+    let request = logical_plan.find_cube_scan().request;
+    assert_eq!(
+        request.measures,
+        Some(vec!["KibanaSampleDataEcommerce.sumPrice".to_string()])
+    );
+    assert_eq!(
+        request
+            .time_dimensions
+            .as_ref()
+            .and_then(|tds| tds.first())
+            .and_then(|td| td.granularity.clone()),
+        Some("day".to_string())
+    );
+}
