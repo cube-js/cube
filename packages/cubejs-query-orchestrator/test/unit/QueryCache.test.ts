@@ -349,8 +349,9 @@ describe('QueryCache.createQueue cancellation', () => {
     await waitForCancelHandlers(nodeA, 2);
 
     try {
-      await nodeB.cancelQueryByRequestId('req-a');
+      const cancelled = await nodeB.cancelQueryByRequestId('req-a');
 
+      expect(cancelled.map((q) => q.requestId)).toEqual(['req-a']);
       expect(running.get('b')?.cancelled).toBe(false);
     } finally {
       running.forEach(({ resolve }) => resolve([]));
