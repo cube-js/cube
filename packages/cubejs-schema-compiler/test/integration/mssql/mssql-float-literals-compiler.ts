@@ -20,9 +20,13 @@ const compileQueries = async (request: CompilationRequest): Promise<CompilationR
   await compilers.compiler.compile();
   const options = { measures: [], timeDimensions: [], filters: [], useNativeSqlPlanner: request.useNativeSqlPlanner };
   const memberExpression = (member: string) => {
-    if (!member.startsWith('{')) return member;
+    if (!member.startsWith('{')) {
+      return member;
+    }
     const definition = JSON.parse(member);
-    if (definition.expr.type !== 'SqlFunction') throw new Error('Unexpected test member expression');
+    if (definition.expr.type !== 'SqlFunction') {
+      throw new Error('Unexpected test member expression');
+    }
     return {
       cubeName: definition.cubeName,
       name: definition.alias,
@@ -63,7 +67,9 @@ const compileQueries = async (request: CompilationRequest): Promise<CompilationR
       throw new Error(`SQL compilation did not return a complete source query: ${JSON.stringify(response)}`);
     }
     const parameters = response.sql[1].map((value: unknown) => {
-      if (value !== null && typeof value !== 'string') throw new Error('Unexpected SQL parameter');
+      if (value !== null && typeof value !== 'string') {
+        throw new Error('Unexpected SQL parameter');
+      }
       return value;
     });
     return [response.sql[0], parameters];
@@ -73,7 +79,9 @@ const compileQueries = async (request: CompilationRequest): Promise<CompilationR
   try {
     const candidateQueries: SourceQuery[] = [];
 
-    for (const query of request.candidateQueries) candidateQueries.push(await compile(server, query));
+    for (const query of request.candidateQueries) {
+      candidateQueries.push(await compile(server, query));
+    }
     return { candidateQueries };
   } finally {
     await shutdownInterface(server, 'fast');
@@ -92,6 +100,9 @@ process.once('message', async (request: CompilationRequest) => {
   }
   // Native callbacks retain referenced channels after shutdown. Keep that
   // lifetime inside this worker so the integration runner exits normally.
-  if (process.send) process.send(response, () => process.exit(exitCode));
-  else process.exit(1);
+  if (process.send) {
+    process.send(response, () => process.exit(exitCode));
+  } else {
+    process.exit(1);
+  }
 });

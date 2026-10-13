@@ -17,9 +17,13 @@ const compileQueries = (request: CompilationRequest): Promise<Exclude<Compilatio
   });
   worker.once('close', code => {
     clearTimeout(timeout);
-    if (response && 'error' in response) reject(new Error(response.error));
-    else if (code !== 0 || !response) reject(new Error(`SQL compilation worker exited with code ${code}`));
-    else resolve(response);
+    if (response && 'error' in response) {
+      reject(new Error(response.error));
+    } else if (code !== 0 || !response) {
+      reject(new Error(`SQL compilation worker exited with code ${code}`));
+    } else {
+      resolve(response);
+    }
   });
   worker.send(request);
 });
@@ -57,7 +61,10 @@ describe.each([false, true])('MSSQL float literals (native planner: %s)', useNat
     expect(query[0]).toMatch(literal);
     const rows = await dbRunner.testQuery(query);
     expect(rows).toHaveLength(1);
-    if (expected === null) expect(rows[0].value).toBeNull();
-    else expect(Number(rows[0].value)).toBeCloseTo(expected, 6);
+    if (expected === null) {
+      expect(rows[0].value).toBeNull();
+    } else {
+      expect(Number(rows[0].value)).toBeCloseTo(expected, 6);
+    }
   });
 });
