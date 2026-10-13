@@ -60,6 +60,20 @@ pub enum WrappedSelectType {
     Aggregate,
 }
 
+/// Whether a `CubeScan` sits inside a `CubeScanWrapper`, and then where the SQL the
+/// wrapper renders on top of it reads from
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Hash)]
+pub enum ScanWrapping {
+    None,
+    /// Cube generates the SQL of the scan for its data source, and the wrapper renders
+    /// in that dialect
+    DataSource,
+    /// Cube generates the SQL of the scan over a Cube Store pre-aggregation, and the
+    /// wrapper renders in the Cube Store dialect. It is one plan among the others for the
+    /// same scan: extraction drops it when Cube says it matches no pre-aggregation
+    PreAggregation,
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Hash)]
 pub enum GroupingSetType {
     Rollup,
@@ -312,7 +326,7 @@ crate::plan_to_language! {
             offset: Option<usize>,
             split: bool,
             can_pushdown_join: bool,
-            wrapped: bool,
+            wrapped: ScanWrapping,
             ungrouped: bool,
             join_hints: Vec<Vec<String>>,
         },

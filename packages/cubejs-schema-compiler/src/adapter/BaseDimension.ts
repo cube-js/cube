@@ -132,6 +132,16 @@ export class BaseDimension {
     return this.aliasPath ?? this.dimension;
   }
 
+  /**
+   * The column this dimension has in a pre-aggregation table, whatever alias the query
+   * asked for it.
+   */
+  public preAggregationColumnName(): string {
+    return this.query.escapeColumnName(
+      this.query.canonicalAliasName(this.expression && this.expressionName ? this.expressionName : this.dimension)
+    );
+  }
+
   public dateFieldType() {
     return this.dimensionDefinition().fieldType;
   }

@@ -76,6 +76,21 @@ export interface SqlPayload {
   query: any,
   memberToAlias: Record<string, string>,
   expressionParams: string[],
+  /** When false, the SQL may read a Cube Store pre-aggregation; cubesql allows it when it
+   * can render the SQL on top in the Cube Store dialect */
+  disableExternalPreAggregations?: boolean,
+}
+
+export interface PreAggregationMatchPayload {
+  request: Request<LoadRequestMeta>,
+  session: SessionContext,
+  /** Cube queries the rewrite plans to read from a pre-aggregation */
+  queries: any[],
+}
+
+export interface PreAggregationMatchResponse {
+  /** For each query, in order: whether a Cube Store pre-aggregation would serve it */
+  matches: boolean[],
 }
 
 export interface SqlApiLoadPayload {
@@ -84,6 +99,10 @@ export interface SqlApiLoadPayload {
   query: any;
   queryKey: any;
   sqlQuery: any;
+  /** `sqlQuery` reads Cube Store pre-aggregations, so it runs on Cube Store */
+  external?: boolean;
+  /** Descriptions of the pre-aggregations `sqlQuery` reads, from the `sql` calls it was built on */
+  preAggregations?: any[];
   streaming: boolean;
   cacheMode: CacheMode;
 }
@@ -112,6 +131,7 @@ export type SQLInterfaceOptions = {
   checkAuth: (payload: CheckAuthPayload) => CheckAuthResponse | Promise<CheckAuthResponse>,
   checkSqlAuth: (payload: CheckSQLAuthPayload) => CheckSQLAuthResponse | Promise<CheckSQLAuthResponse>,
   sql: (payload: SqlPayload) => unknown | Promise<unknown>,
+  preAggregationMatch: (payload: PreAggregationMatchPayload) => unknown | Promise<unknown>,
   meta: (payload: MetaPayload) => unknown | Promise<unknown>,
   stream: (payload: LoadPayload) => unknown | Promise<unknown>,
   sqlApiLoad: (payload: SqlApiLoadPayload) => unknown | Promise<unknown>,
@@ -428,6 +448,10 @@ export const registerInterface = async (options: SQLInterfaceOptions): Promise<S
     throw new Error('options.sql must be a function');
   }
 
+  if (typeof options.preAggregationMatch !== 'function') {
+    throw new Error('options.preAggregationMatch must be a function');
+  }
+
   const native = loadNative();
   return native.registerInterface({
     ...options,
@@ -435,6 +459,7 @@ export const registerInterface = async (options: SQLInterfaceOptions): Promise<S
     checkAuth: wrapNativeFunctionWithChannelCallback(options.checkAuth),
     checkSqlAuth: wrapNativeFunctionWithChannelCallback(options.checkSqlAuth),
     sql: wrapNativeFunctionWithChannelCallback(options.sql),
+    preAggregationMatch: wrapNativeFunctionWithChannelCallback(options.preAggregationMatch),
     meta: wrapNativeFunctionWithChannelCallback(options.meta),
     stream: wrapNativeFunctionWithStream(options.stream),
     sqlApiLoad: wrapNativeFunctionWithStream(options.sqlApiLoad),

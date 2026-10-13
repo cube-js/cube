@@ -243,6 +243,16 @@ export class BaseMeasure {
     return this.aliasPath ?? this.measure;
   }
 
+  /**
+   * The column this measure has in a pre-aggregation table, whatever alias the query
+   * asked for it.
+   */
+  public preAggregationColumnName(): string {
+    return this.query.escapeColumnName(
+      this.query.canonicalAliasName(this.expression ? this.expressionName : this.measure)
+    );
+  }
+
   public isCumulative(): boolean {
     if (this.expression) { // TODO
       return false;

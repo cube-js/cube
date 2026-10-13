@@ -1086,6 +1086,108 @@ export class CompilerApi {
     return cubeEvaluator.preAggregations(filter);
   }
 
+  /**
+   * The members each external rollup may serve, one array per rollup (views in their own
+   * names): cubesql plans a scan over a pre-aggregation only when its members fit one.
+   */
+  public async externalPreAggregationMembers(): Promise<string[][]> {
+    const compilers = await this.getCompilers();
+    // A failure only leaves the rollups unread by pushed down SQL, not the SQL API down
+    return compilers.compilerCache.cache(
+      ['externalPreAggregationMembers'],
+      () => this.createQueryByDataSource(compilers, {})
+        .then((query) => this.collectExternalPreAggregationMembers(compilers.cubeEvaluator, query))
+        .catch((e: any) => {
+          this.logger('Pre-aggregation Members Error', { error: e.stack || e.message || e.toString() });
+          return [];
+        }),
+    );
+  }
+
+  protected collectExternalPreAggregationMembers(cubeEvaluator: any, query: any): string[][] {
+    const infos: PreAggregationInfo[] = cubeEvaluator.preAggregations({});
+    const byId = new Map(infos.map((info) => [info.id, info]));
+    const memberPath = (reference: string) => reference.split('.').slice(-2).join('.');
+
+    const membersOf = (info: PreAggregationInfo, seen: Set<string>): Set<string> => {
+      const members = new Set<string>();
+      if (seen.has(info.id)) {
+        return members;
+      }
+      seen.add(info.id);
+      const { references } = info;
+      [...references.dimensions, ...references.measures]
+        .forEach((reference) => members.add(memberPath(reference)));
+      references.timeDimensions.forEach(({ dimension }) => members.add(memberPath(dimension)));
+      references.rollups.forEach((rollup) => {
+        const referenced = byId.get(rollup);
+        if (referenced) {
+          membersOf(referenced, seen).forEach((member) => members.add(member));
+        }
+      });
+      return members;
+    };
+
+    const views = Object.entries(cubeEvaluator.evaluatedCubes)
+      .filter(([, cube]: [string, any]) => cube.isView && cube.includedMembers);
+
+    // Which cube members reference each member, directly or through other members:
+    // a calculated or multi-stage member can be served by a rollup holding what it reads
+    const referencedBy = new Map<string, Set<string>>();
+    const cubes = Object.entries<any>(cubeEvaluator.evaluatedCubes).filter(([, cube]) => !cube.isView);
+
+    for (const [cubeName, cube] of cubes) {
+      const members: [string, any][] = [
+        ...Object.keys(cube.measures || {}).map((name): [string, any] => [`${cubeName}.${name}`, query.newMeasure(`${cubeName}.${name}`)]),
+        ...Object.keys(cube.dimensions || {}).map((name): [string, any] => [`${cubeName}.${name}`, query.newDimension(`${cubeName}.${name}`)]),
+        ...Object.keys(cube.segments || {}).map((name): [string, any] => [`${cubeName}.${name}`, query.newSegment(`${cubeName}.${name}`)]),
+      ];
+
+      for (const [name, member] of members) {
+        let references: string[] = [];
+
+        try {
+          references = query.collectFrom([member], query.collectMemberNamesFor.bind(query), 'collectMemberNamesFor');
+        } catch (e: any) {
+          this.logger('Pre-aggregation Member References Error', { member: name, error: e.message || e.toString() });
+        }
+
+        for (const reference of references.map(memberPath)) {
+          if (reference !== name) {
+            referencedBy.set(reference, (referencedBy.get(reference) || new Set()).add(name));
+          }
+        }
+      }
+    }
+    const addReferencingMembers = (members: Set<string>) => {
+      for (const member of members) {
+        (referencedBy.get(member) || []).forEach((referencing) => members.add(referencing));
+      }
+    };
+
+    const rollups: string[][] = [];
+    const externalInfos = infos.filter((info) => info.preAggregation?.external);
+
+    for (const info of externalInfos) {
+      const members = membersOf(info, new Set());
+      if (members.size > 0) {
+        addReferencingMembers(members);
+        rollups.push([...members]);
+
+        for (const [viewName, view] of views) {
+          const viewMembers = (view as any).includedMembers
+            .filter((member: { memberPath: string }) => members.has(memberPath(member.memberPath)))
+            .map((member: { name: string }) => `${viewName}.${member.name}`);
+          if (viewMembers.length > 0) {
+            rollups.push(viewMembers);
+          }
+        }
+      }
+    }
+
+    return rollups;
+  }
+
   public async scheduledPreAggregations(): Promise<PreAggregationInfo[]> {
     const { cubeEvaluator } = await this.getCompilers();
     return cubeEvaluator.scheduledPreAggregations();

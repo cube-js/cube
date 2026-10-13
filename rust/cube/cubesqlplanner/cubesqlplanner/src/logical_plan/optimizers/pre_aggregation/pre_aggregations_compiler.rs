@@ -670,7 +670,7 @@ impl PreAggregationsCompiler {
         if pre_aggr.dimensions.iter().any(|pa_m| member == pa_m) {
             return Ok(Some(PreAggregationJoinMember {
                 symbol: member.clone(),
-                column: member.alias(),
+                column: member.canonical_alias(),
                 granularity: None,
             }));
         }
@@ -706,7 +706,7 @@ impl PreAggregationsCompiler {
                 .map_or(String::new(), |g| format!("_{}", g));
             PreAggregationJoinMember {
                 symbol: member.clone(),
-                column: format!("{}{}", member.alias(), suffix),
+                column: format!("{}{}", member.canonical_alias(), suffix),
                 granularity,
             }
         }))

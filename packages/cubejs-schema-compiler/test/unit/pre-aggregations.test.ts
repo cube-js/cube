@@ -244,6 +244,65 @@ describe('pre-aggregations', () => {
     expect(preAggregationsDescription[1].preAggregationId).toEqual('Orders.simple2');
   });
 
+  // The SQL API asks for output aliases through `memberToAlias`. A rollup table was built
+  // by a query asking for none, so its columns keep their own names: the aliases apply
+  // to the query's output only, never to the columns it reads from the rollup.
+  it.each([
+    ['tesseract', true],
+    ['legacy planner', false],
+  ])('rollup query with memberToAlias reads rollup columns by their own names (%s)', async (_, useNativeSqlPlanner) => {
+    const { compiler, cubeEvaluator, joinGraph } = prepareJsCompiler(
+      `
+        cube('Orders', {
+          sql: 'SELECT * FROM orders',
+
+          preAggregations: {
+            main: {
+              measures: [CUBE.count],
+              dimensions: [CUBE.status],
+            },
+          },
+
+          measures: {
+            count: {
+              type: 'count',
+            },
+          },
+
+          dimensions: {
+            id: {
+              sql: 'id',
+              type: 'number',
+              primaryKey: true,
+            },
+            status: {
+              sql: 'status',
+              type: 'string',
+            },
+          },
+        });
+      `
+    );
+
+    await compiler.compile();
+
+    const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+      measures: ['Orders.count'],
+      dimensions: ['Orders.status'],
+      memberToAlias: {
+        'Orders.status': 'status',
+        'Orders.count': 'cnt',
+      },
+      useNativeSqlPlanner,
+    });
+
+    const [sql] = query.buildSqlAndParams();
+    expect(sql).toContain('orders_main');
+    expect(sql).toMatch(/"orders__status"[^,]* "status"/);
+    expect(sql).toMatch(/sum\("[^"]*orders__count"\) "cnt"/);
+    expect(sql).not.toMatch(/sum\("cnt"\)/);
+  });
+
   // @link https://github.com/cube-js/cube/issues/11682
   describe('rollupLambda unionWithSourceData source query', () => {
     const compileEvents = () => prepareJsCompiler(

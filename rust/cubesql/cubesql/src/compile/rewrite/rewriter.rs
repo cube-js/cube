@@ -1,5 +1,6 @@
 use crate::{
     compile::{
+        engine::df::scan::CubeScanNode,
         qtrace::{Qtrace, QtraceEclass, QtraceEgraphIteration},
         rewrite::{
             analysis::LogicalPlanAnalysis,
@@ -10,29 +11,35 @@ use crate::{
                 flatten::FlattenRules, members::MemberRules, old_split::OldSplitRules,
                 order::OrderRules, split::SplitRules, wrapper::WrapperRules,
             },
-            LiteralExprValue, LogicalPlanLanguage, QueryParamIndex,
+            CubeScanWrapped, LiteralExprValue, LogicalPlanLanguage, QueryParamIndex, ScanWrapping,
         },
         CubeContext,
     },
     config::ConfigObj,
     sql::database_variables::postgres::session_vars::CUBESQL_PENALIZE_POST_PROCESSING_VAR,
     sql::{compiler_cache::CompilerCacheEntry, AuthContextRef},
-    transport::{MetaContext, SpanId},
+    transport::{MetaContext, SpanId, TransportLoadRequestQuery, CUBE_STORE_DATA_SOURCE},
     CubeError,
 };
 use datafusion::{
-    logical_plan::LogicalPlan, physical_plan::planner::DefaultPhysicalPlanner, scalar::ScalarValue,
+    logical_plan::{plan::Extension, LogicalPlan},
+    physical_plan::planner::DefaultPhysicalPlanner,
+    scalar::ScalarValue,
 };
-use egg::{EGraph, Id, IterationData, Language, Rewrite, Runner, StopReason};
+use egg::{EGraph, Id, IterationData, Language, RecExpr, Rewrite, Runner, StopReason};
 use serde::{Deserialize, Serialize};
 use std::{
     collections::{HashMap, HashSet},
     env, fs,
     sync::Arc,
-    time::Duration,
+    time::{Duration, Instant},
 };
 
 pub type CubeRewrite = Rewrite<LogicalPlanLanguage, LogicalPlanAnalysis>;
+
+/// How many plans are extracted at most while Cube keeps refusing pre-aggregations for
+/// scans of the best one; the next extraction then reads none from a pre-aggregation
+const MAX_PRE_AGGREGATION_EXTRACTIONS: usize = 10;
 pub type CubeEGraph = EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>;
 
 pub struct Rewriter {
@@ -341,7 +348,7 @@ impl Rewriter {
             .sessions
             .server
             .compiler_cache
-            .rewrite_rules(cache_entry, true)
+            .rewrite_rules(cache_entry.clone(), true)
             .await?;
 
         let penalize_post_processing = self
@@ -362,50 +369,139 @@ impl Rewriter {
         let max_row_limit = config_obj.non_streaming_query_max_row_limit().max(0) as usize;
         let fail_on_limitless_post_processing =
             config_obj.fail_on_limitless_post_processing() && penalize_limitless_post_processing;
+        // Scans over pre-aggregations are in the graph only when both hold, see
+        // `wrapper-cube-scan-wrap`
+        let pre_aggregations = config_obj.sql_push_down_pre_aggregations()
+            && cube_context
+                .meta
+                .data_source_to_sql_generator
+                .contains_key(CUBE_STORE_DATA_SOURCE);
+        let compiler_cache = cube_context.sessions.server.compiler_cache.clone();
+        let load_request_meta = cube_context.session_state.get_load_request_meta("sql");
 
-        let (plan, qtrace_egraph_iterations, qtrace_best_graph, truncates_post_processing) =
+        let (egraph, qtrace_egraph_iterations) = {
+            let cube_context = cube_context.clone();
             tokio::task::spawn_blocking(move || {
                 let (runner, qtrace_egraph_iterations) =
                     Self::run_rewrites(&cube_context, egraph, rules, "final")?;
-
-                // TODO maybe check replacers and penalized_ast_size_outside_wrapper right after extraction?
-                let mut extractor = TopDownExtractor::new(
-                    &runner.egraph,
-                    BestCubePlan::new(
-                        cube_context.meta.clone(),
-                        penalize_post_processing,
-                        penalize_limitless_post_processing,
-                        max_row_limit,
-                    ),
-                    CubePlanTopDownState::new(max_row_limit),
-                );
-                let Some((best_cost, best)) = extractor.find_best(root) else {
-                    return Err(CubeError::rewrite("Unable to find best plan".to_string()));
-                };
-                log::debug!("Best cost: {:#?}", best_cost);
-
-                let qtrace_best_graph = if Qtrace::is_enabled() {
-                    best.as_ref().to_vec()
-                } else {
-                    vec![]
-                };
-                let new_root = Id::from(best.as_ref().len() - 1);
-                log::debug!("Best: {}", best.pretty(120));
-                // TODO maybe pass penalize_post_processing here as well, to break with sane error
-                let converter = LanguageToLogicalPlanConverter::new(
-                    best,
-                    cube_context.clone(),
-                    auth_context,
-                    span_id.clone(),
-                );
-                Ok((
-                    converter.to_logical_plan(new_root),
-                    qtrace_egraph_iterations,
-                    qtrace_best_graph,
-                    best_cost.truncates_post_processing(),
-                ))
+                Ok::<_, CubeError>((Arc::new(runner.egraph), qtrace_egraph_iterations))
             })
-            .await??;
+            .await??
+        };
+
+        // The best plan may read pre-aggregations Cube matches none for, which only Cube
+        // can tell, so it is asked about the scans of each plan, and the scans it refuses
+        // are extracted around until the plan has none of them
+        let mut rejected: HashSet<LogicalPlanLanguage> = HashSet::new();
+        let mut extraction = 0;
+        let (best_cost, best) = loop {
+            extraction += 1;
+            // Past the bound, settle for the plan over the data source
+            let prefer_pre_aggregations =
+                pre_aggregations && extraction <= MAX_PRE_AGGREGATION_EXTRACTIONS;
+            let extraction_start = Instant::now();
+            let (cost, best, egraph_nodes) = {
+                let egraph = egraph.clone();
+                let meta = cube_context.meta.clone();
+                let rejected = rejected.clone();
+                tokio::task::spawn_blocking(move || {
+                    // TODO maybe check replacers and penalized_ast_size_outside_wrapper right after extraction?
+                    let mut extractor = TopDownExtractor::new(
+                        egraph.as_ref(),
+                        BestCubePlan::new(
+                            meta,
+                            penalize_post_processing,
+                            penalize_limitless_post_processing,
+                            max_row_limit,
+                            prefer_pre_aggregations,
+                            rejected,
+                        ),
+                        CubePlanTopDownState::new(max_row_limit),
+                    );
+                    extractor
+                        .find_best_with_egraph_nodes(root)
+                        .ok_or_else(|| CubeError::rewrite("Unable to find best plan".to_string()))
+                })
+                .await??
+            };
+            log::debug!(
+                "Extraction {} took {:?}",
+                extraction,
+                extraction_start.elapsed()
+            );
+            if !prefer_pre_aggregations {
+                break (cost, best);
+            }
+
+            // Conversion recurses over the plan, so it runs on a thread of its own
+            let scans = {
+                let best = best.clone();
+                let cube_context = cube_context.clone();
+                let auth_context = auth_context.clone();
+                let span_id = span_id.clone();
+                tokio::task::spawn_blocking(move || {
+                    Self::pre_aggregation_scans(&best, &cube_context, &auth_context, &span_id)
+                })
+                .await??
+            };
+            let verdicts = if scans.is_empty() {
+                vec![]
+            } else {
+                compiler_cache
+                    .pre_aggregation_matches(
+                        cache_entry.clone(),
+                        span_id.clone(),
+                        scans.iter().map(|(_, request)| request.clone()).collect(),
+                        auth_context.clone(),
+                        load_request_meta.clone(),
+                    )
+                    .await?
+            };
+            let mut newly_rejected = 0;
+            for ((index, _), matched) in scans.iter().zip(verdicts) {
+                if matched {
+                    continue;
+                }
+                // Other spellings of the scan send a query matching the same rollups, so
+                // they are refused along with it instead of one per round
+                for node in Self::pre_aggregation_scans_alike(&egraph, &egraph_nodes[*index]) {
+                    if rejected.insert(node) {
+                        newly_rejected += 1;
+                    }
+                }
+            }
+            if newly_rejected == 0 {
+                break (cost, best);
+            }
+            log::debug!(
+                "Cube matched no pre-aggregation for {} scans of the plan, extracting again",
+                newly_rejected
+            );
+        };
+        log::debug!("Best cost: {:#?}", best_cost);
+        let truncates_post_processing = best_cost.truncates_post_processing();
+
+        let qtrace_best_graph = if Qtrace::is_enabled() {
+            best.as_ref().to_vec()
+        } else {
+            vec![]
+        };
+        log::debug!("Best: {}", best.pretty(120));
+        let plan = {
+            let cube_context = cube_context.clone();
+            let span_id = span_id.clone();
+            tokio::task::spawn_blocking(move || {
+                let new_root = Id::from(best.as_ref().len() - 1);
+                // TODO maybe pass penalize_post_processing here as well, to break with sane error
+                let converter =
+                    LanguageToLogicalPlanConverter::new(best, cube_context, auth_context, span_id);
+                let plan = converter.to_logical_plan(new_root);
+                // Freed here, off the runtime workers: the graph can be huge
+                drop(egraph);
+                plan
+            })
+            .await?
+        };
 
         if let Some(qtrace) = qtrace {
             qtrace.set_egraph_iterations(qtrace_egraph_iterations);
@@ -428,6 +524,103 @@ impl Rewriter {
         }
 
         plan
+    }
+
+    /// `scan` and every scan over a pre-aggregation in the egraph with the same members,
+    /// filters, grouping and join hints: whether a rollup matches depends on nothing
+    /// else in a scan
+    fn pre_aggregation_scans_alike(
+        egraph: &CubeEGraph,
+        scan: &LogicalPlanLanguage,
+    ) -> Vec<LogicalPlanLanguage> {
+        let LogicalPlanLanguage::CubeScan(scan_params) = scan else {
+            return vec![scan.clone()];
+        };
+        let alike = |params: &[Id]| {
+            params[1] == scan_params[1]
+                && params[2] == scan_params[2]
+                && params[9] == scan_params[9]
+                && params[10] == scan_params[10]
+        };
+        egraph
+            .classes()
+            .flat_map(|class| class.nodes.iter())
+            .filter(|node| {
+                let LogicalPlanLanguage::CubeScan(params) = node else {
+                    return false;
+                };
+                alike(params)
+                    && egraph[params[8]].nodes.iter().any(|wrapped| {
+                        matches!(
+                            wrapped,
+                            LogicalPlanLanguage::CubeScanWrapped(CubeScanWrapped(
+                                ScanWrapping::PreAggregation
+                            ))
+                        )
+                    })
+            })
+            .cloned()
+            .chain(std::iter::once(scan.clone()))
+            .collect()
+    }
+
+    /// The scans of `best` planned over a pre-aggregation: the index of each in `best`,
+    /// with the cube query it sends, the one Cube is asked to match a rollup for
+    fn pre_aggregation_scans(
+        best: &RecExpr<LogicalPlanLanguage>,
+        cube_context: &Arc<CubeContext>,
+        auth_context: &AuthContextRef,
+        span_id: &Option<Arc<SpanId>>,
+    ) -> Result<Vec<(usize, TransportLoadRequestQuery)>, CubeError> {
+        let nodes = best.as_ref();
+        let indexes = nodes
+            .iter()
+            .enumerate()
+            .filter_map(|(index, node)| {
+                let LogicalPlanLanguage::CubeScan(params) = node else {
+                    return None;
+                };
+                let wrapped = &nodes[usize::from(params[8])];
+                matches!(
+                    wrapped,
+                    LogicalPlanLanguage::CubeScanWrapped(CubeScanWrapped(
+                        ScanWrapping::PreAggregation
+                    ))
+                )
+                .then_some(index)
+            })
+            .collect::<Vec<_>>();
+        if indexes.is_empty() {
+            return Ok(vec![]);
+        }
+        let converter = LanguageToLogicalPlanConverter::new(
+            best.clone(),
+            cube_context.clone(),
+            auth_context.clone(),
+            span_id.clone(),
+        );
+        indexes
+            .into_iter()
+            .map(|index| {
+                let LogicalPlan::Extension(Extension { node }) =
+                    converter.to_logical_plan(Id::from(index))?
+                else {
+                    return Err(CubeError::internal(
+                        "A scan over a pre-aggregation did not convert to a CubeScan".to_string(),
+                    ));
+                };
+                let scan = node
+                    .as_any()
+                    .downcast_ref::<CubeScanNode>()
+                    .ok_or_else(|| {
+                        CubeError::internal(
+                            "A scan over a pre-aggregation did not convert to a CubeScan"
+                                .to_string(),
+                        )
+                    })?;
+                Ok((index, scan.request.clone()))
+            })
+            .collect()
     }
 
     fn run_rewrites(

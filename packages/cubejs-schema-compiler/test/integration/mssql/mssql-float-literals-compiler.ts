@@ -54,6 +54,7 @@ const compileQueries = async (request: CompilationRequest): Promise<CompilationR
       };
       return { sql: { sql: new MssqlQuery(compilers, { ...options, ...normalized, memberToAlias, expressionParams }).buildSqlAndParams(true) } };
     },
+    preAggregationMatch: async ({ queries }) => ({ matches: queries.map(() => false) }),
     stream: async () => { throw new Error('Compilation must not execute a Cube query'); },
     sqlApiLoad: async () => { throw new Error('Compilation must not execute source SQL'); },
     logLoadEvent: async () => undefined,
