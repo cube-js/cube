@@ -3,6 +3,18 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.8.5](https://github.com/cube-js/cube/compare/v1.8.4...v1.8.5) (2026-10-13)
+
+### Features
+
+- **server-core:** Add CUBEJS_SCHEDULED_REFRESH_TIMER_INTERVAL_ONLY so a numeric scheduledRefreshTimer doesn't enable the refresh worker ([#12107](https://github.com/cube-js/cube/issues/12107)) ([d0ccad7](https://github.com/cube-js/cube/commit/d0ccad76faddeaf08b762ce044f5d5b1b264a8b2))
+
+## [1.8.4](https://github.com/cube-js/cube/compare/v1.8.3...v1.8.4) (2026-10-12)
+
+### Features
+
+- **tesseract:** Enable multi-stage leaf merge and union by default ([#12220](https://github.com/cube-js/cube/issues/12220)) ([c1367cf](https://github.com/cube-js/cube/commit/c1367cf6dbe4027568a73f48fca39d60a5a10ad1)), closes [#12182](https://github.com/cube-js/cube/issues/12182) [#10268](https://github.com/cube-js/cube/issues/10268) [#12182](https://github.com/cube-js/cube/issues/12182)
+
 ## [1.8.3](https://github.com/cube-js/cube/compare/v1.8.2...v1.8.3) (2026-10-10)
 
 ### Features

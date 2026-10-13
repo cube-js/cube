@@ -1255,7 +1255,9 @@ describe('API Gateway', () => {
         .set('Authorization', `Bearer ${token}`)
         .expect(200);
 
-      if (method === 'post') req.send(successBody);
+      if (method === 'post') {
+        req.send(successBody);
+      }
 
       const res = await req;
       expect(res.body).toMatchObject(successResult);

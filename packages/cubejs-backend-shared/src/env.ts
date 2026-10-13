@@ -104,7 +104,9 @@ export function assertDataSource(dataSource = 'default'): string {
  * Returns data source specific environment variable name.
  */
 export function keyByDataSource(origin: string, dataSource?: string, preAggregations?: boolean): string {
-  if (dataSource) assertDataSource(dataSource);
+  if (dataSource) {
+    assertDataSource(dataSource);
+  }
 
   let key: string;
 
@@ -389,7 +391,10 @@ const variables: Record<string, (...args: any) => any> = {
   schemaPath: () => get('CUBEJS_SCHEMA_PATH')
     .default('model')
     .asString(),
-  refreshWorkerMode: () => {
+  /**
+   * Refresh worker mode as set by env, or `undefined` when no env sets it.
+   */
+  refreshWorkerModeExplicit: (): boolean | number | undefined => {
     const refreshWorkerMode = get('CUBEJS_REFRESH_WORKER').asBool();
     if (refreshWorkerMode !== undefined) {
       return refreshWorkerMode;
@@ -406,10 +411,24 @@ const variables: Record<string, (...args: any) => any> = {
       return asBoolOrTime(process.env.CUBEJS_SCHEDULED_REFRESH_TIMER, 'CUBEJS_SCHEDULED_REFRESH_TIMER');
     }
 
+    return undefined;
+  },
+  refreshWorkerMode: () => {
+    // eslint-disable-next-line no-use-before-define
+    const refreshWorkerMode = getEnv('refreshWorkerModeExplicit');
+    if (refreshWorkerMode !== undefined) {
+      return refreshWorkerMode;
+    }
+
     // Deliberately NOT the dev mode decision: background refresh ran in dev mode too,
     // so aligning this on getEnv('devMode') would silently stop it for bare instances
     return process.env.NODE_ENV !== 'production';
   },
+  // When set, a numeric `scheduledRefreshTimer` from the config only sets the
+  // refresh interval: the refresh worker runs only when an env enables it
+  scheduledRefreshTimerIntervalOnly: () => get('CUBEJS_SCHEDULED_REFRESH_TIMER_INTERVAL_ONLY')
+    .default('false')
+    .asBoolStrict(),
   scheduledRefreshQueriesPerAppId: () => get('CUBEJS_SCHEDULED_REFRESH_QUERIES_PER_APP_ID').asIntPositive(),
   refreshWorkerConcurrency: () => get('CUBEJS_REFRESH_WORKER_CONCURRENCY')
     .asIntPositive(),
@@ -496,10 +515,10 @@ const variables: Record<string, (...args: any) => any> = {
     return enabled;
   },
   tesseractMultiStageLeafMerge: () => get('CUBEJS_TESSERACT_MULTI_STAGE_LEAF_MERGE')
-    .default('false')
+    .default('true')
     .asBoolStrict(),
   tesseractCubeStoreUnionFullKeyAggregate: () => get('CUBEJS_TESSERACT_CUBESTORE_UNION_FULL_KEY_AGGREGATE')
-    .default('false')
+    .default('true')
     .asBoolStrict(),
   transpilationWorkerThreads: () => {
     const enabled = get('CUBEJS_TRANSPILATION_WORKER_THREADS')

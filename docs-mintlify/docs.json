@@ -21,6 +21,7 @@
             "pages": [
               "docs/introduction",
               "docs/preferences",
+              "docs/inbox",
               {
                 "group": "Getting Started",
                 "pages": [

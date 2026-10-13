@@ -1662,6 +1662,20 @@ mode](/docs/pre-aggregations/using-pre-aggregations#rollup-only-mode) for detail
 It can be also set using the [`orchestrator_options.rollupOnlyMode` configuration
 option](/reference/configuration/config#orchestrator_options).
 
+## `CUBEJS_SCHEDULED_REFRESH_TIMER_INTERVAL_ONLY`
+
+If `true`, a numeric [`scheduled_refresh_timer`](/reference/configuration/config#scheduled_refresh_timer)
+only sets the refresh worker's heartbeat interval and no longer turns the
+instance into a refresh worker by itself: the refresh worker then runs only
+when [`CUBEJS_REFRESH_WORKER`](/reference/configuration/environment-variables#cubejs_refresh_worker)
+is explicitly set to `true`.
+Use it to keep a shared configuration file from starting refresh workers on API
+instances.
+
+| Possible Values | Default in Development | Default in Production |
+| --------------- | ---------------------- | --------------------- |
+| `true`, `false` | `false`                | `false`               |
+
 ## `CUBEJS_SCHEDULED_REFRESH_TIMEZONES`
 
 A comma-separated [list of timezones to schedule refreshes

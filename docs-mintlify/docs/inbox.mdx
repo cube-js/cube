@@ -1,0 +1,105 @@
+---
+title: Inbox
+description: Get in-app notifications about mentions, alerts, scheduled task runs, failed builds and refreshes, shared content, model syncs, and more.
+---
+
+The inbox collects notifications about events in Cube that concern you: a
+teammate mentions you in a comment, an alert fires, a new Cube version is
+released, and more. Each user has their own inbox. It is the same in every deployment of the
+account.
+
+<Info>
+
+To send a dashboard by email or Slack after a scheduled refresh, see
+[Notifications][ref-notifications].
+
+</Info>
+
+{/* TODO: screenshot — the Inbox page with rows under Today and Yesterday, one row selected and shown in the right pane */}
+
+## Opening the inbox
+
+Click **Inbox** at the bottom of the sidebar. When you have unread
+notifications, its icon turns purple and a badge shows how many.
+
+The inbox has two panes. The left pane lists your notifications, newest first,
+under **Today**, **Yesterday**, or a date. Its header shows your name, for
+example **Ada's inbox**, and the number of unread notifications. When you have
+read everything, it shows **You're all caught up**.
+
+Click a notification to see it in full in the right pane. Until you select one,
+the pane shows **No notification selected**. Click **Open** to go to what the
+notification is about.
+
+New notifications appear as they arrive. You don't need to reload the page.
+
+## Notification types
+
+| Notification | When you get it | Who gets it | **Open** goes to |
+| --- | --- | --- | --- |
+| Mention | Someone mentions you in a [dashboard comment][ref-comments], or edits a comment to add a mention of you | Each mentioned user, except the author | The comment on the dashboard |
+| Alert | An [alert][ref-alerts] fires or resolves | Recipients of the alert who are Cube users | The deployment's **Status** page |
+| Budget | Usage crosses a [budget][ref-budgets] threshold | Users who get the budget's notifications and have a Cube account | No **Open** button |
+| Scheduled task run | A run of a [scheduled task][ref-scheduled-tasks] finishes or fails, if the task has [notifications][ref-scheduled-task-notifications] on | The task's creator | The run's chat thread. If the run failed before it started a thread, the task's page. |
+| New Cube version | A deployment runs an older version than the latest one on its [update channel][ref-update-channels] | Admins | The deployment's **Settings** page |
+| End of support | A deployment runs a Cube version that is about to reach end of support. You get one notification with each end-of-support email. | Admins | The deployment's **Settings** page |
+| Production build failed | A build of a deployment's production branch fails | The user who started the build. If no user started it, for example a Git push, or that user is deactivated: admins | The build and its logs |
+| Scheduled refresh failed | A [scheduled refresh][ref-scheduled-refreshes] of a dashboard fails, or its [notifications][ref-notifications] don't reach some or all recipients | The user who created the schedule | The dashboard |
+| Shared with you | Someone shares a workbook, a folder, or a chat with you, or gives you more access to one, directly or through a group | The user, or each member of the group, except the person who shared it | The workbook, or its dashboard if it is published. The folder or the chat. |
+| Model sync | A [dbt][ref-dbt] pull or push, a [Snowflake semantic view][ref-snowflake] pull or push, or a [Databricks metric view][ref-databricks] publish finishes or fails | The user who started the sync. For an automated dbt sync, the users on its notification list. Otherwise: admins | The [IDE][ref-ide]. If the sync made a branch to review, the changes on that branch. |
+| AI tokens | The account runs out of [AI tokens][ref-ai-tokens], or an automatic AI tokens top-up fails | Admins | The **Billing** page |
+| Invite accepted | A user [accepts your invite][ref-invites] and joins the account | The admin who sent the invite | The new user's page |
+| Google Sheets delivery | A [Google Sheets delivery][ref-sheets-deliveries] fails or starts working again | The owner of the delivery, if the delivery has **Inbox** notifications on. While the owner's Google account can't open the spreadsheet, also admins, at most once a day, whatever the delivery's settings | The delivery |
+| Changelog | Cube publishes a new changelog entry | All users | Usually no **Open** button, since the entry shows in full in the right pane. If the entry is no longer in Cube, **Open** goes to the public Cube changelog. |
+
+A scheduled task run notification has the task name in the title, for
+example **Daily signups finished** or **Daily signups failed**. For a finished
+run, it shows the start of the agent's answer. If the answer has no text, for
+example when the run only built a chart, it shows how the run started and how
+long it took. For a failed run, it shows the error.
+
+The inbox does not send notifications by email or Slack. Alerts and budgets send
+their own email, as set up on the alert or budget, and end-of-support notices
+come with their own email. A Google Sheets delivery can also notify its owner by
+email or Slack, and emails admins while the owner's Google account can't open
+the spreadsheet.
+
+## Read and unread
+
+A new notification is unread. It has a purple dot and a bold title. When you
+select a notification, it becomes read. Opening the inbox does not mark
+anything read.
+
+To change the state of one notification without selecting it, right-click it
+and choose **Mark read** or **Mark unread**. To mark all notifications read,
+open the `⋯` menu in the header and choose **Mark all read**.
+
+{/* TODO: screenshot — the right-click menu on a row with Mark read and Delete */}
+
+## Deleting notifications
+
+To delete one notification, right-click it and choose **Delete**. Cube deletes
+it immediately, without a confirmation.
+
+To delete many notifications at once, open the `⋯` menu in the header:
+
+- **Delete read notifications** deletes every notification that you have read.
+- **Delete all notifications** deletes every notification, read or unread.
+
+Cube asks you to confirm both actions. You can't undo a delete.
+
+[ref-notifications]: /docs/explore-analyze/notifications
+[ref-comments]: /docs/explore-analyze/dashboards/comments#mentions
+[ref-alerts]: /admin/monitoring/alerts
+[ref-budgets]: /admin/account-billing/budgets
+[ref-scheduled-tasks]: /docs/explore-analyze/scheduled-tasks
+[ref-scheduled-task-notifications]: /docs/explore-analyze/scheduled-tasks#getting-notified-when-a-run-finishes
+[ref-update-channels]: /admin/deployment#update-channels
+[ref-scheduled-refreshes]: /docs/explore-analyze/scheduled-refreshes
+[ref-dbt]: /docs/integrations/dbt
+[ref-snowflake]: /docs/integrations/snowflake-semantic-views
+[ref-databricks]: /docs/integrations/databricks-metric-views
+[ref-ide]: /docs/data-modeling/data-model-ide
+[ref-ai-tokens]: /admin/account-billing/ai-tokens
+[ref-invites]: /admin/users-and-permissions/manage-users#inviting-users
+[ref-sheets-deliveries]: /docs/explore-analyze/google-sheets-deliveries#notifications

@@ -258,7 +258,9 @@ export class QueryQueue {
 
       if (query.forceBuild) {
         const jobExists = await queueConnection.getQueryDef(queryKeyHash, null);
-        if (jobExists) return null;
+        if (jobExists) {
+          return null;
+        }
       }
 
       options.orphanedTimeout = query.orphanedTimeout;

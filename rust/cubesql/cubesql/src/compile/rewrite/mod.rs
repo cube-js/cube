@@ -569,6 +569,26 @@ crate::plan_to_language! {
 
 // trace_macros!(false);
 
+/// Positions of `WrappedSelect` children, for code that reads the node instead of matching it
+/// with a pattern. Keep in sync with the `WrappedSelect` definition above.
+pub const WRAPPED_SELECT_SELECT_TYPE: usize = 0;
+pub const WRAPPED_SELECT_PROJECTION_EXPR: usize = 1;
+pub const WRAPPED_SELECT_SUBQUERIES: usize = 2;
+pub const WRAPPED_SELECT_GROUP_EXPR: usize = 3;
+pub const WRAPPED_SELECT_AGGR_EXPR: usize = 4;
+pub const WRAPPED_SELECT_WINDOW_EXPR: usize = 5;
+pub const WRAPPED_SELECT_FROM: usize = 6;
+pub const WRAPPED_SELECT_JOINS: usize = 7;
+pub const WRAPPED_SELECT_FILTER_EXPR: usize = 8;
+pub const WRAPPED_SELECT_HAVING_EXPR: usize = 9;
+pub const WRAPPED_SELECT_LIMIT: usize = 10;
+pub const WRAPPED_SELECT_OFFSET: usize = 11;
+pub const WRAPPED_SELECT_ORDER_EXPR: usize = 12;
+pub const WRAPPED_SELECT_ALIAS: usize = 13;
+pub const WRAPPED_SELECT_DISTINCT: usize = 14;
+pub const WRAPPED_SELECT_PUSH_TO_CUBE: usize = 15;
+pub const WRAPPED_SELECT_UNGROUPED_SCAN: usize = 16;
+
 #[macro_export]
 macro_rules! var_iter {
     ($eclass:expr, $field_variant:ident) => {{
@@ -970,6 +990,7 @@ pub enum ListType {
     WrappedSelectGroupExpr,
     WrappedSelectAggrExpr,
     WrappedSelectWindowExpr,
+    WrappedSelectJoins,
     CubeScanMembers,
     UnionInputs,
     WrappedUnionInputs,
@@ -993,6 +1014,7 @@ impl ListType {
             Self::WrappedSelectGroupExpr => wrapped_select_group_expr_empty_tail(),
             Self::WrappedSelectAggrExpr => wrapped_select_aggr_expr_empty_tail(),
             Self::WrappedSelectWindowExpr => wrapped_select_window_expr_empty_tail(),
+            Self::WrappedSelectJoins => wrapped_select_joins_empty_tail(),
             Self::CubeScanMembers => cube_scan_members_empty_tail(),
             Self::UnionInputs => union_inputs_empty_tail(),
             Self::WrappedUnionInputs => wrapped_union_inputs_empty_tail(),
@@ -1097,6 +1119,9 @@ impl ListNodeSearcher {
             }
             ListType::WrappedSelectWindowExpr => {
                 matches!(node, LogicalPlanLanguage::WrappedSelectWindowExpr(_))
+            }
+            ListType::WrappedSelectJoins => {
+                matches!(node, LogicalPlanLanguage::WrappedSelectJoins(_))
             }
             ListType::CubeScanMembers => {
                 matches!(node, LogicalPlanLanguage::CubeScanMembers(_))
@@ -1324,6 +1349,7 @@ impl ListNodeApplierList {
             ListType::WrappedSelectGroupExpr => LogicalPlanLanguage::WrappedSelectGroupExpr(list),
             ListType::WrappedSelectAggrExpr => LogicalPlanLanguage::WrappedSelectAggrExpr(list),
             ListType::WrappedSelectWindowExpr => LogicalPlanLanguage::WrappedSelectWindowExpr(list),
+            ListType::WrappedSelectJoins => LogicalPlanLanguage::WrappedSelectJoins(list),
             ListType::CubeScanMembers => LogicalPlanLanguage::CubeScanMembers(list),
             ListType::UnionInputs => LogicalPlanLanguage::UnionInputs(list),
             ListType::WrappedUnionInputs => LogicalPlanLanguage::WrappedUnionInputs(list),
@@ -1900,13 +1926,13 @@ fn wrapped_select_join(input: impl Display, expr: impl Display, join_type: impl 
     format!("(WrappedSelectJoin {} {} {})", input, expr, join_type)
 }
 
-#[allow(dead_code)]
-fn wrapped_select_joins(left: impl Display, right: impl Display) -> String {
-    format!("(WrappedSelectJoins {} {})", left, right)
+/// A flat join list of a `WrappedSelect`, in the order the query joins them in
+fn wrapped_select_joins(joins: Vec<impl Display>) -> String {
+    flat_list_expr("WrappedSelectJoins", joins, true)
 }
 
 fn wrapped_select_joins_empty_tail() -> String {
-    "WrappedSelectJoins".to_string()
+    wrapped_select_joins(Vec::<String>::new())
 }
 
 fn wrapped_union(inputs: impl Display, distinct: impl Display, alias: impl Display) -> String {
@@ -2866,4 +2892,101 @@ pub fn extract_exprlist_from_groupping_set(exprs: &Vec<Expr>) -> Vec<Expr> {
         }
     }
     result
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn wrapped_select_positions_match_definition() {
+        let expr: egg::RecExpr<LogicalPlanLanguage> = wrapped_select(
+            "WrappedSelectSelectType:Aggregate",
+            wrapped_select_projection_expr_empty_tail(),
+            wrapped_select_subqueries_empty_tail(),
+            wrapped_select_group_expr_empty_tail(),
+            wrapped_select_aggr_expr_empty_tail(),
+            wrapped_select_window_expr_empty_tail(),
+            // Any node of a type no other slot holds
+            "CubeScanWrapperFinalized:false",
+            wrapped_select_joins_empty_tail(),
+            wrapped_select_filter_expr_empty_tail(),
+            wrapped_select_having_expr_empty_tail(),
+            "WrappedSelectLimit:None",
+            "WrappedSelectOffset:None",
+            wrapped_select_order_expr_empty_tail(),
+            "WrappedSelectAlias:None",
+            "WrappedSelectDistinct:false",
+            "WrappedSelectPushToCube:false",
+            "WrappedSelectUngroupedScan:false",
+        )
+        .parse()
+        .unwrap();
+
+        let LogicalPlanLanguage::WrappedSelect(params) = expr.as_ref().last().unwrap() else {
+            panic!("not a WrappedSelect");
+        };
+        assert_eq!(params.len(), 17, "a child was added or removed");
+        let at = |position: usize| &expr[params[position]];
+        use LogicalPlanLanguage as L;
+        assert!(matches!(
+            at(WRAPPED_SELECT_SELECT_TYPE),
+            L::WrappedSelectSelectType(_)
+        ));
+        assert!(matches!(
+            at(WRAPPED_SELECT_PROJECTION_EXPR),
+            L::WrappedSelectProjectionExpr(_)
+        ));
+        assert!(matches!(
+            at(WRAPPED_SELECT_SUBQUERIES),
+            L::WrappedSelectSubqueries(_)
+        ));
+        assert!(matches!(
+            at(WRAPPED_SELECT_GROUP_EXPR),
+            L::WrappedSelectGroupExpr(_)
+        ));
+        assert!(matches!(
+            at(WRAPPED_SELECT_AGGR_EXPR),
+            L::WrappedSelectAggrExpr(_)
+        ));
+        assert!(matches!(
+            at(WRAPPED_SELECT_WINDOW_EXPR),
+            L::WrappedSelectWindowExpr(_)
+        ));
+        assert!(matches!(
+            at(WRAPPED_SELECT_FROM),
+            L::CubeScanWrapperFinalized(_)
+        ));
+        assert!(matches!(at(WRAPPED_SELECT_JOINS), L::WrappedSelectJoins(_)));
+        assert!(matches!(
+            at(WRAPPED_SELECT_FILTER_EXPR),
+            L::WrappedSelectFilterExpr(_)
+        ));
+        assert!(matches!(
+            at(WRAPPED_SELECT_HAVING_EXPR),
+            L::WrappedSelectHavingExpr(_)
+        ));
+        assert!(matches!(at(WRAPPED_SELECT_LIMIT), L::WrappedSelectLimit(_)));
+        assert!(matches!(
+            at(WRAPPED_SELECT_OFFSET),
+            L::WrappedSelectOffset(_)
+        ));
+        assert!(matches!(
+            at(WRAPPED_SELECT_ORDER_EXPR),
+            L::WrappedSelectOrderExpr(_)
+        ));
+        assert!(matches!(at(WRAPPED_SELECT_ALIAS), L::WrappedSelectAlias(_)));
+        assert!(matches!(
+            at(WRAPPED_SELECT_DISTINCT),
+            L::WrappedSelectDistinct(_)
+        ));
+        assert!(matches!(
+            at(WRAPPED_SELECT_PUSH_TO_CUBE),
+            L::WrappedSelectPushToCube(_)
+        ));
+        assert!(matches!(
+            at(WRAPPED_SELECT_UNGROUPED_SCAN),
+            L::WrappedSelectUngroupedScan(_)
+        ));
+    }
 }

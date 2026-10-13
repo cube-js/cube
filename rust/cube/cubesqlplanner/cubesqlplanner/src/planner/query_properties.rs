@@ -176,10 +176,10 @@ pub struct QueryProperties {
     #[builder(default)]
     total_query: bool,
     /// Folds multi-stage leaves that read one rollup under different filters into one scan.
-    #[builder(default)]
+    #[builder(default = true)]
     multi_stage_leaf_merge: bool,
     /// Lets Cube Store combine multi-stage results with `UNION ALL` instead of joins.
-    #[builder(default)]
+    #[builder(default = true)]
     cubestore_union_full_key_aggregate: bool,
     /// Multi-stage members one dependency path may carry before planning refuses the query.
     #[builder(default = DEFAULT_MAX_MULTI_STAGE_DEPTH)]

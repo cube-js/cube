@@ -279,7 +279,9 @@ export class AthenaDriver extends BaseDriver implements DriverInterface {
       const rows: Row[] = [];
 
       for await (const row of iter) {
-        if (cancelled) throw new Error('Query was cancelled');
+        if (cancelled) {
+          throw new Error('Query was cancelled');
+        }
         rows.push(<Row>row);
       }
       return { types, rows };
@@ -362,7 +364,9 @@ export class AthenaDriver extends BaseDriver implements DriverInterface {
       const rows: R[] = [];
 
       for await (const row of this.lazyRowIterator<R>(qid, query)) {
-        if (cancelled) throw new Error('Query was cancelled');
+        if (cancelled) {
+          throw new Error('Query was cancelled');
+        }
         rows.push(row);
       }
       return rows;
@@ -713,8 +717,12 @@ export class AthenaDriver extends BaseDriver implements DriverInterface {
     arrSchemas.forEach(schemas => {
       Object.keys(schemas).forEach(schema => {
         Object.keys(schemas[schema]).forEach((name) => {
-          if (!result[schema]) result[schema] = {};
-          if (!result[schema][name]) result[schema][name] = schemas[schema][name];
+          if (!result[schema]) {
+            result[schema] = {};
+          }
+          if (!result[schema][name]) {
+            result[schema][name] = schemas[schema][name];
+          }
         });
       });
     });

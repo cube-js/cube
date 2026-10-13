@@ -153,7 +153,14 @@ that match the list node itself — never by a transform that walks it.
 - A transform should only decide scalar facts (a flag, an alias, whether a template
   exists) about nodes the **pattern** already bound. Relationships between several
   matched nodes — "both sides reach the same data source" — belong in the pattern, by
-  reusing one pattern variable in both places, so unification enforces them.
+  reusing one pattern variable in both places, so unification enforces them. A fact about what is
+  *below* a bound node — whether a join is somewhere under it — belongs in
+  `LogicalPlanAnalysis`, computed once per node as the e-graph is built and merged upward
+  (see `joins_subqueries`), never walked from a transform that runs on every iteration.
+- A rule's output should reference the e-class all representations of an input share, not
+  the one representation the pattern happened to bind. A grouped subquery has several plans
+  under one `cube_scan_wrapper`; a join built over the plan exists once per plan, and a rule
+  applied once per join then multiplies those copies along a chain of joins.
 - A push-down replacer must never end up on top of an already pulled-up subtree. Inputs
   that arrive as a finished `cube_scan_wrapper(wrapper_pullup_replacer(..))` — the queries
   of a set operation, the sides of a join — have nothing left to push into, so their list

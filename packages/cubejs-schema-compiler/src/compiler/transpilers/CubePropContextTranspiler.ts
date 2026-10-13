@@ -138,8 +138,12 @@ export class CubePropContextTranspiler implements TranspilerInterface {
       this.cubeSymbols.isCurrentCube(n);
 
     const keyName = (node: t.ObjectProperty): string | undefined => {
-      if (node.key.type === 'Identifier') return node.key.name;
-      if (node.key.type === 'StringLiteral') return node.key.value;
+      if (node.key.type === 'Identifier') {
+        return node.key.name;
+      }
+      if (node.key.type === 'StringLiteral') {
+        return node.key.value;
+      }
       return undefined;
     };
 
@@ -265,7 +269,9 @@ export class CubePropContextTranspiler implements TranspilerInterface {
         // @ts-ignore
         fp = `${pp?.parentPath?.node?.key?.value || '0'}.${fp}`;
         pp = pp?.parentPath?.parentPath;
-      } else break;
+      } else {
+        break;
+      }
     }
 
     return fp;

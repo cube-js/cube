@@ -13,7 +13,7 @@ If the picker is empty, create the report first in a workbook tab — only publi
 
 ## Interaction with controls
 
-Charts respect the [controls][ref-controls] placed on the same dashboard — filters, time granularity switchers and field switchers. A single control can drive multiple charts at once: its value is applied to every chart whose query references the targeted dimension.
+Charts respect the [controls][ref-controls] placed on the same dashboard — filters, time granularity switchers and field switchers. A single control can drive multiple charts at once: its value is applied to every chart built on the same semantic view as the control's member. For charts on other views, map the control from the chart's [Controls mapping][ref-controls-mapping].
 
 If some controls are incompatible with a chart's query, the chart skips them and shows a warning icon. See [Incompatible controls][ref-incompatible-controls] for details.
 
@@ -49,6 +49,7 @@ Use **Hide Title** in the widget's settings menu to suppress the title on the da
 
 [ref-workbooks]: /docs/explore-analyze/workbooks
 [ref-controls]: /docs/explore-analyze/dashboards/widgets/controls
+[ref-controls-mapping]: /docs/explore-analyze/dashboards/widgets/controls#controls-mapping
 [ref-incompatible-controls]: /docs/explore-analyze/dashboards/widgets/controls#incompatible-controls
 [ref-text]: /docs/explore-analyze/dashboards/widgets/text
 [ref-comments]: /docs/explore-analyze/dashboards/comments

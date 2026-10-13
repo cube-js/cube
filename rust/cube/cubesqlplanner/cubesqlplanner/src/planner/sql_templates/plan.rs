@@ -868,6 +868,20 @@ impl PlanSqlTemplates {
             .render_template(&"tesseract/number_param_cast", context! { expr => expr })
     }
 
+    pub fn time_in_list_column_cast(&self, expr: &str) -> Result<String, CubeError> {
+        self.render.render_template(
+            &"tesseract/time_in_list_column_cast",
+            context! { expr => expr },
+        )
+    }
+
+    pub fn time_in_list_param_cast(&self, expr: &str) -> Result<String, CubeError> {
+        self.render.render_template(
+            &"tesseract/time_in_list_param_cast",
+            context! { expr => expr },
+        )
+    }
+
     pub fn like_escape_char(&self) -> Result<Option<char>, CubeError> {
         const TEMPLATE_NAME: &str = "filters/like_escape_char";
 

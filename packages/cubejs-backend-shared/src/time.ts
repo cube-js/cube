@@ -20,16 +20,24 @@ type ParsedInterval = Partial<Record<unitOfTime.DurationConstructor, number>>;
 export const pad2 = (n: number): string => (n < 10 ? `0${n}` : `${n}`);
 
 export const pad3 = (n: number): string => {
-  if (n < 10) return `00${n}`;
-  if (n < 100) return `0${n}`;
+  if (n < 10) {
+    return `00${n}`;
+  }
+  if (n < 100) {
+    return `0${n}`;
+  }
 
   return `${n}`;
 };
 
 export const pad4 = (n: number): string => {
   if (n < 1000) {
-    if (n < 10) return `000${n}`;
-    if (n < 100) return `00${n}`;
+    if (n < 10) {
+      return `000${n}`;
+    }
+    if (n < 100) {
+      return `00${n}`;
+    }
 
     return `0${n}`;
   }

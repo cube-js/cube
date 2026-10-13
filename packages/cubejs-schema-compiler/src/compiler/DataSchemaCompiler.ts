@@ -52,11 +52,15 @@ function hasUseStrictDirective(source: string): boolean {
       i++;
     } else if (source.startsWith('//', i)) {
       const end = source.indexOf('\n', i);
-      if (end === -1) return false;
+      if (end === -1) {
+        return false;
+      }
       i = end + 1;
     } else if (source.startsWith('/*', i)) {
       const end = source.indexOf('*/', i + 2);
-      if (end === -1) return false;
+      if (end === -1) {
+        return false;
+      }
       i = end + 2;
     } else {
       break;

@@ -126,7 +126,7 @@ for (const [index, schema] of Object.entries(SCHEMA_VARIANTS)) {
 
       const queryAndParams = query.buildSqlAndParams();
 
-      expect((<any>query).preAggregations.preAggregationForQuery.preAggregation.granularity).toEqual('month');
+      expect(query.preAggregations.findPreAggregationForQuery()?.preAggregation.granularity).toEqual('month');
 
       console.log(queryAndParams);
       const preAggregationsDescription = query.preAggregations?.preAggregationsDescription();
@@ -186,7 +186,7 @@ for (const [index, schema] of Object.entries(SCHEMA_VARIANTS)) {
 
       const queryAndParams = query.buildSqlAndParams();
 
-      expect((<any>query).preAggregations.preAggregationForQuery.preAggregation.granularity).toEqual('day');
+      expect(query.preAggregations.findPreAggregationForQuery()?.preAggregation.granularity).toEqual('day');
 
       console.log(queryAndParams);
       const preAggregationsDescription = query.preAggregations?.preAggregationsDescription();

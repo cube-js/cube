@@ -520,7 +520,9 @@ export class CubeEvaluator extends CubeSymbols {
 
   private prepareFolders(cube: CubeDefinitionExtended, errorReporter: ErrorReporter): void {
     const folders = cube.rawFolders();
-    if (!folders.length) return;
+    if (!folders.length) {
+      return;
+    }
 
     const seen = new Set<string>();
 
