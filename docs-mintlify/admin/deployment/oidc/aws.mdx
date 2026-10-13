@@ -51,9 +51,17 @@ aws iam create-open-id-connect-provider \
 
 <Note>
 
-AWS no longer requires a TLS thumbprint for HTTPS OIDC providers. The
-`--thumbprint-list` parameter is accepted for compatibility but ignored —
-AWS validates the issuer's certificate chain against its own trust store.
+You don't need to pass `--thumbprint-list`. AWS validates the issuer's
+certificate chain against its own library of trusted root CAs, and when you
+omit the parameter it records the thumbprint of the issuer's top intermediate
+CA for you.
+
+That recorded thumbprint is not always ignored, though. AWS falls back to it
+when it can't validate the chain against its trusted roots, for example when
+the chain ends in a root CA that isn't in that library yet. If a certificate
+renewal then changes the certificates the issuer serves, federation fails
+with `OpenIDConnect provider's HTTPS certificate doesn't match configured
+thumbprint`. See [Verifying the setup](#verifying-the-setup) for the fix.
 
 </Note>
 
@@ -697,6 +705,7 @@ If the test fails:
 | `Not authorized to perform sts:AssumeRoleWithWebIdentity`      | The trust policy's `sub` condition doesn't match the deployment / component. Compare the `sub` in the error with what your `StringLike` allows.       |
 | `Incorrect token audience`                                     | `aud` condition is wrong, or you copied a trust policy from a different tenant. The condition key must be `<tenant-name>.cubecloud.dev:aud`.          |
 | `OpenIDConnectProvider not found`                              | The OIDC provider hasn't been registered in this AWS account yet, or its URL doesn't match your tenant's domain. Re-run `aws iam create-open-id-connect-provider` with the correct URL. |
+| `OpenIDConnect provider's HTTPS certificate doesn't match configured thumbprint` | The certificate chain your tenant serves has changed since the provider was registered, and AWS fell back to the stored thumbprint. Refresh it with `aws iam update-open-id-connect-provider-thumbprint`, listing the SHA-1 thumbprint of every certificate in the current chain (up to five). |
 | `An error occurred ... InvalidIdentityToken`                   | Trying to use `sts:ExternalId`. Remove it — federated assume-role doesn't accept it.                                                                  |
 
 `AssumeRoleWithWebIdentity` events show up in CloudTrail with the deployment
