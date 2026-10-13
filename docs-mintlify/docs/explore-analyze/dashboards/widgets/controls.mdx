@@ -10,7 +10,7 @@ Controls are widgets that let dashboard viewers change what's shown without leav
 - [Field switcher](#field-switcher) — Swap which dimension or measure the charts are built on
 - [Parent](#parent) — Re-point several other controls at once from a single dropdown
 
-The first three each target a member from your semantic model, and apply the viewer's choice to every [chart][ref-charts] on the dashboard whose query references that member. Filters and time granularity switchers change *how a member is queried* — which rows come back, which buckets they fall into. A field switcher goes further and changes *which member is queried at all*. A parent control works one level up: it targets no member of its own and drives *other controls* instead.
+The first three each target a member from your semantic model, and apply the viewer's choice to every [chart][ref-charts] on the dashboard built on that member's semantic view. Filters and time granularity switchers change *how a member is queried* — which rows come back, which buckets they fall into. A field switcher goes further and changes *which member is queried at all*. A parent control works one level up: it targets no member of its own and drives *other controls* instead.
 
 ## Filter
 
@@ -317,7 +317,7 @@ Cube applies the switch in two places: to the SQL that runs, and to the query de
 
 When only one half can take it, the chart keeps rendering the member it was built on and shows a notice reading **"The Field switcher could not be applied to this chart"**. The usual reason is a query Cube can't read back as semantic members — a hand-written one, or one built with a `JOIN` or `UNION`. The rest of the dashboard still switches.
 
-A chart whose query doesn't use the replaced member at all is a different case: it is simply out of the control's scope, exactly as it would be for a filter, and shows no notice.
+A chart whose query doesn't use the replaced member at all is a different case: there is nothing in it to swap, so it renders unchanged and shows no notice.
 
 A chart with a [period comparison][ref-charts] is a narrower case: the comparison can't follow a member switch, so the chart applies the switch and drops the comparison, saying so in its own notice rather than silently showing a comparison that no longer matches the data.
 
@@ -534,7 +534,9 @@ To keep a Hidden control's value out of a downloaded file, use **Download as PDF
 
 This section applies to filters, time granularity switchers and field switchers. A [parent control](#parent) has no member of its own and never applies to a chart itself, so it doesn't appear in any chart's [Controls mapping](#controls-mapping) — it acts only through the children it drives, and it's those children that show up here.
 
-When a control is added to a dashboard, it's automatically wired up to every [chart][ref-charts] whose query already uses the same member. Charts that don't reference that member are left alone, so a dashboard can mix scoped and unscoped views by default. Filters and time granularity switchers always target a dimension; a [field switcher](#field-switcher) targets a dimension or a measure depending on its **Field Type**, and scopes on whichever it is set to. You can override this default per chart from its [Controls mapping](#controls-mapping) — disable the control for that chart, or remap it onto a different member.
+When a control is added to a dashboard, it's automatically wired up to every [chart][ref-charts] built on the same semantic view as the control's member. Charts built on other semantic views are left alone, so a dashboard can mix scoped and unscoped charts by default. Filters and time granularity switchers always target a dimension; a [field switcher](#field-switcher) targets a dimension or a measure depending on its **Field Type**, and scopes on whichever it is set to. You can override this default per chart from its [Controls mapping](#controls-mapping) — disable the control for that chart, or remap it onto a different member.
+
+Adding a chart built on a different semantic view is the case where this needs attention. If at least one control has a [mapping suggestion](#controls-mapping) on the new chart's view, a prompt appears with **Review…**, which opens the chart's [Controls mapping](#controls-mapping) with the suggestions pre-selected, and **Dismiss**, which leaves the mappings as they are. If no control has a suggestion, no prompt appears, and you map controls to the chart by hand.
 
 ### Incompatible controls
 
@@ -551,20 +553,23 @@ Hover over the icon for details. Click it to open the chart's [Controls mapping]
 
 ### Controls mapping
 
-Each chart decides which controls apply to it through its **Controls mapping**. The mapping is resolved automatically in most cases and only needs manual attention when a control targets a member the chart doesn't have.
+Each chart decides which controls apply to it through its **Controls mapping**. The mapping is resolved automatically in most cases and only needs manual attention when a control targets a member that isn't on the chart's semantic view.
 
 Open **Controls mapping** from a chart's settings menu to inspect or override the mapping for that chart. For each control on the dashboard you can:
 
 - **Toggle the control on or off** for the chart, even when a mapping exists
 - **Pick a different member** from the chart's semantic view to remap the control to
 
-Three states show up in the mapping sidebar:
+Four states show up in the mapping sidebar:
 
 | Status | What it means |
 |---|---|
 | **Mapped automatically** | The control's member exists on the chart's semantic view, so it's wired up without configuration. |
 | **Manually mapped** | You (or an AI agent) picked a specific member for this chart. **Reset** restores the automatic mapping. |
-| **Can't map automatically** | The control targets a member that doesn't exist on the chart's semantic view. The chart is unaffected by the control until you map it manually. |
+| **Mapping suggestion** | The control's member isn't on the chart's semantic view, but a different member there has the same name and type. The suggestion is pre-selected in the picker, so saving maps the control, along with any other pending suggestions. Pick a different member, or clear it, to override. |
+| **Can't map automatically** | The control targets a member that doesn't exist on the chart's semantic view, and nothing there could be suggested. The chart is unaffected by the control until you map it manually. |
+
+Two semantic views can share a member name and mean different things by it, so a suggestion reaches a chart only once the mapping is saved. Among members of the control's type, an exact name match wins. Failing that, names are compared ignoring case, and a suggestion is made only when exactly one member matches. Controls you turned off for the chart are not suggested.
 
 Each control's picker offers only the members it can actually be resolved against, so a mapping you can stage is a mapping that will work:
 

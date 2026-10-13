@@ -96,6 +96,7 @@ describe('index.test', () => {
     delete process.env.CUBEJS_ROLLUP_ONLY;
     delete process.env.CUBEJS_SCHEDULED_REFRESH;
     delete process.env.CUBEJS_SCHEDULED_REFRESH_TIMER;
+    delete process.env.CUBEJS_SCHEDULED_REFRESH_TIMER_INTERVAL_ONLY;
     delete process.env.CUBEJS_LOG_REDACTION;
 
     // The cores built here take the pin and are never shut down, so without this the
@@ -691,6 +692,54 @@ describe('index.test', () => {
     await cubejsServerCore.beforeShutdown();
     await cubejsServerCore.shutdown();
   });
+
+  const expectIntervalOnlyRefreshTimer = (
+    { input, refreshWorker, scheduledRefresh, nodeEnv = 'production', output }: {
+      input: boolean | number,
+      refreshWorker?: string,
+      scheduledRefresh?: string,
+      nodeEnv?: string,
+      output: number | false
+    }
+  ) => {
+    test(`CUBEJS_SCHEDULED_REFRESH_TIMER_INTERVAL_ONLY with scheduledRefreshTimer ${input}, CUBEJS_REFRESH_WORKER=${refreshWorker}, CUBEJS_SCHEDULED_REFRESH=${scheduledRefresh}, NODE_ENV=${nodeEnv}`, async () => {
+      process.env.NODE_ENV = nodeEnv;
+      process.env.CUBEJS_SCHEDULED_REFRESH_TIMER_INTERVAL_ONLY = 'true';
+      if (refreshWorker !== undefined) {
+        process.env.CUBEJS_REFRESH_WORKER = refreshWorker;
+      }
+      if (scheduledRefresh !== undefined) {
+        process.env.CUBEJS_SCHEDULED_REFRESH = scheduledRefresh;
+      }
+
+      const cubejsServerCore = new CubejsServerCoreOpen({
+        driverFactory: () => (<any>{ type: 'mysql' }),
+        apiSecret: 'secret',
+        scheduledRefreshTimer: input,
+      });
+
+      if (output === false) {
+        expect(cubejsServerCore.optsHandler.configuredForScheduledRefresh()).toBe(false);
+      } else {
+        expect(cubejsServerCore.optsHandler.getScheduledRefreshInterval()).toEqual(output);
+      }
+
+      await cubejsServerCore.beforeShutdown();
+      await cubejsServerCore.shutdown();
+    });
+  };
+
+  // A number alone no longer turns the refresh worker on (API / dev instances)
+  expectIntervalOnlyRefreshTimer({ input: 60, output: false });
+  expectIntervalOnlyRefreshTimer({ input: 60, refreshWorker: 'false', output: false });
+  // ...not even where the refresh worker would default on (NODE_ENV isn't production)
+  expectIntervalOnlyRefreshTimer({ input: 60, nodeEnv: 'development', output: false });
+  // On a refresh worker the number still sets the interval
+  expectIntervalOnlyRefreshTimer({ input: 60, refreshWorker: 'true', output: 60000 });
+  // ...including via the deprecated alias
+  expectIntervalOnlyRefreshTimer({ input: 60, scheduledRefresh: 'true', output: 60000 });
+  // Booleans keep their meaning
+  expectIntervalOnlyRefreshTimer({ input: true, refreshWorker: 'false', output: 30000 });
 
   const testRefreshWorkerAndRollupModes = (
     { setRefreshWorker, setScheduledRefresh, setScheduledRefreshTimer, testName, options }: {

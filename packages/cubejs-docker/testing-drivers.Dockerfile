@@ -22,6 +22,8 @@ ENV CUBESTORE_SKIP_POST_INSTALL=true
 ENV NODE_ENV=development
 # Use the image's Node headers to avoid concurrent node-gyp downloads and copies.
 ENV npm_config_nodedir=/usr/local
+# Pinned so the BuildKit cache mounts below share one path.
+ENV YARN_CACHE_FOLDER=/usr/local/share/.cache/yarn
 
 WORKDIR /cubejs
 
@@ -84,28 +86,36 @@ COPY packages/cubejs-templates/package.json packages/cubejs-templates/package.js
 #COPY packages/cubejs-client-ws-transport/package.json packages/cubejs-client-ws-transport/package.json
 #COPY packages/cubejs-playground/package.json packages/cubejs-playground/package.json
 
+# Stub post-install: the real one requires the driver's dist/, which doesn't exist before build.
+COPY packages/cubejs-databricks-jdbc-driver/package.json packages/cubejs-databricks-jdbc-driver/package.json
+RUN mkdir packages/cubejs-databricks-jdbc-driver/bin
+RUN echo '#!/usr/bin/env node' > packages/cubejs-databricks-jdbc-driver/bin/post-install
+
 RUN yarn policies set-version v1.22.22
 RUN yarn config set network-timeout 120000 -g
+
+FROM base AS deps
+RUN --mount=type=cache,target=/usr/local/share/.cache/yarn,sharing=locked \
+    yarn install
 
 ######################################################################
 # Databricks driver dependencies                                     #
 ######################################################################
 FROM base AS prod_base_dependencies
-COPY packages/cubejs-databricks-jdbc-driver/package.json packages/cubejs-databricks-jdbc-driver/package.json
-RUN mkdir packages/cubejs-databricks-jdbc-driver/bin
-RUN echo '#!/usr/bin/env node' > packages/cubejs-databricks-jdbc-driver/bin/post-install
-RUN yarn install --prod
+# Binding a file from deps only orders this after the full install, which warms the cache; --prefer-offline still downloads if the mount was evicted.
+RUN --mount=type=cache,target=/usr/local/share/.cache/yarn,sharing=locked \
+    --mount=type=bind,from=deps,source=/cubejs/yarn.lock,target=/tmp/deps-installed \
+    yarn install --prod --prefer-offline
 
 FROM prod_base_dependencies AS prod_dependencies
 COPY packages/cubejs-databricks-jdbc-driver/bin packages/cubejs-databricks-jdbc-driver/bin
-RUN yarn install --prod --ignore-scripts
+RUN --mount=type=cache,target=/usr/local/share/.cache/yarn,sharing=locked \
+    yarn install --prod --ignore-scripts --prefer-offline
 
 ######################################################################
 # Build dependencies                                                 #
 ######################################################################
-FROM base AS build
-
-RUN yarn install
+FROM deps AS build
 
 # Backend
 COPY rust/cubestore/ rust/cubestore/

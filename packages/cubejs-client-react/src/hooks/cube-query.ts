@@ -70,7 +70,7 @@ export function useCubeQuery(
 ): UseCubeQueryInternalResult {
   const mutexRef = useRef<MutexObj>({});
   const [currentQuery, setCurrentQuery] = useState<ReadonlyQueryInput | null>(null);
-  const [isLoading, setLoading] = useState(!options.skip);
+  const [isLoading, setLoading] = useState(!options.skip && isQueryPresent(query));
   const [resultSet, setResultSet] = useState<ResultSet | null>(null);
   const [progress, setProgress] = useState<ProgressResponse | null>(null);
   const [error, setError] = useState<Error | null>(null);
@@ -239,10 +239,18 @@ export function useCubeQuery(
     context,
   ]));
 
+  // The effect above only catches up with a changed query after this render,
+  // so don't hand out the previous query's state in the meantime
+  const isQueryChanged = !options.skip
+    && isQueryPresent(query)
+    && !areQueriesEqual(currentQuery as DeeplyReadonly<Query> | null, query as DeeplyReadonly<Query>);
+  const shouldResetResultSet = isQueryChanged
+    && (options.resetResultSetOnChange == null || options.resetResultSetOnChange);
+
   return {
-    isLoading,
-    resultSet,
-    error,
+    isLoading: isLoading || isQueryChanged,
+    resultSet: shouldResetResultSet ? null : resultSet,
+    error: isQueryChanged ? null : error,
     progress,
     previousQuery: currentQuery,
     refetch: fetch

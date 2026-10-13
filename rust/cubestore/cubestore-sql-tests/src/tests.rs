@@ -175,6 +175,7 @@ pub fn sql_tests(prefix: &str) -> Vec<(&'static str, TestFn)> {
         t("topk_query", topk_query),
         t("topk_having", topk_having),
         t("topk_decimals", topk_decimals),
+        t("topk_having_decimal_sum", topk_having_decimal_sum),
         t("planning_topk_having", planning_topk_having),
         t("planning_topk_hll", planning_topk_hll),
         t("topk_hll", topk_hll),
@@ -3619,7 +3620,7 @@ async fn planning_inplace_aggregate2(service: Box<dyn SqlClient>) -> Result<(), 
         pp_phys_plan_ext(p.router.as_ref(), &verbose),
         "Projection, [url, sum(Data.hits)@1:hits], sort_order: [1]\
            \n  Sort, by: [sum(Data.hits)@1 desc nulls last], fetch: 10, sort_order: [1]\
-           \n    LinearSingleAggregate\
+           \n    LinearFinalAggregate\
            \n      CoalescePartitions\
            \n        ClusterSend, partitions: [[1, 2]]"
     );
@@ -3627,7 +3628,7 @@ async fn planning_inplace_aggregate2(service: Box<dyn SqlClient>) -> Result<(), 
         pp_phys_plan_ext(p.worker.as_ref(), &verbose),
         "Projection, [url, sum(Data.hits)@1:hits], sort_order: [1]\
            \n  Sort, by: [sum(Data.hits)@1 desc nulls last], fetch: 10, sort_order: [1]\
-           \n    LinearSingleAggregate\
+           \n    LinearFinalAggregate\
            \n      CoalescePartitions\
            \n        Worker\
            \n          CoalescePartitions\
@@ -4490,6 +4491,52 @@ async fn topk_decimals(service: Box<dyn SqlClient>) -> Result<(), CubeError> {
     Ok(())
 }
 
+async fn topk_having_decimal_sum(service: Box<dyn SqlClient>) -> Result<(), CubeError> {
+    service.exec_query("CREATE SCHEMA s").await?;
+    service
+        .exec_query("CREATE TABLE s.Data1(url text, hits decimal)")
+        .await?;
+    service
+        .exec_query("INSERT INTO s.Data1(url, hits) VALUES ('a', NULL), ('b', 2), ('c', 3), ('d', 4), ('e', 5), ('z', 100)")
+        .await?;
+    service
+        .exec_query("CREATE TABLE s.Data2(url text, hits decimal)")
+        .await?;
+    service
+        .exec_query("INSERT INTO s.Data2(url, hits) VALUES ('b', 50), ('c', 45), ('d', 40), ('e', 35), ('y', 80), ('z', NULL)")
+        .await?;
+
+    // The top-k re-aggregates the worker sums. Summing a decimal widens its precision, so the
+    // second sum must not widen it again: the HAVING literal is typed against the declared sum
+    // type, and the comparison needs both sides to agree.
+    for having in [
+        "SUM(`hits`) > 1",
+        "SUM(`hits`) > CAST('1' AS DECIMAL(10, 5))",
+        "SUM(`hits`) > 1 AND SUM(`hits`) < 100",
+    ] {
+        let r = service
+            .exec_query(&format!(
+                "SELECT `url` `url`, SUM(`hits`) `hits` \
+                 FROM (SELECT * FROM s.Data1 \
+                       UNION ALL \
+                       SELECT * FROM s.Data2) AS `Data` \
+                 GROUP BY 1 \
+                 HAVING {} \
+                 ORDER BY 2 DESC NULLS LAST \
+                 LIMIT 3",
+                having
+            ))
+            .await?;
+        let expected: &[(&str, Decimal)] = if having.contains("< 100") {
+            &[("y", dec5(80)), ("b", dec5(52)), ("c", dec5(48))]
+        } else {
+            &[("z", dec5(100)), ("y", dec5(80)), ("b", dec5(52))]
+        };
+        assert_eq!(to_rows(&r), rows(expected), "HAVING {}", having);
+    }
+    Ok(())
+}
+
 async fn planning_topk_having(service: Box<dyn SqlClient>) -> Result<(), CubeError> {
     service.exec_query("CREATE SCHEMA s").await?;
     service
@@ -4520,7 +4567,7 @@ async fn planning_topk_having(service: Box<dyn SqlClient>) -> Result<(), CubeErr
         "Projection, [url, sum(Data.hits)@1:hits]\
         \n  Sort, fetch: 3\
         \n    Filter, predicate: sum(Data.hits)@1 > 10\
-        \n      SortedSingleAggregate\
+        \n      InlineFinalAggregate\
         \n        CoalescePartitions\
         \n          MergeSort\
         \n            Worker\
@@ -4537,7 +4584,7 @@ async fn planning_topk_having(service: Box<dyn SqlClient>) -> Result<(), CubeErr
         "Projection, [url, sum(Data.hits)@1:hits]\
         \n  Sort, fetch: 3\
         \n    Filter, predicate: sum(Data.hits)@1 > 10\
-        \n      SortedSingleAggregate\
+        \n      InlineFinalAggregate\
         \n        CoalescePartitions\
         \n          Worker\
         \n            SortedSingleAggregate\

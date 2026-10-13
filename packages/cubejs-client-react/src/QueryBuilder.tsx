@@ -65,6 +65,9 @@ import type {
   TimeDimensionWithExtraFields,
 } from './types';
 
+// A change to any of these query fields can change the dry run response
+const DRY_RUN_QUERY_FIELDS = ['measures', 'dimensions', 'timeDimensions', 'segments', 'filters'];
+
 const granularities: GranularityOption[] = [
   { name: undefined, title: 'w/o grouping' },
   { name: 'second', title: 'Second' },
@@ -661,8 +664,8 @@ export default class QueryBuilder extends React.Component<QueryBuilderProps, Que
     handleVizStateChange(finalState);
 
     const shouldFetchDryRun = !equals(
-      pick(['measures', 'dimensions', 'timeDimensions'], stateQuery),
-      pick(['measures', 'dimensions', 'timeDimensions'], finalState.query)
+      pick(DRY_RUN_QUERY_FIELDS, stateQuery),
+      pick(DRY_RUN_QUERY_FIELDS, finalState.query)
     );
 
     if (shouldFetchDryRun && isQueryPresent(finalState.query) && finalState.missingMembers.length === 0) {

@@ -375,23 +375,28 @@ export class CompilerApi {
     const { includeDebugInfo, exportAnnotatedSql, preAggregationsOnly, includeTransformedQuery = false } = options;
     const { sqlGenerator, compilers } = await this.getSqlGenerator(query);
 
-    const getSqlFn = () => compilers.compiler.withQuery(sqlGenerator, () => ({
-      external: sqlGenerator.externalPreAggregationQuery(),
-      sql: preAggregationsOnly ? null : sqlGenerator.buildSqlAndParams(exportAnnotatedSql),
-      lambdaQueries: preAggregationsOnly ? [] : sqlGenerator.buildLambdaQuery(),
-      timeDimensionAlias: sqlGenerator.timeDimensions[0]?.unescapedAliasName(),
-      timeDimensionField: sqlGenerator.timeDimensions[0]?.dimension,
-      order: sqlGenerator.order,
-      cacheKeyQueries: sqlGenerator.cacheKeyQueries(),
-      preAggregations: sqlGenerator.preAggregations.preAggregationsDescription(),
-      dataSource: sqlGenerator.dataSource,
-      aliasNameToMember: sqlGenerator.aliasNameToMember,
-      rollupMatchResults: includeDebugInfo ?
-        sqlGenerator.preAggregations.rollupMatchResultDescriptions() : undefined,
-      canUseTransformedQuery: includeTransformedQuery ?
-        sqlGenerator.preAggregations.canUseTransformedQuery() : undefined,
-      memberNames: sqlGenerator.collectAllMemberNames(),
-    }));
+    const getSqlFn = () => compilers.compiler.withQuery(sqlGenerator, () => {
+      // Build first: Tesseract matches pre-aggregations during the build, so `external` and
+      // the descriptions below reuse that match instead of running the planner again
+      const sql = preAggregationsOnly ? null : sqlGenerator.buildSqlAndParams(exportAnnotatedSql);
+      return {
+        external: sqlGenerator.externalPreAggregationQuery(),
+        sql,
+        lambdaQueries: preAggregationsOnly ? [] : sqlGenerator.buildLambdaQuery(),
+        timeDimensionAlias: sqlGenerator.timeDimensions[0]?.unescapedAliasName(),
+        timeDimensionField: sqlGenerator.timeDimensions[0]?.dimension,
+        order: sqlGenerator.order,
+        cacheKeyQueries: sqlGenerator.cacheKeyQueries(),
+        preAggregations: sqlGenerator.preAggregations.preAggregationsDescription(),
+        dataSource: sqlGenerator.dataSource,
+        aliasNameToMember: sqlGenerator.aliasNameToMember,
+        rollupMatchResults: includeDebugInfo ?
+          sqlGenerator.preAggregations.rollupMatchResultDescriptions() : undefined,
+        canUseTransformedQuery: includeTransformedQuery ?
+          sqlGenerator.preAggregations.canUseTransformedQuery() : undefined,
+        memberNames: sqlGenerator.collectAllMemberNames(),
+      };
+    });
 
     if (this.sqlCache) {
       // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -678,7 +683,9 @@ export class CompilerApi {
           const hasFullAccess = !policy.memberLevel ||
             (policy.memberLevel.includesMembers.includes(memberName) &&
              !policy.memberLevel.excludesMembers.includes(memberName));
-          if (hasFullAccess) return true;
+          if (hasFullAccess) {
+            return true;
+          }
 
           if (policy.memberMasking) {
             return policy.memberMasking.includesMembers.includes(memberName) &&

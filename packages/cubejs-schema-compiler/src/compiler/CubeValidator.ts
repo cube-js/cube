@@ -1399,7 +1399,9 @@ function collectFunctionFieldsPatterns(patterns, path, o) {
   } else if (o === Object(o)) {
     // eslint-disable-next-line no-restricted-syntax
     for (const k in o) {
-      if (k !== '$_root' && o.hasOwnProperty(k)) collectFunctionFieldsPatterns(patterns, newPath, o[k]);
+      if (k !== '$_root' && o.hasOwnProperty(k)) {
+        collectFunctionFieldsPatterns(patterns, newPath, o[k]);
+      }
     }
   }
 }

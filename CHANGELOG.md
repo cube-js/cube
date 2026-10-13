@@ -3,6 +3,37 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.8.5](https://github.com/cube-js/cube/compare/v1.8.4...v1.8.5) (2026-10-13)
+
+### Bug Fixes
+
+- **cubesql:** Never render an empty alias for wrapped subqueries ([#12239](https://github.com/cube-js/cube/issues/12239)) ([c50979a](https://github.com/cube-js/cube/commit/c50979aeab49aa0b712355f681d8e62e67d9fae7))
+- **cubesql:** Prune unused members from inner wrapped select ([#11972](https://github.com/cube-js/cube/issues/11972)) ([a3da378](https://github.com/cube-js/cube/commit/a3da378c23550fee9e08526a3e3d08c2edeaa264))
+- **cubesql:** Push down joins between grouped subqueries ([#11584](https://github.com/cube-js/cube/issues/11584)) ([acc203b](https://github.com/cube-js/cube/commit/acc203b532755de57ed0f2ac2cbc2b7690ad9e33))
+- **databricks-jdbc-driver:** Cast time dimension values in equals and in filters ([#12158](https://github.com/cube-js/cube/issues/12158)) ([7a59cb8](https://github.com/cube-js/cube/commit/7a59cb8b4a2b72288fd6e630066a9ddef8b225c1))
+- **databricks-jdbc-driver:** Treat unparseable time values as not set in IN filters ([#12234](https://github.com/cube-js/cube/issues/12234)) ([5030576](https://github.com/cube-js/cube/commit/5030576e958e724946926bfd2851fb05acbdce6b))
+
+### Features
+
+- **server-core:** Add CUBEJS_SCHEDULED_REFRESH_TIMER_INTERVAL_ONLY so a numeric scheduledRefreshTimer doesn't enable the refresh worker ([#12107](https://github.com/cube-js/cube/issues/12107)) ([d0ccad7](https://github.com/cube-js/cube/commit/d0ccad76faddeaf08b762ce044f5d5b1b264a8b2))
+
+### Performance Improvements
+
+- **schema-compiler:** Match pre-aggregations once per getSql call ([#12159](https://github.com/cube-js/cube/issues/12159)) ([528e8c5](https://github.com/cube-js/cube/commit/528e8c5f7c2d3220a62f7e439903fb18b6d8d807))
+
+## [1.8.4](https://github.com/cube-js/cube/compare/v1.8.3...v1.8.4) (2026-10-12)
+
+### Bug Fixes
+
+- **api-gateway:** Guard member-expression SQL eval against JS injection ([#12207](https://github.com/cube-js/cube/issues/12207)) ([3c09976](https://github.com/cube-js/cube/commit/3c09976522024961fa43afac958b9dad348ee40b))
+- **client:** Fix stale useCubeQuery state, missed dry runs and dropped granularity ([#12217](https://github.com/cube-js/cube/issues/12217)) ([7a67afb](https://github.com/cube-js/cube/commit/7a67afbe17b10f25c2342215db7fa21c9df1bb03)), closes [#3473](https://github.com/cube-js/cube/issues/3473) [#3552](https://github.com/cube-js/cube/issues/3552) [#12204](https://github.com/cube-js/cube/issues/12204) [#5289](https://github.com/cube-js/cube/issues/5289) [#9985](https://github.com/cube-js/cube/issues/9985) [#7379](https://github.com/cube-js/cube/issues/7379) [#3473](https://github.com/cube-js/cube/issues/3473) [#3552](https://github.com/cube-js/cube/issues/3552) [#5289](https://github.com/cube-js/cube/issues/5289) [#9985](https://github.com/cube-js/cube/issues/9985) [#7379](https://github.com/cube-js/cube/issues/7379)
+- **cubestore:** Don't widen decimal sums twice in full-merge top-k ([#12188](https://github.com/cube-js/cube/issues/12188)) ([31edcf4](https://github.com/cube-js/cube/commit/31edcf42ae99430767637b74872836b9134f139a))
+
+### Features
+
+- **cube-cli:** Manage custom roles from the CLI (CUB-4361) ([#11894](https://github.com/cube-js/cube/issues/11894)) ([46e7928](https://github.com/cube-js/cube/commit/46e7928b411533413c35e3be367c0e5fb5be57a9)), closes [cubedevinc/cubejs-enterprise#15056](https://github.com/cubedevinc/cubejs-enterprise/issues/15056)
+- **tesseract:** Enable multi-stage leaf merge and union by default ([#12220](https://github.com/cube-js/cube/issues/12220)) ([c1367cf](https://github.com/cube-js/cube/commit/c1367cf6dbe4027568a73f48fca39d60a5a10ad1)), closes [#12182](https://github.com/cube-js/cube/issues/12182) [#10268](https://github.com/cube-js/cube/issues/10268) [#12182](https://github.com/cube-js/cube/issues/12182)
+
 ## [1.8.3](https://github.com/cube-js/cube/compare/v1.8.2...v1.8.3) (2026-10-10)
 
 ### Bug Fixes

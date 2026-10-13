@@ -1071,6 +1071,7 @@ export class BaseQuery {
   }
 
   // FIXME Temporary solution
+  /** @returns {import('./PreAggregations').PreAggregationForQuery | undefined} */
   findPreAggregationForQueryRust() {
     let optionsOrder = this.options.order;
     if (optionsOrder && !Array.isArray(optionsOrder)) {
@@ -1122,16 +1123,18 @@ export class BaseQuery {
     const buildResult = nativeBuildSqlAndParams(queryParams);
 
     const [, , preAggResult] = buildResult;
-    this.applyNativePreAggResult(preAggResult);
-    return this.preAggregations.preAggregationForQuery;
+    return this.applyNativePreAggResult(preAggResult);
   }
 
   applyNativePreAggResult(preAggResult) {
-    if (!preAggResult) return;
-    this.preAggregations.preAggregationUsageInfos = preAggResult;
+    if (!preAggResult?.length) {
+      this.preAggregations.setNativePreAggregationResult(undefined, undefined);
+      return undefined;
+    }
     const first = preAggResult[0];
-    this.preAggregations.preAggregationForQuery =
-      this.getPreAggregationByName(first.cubeName, first.preAggregationName);
+    const preAggregationForQuery = this.getPreAggregationByName(first.cubeName, first.preAggregationName);
+    this.preAggregations.setNativePreAggregationResult(preAggResult, preAggregationForQuery);
+    return preAggregationForQuery;
   }
 
   allCubeMembers(path) {
@@ -3760,9 +3763,13 @@ export class BaseQuery {
   }
 
   maskFilterToSql(filter) {
-    if (!filter) return null;
+    if (!filter) {
+      return null;
+    }
     const filterItems = this.extractFiltersAsTree([filter]);
-    if (!filterItems.length) return null;
+    if (!filterItems.length) {
+      return null;
+    }
     const initialized = filterItems.map(this.initFilter.bind(this));
     if (initialized.length === 1) {
       return initialized[0].filterToWhere();
@@ -4857,6 +4864,8 @@ export class BaseQuery {
         series_bounds_cast: '{{ expr }}',
         bool_param_cast: '{{ expr }}',
         number_param_cast: '{{ expr }}',
+        time_in_list_column_cast: '{{ expr }}',
+        time_in_list_param_cast: '{{ expr }}',
         // Tesseract uses its own join type templates, decoupled from `join_types`
         // which are used by the SQL API push down. FULL is opt-in per dialect.
         join_types_inner: 'INNER',
@@ -5793,7 +5802,9 @@ export class BaseQuery {
           return true;
         }
 
-        if (visited.has(node)) return false;
+        if (visited.has(node)) {
+          return false;
+        }
         visited.add(node);
 
         const neighbors = query.joinGraphPaths[node] || [];
@@ -5824,7 +5835,9 @@ export class BaseQuery {
 
     return (member) => {
       const [cube, field] = member.split('.');
-      if (!cube || !field) return member;
+      if (!cube || !field) {
+        return member;
+      }
 
       if (cube === queryJoinRoot?.root) {
         return member;

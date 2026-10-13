@@ -345,7 +345,9 @@ export class PreAggregationPartitionRangeLoader {
             );
             if (usageDateRange) {
               const usagePartitions = loadResults.filter(r => {
-                if (!r.partitionRange) return true;
+                if (!r.partitionRange) {
+                  return true;
+                }
                 const [pStart, pEnd] = r.partitionRange;
                 const [uStart, uEnd] = usageDateRange;
                 return pEnd >= uStart && pStart <= uEnd;
