@@ -733,7 +733,8 @@ Then replace the provider's list with CA thumbprints. Skip the leaf: it
 changes at every renewal. The intermediate can change too: a certificate
 authority usually issues from several intermediates and picks one per
 renewal, so the chain served today shows only one of them. Pin every
-intermediate the issuing authority currently uses, from its published list of
+intermediate of the same key type as your tenant's certificate (RSA or ECDSA)
+that the issuing authority currently uses, from its published list of
 certificates, and use the snippet above to confirm the served one is
 included.
 
