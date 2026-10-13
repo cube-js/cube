@@ -123,6 +123,7 @@ Make sure to use correct terms. On billing, pricing, and support pages, use **on
             - Time granularity
             - Field switcher
             - Parent
+              - Preset
           - AI summary
           - Layout
             - Spacer
