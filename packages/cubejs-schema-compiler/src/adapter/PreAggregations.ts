@@ -1274,13 +1274,12 @@ export class PreAggregations {
           );
         }
       );
-      preAggregationsToJoin.forEach(preAgg => {
-        references.rollupsReferences.push(preAgg.references);
-      });
-      const joinResult = canUsePreAggregation(references);
+      const joinReferences = PreAggregations.withRollupsReferences(references, preAggregationsToJoin);
+      const joinResult = canUsePreAggregation(joinReferences);
 
       return {
         ...preAggObj,
+        references: joinReferences,
         canUsePreAggregation: joinResult.canUse,
         leafMeasureMatch: joinResult.leafMeasureMatch,
         preAggregationsToJoin,
@@ -1329,12 +1328,11 @@ export class PreAggregations {
         PreAggregations.memberNameMismatchValidation(preAggObj, referencedPreAggregation, 'dimensions');
         PreAggregations.memberNameMismatchValidation(preAggObj, referencedPreAggregation, 'timeDimensions');
       });
-      referencedPreAggregations.forEach(preAgg => {
-        references.rollupsReferences.push(preAgg.references);
-      });
-      const lambdaResult = canUsePreAggregation(references);
+      const lambdaReferences = PreAggregations.withRollupsReferences(references, referencedPreAggregations);
+      const lambdaResult = canUsePreAggregation(lambdaReferences);
       return {
         ...preAggObj,
+        references: lambdaReferences,
         canUsePreAggregation: lambdaResult.canUse,
         leafMeasureMatch: lambdaResult.leafMeasureMatch,
         referencedPreAggregations,
@@ -1342,6 +1340,16 @@ export class PreAggregations {
     } else {
       return preAggObj;
     }
+  }
+
+  // `references` come memoized from the compiler cache and are shared by every query,
+  // so they must be copied rather than mutated. Mutating them grows `rollupsReferences`
+  // on every query and, through `buildRollupJoin` cache keys, leaks memory.
+  private static withRollupsReferences(references: PreAggregationReferences, rollups: PreAggregationForQuery[]): PreAggregationReferences {
+    return {
+      ...references,
+      rollupsReferences: references.rollupsReferences.concat(rollups.map(preAgg => preAgg.references)),
+    };
   }
 
   public static checkPartitionGranularityDefined(cube: string, preAggregationName: string, preAggregation: PreAggregationForQuery): string {
