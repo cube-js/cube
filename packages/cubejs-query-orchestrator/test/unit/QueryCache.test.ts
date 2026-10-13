@@ -319,6 +319,8 @@ describe('QueryCache.createQueue cancellation', () => {
       cacheAndQueueDriver: 'memory',
       concurrency: 2,
       continueWaitTimeout: 1,
+      // Seconds, lets the node running a query notice that another node cancelled it
+      heartBeatInterval: 1,
       logger: () => undefined,
     });
 
@@ -352,6 +354,13 @@ describe('QueryCache.createQueue cancellation', () => {
       const cancelled = await nodeB.cancelQueryByRequestId('req-a');
 
       expect(cancelled.map((q) => q.requestId)).toEqual(['req-a']);
+      expect(running.get('b')?.cancelled).toBe(false);
+
+      // The node running `a` cancels it once its heartbeat finds the queue item gone
+      for (let i = 0; i < 30 && !running.get('a')?.cancelled; i++) {
+        await pausePromise(100);
+      }
+      expect(running.get('a')?.cancelled).toBe(true);
       expect(running.get('b')?.cancelled).toBe(false);
     } finally {
       running.forEach(({ resolve }) => resolve([]));
