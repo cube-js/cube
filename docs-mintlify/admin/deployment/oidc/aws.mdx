@@ -725,6 +725,7 @@ openssl s_client -connect <tenant-name>.cubecloud.dev:443 \
   | awk '/BEGIN CERT/{n++; f=(n>1)} f{print > ("ca-" n-1 ".pem")} /END CERT/{f=0}'
 
 for f in ca-*.pem; do
+  echo "$f: $(openssl x509 -in "$f" -subject -noout)"
   openssl x509 -in "$f" -fingerprint -sha1 -noout | cut -d= -f2 | tr -d ':'
 done
 ```
