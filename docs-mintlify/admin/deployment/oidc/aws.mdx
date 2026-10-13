@@ -719,7 +719,7 @@ Save every CA certificate your tenant serves (all but the leaf) and compute
 their SHA-1 thumbprints:
 
 ```bash
-rm -f ca-*.pem
+cd "$(mktemp -d)"
 openssl s_client -connect <tenant-name>.cubecloud.dev:443 \
   -servername <tenant-name>.cubecloud.dev -showcerts </dev/null 2>/dev/null \
   | awk '/BEGIN CERT/{n++; f=(n>1)} f{print > ("ca-" n-1 ".pem")} /END CERT/{f=0}'
