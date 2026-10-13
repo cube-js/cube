@@ -737,8 +737,8 @@ renewal, so the chain served today shows only one of them. Pin every
 intermediate of the same key type as your tenant's certificate (RSA or ECDSA)
 that the issuing authority currently uses, from its published list of
 certificates. Compute each downloaded certificate's thumbprint with the same
-`openssl x509 -fingerprint -sha1` command, and use the snippet above to
-confirm the served one is included.
+`openssl x509 -fingerprint -sha1` command (add `-inform der` for a DER file),
+and use the snippet above to confirm the served one is included.
 
 ```bash
 aws iam update-open-id-connect-provider-thumbprint \
