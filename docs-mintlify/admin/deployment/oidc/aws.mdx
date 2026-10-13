@@ -728,8 +728,13 @@ for f in ca-*.pem; do
 done
 ```
 
-Then replace the provider's list with the thumbprints of those CA
-certificates. Skip the leaf: it changes at every renewal.
+Then replace the provider's list with CA thumbprints. Skip the leaf: it
+changes at every renewal. The intermediate can change too: a certificate
+authority usually issues from several intermediates and picks one per
+renewal, so the chain served today shows only one of them. Pin every
+intermediate the issuing authority currently uses, from its published list of
+certificates, and use the snippet above to confirm the served one is
+included.
 
 ```bash
 aws iam update-open-id-connect-provider-thumbprint \
@@ -737,9 +742,8 @@ aws iam update-open-id-connect-provider-thumbprint \
   --thumbprint-list <ca-thumbprint-1> <ca-thumbprint-2>
 ```
 
-AWS accepts up to five thumbprints. The list only holds until the certificate
-authority switches to a different intermediate or root, so repeat this step if
-the error returns.
+AWS accepts up to five thumbprints. Repeat this step when the certificate
+authority adds a new intermediate or root.
 
 [ref-oidc-overview]: /admin/deployment/oidc
 [ref-sub-editor]: /admin/deployment/oidc#subject-claim-format
