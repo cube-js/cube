@@ -17,6 +17,14 @@ fn release_api_base() -> String {
 
 pub const CURRENT_VERSION: &str = env!("CUBE_CLI_VERSION");
 
+/// The `Cargo.toml` placeholder build.rs falls back to when it can't read
+/// `lerna.json`. Such a binary has no real version to compare with a release.
+const UNVERSIONED: &str = "0.0.0";
+
+fn is_unversioned(version: &str) -> bool {
+    version == UNVERSIONED
+}
+
 /// The release target triple this binary maps to. Linux always maps to the
 /// musl asset — that's the only Linux artifact we ship, and it runs anywhere.
 pub fn release_target() -> Option<&'static str> {
@@ -172,13 +180,27 @@ pub fn print_notice(outcome: &UpdateCheck) -> bool {
         return false;
     };
     eprintln!(
-        "\n{} {} → {}\nRun {} to install it.",
+        "\n{} {}\nRun {} to install it.",
         "A new release of Cube CLI is available:".yellow(),
-        CURRENT_VERSION.dimmed(),
-        latest.bold().green(),
+        upgrade_path(latest, CURRENT_VERSION, true),
         "cube update".bold().cyan(),
     );
     true
+}
+
+/// `current → latest`, or just `latest` for an unversioned build, whose
+/// placeholder version would only confuse.
+fn upgrade_path(latest: &str, current: &str, color: bool) -> String {
+    let (dim, emphasis) = if color {
+        (Style::new().dimmed(), Style::new().bold().green())
+    } else {
+        (Style::new(), Style::new())
+    };
+    if is_unversioned(current) {
+        emphasis.style(latest).to_string()
+    } else {
+        format!("{} → {}", dim.style(current), emphasis.style(latest))
+    }
 }
 
 /// Hint printed under an API error. A CLI that lags the API is a common cause
@@ -212,12 +234,19 @@ fn hint_for(outcome: &UpdateCheck, announced: bool, color: bool) -> Option<Strin
         UpdateCheck::Newer(_) if announced => Some(format!(
             "{hint} this request failed on the API side — the newer release above may already fix it"
         )),
-        UpdateCheck::Newer(latest) => Some(format!(
-            "{hint} this request failed on the API side, and Cube CLI {} is available — run {} \
-             to upgrade from {CURRENT_VERSION}, then try again",
-            emphasis.style(latest),
-            emphasis.style("cube update"),
-        )),
+        UpdateCheck::Newer(latest) => {
+            let from = if is_unversioned(CURRENT_VERSION) {
+                String::new()
+            } else {
+                format!(" from {CURRENT_VERSION}")
+            };
+            Some(format!(
+                "{hint} this request failed on the API side, and Cube CLI {} is available — run {} \
+                 to upgrade{from}, then try again",
+                emphasis.style(latest),
+                emphasis.style("cube update"),
+            ))
+        }
         // Could not find out whether a newer release exists, so the advice is
         // worth giving but not worth asserting.
         UpdateCheck::Unknown => Some(format!(
@@ -243,6 +272,12 @@ mod tests {
         // A terminal gets the notice; an API failure gets the hint.
         assert!(wanted(false, true));
         assert!(wanted(true, false));
+    }
+
+    #[test]
+    fn an_unversioned_build_is_offered_the_release_without_its_placeholder() {
+        assert_eq!(upgrade_path("1.8.5", "0.0.0", false), "1.8.5");
+        assert_eq!(upgrade_path("1.8.5", "1.8.3", false), "1.8.3 → 1.8.5");
     }
 
     #[test]
