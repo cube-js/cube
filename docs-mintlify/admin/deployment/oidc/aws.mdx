@@ -738,7 +738,9 @@ intermediate of the same key type as your tenant's certificate (RSA or ECDSA)
 that the issuing authority currently uses, from its published list of
 certificates. Compute each downloaded certificate's thumbprint with the same
 `openssl x509 -fingerprint -sha1` command (add `-inform der` for a DER file),
-and use the snippet above to confirm the served one is included.
+and use the snippet above to confirm the served one is included. Keep every
+thumbprint the snippet prints, including the last one: when the chain ends in a
+cross-signed root, that is the certificate AWS checks.
 
 ```bash
 aws iam update-open-id-connect-provider-thumbprint \
