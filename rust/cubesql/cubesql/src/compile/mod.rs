@@ -8099,6 +8099,37 @@ ORDER BY "source"."str0" ASC
     }
 
     #[tokio::test]
+    #[ignore = "repro for #12240: CAST(CAST(x AS date) AS timestamp) grouping is planned as SQL push down"]
+    async fn test_metabase_day_bucket_prefers_cube_scan() {
+        init_testing_logger();
+
+        // Metabase "by day" grouping: must plan as a regular CubeScan with day granularity
+        // (so pre-aggregations can serve it), not as SQL push down.
+        let logical_plan = convert_select_to_query_plan(
+            r#"
+            SELECT
+                CAST(CAST("public"."KibanaSampleDataEcommerce"."order_date" AS date) AS timestamp) AS "order_date",
+                SUM("public"."KibanaSampleDataEcommerce"."sumPrice") AS "sum"
+            FROM "public"."KibanaSampleDataEcommerce"
+            GROUP BY CAST(CAST("public"."KibanaSampleDataEcommerce"."order_date" AS date) AS timestamp)
+            "#
+            .to_string(),
+            DatabaseProtocol::PostgreSQL,
+        )
+        .await
+        .as_logical_plan();
+
+        assert_eq!(
+            logical_plan.find_cube_scan().request.time_dimensions,
+            Some(vec![V1LoadRequestQueryTimeDimension {
+                dimension: "KibanaSampleDataEcommerce.order_date".to_string(),
+                granularity: Some("day".to_string()),
+                date_range: None,
+            }])
+        );
+    }
+
+    #[tokio::test]
     async fn test_metabase_unwrap_date_cast() {
         if !Rewriter::sql_push_down_enabled() {
             return;
