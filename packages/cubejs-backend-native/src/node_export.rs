@@ -25,9 +25,13 @@ use crate::stream::{OnCloseHandler, OnDrainHandler};
 use crate::tokio_runtime_node;
 use crate::transport::NodeBridgeTransport;
 use crate::utils::{batch_to_rows, NonDebugInRelease};
+use cubenativeutils::wrappers::inner_types::InnerTypes;
 use cubenativeutils::wrappers::neon::neon_guarded_funcion_call;
-use cubenativeutils::wrappers::NativeContextHolder;
+use cubenativeutils::wrappers::object::NativeRustBox;
+use cubenativeutils::wrappers::rust_handle::NativeRustHandle;
+use cubenativeutils::wrappers::{NativeContextHolder, NativeObjectHandle, NativeType};
 use cubesqlplanner::cube_bridge::base_query_options::NativeBaseQueryOptions;
+use cubesqlplanner::model::Model;
 use cubesqlplanner::planner::base_query::BaseQuery;
 use std::rc::Rc;
 use std::sync::Arc;
@@ -970,11 +974,37 @@ fn build_sql_and_params(cx: FunctionContext) -> JsResult<JsValue> {
     neon_guarded_funcion_call(
         cx,
         |context_holder: NativeContextHolder<_>, options: NativeBaseQueryOptions<_>| {
-            let base_query = BaseQuery::try_new(context_holder.clone(), Rc::new(options))?;
+            let base_query = BaseQuery::try_new(context_holder.clone(), Rc::new(options), None)?;
 
             base_query.build_sql_and_params()
         },
     )
+}
+
+fn prepare_model_inner<IT: InnerTypes>(
+    context_holder: NativeContextHolder<IT>,
+) -> Result<NativeObjectHandle<IT>, cubenativeutils::CubeError> {
+    let rust_box = context_holder.rust_box(NativeRustHandle::new(Model::default()))?;
+    Ok(NativeObjectHandle::new(rust_box.into_object()))
+}
+
+fn prepare_model(cx: FunctionContext) -> JsResult<JsValue> {
+    neon_guarded_funcion_call(cx, prepare_model_inner)
+}
+
+fn model_build_sql_and_params_inner<IT: InnerTypes>(
+    context_holder: NativeContextHolder<IT>,
+    model: NativeObjectHandle<IT>,
+    options: NativeBaseQueryOptions<IT>,
+) -> Result<NativeObjectHandle<IT>, cubenativeutils::CubeError> {
+    let model = model.into_rust_box()?.handle().downcast::<Model>()?;
+    let base_query = BaseQuery::try_new(context_holder, Rc::new(options), Some(model))?;
+
+    base_query.build_sql_and_params()
+}
+
+fn model_build_sql_and_params(cx: FunctionContext) -> JsResult<JsValue> {
+    neon_guarded_funcion_call(cx, model_build_sql_and_params_inner)
 }
 
 fn debug_js_to_clrepr_to_js(mut cx: FunctionContext) -> JsResult<JsValue> {
@@ -1000,6 +1030,8 @@ pub fn register_module_exports<C: NodeConfiguration + 'static>(
 
     //============ sql planner exports ===================
     cx.export_function("buildSqlAndParams", build_sql_and_params)?;
+    cx.export_function("prepareModel", prepare_model)?;
+    cx.export_function("modelBuildSqlAndParams", model_build_sql_and_params)?;
 
     //========= sql orchestrator exports =================
     crate::orchestrator::register_module(&mut cx)?;

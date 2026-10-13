@@ -12,9 +12,6 @@ import moment from 'moment-timezone';
 import R from 'ramda';
 
 import {
-  buildSqlAndParams as nativeBuildSqlAndParams,
-} from '@cubejs-backend/native';
-import {
   FROM_PARTITION_RANGE,
   MAX_SOURCE_ROW_LIMIT,
   QueryAlias,
@@ -1056,7 +1053,7 @@ export class BaseQuery {
     try {
       // Establish the current query context, JS extensions like Funnels/RefreshKeys can resolve compiler.contextQuery()
       // during the member-SQL callbacks the native planner makes back into JS.
-      const buildResult = this.compilers.compiler.withQuery(this, () => nativeBuildSqlAndParams(queryParams));
+      const buildResult = this.compilers.compiler.withQuery(this, () => this.cubeEvaluator.tesseractModel.buildSqlAndParams(queryParams));
 
       const [query, params, preAggResult] = buildResult;
       const paramsArray = [...params];
@@ -1120,7 +1117,7 @@ export class BaseQuery {
       subqueryJoins: this.options.subqueryJoins,
     };
 
-    const buildResult = nativeBuildSqlAndParams(queryParams);
+    const buildResult = this.cubeEvaluator.tesseractModel.buildSqlAndParams(queryParams);
 
     const [, , preAggResult] = buildResult;
     return this.applyNativePreAggResult(preAggResult);

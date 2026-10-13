@@ -476,6 +476,24 @@ export const buildSqlAndParams = (cubeEvaluator: any): any[] => {
   return native.buildSqlAndParams(cubeEvaluator);
 };
 
+/**
+ * Native data model, compiled once per schema version and shared by the
+ * queries planned against it.
+ */
+export class TesseractModel {
+  public constructor(private readonly handle: unknown) {}
+
+  public buildSqlAndParams(queryParams: any): any[] {
+    const native = loadNative();
+    return native.modelBuildSqlAndParams(this.handle, queryParams);
+  }
+}
+
+export const prepareModel = (): TesseractModel => {
+  const native = loadNative();
+  return new TesseractModel(native.prepareModel());
+};
+
 export type ResultRow = Record<string, string>;
 
 /** Read without copying: don't mutate, detach or transfer `message` until the promise settles. */

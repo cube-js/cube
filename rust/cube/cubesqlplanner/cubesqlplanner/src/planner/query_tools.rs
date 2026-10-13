@@ -6,6 +6,7 @@ use crate::cube_bridge::join_definition::JoinDefinition;
 use crate::cube_bridge::join_graph::JoinGraph;
 use crate::cube_bridge::join_item::JoinItemStatic;
 use crate::cube_bridge::sql_templates_render::SqlTemplatesRender;
+use crate::model::Model;
 use crate::planner::filter::FilterItem;
 use crate::planner::join_hints::JoinHints;
 use crate::planner::sql_templates::PlanSqlTemplates;
@@ -41,6 +42,7 @@ pub struct QueryTools {
     join_graph: Rc<dyn JoinGraph>,
     templates_render: Rc<dyn SqlTemplatesRender>,
     params_allocator: Rc<RefCell<ParamsAllocator>>,
+    model: Option<Rc<Model>>,
     timezone: Tz,
     convert_tz_for_raw_time_dimension: bool,
     masked_members: HashSet<String>,
@@ -71,6 +73,7 @@ impl QueryTools {
         export_annotated_sql: bool,
         convert_tz_for_raw_time_dimension: bool,
         masked_members: Option<Vec<MaskedMemberItem>>,
+        model: Option<Rc<Model>>,
     ) -> Result<Rc<Self>, CubeError> {
         let templates_render = base_tools.sql_templates()?;
         let timezone = if let Some(timezone) = timezone_name {
@@ -94,6 +97,7 @@ impl QueryTools {
             join_graph,
             templates_render,
             params_allocator: Rc::new(RefCell::new(ParamsAllocator::new(export_annotated_sql))),
+            model,
             timezone,
             convert_tz_for_raw_time_dimension,
             masked_members: masked_set,
@@ -126,6 +130,10 @@ impl QueryTools {
 
     pub fn cube_evaluator(&self) -> &Rc<dyn CubeEvaluator> {
         &self.cube_evaluator
+    }
+
+    pub fn model(&self) -> Option<&Rc<Model>> {
+        self.model.as_ref()
     }
 
     pub fn plan_sql_templates(&self, external: bool) -> Result<PlanSqlTemplates, CubeError> {

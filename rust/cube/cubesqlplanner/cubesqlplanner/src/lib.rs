@@ -1,5 +1,6 @@
 pub mod cube_bridge;
 pub mod logical_plan;
+pub mod model;
 pub mod physical_plan;
 pub mod physical_plan_builder;
 pub mod planner;

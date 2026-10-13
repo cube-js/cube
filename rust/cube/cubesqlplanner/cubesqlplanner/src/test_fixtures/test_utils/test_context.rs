@@ -97,6 +97,7 @@ impl TestContext {
             None,
             None,
             None,
+            None,
         )?;
 
         Ok(Self {
@@ -273,6 +274,7 @@ impl TestContext {
             masked_members,
             member_to_alias,
             max_member_resolution_depth,
+            None,
         )?;
 
         Ok(Self {
