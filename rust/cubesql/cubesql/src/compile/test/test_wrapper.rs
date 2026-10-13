@@ -263,6 +263,17 @@ async fn test_simple_subquery_wrapper_projection_empty_source() {
     let sql = logical_plan.find_cube_scan_wrapped_sql().wrapped_sql.sql;
     assert!(sql.contains("(SELECT"));
     assert!(sql.contains("utf8__male__"));
+    // The subquery SQL is embedded in member expression JSON, so its quotes are escaped
+    assert!(
+        sql.contains(r#"AS \\\"subquery\\\""#),
+        "fallback subquery alias: {}",
+        sql
+    );
+    assert!(
+        !sql.contains(r#"AS \\\"\\\""#),
+        "empty subquery alias: {}",
+        sql
+    );
 
     let _physical_plan = query_plan.as_physical_plan().await.unwrap();
     //println!("phys plan {:?}", physical_plan);
@@ -6853,5 +6864,59 @@ async fn test_wrapper_select_over_inner_distinct_keeps_columns() {
             json!("${KibanaSampleDataEcommerce.customer_gender}"),
             json!("${KibanaSampleDataEcommerce.notes}"),
         ]
+    );
+}
+
+/// A grand total row over joined cubes starts with literals, which get no qualifier when
+/// the scan spans several cubes; the subquery alias falls back to the cube, not empty
+#[tokio::test]
+async fn test_wrapper_literal_first_over_joined_cubes_has_subquery_alias() {
+    if !Rewriter::sql_push_down_enabled() {
+        return;
+    }
+    init_testing_logger();
+
+    let query_plan = convert_select_to_query_plan(
+        // language=PostgreSQL
+        r#"
+        SELECT
+            k.customer_gender,
+            FALSE AS is_total,
+            MEASURE(k."sumPrice") AS sum_price
+        FROM KibanaSampleDataEcommerce k
+        LEFT JOIN Logs l ON k.__cubeJoinField = l.__cubeJoinField
+        GROUP BY 1
+        HAVING MEASURE(k."sumPrice") IS NOT NULL
+        UNION ALL
+        SELECT
+            CAST(NULL AS TEXT) AS customer_gender,
+            TRUE AS is_total,
+            MEASURE(k."sumPrice") AS sum_price
+        FROM KibanaSampleDataEcommerce k
+        LEFT JOIN Logs l ON k.__cubeJoinField = l.__cubeJoinField
+        HAVING MEASURE(k."sumPrice") IS NOT NULL
+        ;"#
+        .to_string(),
+        DatabaseProtocol::PostgreSQL,
+    )
+    .await;
+
+    let physical_plan = query_plan.as_physical_plan().await.unwrap();
+    println!(
+        "Physical plan: {}",
+        displayable(physical_plan.as_ref()).indent()
+    );
+
+    let sql = query_plan
+        .as_logical_plan()
+        .find_cube_scan_wrapped_sql()
+        .wrapped_sql
+        .sql;
+    println!("SQL: {}", sql);
+    assert!(!sql.contains(r#"AS """#), "empty subquery alias: {}", sql);
+    assert!(
+        sql.contains(r#"AS "KibanaSampleDataEcommerce""#),
+        "subquery alias: {}",
+        sql
     );
 }
