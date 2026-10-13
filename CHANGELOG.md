@@ -3,6 +3,24 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.8.5](https://github.com/cube-js/cube/compare/v1.8.4...v1.8.5) (2026-10-13)
+
+### Bug Fixes
+
+- **cubesql:** Never render an empty alias for wrapped subqueries ([#12239](https://github.com/cube-js/cube/issues/12239)) ([c50979a](https://github.com/cube-js/cube/commit/c50979aeab49aa0b712355f681d8e62e67d9fae7))
+- **cubesql:** Prune unused members from inner wrapped select ([#11972](https://github.com/cube-js/cube/issues/11972)) ([a3da378](https://github.com/cube-js/cube/commit/a3da378c23550fee9e08526a3e3d08c2edeaa264))
+- **cubesql:** Push down joins between grouped subqueries ([#11584](https://github.com/cube-js/cube/issues/11584)) ([acc203b](https://github.com/cube-js/cube/commit/acc203b532755de57ed0f2ac2cbc2b7690ad9e33))
+- **databricks-jdbc-driver:** Cast time dimension values in equals and in filters ([#12158](https://github.com/cube-js/cube/issues/12158)) ([7a59cb8](https://github.com/cube-js/cube/commit/7a59cb8b4a2b72288fd6e630066a9ddef8b225c1))
+- **databricks-jdbc-driver:** Treat unparseable time values as not set in IN filters ([#12234](https://github.com/cube-js/cube/issues/12234)) ([5030576](https://github.com/cube-js/cube/commit/5030576e958e724946926bfd2851fb05acbdce6b))
+
+### Features
+
+- **server-core:** Add CUBEJS_SCHEDULED_REFRESH_TIMER_INTERVAL_ONLY so a numeric scheduledRefreshTimer doesn't enable the refresh worker ([#12107](https://github.com/cube-js/cube/issues/12107)) ([d0ccad7](https://github.com/cube-js/cube/commit/d0ccad76faddeaf08b762ce044f5d5b1b264a8b2))
+
+### Performance Improvements
+
+- **schema-compiler:** Match pre-aggregations once per getSql call ([#12159](https://github.com/cube-js/cube/issues/12159)) ([528e8c5](https://github.com/cube-js/cube/commit/528e8c5f7c2d3220a62f7e439903fb18b6d8d807))
+
 ## [1.8.4](https://github.com/cube-js/cube/compare/v1.8.3...v1.8.4) (2026-10-12)
 
 ### Bug Fixes
