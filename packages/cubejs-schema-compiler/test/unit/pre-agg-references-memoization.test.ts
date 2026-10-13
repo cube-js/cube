@@ -1,9 +1,6 @@
 import { PostgresQuery } from '../../src/adapter/PostgresQuery';
 import { prepareYamlCompiler } from './PrepareCompiler';
 
-// Pre-aggregation references are memoized in the compiler cache, which outlives
-// every query. Evaluating a rollup_join or rollup_lambda must not mutate them,
-// or each query grows them and leaks memory through the cache keys built from them.
 const model = `
 cubes:
   - name: orders

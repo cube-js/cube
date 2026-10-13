@@ -1343,8 +1343,7 @@ export class PreAggregations {
   }
 
   // `references` come memoized from the compiler cache and are shared by every query,
-  // so they must be copied rather than mutated. Mutating them grows `rollupsReferences`
-  // on every query and, through `buildRollupJoin` cache keys, leaks memory.
+  // so they must be copied rather than mutated.
   private static withRollupsReferences(references: PreAggregationReferences, rollups: PreAggregationForQuery[]): PreAggregationReferences {
     return {
       ...references,

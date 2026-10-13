@@ -1245,7 +1245,7 @@ export class CubeEvaluator extends CubeSymbols {
       timeDimensions,
       rollups:
         aggregation.rollupReferences && this.evaluateReferences(cube, aggregation.rollupReferences, { originalSorting: true }) || [],
-      rollupsReferences: [], // May be filled in PreAggregations.evaluateAllReferences()
+      rollupsReferences: [], // Filled on a copy in PreAggregations.evaluatedPreAggregationObj()
     };
   }
 }
