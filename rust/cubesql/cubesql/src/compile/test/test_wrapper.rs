@@ -20,7 +20,7 @@ use crate::{
             get_test_tenant_ctx_with_cube_data_sources,
             get_test_tenant_ctx_with_multi_data_source_view,
             get_test_tenant_ctx_with_multi_data_source_view_and_templates, init_testing_logger,
-            member_expression_sql, LogicalPlanTestUtils, TestContext,
+            member_expression_sql, LogicalPlanTestUtils, TestContext, MSSQL_FLOAT_LITERAL_TEMPLATE,
         },
         DatabaseProtocol,
     },
@@ -38,8 +38,7 @@ async fn test_mssql_integral_float_literal_pushdown() {
         DatabaseProtocol::PostgreSQL,
         vec![(
             "expressions/float_literal".into(),
-            "{% if is_int32 %}CAST({{ value }} AS DECIMAL(10, 0)){% else %}{{ value }}{% endif %}"
-                .into(),
+            MSSQL_FLOAT_LITERAL_TEMPLATE.into(),
         )],
     )
     .await;

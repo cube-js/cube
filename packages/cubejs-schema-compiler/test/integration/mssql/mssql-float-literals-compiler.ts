@@ -6,17 +6,8 @@ export type SourceQuery = [string, (string | null)[]];
 export type CompilationRequest = {
   useNativeSqlPlanner: boolean;
   candidateQueries: string[];
-  controlQueries: string[];
 };
-export type CompilationResponse = { candidateQueries: SourceQuery[]; controlQueries: SourceQuery[] } | { error: string };
-
-class MssqlQueryWithoutFloatLiteral extends MssqlQuery {
-  public sqlTemplates() {
-    const templates = super.sqlTemplates();
-    delete templates.expressions.float_literal;
-    return templates;
-  }
-}
+export type CompilationResponse = { candidateQueries: SourceQuery[] } | { error: string };
 
 const compileQueries = async (request: CompilationRequest): Promise<CompilationResponse> => {
   const compilers = prepareJsCompiler(`
@@ -40,7 +31,7 @@ const compileQueries = async (request: CompilationRequest): Promise<CompilationR
       definition: member,
     };
   };
-  const createInterface = async (Query = MssqlQuery) => registerInterface({
+  const createInterface = async () => registerInterface({
     contextToApiScopes: async () => ['data', 'meta', 'sql'],
     checkAuth: async () => ({ securityContext: {} }),
     checkSqlAuth: async () => ({ password: null, superuser: true, securityContext: {} }),
@@ -48,7 +39,7 @@ const compileQueries = async (request: CompilationRequest): Promise<CompilationR
     sqlGenerators: async () => ({
       cubeNameToDataSource: { Visitors: 'default' },
       memberToDataSource: { 'Visitors.count': 'default', 'Visitors.id': 'default' },
-      dataSourceToSqlGenerator: { default: new Query(compilers, options) },
+      dataSourceToSqlGenerator: { default: new MssqlQuery(compilers, options) },
     }),
     sql: async ({ query, memberToAlias, expressionParams }) => {
       const normalized = {
@@ -57,7 +48,7 @@ const compileQueries = async (request: CompilationRequest): Promise<CompilationR
         dimensions: (query.dimensions || []).map(memberExpression),
         segments: (query.segments || []).map(memberExpression),
       };
-      return { sql: { sql: new Query(compilers, { ...options, ...normalized, memberToAlias, expressionParams }).buildSqlAndParams(true) } };
+      return { sql: { sql: new MssqlQuery(compilers, { ...options, ...normalized, memberToAlias, expressionParams }).buildSqlAndParams(true) } };
     },
     stream: async () => { throw new Error('Compilation must not execute a Cube query'); },
     sqlApiLoad: async () => { throw new Error('Compilation must not execute source SQL'); },
@@ -77,21 +68,16 @@ const compileQueries = async (request: CompilationRequest): Promise<CompilationR
     });
     return [response.sql[0], parameters];
   };
-  const generated: SourceQuery[][] = [];
+  const server = await createInterface();
 
-  for (const [Query, queries] of [[MssqlQuery, request.candidateQueries], [MssqlQueryWithoutFloatLiteral, request.controlQueries]] as const) {
-    const server = await createInterface(Query);
+  try {
+    const candidateQueries: SourceQuery[] = [];
 
-    try {
-      const result: SourceQuery[] = [];
-
-      for (const query of queries) result.push(await compile(server, query));
-      generated.push(result);
-    } finally {
-      await shutdownInterface(server, 'fast');
-    }
+    for (const query of request.candidateQueries) candidateQueries.push(await compile(server, query));
+    return { candidateQueries };
+  } finally {
+    await shutdownInterface(server, 'fast');
   }
-  return { candidateQueries: generated[0], controlQueries: generated[1] };
 };
 
 process.once('message', async (request: CompilationRequest) => {

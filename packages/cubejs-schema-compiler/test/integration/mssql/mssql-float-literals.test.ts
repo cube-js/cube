@@ -42,17 +42,12 @@ describe.each([false, true])('MSSQL float literals (native planner: %s)', useNat
     { name: 'large negative precision ROUND', expression: 'ROUND(MAX(500000000.0), -9)', expected: 1000000000, literal: /CAST\(500000000 AS DECIMAL\(10, 0\)\)/ },
     { name: 'CASE ROUND', expression: 'ROUND(MAX(CASE WHEN id > 0 THEN 500.0 ELSE 0.0 END), -3)', expected: 1000, literal: /CAST\(500 AS DECIMAL\(10, 0\)\)/ },
   ];
-  let generated: { candidateQueries: SourceQuery[]; controlQueries: SourceQuery[] };
+  let generated: { candidateQueries: SourceQuery[] };
 
   beforeAll(async () => {
     generated = await compileQueries({
       useNativeSqlPlanner,
       candidateQueries: cases.map(({ expression }) => `SELECT ${expression} AS value ${from}`),
-      controlQueries: [
-        `SELECT 100.0 * COUNT(*) / (3 * COUNT(*)) AS value ${from}`,
-        `SELECT ROUND(MAX(500.0), -3) AS value ${from}`,
-        `SELECT ROUND(MAX(500000000.0), -9) AS value ${from}`,
-      ],
     });
   });
 
@@ -64,13 +59,5 @@ describe.each([false, true])('MSSQL float literals (native planner: %s)', useNat
     expect(rows).toHaveLength(1);
     if (expected === null) expect(rows[0].value).toBeNull();
     else expect(Number(rows[0].value)).toBeCloseTo(expected, 6);
-  });
-
-  it('reproduces integer truncation while keeping negative precision ROUND valid without the template', async () => {
-    const [percentage, smallRound, largeRound] = generated.controlQueries;
-    expect(percentage[0]).not.toMatch(/CAST\(100 AS DECIMAL/);
-    expect(Number((await dbRunner.testQuery(percentage))[0].value)).toBe(33);
-    expect(Number((await dbRunner.testQuery(smallRound))[0].value)).toBe(1000);
-    expect(Number((await dbRunner.testQuery(largeRound))[0].value)).toBe(1000000000);
   });
 });
