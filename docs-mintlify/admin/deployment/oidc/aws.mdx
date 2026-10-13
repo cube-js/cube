@@ -715,15 +715,17 @@ authenticating against which roles.
 
 ### Refreshing the provider thumbprint
 
-Print the certificates your tenant serves, save each CA certificate (every PEM
-block after the first, which is the leaf) to its own file, and compute its
-SHA-1 thumbprint:
+Save every CA certificate your tenant serves (all but the leaf) and compute
+their SHA-1 thumbprints:
 
 ```bash
 openssl s_client -connect <tenant-name>.cubecloud.dev:443 \
-  -servername <tenant-name>.cubecloud.dev -showcerts </dev/null
+  -servername <tenant-name>.cubecloud.dev -showcerts </dev/null 2>/dev/null \
+  | awk '/BEGIN CERT/{n++; f=(n>1)} f{print > ("ca-" n-1 ".pem")} /END CERT/{f=0}'
 
-openssl x509 -in ca-1.pem -fingerprint -sha1 -noout | cut -d= -f2 | tr -d ':'
+for f in ca-*.pem; do
+  openssl x509 -in "$f" -fingerprint -sha1 -noout | cut -d= -f2 | tr -d ':'
+done
 ```
 
 Then replace the provider's list with the thumbprints of those CA
