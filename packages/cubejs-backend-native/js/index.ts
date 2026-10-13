@@ -496,9 +496,62 @@ export const rest4sql = async (instance: SqlInterfaceInstance, sqlQuery: string,
   return native.rest4sql(instance, sqlQuery, securityContext ? JSON.stringify(securityContext) : null);
 };
 
-export const buildSqlAndParams = (cubeEvaluator: any): any[] => {
+/**
+ * Native planner state shared by the queries against one compiled data model,
+ * such as the compiled SQL templates of each dialect. Opaque on the JS side.
+ */
+export type ModelContext = { readonly __brand: 'ModelContext' };
+
+export const newModelContext = (): ModelContext => loadNative().newModelContext();
+
+/**
+ * Mirrors `BaseQueryOptions` in `cubesqlplanner/src/cube_bridge/base_query_options.rs`.
+ * Nested structures are `unknown`: their shape is validated by the planner on deserialization,
+ * and the schema-compiler objects (`cubeEvaluator`, `joinGraph`, …) can't be typed here since
+ * this package can't depend on schema-compiler.
+ */
+export type NativeQueryOptions = {
+  /** Member names or member expression definitions. */
+  measures?: (string | object)[];
+  dimensions?: (string | object)[];
+  segments?: (string | object)[];
+  timeDimensions?: unknown[];
+  timezone?: string;
+  filters?: unknown[];
+  order?: unknown[];
+  limit?: string | null;
+  rowLimit?: string | null;
+  offset?: string | null;
+  ungrouped?: boolean;
+  exportAnnotatedSql: boolean;
+  preAggregationQuery?: boolean;
+  preAggregationsMatchOnly?: boolean;
+  useOriginalSqlPreAggregationsInPreAggregation?: boolean;
+  totalQuery?: boolean;
+  cubestoreSupportMultistage?: boolean;
+  multiStageLeafMerge?: boolean;
+  cubestoreUnionFullKeyAggregate?: boolean;
+  maxMultiStageDepth?: number;
+  maxMultiStageStages?: number;
+  maxMemberResolutionDepth?: number;
+  disableExternalPreAggregations: boolean;
+  preAggregationId?: string | null;
+  convertTzForRawTimeDimension?: boolean;
+  maskedMembers?: unknown[];
+  memberToAlias?: Record<string, string>;
+  /** The data source of all the query's cubes, if they share one. */
+  dataSource?: string | null;
+  joinHints?: (string | string[])[];
+  subqueryJoins?: unknown[];
+  cubeEvaluator: unknown;
+  baseTools: unknown;
+  joinGraph: unknown;
+  securityContext: unknown;
+};
+
+export const buildSqlAndParams = (queryOptions: NativeQueryOptions, modelContext: ModelContext): any[] => {
   const native = loadNative();
-  return native.buildSqlAndParams(cubeEvaluator);
+  return native.buildSqlAndParams(queryOptions, modelContext);
 };
 
 export type ResultRow = Record<string, string>;

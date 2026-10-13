@@ -22,7 +22,7 @@ import {
 import { GraphQLSchema } from 'graphql';
 import { parse as uuidParse, v4 as uuidv4 } from 'uuid';
 import { LRUCache } from 'lru-cache';
-import { NativeInstance } from '@cubejs-backend/native';
+import { ModelContext, NativeInstance, newModelContext } from '@cubejs-backend/native';
 import { disposedProxy, getEnv } from '@cubejs-backend/shared';
 import type { SchemaFileRepository } from '@cubejs-backend/shared';
 import { NormalizedQuery, MemberExpression } from '@cubejs-backend/api-gateway';
@@ -160,6 +160,13 @@ export class CompilerApi {
 
   protected memberCount: number = 0;
 
+  /**
+   * Native planner state for the compiled model, e.g. the compiled SQL templates of
+   * each data source. Lives as long as the model, like `queryFactory`, since the
+   * dialect it resolves for a data source is what the templates are cached under.
+   */
+  protected modelContext?: ModelContext;
+
   public constructor(repository: SchemaFileRepository, dbType: DbTypeInternalFn, options: CompilerApiOptions) {
     this.repository = repository;
     this.dbType = dbType;
@@ -226,6 +233,7 @@ export class CompilerApi {
     // using safeguard for potential dangling references.
     this.compilers = disposedProxy('compilers', 'disposed CompilerApi instance');
     this.queryFactory = disposedProxy('queryFactory', 'disposed CompilerApi instance');
+    this.modelContext = undefined;
     this.graphqlSchema = undefined;
 
     // A request can still hold this instance -- the gateway keeps one across
@@ -346,6 +354,8 @@ export class CompilerApi {
           });
         }
       }
+
+      this.modelContext = newModelContext();
 
       this.logger('Compiling schema completed', {
         version: compilerVersion,
@@ -1220,6 +1230,7 @@ export class CompilerApi {
         convertTzForRawTimeDimension: this.convertTzForRawTimeDimension,
         localRefreshKey: this.localRefreshKey,
         queryFactory: this.queryFactories.get(compilers) ?? this.queryFactory,
+        modelContext: this.modelContext,
       }
     );
   }

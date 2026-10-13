@@ -29,6 +29,7 @@ use cubenativeutils::wrappers::neon::neon_guarded_funcion_call;
 use cubenativeutils::wrappers::NativeContextHolder;
 use cubesqlplanner::cube_bridge::base_query_options::NativeBaseQueryOptions;
 use cubesqlplanner::planner::base_query::BaseQuery;
+use cubesqlplanner::planner::ModelContext;
 use std::rc::Rc;
 use std::sync::Arc;
 use tokio::sync::oneshot;
@@ -969,11 +970,24 @@ pub fn reset_logger(mut cx: FunctionContext) -> JsResult<JsUndefined> {
 
 //============ sql planner ===================
 
-fn build_sql_and_params(cx: FunctionContext) -> JsResult<JsValue> {
+struct JsModelContext(Rc<ModelContext>);
+
+impl Finalize for JsModelContext {}
+
+fn new_model_context(mut cx: FunctionContext) -> JsResult<JsBox<JsModelContext>> {
+    Ok(cx.boxed(JsModelContext(Rc::new(ModelContext::new()))))
+}
+
+fn build_sql_and_params(mut cx: FunctionContext) -> JsResult<JsValue> {
+    let model_context = cx.argument::<JsBox<JsModelContext>>(1)?.0.clone();
     neon_guarded_funcion_call(
         cx,
-        |context_holder: NativeContextHolder<_>, options: NativeBaseQueryOptions<_>| {
-            let base_query = BaseQuery::try_new(context_holder.clone(), Rc::new(options))?;
+        move |context_holder: NativeContextHolder<_>, options: NativeBaseQueryOptions<_>| {
+            let base_query = BaseQuery::try_new(
+                context_holder.clone(),
+                Rc::new(options),
+                model_context.clone(),
+            )?;
 
             base_query.build_sql_and_params()
         },
@@ -1002,6 +1016,7 @@ pub fn register_module_exports<C: NodeConfiguration + 'static>(
     cx.export_function("__js_to_clrepr_to_js", debug_js_to_clrepr_to_js)?;
 
     //============ sql planner exports ===================
+    cx.export_function("newModelContext", new_model_context)?;
     cx.export_function("buildSqlAndParams", build_sql_and_params)?;
 
     //========= sql orchestrator exports =================

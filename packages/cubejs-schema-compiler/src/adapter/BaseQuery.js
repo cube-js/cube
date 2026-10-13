@@ -13,6 +13,7 @@ import R from 'ramda';
 
 import {
   buildSqlAndParams as nativeBuildSqlAndParams,
+  newModelContext,
 } from '@cubejs-backend/native';
 import {
   FROM_PARTITION_RANGE,
@@ -658,6 +659,16 @@ export class BaseQuery {
     if (dataSources.length > 1 && !this.externalPreAggregationQuery()) {
       throw new UserError(`To join across data sources use rollupJoin with Cube Store. If rollupJoin is defined, this error indicates it doesn't match the query. Please use Rollup Designer to verify it's definition. Found data sources: ${dataSources.join(', ')}`);
     }
+    if (dataSources.length === 1) {
+      /**
+       * The native planner caches templates by data source in the model context. Kept
+       * from a call made anyway (CompilerApi picks the dialect with it) rather than
+       * collected for the planner: collecting cube names recurses on some queries
+       * Tesseract plans fine.
+       * @type {string | undefined}
+       */
+      [this.resolvedDataSource] = dataSources;
+    }
     return dataSources[0];
   }
 
@@ -1074,12 +1085,16 @@ export class BaseQuery {
       maskedMembers: this.options.maskedMembers,
       memberToAlias: this.options.memberToAlias,
       subqueryJoins: this.options.subqueryJoins,
+      dataSource: this.resolvedDataSource ?? null,
     };
 
     try {
       // Establish the current query context, JS extensions like Funnels/RefreshKeys can resolve compiler.contextQuery()
       // during the member-SQL callbacks the native planner makes back into JS.
-      const buildResult = this.compilers.compiler.withQuery(this, () => nativeBuildSqlAndParams(queryParams));
+      const buildResult = this.compilers.compiler.withQuery(
+        this,
+        () => nativeBuildSqlAndParams(queryParams, this.nativeModelContext())
+      );
 
       const [query, params, preAggResult] = buildResult;
       const paramsArray = [...params];
@@ -1141,12 +1156,25 @@ export class BaseQuery {
       // must see the same masked members as the SQL build.
       maskedMembers: this.options.maskedMembers,
       subqueryJoins: this.options.subqueryJoins,
+      dataSource: this.resolvedDataSource ?? null,
     };
 
-    const buildResult = nativeBuildSqlAndParams(queryParams);
+    const buildResult = nativeBuildSqlAndParams(queryParams, this.nativeModelContext());
 
     const [, , preAggResult] = buildResult;
     return this.applyNativePreAggResult(preAggResult);
+  }
+
+  /**
+   * CompilerApi shares one per compiled model. A query built without it (e.g. in tests,
+   * or an external query) gets its own, which caches nothing beyond the query.
+   * @returns {import('@cubejs-backend/native').ModelContext}
+   */
+  nativeModelContext() {
+    if (!this.modelContext) {
+      this.modelContext = this.options.modelContext ?? newModelContext();
+    }
+    return this.modelContext;
   }
 
   applyNativePreAggResult(preAggResult) {
@@ -1249,7 +1277,10 @@ export class BaseQuery {
     const ExternalQuery = this.externalQueryClass;
     return new ExternalQuery(this.compilers, {
       ...this.options,
-      externalQueryClass: null
+      externalQueryClass: null,
+      // The model context caches templates by data source, and this query
+      // renders the same data source in another dialect.
+      modelContext: undefined,
     });
   }
 

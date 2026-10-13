@@ -5,6 +5,7 @@ use crate::cube_bridge::evaluator::CubeEvaluator;
 use crate::cube_bridge::join_graph::JoinGraph;
 use crate::cube_bridge::sql_templates_render::SqlTemplatesRender;
 use crate::planner::filter::FilterItem;
+use crate::planner::model_context::QueryModelContext;
 use crate::planner::sql_templates::PlanSqlTemplates;
 use chrono_tz::Tz;
 use cubenativeutils::CubeError;
@@ -51,6 +52,7 @@ pub struct QueryTools {
     base_tools: Rc<dyn BaseTools>,
     join_graph: Rc<dyn JoinGraph>,
     templates_render: Rc<dyn SqlTemplatesRender>,
+    model_context: QueryModelContext,
     params_allocator: Rc<RefCell<ParamsAllocator>>,
     timezone: Tz,
     convert_tz_for_raw_time_dimension: bool,
@@ -82,8 +84,9 @@ impl QueryTools {
         export_annotated_sql: bool,
         convert_tz_for_raw_time_dimension: bool,
         masked_members: Option<Vec<MaskedMemberItem>>,
+        model_context: QueryModelContext,
     ) -> Result<Rc<Self>, CubeError> {
-        let templates_render = base_tools.sql_templates()?;
+        let templates_render = model_context.sql_templates(false, || base_tools.sql_templates())?;
         let timezone = if let Some(timezone) = timezone_name {
             timezone
                 .parse::<Tz>()
@@ -105,6 +108,7 @@ impl QueryTools {
             base_tools,
             join_graph,
             templates_render,
+            model_context,
             params_allocator: Rc::new(RefCell::new(ParamsAllocator::new(export_annotated_sql))),
             timezone,
             convert_tz_for_raw_time_dimension,
@@ -155,7 +159,10 @@ impl QueryTools {
         }
         let driver_tools = self.base_tools.driver_tools(external)?;
         let templates = if external {
-            PlanSqlTemplates::try_new(driver_tools, true)?
+            let render = self
+                .model_context
+                .sql_templates(true, || driver_tools.sql_templates())?;
+            PlanSqlTemplates::new(render, driver_tools, true)
         } else {
             // `driverTools(false)` is the base query itself, whose templates
             // `try_new` already fetched.

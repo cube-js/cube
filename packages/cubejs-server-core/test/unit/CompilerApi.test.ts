@@ -220,6 +220,75 @@ views:
     });
   });
 
+  describe('model context', () => {
+    const repository: SchemaFileRepository = {
+      localPath: () => '/mock/path',
+      dataSchemaFiles: () => Promise.resolve([
+        {
+          fileName: 'cubes.js',
+          content: `
+            cube('pg_orders', {
+              sql: 'SELECT * FROM orders',
+              measures: { count: { type: 'count' } },
+              dimensions: { status: { sql: 'status', type: 'string' } },
+            });
+            cube('my_orders', {
+              sql: 'SELECT * FROM orders',
+              dataSource: 'mysql',
+              measures: { count: { type: 'count' } },
+              dimensions: { status: { sql: 'status', type: 'string' } },
+            });
+          `
+        }
+      ])
+    };
+
+    let compilerApi: CompilerApi;
+    let sqlTemplates: jest.SpyInstance;
+
+    beforeEach(() => {
+      compilerApi = new CompilerApi(
+        repository,
+        async ({ dataSource }) => (dataSource === 'mysql' ? 'mysql' : 'postgres'),
+        {
+          logger: () => {}, // eslint-disable-line @typescript-eslint/no-empty-function
+          sqlCache: false,
+        }
+      );
+      sqlTemplates = jest.spyOn(BaseQuery.prototype, 'sqlTemplates');
+    });
+
+    afterEach(() => {
+      sqlTemplates.mockRestore();
+      compilerApi.dispose();
+    });
+
+    const sql = async (cube: string) => (await compilerApi.getSql(
+      { measures: [`${cube}.count`], dimensions: [`${cube}.status`], timezone: 'UTC' } as any
+    )).sql[0];
+
+    test('renders each data source in its own dialect', async () => {
+      const pg = await sql('pg_orders');
+      const my = await sql('my_orders');
+
+      expect(pg).toContain('"pg_orders".status');
+      expect(my).toContain('`my_orders`.status');
+      expect(await sql('pg_orders')).toEqual(pg);
+      expect(await sql('my_orders')).toEqual(my);
+    });
+
+    test('compiles the templates of a data source once per model', async () => {
+      await sql('pg_orders');
+      await sql('my_orders');
+      const calls = sqlTemplates.mock.calls.length;
+
+      await sql('pg_orders');
+      await sql('my_orders');
+
+      expect(sqlTemplates).toHaveBeenCalledTimes(calls);
+    });
+  });
+
   describe('getSql', () => {
     const repository: SchemaFileRepository = {
       localPath: () => '/mock/path',
@@ -281,6 +350,23 @@ views:
       expect(result.external).toEqual(false);
       expect(result.preAggregations).toEqual([]);
       expect(matchOnlyRun).not.toHaveBeenCalled();
+    });
+
+    // One model context holds the templates of both dialects for the data source
+    test('renders the external pre-aggregation and the data source in their own dialects', async () => {
+      const filtered = (dimension: string) => compilerApi.getSql({
+        measures: ['visits.count'],
+        dimensions: [dimension],
+        filters: [{ member: dimension, operator: 'equals', values: ['a'] }],
+        timezone: 'UTC',
+      } as any);
+
+      const hit = (await filtered('visits.source')).sql[0];
+      const miss = (await filtered('visits.browser')).sql[0];
+
+      expect(hit).toContain('= ?');
+      expect(miss).toContain('= $1');
+      expect((await filtered('visits.source')).sql[0]).toEqual(hit);
     });
 
     test('matches once without a build for preAggregationsOnly', async () => {

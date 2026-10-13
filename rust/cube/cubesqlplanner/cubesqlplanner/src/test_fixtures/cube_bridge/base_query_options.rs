@@ -89,6 +89,8 @@ pub struct MockBaseQueryOptions {
     masked_members: Option<Vec<MaskedMemberItem>>,
     #[builder(default)]
     member_to_alias: Option<HashMap<String, String>>,
+    #[builder(default)]
+    data_source: Option<String>,
 }
 
 impl_static_data!(
@@ -117,7 +119,8 @@ impl_static_data!(
     pre_aggregation_id,
     convert_tz_for_raw_time_dimension,
     masked_members,
-    member_to_alias
+    member_to_alias,
+    data_source
 );
 
 pub fn members_from_strings<S: ToString>(strings: Vec<S>) -> Vec<OptionsMember> {
