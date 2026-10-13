@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.8.6](https://github.com/cube-js/cube/compare/v1.8.5...v1.8.6) (2026-10-13)
+
+### Bug Fixes
+
+- **schema-compiler:** Stop rollupJoin and rollupLambda from leaking memory through memoized references ([#12248](https://github.com/cube-js/cube/issues/12248)) ([0b90fd3](https://github.com/cube-js/cube/commit/0b90fd303d44e11cd431100680ab2e7e20997ff2))
+
 ## [1.8.5](https://github.com/cube-js/cube/compare/v1.8.4...v1.8.5) (2026-10-13)
 
 ### Bug Fixes
