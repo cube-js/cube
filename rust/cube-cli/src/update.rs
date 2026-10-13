@@ -21,7 +21,7 @@ pub const CURRENT_VERSION: &str = env!("CUBE_CLI_VERSION");
 /// `lerna.json`. Such a binary has no real version to compare with a release.
 const UNVERSIONED: &str = "0.0.0";
 
-fn is_unversioned(version: &str) -> bool {
+pub(crate) fn is_unversioned(version: &str) -> bool {
     version == UNVERSIONED
 }
 
@@ -215,12 +215,17 @@ fn upgrade_path(latest: &str, current: &str, color: bool) -> String {
 /// attached to a failure the user asked for rather than an unprompted nag, and
 /// a stale pinned CLI in CI is exactly where the advice pays off.
 pub fn api_error_hint(outcome: &UpdateCheck, announced: bool) -> Option<String> {
-    hint_for(outcome, announced, std::io::stderr().is_terminal())
+    hint_for(
+        outcome,
+        announced,
+        std::io::stderr().is_terminal(),
+        CURRENT_VERSION,
+    )
 }
 
 /// Split out from [`api_error_hint`] so the policy can be tested without
 /// touching process-wide environment or terminal state.
-fn hint_for(outcome: &UpdateCheck, announced: bool, color: bool) -> Option<String> {
+fn hint_for(outcome: &UpdateCheck, announced: bool, color: bool, current: &str) -> Option<String> {
     let (label, emphasis) = if color {
         (Style::new().yellow(), Style::new().bold().cyan())
     } else {
@@ -235,10 +240,10 @@ fn hint_for(outcome: &UpdateCheck, announced: bool, color: bool) -> Option<Strin
             "{hint} this request failed on the API side — the newer release above may already fix it"
         )),
         UpdateCheck::Newer(latest) => {
-            let from = if is_unversioned(CURRENT_VERSION) {
+            let from = if is_unversioned(current) {
                 String::new()
             } else {
-                format!(" from {CURRENT_VERSION}")
+                format!(" from {current}")
             };
             Some(format!(
                 "{hint} this request failed on the API side, and Cube CLI {} is available — run {} \
@@ -262,7 +267,7 @@ mod tests {
     use super::*;
 
     fn hint(outcome: &UpdateCheck, announced: bool) -> Option<String> {
-        hint_for(outcome, announced, false)
+        hint_for(outcome, announced, false, "1.8.3")
     }
 
     #[test]
@@ -291,7 +296,14 @@ mod tests {
         let hint = hint(&UpdateCheck::Newer("9.9.9".into()), false).unwrap();
         assert!(hint.contains("cube update"), "{hint}");
         assert!(hint.contains("9.9.9"), "{hint}");
-        assert!(hint.contains(CURRENT_VERSION), "{hint}");
+        assert!(hint.contains("from 1.8.3"), "{hint}");
+    }
+
+    #[test]
+    fn an_unversioned_cli_is_pointed_at_the_new_release_without_its_placeholder() {
+        let hint = hint_for(&UpdateCheck::Newer("9.9.9".into()), false, false, "0.0.0").unwrap();
+        assert!(hint.contains("cube update"), "{hint}");
+        assert!(!hint.contains("0.0.0"), "{hint}");
     }
 
     #[test]
@@ -310,8 +322,8 @@ mod tests {
 
     #[test]
     fn color_is_applied_only_when_asked_for() {
-        let plain = hint_for(&UpdateCheck::Unknown, false, false).unwrap();
-        let colored = hint_for(&UpdateCheck::Unknown, false, true).unwrap();
+        let plain = hint_for(&UpdateCheck::Unknown, false, false, "1.8.3").unwrap();
+        let colored = hint_for(&UpdateCheck::Unknown, false, true, "1.8.3").unwrap();
         assert!(!plain.contains('\u{1b}'), "{plain}");
         assert!(colored.contains('\u{1b}'), "{colored}");
     }
