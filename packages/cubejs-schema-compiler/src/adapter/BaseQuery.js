@@ -660,13 +660,8 @@ export class BaseQuery {
       throw new UserError(`To join across data sources use rollupJoin with Cube Store. If rollupJoin is defined, this error indicates it doesn't match the query. Please use Rollup Designer to verify it's definition. Found data sources: ${dataSources.join(', ')}`);
     }
     if (dataSources.length === 1) {
-      /**
-       * The native planner caches templates by data source in the model context. Kept
-       * from a call made anyway (CompilerApi picks the dialect with it) rather than
-       * collected for the planner: collecting cube names recurses on some queries
-       * Tesseract plans fine.
-       * @type {string | undefined}
-       */
+      // Read by the native planner to cache templates per data source; collecting cube names
+      // separately for it recurses on some queries Tesseract plans fine.
       [this.resolvedDataSource] = dataSources;
     }
     return dataSources[0];
