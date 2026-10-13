@@ -18,8 +18,9 @@ fn release_api_base() -> String {
 pub const CURRENT_VERSION: &str = env!("CUBE_CLI_VERSION");
 
 /// The `Cargo.toml` placeholder build.rs falls back to when it can't read
-/// `lerna.json`. Such a binary has no real version to compare with a release.
-const UNVERSIONED: &str = "0.0.0";
+/// `lerna.json` — read from the same place, so the two can't drift. Such a
+/// binary has no real version to compare with a release.
+const UNVERSIONED: &str = env!("CARGO_PKG_VERSION");
 
 pub(crate) fn is_unversioned(version: &str) -> bool {
     version == UNVERSIONED
@@ -281,7 +282,7 @@ mod tests {
 
     #[test]
     fn an_unversioned_build_is_offered_the_release_without_its_placeholder() {
-        assert_eq!(upgrade_path("1.8.5", "0.0.0", false), "1.8.5");
+        assert_eq!(upgrade_path("1.8.5", UNVERSIONED, false), "1.8.5");
         assert_eq!(upgrade_path("1.8.5", "1.8.3", false), "1.8.3 → 1.8.5");
     }
 
@@ -301,9 +302,15 @@ mod tests {
 
     #[test]
     fn an_unversioned_cli_is_pointed_at_the_new_release_without_its_placeholder() {
-        let hint = hint_for(&UpdateCheck::Newer("9.9.9".into()), false, false, "0.0.0").unwrap();
+        let hint = hint_for(
+            &UpdateCheck::Newer("9.9.9".into()),
+            false,
+            false,
+            UNVERSIONED,
+        )
+        .unwrap();
         assert!(hint.contains("cube update"), "{hint}");
-        assert!(!hint.contains("0.0.0"), "{hint}");
+        assert!(!hint.contains(UNVERSIONED), "{hint}");
     }
 
     #[test]
