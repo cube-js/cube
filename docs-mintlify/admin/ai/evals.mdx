@@ -116,8 +116,8 @@ pass it with the CLI's `--security-context` or the API's `securityContext`. It
 is merged over your own security context and applies to the ground-truth
 queries and, for agents defined in [`agents/config.yml`](/admin/ai/multi-agent),
 to the agent's queries; the default `auto` agent keeps your own context.
-Passing it requires `DeploymentUpdate` or `DeploymentsManage` access, or an
-admin, and only an admin can set its `cubeCloud` key; otherwise the request
+Passing it requires `DeploymentUpdate` or `DeploymentsManage` access or the
+admin role, and only an admin can set its `cubeCloud` key; otherwise the request
 returns `403`. Under `cubeCloud`, only `groups` and `userAttributes` take effect.
 
 #### With the Cube CLI
