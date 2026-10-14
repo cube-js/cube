@@ -1,5 +1,6 @@
 /* eslint-disable no-restricted-syntax */
 import R from 'ramda';
+import { prepareModel, TesseractModel } from '@cubejs-backend/native';
 
 import {
   AccessPolicyDefinition,
@@ -242,6 +243,8 @@ export class CubeEvaluator extends CubeSymbols {
    */
   public relativeDateFilterCubes: Set<string> = new Set();
 
+  private tesseractModelCache: TesseractModel | null = null;
+
   public constructor(
     protected readonly cubeValidator: CubeValidator,
     protected readonly options: { internStrings?: boolean } = {},
@@ -249,8 +252,19 @@ export class CubeEvaluator extends CubeSymbols {
     super(true);
   }
 
+  /**
+   * Built on first use, so that only queries planned natively pay for it.
+   */
+  public get tesseractModel(): TesseractModel {
+    if (!this.tesseractModelCache) {
+      this.tesseractModelCache = prepareModel();
+    }
+    return this.tesseractModelCache;
+  }
+
   public compile(cubes: any[], errorReporter: ErrorReporter) {
     this.relativeDateFilterCubes = new Set();
+    this.tesseractModelCache = null;
     super.compile(cubes, errorReporter);
     const validCubes = this.cubeList.filter(cube => this.cubeValidator.isCubeValid(cube)).sort((a, b) => {
       if (a.isView) {

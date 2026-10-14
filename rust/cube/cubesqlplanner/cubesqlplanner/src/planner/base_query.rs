@@ -3,6 +3,7 @@ use super::top_level_planner::TopLevelPlanner;
 use super::{QueryProperties, QueryPropertiesCompiler};
 use crate::cube_bridge::base_query_options::BaseQueryOptions;
 use crate::logical_plan::PreAggregationUsage;
+use crate::model::Model;
 use cubenativeutils::wrappers::inner_types::InnerTypes;
 use cubenativeutils::wrappers::object::NativeArray;
 use cubenativeutils::wrappers::serializer::NativeSerialize;
@@ -55,6 +56,7 @@ impl<IT: InnerTypes> BaseQuery<IT> {
     pub fn try_new(
         context: NativeContextHolder<IT>,
         options: Rc<dyn BaseQueryOptions>,
+        model: Option<Rc<Model>>,
     ) -> Result<Self, CubeError> {
         let cubestore_support_multistage = options
             .static_data()
@@ -74,6 +76,7 @@ impl<IT: InnerTypes> BaseQuery<IT> {
             options.static_data().masked_members.clone(),
             options.static_data().member_to_alias.clone(),
             options.static_data().max_member_resolution_depth,
+            model,
         )?;
 
         let request = QueryPropertiesCompiler::new(query_tools.clone()).build(options)?;

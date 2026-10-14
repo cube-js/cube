@@ -6,6 +6,7 @@ use crate::cube_bridge::base_tools::BaseTools;
 use crate::cube_bridge::evaluator::CubeEvaluator;
 use crate::cube_bridge::join_graph::JoinGraph;
 use crate::cube_bridge::security_context::SecurityContext;
+use crate::model::Model;
 use crate::planner::filter::compiler::FilterCompiler;
 use crate::planner::filter::{FilterGroup, FilterGroupOperator, FilterItem};
 use cubenativeutils::CubeError;
@@ -48,6 +49,7 @@ impl State {
         masked_members: Option<Vec<MaskedMemberItem>>,
         member_to_alias: Option<HashMap<String, String>>,
         max_member_resolution_depth: Option<usize>,
+        model: Option<Rc<Model>>,
     ) -> Result<Rc<Self>, CubeError> {
         let query_tools = QueryTools::try_new(
             cube_evaluator.clone(),
@@ -57,6 +59,7 @@ impl State {
             export_annotated_sql,
             convert_tz_for_raw_time_dimension,
             masked_members.clone(),
+            model,
         )?;
 
         let compiler = Rc::new(RefCell::new(Compiler::new(
