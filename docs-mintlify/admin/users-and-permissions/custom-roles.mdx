@@ -118,7 +118,7 @@ Either grant **Full access** (a shortcut that enables every current and future d
 | Data Model  | View data model                     | Read data model files and dev branches.                                                                                                                                   |
 | Data Model  | Edit data model                     | Edit the data model on any branch, including the main/deploy branch. Allows committing and merging to main, force-syncing main, and starting dev mode against main.       |
 | Data Model  | Edit data model on dev branches     | Edit the data model only on non-default branches. Blocks any write that targets the main/deploy branch (including merging to main).                                       |
-| Data Model  | Access SQL Runner                   | Open the SQL Runner and execute queries in it.                                                                                                                            |
+| Data Model  | Access SQL Runner                   | Query data sources directly with SQL: source SQL in Explore, Source SQL tabs in workbooks, dashboard widgets based on them, the agent's SQL queries against data sources, and the legacy SQL Runner. Also shows the **Generated SQL** tab when [inspecting queries][ref-inspecting-queries] in workbooks and in chat. |
 | AI          | Access AI agents                    | Use the agent in Analytics Chat, workbooks, the IDE, and dashboards.                                                                                                      |
 | AI          | Create scheduled tasks              | Create [scheduled tasks][ref-scheduled-tasks] in the deployment, from the **Scheduled** page, by asking the agent, or with the Platform API. Editing, pausing, running, and deleting a task stay with its creator or an admin. |
 | Monitoring  | Access query history                | View deployment query history, performance, and traces.                                                                                                                   |
@@ -281,6 +281,7 @@ Assignment is the exception — `PUT /api/v1/roles/{roleId}/users/{userId}` reso
 [ref-api-roles]: /api-reference/roles/list-custom-roles
 [ref-api-auth]: /api-reference/authentication
 [ref-api-create-role]: /api-reference/roles/create-a-custom-role
+[ref-inspecting-queries]: /docs/explore-analyze/workbooks/querying-data#inspecting-queries
 [ref-api-create-deployment]: /api-reference/deployment-creation/create-a-deployment-with-an-empty-starter-project-and-trigger-its-first-build
 
 ## Reference: action catalog

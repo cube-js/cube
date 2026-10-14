@@ -9,11 +9,11 @@ The table visualization presents query results in a structured grid. Unlike the 
 
 ## Showing and hiding columns
 
-Right-click a column header in the table visualization to hide it. Hidden columns can be restored from the **Fields** section of the configuration panel. You can also hide columns from the column options menu (the three-dot menu on each column header).
+Hide a column with the eye button on its row in the **Fields** section of the **Fields** tab, and press it again to show the column. A hidden column keeps its place in the [pivot](#pivots), so it comes back where it was.
 
 ## Reordering columns
 
-Drag a column header to reorder columns. Dimensions and measures can be interspersed freely when no pivot is active.
+The table shows its columns in the order of the **Pivot** section of the **Fields** tab: the dimensions in **Rows** first, then the measures in **Values**. Drag a field within its list to reorder the columns. Moving a field to another list changes the [pivot](#pivots).
 
 ## Sorting
 
@@ -38,7 +38,6 @@ the columns. The **Pivot** section holds:
 Pivot behavior:
 - Pivot columns can be sorted by clicking the column header, including the totals column.
 - Pivot columns can also be sorted by row values — click a row number to sort by that row, including the totals row.
-- Pivoted columns can be hidden, but hiding is indexed to the specific value (e.g. hiding `status: returned`), not position.
 
 ### Pivot presets
 
@@ -133,7 +132,7 @@ Configure individual columns in the **Columns** section of the **Style** tab (or
 | **Vertical alignment** | Top, middle, or bottom — where the value sits when the row is taller than one line |
 | **Word wrap** | Allow cell content to wrap to multiple lines |
 | **Width** | **Flex** (a weight) or **Fix** (pixels) — see [Column width](#column-width) |
-| **Hide** | Show or hide the column |
+| **Freeze** | Keep the column and every column to its left in view on horizontal scroll — see [Freezing columns](#freezing-columns) |
 
 When a cell's value is too long for its column and word wrap is off, the value is truncated with an ellipsis. Hover over a truncated cell to see its full value in a tooltip.
 
@@ -165,7 +164,7 @@ You can mix the two: give a label column a fixed width and let the metric column
 At the top of the **Columns** section, three buttons apply a width mode to every column at once:
 
 - **Flex** — converts every column to flexible, deriving each weight from its current width (so the layout doesn't jump). Enabled only when at least one column is fixed.
-- **Fix** — freezes every column at its current rendered pixel width. Enabled only when at least one column is flexible.
+- **Fix** — sets every column to its current rendered pixel width. Enabled only when at least one column is flexible.
 - **Fit** — sizes every column to its content and fixes it at that width, in a single action. Like the per-column **Fit**, it measures the rows currently rendered on screen.
 
 <Note>
@@ -173,6 +172,41 @@ At the top of the **Columns** section, three buttons apply a width mode to every
 Under a column pivot, a width set on a measure applies to every column generated for that measure.
 
 </Note>
+
+## Freezing columns
+
+Freeze columns to keep them in view while the table scrolls horizontally — for example, the
+dimension columns that tell a viewer which row they are reading.
+
+Each column's card in the **Columns** section of the **Style** tab has a pin button at the end of
+its header:
+
+- Press the pin on a column to freeze that column and every column to its left. The pins of all
+  frozen columns show as pressed.
+- Press the pin on a frozen column to unfreeze it and every column to its right. On the first
+  column, this clears the freeze.
+- **Reset** in the **Columns** section restores the default freeze, together with the column
+  widths.
+
+A line on the right edge of the last frozen column shows where the scrolling part starts. The
+row-number column freezes along with the frozen columns. The freeze is saved with the chart, so
+it also applies on published and embedded dashboards and in snapshots. In the print layout,
+frozen columns print as ordinary columns.
+
+By default, a table with a [column pivot](#pivots) freezes all of its row-header columns, and a
+table without one freezes nothing. Under a column pivot, only the row-header columns can be
+frozen: a measure there spans one column per pivot value, so its pin is disabled. When the
+**Measures** placeholder is in **Rows**, the pins of the measures are disabled too. The
+measure-name column then freezes together with the row-header columns.
+
+With [per-group subtotals](#per-group-subtotals) on, all row-dimension columns freeze and unfreeze
+together, because a group's label spans all of them.
+
+A frozen column doesn't share the table's width by [weight](#column-width); to control its
+width, switch it to **Fix**. If the frozen columns leave no room to scroll in a narrow tile, the
+table shows them unfrozen until the tile is wide enough again.
+
+{/* TODO: screenshot — a scrolled table with two frozen columns and the pressed pins on their cards */}
 
 ## Showing columns as links, bars, sparklines, or images
 

@@ -66,13 +66,13 @@ recommended approach for straightforward table access (e.g., `sql_table: MY_SCHE
 
 ### Prerequisites
 
-The push integration uses the SQL Runner to execute DDL statements in Snowflake. To
-successfully create semantic views, ensure the following:
+The push integration executes DDL statements in Snowflake. To successfully create
+semantic views, ensure the following:
 
-- **Enable DDL operations** for your Cube deployment. In the Cube UI, go to
-  **Deployment Settings** → **Configuration** and turn on **Enable DDL operations**.
-  Without this setting, the SQL Runner will reject the DDL statements that the push
-  integration generates.
+- **Enable DDL operations in SQL** for your Cube deployment. In the Cube UI, go to
+  the deployment's **Settings** → **Configuration** and turn on **Enable DDL
+  operations in SQL** under **Configuration flags**. Without this setting, Cube
+  rejects the DDL statements that the push integration generates.
 - The Snowflake role configured for your Cube data source (via [`CUBEJS_DB_SNOWFLAKE_ROLE`](/reference/configuration/environment-variables#cubejs_db_snowflake_role))
   has privileges to create semantic views in the target database and schema
   (`CREATE SEMANTIC VIEW` on the schema, plus `USAGE` on the parent database and schema).
@@ -84,8 +84,8 @@ successfully create semantic views, ensure the following:
   is set consistently with how identifiers are defined in your Cube data model. The
   default value is `false`.
 
-If a push fails with a permissions error, verify that **Enable DDL operations** is
-turned on in your deployment configuration and that the configured role has the
+If a push fails with a permissions error, verify that **Enable DDL operations in SQL** is
+turned on in the deployment's **Settings** → **Configuration** and that the configured role has the
 required privileges listed above. See [Snowflake data source configuration](/admin/connect-to-data/data-sources/snowflake)
 for the full list of relevant environment variables.
 

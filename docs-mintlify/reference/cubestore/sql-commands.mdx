@@ -52,8 +52,10 @@ This connection is available when you run Cube Store yourself. Cube's cloud
 platform doesn't expose the Cube Store port, so you can't attach a MySQL client
 to it.
 
-You can still inspect query plans there: in the SQL Runner, pick the `cache` data
-source and run `EXPLAIN` or `EXPLAIN ANALYZE` against Cube Store. That path only
+You can still inspect query plans there: in [source SQL in
+Explore](/docs/explore-analyze/explore#querying-source-data), pick **Cube Store**
+(or the `cache` data source in the [SQL Runner](/docs/data-modeling/sql-runner))
+and run `EXPLAIN` or `EXPLAIN ANALYZE` against Cube Store. That path only
 accepts read-only statements, so the [cache and queue](#cache-and-queue) and
 [store maintenance and recovery](#store-maintenance-and-recovery) commands below
 are rejected before they reach Cube Store. If you need one of those, contact

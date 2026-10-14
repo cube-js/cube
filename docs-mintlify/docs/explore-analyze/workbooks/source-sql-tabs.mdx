@@ -5,17 +5,38 @@ description: Run warehouse-native SQL inside Workbooks—by hand or with AI help
 
 Source SQL Query tabs allow you to query your connected data sources directly, bypassing the semantic layer. Source SQL Query tabs can be used for prototyping your calculations before they would go into the semantic layer.
 
+Unlike [source SQL in Explore](/docs/explore-analyze/explore#querying-source-data),
+Source SQL tabs are saved with the workbook and can feed charts on dashboards.
+
 <Frame>
   <img src="https://lgo0ecceic.ucarecd.net/103fafdb-783c-46d0-9d5d-a4879bc11a9d/" />
 </Frame>
 
+## Adding a Source SQL tab
+
+To add a Source SQL tab, do one of the following:
+
+- In a new tab, click **Query Source Data**, or use the **Source tables**
+  tab.
+- Open the dropdown next to **Paste semantic SQL query** and select **Paste
+  source SQL query**.
+- In an existing tab, pick **Source SQL Query** in the query type picker.
+
+Source SQL tabs require the **Access SQL Runner** permission (`SqlRunnerRead`).
+The built-in Admin and Developer roles have it. Without it, these options are
+hidden, and dashboard widgets based on source SQL show **No access to source
+SQL**.
+
 ## Data sources
 
-The data sources sidebar lists every source declared on the deployment —
+The **Source Schemas** pane lists every source declared on the deployment —
 both the default source and any named sources added under
 [**Settings → Data Sources**](/admin/connect-to-data/multiple-data-sources).
 Newly added sources show up immediately; you don't have to wire them into
 a cube first.
+
+Expand a source to browse its schemas, tables, and columns. Click **Query
+table** to select the first 100 rows of a table and run the query.
 
 ## Querying methods
 
@@ -23,3 +44,14 @@ You can query source SQL in two ways:
 
 - **Write SQL manually** – Write standard SQL queries directly against your data source for maximum flexibility
 - **Ask AI** – Use the AI agent to help you research your data source, build SQL queries, and refine results in real-time
+
+Click **Run** or press **Cmd+Enter** (macOS) or **Ctrl+Enter** (Windows/Linux)
+to run the query. Results show up to 5,000 rows. When a query fails, click
+**Fix in chat** to have the agent fix it.
+
+Queries run with the [security context](/docs/explore-analyze/workbooks/querying-data#applying-a-security-context)
+selected in the header, if any.
+
+DDL statements, such as `CREATE` or `DROP`, run only when **Enable DDL
+operations in SQL** is turned on in the deployment's **Settings →
+Configuration**.
