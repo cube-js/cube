@@ -1014,6 +1014,13 @@ const variables: Record<string, (...args: any) => any> = {
     .asIntPositive(),
 
   /**
+   * Seconds a driver replaced by a `driverVersion` swap stays open for queries that already hold it
+   */
+  driverSwapReleaseDelay: (): number => get('CUBEJS_DRIVER_SWAP_RELEASE_DELAY')
+    .default(600)
+    .asIntPositive(),
+
+  /**
    * Maximum time for exponential backoff for pre-aggs (in seconds)
    */
   preAggBackoffMaxTime: (): number => get('CUBEJS_PRE_AGGREGATIONS_BACKOFF_MAX_TIME')

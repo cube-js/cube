@@ -83,7 +83,7 @@ const { version } = require('../../../package.json');
 /** A failed swap to one driver version is not retried for this long. */
 const DRIVER_SWAP_FAILURE_BACKOFF_MS = 10 * 1000;
 
-/** A swap back to the version replaced less than this long ago is reported as ping-pong. */
+/** A swap back to the version replaced less than this long before the swap started is reported as ping-pong. */
 const DRIVER_SWAP_PING_PONG_MS = 5 * 1000;
 
 /** `driverVersion` bookkeeping for one orchestrator api. */
@@ -105,24 +105,6 @@ type SwappedDriverRelease = {
   timer?: NodeJS.Timeout;
   release: () => Promise<void>;
 };
-
-function driverSwapReleaseDelayFromEnv(): number {
-  const value = process.env.CUBEJS_DRIVER_SWAP_RELEASE_DELAY;
-
-  if (value === undefined || value === '') {
-    return 600;
-  }
-
-  const seconds = Number(value);
-
-  if (!Number.isInteger(seconds) || seconds < 0) {
-    throw new Error(
-      `Invalid CUBEJS_DRIVER_SWAP_RELEASE_DELAY "${value}": must be a non-negative integer number of seconds.`
-    );
-  }
-
-  return seconds;
-}
 
 function wrapToFnIfNeeded<T, R>(possibleFn: T | ((a: R) => T)): (a: R) => T {
   if (typeof possibleFn === 'function') {
@@ -301,7 +283,7 @@ export class CubejsServerCore {
 
     this.contextToOrchestratorId = this.options.contextToOrchestratorId || (() => 'STANDALONE');
     this.contextToCubeStoreRouterId = this.options.contextToCubeStoreRouterId;
-    this.driverSwapReleaseDelay = this.options.driverSwapReleaseDelay ?? driverSwapReleaseDelayFromEnv();
+    this.driverSwapReleaseDelay = this.options.driverSwapReleaseDelay ?? getEnv('driverSwapReleaseDelay');
 
     // proactively free up old cache values occasionally
     if (this.options.maxCompilerCacheKeepAlive) {
@@ -1002,6 +984,8 @@ export class CubejsServerCore {
      * once, or none: on failure the old drivers and version stay.
      */
     const swapDrivers = async (swapContext: RequestContext, swapVersion: string, isLive: () => boolean) => {
+      // Before the build: a slow testConnection() must not stretch the gap past the ping-pong window
+      const startedAt = Date.now();
       const replacements = new Map<Promise<BaseDriver>, { previous: BaseDriver | null, next: BaseDriver | null }>();
       const inUse = new Set<BaseDriver>();
 
@@ -1119,7 +1103,7 @@ export class CubejsServerCore {
       if (
         swapVersion === state.previousVersion &&
         state.lastSwapAt !== undefined &&
-        now - state.lastSwapAt < DRIVER_SWAP_PING_PONG_MS
+        startedAt - state.lastSwapAt < DRIVER_SWAP_PING_PONG_MS
       ) {
         this.logger('Driver Swap Ping-Pong', {
           orchestratorId,
