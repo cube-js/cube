@@ -82,7 +82,7 @@ const { version } = require('../../../package.json');
 /** A failed swap to one driver version is not retried for this long. */
 const DRIVER_SWAP_FAILURE_BACKOFF_MS = 10 * 1000;
 
-/** Swaps of one orchestrator closer together than this are reported as ping-pong. */
+/** A swap back to the version replaced less than this long ago is reported as ping-pong. */
 const DRIVER_SWAP_PING_PONG_MS = 5 * 1000;
 
 /** `driverVersion` bookkeeping for one orchestrator api. */
@@ -94,6 +94,8 @@ type DriverVersionState = {
   swapping?: { version: string, promise: Promise<void> };
   lastFailure?: { version: string, at: number, reported: boolean };
   lastSwapAt?: number;
+  /** The version the last swap replaced */
+  previousVersion?: string;
   /** Resolves false, installing nothing, when `isLive` turns false before the install. */
   swapDrivers: (context: RequestContext, version: string, isLive: () => boolean) => Promise<boolean>;
 };
@@ -1048,15 +1050,21 @@ export class CubejsServerCore {
         }
       });
 
-      if (state.lastSwapAt !== undefined && now - state.lastSwapAt < DRIVER_SWAP_PING_PONG_MS) {
+      // Two forward swaps in a row are normal (two credentials rotating a moment apart); flipping back is not
+      if (
+        swapVersion === state.previousVersion &&
+        state.lastSwapAt !== undefined &&
+        now - state.lastSwapAt < DRIVER_SWAP_PING_PONG_MS
+      ) {
         this.logger('Driver Swap Ping-Pong', {
           orchestratorId,
-          warning: `Drivers were swapped twice within ${DRIVER_SWAP_PING_PONG_MS / 1000}s. contextToOrchestratorId must give ` +
+          warning: `Drivers were swapped back to the version they replaced within ${DRIVER_SWAP_PING_PONG_MS / 1000}s. contextToOrchestratorId must give ` +
             'contexts with different driverVersion values different ids, or they keep replacing each other\'s drivers.',
         });
       }
 
       ctxRef.current = swapContext;
+      state.previousVersion = state.version;
       state.version = swapVersion;
       state.lastSwapAt = now;
 

@@ -484,6 +484,24 @@ describe('driverVersion', () => {
     expect(await driver()).toMatchObject({ builtFrom: { password: 'b' } });
   });
 
+  test('consecutive forward swaps within 5s are not ping-pong', async () => {
+    let now = Date.parse('2026-01-01T00:00:00Z');
+    jest.spyOn(Date, 'now').mockImplementation(() => now);
+
+    const { request, driver, logged } = createCore();
+
+    await request('a');
+    await driver();
+
+    await request('b');
+    now += 400;
+    await request('c');
+
+    expect(logged('Driver Swap')).toHaveLength(2);
+    expect(logged('Driver Swap Ping-Pong')).toHaveLength(0);
+    expect(await driver()).toMatchObject({ builtFrom: { password: 'c' } });
+  });
+
   test('a driverVersion error fails a request that carries a security context', async () => {
     const { request, driver, driverFactory } = createCore({
       driverVersion: (ctx: any) => {
