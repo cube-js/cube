@@ -304,7 +304,7 @@ export class ScaffoldingSchema {
 
   private cubeName(table: string) {
     return toIdentifier(
-      this.options.snakeCase ? toSnakeCase(table) : inflection.camelize(table.replace(/[^A-Za-z0-9]+/g, '_'))
+      this.options.snakeCase ? toSnakeCase(table) : inflection.camelize(table.replace(/[^\p{L}\p{N}]+/gu, '_'))
     );
   }
 

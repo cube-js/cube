@@ -55,4 +55,16 @@ describe('Scaffolding identifiers that start with a digit', () => {
       });
     });
   });
+
+  it('keeps distinct file names for non-Latin table names in camelCase', () => {
+    const template = new ScaffoldingTemplate({
+      public: {
+        заказы: [{ name: 'id', type: 'integer', attributes: ['primaryKey'] }],
+        клиенты: [{ name: 'id', type: 'integer', attributes: ['primaryKey'] }],
+      },
+    }, driver, { format: SchemaFormat.JavaScript, snakeCase: false });
+
+    const fileNames = template.generateFilesByTableNames(['public.заказы', 'public.клиенты']).map((f) => f.fileName);
+    expect(fileNames).toEqual(['Заказы.js', 'Клиенты.js']);
+  });
 });
