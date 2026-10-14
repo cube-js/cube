@@ -1304,6 +1304,17 @@ deprecated and no longer happens; Cube prints a warning if it sees a non-product
 
 <DevModeWarning />
 
+## `CUBEJS_DRIVER_SWAP_RELEASE_DELAY`
+
+The number of seconds a driver replaced because
+[`driver_version`](/reference/configuration/config#driver_version) changed stays
+open before it is released. The `driverSwapReleaseDelay` configuration option
+takes precedence over it.
+
+| Possible Values             | Default |
+| --------------------------- | ------- |
+| A non-negative whole number | `600`   |
+
 ## `CUBEJS_DROP_PRE_AGG_WITHOUT_TOUCH`
 
 If `true`, it enables dropping pre-aggregations that Refresh Worker doesn't
