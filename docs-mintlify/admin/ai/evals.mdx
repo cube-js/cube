@@ -296,8 +296,11 @@ run's scope is repeated in the header, next to **Questions**.
   Markdown. Long answers are truncated.
 
 The results endpoint and the CLI's `--json` output return these details for
-each question in the fields shown in parentheses. A field with nothing to show
-is `null`, or an empty array for `scoreReasons`.
+each question in the fields shown in parentheses. `scoreReasons` holds the
+labels exactly as the UI shows them, such as `"Row count mismatch"`. They are
+display text, not stable codes, and new labels can appear, so gate CI on
+`verdict` and print the reasons rather than match on them. A field with nothing
+to show is `null`, or an empty array for `scoreReasons`.
 
 ## How grading works
 
