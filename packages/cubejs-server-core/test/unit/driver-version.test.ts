@@ -246,18 +246,46 @@ describe('driverVersion', () => {
     expect(first.releases).toEqual(1);
   });
 
-  test('a data source and its pre-aggregation alias are swapped together', async () => {
+  const lookupOrders: Array<[string, boolean]> = [
+    ['the data source first', false],
+    ['its pre-aggregations first', true],
+  ];
+
+  test.each(lookupOrders)('a data source and its pre-aggregations share one driver, swapped together, asked for %s', async (_name, preAggregationsFirst) => {
     const { request, driver, driverFactory } = createCore();
 
     await request('a');
-    const first = await driver();
-    expect(await driver('default', true)).toBe(first);
+    const first = await driver('default', preAggregationsFirst);
+
+    expect(await driver('default', !preAggregationsFirst)).toBe(first);
+    expect(built).toHaveLength(1);
 
     await request('b');
 
     expect(driverFactory).toHaveBeenCalledTimes(2);
     expect(await driver()).toBe(built[1]);
     expect(await driver('default', true)).toBe(built[1]);
+  });
+
+  test('separate pre-aggregation credentials keep a separate driver through a swap', async () => {
+    process.env.CUBEJS_PRE_AGGREGATIONS_DB_HOST = 'pre-aggregations.example.com';
+
+    try {
+      const { request, driver } = createCore();
+
+      await request('a');
+      const regular = await driver();
+      const preAggregations = await driver('default', true);
+
+      expect(preAggregations).not.toBe(regular);
+
+      await request('b');
+
+      expect(built).toHaveLength(4);
+      expect(await driver()).not.toBe(await driver('default', true));
+    } finally {
+      delete process.env.CUBEJS_PRE_AGGREGATIONS_DB_HOST;
+    }
   });
 
   test('a factory returning constructed drivers is swapped', async () => {
@@ -288,6 +316,115 @@ describe('driverVersion', () => {
     await core.releaseConnections();
 
     expect(shared.releases).toEqual(0);
+  });
+
+  // A factory that caches one driver per credential hands an earlier driver back
+  function createCachingCore() {
+    const instances: Record<string, FakeDriver> = {};
+
+    return {
+      instances,
+      ...createCore({
+        driverFactory: (ctx: any) => {
+          const { token } = ctx.securityContext;
+          instances[token] = instances[token] || new FakeDriver({ password: token });
+
+          return instances[token];
+        },
+      }),
+    };
+  }
+
+  test('a driver reinstalled by a later swap is not released by the earlier one', async () => {
+    jest.useFakeTimers({ doNotFake: ['nextTick', 'setImmediate'] });
+
+    const { request, driver, instances } = createCachingCore();
+
+    await request('a');
+    await driver();
+    await request('b');
+
+    jest.advanceTimersByTime(1000);
+    await request('a');
+
+    expect(await driver()).toBe(instances.a);
+
+    jest.advanceTimersByTime(600 * 1000);
+    await flush();
+
+    expect(instances.a.releases).toEqual(0);
+    expect(instances.b.releases).toEqual(1);
+  });
+
+  test('a failed swap back to a driver awaiting release leaves it to its timer', async () => {
+    jest.useFakeTimers({ doNotFake: ['nextTick', 'setImmediate'] });
+
+    const { request, driver, instances } = createCachingCore();
+
+    await request('a');
+    await driver();
+    await request('b');
+
+    onTestConnection = (d) => {
+      if (d === instances.a) {
+        throw new Error('bad credential');
+      }
+    };
+
+    await expect(request('a')).rejects.toThrow('bad credential');
+
+    expect(await driver()).toBe(instances.b);
+    expect(instances.a.releases).toEqual(0);
+
+    jest.advanceTimersByTime(600 * 1000);
+    await flush();
+
+    expect(instances.a.releases).toEqual(1);
+  });
+
+  test('a swap finishing after the orchestrator left the cache installs nothing and re-resolves', async () => {
+    // Released apis then stay unmarked, so only the cache check can catch this
+    jest.spyOn(OrchestratorApi.prototype, 'release').mockImplementation(async () => undefined);
+
+    const { core, request, driver } = createCore();
+
+    const original = await request('a');
+    const first = await driver();
+
+    const testing = gate();
+    onTestConnection = (d) => (d.builtFrom.password === 'b' ? testing.opened : undefined);
+
+    const swapping = request('b');
+    await waitFor(() => built.length === 2);
+
+    await core.releaseConnections();
+    testing.open();
+
+    const api = await swapping;
+
+    expect(built[1].releases).toEqual(1);
+    expect(await driver()).toBe(first);
+    expect(api).not.toBe(original);
+  });
+
+  test('a swap finishing after its orchestrator was released installs nothing', async () => {
+    const { request, driver } = createCore();
+
+    const original = await request('a');
+    const first = await driver();
+
+    const testing = gate();
+    onTestConnection = (d) => (d.builtFrom.password === 'b' ? testing.opened : undefined);
+
+    const swapping = request('b');
+    await waitFor(() => built.length === 2);
+
+    await original.release();
+    testing.open();
+
+    expect(await swapping).toBe(original);
+    expect(built[1].releases).toEqual(1);
+    expect(await driver()).toBe(first);
   });
 
   test('a data source first used after a swap is built from the new context', async () => {
@@ -347,7 +484,27 @@ describe('driverVersion', () => {
     expect(await driver()).toMatchObject({ builtFrom: { password: 'b' } });
   });
 
-  test('a throwing driverVersion does not swap and does not fail the request', async () => {
+  test('a driverVersion error fails a request that carries a security context', async () => {
+    const { request, driver, driverFactory } = createCore({
+      driverVersion: (ctx: any) => {
+        if (ctx.securityContext.token === 'broken') {
+          throw new Error('token store unavailable');
+        }
+
+        return ctx.securityContext.token;
+      },
+    });
+
+    await request('a');
+    const first = await driver();
+
+    await expect(request('broken')).rejects.toThrow('token store unavailable');
+
+    expect(await driver()).toBe(first);
+    expect(driverFactory).toHaveBeenCalledTimes(1);
+  });
+
+  test('a driverVersion error without a security context does not swap or fail the request', async () => {
     const { request, driver, driverFactory, logged } = createCore();
 
     await request('a');
