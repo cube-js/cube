@@ -56,7 +56,10 @@ A scheduled task run notification has the task name in the title, for
 example **Daily signups finished** or **Daily signups failed**. For a finished
 run, it shows the start of the agent's answer. If the answer has no text, for
 example when the run only built a chart, it shows how the run started and how
-long it took. For a failed run, it shows the error.
+long it took. For a failed run, it shows the error. For a run that a
+[conditional task's][ref-conditional-tasks] condition started, the title reads
+**Daily signups: condition met**, and it shows the change the check found
+instead of the answer.
 
 The inbox does not send notifications by email or Slack. Alerts and budgets send
 their own email, as set up on the alert or budget, and end-of-support notices
@@ -94,6 +97,7 @@ Cube asks you to confirm both actions. You can't undo a delete.
 [ref-budgets]: /admin/account-billing/budgets
 [ref-scheduled-tasks]: /docs/explore-analyze/scheduled-tasks
 [ref-scheduled-task-notifications]: /docs/explore-analyze/scheduled-tasks#getting-notified-when-a-run-finishes
+[ref-conditional-tasks]: /docs/explore-analyze/scheduled-tasks#conditional-tasks
 [ref-update-channels]: /admin/deployment#update-channels
 [ref-scheduled-refreshes]: /docs/explore-analyze/scheduled-refreshes
 [ref-dbt]: /docs/integrations/dbt
