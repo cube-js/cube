@@ -604,7 +604,9 @@ that request's context, tests their connections, and only then switches queries
 to them. Return `undefined` to keep the cached drivers.
 
 Called on each request, including the readiness probe, which passes an empty
-context. An error is logged and treated as `undefined`.
+context. An error fails the request, so a failed credential lookup cannot keep
+serving the previous drivers. For a context without a security context, such as
+the readiness probe's, the error is logged and treated as `undefined`.
 
 <Warning>
 
