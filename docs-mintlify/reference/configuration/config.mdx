@@ -603,10 +603,12 @@ than the one the cached drivers were built for, Cube builds new drivers from
 that request's context, tests their connections, and only then switches queries
 to them. Return `undefined` to keep the cached drivers.
 
-Called on each request, including the readiness probe, which passes an empty
-context. An error fails the request, so a failed credential lookup cannot keep
-serving the previous drivers. For a context without a security context, such as
-the readiness probe's, the error is logged and treated as `undefined`.
+Called on every orchestrator lookup: once per API request, many times per
+scheduled refresh run (with the refresh worker's contexts), and by the readiness
+probe with an empty context. Keep it a cheap lookup, not a token fetch. An error
+fails the request or the scheduled refresh, so a failed credential lookup cannot
+keep serving the previous drivers. For a context without a security context,
+such as the readiness probe's, the error is logged and treated as `undefined`.
 
 <Warning>
 
@@ -638,9 +640,6 @@ module.exports = {
   },
 
   driverVersion: ({ securityContext }) => {
-    if (!securityContext) {
-      return undefined
-    }
     return `${getToken(securityContext.tenant_id).issuedAt}`
   },
 

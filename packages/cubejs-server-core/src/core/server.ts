@@ -95,7 +95,6 @@ type DriverVersionState = {
   swapping?: { version: string, promise: Promise<void> };
   lastFailure?: { version: string, at: number, reported: boolean };
   lastSwapAt?: number;
-  /** The version the last swap replaced */
   previousVersion?: string;
   /** Resolves false, installing nothing, when `isLive` turns false before the install. */
   swapDrivers: (context: RequestContext, version: string, isLive: () => boolean) => Promise<boolean>;
@@ -187,8 +186,7 @@ export class CubejsServerCore {
 
   protected readonly contextToCubeStoreRouterId: ContextToCubeStoreRouterIdFn | null;
 
-  /** Seconds; see `CreateOptions.driverSwapReleaseDelay`. */
-  protected readonly driverSwapReleaseDelay: number;
+  protected readonly driverSwapReleaseDelaySeconds: number;
 
   protected readonly preAggregationsSchema: PreAggregationsSchemaFn;
 
@@ -283,7 +281,7 @@ export class CubejsServerCore {
 
     this.contextToOrchestratorId = this.options.contextToOrchestratorId || (() => 'STANDALONE');
     this.contextToCubeStoreRouterId = this.options.contextToCubeStoreRouterId;
-    this.driverSwapReleaseDelay = this.options.driverSwapReleaseDelay ?? getEnv('driverSwapReleaseDelay');
+    this.driverSwapReleaseDelaySeconds = this.options.driverSwapReleaseDelay ?? getEnv('driverSwapReleaseDelay');
 
     // proactively free up old cache values occasionally
     if (this.options.maxCompilerCacheKeepAlive) {
@@ -803,7 +801,6 @@ export class CubejsServerCore {
     return orchestratorApi;
   }
 
-  /** Whether a swap to `requested` failed too recently to be retried. */
   protected isDriverSwapBackingOff(state: DriverVersionState, requested: string): boolean {
     const { lastFailure } = state;
 
@@ -869,7 +866,7 @@ export class CubejsServerCore {
     };
 
     // Past 2^31-1 ms setTimeout fires at once, which would release the driver under its queries
-    entry.timer = setTimeout(entry.release, Math.min(this.driverSwapReleaseDelay * 1000, 2 ** 31 - 1));
+    entry.timer = setTimeout(entry.release, Math.min(this.driverSwapReleaseDelaySeconds * 1000, 2 ** 31 - 1));
     entry.timer.unref();
 
     this.swappedDriverReleases.set(driver, entry);
