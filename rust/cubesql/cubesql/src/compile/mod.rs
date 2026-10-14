@@ -6879,11 +6879,7 @@ ORDER BY
             DatabaseProtocol::PostgreSQL,
         )
         .await?;
-        assert!(
-            result.contains("t1") && result.contains("t2"),
-            "{}",
-            result
-        );
+        assert!(result.contains("t1") && result.contains("t2"), "{}", result);
 
         Ok(())
     }

@@ -2527,17 +2527,16 @@ async fn create_table_with_url(service: Box<dyn SqlClient>) -> Result<(), CubeEr
 async fn create_table_with_many_urls_connection_limit(
     service: Box<dyn SqlClient>,
 ) -> Result<(), CubeError> {
-    let (server, peak_connections) = serve_file_with_connection_limit(
-        "id,v\n1,a\n".to_string(),
-        32,
-        Duration::from_millis(200),
-    )
-    .await?;
+    let (server, peak_connections) =
+        serve_file_with_connection_limit("id,v\n1,a\n".to_string(), 32, Duration::from_millis(200))
+            .await?;
     let locations = (0..256)
         .map(|i| format!("'{}'", server.url(&format!("part_{}.csv", i))))
         .join(", ");
 
-    service.exec_query("CREATE SCHEMA IF NOT EXISTS foo").await?;
+    service
+        .exec_query("CREATE SCHEMA IF NOT EXISTS foo")
+        .await?;
     service
         .exec_query(&format!(
             "CREATE TABLE foo.many_files (id int, v text) WITH (input_format = 'csv') LOCATION {}",

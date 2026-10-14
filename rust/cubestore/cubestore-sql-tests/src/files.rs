@@ -164,8 +164,7 @@ pub async fn serve_file_with_connection_limit(
             let body = body.clone();
             let open = open.clone();
             tokio::spawn(async move {
-                if let Err(e) = serve_one_request_with_head_delay(socket, &body, head_delay).await
-                {
+                if let Err(e) = serve_one_request_with_head_delay(socket, &body, head_delay).await {
                     log::error!("Test file server: {}", e);
                 }
                 open.fetch_sub(1, Ordering::SeqCst);
