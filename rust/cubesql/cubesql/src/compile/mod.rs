@@ -6855,6 +6855,35 @@ ORDER BY
         Ok(())
     }
 
+    /// https://github.com/cube-js/cube/issues/10320
+    /// Felt introspects tables with a CTE whose body is a UNION ALL, referenced by its
+    /// name without an alias and joined to pg_namespace. Columns of such a CTE must be
+    /// addressable by the CTE name, like in PostgreSQL.
+    #[tokio::test]
+    async fn test_issue_10320_union_cte_qualified_column_in_join() -> Result<(), CubeError> {
+        init_testing_logger();
+
+        let result = execute_query(
+            "
+            WITH all_tables AS (
+                SELECT 'public' AS relation_schema, 't1' AS relation_name
+                UNION ALL
+                SELECT 'public' AS relation_schema, 't2' AS relation_name
+            )
+            SELECT all_tables.*
+            FROM all_tables
+            JOIN pg_namespace AS n ON n.nspname = all_tables.relation_schema
+            ORDER BY all_tables.relation_name
+            ;"
+            .to_string(),
+            DatabaseProtocol::PostgreSQL,
+        )
+        .await?;
+        assert!(result.contains("t1") && result.contains("t2"), "{}", result);
+
+        Ok(())
+    }
+
     #[tokio::test]
     async fn test_cast_decimal_default_precision() -> Result<(), CubeError> {
         if !Rewriter::sql_push_down_enabled() {
