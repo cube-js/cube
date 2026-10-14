@@ -135,6 +135,7 @@ Make sure to use correct terms. On billing, pricing, and support pages, use **on
       - Scheduled refresh
         - Data alert
       - Review (revisions, reviewers, approvals)
+      - Saved control values (a viewer's personal control combinations, under the **Control values** icon; separate from Favorites)
     - **Semantic Model**
       - Semantic Model IDE (short: "IDE")
       - Semantic Model Agent
