@@ -473,7 +473,8 @@ of distinct ids should stay at or below **Number of clusters**.
 A function to provide a custom configuration for the data source driver.
 
 Called once per [`data_source`][ref-schema-ref-datasource] for every
-[orchestrator id][self-orchestrator-id].
+[orchestrator id][self-orchestrator-id], and again when
+[`driver_version`](#driver_version) changes.
 
 {/* TODO: Check with Pavel */}
 
@@ -561,6 +562,83 @@ Cube's own drivers can also be loaded with a named ESM import instead of `requir
 ```javascript
 import { PostgresDriver } from '@cubejs-backend/postgres-driver'
 ```
+
+### `driver_version`
+
+A function that returns a version string for the credentials
+[`driver_factory`](#driver_factory) resolves for a context, such as the issue
+time of an OAuth token. Drivers are cached per data source for every
+[orchestrator id][self-orchestrator-id]. When a request returns a version other
+than the one the cached drivers were built for, Cube builds new drivers from
+that request's context, tests their connections, and only then switches queries
+to them. Return `undefined` to keep the cached drivers.
+
+Called on each request, including the readiness probe, which passes an empty
+context. An error is logged and treated as `undefined`.
+
+<Warning>
+
+[`context_to_orchestrator_id`][self-orchestrator-id] must give contexts that
+can return different versions different ids. Otherwise they keep replacing each
+other's drivers, and Cube logs a warning when drivers are replaced more than
+once in 5 seconds.
+
+</Warning>
+
+If a new driver fails to connect, the request that triggered the switch fails,
+the previous drivers stay in use, and the same version is not retried for 10
+seconds. A replaced driver stays open for
+[`CUBEJS_DRIVER_SWAP_RELEASE_DELAY`](/reference/configuration/environment-variables#cubejs_driver_swap_release_delay)
+seconds (600 by default, or the `driverSwapReleaseDelay` option) so queries
+already running on it can finish, and is released after that. The Cube Store
+driver is not replaced.
+
+<Info>
+
+`driver_version` is available in JavaScript configuration only. Python support
+will follow; the Python example shows the intended shape.
+
+</Info>
+
+<CodeGroup>
+
+```python title="Python"
+from cube import config
+from token_cache import get_token
+
+@config('driver_version')
+def driver_version(ctx: dict) -> str | None:
+  security_context = ctx.get('securityContext')
+  if not security_context:
+    return None
+  return str(get_token(security_context['tenant_id'])['issued_at'])
+```
+
+```javascript title="JavaScript"
+const { getToken } = require('./token-cache')
+
+module.exports = {
+  contextToOrchestratorId: ({ securityContext }) => {
+    return `CUBE_APP_${securityContext.tenant_id}`
+  },
+
+  driverVersion: ({ securityContext }) => {
+    if (!securityContext) {
+      return undefined
+    }
+    return `${getToken(securityContext.tenant_id).issuedAt}`
+  },
+
+  driverFactory: ({ securityContext }) => {
+    return {
+      type: 'databricks-jdbc',
+      token: getToken(securityContext.tenant_id).accessToken
+    }
+  }
+}
+```
+
+</CodeGroup>
 
 ### `orchestrator_options`
 

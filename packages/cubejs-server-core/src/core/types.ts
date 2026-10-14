@@ -134,6 +134,7 @@ export type DatabaseType =
 export type ContextToAppIdFn = (context: RequestContext) => string | Promise<string>;
 export type ContextToGroupsFn = (context: RequestContext) => string[] | Promise<string[]>;
 export type ContextToOrchestratorIdFn = (context: RequestContext) => string | Promise<string>;
+export type DriverVersionFn = (context: RequestContext) => string | undefined | Promise<string | undefined>;
 export type ContextToCubeStoreRouterIdFn = (context: RequestContext) => string | Promise<string>;
 
 export type OrchestratorOptionsFn = (context: RequestContext) => OrchestratorOptions | Promise<OrchestratorOptions>;
@@ -204,6 +205,13 @@ export interface CreateOptions {
   contextToAppId?: ContextToAppIdFn;
   contextToGroups?: ContextToGroupsFn;
   contextToOrchestratorId?: ContextToOrchestratorIdFn;
+  /**
+   * Version of the credentials `driverFactory` resolves for a context. When it
+   * changes, the orchestrator's cached drivers are rebuilt from the new context.
+   */
+  driverVersion?: DriverVersionFn;
+  /** Seconds a driver replaced by a `driverVersion` change stays open before release. */
+  driverSwapReleaseDelay?: number;
   contextToCubeStoreRouterId?: ContextToCubeStoreRouterIdFn;
   contextToApiScopes?: ContextToApiScopesFn;
   repositoryFactory?: (context: RequestContext) => SchemaFileRepository;
