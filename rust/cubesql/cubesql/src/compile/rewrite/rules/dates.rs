@@ -772,9 +772,12 @@ impl DateRules {
         let data_type_var = var!(data_type_var);
         let transform_root_alias = self.transform_root_alias(alias_var);
         move |egraph, root, subst| {
-            let is_timestamp = var_iter!(egraph[subst[data_type_var]], CastExprDataType)
-                .any(|data_type| data_type == &DataType::Timestamp(TimeUnit::Nanosecond, None));
-            is_timestamp && transform_root_alias(egraph, root, subst)
+            if !var_iter!(egraph[subst[data_type_var]], CastExprDataType)
+                .any(|data_type| data_type == &DataType::Timestamp(TimeUnit::Nanosecond, None))
+            {
+                return false;
+            }
+            transform_root_alias(egraph, root, subst)
         }
     }
 
