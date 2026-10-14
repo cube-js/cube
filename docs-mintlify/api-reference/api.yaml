@@ -709,9 +709,9 @@ paths:
 
 
           Pass `layout: print` with `format: pdf` for the paginated A4 document the dashboard's
-          "Print version" menu item produces — one column, every table row, the filter state as a
-          summary line — instead of the default `screenshot` of the board. `print` with `format:
-          png` returns `400`.
+          "Download print version" menu item produces — one column, every table row, the filter
+          state as a summary line — instead of the default `screenshot` of the board. `print` with
+          `format: png` returns `400`.
 
 
           By default the dashboard renders under the calling user's own security context, so the
@@ -16287,9 +16287,9 @@ components:
           default: screenshot
           description: >-
             How the dashboard is laid out. `screenshot` (the default) renders the board as it looks
-            on screen. `print` renders the paginated A4 document the dashboard's 'Print version'
-            menu item produces: one column, every table row, and the filter state as a summary line
-            instead of filter controls. `print` is available for `format: 'pdf'` only.
+            on screen. `print` renders the paginated A4 document the dashboard's 'Download print
+            version' menu item produces: one column, every table row, and the filter state as a
+            summary line instead of filter controls. `print` is available for `format: 'pdf'` only.
           oneOf:
             - $ref: '#/components/schemas/StartDashboardExportInputLayout'
             - type: 'null'
