@@ -427,6 +427,26 @@ describe('driverVersion', () => {
     expect(await driver()).toBe(first);
   });
 
+  test('a request that waited on a swap to another version then swaps to its own', async () => {
+    const { request, driver, logged } = createCore();
+
+    await request('a');
+    await driver();
+
+    const testing = gate();
+    onTestConnection = (d) => (d.builtFrom.password === 'b' ? testing.opened : undefined);
+
+    const toB = request('b');
+    await waitFor(() => built.length === 2);
+    const toC = request('c');
+
+    testing.open();
+    await Promise.all([toB, toC]);
+
+    expect(await driver()).toMatchObject({ builtFrom: { password: 'c' } });
+    expect(logged('Driver Swap')).toHaveLength(2);
+  });
+
   test('a data source first used after a swap is built from the new context', async () => {
     const { request, driver, driverFactory } = createCore();
 
