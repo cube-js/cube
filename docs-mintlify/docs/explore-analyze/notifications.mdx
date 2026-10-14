@@ -15,7 +15,13 @@ Notifications let you send email or Slack messages with a screenshot of a
 dashboard after each [scheduled refresh][ref-scheduled-refreshes]. This is useful
 for distributing regular updates to stakeholders without requiring them to log in.
 They can optionally carry a short [AI-generated summary](#ai-summary) of what
-changed since the previous notification.
+changed since the previous notification. To send them only when a value on the
+dashboard meets a condition, add a [data alert][ref-data-alerts] to the schedule.
+
+By default a notification shows the dashboard the way it opens. To send one
+slice of it instead, set the schedule's [control values][ref-control-values]:
+the [attachment](#dashboard-attachment), in every format, the AI summary, and
+the dashboard link in the message all use them.
 
 For in-app notifications about mentions, alerts, budgets, new Cube versions, and
 the changelog, see [Inbox][ref-inbox].
@@ -45,16 +51,18 @@ radio buttons:
   workspace first (one-time OAuth flow via **Connect to Slack**). Once
   connected, select a channel from a searchable picker.
 
-### Screenshot attachment
+### Dashboard attachment
 
-Choose the format for the dashboard screenshot attached to the notification:
+Choose the format of the dashboard file attached to the notification:
 
 - **PNG** (default)
-- **PDF**
+- **PDF** — the dashboard's grid as it is laid out on screen.
+- **Print version** — the dashboard's [print version][ref-print-version], laid
+  out for A4 pages rather than captured as it looks on screen.
 
-Select the format using the **Attach screenshot as** option. The same
-formats are available for ad-hoc [downloads from the dashboard
-header][ref-download].
+Select the format using the **Attach dashboard as** option, for email and
+Slack alike. The same formats are available for ad-hoc [downloads from the
+dashboard header][ref-download].
 
 ### AI summary
 
@@ -93,6 +101,9 @@ agent run per recipient per send, which is why the option is off by default.
 If the summary can't be generated — the agent is unavailable, or the run takes
 too long — the notification is still delivered, without the note.
 
+On a schedule with a [data alert][ref-data-alerts], the summary is generated
+only on the runs where the alert fires.
+
 <Tip>
 
 This is not the same as the [AI summary widget][ref-ai-widget], which lives on
@@ -110,7 +121,8 @@ notification card header before saving.
 ## Email notifications
 
 Email notifications are sent to the selected recipients after a scheduled
-refresh completes. Each recipient receives a message with a link to the
+refresh completes — or, on a schedule with a [data alert][ref-data-alerts], only
+when the alert fires. Each recipient receives a message with a link to the
 dashboard and the attached screenshot.
 
 <Tip>
@@ -179,6 +191,7 @@ This is a one-time setup. Once connected, you can select any channel your Slack
 workspace has access to.
 
 [ref-download]: /docs/explore-analyze/dashboards#download-as-png-or-pdf
+[ref-print-version]: /docs/explore-analyze/dashboards#print-version
 [ref-roles]: /admin/users-and-permissions/roles-and-permissions
 [ref-scheduled-refreshes]: /docs/explore-analyze/scheduled-refreshes
 [ref-duplicate]: /docs/explore-analyze/scheduled-refreshes#duplicating-a-schedule
@@ -187,3 +200,5 @@ workspace has access to.
 [ref-agents]: /admin/ai
 [ref-ai-widget]: /docs/explore-analyze/dashboards/widgets/ai-summary
 [ref-inbox]: /docs/inbox
+[ref-data-alerts]: /docs/explore-analyze/data-alerts
+[ref-control-values]: /docs/explore-analyze/scheduled-refreshes#control-values

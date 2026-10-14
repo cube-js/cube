@@ -52,6 +52,12 @@ On a workbook, **Can edit** lets a user edit its dashboard in the
 dashboard builder and publish it. Deleting or moving the workbook and
 changing who it is shared with require **Full access**.
 
+On a dashboard that requires [review][ref-reviews], **Can edit** lets a
+user request a review, comment on it and publish it once a reviewer has
+approved it. Turning review on or off, choosing default reviewers and
+sharing with a reviewer who has no access require **Full access**.
+Reviewers need **Can view**.
+
 An access level never grants more than the user's [role][ref-roles]
 allows. A Viewer given **Can edit** on a workbook still can't edit it or
 its dashboard.
@@ -229,5 +235,6 @@ interface.
 [ref-excel]: /docs/integrations/microsoft-excel
 [ref-signed-embedding]: /embedding/iframe/auth/signed
 [ref-comments]: /docs/explore-analyze/dashboards/comments
+[ref-reviews]: /docs/explore-analyze/dashboards/reviews
 [ref-comments-delete]: /docs/explore-analyze/dashboards/comments#editing-and-deleting
 [ref-comments-toggle]: /docs/explore-analyze/dashboards/comments#turn-it-on

@@ -9052,6 +9052,7 @@ components:
       enum:
         - png
         - pdf
+        - pdf_print
       type: string
     CreateNotificationInputScheduleType:
       enum:
@@ -9281,6 +9282,16 @@ components:
           description: The agent that runs the task. Omit for the deployment default.
           oneOf:
             - type: integer
+            - type: 'null'
+        condition:
+          description: >-
+            Notify only when: on each fire the measure is read once, before the agent runs, and the
+            agent runs only when the condition starts to hold, with the crossing facts at the top of
+            its thread; it runs again only after the condition has stopped holding. A `change` or
+            `anomaly` rule needs `timeDimension` and `granularity`. The creator gets an inbox row
+            only with `notificationEnabled: true`. Omit to run the agent on every fire.
+          oneOf:
+            - $ref: '#/components/schemas/ScheduledTaskCondition'
             - type: 'null'
         cronExpression:
           description: >-
@@ -9979,7 +9990,9 @@ components:
           pattern: .+\..+
           type: string
         operator:
-          description: Filter operator (defaults to "equals")
+          description: >-
+            Filter operator (defaults to "equals"; with an empty value, omitting it clears the
+            control instead)
           oneOf:
             - $ref: '#/components/schemas/DashboardFilterInputOperator'
             - type: 'null'
@@ -9991,7 +10004,8 @@ components:
         value:
           description: >-
             Filter value. Omit for is_null / is_not_null / is_empty / is_not_empty; provide a
-            2-element [start, end] array for between.
+            2-element [start, end] array for between. An empty array or empty string with no
+            operator renders the filter cleared; with an operator, the filter keeps that operator.
           oneOf:
             - oneOf:
                 - type: string
@@ -10017,6 +10031,12 @@ components:
         - not_starts_with
         - ends_with
         - not_ends_with
+        - in_month
+        - not_in_month
+        - in_quarter
+        - not_in_quarter
+        - in_year
+        - not_in_year
         - is_null
         - is_not_null
         - is_empty
@@ -10038,6 +10058,12 @@ components:
         - not_starts_with
         - ends_with
         - not_ends_with
+        - in_month
+        - not_in_month
+        - in_quarter
+        - not_in_quarter
+        - in_year
+        - not_in_year
         - is_null
         - is_not_null
         - is_empty
@@ -10223,7 +10249,7 @@ components:
     DashboardTimeGrainInput:
       properties:
         grain:
-          description: Granularity, e.g. "day", "week", "month"
+          description: Granularity, e.g. "day", "week", "month". An empty string renders the control cleared.
           type: string
         member:
           description: Time dimension path, e.g. "Orders.created_at"
@@ -15767,6 +15793,170 @@ components:
         - selected
         - pattern
       type: string
+    ScheduledTaskCondition:
+      properties:
+        granularity:
+          oneOf:
+            - $ref: '#/components/schemas/ScheduledTaskConditionGranularity'
+            - type: 'null'
+        id:
+          description: Changes whenever the condition does. Read-only.
+          oneOf:
+            - type: string
+            - type: 'null'
+        measure:
+          description: Full measure name, e.g. `orders.revenue`.
+          minLength: 1
+          type: string
+        measureTitle:
+          oneOf:
+            - type: string
+            - type: 'null'
+        rule:
+          $ref: '#/components/schemas/ScheduledTaskConditionRule'
+        timeDimension:
+          description: Full time dimension name, e.g. `orders.created_at`.
+          oneOf:
+            - type: string
+            - type: 'null'
+        timeDimensionTitle:
+          oneOf:
+            - type: string
+            - type: 'null'
+      required:
+        - measure
+        - rule
+      type: object
+    ScheduledTaskConditionBand:
+      properties:
+        high:
+          type: number
+        low:
+          type: number
+        median:
+          type: number
+      required:
+        - low
+        - high
+        - median
+      type: object
+    ScheduledTaskConditionGranularity:
+      enum:
+        - day
+        - week
+        - month
+        - quarter
+        - year
+      type: string
+    ScheduledTaskConditionRule:
+      properties:
+        direction:
+          description: 'For `change`: increases, decreases, or changes either way.'
+          oneOf:
+            - $ref: '#/components/schemas/ScheduledTaskConditionRuleDirection'
+            - type: 'null'
+        operator:
+          description: 'For `threshold`: above, below or equal to.'
+          oneOf:
+            - $ref: '#/components/schemas/ScheduledTaskConditionRuleOperator'
+            - type: 'null'
+        percent:
+          description: 'For `change`: the percentage, greater than 0, e.g. `5` for 5 %.'
+          oneOf:
+            - type: number
+            - type: 'null'
+        type:
+          $ref: '#/components/schemas/ScheduledTaskConditionRuleType'
+          description: >-
+            `threshold`: the last complete period (or the total, with no time dimension) is above,
+            below or equal to `value`. `change`: the last complete period moved by at least
+            `percent` % from the one before it. `anomaly`: the last complete period lies outside
+            median ± 3·MAD of the at least 8 complete periods before it.
+        value:
+          description: 'For `threshold`: the number compared with.'
+          oneOf:
+            - type: number
+            - type: 'null'
+      required:
+        - type
+      type: object
+    ScheduledTaskConditionRuleDirection:
+      enum:
+        - up
+        - down
+        - either
+      type: string
+    ScheduledTaskConditionRuleOperator:
+      enum:
+        - gt
+        - lt
+        - eq
+      type: string
+    ScheduledTaskConditionRuleType:
+      enum:
+        - threshold
+        - change
+        - anomaly
+      type: string
+    ScheduledTaskLastConditionCheck:
+      properties:
+        at:
+          description: When the check ran (ISO 8601).
+          type: string
+        band:
+          oneOf:
+            - $ref: '#/components/schemas/ScheduledTaskConditionBand'
+            - type: 'null'
+        changePercent:
+          oneOf:
+            - type: number
+            - type: 'null'
+        conditionId:
+          type: string
+        notifiedAt:
+          oneOf:
+            - type: string
+            - type: 'null'
+        period:
+          description: Start of the period read, `YYYY-MM-DD`.
+          oneOf:
+            - type: string
+            - type: 'null'
+        previous:
+          oneOf:
+            - type: number
+            - type: 'null'
+        previousPeriod:
+          oneOf:
+            - type: string
+            - type: 'null'
+        reason:
+          oneOf:
+            - type: string
+            - type: 'null'
+        status:
+          $ref: '#/components/schemas/ScheduledTaskLastConditionCheckStatus'
+          description: >-
+            `held-notified` ran the agent; `held-already-notified` was still holding since an
+            earlier notification; `cannot-evaluate` carries a `reason` code; an `error` carries its
+            text in `reason` to the task's creator only, as do the figures the check read.
+        value:
+          oneOf:
+            - type: number
+            - type: 'null'
+      required:
+        - at
+        - conditionId
+        - status
+      type: object
+    ScheduledTaskLastConditionCheckStatus:
+      enum:
+        - not-held
+        - held-notified
+        - held-already-notified
+        - cannot-evaluate
+        - error
+      type: string
     ScheduledTaskListResponse:
       properties:
         items:
@@ -15785,6 +15975,16 @@ components:
           description: The agent that runs the task; null runs the deployment default.
           oneOf:
             - type: integer
+            - type: 'null'
+        condition:
+          description: >-
+            Notify only when: on each fire the measure is read once, before the agent runs, and the
+            agent runs only when the condition starts to hold, with the crossing facts at the top of
+            its thread; it runs again only after the condition has stopped holding. A `change` or
+            `anomaly` rule needs `timeDimension` and `granularity`. The creator gets an inbox row
+            only with `notificationEnabled: true`. Null runs the agent on every fire.
+          oneOf:
+            - $ref: '#/components/schemas/ScheduledTaskCondition'
             - type: 'null'
         cronExpression:
           description: >-
@@ -15805,6 +16005,11 @@ components:
         isEnabled:
           description: False while the schedule is paused.
           type: boolean
+        lastConditionCheck:
+          description: The latest condition check; null before the first one.
+          oneOf:
+            - $ref: '#/components/schemas/ScheduledTaskLastConditionCheck'
+            - type: 'null'
         name:
           type: string
         nextRunAt:
@@ -16711,6 +16916,7 @@ components:
       enum:
         - png
         - pdf
+        - pdf_print
       type: string
     UpdateNotificationInputScheduleType:
       enum:
@@ -16954,6 +17160,17 @@ components:
             default.
           oneOf:
             - type: integer
+            - type: 'null'
+        condition:
+          description: >-
+            Notify only when: on each fire the measure is read once, before the agent runs, and the
+            agent runs only when the condition starts to hold, with the crossing facts at the top of
+            its thread; it runs again only after the condition has stopped holding. A `change` or
+            `anomaly` rule needs `timeDimension` and `granularity`. The creator gets an inbox row
+            only with `notificationEnabled: true`. Omit to leave unchanged; null removes it. A
+            changed condition starts its breach state fresh.
+          oneOf:
+            - $ref: '#/components/schemas/ScheduledTaskCondition'
             - type: 'null'
         cronExpression:
           description: >-

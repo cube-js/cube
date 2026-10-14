@@ -49,6 +49,10 @@ enum Cmd {
         /// Run one file under agents/, e.g. eval_questions/revenue.yml
         #[arg(long, value_name = "PATH", value_parser = util::nonempty_repo_path)]
         file: Option<String>,
+        /// Security context to evaluate under, as JSON (inline, @file, or - for stdin); merged over
+        /// yours, and not applied to the auto agent's own queries
+        #[arg(long)]
+        security_context: Option<String>,
         /// Wait for the run and exit non-zero unless every question passes
         #[arg(long)]
         wait: bool,
@@ -102,7 +106,12 @@ fn results_path(deployment: i64, evaluation: i64) -> String {
     format!("{}/results", run_path(deployment, evaluation))
 }
 
-fn start_body(branch: &str, agent: &Option<String>, file: &Option<String>) -> Value {
+fn start_body(
+    branch: &str,
+    agent: &Option<String>,
+    file: &Option<String>,
+    security_context: Option<Value>,
+) -> Value {
     let mut body = json!({ "branchName": branch });
     if let Some(agent) = agent {
         body["agentName"] = json!(agent);
@@ -110,7 +119,16 @@ fn start_body(branch: &str, agent: &Option<String>, file: &Option<String>) -> Va
     if let Some(file) = file {
         body["questionFile"] = json!(file);
     }
+    if let Some(security_context) = security_context {
+        body["securityContext"] = security_context;
+    }
     body
+}
+
+/// The auto agent queries under the caller's own context, so an override would reach only the
+/// ground truth and grade the two under different contexts.
+fn override_skips_agent(agent: &Option<String>, security_context: &Option<Value>) -> bool {
+    security_context.is_some() && matches!(agent.as_deref(), None | Some("auto"))
 }
 
 async fn wait_for_run(
@@ -287,11 +305,22 @@ pub async fn command(args: Args, ctx: &Ctx) -> Result<()> {
             branch,
             agent,
             file,
+            security_context,
             wait,
             timeout,
             poll,
         } => {
-            let body = start_body(&branch, &agent, &file);
+            let security_context = security_context
+                .map(|raw| util::parse_json_object("--security-context", &raw).map(Value::Object))
+                .transpose()?;
+            if override_skips_agent(&agent, &security_context) {
+                eprintln!(
+                    "warning: the auto agent ignores --security-context, so only the ground truth \
+                     runs under it; pass --agent with an agent from agents/config.yml to apply it \
+                     to both"
+                );
+            }
+            let body = start_body(&branch, &agent, &file, security_context);
             let started = api.post(&base(deployment), Some(&body)).await?;
             let evaluation = output::field(&started, "id")
                 .parse::<i64>()
@@ -372,21 +401,35 @@ mod tests {
     #[test]
     fn start_body_omits_unspecified_options() {
         assert_eq!(
-            start_body("feature", &None, &None),
+            start_body("feature", &None, &None, None),
             json!({ "branchName": "feature" })
         );
         assert_eq!(
             start_body(
                 "feature",
                 &Some("sales-agent".to_string()),
-                &Some("eval_questions/revenue.yml".to_string())
+                &Some("eval_questions/revenue.yml".to_string()),
+                Some(json!({ "tenant_id": 7 }))
             ),
             json!({
                 "branchName": "feature",
                 "agentName": "sales-agent",
-                "questionFile": "eval_questions/revenue.yml"
+                "questionFile": "eval_questions/revenue.yml",
+                "securityContext": { "tenant_id": 7 }
             })
         );
+    }
+
+    #[test]
+    fn warns_when_the_override_skips_the_agent() {
+        let ctx = Some(json!({ "tenant_id": 7 }));
+        assert!(override_skips_agent(&None, &ctx));
+        assert!(override_skips_agent(&Some("auto".to_string()), &ctx));
+        assert!(!override_skips_agent(
+            &Some("sales-agent".to_string()),
+            &ctx
+        ));
+        assert!(!override_skips_agent(&None, &None));
     }
 
     #[test]

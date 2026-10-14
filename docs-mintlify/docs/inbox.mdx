@@ -44,6 +44,7 @@ New notifications appear as they arrive. You don't need to reload the page.
 | New Cube version | A deployment runs an older version than the latest one on its [update channel][ref-update-channels] | Admins | The deployment's **Settings** page |
 | End of support | A deployment runs a Cube version that is about to reach end of support. You get one notification with each end-of-support email. | Admins | The deployment's **Settings** page |
 | Production build failed | A build of a deployment's production branch fails | The user who started the build. If no user started it, for example a Git push, or that user is deactivated: admins | The build and its logs |
+| Dashboard review | Someone requests a [review][ref-reviews] of a dashboard or a new revision of it, comments on the review, approves, requests changes, or publishes the review | Everyone taking part in the review, except the person who acted: the requester, the reviewers, and anyone who commented. Only those who can still view the dashboard. | The review page. For a published review, the published dashboard. |
 | Scheduled refresh failed | A [scheduled refresh][ref-scheduled-refreshes] of a dashboard fails, or its [notifications][ref-notifications] don't reach some or all recipients | The user who created the schedule | The dashboard |
 | Shared with you | Someone shares a workbook, a folder, or a chat with you, or gives you more access to one, directly or through a group | The user, or each member of the group, except the person who shared it | The workbook, or its dashboard if it is published. The folder or the chat. |
 | Model sync | A [dbt][ref-dbt] pull or push, a [Snowflake semantic view][ref-snowflake] pull or push, or a [Databricks metric view][ref-databricks] publish finishes or fails | The user who started the sync. For an automated dbt sync, the users on its notification list. Otherwise: admins | The [IDE][ref-ide]. If the sync made a branch to review, the changes on that branch. |
@@ -56,13 +57,16 @@ A scheduled task run notification has the task name in the title, for
 example **Daily signups finished** or **Daily signups failed**. For a finished
 run, it shows the start of the agent's answer. If the answer has no text, for
 example when the run only built a chart, it shows how the run started and how
-long it took. For a failed run, it shows the error.
+long it took. For a failed run, it shows the error. For a run that a
+[conditional task's][ref-conditional-tasks] condition started, the title reads
+**Daily signups: condition met**, and it shows the change the check found
+instead of the answer.
 
 The inbox does not send notifications by email or Slack. Alerts and budgets send
 their own email, as set up on the alert or budget, and end-of-support notices
-come with their own email. A Google Sheets delivery can also notify its owner by
-email or Slack, and emails admins while the owner's Google account can't open
-the spreadsheet.
+come with their own email, as do dashboard review notifications. A Google Sheets
+delivery can also notify its owner by email or Slack, and emails admins while
+the owner's Google account can't open the spreadsheet.
 
 ## Read and unread
 
@@ -94,6 +98,7 @@ Cube asks you to confirm both actions. You can't undo a delete.
 [ref-budgets]: /admin/account-billing/budgets
 [ref-scheduled-tasks]: /docs/explore-analyze/scheduled-tasks
 [ref-scheduled-task-notifications]: /docs/explore-analyze/scheduled-tasks#getting-notified-when-a-run-finishes
+[ref-conditional-tasks]: /docs/explore-analyze/scheduled-tasks#conditional-tasks
 [ref-update-channels]: /admin/deployment#update-channels
 [ref-scheduled-refreshes]: /docs/explore-analyze/scheduled-refreshes
 [ref-dbt]: /docs/integrations/dbt
@@ -102,4 +107,5 @@ Cube asks you to confirm both actions. You can't undo a delete.
 [ref-ide]: /docs/data-modeling/data-model-ide
 [ref-ai-tokens]: /admin/account-billing/ai-tokens
 [ref-invites]: /admin/users-and-permissions/manage-users#inviting-users
+[ref-reviews]: /docs/explore-analyze/dashboards/reviews
 [ref-sheets-deliveries]: /docs/explore-analyze/google-sheets-deliveries#notifications
