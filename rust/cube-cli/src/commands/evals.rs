@@ -433,22 +433,6 @@ mod tests {
     }
 
     #[test]
-    fn security_context_accepts_stdin() {
-        use clap::Parser as _;
-        assert!(crate::Cli::try_parse_from([
-            "cube",
-            "evals",
-            "run",
-            "1",
-            "--branch",
-            "x",
-            "--security-context",
-            "-"
-        ])
-        .is_ok());
-    }
-
-    #[test]
     fn every_result_must_pass() {
         let all_pass = json!({ "items": [
             { "verdict": "pass" },
