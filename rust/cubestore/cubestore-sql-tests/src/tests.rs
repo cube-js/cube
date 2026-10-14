@@ -1,4 +1,4 @@
-use crate::files::{serve_file, write_tmp_file};
+use crate::files::{serve_file, serve_file_with_connection_limit, write_tmp_file};
 use crate::rows::{rows, NULL};
 use crate::SqlClient;
 use async_compression::tokio::write::GzipEncoder;
@@ -124,6 +124,10 @@ pub fn sql_tests(prefix: &str) -> Vec<(&'static str, TestFn)> {
             create_table_with_csv_no_header_and_quotes,
         ),
         t("create_table_with_url", create_table_with_url),
+        t(
+            "create_table_with_many_urls_connection_limit",
+            create_table_with_many_urls_connection_limit,
+        ),
         t("create_table_fail_and_retry", create_table_fail_and_retry),
         t("empty_crash", empty_crash),
         t("bytes", bytes),
@@ -424,6 +428,7 @@ lazy_static::lazy_static! {
         "aggregate_index_decimal_overflow",
         "create_table_with_location_invalid_digit",
         "create_table_with_url",
+        "create_table_with_many_urls_connection_limit",
         "hyperloglog_inserts",
         "partitioned_index_if_not_exists",
         "drop_partitioned_index",
@@ -2509,6 +2514,46 @@ async fn create_table_with_url(service: Box<dyn SqlClient>) -> Result<(), CubeEr
         result.get_rows(),
         &vec![Row::new(vec![TableValue::Int(813)])]
     );
+    Ok(())
+}
+
+/// https://github.com/cube-js/cube/issues/10703
+/// BigQuery export produces hundreds of files, and Cube Store sends a HEAD request to
+/// every location of `CREATE TABLE ... LOCATION` at once to estimate the row count.
+/// An endpoint (or a NAT in between) with a connection limit resets the excess
+/// connections and the import fails with `error sending request for url`. The
+/// requests to the locations must be bounded, so the import succeeds behind such a
+/// limit.
+async fn create_table_with_many_urls_connection_limit(
+    service: Box<dyn SqlClient>,
+) -> Result<(), CubeError> {
+    let (server, peak_connections) = serve_file_with_connection_limit(
+        "id,v\n1,a\n".to_string(),
+        32,
+        Duration::from_millis(200),
+    )
+    .await?;
+    let locations = (0..256)
+        .map(|i| format!("'{}'", server.url(&format!("part_{}.csv", i))))
+        .join(", ");
+
+    service.exec_query("CREATE SCHEMA IF NOT EXISTS foo").await?;
+    service
+        .exec_query(&format!(
+            "CREATE TABLE foo.many_files (id int, v text) WITH (input_format = 'csv') LOCATION {}",
+            locations
+        ))
+        .await?;
+
+    let result = service
+        .exec_query("SELECT count(*) from foo.many_files")
+        .await?;
+    assert_eq!(
+        result.get_rows(),
+        &vec![Row::new(vec![TableValue::Int(256)])]
+    );
+    let peak = peak_connections.load(std::sync::atomic::Ordering::SeqCst);
+    assert!(peak <= 32, "{} connections were open at once", peak);
     Ok(())
 }
 
