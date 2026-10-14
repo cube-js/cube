@@ -487,7 +487,7 @@ SQL are exported as is, without [redaction](#inputs-for-logs).
 
 Delivery is best-effort, and a turn can be sent more than once: for example, a
 stopped turn that the user continues is sent again when it finishes. Deduplicate
-records on `eventId` and keep the latest one.
+records on `eventId` and keep the one with the latest `endedAt`.
 
 Exported data includes the following fields:
 
