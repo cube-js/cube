@@ -80,6 +80,47 @@ import {
 
 const { version } = require('../../../package.json');
 
+/** A failed swap to one driver version is not retried for this long. */
+const DRIVER_SWAP_FAILURE_BACKOFF_MS = 10 * 1000;
+
+/** Swaps of one orchestrator closer together than this are reported as ping-pong. */
+const DRIVER_SWAP_PING_PONG_MS = 5 * 1000;
+
+/** `driverVersion` bookkeeping for one orchestrator api. */
+type DriverVersionState = {
+  orchestratorId: string;
+  version: string | undefined;
+  /** Context drivers are built from, moved to the swapping request's context on commit. */
+  ctxRef: { current: RequestContext };
+  swapping?: { version: string, promise: Promise<void> };
+  lastFailure?: { version: string, at: number, reported: boolean };
+  lastSwapAt?: number;
+  swapDrivers: (context: RequestContext, version: string) => Promise<void>;
+};
+
+type SwappedDriverRelease = {
+  timer?: NodeJS.Timeout;
+  release: () => Promise<void>;
+};
+
+function driverSwapReleaseDelayFromEnv(): number {
+  const value = process.env.CUBEJS_DRIVER_SWAP_RELEASE_DELAY;
+
+  if (value === undefined || value === '') {
+    return 600;
+  }
+
+  const seconds = Number(value);
+
+  if (!Number.isInteger(seconds) || seconds < 0) {
+    throw new Error(
+      `Invalid CUBEJS_DRIVER_SWAP_RELEASE_DELAY "${value}": must be a non-negative integer number of seconds.`
+    );
+  }
+
+  return seconds;
+}
+
 function wrapToFnIfNeeded<T, R>(possibleFn: T | ((a: R) => T)): (a: R) => T {
   if (typeof possibleFn === 'function') {
     return <any>possibleFn;
@@ -143,6 +184,11 @@ export class CubejsServerCore {
    */
   protected readonly buildingOrchestratorApis: Map<string, Promise<OrchestratorApi>> = new Map();
 
+  protected readonly driverVersionStates: WeakMap<OrchestratorApi, DriverVersionState> = new WeakMap();
+
+  /** Drivers a swap replaced and has not released yet; shutdown releases them at once. */
+  protected readonly swappedDriverReleases: Set<SwappedDriverRelease> = new Set();
+
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   protected repositoryFactory: ((context: RequestContext) => SchemaFileRepository) | (() => FileRepository);
 
@@ -155,6 +201,9 @@ export class CubejsServerCore {
   protected readonly contextToOrchestratorId: ContextToOrchestratorIdFn;
 
   protected readonly contextToCubeStoreRouterId: ContextToCubeStoreRouterIdFn | null;
+
+  /** Seconds; see `CreateOptions.driverSwapReleaseDelay`. */
+  protected readonly driverSwapReleaseDelay: number;
 
   protected readonly preAggregationsSchema: PreAggregationsSchemaFn;
 
@@ -249,6 +298,7 @@ export class CubejsServerCore {
 
     this.contextToOrchestratorId = this.options.contextToOrchestratorId || (() => 'STANDALONE');
     this.contextToCubeStoreRouterId = this.options.contextToCubeStoreRouterId;
+    this.driverSwapReleaseDelay = this.options.driverSwapReleaseDelay ?? driverSwapReleaseDelayFromEnv();
 
     // proactively free up old cache values occasionally
     if (this.options.maxCompilerCacheKeepAlive) {
@@ -656,6 +706,7 @@ export class CubejsServerCore {
 
   public async resetInstanceState() {
     await this.orchestratorStorage.releaseConnections();
+    await this.releaseSwappedDrivers();
 
     this.orchestratorStorage.clear();
     // A build still in flight would otherwise keep handing its pre-reset api --
@@ -676,17 +727,18 @@ export class CubejsServerCore {
     const orchestratorId = await this.contextToOrchestratorId(context);
 
     if (this.orchestratorStorage.has(orchestratorId)) {
-      return this.orchestratorStorage.get(orchestratorId);
+      return this.checkDriverVersion(this.orchestratorStorage.get(orchestratorId), context);
     }
 
     const building = this.buildingOrchestratorApis.get(orchestratorId);
 
     if (building) {
-      return building;
+      return building.then((orchestratorApi) => this.checkDriverVersion(orchestratorApi, context));
     }
 
     // Registered before the first `await` in the build, so nothing can interleave
-    // between the miss above and this line.
+    // between the miss above and this line. The build records this context's
+    // driver version, so the creator skips the check.
     const pending = this.buildOrchestratorApi(orchestratorId, context)
       .finally(() => {
         // Dropped once settled: a success is in the cache by now, and a failure must
@@ -703,6 +755,135 @@ export class CubejsServerCore {
     return pending;
   }
 
+  /**
+   * Swaps the drivers of `orchestratorApi` when `driverVersion` gives `context` a
+   * version other than the one they were built for. Only the request that starts
+   * a failing swap sees its error; others keep the old drivers.
+   */
+  protected async checkDriverVersion(orchestratorApi: OrchestratorApi, context: RequestContext): Promise<OrchestratorApi> {
+    const state = this.driverVersionStates.get(orchestratorApi);
+
+    if (!state || !this.options.driverVersion) {
+      return orchestratorApi;
+    }
+
+    const requested = await this.resolveDriverVersion(context);
+
+    if (requested === undefined) {
+      return orchestratorApi;
+    }
+
+    while (requested !== state.version) {
+      if (state.swapping) {
+        await state.swapping.promise.catch(() => undefined);
+      } else if (this.isDriverSwapBackingOff(state, requested)) {
+        return orchestratorApi;
+      } else {
+        const promise = state.swapDrivers(context, requested)
+          .then(
+            () => {
+              state.lastFailure = undefined;
+            },
+            (error) => {
+              state.lastFailure = { version: requested, at: Date.now(), reported: false };
+
+              this.logger('Driver Swap Error', {
+                orchestratorId: state.orchestratorId,
+                error: (error as Error).stack || String(error),
+              });
+
+              throw error;
+            },
+          )
+          .finally(() => {
+            state.swapping = undefined;
+          });
+
+        state.swapping = { version: requested, promise };
+
+        await promise;
+      }
+    }
+
+    return orchestratorApi;
+  }
+
+  /** Whether a swap to `requested` failed too recently to be retried. */
+  protected isDriverSwapBackingOff(state: DriverVersionState, requested: string): boolean {
+    const { lastFailure } = state;
+
+    if (
+      !lastFailure ||
+      lastFailure.version !== requested ||
+      Date.now() - lastFailure.at >= DRIVER_SWAP_FAILURE_BACKOFF_MS
+    ) {
+      return false;
+    }
+
+    if (!lastFailure.reported) {
+      lastFailure.reported = true;
+
+      this.logger('Driver Swap Backoff', {
+        orchestratorId: state.orchestratorId,
+        warning: `Swapping drivers to a new driverVersion failed less than ${DRIVER_SWAP_FAILURE_BACKOFF_MS / 1000}s ago. ` +
+          'Serving with the previous drivers until it is retried.',
+      });
+    }
+
+    return true;
+  }
+
+  /** Errors read as no version: the readiness probe asks with an empty context. */
+  protected async resolveDriverVersion(context: RequestContext): Promise<string | undefined> {
+    try {
+      return (await this.options.driverVersion(context)) ?? undefined;
+    } catch (error) {
+      this.logger('Driver Version Error', {
+        error: (error as Error).stack || String(error),
+      });
+
+      return undefined;
+    }
+  }
+
+  /**
+   * Releases a driver replaced by a swap once work that already holds it, such as
+   * a stream or a pre-aggregation build, had time to finish: release destroys or
+   * drains it at once.
+   */
+  protected scheduleSwappedDriverRelease(driver: BaseDriver) {
+    const entry: SwappedDriverRelease = {
+      release: async () => {
+        clearTimeout(entry.timer);
+        this.swappedDriverReleases.delete(entry);
+
+        await this.releaseDriverSafely(driver);
+      },
+    };
+
+    // Past 2^31-1 ms setTimeout fires at once, which would release the driver under its queries
+    entry.timer = setTimeout(entry.release, Math.min(this.driverSwapReleaseDelay * 1000, 2 ** 31 - 1));
+    entry.timer.unref();
+
+    this.swappedDriverReleases.add(entry);
+  }
+
+  protected async releaseSwappedDrivers() {
+    await Promise.all([...this.swappedDriverReleases].map((entry) => entry.release()));
+  }
+
+  protected async releaseDriverSafely(driver: BaseDriver) {
+    try {
+      if (driver.release) {
+        await driver.release();
+      }
+    } catch (error) {
+      this.logger('Driver Release Error', {
+        error: (error as Error).stack || String(error),
+      });
+    }
+  }
+
   protected async buildOrchestratorApi(orchestratorId: string, context: RequestContext): Promise<OrchestratorApi> {
     /**
      * Hash table to store promises which will be resolved with the
@@ -710,6 +891,11 @@ export class CubejsServerCore {
      * this constant.
      */
     const driverPromise: Record<string, Promise<BaseDriver>> = {};
+
+    /** What each `driverPromise` key was built for, so a swap can rebuild it. */
+    const driverSpecs: Record<string, { dataSource: string, preAggregations: boolean }> = {};
+
+    const ctxRef = { current: context };
 
     let externalPreAggregationsDriverPromise: Promise<BaseDriver> | null = null;
 
@@ -723,6 +909,182 @@ export class CubejsServerCore {
         context,
         (await this.orchestratorOptions(context)) || {},
       );
+
+    const initialDriverVersion = this.options.driverVersion
+      ? await this.resolveDriverVersion(context)
+      : undefined;
+
+    const state: DriverVersionState = {
+      orchestratorId,
+      version: initialDriverVersion,
+      ctxRef,
+      swapDrivers: null,
+    };
+
+    const buildDriver = async (
+      driverContext: RequestContext,
+      dataSource: string,
+      preAggregations: boolean,
+      inUse?: Set<BaseDriver>,
+    ): Promise<BaseDriver> => {
+      let driver: BaseDriver | null = null;
+
+      try {
+        driver = await this.resolveDriver(
+          {
+            ...driverContext,
+            dataSource,
+            preAggregations,
+          },
+          orchestratorOptions,
+        );
+
+        if (typeof driver === 'object' && driver != null) {
+          if (driver.setLogger) {
+            driver.setLogger(this.logger);
+          }
+
+          await driver.testConnection();
+
+          return driver;
+        }
+
+        throw new Error(
+          `Unexpected return type, driverFactory must return driver (dataSource: "${dataSource}"), actual: ${getRealType(driver)}`
+        );
+      } catch (e) {
+        // A factory that caches its instances can hand back a driver still serving queries
+        if (driver && !inUse?.has(driver)) {
+          await driver.release();
+        }
+
+        throw e;
+      }
+    };
+
+    /**
+     * Rebuilds every cached driver from `swapContext` and installs all of them at
+     * once, or none: on failure the old drivers and version stay.
+     */
+    const swapDrivers = async (swapContext: RequestContext, swapVersion: string) => {
+      const replacements = new Map<Promise<BaseDriver>, { previous: BaseDriver | null, next: BaseDriver | null }>();
+      const inUse = new Set<BaseDriver>();
+
+      const unswapped = () => {
+        const firstKeys = new Map<Promise<BaseDriver>, string>();
+
+        Object.keys(driverPromise).forEach((key) => {
+          const promise = driverPromise[key];
+
+          if (promise && !replacements.has(promise) && !firstKeys.has(promise)) {
+            firstKeys.set(promise, key);
+          }
+        });
+
+        return firstKeys;
+      };
+
+      try {
+        // Repeated because a driver built lazily during the swap used the old context
+        for (let pending = unswapped(); pending.size; pending = unswapped()) {
+          const promises = [...pending.keys()];
+          const previous = await Promise.all(promises.map((promise) => promise.catch(() => null)));
+
+          previous.forEach((driver) => driver && inUse.add(driver));
+
+          const built = await Promise.allSettled(promises.map((promise, i) => {
+            // Its own build failed and dropped it from the cache
+            if (!previous[i]) {
+              return null;
+            }
+
+            const spec = driverSpecs[pending.get(promise)];
+
+            return buildDriver(swapContext, spec.dataSource, spec.preAggregations, inUse);
+          }));
+
+          built.forEach((result, i) => {
+            if (result.status === 'fulfilled') {
+              replacements.set(promises[i], { previous: previous[i], next: result.value });
+            }
+          });
+
+          const failure = built.find((result): result is PromiseRejectedResult => result.status === 'rejected');
+
+          if (failure) {
+            throw failure.reason;
+          }
+        }
+      } catch (e) {
+        await Promise.all(
+          [...new Set([...replacements.values()].map(({ next }) => next))]
+            .filter((next) => next && !inUse.has(next))
+            .map((next) => this.releaseDriverSafely(next)),
+        );
+
+        throw e;
+      }
+
+      // Synchronous from here on, so no request sees some keys swapped and others not
+      const installed = new Set<BaseDriver>();
+      const replaced = new Set<BaseDriver>();
+      const discarded = new Set<BaseDriver>();
+      const now = Date.now();
+
+      replacements.forEach(({ previous, next }, previousPromise) => {
+        const keys = Object.keys(driverPromise).filter((key) => driverPromise[key] === previousPromise);
+
+        if (!next) {
+          return;
+        }
+
+        if (!keys.length) {
+          discarded.add(next);
+          return;
+        }
+
+        const nextPromise = Promise.resolve(next);
+
+        keys.forEach((key) => {
+          driverPromise[key] = nextPromise;
+        });
+
+        installed.add(next);
+        replaced.add(previous);
+      });
+
+      replaced.forEach((driver) => {
+        if (!installed.has(driver)) {
+          this.scheduleSwappedDriverRelease(driver);
+        }
+      });
+
+      // Never handed out, so nothing can be using them
+      discarded.forEach((driver) => {
+        if (!installed.has(driver) && !inUse.has(driver)) {
+          this.releaseDriverSafely(driver);
+        }
+      });
+
+      if (state.lastSwapAt !== undefined && now - state.lastSwapAt < DRIVER_SWAP_PING_PONG_MS) {
+        this.logger('Driver Swap Ping-Pong', {
+          orchestratorId,
+          warning: `Drivers were swapped twice within ${DRIVER_SWAP_PING_PONG_MS / 1000}s. contextToOrchestratorId must give ` +
+            'contexts with different driverVersion values different ids, or they keep replacing each other\'s drivers.',
+        });
+      }
+
+      ctxRef.current = swapContext;
+      state.version = swapVersion;
+      state.lastSwapAt = now;
+
+      this.logger('Driver Swap', {
+        orchestratorId,
+        dataSources: Object.keys(driverPromise).filter((key) => driverPromise[key]),
+      });
+    };
+
+    state.swapDrivers = swapDrivers;
 
     const orchestratorApi = this.createOrchestratorApi(
       /**
@@ -744,55 +1106,33 @@ export class CubejsServerCore {
           });
         }
 
-        driverPromise[factoryKey] = (async () => {
-          let driver: BaseDriver | null = null;
+        // No separate pre-agg driver needed — share the same promise for both keys
+        const keys = !preAggregations && !hasSeparatePreAggEnv
+          ? [factoryKey, `${dataSource}@pre_agg`]
+          : [factoryKey];
+        const spec = { dataSource, preAggregations: usePreAgg || false };
 
-          try {
-            driver = await this.resolveDriver(
-              {
-                ...context,
-                dataSource,
-                preAggregations: usePreAgg || false,
-              },
-              orchestratorOptions,
-            );
-
-            if (typeof driver === 'object' && driver != null) {
-              if (driver.setLogger) {
-                driver.setLogger(this.logger);
+        const pending = buildDriver(ctxRef.current, dataSource, spec.preAggregations)
+          .catch((e) => {
+            keys.forEach((key) => {
+              // A swap may have replaced it meanwhile
+              if (driverPromise[key] === pending) {
+                driverPromise[key] = null;
               }
-
-              await driver.testConnection();
-
-              return driver;
-            }
-
-            throw new Error(
-              `Unexpected return type, driverFactory must return driver (dataSource: "${dataSource}"), actual: ${getRealType(driver)}`
-            );
-          } catch (e) {
-            driverPromise[factoryKey] = null;
-
-            if (!preAggregations && !hasSeparatePreAggEnv) {
-              driverPromise[`${dataSource}@pre_agg`] = null;
-            }
-
-            if (driver) {
-              await driver.release();
-            }
+            });
 
             throw e;
-          }
-        })();
+          });
 
-        // No separate pre-agg driver needed — share the same promise for both keys
-        if (!preAggregations && !hasSeparatePreAggEnv) {
-          driverPromise[`${dataSource}@pre_agg`] = driverPromise[factoryKey];
-        }
+        keys.forEach((key) => {
+          driverPromise[key] = pending;
+          driverSpecs[key] = spec;
+        });
 
-        return driverPromise[factoryKey];
+        return pending;
       },
       {
+        // Built from the creating context and never swapped by `driverVersion`
         externalDriverFactory: this.options.externalDriverFactory && (async () => {
           if (externalPreAggregationsDriverPromise) {
             return externalPreAggregationsDriverPromise;
@@ -841,6 +1181,7 @@ export class CubejsServerCore {
       }
     );
 
+    this.driverVersionStates.set(orchestratorApi, state);
     this.orchestratorStorage.set(orchestratorId, orchestratorApi);
 
     return orchestratorApi;
@@ -1038,6 +1379,7 @@ export class CubejsServerCore {
 
   public async releaseConnections() {
     await this.orchestratorStorage.releaseConnections();
+    await this.releaseSwappedDrivers();
 
     if (this.maxCompilerCacheKeep) {
       clearInterval(this.maxCompilerCacheKeep);
@@ -1109,6 +1451,7 @@ export class CubejsServerCore {
       this.apiGatewayInstance.release();
     }
 
-    return this.orchestratorStorage.releaseConnections();
+    await this.orchestratorStorage.releaseConnections();
+    await this.releaseSwappedDrivers();
   }
 }
