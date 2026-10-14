@@ -6855,6 +6855,27 @@ ORDER BY
         Ok(())
     }
 
+    /// https://github.com/cube-js/cube/issues/8156
+    /// A column of a CTE whose body is a UNION must be addressable by the CTE name.
+    #[tokio::test]
+    async fn test_union_cte_qualified_column() -> Result<(), CubeError> {
+        init_testing_logger();
+
+        for union in ["UNION", "UNION ALL"] {
+            let result = execute_query(
+                format!(
+                    "WITH test AS (SELECT 1 AS name {union} SELECT 2 AS name) \
+                     SELECT test.name FROM test ORDER BY 1"
+                ),
+                DatabaseProtocol::PostgreSQL,
+            )
+            .await?;
+            assert!(result.contains('1') && result.contains('2'), "{}", result);
+        }
+
+        Ok(())
+    }
+
     #[tokio::test]
     async fn test_cast_decimal_default_precision() -> Result<(), CubeError> {
         if !Rewriter::sql_push_down_enabled() {

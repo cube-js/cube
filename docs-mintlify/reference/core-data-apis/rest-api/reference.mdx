@@ -431,6 +431,7 @@ This endpoint is part of the [SQL API][ref-sql-api].
 | `query` | The SQL query to run | ✅ Yes |
 | `timezone` | The [time zone][ref-time-zone] for this query in the [TZ Database Name][link-tzdb] format, e.g., `America/Los_Angeles` | ❌ No |
 | `cache` | See [cache control][ref-cache-control]. `stale-if-slow` by default | ❌ No |
+| `throwContinueWait` | If `true`, a long-running query returns [`Continue wait`][ref-continue-wait] instead of keeping the request open until it completes. `false` by default | ❌ No |
 
 ### Headers
 
@@ -1353,6 +1354,7 @@ Keep-Alive: timeout=5
 [ref-orchestration-api]: /reference/orchestration-api
 [ref-folders]: /reference/data-modeling/view#folders
 [ref-cache-control]: /reference/core-data-apis/rest-api#cache-control
+[ref-continue-wait]: /reference/core-data-apis/rest-api#continue-wait
 [ref-time-zone]: /reference/core-data-apis/queries#time-zone
 [link-tzdb]: https://en.wikipedia.org/wiki/Tz_database
 [ref-control-plane-api]: /reference/control-plane-api
