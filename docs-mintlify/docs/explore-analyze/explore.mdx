@@ -47,6 +47,51 @@ If you have developer or admin access, you can [apply a security context](/docs/
 
 Explore results carry the same [freshness and pre-aggregation indicators](/docs/explore-analyze/workbooks/querying-data#result-freshness-and-provenance) as workbook reports.
 
+## Querying source data
+
+You can also query your data sources directly with SQL, bypassing the
+semantic layer. Use it to inspect raw tables or to prototype a calculation
+before you add it to the data model.
+
+To switch to source SQL, pick **Source SQL Query** in the query type picker
+at the top of the data pane. In an empty exploration, you can also click
+**Query Source Data**.
+
+{/* TODO: screenshot — Explore in Source SQL Query mode: Source Schemas pane, SQL editor, results */}
+
+- **Source Schemas** — Browse data sources, schemas, tables, and columns.
+  Click **Query table** to select the first 100 rows of a table and run the
+  query.
+- **Data sources** — Every data source of the deployment is listed: the
+  default one and all [named data sources](/admin/connect-to-data/multiple-data-sources).
+  Users with the Developer role can also query **Cube Store** to check
+  pre-aggregation contents.
+- **SQL editor** — Write SQL in the dialect of your data source and click
+  **Run**, or press **Cmd+Enter** (macOS) or **Ctrl+Enter** (Windows/Linux).
+  Results show up to 5,000 rows.
+- **AI agent** — Ask the agent in the chat to write or change the query. When
+  a query fails, click **Fix in chat** to have the agent fix it.
+
+Source SQL queries run with the [security context](/docs/explore-analyze/workbooks/querying-data#applying-a-security-context)
+selected in the header, if any.
+
+Source SQL explorations can't be saved, converted to a workbook, or copied to
+the clipboard. To share one, use **Copy shareable link**. To keep a source SQL
+query, use a [Source SQL tab](/docs/explore-analyze/workbooks/source-sql-tabs)
+in a workbook.
+
+<Info>
+
+Querying source data requires the **Access SQL Runner** permission
+(`SqlRunnerRead`). The built-in Admin and Developer roles have it. For other
+roles, see [custom roles](/admin/users-and-permissions/custom-roles).
+
+DDL statements, such as `CREATE` or `DROP`, run only when **Enable DDL
+operations in SQL** is turned on in the deployment's **Settings →
+Configuration**.
+
+</Info>
+
 ## Saving explorations
 
 You can save an exploration so you can return to it later without
