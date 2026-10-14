@@ -484,6 +484,25 @@ describe('driverVersion', () => {
     expect(await driver()).toMatchObject({ builtFrom: { password: 'b' } });
   });
 
+  test('a swap back is reported as ping-pong even when testConnection takes longer than 5s', async () => {
+    let now = Date.parse('2026-01-01T00:00:00Z');
+    jest.spyOn(Date, 'now').mockImplementation(() => now);
+
+    const { request, driver, logged } = createCore();
+
+    await request('a');
+    await driver();
+
+    onTestConnection = () => {
+      now += 8 * 1000;
+    };
+
+    await request('b');
+    await request('a');
+
+    expect(logged('Driver Swap Ping-Pong')).toHaveLength(1);
+  });
+
   test('consecutive forward swaps within 5s are not ping-pong', async () => {
     let now = Date.parse('2026-01-01T00:00:00Z');
     jest.spyOn(Date, 'now').mockImplementation(() => now);
