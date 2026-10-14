@@ -69,6 +69,34 @@ tab of the **Scheduled** page. Its **New scheduled refresh** dialog shows the
 dashboard to add an alert condition." until you pick a **Dashboard**. After
 that, it works as it does in the sidebar.
 
+### From a chart's menu {#from-a-charts-menu}
+
+To watch a particular chart, open that chart or KPI's menu (`⋮`) on the
+published dashboard and choose **Create alert**. The **New scheduled refresh**
+dialog opens with the **Alert condition** card already open, that chart in
+**Chart**, and its first measure in **Measure**; continue from step 5 of the
+list above. Everything outside the card starts as it does for **New scheduled
+refresh** in the sidebar, and once you save, the new schedule is listed in the
+sidebar.
+
+**Create alert** is offered only to people who can create schedules on the
+dashboard (see the note at the top of this page), and never on an
+[embedded dashboard][ref-embedding], published or in
+[Creator Mode][ref-creator-mode].
+
+In the [dashboard builder][ref-workbooks], a chart's menu offers **Create
+alert** too. An alert reads the published dashboard, so the item is enabled
+only on a chart that is in the published version. On a chart added since the
+last publish, or on every chart of a dashboard that has never been published,
+it is disabled, and hovering it shows "Publish the dashboard to create an alert
+on this chart." Once you publish, the item is enabled.
+
+If the chart can't carry an alert — it is split by a dimension, or Cube can't
+read its query — the dialog still opens on it, disables every rule type, shows
+the reason under them, and keeps **Save** disabled with, for example, "This
+chart has no single value to check. Choose another chart." Pick another chart
+in **Chart** to continue.
+
 ## Rule types
 
 ### Threshold
@@ -271,8 +299,11 @@ back on, the alerts resume where they left off.
 [ref-ai-summary]: /docs/explore-analyze/notifications#ai-summary
 [ref-all-schedules]: /docs/explore-analyze/scheduled-refreshes#viewing-all-scheduled-refreshes
 [ref-control-values]: /docs/explore-analyze/scheduled-refreshes#control-values
+[ref-creator-mode]: /embedding/iframe/creator-mode
 [ref-duplicate]: /docs/explore-analyze/scheduled-refreshes#duplicating-a-schedule
+[ref-embedding]: /embedding/iframe/dashboards
 [ref-notifications]: /docs/explore-analyze/notifications
 [ref-roles]: /admin/users-and-permissions/roles-and-permissions
 [ref-scheduled-refreshes]: /docs/explore-analyze/scheduled-refreshes
 [ref-time-granularity]: /docs/explore-analyze/dashboards/widgets/controls#time-granularity-switcher
+[ref-workbooks]: /docs/explore-analyze/workbooks
