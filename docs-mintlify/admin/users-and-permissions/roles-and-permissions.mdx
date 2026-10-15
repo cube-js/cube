@@ -56,6 +56,46 @@ This feature should not be used as a security measure. Configure [access policie
 - Developers: Usually data stewards and data engineers
 - Admins: Typically assigned to data engineers managing the entire Cube instance (billed at the developer rate with additional privileges)
 
+## Built-in role IDs
+
+The [REST API][ref-api-assign-role] and the [CLI][ref-cli] refer to roles by numeric ID. Built-in roles have fixed negative IDs, the same in every Cube account:
+
+| Role      | ID   | API name        | What it is for                                                                    |
+| --------- | :--: | --------------- | --------------------------------------------------------------------------------- |
+| Developer | `-3` | `AIBIDeveloper` | Edit the semantic model, manage deployments, query data sources, build workbooks. |
+| Explorer  | `-4` | `AIBIUser`      | Explore semantic models, build workbooks, use Analytics Chat.                     |
+| Viewer    | `-6` | `AIBIViewer`    | View published dashboards, use Analytics Chat, query from external tools.         |
+
+**Admin** has no assignable ID. It is a flag on the user rather than a role: set `isAdmin` with [`PUT /api/v1/users/{id}`][ref-api-update-user].
+
+<Note>
+
+Users created before the current role set may hold the legacy **Developer** role, ID `-1`. It is the predecessor of `-3`, and the console replaces it whenever a user's role is changed there.
+
+</Note>
+
+### Replacing a built-in role
+
+Permissions stack, so giving a user a [custom role][ref-custom-roles] does not take away what a built-in role grants. To move a user from Explorer to a custom role, assign the custom role first, then remove Explorer:
+
+```bash
+cube roles assign "$CUSTOM_ROLE_ID" "$USER_ID"
+cube roles unassign -4 "$USER_ID"
+```
+
+Over the API, the same two calls are `PUT` and `DELETE` on `/api/v1/roles/{roleId}/users/{userId}`. Both are idempotent, so a script can run them for every user and be re-run after a failure.
+
+To find who still holds a role, page through `GET /api/v1/roles/-4/users`. Each user in it carries every role they hold, so "holds Explorer but not the custom role yet" is a filter over those pages. `GET /api/v1/users/{userId}/roles` returns one user's roles.
+
+A role a user holds through a [group][ref-user-groups] shows `direct: false` and the granting `groupIds`. Removing the role from the user does not affect it; remove it from the group instead.
+
+Single sign-on never removes roles: a later sign-in only adds the roles your identity provider maps, so a role removed this way stays removed unless a mapping grants it again.
+
+[ref-api-assign-role]: /api-reference/roles/assign-a-role-to-a-user
+[ref-api-update-user]: /api-reference/users-admin/update-user
+[ref-cli]: /reference/cli
+[ref-user-groups]: /admin/users-and-permissions/user-groups
+
 
 [ref-data-access-policies]: /docs/data-modeling/data-access-policies
 [ref-sharing-comments]: /docs/organize-content/sharing#dashboard-comments
