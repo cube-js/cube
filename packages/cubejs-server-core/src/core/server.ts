@@ -844,9 +844,9 @@ export class CubejsServerCore {
   }
 
   /**
-   * Releases a driver replaced by a swap once work that already holds it, such as
-   * a stream or a pre-aggregation build, has had time to finish: release destroys
-   * or drains it at once.
+   * Releases a driver replaced by a swap once queries and pre-aggregation builds that
+   * hold it have timed out: release destroys or drains it at once. Streams have no
+   * timeout, so one still running then is cut off.
    */
   protected scheduleSwappedDriverRelease(driver: BaseDriver, afterSeconds: number) {
     if (this.swappedDriverReleases.has(driver)) {
@@ -1098,7 +1098,6 @@ export class CubejsServerCore {
 
       replaced.forEach((driver) => {
         if (!installed.has(driver)) {
-          // Open until any query or pre-aggregation build that holds it has timed out
           this.scheduleSwappedDriverRelease(
             driver,
             this.queryTimeoutSeconds(rawOrchestratorOptions, replacedDataSources.get(driver) ?? 'default'),
