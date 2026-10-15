@@ -195,12 +195,11 @@ export class RefreshScheduler {
     preAggregation,
     queryingOptions: ScheduledRefreshQueryingOptions
   ) {
-    const compilers = await compilerApi.getCompilers();
-    const query = await compilerApi.createQueryByDataSource(compilers, queryingOptions);
+    const { cubeEvaluator } = await compilerApi.getCompilers();
     if (preAggregation.preAggregation.partitionGranularity || preAggregation.preAggregation.type === 'rollup') {
       return { ...queryingOptions, ...preAggregation.references, preAggregationId: preAggregation.id };
     } else if (preAggregation.preAggregation.type === 'originalSql') {
-      const cubeFromPath = query.cubeEvaluator.cubeFromPath(preAggregation.cube);
+      const cubeFromPath = cubeEvaluator.cubeFromPath(preAggregation.cube);
       const measuresCount = Object.keys(cubeFromPath.measures || {}).length;
       const dimensionsCount = Object.keys(cubeFromPath.dimensions || {}).length;
       if (measuresCount === 0 && dimensionsCount === 0) {
@@ -340,15 +339,14 @@ export class RefreshScheduler {
     compilerApi: CompilerApi,
     queryingOptions: ScheduledRefreshQueryingOptions
   ) {
-    const compilers = await compilerApi.getCompilers();
-    const queryForEvaluation = await compilerApi.createQueryByDataSource(compilers, {});
+    const { cubeEvaluator } = await compilerApi.getCompilers();
 
     const orchestratorApi = await this.serverCore.getOrchestratorApi(context);
     const queryCache = orchestratorApi.getQueryOrchestrator().getQueryCache();
     const uncachedLocalRefreshKey = queryCache.usesUncachedLocalRefreshKey();
 
-    await Promise.all(queryForEvaluation.cubeEvaluator.cubeNames().map(async cube => {
-      const cubeFromPath = queryForEvaluation.cubeEvaluator.cubeFromPath(cube);
+    await Promise.all(cubeEvaluator.cubeNames().map(async cube => {
+      const cubeFromPath = cubeEvaluator.cubeFromPath(cube);
       const measuresCount = Object.keys(cubeFromPath.measures || {}).length;
       const dimensionsCount = Object.keys(cubeFromPath.dimensions || {}).length;
       if (measuresCount === 0 && dimensionsCount === 0) {
