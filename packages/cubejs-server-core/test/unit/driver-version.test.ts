@@ -217,6 +217,31 @@ describe('driverVersion', () => {
     expect(await driver()).toBe(built[2]);
   });
 
+  test('two failing versions both back off', async () => {
+    let now = Date.parse('2026-01-01T00:00:00Z');
+    jest.spyOn(Date, 'now').mockImplementation(() => now);
+
+    const { swapTo, driver, driverFactory } = createCore();
+
+    await swapTo('a');
+    await driver();
+
+    onTestConnection = (d) => {
+      if (d.builtFrom.password !== 'a') {
+        throw new Error('bad credential');
+      }
+    };
+
+    await swapTo('b');
+    await swapTo('c');
+    expect(driverFactory).toHaveBeenCalledTimes(3);
+
+    now += 1000;
+    await swapTo('b');
+    await swapTo('c');
+    expect(driverFactory).toHaveBeenCalledTimes(3);
+  });
+
   const releaseDelays: Array<[string, Record<string, unknown>, string | undefined, number]> = [
     ['the default query timeout', {}, undefined, 600],
     ['CUBEJS_DB_QUERY_TIMEOUT', {}, '45s', 45],
