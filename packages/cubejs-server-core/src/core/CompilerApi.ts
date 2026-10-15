@@ -22,7 +22,7 @@ import {
 import { GraphQLSchema } from 'graphql';
 import { parse as uuidParse, v4 as uuidv4 } from 'uuid';
 import { LRUCache } from 'lru-cache';
-import { ModelContext, NativeInstance, newModelContext } from '@cubejs-backend/native';
+import { NativeInstance, newModelContext } from '@cubejs-backend/native';
 import { disposedProxy, getEnv } from '@cubejs-backend/shared';
 import type { SchemaFileRepository } from '@cubejs-backend/shared';
 import { NormalizedQuery, MemberExpression } from '@cubejs-backend/api-gateway';
@@ -159,13 +159,6 @@ export class CompilerApi {
   private readonly queryFactories = new WeakMap<Compiler, QueryFactory>();
 
   protected memberCount: number = 0;
-
-  /**
-   * Each compile's native planner state, e.g. the compiled SQL templates of each data
-   * source. Paired with `compilers` like `queryFactories`, since the dialect a model
-   * resolves for a data source is what the templates are cached under.
-   */
-  private readonly modelContexts = new WeakMap<Compiler, ModelContext>();
 
   public constructor(repository: SchemaFileRepository, dbType: DbTypeInternalFn, options: CompilerApiOptions) {
     this.repository = repository;
@@ -338,7 +331,7 @@ export class CompilerApi {
       });
       this.queryFactory = await this.createQueryFactory(compilers);
       this.queryFactories.set(compilers, this.queryFactory);
-      this.modelContexts.set(compilers, newModelContext());
+      compilers.modelContext = newModelContext();
       // A compile that a newer version superseded, or that finished on an
       // evicted instance, no longer describes what this entry holds.
       if (this.compilerVersion === compilerVersion) {
@@ -1234,7 +1227,7 @@ export class CompilerApi {
         convertTzForRawTimeDimension: this.convertTzForRawTimeDimension,
         localRefreshKey: this.localRefreshKey,
         queryFactory: this.queryFactories.get(compilers) ?? this.queryFactory,
-        modelContext: this.modelContexts.get(compilers),
+        modelContext: compilers.modelContext,
         // The data source the dialect was picked for, when the caller knows it
         dataSource,
       }
