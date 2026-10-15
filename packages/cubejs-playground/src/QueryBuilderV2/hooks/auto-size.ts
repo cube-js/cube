@@ -40,11 +40,10 @@ export function useAutoSizeData<T extends HTMLElement>(
 
   const updateSize = useEvent(() => {
     if (container) {
-      const height =
-        window.innerHeight -
-        container.getBoundingClientRect().y +
-        compensation -
-        document.documentElement.scrollTop;
+      const height = window.innerHeight
+        - container.getBoundingClientRect().y
+        + compensation
+        - document.documentElement.scrollTop;
 
       const value = Math.max(Math.min(height, window.innerHeight), 0);
 
@@ -92,11 +91,10 @@ export function useAutoSize<T extends HTMLElement>(
 
   const updateSize = useEvent(() => {
     if (container) {
-      const height =
-        window.innerHeight -
-        container.getBoundingClientRect().y +
-        compensation -
-        document.documentElement.scrollTop;
+      const height = window.innerHeight
+        - container.getBoundingClientRect().y
+        + compensation
+        - document.documentElement.scrollTop;
 
       setContainerSize(Math.max(Math.min(height, window.innerHeight), 0));
     }

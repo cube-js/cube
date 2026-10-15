@@ -1,10 +1,10 @@
-use crate::planner::{CubeRef, MemberSymbol, TraversalVisitor};
+use crate::planner::{CubeId, CubeRef, MemberSymbol, TraversalVisitor};
 use cubenativeutils::CubeError;
 use std::collections::HashSet;
 use std::rc::Rc;
 
 pub struct CubeNamesCollector {
-    names: HashSet<String>,
+    names: HashSet<CubeId>,
 }
 
 impl CubeNamesCollector {
@@ -14,7 +14,7 @@ impl CubeNamesCollector {
         }
     }
 
-    pub fn extract_result(self) -> Vec<String> {
+    pub fn extract_result(self) -> Vec<CubeId> {
         self.names.into_iter().collect()
     }
 }
@@ -35,7 +35,7 @@ impl TraversalVisitor for CubeNamesCollector {
                             self.names.insert(p.clone());
                         }
                     } else {
-                        self.names.insert(e.cube_name().clone());
+                        self.names.insert(e.cube_id().clone());
                     }
                 }
                 if e.is_sub_query() {
@@ -51,11 +51,11 @@ impl TraversalVisitor for CubeNamesCollector {
                             self.names.insert(p.clone());
                         }
                     } else {
-                        self.names.insert(e.cube_name().clone());
+                        self.names.insert(e.cube_id().clone());
                     }
                 }
             }
-            MemberSymbol::MemberExpression(_) => {}
+            MemberSymbol::MemberExpression(_) | MemberSymbol::Ref(_) => {}
         };
         Ok(Some(()))
     }
@@ -70,7 +70,7 @@ impl TraversalVisitor for CubeNamesCollector {
     }
 }
 
-pub fn collect_cube_names(node: &Rc<MemberSymbol>) -> Result<Vec<String>, CubeError> {
+pub fn collect_cube_names(node: &Rc<MemberSymbol>) -> Result<Vec<CubeId>, CubeError> {
     let mut visitor = CubeNamesCollector::new();
     visitor.apply(node, &())?;
     Ok(visitor.extract_result())
@@ -78,7 +78,7 @@ pub fn collect_cube_names(node: &Rc<MemberSymbol>) -> Result<Vec<String>, CubeEr
 
 pub fn collect_cube_names_from_symbols(
     nodes: &Vec<Rc<MemberSymbol>>,
-) -> Result<Vec<String>, CubeError> {
+) -> Result<Vec<CubeId>, CubeError> {
     let mut visitor = CubeNamesCollector::new();
     for node in nodes {
         visitor.apply(node, &())?;

@@ -165,13 +165,20 @@ async fn test_trailing_finite_offset_start_no_granularity() {
               - "2024-01-16"
     "#};
 
-    let sql = ctx.build_sql(query).expect("Should generate SQL");
+    let (sql, params) = ctx
+        .build_sql_and_params(query)
+        .expect("Should generate SQL");
 
-    // offset start + trailing 7 day => [from - 7 day, from): the trailing interval
-    // shifts the lower bound; the upper bound is the strict range start.
+    // offset start + trailing 7 day => [from - 7 day, from): the frame shifts
+    // the lower bound; the upper bound is the strict range start. The shift is
+    // folded into the bound, so the evidence is a date a week back.
+    let bounds = params
+        .iter()
+        .filter_map(|value| value.to_param_string())
+        .collect::<Vec<_>>();
     assert!(
-        sql.contains("7 day"),
-        "Should apply the trailing interval, got: {sql}"
+        bounds.iter().any(|bound| bound.starts_with("2024-01-03")),
+        "Should apply the trailing interval, got {bounds:?} in: {sql}"
     );
     assert!(
         sql.contains(r#""orders".created_at < $"#),
@@ -205,13 +212,20 @@ async fn test_trailing_finite_offset_end_no_granularity() {
               - "2024-01-16"
     "#};
 
-    let sql = ctx.build_sql(query).expect("Should generate SQL");
+    let (sql, params) = ctx
+        .build_sql_and_params(query)
+        .expect("Should generate SQL");
 
-    // offset end + trailing 7 day => (to - 7 day, to]: the trailing interval shifts
-    // the lower bound (strict); the upper bound is the inclusive range end.
+    // offset end + trailing 7 day => (to - 7 day, to]: the frame shifts the
+    // lower bound (strict); the upper bound is the inclusive range end. The
+    // shift is folded into the bound, so the evidence is a date a week back.
+    let bounds = params
+        .iter()
+        .filter_map(|value| value.to_param_string())
+        .collect::<Vec<_>>();
     assert!(
-        sql.contains("7 day"),
-        "Should apply the trailing interval, got: {sql}"
+        bounds.iter().any(|bound| bound.starts_with("2024-01-09")),
+        "Should apply the trailing interval, got {bounds:?} in: {sql}"
     );
     assert!(
         sql.contains(r#""orders".created_at <= $"#),

@@ -1,0 +1,14 @@
+{
+  "$schema": "../../node_modules/oxlint/configuration_schema.json",
+  "extends": ["../cubejs-linter/node.json"],
+  "ignorePatterns": [
+    "dist/",
+    "lib/",
+    "build/",
+    "coverage/",
+    "gen/",
+    "**/*.d.ts",
+    // a mongosh script, not Node: `db` is a shell global
+    "test/mongo-init.js"
+  ]
+}

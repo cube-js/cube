@@ -671,10 +671,21 @@ impl TransportService for NodeBridgeTransport {
             .expect("Unable to cast AuthContext to NativeAuthContext");
 
         let mut request_id = span_id
+            .as_ref()
             .map(|s| s.span_id.clone())
             .unwrap_or_else(|| Uuid::new_v4().to_string());
         if !request_id.contains("-span-") {
             request_id = format!("{}-span-1", request_id);
+        }
+        // The redacted twin of the span's query travels beside `query`: the log
+        // sink swaps it in, APM events keep the statement as sent
+        let mut properties = properties;
+        if let Some(redacted_query) = span_id.as_ref().and_then(|s| s.redacted_query_key.clone()) {
+            if let Some(object) = properties.as_object_mut() {
+                if object.contains_key("query") {
+                    object.insert("redactedQuery".to_string(), redacted_query);
+                }
+            }
         }
         call_raw_js_with_channel_as_callback(
             self.channel.clone(),

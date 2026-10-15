@@ -93,7 +93,9 @@ Each access policy grants visibility over a rectangular region of this space:
 its `member_level` chooses the members (the horizontal extent) and its
 `row_level` chooses the rows (the vertical extent). Defaults _widen_ the region —
 a policy with no `row_level` (or with `row_level: { allow_all: true }`) spans
-**every row**, and a policy with no `member_level` spans **every member**.
+**every row**, and a policy with no `member_level` spans **every member** (an
+empty `member_level` block is rejected — write `includes: "*"` to say that
+explicitly).
 `member_masking` marks part of a region as **visible but masked** rather than
 fully readable.
 

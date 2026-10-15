@@ -8,6 +8,7 @@ hidden: true
 
 Cube works with both [Power BI Desktop and Power BI Service][link-powerbi-desktop-vs-service].
 If you're using Power BI Service, you need to set up an [on-premises data gateway][link-powerbi-gateway].
+[Power BI Report Builder][link-powerbi-report-builder] is not supported.
 
 <iframe
   width="100%"
@@ -47,6 +48,7 @@ Cube supports the following authentication methods for Power BI:
 | Power BI Desktop | [NTLM][ref-ntlm-desktop] | 🟡 Works well for testing purposes |
 | Power BI Desktop | [Kerberos][ref-kerberos] | 🟢 Recommended for production |
 | Power BI Service | [NTLM][ref-ntlm] + [Kerberos][ref-kerberos] | 🟢 Recommended for production.<br/>Requires [on-premises data gateway][ref-opdg] |
+| Power BI Report Builder | — | 🔴 Not supported |
 
 ### Connection methods
 
@@ -85,6 +87,7 @@ so a sorted visual keeps its order except among groups that would otherwise tie.
 [link-powerbi]: https://www.microsoft.com/en-gb/power-platform/products/power-bi/
 [link-powerbi-desktop-vs-service]: https://learn.microsoft.com/en-us/power-bi/fundamentals/service-service-vs-desktop
 [link-powerbi-gateway]: https://learn.microsoft.com/en-us/power-bi/connect-data/service-gateway-onprem
+[link-powerbi-report-builder]: https://learn.microsoft.com/en-us/power-bi/paginated-reports/report-builder-power-bi
 [ref-count-distinct]: /reference/data-modeling/measures#type
 [ref-dax-api]: /reference/core-data-apis/dax-api
 [ref-integrations-apis]: /admin/connect-to-data/visualization-tools

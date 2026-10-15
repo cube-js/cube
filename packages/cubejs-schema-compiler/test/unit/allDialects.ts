@@ -9,8 +9,9 @@ const ADAPTER_DIR = path.join(__dirname, '..', '..', 'src', 'adapter');
 const MIN_DIALECTS = 10;
 
 /**
- * Every dialect, read off the adapter directory rather than listed by hand, so a dialect
- * added later cannot quietly escape an invariant asserted over all of them.
+ * Every dialect in the schema-compiler adapter directory, discovered rather than listed
+ * by hand. Driver packages carry Query subclasses outside this scan; for a given template
+ * invariant the ones that matter are those redefining or deleting that template.
  *
  * Paired with its name, which is what a caller needs to report which dialect failed.
  */

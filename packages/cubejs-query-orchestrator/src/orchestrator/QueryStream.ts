@@ -10,7 +10,7 @@ export class QueryStream extends stream.Transform {
 
   public streams: Map<string, stream.Stream>;
 
-  public aliasNameToMember: { [alias: string]: string };
+  public aliasNameToMember: { [alias: string]: string } | null;
 
   public counter = 0;
 

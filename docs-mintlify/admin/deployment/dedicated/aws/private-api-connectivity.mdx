@@ -11,7 +11,7 @@ to your applications, browsers, BI tools, embedded analytics clients, and
 Semantic Layer Sync-generated configs over a private network. For **backend
 connectivity** (letting Cube reach into your network to query data sources,
 auth providers, BI APIs targeted by SLS, and other upstream services), see
-[AWS PrivateLink][aws-private-link] or [VPC Peering][aws-vpc-peering].
+[AWS PrivateLink][aws-private-link].
 
 </Note>
 
@@ -49,8 +49,8 @@ Cube runs as two cooperating planes:
   results, and the part this document teaches you how to expose privately.
 
 [AWS PrivateLink][aws-privatelink] lets a service running in one VPC be
-consumed from another VPC over the AWS internal network, without VPC peering
-or routing through the internet. The service owner publishes a
+consumed from another VPC over the AWS internal network, without routing through
+the internet. The service owner publishes a
 [VPC Endpoint Service][aws-endpoint-service] in front of an internal load
 balancer; the consumer creates a corresponding
 [interface VPC Endpoint][aws-interface-endpoint] in their VPC, which appears
@@ -633,7 +633,6 @@ hop is failing:
 
 [cube-region]: /admin/deployment/infrastructure#understanding-cube-cloud-region
 [aws-private-link]: /admin/deployment/dedicated/aws/private-link
-[aws-vpc-peering]: /admin/deployment/dedicated/aws/vpc-peering
 [chat-api]: /reference/embed-apis/chat-api
 [agent-to-agent]: /recipes/ai/agent-to-agent
 [aws-privatelink]: https://docs.aws.amazon.com/vpc/latest/privatelink/what-is-privatelink.html

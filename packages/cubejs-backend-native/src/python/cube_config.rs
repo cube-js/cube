@@ -28,6 +28,7 @@ impl CubeConfigPy {
             "http",
             "jwt",
             "live_preview",
+            "max_compiled_members",
             "max_compiler_cache_keep_alive",
             "pg_sql_port",
             "process_subscriptions_interval",

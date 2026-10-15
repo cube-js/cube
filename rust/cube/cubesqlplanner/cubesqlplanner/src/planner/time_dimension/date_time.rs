@@ -4,6 +4,7 @@ use chrono::Duration;
 use chrono_tz::Tz;
 use cubenativeutils::CubeError;
 use std::cmp::Ord;
+use std::str::FromStr;
 
 #[derive(Clone, PartialEq, PartialOrd, Eq, Ord, Debug)]
 pub struct QueryDateTime {
@@ -16,6 +17,38 @@ impl ToString for QueryDateTime {
     fn to_string(&self) -> String {
         self.default_format()
     }
+}
+
+/// The marker an interval carries when its side reaches without limit.
+pub const UNBOUNDED_INTERVAL: &str = "unbounded";
+
+/// `date` moved by `interval` on the wall clock, or `None` for an `unbounded`
+/// side — which no date states. A side with no interval keeps the date as it is.
+///
+/// Wall clock rather than absolute time because this is what SQL interval
+/// arithmetic over a naive local timestamp does, and where a series places its
+/// own points; across a daylight-saving transition the two differ by the offset.
+pub fn shift_bound_wall_clock(
+    tz: Tz,
+    date: &str,
+    interval: &Option<String>,
+    subtract: bool,
+) -> Result<Option<String>, CubeError> {
+    let interval = match interval.as_deref() {
+        Some(UNBOUNDED_INTERVAL) => return Ok(None),
+        Some(interval) => SqlInterval::from_str(interval)?,
+        None => return Ok(Some(date.to_string())),
+    };
+    let interval = if subtract {
+        interval.inverse()
+    } else {
+        interval
+    };
+    Ok(Some(
+        QueryDateTime::from_date_str(tz, date)?
+            .add_interval_wall_clock(&interval)?
+            .default_format(),
+    ))
 }
 
 impl QueryDateTime {
@@ -163,8 +196,11 @@ impl QueryDateTime {
 
     pub fn add_interval(&self, interval: &SqlInterval) -> Result<Self, CubeError> {
         // For time-only intervals (hour, minute, second), use UTC arithmetic to avoid DST issues
-        let is_time_only =
-            interval.year == 0 && interval.month == 0 && interval.week == 0 && interval.day == 0;
+        let is_time_only = interval.year == 0
+            && interval.quarter == 0
+            && interval.month == 0
+            && interval.week == 0
+            && interval.day == 0;
 
         if is_time_only {
             // Use UTC-based arithmetic for time intervals
@@ -178,9 +214,11 @@ impl QueryDateTime {
         // For date-based intervals, use local time arithmetic
         let date = self.naive_local().date();
 
-        // Step 1: add years and months with fallback logic
+        // Step 1: add years and months with fallback logic. A quarter is three
+        // months — `SqlInterval` keeps it in a field of its own and never folds
+        // it in, so anything reading `month` alone would drop it silently.
         let mut year = date.year() + interval.year;
-        let mut month = date.month() as i32 + interval.month;
+        let mut month = date.month() as i32 + interval.quarter * 3 + interval.month;
 
         while month > 12 {
             year += 1;
@@ -221,6 +259,26 @@ impl QueryDateTime {
             + Duration::seconds(interval.second as i64);
 
         Self::from_local_date_time(self.date_time.timezone(), naive)
+    }
+
+    /// `add_interval`, but a time-only interval moves the wall clock rather
+    /// than the instant. An hour of interval is an hour of the clock, the way
+    /// a series places its points and the way SQL interval arithmetic reads it;
+    /// across a daylight-saving transition the two differ by the offset.
+    pub fn add_interval_wall_clock(&self, interval: &SqlInterval) -> Result<Self, CubeError> {
+        let carries_date = interval.year != 0
+            || interval.quarter != 0
+            || interval.month != 0
+            || interval.week != 0
+            || interval.day != 0;
+        if carries_date {
+            return self.add_interval(interval);
+        }
+        self.add_duration(
+            Duration::hours(interval.hour as i64)
+                + Duration::minutes(interval.minute as i64)
+                + Duration::seconds(interval.second as i64),
+        )
     }
 
     pub fn sub_interval(&self, interval: &SqlInterval) -> Result<Self, CubeError> {
@@ -285,6 +343,36 @@ impl QueryDateTime {
         }
 
         Ok(aligned)
+    }
+}
+
+#[cfg(test)]
+mod shift_bound_tests {
+    use super::*;
+
+    // A bound folded out of an end-of-day anchor stays an end-of-day, and on a
+    // dialect keeping microseconds it has to survive being normalised again:
+    // read back as a range start it would lose its sub-second tail, and the
+    // window — whose frame this predicate *is* — would silently widen.
+    #[test]
+    fn an_end_of_day_bound_keeps_its_tail_at_microsecond_precision() {
+        let anchor = QueryDateTimeHelper::format_to_date("2024-01-20", 6).unwrap();
+        assert_eq!(anchor, "2024-01-20T23:59:59.999999");
+
+        let shifted = shift_bound_wall_clock(Tz::UTC, &anchor, &Some("7 day".to_string()), true)
+            .unwrap()
+            .unwrap();
+
+        assert_eq!(
+            QueryDateTimeHelper::format_to_date(&shifted, 6).unwrap(),
+            "2024-01-13T23:59:59.999999",
+            "normalised as the anchor was"
+        );
+        assert_eq!(
+            QueryDateTimeHelper::format_from_date(&shifted, 6).unwrap(),
+            "2024-01-13T23:59:59.999000",
+            "normalised as a range start instead, which is what the bug did"
+        );
     }
 }
 

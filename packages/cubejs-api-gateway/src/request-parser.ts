@@ -1,4 +1,7 @@
 import { v4 as uuidv4 } from 'uuid';
+import { isValidRequestId, INVALID_REQUEST_ID_MESSAGE } from '@cubejs-backend/shared';
+
+import { UserError } from './user-error';
 import type { Request, Response } from 'express';
 
 interface RequestParserResult {
@@ -11,8 +14,29 @@ interface RequestParserResult {
   contentType?: string
 }
 
+function parseRequestIdHeader(value: string): string {
+  // A repeated header (e.g. one more added by a proxy) arrives joined with ", ";
+  // commas are never valid in an id, so the first value is the client's
+  const requestId = value.split(',')[0].trim();
+  if (!isValidRequestId(requestId)) {
+    throw new UserError(INVALID_REQUEST_ID_MESSAGE);
+  }
+
+  return requestId;
+}
+
 export function getRequestIdFromRequest(req: Request): string {
-  return req.get('x-request-id') || req.get('traceparent') || `${uuidv4()}-span-1`;
+  const xRequestId = req.get('x-request-id');
+  if (xRequestId) {
+    return parseRequestIdHeader(xRequestId);
+  }
+
+  const traceparent = req.get('traceparent');
+  if (traceparent) {
+    return parseRequestIdHeader(traceparent);
+  }
+
+  return `${uuidv4()}-span-1`;
 }
 
 export function requestParser(req: Request, res: Response) {

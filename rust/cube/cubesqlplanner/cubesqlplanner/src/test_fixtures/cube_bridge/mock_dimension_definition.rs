@@ -46,6 +46,8 @@ pub struct MockDimensionDefinition {
     filter: Option<Rc<MockMultiStageFilterReferences>>,
     #[builder(default, setter(strip_option(fallback = resolved_mask_sql_opt)))]
     resolved_mask_sql: Option<String>,
+    #[builder(default)]
+    included: Option<bool>,
 }
 
 impl_static_data!(
@@ -58,10 +60,15 @@ impl_static_data!(
     sub_query,
     propagate_filters_to_sub_query,
     values,
-    primary_key
+    primary_key,
+    included
 );
 
 impl MockDimensionDefinition {
+    pub fn raw_mask_sql(&self) -> Option<String> {
+        self.resolved_mask_sql.clone()
+    }
+
     pub fn from_yaml(yaml: &str) -> Result<Rc<Self>, CubeError> {
         let yaml_def: YamlDimensionDefinition = serde_yaml::from_str(yaml)
             .map_err(|e| CubeError::user(format!("Failed to parse YAML: {}", e)))?;

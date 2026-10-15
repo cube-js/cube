@@ -1,6 +1,7 @@
 import { GenericContainer, Wait } from 'testcontainers';
 
 import { DbRunnerAbstract, DBRunnerContainerOptions } from './db-runner.abstract';
+import { startContainerWithRetry } from './start-with-retry';
 
 export class MysqlDBRunner extends DbRunnerAbstract {
   public static startContainer(options: DBRunnerContainerOptions) {
@@ -45,6 +46,6 @@ export class MysqlDBRunner extends DbRunnerAbstract {
       container.withBindMounts(binds);
     }
 
-    return container.start();
+    return startContainerWithRetry(container);
   }
 }

@@ -285,6 +285,30 @@ describe('Single datasources', () => {
     })).toThrow('The CUBEJS_DB_SCHEMA is required and missing.');
   });
 
+  test.each([
+    ['dbSchema', 'CUBEJS_DB_SCHEMA', 'CUBEJS_DB_NAME'],
+    ['dbDatabase', 'CUBEJS_DATABASE', 'CUBEJS_DB_NAME'],
+    ['dbCatalog', 'CUBEJS_DB_CATALOG', 'CUBEJS_DB_PRESTO_CATALOG'],
+  ] as const)('getEnv("%s") warns about deprecation only when %s is set', (name, deprecatedKey, newKey) => {
+    const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => undefined);
+
+    try {
+      delete process.env[deprecatedKey];
+      expect(getEnv(name, { dataSource: 'default' })).toBeUndefined();
+      expect(warnSpy).not.toHaveBeenCalled();
+
+      process.env[deprecatedKey] = 'value';
+      expect(getEnv(name, { dataSource: 'default' })).toEqual('value');
+      expect(warnSpy).toHaveBeenCalledTimes(1);
+      expect(warnSpy).toHaveBeenCalledWith(
+        `The ${deprecatedKey} is deprecated. Please, use the ${newKey} instead.`
+      );
+    } finally {
+      delete process.env[deprecatedKey];
+      warnSpy.mockRestore();
+    }
+  });
+
   test('getEnv("dbDatabase")', () => {
     process.env.CUBEJS_DATABASE = 'default1';
     expect(getEnv('dbDatabase', { dataSource: 'default' })).toEqual('default1');
@@ -1038,12 +1062,12 @@ describe('Single datasources', () => {
   });
 
   test('getEnv("fireboltAccount")', () => {
-    process.env.CUBEJS_FIREBOLT_ACCOUNT = "default1";
+    process.env.CUBEJS_FIREBOLT_ACCOUNT = 'default1';
     expect(getEnv('fireboltAccount', { dataSource: 'default' })).toEqual('default1');
     expect(getEnv('fireboltAccount', { dataSource: 'postgres' })).toEqual('default1');
     expect(getEnv('fireboltAccount', { dataSource: 'wrong' })).toEqual('default1');
 
-    process.env.CUBEJS_FIREBOLT_ACCOUNT = "default2";
+    process.env.CUBEJS_FIREBOLT_ACCOUNT = 'default2';
     expect(getEnv('fireboltAccount', { dataSource: 'default' })).toEqual('default2');
     expect(getEnv('fireboltAccount', { dataSource: 'postgres' })).toEqual('default2');
     expect(getEnv('fireboltAccount', { dataSource: 'wrong' })).toEqual('default2');

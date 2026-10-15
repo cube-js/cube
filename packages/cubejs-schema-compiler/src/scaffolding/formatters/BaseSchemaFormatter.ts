@@ -35,9 +35,9 @@ export abstract class BaseSchemaFormatter {
   protected readonly scaffoldingSchema: ScaffoldingSchema;
 
   public constructor(
-      protected readonly dbSchema: DatabaseSchema,
-      protected readonly driver: any,
-      protected readonly options: SchemaFormatterOptions
+    protected readonly dbSchema: DatabaseSchema,
+    protected readonly driver: any,
+    protected readonly options: SchemaFormatterOptions
   ) {
     this.scaffoldingSchema = new ScaffoldingSchema(dbSchema, this.options);
   }
@@ -218,7 +218,7 @@ export abstract class BaseSchemaFormatter {
         null,
         [
           'Pre-aggregation definitions go here.',
-          'Learn more in the documentation: https://cube.dev/docs/caching/pre-aggregations/getting-started',
+          'Learn more in the documentation: https://docs.cube.dev/docs/pre-aggregations/getting-started-pre-aggregations',
         ]
       ),
     };

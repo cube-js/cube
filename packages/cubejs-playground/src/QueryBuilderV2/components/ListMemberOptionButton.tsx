@@ -44,6 +44,7 @@ export function ListMemberOptionButton(props: ListMemberOptionButtonProps) {
       case 'date-range':
         onAddDateRange?.(member.name as string);
         break;
+      // no default
     }
   }
 

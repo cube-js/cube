@@ -69,7 +69,7 @@ impl QueryBuilder {
             .filter(|tdm| tdm.dimension.eq(member))
             .count();
         if tdm_member_cnt == 0 {
-            // If we didnt find any TD for member, let's push a new one without granularity (supported by Cube.js)
+            // If we didnt find any TD for member, let's push a new one without granularity (supported by Cube)
             self.time_dimensions.push(V1LoadRequestQueryTimeDimension {
                 dimension: member.clone(),
                 date_range: Some(date_range),

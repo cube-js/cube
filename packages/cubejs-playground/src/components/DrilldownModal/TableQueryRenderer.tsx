@@ -6,8 +6,8 @@ import { useDeepMemo } from '../../hooks/deep-memo';
 const TABLE_PAGE_SIZE = 50;
 
 const formatTableData = (columns, data) => {
-  function flatten(columns = []) {
-    return columns.reduce<any>((memo, column: any) => {
+  function flatten(nestedColumns = []) {
+    return nestedColumns.reduce<any>((memo, column: any) => {
       if (column.children) {
         return [...memo, ...flatten(column.children)];
       }
@@ -16,12 +16,12 @@ const formatTableData = (columns, data) => {
     }, []);
   }
 
-  const typeByIndex = flatten(columns).reduce((memo, column) => {
-    return { ...memo, [column.dataIndex]: column };
-  }, {});
+  const typeByIndex = flatten(columns).reduce((memo, column) => (
+    { ...memo, [column.dataIndex]: column }
+  ), {});
 
-  function formatValue(value, { type, format }: any = {}) {
-    if (value == undefined) {
+  function formatValue(value, { type, format: valueFormat }: any = {}) {
+    if (value == null) {
       return value;
     }
 
@@ -35,7 +35,7 @@ const formatTableData = (columns, data) => {
       return value;
     }
 
-    if (type === 'number' && format === 'percent') {
+    if (type === 'number' && valueFormat === 'percent') {
       return [(parseFloat(value) * 100).toFixed(2), '%'].join('');
     }
 
@@ -44,9 +44,7 @@ const formatTableData = (columns, data) => {
 
   function format(row) {
     return Object.fromEntries(
-      Object.entries(row).map(([dataIndex, value]) => {
-        return [dataIndex, formatValue(value, typeByIndex[dataIndex])];
-      })
+      Object.entries(row).map(([dataIndex, value]) => [dataIndex, formatValue(value, typeByIndex[dataIndex])])
     );
   }
 

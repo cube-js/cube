@@ -109,7 +109,7 @@ export class CubeCloudClient {
 
   public uploadFile(
     { transaction, fileName, data, auth }:
-      { transaction: any, fileName: string, data: ReadStream, auth?: AuthObject }
+    { transaction: any, fileName: string, data: ReadStream, auth?: AuthObject }
   ) {
     const formData = new FormData();
     formData.append('transaction', JSON.stringify(transaction));
@@ -134,7 +134,7 @@ export class CubeCloudClient {
   }
 
   public finishUpload({ transaction, files, auth }:
-    { transaction: any, files: any, auth?: AuthObject }) {
+  { transaction: any, files: any, auth?: AuthObject }) {
     return this.request({
       url: (deploymentId: string) => `build/deploy/${deploymentId}/finish-upload${this.extendRequestByLivePreview()}`,
       method: 'POST',
@@ -159,7 +159,7 @@ export class CubeCloudClient {
     });
   }
 
-  public getStatusDevMode({ auth, lastHash }: { auth?: AuthObject, lastHash?: string } = {}): Promise<{[key: string]: any}> {
+  public getStatusDevMode({ auth, lastHash }: { auth?: AuthObject, lastHash?: string } = {}): Promise<{ [key: string]: any }> {
     const params = new URLSearchParams();
     if (lastHash) {
       params.append('lastHash', lastHash);

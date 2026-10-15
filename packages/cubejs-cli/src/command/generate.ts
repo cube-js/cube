@@ -67,7 +67,7 @@ const generate = async (options) => {
     requestId: 'CLI REQUEST'
   });
 
-  const dbSchema = await driver.tablesSchema();
+  const dbSchema = await driver.tablesSchemaV2();
   await driver.release();
 
   logStage('Generating schema files');

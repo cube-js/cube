@@ -219,7 +219,7 @@ export type ResponseFormat = 'compact' | 'columnar' | 'default' | undefined;
 
 export type CubeApiOptions = {
   /**
-   * URL of your Cube.js Backend. By default, in the development environment it is `http://localhost:4000/cubejs-api/v1`
+   * URL of your Cube Backend. By default, in the development environment it is `http://localhost:4000/cubejs-api/v1`
    */
   apiUrl: string;
   /**

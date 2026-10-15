@@ -1,0 +1,11 @@
+---
+source: cubesqlplanner/cubesqlplanner/src/tests/integration/pre_aggregations/filtered_leaf_merge.rs
+assertion_line: 229
+expression: "pg_ctx().build_sql(&with_merge(query, true)).unwrap()"
+---
+SELECT "orders__status" "orders__status", "orders__size" "orders__size", sum(CASE WHEN (("orders__created_at_day" >= $_0_$::timestamptz AND "orders__created_at_day" <= $_1_$::timestamptz)) THEN "orders__total_amount" END) "orders__amount_all_week", sum(CASE WHEN (("orders__created_at_day" >= $_2_$::timestamptz AND "orders__created_at_day" <= $_3_$::timestamptz)) THEN "orders__total_amount" END) "orders__amount_mid_week" 
+FROM  orders__orders_by_status_size_day__usage_1  AS "orders__orders_by_status_size_day"
+WHERE (("orders__created_at_day" >= $_4_$::timestamptz AND "orders__created_at_day" <= $_5_$::timestamptz) OR ("orders__created_at_day" >= $_6_$::timestamptz AND "orders__created_at_day" <= $_7_$::timestamptz))
+GROUP BY 1, 2
+ORDER BY  4  DESC,  1  ASC
+LIMIT 2

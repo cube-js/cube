@@ -28,6 +28,7 @@ export class ContextEvaluator implements CompilerInterface {
     }
 
     this.contextDefinitions = new Map<string, CompiledContext>();
+
     for (const context of contexts) {
       if (errorReporter && this.contextDefinitions.has(context.name)) {
         errorReporter.error(`Context "${context.name}" already exists!`);

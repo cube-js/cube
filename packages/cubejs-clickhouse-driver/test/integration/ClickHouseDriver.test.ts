@@ -154,6 +154,7 @@ describe('ClickHouseDriver', () => {
   it('should create schema if not exists', async () => {
     await doWithDriver(async (driver) => {
       const name = `temp_${Date.now()}`;
+
       try {
         await driver.createSchemaIfNotExists(name);
       } finally {
@@ -199,6 +200,7 @@ describe('ClickHouseDriver', () => {
   it('should normalise all dates as ISO8601', async () => {
     await doWithDriver(async (driver) => {
       const name = `temp_${Date.now()}`;
+
       try {
         await driver.createSchemaIfNotExists(name);
         await driver.command(`CREATE TABLE ${name}.a (dateTime DateTime, date Date) ENGINE Log`);
@@ -218,6 +220,7 @@ describe('ClickHouseDriver', () => {
   it('should substitute parameters', async () => {
     await doWithDriver(async (driver) => {
       const name = `temp_${Date.now()}`;
+
       try {
         await driver.createSchemaIfNotExists(name);
         await driver.command(`CREATE TABLE ${name}.test (x Int32, s String) ENGINE Log`);
@@ -233,6 +236,7 @@ describe('ClickHouseDriver', () => {
   it('should return null for missing values on left outer join', async () => {
     await doWithDriver(async (driver) => {
       const name = `temp_${Date.now()}`;
+
       try {
         await driver.createSchemaIfNotExists(name);
         await driver.command(`CREATE TABLE ${name}.a (x Int32, s String) ENGINE Log`);

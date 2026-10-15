@@ -5,7 +5,7 @@ import { VerticaDBRunner } from '@cubejs-backend/testing-shared';
 import cubejs, { CubeApi, Query } from '@cubejs-client/core';
 import { afterAll, beforeAll, expect, jest } from '@jest/globals';
 import { BirdBox, getBirdbox } from '../src';
-import { DEFAULT_CONFIG } from './smoke-tests';
+import { DEFAULT_CONFIG, stopIfStarted } from './smoke-tests';
 
 describe('vertica pa', () => {
   jest.setTimeout(60 * 5 * 1000);
@@ -38,8 +38,8 @@ describe('vertica pa', () => {
   });
 
   afterAll(async () => {
-    await birdbox.stop();
-    await db.stop();
+    await stopIfStarted('birdbox', birdbox);
+    await stopIfStarted('db', db);
   });
 
   test('basic pa', async () => {

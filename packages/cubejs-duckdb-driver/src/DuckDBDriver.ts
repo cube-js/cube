@@ -5,16 +5,14 @@ import {
   QueryOptions,
   StreamTableData,
   GenericDataBaseType,
-  TableStructure,
-  TableColumnQueryResult,
 } from '@cubejs-backend/base-driver';
 import { getEnv } from '@cubejs-backend/shared';
-import { promisify } from 'util';
-import * as stream from 'stream';
-import { Connection, Database } from 'duckdb';
+import { finished } from 'stream/promises';
+import { DuckDBConnection, DuckDBInstance } from '@duckdb/node-api';
 
 import { DuckDBQuery } from './DuckDBQuery';
-import { HydrationStream, transformRow } from './HydrationStream';
+import { DuckDBRowStream } from './RowStream';
+import { buildTransform, convertDuckDBParams, transformChunk } from './Transform';
 
 const { version } = require('../../package.json');
 
@@ -29,14 +27,15 @@ export type DuckDBDriverConfiguration = {
 };
 
 type InitPromise = {
-  defaultConnection: Connection,
-  db: Database;
+  defaultConnection: DuckDBConnection,
+  instance: DuckDBInstance;
 };
 
+type ExecFn = (sql: string) => Promise<unknown>;
+
 const DuckDBToGenericType: Record<string, GenericDataBaseType> = {
-  // DATE_TRUNC returns DATE, but Cube Store still doesn't support DATE type
-  // DuckDB's driver transform date/timestamp to Date object, but HydrationStream converts any Date object to ISO timestamp
-  // That's why It's safe to use timestamp here
+  // DATE_TRUNC returns DATE, but Cube Store still doesn't support DATE type;
+  // Transform renders DATE values as ISO timestamps anyway, so declaring them timestamp is safe
   date: 'timestamp',
 };
 
@@ -64,8 +63,9 @@ export class DuckDBDriver extends BaseDriver implements DriverInterface {
     return DuckDBToGenericType[columnType.toLowerCase()] || super.toGenericType(columnType.toLowerCase(), precision, scale);
   }
 
-  private async installExtensions(extensions: string[], execAsync: (sql: string, ...params: any[]) => Promise<void>, repository: string = ''): Promise<void> {
+  private async installExtensions(extensions: string[], execAsync: ExecFn, repository: string = ''): Promise<void> {
     repository = repository ? ` FROM ${repository}` : '';
+
     for (const extension of extensions) {
       try {
         await execAsync(`INSTALL ${extension}${repository}`);
@@ -73,13 +73,12 @@ export class DuckDBDriver extends BaseDriver implements DriverInterface {
         if (this.logger) {
           console.error(`DuckDB - error on installing ${extension}`, { e });
         }
-        // DuckDB will lose connection_ref on connection on error, this will lead to broken connection object
         throw e;
       }
     }
   }
 
-  private async loadExtensions(extensions: string[], execAsync: (sql: string, ...params: any[]) => Promise<void>): Promise<void> {
+  private async loadExtensions(extensions: string[], execAsync: ExecFn): Promise<void> {
     for (const extension of extensions) {
       try {
         await execAsync(`LOAD ${extension}`);
@@ -87,7 +86,6 @@ export class DuckDBDriver extends BaseDriver implements DriverInterface {
         if (this.logger) {
           console.error(`DuckDB - error on loading ${extension}`, { e });
         }
-        // DuckDB will lose connection_ref on connection on error, this will lead to broken connection object
         throw e;
       }
     }
@@ -96,7 +94,6 @@ export class DuckDBDriver extends BaseDriver implements DriverInterface {
   protected async init(): Promise<InitPromise> {
     const token = this.config.motherDuckToken || getEnv('duckdbMotherDuckToken', this.config);
     const dbPath = this.config.databasePath || getEnv('duckdbDatabasePath', this.config);
-    // Determine the database URL based on the provided db_path or token
     let dbUrl: string;
     if (dbPath) {
       dbUrl = dbPath;
@@ -106,17 +103,32 @@ export class DuckDBDriver extends BaseDriver implements DriverInterface {
       dbUrl = ':memory:';
     }
 
-    let dbOptions;
+    let dbOptions: Record<string, string> | undefined;
     if (token) {
       dbOptions = { custom_user_agent: `Cube/${version}` };
     }
 
-    // Create a new Database instance with the determined URL and custom user agent
-    const db = new Database(dbUrl, dbOptions);
+    const instance = await DuckDBInstance.create(dbUrl, dbOptions);
+    let defaultConnection: DuckDBConnection | undefined;
 
-    // Under the hood all methods of Database uses internal default connection, but there is no way to expose it
-    const defaultConnection = db.connect();
-    const execAsync: (sql: string, ...params: any[]) => Promise<void> = promisify(defaultConnection.exec).bind(defaultConnection) as any;
+    try {
+      defaultConnection = await instance.connect();
+      await this.configureConnection(defaultConnection);
+
+      return { defaultConnection, instance };
+    } catch (e) {
+      try {
+        defaultConnection?.closeSync();
+      } finally {
+        instance.closeSync();
+      }
+
+      throw e;
+    }
+  }
+
+  private async configureConnection(connection: DuckDBConnection): Promise<void> {
+    const execAsync: ExecFn = (sql: string) => connection.run(sql);
 
     const configuration = [
       {
@@ -183,7 +195,6 @@ export class DuckDBDriver extends BaseDriver implements DriverInterface {
       }
     }
 
-    // Install & load extensions if configured in env variable.
     const officialExtensions = getEnv('duckdbExtensions', this.config);
     await this.installExtensions(officialExtensions, execAsync);
     await this.loadExtensions(officialExtensions, execAsync);
@@ -203,11 +214,6 @@ export class DuckDBDriver extends BaseDriver implements DriverInterface {
         }
       }
     }
-
-    return {
-      defaultConnection,
-      db
-    };
   }
 
   public override informationSchemaQuery(): string {
@@ -250,14 +256,18 @@ export class DuckDBDriver extends BaseDriver implements DriverInterface {
 
   public async query<R = unknown>(query: string, values: unknown[] = [], _options?: QueryOptions): Promise<R[]> {
     const { defaultConnection } = await this.getInitiatedState();
-    const fetchAsync: (sql: string, ...params: any[]) => Promise<R[]> = promisify(defaultConnection.all).bind(defaultConnection) as any;
 
-    const result = await fetchAsync(query, ...values);
-    return result.map((item) => {
-      transformRow(item);
+    const result = await defaultConnection.run(query, convertDuckDBParams(values));
+    const transform = buildTransform(result.columnNames(), result.columnTypes());
+    const rows: R[] = [];
 
-      return item;
-    });
+    for (const chunk of await result.fetchAllChunks()) {
+      for (const row of transformChunk(chunk, transform)) {
+        rows.push(row as R);
+      }
+    }
+
+    return rows;
   }
 
   public async stream(
@@ -265,26 +275,39 @@ export class DuckDBDriver extends BaseDriver implements DriverInterface {
     values: unknown[],
     { highWaterMark }: StreamOptions
   ): Promise<StreamTableData> {
-    const { db } = await this.getInitiatedState();
+    const { instance } = await this.getInitiatedState();
 
     // new connection, because stream can break with
     // Attempting to execute an unsuccessful or closed pending query result
     // PreAggregation queue has a concurrency limit, it's why pool is not needed here
-    const connection = db.connect();
-    const closeAsync = promisify(connection.close).bind(connection);
+    const connection = await instance.connect();
+    let closed = false;
+    const close = () => {
+      if (!closed) {
+        closed = true;
+        connection.closeSync();
+      }
+    };
 
     try {
-      const asyncIterator = connection.stream(query, ...(values || []));
-      const rowStream = stream.Readable.from(asyncIterator, { highWaterMark }).pipe(new HydrationStream());
+      const result = await connection.stream(query, convertDuckDBParams(values));
+      const transform = buildTransform(result.columnNames(), result.columnTypes());
+
+      // Chunks are fetched lazily, so the connection lives until the stream is destroyed,
+      // which covers completion, release(), destroy() and an early `break` alike.
+      const rowStream = new DuckDBRowStream(result, transform, close, highWaterMark);
 
       return {
         rowStream,
         release: async () => {
-          await closeAsync();
+          rowStream.destroy();
+          await finished(rowStream, { cleanup: true }).catch(() => {
+            // the consumer already received the destroy error
+          });
         }
       };
     } catch (e) {
-      await closeAsync();
+      close();
 
       throw e;
     }
@@ -300,11 +323,15 @@ export class DuckDBDriver extends BaseDriver implements DriverInterface {
 
   public async release(): Promise<void> {
     if (this.initPromise) {
-      const { db } = await this.initPromise;
-      const close = promisify(db.close).bind(db);
+      const { initPromise } = this;
       this.initPromise = null;
+      const { defaultConnection, instance } = await initPromise;
 
-      await close();
+      try {
+        defaultConnection.closeSync();
+      } finally {
+        instance.closeSync();
+      }
     }
   }
 }

@@ -1,0 +1,16 @@
+{
+  "$schema": "../../node_modules/oxlint/configuration_schema.json",
+  "extends": ["../cubejs-linter/node.json"],
+  "ignorePatterns": [
+    "dist/",
+    "lib/",
+    "build/",
+    "coverage/",
+    "gen/",
+    "**/*.d.ts",
+    // generated ANTLR parsers and SQL fixtures
+    "src/parser/GenericSql*.ts",
+    "src/parser/Python3*.ts",
+    "test/unit/fixtures/"
+  ]
+}

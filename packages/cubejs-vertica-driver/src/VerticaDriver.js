@@ -111,3 +111,4 @@ class VerticaDriver extends BaseDriver {
 }
 
 module.exports = VerticaDriver;
+module.exports.VerticaDriver = VerticaDriver;

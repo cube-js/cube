@@ -1,5 +1,6 @@
 import { GenericContainer, Wait } from 'testcontainers';
 import { DbRunnerAbstract } from './db-runner.abstract';
+import { startContainerWithRetry } from './start-with-retry';
 
 export class VerticaDBRunner extends DbRunnerAbstract {
   public static startContainer() {
@@ -13,6 +14,6 @@ export class VerticaDBRunner extends DbRunnerAbstract {
         Wait.forLogMessage('Vertica is now running')
       );
 
-    return container.start();
+    return startContainerWithRetry(container);
   }
 }

@@ -31,6 +31,8 @@ pub struct DimensionDefinitionStatic {
     pub values: Option<Vec<String>>,
     #[serde(rename = "primaryKey")]
     pub primary_key: Option<bool>,
+    /// Re-exported by a view from its `includes`, rather than declared by it.
+    pub included: Option<bool>,
 }
 
 #[nativebridge::native_bridge(DimensionDefinitionStatic, with_static_meta)]

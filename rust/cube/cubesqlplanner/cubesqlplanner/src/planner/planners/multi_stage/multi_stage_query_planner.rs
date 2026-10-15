@@ -1,7 +1,7 @@
 use super::{
-    MultiStageInodeMember, MultiStageInodeMemberType, MultiStageLeafMemberType, MultiStageMember,
-    MultiStageMemberQueryPlanner, MultiStageMemberType, MultiStageQueryDescription, PlanningScope,
-    RollingWindowDescription, TimeSeriesDescription,
+    check_multi_stage_stages, MultiStageInodeMember, MultiStageInodeMemberType,
+    MultiStageLeafMemberType, MultiStageMember, MultiStageMemberQueryPlanner, MultiStageMemberType,
+    MultiStageQueryDescription, PlanningScope, RollingWindowDescription, TimeSeriesDescription,
 };
 use crate::cube_bridge::base_query_options::FilterValue;
 use crate::cube_bridge::measure_definition::RollingWindow;
@@ -17,16 +17,25 @@ use crate::planner::state::State;
 use crate::planner::symbols::deps::{collect_cube_refs, collect_deps, SymbolDeps};
 use crate::planner::symbols::transforms;
 use crate::planner::symbols::AggregationType;
+use crate::planner::time_dimension::shift_bound_wall_clock;
 use crate::planner::Case;
 use crate::planner::CaseSwitchDefinition;
 use crate::planner::CaseSwitchItem;
+use crate::planner::Granularity;
 use crate::planner::GranularityHelper;
 use crate::planner::MeasureKind;
+use crate::planner::MemberId;
 use crate::planner::MemberSymbol;
 use crate::planner::MultiStageFilter;
 use crate::planner::MultiStageFilterMode;
 use crate::planner::MultiStageGrain;
+use crate::planner::QueryDateTime;
+use crate::planner::QueryDateTimeHelper;
 use crate::planner::QueryProperties;
+use crate::planner::QueryTimeSeries;
+use crate::planner::SeriesSpan;
+use crate::planner::TimeDimensionSymbol;
+use chrono::Duration;
 use cubenativeutils::CubeError;
 use indexmap::IndexMap;
 use itertools::Itertools;
@@ -160,7 +169,7 @@ impl MultiStageQueryPlanner {
     fn create_multi_stage_inode_member(
         &self,
         base_member: Rc<MemberSymbol>,
-        resolved_multi_stage_dimensions: &mut HashSet<String>,
+        resolved_multi_stage_dimensions: &mut HashSet<MemberId>,
     ) -> Result<(MultiStageInodeMember, bool), CubeError> {
         let inode = if let Ok(measure) = base_member.as_measure() {
             let member_type = match measure.kind() {
@@ -209,7 +218,7 @@ impl MultiStageQueryPlanner {
                 .and_then(|d| d.multi_stage().map(|ms| ms.grain.clone()))
                 .unwrap_or_default();
             resolved_multi_stage_dimensions
-                .insert(base_member.clone().resolve_reference_chain().full_name());
+                .insert(base_member.clone().resolve_reference_chain().id().clone());
             (
                 MultiStageInodeMember::new(MultiStageInodeMemberType::Dimension, grain, None),
                 false,
@@ -229,7 +238,7 @@ impl MultiStageQueryPlanner {
         parent_state: &Rc<QueryProperties>,
         result: &mut Vec<Rc<MultiStageQueryDescription>>,
         descriptions: &mut Vec<Rc<MultiStageQueryDescription>>,
-        resolved_multi_stage_dimensions: &mut HashSet<String>,
+        resolved_multi_stage_dimensions: &mut HashSet<MemberId>,
         scope: &mut PlanningScope,
     ) -> Result<(), CubeError> {
         // The CASE-SWITCH path plans every branch dependency as its own CTE,
@@ -344,7 +353,7 @@ impl MultiStageQueryPlanner {
         parent_state: &Rc<QueryProperties>,
         result: &mut Vec<Rc<MultiStageQueryDescription>>,
         descriptions: &mut Vec<Rc<MultiStageQueryDescription>>,
-        resolved_multi_stage_dimensions: &mut HashSet<String>,
+        resolved_multi_stage_dimensions: &mut HashSet<MemberId>,
         scope: &mut PlanningScope,
     ) -> Result<(), CubeError> {
         let is_masked = |m: &Rc<MemberSymbol>| {
@@ -352,9 +361,9 @@ impl MultiStageQueryPlanner {
                 .query_tools()
                 .is_member_masked(&m.full_name())
         };
-        let rendered: HashSet<String> = rendered_dependencies(&member, &is_masked)
+        let rendered: HashSet<MemberId> = rendered_dependencies(&member, &is_masked)
             .into_iter()
-            .map(|d| d.resolve_reference_chain().full_name())
+            .map(|d| d.resolve_reference_chain().id().clone())
             .collect();
         let mut has_inputs = false;
         for dep in member.get_dependencies() {
@@ -371,7 +380,7 @@ impl MultiStageQueryPlanner {
                 if !description.is_multi_stage_dimension() || member.as_dimension().is_ok() {
                     result.push(description);
                 }
-            } else if dep.is_dimension() && rendered.contains(&dep.full_name()) {
+            } else if dep.is_dimension() && rendered.contains(dep.id()) {
                 self.check_dimension_is_reachable(&member, dep, &new_state, parent_state)?;
             }
         }
@@ -466,10 +475,7 @@ impl MultiStageQueryPlanner {
                 .chain(state.time_dimensions().iter())
             {
                 let resolved = dimension.clone().resolve_reference_chain();
-                if !members
-                    .iter()
-                    .any(|m| m.full_name() == resolved.full_name())
-                {
+                if !members.iter().any(|m| m.id() == resolved.id()) {
                     members.push(resolved);
                 }
             }
@@ -493,7 +499,10 @@ impl MultiStageQueryPlanner {
                 ),
                 None => member.full_name(),
             },
-            _ => member.full_name(),
+            MemberSymbol::Dimension(_)
+            | MemberSymbol::Measure(_)
+            | MemberSymbol::MemberExpression(_)
+            | MemberSymbol::Ref(_) => member.full_name(),
         }
     }
 
@@ -508,7 +517,10 @@ impl MultiStageQueryPlanner {
                         .full_name()
                 })
             }
-            _ => None,
+            MemberSymbol::Dimension(_)
+            | MemberSymbol::Measure(_)
+            | MemberSymbol::MemberExpression(_)
+            | MemberSymbol::Ref(_) => None,
         }
     }
 
@@ -525,7 +537,7 @@ impl MultiStageQueryPlanner {
         new_state: Rc<QueryProperties>,
         result: &mut Vec<Rc<MultiStageQueryDescription>>,
         descriptions: &mut Vec<Rc<MultiStageQueryDescription>>,
-        resolved_multi_stage_dimensions: &mut HashSet<String>,
+        resolved_multi_stage_dimensions: &mut HashSet<MemberId>,
         scope: &mut PlanningScope,
     ) -> Result<bool, CubeError> {
         let CaseSwitchItem::Member(switch_member) = &case.switch else {
@@ -536,12 +548,12 @@ impl MultiStageQueryPlanner {
         // `None` marks an unrestricted (open ELSE) entry: such a dependency
         // must be processed without a prefilter on switch_member, since the
         // outer CASE will dispatch by value at row level.
-        let mut deps: IndexMap<String, (Rc<MemberSymbol>, Option<Vec<String>>)> = IndexMap::new();
+        let mut deps: IndexMap<MemberId, (Rc<MemberSymbol>, Option<Vec<String>>)> = IndexMap::new();
 
         let mut record = |dep: Rc<MemberSymbol>, branch_values: Option<Vec<String>>| {
             let dep = dep.resolve_reference_chain();
             let entry = deps
-                .entry(dep.full_name())
+                .entry(dep.id().clone())
                 .or_insert_with(|| (dep.clone(), Some(Vec::new())));
             match (&mut entry.1, branch_values) {
                 (None, _) => {} // already unrestricted
@@ -610,7 +622,7 @@ impl MultiStageQueryPlanner {
         member: Rc<MemberSymbol>,
         state: Rc<QueryProperties>,
         descriptions: &mut Vec<Rc<MultiStageQueryDescription>>,
-        resolved_multi_stage_dimensions: &mut HashSet<String>,
+        resolved_multi_stage_dimensions: &mut HashSet<MemberId>,
         scope: &mut PlanningScope,
     ) -> Result<Rc<MultiStageQueryDescription>, CubeError> {
         let member = member.resolve_reference_chain();
@@ -630,7 +642,7 @@ impl MultiStageQueryPlanner {
             state
         };
 
-        let member_name = member.full_name();
+        let member_id = member.id().clone();
         // Skip without-member leaves: they carry the rank/similar member's
         // own name only to select its dimension grid, so `(member, state)`
         // alone can't tell them apart from the member's real inode CTE. A
@@ -641,6 +653,11 @@ impl MultiStageQueryPlanner {
         }) {
             return Ok(exists.clone());
         };
+        check_multi_stage_stages(
+            descriptions.len(),
+            &member,
+            self.query_properties.max_multi_stage_stages(),
+        )?;
 
         if let Some(rolling_window_query) = self.try_plan_rolling_window(
             member.clone(),
@@ -707,7 +724,7 @@ impl MultiStageQueryPlanner {
                 };
 
                 if let Some(filter) = &directive_filter {
-                    apply_filter_directive_to_state(filter, &mut filtered_state);
+                    apply_filter_directive_to_state(filter, &mut filtered_state)?;
                 }
                 filtered_state
             };
@@ -768,8 +785,8 @@ impl MultiStageQueryPlanner {
                 if let Some(time_shift) = multi_stage_member.time_shift() {
                     new_state.add_time_shifts(time_shift.clone())?;
                 }
-                if new_state.has_filters_for_member(&member_name) {
-                    new_state.remove_filter_for_member(&member_name);
+                if new_state.has_filters_for_member(&member_id) {
+                    new_state.remove_filter_for_member(&member_id);
                 }
                 Rc::new(new_state)
             };
@@ -797,12 +814,12 @@ impl MultiStageQueryPlanner {
             let mut keys_input: Vec<Rc<MultiStageQueryDescription>> = vec![];
             if !use_window_path {
                 let new_state_has = |sym: &Rc<MemberSymbol>| {
-                    let sym_name = sym.clone().resolve_reference_chain().full_name();
+                    let sym_id = sym.clone().resolve_reference_chain().id().clone();
                     new_state
                         .dimensions()
                         .iter()
                         .chain(new_state.time_dimensions().iter())
-                        .any(|d| d.clone().resolve_reference_chain().full_name() == sym_name)
+                        .any(|d| d.clone().resolve_reference_chain().id() == &sym_id)
                 };
                 let any_missing = state
                     .dimensions()
@@ -854,11 +871,22 @@ impl MultiStageQueryPlanner {
         member: Rc<MemberSymbol>,
         state: Rc<QueryProperties>,
         descriptions: &mut Vec<Rc<MultiStageQueryDescription>>,
-        resolved_multi_stage_dimensions: &mut HashSet<String>,
+        resolved_multi_stage_dimensions: &mut HashSet<MemberId>,
         scope: &mut PlanningScope,
     ) -> Result<Option<Rc<MultiStageQueryDescription>>, CubeError> {
         if let Ok(measure) = member.as_measure() {
             if measure.is_cumulative() {
+                // A rollup stores a rolling measure without its window and queries
+                // apply the window over it, so it is built unrolled.
+                if measure.is_multi_stage() && self.query_properties.is_pre_aggregation_query() {
+                    return Ok(Some(self.make_queries_descriptions(
+                        MemberSymbol::new_measure(transforms::strip_rolling_window(&measure)),
+                        state,
+                        descriptions,
+                        resolved_multi_stage_dimensions,
+                        scope,
+                    )?));
+                }
                 let rolling_window = if let Some(rolling_window) = measure.rolling_window() {
                     rolling_window.clone()
                 } else {
@@ -941,7 +969,7 @@ impl MultiStageQueryPlanner {
                 }
                 let uniq_time_dimensions = time_dimensions
                     .iter()
-                    .unique_by(|a| (a.cube_name(), a.name(), a.date_range_vec()))
+                    .unique_by(|a| (a.cube_id(), a.name(), a.date_range_vec()))
                     .collect_vec();
                 if uniq_time_dimensions.len() != 1 {
                     return Err(CubeError::internal(
@@ -952,6 +980,13 @@ impl MultiStageQueryPlanner {
 
                 let time_dimension =
                     GranularityHelper::find_dimension_with_min_granularity(&time_dimensions)?;
+                // The measure's own state carries the date range an include narrowed it to.
+                let time_dimension = state
+                    .time_dimensions()
+                    .iter()
+                    .filter_map(|d| d.as_time_dimension().ok())
+                    .find(|d| d.id() == time_dimension.id())
+                    .unwrap_or(time_dimension);
                 let time_dimension = MemberSymbol::new_time_dimension(time_dimension);
 
                 // Of the grain keys only `include` reaches the window assembly.
@@ -1131,19 +1166,33 @@ impl MultiStageQueryPlanner {
         state: Rc<QueryProperties>,
         descriptions: &mut Vec<Rc<MultiStageQueryDescription>>,
     ) -> Result<Rc<MultiStageQueryDescription>, CubeError> {
-        let description = if let Some(description) =
-            descriptions.iter().find(|d| d.alias() == "time_series")
-        {
-            // Rolling windows share one series, so a window joining an existing
-            // one has to register its own boundary column on it.
+        // Rolling windows over the same date range share one series. An include
+        // narrows the range of its own windows, so those get a series of their own.
+        let date_range = time_dimension.as_time_dimension()?.date_range_vec();
+        let mut series_count = 0;
+        let mut existing = None;
+        for description in descriptions.iter() {
+            if let MultiStageMemberType::Leaf(MultiStageLeafMemberType::TimeSeries(series)) =
+                description.member().member_type()
+            {
+                series_count += 1;
+                if series.time_dimension.as_time_dimension()?.date_range_vec() == date_range {
+                    existing = Some(description.clone());
+                    break;
+                }
+            }
+        }
+        let description = if let Some(description) = existing {
+            // A window joining an existing series has to register its own
+            // boundary column on it.
             if let Some(granularity) = &calendar_period_granularity {
-                let granularities = Self::time_series_calendar_granularities(description)?;
+                let granularities = Self::time_series_calendar_granularities(&description)?;
                 let mut granularities = granularities.borrow_mut();
                 if !granularities.contains(granularity) {
                     granularities.push(granularity.clone());
                 }
             }
-            description.clone()
+            description
         } else {
             let get_range_query_description = if time_dimension
                 .as_time_dimension()?
@@ -1176,7 +1225,11 @@ impl MultiStageQueryPlanner {
                 state.clone(),
                 vec![],
                 vec![],
-                "time_series".to_string(),
+                if series_count == 0 {
+                    "time_series".to_string()
+                } else {
+                    format!("time_series_{}", series_count)
+                },
             );
             descriptions.push(time_series_node.clone());
             time_series_node
@@ -1213,6 +1266,185 @@ impl MultiStageQueryPlanner {
         Ok(description)
     }
 
+    /// Outer bounds of the series a rolling window over `time_dimension` walks,
+    /// rendered by the base-scan filter as literals instead of read back off
+    /// the series.
+    ///
+    /// `None` where the series is not derivable at plan time: a date range that
+    /// is itself a query, a granularity whose periods come off a calendar cube,
+    /// and a range standing for a pre-aggregation's partition.
+    fn rolling_series_bounds(
+        &self,
+        time_dimension: &Rc<TimeDimensionSymbol>,
+    ) -> Result<Option<SeriesSpan>, CubeError> {
+        let Some(granularity) = time_dimension.granularity_obj() else {
+            return Ok(None);
+        };
+        if granularity.calendar_sql().is_some() {
+            return Ok(None);
+        }
+        let Some(date_range) = time_dimension.date_range_vec() else {
+            return Ok(None);
+        };
+        if date_range
+            .iter()
+            .any(|bound| QueryDateTimeHelper::parse_native_date_time(bound).is_err())
+        {
+            return Ok(None);
+        }
+        let bounds = if granularity.is_predefined_granularity() {
+            QueryTimeSeries::covering_bounds_predefined(
+                granularity.granularity(),
+                granularity.granularity_interval(),
+                &[date_range[0].clone(), date_range[1].clone()],
+                QueryTimeSeries::MILLISECOND_PRECISION,
+            )?
+        } else {
+            self.custom_series_bounds(&granularity, &date_range)?
+        };
+        Ok(Some(bounds))
+    }
+
+    /// [`Self::rolling_series_bounds`] for a custom granularity, whose buckets
+    /// are placed by stepping its interval from its origin. Both ends align to
+    /// that origin the way the series itself is placed, which is where either
+    /// series shape puts its points — so the two upper bounds coincide.
+    fn custom_series_bounds(
+        &self,
+        granularity: &Granularity,
+        date_range: &[String],
+    ) -> Result<SeriesSpan, CubeError> {
+        let interval = granularity.granularity_interval();
+        if interval.is_zero() {
+            return Err(CubeError::user(format!(
+                "Granularity interval can't be zero: {}",
+                granularity.granularity()
+            )));
+        }
+        let tz = self.query_tools.query_tools().timezone();
+        let first =
+            granularity.align_date_to_origin(QueryDateTime::from_date_str(tz, &date_range[0])?)?;
+        let last =
+            granularity.align_date_to_origin(QueryDateTime::from_date_str(tz, &date_range[1])?)?;
+        let past_end = last
+            .add_interval(interval)?
+            .add_duration(Duration::seconds(-1))?;
+        let past_end = format!("{}.999", past_end.format("%Y-%m-%dT%H:%M:%S"));
+        Ok(SeriesSpan {
+            from: first.default_format(),
+            to_aligned: past_end.clone(),
+            to_stepped: past_end,
+            predefined_granularity: false,
+        })
+    }
+
+    /// The `Granularity` a `to_date` window counts its period in. The compiler
+    /// borrow lives no longer than the build, so a caller is free to reach for
+    /// it again — `change_date_range_filter_impl` takes the same one right
+    /// after this returns.
+    fn to_date_period_granularity(
+        &self,
+        time_dimension: &Rc<TimeDimensionSymbol>,
+        granularity: &str,
+    ) -> Result<Option<Granularity>, CubeError> {
+        let compiler_cell = self.query_tools.compiler().clone();
+        let mut compiler = compiler_cell.borrow_mut();
+        GranularityHelper::make_granularity_obj(
+            self.query_tools.cube_evaluator().clone(),
+            &mut compiler,
+            &time_dimension.cube_id(),
+            &time_dimension.name(),
+            Some(granularity.to_string()),
+        )
+    }
+
+    /// Span a regular rolling window's base scan reads: the series' own bounds
+    /// with the window's frame folded in.
+    ///
+    /// Folded here rather than applied to the bound in SQL, so the predicate is
+    /// a bare literal comparison. A dialect that evaluates interval arithmetic
+    /// over a constant while planning the query cannot always do it — the
+    /// argument reaches its interval function before the surrounding cast does
+    /// — and a bare bound is the one every engine can both read and prune by.
+    ///
+    /// An `unbounded` side keeps the unshifted bound, which the filter drops:
+    /// no date states the absence of a bound.
+    fn regular_scan_span(
+        &self,
+        time_dimension: &Rc<TimeDimensionSymbol>,
+        rolling_window: &RollingWindow,
+    ) -> Result<Option<SeriesSpan>, CubeError> {
+        let Some(series) = self.rolling_series_bounds(time_dimension)? else {
+            return Ok(None);
+        };
+        let tz = self.query_tools.query_tools().timezone();
+        let shift = |bound: &String, interval: &Option<String>, backwards: bool| {
+            shift_bound_wall_clock(tz, bound, interval, backwards)
+                .map(|shifted| shifted.unwrap_or_else(|| bound.clone()))
+        };
+        Ok(Some(SeriesSpan {
+            from: shift(&series.from, &rolling_window.trailing, true)?,
+            to_aligned: shift(&series.to_aligned, &rolling_window.leading, false)?,
+            to_stepped: shift(&series.to_stepped, &rolling_window.leading, false)?,
+            predefined_granularity: series.predefined_granularity,
+        }))
+    }
+
+    /// Span the base scan of a `to_date` window over `time_dimension` reads:
+    /// from the start of the period the series opens in, to the series' own
+    /// end, rendered by the filter as literals.
+    ///
+    /// `None` wherever the series itself is not derivable
+    /// ([`Self::rolling_series_bounds`]), and for a period whose boundaries are
+    /// rows of a calendar cube — no interval math reproduces those.
+    fn to_date_window_bounds(
+        &self,
+        time_dimension: &Rc<TimeDimensionSymbol>,
+        granularity: &str,
+    ) -> Result<Option<SeriesSpan>, CubeError> {
+        let Some(series) = self.rolling_series_bounds(time_dimension)? else {
+            return Ok(None);
+        };
+        let Some(period_start) =
+            self.to_date_period_start(time_dimension, granularity, &series.from)?
+        else {
+            return Ok(None);
+        };
+        Ok(Some(SeriesSpan {
+            from: period_start,
+            ..series
+        }))
+    }
+
+    /// Start of the `granularity` period `from` falls in. `None` for a period
+    /// whose boundaries are rows of a calendar cube.
+    fn to_date_period_start(
+        &self,
+        time_dimension: &Rc<TimeDimensionSymbol>,
+        granularity: &str,
+        from: &String,
+    ) -> Result<Option<String>, CubeError> {
+        let Some(period) = self.to_date_period_granularity(time_dimension, granularity)? else {
+            return Ok(None);
+        };
+        if period.calendar_sql().is_some() {
+            return Ok(None);
+        }
+        if period.is_predefined_granularity() {
+            return Ok(Some(QueryTimeSeries::period_start_predefined(
+                period.granularity(),
+                from,
+                QueryTimeSeries::MILLISECOND_PRECISION,
+            )?));
+        }
+        let tz = self.query_tools.query_tools().timezone();
+        Ok(Some(
+            period
+                .align_date_to_origin(QueryDateTime::from_date_str(tz, from)?)?
+                .default_format(),
+        ))
+    }
+
     /// The granularity of a `to_date` rolling window whose period boundary is
     /// defined by a calendar column. `None` for a boundary that interval math
     /// can compute on its own.
@@ -1225,16 +1457,7 @@ impl MultiStageQueryPlanner {
             return Ok(None);
         };
         let time_dimension = time_dimension.as_time_dimension()?;
-
-        let compiler_cell = self.query_tools.compiler().clone();
-        let mut compiler = compiler_cell.borrow_mut();
-        let granularity_obj = GranularityHelper::make_granularity_obj(
-            self.query_tools.cube_evaluator().clone(),
-            &mut compiler,
-            &time_dimension.cube_name(),
-            &time_dimension.name(),
-            Some(granularity.clone()),
-        )?;
+        let granularity_obj = self.to_date_period_granularity(&time_dimension, &granularity)?;
 
         Ok(granularity_obj
             .filter(|obj| obj.calendar_sql().is_some())
@@ -1289,11 +1512,30 @@ impl MultiStageQueryPlanner {
         state: Rc<QueryProperties>,
     ) -> Result<Rc<QueryProperties>, CubeError> {
         let mut new_state = state.as_ref().clone();
+        let to_date_granularity = rolling_window
+            .granularity
+            .as_ref()
+            .filter(|_| rolling_window.rolling_type.as_deref() == Some("to_date"));
         for filter_item in state.time_dimensions_filters() {
             if let FilterItem::Item(filter) = filter_item {
-                if matches!(filter.filter_operator(), FilterOperator::InDateRange) {
+                if !matches!(filter.filter_operator(), FilterOperator::InDateRange) {
+                    continue;
+                }
+                if let Some(granularity) = to_date_granularity {
+                    // The window runs from the start of the period the range starts in.
+                    let time_dimension = filter.raw_member_evaluator().as_time_dimension().ok();
+                    if let (Some(time_dimension), [FilterValue::Str(from), FilterValue::Str(to)]) =
+                        (time_dimension, filter.values().as_slice())
+                    {
+                        if let Some(from) =
+                            self.to_date_period_start(&time_dimension, granularity, from)?
+                        {
+                            new_state.replace_bounds_of_date_filter(filter, from, to.clone())?;
+                        }
+                    }
+                } else {
                     new_state.replace_date_range_for_rolling_window_without_granularity(
-                        &filter.member_name(),
+                        &filter.member_id(),
                         &rolling_window.trailing,
                         &rolling_window.leading,
                         rolling_window.offset.as_deref().unwrap_or("end"),
@@ -1317,7 +1559,7 @@ impl MultiStageQueryPlanner {
         state: Rc<QueryProperties>,
     ) -> Result<(Rc<QueryProperties>, Rc<MemberSymbol>), CubeError> {
         let time_dimension_symbol = time_dimension.as_time_dimension()?;
-        let time_dimension_base_name = time_dimension_symbol.base_symbol().full_name();
+        let time_dimension_base_id = time_dimension_symbol.base_symbol().id().clone();
         let mut new_state = state.as_ref().clone();
         let trailing_granularity =
             GranularityHelper::granularity_from_interval(&rolling_window.trailing);
@@ -1350,12 +1592,18 @@ impl MultiStageQueryPlanner {
         new_state.set_dimensions(dimensions);
 
         if let Some(granularity) = self.get_to_date_rolling_granularity(rolling_window)? {
-            new_state.replace_to_date_date_range_filter(&time_dimension_base_name, &granularity)?;
+            let window_bounds = self.to_date_window_bounds(&time_dimension_symbol, &granularity)?;
+            new_state.replace_to_date_date_range_filter(
+                &time_dimension_base_id,
+                &granularity,
+                window_bounds,
+            )?;
         } else {
             new_state.replace_regular_date_range_filter(
-                &time_dimension_base_name,
+                &time_dimension_base_id,
                 rolling_window.trailing.clone(),
                 rolling_window.leading.clone(),
+                self.regular_scan_span(&time_dimension_symbol, rolling_window)?,
             )?;
         }
 
@@ -1381,13 +1629,13 @@ fn dimension_is_reachable(
     parent_state: &QueryProperties,
     is_masked: &dyn Fn(&Rc<MemberSymbol>) -> bool,
 ) -> bool {
-    let target = dimension.full_name();
+    let target = dimension.id();
     let carries = |state: &QueryProperties| {
         state
             .dimensions()
             .iter()
             .chain(state.time_dimensions().iter())
-            .any(|d| d.clone().resolve_reference_chain().full_name() == target)
+            .any(|d| d.clone().resolve_reference_chain().id() == target)
     };
     if carries(grain_state) || carries(parent_state) {
         return true;
@@ -1449,6 +1697,8 @@ fn visit_rendered_slots(
         // whatever the base renders, so both contribute.
         visit(time_dimension.granularity_obj());
         visit_rendered_slots(time_dimension.base_symbol(), is_masked, visit);
+    } else if let Ok(ref_symbol) = member.as_ref_symbol() {
+        visit(ref_symbol.target());
     } else {
         visit(member.as_ref());
     }
@@ -1505,17 +1755,14 @@ fn multi_stage_filter_directive(member: &Rc<MemberSymbol>) -> Option<MultiStageF
 //    restricts the switch dimension, case branches are pruned at symbol
 //    level; the subsequent `mode: fixed` reset cannot un-prune them.
 //
-// `add_dimension_evaluator` wraps segment references into a `MemberExpression`
-// whose `full_name()` is prefixed with `expr:` (e.g. `expr:orders.completed`).
-// `BaseSegment::full_name()` carries the bare path (`orders.completed`). To make
-// `exclude`/`keep_only` match both forms, return the symbol's `full_name()`
-// alongside its `expr:`-stripped variant.
-fn filter_directive_match_names(symbol: &Rc<MemberSymbol>) -> Vec<String> {
-    let full = symbol.full_name();
-    if let Some(stripped) = full.strip_prefix("expr:") {
-        vec![full.clone(), stripped.to_string()]
+// Segment references compile to an `expr:` id while a `BaseSegment` keeps the
+// plain member id; `exclude`/`keep_only` must match both.
+fn filter_directive_match_ids(symbol: &Rc<MemberSymbol>) -> Vec<MemberId> {
+    let id = symbol.id().clone();
+    if let Some(named) = id.named_member() {
+        vec![id, named]
     } else {
-        vec![full]
+        vec![id]
     }
 }
 
@@ -1565,18 +1812,21 @@ fn query_filters_dropped(
     ) || any_dropped(root.segments(), base.segments(), narrowed.segments())
 }
 
-fn apply_filter_directive_to_state(filter: &MultiStageFilter, state: &mut QueryProperties) {
+fn apply_filter_directive_to_state(
+    filter: &MultiStageFilter,
+    state: &mut QueryProperties,
+) -> Result<(), CubeError> {
     if let Some(exclude) = &filter.exclude {
-        let names: Vec<String> = exclude
+        let names: Vec<MemberId> = exclude
             .iter()
-            .flat_map(|s| filter_directive_match_names(s))
+            .flat_map(|s| filter_directive_match_ids(s))
             .collect();
         state.remove_filters_for_members(&names);
     }
     if let Some(keep_only) = &filter.keep_only {
-        let names: Vec<String> = keep_only
+        let names: Vec<MemberId> = keep_only
             .iter()
-            .flat_map(|s| filter_directive_match_names(s))
+            .flat_map(|s| filter_directive_match_ids(s))
             .collect();
         state.keep_only_filters_for_members(&names);
     }
@@ -1584,9 +1834,68 @@ fn apply_filter_directive_to_state(filter: &MultiStageFilter, state: &mut QueryP
         state.add_dimension_filters(filter.include_dimension.clone());
     }
     if !filter.include_time_dimension.is_empty() {
+        narrow_time_dimensions_to_include(&filter.include_time_dimension, state)?;
         state.add_time_dimension_filters(filter.include_time_dimension.clone());
     }
     if !filter.include_measure.is_empty() {
         state.add_measure_filters(filter.include_measure.clone());
     }
+    Ok(())
+}
+
+/// An include date range on a time dimension the query groups by narrows that
+/// dimension's date range, so the series has rows only inside the included period
+/// while rolling windows still read back from it.
+fn narrow_time_dimensions_to_include(
+    include: &[FilterItem],
+    state: &mut QueryProperties,
+) -> Result<(), CubeError> {
+    let mut time_dimensions = state.time_dimensions().clone();
+    for item in include {
+        let FilterItem::Item(filter) = item else {
+            continue;
+        };
+        let [FilterValue::Str(from), FilterValue::Str(to)] = filter.values().as_slice() else {
+            continue;
+        };
+        if !matches!(filter.filter_operator(), FilterOperator::InDateRange) {
+            continue;
+        }
+        let base_id = filter
+            .member_evaluator()
+            .resolve_reference_chain()
+            .id()
+            .clone();
+        // Bounds are compared normalized but kept as given, the form the series expects.
+        let precision = QueryTimeSeries::MILLISECOND_PRECISION;
+        let later_from = |a: &String, b: &String| -> Result<String, CubeError> {
+            let (na, nb) = (
+                QueryDateTimeHelper::format_from_date(a, precision)?,
+                QueryDateTimeHelper::format_from_date(b, precision)?,
+            );
+            Ok(if na >= nb { a.clone() } else { b.clone() })
+        };
+        let earlier_to = |a: &String, b: &String| -> Result<String, CubeError> {
+            let (na, nb) = (
+                QueryDateTimeHelper::format_to_date(a, precision)?,
+                QueryDateTimeHelper::format_to_date(b, precision)?,
+            );
+            Ok(if na <= nb { a.clone() } else { b.clone() })
+        };
+        for time_dimension in time_dimensions.iter_mut() {
+            let Ok(symbol) = time_dimension.as_time_dimension() else {
+                continue;
+            };
+            if symbol.base_symbol().clone().resolve_reference_chain().id() != &base_id {
+                continue;
+            }
+            let range = match symbol.date_range_vec().as_deref() {
+                Some([own_from, own_to]) => (later_from(own_from, from)?, earlier_to(own_to, to)?),
+                _ => (from.clone(), to.clone()),
+            };
+            *time_dimension = MemberSymbol::new_time_dimension(symbol.with_date_range(Some(range)));
+        }
+    }
+    state.set_time_dimensions(time_dimensions);
+    Ok(())
 }

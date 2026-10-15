@@ -17,5 +17,8 @@ export type Required<T, K extends keyof T> = {
 
 export type Optional<T, K extends keyof T> = Pick<Partial<T>, K> & Omit<T, K>;
 
+// Unlike `Omit`, keeps the declared fields typed when `T` has an index signature
+export type OmitKnown<T, K extends PropertyKey> = { [P in keyof T as Exclude<P, K>]: T[P] };
+
 // <M extends Method<Class/Interface, M>>
 export type MethodName<T> = { [K in keyof T]: T[K] extends (...args: any[]) => any ? K : never }[keyof T];

@@ -8,11 +8,13 @@ use std::any::Any;
 use std::rc::Rc;
 
 /// Dispatches rendering to a kind-specific sub-chain based on the
-/// member's variant: dimension / time dimension / measure / other.
+/// member's variant: dimension / time dimension / measure / reference /
+/// other.
 pub struct RootSqlNode {
     dimension_processor: Rc<dyn SqlNode>,
     time_dimesions_processor: Rc<dyn SqlNode>,
     measure_processor: Rc<dyn SqlNode>,
+    reference_processor: Rc<dyn SqlNode>,
     default_processor: Rc<dyn SqlNode>,
 }
 
@@ -21,12 +23,14 @@ impl RootSqlNode {
         dimension_processor: Rc<dyn SqlNode>,
         time_dimesions_processor: Rc<dyn SqlNode>,
         measure_processor: Rc<dyn SqlNode>,
+        reference_processor: Rc<dyn SqlNode>,
         default_processor: Rc<dyn SqlNode>,
     ) -> Rc<Self> {
         Rc::new(Self {
             dimension_processor,
             time_dimesions_processor,
             measure_processor,
+            reference_processor,
             default_processor,
         })
     }
@@ -75,7 +79,14 @@ impl SqlNode for RootSqlNode {
                 node_processor.clone(),
                 templates,
             )?,
-            _ => self.default_processor.to_sql(
+            MemberSymbol::Ref(_) => self.reference_processor.to_sql(
+                visitor,
+                node,
+                query_tools.clone(),
+                node_processor.clone(),
+                templates,
+            )?,
+            MemberSymbol::MemberExpression(_) => self.default_processor.to_sql(
                 visitor,
                 node,
                 query_tools.clone(),
@@ -94,6 +105,7 @@ impl SqlNode for RootSqlNode {
         vec![
             self.dimension_processor.clone(),
             self.measure_processor.clone(),
+            self.reference_processor.clone(),
             self.default_processor.clone(),
         ]
     }

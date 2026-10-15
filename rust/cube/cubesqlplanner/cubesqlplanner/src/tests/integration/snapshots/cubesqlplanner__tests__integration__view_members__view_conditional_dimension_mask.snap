@@ -1,0 +1,8 @@
+---
+source: cubesqlplanner/cubesqlplanner/src/tests/integration/view_members.rs
+expression: result
+---
+orders_view__masked_status | orders_view__status | orders_view__count
+---------------------------+---------------------+-------------------
+completed                  | completed           | 5                 
+hidden                     | pending             | 3

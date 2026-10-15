@@ -33,29 +33,16 @@ impl SqlNode for UngroupedMeasureSqlNode {
         node_processor: Rc<dyn SqlNode>,
         templates: &PlanSqlTemplates,
     ) -> Result<String, CubeError> {
-        let res = match node.as_ref() {
-            MemberSymbol::Measure(_) => {
-                let input = self.input.to_sql(
-                    visitor,
-                    node,
-                    query_tools.clone(),
-                    node_processor.clone(),
-                    templates,
-                )?;
+        node.as_measure()?;
+        let input = self.input.to_sql(
+            visitor,
+            node,
+            query_tools.clone(),
+            node_processor.clone(),
+            templates,
+        )?;
 
-                if input == "*" {
-                    "1".to_string()
-                } else {
-                    input
-                }
-            }
-            _ => {
-                return Err(CubeError::internal(format!(
-                    "Measure filter node processor called for wrong node",
-                )));
-            }
-        };
-        Ok(res)
+        Ok(if input == "*" { "1".to_string() } else { input })
     }
 
     fn as_any(self: Rc<Self>) -> Rc<dyn Any> {

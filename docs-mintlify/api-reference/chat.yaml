@@ -57,9 +57,11 @@ paths:
 
         terminated by `\n`) and served with `Content-Type: application/json`. Each line represents a
 
-        chat message, a state update, or an error object. Assistant content arrives incrementally —
+        chat message, a state update, a usage frame, or an error object. Assistant content arrives
 
-        updates to a previously emitted message carry the same `id` with `isDelta: true`.
+        incrementally — updates to a previously emitted message carry the same `id` with
+
+        `isDelta: true`.
 
 
         Provide `input` to send a new message. Omit `input` (with a `chatId`) to retrieve the
@@ -75,12 +77,37 @@ paths:
         - `__cutoff__` — initial marker emitted before new content; also carries the thread `chatId`
         and `isStreaming` under `state`.
 
-        - `__state__` — final thread snapshot emitted at the end, carrying the full `{ messages:
-        [...] }` state.
+        - `__state__` — thread snapshot emitted near the end, carrying the full `{ messages: [...] }`
+        state.
+
+        - `__aborted__` — terminal marker emitted when the run was stopped via the abort endpoint.
+
+        - `__suspended__` — terminal marker emitted when a server restart suspended the run before
+        it finished; resend the same request to resume it.
+
+        - `__usage__` — always the last frame on the stream, whether the run completed, was aborted,
+        or errored (all counts are `0` and `models` is empty if the request was rejected before any
+        LLM call). Carries `type: "usage"` and `{ models, llmCalls, inputTokens, outputTokens,
+        cacheWriteTokens, cacheReadTokens, totalTokens }` under `usage`. There is no cost field.
 
 
         Errors mid-stream are emitted as a standalone line `{ "error": "<message>" }` rather than a
         non-200 status.
+
+
+        Suspensions: when the server serving a run shuts down (a deployment, a scale-down), the run
+        is stopped at the next step boundary with its progress saved, and the stream emits
+
+        `{ "id": "__suspended__", "type": "suspend", "code": "chat_suspended", "retryable": true,
+        "messageId": "<id>", "error": "<message>" }` before it closes. The content received so far
+        is partial. Resend the same request — the same `chatId`, `input` and `messageId` — and the
+        run continues from where it stopped (if the original request had no `chatId`, add the one
+        returned as `state.chatId` on its `__cutoff__` frame); the response replays the thread and
+        then streams the rest of the turn. `input` may be omitted: `chatId` plus the suspended
+        `messageId` resumes it too. A read of the thread (no `input`, no `messageId`) reports a pending suspension as
+        `state.suspended.messageId` on `__cutoff__`. A request for a different message ends the
+        suspended turn. A suspended turn stays resumable for 24 hours; after that, resending the
+        request returns the thread as it stands, with the partial turn, without rerunning it.
 
 
         Finding the final answer: filter assistant messages where `graphPath[0] === "final"` and
@@ -97,7 +124,8 @@ paths:
         message is still active on the thread, the API resubscribes the new request to the existing
         stream
 
-        instead of starting a new one.
+        instead of starting a new one. If that message was suspended by a server restart, the
+        request resumes it.
       operationId: streamChatState
       requestBody:
         content:
@@ -128,14 +156,6 @@ paths:
                   summary: Error line
                   value:
                     error: 'BadRequestError: Bad branch'
-                finalState:
-                  summary: Final state (__state__)
-                  value:
-                    id: __state__
-                    isDelta: false
-                    role: assistant
-                    state:
-                      messages: []
                 initialState:
                   summary: Initial state (__cutoff__)
                   value:
@@ -145,6 +165,26 @@ paths:
                     state:
                       chatId: a1b2c3d4-08d7-40b9-8b1c-e7e3a698647e
                       isStreaming: false
+                threadState:
+                  summary: Thread state snapshot (__state__)
+                  value:
+                    id: __state__
+                    isDelta: false
+                    role: assistant
+                    sort: 10
+                    state:
+                      messages: []
+                suspended:
+                  summary: Suspended run (__suspended__)
+                  value:
+                    code: chat_suspended
+                    error: >-
+                      The server restarted before the agent finished responding; retry the same
+                      request to resume
+                    id: __suspended__
+                    messageId: 1732512345678-message
+                    retryable: true
+                    type: suspend
                 toolCall:
                   summary: Tool call (cubeMeta)
                   value:
@@ -157,6 +197,20 @@ paths:
                     toolCall:
                       input: '{"searchQuery":"revenue trends"}'
                       name: cubeMeta
+                usage:
+                  summary: Usage (__usage__, always the last frame)
+                  value:
+                    id: __usage__
+                    type: usage
+                    usage:
+                      cacheReadTokens: 264118
+                      cacheWriteTokens: 31006
+                      inputTokens: 18412
+                      llmCalls: 7
+                      models:
+                        - claude-sonnet-5
+                      outputTokens: 2280
+                      totalTokens: 315816
                 userEcho:
                   summary: User message echo
                   value:
@@ -167,6 +221,14 @@ paths:
                     sort: 1
               schema:
                 properties:
+                  code:
+                    description: >-
+                      Machine-readable reason the run ended early. Present only on the
+                      `__aborted__` and `__suspended__` frames.
+                    enum:
+                      - chat_aborted
+                      - chat_suspended
+                    type: string
                   content:
                     description: >-
                       Message content. Streamed incrementally for assistant messages when `isDelta`
@@ -174,8 +236,8 @@ paths:
                     type: string
                   error:
                     description: >-
-                      Present only on error lines (`{ "error": "<message>" }`). When set, the line
-                      carries no message fields.
+                      Present on error lines (`{ "error": "<message>" }`), which carry no message
+                      fields, and on the `__aborted__` and `__suspended__` frames.
                     type: string
                   graphPath:
                     description: Agent graph node path, e.g. `["cube_data_analyst_agent"]` or `["final"]`.
@@ -185,8 +247,11 @@ paths:
                   id:
                     description: >-
                       Unique message identifier. Sentinel values: `__cutoff__` (initial marker,
-                      carries the chatId under `state`) and `__state__` (final thread state
-                      snapshot). Absent on error lines.
+                      carries the chatId under `state`), `__state__` (thread state snapshot),
+                      `__aborted__` (run stopped via the abort endpoint), `__suspended__` (run
+                      suspended by a server restart; resend to resume), and `__usage__` (always the
+                      last frame, carries model/token counts under `usage`).
+                      Absent on error lines.
                     type: string
                   isDelta:
                     description: >-
@@ -196,17 +261,30 @@ paths:
                   isInProcess:
                     description: Whether the message is still being generated.
                     type: boolean
+                  messageId:
+                    description: >-
+                      Present only on the `__suspended__` frame: the `messageId` of the suspended
+                      turn, to resend.
+                    type: string
+                  retryable:
+                    description: >-
+                      Present only on the `__suspended__` frame, always `true`: resending the same
+                      request resumes the run.
+                    type: boolean
                   role:
+                    description: Absent on error lines and on the `__usage__` frame.
                     enum:
                       - user
                       - assistant
                     type: string
                   sort:
-                    description: Message ordering sequence.
+                    description: >-
+                      Message ordering sequence. Absent on the `__usage__` frame.
                     type: number
                   state:
                     description: >-
-                      Streaming state. Carries `{ isStreaming, chatId }` on the `__cutoff__` message
+                      Streaming state. Carries `{ isStreaming, chatId }` (plus
+                      `suspended.messageId` when a suspended turn is pending) on the `__cutoff__` message
                       and `{ messages: [...] }` on the `__state__` message.
                     type: object
                   thinking:
@@ -227,10 +305,49 @@ paths:
                           contains a JSON object with an `error` field.
                         type: string
                     type: object
+                  type:
+                    description: >-
+                      Present only on a terminal sentinel: `abort` on `__aborted__`, `suspend` on
+                      `__suspended__`, `usage` on `__usage__`. Absent on every other message.
+                    enum:
+                      - abort
+                      - suspend
+                      - usage
+                    type: string
+                  usage:
+                    description: >-
+                      Model and token counts for the run. Present only on the `__usage__` frame.
+                    properties:
+                      cacheReadTokens:
+                        type: number
+                      cacheWriteTokens:
+                        type: number
+                      inputTokens:
+                        type: number
+                      llmCalls:
+                        description: Number of LLM calls made during the run.
+                        type: number
+                      models:
+                        description: >-
+                          Distinct models used across the run's LLM calls, deduplicated. For a BYOM
+                          model, normalized to omit infrastructure detail (e.g. a Bedrock
+                          inference-profile ARN is reduced to its model name) rather than the raw
+                          configured identifier.
+                        items:
+                          type: string
+                        type: array
+                      outputTokens:
+                        type: number
+                      totalTokens:
+                        description: >-
+                          Sum of `inputTokens`, `outputTokens`, `cacheWriteTokens`, and
+                          `cacheReadTokens`.
+                        type: number
+                    type: object
                 type: object
             text/html; charset=utf-8: {}
           description: >-
-            Newline-delimited stream of chat message / state / error objects (served as
+            Newline-delimited stream of chat message / state / usage / error objects (served as
             `Content-Type: application/json`). Each line is a JSON object of the schema below.
       security:
         - apiKey: []

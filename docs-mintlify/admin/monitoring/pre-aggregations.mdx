@@ -13,6 +13,14 @@ build history.
   <img src="https://ucarecdn.com/eb10de99-4ff6-4a9f-abd5-736971497583/" />
 </Frame>
 
+The built-in Admin and Developer roles can open this page and build
+pre-aggregations; the Explorer and Viewer roles can't open it. To let other users
+check pre-aggregation status without building, give them a [custom
+role][ref-custom-roles-deployment-permissions] (Enterprise plan) with
+**Access deployment** and **View pre-aggregations**. They see the page
+read-only: **Build All**, **Build Selected**, and the controls that cancel
+queued or running builds are hidden.
+
 ## Exploring pre-aggregations
 
 You can switch between [pre-aggregations](#pre-aggregations) and
@@ -131,3 +139,4 @@ To see more information about a specific build, click on it:
 [ref-model-ref-preaggs]: /reference/data-modeling/pre-aggregations
 [ref-model-ref-preaggs-index]: /reference/data-modeling/pre-aggregations#indexes
 [ref-model-ref-preaggs-partition-granularity]: /reference/data-modeling/pre-aggregations#partition_granularity
+[ref-custom-roles-deployment-permissions]: /admin/users-and-permissions/custom-roles#deployment-permissions

@@ -42,46 +42,39 @@ impl SqlNode for MultiStageWindowNode {
         node_processor: Rc<dyn SqlNode>,
         templates: &PlanSqlTemplates,
     ) -> Result<String, CubeError> {
-        let res = match node.as_ref() {
-            MemberSymbol::Measure(m) => {
-                if let Some(modifier @ MeasureRenderModifier::MultiStageWindow { partition }) =
-                    m.render_modifier()
-                {
-                    modifier.ensure_applies_to(m)?;
-                    let inner_visitor = visitor.with_arg_needs_paren_safe(false);
-                    let input_sql = self.input.to_sql(
-                        &inner_visitor,
-                        node,
-                        query_tools.clone(),
-                        node_processor.clone(),
-                        templates,
-                    )?;
+        let m = node.as_measure()?;
+        Ok(
+            if let Some(modifier @ MeasureRenderModifier::MultiStageWindow { partition }) =
+                m.render_modifier()
+            {
+                modifier.ensure_applies_to(&m)?;
+                let inner_visitor = visitor.with_arg_needs_paren_safe(false);
+                let input_sql = self.input.to_sql(
+                    &inner_visitor,
+                    node,
+                    query_tools.clone(),
+                    node_processor.clone(),
+                    templates,
+                )?;
 
-                    let partition_by = render_partition_by(
-                        partition,
-                        &inner_visitor,
-                        node_processor.clone(),
-                        templates,
-                    )?;
-                    let measure_type = m.measure_type();
-                    format!("{measure_type}({measure_type}({input_sql})) OVER ({partition_by})")
-                } else {
-                    self.else_processor.to_sql(
-                        visitor,
-                        node,
-                        query_tools.clone(),
-                        node_processor.clone(),
-                        templates,
-                    )?
-                }
-            }
-            _ => {
-                return Err(CubeError::internal(format!(
-                    "Unexpected evaluation node type for MultStageWindowNode"
-                )));
-            }
-        };
-        Ok(res)
+                let partition_by = render_partition_by(
+                    partition,
+                    &inner_visitor,
+                    node_processor.clone(),
+                    templates,
+                )?;
+                let measure_type = m.measure_type();
+                format!("{measure_type}({measure_type}({input_sql})) OVER ({partition_by})")
+            } else {
+                self.else_processor.to_sql(
+                    visitor,
+                    node,
+                    query_tools.clone(),
+                    node_processor.clone(),
+                    templates,
+                )?
+            },
+        )
     }
 
     fn as_any(self: Rc<Self>) -> Rc<dyn Any> {

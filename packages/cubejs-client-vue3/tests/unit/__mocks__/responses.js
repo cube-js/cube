@@ -723,7 +723,7 @@ export default (body = {}, status = 200) => () => ({
         status,
         json: async () => body,
         text: async () => JSON.stringify(body),
-        clone: function() {
+        clone() {
           return this;
         },
         ok: status >= 200 && status <= 399

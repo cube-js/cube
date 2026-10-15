@@ -45,7 +45,7 @@ fn cube_refs_look_through_base() {
 
     let cube_refs = td.get_cube_refs();
     assert_eq!(cube_refs.len(), 1);
-    assert_eq!(cube_refs[0].cube_name(), "visitors");
+    assert_eq!(cube_refs[0].cube_id().to_string(), "visitors");
 }
 
 #[test]

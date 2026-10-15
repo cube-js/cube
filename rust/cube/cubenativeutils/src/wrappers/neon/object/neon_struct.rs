@@ -1,4 +1,7 @@
-use super::{NeonObject, ObjectNeonTypeHolder, RootHolder};
+use super::{
+    primitive_root_holder::{read_js_string, read_js_string_into},
+    NeonObject, ObjectNeonTypeHolder, RootHolder,
+};
 use crate::wrappers::{
     neon::{inner_types::NeonInnerTypes, object::IntoNeonObject},
     object::{NativeStruct, NativeType},
@@ -6,6 +9,32 @@ use crate::wrappers::{
 };
 use crate::CubeError;
 use neon::prelude::*;
+use neon::thread::LocalKey;
+use std::mem::MaybeUninit;
+
+static OBJECT_KEYS: LocalKey<Root<JsFunction>> = LocalKey::new();
+
+/// N-API's `napi_get_all_property_names` always collects keys through V8's slow `KeyAccumulator`
+/// (a hash set per call); `Object.keys` copies the enum cache of the object's map instead.
+fn object_keys<C: Context<'static>>(
+    cx: &mut C,
+    object: Handle<'static, JsObject>,
+) -> NeonResult<Handle<'static, JsArray>> {
+    let keys_fn = OBJECT_KEYS
+        .get_or_try_init(cx, |cx| {
+            let object_ctor = cx.global::<JsFunction>("Object")?;
+            let keys_fn = object_ctor.get::<JsFunction, _, _>(cx, "keys")?;
+            NeonResult::Ok(keys_fn.root(cx))
+        })?
+        .to_inner(cx);
+    let undefined = cx.undefined();
+    // Checked rather than trusted: `Object.keys` may have been replaced by a polyfill.
+    keys_fn
+        .call(cx, undefined, [object.upcast::<JsValue>()])?
+        .downcast_or_throw::<JsArray, _>(cx)
+}
+
+type Entries<K, C> = Vec<(K, NativeObjectHandle<NeonInnerTypes<C>>)>;
 
 pub struct NeonStruct<C: Context<'static>> {
     object: ObjectNeonTypeHolder<C, JsObject>,
@@ -14,6 +43,38 @@ pub struct NeonStruct<C: Context<'static>> {
 impl<C: Context<'static> + 'static> NeonStruct<C> {
     pub fn new(object: ObjectNeonTypeHolder<C, JsObject>) -> Self {
         Self { object }
+    }
+
+    fn collect_entries<K: std::fmt::Display>(
+        &self,
+        capacity_limit: usize,
+        mut select: impl FnMut(&mut C, Handle<'static, JsString>) -> Option<K>,
+    ) -> Result<Entries<K, C>, CubeError> {
+        let context = self.object.get_context();
+        self.object.map_neon_object_with_error(|cx, object| {
+            let names = object_keys(cx, *object)?;
+            let len = names.len(cx);
+            let mut entries = Vec::with_capacity((len as usize).min(capacity_limit));
+            for idx in 0..len {
+                let key = names.get::<JsString, _, _>(cx, idx)?;
+                let Some(name) = select(cx, key) else {
+                    continue;
+                };
+                // Looked up by the original key handle: a fresh JsString built from `name`
+                // would be re-internalized by V8 on every lookup.
+                let value = object
+                    .get_value(cx, key)
+                    .map_err(CubeError::from)
+                    .and_then(|value| RootHolder::new_in(cx, &context, value))
+                    .map_err(|mut err| {
+                        err.message =
+                            format!("field `{name}`: failed to read value: {}", err.message);
+                        err
+                    })?;
+                entries.push((name, NeonObject::from_root(value).into()));
+            }
+            Ok(entries)
+        })
     }
 }
 
@@ -46,6 +107,24 @@ impl<C: Context<'static> + 'static> NativeStruct<NeonInnerTypes<C>> for NeonStru
         )?))
     }
 
+    fn entries(&self) -> Result<Vec<(String, NativeObjectHandle<NeonInnerTypes<C>>)>, CubeError> {
+        self.collect_entries(usize::MAX, |cx, key| Some(read_js_string(cx, key)))
+    }
+
+    fn entries_for_fields(
+        &self,
+        fields: &'static [&'static str],
+    ) -> Result<Vec<(&'static str, NativeObjectHandle<NeonInnerTypes<C>>)>, CubeError> {
+        self.collect_entries(fields.len(), |cx, key| {
+            let mut buf = [MaybeUninit::uninit(); 128];
+            let key = read_js_string_into(cx, key, &mut buf);
+            fields
+                .iter()
+                .copied()
+                .find(|field| field.as_bytes() == key.as_ref())
+        })
+    }
+
     fn has_field(&self, field_name: &str) -> Result<bool, CubeError> {
         let result = self.object.map_neon_object(|cx, neon_object| {
             let res = neon_object
@@ -64,18 +143,6 @@ impl<C: Context<'static> + 'static> NativeStruct<NeonInnerTypes<C>> for NeonStru
         let value = value.into_object().get_js_value()?;
         self.object
             .map_neon_object::<_, _>(|cx, object| object.set(cx, field_name, value))
-    }
-    fn get_own_property_names(
-        &self,
-    ) -> Result<Vec<NativeObjectHandle<NeonInnerTypes<C>>>, CubeError> {
-        self.object
-            .map_neon_object(|cx, neon_object| {
-                let neon_array = neon_object.get_own_property_names(cx)?;
-                neon_array.to_vec(cx)
-            })?
-            .into_iter()
-            .map(|o| Ok(o.into_neon_object(self.object.get_context())?.into()))
-            .collect()
     }
     fn call_method(
         &self,

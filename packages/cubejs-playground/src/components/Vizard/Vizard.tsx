@@ -12,23 +12,23 @@ export interface VizardProps {
 export default function Vizard(props: VizardProps) {
   const { apiUrl, apiToken, query, pivotConfig } = props;
 
-  const configHash = useMemo(() => {
-    return encodeURIComponent(
-      btoa(
-        JSON.stringify({
-          apiUrl,
-          apiToken,
-          query,
-          pivotConfig,
-        })
-      )
-    );
-  }, [apiUrl, apiToken, JSON.stringify(query), JSON.stringify(pivotConfig)]);
+  const configHash = useMemo(() => encodeURIComponent(
+    btoa(
+      JSON.stringify({
+        apiUrl,
+        apiToken,
+        query,
+        pivotConfig,
+      })
+    )
+  ),
+  [apiUrl, apiToken, JSON.stringify(query), JSON.stringify(pivotConfig)]);
 
   return (
     <iframe
+      title="Vizard"
       src={`/vizard/index.html#${configHash}`}
       style={{ height: 'calc(90vw - 80px)', border: 'none' }}
-    ></iframe>
+    />
   );
 }

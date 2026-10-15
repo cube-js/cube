@@ -1,10 +1,15 @@
-import { getEnv } from '@cubejs-backend/shared';
 import { PostgresQuery } from '../../../src/adapter/PostgresQuery';
 import { prepareJsCompiler } from '../../unit/PrepareCompiler';
 import { DataSchemaCompiler } from '../../../src/compiler/DataSchemaCompiler';
 import { JoinGraph } from '../../../src/compiler/JoinGraph';
 import { CubeEvaluator } from '../../../src/compiler/CubeEvaluator';
 import { testWithPreAggregation } from './pre-aggregation-utils';
+
+class TestPostgresQuery extends PostgresQuery {
+  public enrichedJoinHintsFromJoinTree(joinTree, joinHints) {
+    return super.enrichedJoinHintsFromJoinTree(joinTree, joinHints);
+  }
+}
 
 describe('Multiple join paths', () => {
   jest.setTimeout(200000);
@@ -612,46 +617,33 @@ describe('Multiple join paths', () => {
         ],
       },
     ];
+
     for (const { preAggregationId, addTimeRange, expectedData } of preAggregationTests) {
-      if (!getEnv('nativeSqlPlanner')) {
-        // eslint-disable-next-line no-loop-func
-        it(`pre-aggregation ${preAggregationId} should match its own references`, async () => {
-          // Always not using range, because reference query would have no range to start from
-          // but should match pre-aggregation anyway
-          const query = makeReferenceQueryFor(preAggregationId);
+      it(`pre-aggregation ${preAggregationId} should match its own references`, async () => {
+        // Always not using range, because reference query would have no range to start from
+        // but should match pre-aggregation anyway
+        const query = makeReferenceQueryFor(preAggregationId);
 
-          const preAggregationsDescription: any = query.preAggregations?.preAggregationsDescription();
-          const preAggregationFromQuery = preAggregationsDescription.find(p => p.preAggregationId === preAggregationId);
-          if (preAggregationFromQuery === undefined) {
-            throw expect(preAggregationFromQuery).toBeDefined();
-          }
-        });
-      } else {
-        it.skip(`FIXME(tesseract): pre-aggregation ${preAggregationId} should match its own references`, async () => {
-          // This should be implemented in Tesseract.
-        });
-      }
+        const preAggregationsDescription: any = query.preAggregations?.preAggregationsDescription();
+        const preAggregationFromQuery = preAggregationsDescription.find(p => p.preAggregationId === preAggregationId);
+        if (preAggregationFromQuery === undefined) {
+          throw expect(preAggregationFromQuery).toBeDefined();
+        }
+      });
 
-      if (!getEnv('nativeSqlPlanner')) {
-        // eslint-disable-next-line no-loop-func
-        it(`pre-aggregation ${preAggregationId} reference query should be executable`, async () => {
-          // Adding date range for rolling window measure
-          const query = makeReferenceQueryFor(preAggregationId, addTimeRange);
+      it(`pre-aggregation ${preAggregationId} reference query should be executable`, async () => {
+        // Adding date range for rolling window measure
+        const query = makeReferenceQueryFor(preAggregationId, addTimeRange);
 
-          const preAggregationsDescription: any = query.preAggregations?.preAggregationsDescription();
-          const preAggregationFromQuery = preAggregationsDescription.find(p => p.preAggregationId === preAggregationId);
-          if (preAggregationFromQuery === undefined) {
-            throw expect(preAggregationFromQuery).toBeDefined();
-          }
+        const preAggregationsDescription: any = query.preAggregations?.preAggregationsDescription();
+        const preAggregationFromQuery = preAggregationsDescription.find(p => p.preAggregationId === preAggregationId);
+        if (preAggregationFromQuery === undefined) {
+          throw expect(preAggregationFromQuery).toBeDefined();
+        }
 
-          const res = await testWithPreAggregation(preAggregationFromQuery, query);
-          expect(res).toEqual(expectedData);
-        });
-      } else {
-        it.skip(`FIXME(tesseract): pre-aggregation ${preAggregationId} reference query should be executable`, async () => {
-          // This should be implemented in Tesseract.
-        });
-      }
+        const res = await testWithPreAggregation(preAggregationFromQuery, query);
+        expect(res).toEqual(expectedData);
+      });
     }
   });
 
@@ -680,6 +672,106 @@ describe('Multiple join paths', () => {
       expect(sql).not.toMatch(/ON 'C' = 'X'/);
       expect(sql).not.toMatch(/ON 'A' = 'F'/);
       expect(sql).not.toMatch(/ON 'F' = 'X'/);
+    });
+  });
+
+  // B is joined from A, C is only reachable through B, and both C and D also join B. A hint that
+  // leads into B again adds a second edge into it; the next pass of joinTreeForHints follows the
+  // later edge into each cube
+  describe('Hint leading back into an already joined cube', () => {
+    let backCompilers: ReturnType<typeof prepareJsCompiler>;
+
+    beforeAll(async () => {
+      // language=JavaScript
+      backCompilers = prepareJsCompiler(`
+        cube('BackA', {
+          sql: 'SELECT 1 AS id',
+          joins: {
+            BackB: { relationship: 'many_to_one', sql: "'A' = 'B'" },
+            BackD: { relationship: 'many_to_one', sql: "'A' = 'D'" },
+          },
+          dimensions: { id: { type: 'number', sql: 'id', primaryKey: true } },
+          measures: { count: { type: 'count' } },
+        });
+
+        cube('BackB', {
+          sql: 'SELECT 1 AS id',
+          joins: {
+            BackC: { relationship: 'many_to_one', sql: "'B' = 'C'" },
+          },
+          dimensions: { id: { type: 'number', sql: 'id', primaryKey: true } },
+        });
+
+        cube('BackC', {
+          sql: 'SELECT 1 AS id',
+          joins: {
+            BackB: { relationship: 'many_to_one', sql: "'C' = 'B'" },
+          },
+          dimensions: { id: { type: 'number', sql: 'id', primaryKey: true } },
+        });
+
+        cube('BackD', {
+          sql: 'SELECT 1 AS id',
+          joins: {
+            BackB: { relationship: 'many_to_one', sql: "'D' = 'B'" },
+          },
+          dimensions: { id: { type: 'number', sql: 'id', primaryKey: true } },
+        });
+
+        view('BackCB_view', {
+          cubes: [
+            { joinPath: 'BackC', includes: ['id'], prefix: true },
+            { joinPath: 'BackC.BackB', includes: ['id'], prefix: true },
+          ],
+        });
+
+        view('BackDB_view', {
+          cubes: [
+            { joinPath: 'BackD', includes: ['id'], prefix: true },
+            { joinPath: 'BackD.BackB', includes: ['id'], prefix: true },
+          ],
+        });
+      `);
+      await backCompilers.compiler.compile();
+    });
+
+    function buildSql(dimensions: string[]): string {
+      const query = new PostgresQuery(backCompilers, { measures: ['BackA.count'], dimensions });
+      return query.buildSqlAndParams()[0];
+    }
+
+    it('should join through the later hint when the cube has another route', async () => {
+      const sql = buildSql(['BackC.id', 'BackDB_view.BackB_id']);
+
+      expect(sql).toMatch(/ON 'A' = 'D'/);
+      expect(sql).toMatch(/ON 'D' = 'B'/);
+      expect(sql).toMatch(/ON 'B' = 'C'/);
+      expect(sql).not.toMatch(/ON 'A' = 'B'/);
+    });
+
+    // Following the C->B hint would make C the parent of B while B is the parent of C, so that
+    // parent chain would never reach the root
+    it('should keep the earlier edge when the later hint closes a cycle', async () => {
+      const sql = buildSql(['BackC.id', 'BackCB_view.BackB_id']);
+
+      expect(sql).toMatch(/ON 'A' = 'B'/);
+      expect(sql).toMatch(/ON 'B' = 'C'/);
+      expect(sql).not.toMatch(/ON 'C' = 'B'/);
+    });
+
+    it('should follow a cyclic join tree without looping', async () => {
+      const query = new TestPostgresQuery(backCompilers, { measures: ['BackA.count'] });
+      const joinTree = {
+        root: 'BackA',
+        joins: [
+          { from: 'BackA', to: 'BackB' },
+          { from: 'BackB', to: 'BackC' },
+          { from: 'BackC', to: 'BackB' },
+        ],
+      };
+
+      expect(query.enrichedJoinHintsFromJoinTree(joinTree, ['BackC', 'BackB']))
+        .toEqual([['BackA', 'BackB', 'BackC'], ['BackA', 'BackB']]);
     });
   });
 });

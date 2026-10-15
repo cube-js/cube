@@ -22,7 +22,7 @@ convert_case = "0.6.0"
 [dependencies.neon]
 version = "=1"
 default-features = false
-features = ["napi-1", "napi-4", "napi-6", "futures"]
+features = ["napi-1", "napi-4", "napi-6", "futures", "sys"]
 
 # Code in cubenativeutils crate is not ready for full-blown clippy
 # So we disable some rules to enable per-rule latch in CI, not for a whole clippy run

@@ -65,6 +65,9 @@ import type {
   TimeDimensionWithExtraFields,
 } from './types';
 
+// A change to any of these query fields can change the dry run response
+const DRY_RUN_QUERY_FIELDS = ['measures', 'dimensions', 'timeDimensions', 'segments', 'filters'];
+
 const granularities: GranularityOption[] = [
   { name: undefined, title: 'w/o grouping' },
   { name: 'second', title: 'Second' },
@@ -78,7 +81,7 @@ const granularities: GranularityOption[] = [
 ];
 
 /**
- * `<QueryBuilder />` is used to build interactive analytics query builders. It abstracts state management and API calls to Cube.js Backend. It uses render prop technique and doesn’t render anything itself, but calls the render function instead.
+ * `<QueryBuilder />` is used to build interactive analytics query builders. It abstracts state management and API calls to Cube Backend. It uses render prop technique and doesn’t render anything itself, but calls the render function instead.
  *
  * **Example**
  *
@@ -143,6 +146,8 @@ const granularities: GranularityOption[] = [
  */
 export default class QueryBuilder extends React.Component<QueryBuilderProps, QueryBuilderInternalState> {
   static contextType = CubeContext;
+
+  context!: React.ContextType<typeof CubeContext>;
 
   static defaultProps = {
     cubeApi: null,
@@ -278,10 +283,6 @@ export default class QueryBuilder extends React.Component<QueryBuilderProps, Que
   // TypeScript field declarations into `everything-else`, which the configured
   // order puts after `lifecycle`. Runtime is unaffected: field initializers run
   // right after `super()`, so the constructor's assignments still win.
-  //
-  // `this.context` is not re-declared: React types it as `any`, and a field
-  // declaration would be emitted at runtime and shadow the context React
-  // assigns.
   private mutexObj: MutexObj;
 
   private orderMembersOrderKeys: string[];
@@ -663,8 +664,8 @@ export default class QueryBuilder extends React.Component<QueryBuilderProps, Que
     handleVizStateChange(finalState);
 
     const shouldFetchDryRun = !equals(
-      pick(['measures', 'dimensions', 'timeDimensions'], stateQuery),
-      pick(['measures', 'dimensions', 'timeDimensions'], finalState.query)
+      pick(DRY_RUN_QUERY_FIELDS, stateQuery),
+      pick(DRY_RUN_QUERY_FIELDS, finalState.query)
     );
 
     if (shouldFetchDryRun && isQueryPresent(finalState.query) && finalState.missingMembers.length === 0) {

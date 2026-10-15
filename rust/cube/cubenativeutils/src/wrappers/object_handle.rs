@@ -1,4 +1,7 @@
-use super::{inner_types::InnerTypes, object::NativeObject};
+use super::{
+    inner_types::InnerTypes,
+    object::{NativeObject, NativeTypedObject},
+};
 use super::{
     NativeBoolean, NativeContextHolder, NativeContextHolderRef, NativeNumber, NativeString,
     NativeStruct,
@@ -40,6 +43,9 @@ impl<IT: InnerTypes> NativeObjectHandle<IT> {
     }
     pub fn into_boolean(self) -> Result<IT::Boolean, CubeError> {
         self.object.into_boolean()
+    }
+    pub fn into_typed(self) -> Result<NativeTypedObject<IT>, CubeError> {
+        self.object.into_typed()
     }
     pub fn into_rust_box(self) -> Result<IT::RustBox, CubeError> {
         self.object.into_rust_box()

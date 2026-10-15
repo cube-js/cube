@@ -43,7 +43,7 @@ fn tz_mark_survives_granularity_change() {
     let td = ctx
         .create_time_dimension("events.created_at", Some("day"))
         .unwrap();
-    let names = HashSet::from(["events.created_at_day".to_string()]);
+    let names = HashSet::from([td.id().clone()]);
     let marked = transforms::mark_tz_converted_at_source(&td, &names).unwrap();
     let marked = marked.as_time_dimension().unwrap();
     assert!(marked.tz_converted_at_source());

@@ -1,6 +1,6 @@
 import { QueuePriority, TableStructure } from '@cubejs-backend/base-driver';
 import { DriverFactory } from './DriverFactory';
-import { QueryCache, QueryWithParams } from './QueryCache';
+import { QueryCache, QueryWithParams, REFRESH_KEY_CACHE_TTL_SECONDS } from './QueryCache';
 import {
   PreAggregationDescription,
   PreAggregations,
@@ -196,7 +196,7 @@ export class PreAggregationLoadCache {
     if (!this.queryResults[memoKey]) {
       this.queryResults[memoKey] = await this.queryCache.cacheRefreshKeyResult(
         sqlQuery,
-        60 * 60,
+        REFRESH_KEY_CACHE_TTL_SECONDS,
         {
           waitForRenew,
           priority,

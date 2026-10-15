@@ -2,7 +2,7 @@
 
 use crate::planner::symbols::dimension_kinds::DimensionKind;
 use crate::planner::symbols::DimensionType;
-use crate::planner::{AggregationType, CalculatedMeasureType, MeasureKind};
+use crate::planner::{AggregationType, CalculatedMeasureType, CubeId, MeasureKind};
 use crate::test_fixtures::cube_bridge::MockSchema;
 use crate::test_fixtures::schemas::TestCompiler;
 use crate::test_fixtures::test_utils::TestContext;
@@ -21,7 +21,7 @@ fn test_add_dimension_evaluator_number_dimension() {
     assert!(symbol.is_dimension());
     assert!(!symbol.is_measure());
     assert_eq!(symbol.full_name(), "visitors.id");
-    assert_eq!(symbol.cube_name(), "visitors");
+    assert_eq!(symbol.cube_id().to_string(), "visitors");
     assert_eq!(symbol.name(), "id");
     assert_eq!(symbol.get_dependencies().len(), 0);
     assert!(
@@ -43,7 +43,7 @@ fn test_add_dimension_evaluator_string_dimension() {
     assert!(symbol.is_dimension());
     assert!(!symbol.is_measure());
     assert_eq!(symbol.full_name(), "visitors.source");
-    assert_eq!(symbol.cube_name(), "visitors");
+    assert_eq!(symbol.cube_id().to_string(), "visitors");
     assert_eq!(symbol.name(), "source");
     assert_eq!(symbol.get_dependencies().len(), 0);
     assert!(
@@ -132,7 +132,7 @@ fn test_add_measure_evaluator_count_measure() {
     assert!(symbol.is_measure());
     assert!(!symbol.is_dimension());
     assert_eq!(symbol.full_name(), "visitor_checkins.count");
-    assert_eq!(symbol.cube_name(), "visitor_checkins");
+    assert_eq!(symbol.cube_id().to_string(), "visitor_checkins");
     assert_eq!(symbol.name(), "count");
     assert_eq!(symbol.get_dependencies().len(), 0);
     assert!(matches!(
@@ -155,7 +155,7 @@ fn test_add_measure_evaluator_sum_measure() {
     assert!(symbol.is_measure());
     assert!(!symbol.is_dimension());
     assert_eq!(symbol.full_name(), "visitors.total_revenue");
-    assert_eq!(symbol.cube_name(), "visitors");
+    assert_eq!(symbol.cube_id().to_string(), "visitors");
     assert_eq!(symbol.name(), "total_revenue");
     assert_eq!(symbol.get_dependencies().len(), 0);
     assert!(matches!(
@@ -238,7 +238,7 @@ fn test_add_auto_resolved_member_evaluator_dimension() {
     assert!(symbol.is_dimension());
     assert!(!symbol.is_measure());
     assert_eq!(symbol.full_name(), "visitors.source");
-    assert_eq!(symbol.cube_name(), "visitors");
+    assert_eq!(symbol.cube_id().to_string(), "visitors");
     assert_eq!(symbol.name(), "source");
     assert_eq!(symbol.get_dependencies().len(), 0);
     assert!(
@@ -260,7 +260,7 @@ fn test_add_auto_resolved_member_evaluator_measure() {
     assert!(symbol.is_measure());
     assert!(!symbol.is_dimension());
     assert_eq!(symbol.full_name(), "visitors.total_revenue");
-    assert_eq!(symbol.cube_name(), "visitors");
+    assert_eq!(symbol.cube_id().to_string(), "visitors");
     assert_eq!(symbol.name(), "total_revenue");
     assert_eq!(symbol.get_dependencies().len(), 0);
     assert!(matches!(
@@ -277,10 +277,10 @@ fn test_add_cube_table_evaluator() {
 
     let symbol = test_compiler
         .compiler
-        .add_cube_table_evaluator("visitors".to_string(), vec![])
+        .add_cube_table_evaluator(CubeId::cube("visitors"), vec![])
         .unwrap();
 
-    assert_eq!(symbol.cube_name(), "visitors");
+    assert_eq!(symbol.cube_id().to_string(), "visitors");
 }
 
 #[test]
@@ -291,10 +291,10 @@ fn test_add_cube_name_evaluator() {
 
     let symbol = test_compiler
         .compiler
-        .add_cube_name_evaluator("visitors".to_string(), vec![])
+        .add_cube_name_evaluator(CubeId::cube("visitors"), vec![])
         .unwrap();
 
-    assert_eq!(symbol.cube_name(), "visitors");
+    assert_eq!(symbol.cube_id().to_string(), "visitors");
 }
 
 #[test]
@@ -310,7 +310,7 @@ fn test_dimension_with_cube_table_dependency() {
 
     assert!(symbol.is_dimension());
     assert_eq!(symbol.full_name(), "visitors.visitor_id");
-    assert_eq!(symbol.cube_name(), "visitors");
+    assert_eq!(symbol.cube_id().to_string(), "visitors");
     assert!(
         matches!(symbol.as_dimension().unwrap().kind(), DimensionKind::Regular(r) if *r.dimension_type() == DimensionType::Number)
     );
@@ -320,7 +320,7 @@ fn test_dimension_with_cube_table_dependency() {
 
     let cube_refs = symbol.get_cube_refs();
     assert_eq!(cube_refs.len(), 1, "Should have 1 cube ref dependency");
-    assert_eq!(cube_refs[0].cube_name(), "visitors");
+    assert_eq!(cube_refs[0].cube_id().to_string(), "visitors");
 }
 
 #[test]
@@ -336,7 +336,7 @@ fn test_dimension_with_member_dependency_no_prefix() {
 
     assert!(symbol.is_dimension());
     assert_eq!(symbol.full_name(), "visitors.visitor_id_twice");
-    assert_eq!(symbol.cube_name(), "visitors");
+    assert_eq!(symbol.cube_id().to_string(), "visitors");
     assert!(
         matches!(symbol.as_dimension().unwrap().kind(), DimensionKind::Regular(r) if *r.dimension_type() == DimensionType::Number)
     );
@@ -351,7 +351,7 @@ fn test_dimension_with_member_dependency_no_prefix() {
     let dep = &dependencies[0];
     assert!(dep.is_dimension(), "Dependency should be a dimension");
     assert_eq!(dep.full_name(), "visitors.visitor_id");
-    assert_eq!(dep.cube_name(), "visitors");
+    assert_eq!(dep.cube_id().to_string(), "visitors");
 }
 
 #[test]
@@ -367,7 +367,7 @@ fn test_dimension_with_mixed_dependencies() {
 
     assert!(symbol.is_dimension());
     assert_eq!(symbol.full_name(), "visitors.source_concat_id");
-    assert_eq!(symbol.cube_name(), "visitors");
+    assert_eq!(symbol.cube_id().to_string(), "visitors");
     assert!(
         matches!(symbol.as_dimension().unwrap().kind(), DimensionKind::Regular(r) if *r.dimension_type() == DimensionType::String)
     );
@@ -381,7 +381,7 @@ fn test_dimension_with_mixed_dependencies() {
 
     for dep in &dependencies {
         assert!(dep.is_dimension(), "All dependencies should be dimensions");
-        assert_eq!(dep.cube_name(), "visitors");
+        assert_eq!(dep.cube_id().to_string(), "visitors");
     }
 
     let dep_names: Vec<String> = dependencies.iter().map(|d| d.full_name()).collect();
@@ -408,7 +408,7 @@ fn test_measure_with_cube_table_dependency() {
 
     assert!(symbol.is_measure());
     assert_eq!(symbol.full_name(), "visitors.revenue");
-    assert_eq!(symbol.cube_name(), "visitors");
+    assert_eq!(symbol.cube_id().to_string(), "visitors");
     assert!(matches!(
         symbol.as_measure().unwrap().kind(),
         MeasureKind::Aggregated(a) if a.agg_type() == AggregationType::Sum
@@ -419,7 +419,7 @@ fn test_measure_with_cube_table_dependency() {
 
     let cube_refs = symbol.get_cube_refs();
     assert_eq!(cube_refs.len(), 1, "Should have 1 cube ref dependency");
-    assert_eq!(cube_refs[0].cube_name(), "visitors");
+    assert_eq!(cube_refs[0].cube_id().to_string(), "visitors");
 }
 
 #[test]
@@ -435,7 +435,7 @@ fn test_measure_with_explicit_cube_and_member_dependencies() {
 
     assert!(symbol.is_measure());
     assert_eq!(symbol.full_name(), "visitors.total_revenue_per_count");
-    assert_eq!(symbol.cube_name(), "visitors");
+    assert_eq!(symbol.cube_id().to_string(), "visitors");
     assert!(matches!(
         symbol.as_measure().unwrap().kind(),
         MeasureKind::Calculated(c) if c.calc_type() == CalculatedMeasureType::Number
@@ -446,7 +446,7 @@ fn test_measure_with_explicit_cube_and_member_dependencies() {
 
     for dep in &dependencies {
         assert!(dep.is_measure(), "All dependencies should be measures");
-        assert_eq!(dep.cube_name(), "visitors");
+        assert_eq!(dep.cube_id().to_string(), "visitors");
     }
 
     let dep_names: Vec<String> = dependencies.iter().map(|d| d.full_name()).collect();
@@ -473,16 +473,19 @@ fn test_view_dimension_compilation() {
 
     assert!(id_symbol.is_dimension());
     assert_eq!(id_symbol.full_name(), "visitors_visitors_checkins.id");
-    assert_eq!(id_symbol.cube_name(), "visitors_visitors_checkins");
+    assert_eq!(
+        id_symbol.cube_id().to_string(),
+        "visitors_visitors_checkins"
+    );
     assert_eq!(id_symbol.name(), "id");
 
-    let dimension = id_symbol.as_dimension().unwrap();
-    assert!(dimension.is_view(), "Should be a view member");
-
-    assert!(
-        dimension.is_reference(),
-        "Should be a reference to original member"
+    let reference = id_symbol.as_ref_symbol().unwrap();
+    assert!(id_symbol.is_reference());
+    assert_eq!(
+        reference.target_member().unwrap().full_name(),
+        "visitors.id"
     );
+    assert!(id_symbol.as_dimension().is_err());
 
     let resolved = id_symbol.clone().resolve_reference_chain();
     assert_eq!(
@@ -506,9 +509,8 @@ fn test_view_dimension_compilation() {
         "visitors_visitors_checkins.visitor_id"
     );
 
-    let visitor_id_dim = visitor_id_symbol.as_dimension().unwrap();
-    assert!(visitor_id_dim.is_view(), "Should be a view member");
-    assert!(visitor_id_dim.is_reference(), "Should be a reference");
+    assert!(visitor_id_symbol.as_ref_symbol().is_ok());
+    assert!(visitor_id_symbol.is_reference(), "Should be a reference");
 
     let resolved = visitor_id_symbol.clone().resolve_reference_chain();
     assert_eq!(
@@ -535,16 +537,19 @@ fn test_view_measure_compilation() {
 
     assert!(count_symbol.is_measure());
     assert_eq!(count_symbol.full_name(), "visitors_visitors_checkins.count");
-    assert_eq!(count_symbol.cube_name(), "visitors_visitors_checkins");
+    assert_eq!(
+        count_symbol.cube_id().to_string(),
+        "visitors_visitors_checkins"
+    );
     assert_eq!(count_symbol.name(), "count");
 
-    let measure = count_symbol.as_measure().unwrap();
-    assert!(measure.is_view(), "Should be a view member");
-
-    assert!(
-        measure.is_reference(),
-        "Should be a reference to original member"
+    let reference = count_symbol.as_ref_symbol().unwrap();
+    assert!(count_symbol.is_reference());
+    assert_eq!(
+        reference.target_member().unwrap().full_name(),
+        "visitor_checkins.count"
     );
+    assert!(count_symbol.as_measure().is_err());
 
     let resolved = count_symbol.clone().resolve_reference_chain();
     assert_eq!(
@@ -571,7 +576,7 @@ fn test_proxy_dimension_compilation() {
 
     assert!(proxy_symbol.is_dimension());
     assert_eq!(proxy_symbol.full_name(), "visitors.visitor_id_proxy");
-    assert_eq!(proxy_symbol.cube_name(), "visitors");
+    assert_eq!(proxy_symbol.cube_id().to_string(), "visitors");
     assert_eq!(proxy_symbol.name(), "visitor_id_proxy");
 
     let dimension = proxy_symbol.as_dimension().unwrap();
@@ -614,7 +619,7 @@ fn test_proxy_measure_compilation() {
 
     assert!(proxy_symbol.is_measure());
     assert_eq!(proxy_symbol.full_name(), "visitors.total_revenue_proxy");
-    assert_eq!(proxy_symbol.cube_name(), "visitors");
+    assert_eq!(proxy_symbol.cube_id().to_string(), "visitors");
     assert_eq!(proxy_symbol.name(), "total_revenue_proxy");
 
     let measure = proxy_symbol.as_measure().unwrap();
@@ -667,7 +672,7 @@ fn test_time_dimension_with_granularity_compilation() {
         "visitors.created_at_month",
         "Full name should be visitors.created_at_month"
     );
-    assert_eq!(time_symbol.cube_name(), "visitors");
+    assert_eq!(time_symbol.cube_id().to_string(), "visitors");
     assert_eq!(time_symbol.name(), "created_at");
 
     let time_dim = time_symbol.as_time_dimension().unwrap();
@@ -720,7 +725,7 @@ fn test_sql_deps_validation() {
         "visitors.created_at_month",
         "Full name should be visitors.created_at_month"
     );
-    assert_eq!(time_symbol.cube_name(), "visitors");
+    assert_eq!(time_symbol.cube_id().to_string(), "visitors");
     assert_eq!(time_symbol.name(), "created_at");
 
     let time_dim = time_symbol.as_time_dimension().unwrap();
@@ -842,4 +847,166 @@ fn test_sql_multi_stage_measures() {
             dim
         );
     }
+}
+
+fn view_members_compiler() -> TestCompiler {
+    let schema = MockSchema::from_yaml_file("common/integration_view_members.yaml");
+    TestCompiler::new(schema.create_evaluator())
+}
+
+#[test]
+fn test_view_calculated_dimension_is_not_a_reference() {
+    let mut test_compiler = view_members_compiler();
+
+    let symbol = test_compiler
+        .compiler
+        .add_dimension_evaluator("orders_view.status_label".to_string())
+        .unwrap();
+
+    let dimension = symbol.as_dimension().unwrap();
+    assert!(dimension.is_view());
+    assert!(!dimension.is_reference());
+    let deps = symbol
+        .get_dependencies()
+        .iter()
+        .map(|dep| dep.full_name())
+        .collect::<Vec<_>>();
+    assert_eq!(deps, vec!["orders.status", "orders_view.name"]);
+}
+
+#[test]
+fn test_view_calculated_measure_is_not_a_reference() {
+    let mut test_compiler = view_members_compiler();
+
+    let symbol = test_compiler
+        .compiler
+        .add_measure_evaluator("orders_view.amount_per_order".to_string())
+        .unwrap();
+
+    let measure = symbol.as_measure().unwrap();
+    assert!(measure.is_view());
+    assert!(!measure.is_reference());
+    assert!(measure.is_calculated());
+}
+
+// A member the view declares itself keeps its own definition even when its sql
+// is a direct reference; it references a re-exported sibling, which resolves to
+// the cube member.
+#[test]
+fn test_view_sibling_reference_resolves_to_cube_member() {
+    let mut test_compiler = view_members_compiler();
+
+    let symbol = test_compiler
+        .compiler
+        .add_dimension_evaluator("orders_view.status_ref".to_string())
+        .unwrap();
+
+    assert!(symbol.as_dimension().unwrap().is_view());
+    assert!(symbol.is_reference());
+    let target = symbol.reference_member().unwrap();
+    assert_eq!(target.full_name(), "orders_view.status");
+    assert!(target.as_ref_symbol().is_ok());
+    assert_eq!(
+        symbol.clone().resolve_reference_chain().full_name(),
+        "orders.status"
+    );
+}
+
+#[test]
+fn test_view_hand_written_reference_resolves_to_cube_member() {
+    let mut test_compiler = view_members_compiler();
+
+    let symbol = test_compiler
+        .compiler
+        .add_measure_evaluator("orders_view.total_amount_ref".to_string())
+        .unwrap();
+
+    assert!(symbol.as_measure().unwrap().is_view());
+    assert!(symbol.is_reference());
+    assert_eq!(
+        symbol.clone().resolve_reference_chain().full_name(),
+        "orders.total_amount"
+    );
+}
+
+// A view member's mask is compiled against the cube that owns the target, and
+// its dependencies follow the target.
+#[test]
+fn test_view_member_mask_depends_on_target_cube_members() {
+    let mut test_compiler = view_members_compiler();
+
+    let symbol = test_compiler
+        .compiler
+        .add_dimension_evaluator("orders_view.masked_status_dep".to_string())
+        .unwrap();
+
+    assert!(symbol.as_ref_symbol().unwrap().mask_sql().is_some());
+    let deps = symbol
+        .get_dependencies()
+        .iter()
+        .map(|dep| dep.full_name())
+        .collect::<Vec<_>>();
+    assert_eq!(deps, vec!["orders.masked_status_dep", "orders.id"]);
+    assert_eq!(
+        symbol.reference_member().unwrap().full_name(),
+        "orders.masked_status_dep"
+    );
+}
+
+#[test]
+fn test_view_custom_granularity_time_dimension() {
+    let mut test_compiler = view_members_compiler();
+
+    let symbol = test_compiler
+        .compiler
+        .add_dimension_evaluator("orders_view.created_at.bi_weekly".to_string())
+        .unwrap();
+
+    let time_dimension = symbol.as_time_dimension().unwrap();
+    assert_eq!(time_dimension.granularity().as_deref(), Some("bi_weekly"));
+    assert!(time_dimension.granularity_obj().is_some());
+    assert_eq!(
+        time_dimension.base_symbol().full_name(),
+        "orders_view.created_at"
+    );
+    assert!(time_dimension.base_symbol().as_ref_symbol().is_ok());
+    assert_eq!(
+        symbol.reference_member().unwrap().full_name(),
+        "orders.created_at_bi_weekly"
+    );
+}
+
+// A view member that aggregates the member it names computes something of its
+// own, so it is not a reference.
+#[test]
+fn test_view_own_aggregation_is_not_a_reference() {
+    let mut test_compiler = view_members_compiler();
+
+    let symbol = test_compiler
+        .compiler
+        .add_measure_evaluator("orders_view.distinct_customers".to_string())
+        .unwrap();
+
+    let measure = symbol.as_measure().unwrap();
+    assert!(measure.is_view());
+    assert!(!symbol.is_reference());
+    assert!(matches!(
+        measure.kind(),
+        MeasureKind::Aggregated(a) if a.agg_type() == AggregationType::CountDistinct
+    ));
+}
+
+#[test]
+fn test_view_own_sub_query_dimension_is_not_a_reference() {
+    let mut test_compiler = view_members_compiler();
+
+    let symbol = test_compiler
+        .compiler
+        .add_dimension_evaluator("customers_view.orders_count".to_string())
+        .unwrap();
+
+    let dimension = symbol.as_dimension().unwrap();
+    assert!(dimension.is_view());
+    assert!(dimension.is_sub_query());
+    assert!(!symbol.is_reference());
 }

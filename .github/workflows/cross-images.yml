@@ -12,6 +12,9 @@ on:
       - '.github/workflows/cross-images.yml'
       - 'rust/cubestore/cross/**'
 
+permissions:
+  contents: read
+
 jobs:
   docker-dev:
     name: Build cross image for ${{ matrix.target }} target

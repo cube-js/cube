@@ -9,8 +9,7 @@ import { TabPaneWithToolbar } from './components/TabPaneWithToolbar';
 import { ScrollableCodeContainer } from './components/ScrollableCodeContainer';
 
 export function QueryBuilderSQL() {
-  const { queryHash, meta, isQueryEmpty, verificationError, dryRunResponse } =
-    useQueryBuilderContext();
+  const { queryHash, meta, isQueryEmpty, verificationError, dryRunResponse } = useQueryBuilderContext();
 
   return useDeepMemo(() => {
     // todo: fix types of normalizedQueries (e.g. order is always an array)
@@ -58,11 +57,11 @@ export function QueryBuilderSQL() {
 
       return (
         <TabPaneWithToolbar
-          actions={
+          actions={(
             <CopyButton type="secondary" value={sqlQuery}>
               Copy
             </CopyButton>
-          }
+          )}
         >
           <ScrollableCodeContainer value={sqlQuery} />
         </TabPaneWithToolbar>

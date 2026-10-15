@@ -1,13 +1,13 @@
 use super::CompiledPreAggregation;
-use crate::planner::MemberSymbol;
+use crate::planner::{MemberId, MemberSymbol};
 use cubenativeutils::CubeError;
 use std::collections::HashSet;
 use std::rc::Rc;
 
 pub struct MeasureMatcher {
     only_additive: bool,
-    pre_aggregation_measures: HashSet<String>,
-    matched_measures: HashSet<String>,
+    pre_aggregation_measures: HashSet<MemberId>,
+    matched_measures: HashSet<MemberId>,
 }
 
 impl MeasureMatcher {
@@ -15,7 +15,7 @@ impl MeasureMatcher {
         let pre_aggregation_measures = pre_aggregation
             .measures
             .iter()
-            .map(|m| m.full_name())
+            .map(|m| m.peel_refs().id().clone())
             .collect();
         Self {
             only_additive,
@@ -24,7 +24,7 @@ impl MeasureMatcher {
         }
     }
 
-    pub fn matched_measures(&self) -> &HashSet<String> {
+    pub fn matched_measures(&self) -> &HashSet<MemberId> {
         &self.matched_measures
     }
 
@@ -37,11 +37,16 @@ impl MeasureMatcher {
                 if measure.is_cumulative() {
                     return Ok(false);
                 }
-                if self.pre_aggregation_measures.contains(&measure.full_name())
+                if self.pre_aggregation_measures.contains(measure.id())
                     && (!self.only_additive || measure.is_additive())
                 {
-                    self.matched_measures.insert(measure.full_name());
+                    self.matched_measures.insert(measure.id().clone());
                     return Ok(true);
+                }
+                // A reference not stored under its own name is the member it
+                // names, multi-stage or not.
+                if let Some(target) = measure.reference_member() {
+                    return self.try_match(&target);
                 }
                 // Multi-stage measures carry their own aggregate semantics
                 // (time_shift, reduce_by, add_group_by, rolling window) that
@@ -55,7 +60,13 @@ impl MeasureMatcher {
             MemberSymbol::MemberExpression(_) => {
                 return Ok(false); //TODO We not allow to use pre-aggregations with member expressions before sqlapi ready for it
             }
-            _ => return Ok(false),
+            MemberSymbol::Ref(ref_symbol) => {
+                return match ref_symbol.target_member() {
+                    Some(target) if symbol.is_measure() => self.try_match(target),
+                    _ => Ok(false),
+                };
+            }
+            MemberSymbol::Dimension(_) | MemberSymbol::TimeDimension(_) => return Ok(false),
         }
 
         if symbol.get_dependencies().is_empty() {
@@ -77,7 +88,9 @@ mod tests {
     use crate::logical_plan::optimizers::pre_aggregation::{
         PreAggregationFullName, PreAggregationsCompiler,
     };
+    use crate::planner::CubeId;
     use crate::test_fixtures::cube_bridge::MockSchema;
+    use crate::test_fixtures::test_utils::member_id;
     use crate::test_fixtures::test_utils::TestContext;
 
     fn create_test_context() -> TestContext {
@@ -86,7 +99,7 @@ mod tests {
     }
 
     fn compile_pre_agg(ctx: &TestContext, pre_agg_name: &str) -> Rc<CompiledPreAggregation> {
-        let cube_names = vec!["orders".to_string()];
+        let cube_names = vec![CubeId::cube("orders")];
         let mut compiler =
             PreAggregationsCompiler::try_new(ctx.query_tools().clone(), &cube_names).unwrap();
         let name = PreAggregationFullName::new("orders".to_string(), pre_agg_name.to_string());
@@ -196,6 +209,24 @@ mod tests {
     }
 
     #[test]
+    fn test_reference_stored_under_its_own_name() {
+        let ctx = create_test_context();
+        let pre_agg = compile_pre_agg(&ctx, "alias_only_rollup");
+        let alias = ctx.create_measure("orders.total_amount_alias").unwrap();
+        assert!(alias.as_measure().unwrap().is_reference());
+
+        let mut matcher = MeasureMatcher::new(&pre_agg, false);
+        assert!(matcher.try_match(&alias).unwrap());
+        assert!(matcher
+            .matched_measures()
+            .contains(&member_id("orders.total_amount_alias")));
+
+        // Rolled up, the alias resolves to a measure the rollup does not store.
+        let mut additive_matcher = MeasureMatcher::new(&pre_agg, true);
+        assert!(!additive_matcher.try_match(&alias).unwrap());
+    }
+
+    #[test]
     fn test_matched_measures_full_match() {
         let ctx = create_test_context();
         let pre_agg = compile_pre_agg(&ctx, "base_and_calculated_measure_rollup");
@@ -207,9 +238,13 @@ mod tests {
             .unwrap());
         assert!(matcher
             .matched_measures()
-            .contains("orders.amount_per_count"));
-        assert!(!matcher.matched_measures().contains("orders.count"));
-        assert!(!matcher.matched_measures().contains("orders.total_amount"));
+            .contains(&member_id("orders.amount_per_count")));
+        assert!(!matcher
+            .matched_measures()
+            .contains(&member_id("orders.count")));
+        assert!(!matcher
+            .matched_measures()
+            .contains(&member_id("orders.total_amount")));
     }
 
     #[test]
@@ -224,8 +259,12 @@ mod tests {
             .unwrap());
         assert!(!matcher
             .matched_measures()
-            .contains("orders.amount_per_count"));
-        assert!(matcher.matched_measures().contains("orders.count"));
-        assert!(matcher.matched_measures().contains("orders.total_amount"));
+            .contains(&member_id("orders.amount_per_count")));
+        assert!(matcher
+            .matched_measures()
+            .contains(&member_id("orders.count")));
+        assert!(matcher
+            .matched_measures()
+            .contains(&member_id("orders.total_amount")));
     }
 }

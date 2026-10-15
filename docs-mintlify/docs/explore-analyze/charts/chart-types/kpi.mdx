@@ -106,6 +106,12 @@ KPI tiles have a layout panel that controls how blocks are arranged:
 | **Gap** | Spacing between blocks |
 | **Wrap** | Whether blocks wrap to a new line when the tile is narrow |
 
+## Drill down
+
+Clicking a **Number** block opens the rows behind its value, as clicking a measure cell does in a [table](/docs/explore-analyze/charts/chart-types/table#cell-menu). The block must show a measure with [`drill_members`](/reference/data-modeling/measures#drill_members) defined in the data model. Other block types are not clickable.
+
+Drill down works on dashboards, including published and embedded ones, but not in a workbook or while you edit a dashboard.
+
 ## Converting to raw Markdown
 
 If you need customization beyond what the block builder supports, you can convert the KPI visualization directly to Markdown by clicking on the Markdown visualization option.

@@ -114,15 +114,15 @@ export type JoinDefinition = {
 
 export type Filter =
   | {
-      member: string;
-      memberReference?: string;
-      [key: string]: any;
-    }
+    member: string;
+    memberReference?: string;
+    [key: string]: any;
+  }
   | {
-      and?: Filter[];
-      or?: Filter[];
-      [key: string]: any;
-    };
+    and?: Filter[];
+    or?: Filter[];
+    [key: string]: any;
+  };
 
 export type AccessPolicyDefinition = {
   group?: string;
@@ -660,15 +660,20 @@ export class CubeSymbols implements TranspilerSymbolResolver, CompilerInterface 
   }
 
   protected generateSyntheticLinkDimensions(cube: any) {
-    if (!cube.dimensions) return;
+    if (!cube.dimensions) {
+      return;
+    }
 
     const dims = cube.dimensions;
+
     for (const dimName of Object.keys(dims)) {
       const dimDef = dims[dimName];
       if (dimDef.links && Array.isArray(dimDef.links)) {
         for (const link of dimDef.links) {
           const linkName = typeof link.name === 'function' ? link.name() : link.name;
-          if (!linkName) return;
+          if (!linkName) {
+            return;
+          }
           const syntheticName = `${dimName}___link_${linkName}_url`;
           if (dims[syntheticName] && !dims[syntheticName].synthetic) {
             throw new Error(`Link '${linkName}' on dimension '${dimName}' conflicts with existing dimension '${syntheticName}'`);
@@ -714,12 +719,14 @@ export class CubeSymbols implements TranspilerSymbolResolver, CompilerInterface 
     // Collect all unique arg names (deduped, preserving order)
     const seenArgs = new Set([cubeName, 'SQL_UTILS']);
     const extraArgs: string[] = [];
+
     for (const arg of baseSqlArgs) {
       if (!seenArgs.has(arg)) {
         seenArgs.add(arg);
         extraArgs.push(arg);
       }
     }
+
     for (const argSet of paramArgSets) {
       for (const arg of argSet) {
         if (!seenArgs.has(arg)) {
@@ -734,10 +741,10 @@ export class CubeSymbols implements TranspilerSymbolResolver, CompilerInterface 
     const body = `
       var base = \`\${(${baseSql.toString()})(${baseSqlArgs.join(', ')})}\`;
       ${resolvedParams.map((p, idx) => {
-    const sep = idx === 0 ? '?' : '&';
-    const paramArgs = paramArgSets[idx].join(', ');
-    return `base += " || '${sep}${p.encodedKey}=' || " + SQL_UTILS.urlEncode((${p.valueFn.toString()})(${paramArgs}));`;
-  }).join('\n      ')}
+        const sep = idx === 0 ? '?' : '&';
+        const paramArgs = paramArgSets[idx].join(', ');
+        return `base += " || '${sep}${p.encodedKey}=' || " + SQL_UTILS.urlEncode((${p.valueFn.toString()})(${paramArgs}));`;
+      }).join('\n      ')}
       return base;
     `;
 
@@ -836,6 +843,7 @@ export class CubeSymbols implements TranspilerSymbolResolver, CompilerInterface 
         // Auto-include synthetic link dimensions for included dimensions that have links
         const syntheticLinkMembers: string[] = [];
         const membersObj = this.symbols[cubeRef]?.cubeObj()?.dimensions || {};
+
         for (const include of (it.includes as (string | ViewCubeIncludeMember)[])) {
           const memberName = typeof include === 'object' ? include.name : include;
           if (membersObj[memberName] && (membersObj[memberName] as any).links) {
@@ -970,7 +978,9 @@ export class CubeSymbols implements TranspilerSymbolResolver, CompilerInterface 
             includedMemberName
           );
 
-          if (!resolved) return undefined;
+          if (!resolved) {
+            return undefined;
+          }
 
           memberSets.resolvedMembers.add(name);
 
@@ -1111,9 +1121,12 @@ export class CubeSymbols implements TranspilerSymbolResolver, CompilerInterface 
       const sql = new Function(path[0], `return \`\${${memberRef.member}}\`;`);
       let memberDefinition;
       const propagatedCurrency = memberRef.override?.currency || resolvedMember.currency;
+      // `included` marks a member the view re-exports from `includes`, as opposed
+      // to one declared in the view's own `measures` / `dimensions`.
       if (type === 'measures') {
         memberDefinition = {
           sql,
+          included: true,
           type: CubeSymbols.toMemberDataType(resolvedMember.type),
           aggType: resolvedMember.type,
           meta: memberRef.override?.meta || resolvedMember.meta,
@@ -1131,6 +1144,7 @@ export class CubeSymbols implements TranspilerSymbolResolver, CompilerInterface 
       } else if (type === 'dimensions') {
         memberDefinition = {
           sql,
+          included: true,
           type: resolvedMember.type,
           meta: memberRef.override?.meta || resolvedMember.meta,
           title: memberRef.override?.title || resolvedMember.title,
@@ -1281,6 +1295,7 @@ export class CubeSymbols implements TranspilerSymbolResolver, CompilerInterface 
   ): T {
     const oldContext = this.resolveSymbolsCallContext;
     this.resolveSymbolsCallContext = context;
+
     try {
       // eslint-disable-next-line prefer-spread
       const res = func.apply(null, this.funcArguments(func).map((id) => nameResolver(id.trim())));
@@ -1296,6 +1311,7 @@ export class CubeSymbols implements TranspilerSymbolResolver, CompilerInterface 
   protected withSymbolsCallContext(func: Function, context) {
     const oldContext = this.resolveSymbolsCallContext;
     this.resolveSymbolsCallContext = context;
+
     try {
       return func();
     } finally {
@@ -1690,7 +1706,9 @@ export class CubeSymbols implements TranspilerSymbolResolver, CompilerInterface 
     // when the security context is empty during compilation/dep resolution.
     const undefinedChainableHandler: ProxyHandler<any> = {
       get: (target, name) => {
-        if (name in target || typeof name === 'symbol') return target[name];
+        if (name in target || typeof name === 'symbol') {
+          return target[name];
+        }
         return new Proxy(methods(undefined), undefinedChainableHandler);
       }
     };
@@ -1699,7 +1717,9 @@ export class CubeSymbols implements TranspilerSymbolResolver, CompilerInterface 
       get: (target, name) => {
         const propValue = target[name];
         const methodOnTarget = methods(target)[name];
-        if (methodOnTarget) return methodOnTarget;
+        if (methodOnTarget) {
+          return methodOnTarget;
+        }
 
         if (typeof propValue === 'object' && propValue !== null) {
           return CubeSymbols.contextSymbolsProxyFrom(propValue, allocateParam);

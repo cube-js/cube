@@ -1,0 +1,187 @@
+use datafusion::common::config::ConfigOptions;
+use datafusion::common::tree_node::Transformed;
+use datafusion::logical_expr::expr::WildcardOptions;
+use datafusion::logical_expr::{Expr, LogicalPlan, Projection, SubqueryAlias, Union};
+use datafusion::optimizer::AnalyzerRule;
+use std::collections::HashSet;
+use std::sync::Arc;
+
+/// Collapses nested `UNION ALL`s top-down before type coercion. Stock `EliminateNestedUnion` runs
+/// after it and re-coerces every flattened input at each level, which is quadratic in the inputs.
+#[derive(Debug)]
+pub struct FlattenUnionRule {}
+
+impl AnalyzerRule for FlattenUnionRule {
+    fn analyze(
+        &self,
+        plan: LogicalPlan,
+        _config: &ConfigOptions,
+    ) -> datafusion::common::Result<LogicalPlan> {
+        plan.transform_down_with_subqueries(|plan| {
+            if let LogicalPlan::SubqueryAlias(alias) = &plan {
+                if let LogicalPlan::Union(union) = alias.input.as_ref() {
+                    return Ok(match requalify_union_inputs(alias, union)? {
+                        Some(plan) => Transformed::yes(plan),
+                        None => Transformed::no(plan),
+                    });
+                }
+            }
+            let LogicalPlan::Union(union) = plan else {
+                return Ok(Transformed::no(plan));
+            };
+            let Some((flattened, changed)) = flatten_inputs(&union) else {
+                return Ok(Transformed::no(LogicalPlan::Union(union)));
+            };
+            let union = LogicalPlan::Union(Union {
+                inputs: flattened,
+                schema: union.schema,
+            });
+            Ok(if changed {
+                Transformed::yes(union)
+            } else {
+                Transformed::no(union)
+            })
+        })
+        .map(|t| t.data)
+    }
+
+    fn name(&self) -> &str {
+        "flatten_union"
+    }
+}
+
+/// Whether every input of the union has the union's column names in the union's order. Then reading
+/// the union by position and by name agree, so its inputs can be flattened, reordered or narrowed
+/// by position. A `UNION BY NAME` keeps its inputs in their own column order.
+pub fn is_aligned_union(union: &Union) -> bool {
+    union.inputs.iter().all(|input| {
+        let fields = input.schema().fields();
+        fields.len() == union.schema.fields().len()
+            && fields
+                .iter()
+                .zip(union.schema.fields().iter())
+                .all(|(a, b)| a.name() == b.name())
+    })
+}
+
+// Gives table-scan inputs of an aliased union the alias, so `merge_schema` (run by every
+// optimizer rule) dedups their fields instead of growing to all inputs' fields. `None` if unchanged.
+fn requalify_union_inputs(
+    alias: &SubqueryAlias,
+    union: &Union,
+) -> datafusion::common::Result<Option<LogicalPlan>> {
+    let Some((flattened, flattened_any)) = flatten_inputs(union) else {
+        return Ok(None);
+    };
+    // Requalified duplicate names would make the schema invalid.
+    let names = union
+        .schema
+        .fields()
+        .iter()
+        .map(|f| f.name())
+        .collect::<HashSet<_>>();
+    let requalify = names.len() == union.schema.fields().len()
+        && flattened
+            .iter()
+            .any(|i| matches!(i.as_ref(), LogicalPlan::TableScan(_)));
+    if !flattened_any && !requalify {
+        return Ok(None);
+    }
+    let (inputs, schema) = if requalify {
+        let inputs = flattened
+            .into_iter()
+            .map(|input| match input.as_ref() {
+                LogicalPlan::TableScan(_) => Ok(Arc::new(LogicalPlan::SubqueryAlias(
+                    SubqueryAlias::try_new(input, alias.alias.clone())?,
+                ))),
+                _ => Ok(input),
+            })
+            .collect::<datafusion::common::Result<Vec<_>>>()?;
+        let schema = union
+            .schema
+            .as_ref()
+            .clone()
+            .replace_qualifier(alias.alias.clone());
+        (inputs, Arc::new(schema))
+    } else {
+        (flattened, union.schema.clone())
+    };
+    let union = LogicalPlan::Union(Union { inputs, schema });
+    Ok(Some(LogicalPlan::SubqueryAlias(SubqueryAlias::try_new(
+        Arc::new(union),
+        alias.alias.clone(),
+    )?)))
+}
+
+// The flattened inputs and whether any changed, or `None` if the union must stay as is.
+fn flatten_inputs(union: &Union) -> Option<(Vec<Arc<LogicalPlan>>, bool)> {
+    if !is_aligned_union(union) {
+        return None;
+    }
+    let mut flattened = Vec::with_capacity(union.inputs.len());
+    let changed = collect_union_inputs(union.inputs.clone(), &mut flattened);
+    same_types(&flattened).then_some((flattened, changed))
+}
+
+// Nested unions are coerced one by one, so with different input types an intermediate cast can
+// change the values, e.g. `1` becomes `'1.0'` via `Float64` instead of `'1'`. With the same types
+// coercion does nothing and flattening is safe.
+fn same_types(inputs: &[Arc<LogicalPlan>]) -> bool {
+    let Some((first, rest)) = inputs.split_first() else {
+        return true;
+    };
+    let first = first.schema().fields();
+    rest.iter().all(|i| {
+        let fields = i.schema().fields();
+        fields.len() == first.len()
+            && fields
+                .iter()
+                .zip(first.iter())
+                .all(|(a, b)| a.data_type() == b.data_type())
+    })
+}
+
+// Returns whether any input was flattened or had its `SELECT *` removed.
+fn collect_union_inputs(inputs: Vec<Arc<LogicalPlan>>, onto: &mut Vec<Arc<LogicalPlan>>) -> bool {
+    let mut changed = false;
+    for input in inputs {
+        let mut input = input;
+        while let Some(i) = select_star_input(&input) {
+            input = i;
+            changed = true;
+        }
+        match input.as_ref() {
+            LogicalPlan::Union(nested) if is_aligned_union(nested) => {
+                collect_union_inputs(nested.inputs.clone(), onto);
+                changed = true;
+            }
+            _ => onto.push(input),
+        }
+    }
+    changed
+}
+
+// The input of a `SELECT * FROM input` projection that adds nothing to it.
+fn select_star_input(plan: &Arc<LogicalPlan>) -> Option<Arc<LogicalPlan>> {
+    let LogicalPlan::Projection(Projection {
+        expr,
+        input,
+        schema,
+        ..
+    }) = plan.as_ref()
+    else {
+        return None;
+    };
+    #[allow(deprecated)]
+    let [Expr::Wildcard {
+        qualifier: None,
+        options,
+    }] = expr.as_slice()
+    else {
+        return None;
+    };
+    if **options != WildcardOptions::default() || schema != input.schema() {
+        return None;
+    }
+    Some(input.clone())
+}

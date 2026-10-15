@@ -111,6 +111,16 @@ cube("users", {
 
 </CodeGroup>
 
+<Note>
+
+The source data part is read with a row limit, set by
+[`CUBEJS_MAX_SOURCE_ROW_LIMIT`][ref-max-source-row-limit] (`200000` by default).
+If the source query reaches it, the query fails with an error instead of
+returning truncated data. Raise the limit or narrow the window not covered by
+the batch rollup.
+
+</Note>
+
 ### Batch and streaming data
 
 In this scenario, batch data is comes from one pre-aggregation and real-time
@@ -128,11 +138,13 @@ data comes from a [streaming pre-aggregation][streaming-pre-agg].
 You can use lambda pre-aggregations to combine data from multiple
 pre-aggregations, where one pre-aggregation can have batch data and another
 streaming.
-Please note that build ranges of all rollups referenced by lambda rollup should have enough intersection between each other that anticipates partition build times for those rollups.
-Cube will maximize the coverage of the requested date range by partitions from different rollups.
-The first rollup in a list of referenced rollups that has a fully built partition for a particular date range will be used to serve this date range.
-The last rollup in a list will be used to cover the remaining uncovered part of a date range.
-Partitions of the last rollup will be used even if not completely built.
+Cube serves each date range with the first rollup in the list that has a fully
+built partition for it. Each next rollup is used only after the last partition
+served by the previous one. Partitions of the last rollup are used even if they
+are not completely built.
+
+Build ranges of the referenced rollups have to overlap, see
+[below](#overlapping-build-ranges).
 
 <CodeGroup>
 
@@ -226,4 +238,99 @@ cube("users", {
 
 </CodeGroup>
 
+## Overlapping build ranges
+
+A partition that isn't fully built is skipped for every rollup except the last
+one. When the build range of a rollup starts exactly where the previous one ends,
+the partition that has just become complete, for example the previous day right
+after midnight, is served by no rollup until it's rebuilt. Such days are missing
+from query results without an error.
+
+To avoid that, start the build range of each rollup earlier than the build range
+of the previous one ends, with a margin longer than the previous rollup's
+`refresh_key` interval plus its build time. Rows are not counted twice: a rollup
+skips partitions that the previous one already serves.
+
+<CodeGroup>
+
+```yaml title="YAML"
+cubes:
+  - name: orders
+    # ...
+
+    pre_aggregations:
+      - name: lambda
+        type: rollup_lambda
+        rollups:
+          - CUBE.batch
+          - CUBE.hot
+
+      - name: batch
+        # ...
+        partition_granularity: day
+        build_range_end:
+          sql: SELECT CURRENT_DATE - INTERVAL '14 days'
+        refresh_key:
+          every: 1 day
+
+      - name: hot
+        # ...
+        partition_granularity: day
+        # Starts 2 days before `batch` ends
+        build_range_start:
+          sql: SELECT CURRENT_DATE - INTERVAL '16 days'
+        build_range_end:
+          sql: SELECT CURRENT_DATE
+        refresh_key:
+          every: 10 minute
+```
+
+```javascript title="JavaScript"
+cube(`orders`, {
+  // ...
+
+  pre_aggregations: {
+    lambda: {
+      type: `rollup_lambda`,
+      rollups: [CUBE.batch, CUBE.hot]
+    },
+
+    batch: {
+      // ...
+      partition_granularity: `day`,
+      build_range_end: {
+        sql: `SELECT CURRENT_DATE - INTERVAL '14 days'`
+      },
+      refresh_key: {
+        every: `1 day`
+      }
+    },
+
+    hot: {
+      // ...
+      partition_granularity: `day`,
+      // Starts 2 days before `batch` ends
+      build_range_start: {
+        sql: `SELECT CURRENT_DATE - INTERVAL '16 days'`
+      },
+      build_range_end: {
+        sql: `SELECT CURRENT_DATE`
+      },
+      refresh_key: {
+        every: `10 minute`
+      }
+    }
+  }
+})
+```
+
+</CodeGroup>
+
+If a rollup uses a coarser `partition_granularity` than the next one, the next
+rollup has to start before the beginning of the previous rollup's last partition,
+because that whole partition is skipped until it's complete. For example, with
+`month` partitions on `batch` and `day` partitions on `hot`, start `hot` at
+`date_trunc('month', CURRENT_DATE - INTERVAL '16 days')`.
+
 [streaming-pre-agg]: /docs/pre-aggregations/using-pre-aggregations#streaming-pre-aggregations
+[ref-max-source-row-limit]: /reference/configuration/environment-variables#cubejs_max_source_row_limit

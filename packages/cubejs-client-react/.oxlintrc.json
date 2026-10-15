@@ -1,0 +1,13 @@
+{
+  "$schema": "../../node_modules/oxlint/configuration_schema.json",
+  "extends": [
+    "../../.oxlintrc.json",
+    "../cubejs-linter/airbnb-react.json"
+  ],
+  "env": {
+    "node": true,
+    "browser": true,
+    "es6": true
+  },
+  "ignorePatterns": ["dist/", "lib/", "coverage/", "**/*.d.ts"]
+}

@@ -1,7 +1,7 @@
 use crate::logical_plan::*;
 use crate::planner::collectors::has_multi_stage_members;
 use crate::planner::query_properties::OrderByItem;
-use crate::planner::MemberSymbol;
+use crate::planner::{MemberId, MemberSymbol};
 use cubenativeutils::CubeError;
 use itertools::Itertools;
 use std::rc::Rc;
@@ -35,11 +35,11 @@ impl MultiStageDimensionCalculation {
         &self.source
     }
 
-    pub fn resolved_dimensions(&self) -> Result<Vec<String>, CubeError> {
+    pub fn resolved_dimensions(&self) -> Result<Vec<MemberId>, CubeError> {
         let mut result = vec![];
         for dim in self.schema.all_dimensions() {
             if has_multi_stage_members(dim, true)? {
-                result.push(dim.clone().resolve_reference_chain().full_name());
+                result.push(dim.clone().resolve_reference_chain().id().clone());
             }
         }
         result.sort();
@@ -62,7 +62,7 @@ impl MultiStageDimensionCalculation {
         }
         let result = result
             .into_iter()
-            .unique_by(|d| d.full_name())
+            .unique_by(|d| d.id().clone())
             .collect_vec();
         Ok(result)
     }

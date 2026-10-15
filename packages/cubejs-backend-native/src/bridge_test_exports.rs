@@ -12,7 +12,7 @@ use cubenativeutils::wrappers::object::{
     NativeArray, NativeFunction, NativeRustBox, NativeStruct, NativeType,
 };
 use cubenativeutils::wrappers::rust_handle::NativeRustHandle;
-use cubenativeutils::wrappers::serializer::NativeSerialize;
+use cubenativeutils::wrappers::serializer::{NativeDeserialize, NativeSerialize};
 use cubenativeutils::wrappers::{inner_types::InnerTypes, NativeContextHolder, NativeObjectHandle};
 use cubenativeutils::CubeError;
 use cubesqlplanner::cube_bridge::{
@@ -93,7 +93,7 @@ use cubesqlplanner::cube_bridge::{
     },
 };
 use neon::prelude::*;
-use std::collections::HashSet;
+use std::collections::{BTreeMap, HashMap, HashSet};
 
 enum InvokeStatus {
     Ok,
@@ -650,6 +650,7 @@ fn invoke_base_tools<IT: InnerTypes>(b: &NativeBaseTools<IT>) -> InvokeResult {
         b.pre_aggregation_table_name("Orders".to_string(), "main".to_string()),
     );
     r.record("join_tree_for_hints", b.join_tree_for_hints(vec![]));
+    r.record("try_join_tree_for_hints", b.try_join_tree_for_hints(vec![]));
     r.skip(
         "compile_member_sql",
         "Rc<dyn MemberSql> argument has no auto-default in Rust",
@@ -799,6 +800,105 @@ fn rust_box_unwrap(cx: FunctionContext) -> JsResult<JsValue> {
     )
 }
 
+/// Mirrors the shapes Tesseract bridges deserialize through serde.
+#[derive(serde::Deserialize, serde::Serialize)]
+struct DeserializeProbe {
+    name: String,
+    label: Option<String>,
+    ratio: f64,
+    weight: f32,
+    ids: Vec<i64>,
+    tags: BTreeMap<String, String>,
+}
+
+fn to_json<T: serde::Serialize>(value: &T) -> Result<String, CubeError> {
+    serde_json::to_string(value).map_err(|e| CubeError::internal(e.to_string()))
+}
+
+fn deserialize_sql_templates<IT: InnerTypes>(
+    obj: NativeObjectHandle<IT>,
+) -> Result<HashMap<String, HashMap<String, String>>, CubeError> {
+    // Same target type as `NativeSqlTemplatesRender::from_native`.
+    HashMap::<String, HashMap<String, String>>::from_native(obj)
+}
+
+fn deserialize_json(cx: FunctionContext) -> JsResult<JsValue> {
+    neon_guarded_funcion_call(
+        cx,
+        |_context_holder: NativeContextHolder<_>, obj: NativeObjectHandle<_>| {
+            to_json(&serde_json::Value::from_native(obj)?)
+        },
+    )
+}
+
+fn deserialize_typed(cx: FunctionContext) -> JsResult<JsValue> {
+    neon_guarded_funcion_call(
+        cx,
+        |_context_holder: NativeContextHolder<_>, obj: NativeObjectHandle<_>| {
+            to_json(&DeserializeProbe::from_native(obj)?)
+        },
+    )
+}
+
+fn deserialize_sql_templates_json(cx: FunctionContext) -> JsResult<JsValue> {
+    neon_guarded_funcion_call(
+        cx,
+        |_context_holder: NativeContextHolder<_>, obj: NativeObjectHandle<_>| {
+            let sorted = deserialize_sql_templates(obj)?
+                .into_iter()
+                .map(|(k, v)| (k, v.into_iter().collect::<BTreeMap<_, _>>()))
+                .collect::<BTreeMap<_, _>>();
+            to_json(&sorted)
+        },
+    )
+}
+
+/// Loops natively so a benchmark measures the deserializer rather than the
+/// JS -> N-API hop.
+fn deserialize_loop_inner<IT: InnerTypes>(
+    kind: &str,
+    obj: NativeObjectHandle<IT>,
+    iterations: u32,
+) -> Result<f64, CubeError> {
+    let mut entries = 0usize;
+    for _ in 0..iterations {
+        entries += match kind {
+            "json" => match serde_json::Value::from_native(obj.clone())? {
+                serde_json::Value::Object(m) => m.len(),
+                serde_json::Value::Array(a) => a.len(),
+                _ => 1,
+            },
+            "sqlTemplates" => deserialize_sql_templates(obj.clone())?.len(),
+            "cubeStatic" => {
+                cubesqlplanner::cube_bridge::cube_definition::CubeDefinitionStatic::from_native(
+                    obj.clone(),
+                )?
+                .name
+                .len()
+            }
+            "measureStatic" => {
+                cubesqlplanner::cube_bridge::measure_definition::MeasureDefinitionStatic::from_native(
+                    obj.clone(),
+                )?
+                .measure_type
+                .len()
+            }
+            _ => return Err(CubeError::user(format!("Unknown deserialize kind: {kind}"))),
+        };
+    }
+    Ok(entries as f64)
+}
+
+fn deserialize_loop(cx: FunctionContext) -> JsResult<JsValue> {
+    neon_guarded_funcion_call(
+        cx,
+        |_context_holder: NativeContextHolder<_>,
+         kind: String,
+         obj: NativeObjectHandle<_>,
+         iterations: u32| { deserialize_loop_inner(&kind, obj, iterations) },
+    )
+}
+
 pub fn register_module(cx: &mut ModuleContext) -> NeonResult<()> {
     cx.export_function("__testBridgeParseArgsNames", parse_args_names)?;
     cx.export_function(
@@ -812,5 +912,12 @@ pub fn register_module(cx: &mut ModuleContext) -> NeonResult<()> {
     cx.export_function("__testBridgeRustBoxCreate", rust_box_create)?;
     cx.export_function("__testBridgeRustBoxCreateAlt", rust_box_create_alt)?;
     cx.export_function("__testBridgeRustBoxUnwrap", rust_box_unwrap)?;
+    cx.export_function("__testBridgeDeserializeJson", deserialize_json)?;
+    cx.export_function("__testBridgeDeserializeTyped", deserialize_typed)?;
+    cx.export_function(
+        "__testBridgeDeserializeSqlTemplates",
+        deserialize_sql_templates_json,
+    )?;
+    cx.export_function("__testBridgeDeserializeLoop", deserialize_loop)?;
     Ok(())
 }

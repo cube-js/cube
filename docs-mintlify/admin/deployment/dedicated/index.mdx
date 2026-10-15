@@ -23,9 +23,9 @@ cluster for you in a Cube-managed account on AWS, GCP, or Azure. *Single-tenant*
 means the cluster — VPC/VNet, compute, storage, and the Cube data plane that
 runs your deployments — is dedicated entirely to your organization and not
 shared with any other customer. The cluster lives in a Cube
-[Region][cube-region], can be peered or PrivateLink/PSC-connected to your own
-networks, and can optionally expose Cube's APIs to your network so that no Cube
-traffic ever crosses the public internet.
+[Region][cube-region], can be PrivateLink/PSC-connected to your own networks,
+and can optionally expose Cube's APIs to your network so that no Cube traffic
+ever crosses the public internet.
 
 ## Bring Your Own Cloud (BYOC)
 
@@ -45,9 +45,8 @@ network, and each has its own connectivity story:
   Cube uses these connections to query the things it needs to function:
   databases and warehouses, auth providers (e.g. an internal OIDC issuer),
   upstream BI APIs that Semantic Layer Sync targets, and any other service the
-  Cube data plane has to reach. PrivateLink, Private Link, Private Service
-  Connect, and Peering on the provider pages below all configure backend
-  connectivity.
+  Cube data plane has to reach. PrivateLink, Private Link, and Private Service
+  Connect on the provider pages below all configure backend connectivity.
 - **Frontend connectivity** — traffic that flows **from your network into
   Cube**. Anything that needs to query Cube falls in this bucket: the Cube UI
   running in employee browsers, application servers, BI tools, embedded
@@ -57,7 +56,7 @@ network, and each has its own connectivity story:
   equivalent patterns are available on Azure and GCP on request.
 
 Most enterprise deployments end up using both: a backend
-PrivateLink/PSC/peering into the customer's data network, plus a frontend
+PrivateLink/PSC into the customer's data network, plus a frontend
 private API endpoint so the Cube UI and BI tools talk to Cube over the same
 private fabric.
 

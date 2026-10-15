@@ -1,11 +1,11 @@
-<p align="center"><a href="https://cube.dev"><img src="https://i.imgur.com/zYHXm4o.png" alt="Cube.js" width="300px"></a></p>
+<p align="center"><a href="https://cube.dev"><img src="https://i.imgur.com/zYHXm4o.png" alt="Cube" width="300px"></a></p>
 
 [Website](https://cube.dev) • [Docs](https://docs.cube.dev) • [Blog](https://cube.dev/blog) • [Slack](https://slack.cube.dev) • [Twitter](https://twitter.com/the_cube_dev)
 
 [![npm version](https://badge.fury.io/js/%40cubejs-backend%2Fserver.svg)](https://badge.fury.io/js/%40cubejs-backend%2Fserver)
 [![GitHub Actions](https://github.com/cube-js/cube.js/workflows/Build/badge.svg)](https://github.com/cube-js/cube.js/actions?query=workflow%3ABuild+branch%3Amaster)
 
-# Cube.js MongoBI Driver
+# Cube MongoBI Driver
 
 Mysql2 based Javascript MongoBI driver.
 
@@ -13,8 +13,8 @@ Mysql2 based Javascript MongoBI driver.
 
 This package is **community supported** and should be used at your own risk. 
 
-While the Cube Dev team is happy to review and accept future community contributions, we don't have active plans for further development. This includes bug fixes unless they affect different parts of Cube.js. **We're looking for maintainers for this package.** If you'd like to become a maintainer, please contact us in Cube.js Slack.
+While the Cube Dev team is happy to review and accept future community contributions, we don't have active plans for further development. This includes bug fixes unless they affect different parts of Cube. **We're looking for maintainers for this package.** If you'd like to become a maintainer, please contact us in Cube Slack.
 
 ## License
 
-Cube.js MongoBI Driver is [Apache 2.0 licensed](./LICENSE).
+Cube MongoBI Driver is [Apache 2.0 licensed](./LICENSE).

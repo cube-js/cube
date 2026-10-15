@@ -66,9 +66,9 @@ const AccordionDetailsContent = memo(styled.div<{ $expanded: boolean }>`
     }
   }
 `);
-export const AccordionDetails = memo(function AccordionDetails(
+export const AccordionDetails = memo((
   props: AccordionDetailsProps
-): JSX.Element {
+): JSX.Element => {
   const { children, isLazy, size, isSeparated, isExpanded = false, styles } = props;
 
   const [innerExpandingState, setInnerExpandingState] = useState<

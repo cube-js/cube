@@ -1633,7 +1633,7 @@ async fn test_ungrouped_view_query_matches_rollup_covering_primary_key() -> Resu
         "expected `visitors.for_join` to be used, got SQL:\n{sql}"
     );
     assert_eq!(pre_aggrs[0].name(), "for_join");
-    assert_eq!(pre_aggrs[0].cube_name(), "visitors");
+    assert_eq!(pre_aggrs[0].cube_name().to_string(), "visitors");
 
     // The rows are the claim: one per raw visitor, not per (id, source) group.
     if let Some(result) = ctx

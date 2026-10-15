@@ -2,7 +2,7 @@
   "name": "@cubejs-backend/api-gateway",
   "description": "Cube API Gateway",
   "author": "Cube Dev, Inc.",
-  "version": "1.7.35",
+  "version": "1.8.6",
   "repository": {
     "type": "git",
     "url": "https://github.com/cube-js/cube.git",
@@ -18,23 +18,21 @@
     "unit": "CUBE_JS_NATIVE_API_GATEWAY_INTERNAL=true jest --coverage --forceExit dist/test",
     "build": "rm -rf dist && npm run tsc",
     "tsc": "tsc",
-    "watch": "tsc -w",
-    "lint": "eslint \"**/*.{ts,tsx}\"",
-    "lint:fix": "eslint --fix \"**/*.{ts,tsx}\""
+    "watch": "tsc -w"
   },
   "files": [
     "README.md",
     "dist/src/*"
   ],
   "dependencies": {
-    "@cubejs-backend/native": "1.7.35",
-    "@cubejs-backend/query-orchestrator": "1.7.35",
-    "@cubejs-backend/shared": "1.7.35",
+    "@cubejs-backend/native": "1.8.6",
+    "@cubejs-backend/query-orchestrator": "1.8.6",
+    "@cubejs-backend/shared": "1.8.6",
     "@ungap/structured-clone": "^0.3.4",
     "assert-never": "^1.4.0",
-    "body-parser": "^1.19.0",
+    "body-parser": "^1.20.8",
     "chrono-node": "2.6.2",
-    "express": "^4.21.1",
+    "express": "^4.22.2",
     "express-graphql": "^0.12.0",
     "graphql": "^15.8.0",
     "graphql-scalars": "^1.10.0",
@@ -53,7 +51,7 @@
     "zod": "^4.1.13"
   },
   "devDependencies": {
-    "@cubejs-backend/linter": "1.7.35",
+    "@cubejs-backend/linter": "1.8.6",
     "@types/express": "^4.17.21",
     "@types/jest": "^29",
     "@types/jsonwebtoken": "^9.0.2",
@@ -69,8 +67,5 @@
     "supertest": "^4.0.2",
     "typescript": "~6.0.3"
   },
-  "license": "Apache-2.0",
-  "eslintConfig": {
-    "extends": "../cubejs-linter"
-  }
+  "license": "Apache-2.0"
 }

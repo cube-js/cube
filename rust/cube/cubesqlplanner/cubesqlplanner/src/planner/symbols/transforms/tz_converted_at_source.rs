@@ -1,22 +1,23 @@
 use super::super::MemberSymbol;
+use crate::planner::MemberId;
 use cubenativeutils::CubeError;
 use std::collections::HashSet;
 use std::rc::Rc;
 
-/// Marks the time dimensions listed in `names` as timezone-converted
+/// Marks the time dimensions listed in `ids` as timezone-converted
 /// at the source, everywhere in the symbol tree: their value comes
 /// converted from a pre-aggregation rollup or an input CTE, so
 /// rendering must not apply the timezone conversion again.
 pub fn mark_tz_converted_at_source(
     symbol: &Rc<MemberSymbol>,
-    names: &HashSet<String>,
+    ids: &HashSet<MemberId>,
 ) -> Result<Rc<MemberSymbol>, CubeError> {
-    if names.is_empty() {
+    if ids.is_empty() {
         return Ok(symbol.clone());
     }
     symbol.apply_recursive(&|node| {
         if let MemberSymbol::TimeDimension(td) = node.as_ref() {
-            if !td.tz_converted_at_source() && names.contains(&node.full_name()) {
+            if !td.tz_converted_at_source() && ids.contains(node.id()) {
                 let mut new = (**td).clone();
                 new.tz_converted_at_source = true;
                 return Ok(Rc::new(MemberSymbol::TimeDimension(Rc::new(new))));

@@ -128,6 +128,7 @@ export async function extractFilesFromAzure(
   const csvFiles: string[] = [];
   const containerClient = blobServiceClient.getContainerClient(container);
   const blobsList = containerClient.listBlobsFlat({ prefix: `${tableName}` });
+
   for await (const blob of blobsList) {
     if (blob.name && (blob.name.endsWith('.csv.gz') || blob.name.endsWith('.csv'))) {
       const starts = new Date();

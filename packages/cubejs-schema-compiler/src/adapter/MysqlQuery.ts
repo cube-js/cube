@@ -260,8 +260,8 @@ export class MysqlQuery extends BaseQuery {
     // planner falls back to the portable VALUES/UNION ALL `time_series_select`
     // template, which also works on MySQL 5.6/5.7.
     //
-    // The template body becomes the content of `time_series AS (...)` CTE, so
-    // it self-references `time_series` for recursion (no nested WITH). The
+    // The template body becomes the content of the series CTE, so it
+    // self-references that CTE (`series_name`) for recursion (no nested WITH). The
     // outer WITH is emitted as `WITH RECURSIVE` because the
     // `generated_time_series_recursive` marker below is present.
     if (this.useGeneratedTimeSeries) {
@@ -271,7 +271,7 @@ export class MysqlQuery extends BaseQuery {
         'UNION ALL\n' +
         'SELECT DATE_ADD(date_from, INTERVAL {{ granularity }}),\n' +
         '       CAST(DATE_SUB(DATE_ADD(DATE_ADD(date_from, INTERVAL {{ granularity }}), INTERVAL {{ granularity }}), INTERVAL 1000 MICROSECOND) AS DATETIME(6))\n' +
-        'FROM time_series\n' +
+        'FROM {{ series_name }}\n' +
         'WHERE DATE_ADD(date_from, INTERVAL {{ granularity }}) <= TIMESTAMP({{ end }})';
 
       templates.statements.generated_time_series_with_cte_range_source =
@@ -283,7 +283,7 @@ export class MysqlQuery extends BaseQuery {
         'SELECT DATE_ADD(date_from, INTERVAL {{ granularity }}),\n' +
         '       CAST(DATE_SUB(DATE_ADD(DATE_ADD(date_from, INTERVAL {{ granularity }}), INTERVAL {{ granularity }}), INTERVAL 1000 MICROSECOND) AS DATETIME(6)),\n' +
         '       max_date\n' +
-        'FROM time_series\n' +
+        'FROM {{ series_name }}\n' +
         'WHERE DATE_ADD(date_from, INTERVAL {{ granularity }}) <= max_date';
 
       // Marker (presence-only) telling the Tesseract planner that the generated

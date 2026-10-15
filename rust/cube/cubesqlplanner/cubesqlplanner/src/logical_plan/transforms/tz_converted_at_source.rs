@@ -13,15 +13,15 @@ use std::rc::Rc;
 pub fn mark_tz_converted_at_source_in_schema(
     schema: &LogicalSchema,
 ) -> Result<Rc<LogicalSchema>, CubeError> {
-    let names = schema
+    let ids = schema
         .time_dimensions
         .iter()
-        .map(|d| d.full_name())
+        .map(|d| d.id().clone())
         .collect::<HashSet<_>>();
     let mark = |members: &Vec<Rc<MemberSymbol>>| {
         members
             .iter()
-            .map(|m| transforms::mark_tz_converted_at_source(m, &names))
+            .map(|m| transforms::mark_tz_converted_at_source(m, &ids))
             .collect::<Result<Vec<_>, _>>()
     };
     let mut new = schema.clone();

@@ -11,6 +11,7 @@ serde = { version = "1.0.217", features = ["derive", "rc"] }
 serde_json = "1.0.133"
 anyhow = "1.0"
 itertools = "0.13.0"
+hex = "0.4.3"
 indexmap = { version = "2.0", features = ["serde"] }
 
 [dependencies.neon]

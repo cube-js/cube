@@ -162,24 +162,29 @@ async fn test_bounded_no_granularity() {
               - "2024-01-20"
     "#};
 
-    let sql = ctx
-        .build_sql(query)
+    let (sql, params) = ctx
+        .build_sql_and_params(query)
         .expect("Should generate SQL for bounded rolling window");
 
     // Default offset 'end' anchors at the range end: the trailing interval shifts
     // the (strict) lower bound back, the leading interval shifts the (inclusive)
-    // upper bound forward.
+    // upper bound forward. Both are folded into the bound rather than applied
+    // around it, so the evidence is the shifted dates.
     assert!(
         !sql.contains("time_series"),
         "Without granularity should not reference time_series CTE, got: {sql}"
     );
+    let bounds = params
+        .iter()
+        .filter_map(|value| value.to_param_string())
+        .collect::<Vec<_>>();
     assert!(
-        sql.contains("- interval '3 day'"),
-        "Should subtract trailing interval '3 day', got: {sql}"
+        bounds.iter().any(|bound| bound.starts_with("2024-01-17")),
+        "Should subtract trailing interval '3 day', got {bounds:?} in: {sql}"
     );
     assert!(
-        sql.contains("+ interval '1 day'"),
-        "Should add leading interval '1 day', got: {sql}"
+        bounds.iter().any(|bound| bound.starts_with("2024-01-21")),
+        "Should add leading interval '1 day', got {bounds:?} in: {sql}"
     );
     assert!(
         sql.contains("created_at > ") && !sql.contains("created_at >= "),
@@ -246,19 +251,28 @@ async fn test_trailing_bounded_no_granularity() {
               - "2024-01-20"
     "#};
 
-    let sql = ctx
-        .build_sql(query)
+    let (sql, params) = ctx
+        .build_sql_and_params(query)
         .expect("Should generate SQL for trailing bounded rolling window");
 
     // Default offset 'end' anchors at the range end: trailing shifts the (strict)
-    // lower bound back; with no leading the upper bound is the inclusive range end.
+    // lower bound back; with no leading the upper bound is the inclusive range
+    // end. The shift is folded into the bound rather than applied around it.
+    let bounds = params
+        .iter()
+        .filter_map(|value| value.to_param_string())
+        .collect::<Vec<_>>();
     assert!(
-        sql.contains("- interval '7 day'"),
-        "Should subtract trailing interval '7 day', got: {sql}"
+        bounds.iter().any(|bound| bound.starts_with("2024-01-13")),
+        "Should subtract trailing interval '7 day', got {bounds:?} in: {sql}"
     );
     assert!(
-        !sql.contains("+ interval"),
-        "Should not have a leading interval, got: {sql}"
+        bounds.iter().any(|bound| bound.starts_with("2024-01-20")),
+        "Upper bound should be the inclusive range end, got {bounds:?} in: {sql}"
+    );
+    assert!(
+        !sql.contains("interval"),
+        "The frame should be folded into the bound, got: {sql}"
     );
     assert!(
         sql.contains("created_at > ") && !sql.contains("created_at >= "),

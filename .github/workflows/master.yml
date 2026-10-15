@@ -2,10 +2,11 @@ name: Master
 on:
   push:
     paths:
+      - '.github/actions/setup-yarn-1/**'
       - '.github/workflows/push.yml'
       - '.github/workflows/master.yml'
       - 'packages/**'
-      - '.eslintrc.js'
+      - '.oxlintrc.json'
       - '.prettierrc'
       - 'lerna.json'
       - 'package.json'
@@ -15,6 +16,9 @@ on:
       - 'rust/cubesql/**'
     branches:
       - master
+permissions:
+  contents: read
+
 jobs:
   latest-tag-sha:
     runs-on: ubuntu-24.04
@@ -53,7 +57,7 @@ jobs:
       - name: Install Rust
         uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
-          toolchain: 1.90.0
+          toolchain: 1.98.1
           # override: true # this is by default on
           rustflags: ""
           components: rustfmt
@@ -71,7 +75,7 @@ jobs:
       - name: Install Yarn
         run: npm install -g yarn
       - name: Set Yarn version
-        run: yarn policies set-version v1.22.22
+        uses: ./.github/actions/setup-yarn-1
         # We don't need to install all yarn deps to build native
       - name: Install cargo-cp-artifact
         run: npm install -g cargo-cp-artifact@0.1

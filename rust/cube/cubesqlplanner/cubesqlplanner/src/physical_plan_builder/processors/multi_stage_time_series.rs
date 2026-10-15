@@ -77,6 +77,7 @@ impl<'a> LogicalNodeProcessor<'a, MultiStageTimeSeries> for MultiStageTimeSeries
             };
 
             let time_series = TimeSeries::new(
+                time_series.name().clone(),
                 &time_dimension,
                 TimeSeriesSource::Calendar(CalendarPeriodSource::new(
                     Rc::new(QueryPlan::Select(source)),
@@ -116,6 +117,7 @@ impl<'a> LogicalNodeProcessor<'a, MultiStageTimeSeries> for MultiStageTimeSeries
         };
 
         let time_series = TimeSeries::new(
+            time_series.name().clone(),
             &time_dimension,
             TimeSeriesSource::Range(ts_date_range),
             granularity_obj,

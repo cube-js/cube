@@ -2,7 +2,7 @@ use cubenativeutils::CubeError;
 
 use super::pretty_print::*;
 use crate::planner::collectors::has_multi_stage_members;
-use crate::planner::MemberSymbol;
+use crate::planner::{MemberId, MemberSymbol};
 use std::fmt;
 use std::rc::Rc;
 
@@ -45,24 +45,24 @@ impl LogicalSchema {
 }
 
 impl LogicalSchema {
-    pub fn find_member_positions(&self, name: &str) -> Vec<usize> {
+    pub fn find_member_positions(&self, id: &MemberId) -> Vec<usize> {
         let mut result = Vec::new();
         for (i, m) in self.dimensions.iter().enumerate() {
-            if m.full_name() == name {
+            if m.id() == id {
                 result.push(i);
             }
         }
         for (i, m) in self.time_dimensions.iter().enumerate() {
-            if m.full_name() == name {
+            if m.id() == id {
                 result.push(i + self.dimensions.len());
             } else if let Ok(time_dimension) = m.as_time_dimension() {
-                if time_dimension.base_symbol().full_name() == name {
+                if time_dimension.base_symbol().id() == id {
                     result.push(i + self.dimensions.len());
                 }
             }
         }
         for (i, m) in self.measures.iter().enumerate() {
-            if m.full_name() == name {
+            if m.id() == id {
                 result.push(i + self.time_dimensions.len() + self.dimensions.len());
             }
         }
@@ -131,7 +131,7 @@ mod tests {
     use super::*;
     use crate::planner::symbols::TimeDimensionSymbol;
     use crate::test_fixtures::cube_bridge::MockSchema;
-    use crate::test_fixtures::test_utils::TestContext;
+    use crate::test_fixtures::test_utils::{member_id, TestContext};
 
     #[test]
     fn test_get_member_at_position_dimension() -> Result<(), CubeError> {
@@ -354,7 +354,7 @@ mod tests {
             .set_measures(vec![measure.clone()]);
 
         // Test dimension lookup
-        let dim_positions = logical_schema.find_member_positions("visitors.source");
+        let dim_positions = logical_schema.find_member_positions(&member_id("visitors.source"));
         assert_eq!(dim_positions.len(), 1);
         let retrieved_dim = logical_schema.get_member_at_position(dim_positions[0]);
         assert_eq!(
@@ -363,7 +363,8 @@ mod tests {
         );
 
         // Test time dimension lookup (by base name)
-        let time_dim_positions = logical_schema.find_member_positions("visitors.created_at");
+        let time_dim_positions =
+            logical_schema.find_member_positions(&member_id("visitors.created_at"));
         assert_eq!(time_dim_positions.len(), 1);
         let retrieved_time_dim = logical_schema.get_member_at_position(time_dim_positions[0]);
         assert_eq!(
@@ -372,7 +373,7 @@ mod tests {
         );
 
         // Test measure lookup
-        let measure_positions = logical_schema.find_member_positions("visitors.count");
+        let measure_positions = logical_schema.find_member_positions(&member_id("visitors.count"));
         assert_eq!(measure_positions.len(), 1);
         let retrieved_measure = logical_schema.get_member_at_position(measure_positions[0]);
         assert_eq!(

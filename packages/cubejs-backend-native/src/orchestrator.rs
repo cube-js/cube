@@ -8,7 +8,7 @@ use cubeorchestrator::transport::{JsRawColumnarData, TransformDataRequest};
 use cubesql::compile::engine::df::scan::{ColumnarValueObject, FieldValue};
 use cubesql::CubeError;
 use neon::context::{Context, FunctionContext, ModuleContext};
-use neon::handle::Handle;
+use neon::handle::{Handle, Root};
 use neon::object::Object;
 use neon::prelude::{
     JsArray, JsArrayBuffer, JsBox, JsBuffer, JsFunction, JsObject, JsPromise, JsResult, JsString,
@@ -237,15 +237,62 @@ fn extract_query_result(
     }
 }
 
+/// Zero-copy view of a JS `Buffer` that keeps it rooted.
+struct JsBufferView {
+    root: Root<JsBuffer>,
+    ptr: *const u8,
+    len: usize,
+}
+
+// SAFETY: `ptr` is only read, and the `Root` keeps its backing store alive; GC never moves
+// ArrayBuffer backing stores.
+unsafe impl Send for JsBufferView {}
+
+impl JsBufferView {
+    fn new<'a, C: Context<'a>>(cx: &mut C, buffer: Handle<'a, JsBuffer>) -> Self {
+        let slice = buffer.as_slice(cx);
+        let (ptr, len) = (slice.as_ptr(), slice.len());
+
+        Self {
+            root: buffer.root(cx),
+            ptr,
+            len,
+        }
+    }
+
+    /// # Safety
+    /// JS must not mutate, detach or transfer the buffer while the slice is in use.
+    unsafe fn as_slice(&self) -> &[u8] {
+        // N-API may return null for an empty buffer.
+        if self.len == 0 {
+            &[]
+        } else {
+            std::slice::from_raw_parts(self.ptr, self.len)
+        }
+    }
+
+    fn release<'a, C: Context<'a>>(self, cx: &mut C) {
+        self.root.drop(cx);
+    }
+}
+
 pub fn parse_cubestore_result_message(mut cx: FunctionContext) -> JsResult<JsPromise> {
     let msg = cx.argument::<JsBuffer>(0)?;
-    let msg_data = msg.as_slice(&cx).to_vec();
+    let msg = JsBufferView::new(&mut cx, msg);
 
     let promise = cx
-        .task(move || QueryResult::from_cubestore_fb(&msg_data))
-        .promise(move |mut cx, res| match res {
-            Ok(result) => Ok(cx.boxed(Arc::new(result))),
-            Err(err) => cx.throw_error(err.to_string()),
+        .task(move || {
+            // SAFETY: JS doesn't mutate the message until the promise settles.
+            let res = QueryResult::from_cubestore_fb(unsafe { msg.as_slice() });
+            (msg, res)
+        })
+        .promise(move |mut cx, (msg, res)| {
+            msg.release(&mut cx);
+
+            match res {
+                Ok(result) => Ok(cx.boxed(Arc::new(result))),
+                Err(err) => cx.throw_error(err.to_string()),
+            }
         });
 
     Ok(promise)
@@ -269,8 +316,8 @@ pub fn get_cubestore_result(mut cx: FunctionContext) -> JsResult<JsValue> {
             let js_row = cx.execute_scoped(|mut cx| {
                 let js_row = JsObject::new(&mut cx);
 
-                for (col_idx, js_key) in js_keys.iter().enumerate() {
-                    let value = &columns[col_idx][row_idx];
+                for (js_key, column) in js_keys.iter().zip(columns.iter()) {
+                    let value = &column[row_idx];
                     let js_value: Handle<'_, JsValue> = match value {
                         DBResponsePrimitive::Null => cx.null().upcast(),
                         // For compatibility, we convert all primitives to strings

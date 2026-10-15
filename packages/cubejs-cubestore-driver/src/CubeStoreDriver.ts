@@ -196,7 +196,7 @@ export class CubeStoreDriver extends BaseDriver implements DriverInterface {
     }
 
     return this.query(sql, params, queryTracingObj).catch(e => {
-      e.message = `Error during create table: ${sql}: ${e.message}`;
+      e.message = `Error during create table ${tableName}: ${e.message}`;
       throw e;
     });
   }
@@ -299,8 +299,10 @@ export class CubeStoreDriver extends BaseDriver implements DriverInterface {
     }
 
     await this.createTableWithOptions(table, columns, { indexes: indexesSql, aggregations, buildRangeEnd: queryTracingObj?.buildRangeEnd }, queryTracingObj);
+
     try {
       const batchSize = 2000; // TODO make dynamic?
+
       for (let j = 0; j < Math.ceil(tableData.rows.length / batchSize); j++) {
         const currentBatchSize = Math.min(tableData.rows.length - j * batchSize, batchSize);
         const indexArray = Array.from({ length: currentBatchSize }, (v, i) => i);
@@ -374,6 +376,7 @@ export class CubeStoreDriver extends BaseDriver implements DriverInterface {
     }
 
     const tempFiles: string[] = [];
+
     try {
       const pipelinePromises: Promise<any>[] = [];
       const filePromises: Promise<string>[] = [];
@@ -387,10 +390,6 @@ export class CubeStoreDriver extends BaseDriver implements DriverInterface {
 
       const { baseUrl } = this;
       let fileCounter = 0;
-
-      this.createTableSql(table, columns);
-      // eslint-disable-next-line no-unused-vars
-      const createTableSqlWithoutLocation = this.createTableSqlWithOptions(table, columns, options);
 
       const getFileStream = () => {
         if (!currentFileStream) {
@@ -411,7 +410,7 @@ export class CubeStoreDriver extends BaseDriver implements DriverInterface {
               }).then(async res => {
                 if (res.status !== 200) {
                   const error = await res.json();
-                  throw new Error(`Error during upload of ${fileName} create table: ${createTableSqlWithoutLocation}: ${error.error}`);
+                  throw new Error(`Error during upload of ${fileName}: ${error.error}`);
                 }
                 return fileName;
               }));
@@ -493,6 +492,7 @@ export class CubeStoreDriver extends BaseDriver implements DriverInterface {
 
     if (tableData.partitions) {
       locations = [];
+
       for (let i = 0; i < tableData.partitions; i++) {
         locations.push(`stream://${tableData.streamingSource.name}/${tableData.streamingTable}/${i}`);
       }

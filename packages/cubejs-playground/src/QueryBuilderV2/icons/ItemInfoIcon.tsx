@@ -7,10 +7,10 @@ interface ItemInfoIconProps {
   description?: ReactNode;
 }
 
-export const ItemInfoIcon = memo(function InfoIcon({
+export const ItemInfoIcon = memo(({
   color = 'dark-02',
   description,
-}: ItemInfoIconProps) {
+}: ItemInfoIconProps) => {
   const icon = <InfoCircleOutlined style={{ color: `var(--${color}-color)` }} />;
 
   if (typeof description === 'string') {

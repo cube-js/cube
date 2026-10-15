@@ -9,7 +9,7 @@ import R from 'ramda';
 import { isPredefinedGranularity } from '@cubejs-backend/shared';
 import { MetaConfig, MetaConfigMap, toConfigMap } from './to-config-map';
 import { MemberType } from '../types/strings';
-import { MemberType as MemberTypeEnum } from '../types/enums';
+import { MemberTypeEnum } from '../types/enums';
 import { MemberExpression } from '../types/query';
 
 type GranularityMeta = {

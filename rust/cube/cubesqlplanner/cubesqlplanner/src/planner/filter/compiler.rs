@@ -3,8 +3,10 @@ use super::FilterOperator;
 use crate::cube_bridge::base_query_options::{FilterItem as NativeFilterItem, FilterValue};
 use crate::planner::filter::{FilterGroup, FilterGroupOperator, FilterItem};
 use crate::planner::query_tools::QueryTools;
-use crate::planner::{Compiler, MemberSymbol};
+use crate::planner::time_dimension::{resolve_relative_date_range, QueryDateTimeHelper};
+use crate::planner::{Compiler, MemberSymbol, SymbolPath, SymbolPathType, TimeDimensionSymbol};
 use cubenativeutils::CubeError;
+use std::collections::HashMap;
 use std::rc::Rc;
 use std::str::FromStr;
 
@@ -19,6 +21,10 @@ pub struct FilterCompiler<'a> {
     dimension_filters: Vec<FilterItem>,
     time_dimension_filters: Vec<FilterItem>,
     measures_filters: Vec<FilterItem>,
+    member_paths: HashMap<String, SymbolPath>,
+    // Set while compiling a data-model `include`, whose relative date values
+    // never pass through the REST API's resolution.
+    resolve_relative_dates: bool,
 }
 
 impl<'a> FilterCompiler<'a> {
@@ -29,13 +35,11 @@ impl<'a> FilterCompiler<'a> {
             dimension_filters: vec![],
             time_dimension_filters: vec![],
             measures_filters: vec![],
+            member_paths: HashMap::new(),
+            resolve_relative_dates: false,
         }
     }
 
-    // TODO classify time-dimension filters into `time_dimension_filters` so
-    // callers like the multi-stage `filter:` directive can route them to
-    // `QueryProperties::time_dimensions_filters` instead of treating every
-    // include as a plain dimension filter.
     pub fn add_item(&mut self, item: &NativeFilterItem) -> Result<(), CubeError> {
         if let Some(item_type) = self.get_item_type(item, &None)? {
             let compiled_item = self.compile_item(item, &item_type)?;
@@ -45,6 +49,65 @@ impl<'a> FilterCompiler<'a> {
             }
         }
         Ok(())
+    }
+
+    /// Like `add_item`, but a date range on a time dimension goes to
+    /// `time_dimension_filters`, where it bounds rolling windows the way a
+    /// query's `dateRange` does. Used for the multi-stage `filter.include`.
+    pub fn add_include_item(&mut self, item: &NativeFilterItem) -> Result<(), CubeError> {
+        self.resolve_relative_dates = true;
+        let result = self.add_include_item_impl(item);
+        self.resolve_relative_dates = false;
+        result
+    }
+
+    fn add_include_item_impl(&mut self, item: &NativeFilterItem) -> Result<(), CubeError> {
+        // Include entries are ANDed already, so a top-level `and` splits into them.
+        if let Some(items) = &item.and {
+            for item in items {
+                self.add_include_item_impl(item)?;
+            }
+            return Ok(());
+        }
+        if let Some(FilterType::Dimension) = self.get_item_type(item, &None)? {
+            let compiled_item = self.compile_item(item, &FilterType::Dimension)?;
+            match self.as_time_dimension_date_range(&compiled_item)? {
+                Some(filter) => self.time_dimension_filters.push(filter),
+                None => self.dimension_filters.push(compiled_item),
+            }
+            return Ok(());
+        }
+        self.add_item(item)
+    }
+
+    /// The filter re-targeted at the time dimension without granularity, the
+    /// member a query's `dateRange` filters, so rollups match it as well.
+    fn as_time_dimension_date_range(
+        &self,
+        item: &FilterItem,
+    ) -> Result<Option<FilterItem>, CubeError> {
+        let FilterItem::Item(filter) = item else {
+            return Ok(None);
+        };
+        let member = filter.member_evaluator();
+        let is_time = member
+            .clone()
+            .resolve_reference_chain()
+            .as_dimension()
+            .is_ok_and(|dimension| dimension.is_time());
+        if !is_time || !matches!(filter.filter_operator(), FilterOperator::InDateRange) {
+            return Ok(None);
+        }
+        let time_dimension =
+            MemberSymbol::new_time_dimension(TimeDimensionSymbol::new(member, None, None, None));
+        Ok(Some(FilterItem::Item(BaseFilter::try_new(
+            self.query_tools.clone(),
+            time_dimension,
+            FilterType::Dimension,
+            FilterOperator::InDateRange,
+            Some(filter.values().clone()),
+            None,
+        )?)))
     }
 
     /// Lifts the optional `date_range` of a time-dimension request
@@ -107,20 +170,22 @@ impl<'a> FilterCompiler<'a> {
             Ok(FilterItem::Group(Rc::new(FilterGroup::new(op, items))))
         } else {
             if let (Some(member), Some(operator)) = (item.member(), &item.operator) {
-                let member_path = member.split(".").map(|m| m.to_string()).collect::<Vec<_>>();
-                let evaluator = if self.query_tools.cube_evaluator().is_measure(member_path)? {
+                let path = self.member_path(member)?;
+                let evaluator = if path.path_type() == &SymbolPathType::Measure {
                     self.evaluator_compiler
-                        .add_measure_evaluator(member.clone())?
+                        .add_measure_evaluator_by_path(path)?
                 } else {
                     self.evaluator_compiler
-                        .add_dimension_evaluator(member.clone())?
+                        .add_dimension_or_segment_by_path(path)?
                 };
+                let operator = FilterOperator::from_str(&operator)?;
+                let values = self.resolve_relative_dates(&operator, &item.values)?;
                 Ok(FilterItem::Item(BaseFilter::try_new(
                     self.query_tools.clone(),
                     evaluator,
                     item_type.clone(),
-                    FilterOperator::from_str(&operator)?,
-                    item.values.clone(),
+                    operator,
+                    values,
                     Some(&mut *self.evaluator_compiler),
                 )?))
             } else {
@@ -131,8 +196,58 @@ impl<'a> FilterCompiler<'a> {
         }
     }
 
-    fn get_item_type(
+    /// A single relative date value (`this month`, `last 7 days`, ...) becomes
+    /// absolute bounds in the query's time zone, as the REST API resolves it.
+    fn resolve_relative_dates(
         &self,
+        operator: &FilterOperator,
+        values: &Option<Vec<FilterValue>>,
+    ) -> Result<Option<Vec<FilterValue>>, CubeError> {
+        let Some(items) = values
+            .as_deref()
+            .filter(|_| self.resolve_relative_dates && is_date_operator(operator))
+        else {
+            return Ok(values.clone());
+        };
+        if let [FilterValue::Str(value)] = items {
+            if let Some((start, end)) =
+                resolve_relative_date_range(value, self.query_tools.timezone())?
+            {
+                let resolved = match operator {
+                    FilterOperator::BeforeDate | FilterOperator::AfterOrOnDate => vec![start],
+                    FilterOperator::BeforeOrOnDate | FilterOperator::AfterDate => vec![end],
+                    _ => vec![start, end],
+                };
+                return Ok(Some(resolved.into_iter().map(FilterValue::Str).collect()));
+            }
+        }
+        // Anything else has to be an absolute date, or it reaches the database as text.
+        for item in items {
+            if let FilterValue::Str(value) = item {
+                if QueryDateTimeHelper::parse_native_date_time(value).is_err() {
+                    return Err(CubeError::user(format!(
+                        "Can't parse date '{}'. Use an absolute date or one of: this / last / next <unit>, last / next <n> <units>, today, yesterday, tomorrow",
+                        value
+                    )));
+                }
+            }
+        }
+        Ok(values.clone())
+    }
+
+    // Resolved once per member: classifying a filter and compiling it both
+    // need the path, and resolving it calls into the data model.
+    fn member_path(&mut self, member: &String) -> Result<SymbolPath, CubeError> {
+        if let Some(path) = self.member_paths.get(member) {
+            return Ok(path.clone());
+        }
+        let path = SymbolPath::parse(self.query_tools.cube_evaluator().clone(), member)?;
+        self.member_paths.insert(member.clone(), path.clone());
+        Ok(path)
+    }
+
+    fn get_item_type(
+        &mut self,
         item: &NativeFilterItem,
         expected_type: &Option<FilterType>,
     ) -> Result<Option<FilterType>, CubeError> {
@@ -144,10 +259,8 @@ impl<'a> FilterCompiler<'a> {
             if let (Some(member), Some(operator)) = (item.member(), &item.operator) {
                 let operator = FilterOperator::from_str(&operator)?;
                 let is_measure_filter_op = matches!(operator, FilterOperator::MeasureFilter);
-                let member_path = member.split(".").map(|m| m.to_string()).collect::<Vec<_>>();
-                if self.query_tools.cube_evaluator().is_measure(member_path)?
-                    && !is_measure_filter_op
-                {
+                let path = self.member_path(member)?;
+                if path.path_type() == &SymbolPathType::Measure && !is_measure_filter_op {
                     Ok(Some(FilterType::Measure))
                 } else {
                     Ok(Some(FilterType::Dimension))
@@ -161,7 +274,7 @@ impl<'a> FilterCompiler<'a> {
     }
 
     fn get_item_type_from_vec(
-        &self,
+        &mut self,
         items: &Vec<NativeFilterItem>,
         expected_type: &Option<FilterType>,
     ) -> Result<Option<FilterType>, CubeError> {
@@ -180,4 +293,16 @@ impl<'a> FilterCompiler<'a> {
         }
         Ok(result)
     }
+}
+
+fn is_date_operator(operator: &FilterOperator) -> bool {
+    matches!(
+        operator,
+        FilterOperator::InDateRange
+            | FilterOperator::NotInDateRange
+            | FilterOperator::BeforeDate
+            | FilterOperator::AfterOrOnDate
+            | FilterOperator::BeforeOrOnDate
+            | FilterOperator::AfterDate
+    )
 }

@@ -10,7 +10,7 @@ Both options support private network connectivity to your data sources.
 
 ## Backend connectivity (Cube → your network)
 
-Use these options to give Cube private access to your data sources, auth
+Use this option to give Cube private access to your data sources, auth
 providers, BI APIs targeted by Semantic Layer Sync, and anything else Cube
 needs to query. See [Backend and frontend connectivity][backend-frontend] for
 the full picture.
@@ -18,8 +18,6 @@ the full picture.
 - [**Azure Private Link**][azure-private-link] — connect to data sources
   exposed through Azure Private Link Services without routing traffic over
   the public internet.
-- [**VNet Peering**][azure-vnet-peering] — establish a VNet peering connection
-  between the Cube VNet and your own VNet.
 
 ## Frontend connectivity (your clients → Cube)
 
@@ -36,7 +34,6 @@ If you'd like the entire Cube data plane to live inside your own Azure
 subscription, see [Bring Your Own Cloud on Azure][azure-byoc].
 
 [azure-private-link]: /admin/deployment/dedicated/azure/private-link
-[azure-vnet-peering]: /admin/deployment/dedicated/azure/vpc-peering
 [azure-byoc]: /admin/deployment/dedicated/azure/byoc
 [aws-private-api-connectivity]: /admin/deployment/dedicated/aws/private-api-connectivity
 [backend-frontend]: /admin/deployment/dedicated#backend-and-frontend-connectivity

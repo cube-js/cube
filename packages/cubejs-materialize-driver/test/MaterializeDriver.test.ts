@@ -92,6 +92,28 @@ describe('MaterializeDriver', () => {
     expect(v).toBeUndefined();
   });
 
+  // Key queries are inherited from PostgresDriver; Materialize has no key constraints,
+  // so they must come back empty or fail softly instead of breaking schema loading
+  test('schema detection with keys', async () => {
+    await driver.query('CREATE TABLE keys_test_orders (id INT, customer_id INT);', []);
+
+    const { public: publicSchema } = await driver.tablesSchemaV2();
+    expect(publicSchema.keys_test_orders).toEqual([
+      { name: 'customer_id', type: 'integer', attributes: [] },
+      { name: 'id', type: 'integer', attributes: [] },
+    ]);
+
+    const columns = await driver.getColumnsForSpecificTables([
+      { schema_name: 'public', table_name: 'keys_test_orders' },
+    ]);
+    expect(columns.map(({ column_name, attributes, foreign_keys }) => ({
+      column_name, attributes, foreign_keys,
+    })).sort((a, b) => a.column_name.localeCompare(b.column_name))).toEqual([
+      { column_name: 'customer_id', attributes: undefined, foreign_keys: [] },
+      { column_name: 'id', attributes: undefined, foreign_keys: [] },
+    ]);
+  });
+
   test('stream', async () => {
     await driver.uploadTable(
       'test.streaming_test',
@@ -156,8 +178,7 @@ describe('MaterializeDriver', () => {
     const data = await driver.query(`SHOW CLUSTER;`, []);
     expect(data).toEqual([
       {
-        'cluster': 'quickstart',
+        cluster: 'quickstart',
       }]);
   });
-
 });

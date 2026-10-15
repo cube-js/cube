@@ -1,0 +1,245 @@
+---
+title: Reusing a view measure across views
+description: Define a multi-fact measure once on a base view, then give it to other views with extends instead of copying it into each one.
+---
+
+## Use case
+
+A measure that combines two fact tables, such as a refund rate over `orders` and
+`returns`, can live on a cube or on a view. The [average order value
+recipe][ref-recipe-aov-placement] compares the two placements.
+
+**Put the measure on a cube when you can.** A cube measure is defined once, and
+every view that includes it gets it. This keeps [shared logic in
+cubes][ref-views-shared-logic]. Add the measure to each view with `includes`.
+
+**Put the measure on a view when the cubes must not reference each other.** For
+example, `orders` and `returns` belong to different teams, and you do not want
+one cube to name the other cube's measures. Then the measure is a [measure of a
+view][ref-view-measures]. When several views need it, for example one view per
+team, do not copy the measure into each view. Define it once on a base view,
+and let the other views [extend][ref-extending-views] the base view.
+
+<Warning>
+
+Multi-fact views and multi-stage measures are powered by Tesseract, the
+[next-generation data modeling engine][link-tesseract]. In versions before
+v1.7.0, it was not enabled by default.
+
+</Warning>
+
+## Data modeling
+
+This recipe uses the `orders`, `returns`, `customers` and `dates` cubes from
+[multi-fact views][ref-multi-fact-views]. `orders` and `returns` do not join to
+each other. Both join to `customers` and `dates`.
+
+The base view, `customer_metrics`, includes the members that `refund_rate`
+needs and the dimensions that both facts share. It defines `refund_rate` as a
+[`multi_stage`][ref-multi-stage] measure, as in [combining facts in one
+measure][ref-multi-fact-measure]. `public: false` hides the base view from
+data consumers.
+
+Each team's view extends `customer_metrics` and adds its own includes and
+folders:
+
+<CodeGroup>
+
+```yaml title="YAML"
+views:
+  - name: customer_metrics
+    public: false
+
+    cubes:
+      - join_path: orders
+        prefix: true
+        includes:
+          - total_amount
+
+      - join_path: returns
+        prefix: true
+        includes:
+          - total_refund
+
+      - join_path: customers
+        includes:
+          - city
+
+      - join_path: dates
+        includes:
+          - date
+
+    measures:
+      - name: refund_rate
+        type: number
+        multi_stage: true
+        sql: "{CUBE.returns_total_refund} / NULLIF({CUBE.orders_total_amount}, 0)"
+
+  - name: sales_overview
+    extends: customer_metrics
+    public: true
+
+    cubes:
+      - join_path: orders
+        prefix: true
+        includes:
+          - count
+          - status
+
+    folders:
+      - name: Orders
+        includes:
+          - orders_count
+          - orders_total_amount
+          - orders_status
+
+  - name: support_overview
+    extends: customer_metrics
+    public: true
+
+    cubes:
+      - join_path: returns
+        prefix: true
+        includes:
+          - count
+
+      - join_path: customers
+        includes:
+          - name
+```
+
+```javascript title="JavaScript"
+view(`customer_metrics`, {
+  public: false,
+
+  cubes: [
+    {
+      join_path: orders,
+      prefix: true,
+      includes: [`total_amount`]
+    },
+    {
+      join_path: returns,
+      prefix: true,
+      includes: [`total_refund`]
+    },
+    {
+      join_path: customers,
+      includes: [`city`]
+    },
+    {
+      join_path: dates,
+      includes: [`date`]
+    }
+  ],
+
+  measures: {
+    refund_rate: {
+      type: `number`,
+      multi_stage: true,
+      sql: `${CUBE.returns_total_refund} / NULLIF(${CUBE.orders_total_amount}, 0)`
+    }
+  }
+})
+
+view(`sales_overview`, {
+  extends: customer_metrics,
+  public: true,
+
+  cubes: [
+    {
+      join_path: orders,
+      prefix: true,
+      includes: [`count`, `status`]
+    }
+  ],
+
+  folders: [
+    {
+      name: `Orders`,
+      includes: [`orders_count`, `orders_total_amount`, `orders_status`]
+    }
+  ]
+})
+
+view(`support_overview`, {
+  extends: customer_metrics,
+  public: true,
+
+  cubes: [
+    {
+      join_path: returns,
+      prefix: true,
+      includes: [`count`]
+    },
+    {
+      join_path: customers,
+      includes: [`name`]
+    }
+  ]
+})
+```
+
+</CodeGroup>
+
+`sales_overview` gets these members:
+
+- From `customer_metrics`: `refund_rate`, `orders_total_amount`,
+  `returns_total_refund`, `city` and `date`.
+- From its own includes: `orders_count` and `orders_status`.
+
+`support_overview` gets the same members from `customer_metrics`, plus
+`returns_count` and `name`. The `refund_rate` definition exists only once.
+
+A child view gets each parameter that it does not set from its parent view,
+such as `public` and `description`. Set `public: true` on each child view, or
+the child view is hidden like the base view.
+
+## Result
+
+Query `refund_rate` through a child view, for example `sales_overview.refund_rate`
+grouped by `sales_overview.city`. Cube plans it the same way as
+`customer_metrics.refund_rate`:
+
+```text
+-- one aggregating subquery per fact, at the query's grain
+SUM(orders.amount)          GROUP BY city
+SUM(returns.refund_amount)  GROUP BY city
+-- final stage, once the two are joined on city
+total_refund / NULLIF(total_amount, 0)
+```
+
+## Trade-off: the child view gets all members of the base view
+
+A child view cannot select only some of the inherited members. It gets every
+include and every measure, dimension and folder of the base view:
+
+- **`excludes` does not remove an inherited member.** [`excludes`][ref-view-excludes]
+  applies only to the `cubes` item where you write it. If a child view excludes
+  a member that the base view includes or defines, the member stays in the
+  child view. Cube does not show an error.
+- **A redefined member overrides the inherited one only in the child view.** If
+  a child view defines a measure with the same name as a measure of the base
+  view, or a dimension with the same name as a dimension, the child's
+  definition applies in the child view. The base view keeps its own definition.
+- **A child member cannot use the name of an inherited included member.** For
+  example, a child view that defines its own `orders_total_amount` measure
+  fails to compile with `Included member 'orders_total_amount' conflicts with
+  existing member`.
+- **Folder names must be unique across the base and child views.** A child
+  view that adds a folder with the name of an inherited folder fails to compile
+  with `Found duplicate folder`.
+
+Keep the base view small. Include only the members that the shared measure
+needs and the dimensions that all child views share. Add team-specific
+members in the child views.
+
+[ref-recipe-aov-placement]: /recipes/data-modeling/average-order-value#where-to-put-the-measure
+[ref-views-shared-logic]: /docs/data-modeling/views#keep-shared-logic-in-cubes
+[ref-view-measures]: /reference/data-modeling/view#measures
+[ref-extending-views]: /docs/data-modeling/extending-cubes#extending-views
+[ref-multi-fact-views]: /docs/data-modeling/multi-fact-views
+[ref-multi-fact-measure]: /docs/data-modeling/multi-fact-views#combining-facts-in-one-measure
+[ref-multi-stage]: /reference/data-modeling/measures#multi_stage
+[ref-view-excludes]: /reference/data-modeling/view#includes-and-excludes
+[link-tesseract]: https://cube.dev/blog/introducing-tesseract

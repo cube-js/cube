@@ -1,3 +1,5 @@
+import Joi from 'joi';
+
 import { CubeValidator, functionFieldsPatterns } from '../../src/compiler/CubeValidator';
 import {
   CubeRefreshKey,
@@ -1795,6 +1797,111 @@ describe('Cube Validation', () => {
     });
   });
 
+  describe('Access Policy memberLevel includes/excludes:', () => {
+    const cubeValidator = new CubeValidator(new CubeSymbols());
+
+    const newCube = (memberLevel: any, rest: any = {}) => ({
+      name: 'TestCube',
+      fileName: 'test.js',
+      sql: () => 'SELECT * FROM test',
+      accessPolicy: [{
+        group: 'admin',
+        memberLevel,
+        ...rest,
+      }]
+    });
+
+    it('should allow memberLevel with includes', () => {
+      const result = cubeValidator.validate(newCube({ includes: ['status'] }), new ConsoleErrorReporter());
+      expect(result.error).toBeFalsy();
+    });
+
+    it('should allow memberLevel with an empty includes list', () => {
+      const result = cubeValidator.validate(newCube({ includes: [] }), new ConsoleErrorReporter());
+      expect(result.error).toBeFalsy();
+    });
+
+    it('should allow memberLevel with includes: "*"', () => {
+      const result = cubeValidator.validate(newCube({ includes: '*' }), new ConsoleErrorReporter());
+      expect(result.error).toBeFalsy();
+    });
+
+    it('should allow memberLevel with excludes', () => {
+      const result = cubeValidator.validate(newCube({ excludes: ['ssn'] }), new ConsoleErrorReporter());
+      expect(result.error).toBeFalsy();
+    });
+
+    it('should allow memberLevel with both includes and excludes', () => {
+      const result = cubeValidator.validate(
+        newCube({ includes: '*', excludes: ['ssn'] }),
+        new ConsoleErrorReporter()
+      );
+      expect(result.error).toBeFalsy();
+    });
+
+    it('should reject an empty memberLevel', () => {
+      const result = cubeValidator.validate(newCube({}), new ConsoleErrorReporter());
+      expect(result.error).toBeTruthy();
+      expect(result.error?.message).toContain('must define either includes or excludes');
+    });
+
+    // The motivating shape. The rule reads only memberLevel, so memberMasking is
+    // inert here: this pins that the combination stays rejected, not the masking
+    // no-op itself, which lives in applyRowLevelSecurity (server-core).
+    it('should reject an empty memberLevel paired with memberMasking', () => {
+      const result = cubeValidator.validate(
+        newCube({}, { memberMasking: { includes: ['ssn'] } }),
+        new ConsoleErrorReporter()
+      );
+      expect(result.error).toBeTruthy();
+      expect(result.error?.message).toContain('must define either includes or excludes');
+    });
+
+    // The wording has to stay true for a policy with rowLevel filters, where a
+    // granted member is still masked outside the granted rows.
+    it('should point at excludes for members that must always be masked', () => {
+      const result = cubeValidator.validate(newCube({}), new ConsoleErrorReporter());
+      expect(result.error?.message).toContain('unmasked on every row the policy grants');
+      expect(result.error?.message).toContain('must always be masked belongs in excludes');
+    });
+
+    // The message keeps Joi's label: errors are deduped by message text, so
+    // without it two broken policies in one cube collapse into a single line
+    // naming neither.
+    it('should name each offending policy when several are empty', () => {
+      const cube = {
+        name: 'TestCube',
+        fileName: 'test.js',
+        sql: () => 'SELECT * FROM test',
+        accessPolicy: [
+          { group: 'admin', memberLevel: {} },
+          { group: 'analyst', memberLevel: {} },
+        ]
+      };
+
+      const result = cubeValidator.validate(cube, new ConsoleErrorReporter());
+      expect(result.error).toBeTruthy();
+      expect(result.error?.message).toContain('accessPolicy[0].memberLevel');
+      expect(result.error?.message).toContain('accessPolicy[1].memberLevel');
+      expect(result.error?.message.match(/must define either includes or excludes/g)).toHaveLength(2);
+    });
+
+    it('should still allow a policy that omits memberLevel entirely', () => {
+      const cube = {
+        name: 'TestCube',
+        fileName: 'test.js',
+        sql: () => 'SELECT * FROM test',
+        accessPolicy: [{
+          group: 'admin',
+          rowLevel: { allowAll: true }
+        }]
+      };
+
+      const result = cubeValidator.validate(cube, new ConsoleErrorReporter());
+      expect(result.error).toBeFalsy();
+    });
+  });
+
   describe('Custom time format for time dimensions (strptime)', () => {
     it('time dimension with valid strptime format - correct', async () => {
       const cubeValidator = new CubeValidator(new CubeSymbols());
@@ -2717,5 +2824,95 @@ describe('Cube Validation', () => {
 
       expect(validationResult.error).toBeFalsy();
     });
+  });
+});
+
+describe('Cube Validation cache', () => {
+  class CollectingErrorReporter extends ErrorReporter {
+    public readonly messages: string[] = [];
+
+    public error(message: any) {
+      this.messages.push(String(message));
+    }
+  }
+
+  // Every schema's validate() comes from Joi's shared base prototype
+  const joiValidate = () => jest.spyOn(Object.getPrototypeOf(Joi.object()), 'validate');
+
+  const cube = (name: string, measureType: string) => ({
+    name,
+    sql: () => 'SELECT * FROM public.orders',
+    measures: {
+      count: { type: measureType },
+    },
+    dimensions: {
+      id: { sql: () => 'id', type: 'number', primaryKey: true },
+    },
+    fileName: 'orders.js',
+  });
+
+  afterEach(() => jest.restoreAllMocks());
+
+  it('skips the schema for an identical definition that already passed', () => {
+    const spy = joiValidate();
+
+    const first = new CubeValidator(new CubeSymbols()).validate(cube('cache_hit', 'count'), new CollectingErrorReporter());
+    const callsAfterFirst = spy.mock.calls.length;
+    const second = new CubeValidator(new CubeSymbols()).validate(cube('cache_hit', 'count'), new CollectingErrorReporter());
+
+    expect(first.error).toBeFalsy();
+    expect(second.error).toBeFalsy();
+    expect(callsAfterFirst).toBeGreaterThan(0);
+    expect(spy.mock.calls.length).toBe(callsAfterFirst);
+  });
+
+  it('matches a definition whose keys come in a different order', () => {
+    const reordered = {
+      fileName: 'orders.js',
+      dimensions: {
+        id: { primaryKey: true, type: 'number', sql: () => 'id' },
+      },
+      measures: {
+        count: { type: 'count' },
+      },
+      sql: () => 'SELECT * FROM public.orders',
+      name: 'cache_order',
+    };
+    new CubeValidator(new CubeSymbols()).validate(cube('cache_order', 'count'), new CollectingErrorReporter());
+
+    const spy = joiValidate();
+    expect(new CubeValidator(new CubeSymbols()).validate(reordered, new CollectingErrorReporter()).error).toBeFalsy();
+    expect(spy).not.toHaveBeenCalled();
+  });
+
+  it('validates a failing definition again and reports its errors every time', () => {
+    for (let i = 0; i < 2; i++) {
+      const reporter = new CollectingErrorReporter();
+      const result = new CubeValidator(new CubeSymbols()).validate(cube('cache_invalid', 'not_a_type'), reporter);
+
+      expect(result.error).toBeTruthy();
+      expect(reporter.messages.join('\n')).toMatch(/measures\.count/);
+    }
+  });
+
+  it('validates a definition again when anything in it changed', () => {
+    const validator = new CubeValidator(new CubeSymbols());
+    expect(validator.validate(cube('cache_changed', 'count'), new CollectingErrorReporter()).error).toBeFalsy();
+
+    const reporter = new CollectingErrorReporter();
+    expect(validator.validate(cube('cache_changed', 'not_a_type'), reporter).error).toBeTruthy();
+    expect(reporter.messages).not.toHaveLength(0);
+  });
+
+  it('sees inherited members of an extending cube', () => {
+    const parent = cube('cache_parent', 'count');
+    const child = Object.setPrototypeOf({ name: 'cache_child', fileName: 'child.js' }, parent);
+    expect(new CubeValidator(new CubeSymbols()).validate(child, new CollectingErrorReporter()).error).toBeFalsy();
+
+    const brokenParent = cube('cache_parent', 'not_a_type');
+    const brokenChild = Object.setPrototypeOf({ name: 'cache_child', fileName: 'child.js' }, brokenParent);
+    const joiResult = new CubeValidator(new CubeSymbols()).validate(brokenChild, new CollectingErrorReporter());
+
+    expect(joiResult.error).toBeTruthy();
   });
 });

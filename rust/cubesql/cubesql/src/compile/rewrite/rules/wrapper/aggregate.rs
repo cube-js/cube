@@ -292,6 +292,7 @@ impl WrapperRules {
                         "?out_measure_expr",
                         "?out_measure_alias",
                         "?alias_to_cube",
+                        "?input_data_source",
                     ),
                 )
             },
@@ -400,6 +401,7 @@ impl WrapperRules {
                     "?fun",
                     "?distinct",
                     "?cube_members",
+                    "?input_data_source",
                     "?replace_agg_type",
                     "?out_measure_alias",
                 ),
@@ -461,6 +463,7 @@ impl WrapperRules {
                     "?fun",
                     "?distinct",
                     "?cube_members",
+                    "?input_data_source",
                     "?replace_agg_type",
                     "?out_measure_alias",
                 ),
@@ -1161,10 +1164,17 @@ impl WrapperRules {
         out_expr_var: Var,
         out_alias_var: Var,
         alias_to_cube_var: Var,
+        input_data_source_var: Var,
         meta: &MetaContext,
         disable_strict_agg_type_match: bool,
     ) -> bool {
         let Some(alias) = original_expr_name(egraph, subst[original_expr_var]) else {
+            return false;
+        };
+        // Read before members are resolved, which holds the e-graph mutably
+        let Ok(context_data_source) =
+            Self::context_data_source(egraph, subst, input_data_source_var, meta)
+        else {
             return false;
         };
 
@@ -1225,6 +1235,10 @@ impl WrapperRules {
                                     &column.name,
                                 )
                             {
+                                if !Self::member_fits_data_source(context_data_source, meta, member)
+                                {
+                                    continue;
+                                }
                                 if let Some(measure) = meta.find_measure_with_name(member) {
                                     let Some(call_agg_type) = &call_agg_type else {
                                         // call_agg_type is None, rewrite as is
@@ -1296,6 +1310,7 @@ impl WrapperRules {
         out_expr_var: &'static str,
         out_alias_var: &'static str,
         alias_to_cube_var: &'static str,
+        input_data_source_var: &'static str,
     ) -> impl Fn(&mut CubeEGraph, &mut Subst) -> bool {
         let original_expr_var = var!(original_expr_var);
         let column_var = column_var.map(|v| var!(v));
@@ -1306,6 +1321,7 @@ impl WrapperRules {
         let out_expr_var = var!(out_expr_var);
         let out_alias_var = var!(out_alias_var);
         let alias_to_cube_var = var!(alias_to_cube_var);
+        let input_data_source_var = var!(input_data_source_var);
         let meta = self.meta_context.clone();
         let disable_strict_agg_type_match = self.config_obj.disable_strict_agg_type_match();
         move |egraph, subst| {
@@ -1320,6 +1336,7 @@ impl WrapperRules {
                 out_expr_var,
                 out_alias_var,
                 alias_to_cube_var,
+                input_data_source_var,
                 &meta,
                 disable_strict_agg_type_match,
             )
@@ -1403,6 +1420,7 @@ impl WrapperRules {
         fun_name_var: &'static str,
         distinct_var: &'static str,
         cube_members_var: &'static str,
+        input_data_source_var: &'static str,
         replace_agg_type_var: &'static str,
         out_measure_alias_var: &'static str,
     ) -> impl Fn(&mut CubeEGraph, &mut Subst) -> bool {
@@ -1412,6 +1430,7 @@ impl WrapperRules {
         let fun_name_var = var!(fun_name_var);
         let distinct_var = var!(distinct_var);
         let cube_members_var = var!(cube_members_var);
+        let input_data_source_var = var!(input_data_source_var);
         let replace_agg_type_var = var!(replace_agg_type_var);
         let out_measure_alias_var = var!(out_measure_alias_var);
 
@@ -1431,6 +1450,12 @@ impl WrapperRules {
             };
 
             let Some(alias) = original_expr_name(egraph, subst[aggr_expr_var]) else {
+                return false;
+            };
+            // Read before members are resolved, which holds the e-graph mutably
+            let Ok(context_data_source) =
+                Self::context_data_source(egraph, subst, input_data_source_var, &meta)
+            else {
                 return false;
             };
 
@@ -1466,6 +1491,10 @@ impl WrapperRules {
                         else {
                             continue;
                         };
+
+                        if !Self::member_fits_data_source(context_data_source, &meta, member) {
+                            continue;
+                        }
 
                         let Some(measure) = meta.find_measure_with_name(member) else {
                             continue;

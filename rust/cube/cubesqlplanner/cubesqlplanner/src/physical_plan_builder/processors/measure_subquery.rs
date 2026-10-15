@@ -1,28 +1,38 @@
-use super::super::{LogicalNodeProcessor, ProcessableNode, PushDownBuilderContext};
+use super::super::PushDownBuilderContext;
 use crate::logical_plan::MeasureSubquery;
 use crate::physical_plan::ReferencesBuilder;
 use crate::physical_plan::{Select, SelectBuilder};
 use crate::physical_plan_builder::PhysicalPlanBuilder;
+use crate::planner::filter::Filter;
 use crate::planner::symbols::transforms;
 use crate::planner::MeasureRenderModifier;
 use cubenativeutils::CubeError;
 use std::rc::Rc;
 
+/// Deliberately not a `ProcessableNode`: a measure subquery is only meaningful
+/// inside the aggregate that owns it, which is the only thing that knows the
+/// filters its sources must resolve their bindings against. Going through the
+/// generic `process_node` would lose them silently, so there is no way in.
 pub struct MeasureSubqueryProcessor<'a> {
     builder: &'a PhysicalPlanBuilder,
 }
 
-impl<'a> LogicalNodeProcessor<'a, MeasureSubquery> for MeasureSubqueryProcessor<'a> {
-    type PhysycalNode = Rc<Select>;
-    fn new(builder: &'a PhysicalPlanBuilder) -> Self {
+impl<'a> MeasureSubqueryProcessor<'a> {
+    pub fn new(builder: &'a PhysicalPlanBuilder) -> Self {
         Self { builder }
     }
 
-    fn process(
+    /// `filter_params_filters` are the enclosing keys subquery's filters. This
+    /// select applies no WHERE of its own - the keys subquery already
+    /// restricts the rows - but its sources' `FILTER_PARAMS` and `FILTER_GROUP`
+    /// bindings resolve against them, so both copies of the fact source render
+    /// the same predicate.
+    pub fn process(
         &self,
         measure_subquery: &MeasureSubquery,
         context: &PushDownBuilderContext,
-    ) -> Result<Self::PhysycalNode, CubeError> {
+        filter_params_filters: Option<Filter>,
+    ) -> Result<Rc<Select>, CubeError> {
         let query_tools = self.builder.query_tools();
         let from = self
             .builder
@@ -48,11 +58,9 @@ impl<'a> LogicalNodeProcessor<'a, MeasureSubquery> for MeasureSubqueryProcessor<
             select_builder.add_projection_member(&meas, None);
         }
 
+        select_builder.set_filter_params_filters(filter_params_filters);
+
         let select = Rc::new(select_builder.build(query_tools.clone(), context_factory));
         Ok(select)
     }
-}
-
-impl ProcessableNode for MeasureSubquery {
-    type ProcessorType<'a> = MeasureSubqueryProcessor<'a>;
 }

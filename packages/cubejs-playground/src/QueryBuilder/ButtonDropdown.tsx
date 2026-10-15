@@ -84,7 +84,7 @@ export function ButtonDropdown({
         }}
         disabled={disabled}
       />
-      <div onClick={onItemClick}>{overlay}</div>
+      <div role="presentation" onClick={onItemClick}>{overlay}</div>
     </TooltipTrigger>
   );
 }

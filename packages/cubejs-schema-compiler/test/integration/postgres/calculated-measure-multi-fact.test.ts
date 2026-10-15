@@ -114,6 +114,7 @@ cube(\`Rates\`, {
 
   async function expectQueryToFail(q) {
     await compiler.compile();
+
     try {
       const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, q);
       await dbRunner.testQuery(query.buildSqlAndParams());

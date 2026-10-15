@@ -17,7 +17,7 @@ impl CalcGroupDimsCollector {
     pub fn extract_result(self) -> Vec<Rc<MemberSymbol>> {
         self.calc_groups
             .into_iter()
-            .unique_by(|dim| dim.full_name())
+            .unique_by(|dim| dim.id().clone())
             .collect()
     }
 }
@@ -38,7 +38,7 @@ impl TraversalVisitor for CalcGroupDimsCollector {
             }
             MemberSymbol::TimeDimension(e) => return self.on_node_traverse(e.base_symbol(), &()),
             MemberSymbol::Measure(_) => {}
-            MemberSymbol::MemberExpression(_) => {}
+            MemberSymbol::MemberExpression(_) | MemberSymbol::Ref(_) => {}
         };
         Ok(Some(()))
     }
@@ -66,7 +66,7 @@ where
     let res = visitor
         .extract_result()
         .into_iter()
-        .unique_by(|s| s.full_name())
+        .unique_by(|s| s.id().clone())
         .collect();
     Ok(res)
 }

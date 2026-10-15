@@ -309,7 +309,7 @@ fn ensure_member_in_annotation(
             concat!(
                 "You requested hidden member: '{}'. Please make it visible using `public: true`. ",
                 "Please note primaryKey fields are `public: false` by default: ",
-                "https://cube.dev/docs/schema/reference/joins#setting-a-primary-key."
+                "https://docs.cube.dev/reference/data-modeling/joins#setting-a-primary-key."
             ),
             member
         );

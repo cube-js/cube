@@ -7,6 +7,7 @@ use std::rc::Rc;
 
 /// Regular rolling window: trailing and/or leading bounds, plus a
 /// time-series offset.
+#[derive(Clone)]
 pub struct MultiStageRegularRollingWindow {
     pub trailing: Option<String>,
     pub leading: Option<String>,
@@ -29,6 +30,7 @@ impl PrettyPrint for MultiStageRegularRollingWindow {
 
 /// `to_date` rolling window — bounded by the start of the
 /// specified granularity (month-to-date, year-to-date, …).
+#[derive(Clone)]
 pub struct MultiStageToDateRollingWindow {
     pub granularity_obj: Rc<Granularity>,
 }
@@ -46,6 +48,7 @@ impl PrettyPrint for MultiStageToDateRollingWindow {
 
 /// Flavour of rolling-window calculation: regular trailing/leading
 /// window or a `to_date` window.
+#[derive(Clone)]
 pub enum MultiStageRollingWindowType {
     Regular(MultiStageRegularRollingWindow),
     ToDate(MultiStageToDateRollingWindow),

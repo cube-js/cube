@@ -1,0 +1,9 @@
+---
+source: cubesqlplanner/cubesqlplanner/src/tests/integration/view_members.rs
+expression: result
+---
+orders_view__name | orders_view__masked_total_const
+------------------+--------------------------------
+Alice             | -1                             
+Bob               | -1                             
+Diana             | -1

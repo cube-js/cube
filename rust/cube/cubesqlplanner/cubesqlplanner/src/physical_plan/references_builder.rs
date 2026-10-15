@@ -204,7 +204,7 @@ impl ReferencesBuilder {
 
         match &source.source {
             SingleSource::Cube(cube) => {
-                cube.name() == &member.cube_name() && cube.has_member(&member.name())
+                cube.cube_id() == &member.cube_id() && cube.has_member(&member.name())
             }
             _ => false,
         }

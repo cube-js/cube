@@ -47,6 +47,7 @@ impl State {
         convert_tz_for_raw_time_dimension: bool,
         masked_members: Option<Vec<MaskedMemberItem>>,
         member_to_alias: Option<HashMap<String, String>>,
+        max_member_resolution_depth: Option<usize>,
     ) -> Result<Rc<Self>, CubeError> {
         let query_tools = QueryTools::try_new(
             cube_evaluator.clone(),
@@ -64,6 +65,7 @@ impl State {
             security_context,
             query_tools.timezone(),
             member_to_alias,
+            max_member_resolution_depth,
         )));
 
         let result = Rc::new(Self {

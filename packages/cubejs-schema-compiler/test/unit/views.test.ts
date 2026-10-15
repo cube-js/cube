@@ -139,6 +139,7 @@ describe('Views YAML', () => {
         key: `Meta.key for ${name}`
       },
       ownedByCube: false,
+      included: true,
       sql: expect.any(Function),
       aliasMember: aliasName,
       format: 'imageUrl',
@@ -154,6 +155,7 @@ describe('Views YAML', () => {
         key: `Meta.key for ${name}`
       },
       ownedByCube: false,
+      included: true,
       sql: expect.any(Function),
       aliasMember: aliasName,
       format: 'number',

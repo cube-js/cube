@@ -1,18 +1,25 @@
 use std::io::Read;
+use std::path::{Component, Path, PathBuf};
 
 use anyhow::{bail, Context as _, Result};
 use serde_json::{Map, Value};
 
 use crate::client::Query;
+use crate::output;
 
-/// Parse a `--data` argument into a JSON object.
-///
-/// Accepts inline JSON (`'{"name": "x"}'`), `@path/to/file.json`, or `-`
-/// to read from stdin — the same convention as `gh api` / `curl -d`.
+/// Parse a `--data` argument into a JSON object; see [`parse_json_object`].
 pub fn parse_data(data: Option<&str>) -> Result<Map<String, Value>> {
     let Some(data) = data else {
         return Ok(Map::new());
     };
+    parse_json_object("--data", data)
+}
+
+/// Parse a JSON-object flag value, naming `flag` in errors.
+///
+/// Accepts inline JSON (`'{"name": "x"}'`), `@path/to/file.json`, or `-`
+/// to read from stdin — the same convention as `gh api` / `curl -d`.
+pub fn parse_json_object(flag: &str, data: &str) -> Result<Map<String, Value>> {
     let raw = if data == "-" {
         let mut buf = String::new();
         std::io::stdin().read_to_string(&mut buf)?;
@@ -22,10 +29,11 @@ pub fn parse_data(data: Option<&str>) -> Result<Map<String, Value>> {
     } else {
         data.to_string()
     };
-    let value: Value = serde_json::from_str(&raw).context("--data is not valid JSON")?;
+    let value: Value =
+        serde_json::from_str(&raw).with_context(|| format!("{flag} is not valid JSON"))?;
     match value {
         Value::Object(map) => Ok(map),
-        _ => bail!("--data must be a JSON object"),
+        _ => bail!("{flag} must be a JSON object"),
     }
 }
 
@@ -178,6 +186,29 @@ pub fn nonempty_ref(s: &str) -> Result<String, String> {
     Ok(s.to_string())
 }
 
+/// Reject a supplied-but-empty file path while preserving meaningful whitespace in
+/// names that really contain it. `-` remains valid for commands that use it as stdin.
+pub fn nonempty_path(s: &str) -> Result<String, String> {
+    if s.trim().is_empty() {
+        return Err(format!(
+            "{EMPTY_VALUE_REFUSED} names no file to read — pass a path or `-` for stdin"
+        ));
+    }
+
+    Ok(s.to_string())
+}
+
+/// Reject an empty path that is interpreted by the server rather than read locally.
+pub fn nonempty_repo_path(s: &str) -> Result<String, String> {
+    if s.trim().is_empty() {
+        return Err(format!(
+            "{EMPTY_VALUE_REFUSED} names no file in the deployment's data model repository"
+        ));
+    }
+
+    Ok(s.to_string())
+}
+
 /// `nonempty` with a message specific to a LIST FILTER — `dbt history --status`, and
 /// anything that follows it — where an empty value is neither a filter nor nothing at
 /// all: `push` sends `status=`, and every runs / no runs / a complaint are three answers
@@ -262,6 +293,22 @@ pub const COMPLAINT_LIMIT: usize = 120;
 /// runs well past 120 characters, and cutting it there would leave a gate's log saying
 /// that something failed without saying what.
 pub const REASON_LIMIT: usize = 800;
+
+/// Server text as a terminal may safely show it. Newlines and tabs survive for
+/// multi-line log output; other control characters, including ESC, do not.
+pub fn printable(text: &str) -> String {
+    text.chars()
+        .filter(|character| !character.is_control() || *character == '\n' || *character == '\t')
+        .collect()
+}
+
+/// How much of one server-supplied value a table cell keeps.
+pub const CELL_LIMIT: usize = 120;
+
+/// One bounded, printable line of server text for table cells and progress labels.
+pub fn one_cell(text: &str) -> String {
+    one_line(&printable(text), CELL_LIMIT)
+}
 
 /// Squash arbitrary server text into a single line.
 ///
@@ -378,6 +425,134 @@ pub fn parse_duration(s: &str) -> Result<std::time::Duration, String> {
     Ok(std::time::Duration::from_secs(seconds))
 }
 
+/// Read `what` from `path`, or from stdin for `-`; returns the text and where it came from.
+pub fn read_text(path: &str, what: &str) -> Result<(String, String)> {
+    if path == "-" {
+        let mut raw = String::new();
+        std::io::stdin()
+            .read_to_string(&mut raw)
+            .with_context(|| format!("failed to read {what} from stdin"))?;
+        return Ok((raw, "stdin".to_string()));
+    }
+
+    let raw = std::fs::read_to_string(path)
+        .with_context(|| format!("failed to read {what} from {path}"))?;
+    Ok((raw, path.to_string()))
+}
+
+/// Resolve a server-supplied path beneath `root`, refusing anything that would land
+/// outside it. Lexical only, deliberately: the check is about what the SERVER can
+/// name, not about what already exists, so symlinks are not resolved.
+pub fn resolve_within(root: &Path, raw: &str) -> Result<PathBuf> {
+    // No real file name has one, and the path is printed after it is written.
+    if raw.chars().any(char::is_control) {
+        bail!(
+            "refusing to write {}: the server returned a path with control characters",
+            raw.escape_debug()
+        );
+    }
+
+    let candidate = Path::new(raw);
+    if candidate.is_absolute() {
+        bail!("refusing to write the absolute path {raw} returned by the server");
+    }
+
+    for component in candidate.components() {
+        match component {
+            Component::Normal(_) => {}
+            Component::CurDir => {}
+            _ => bail!(
+                "refusing to write {raw}: it points outside {}",
+                root.display()
+            ),
+        }
+    }
+
+    if candidate.components().next().is_none() {
+        bail!("the server returned an empty file path");
+    }
+
+    Ok(root.join(candidate))
+}
+
+/// Write server-named files beneath `root` and return where each landed. Every path is
+/// resolved BEFORE any is written, so a rejected path cannot leave a half-written tree.
+pub fn write_files(root: &Path, files: &[(String, String)]) -> Result<Vec<PathBuf>> {
+    let targets = files
+        .iter()
+        .map(|(path, content)| resolve_within(root, path).map(|t| (t, content)))
+        .collect::<Result<Vec<_>>>()?;
+
+    for (target, content) in &targets {
+        if let Some(parent) = target.parent() {
+            std::fs::create_dir_all(parent)
+                .with_context(|| format!("could not create {}", parent.display()))?;
+        }
+
+        std::fs::write(target, content)
+            .with_context(|| format!("could not write {}", target.display()))?;
+    }
+
+    Ok(targets.into_iter().map(|(target, _)| target).collect())
+}
+
+/// The files that do not match what is beneath `root`, as (path, "missing" | "differs").
+pub fn differing_files(
+    root: &Path,
+    files: &[(String, String)],
+) -> Result<Vec<(String, &'static str)>> {
+    let mut differing = Vec::new();
+    for (path, content) in files {
+        let target = resolve_within(root, path)?;
+        match std::fs::read_to_string(&target) {
+            Ok(on_disk) if &on_disk == content => {}
+            Ok(_) => differing.push((path.clone(), "differs")),
+            // Only NotFound is "not committed yet". A permissions error or a
+            // directory in the way reported as "missing" would send the reader
+            // to re-run the write, which fails the same way.
+            Err(err) if err.kind() == std::io::ErrorKind::NotFound => {
+                differing.push((path.clone(), "missing"))
+            }
+            Err(err) => {
+                return Err(
+                    anyhow::Error::new(err).context(format!("could not read {}", target.display()))
+                );
+            }
+        }
+    }
+
+    Ok(differing)
+}
+
+/// Read the (path, content) pairs out of a generated-files payload.
+///
+/// `content` is taken as a REQUIRED string rather than through `output::field`,
+/// which yields `""` for an absent key. A file arriving without content would
+/// otherwise be written as a zero-byte file over the committed one, and the
+/// command would exit 0 — destroying working-copy content it was asked to
+/// produce. An absent key is a protocol error; `what` names the job in that error.
+pub fn read_generated_files(payload: &Value, what: &str) -> Result<Vec<(String, String)>> {
+    output::items(payload)
+        .iter()
+        .map(|file| {
+            let path = output::field(file, "path");
+            let Some(content) = file.get("content").and_then(Value::as_str) else {
+                bail!(
+                    "{what} returned a file with no content{}. Refusing to \
+                     write it, since doing so would empty a file you are about to commit",
+                    if path.is_empty() {
+                        String::new()
+                    } else {
+                        format!(" ({path})")
+                    }
+                );
+            };
+
+            Ok((path, content.to_string()))
+        })
+        .collect()
+}
+
 #[cfg(test)]
 mod tests {
     #[test]
@@ -397,6 +572,14 @@ mod tests {
         let cut = one_line(&long, 10);
         assert_eq!(cut.chars().count(), 11, "10 chars plus the ellipsis");
         assert!(cut.starts_with("xxxxxxxxxx"));
+    }
+
+    #[test]
+    fn table_cells_are_single_line_and_terminal_safe() {
+        assert_eq!(one_cell("first\n\u{1b}[2Jsecond"), "first [2Jsecond");
+        let bounded = one_cell(&"x".repeat(200));
+        assert_eq!(bounded.chars().count(), CELL_LIMIT + 1);
+        assert!(bounded.ends_with('…'));
     }
 
     #[test]
@@ -525,6 +708,17 @@ mod tests {
     }
 
     #[test]
+    fn parse_json_object_errors_name_the_flag() {
+        let not_object = parse_json_object("--security-context", "[1]").unwrap_err();
+        assert_eq!(
+            not_object.to_string(),
+            "--security-context must be a JSON object"
+        );
+        let not_json = parse_json_object("--security-context", "nope").unwrap_err();
+        assert_eq!(not_json.to_string(), "--security-context is not valid JSON");
+    }
+
+    #[test]
     fn normalize_url_defaults_to_https() {
         assert_eq!(
             normalize_url("cloud.cubecloud.dev"),
@@ -554,6 +748,16 @@ mod tests {
         assert!(nonempty_ref("main").is_ok());
         assert!(nonempty_ref("").is_err());
         assert!(nonempty_ref("\t").is_err());
+        assert_eq!(nonempty_path("manifest.json").unwrap(), "manifest.json");
+        assert_eq!(nonempty_path("-").unwrap(), "-");
+        assert!(nonempty_path("").is_err());
+        assert!(nonempty_path("  ").is_err());
+        assert_eq!(
+            nonempty_repo_path("eval_questions/a.yml").unwrap(),
+            "eval_questions/a.yml"
+        );
+        assert!(nonempty_repo_path("").is_err());
+        assert!(nonempty_repo_path("  ").is_err());
         assert_eq!(nonempty_filter("FAILED").unwrap(), "FAILED");
         assert!(nonempty_filter("").is_err());
         assert!(nonempty_filter("  ").is_err());
@@ -580,6 +784,17 @@ mod tests {
             vec!["cube", "dbt", "status", "1", "job", "--poll", "1s"],
             vec![
                 "cube",
+                "evals",
+                "run",
+                "1",
+                "--branch",
+                "x",
+                "--timeout",
+                "1h",
+            ],
+            vec!["cube", "evals", "status", "1", "2", "--poll", "1s"],
+            vec![
+                "cube",
                 "deployments",
                 "build-status",
                 "1",
@@ -596,6 +811,8 @@ mod tests {
         for args in [
             vec!["cube", "dbt", "sync", "1"],
             vec!["cube", "dbt", "status", "1", "job"],
+            vec!["cube", "evals", "run", "1", "--branch", "x"],
+            vec!["cube", "evals", "status", "1", "2"],
             vec!["cube", "deployments", "build-status", "1"],
         ] {
             assert!(crate::Cli::try_parse_from(args).is_ok());
@@ -760,6 +977,9 @@ mod tests {
                 // accepting an explicit empty value for them.
                 "cube dbt sync --branch",
                 "cube dbt sync --ref",
+                // An eval gate must never turn an unset pull-request branch variable
+                // into a run against an unnamed server-selected branch.
+                "cube evals run --branch",
             ],
             "the set of branch arguments refusing an empty value changed. Adding one is \
              `value_parser = util::nonempty` on the declaration; dropping one means a \
@@ -877,5 +1097,127 @@ mod tests {
             .to_string();
         assert!(err.contains("--limit/--page"), "got: {err}");
         assert!(err.contains("--first/--after"), "got: {err}");
+    }
+
+    #[test]
+    fn a_file_with_no_content_is_refused_rather_than_written_empty() {
+        // `output::field` yields "" for an absent key, so without an explicit read
+        // this item would be written as a zero-byte file OVER the committed one,
+        // and the command would exit 0 reporting success.
+        let payload = json!({"items": [
+            {"path": "model/cubes/dbt/orders.yml", "content": "cubes: []\n"},
+            {"path": "model/cubes/dbt/customers.yml"}
+        ]});
+
+        let err = read_generated_files(&payload, "dbt sync job-1")
+            .unwrap_err()
+            .to_string();
+        assert!(err.contains("no content"), "{err}");
+        assert!(err.contains("customers.yml"), "{err}");
+    }
+
+    #[test]
+    fn files_read_back_as_the_pairs_they_arrived_as() {
+        let payload = json!({"items": [
+            {"path": "model/cubes/dbt/orders.yml", "content": "cubes:\n  - name: orders\n"}
+        ]});
+
+        assert_eq!(
+            read_generated_files(&payload, "dbt sync job-1").unwrap(),
+            vec![(
+                "model/cubes/dbt/orders.yml".to_string(),
+                "cubes:\n  - name: orders\n".to_string()
+            )]
+        );
+    }
+
+    #[test]
+    fn generated_paths_stay_under_the_output_directory() {
+        let root = Path::new("/tmp/project");
+
+        assert_eq!(
+            resolve_within(root, "model/cubes/dbt/orders.yml").unwrap(),
+            Path::new("/tmp/project/model/cubes/dbt/orders.yml")
+        );
+
+        // The server names these paths, and this is the only place the CLI writes a
+        // remote-supplied path, so each of these would otherwise put a file wherever
+        // the shell user can write.
+        for hostile in [
+            "../outside.yml",
+            "model/../../outside.yml",
+            "/etc/passwd",
+            "",
+            // Printed after it is written, so it could drive the terminal.
+            "model/cubes/\u{1b}]0;pwned\u{7}.yml",
+        ] {
+            assert!(
+                resolve_within(root, hostile).is_err(),
+                "{hostile} should have been refused"
+            );
+        }
+    }
+
+    /// A fresh directory for one test, removed first in case an earlier run left it.
+    fn scratch(name: &str) -> PathBuf {
+        let dir = std::env::temp_dir().join(format!("cube-cli-util-{name}-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        dir
+    }
+
+    fn write(root: &Path, path: &str, content: &str) {
+        let target = root.join(path);
+        std::fs::create_dir_all(target.parent().unwrap()).unwrap();
+        std::fs::write(target, content).unwrap();
+    }
+
+    #[test]
+    fn a_hostile_path_writes_nothing_at_all() {
+        let root = scratch("hostile");
+        let files = vec![
+            (
+                "model/cubes/orders.yml".to_string(),
+                "cubes: []\n".to_string(),
+            ),
+            ("../outside.yml".to_string(), "x".to_string()),
+        ];
+
+        assert!(write_files(&root, &files).is_err());
+        // Every path is resolved before any is written, so the safe one was not written either.
+        assert!(!root.join("model").exists());
+
+        let _ = std::fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn check_reports_missing_and_differing_files() {
+        let root = scratch("check");
+        write(&root, "model/cubes/orders.yml", "cubes: []\n");
+        write(&root, "model/cubes/users.yml", "old\n");
+
+        let files = vec![
+            (
+                "model/cubes/orders.yml".to_string(),
+                "cubes: []\n".to_string(),
+            ),
+            ("model/cubes/users.yml".to_string(), "new\n".to_string()),
+            (
+                "model/views/sales.yml".to_string(),
+                "views: []\n".to_string(),
+            ),
+        ];
+        assert_eq!(
+            differing_files(&root, &files).unwrap(),
+            vec![
+                ("model/cubes/users.yml".to_string(), "differs"),
+                ("model/views/sales.yml".to_string(), "missing"),
+            ]
+        );
+
+        write_files(&root, &files).unwrap();
+        assert!(differing_files(&root, &files).unwrap().is_empty());
+
+        let _ = std::fs::remove_dir_all(root);
     }
 }

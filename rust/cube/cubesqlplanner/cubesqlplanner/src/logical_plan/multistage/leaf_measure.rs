@@ -27,7 +27,12 @@ impl PrettyPrint for MultiStageLeafMeasure {
         if !self.evaluation_context.time_shifts.is_empty() {
             result.println("time_shifts:", &state);
             let details_state = state.new_level();
-            for (_, time_shift) in self.evaluation_context.time_shifts.dimensions_shifts.iter() {
+            for time_shift in self
+                .evaluation_context
+                .time_shifts
+                .dimensions_shifts
+                .values()
+            {
                 result.println(
                     &format!(
                         "- {}: {}",

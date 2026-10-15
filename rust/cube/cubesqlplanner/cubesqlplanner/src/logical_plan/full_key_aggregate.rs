@@ -6,7 +6,7 @@ use typed_builder::TypedBuilder;
 
 /// Reference to a multi-stage CTE consumed by `FullKeyAggregate`:
 /// the CTE's name plus the symbols it exposes.
-#[derive(TypedBuilder)]
+#[derive(Clone, TypedBuilder)]
 pub struct MultiStageSubqueryRef {
     name: String,
     #[builder(default)]

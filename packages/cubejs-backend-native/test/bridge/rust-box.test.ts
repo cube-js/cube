@@ -28,6 +28,7 @@ describeBridge('bridge: NativeRustHandle / JsBox roundtrip', () => {
 
     it('survives many unwrap calls on the same handle', () => {
       const handle = createRustBoxProbe(7, 'persist');
+
       for (let i = 0; i < 100; i += 1) {
         const view = unwrapRustBoxProbe(handle);
         expect(view.value).toBe(7);

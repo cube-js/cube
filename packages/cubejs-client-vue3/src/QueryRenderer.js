@@ -129,14 +129,12 @@ export default {
         this.loading = true;
 
         const resultPromises = Promise.all(
-          toPairs(queries).map(([name, query]) =>
-            this.cubeApi
-              .load(query, {
-                mutexObj: this.mutexObj,
-                mutexKey: name,
-              })
-              .then((r) => [name, r])
-          )
+          toPairs(queries).map(([name, query]) => this.cubeApi
+            .load(query, {
+              mutexObj: this.mutexObj,
+              mutexKey: name,
+            })
+            .then((r) => [name, r]))
         );
 
         this.resultSet = fromPairs(await resultPromises);

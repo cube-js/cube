@@ -1,8 +1,8 @@
 use crate::cube_bridge::join_item::JoinItem;
 use crate::planner::state::State;
-use crate::planner::BaseCube;
 use crate::planner::MemberSymbol;
 use crate::planner::SqlCall;
+use crate::planner::{BaseCube, CubeId};
 use cubenativeutils::CubeError;
 use std::rc::Rc;
 
@@ -27,29 +27,28 @@ impl CommonUtils {
         let definition = join_item.join()?;
         let evaluator_compiler_cell = self.query_tools.compiler().clone();
         let mut evaluator_compiler = evaluator_compiler_cell.borrow_mut();
-        evaluator_compiler
-            .compile_sql_call(&join_item.static_data().original_from, definition.sql()?)
+        let from = CubeId::cube(join_item.static_data().original_from.clone());
+        evaluator_compiler.compile_sql_call(&from, definition.sql()?)
     }
 
     /// Resolves the planner-level `BaseCube` for the given cube path.
-    pub fn cube_from_path(&self, cube_path: String) -> Result<Rc<BaseCube>, CubeError> {
+    pub fn cube_from_path(&self, cube: &CubeId) -> Result<Rc<BaseCube>, CubeError> {
         let evaluator_compiler_cell = self.query_tools.compiler().clone();
         let mut evaluator_compiler = evaluator_compiler_cell.borrow_mut();
 
-        let evaluator =
-            evaluator_compiler.add_cube_table_evaluator(cube_path.to_string(), vec![])?;
+        let evaluator = evaluator_compiler.add_cube_table_evaluator(cube.clone(), vec![])?;
         BaseCube::try_new(
-            cube_path.to_string(),
+            cube.clone(),
             self.query_tools.query_tools().clone(),
             evaluator,
         )
     }
 
-    /// Primary-key dimensions of `cube_name` as planner
+    /// Primary-key dimensions of `cube_id` as planner
     /// `MemberSymbol`s.
     pub fn primary_keys_dimensions(
         &self,
-        cube_name: &String,
+        cube_id: &CubeId,
     ) -> Result<Vec<Rc<MemberSymbol>>, CubeError> {
         let evaluator_compiler_cell = self.query_tools.compiler().clone();
         let mut evaluator_compiler = evaluator_compiler_cell.borrow_mut();
@@ -58,14 +57,14 @@ impl CommonUtils {
             .cube_evaluator()
             .static_data()
             .primary_keys
-            .get(cube_name)
+            .get(cube_id.target())
             .cloned()
             .unwrap_or_else(|| vec![]);
 
         let dims = primary_keys
             .iter()
             .map(|d| -> Result<_, CubeError> {
-                let full_name = format!("{}.{}", cube_name, d);
+                let full_name = format!("{}.{}", cube_id, d);
                 let symbol = evaluator_compiler.add_dimension_evaluator(full_name.clone())?;
                 Ok(symbol)
             })

@@ -1,0 +1,196 @@
+import { TestBed } from '@angular/core/testing';
+import { firstValueFrom, BehaviorSubject, Subject } from 'rxjs';
+import { Meta, ResultSet, SqlQuery } from '@cubejs-client/core';
+
+import { CubeClient } from '../src/client';
+import { CubeClientModule } from '../src/module';
+
+import { metaResponse } from './meta-fixture';
+
+const loadResponse = {
+  queryType: 'regularQuery',
+  pivotQuery: { measures: ['Orders.count'], dimensions: [], queryType: 'regularQuery' },
+  results: [
+    {
+      query: { measures: ['Orders.count'], dimensions: [] },
+      data: [{ 'Orders.count': '10' }],
+      annotation: {
+        measures: { 'Orders.count': { title: 'Orders Count', type: 'number' } },
+        dimensions: {},
+        segments: {},
+        timeDimensions: {},
+      },
+    },
+  ],
+};
+
+const responses: Record<string, any> = {
+  load: loadResponse,
+  sql: { sql: { sql: ['SELECT 1', []] } },
+  'dry-run': { queryType: 'regularQuery', normalizedQueries: [] },
+  meta: metaResponse,
+};
+
+const noop = () => undefined;
+
+class StubTransport {
+  public readonly calls: string[] = [];
+
+  public request(method: string, _params: any) {
+    this.calls.push(method);
+
+    return {
+      subscribe: (cb: any) => Promise.resolve(
+        cb(
+          { status: 200, text: async () => JSON.stringify(responses[method]) },
+          noop
+        )
+      ),
+    };
+  }
+}
+
+function setup(config: any) {
+  TestBed.configureTestingModule({
+    imports: [CubeClientModule.forRoot(config)],
+  });
+
+  return TestBed.inject(CubeClient);
+}
+
+describe('CubeClient requests', () => {
+  let transport: StubTransport;
+
+  beforeEach(() => {
+    transport = new StubTransport();
+  });
+
+  afterEach(() => {
+    TestBed.resetTestingModule();
+  });
+
+  describe.each([
+    ['a plain config object', (t: StubTransport) => ({ token: 'token', options: { transport: t } })],
+    [
+      'a BehaviorSubject config',
+      (t: StubTransport) => new BehaviorSubject({ token: 'token', options: { transport: t } }),
+    ],
+  ])('with %s', (_name, makeConfig) => {
+    test('load resolves a ResultSet', async () => {
+      const client = setup(makeConfig(transport));
+
+      const resultSet = await firstValueFrom(client.load({ measures: ['Orders.count'] }));
+
+      expect(resultSet).toBeInstanceOf(ResultSet);
+      expect(resultSet.rawData()).toEqual([{ 'Orders.count': '10' }]);
+      expect(transport.calls).toEqual(['load']);
+    });
+
+    test('sql resolves a SqlQuery', async () => {
+      const client = setup(makeConfig(transport));
+
+      const sqlQuery = await firstValueFrom(client.sql({ measures: ['Orders.count'] }));
+
+      expect(sqlQuery).toBeInstanceOf(SqlQuery);
+      expect(sqlQuery.sql()).toBe('SELECT 1');
+      expect(transport.calls).toEqual(['sql']);
+    });
+
+    test('dryRun resolves the response', async () => {
+      const client = setup(makeConfig(transport));
+
+      await expect(
+        firstValueFrom(client.dryRun({ measures: ['Orders.count'] }))
+      ).resolves.toEqual(responses['dry-run']);
+      expect(transport.calls).toEqual(['dry-run']);
+    });
+
+    test('meta resolves a Meta', async () => {
+      const client = setup(makeConfig(transport));
+
+      const meta = await firstValueFrom(client.meta());
+
+      expect(meta).toBeInstanceOf(Meta);
+      expect(meta.cubes.map((cube) => cube.name)).toEqual(['Orders']);
+      expect(transport.calls).toEqual(['meta']);
+    });
+
+    test('watch emits a ResultSet per query emission', async () => {
+      const client = setup(makeConfig(transport));
+      const query = new Subject<any>();
+
+      const emitted = firstValueFrom(client.watch(query));
+      query.next({ measures: ['Orders.count'] });
+
+      expect(await emitted).toBeInstanceOf(ResultSet);
+      expect(transport.calls).toEqual(['load']);
+    });
+  });
+
+  test('a plain config is only read once, the api instance is reused', async () => {
+    let tokenReads = 0;
+    const client = setup({
+      get token() {
+        tokenReads++;
+
+        return 'token';
+      },
+      options: { transport },
+    });
+
+    await firstValueFrom(client.load({ measures: ['Orders.count'] }));
+    await firstValueFrom(client.load({ measures: ['Orders.count'] }));
+
+    expect(tokenReads).toBe(1);
+    expect(transport.calls).toEqual(['load', 'load']);
+  });
+
+  test('an observable config is only subscribed once, the api instance is reused', async () => {
+    const config = new BehaviorSubject({ token: 'token', options: { transport } });
+    const subscribeSpy = jest.spyOn(config, 'subscribe');
+    const client = setup(config);
+
+    await firstValueFrom(client.load({ measures: ['Orders.count'] }));
+    await firstValueFrom(client.load({ measures: ['Orders.count'] }));
+
+    expect(subscribeSpy).toHaveBeenCalledTimes(1);
+    expect(transport.calls).toEqual(['load', 'load']);
+  });
+
+  describe('with a bare Subject config', () => {
+    test('requests work once the config has emitted', async () => {
+      const config = new Subject<any>();
+      const client = setup(config);
+
+      config.next({ token: 'token', options: { transport } });
+
+      const resultSet = await firstValueFrom(client.load({ measures: ['Orders.count'] }));
+
+      expect(resultSet).toBeInstanceOf(ResultSet);
+      expect(transport.calls).toEqual(['load']);
+    });
+
+    test('requests before the first emission report a missing config', () => {
+      const client = setup(new Subject<any>());
+
+      expect(() => client.load({ measures: ['Orders.count'] })).toThrow(
+        /The config observable has not emitted yet/
+      );
+    });
+
+    test('a later emission replaces the api instance', async () => {
+      const config = new Subject<any>();
+      const client = setup(config);
+      const nextTransport = new StubTransport();
+
+      config.next({ token: 'token', options: { transport } });
+      await firstValueFrom(client.load({ measures: ['Orders.count'] }));
+
+      config.next({ token: 'next-token', options: { transport: nextTransport } });
+      await firstValueFrom(client.load({ measures: ['Orders.count'] }));
+
+      expect(transport.calls).toEqual(['load']);
+      expect(nextTransport.calls).toEqual(['load']);
+    });
+  });
+});

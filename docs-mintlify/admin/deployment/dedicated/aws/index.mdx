@@ -11,7 +11,7 @@ optionally, Cube API traffic — never traverses the public internet.
 
 ## Backend connectivity (Cube → your network)
 
-Use these options to give Cube private access to your data sources, auth
+Use this option to give Cube private access to your data sources, auth
 providers, BI APIs targeted by Semantic Layer Sync, and anything else Cube
 needs to query. See [Backend and frontend connectivity][backend-frontend] for
 the full picture.
@@ -19,8 +19,6 @@ the full picture.
 - [**AWS PrivateLink**][aws-private-link] — let Cube reach data sources (your
   own services, Snowflake, Databricks, etc.) over PrivateLink endpoint services
   you expose.
-- [**VPC Peering**][aws-vpc-peering] — establish a VPC peering connection
-  between the Cube VPC and your own VPC for access to internal data sources.
 
 ## Frontend connectivity (your clients → Cube)
 
@@ -37,7 +35,6 @@ If you'd like the entire Cube data plane to live inside your own AWS account,
 see [Bring Your Own Cloud on AWS][aws-byoc].
 
 [aws-private-link]: /admin/deployment/dedicated/aws/private-link
-[aws-vpc-peering]: /admin/deployment/dedicated/aws/vpc-peering
 [aws-private-api-connectivity]: /admin/deployment/dedicated/aws/private-api-connectivity
 [aws-byoc]: /admin/deployment/dedicated/aws/byoc
 [backend-frontend]: /admin/deployment/dedicated#backend-and-frontend-connectivity

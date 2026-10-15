@@ -10,6 +10,7 @@ use crate::cube_bridge::join_hints::JoinHintItem;
 use cubenativeutils::wrappers::serializer::{
     NativeDeserialize, NativeDeserializer, NativeSerialize,
 };
+use cubenativeutils::wrappers::NativeArray;
 use cubenativeutils::wrappers::NativeContextHolder;
 use cubenativeutils::wrappers::NativeObjectHandle;
 use cubenativeutils::CubeError;
@@ -43,6 +44,14 @@ pub trait BaseTools {
         &self,
         hints: Vec<JoinHintItem>,
     ) -> Result<Rc<dyn JoinDefinition>, CubeError>;
+
+    /// The join for `hints`, or none when the join graph has no path covering
+    /// them. A list, as the bridge has no optional return values.
+    #[nbridge(vec)]
+    fn try_join_tree_for_hints(
+        &self,
+        hints: Vec<JoinHintItem>,
+    ) -> Result<Vec<Rc<dyn JoinDefinition>>, CubeError>;
 
     fn compile_member_sql(
         &self,

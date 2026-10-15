@@ -48,34 +48,23 @@ impl SqlNode for FinalMeasureSqlNode {
         node_processor: Rc<dyn SqlNode>,
         templates: &PlanSqlTemplates,
     ) -> Result<String, CubeError> {
-        let res = match node.as_ref() {
-            MemberSymbol::Measure(ev) => {
-                let wrap = ev.kind().aggregate_wrap();
-                let child_visitor = match wrap {
-                    AggregateWrap::PassThrough => visitor.clone(),
-                    AggregateWrap::Function(_)
-                    | AggregateWrap::CountDistinct
-                    | AggregateWrap::CountDistinctApprox
-                    | AggregateWrap::CountDistinctApproxState => {
-                        visitor.with_arg_needs_paren_safe(false)
-                    }
-                };
-                let input = self.input.to_sql(
-                    &child_visitor,
-                    node,
-                    query_tools.clone(),
-                    node_processor.clone(),
-                    templates,
-                )?;
-                self.apply_wrap(wrap, input, templates)?
-            }
-            _ => {
-                return Err(CubeError::internal(format!(
-                    "Measure filter node processor called for wrong node",
-                )));
-            }
+        let ev = node.as_measure()?;
+        let wrap = ev.kind().aggregate_wrap();
+        let child_visitor = match wrap {
+            AggregateWrap::PassThrough => visitor.clone(),
+            AggregateWrap::Function(_)
+            | AggregateWrap::CountDistinct
+            | AggregateWrap::CountDistinctApprox
+            | AggregateWrap::CountDistinctApproxState => visitor.with_arg_needs_paren_safe(false),
         };
-        Ok(res)
+        let input = self.input.to_sql(
+            &child_visitor,
+            node,
+            query_tools.clone(),
+            node_processor.clone(),
+            templates,
+        )?;
+        self.apply_wrap(wrap, input, templates)
     }
 
     fn as_any(self: Rc<Self>) -> Rc<dyn Any> {

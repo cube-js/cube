@@ -35,8 +35,8 @@ export default function FilterInput({
   const Filter = FilterInputs[member.dimension.type] || FilterInputs.string;
 
   const ref = useRef(
-    debounce<(member: any, values: string[]) => void>(500, (member, values) => {
-      updateMethods.update(member, { ...member, values });
+    debounce<(member: any, values: string[]) => void>(500, (filterMember, values) => {
+      updateMethods.update(filterMember, { ...filterMember, values });
     })
   );
   const [values, setValues] = useState<string[]>(member.values);
@@ -46,9 +46,9 @@ export default function FilterInput({
       key="filter"
       disabled={disabled}
       values={values}
-      onChange={(values) => {
-        setValues(values);
-        ref.current(member, values);
+      onChange={(nextValues) => {
+        setValues(nextValues);
+        ref.current(member, nextValues);
       }}
     />
   );

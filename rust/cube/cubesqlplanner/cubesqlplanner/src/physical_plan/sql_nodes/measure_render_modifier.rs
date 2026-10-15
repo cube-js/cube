@@ -44,26 +44,20 @@ impl SqlNode for MeasureRenderModifierSqlNode {
         node_processor: Rc<dyn SqlNode>,
         templates: &PlanSqlTemplates,
     ) -> Result<String, CubeError> {
-        let chain = match node.as_ref() {
-            MemberSymbol::Measure(m) => match m.render_modifier() {
-                None => &self.aggregated,
-                Some(modifier @ MeasureRenderModifier::RollingMerge) => {
-                    modifier.ensure_applies_to(m)?;
-                    &self.rolling_merge
-                }
-                Some(MeasureRenderModifier::RawValue) => &self.raw_value,
-                Some(MeasureRenderModifier::UngroupedFinal) => &self.ungrouped_final,
-                Some(MeasureRenderModifier::MultiStageRank { .. })
-                | Some(MeasureRenderModifier::MultiStageWindow { .. }) => {
-                    return Err(CubeError::internal(format!(
-                        "Multi-stage window measure {} reached the render-modifier dispatcher instead of its dedicated node",
-                        m.full_name()
-                    )));
-                }
-            },
-            _ => {
+        let m = node.as_measure()?;
+        let chain = match m.render_modifier() {
+            None => &self.aggregated,
+            Some(modifier @ MeasureRenderModifier::RollingMerge) => {
+                modifier.ensure_applies_to(&m)?;
+                &self.rolling_merge
+            }
+            Some(MeasureRenderModifier::RawValue) => &self.raw_value,
+            Some(MeasureRenderModifier::UngroupedFinal) => &self.ungrouped_final,
+            Some(MeasureRenderModifier::MultiStageRank { .. })
+            | Some(MeasureRenderModifier::MultiStageWindow { .. }) => {
                 return Err(CubeError::internal(format!(
-                    "Measure render modifier node processor called for wrong node",
+                    "Multi-stage window measure {} reached the render-modifier dispatcher instead of its dedicated node",
+                    m.full_name()
                 )));
             }
         };

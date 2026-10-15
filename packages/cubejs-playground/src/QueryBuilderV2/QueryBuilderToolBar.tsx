@@ -68,12 +68,12 @@ export function QueryBuilderToolBar() {
       <Space height="min-content" placeContent="space-between">
         <Space gap="1x">
           <TooltipProvider
-            title={
+            title={(
               <>
                 <kbd>⌘</kbd> + <kbd>Enter</kbd> <span style={{ padding: '0 16px' }}>OR</span>{' '}
                 <kbd>Ctrl</kbd> + <kbd>Enter</kbd>
               </>
-            }
+            )}
           >
             <Button
               qa="RunQueryButton"

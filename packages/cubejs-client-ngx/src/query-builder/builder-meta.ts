@@ -6,33 +6,36 @@ import {
 } from '@cubejs-client/core';
 
 export class BuilderMeta {
-  measures: TCubeMeasure[];
-  dimensions: TCubeDimension[];
-  segments: TCubeSegment[];
-  timeDimensions: TCubeDimension[];
-  filters: Array<TCubeMeasure | TCubeDimension>;
+  public measures: TCubeMeasure[];
 
-  constructor(public readonly meta: Meta) {
+  public dimensions: TCubeDimension[];
+
+  public segments: TCubeSegment[];
+
+  public timeDimensions: TCubeDimension[];
+
+  public filters: Array<TCubeMeasure | TCubeDimension>;
+
+  public constructor(public readonly meta: Meta) {
     this.mapMeta();
   }
 
   private mapMeta() {
-    const allDimensions = <TCubeDimension[]>(
-      this.meta.membersForQuery(null, 'dimensions')
-    );
+    const allDimensions = this.meta.membersForQuery(
+      null,
+      'dimensions'
+    ) as TCubeDimension[];
 
-    this.measures = <TCubeMeasure[]>this.meta.membersForQuery(null, 'measures');
+    this.measures = this.meta.membersForQuery(null, 'measures') as TCubeMeasure[];
     this.segments = this.meta.membersForQuery(null, 'segments');
     this.dimensions = allDimensions.filter(({ type }) => type !== 'time');
     this.timeDimensions = allDimensions.filter(({ type }) => type === 'time');
-    this.filters = [...allDimensions, ...this.measures].map((member) => {
-      return {
-        ...member,
-        operators: this.meta.filterOperatorsForMember(member.name, [
-          'dimensions',
-          'measures',
-        ]),
-      };
-    });
+    this.filters = [...allDimensions, ...this.measures].map((member) => ({
+      ...member,
+      operators: this.meta.filterOperatorsForMember(member.name, [
+        'dimensions',
+        'measures',
+      ]),
+    }));
   }
 }
