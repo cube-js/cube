@@ -368,7 +368,6 @@ describe('QueryOrchestrator', () => {
     };
     // The mocks implement only the part of BaseDriver the orchestrator touches.
     const driverFactory = (dataSource: string) => mockDriverFor(dataSource) as unknown as BaseDriver;
-    const logger = testLogger;
     const options = (processUid) => ({
       externalDriverFactory: () => externalMockDriverLocal as unknown as BaseDriver,
       queryCacheOptions: {
@@ -389,9 +388,9 @@ describe('QueryOrchestrator', () => {
     });
 
     queryOrchestrator =
-      new TestQueryOrchestrator(redisPrefix, driverFactory, logger, options('p1'));
+      new TestQueryOrchestrator(redisPrefix, driverFactory, testLogger, options('p1'));
     queryOrchestratorExternalRefresh =
-      new TestQueryOrchestrator(redisPrefix, driverFactory, logger, {
+      new TestQueryOrchestrator(redisPrefix, driverFactory, testLogger, {
         ...options('p1'),
         preAggregationsOptions: {
           ...options('p1').preAggregationsOptions,
@@ -399,7 +398,7 @@ describe('QueryOrchestrator', () => {
         },
       });
     queryOrchestratorDropWithoutTouch =
-      new TestQueryOrchestrator(redisPrefix, driverFactory, logger, {
+      new TestQueryOrchestrator(redisPrefix, driverFactory, testLogger, {
         ...options('p1'),
         preAggregationsOptions: {
           ...options('p1').preAggregationsOptions,
