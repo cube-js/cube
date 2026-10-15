@@ -691,6 +691,40 @@ describe('driverVersion', () => {
     expect(await driver()).toMatchObject({ builtFrom: { password: 'b' } });
   });
 
+  test('a retry queued behind another swap is waited for, not failed with the earlier error', async () => {
+    let now = Date.parse('2026-01-01T00:00:00Z');
+    jest.spyOn(Date, 'now').mockImplementation(() => now);
+
+    const { request, driver } = createCore({ driverFactory: probeFallbackFactory });
+
+    await request();
+    await driver();
+
+    let failA = true;
+    const toB = gate();
+    onTestConnection = async (d) => {
+      if (d.builtFrom.password === 'a' && failA) {
+        throw new Error('bad credential a');
+      }
+      if (d.builtFrom.password === 'b') {
+        await toB.opened;
+      }
+    };
+
+    await expect(request('a')).rejects.toThrow('bad credential a');
+
+    now += 11 * 1000;
+    failA = false;
+    const servedB = request('b');
+    await waitFor(() => built.length === 3);
+    const servedA = request('a');
+
+    expect(await Promise.race([servedA.then(() => 'served', () => 'failed'), flush().then(() => 'waiting')])).toBe('waiting');
+
+    toB.open();
+    await Promise.all([servedA, servedB]);
+  });
+
   test('a request with a version fails rather than use the drivers the probe built', async () => {
     const { request, driver } = createCore({ driverFactory: probeFallbackFactory });
 

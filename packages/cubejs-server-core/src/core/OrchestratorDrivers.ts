@@ -7,6 +7,9 @@ import type { LoggerFn, OrchestratorOptions, QueueOptions, RequestContext } from
 /** A failed swap to one driver version is not retried for this long. */
 const SWAP_FAILURE_BACKOFF_MS = 10 * 1000;
 
+/** Swap errors kept for requests waiting on drivers built for no version, oldest dropped first. */
+const MAX_FAILURES_KEPT = 16;
+
 /** A swap back to the version replaced less than this long before the swap started is reported as ping-pong. */
 const SWAP_PING_PONG_MS = 5 * 1000;
 
@@ -83,7 +86,10 @@ export class OrchestratorDrivers {
 
   protected lastFailure: { version: string, at: number, reported: boolean } | undefined;
 
-  /** Why each version's latest swap failed, until a swap to it starts again or any installs. */
+  /**
+   * While no version is installed: why each version's latest swap failed, until it is
+   * queued or swapped to again. Read only by `awaitFirstVersion`.
+   */
   protected readonly failures: Map<string, unknown> = new Map();
 
   public constructor(protected readonly options: OrchestratorDriversOptions) {
@@ -238,6 +244,7 @@ export class OrchestratorDrivers {
     if (this.swapping) {
       // Keeps a newer version queued behind the one being built
       if (version !== this.swappingVersion) {
+        this.failures.delete(version);
         this.queued = { version, context, isLive };
       }
     } else if (!this.isBackingOff(version)) {
@@ -275,7 +282,10 @@ export class OrchestratorDrivers {
 
   protected recordFailure(version: string, error: unknown) {
     this.lastFailure = { version, at: Date.now(), reported: false };
-    this.failures.set(version, error);
+    if (this.version === undefined) {
+      this.failures.set(version, error);
+      this.failures.forEach((_, key) => this.failures.size > MAX_FAILURES_KEPT && this.failures.delete(key));
+    }
 
     this.options.logger('Driver Swap Error', {
       orchestratorId: this.options.orchestratorId,

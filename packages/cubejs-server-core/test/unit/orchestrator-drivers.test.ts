@@ -35,6 +35,13 @@ class LateLookupDrivers extends OrchestratorDrivers {
   }
 }
 
+/** Rejects every token but `ok`, and shows how many swap errors it keeps. */
+class FailingDrivers extends OrchestratorDrivers {
+  public get failuresKept(): number {
+    return this.failures.size;
+  }
+}
+
 const contextFor = (token: string): RequestContext => <RequestContext>{
   requestId: `request-${token}`,
   securityContext: { token },
@@ -61,5 +68,50 @@ describe('OrchestratorDrivers', () => {
     expect(drivers.lateLookup).toBeDefined();
     expect(<FakeDriver>(await drivers.getDriver('default'))).toMatchObject({ token: 'v2' });
     expect(<FakeDriver>(await drivers.getDriver('late'))).toMatchObject({ token: 'v2' });
+  });
+
+  function failingDrivers(version: string | undefined) {
+    const logger = jest.fn();
+
+    return new FailingDrivers({
+      orchestratorId: 'ORCHESTRATOR_ID',
+      context: contextFor('probe'),
+      version,
+      orchestratorOptions: {},
+      isCustomDriverFactory: () => true,
+      buildDriver: async (context) => {
+        const { token } = context.securityContext;
+        if (token !== 'probe' && token !== 'ok') {
+          throw new Error(`bad credential ${token}`);
+        }
+
+        return new FakeDriver(token);
+      },
+      releases: new SwappedDriverReleases(logger),
+      logger,
+    });
+  }
+
+  test('keeps a bounded number of swap errors while no version is installed', async () => {
+    const drivers = failingDrivers(undefined);
+    await drivers.getDriver('default');
+
+    for (let i = 0; i < 40; i++) {
+      await expect(drivers.ensureVersion(`v${i}`, contextFor(`v${i}`), () => true)).rejects.toThrow(`bad credential v${i}`);
+    }
+
+    expect(drivers.failuresKept).toEqual(16);
+  });
+
+  test('keeps no swap errors once a version is installed', async () => {
+    const drivers = failingDrivers('ok');
+    await drivers.getDriver('default');
+
+    for (let i = 0; i < 5; i++) {
+      await drivers.ensureVersion(`v${i}`, contextFor(`v${i}`), () => true);
+      await drivers.settled();
+    }
+
+    expect(drivers.failuresKept).toEqual(0);
   });
 });
