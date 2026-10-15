@@ -15,28 +15,43 @@ One measure plotted against a time or ordered dimension. The simplest and most c
 
 ### Multi-series
 
-Multiple lines plotted on the same axes. Map a second dimension to the **Color** channel to split one measure into one line per dimension value, or add multiple measures to the Y axis to plot them as separate series.
+Multiple lines plotted on the same axes. Pick a dimension in the measure's **Break down by** row to split it into one line per dimension value, or add more measures to plot them as separate series.
 
 {/* Screenshot: multi-series line chart — order count by week, split by order status (3–4 colored lines). Place directly below this heading, full-width. (hidden — replace this comment with <Frame><img src="..." /></Frame> when image is ready) */}
 
 ### With reference line
 
-A horizontal reference line marks a target, threshold, or benchmark. Added via the **Axes** section of the Style tab.
+A reference line marks a target, threshold, or benchmark. Add one from the axis's **Axis actions** menu on the Style tab.
 
 {/* Screenshot: line chart with a dashed reference line at a target value, label visible on the right side of the line. Place directly below this heading, full-width. (hidden — replace this comment with <Frame><img src="..." /></Frame> when image is ready) */}
 
+## Line appearance
+
+A line's row in its axis section on the Style tab carries the controls that shape it:
+
+| Control | Options |
+|---|---|
+| **Line style** | **Solid**, **Dashed**, **Dotted** — Auto assigns styles by list order |
+| **Point shape** | **Circle**, **Square**, **Triangle**, **Diamond**, **None** — Auto draws a marker-free line |
+| **Interpolation** | **Linear**, **Step**, **Smooth** |
+| **Trend line** | A dashed least-squares regression line in the measure's color |
+
+Line style earns its keep on a chart where color already belongs to a break-down: it tells the measures apart when their colors cannot.
+
 ## Reference lines
 
-Add a horizontal reference line in the **Y axis** section of the Style tab. Set the value, label, color, and line style (solid, dashed, or dotted). A labelled line also takes horizontal (start / middle / end) and vertical (above / below) placement for its text. Multiple reference lines are supported.
+Add a reference line from the **Axis actions** menu (⋮) in any axis header on the Style tab. Set the value, label, color, line width, and line style. A labeled line also takes horizontal (start / middle / end) and vertical (above / below) placement for its text. Multiple reference lines are supported on the same axis.
 
 {/* Screenshot: reference line configuration panel open — value field, label field, style dropdown. Place inline, 50% width, right-aligned. (hidden — replace this comment with <Frame><img src="..." /></Frame> when image is ready) */}
 
-See [Axes](/docs/explore-analyze/charts/configuration/axes) for the full configuration reference.
+See [Axes & series style](/docs/explore-analyze/charts/configuration/axes) for the full configuration reference.
 
 ## Axis behavior
 
-Line charts use a temporal X axis for time dimensions — continuous, time-aware, and not constrained to the result set. For non-time dimensions, the axis is ordinal and follows the result set sort order. Gaps in the line indicate missing data points.
+Line charts use a temporal dimension axis for time dimensions — continuous, time-aware, and not constrained to the result set. For non-time dimensions, the axis is ordinal and follows the result set sort order. Gaps in the line indicate missing data points.
+
+A line is drawn against a category axis whenever the chart also draws a bar, so the two marks always agree on the same bands.
 
 ## Combining with bars
 
-To layer a line on top of a bar chart, add a second series to the Y axis, set its mark type to **Line** in [series configuration](/docs/explore-analyze/charts/configuration/series-configuration), and assign it to the right Y axis for a dual-axis layout.
+Add a second measure from the **Measure actions** menu on the Fields tab, set its mark to **Line**, and assign it to the right axis for a dual-axis layout. The chart type reads **Composite** once the marks differ.
