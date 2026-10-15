@@ -87,7 +87,6 @@ const schemaOptions = Joi.object().keys({
   contextToGroups: Joi.func(),
   contextToOrchestratorId: Joi.func(),
   driverVersion: Joi.func(),
-  driverSwapReleaseDelay: Joi.number().min(0),
   contextToCubeStoreRouterId: Joi.func(),
   contextToDataSourceId: Joi.func(),
   contextToApiScopes: Joi.func(),
