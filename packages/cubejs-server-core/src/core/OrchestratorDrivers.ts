@@ -81,7 +81,7 @@ export class OrchestratorDrivers {
   /** The latest version asked for while a swap was running, started once it ends. */
   protected queued: { version: string, context: RequestContext, isLive: () => boolean } | undefined;
 
-  protected lastFailure: { version: string, at: number, reported: boolean } | undefined;
+  protected lastFailure: { version: string, at: number, reported: boolean, error: unknown } | undefined;
 
   public constructor(protected readonly options: OrchestratorDriversOptions) {
     this.context = options.context;
@@ -122,9 +122,9 @@ export class OrchestratorDrivers {
   }
 
   /**
-   * Starts a swap when `requested` differs from the version the drivers were built for,
-   * without waiting for it: the request is served by the current drivers. A failed
-   * version is not retried until the backoff passes.
+   * Starts a swap when `requested` differs from the version the drivers were built for.
+   * The request is served by the current drivers, unless they were built for no version
+   * (see `awaitFirstVersion`). A failed version is not retried until the backoff passes.
    */
   public async ensureVersion(
     requested: string,
@@ -149,7 +149,7 @@ export class OrchestratorDrivers {
 
     this.requestSwap(requested, context, isLive);
 
-    return this.version === undefined ? this.awaitFirstVersion(isLive) : 'ready';
+    return this.version === undefined ? this.awaitFirstVersion(requested, isLive) : 'ready';
   }
 
   /** Resolves once no swap is running or queued. */
@@ -208,15 +208,21 @@ export class OrchestratorDrivers {
    * Drivers built with no version, as from the readiness probe's empty context, may hold a
    * fallback credential, so a versioned request waits for its own and fails without them.
    */
-  protected async awaitFirstVersion(isLive: () => boolean): Promise<EnsureVersionResult> {
-    await this.settled();
+  protected async awaitFirstVersion(requested: string, isLive: () => boolean): Promise<EnsureVersionResult> {
+    while (this.swapping && this.version === undefined) {
+      await this.swapping;
+    }
 
     if (!isLive()) {
       return 'evicted';
     }
 
     if (this.version === undefined) {
-      throw new Error('No drivers could be built for this driverVersion. See the Driver Swap Error log.');
+      const { lastFailure } = this;
+
+      throw lastFailure?.version === requested
+        ? lastFailure.error
+        : new Error('Drivers built for no version cannot serve a request with a driverVersion, and no swap installed one.');
     }
 
     return 'ready';
@@ -251,7 +257,7 @@ export class OrchestratorDrivers {
         this.swappingVersion = undefined;
         this.startQueued();
       })
-      // Nothing else awaits it, so a throwing logger must not become an unhandled rejection
+      // Started without being awaited, so a throwing logger must not become an unhandled rejection
       .catch(() => undefined);
   }
 
@@ -265,7 +271,7 @@ export class OrchestratorDrivers {
   }
 
   protected recordFailure(version: string, error: unknown) {
-    this.lastFailure = { version, at: Date.now(), reported: false };
+    this.lastFailure = { version, at: Date.now(), reported: false, error };
 
     this.options.logger('Driver Swap Error', {
       orchestratorId: this.options.orchestratorId,
