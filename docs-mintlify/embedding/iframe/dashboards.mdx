@@ -169,6 +169,32 @@ https://your-tenant.cubecloud.dev/embed/dashboard/YOUR_DASHBOARD_PUBLIC_ID?sessi
 Like the header controls below, only the exact literal string `false` hides
 the menu; it has no effect unless `allowExport=true` is also set.
 
+### Downloads in a sandboxed iframe {#sandboxed-iframe-downloads}
+
+Every download is saved from inside the embed's iframe, so your page needs no
+extra configuration for it — unless you sandbox the iframe. A `sandbox`
+attribute blocks file downloads unless it includes `allow-downloads`:
+
+```html
+<iframe
+  title="Dashboard"
+  src="https://your-tenant.cubecloud.dev/embed/dashboard/YOUR_DASHBOARD_PUBLIC_ID?session=YOUR_SESSION_ID&allowExport=true"
+  sandbox="allow-scripts allow-same-origin allow-downloads"
+  width="100%"
+  height="800"
+></iframe>
+```
+
+- `allow-scripts allow-same-origin` are required for the embed to load at all.
+- `allow-downloads` is required for downloads. Without it, the browser drops
+  the file silently: the viewer clicks **Download** and nothing happens, with no
+  error shown.
+- A `Content-Security-Policy: sandbox …` response header on your page applies
+  the same restriction to the iframe, so add `allow-downloads` there too.
+- Other CSP directives on your page and `Permissions-Policy` do not affect
+  downloads. `frame-src` (or its `default-src` fallback) must still allow your
+  Cube tenant's origin for the embed to load at all.
+
 ## Show or hide the AI chat
 
 Embedded dashboards show an AI chat (the agent panel and its launcher bubble) by
