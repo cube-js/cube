@@ -81,7 +81,10 @@ export class OrchestratorDrivers {
   /** The latest version asked for while a swap was running, started once it ends. */
   protected queued: { version: string, context: RequestContext, isLive: () => boolean } | undefined;
 
-  protected lastFailure: { version: string, at: number, reported: boolean, error: unknown } | undefined;
+  protected lastFailure: { version: string, at: number, reported: boolean } | undefined;
+
+  /** Why each version's latest swap failed, until a swap to it starts again or any installs. */
+  protected readonly failures: Map<string, unknown> = new Map();
 
   public constructor(protected readonly options: OrchestratorDriversOptions) {
     this.context = options.context;
@@ -206,10 +209,11 @@ export class OrchestratorDrivers {
 
   /**
    * Drivers built with no version, as from the readiness probe's empty context, may hold a
-   * fallback credential, so a versioned request waits for its own and fails without them.
+   * fallback credential. A versioned request waits until a swap installs a version, and
+   * fails with its own swap's error once that fails.
    */
   protected async awaitFirstVersion(requested: string, isLive: () => boolean): Promise<EnsureVersionResult> {
-    while (this.swapping && this.version === undefined) {
+    while (this.swapping && this.version === undefined && !this.failures.has(requested)) {
       await this.swapping;
     }
 
@@ -218,10 +222,8 @@ export class OrchestratorDrivers {
     }
 
     if (this.version === undefined) {
-      const { lastFailure } = this;
-
-      throw lastFailure?.version === requested
-        ? lastFailure.error
+      throw this.failures.has(requested)
+        ? this.failures.get(requested)
         : new Error('Drivers built for no version cannot serve a request with a driverVersion, and no swap installed one.');
     }
 
@@ -244,6 +246,7 @@ export class OrchestratorDrivers {
   }
 
   protected startSwap(context: RequestContext, version: string, isLive: () => boolean) {
+    this.failures.delete(version);
     this.swappingVersion = version;
     this.swapping = this.swap(context, version, isLive)
       .then(
@@ -271,7 +274,8 @@ export class OrchestratorDrivers {
   }
 
   protected recordFailure(version: string, error: unknown) {
-    this.lastFailure = { version, at: Date.now(), reported: false, error };
+    this.lastFailure = { version, at: Date.now(), reported: false };
+    this.failures.set(version, error);
 
     this.options.logger('Driver Swap Error', {
       orchestratorId: this.options.orchestratorId,
@@ -462,6 +466,7 @@ export class OrchestratorDrivers {
   }
 
   protected recordSwap(context: RequestContext, version: string) {
+    this.failures.clear();
     this.context = context;
     this.previousVersion = this.version;
     this.version = version;

@@ -660,6 +660,37 @@ describe('driverVersion', () => {
     expect(await driver()).toMatchObject({ builtFrom: { password: 'b' } });
   });
 
+  test('a request whose own first swap fails gets its error, not the next queued swap', async () => {
+    const { request, swapped, driver } = createCore({ driverFactory: probeFallbackFactory });
+
+    await request();
+    await driver();
+
+    const toA = gate();
+    const toB = gate();
+    onTestConnection = async (d) => {
+      if (d.builtFrom.password === 'a') {
+        await toA.opened;
+        throw new Error('bad credential a');
+      }
+      if (d.builtFrom.password === 'b') {
+        await toB.opened;
+      }
+    };
+
+    const servedA = request('a');
+    await waitFor(() => built.length === 2);
+    const servedB = request('b');
+
+    toA.open();
+    await expect(servedA).rejects.toThrow('bad credential a');
+
+    toB.open();
+    await servedB;
+    await swapped();
+    expect(await driver()).toMatchObject({ builtFrom: { password: 'b' } });
+  });
+
   test('a request with a version fails rather than use the drivers the probe built', async () => {
     const { request, driver } = createCore({ driverFactory: probeFallbackFactory });
 
