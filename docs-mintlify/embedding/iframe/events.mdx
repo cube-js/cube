@@ -215,7 +215,10 @@ the exported rows themselves.
   whole-dashboard (PNG, PDF, print version) — only appear when the embed URL
   includes `allowExport=true` (see [Dashboards → Allow chart and dashboard
   export](/embedding/iframe/dashboards#allow-csv-export)). The event fires
-  when a viewer uses one of them.
+  when a viewer uses one of them. It reports that the viewer asked for a file,
+  not that the browser saved it: a [sandboxed
+  iframe](/embedding/iframe/dashboards#sandboxed-iframe-downloads) without
+  `allow-downloads` drops the file, and the event still fires.
 </Note>
 
 #### `cube:event:drilldown` {#cube-event-drilldown}
