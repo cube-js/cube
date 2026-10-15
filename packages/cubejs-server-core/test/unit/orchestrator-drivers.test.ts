@@ -55,7 +55,8 @@ describe('OrchestratorDrivers', () => {
     });
 
     await drivers.getDriver('default');
-    await drivers.ensureVersion('v2', contextFor('v2'), () => true);
+    drivers.ensureVersion('v2', contextFor('v2'), () => true);
+    await drivers.settled();
 
     expect(drivers.lateLookup).toBeDefined();
     expect(<FakeDriver>(await drivers.getDriver('default'))).toMatchObject({ token: 'v2' });

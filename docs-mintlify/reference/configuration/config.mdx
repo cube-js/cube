@@ -570,8 +570,10 @@ A function that returns a version string for the credentials
 time of an OAuth token. Drivers are cached per data source for every
 [orchestrator id][self-orchestrator-id]. When a request returns a version other
 than the one the cached drivers were built for, Cube builds new drivers from
-that request's context, tests their connections, and only then switches queries
-to them. Return `undefined` to keep the cached drivers.
+that request's context in the background, tests their connections, and only
+then switches queries to them. Requests do not wait for this: until the switch,
+they are served by the cached drivers. Return `undefined` to keep the cached
+drivers.
 
 Called on every orchestrator lookup: once per API request, many times per
 scheduled refresh run (with the refresh worker's contexts), and by the readiness
@@ -590,9 +592,9 @@ version they replaced within 5 seconds.
 </Warning>
 
 A switch rebuilds and tests every data source the orchestrator has drivers for,
-together. If any new driver fails to connect, the request that triggered the
-switch fails, the previous drivers stay in use, and the same version is not
-retried for 10 seconds. A replaced driver stays open until the queries and
+together. If any new driver fails to connect, Cube logs the error, the previous
+drivers stay in use, and the same version is not retried for 10 seconds. A
+version requested while a switch is running is switched to once it ends. A replaced driver stays open until the queries and
 pre-aggregation builds that may still be running on it have timed out: the
 longer of the query and pre-aggregation queues' `executionTimeout`
 ([`CUBEJS_DB_QUERY_TIMEOUT`](/reference/configuration/environment-variables#cubejs_db_query_timeout)
