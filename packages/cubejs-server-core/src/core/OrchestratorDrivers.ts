@@ -38,7 +38,7 @@ export type EnsureVersionResult = 'ready' | 'evicted';
 type DriverSpec = { dataSource: string, preAggregations: boolean };
 
 /** One rebuild of every cached driver, from the context that asked for a new version. */
-type SwapRun = {
+export type SwapRun = {
   context: RequestContext;
   replacements: Map<Promise<BaseDriver>, { previous: BaseDriver | null, next: BaseDriver | null }>;
   replacedDataSources: Map<BaseDriver, string>;
@@ -228,7 +228,10 @@ export class OrchestratorDrivers {
     const run = this.newSwapRun(context);
 
     try {
-      await this.rebuildAll(run);
+      // Last checked in the same synchronous step as the install, so no driver built from the old context slips in
+      do {
+        await this.rebuildAll(run);
+      } while (isLive() && this.unswapped(run).size);
     } catch (e) {
       await this.discardBuilt(run);
 
