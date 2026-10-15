@@ -1043,7 +1043,8 @@
                   "POST /api/v1/users",
                   "POST /api/v1/users/bulk",
                   "PUT /api/v1/users/{id}",
-                  "DELETE /api/v1/users/{id}"
+                  "DELETE /api/v1/users/{id}",
+                  "GET /api/v1/users/{id}/roles"
                 ]
               },
               {
@@ -1065,6 +1066,7 @@
                   "GET /api/v1/roles/{roleId}",
                   "PUT /api/v1/roles/{roleId}",
                   "DELETE /api/v1/roles/{roleId}",
+                  "GET /api/v1/roles/{roleId}/users",
                   "PUT /api/v1/roles/{roleId}/users/{userId}",
                   "DELETE /api/v1/roles/{roleId}/users/{userId}"
                 ]
