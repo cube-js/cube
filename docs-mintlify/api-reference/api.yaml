@@ -3090,8 +3090,9 @@ paths:
           definition).
 
 
-          Access: updating requires **edit** access to the existing report; creating requires the
-          same access as `POST /reports`.
+          Access: updating requires **edit** access to the existing report; moving it to a different
+          parent requires **manage** access to the report and **edit** access to the destination.
+          Creating requires the same access as `POST /reports`.
   /api/v1/deployments/{deploymentId}/reports/{reportId}:
     delete:
       operationId: deleteReport
@@ -3184,7 +3185,8 @@ paths:
           assigned — it is not unique — and is rejected with `400`.
 
 
-          Requires **edit** access to the report.
+          Requires **edit** access to the report. Moving it to a different parent requires
+          **manage** access to the report and **edit** access to the destination.
   /api/v1/deployments/{deploymentId}/reports/{reportId}/connect-workbook:
     delete:
       operationId: disconnectReportFromWorkbook
@@ -4068,7 +4070,7 @@ paths:
           Access: updating requires **edit** access to the workbook holding the slug (requests that
           include `folderId` require **manage** access, plus **edit** access to the destination
           folder); creating requires the same access as `POST /workbooks` (AI BI User role or
-          higher).
+          higher, plus **edit** access to a supplied destination folder).
 
 
           Whether this request creates or updates is decided — and access-checked — before it is
@@ -4756,7 +4758,9 @@ paths:
           `REPORT`). Repeat the parameter to pass several.
 
           - `search` — case-insensitive substring match on item names; searches across all folders,
-          not just the current level.
+          not just the current level. A workbook also matches when a report inside it does, so a
+          search finds a dashboard by the name of a chart on it. Use this to find an item by name
+          instead of walking folders.
 
           - `orderByField` / `orderByDirection` — sort the non-folder items (e.g. by `name`,
           `updated_at`, `created_at`, or `viewer_last_viewed_at`).
@@ -4933,7 +4937,8 @@ paths:
           - **Workbook** — manage access to the workbook, plus edit access to the destination folder
           when moving into one.
 
-          - **Report** — edit access to the report (with the report-manage permission).
+          - **Report** — manage access to the report, plus edit access to the destination folder, which
+          must belong to the same deployment.
 
           - **Folder** — manage access to the folder being moved, plus manage or edit access to the
           destination parent folder.
@@ -6431,6 +6436,9 @@ paths:
 
           Lists the tenant's custom roles, newest first, cursor-paginated via `first`/`after`.
           Cube's built-in roles are not included — they are not tenant data.
+
+
+          An API key scoped to specific deployments answers `403` here.
     post:
       operationId: createRole
       requestBody:
@@ -6514,6 +6522,9 @@ paths:
           — pass the numeric id returned by POST /build/api/v1/deployments, not a slug or a name.
           Ids are checked for shape, not existence, so an id whose deployment was since deleted is
           kept and simply grants nothing.
+
+
+          An API key scoped to specific deployments answers `403` here.
   /api/v1/roles/{roleId}:
     delete:
       operationId: deleteRole
@@ -6543,6 +6554,9 @@ paths:
 
           Deletes the role and every assignment of it, from users and from groups. Built-in roles
           cannot be deleted.
+
+
+          An API key scoped to specific deployments answers `403` here.
     get:
       operationId: getRole
       parameters:
@@ -6570,6 +6584,9 @@ paths:
 
 
           Returns one custom role by id, with its policies.
+
+
+          An API key scoped to specific deployments answers `403` here.
     put:
       operationId: updateRole
       parameters:
@@ -6613,6 +6630,56 @@ paths:
           replaces the role's policies outright, so read the role first if you mean to add one
           rather than start over. Renaming to a name another role already holds answers `409`.
           Built-in roles cannot be updated.
+
+
+          An API key scoped to specific deployments answers `403` here.
+  /api/v1/roles/{roleId}/users:
+    get:
+      operationId: getRoleHolders
+      parameters:
+        - in: path
+          name: roleId
+          required: true
+          schema:
+            type: number
+        - in: query
+          name: after
+          schema:
+            oneOf:
+              - type: string
+              - type: 'null'
+        - in: query
+          name: first
+          schema:
+            oneOf:
+              - minimum: 1
+                type: integer
+              - type: 'null'
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RoleHoldersListResponse'
+          description: ''
+        '404':
+          description: No role has that id. Cube's Admin role answers `404` too.
+      summary: List the users holding a role
+      tags:
+        - Roles
+      x-mint:
+        content: >-
+          **🔒 Admin only.** Requires administrator privileges — the authenticated principal (API
+          key, embed JWT, or any bearer token) must belong to a user with the admin role.
+
+
+          Lists every user holding the role, directly or through a group, newest first,
+          cursor-paginated via `first`/`after`. Accepts built-in role ids. Each user carries every
+          role they hold, so a combination such as "holds Explorer but not my custom role" is one
+          pass over these pages. Deactivated users are included.
+
+
+          An API key scoped to specific deployments answers `403` here.
   /api/v1/roles/{roleId}/users/{userId}:
     delete:
       operationId: removeRoleFromUser
@@ -6647,6 +6714,9 @@ paths:
 
           Takes the role away from the user. Idempotent — removing a role the user does not hold
           changes nothing. Returns `404` if the user is unknown.
+
+
+          An API key scoped to specific deployments answers `403` here.
     put:
       operationId: assignRoleToUser
       parameters:
@@ -6689,6 +6759,9 @@ paths:
           **Cube's Admin role is the exception and cannot be granted this way** — it is not among
           the built-in roles this endpoint resolves, so its id returns `404`. No call to this
           endpoint can make a user an account-wide administrator.
+
+
+          An API key scoped to specific deployments answers `403` here.
   /api/v1/spec:
     get:
       operationId: getSpec
@@ -7065,6 +7138,9 @@ paths:
 
           Reapplying an action a user is already in (deactivating a deactivated user) succeeds as a
           no-op.
+
+
+          An API key scoped to specific deployments answers `403` here.
   /api/v1/users/me/settings:
     patch:
       operationId: updateMySettings
@@ -7088,7 +7164,8 @@ paths:
       x-mint:
         content: >-
           Merge a partial patch into the authenticated user's own settings. Omitted fields are left
-          as they are; `sheets` merges field-by-field, and an explicit `null` clears it.
+          as they are; `sheets` and `memory` merge field-by-field, and an explicit `null` clears
+          one.
   /api/v1/users/{id}:
     delete:
       operationId: deleteUser
@@ -7131,6 +7208,39 @@ paths:
       summary: Update user
       tags:
         - Users Admin
+  /api/v1/users/{id}/roles:
+    get:
+      operationId: getUserRoles
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: number
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserRolesResponse'
+          description: ''
+        '404':
+          description: The user is unknown.
+      summary: List a user's roles
+      tags:
+        - Users Admin
+      x-mint:
+        content: >-
+          **🔒 Admin only.** Requires administrator privileges — the authenticated principal (API
+          key, embed JWT, or any bearer token) must belong to a user with the admin role.
+
+
+          Every role the user holds, built-in and custom, whether assigned directly or through a
+          group. Only a direct assignment can be removed with `DELETE
+          /api/v1/roles/{roleId}/users/{userId}`.
+
+
+          An API key scoped to specific deployments answers `403` here.
   /build/api/v1/deployments:
     post:
       operationId: createDeployment
@@ -13339,6 +13449,13 @@ components:
         - locale
         - value
       type: object
+    MemoryUserSettingsInput:
+      properties:
+        generateFromChats:
+          oneOf:
+            - type: boolean
+            - type: 'null'
+      type: object
     MergeIntoParentBranchRequest:
       properties:
         branchId:
@@ -15617,14 +15734,52 @@ components:
         - name
         - policies
       type: object
+    RoleHolder:
+      properties:
+        email:
+          type: string
+        firstName:
+          oneOf:
+            - type: string
+            - type: 'null'
+        id:
+          type: integer
+        isAdmin:
+          description: Set by the user's own Admin flag or by a group granting Admin.
+          type: boolean
+        isDeactivated:
+          type: boolean
+        roles:
+          items:
+            $ref: '#/components/schemas/UserRoleAssignmentResponse'
+          type: array
+      required:
+        - id
+        - email
+        - isDeactivated
+        - isAdmin
+        - roles
+      type: object
+    RoleHoldersListResponse:
+      properties:
+        items:
+          items:
+            $ref: '#/components/schemas/RoleHolder'
+          type: array
+        pageInfo:
+          $ref: '#/components/schemas/PageInfo'
+      required:
+        - items
+        - pageInfo
+      type: object
     RoleUpdateBody:
       properties:
         description:
+          description: Omit to leave the description unchanged; `null` clears it.
           oneOf:
             - maxLength: 255
               type: string
             - type: 'null'
-          description: Omit to leave the description unchanged; `null` clears it.
         name:
           description: Omit to leave the name unchanged. `null` is rejected.
           maxLength: 255
@@ -17792,6 +17947,51 @@ components:
         - createdAt
         - updatedAt
       type: object
+    UserRoleAssignmentResponse:
+      properties:
+        builtIn:
+          type: boolean
+        description:
+          oneOf:
+            - type: string
+            - type: 'null'
+        direct:
+          description: >-
+            Assigned to the user directly — the assignment `DELETE
+            /api/v1/roles/{roleId}/users/{userId}` removes.
+          type: boolean
+        groupIds:
+          description: >-
+            Groups that grant the role. Removing it from the user does not touch these; change the
+            group instead.
+          items:
+            type: integer
+          type: array
+        id:
+          description: Role id. Built-in roles have fixed negative ids.
+          type: integer
+        name:
+          type: string
+      required:
+        - id
+        - name
+        - builtIn
+        - direct
+        - groupIds
+      type: object
+    UserRolesResponse:
+      properties:
+        isAdmin:
+          description: Set by the user's own Admin flag or by a group granting Admin.
+          type: boolean
+        roles:
+          items:
+            $ref: '#/components/schemas/UserRoleAssignmentResponse'
+          type: array
+      required:
+        - isAdmin
+        - roles
+      type: object
     UserSettingsInput:
       properties:
         alternatingRowColors:
@@ -17814,6 +18014,10 @@ components:
         locale:
           oneOf:
             - type: string
+            - type: 'null'
+        memory:
+          oneOf:
+            - $ref: '#/components/schemas/MemoryUserSettingsInput'
             - type: 'null'
         sheets:
           oneOf:
