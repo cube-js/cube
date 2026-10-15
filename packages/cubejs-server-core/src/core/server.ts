@@ -59,8 +59,10 @@ import type {
   DbTypeInternalFn,
   DbTypeInternalContext,
   ExternalDbTypeFn,
+  OrchestratorOptions,
   OrchestratorOptionsFn,
   OrchestratorInitedOptions,
+  QueueOptions,
   PreAggregationsSchemaFn,
   RequestContext,
   DriverContext,
@@ -184,8 +186,6 @@ export class CubejsServerCore {
 
   protected readonly contextToCubeStoreRouterId: ContextToCubeStoreRouterIdFn | null;
 
-  protected readonly driverSwapReleaseDelaySeconds: number;
-
   protected readonly preAggregationsSchema: PreAggregationsSchemaFn;
 
   /**
@@ -279,7 +279,6 @@ export class CubejsServerCore {
 
     this.contextToOrchestratorId = this.options.contextToOrchestratorId || (() => 'STANDALONE');
     this.contextToCubeStoreRouterId = this.options.contextToCubeStoreRouterId;
-    this.driverSwapReleaseDelaySeconds = this.options.driverSwapReleaseDelay ?? getEnv('driverSwapReleaseDelay');
 
     // proactively free up old cache values occasionally
     if (this.options.maxCompilerCacheKeepAlive) {
@@ -846,10 +845,10 @@ export class CubejsServerCore {
 
   /**
    * Releases a driver replaced by a swap once work that already holds it, such as
-   * a stream or a pre-aggregation build, had time to finish: release destroys or
-   * drains it at once.
+   * a stream or a pre-aggregation build, has had time to finish: release destroys
+   * or drains it at once.
    */
-  protected scheduleSwappedDriverRelease(driver: BaseDriver) {
+  protected scheduleSwappedDriverRelease(driver: BaseDriver, afterSeconds: number) {
     if (this.swappedDriverReleases.has(driver)) {
       return;
     }
@@ -864,10 +863,27 @@ export class CubejsServerCore {
     };
 
     // Past 2^31-1 ms setTimeout fires at once, which would release the driver under its queries
-    entry.timer = setTimeout(entry.release, Math.min(this.driverSwapReleaseDelaySeconds * 1000, 2 ** 31 - 1));
+    entry.timer = setTimeout(entry.release, Math.min(afterSeconds * 1000, 2 ** 31 - 1));
     entry.timer.unref();
 
     this.swappedDriverReleases.set(driver, entry);
+  }
+
+  /**
+   * How long a query or pre-aggregation build on `dataSource` may run, in seconds: the queues'
+   * executionTimeout, defaulting as QueryQueue does. Read raw, since resolving the queue options
+   * computes concurrency, which can call driverFactory.
+   */
+  protected queryTimeoutSeconds(options: OrchestratorOptions, dataSource: string): number {
+    const timeout = (queueOptions?: QueueOptions | ((ds: string) => QueueOptions)) => (
+      (typeof queueOptions === 'function' ? queueOptions(dataSource) : queueOptions)?.executionTimeout ||
+      getEnv('dbQueryTimeout')
+    );
+
+    return Math.max(
+      timeout(options.queryCacheOptions?.queueOptions),
+      timeout(options.preAggregationsOptions?.queueOptions),
+    );
   }
 
   /** A caching driverFactory can return a driver still awaiting its delayed release; keep it open. */
@@ -916,11 +932,9 @@ export class CubejsServerCore {
 
     // orchestrator options can be empty, if user didn't define it.
     // so we are adding default and configuring queues concurrency.
+    const rawOrchestratorOptions: OrchestratorOptions = (await this.orchestratorOptions(context)) || {};
     const orchestratorOptions =
-      this.optsHandler.getOrchestratorInitializedOptions(
-        context,
-        (await this.orchestratorOptions(context)) || {},
-      );
+      this.optsHandler.getOrchestratorInitializedOptions(context, rawOrchestratorOptions);
 
     const initialDriverVersion = this.options.driverVersion
       ? await this.resolveDriverVersion(context)
@@ -981,6 +995,7 @@ export class CubejsServerCore {
       // Before the build: a slow testConnection() must not stretch the gap past the ping-pong window
       const startedAt = Date.now();
       const replacements = new Map<Promise<BaseDriver>, { previous: BaseDriver | null, next: BaseDriver | null }>();
+      const replacedDataSources = new Map<BaseDriver, string>();
       const inUse = new Set<BaseDriver>();
 
       // Replaced drivers, and those awaiting a delayed release, may still be serving queries
@@ -1021,6 +1036,7 @@ export class CubejsServerCore {
             }
 
             const spec = driverSpecs[pending.get(promise)];
+            replacedDataSources.set(previous[i], spec.dataSource);
 
             return buildDriver(swapContext, spec.dataSource, spec.preAggregations, keep);
           }));
@@ -1082,7 +1098,11 @@ export class CubejsServerCore {
 
       replaced.forEach((driver) => {
         if (!installed.has(driver)) {
-          this.scheduleSwappedDriverRelease(driver);
+          // Open until any query or pre-aggregation build that holds it has timed out
+          this.scheduleSwappedDriverRelease(
+            driver,
+            this.queryTimeoutSeconds(rawOrchestratorOptions, replacedDataSources.get(driver) ?? 'default'),
+          );
         }
       });
 
