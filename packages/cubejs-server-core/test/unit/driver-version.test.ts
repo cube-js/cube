@@ -750,6 +750,34 @@ describe('driverVersion', () => {
     await Promise.all([servedA, servedB]);
   });
 
+  test('a version still backing off is not queued, and keeps its own error', async () => {
+    const { request, driver } = createCore({ driverFactory: probeFallbackFactory });
+
+    await request();
+    await driver();
+
+    const toB = gate();
+    onTestConnection = async (d) => {
+      if (d.builtFrom.password === 'c') {
+        throw new Error('bad credential c');
+      }
+      if (d.builtFrom.password === 'b') {
+        await toB.opened;
+        throw new Error('bad credential b');
+      }
+    };
+
+    await expect(request('c')).rejects.toThrow('bad credential c');
+
+    const servedB = request('b');
+    await waitFor(() => built.length === 3);
+
+    await expect(request('c')).rejects.toThrow('bad credential c');
+
+    toB.open();
+    await expect(servedB).rejects.toThrow('bad credential b');
+  });
+
   test('a request with a version fails rather than use the drivers the probe built', async () => {
     const { request, driver } = createCore({ driverFactory: probeFallbackFactory });
 
