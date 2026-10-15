@@ -232,9 +232,9 @@ views:
               measures: { count: { type: 'count' } },
               dimensions: { status: { sql: 'status', type: 'string' } },
             });
-            cube('my_orders', {
+            cube('bq_orders', {
               sql: 'SELECT * FROM orders',
-              dataSource: 'mysql',
+              dataSource: 'bigquery',
               measures: { count: { type: 'count' } },
               dimensions: { status: { sql: 'status', type: 'string' } },
             });
@@ -249,7 +249,8 @@ views:
     beforeEach(() => {
       compilerApi = new CompilerApi(
         repository,
-        async ({ dataSource }) => (dataSource === 'mysql' ? 'mysql' : 'postgres'),
+        // Unlike MysqlQuery, BigqueryQuery doesn't read its data source when constructed
+        async ({ dataSource }) => (dataSource === 'bigquery' ? 'bigquery' : 'postgres'),
         {
           logger: () => {}, // eslint-disable-line @typescript-eslint/no-empty-function
           sqlCache: false,
@@ -269,21 +270,21 @@ views:
 
     test('renders each data source in its own dialect', async () => {
       const pg = await sql('pg_orders');
-      const my = await sql('my_orders');
+      const bq = await sql('bq_orders');
 
       expect(pg).toContain('"pg_orders".status');
-      expect(my).toContain('`my_orders`.status');
+      expect(bq).toContain('`bq_orders`.status');
       expect(await sql('pg_orders')).toEqual(pg);
-      expect(await sql('my_orders')).toEqual(my);
+      expect(await sql('bq_orders')).toEqual(bq);
     });
 
     test('compiles the templates of a data source once per model', async () => {
       await sql('pg_orders');
-      await sql('my_orders');
+      await sql('bq_orders');
       const calls = sqlTemplates.mock.calls.length;
 
       await sql('pg_orders');
-      await sql('my_orders');
+      await sql('bq_orders');
 
       expect(sqlTemplates).toHaveBeenCalledTimes(calls);
     });
@@ -367,6 +368,20 @@ views:
       expect(hit).toContain('= ?');
       expect(miss).toContain('= $1');
       expect((await filtered('visits.source')).sql[0]).toEqual(hit);
+    });
+
+    // The pre-aggregation's own query is a sub-query of the same model
+    test('fetches the templates of each dialect once, pre-aggregation SQL included', async () => {
+      const sqlTemplates = jest.spyOn(BaseQuery.prototype, 'sqlTemplates');
+      try {
+        const result = await getSql('visits.source');
+
+        expect(result.preAggregations[0].loadSql[0]).toContain('"visits".source');
+        expect(sqlTemplates.mock.contexts.map((query: any) => query.constructor.name).sort())
+          .toEqual(['CubeStoreQuery', 'PostgresQuery']);
+      } finally {
+        sqlTemplates.mockRestore();
+      }
     });
 
     test('matches once without a build for preAggregationsOnly', async () => {

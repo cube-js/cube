@@ -1080,7 +1080,7 @@ export class BaseQuery {
       maskedMembers: this.options.maskedMembers,
       memberToAlias: this.options.memberToAlias,
       subqueryJoins: this.options.subqueryJoins,
-      dataSource: this.resolvedDataSource ?? null,
+      dataSource: this.nativeDataSource(),
     };
 
     try {
@@ -1151,7 +1151,7 @@ export class BaseQuery {
       // must see the same masked members as the SQL build.
       maskedMembers: this.options.maskedMembers,
       subqueryJoins: this.options.subqueryJoins,
-      dataSource: this.resolvedDataSource ?? null,
+      dataSource: this.nativeDataSource(),
     };
 
     const buildResult = nativeBuildSqlAndParams(queryParams, this.nativeModelContext());
@@ -1165,6 +1165,15 @@ export class BaseQuery {
    * or an external query) gets its own, which caches nothing beyond the query.
    * @returns {import('@cubejs-backend/native').ModelContext}
    */
+  /**
+   * The data source the native planner caches this query's templates under. Set
+   * explicitly by whoever picked the dialect, or kept from the `dataSource` getter.
+   * @returns {string | null}
+   */
+  nativeDataSource() {
+    return this.options.dataSource ?? this.resolvedDataSource ?? null;
+  }
+
   nativeModelContext() {
     if (!this.modelContext) {
       this.modelContext = this.options.modelContext ?? newModelContext();
@@ -4576,6 +4585,9 @@ export class BaseQuery {
       queryFactory: this.options.queryFactory,
       useNativeSqlPlanner: this.options.useNativeSqlPlanner,
       localRefreshKey: this.options.localRefreshKey,
+      // Same class, so the same data source; `queryFactory` sets its own
+      modelContext: this.options.modelContext,
+      dataSource: this.nativeDataSource() ?? undefined,
       ...options,
     };
   }

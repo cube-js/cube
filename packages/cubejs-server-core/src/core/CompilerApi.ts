@@ -161,11 +161,11 @@ export class CompilerApi {
   protected memberCount: number = 0;
 
   /**
-   * Native planner state for the compiled model, e.g. the compiled SQL templates of
-   * each data source. Lives as long as the model, like `queryFactory`, since the
-   * dialect it resolves for a data source is what the templates are cached under.
+   * Each compile's native planner state, e.g. the compiled SQL templates of each data
+   * source. Paired with `compilers` like `queryFactories`, since the dialect a model
+   * resolves for a data source is what the templates are cached under.
    */
-  protected modelContext?: ModelContext;
+  private readonly modelContexts = new WeakMap<Compiler, ModelContext>();
 
   public constructor(repository: SchemaFileRepository, dbType: DbTypeInternalFn, options: CompilerApiOptions) {
     this.repository = repository;
@@ -233,7 +233,6 @@ export class CompilerApi {
     // using safeguard for potential dangling references.
     this.compilers = disposedProxy('compilers', 'disposed CompilerApi instance');
     this.queryFactory = disposedProxy('queryFactory', 'disposed CompilerApi instance');
-    this.modelContext = undefined;
     this.graphqlSchema = undefined;
 
     // A request can still hold this instance -- the gateway keeps one across
@@ -339,6 +338,7 @@ export class CompilerApi {
       });
       this.queryFactory = await this.createQueryFactory(compilers);
       this.queryFactories.set(compilers, this.queryFactory);
+      this.modelContexts.set(compilers, newModelContext());
       // A compile that a newer version superseded, or that finished on an
       // evicted instance, no longer describes what this entry holds.
       if (this.compilerVersion === compilerVersion) {
@@ -354,8 +354,6 @@ export class CompilerApi {
           });
         }
       }
-
-      this.modelContext = newModelContext();
 
       this.logger('Compiling schema completed', {
         version: compilerVersion,
@@ -1213,10 +1211,16 @@ export class CompilerApi {
       dbType = await this.getDbType(dataSource);
     }
 
-    return this.createQuery(compilers, dbType, this.getDialectClass(dataSource, dbType), query);
+    return this.createQuery(compilers, dbType, this.getDialectClass(dataSource, dbType), query, dataSource);
   }
 
-  public createQuery(compilers: Compiler, dbType: string, dialectClass: BaseQuery, query: NormalizedQuery | {}): BaseQuery {
+  public createQuery(
+    compilers: Compiler,
+    dbType: string,
+    dialectClass: BaseQuery,
+    query: NormalizedQuery | {},
+    dataSource?: string,
+  ): BaseQuery {
     return createQuery(
       compilers,
       dbType,
@@ -1230,7 +1234,9 @@ export class CompilerApi {
         convertTzForRawTimeDimension: this.convertTzForRawTimeDimension,
         localRefreshKey: this.localRefreshKey,
         queryFactory: this.queryFactories.get(compilers) ?? this.queryFactory,
-        modelContext: this.modelContext,
+        modelContext: this.modelContexts.get(compilers),
+        // The data source the dialect was picked for, when the caller knows it
+        dataSource,
       }
     );
   }
