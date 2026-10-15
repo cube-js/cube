@@ -66,7 +66,7 @@ The [REST API][ref-api-assign-role] and the [CLI][ref-cli] refer to roles by num
 | Explorer  | `-4` | `AIBIUser`      | Explore semantic models, build workbooks, use Analytics Chat.                     |
 | Viewer    | `-6` | `AIBIViewer`    | View published dashboards, use Analytics Chat, query from external tools.         |
 
-**Admin** has no assignable ID. It is a flag on the user rather than a role: set `isAdmin` with [`PUT /api/v1/users/{id}`][ref-api-update-user].
+**Admin** has no assignable ID. It is granted through a flag on the user rather than a role ID: set `isAdmin` with [`PUT /api/v1/users/{id}`][ref-api-update-user].
 
 <Note>
 
