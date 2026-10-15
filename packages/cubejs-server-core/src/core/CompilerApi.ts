@@ -367,18 +367,18 @@ export class CompilerApi {
 
   public async createQueryFactory(compilers: Compiler): Promise<QueryFactory> {
     const { cubeEvaluator } = compilers;
+    const dataSources = new Set(cubeEvaluator.cubeNames().map(cube => cubeEvaluator.cubeDataSource(cube)));
 
-    const cubeToQueryClass = Object.fromEntries(
+    const dataSourceToQueryClass = Object.fromEntries(
       await Promise.all(
-        cubeEvaluator.cubeNames().map(async (cube) => {
-          const dataSource = cubeEvaluator.cubeFromPath(cube).dataSource ?? 'default';
+        [...dataSources].map(async (dataSource) => {
           const dbType = await this.getDbType(dataSource);
           const dialectClass = this.getDialectClass(dataSource, dbType);
-          return [cube, queryClass(dbType, dialectClass)];
+          return [dataSource, queryClass(dbType, dialectClass)];
         })
       )
     );
-    return new QueryFactory(cubeToQueryClass);
+    return new QueryFactory(dataSourceToQueryClass);
   }
 
   public async getDbType(dataSource: string = 'default'): Promise<string> {
@@ -1283,7 +1283,7 @@ export class CompilerApi {
     return cubeEvaluator
       .cubeNames()
       .map(
-        (cube) => ({ [cube]: cubeEvaluator.cubeFromPath(cube).dataSource || 'default' })
+        (cube) => ({ [cube]: cubeEvaluator.cubeDataSource(cube) })
       ).reduce((a, b) => ({ ...a, ...b }), {});
   }
 
@@ -1298,13 +1298,11 @@ export class CompilerApi {
           const viewName = cubeDef.name;
           return cubeDef.includedMembers?.map((included: ViewIncludedMember) => {
             const memberName = `${viewName}.${included.name}`;
-            const refCubeDef = cubeEvaluator.cubeFromPath(included.memberPath);
-            const dataSource = refCubeDef.dataSource ?? 'default';
-            return [memberName, dataSource];
+            return [memberName, cubeEvaluator.cubeDataSource(included.memberPath)];
           }) || [];
         } else {
           const cubeName = cubeDef.name;
-          const dataSource = cubeDef.dataSource ?? 'default';
+          const dataSource = cubeEvaluator.cubeDataSource(cubeName);
           return [
             ...Object.keys(cubeDef.dimensions),
             ...Object.keys(cubeDef.measures),

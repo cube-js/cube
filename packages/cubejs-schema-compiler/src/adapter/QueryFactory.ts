@@ -1,17 +1,21 @@
+import type { CubeEvaluator } from '../compiler/CubeEvaluator';
+
 export class QueryFactory {
   public constructor(
-    private cubeToQueryClass: Record<string, any>,
+    protected dataSourceToQueryClass: Record<string, any>,
   ) {
   }
 
-  public createQuery(cube: string, compilers: any, queryOptions: any) {
-    if (!(cube in this.cubeToQueryClass)) {
-      throw new Error(`Undefined cube '${cube}'`);
-    }
-    const QueryClass = this.cubeToQueryClass[cube];
+  protected queryClassForDataSource(dataSource: string) {
+    const QueryClass = this.dataSourceToQueryClass[dataSource];
     if (!QueryClass) {
-      throw new Error(`Undefined dbType or dialectClass for '${cube}'`);
+      throw new Error(`Undefined dbType or dialectClass for '${dataSource}' data source`);
     }
+    return QueryClass;
+  }
+
+  public createQuery(cube: string, compilers: { cubeEvaluator: CubeEvaluator }, queryOptions: any) {
+    const QueryClass = this.queryClassForDataSource(compilers.cubeEvaluator.cubeDataSource(cube));
     return new QueryClass(compilers, queryOptions);
   }
 }

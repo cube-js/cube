@@ -662,7 +662,7 @@ export class BaseQuery {
   }
 
   cubeDataSource(cube) {
-    return this.cubeEvaluator.cubeFromPath(cube).dataSource || 'default';
+    return this.cubeEvaluator.cubeDataSource(cube);
   }
 
   get aliasNameToMember() {

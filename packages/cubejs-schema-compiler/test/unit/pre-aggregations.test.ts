@@ -802,7 +802,7 @@ describe('pre-aggregations', () => {
     // with paramAllocator reset in BaseQuery->newSubQueryForCube()
     const queryFactory = new QueryFactory(
       {
-        orders: PostgresQuery
+        default: PostgresQuery
       }
     );
 
@@ -867,7 +867,7 @@ describe('pre-aggregations', () => {
 
     // It's important to provide a queryFactory, as it triggers flow
     // with paramAllocator reset in BaseQuery->newSubQueryForCube()
-    const queryFactory = new QueryFactory({ orders: PostgresQuery });
+    const queryFactory = new QueryFactory({ default: PostgresQuery });
 
     const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
       timeDimensions: [{
