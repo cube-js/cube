@@ -391,9 +391,7 @@ class MockDriver extends BaseDriver {
 
 let testCounter = 1;
 
-// The query queue catches driver factory errors and only logs them, so a failed `expect`
-// inside a factory never reaches the test. Collect them and fail the test in `afterEach`.
-let securityContextErrors: unknown[] = [];
+let backgroundErrors: unknown[] = [];
 
 const assertSecurityContext = (securityContext: unknown, skipAssertSecurityContext?: true) => {
   try {
@@ -402,7 +400,7 @@ const assertSecurityContext = (securityContext: unknown, skipAssertSecurityConte
       expect(securityContext).toHaveProperty('tenantId');
     }
   } catch (e) {
-    securityContextErrors.push(e);
+    backgroundErrors.push(e);
     throw e;
   }
 };
@@ -481,12 +479,12 @@ describe('Refresh Scheduler', () => {
     delete process.env.CUBEJS_TOUCH_PRE_AGG_TIMEOUT;
     delete process.env.CUBEJS_DB_QUERY_TIMEOUT;
     delete process.env.CUBEJS_REFRESH_KEY_LOCAL_TIME;
-    securityContextErrors = [];
+    backgroundErrors = [];
   });
 
   afterEach(() => {
-    const [error] = securityContextErrors;
-    securityContextErrors = [];
+    const [error] = backgroundErrors;
+    backgroundErrors = [];
     if (error) {
       throw error;
     }
