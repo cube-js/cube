@@ -12,6 +12,7 @@ import {
   Required,
 } from '@cubejs-backend/shared';
 import R from 'ramda';
+import { randomUUID } from 'crypto';
 import {
   BigQuery,
   BigQueryOptions,
@@ -32,6 +33,8 @@ import {
   StreamOptions,
   StreamTableData,
   TableCSVData,
+  TableParquetData,
+  UnloadOptions,
 } from '@cubejs-backend/base-driver';
 import type { Query } from '@google-cloud/bigquery/build/src/bigquery';
 
@@ -44,6 +47,8 @@ interface BigQueryDriverOptions extends BigQueryOptions {
   projectId?: string,
   keyFilename?: string,
   exportBucket?: string,
+  /** Opt-in; requires a Parquet-capable CubeStore and its own access to the GCS bucket. */
+  exportBucketFormat?: 'csv' | 'parquet',
   location?: string,
   pollTimeout?: number,
   pollMaxInterval?: number,
@@ -355,33 +360,42 @@ export class BigQueryDriver extends BaseDriver implements DriverInterface {
     };
   }
 
-  public async unload(table: string): Promise<TableCSVData> {
+  public async unload(table: string, options?: UnloadOptions): Promise<TableCSVData | TableParquetData> {
     if (!this.bucket) {
       throw new Error('Unload is not configured');
     }
 
-    const destination = this.bucket.file(`${table}-*.csv.gz`);
+    const parquet = this.options.exportBucketFormat === 'parquet' && options?.parquetImport === true;
+    const extension = parquet ? 'parquet' : 'csv.gz';
+    // A separate namespace for each attempt prevents concurrent exports and stale
+    // shards from interfering. Failed attempts can be expired by a bucket lifecycle rule.
+    const prefix = `${table}-${randomUUID()}/`;
+    const destination = this.bucket.file(`${prefix}part-*.${extension}`);
     const [schema, tableName] = table.split('.');
     const bigQueryTable = this.bigquery.dataset(schema).table(tableName);
-    const [job] = await bigQueryTable.createExtractJob(destination, { format: 'CSV', gzip: true });
+    const [job] = await bigQueryTable.createExtractJob(destination, parquet ? { format: 'PARQUET' } : { format: 'CSV', gzip: true });
     await this.waitForJobResult(job, { table }, false);
-    // There is an implementation for extracting and signing urls from S3
-    // @see BaseDriver->extractUnloadedFilesFromS3()
-    // Please use that if you need. Here is a different flow
-    // because bigquery requires storage/bucket object for other things,
-    // and there is no need to initiate another one (created in extractUnloadedFilesFromS3()).
-    const [files] = await this.bucket.getFiles({ prefix: `${table}-` });
-    const urls = await Promise.all(files.map(async file => {
-      const [url] = await file.getSignedUrl({
-        action: 'read',
-        expires: new Date(new Date().getTime() + 60 * 60 * 1000),
-      });
+    const [files] = await this.bucket.getFiles({ prefix });
+    const exportedFiles = files.filter(file => file.name.startsWith(prefix) && file.name.endsWith(`.${extension}`));
+    const release = async () => {
+      await Promise.all(exportedFiles.map(file => file.delete({ ignoreNotFound: true })));
+    };
+
+    if (parquet) {
+      return {
+        parquetFile: exportedFiles.map(file => `gs://${this.bucket!.name}/${file.name}`),
+        release,
+      };
+    }
+
+    const urls = await Promise.all(exportedFiles.map(async file => {
+      const [url] = await file.getSignedUrl({ action: 'read', expires: new Date(Date.now() + 60 * 60 * 1000) });
       return url;
     }));
-
     return {
       exportBucketCsvEscapeSymbol: this.options.exportBucketCsvEscapeSymbol,
       csvFile: urls,
+      release,
     };
   }
 
