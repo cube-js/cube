@@ -734,7 +734,7 @@ export class CubejsServerCore {
     const { orchestratorId } = drivers;
     const isLive = () => !orchestratorApi.isReleased() && this.orchestratorStorage.peek(orchestratorId) === orchestratorApi;
 
-    if (drivers.ensureVersion(requested, context, isLive) === 'evicted') {
+    if (await drivers.ensureVersion(requested, context, isLive) === 'evicted') {
       // Serve from the api that holds the id now, if any
       return this.orchestratorStorage.peek(orchestratorId) === orchestratorApi
         ? orchestratorApi

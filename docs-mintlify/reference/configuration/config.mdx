@@ -602,7 +602,9 @@ time of an OAuth token. Drivers are cached per data source for every
 than the one the cached drivers were built for, Cube builds new drivers from
 that request's context in the background, tests their connections, and only
 then switches queries to them. Requests do not wait for this: until the switch,
-they are served by the cached drivers. Return `undefined` to keep the cached
+they are served by the cached drivers. Drivers built for no version, such as
+the readiness probe's, are the exception: a request with a version waits for its
+own, and fails if they cannot be built. Return `undefined` to keep the cached
 drivers.
 
 <Warning>
@@ -634,8 +636,8 @@ together. If any new driver fails to connect, Cube logs the error, the previous
 drivers stay in use, and the same version is not retried for 10 seconds. A
 version requested while a switch is running is switched to once it ends. A
 replaced driver stays open until the queries and pre-aggregation builds that
-may still be running on it have timed out: the
-longer of the query and pre-aggregation queues' `executionTimeout`
+may still be running on it have timed out: the longer of the query and
+pre-aggregation queues' `executionTimeout`
 ([`CUBEJS_DB_QUERY_TIMEOUT`](/reference/configuration/environment-variables#cubejs_db_query_timeout)
 by default). Streams have no timeout, so one still running then is cut off. The
 Cube Store driver is not replaced.
