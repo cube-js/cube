@@ -2,7 +2,7 @@ use crate::cube_bridge::join_item::JoinItem;
 use crate::planner::state::State;
 use crate::planner::MemberSymbol;
 use crate::planner::SqlCall;
-use crate::planner::{BaseCube, CubeId};
+use crate::planner::{BaseCube, CubeId, CubeJoin};
 use cubenativeutils::CubeError;
 use std::rc::Rc;
 
@@ -29,6 +29,18 @@ impl CommonUtils {
         let mut evaluator_compiler = evaluator_compiler_cell.borrow_mut();
         let from = CubeId::cube(join_item.static_data().original_from.clone());
         evaluator_compiler.compile_sql_call(&from, definition.sql()?)
+    }
+
+    /// Compiles the ON SQL of the join a cube instance is reached through,
+    /// rooted at its parent.
+    pub fn compile_instance_join_condition(
+        &self,
+        instance: &CubeId,
+        join: &CubeJoin,
+    ) -> Result<Rc<SqlCall>, CubeError> {
+        let evaluator_compiler_cell = self.query_tools.compiler().clone();
+        let mut evaluator_compiler = evaluator_compiler_cell.borrow_mut();
+        evaluator_compiler.compile_join_sql_call(instance, join.definition().sql()?)
     }
 
     /// Resolves the planner-level `BaseCube` for the given cube path.

@@ -458,9 +458,12 @@ export class CompilerApi {
       const sql = await compilers.compilerCache.getQueryCache(key).cache(['sql'], getSqlFn);
       // Relative date ranges in the data model resolve to the current time, so
       // SQL reaching a cube with one is reused within the minute only.
-      const { relativeDateFilterCubes } = compilers.cubeEvaluator;
+      const { cubeEvaluator } = compilers;
+      const { relativeDateFilterCubes } = cubeEvaluator;
       const isRelative = relativeDateFilterCubes.size > 0 &&
-        sql.memberNames?.some((member: string) => relativeDateFilterCubes.has(member.split('.')[0]));
+        sql.memberNames?.some((member: string) => relativeDateFilterCubes.has(
+          cubeEvaluator.resolveMemberPath(member)?.targetCube ?? member.split('.')[0]
+        ));
       if (!isRelative) {
         return sql;
       }
@@ -596,6 +599,32 @@ export class CompilerApi {
     const queryMemberNames = new Set(sql.memberNames);
     const queryCubes = new Set(sql.memberNames.map(memberName => memberName.split('.')[0]));
 
+    // A member reached through a join alias belongs to a cube instance: the
+    // policies of the cube it instantiates apply to it, and they constrain that
+    // instance alone. Every other member belongs to the cube it names.
+    const instances = new Map<string, { cubeName: string, members: { name: string, policyName: string }[] }>();
+    for (const memberName of queryMemberNames) {
+      const resolved = cubeEvaluator.resolveMemberPath(memberName);
+      // A path through joins that resolves to no cube instance can't be held
+      // to the policies of the cube it reads, so it is denied
+      if (!resolved?.aliased && memberName.split('.').length > 2) {
+        query.segments = query.segments || [];
+        query.segments.push({
+          expression: () => '1 = 0',
+          cubeName: memberName.split('.')[0],
+          name: 'rlsAccessDenied',
+        } as unknown as MemberExpression);
+        return { query, denied: true };
+      }
+      const [instancePath, cubeName, policyName] = resolved?.aliased ?
+        [resolved.instancePath, resolved.targetCube, resolved.targetPath] :
+        [memberName.split('.')[0], memberName.split('.')[0], memberName];
+      if (!instances.has(instancePath)) {
+        instances.set(instancePath, { cubeName, members: [] });
+      }
+      instances.get(instancePath)!.members.push({ name: memberName, policyName });
+    }
+
     // Identify cubes that are accessed through views.
     // Similar to PostgreSQL views: views act as a security boundary for member access.
     // When a cube is accessed via a view, we skip the cube's member-level restrictions
@@ -619,8 +648,12 @@ export class CompilerApi {
     const maskedMembersSet = new Set<string>();
     const memberMaskFiltersMap: Record<string, any> = {};
 
-    for (const cubeName of queryCubes) {
+    for (const [instancePath, { cubeName, members: instanceMembers }] of instances) {
       const cube = cubeEvaluator.cubeFromPath(cubeName);
+      // The policies name the cube's own members, which the query reads
+      // through the instance
+      const onInstance = (filter: any) => (instancePath === cubeName ?
+        filter : this.rebaseFilterMembers(filter, cubeName, instancePath));
 
       if (cubeEvaluator.isRbacEnabledForCube(cube)) {
         const userPolicies = await this.getApplicablePolicies(cube, context, compilers);
@@ -719,9 +752,6 @@ export class CompilerApi {
         //
         //         Disjoint row ranges (R1 ∩ R2 = ∅) → empty result
         //
-        const cubeMembersInQuery = Array.from(queryMemberNames).filter(
-          memberName => memberName.startsWith(`${cubeName}.`)
-        );
 
         // A policy "grants" a member if it exposes it through memberLevel (full
         // access) or memberMasking (masked access). Policies without memberLevel
@@ -749,7 +779,7 @@ export class CompilerApi {
 
         const policyRowFilter = (policy: any) => {
           const filters = (policy.rowLevel?.filters || []).map(
-            (filter: any) => this.evaluateNestedFilter(filter, cube, context, cubeEvaluator)
+            (filter: any) => onInstance(this.evaluateNestedFilter(filter, cube, context, cubeEvaluator))
           );
           return filters.length === 1 ? filters[0] : { and: filters };
         };
@@ -781,7 +811,7 @@ export class CompilerApi {
         const seenRowConstraints = new Set<string>();
         let cubeAccessDenied = false;
 
-        for (const memberName of cubeMembersInQuery) {
+        for (const { name: queryMemberName, policyName: memberName } of instanceMembers) {
           const grantingPolicies = userPolicies.filter(
             (policy: any) => policyGrantsMember(policy, memberName)
           );
@@ -806,7 +836,7 @@ export class CompilerApi {
             );
 
             if (hasMaskingPolicy) {
-              maskedMembersSet.add(memberName);
+              maskedMembersSet.add(queryMemberName);
 
               const conditionalFullAccessPolicies = grantingPolicies.filter((policy: any) => {
                 const hasFullMemberAccess = !policy.memberLevel ||
@@ -817,7 +847,7 @@ export class CompilerApi {
 
               if (conditionalFullAccessPolicies.length > 0) {
                 const policyFilters = conditionalFullAccessPolicies.map(policyRowFilter);
-                memberMaskFiltersMap[memberName] = policyFilters.length === 1
+                memberMaskFiltersMap[queryMemberName] = policyFilters.length === 1
                   ? policyFilters[0]
                   : { or: policyFilters };
               }
@@ -847,7 +877,9 @@ export class CompilerApi {
           query.segments = query.segments || [];
           query.segments.push({
             expression: () => '1 = 0',
-            cubeName: cube.name,
+            // A cube reached only through an alias isn't in the join graph
+            // itself; the cube the alias is declared on is
+            cubeName: instancePath === cubeName ? cube.name : instancePath.split('.')[0],
             name: 'rlsAccessDenied',
           } as unknown as MemberExpression);
           return { query, denied: true };
@@ -893,6 +925,26 @@ export class CompilerApi {
       }));
     }
     return { query, denied: false };
+  }
+
+  /**
+   * Moves a filter on members of `cubeName` onto the cube instance at
+   * `instancePath`. Policy filters only name members of their own cube.
+   */
+  protected rebaseFilterMembers(filter: any, cubeName: string, instancePath: string): any {
+    if (!filter || typeof filter !== 'object') {
+      return filter;
+    }
+    const rebase = (member: any) => (typeof member === 'string' && member.startsWith(`${cubeName}.`) ?
+      `${instancePath}${member.slice(cubeName.length)}` : member);
+    const rebaseAll = (filters: any[]) => filters.map((f: any) => this.rebaseFilterMembers(f, cubeName, instancePath));
+    return {
+      ...filter,
+      ...(filter.member ? { member: rebase(filter.member) } : {}),
+      ...(filter.dimension ? { dimension: rebase(filter.dimension) } : {}),
+      ...(filter.and ? { and: rebaseAll(filter.and) } : {}),
+      ...(filter.or ? { or: rebaseAll(filter.or) } : {}),
+    };
   }
 
   protected filterMemberName(filter: any): string | undefined {

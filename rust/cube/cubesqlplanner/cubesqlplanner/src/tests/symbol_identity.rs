@@ -39,6 +39,48 @@ fn cube_id_alias_is_the_alias_of_its_name() {
 }
 
 #[test]
+fn joined_cube_id_renders_its_path_and_targets_the_joined_cube() {
+    let orders = CubeId::cube("orders");
+    let customer = CubeId::joined(orders.clone(), "customer", "users");
+    assert_eq!(customer.to_string(), "orders.customer");
+    assert_eq!(customer.target(), "users");
+    assert_eq!(customer.segment(), "customer");
+    assert!(customer.is_joined());
+    assert_eq!(customer.parent(), Some(&orders));
+    assert_eq!(customer.root(), &orders);
+
+    let departments = CubeId::joined(customer.clone(), "departments", "departments");
+    assert_eq!(departments.to_string(), "orders.customer.departments");
+    assert_eq!(departments.root(), &orders);
+    assert_eq!(
+        departments.joined_chain(),
+        vec![customer.clone(), departments.clone()]
+    );
+
+    assert!(!orders.is_joined());
+    assert_eq!(orders.parent(), None);
+    assert_eq!(orders.root(), &orders);
+    assert!(orders.joined_chain().is_empty());
+}
+
+#[test]
+fn joined_cube_ids_of_one_cube_stay_distinct() {
+    let orders = CubeId::cube("orders");
+    let customer = CubeId::joined(orders.clone(), "customer", "users");
+    let manager = CubeId::joined(orders.clone(), "manager", "users");
+    assert_ne!(customer, manager);
+    assert_ne!(customer, CubeId::cube("users"));
+    assert_eq!(customer, CubeId::joined(orders, "customer", "users"));
+    assert_ne!(
+        MemberId::member(customer.clone(), "city"),
+        MemberId::member(manager, "city")
+    );
+    let city = MemberId::member(customer, "city");
+    assert_eq!(city.full_name(), "orders.customer.city");
+    assert_eq!(city.target_path(), "users.city");
+}
+
+#[test]
 fn member_id_full_names() {
     let orders = CubeId::cube("orders");
     let status = MemberId::member(orders.clone(), "status");

@@ -3,7 +3,7 @@ use super::SymbolPath;
 use super::SymbolPathType;
 use super::{
     CubeId, CubeNameSymbol, CubeNameSymbolFactory, CubeTableSymbol, CubeTableSymbolFactory,
-    DimensionSymbolFactory, MeasureSymbolFactory, SqlCall, SymbolFactory,
+    DimensionSymbolFactory, MeasureSymbolFactory, ModelCubes, SqlCall, SymbolFactory,
 };
 use crate::cube_bridge::base_tools::BaseTools;
 use crate::cube_bridge::evaluator::CubeEvaluator;
@@ -28,6 +28,7 @@ pub const DEFAULT_MAX_MEMBER_RESOLUTION_DEPTH: usize = 160;
 /// security context) together with query-level metadata (timezone,
 /// alias overrides).
 pub struct Compiler {
+    model_cubes: Rc<ModelCubes>,
     cube_evaluator: Rc<dyn CubeEvaluator>,
     base_tools: Rc<dyn BaseTools>,
     security_context: Rc<dyn SecurityContext>,
@@ -49,7 +50,7 @@ pub struct Compiler {
 
 impl Compiler {
     pub fn new(
-        cube_evaluator: Rc<dyn CubeEvaluator>,
+        model_cubes: Rc<ModelCubes>,
         base_tools: Rc<dyn BaseTools>,
         security_context: Rc<dyn SecurityContext>,
         timezone: Tz,
@@ -57,7 +58,8 @@ impl Compiler {
         max_resolution_depth: Option<usize>,
     ) -> Self {
         Self {
-            cube_evaluator,
+            cube_evaluator: model_cubes.evaluator().clone(),
+            model_cubes,
             security_context,
             base_tools,
             timezone,
@@ -126,7 +128,7 @@ impl Compiler {
         &mut self,
         name: String,
     ) -> Result<Rc<MemberSymbol>, CubeError> {
-        let path = SymbolPath::parse(self.cube_evaluator.clone(), &name)?;
+        let path = SymbolPath::parse(&self.model_cubes, &name)?;
         match path.path_type() {
             SymbolPathType::Dimension => self.add_dimension_evaluator_by_path(path),
             SymbolPathType::Measure => self.add_measure_evaluator_by_path(path),
@@ -144,7 +146,7 @@ impl Compiler {
         &mut self,
         measure: String,
     ) -> Result<Rc<MemberSymbol>, CubeError> {
-        let path = SymbolPath::parse(self.cube_evaluator.clone(), &measure)?;
+        let path = SymbolPath::parse(&self.model_cubes, &measure)?;
         self.add_measure_evaluator_by_path(path)
     }
 
@@ -169,7 +171,26 @@ impl Compiler {
         &mut self,
         dimension: String,
     ) -> Result<Rc<MemberSymbol>, CubeError> {
-        let path = SymbolPath::parse(self.cube_evaluator.clone(), &dimension)?;
+        let path = SymbolPath::parse(&self.model_cubes, &dimension)?;
+        self.add_dimension_or_segment_by_path(path)
+    }
+
+    /// Resolves a dimension path the data model wrote out in full, on behalf
+    /// of a member of `owner`. Inside a joined cube instance the path names
+    /// the data-model cube, so it is resolved relative to the instance.
+    pub fn add_dimension_evaluator_for(
+        &mut self,
+        owner: &CubeId,
+        dimension: String,
+    ) -> Result<Rc<MemberSymbol>, CubeError> {
+        if !owner.is_joined() {
+            return self.add_dimension_evaluator(dimension);
+        }
+        let parts = dimension
+            .split('.')
+            .map(|s| s.to_string())
+            .collect::<Vec<_>>();
+        let path = SymbolPath::parse_parts(&self.model_cubes, Some(owner), &parts)?;
         self.add_dimension_or_segment_by_path(path)
     }
 
@@ -212,7 +233,7 @@ impl Compiler {
     /// materialised as `MemberExpression` members so they plug into
     /// the same machinery as other members.
     pub fn add_segment_evaluator(&mut self, name: String) -> Result<Rc<MemberSymbol>, CubeError> {
-        let path = SymbolPath::parse(self.cube_evaluator.clone(), &name)?;
+        let path = SymbolPath::parse(&self.model_cubes, &name)?;
         self.add_segment_evaluator_by_path(path)
     }
 
@@ -289,6 +310,10 @@ impl Compiler {
         }
     }
 
+    pub fn model_cubes(&self) -> &Rc<ModelCubes> {
+        &self.model_cubes
+    }
+
     pub fn timezone(&self) -> Tz {
         self.timezone.clone()
     }
@@ -321,6 +346,27 @@ impl Compiler {
         self.compile_sql_call_impl(cube_id, member_sql, true)
     }
 
+    /// Compiles the ON sql of the join `joined` is reached through, rooted at
+    /// its parent. There the joined cube's own name means `joined`, as does
+    /// the name of the join.
+    pub fn compile_join_sql_call(
+        &mut self,
+        joined: &CubeId,
+        member_sql: Rc<dyn MemberSql>,
+    ) -> Result<Rc<SqlCall>, CubeError> {
+        let parent = joined.parent().cloned().ok_or_else(|| {
+            CubeError::internal(format!("`{}` is not a joined cube instance", joined))
+        })?;
+        let call_builder = SqlCallBuilder::new(
+            self,
+            self.model_cubes.clone(),
+            self.base_tools.clone(),
+            self.security_context.clone(),
+        )
+        .for_join_to(joined.clone());
+        Ok(Rc::new(call_builder.build(&parent, member_sql)?))
+    }
+
     fn compile_sql_call_impl(
         &mut self,
         cube_id: &CubeId,
@@ -329,7 +375,7 @@ impl Compiler {
     ) -> Result<Rc<SqlCall>, CubeError> {
         let call_builder = SqlCallBuilder::new(
             self,
-            self.cube_evaluator.clone(),
+            self.model_cubes.clone(),
             self.base_tools.clone(),
             self.security_context.clone(),
         );

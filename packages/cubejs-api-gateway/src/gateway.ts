@@ -1452,11 +1452,22 @@ class ApiGateway {
 
     const startTime = new Date().getTime();
     const compilerApi = await this.getCompilerApi(context);
+    // The data model is read only for queries it takes to tell their paths apart
+    let resolver: ReturnType<ApiGateway['memberPathResolver']> | undefined;
+    const normalize = async (q: Query) => {
+      const resolve = this.hasLongMemberPaths(q)
+        ? await (resolver ??= this.memberPathResolver(context, compilerApi))
+        : undefined;
+      return this.checkMemberPaths(
+        normalizeQuery(q, persistent, cacheMode, this.granularitySplitter(resolve)),
+        resolve
+      );
+    };
 
     const queryNormalizationResult: Array<{
       normalizedQuery: NormalizedQuery,
       hasExpressionsInQuery: boolean
-    }> = queries.map((currentQuery) => {
+    }> = await Promise.all(queries.map(async (currentQuery) => {
       const hasExpressionsInQuery = this.hasExpressionsInQuery(currentQuery);
 
       if (hasExpressionsInQuery) {
@@ -1472,10 +1483,10 @@ class ApiGateway {
       }
 
       return {
-        normalizedQuery: (normalizeQuery(currentQuery, persistent, cacheMode)),
+        normalizedQuery: await normalize(currentQuery),
         hasExpressionsInQuery
       };
-    });
+    }));
 
     let normalizedQueries: NormalizedQuery[] = await Promise.all(
       queryNormalizationResult.map(
@@ -1510,7 +1521,7 @@ class ApiGateway {
             rewrittenQuery = this.evalMemberExpressionsInQuery(rewrittenQuery);
           }
 
-          return normalizeQuery(rewrittenQuery, persistent, cacheMode);
+          return normalize(rewrittenQuery);
         }
       )
     );
@@ -1608,6 +1619,96 @@ class ApiGateway {
         e, context, query, res, requestStarted
       });
     }
+  }
+
+  /**
+   * Resolves member paths through the data model's joins, so a path through a
+   * join alias can be told apart from a time dimension with a granularity.
+   */
+  protected async memberPathResolver(context: RequestContext, compilerApi?: any) {
+    const api = compilerApi ?? await this.getCompilerApi(context);
+    if (typeof api?.getCompilers !== 'function') {
+      return undefined;
+    }
+    const { cubeEvaluator } = await api.getCompilers({ requestId: context.requestId });
+    if (typeof cubeEvaluator?.resolveMemberPath !== 'function') {
+      return undefined;
+    }
+    return (path: string) => cubeEvaluator.resolveMemberPath(path);
+  }
+
+  /**
+   * The member paths a query names, in its raw or normalized form. Only
+   * `order` may name a time dimension with a granularity.
+   */
+  private memberPaths(query: Query | NormalizedQuery): { members: unknown[], order: unknown[] } {
+    const filterMembers = (filters: any[] = []): unknown[] => filters.flatMap(
+      f => (f.and || f.or ? filterMembers(f.and || f.or) : [f.member ?? f.dimension])
+    );
+    const { order } = query as { order?: unknown };
+    const orderMembers = Array.isArray(order)
+      ? order.map(o => (Array.isArray(o) ? o[0] : o?.id))
+      : Object.keys(order || {});
+    return {
+      members: [
+        ...(query.measures || []),
+        ...(query.dimensions || []),
+        ...(query.segments || []),
+        ...(query.timeDimensions || []).map(td => td.dimension),
+        ...filterMembers(query.filters),
+      ],
+      order: orderMembers,
+    };
+  }
+
+  /**
+   * Whether the query names a member by a path longer than `cube.member`,
+   * which takes the data model to read.
+   */
+  protected hasLongMemberPaths(query: Query | NormalizedQuery): boolean {
+    const { members, order } = this.memberPaths(query);
+    return [...members, ...order].some(path => typeof path === 'string' && path.split('.').length > 2);
+  }
+
+  /**
+   * A member path is a cube or a cube instance reached through join aliases,
+   * and a member; other join paths are not part of the query format.
+   */
+  protected checkMemberPaths(query: NormalizedQuery, resolve?: (path: string) => any): NormalizedQuery {
+    if (!resolve) {
+      return query;
+    }
+
+    const { members, order } = this.memberPaths(query);
+
+    for (const path of [...members, ...order]) {
+      const resolved = typeof path === 'string' ? resolve(path) : null;
+      const memberPath = resolved && `${resolved.instancePath}.${resolved.member}`;
+      if (resolved && resolved.fullPath !== memberPath) {
+        throw new UserError(`'${path}' goes through joins that are not join aliases. Query it as '${memberPath}'`);
+      }
+      if (resolved?.granularity && members.includes(path)) {
+        throw new UserError(`'${path}' names the '${resolved.granularity}' granularity of '${resolved.fullPath}'. Only dimensions and order can name a granularity; filter on '${resolved.fullPath}' instead`);
+      }
+    }
+    return query;
+  }
+
+  protected granularitySplitter(resolve?: (path: string) => any) {
+    return resolve && ((path: string) => {
+      const resolved = resolve(path);
+      if (!resolved) {
+        return undefined;
+      }
+      return resolved.granularity ? { dimension: resolved.fullPath, granularity: resolved.granularity } : null;
+    });
+  }
+
+  protected memberTarget(resolve?: (path: string) => any) {
+    return resolve && ((path: string) => {
+      const resolved = resolve(path);
+      return resolved?.aliased ? resolved.targetPath : undefined;
+    });
   }
 
   private hasExpressionsInQuery(query: Query): boolean {
@@ -2169,6 +2270,9 @@ class ApiGateway {
       });
 
       metaConfigResult = this.filterVisibleItemsInMeta(context, metaConfigResult);
+      const memberTarget = this.memberTarget(
+        normalizedQueries.some(q => this.hasLongMemberPaths(q)) ? await this.memberPathResolver(context) : undefined
+      );
 
       const sqlQueries = await this.getSqlQueriesInternal(context, normalizedQueries);
 
@@ -2186,7 +2290,7 @@ class ApiGateway {
           );
 
           const annotation = prepareAnnotation(
-            metaConfigResult, normalizedQuery
+            metaConfigResult, normalizedQuery, memberTarget
           );
 
           return this.prepareResultTransformData(
@@ -2272,6 +2376,9 @@ class ApiGateway {
       });
 
       metaConfigResult = this.filterVisibleItemsInMeta(context, metaConfigResult);
+      const memberTarget = this.memberTarget(
+        normalizedQueries.some(q => this.hasLongMemberPaths(q)) ? await this.memberPathResolver(context) : undefined
+      );
 
       const sqlQueries = await this
         .getSqlQueriesInternal(
@@ -2321,7 +2428,7 @@ class ApiGateway {
           const response = await adapterApi.executeQuery(finalQuery);
 
           const annotation = prepareAnnotation(
-            metaConfigResult, normalizedQueries[0]
+            metaConfigResult, normalizedQueries[0], memberTarget
           );
 
           // TODO Can we just pass through data? Ensure hidden members can't be queried
@@ -2368,7 +2475,7 @@ class ApiGateway {
               Boolean(sqlQueries[index].slowQuery);
 
             const annotation = prepareAnnotation(
-              metaConfigResult, normalizedQuery
+              metaConfigResult, normalizedQuery, memberTarget
             );
 
             if (request.streaming) {

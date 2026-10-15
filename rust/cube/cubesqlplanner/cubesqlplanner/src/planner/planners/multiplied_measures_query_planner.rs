@@ -1,4 +1,4 @@
-use super::{CommonUtils, DimensionSubqueryPlanner, JoinPlanner};
+use super::{CommonUtils, DimensionSubqueryPlanner, JoinPlanner, JoinTreeBuilder};
 use crate::logical_plan::*;
 use crate::planner::collectors::{
     collect_cube_names, collect_join_hints, collect_join_hints_for_measures,
@@ -8,7 +8,7 @@ use crate::planner::planners::multi_stage::{EvaluationContext, PlanningScope};
 use crate::planner::state::State;
 use crate::planner::symbols::transforms;
 use crate::planner::MemberSymbol;
-use crate::planner::{CubeId, JoinTree};
+use crate::planner::{CubeId, JoinHints, JoinTree};
 use crate::planner::{FullKeyAggregateMeasures, QueryProperties};
 use cubenativeutils::CubeError;
 use itertools::Itertools;
@@ -201,6 +201,7 @@ impl MultipliedMeasuresQueryPlanner {
         let source = if should_build_join_for_measure_select {
             let measure_subquery = self.aggregate_subquery_measure(
                 key_join.clone(),
+                key_cube,
                 &measures,
                 &primary_keys_dimensions,
                 scope,
@@ -250,16 +251,7 @@ impl MultipliedMeasuresQueryPlanner {
             };
             let join_hints = collect_join_hints(&owned_measure)?;
             if cubes.iter().any(|cube| cube != key_cube) {
-                let measures_join = self
-                    .query_tools
-                    .join_graph()
-                    .build_join(join_hints.into_items())?;
-                if *measures_join
-                    .static_data()
-                    .multiplication_factor
-                    .get(key_cube.target())
-                    .unwrap_or(&false)
-                {
+                if self.is_multiplied_in_join(&join_hints, key_cube)? {
                     return Err(CubeError::user(format!("{} references cubes ({}) that lead to row multiplication. Please rewrite it using sub query.", measure.full_name(), cubes.iter().join(", "))));
                 }
                 return Ok(true);
@@ -268,9 +260,36 @@ impl MultipliedMeasuresQueryPlanner {
         Ok(false)
     }
 
+    // The join graph caches the trees it builds; only a tree with cube
+    // instances is built here.
+    fn is_multiplied_in_join(
+        &self,
+        join_hints: &JoinHints,
+        key_cube: &CubeId,
+    ) -> Result<bool, CubeError> {
+        if key_cube.is_joined() {
+            let (_, join) = JoinTreeBuilder::new(self.query_tools.clone())
+                .build_rooted_at(key_cube, join_hints)?;
+            return Ok(join.is_multiplied(key_cube));
+        }
+        let (graph_hints, joined) = join_hints.split_joined();
+        if joined.is_empty() {
+            let join = self.query_tools.join_graph().build_join(graph_hints)?;
+            return Ok(*join
+                .static_data()
+                .multiplication_factor
+                .get(key_cube.target())
+                .unwrap_or(&false));
+        }
+        let (_, join) =
+            JoinTreeBuilder::new(self.query_tools.clone()).build_for_hints(join_hints)?;
+        Ok(join.is_multiplied(key_cube))
+    }
+
     fn aggregate_subquery_measure(
         &self,
         key_join: Rc<JoinTree>,
+        key_cube: &CubeId,
         measures: &Vec<Rc<MemberSymbol>>,
         primary_keys_dimensions: &Vec<Rc<MemberSymbol>>,
         scope: &mut PlanningScope,
@@ -284,10 +303,17 @@ impl MultipliedMeasuresQueryPlanner {
         let subquery_dimension_queries =
             dimension_subquery_planner.plan_queries(&subquery_dimensions, scope)?;
         let measure_join_hints = collect_join_hints_for_measures(&measures)?;
-        let source = self.join_planner.make_join_logical_plan_with_join_hints(
-            measure_join_hints,
-            subquery_dimension_queries,
-        )?;
+        let source = if key_cube.is_joined() {
+            let (_, join) = JoinTreeBuilder::new(self.query_tools.clone())
+                .build_rooted_at(key_cube, &measure_join_hints)?;
+            self.join_planner
+                .make_join_logical_plan(&join, subquery_dimension_queries)
+        } else {
+            self.join_planner.make_join_logical_plan_with_join_hints(
+                measure_join_hints,
+                subquery_dimension_queries,
+            )?
+        };
 
         let schema = LogicalSchema::default()
             .set_dimensions(primary_keys_dimensions.clone())

@@ -1,10 +1,9 @@
-use crate::cube_bridge::join_hints::JoinHintItem;
 use crate::planner::collectors::{
     collect_join_hints, collect_multiplied_measures, has_expression_or_calculated_members,
     has_multi_stage_members,
 };
 use crate::planner::filter::FilterItem;
-use crate::planner::join_hints::JoinHints;
+use crate::planner::join_hints::{JoinHint, JoinHints};
 use crate::planner::planners::JoinTreeBuilder;
 use crate::planner::query_tools::JoinKey;
 use crate::planner::state::State;
@@ -298,10 +297,7 @@ impl MultiFactJoinGroups {
                 query_tools
                     .join_tree_cache()
                     .get_or_try_build(join_hints, || {
-                        let Some((key, join)) = query_tools.try_join_for_hints(join_hints)? else {
-                            return Ok(None);
-                        };
-                        Ok(Some((key, join_tree_builder.build(join)?)))
+                        join_tree_builder.try_build_for_hints(join_hints)
                     })
             };
 
@@ -387,8 +383,8 @@ impl MultiFactJoinGroups {
         let cubes = hints
             .iter()
             .map(|item| match item {
-                JoinHintItem::Single(cube) => format!("'{}'", cube),
-                JoinHintItem::Vector(path) => format!("'{}'", path.join(",")),
+                JoinHint::Single(cube) => format!("'{}'", cube),
+                JoinHint::Vector(path) => format!("'{}'", path.iter().join(",")),
             })
             .join(", ");
         CubeError::user(format!("Can't find join path to join {}", cubes))
@@ -425,7 +421,7 @@ impl MultiFactJoinGroups {
                     .iter()
                     .map(|item| item.cube().cube_id().clone()),
             );
-            for cube_name in cubes {
+            for cube_name in cubes.filter(|cube| !cube.is_joined()) {
                 if !seen.insert(cube_name.clone()) {
                     continue;
                 }
@@ -603,8 +599,8 @@ impl MultiFactJoinGroups {
             .and_then(|cube| cube.static_data().is_view)
             .unwrap_or(false);
         if !is_view {
-            return Ok(JoinHints::from_items(vec![JoinHintItem::Single(
-                cube_name.target().to_string(),
+            return Ok(JoinHints::from_items(vec![JoinHint::Single(
+                cube_name.clone(),
             )]));
         }
 
@@ -643,9 +639,9 @@ impl MultiFactJoinGroups {
         };
 
         match roots.as_slice() {
-            [root_cube] => Ok(JoinHints::from_items(vec![JoinHintItem::Single(
+            [root_cube] => Ok(JoinHints::from_items(vec![JoinHint::Single(CubeId::cube(
                 (*root_cube).clone(),
-            )])),
+            ))])),
             // Every path of the join map is headed by a cube some other path
             // reaches, so the paths lead in a circle and none of them starts at
             // the view's root.

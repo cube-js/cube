@@ -1,6 +1,5 @@
 import type { BaseQuery } from './BaseQuery';
 import type { DimensionDefinition, SegmentDefinition } from '../compiler/CubeEvaluator';
-import { CubeSymbols } from '../compiler/CubeSymbols';
 
 export class BaseDimension {
   public readonly expression: any;
@@ -12,6 +11,9 @@ export class BaseDimension {
   public readonly isMemberExpression: boolean = false;
 
   public readonly joinHint: Array<string> = [];
+
+  // The path the member was requested by, when it goes through a join alias
+  public aliasPath: string | undefined;
 
   public constructor(
     protected readonly query: BaseQuery,
@@ -27,9 +29,10 @@ export class BaseDimension {
       // TODO move this `as` to static types
       const dimensionPath = dimension as string | null;
       if (dimensionPath !== null) {
-        const { path, joinHint } = CubeSymbols.joinHintFromPath(dimensionPath);
+        const { path, joinHint, aliasPath } = this.query.memberPathForModel(dimensionPath);
         this.dimension = path;
         this.joinHint = joinHint;
+        this.aliasPath = aliasPath;
       }
     }
   }
@@ -119,7 +122,14 @@ export class BaseDimension {
       return this.query.aliasName(this.expressionName);
     }
 
-    return this.query.aliasName(this.dimension);
+    return this.query.aliasName(this.memberPath());
+  }
+
+  /**
+   * The path naming the member in the query and its output.
+   */
+  public memberPath(): string {
+    return this.aliasPath ?? this.dimension;
   }
 
   public dateFieldType() {

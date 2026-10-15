@@ -1,0 +1,11 @@
+---
+source: cubesqlplanner/cubesqlplanner/src/tests/integration/join_aliases.rs
+assertion_line: 205
+expression: result
+---
+orders__id | orders__customer__review_count
+-----------+-------------------------------
+1          | 3                             
+2          | 3                             
+3          | 1                             
+4          | 0
