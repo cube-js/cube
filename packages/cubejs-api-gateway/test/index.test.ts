@@ -5,6 +5,7 @@ import express from 'express';
 // eslint-disable-next-line import/no-extraneous-dependencies
 import request from 'supertest';
 import jwt from 'jsonwebtoken';
+import { testLogger } from '@cubejs-backend/shared';
 
 import * as console from 'console';
 import { ApiGateway, ApiGatewayOptions, Query, QueryRequest, Request } from '../src';
@@ -29,8 +30,6 @@ jest.mock('@cubejs-backend/native', () => {
     get: (target, prop) => (prop === 'redactSqlLiterals' ? redactSqlLiterals : target[prop]),
   });
 });
-
-const logger = (type, message) => console.log({ type, ...message });
 
 async function requestBothGetAndPost(app, { url, query, body }, assert) {
   {
@@ -63,7 +62,7 @@ async function createApiGateway(
 ) {
   process.env.NODE_ENV = 'production';
 
-  const apiGateway = new ApiGateway(API_SECRET, compilerApi, async () => adapterApi, logger, {
+  const apiGateway = new ApiGateway(API_SECRET, compilerApi, async () => adapterApi, testLogger, {
     standalone: true,
     dataSourceStorage,
     basePath: '/cubejs-api',
@@ -95,7 +94,7 @@ describe('enforceSecurityChecks resolution', () => {
     API_SECRET,
     compilerApi,
     async () => new AdapterApiMock(),
-    logger,
+    testLogger,
     {
       standalone: true,
       dataSourceStorage: new DataSourceStorageMock(),
@@ -1119,7 +1118,7 @@ describe('API Gateway', () => {
           },
         };
       };
-      const apiGateway = new ApiGateway(API_SECRET, recordingCompilerApi, async () => new AdapterApiMock(), logger, {
+      const apiGateway = new ApiGateway(API_SECRET, recordingCompilerApi, async () => new AdapterApiMock(), testLogger, {
         standalone: true,
         dataSourceStorage: new DataSourceStorageMock(),
         basePath: '/cubejs-api',

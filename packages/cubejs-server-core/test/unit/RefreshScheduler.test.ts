@@ -1,6 +1,6 @@
 import R from 'ramda';
 import { BaseDriver } from '@cubejs-backend/query-orchestrator';
-import { pausePromise, SchemaFileRepository, createPromiseLock } from '@cubejs-backend/shared';
+import { pausePromise, SchemaFileRepository, createPromiseLock, testLogger } from '@cubejs-backend/shared';
 import { CubejsServerCore, CompilerApi, RefreshScheduler } from '../../src';
 
 const schemaContent = `
@@ -423,7 +423,7 @@ const setupScheduler = ({ repository, useOriginalSqlPreAggregations, skipAssertS
 
   const serverCore = new CubejsServerCoreDisabledRefreshTimer({
     apiSecret: 'foo',
-    logger: (msg, params) => console.log(msg, params),
+    logger: testLogger,
     driverFactory: async ({ securityContext }) => {
       assertSecurityContext(securityContext, skipAssertSecurityContext);
 
@@ -459,9 +459,7 @@ const setupScheduler = ({ repository, useOriginalSqlPreAggregations, skipAssertS
       compileContext: {
         useOriginalSqlPreAggregations,
       },
-      logger: (msg, params) => {
-        console.log(msg, params);
-      },
+      logger: testLogger,
     }
   );
 
@@ -553,7 +551,6 @@ describe('Refresh Scheduler', () => {
       const refreshResult = await refreshScheduler.runScheduledRefresh(ctx, {
         concurrency: 2, workerIndices: [0], queryIteratorState, preAggregationsWarmup: true,
       });
-      console.log(mockDriver.createdTables);
       expect(mockDriver.createdTables).toEqual(
         R.take(mockDriver.createdTables.length, result1),
       );
@@ -893,8 +890,6 @@ describe('Refresh Scheduler', () => {
     expect(mockDriver.createdTables).toEqual(
       result.filter((x, qi) => qi % 2 === 0).concat(result.filter((x, qi) => qi % 2 === 1)),
     );
-
-    console.log('Running refresh on existing queryIteratorSate');
 
     const refreshResult = await refreshScheduler.runScheduledRefresh(
       ctx,
