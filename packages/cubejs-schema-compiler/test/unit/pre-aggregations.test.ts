@@ -3,7 +3,7 @@ import path from 'path';
 import { FROM_PARTITION_RANGE, MAX_SOURCE_ROW_LIMIT } from '@cubejs-backend/shared';
 import { prepareJsCompiler, prepareYamlCompiler } from './PrepareCompiler';
 import { createECommerceSchema, createSchemaYaml } from './utils';
-import { PostgresQuery, queryClass, QueryFactory } from '../../src';
+import { PostgresQuery, QueryFactory } from '../../src';
 import { RedshiftQuery } from '../../src/adapter/RedshiftQuery';
 import {
   PreAggregationForQuery,
