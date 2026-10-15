@@ -210,8 +210,6 @@ export interface CreateOptions {
    * changes, the orchestrator's cached drivers are rebuilt from the new context.
    */
   driverVersion?: DriverVersionFn;
-  /** Seconds a driver replaced by a `driverVersion` change stays open before release. */
-  driverSwapReleaseDelay?: number;
   contextToCubeStoreRouterId?: ContextToCubeStoreRouterIdFn;
   contextToApiScopes?: ContextToApiScopesFn;
   repositoryFactory?: (context: RequestContext) => SchemaFileRepository;

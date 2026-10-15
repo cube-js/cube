@@ -197,18 +197,28 @@ describe('driverVersion', () => {
   });
 
   const releaseDelays: Array<[string, Record<string, unknown>, string | undefined, number]> = [
-    ['the default', {}, undefined, 600],
-    ['driverSwapReleaseDelay', { driverSwapReleaseDelay: 30 }, undefined, 30],
-    ['CUBEJS_DRIVER_SWAP_RELEASE_DELAY', {}, '45', 45],
+    ['the default query timeout', {}, undefined, 600],
+    ['CUBEJS_DB_QUERY_TIMEOUT', {}, '45s', 45],
+    [
+      'the longer of its queues\' execution timeouts',
+      {
+        orchestratorOptions: {
+          queryCacheOptions: { queueOptions: { executionTimeout: 30 } },
+          preAggregationsOptions: { queueOptions: { executionTimeout: 90 } },
+        },
+      },
+      undefined,
+      90,
+    ],
   ];
 
-  test.each(releaseDelays)('releases a replaced driver after %s delay', async (_name, options, env, seconds) => {
+  test.each(releaseDelays)('releases a replaced driver after %s', async (_name, options, env, seconds) => {
     jest.useFakeTimers({ doNotFake: ['nextTick', 'setImmediate'] });
 
-    const previousEnv = process.env.CUBEJS_DRIVER_SWAP_RELEASE_DELAY;
+    const previousEnv = process.env.CUBEJS_DB_QUERY_TIMEOUT;
 
     if (env !== undefined) {
-      process.env.CUBEJS_DRIVER_SWAP_RELEASE_DELAY = env;
+      process.env.CUBEJS_DB_QUERY_TIMEOUT = env;
     }
 
     try {
@@ -228,9 +238,9 @@ describe('driverVersion', () => {
       expect(built[1].releases).toEqual(0);
     } finally {
       if (previousEnv === undefined) {
-        delete process.env.CUBEJS_DRIVER_SWAP_RELEASE_DELAY;
+        delete process.env.CUBEJS_DB_QUERY_TIMEOUT;
       } else {
-        process.env.CUBEJS_DRIVER_SWAP_RELEASE_DELAY = previousEnv;
+        process.env.CUBEJS_DB_QUERY_TIMEOUT = previousEnv;
       }
     }
   });
