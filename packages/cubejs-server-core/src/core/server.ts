@@ -715,8 +715,8 @@ export class CubejsServerCore {
   }
 
   /**
-   * Swaps the drivers of `orchestratorApi` when `driverVersion` gives `context` a
-   * version other than the one they were built for (see `OrchestratorDrivers`).
+   * Starts a swap of the drivers of `orchestratorApi` when `driverVersion` gives `context`
+   * a version other than the one they were built for (see `OrchestratorDrivers`).
    */
   protected async checkDriverVersion(orchestratorApi: OrchestratorApi, context: RequestContext): Promise<OrchestratorApi> {
     const drivers = this.orchestratorDrivers.get(orchestratorApi);
@@ -734,7 +734,7 @@ export class CubejsServerCore {
     const { orchestratorId } = drivers;
     const isLive = () => !orchestratorApi.isReleased() && this.orchestratorStorage.peek(orchestratorId) === orchestratorApi;
 
-    if (await drivers.ensureVersion(requested, context, isLive) === 'evicted') {
+    if (drivers.ensureVersion(requested, context, isLive) === 'evicted') {
       // Serve from the api that holds the id now, if any
       return this.orchestratorStorage.peek(orchestratorId) === orchestratorApi
         ? orchestratorApi
@@ -765,7 +765,7 @@ export class CubejsServerCore {
     }
   }
 
-  /** Builds and tests one driver for an orchestrator; on failure releases it unless `keep` says it is in use. */
+  /** The `BuildDriverFn` of an orchestrator's `OrchestratorDrivers`. */
   protected async buildDriver(
     context: RequestContext,
     dataSource: string,
