@@ -1,6 +1,6 @@
 ---
 title: Semantic Layer Sync
-description: Automatically synchronize your Cube data model into BI tools like Superset, Metabase, Preset, and Tableau.
+description: Automatically synchronize your Cube data model into BI tools like Superset, Preset, and Tableau.
 hidden: true
 ---
 
@@ -15,6 +15,15 @@ Support for Preset and Superset is available on [all plans](https://cube.dev/pri
 Support for Tableau is available on [Enterprise plan](https://cube.dev/pricing).
 
 </Info>
+
+<Warning>
+
+Semantic Layer Sync with Metabase is deprecated. Consider moving to Cube's
+built-in [workbooks][ref-workbooks], [dashboards][ref-dashboards], and
+[Analytics Chat][ref-analytics-chat] instead. You can still
+[connect Metabase][ref-metabase] to Cube via the SQL API.
+
+</Warning>
 
 Semantic Layer Sync programmatically connects a BI tool to Cube via the [SQL
 API][ref-sql-api] and creates or updates BI-specific entities that correspond to
@@ -397,3 +406,7 @@ on, i.e., your development mode branch, shared branch, or main branch.
 [ref-auto-sus]: /admin/deployment/auto-suspension
 [ref-dap]: /docs/data-modeling/data-access-policies
 [ref-dap-mapping]: /docs/data-modeling/data-access-policies#custom-mapping
+[ref-workbooks]: /docs/explore-analyze/workbooks
+[ref-dashboards]: /docs/explore-analyze/dashboards
+[ref-analytics-chat]: /docs/explore-analyze/analytics-chat
+[ref-metabase]: /admin/connect-to-data/visualization-tools/metabase
