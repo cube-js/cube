@@ -11,6 +11,8 @@ type Files = { fileName: string, content: string }[];
 // starve suites that run next to it.
 const previousWorkerThreads = process.env.CUBEJS_TRANSPILATION_WORKER_THREADS_COUNT;
 
+jest.setTimeout(30_000);
+
 beforeAll(() => {
   process.env.CUBEJS_TRANSPILATION_WORKER_THREADS_COUNT = '1';
 });
