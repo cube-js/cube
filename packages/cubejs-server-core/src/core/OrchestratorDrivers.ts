@@ -250,7 +250,7 @@ export class OrchestratorDrivers {
   protected requestSwap(version: string, context: RequestContext, isLive: () => boolean) {
     if (this.swapping) {
       // Keeps a newer version queued behind the one being built
-      if (version !== this.swappingVersion) {
+      if (version !== this.swappingVersion && !this.isBackingOff(version)) {
         this.failures.delete(version);
         this.queued = { version, context, isLive };
       }
