@@ -35,7 +35,7 @@ class LateLookupDrivers extends OrchestratorDrivers {
   }
 }
 
-/** Rejects every token but `ok`, and shows how many swap errors it keeps. */
+/** Shows how many swap errors it keeps. */
 class FailingDrivers extends OrchestratorDrivers {
   public get failuresKept(): number {
     return this.failures.size;
