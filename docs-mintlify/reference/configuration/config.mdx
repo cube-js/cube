@@ -603,8 +603,8 @@ than the one the cached drivers were built for, Cube builds new drivers from
 that request's context in the background, tests their connections, and only
 then switches queries to them. Requests do not wait for this: until the switch,
 they are served by the cached drivers. Drivers built for no version, such as
-the readiness probe's, are the exception: a request with a version waits for its
-own, and fails if they cannot be built. Return `undefined` to keep the cached
+the readiness probe's, are the exception: a request with a version waits until a
+switch installs drivers for a version, and fails if its own cannot be built. Return `undefined` to keep the cached
 drivers.
 
 <Warning>
