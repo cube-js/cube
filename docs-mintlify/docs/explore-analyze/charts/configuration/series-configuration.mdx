@@ -3,7 +3,10 @@ title: Series configuration
 description: Configure individual series — mark type, color, and display options — independently from the global chart settings.
 ---
 
-Series configuration lets you override chart settings on a per-series basis. Access it from the **Fields** tab by expanding an individual series in the Y-axis section.
+Series configuration lets you override chart settings on a per-series basis. Each measure on a bar, line, area or scatter chart is one series:
+
+- On the **Fields** tab, set its mark type, its Y axis and its break-down.
+- On the **Style** tab, under its Y axis, set its color, line style, point shape, interpolation and [trend line](#trend-line).
 
 {/* TODO screenshot: series configuration panel expanded for one series (hidden — replace this comment with <Frame><img src="..." /></Frame> when image is ready) */}
 
@@ -19,7 +22,7 @@ Available mark types per series:
 
 To create a bar + line chart:
 1. Add two measures to the Y axis.
-2. Expand the second series in the Fields tab.
+2. Find the second measure on the Fields tab.
 3. Set its mark type to **Line**.
 4. Optionally assign it to the **Right Y axis** in the same panel (see [Axes](/docs/explore-analyze/charts/configuration/axes)).
 
@@ -27,9 +30,32 @@ To create a bar + line chart:
 
 ## Series color
 
-When no **Color** channel is assigned (single-color charts with no color-by dimension), each series has an individual color picker. Click the color swatch to open the picker and set a custom color for that series.
+When no **Color** channel is assigned (single-color charts with no color-by dimension), each series has an individual color picker. On the Style tab, click the color swatch to open the picker and set a custom color for that series.
 
 This setting has no effect when a Color channel is active — in that case, colors are managed by the palette in [Color & stacking](/docs/explore-analyze/charts/configuration/color-and-stacking).
+
+## Trend line
+
+A trend line summarizes the series with a dashed line. To add one, go to the Style tab and click the **Trend line** toggle on the line under the series' style controls. The toggle is available when the X axis shows a time or numeric dimension.
+
+When the trend line is on, select its model:
+
+| Model | What it draws |
+| --- | --- |
+| **Linear** | A straight line. This is the default. |
+| **Exponential** | A curve that grows or decays by a constant ratio. |
+| **Polynomial** | A curve of the **Degree** you set, from 2 to 8. The default is 3. |
+| **Moving average** | The average of each point and the points before it. The **Period** you set, from 2 to 100, is the number of points. The line starts at the first point that has a full period. The default is 3. |
+| **Logarithmic** | A curve that rises or falls quickly, then levels off. |
+| **Power** | A curve of the form y = a·x<sup>b</sup>. |
+
+**Logarithmic** and **Power** need a numeric X axis. On a time X axis, they are not available, and a saved Logarithmic or Power trend line shows as Linear.
+
+**Exponential** and **Power** need values above zero. A series with a zero or a negative value shows no trend line. **Logarithmic** and **Power** also need X values above zero.
+
+Click the **Confidence band (95%)** toggle to show the 95% confidence interval of the fitted curve as a shaded band. The band is not available for **Moving average**.
+
+When a series has a break-down, each value of the break-down gets its own trend line and band, in its own color. When the chart has small multiples, each panel gets its own trend line.
 
 ## Y axis assignment
 
