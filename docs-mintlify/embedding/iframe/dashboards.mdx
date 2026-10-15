@@ -191,9 +191,10 @@ attribute blocks file downloads unless it includes `allow-downloads`:
   error shown.
 - A `Content-Security-Policy: sandbox …` response header on your page applies
   the same restriction to the iframe, so add `allow-downloads` there too.
-- Other CSP directives on your page (`frame-src`, `default-src`, and so on) and
-  `Permissions-Policy` do not affect downloads: they apply to your page, not to
-  the embed's document.
+- Other CSP directives on your page and `Permissions-Policy` do not affect
+  downloads: none of them governs file downloads. `frame-src` (or its
+  `default-src` fallback) must still allow your Cube tenant's origin for the
+  embed to load at all.
 
 ## Show or hide the AI chat
 
