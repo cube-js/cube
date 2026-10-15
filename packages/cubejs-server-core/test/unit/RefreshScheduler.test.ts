@@ -391,6 +391,22 @@ class MockDriver extends BaseDriver {
 
 let testCounter = 1;
 
+// The query queue catches driver factory errors and only logs them, so a failed `expect`
+// inside a factory never reaches the test. Collect them and fail the test in `afterEach`.
+let securityContextErrors: unknown[] = [];
+
+const assertSecurityContext = (securityContext: unknown, skipAssertSecurityContext?: true) => {
+  try {
+    expect(typeof securityContext).toEqual('object');
+    if (!skipAssertSecurityContext) {
+      expect(securityContext).toHaveProperty('tenantId');
+    }
+  } catch (e) {
+    securityContextErrors.push(e);
+    throw e;
+  }
+};
+
 const setupScheduler = ({ repository, useOriginalSqlPreAggregations, skipAssertSecurityContext, refreshKeyRenewalThreshold }: {
   repository: SchemaFileRepository,
   useOriginalSqlPreAggregations?: boolean,
@@ -411,18 +427,12 @@ const setupScheduler = ({ repository, useOriginalSqlPreAggregations, skipAssertS
     apiSecret: 'foo',
     logger: (msg, params) => console.log(msg, params),
     driverFactory: async ({ securityContext }) => {
-      expect(typeof securityContext).toEqual('object');
-      if (!skipAssertSecurityContext) {
-        expect(securityContext.hasOwnProperty('tenantId')).toEqual(true);
-      }
+      assertSecurityContext(securityContext, skipAssertSecurityContext);
 
       return mockDriver;
     },
     externalDriverFactory: async ({ securityContext }) => {
-      expect(typeof securityContext).toEqual('object');
-      if (!skipAssertSecurityContext) {
-        expect(securityContext.hasOwnProperty('tenantId')).toEqual(true);
-      }
+      assertSecurityContext(securityContext, skipAssertSecurityContext);
 
       return externalDriver;
     },
@@ -471,6 +481,15 @@ describe('Refresh Scheduler', () => {
     delete process.env.CUBEJS_TOUCH_PRE_AGG_TIMEOUT;
     delete process.env.CUBEJS_DB_QUERY_TIMEOUT;
     delete process.env.CUBEJS_REFRESH_KEY_LOCAL_TIME;
+    securityContextErrors = [];
+  });
+
+  afterEach(() => {
+    const [error] = securityContextErrors;
+    securityContextErrors = [];
+    if (error) {
+      throw error;
+    }
   });
 
   afterAll(async () => {
@@ -1118,10 +1137,11 @@ describe('Refresh Scheduler', () => {
       repository: repositoryWithoutPreAggregations,
     });
 
+    const ctx = { authInfo: { tenantId: 'tenant1' }, securityContext: { tenantId: 'tenant1' }, requestId: 'XXX' };
     const queryIteratorState = {};
 
     for (let i = 0; i < 1000; i++) {
-      const refreshResult = await refreshScheduler.runScheduledRefresh(null, {
+      const refreshResult = await refreshScheduler.runScheduledRefresh(ctx, {
         concurrency: 1,
         workerIndices: [0],
         queryIteratorState,
