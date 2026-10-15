@@ -1,5 +1,5 @@
 import { SchemaFileRepository } from '@cubejs-backend/shared';
-import { BaseQuery } from '@cubejs-backend/schema-compiler';
+import { BaseQuery, MysqlQuery, PostgresQuery } from '@cubejs-backend/schema-compiler';
 import type { Compiler, QueryFactory } from '@cubejs-backend/schema-compiler';
 import { CompilerApi } from '../../src/core/CompilerApi';
 import { DbTypeInternalFn } from '../../src/core/types';
@@ -289,6 +289,57 @@ views:
       expect(result.sql).toBeNull();
       expect(result.preAggregations.map((p: any) => p.preAggregationId)).toEqual(['visits.bySource']);
       expect(matchOnlyRun).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe('createQueryFactory', () => {
+    const repository: SchemaFileRepository = {
+      localPath: () => '/mock/path',
+      dataSchemaFiles: () => Promise.resolve([
+        {
+          fileName: 'model.js',
+          content: `
+            cube('orders', {
+              sql: 'SELECT * FROM orders',
+              measures: { count: { type: 'count' } },
+            });
+            cube('customers', {
+              sql: 'SELECT * FROM customers',
+              measures: { count: { type: 'count' } },
+            });
+            cube('events', {
+              sql: 'SELECT * FROM events',
+              dataSource: 'events',
+              measures: { count: { type: 'count' } },
+            });
+            cube('sessions', {
+              sql: 'SELECT * FROM sessions',
+              dataSource: 'events',
+              measures: { count: { type: 'count' } },
+            });
+          `
+        }
+      ])
+    };
+
+    test('resolves the dialect once per data source', async () => {
+      const dbType = jest.fn(async ({ dataSource }) => (dataSource === 'events' ? 'mysql' : 'postgres'));
+      const compilerApi = new CompilerApi(repository, dbType, {
+        logger: () => {}, // eslint-disable-line @typescript-eslint/no-empty-function
+      });
+
+      try {
+        const compilers = await compilerApi.getCompilers();
+        dbType.mockClear();
+
+        const queryFactory = await compilerApi.createQueryFactory(compilers);
+        expect(dbType.mock.calls.map(([ctx]) => ctx.dataSource).sort()).toEqual(['default', 'events']);
+
+        expect(queryFactory.createQuery('orders', compilers, {})).toBeInstanceOf(PostgresQuery);
+        expect(queryFactory.createQuery('sessions', compilers, {})).toBeInstanceOf(MysqlQuery);
+      } finally {
+        compilerApi.dispose();
+      }
     });
   });
 });

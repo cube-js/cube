@@ -327,7 +327,7 @@ export class RefreshScheduler {
     const processed = [];
 
     await Promise.all(cubeEvaluator.cubeNames().map(async (name) => {
-      const ds = cubeEvaluator.cubeFromPath(name).dataSource ?? 'default';
+      const ds = cubeEvaluator.cubeDataSource(name);
       if (processed.indexOf(ds) === -1) {
         processed.push(ds);
         await orchestratorApi.forceReconcile(ds);

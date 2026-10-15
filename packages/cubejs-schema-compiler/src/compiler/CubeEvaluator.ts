@@ -1050,9 +1050,7 @@ export class CubeEvaluator extends CubeSymbols {
         ) && (
           !dataSources ||
           (dataSources && dataSources.length === 0) ||
-          dataSources.includes(
-            this.evaluatedCubes[cube].dataSource || 'default'
-          )
+          dataSources.includes(this.cubeDataSource(cube))
         )
       ))
       .flatMap(cube => {
@@ -1077,7 +1075,7 @@ export class CubeEvaluator extends CubeSymbols {
               preAggregationName,
               preAggregation: preAggregations[preAggregationName],
               cube,
-              dataSource: this.evaluatedCubes[cube].dataSource || 'default',
+              dataSource: this.cubeDataSource(cube),
               references: this.evaluatePreAggregationReferences(cube, preAggregations[preAggregationName]),
               refreshKey,
               indexesReferences: indexes && Object.keys(indexes).reduce((obj, indexName) => {
@@ -1146,6 +1144,10 @@ export class CubeEvaluator extends CubeSymbols {
 
   public cubeFromPath(path: string): EvaluatedCube {
     return this.evaluatedCubes[this.cubeNameFromPath(path)];
+  }
+
+  public cubeDataSource(path: string): string {
+    return this.cubeFromPath(path).dataSource || 'default';
   }
 
   public cubeNameFromPath(path: string) {
