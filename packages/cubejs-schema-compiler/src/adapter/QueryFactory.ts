@@ -2,11 +2,11 @@ import type { CubeEvaluator } from '../compiler/CubeEvaluator';
 
 export class QueryFactory {
   public constructor(
-    private dataSourceToQueryClass: Record<string, any>,
+    protected dataSourceToQueryClass: Record<string, any>,
   ) {
   }
 
-  public queryClassForDataSource(dataSource: string) {
+  protected queryClassForDataSource(dataSource: string) {
     const QueryClass = this.dataSourceToQueryClass[dataSource];
     if (!QueryClass) {
       throw new Error(`Undefined dbType or dialectClass for '${dataSource}' data source`);
