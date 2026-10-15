@@ -636,6 +636,30 @@ describe('driverVersion', () => {
     expect(await driver()).toMatchObject({ builtFrom: { password: 'a' } });
   });
 
+  test('a request waiting on the probe-built drivers stops waiting once a version is installed', async () => {
+    const { request, swapped, driver } = createCore({ driverFactory: probeFallbackFactory });
+
+    await request();
+    await driver();
+
+    const toA = gate();
+    const toB = gate();
+    onTestConnection = (d) => ({ a: toA.opened, b: toB.opened } as Record<string, Promise<void>>)[d.builtFrom.password];
+
+    const servedA = request('a');
+    await waitFor(() => built.length === 2);
+    const servedB = request('b');
+
+    toA.open();
+    // b's swap is queued behind a's and still blocked, yet a is served
+    expect(await Promise.race([servedA.then(() => 'served'), waitFor(() => built.length === 3).then(() => 'waiting')])).toBe('served');
+
+    toB.open();
+    await servedB;
+    await swapped();
+    expect(await driver()).toMatchObject({ builtFrom: { password: 'b' } });
+  });
+
   test('a request with a version fails rather than use the drivers the probe built', async () => {
     const { request, driver } = createCore({ driverFactory: probeFallbackFactory });
 
@@ -648,9 +672,9 @@ describe('driverVersion', () => {
       }
     };
 
-    await expect(request('a')).rejects.toThrow('No drivers could be built for this driverVersion');
+    await expect(request('a')).rejects.toThrow('bad credential');
     // Backing off, it still refuses rather than serve the probe's driver
-    await expect(request('a')).rejects.toThrow('No drivers could be built for this driverVersion');
+    await expect(request('a')).rejects.toThrow('bad credential');
     expect(await driver()).toBe(probeDriver);
   });
 
