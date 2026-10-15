@@ -89,9 +89,7 @@ const DRIVER_SWAP_PING_PONG_MS = 5 * 1000;
 type DriverVersionState = {
   orchestratorId: string;
   version: string | undefined;
-  /** Context drivers are built from, moved to the swapping request's context on commit. */
-  ctxRef: { current: RequestContext };
-  swapping?: { version: string, promise: Promise<void> };
+  swapping?: Promise<void>;
   lastFailure?: { version: string, at: number, reported: boolean };
   lastSwapAt?: number;
   previousVersion?: string;
@@ -703,7 +701,7 @@ export class CubejsServerCore {
       }
 
       if (state.swapping) {
-        await state.swapping.promise.catch(() => undefined);
+        await state.swapping.catch(() => undefined);
       } else if (this.isDriverSwapBackingOff(state, requested)) {
         return orchestratorApi;
       } else {
@@ -727,7 +725,7 @@ export class CubejsServerCore {
             state.swapping = undefined;
           });
 
-        state.swapping = { version: requested, promise };
+        state.swapping = promise;
 
         await promise;
       }
@@ -866,7 +864,6 @@ export class CubejsServerCore {
     const state: DriverVersionState = {
       orchestratorId,
       version: initialDriverVersion,
-      ctxRef,
       swapDrivers: null,
     };
 
