@@ -298,7 +298,7 @@ Metrics are exported with the following Prometheus labels:
 | `pod_name` | `cube_cpu_usage_ratio`, `cube_memory_usage_ratio` | Name of the pod that the measurement was taken on. |
 | `deployment_id` | `cube_requests_*` | Identifier of the [deployment][ref-deployments]. |
 | `api_type` | `cube_requests_*` | Type of [data API][ref-apis] that served the requests (`rest`, `sql`, etc.), the same values as in [Query History][ref-query-history]. `unknown` if the API type is not known. |
-| `request_source` | `cube_requests_*` | Source of the requests: `ai-engineer` for requests coming from AI features, `other` for any other source, `unknown` if the requests carry no source. |
+| `request_source` | `cube_requests_*` | Source of the requests: `cube`, `sql-runner`, `playground`, `embedding`, `cube-excel-addin`, `cube-sheets-addon`, or `ai-engineer` (AI features), matching the **Source** filter in [Query History][ref-query-history]. `other` for any other source, `unknown` if the requests carry no source (both are shown as **Other** in Query History). |
 
 Request metrics are reported per `api_type` and `request_source` combination, so
 you can break down request counts and latency by data API:
