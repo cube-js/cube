@@ -1,5 +1,6 @@
 import { Readable } from 'stream';
 import type { BaseDriver } from '@cubejs-backend/base-driver';
+import { testLogger } from '@cubejs-backend/shared';
 import type { OmitKnown } from '@cubejs-backend/shared';
 import { QueryOrchestrator } from '../../src/orchestrator/QueryOrchestrator';
 import { LocalCacheDriver } from '../../src/orchestrator/LocalCacheDriver';
@@ -367,8 +368,7 @@ describe('QueryOrchestrator', () => {
     };
     // The mocks implement only the part of BaseDriver the orchestrator touches.
     const driverFactory = (dataSource: string) => mockDriverFor(dataSource) as unknown as BaseDriver;
-    const logger =
-      (msg, params) => console.log(new Date().toJSON(), msg, params);
+    const logger = testLogger;
     const options = (processUid) => ({
       externalDriverFactory: () => externalMockDriverLocal as unknown as BaseDriver,
       queryCacheOptions: {

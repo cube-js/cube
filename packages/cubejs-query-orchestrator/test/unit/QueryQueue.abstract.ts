@@ -3,7 +3,7 @@ import crypto from 'crypto';
 
 import type { QueryKey, QueryKeyHash, QueueDriverConnectionInterface, QueueDriverInterface, QueueDriverOptions } from '@cubejs-backend/base-driver';
 import { QueuePriority } from '@cubejs-backend/base-driver';
-import { pausePromise } from '@cubejs-backend/shared';
+import { pausePromise, testLogger } from '@cubejs-backend/shared';
 import { CubeStoreDriver, CubestoreQueueDriverConnection } from '@cubejs-backend/cubestore-driver';
 
 import { factoryQueueDriver, QueryQueue, QueryQueueOptions } from '../../src';
@@ -37,7 +37,7 @@ export const QueryQueueTest = (name: string, options: QueryQueueTestOptions) => 
     );
 
     const delayFn = (result, delay) => new Promise(resolve => setTimeout(() => resolve(result), delay));
-    const logger = jest.fn((message, event) => console.log(`${message} ${JSON.stringify(event)}`));
+    const logger = jest.fn(testLogger);
 
     let delayCount = 0;
     let streamCount = 0;
