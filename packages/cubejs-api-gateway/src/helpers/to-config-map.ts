@@ -42,7 +42,7 @@ function toConfigMap(metaConfig: MetaConfig[]): MetaConfigMap {
 
 export default toConfigMap;
 export {
-  MetaConfig,
-  MetaConfigMap,
+  type MetaConfig,
+  type MetaConfigMap,
   toConfigMap,
 };

@@ -179,7 +179,7 @@ export type ExternalDbTypeFn = (context: RequestContext) => DatabaseType;
 export type ExternalDriverFactoryFn = (context: RequestContext) => Promise<BaseDriver> | BaseDriver;
 export type ExternalDialectFactoryFn = (context: RequestContext) => BaseQuery;
 
-export { LoggerFnParams, LoggerFn } from '@cubejs-backend/shared';
+export type { LoggerFnParams, LoggerFn } from '@cubejs-backend/shared';
 
 export type BiToolSyncConfig = {
   type: string;

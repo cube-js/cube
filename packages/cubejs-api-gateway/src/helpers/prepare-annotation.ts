@@ -168,9 +168,9 @@ function prepareAnnotation(metaConfig: MetaConfig[], query: any, memberTarget?: 
 
 export default prepareAnnotation;
 export {
-  ConfigItem,
-  MemberTarget,
-  GranularityMeta,
+  type ConfigItem,
+  type MemberTarget,
+  type GranularityMeta,
   annotation,
   prepareAnnotation,
 };
