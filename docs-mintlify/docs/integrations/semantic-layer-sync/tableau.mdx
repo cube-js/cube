@@ -223,6 +223,22 @@ config: {
 Syncs with Tableau Cloud and Tableau Server run automatically via the [Tableau
 API][tableau-api].
 
+### Hierarchies and folders
+
+[Hierarchies][ref-hierarchies] defined in your data model are synced to Tableau
+as hierarchies, so users can drill down through their levels. [Folders][ref-view-folders]
+defined in views are synced as Tableau folders, including any hierarchies listed
+in them. Tableau doesn't support nested folders, so they are
+[flattened][ref-view-folders].
+
+Define hierarchies and folders in the data model rather than in Tableau. Each
+sync overwrites the published data source, so hierarchies or folders added to
+it in Tableau are lost on the next sync.
+
+To build a hierarchy on a calculation, define the calculation as a
+[dimension][ref-dimensions] in the data model and use that dimension as a level
+of the hierarchy.
+
 ### Tableau Desktop
 
 The recommended way to use Cube with Tableau Desktop is to connect to your
@@ -248,6 +264,9 @@ per cube or view. You can open these files in Tableau to create data sources.
 
 
 [tds]: https://help.tableau.com/current/pro/desktop/en-us/export_connection.htm
+[ref-hierarchies]: /reference/data-modeling/hierarchies
+[ref-view-folders]: /reference/data-modeling/view#folders
+[ref-dimensions]: /reference/data-modeling/dimensions
 [ref-node-extra-ca-certs]: /reference/configuration/environment-variables#node_extra_ca_certs
 [tableau-api]: https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api.htm
 [tableau-api-authentication]: https://help.tableau.com/current/server/en-us/security_personal_access_tokens.htm#create-personal-access-tokens
