@@ -11,8 +11,6 @@ type Files = { fileName: string, content: string }[];
 // starve suites that run next to it.
 const previousWorkerThreads = process.env.CUBEJS_TRANSPILATION_WORKER_THREADS_COUNT;
 
-// A case runs up to eight compiles, each starting its own pool: ~1.6s locally, but CI runs this file
-// over 2x slower and a case crossed the default 5s there.
 jest.setTimeout(30_000);
 
 beforeAll(() => {
