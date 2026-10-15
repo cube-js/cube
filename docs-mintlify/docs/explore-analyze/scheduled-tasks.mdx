@@ -41,10 +41,11 @@ searchable. Each row shows:
   under it, in your timezone and naming it. It reads "Paused" for a paused
   task, "Manual" for a manual one, and "Not scheduled" for an enabled task
   that has no next run.
-- **Notifications** — "Inbox" when the task notifies its creator in the
-  [inbox](/docs/inbox) (see
-  [Getting notified when a run finishes](#getting-notified-when-a-run-finishes)),
-  otherwise "—".
+- **Notifications** — where the task's notifications go (see
+  [Notifying people when a run finishes](#notifying-people-when-a-run-finishes)):
+  its channels, how many people and groups, and its Slack channels, for
+  example "Inbox, Email · 3 people, 1 group · #sales, #finance-alerts", or
+  "Nobody is notified".
 - **Last check** — on a conditional task, the outcome of its last check, for
   example "3 minutes ago, Count increased by 2.7%, notified", or "Not checked
   yet" before the first one; "—" on a task with no condition. Only the task's
@@ -78,9 +79,9 @@ A task has:
   task created from chat keeps that chat's agent.
 - **Schedule** — how often the task runs (see below).
 - **Enabled** — a toggle to activate or pause a scheduled task.
-- **Notify me when a run finishes** — a toggle to get an
-  [inbox](/docs/inbox) notification after each run (see
-  [Getting notified when a run finishes](#getting-notified-when-a-run-finishes)).
+- **Notify** — the people and groups to notify when a run finishes, and how:
+  **Inbox**, **Email**, and **Slack** channels, in any combination (see
+  [Notifying people when a run finishes](#notifying-people-when-a-run-finishes)).
 - **Notify only when a condition is met** (optional) — a metric condition
   that decides whether the agent runs at all (see
   [Conditional tasks](#conditional-tasks)).
@@ -141,14 +142,21 @@ The task notifies once each time the condition starts to hold:
 - The agent runs the task's **Instructions** in a new chat thread that opens
   with the facts it found: the value read, what it was compared with, and the
   periods. Ask follow-up questions in that thread as in any chat.
-- If the task's
-  [Notify me when a run finishes](#getting-notified-when-a-run-finishes)
-  toggle is on, your in-app inbox gets a message titled with the task's name
-  and *"condition met"* that states the change, for example *"Revenue rose
-  7.2 % (Aug → Sep 2026), above your 5 % threshold"*. The message names the
-  measure by the title picked in the task dialog, or by its full name (such
-  as `orders.revenue`) on a task that has no title for it. With the toggle
-  off, the agent still writes the thread, but nothing reaches your inbox.
+- The task's [recipients](#notifying-people-when-a-run-finishes) are
+  notified on the channels the task has on. The creator's message is titled
+  with the task's name and *"condition met"* and states the change, for
+  example *"Revenue rose 7.2 % (Aug → Sep 2026), above your 5 % threshold"*.
+  The message names the measure by the title picked in the task dialog, or by
+  its full name (such as `orders.revenue`) on a task that has no title for
+  it. Everyone else, and each Slack channel, is told that the condition
+  started to hold, without the figures, because the check read them with the
+  creator's data access.
+
+A task with a condition must notify someone: **Inbox** or **Email** on with at
+least one person or group picked, or **Slack** on with at least one channel.
+Until it does, the dialog's **Save** stays disabled and says why, and the agent
+refuses the save. The Platform API refuses it too when the request sets the
+task's `notification` field; a request that leaves that field out is saved.
 
 While the condition keeps holding, later checks send nothing. Once a check
 finds it no longer holding, the next time it holds notifies again. Changing
@@ -209,9 +217,9 @@ That exception carries the creator's data access with it: an admin or a
 **Manage all scheduled tasks** holder who edits another user's task changes what runs under that user's access. A run's chat
 thread belongs to the task's creator, and only the creator, admins, users with
 the **Access chat history**
-[permission](/admin/users-and-permissions/custom-roles), and people the thread
-itself is shared with can open it. Sharing the task doesn't share its runs'
-chat threads.
+[permission](/admin/users-and-permissions/custom-roles), people the thread
+itself is shared with, and the people and groups the task is shared with can
+open it. For anyone the task is shared with, the thread is view-only.
 
 From the list, you can:
 
@@ -263,6 +271,8 @@ The page shows:
 - **Instructions** — the task's prompt.
 - **Repeats** — the schedule with its timezone, for example "Daily at 9:00
   AM UTC".
+- **Notifies** — where the task's notifications go, as in the list's
+  **Notifications** column.
 - **Condition** — on a conditional task only, after **Instructions** and
   **Repeats**: the condition in plain language (for example, *"When Count
   changes by ≥ 5 % vs the previous month"*), then, on a line of its own,
@@ -277,8 +287,9 @@ The **Last check** shows when the last check ran, its result (**Condition not
 met**, **Condition met — notified**, **Still holding — already notified**,
 **Could not check**, or **Check failed**), the value it read with the
 comparison it made, and, when nothing was sent, why. On a task that notifies
-nobody when its condition holds, for example because **Notify me when a run
-finishes** is off, the two results of a check that finds it holding read
+nobody when its condition holds, for example one created through the Platform
+API without a `notification` field, the two results of a check that finds it
+holding read
 **Condition met** and **Still holding**. While a check runs, it reads
 **Checking…**. After a check that finds the condition starting to hold, the
 agent run it started appears in **History** on the same page. The check reads
@@ -308,22 +319,58 @@ run.
 The task runs headlessly under the security context of the user who created
 it, so it sees exactly the data that user can access.
 
-### Getting notified when a run finishes
+### Notifying people when a run finishes
 
-Turn on **Notify me when a run finishes** in the task's create or edit dialog
-to get an [inbox](/docs/inbox) notification when a run finishes or fails. The
-toggle is on by default for a task that you create in the dialog. It applies
-to both scheduled runs and **Run now**. On a
-[conditional task](#conditional-tasks), a check that runs no agent sends
-nothing.
+The **Notify** section of the task's create or edit dialog decides who hears
+about a finished run, and how:
 
-The notification goes to the task's creator, even when an admin or another user
-with **Manage all scheduled tasks** edits or runs the task. See [Inbox](/docs/inbox#notification-types) for what it shows.
+- **People and groups** — any workspace users and user groups, picked from
+  the same search as the **Share** dialog. A group is expanded to its members
+  when the run finishes, so people who join it later are notified too. A
+  person picked directly and through a group is notified once.
+- **Send by** — **Inbox** (an [inbox](/docs/inbox) notification), **Email**,
+  and **Slack**, in any combination. **Inbox** and **Email** go to every
+  person and group picked above. With **Slack** on, pick one or more
+  channels: each gets one post. If Slack isn't connected to the workspace,
+  the dialog offers to connect it. **Inbox** is unavailable when the inbox is
+  off for the workspace, and a task saved with it on then sends no inbox
+  notifications but still sends its other channels.
 
-A task that you create with the agent or the Platform API has notifications
-off, unless you ask for them: for example, *"schedule a daily summary of
-yesterday's signups at 9am and notify me when it runs."* With the Platform
-API, set `notificationEnabled` to `true`.
+A new task starts with you picked and **Inbox** on, so it notifies you the way
+it did before; you can remove yourself. With every channel off, nobody is
+notified, and the dialog says so.
+
+Each notification carries the task name, whether the run succeeded, the start
+of the agent's answer, and a link that opens the run. Each Slack post carries
+the same answer and link. Picking a person or group shares the task with them,
+view-only, so the link opens the run for them. Removing them from **Notify**
+leaves the share in place; remove it in the **Share** dialog. Besides the
+creator, a run notifies only people who can open the task (admins, and anyone
+it's shared with directly, through a group, or with the whole organization)
+and read its deployment. Anyone else picked is skipped, and the dialog marks
+them **Not shared: won't be notified**. Deactivated users and people outside
+the workspace get nothing.
+
+Notifications go to the task's recipients, whoever runs the task: an admin or
+a user with **Manage all scheduled tasks** who edits or runs it is notified
+only if they are a recipient.
+
+Each task email has an unsubscribe link. Unsubscribing stops that person's
+emails from this task, scheduled runs included, until the task's creator picks
+them again directly.
+
+A failed run notifies only the task's creator, if they are among the task's
+recipients, on the task's **Inbox** and **Email** channels; other recipients
+and Slack channels get nothing. Notifications apply to both scheduled runs and
+**Run now**. On a [conditional task](#conditional-tasks), a check that runs no
+agent sends nothing. See [Inbox](/docs/inbox#notification-types) for what an
+inbox notification shows.
+
+A task that you create with the agent or the Platform API notifies nobody,
+unless you ask for it: for example, *"every Monday summarize sales, email it
+to the Finance group and anna@example.com, and post it in #sales."* The agent
+names people by email and groups by name. With the Platform API, set the
+task's `notification` field.
 
 ### What the agent can do in a scheduled run
 
@@ -365,7 +412,7 @@ task"*.
 
 The agent manages task definitions: when listing tasks, it can report each
 task's id, name, description, schedule, timezone, enabled state, next run
-time, **Notify me when a run finishes** setting, and condition with its last
+time, who it notifies and how, and condition with its last
 check (the check's values and error text only to the task's creator). It can
 also add, change, or remove a task's [condition](#conditional-tasks) — for
 example, *"tell me when monthly orders change by 5% or more."* A task's run
@@ -380,7 +427,14 @@ scripts and CI with the [Platform API](/api-reference/introduction) (by
 default, only admins can
 [create API keys](/admin/account-billing/api-keys#personal-api-keys)). Its
 Scheduled Tasks endpoints follow the same [limits](#limits) and
-[permissions](#managing-tasks) as the **Scheduled** page. A task's optional
+[permissions](#managing-tasks) as the **Scheduled** page. A task's
+`notification` field holds its
+[recipients and channels](#notifying-people-when-a-run-finishes): `channels`
+(`inbox`, `email`, `slack`), `userIds`, `groupIds`, and `slackChannels`, with
+at most 1,000 users, 200 groups, and 50 Slack channels. An unknown user or
+group id is refused. The older `notificationEnabled` field is
+deprecated: it reads whether the creator gets an inbox notification, and
+writing it adds or removes that. A task's optional
 `condition` field holds its [condition](#conditional-tasks) (`null` on an
 update removes it), and `lastConditionCheck` holds its latest check, whose
 values and error text are returned only to the task's creator. See the
