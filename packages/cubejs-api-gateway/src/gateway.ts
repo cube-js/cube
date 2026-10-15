@@ -3211,7 +3211,7 @@ class ApiGateway {
   }
 }
 export {
-  UserBackgroundContext,
-  ApiGatewayOptions,
+  type UserBackgroundContext,
+  type ApiGatewayOptions,
   ApiGateway,
 };

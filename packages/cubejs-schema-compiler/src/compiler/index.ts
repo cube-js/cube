@@ -1,12 +1,12 @@
 export * from './PrepareCompiler';
 export * from './UserError';
 export * from './converters';
-export {
+export type {
   CubeDefinition,
   AccessPolicyDefinition,
   ViewIncludedMember,
 } from './CubeSymbols';
-export {
+export type {
   PreAggregationFilters,
   PreAggregationInfo,
   EvaluatedCube,

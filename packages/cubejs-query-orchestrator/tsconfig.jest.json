@@ -1,7 +1,6 @@
 {
   "extends": "./tsconfig.json",
   "compilerOptions": {
-    "isolatedModules": true,
     "paths": {
       "@cubejs-backend/shared": ["../cubejs-backend-shared/src"],
       "@cubejs-backend/base-driver": ["../cubejs-base-driver/src"]

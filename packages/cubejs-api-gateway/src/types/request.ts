@@ -223,7 +223,7 @@ type PreAggJobStatusResponse =
   | PreAggJobStatusItem[]
   | PreAggJobStatusObject;
 
-export {
+export type {
   ConvertQuery,
   RequestContext,
   RequestExtension,
