@@ -20,7 +20,7 @@ use crate::{
             get_test_tenant_ctx_with_cube_data_sources,
             get_test_tenant_ctx_with_multi_data_source_view,
             get_test_tenant_ctx_with_multi_data_source_view_and_templates, init_testing_logger,
-            member_expression_sql, LogicalPlanTestUtils, TestContext, MSSQL_FLOAT_LITERAL_TEMPLATE,
+            member_expression_sql, LogicalPlanTestUtils, TestContext,
         },
         DatabaseProtocol,
     },
@@ -28,6 +28,106 @@ use crate::{
     transport::TransportLoadRequestQuery,
     CubeError,
 };
+
+const MSSQL_FLOAT_LITERAL_TEMPLATE: &str =
+    "{% if is_int32 %}CAST({{ value }} AS DECIMAL(10, 0)){% else %}{{ value }}{% endif %}";
+
+#[test]
+fn test_mssql_integral_float_literal_rendering() {
+    use crate::compile::{
+        engine::df::wrapper::{SqlQuery, WrappedSelectNode},
+        test::sql_generator,
+    };
+    use datafusion::logical_plan::Expr;
+    use std::collections::HashMap;
+
+    for (literal, original, mssql) in [
+        (
+            ScalarValue::Float32(Some(100.0)),
+            "100",
+            "CAST(100 AS DECIMAL(10, 0))",
+        ),
+        (ScalarValue::Float32(Some(0.1)), "0.1", "0.1"),
+        (
+            ScalarValue::Float64(Some(100.0)),
+            "100",
+            "CAST(100 AS DECIMAL(10, 0))",
+        ),
+        (
+            ScalarValue::Float64(Some(-100.0)),
+            "-100",
+            "CAST(-100 AS DECIMAL(10, 0))",
+        ),
+        (
+            ScalarValue::Float64(Some(0.0)),
+            "0",
+            "CAST(0 AS DECIMAL(10, 0))",
+        ),
+        (
+            ScalarValue::Float64(Some(-0.0)),
+            "-0",
+            "CAST(-0 AS DECIMAL(10, 0))",
+        ),
+        (ScalarValue::Float64(Some(100.1)), "100.1", "100.1"),
+        (
+            ScalarValue::Float64(Some(2_147_483_647.0)),
+            "2147483647",
+            "CAST(2147483647 AS DECIMAL(10, 0))",
+        ),
+        (
+            ScalarValue::Float64(Some(-2_147_483_648.0)),
+            "-2147483648",
+            "CAST(-2147483648 AS DECIMAL(10, 0))",
+        ),
+        (
+            ScalarValue::Float64(Some(2_147_483_648.0)),
+            "2147483648",
+            "2147483648",
+        ),
+        (
+            ScalarValue::Float32(Some(2_147_483_648.0)),
+            "2147483600",
+            "CAST(2147483600 AS DECIMAL(10, 0))",
+        ),
+        (
+            ScalarValue::Float64(Some(1e37)),
+            "10000000000000000000000000000000000000",
+            "10000000000000000000000000000000000000",
+        ),
+        (
+            ScalarValue::Float32(None),
+            "CAST(NULL AS FLOAT)",
+            "CAST(NULL AS FLOAT)",
+        ),
+        (
+            ScalarValue::Float64(None),
+            "CAST(NULL AS DOUBLE)",
+            "CAST(NULL AS DOUBLE)",
+        ),
+        (ScalarValue::Int64(Some(100)), "100", "100"),
+    ] {
+        for (templates, expected) in [
+            (vec![], original),
+            (
+                vec![(
+                    "expressions/float_literal".into(),
+                    MSSQL_FLOAT_LITERAL_TEMPLATE.into(),
+                )],
+                mssql,
+            ),
+        ] {
+            let (sql, _) = WrappedSelectNode::generate_sql_for_expr(
+                SqlQuery::new(String::new(), vec![]),
+                sql_generator(templates),
+                Expr::Literal(literal.clone()),
+                None,
+                &HashMap::new(),
+            )
+            .unwrap();
+            assert_eq!(sql, expected, "{literal:?}");
+        }
+    }
+}
 
 #[tokio::test]
 async fn test_mssql_integral_float_literal_pushdown() {

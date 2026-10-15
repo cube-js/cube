@@ -26,10 +26,6 @@ use std::{collections::HashMap, env, ops::Deref, sync::Arc};
 use uuid::Uuid;
 
 #[cfg(test)]
-pub(crate) const MSSQL_FLOAT_LITERAL_TEMPLATE: &str =
-    "{% if is_int32 %}CAST({{ value }} AS DECIMAL(10, 0)){% else %}{{ value }}{% endif %}";
-
-#[cfg(test)]
 mod mssql_boolean_contexts;
 #[cfg(test)]
 pub(crate) use mssql_boolean_contexts::{mssql_boolean_fixture, mssql_boolean_templates};
