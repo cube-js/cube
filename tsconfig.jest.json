@@ -1,6 +1,7 @@
 {
   "extends": "./tsconfig.json",
   "compilerOptions": {
+    "isolatedModules": true,
     "types": ["node", "jest"],
     "sourceMap": true,
     "inlineSourceMap": true,
