@@ -55,9 +55,9 @@ type Installation = {
 };
 
 /**
- * The drivers of one orchestrator, keyed by data source (`ds`, `ds@pre_agg`), and the
- * `driverVersion` they were built for. When a request brings another version, every
- * cached driver is rebuilt from that request's context and swapped in at once.
+ * One orchestrator's drivers by data source (`ds`, `ds@pre_agg`) and their `driverVersion`.
+ * A request with another version starts a background rebuild of all of them from its
+ * context, installed at once; requests keep the current drivers meanwhile.
  */
 export class OrchestratorDrivers {
   protected readonly drivers: Record<string, Promise<BaseDriver> | null> = {};
@@ -73,7 +73,11 @@ export class OrchestratorDrivers {
 
   protected lastSwapAt: number | undefined;
 
+  /** Never rejects: a failure is logged and backs off. */
   protected swapping: Promise<void> | undefined;
+
+  /** The latest version asked for while a swap was running, started once it ends. */
+  protected queued: { version: string, context: RequestContext, isLive: () => boolean } | undefined;
 
   protected lastFailure: { version: string, at: number, reported: boolean } | undefined;
 
@@ -116,30 +120,35 @@ export class OrchestratorDrivers {
   }
 
   /**
-   * Swaps the drivers when `requested` differs from the version they were built for.
-   * Only the request that starts a failing swap sees its error; others keep the old
-   * drivers, and a failed version is not retried until the backoff passes.
+   * Starts a swap when `requested` differs from the version the drivers were built for,
+   * without waiting for it: the request is served by the current drivers. A failed
+   * version is not retried until the backoff passes.
    */
-  public async ensureVersion(
-    requested: string,
-    context: RequestContext,
-    isLive: () => boolean,
-  ): Promise<EnsureVersionResult> {
-    while (requested !== this.version) {
-      if (!isLive()) {
-        return 'evicted';
-      }
+  public ensureVersion(requested: string, context: RequestContext, isLive: () => boolean): EnsureVersionResult {
+    if (requested === this.version) {
+      return 'ready';
+    }
 
-      if (this.swapping) {
-        await this.swapping.catch(() => undefined);
-      } else if (this.isBackingOff(requested)) {
-        return 'ready';
-      } else {
-        await this.startSwap(context, requested, isLive);
-      }
+    if (!isLive()) {
+      return 'evicted';
+    }
+
+    if (this.hasDrivers()) {
+      this.requestSwap(requested, context, isLive);
+    } else {
+      // Nothing to rebuild, as after the readiness probe: build the first drivers from this context
+      this.context = context;
+      this.version = requested;
     }
 
     return 'ready';
+  }
+
+  /** Resolves once no swap is running or queued. */
+  public async settled(): Promise<void> {
+    while (this.swapping) {
+      await this.swapping;
+    }
   }
 
   protected driverSpec(dataSource: string, preAggregations: boolean, hasSeparatePreAggEnv: boolean): DriverSpec {
@@ -187,25 +196,39 @@ export class OrchestratorDrivers {
     return true;
   }
 
-  protected startSwap(context: RequestContext, version: string, isLive: () => boolean): Promise<void> {
-    const swap = this.swap(context, version, isLive)
+  protected hasDrivers(): boolean {
+    return Object.values(this.drivers).some((driver) => driver);
+  }
+
+  protected requestSwap(version: string, context: RequestContext, isLive: () => boolean) {
+    if (this.swapping) {
+      this.queued = { version, context, isLive };
+    } else if (!this.isBackingOff(version)) {
+      this.startSwap(context, version, isLive);
+    }
+  }
+
+  protected startSwap(context: RequestContext, version: string, isLive: () => boolean) {
+    this.swapping = this.swap(context, version, isLive)
       .then(
         () => {
           this.lastFailure = undefined;
         },
-        (error) => {
-          this.recordFailure(version, error);
-
-          throw error;
-        },
+        (error) => this.recordFailure(version, error),
       )
       .finally(() => {
         this.swapping = undefined;
+        this.startQueued();
       });
+  }
 
-    this.swapping = swap;
+  protected startQueued() {
+    const { queued } = this;
+    this.queued = undefined;
 
-    return swap;
+    if (queued && queued.version !== this.version && queued.isLive()) {
+      this.requestSwap(queued.version, queued.context, queued.isLive);
+    }
   }
 
   protected recordFailure(version: string, error: unknown) {
