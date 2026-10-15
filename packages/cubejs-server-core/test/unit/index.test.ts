@@ -153,29 +153,34 @@ describe('index.test', () => {
     };
 
     const cubejsServerCore = new CubejsServerCore(options);
-    expect(cubejsServerCore).toBeInstanceOf(CubejsServerCore);
 
-    await cubejsServerCore.beforeShutdown();
-    await cubejsServerCore.shutdown();
+    try {
+      expect(cubejsServerCore).toBeInstanceOf(CubejsServerCore);
+    } finally {
+      await cubejsServerCore.beforeShutdown();
+      await cubejsServerCore.shutdown();
+    }
   });
 
   const getCreateOrchestratorOptionsFromServer = async (options: CreateOptions) => {
     const cubejsServerCore = new CubejsServerCoreOpen(<any>options);
-    expect(cubejsServerCore).toBeInstanceOf(CubejsServerCore);
 
-    const createOrchestratorApiSpy = jest.spyOn(cubejsServerCore, 'createOrchestratorApi');
-    await cubejsServerCore.getOrchestratorApi({
-      requestId: 'XXX',
-      authInfo: null,
-      securityContext: null,
-    });
+    try {
+      expect(cubejsServerCore).toBeInstanceOf(CubejsServerCore);
 
-    expect(createOrchestratorApiSpy.mock.calls.length).toEqual(1);
+      const createOrchestratorApiSpy = jest.spyOn(cubejsServerCore, 'createOrchestratorApi');
+      await cubejsServerCore.getOrchestratorApi({
+        requestId: 'XXX',
+        authInfo: null,
+        securityContext: null,
+      });
 
-    await cubejsServerCore.beforeShutdown();
-    await cubejsServerCore.shutdown();
-
-    return createOrchestratorApiSpy.mock.calls[0];
+      expect(createOrchestratorApiSpy.mock.calls.length).toEqual(1);
+      return createOrchestratorApiSpy.mock.calls[0];
+    } finally {
+      await cubejsServerCore.beforeShutdown();
+      await cubejsServerCore.shutdown();
+    }
   };
 
   test('driverFactory should return driver, failure', async () => {
@@ -512,10 +517,13 @@ describe('index.test', () => {
     process.env.CUBEJS_DB_TYPE = 'mysql';
 
     const cubejsServerCore = new CubejsServerCore({});
-    expect(cubejsServerCore).toBeInstanceOf(CubejsServerCore);
 
-    await cubejsServerCore.beforeShutdown();
-    await cubejsServerCore.shutdown();
+    try {
+      expect(cubejsServerCore).toBeInstanceOf(CubejsServerCore);
+    } finally {
+      await cubejsServerCore.beforeShutdown();
+      await cubejsServerCore.shutdown();
+    }
   });
 
   test('Should create instance of CubejsServerCore, on unsupported platform for Cube Store', async () => {
@@ -609,10 +617,13 @@ describe('index.test', () => {
     process.env.CUBEJS_DB_TYPE = 'mysql';
 
     const cubejsServerCore = new CubejsServerCore({ jwt: { jwkUrl: 'https://test.com/j.json' } });
-    expect(cubejsServerCore).toBeInstanceOf(CubejsServerCore);
 
-    await cubejsServerCore.beforeShutdown();
-    await cubejsServerCore.shutdown();
+    try {
+      expect(cubejsServerCore).toBeInstanceOf(CubejsServerCore);
+    } finally {
+      await cubejsServerCore.beforeShutdown();
+      await cubejsServerCore.shutdown();
+    }
   });
 
   test('Should throw error, options are required (production mode)', () => {
@@ -647,10 +658,13 @@ describe('index.test', () => {
     process.env.CUBEJS_DB_TYPE = 'mysql';
 
     const cubejsServerCore = new CubejsServerCore({ jwt: { jwkUrl: 'https://test.com/j.json' } });
-    expect(cubejsServerCore).toBeInstanceOf(CubejsServerCore);
 
-    await cubejsServerCore.beforeShutdown();
-    await cubejsServerCore.shutdown();
+    try {
+      expect(cubejsServerCore).toBeInstanceOf(CubejsServerCore);
+    } finally {
+      await cubejsServerCore.beforeShutdown();
+      await cubejsServerCore.shutdown();
+    }
   });
 
   test('Should not throw when the required options are missing in dev mode and no config file exists', () => {
