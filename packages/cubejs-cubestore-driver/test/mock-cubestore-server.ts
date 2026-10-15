@@ -16,6 +16,8 @@ export interface ReceivedMessage {
   connectionIndex: number;
   messageId: number;
   query: string;
+  // Bytes of the message as it arrived, the size Cube Store names when it refuses one.
+  size: number;
 }
 
 export interface MockConnection {
@@ -99,6 +101,7 @@ export class MockCubeStoreServer {
           connectionIndex: connection.index,
           messageId: httpMessage.messageId(),
           query: httpMessage.command(new HttpQuery())?.query() || '',
+          size: raw.length,
         };
         this.received.push(message);
         this.handler(message, connection);

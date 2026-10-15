@@ -2,7 +2,7 @@ import { Socket } from 'net';
 import WebSocket from 'ws';
 
 import { WebSocketConnection } from '../src/WebSocketConnection';
-import { ConnectionError, MessageTooLargeError, QueryError } from '../src/errors';
+import { ClientMessageTooLargeError, ConnectionError, MessageTooLargeError, QueryError } from '../src/errors';
 import { QueryResultFormat } from '../codegen';
 import {
   answeredBy,
@@ -359,6 +359,7 @@ describe('WebSocketConnection', () => {
         'Reduce the amount of data the query returns, e.g. by adding filters or a limit, ' +
         'or raise CUBEJS_CUBESTORE_MAX_MESSAGE_SIZE.'
       );
+      await expect(promise).rejects.toMatchObject({ offender: false });
 
       // Re-sent once, since a fatal close on a sole in-flight query can just as
       // well be an ordinary disconnect. The second oversized response spends
@@ -510,10 +511,12 @@ describe('WebSocketConnection', () => {
 
       const promise = query(`SELECT ${'x'.repeat(MAX_MESSAGE_SIZE + 1)}`);
 
-      await expect(promise).rejects.toThrow(MessageTooLargeError);
+      await expect(promise).rejects.toThrow(ClientMessageTooLargeError);
       await expect(promise).rejects.toThrow(
         /Cube Store request size of \d+(\.\d+)? MB exceeds the maximum message size of 1 MB/
       );
+      await expect(promise).rejects.toMatchObject({ limit: MAX_MESSAGE_SIZE, size: expect.any(Number), offender: true });
+      expect((await promise.catch(e => e)).size).toBeGreaterThan(MAX_MESSAGE_SIZE);
 
       expect(server.connections).toHaveLength(0);
     }, JEST_TIMEOUT);
@@ -542,10 +545,60 @@ describe('WebSocketConnection', () => {
         'CUBESTORE_TRANSPORT_MAX_MESSAGE_SIZE or CUBESTORE_TRANSPORT_MAX_FRAME_SIZE ' +
         'on the Cube Store side.'
       );
+      // A size no message in flight has can't name the offender, so it is left unknown.
+      await expect(promise).rejects.toMatchObject({ limit: 4096, size: expect.any(Number), offender: undefined });
 
       // Re-sent once before the size is reported, same as an over-limit
       // response: one 1009 close is indistinguishable from a restart.
       expect(server.received).toHaveLength(2);
+    }, JEST_TIMEOUT);
+
+    it('names the message Cube Store refused by the size in its close reason', async () => {
+      connection = new WebSocketConnection(server.url);
+
+      server.handler = (message, mockConnection) => {
+        mockConnection.ws.close(
+          1009,
+          `Message of ${message.size} bytes exceeds the maximum message size of 16 bytes`
+        );
+      };
+
+      const promise = query('SELECT 1');
+
+      await expect(promise).rejects.toThrow(MessageTooLargeError);
+      await expect(promise).rejects.toMatchObject({
+        limit: 16,
+        limitSetting: 'CUBESTORE_TRANSPORT_MAX_MESSAGE_SIZE',
+        size: server.received[0].size,
+        offender: true,
+      });
+      // Named by the close reason, so it is not sent again to close the next connection too.
+      expect(server.received).toHaveLength(1);
+    }, JEST_TIMEOUT);
+
+    it('re-sends the messages a close reason did not name without failing them', async () => {
+      connection = new WebSocketConnection(server.url);
+
+      const bigQuery = `SELECT '${'x'.repeat(1024)}'`;
+      server.handler = (message, mockConnection) => {
+        if (message.query === bigQuery) {
+          mockConnection.ws.close(
+            1009,
+            `Message of ${message.size} bytes exceeds the maximum message size of 512 bytes`
+          );
+        } else if (mockConnection.index > 0) {
+          // held on the first connection, so it is still in flight when that one closes
+          mockConnection.ws.send(buildErrorMessage(message.messageId, answeredBy(mockConnection.index)));
+        }
+      };
+
+      const small = query('SELECT 1');
+      await server.waitForMessages(1);
+      const big = query(bigQuery);
+
+      await expect(big).rejects.toMatchObject({ offender: true });
+      await expect(small).rejects.toThrow(answeredBy(1));
+      expect(server.received.filter((message) => message.query === bigQuery)).toHaveLength(1);
     }, JEST_TIMEOUT);
 
     it('falls back to the generic wording when 1009 carries no reason', async () => {
@@ -565,6 +618,7 @@ describe('WebSocketConnection', () => {
         'CUBESTORE_TRANSPORT_MAX_MESSAGE_SIZE or CUBESTORE_TRANSPORT_MAX_FRAME_SIZE ' +
         'on the Cube Store side.'
       );
+      await expect(promise).rejects.toMatchObject({ limit: undefined, offender: undefined });
     }, JEST_TIMEOUT);
 
     it('does not double the full stop when 1009 carries a punctuated reason', async () => {
@@ -602,6 +656,11 @@ describe('WebSocketConnection', () => {
         'CUBESTORE_TRANSPORT_MAX_MESSAGE_SIZE or CUBESTORE_TRANSPORT_MAX_FRAME_SIZE ' +
         'on the Cube Store side.'
       );
+      await expect(promise).rejects.toMatchObject({
+        limit: 4194304,
+        limitSetting: 'CUBESTORE_TRANSPORT_MAX_FRAME_SIZE',
+        offender: undefined,
+      });
     }, JEST_TIMEOUT);
   });
 

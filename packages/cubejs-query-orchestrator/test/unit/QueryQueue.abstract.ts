@@ -4,7 +4,7 @@ import crypto from 'crypto';
 import type { QueryKey, QueryKeyHash, QueueDriverConnectionInterface, QueueDriverInterface, QueueDriverOptions } from '@cubejs-backend/base-driver';
 import { QueuePriority } from '@cubejs-backend/base-driver';
 import { pausePromise } from '@cubejs-backend/shared';
-import { CubeStoreDriver, CubestoreQueueDriverConnection } from '@cubejs-backend/cubestore-driver';
+import { CubeStoreDriver, CubestoreQueueDriverConnection, MessageTooLargeError, ResultTooLargeError } from '@cubejs-backend/cubestore-driver';
 
 import { factoryQueueDriver, QueryQueue, QueryQueueOptions } from '../../src';
 import { ContinueWaitError } from '../../src/orchestrator/ContinueWaitError';
@@ -52,6 +52,22 @@ export const QueryQueueTest = (name: string, options: QueryQueueTestOptions) => 
     // reject a test's own executeInQueue before its assertions run.
     let failCancelMessageFor: QueryKeyHash | null = null;
     let failResultAckFor: QueryKeyHash | null = null;
+    // Refuses the ack of a successful result, or of an error longer than a truncated one, for one
+    // query the way Cube Store refuses an oversized message.
+    let oversizeResultAckFor: QueryKeyHash | null = null;
+    // Removes the item before that refusal, the way a cancellation that rejected the query does.
+    let oversizeResultAckRemovesItem = false;
+    // Refuses only the first ack, the way an innocent message in flight is rejected alongside an
+    // oversized one on the shared connection.
+    let oversizeFirstResultAckFor: QueryKeyHash | null = null;
+    // The `offender` of that first refusal: false when another message was refused, unset the way a
+    // close without a reason leaves it.
+    let oversizeFirstResultAckOffender: boolean | undefined = false;
+    // Stores the first ack before refusing it, the way Cube Store can run an ack whose answer is lost.
+    let oversizeFirstResultAckStored = false;
+    // Then refuses the retry for its own size, the way Cube Store answers a message within twice its limit.
+    let oversizeFirstThenTooLarge = false;
+    let resultAckAttempts = 0;
     // Rejects of the in-flight `cancelable` queries, so that a cancellation can reject the
     // running handler the way a driver rejects a query it has stopped. Keyed by the handle the
     // handler registers with setCancelHandler, so a cancellation rejects only its own query.
@@ -132,7 +148,7 @@ export const QueryQueueTest = (name: string, options: QueryQueueTestOptions) => 
     queue.queueDriver.createConnection = async () => {
       const connection = await createQueueConnection();
 
-      if (!failResultAckFor) {
+      if (!failResultAckFor && !oversizeResultAckFor && !oversizeFirstResultAckFor) {
         return connection;
       }
 
@@ -143,6 +159,38 @@ export const QueryQueueTest = (name: string, options: QueryQueueTestOptions) => 
             return async (hash: QueryKeyHash, executionResult: unknown, queueId: number) => {
               if (hash === failResultAckFor) {
                 throw new Error('Queue storage failure while setting the result');
+              }
+
+              const { result, error } = (executionResult || {}) as { result?: unknown, error?: string };
+              if (hash === oversizeResultAckFor && (result !== undefined || (error?.length ?? 0) > 64 * 1024 + ' [truncated]'.length)) {
+                resultAckAttempts += 1;
+
+                if (oversizeResultAckRemovesItem) {
+                  await target.setResultAndRemoveQuery(hash, { error: 'cancelled' }, queueId);
+                }
+
+                throw new ResultTooLargeError(
+                  'Query result message of 50.9 MB exceeds the limit of 48 MB set by CUBESTORE_TRANSPORT_MAX_MESSAGE_SIZE ' +
+                  'on the Cube Store side'
+                );
+              }
+
+              if (hash === oversizeFirstResultAckFor) {
+                oversizeFirstResultAckFor = null;
+
+                if (oversizeFirstThenTooLarge) {
+                  oversizeResultAckFor = hash;
+                }
+
+                if (oversizeFirstResultAckStored) {
+                  await target.setResultAndRemoveQuery(hash, executionResult, queueId);
+                }
+
+                throw new MessageTooLargeError(
+                  'Cube Store closed the connection: message is too long',
+                  undefined,
+                  { offender: oversizeFirstResultAckOffender }
+                );
               }
 
               return target.setResultAndRemoveQuery(hash, executionResult, queueId);
@@ -178,6 +226,13 @@ export const QueryQueueTest = (name: string, options: QueryQueueTestOptions) => 
       cancelableRejects = new Map();
       failCancelMessageFor = null;
       failResultAckFor = null;
+      oversizeResultAckFor = null;
+      oversizeFirstResultAckFor = null;
+      oversizeFirstResultAckOffender = false;
+      oversizeFirstResultAckStored = false;
+      oversizeFirstThenTooLarge = false;
+      oversizeResultAckRemovesItem = false;
+      resultAckAttempts = 0;
     });
 
     afterAll(async () => {
@@ -309,6 +364,218 @@ export const QueryQueueTest = (name: string, options: QueryQueueTestOptions) => 
         // the ack threw, so the item is still active - see the failing-cancel test above
         await queue.cancelQuery(queue.redisHash(queryKey), null);
       }
+    });
+
+    test('a result too large to store fails its waiters instead of hanging', async () => {
+      const queryKey: QueryKey = ['select * from 6a', []];
+
+      oversizeResultAckFor = queue.redisHash(queryKey);
+
+      const error = await queue.executeInQueue('delay', queryKey, { delay: 100, result: '6' }).catch(e => e);
+      await awaitProcessing();
+
+      expect(error).toBeInstanceOf(Error);
+      expect(error.message).toEqual(
+        'Query result message of 50.9 MB exceeds the limit of 48 MB set by CUBESTORE_TRANSPORT_MAX_MESSAGE_SIZE on the ' +
+        'Cube Store side. Reduce the number of rows or columns the query returns, e.g. by adding filters or ' +
+        'lowering the limit, add a pre-aggregation for it, or raise that limit.'
+      );
+      // the oversized result is not sent again, which would only close the shared connection again
+      expect(resultAckAttempts).toEqual(1);
+
+      const events = logger.mock.calls.map(([message]) => message);
+      expect(events).toContain('Error while querying');
+      expect(events).not.toContain('Queue storage error');
+
+      // the error was acked, so the item is gone rather than left for reconcile to orphan
+      const connection = await queue.queueDriver.createConnection();
+
+      try {
+        expect(await connection.getQueryDef(queue.redisHash(queryKey), null)).toBeNull();
+      } finally {
+        queue.queueDriver.release(connection);
+      }
+    });
+
+    test('a result rejected alongside an oversized message is retried', async () => {
+      const queryKey: QueryKey = ['select * from 6b', []];
+
+      oversizeFirstResultAckFor = queue.redisHash(queryKey);
+
+      const result = await queue.executeInQueue('delay', queryKey, { delay: 100, result: '6' });
+      await awaitProcessing();
+
+      expect(result).toEqual('60');
+      expect(oversizeFirstResultAckFor).toBeNull();
+
+      const events = logger.mock.calls.map(([message]) => message);
+      expect(events).not.toContain('Error while querying');
+      expect(events).not.toContain('Queue storage error');
+    });
+
+    test('a retried result refused for its own size fails its waiters', async () => {
+      const queryKey: QueryKey = ['select * from 6f', []];
+
+      oversizeFirstResultAckFor = queue.redisHash(queryKey);
+      oversizeFirstThenTooLarge = true;
+
+      const error = await queue.executeInQueue('delay', queryKey, { delay: 100, result: '6' }).catch(e => e);
+      await awaitProcessing();
+
+      expect(error.message).toContain('Query result message of 50.9 MB exceeds the limit of 48 MB');
+      expect(resultAckAttempts).toEqual(1);
+
+      const events = logger.mock.calls.map(([message]) => message);
+      expect(events).toContain('Retrying execution result');
+      expect(events).not.toContain('Queue storage error');
+    });
+
+    test('a cancelled query whose retried result is refused for its size is reported as orphaned', async () => {
+      const queryKey: QueryKey = ['select * from 6j', []];
+
+      oversizeFirstResultAckFor = queue.redisHash(queryKey);
+      oversizeFirstThenTooLarge = true;
+      oversizeResultAckRemovesItem = true;
+
+      await queue.executeInQueue('delay', queryKey, { delay: 100, result: '6' }).catch(e => e);
+      await awaitProcessing();
+
+      const events = logger.mock.calls.map(([message]) => message);
+      expect(events).toContain('Orphaned execution result');
+      expect(events).not.toContain('Retried execution result found no active queue item');
+      expect(events).not.toContain('Error while querying');
+    });
+
+    test('an error result too large to store is truncated for its waiters', async () => {
+      const queryKey: QueryKey = ['select * from 6g', []];
+
+      oversizeResultAckFor = queue.redisHash(queryKey);
+
+      const pending = queue
+        .executeInQueue('cancelable', queryKey, { delay: 60 * 1000, result: '6g' }, QueuePriority.Background)
+        .catch(e => e);
+
+      const deadline = Date.now() + 750;
+      while (cancelableRejects.size === 0 && Date.now() < deadline) {
+        await pausePromise(10);
+      }
+      expect(cancelableRejects.size).toEqual(1);
+
+      // e.g. a driver error which embeds the whole SQL
+      cancelableRejects.get('6g')!(new Error(`Query failed: ${'x'.repeat(100 * 1024)}`));
+      const error = await pending;
+      await awaitProcessing();
+
+      expect(error.message).toEqual(`Query failed: ${'x'.repeat(64 * 1024 - 'Query failed: '.length)} [truncated]`);
+
+      const events = logger.mock.calls.map(([message]) => message);
+      expect(events.filter(message => message === 'Error while querying')).toHaveLength(1);
+      expect(events).not.toContain('Queue storage error');
+    });
+
+    test('an oversized result of a cancelled query is not reported as a query failure', async () => {
+      const queryKey: QueryKey = ['select * from 6i', []];
+
+      oversizeResultAckFor = queue.redisHash(queryKey);
+      oversizeResultAckRemovesItem = true;
+
+      await queue.executeInQueue('delay', queryKey, { delay: 100, result: '6' }).catch(e => e);
+      await awaitProcessing();
+
+      const events = logger.mock.calls.map(([message]) => message);
+      expect(events).not.toContain('Error while querying');
+      expect(events).toContain('Orphaned execution result');
+    });
+
+    test('an oversized error of a cancelled query is not reported as a query failure', async () => {
+      const queryKey: QueryKey = ['select * from 6h', []];
+
+      oversizeResultAckFor = queue.redisHash(queryKey);
+      oversizeResultAckRemovesItem = true;
+
+      const pending = queue
+        .executeInQueue('cancelable', queryKey, { delay: 60 * 1000, result: '6h' }, QueuePriority.Background)
+        .catch(e => e);
+
+      const deadline = Date.now() + 750;
+      while (cancelableRejects.size === 0 && Date.now() < deadline) {
+        await pausePromise(10);
+      }
+      expect(cancelableRejects.size).toEqual(1);
+
+      cancelableRejects.get('6h')!(new Error(`Query cancelled: ${'x'.repeat(100 * 1024)}`));
+      await pending;
+      await awaitProcessing();
+
+      const events = logger.mock.calls.map(([message]) => message);
+      expect(events).not.toContain('Error while querying');
+
+      const orphaned = logger.mock.calls.find(([message]) => message === 'Orphaned execution result');
+      expect(orphaned?.[1]).toMatchObject({ warning: 'Query execution was rejected after its queue item was already gone' });
+    });
+
+    test('a retried result whose first ack was stored is not reported as orphaned', async () => {
+      const queryKey: QueryKey = ['select * from 6e', []];
+
+      oversizeFirstResultAckFor = queue.redisHash(queryKey);
+      oversizeFirstResultAckStored = true;
+
+      const result = await queue.executeInQueue('delay', queryKey, { delay: 100, result: '6' });
+      await awaitProcessing();
+
+      expect(result).toEqual('60');
+
+      const events = logger.mock.calls.map(([message]) => message);
+      expect(events).not.toContain('Orphaned execution result');
+      // still traced, as a real cancellation between the two acks would look the same
+      expect(events).toContain('Retried execution result found no active queue item');
+      expect(events).not.toContain('Queue storage error');
+    });
+
+    test('a result that may be the offender is not sent again', async () => {
+      const queryKey: QueryKey = ['select * from 6d', []];
+
+      oversizeFirstResultAckFor = queue.redisHash(queryKey);
+      oversizeFirstResultAckOffender = undefined;
+
+      try {
+        const error = await queue.executeInQueue('delay', queryKey, { delay: 100, result: '6' }).catch(e => e);
+        await awaitProcessing();
+
+        // it may be the offender itself, so it is left to the storage error path rather than retried
+        expect(error).toBeInstanceOf(ContinueWaitError);
+        const events = logger.mock.calls.map(([message]) => message);
+        expect(events).toContain('Queue storage error');
+      } finally {
+        // the ack threw, so the item is still active - see the failing-cancel test above
+        await queue.cancelQuery(queue.redisHash(queryKey), null);
+      }
+    });
+
+    test('an error result rejected alongside an oversized message is retried', async () => {
+      const queryKey: QueryKey = ['select * from 6c', []];
+
+      oversizeFirstResultAckFor = queue.redisHash(queryKey);
+
+      const pending = queue
+        .executeInQueue('cancelable', queryKey, { delay: 60 * 1000, result: '6c' }, QueuePriority.Background)
+        .catch(e => e);
+
+      const deadline = Date.now() + 750;
+      while (cancelableRejects.size === 0 && Date.now() < deadline) {
+        await pausePromise(10);
+      }
+      expect(cancelableRejects.size).toEqual(1);
+
+      cancelableRejects.get('6c')!(new Error('Query failed'));
+      const error = await pending;
+      await awaitProcessing();
+
+      expect(error.message).toEqual('Query failed');
+      expect(oversizeFirstResultAckFor).toBeNull();
+
+      const events = logger.mock.calls.map(([message]) => message);
+      expect(events).not.toContain('Queue storage error');
     });
 
     test('a query failure on an active queue item is still an error', async () => {

@@ -143,6 +143,8 @@ fn message_too_large_reason(
             } else {
                 "transport"
             };
+            // Parsed by CLOSE_REASON_RE in cubejs-cubestore-driver, which needs the size and the limit
+            // name to tell the refused message from the rest in flight; keep the wording.
             Some(format!(
                 "Message of {} bytes exceeds the maximum {} size of {} bytes",
                 size, limit, configured
@@ -571,6 +573,8 @@ impl HttpServer {
                                             // connection survives for everything else in flight
                                             // on it. See TRANSPORT_SIZE_HEADROOM.
                                             if message_buffer.len() > max_message_size {
+                                                // Parsed by REQUEST_TOO_LARGE_RE in
+                                                // cubejs-cubestore-driver; keep the wording.
                                                 let error = format!(
                                                     "Request of {} bytes exceeds the maximum message size of {} bytes. Reduce the size of the query, e.g. by sending fewer or smaller inline tables, or raise CUBESTORE_TRANSPORT_MAX_MESSAGE_SIZE.",
                                                     message_buffer.len(), max_message_size

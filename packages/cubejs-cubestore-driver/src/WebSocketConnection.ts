@@ -4,7 +4,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { InlineTable } from '@cubejs-backend/base-driver';
 import { getEnv, getProcessUid } from '@cubejs-backend/shared';
 import { parseCubestoreResultMessage } from '@cubejs-backend/native';
-import { ConnectionError, MessageTooLargeError, QueryError } from './errors';
+import { ClientMessageTooLargeError, ConnectionError, MessageTooLargeError, QueryError } from './errors';
 import {
   BinaryValue,
   BoolValue,
@@ -30,7 +30,18 @@ const MESSAGE_TOO_BIG_CLOSE_CODE = 1009;
 // The `ws` error code for an incoming message bigger than `maxPayload`.
 const MAX_PAYLOAD_EXCEEDED_CODE = 'WS_ERR_UNSUPPORTED_MESSAGE_LENGTH';
 
-function formatSize(bytes: number): string {
+// The size of the refused message and the configured limit Cube Store names in the reason of a 1009
+// close. Messages go out as a single frame, so the size singles out the offender.
+const CLOSE_REASON_RE = /^Message of (\d+) bytes exceeds the maximum (\w+) size of (\d+) bytes/;
+
+// The Cube Store setting behind each limit its close reason can name.
+const CLOSE_REASON_LIMIT_SETTINGS: Record<string, string> = {
+  message: 'CUBESTORE_TRANSPORT_MAX_MESSAGE_SIZE',
+  frame: 'CUBESTORE_TRANSPORT_MAX_FRAME_SIZE',
+  transport: 'CUBESTORE_TRANSPORT_MAX_MESSAGE_SIZE and CUBESTORE_TRANSPORT_MAX_FRAME_SIZE',
+};
+
+export function formatSize(bytes: number): string {
   const units: [number, string][] = [[1024 * 1024, 'MB'], [1024, 'KB']];
 
   for (const [unit, name] of units) {
@@ -193,7 +204,9 @@ export class WebSocketConnection {
               `Cube Store response size exceeds the maximum message size of ${formatSize(this.maxMessageSize)}. ` +
               'Reduce the amount of data the query returns, e.g. by adding filters or a limit, ' +
               'or raise CUBEJS_CUBESTORE_MAX_MESSAGE_SIZE.',
-              err
+              err,
+              // Only an incoming message went over the limit, so none of ours is the offender.
+              { offender: false }
             );
 
             if (webSocket === this.webSocket) {
@@ -284,36 +297,63 @@ export class WebSocketConnection {
               // eslint-disable-next-line no-control-regex
               ? `${reason}`.replace(/[\u0000-\u001F\u007F]+/g, ' ').replace(/\s*\.?\s*$/, '')
               : '';
+            const closeReasonSizes = CLOSE_REASON_RE.exec(closeReason);
+            const refusedSize = closeReasonSizes ? parseInt(closeReasonSizes[1], 10) : undefined;
             const fatalError = webSocket.fatalError || (
               // Cube Store refused a message that didn't fit into its limits.
               code === MESSAGE_TOO_BIG_CLOSE_CODE ? new MessageTooLargeError(
                 `Cube Store closed the connection: ${closeReason || 'message size exceeds the maximum message size Cube Store accepts'}. `
                 + 'Reduce the size of the query and of the inline tables it sends, or raise '
                 + 'CUBESTORE_TRANSPORT_MAX_MESSAGE_SIZE or CUBESTORE_TRANSPORT_MAX_FRAME_SIZE '
-                + 'on the Cube Store side.'
+                + 'on the Cube Store side.',
+                undefined,
+                closeReasonSizes ? {
+                  limit: parseInt(closeReasonSizes[3], 10),
+                  limitSetting: CLOSE_REASON_LIMIT_SETTINGS[closeReasonSizes[2]],
+                } : {}
               ) : null
             );
 
-            // The connection multiplexes messages and an oversized one can't be
-            // attributed -- `ws` drops the frame before its message id is read
-            // -- so every message in flight gets one more round, which answers
-            // the innocent ones and usually leaves the offender alone to be
-            // named next time. That includes a message that was alone in
-            // flight: `fatalError` says an oversized frame was seen on this
-            // socket, not which query produced it, and it can be the response
-            // to a query rejected on an earlier round that was still on the
-            // wire. Whatever is still in flight after its round is failed
-            // regardless: an offender whose response keeps arriving before the
-            // other answers would otherwise be re-sent forever.
+            // Each message gets its own error, so a caller can tell the offender from the rest.
+            const rejectTooLarge = (sentMessage: SentMessage, offender: boolean | undefined) => sentMessage.reject(
+              fatalError instanceof MessageTooLargeError ? new MessageTooLargeError(
+                fatalError.message,
+                fatalError.cause,
+                {
+                  limit: fatalError.limit,
+                  limitSetting: fatalError.limitSetting,
+                  size: sentMessage.buffer.length,
+                  offender,
+                }
+              ) : fatalError
+            );
+
+            // Cube Store names the size of the message it refused, and a message goes out as a single
+            // frame, so the one of that size is the offender and the rest are re-sent as after any drop.
+            const offenderKeys = fatalError && refusedSize !== undefined
+              ? pending.filter((key) => webSocket.sentMessages[key].buffer.length === refusedSize)
+              : [];
+
+            // Without that size the offender can't be told apart (`ws` drops the frame before its id is read),
+            // so every message in flight gets one more round and whatever is still pending after it is failed,
+            // or an offender whose response keeps arriving first would be re-sent forever.
             if (fatalError) {
               // eslint-disable-next-line no-restricted-syntax
               for (const key of pending) {
                 const sentMessage = webSocket.sentMessages[key];
-                sentMessage.fatalRounds += 1;
 
-                if (sentMessage.fatalRounds > 1) {
+                if (offenderKeys.includes(key)) {
                   delete webSocket.sentMessages[key];
-                  sentMessage.reject(fatalError);
+                  rejectTooLarge(sentMessage, true);
+                } else if (offenderKeys.length) {
+                  sentMessage.fatalRounds = 0;
+                } else {
+                  sentMessage.fatalRounds += 1;
+
+                  if (sentMessage.fatalRounds > 1) {
+                    delete webSocket.sentMessages[key];
+                    rejectTooLarge(sentMessage, fatalError instanceof MessageTooLargeError ? fatalError.offender : undefined);
+                  }
                 }
               }
 
@@ -422,11 +462,13 @@ export class WebSocketConnection {
       // This only catches what is over our own limit: Cube Store applies its
       // own, by default stricter, CUBESTORE_TRANSPORT_MAX_MESSAGE_SIZE, and a
       // message it refuses is reported once it closes the connection.
-      throw new MessageTooLargeError(
+      throw new ClientMessageTooLargeError(
         `Cube Store request size of ${formatSize(buffer.length)} exceeds the maximum message size of ` +
         `${formatSize(this.maxMessageSize)}. Reduce the size of the query and of the inline tables it sends, ` +
         'or raise CUBEJS_CUBESTORE_MAX_MESSAGE_SIZE together with CUBESTORE_TRANSPORT_MAX_MESSAGE_SIZE ' +
-        'on the Cube Store side.'
+        'on the Cube Store side.',
+        this.maxMessageSize,
+        buffer.length
       );
     }
 
