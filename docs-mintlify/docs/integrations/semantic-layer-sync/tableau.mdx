@@ -228,7 +228,8 @@ API][tableau-api].
 [Hierarchies][ref-hierarchies] defined in your data model are synced to Tableau
 as hierarchies, so users can drill down through their levels. [Folders][ref-view-folders]
 defined in views are synced as Tableau folders, including any hierarchies listed
-in them.
+in them. Tableau doesn't support nested folders, so they are
+[flattened][ref-view-folders].
 
 Define hierarchies and folders in the data model rather than in Tableau. Each
 sync overwrites the published data source, so hierarchies or folders added to
