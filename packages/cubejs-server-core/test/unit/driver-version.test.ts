@@ -5,6 +5,7 @@ import { CubejsServerCore } from '../../src';
 import { OrchestratorApi, OrchestratorApiOptions } from '../../src/core/OrchestratorApi';
 
 let onTestConnection: (driver: FakeDriver) => Promise<void> | void = () => undefined;
+let onRelease: (driver: FakeDriver) => Promise<void> | void = () => undefined;
 
 class FakeDriver extends BaseDriver {
   public tests = 0;
@@ -26,6 +27,7 @@ class FakeDriver extends BaseDriver {
 
   public async release() {
     this.releases += 1;
+    await onRelease(this);
   }
 }
 
@@ -95,6 +97,7 @@ describe('driverVersion', () => {
   beforeEach(() => {
     built = [];
     onTestConnection = () => undefined;
+    onRelease = () => undefined;
 
     jest.spyOn(CubejsServerCore, 'createDriver').mockImplementation((_type, options) => {
       const driver = new FakeDriver(<any>options);
@@ -445,6 +448,26 @@ describe('driverVersion', () => {
 
     expect(await driver()).toMatchObject({ builtFrom: { password: 'c' } });
     expect(logged('Driver Swap')).toHaveLength(2);
+  });
+
+  test('a failing release does not mask why the new driver was rejected', async () => {
+    const { request, driver } = createCore();
+
+    await request('a');
+    await driver();
+
+    onTestConnection = (d) => {
+      if (d.builtFrom.password === 'b') {
+        throw new Error('token expired');
+      }
+    };
+    onRelease = (d) => {
+      if (d.builtFrom.password === 'b') {
+        throw new Error('pool never connected');
+      }
+    };
+
+    await expect(request('b')).rejects.toThrow('token expired');
   });
 
   test('a data source first used after a swap is built from the new context', async () => {
