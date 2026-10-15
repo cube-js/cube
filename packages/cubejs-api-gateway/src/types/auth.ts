@@ -2,7 +2,7 @@
  * @license Apache-2.0
  * @copyright Cube Dev, Inc.
  * @fileoverview
- * Cube.js auth related data types definition.
+ * Cube auth related data types definition.
  */
 
 import { ApiScopes } from './strings';
@@ -40,7 +40,7 @@ interface JWTOptions {
 }
 
 type CheckAuthResponse = {
-  'security_context'?: unknown,
+  security_context?: unknown,
 };
 
 /**
@@ -87,7 +87,7 @@ type CanSwitchSQLUserFn =
  */
 type ContextToApiScopesFn =
   (securityContext?: any, scopes?: ApiScopesTuple) =>
-    Promise<ApiScopesTuple>;
+  Promise<ApiScopesTuple>;
 
 export {
   CheckAuthInternalOptions,

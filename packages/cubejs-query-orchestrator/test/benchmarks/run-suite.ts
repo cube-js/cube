@@ -308,6 +308,7 @@ function pct(off: number | null | undefined, on: number | null | undefined): str
 
 function markdownTable(records: RunRecord[]): string {
   const byLabel = new Map<string, { off?: RunRecord, on?: RunRecord }>();
+
   for (const r of records) {
     const key = `${r.suite}/${r.label}`;
     const pair = byLabel.get(key) || {};

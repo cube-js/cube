@@ -3,4 +3,5 @@ export * from './CubePropContextTranspiler';
 export * from './CubeCheckDuplicatePropTranspiler';
 export * from './ValidationTranspiler';
 export * from './IIFETranspiler';
+export * from './MemoKeyTranspiler';
 export * from './transpiler.interface';

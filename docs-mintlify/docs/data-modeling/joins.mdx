@@ -534,9 +534,42 @@ cubes:
         primary_key: true
 ```
 
+### `Only one join per pair of cubes is supported`
+
+A cube can define at most one join to any other cube. Two joins to the same
+cube would leave the join path ambiguous, so the data model fails to compile.
+
+To join the same table through two different keys, use
+[`extends`][ref-extends] to create a second cube over it and join that:
+
+```yaml
+cubes:
+  - name: users
+    sql_table: users
+
+  - name: managers
+    extends: users
+
+  - name: orders
+    sql_table: orders
+
+    joins:
+      - name: users
+        sql: "{CUBE}.user_id = {users}.id"
+        relationship: many_to_one
+
+      - name: managers
+        sql: "{CUBE}.manager_id = {managers}.id"
+        relationship: many_to_one
+```
+
+A cube that `extends` another may redefine a join it inherits; that replaces
+the inherited one rather than adding a second join.
+
 [ref-schema-ref-joins-relationship]: /reference/data-modeling/joins
 [ref-views]: /docs/data-modeling/views
 [ref-view-join-path]: /reference/data-modeling/view#join_path
 [ref-calculated-members]: /docs/data-modeling/measures#calculated-measures
 [ref-primary-key]: /reference/data-modeling/dimensions#primary_key
 [ref-visual-model]: /docs/data-modeling/visual-modeler
+[ref-extends]: /reference/data-modeling/cube#extends

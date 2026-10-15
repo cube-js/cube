@@ -2,6 +2,7 @@ import fetch from 'node-fetch';
 import { GenericContainer, StartedTestContainer } from 'testcontainers';
 import { pausePromise } from '@cubejs-backend/shared';
 import { DbRunnerAbstract, DBRunnerContainerOptions } from './db-runner.abstract';
+import { startContainerWithRetry } from './start-with-retry';
 
 export class KsqlDBRunner extends DbRunnerAbstract {
   public static startContainer(options: DBRunnerContainerOptions) {
@@ -27,7 +28,7 @@ export class KsqlDBRunner extends DbRunnerAbstract {
       container.withBindMounts(binds);
     }
 
-    return container.start();
+    return startContainerWithRetry(container);
   }
 
   public static async loadData(db: StartedTestContainer) {

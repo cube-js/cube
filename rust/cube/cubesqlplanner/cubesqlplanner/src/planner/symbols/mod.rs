@@ -7,6 +7,7 @@ pub mod measure_kinds;
 mod measure_symbol;
 mod member_expression_symbol;
 mod member_symbol;
+mod ref_symbol;
 mod symbol_factory;
 mod time_dimension_symbol;
 pub mod transforms;
@@ -27,5 +28,6 @@ pub use measure_symbol::{
 };
 pub use member_expression_symbol::{MemberExpressionExpression, MemberExpressionSymbol};
 pub use member_symbol::MemberSymbol;
+pub use ref_symbol::{RefSymbol, RefTarget};
 pub use symbol_factory::SymbolFactory;
 pub use time_dimension_symbol::TimeDimensionSymbol;

@@ -1,0 +1,9 @@
+---
+source: cubesqlplanner/cubesqlplanner/src/tests/integration/view_members.rs
+expression: result
+---
+orders_view__location | orders_view__count
+----------------------+-------------------
+1,1                   | 4                 
+1,2                   | 3                 
+1,4                   | 1

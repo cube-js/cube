@@ -5,6 +5,10 @@ on:
   pull_request:
     types: [opened]
 
+permissions:
+  contents: read
+  pull-requests: write
+
 jobs:
   authorDetector:
     name: Detect PR's author

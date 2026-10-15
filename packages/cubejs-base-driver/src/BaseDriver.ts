@@ -296,8 +296,8 @@ export abstract class BaseDriver implements DriverInterface {
     throw new TypeError('Driver\'s .streamQuery() method is not implemented yet.');
   }
 
-  public async downloadQueryResults(query: string, values: unknown[], _options: DownloadQueryResultsOptions): Promise<DownloadQueryResultsResult> {
-    const rows = await this.query<Row>(query, values);
+  public async downloadQueryResults(query: string, values: unknown[], options: DownloadQueryResultsOptions): Promise<DownloadQueryResultsResult> {
+    const rows = await this.query<Row>(query, values, { requestId: options?.requestId });
     const types = detectTypesFromTabular(rows);
 
     return {
@@ -490,6 +490,7 @@ export abstract class BaseDriver implements DriverInterface {
     }
 
     await this.createTable(table, columns);
+
     try {
       if (isDownloadTableMemoryData(tableData)) {
         for (let i = 0; i < tableData.rows.length; i++) {
@@ -500,6 +501,7 @@ export abstract class BaseDriver implements DriverInterface {
             columns.map(c => this.toColumnValue(tableData.rows[i][c.name] as string, c.type))
           );
         }
+
         for (let i = 0; i < indexesSql.length; i++) {
           const [query, params] = indexesSql[i].sql;
           await this.query(query, params);
@@ -635,7 +637,7 @@ export abstract class BaseDriver implements DriverInterface {
     return Date.now();
   }
 
-  public wrapQueryWithLimit(query: { query: string, limit: number}) {
+  public wrapQueryWithLimit(query: { query: string, limit: number }) {
     query.query = `SELECT * FROM (${query.query}) AS t LIMIT ${query.limit}`;
   }
 

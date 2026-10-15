@@ -1,4 +1,5 @@
 mod member_operand;
+mod member_path;
 mod partition_range;
 mod to_sql;
 mod to_sql_timezone;

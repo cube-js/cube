@@ -1,0 +1,8 @@
+---
+source: cubesqlplanner/cubesqlplanner/src/tests/integration/pre_aggregations/views.rs
+expression: result
+---
+orders_view__status | orders_view__customers_count
+--------------------+-----------------------------
+completed           | 3                           
+pending             | 2

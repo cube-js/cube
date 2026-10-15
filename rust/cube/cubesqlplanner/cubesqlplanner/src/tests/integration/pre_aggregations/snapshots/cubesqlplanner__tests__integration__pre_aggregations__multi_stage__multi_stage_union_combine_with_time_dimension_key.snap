@@ -1,0 +1,14 @@
+---
+source: cubesqlplanner/cubesqlplanner/src/tests/integration/pre_aggregations/multi_stage.rs
+expression: result
+---
+orders__status | orders__created_at_day   | orders__amount_total | orders__amount_label | orders__amount_mid_week
+---------------+--------------------------+----------------------+----------------------+------------------------
+completed      | 2025-03-01T00:00:00.000Z | 100                  | low                  | NULL                   
+completed      | 2025-03-02T00:00:00.000Z | 200                  | low                  | NULL                   
+pending        | 2025-03-03T00:00:00.000Z | 50                   | low                  | NULL                   
+completed      | 2025-03-04T00:00:00.000Z | 300                  | high                 | 300                    
+pending        | 2025-03-05T00:00:00.000Z | 100                  | low                  | 100                    
+completed      | 2025-03-06T00:00:00.000Z | 400                  | high                 | 400                    
+pending        | 2025-03-07T00:00:00.000Z | 75                   | low                  | NULL                   
+completed      | 2025-03-08T00:00:00.000Z | 150                  | low                  | NULL

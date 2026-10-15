@@ -10,6 +10,9 @@ use typed_builder::TypedBuilder;
 /// `MultiStageGetDateRange` CTE (`get_date_range_multistage_ref`).
 #[derive(TypedBuilder)]
 pub struct MultiStageTimeSeries {
+    /// Name of the CTE the series is rendered as. A recursive series refers
+    /// to itself by it.
+    name: String,
     time_dimension: Rc<MemberSymbol>,
     #[builder(default)]
     date_range: Option<Vec<String>>,
@@ -27,6 +30,10 @@ pub struct MultiStageTimeSeries {
 }
 
 impl MultiStageTimeSeries {
+    pub fn name(&self) -> &String {
+        &self.name
+    }
+
     pub fn time_dimension(&self) -> &Rc<MemberSymbol> {
         &self.time_dimension
     }
@@ -108,6 +115,7 @@ impl LogicalNode for MultiStageTimeSeries {
         check_inputs_len(&inputs, expected, self.node_name())?;
         if let Some(source) = inputs.into_iter().next() {
             Ok(Rc::new(Self {
+                name: self.name.clone(),
                 time_dimension: self.time_dimension.clone(),
                 date_range: self.date_range.clone(),
                 get_date_range_multistage_ref: self.get_date_range_multistage_ref.clone(),

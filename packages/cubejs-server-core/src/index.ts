@@ -11,6 +11,7 @@ export { FileRepository };
 export * from './core/RefreshScheduler';
 export * from './core/OrchestratorApi';
 export * from './core/CompilerApi';
+export * from './core/SharedCompilerCaches';
 
 export type { OrchestratorStorage } from './core/OrchestratorStorage';
 

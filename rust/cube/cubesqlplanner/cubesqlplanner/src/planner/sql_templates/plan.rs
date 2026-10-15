@@ -44,13 +44,21 @@ pub const UPPER_UPPER_BOUND: Boundary = Boundary {
 };
 
 impl PlanSqlTemplates {
-    pub fn try_new(driver_tools: Rc<dyn DriverTools>, external: bool) -> Result<Self, CubeError> {
-        let render = driver_tools.sql_templates()?;
-        Ok(Self {
+    pub fn new(
+        render: Rc<dyn SqlTemplatesRender>,
+        driver_tools: Rc<dyn DriverTools>,
+        external: bool,
+    ) -> Self {
+        Self {
             render,
             driver_tools,
             external,
-        })
+        }
+    }
+
+    pub fn try_new(driver_tools: Rc<dyn DriverTools>, external: bool) -> Result<Self, CubeError> {
+        let render = driver_tools.sql_templates()?;
+        Ok(Self::new(render, driver_tools, external))
     }
 
     pub fn convert_tz(&self, field: String) -> Result<String, CubeError> {
@@ -310,8 +318,21 @@ impl PlanSqlTemplates {
         )
     }
 
+    /// The type a cast has to name to produce a NULL of `sql_type`.
+    pub fn nullable_type(&self, sql_type: &str) -> Result<String, CubeError> {
+        if !self.render.contains_template("types/nullable") {
+            return Ok(sql_type.to_string());
+        }
+
+        self.render
+            .render_template("types/nullable", context! { data_type => sql_type })
+    }
+
     pub fn cast_to_string(&self, expr: &str) -> Result<String, CubeError> {
         let string_type = self.render.render_template("types/string", context! {})?;
+        // The keys this counts may hold NULLs, and a dialect whose types reject one would
+        // fail the whole query over a key it should simply not count
+        let string_type = self.nullable_type(&string_type)?;
         self.cast(expr, &string_type)
     }
 
@@ -455,7 +476,8 @@ impl PlanSqlTemplates {
         group_by: Vec<TemplateGroupByColumn>,
         having: Option<String>,
         order_by: Vec<TemplateOrderByColumn>,
-        limit: Option<usize>,
+        // A number, or a param placeholder when the orchestrator substitutes the limit.
+        limit: Option<minijinja::Value>,
         offset: Option<usize>,
         distinct: bool,
         recursive: bool,
@@ -538,6 +560,19 @@ impl PlanSqlTemplates {
         ))
     }
 
+    /// The dialect opts into assembling multi-stage results with UNION ALL +
+    /// GROUP BY by giving the NULL that pads the union branches. It must unify
+    /// with a column of any type, so it is untyped where the dialect allows it.
+    pub fn supports_union_full_key_aggregate(&self) -> bool {
+        self.render
+            .contains_template("tesseract/full_key_aggregate_union_null")
+    }
+
+    pub fn full_key_aggregate_union_null(&self) -> Result<String, CubeError> {
+        self.render
+            .render_template("tesseract/full_key_aggregate_union_null", context! {})
+    }
+
     pub fn supports_full_join(&self) -> bool {
         self.render.contains_template("tesseract/join_types_full")
     }
@@ -583,10 +618,11 @@ impl PlanSqlTemplates {
         granularity: &str,
         granularity_offset: &Option<String>,
         minimal_time_unit: &str,
+        series_name: &str,
     ) -> Result<String, CubeError> {
         self.render.render_template(
             "statements/generated_time_series_select",
-            context! {date_from => date_from, date_to => date_to, start => start, end => end, granularity => granularity, granularity_offset => granularity_offset, minimal_time_unit => minimal_time_unit },
+            context! {date_from => date_from, date_to => date_to, start => start, end => end, granularity => granularity, granularity_offset => granularity_offset, minimal_time_unit => minimal_time_unit, series_name => series_name },
         )
     }
     pub fn generated_time_series_with_cte_range_source(
@@ -596,6 +632,7 @@ impl PlanSqlTemplates {
         max_name: &str,
         granularity: &str,
         minimal_time_unit: &str,
+        series_name: &str,
     ) -> Result<String, CubeError> {
         self.render.render_template(
             "statements/generated_time_series_with_cte_range_source",
@@ -605,6 +642,7 @@ impl PlanSqlTemplates {
                 max_name => max_name,
                 granularity => granularity,
                 minimal_time_unit => minimal_time_unit,
+                series_name => series_name,
             },
         )
     }
@@ -830,6 +868,20 @@ impl PlanSqlTemplates {
             .render_template(&"tesseract/number_param_cast", context! { expr => expr })
     }
 
+    pub fn time_in_list_column_cast(&self, expr: &str) -> Result<String, CubeError> {
+        self.render.render_template(
+            &"tesseract/time_in_list_column_cast",
+            context! { expr => expr },
+        )
+    }
+
+    pub fn time_in_list_param_cast(&self, expr: &str) -> Result<String, CubeError> {
+        self.render.render_template(
+            &"tesseract/time_in_list_param_cast",
+            context! { expr => expr },
+        )
+    }
+
     pub fn like_escape_char(&self) -> Result<Option<char>, CubeError> {
         const TEMPLATE_NAME: &str = "filters/like_escape_char";
 
@@ -918,6 +970,23 @@ mod tests {
         let render = MockSqlTemplatesRender::try_new(t).unwrap();
         let driver_tools = Rc::new(MockDriverTools::with_sql_templates(render));
         PlanSqlTemplates::try_new(driver_tools, false).unwrap()
+    }
+
+    #[test]
+    fn test_nullable_type_is_the_type_itself_where_the_dialect_names_nothing() {
+        let templates = plan_templates_with(vec![]);
+
+        assert_eq!(templates.nullable_type("integer").unwrap(), "integer");
+    }
+
+    #[test]
+    fn test_nullable_type_is_the_form_the_dialect_names() {
+        let templates = plan_templates_with(vec![("types/nullable", "Nullable({{ data_type }})")]);
+
+        assert_eq!(
+            templates.nullable_type("integer").unwrap(),
+            "Nullable(integer)"
+        );
     }
 
     #[test]

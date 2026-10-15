@@ -187,7 +187,7 @@ export class ClickHouseQuery extends BaseQuery {
   }
 
   public castToString(sql) {
-    return `CAST(${sql} as String)`;
+    return `CAST(${sql} as Nullable(String))`;
   }
 
   public seriesSql(timeDimension: BaseTimeDimension) {
@@ -286,6 +286,11 @@ export class ClickHouseQuery extends BaseQuery {
     delete templates.expressions.like_escape;
     templates.quotes.identifiers = '`';
     templates.quotes.escape = '\\`';
+    // ClickHouse spells its string type `String`, and case-sensitively so
+    templates.types.string = 'String';
+    // A ClickHouse type holds no NULL of its own, so a cast that has to produce one
+    // names the nullable form of the type instead
+    templates.types.nullable = 'Nullable({{ data_type }})';
     templates.types.boolean = 'BOOL';
     templates.types.timestamp = 'DATETIME';
     delete templates.types.time;
@@ -307,13 +312,15 @@ export class ClickHouseQuery extends BaseQuery {
     ') AS dates';
 
     // ClickHouse rejects a bare UNION unless `union_default_mode` is set, so a set
-    // operation has to say which one it is.
-    templates.statements.union = '{% for query in queries %}(\n' +
+    // operation has to say which one it is. A LIMIT after a parenthesized last operand
+    // is a syntax error, so a bounded set operation is read through a derived table.
+    templates.statements.union = '{% if limit is not none %}SELECT * FROM (\n{% endif %}' +
+      '{% for query in queries %}(\n' +
       '{{ query | indent(2, true) }}\n' +
       ')' +
       '{% if not loop.last %}\nUNION {% if distinct %}DISTINCT{% else %}ALL{% endif %} {% endif %}' +
       '{% endfor %}' +
-      '{% if limit is not none %}\nLIMIT {{ limit }}{% endif %}';
+      '{% if limit is not none %}\n) AS union_result\nLIMIT {{ limit }}{% endif %}';
 
     return templates;
   }

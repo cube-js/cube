@@ -3,6 +3,128 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.8.6](https://github.com/cube-js/cube/compare/v1.8.5...v1.8.6) (2026-10-13)
+
+**Note:** Version bump only for package @cubejs-backend/shared
+
+## [1.8.5](https://github.com/cube-js/cube/compare/v1.8.4...v1.8.5) (2026-10-13)
+
+### Features
+
+- **server-core:** Add CUBEJS_SCHEDULED_REFRESH_TIMER_INTERVAL_ONLY so a numeric scheduledRefreshTimer doesn't enable the refresh worker ([#12107](https://github.com/cube-js/cube/issues/12107)) ([d0ccad7](https://github.com/cube-js/cube/commit/d0ccad76faddeaf08b762ce044f5d5b1b264a8b2))
+
+## [1.8.4](https://github.com/cube-js/cube/compare/v1.8.3...v1.8.4) (2026-10-12)
+
+### Features
+
+- **tesseract:** Enable multi-stage leaf merge and union by default ([#12220](https://github.com/cube-js/cube/issues/12220)) ([c1367cf](https://github.com/cube-js/cube/commit/c1367cf6dbe4027568a73f48fca39d60a5a10ad1)), closes [#12182](https://github.com/cube-js/cube/issues/12182) [#10268](https://github.com/cube-js/cube/issues/10268) [#12182](https://github.com/cube-js/cube/issues/12182)
+
+## [1.8.3](https://github.com/cube-js/cube/compare/v1.8.2...v1.8.3) (2026-10-10)
+
+### Features
+
+- **tesseract:** Add an opt-in UNION ALL combine for multi-stage results on Cube Store ([#12182](https://github.com/cube-js/cube/issues/12182)) ([67d7d74](https://github.com/cube-js/cube/commit/67d7d74584f13d8789622afe8053ff4e5a034773))
+- **tesseract:** Fold windowed multi-stage measures into one rollup scan ([#12189](https://github.com/cube-js/cube/issues/12189)) ([b162d11](https://github.com/cube-js/cube/commit/b162d11cc48a681b77c6d9cb9e957662bfa06251)), closes [#12183](https://github.com/cube-js/cube/issues/12183) [#12182](https://github.com/cube-js/cube/issues/12182) [#12183](https://github.com/cube-js/cube/issues/12183)
+
+## [1.8.2](https://github.com/cube-js/cube/compare/v1.8.1...v1.8.2) (2026-10-08)
+
+**Note:** Version bump only for package @cubejs-backend/shared
+
+## [1.8.1](https://github.com/cube-js/cube/compare/v1.8.0...v1.8.1) (2026-10-07)
+
+**Note:** Version bump only for package @cubejs-backend/shared
+
+# [1.8.0](https://github.com/cube-js/cube/compare/v1.7.50...v1.8.0) (2026-10-07)
+
+### Bug Fixes
+
+- **backend-shared:** Warn about deprecated CUBEJS_DB_SCHEMA only when it is set ([#12099](https://github.com/cube-js/cube/issues/12099)) ([71bd0c7](https://github.com/cube-js/cube/commit/71bd0c78a7b95ac92a56d11b2b1afdb75fede395))
+
+## [1.7.50](https://github.com/cube-js/cube/compare/v1.7.49...v1.7.50) (2026-10-02)
+
+### Bug Fixes
+
+- **tesseract:** Bound multi-stage stages and stop the pre-aggregation walk doubling per level ([#12091](https://github.com/cube-js/cube/issues/12091)) ([c574673](https://github.com/cube-js/cube/commit/c57467378bac552f219232be806954b08bc3c941))
+
+## [1.7.49](https://github.com/cube-js/cube/compare/v1.7.48...v1.7.49) (2026-10-02)
+
+### Bug Fixes
+
+- **api-gateway:** Reject request ids with forbidden characters ([#12081](https://github.com/cube-js/cube/issues/12081)) ([fd75d84](https://github.com/cube-js/cube/commit/fd75d8431358f625fe8d5c74444c5d6ad60bfc4d))
+- **tesseract:** Refuse member chains too deep to resolve instead of overflowing the JS stack ([#12089](https://github.com/cube-js/cube/issues/12089)) ([40e536a](https://github.com/cube-js/cube/commit/40e536a154f6dbe1ba33645602c295fb13dadf57)), closes [#11815](https://github.com/cube-js/cube/issues/11815)
+
+## [1.7.48](https://github.com/cube-js/cube/compare/v1.7.47...v1.7.48) (2026-10-01)
+
+### Performance Improvements
+
+- **schema-compiler:** Share compile state across tenants with CUBEJS_COMPILER_MULTI_TENANT_SHARING ([#12049](https://github.com/cube-js/cube/issues/12049)) ([a62e704](https://github.com/cube-js/cube/commit/a62e70488b3a67cbec204fa58711cc7e938ad9d9))
+
+## [1.7.47](https://github.com/cube-js/cube/compare/v1.7.46...v1.7.47) (2026-09-29)
+
+### Bug Fixes
+
+- **query-orchestrator:** Wait continueWaitTimeout seconds for a queued stream, not 10x ([#12029](https://github.com/cube-js/cube/issues/12029)) ([ec35e19](https://github.com/cube-js/cube/commit/ec35e195aac3fa2d4a87795d9d9ff87ecef00439)), closes [#7501](https://github.com/cube-js/cube/issues/7501)
+
+### Features
+
+- **server-core:** make dev mode opt-in and stop respecting NODE_ENV ([#11959](https://github.com/cube-js/cube/issues/11959)) ([4034a90](https://github.com/cube-js/cube/commit/4034a90bb1c59a815e0558daffa1d0625c40b7aa))
+
+## [1.7.46](https://github.com/cube-js/cube/compare/v1.7.45...v1.7.46) (2026-09-26)
+
+**Note:** Version bump only for package @cubejs-backend/shared
+
+## [1.7.45](https://github.com/cube-js/cube/compare/v1.7.44...v1.7.45) (2026-09-25)
+
+### Bug Fixes
+
+- report query depth instead of failing or crashing on it ([#11815](https://github.com/cube-js/cube/issues/11815)) ([8a32446](https://github.com/cube-js/cube/commit/8a32446e1ba2553c33bd05c33f9f861ec1ce8549))
+
+## [1.7.44](https://github.com/cube-js/cube/compare/v1.7.43...v1.7.44) (2026-09-24)
+
+**Note:** Version bump only for package @cubejs-backend/shared
+
+## [1.7.43](https://github.com/cube-js/cube/compare/v1.7.42...v1.7.43) (2026-09-21)
+
+**Note:** Version bump only for package @cubejs-backend/shared
+
+## [1.7.42](https://github.com/cube-js/cube/compare/v1.7.41...v1.7.42) (2026-09-18)
+
+**Note:** Version bump only for package @cubejs-backend/shared
+
+## [1.7.41](https://github.com/cube-js/cube/compare/v1.7.40...v1.7.41) (2026-09-18)
+
+### Features
+
+- Replace extract-zip (unmaintained, 2 CVEs) with node-stream-zip ([#11892](https://github.com/cube-js/cube/issues/11892)) ([2bfc860](https://github.com/cube-js/cube/commit/2bfc860491d403cd3e4d831c35c2f8af05cfdf77))
+
+## [1.7.40](https://github.com/cube-js/cube/compare/v1.7.39...v1.7.40) (2026-09-16)
+
+### Performance Improvements
+
+- **query-orchestrator:** Compute only build range boundary partitions ([#11876](https://github.com/cube-js/cube/issues/11876)) ([1bf7138](https://github.com/cube-js/cube/commit/1bf7138ad144ba6e9ee2387084eaacde525bfb98))
+
+## [1.7.39](https://github.com/cube-js/cube/compare/v1.7.38...v1.7.39) (2026-09-15)
+
+### Features
+
+- **server-core:** Redact query values in log events ([#11854](https://github.com/cube-js/cube/issues/11854)) ([99cceac](https://github.com/cube-js/cube/commit/99cceac77f00c8c0a13c0f2c0f4b237b4d97460f))
+
+## [1.7.38](https://github.com/cube-js/cube/compare/v1.7.37...v1.7.38) (2026-09-14)
+
+**Note:** Version bump only for package @cubejs-backend/shared
+
+## [1.7.37](https://github.com/cube-js/cube/compare/v1.7.35...v1.7.37) (2026-09-10)
+
+### Features
+
+- Migrate to TypeScript 6.0.3 (prepare for 7) ([#11767](https://github.com/cube-js/cube/issues/11767)) ([98ac580](https://github.com/cube-js/cube/commit/98ac58039be36e7392ac617562d0dad03f17de3c))
+
+## [1.7.36](https://github.com/cube-js/cube/compare/v1.7.35...v1.7.36) (2026-09-09)
+
+### Features
+
+- Migrate to TypeScript 6.0.3 (prepare for 7) ([#11767](https://github.com/cube-js/cube/issues/11767)) ([98ac580](https://github.com/cube-js/cube/commit/98ac58039be36e7392ac617562d0dad03f17de3c))
+
 ## [1.7.35](https://github.com/cube-js/cube/compare/v1.7.34...v1.7.35) (2026-09-07)
 
 **Note:** Version bump only for package @cubejs-backend/shared

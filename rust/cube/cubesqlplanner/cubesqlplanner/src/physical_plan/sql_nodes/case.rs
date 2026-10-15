@@ -84,13 +84,15 @@ impl CaseSqlNode {
                 templates,
             );
         }
-        if case.items.is_empty() && case.else_sql.is_some() {
-            return case.else_sql.as_ref().unwrap().eval(
-                visitor,
-                node_processor.clone(),
-                query_tools.clone(),
-                templates,
-            );
+        if case.items.is_empty() {
+            if let Some(else_sql) = &case.else_sql {
+                return else_sql.eval(
+                    visitor,
+                    node_processor.clone(),
+                    query_tools.clone(),
+                    templates,
+                );
+            }
         }
         let inner_visitor = visitor.with_arg_needs_paren_safe(false);
         let expr = match &case.switch {
@@ -187,7 +189,9 @@ impl SqlNode for CaseSqlNode {
                     )?
                 }
             }
-            _ => {
+            MemberSymbol::TimeDimension(_)
+            | MemberSymbol::MemberExpression(_)
+            | MemberSymbol::Ref(_) => {
                 return Err(CubeError::internal(format!(
                     "Case node processor called for wrong node",
                 )));

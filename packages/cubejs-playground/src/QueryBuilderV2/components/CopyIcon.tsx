@@ -67,7 +67,7 @@ const CopiedIconElement = tasty({
   children: <CheckOutlined />,
 });
 
-export const CopyIcon = memo(function CopyIcon(props: CopyIconProps) {
+export const CopyIcon = memo((props: CopyIconProps) => {
   const { isCopied, onCopyAnimationEnd } = props;
   const copyIconRef = useRef<HTMLSpanElement>(null);
   const copiedIconRef = useRef<HTMLSpanElement>(null);

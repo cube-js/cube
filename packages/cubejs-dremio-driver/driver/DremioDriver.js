@@ -276,4 +276,5 @@ class DremioDriver extends BaseDriver {
 }
 
 module.exports = DremioDriver;
+module.exports.DremioDriver = DremioDriver;
 module.exports.applyParams = applyParams;

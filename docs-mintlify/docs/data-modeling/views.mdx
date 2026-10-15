@@ -332,6 +332,10 @@ directly — that keeps it defined once for every view that includes it, at the
 cost of one cube naming another. The [average order value
 recipe][ref-recipe-aov] compares the two placements.
 
+To reuse a view measure in other views, make them [extend][ref-extending-views]
+the view that defines it. See [Reusing a view measure across
+views][ref-recipe-reuse-view-measures].
+
 ### Control visibility
 
 Not every view should be publicly accessible. Use [`public`][ref-view-public]
@@ -518,3 +522,5 @@ parameters.
 [ref-view-group-ref]: /reference/data-modeling/view-group
 [ref-meta-endpoint]: /reference/core-data-apis/rest-api/reference
 [wiki-dry]: https://en.wikipedia.org/wiki/Don%27t_repeat_yourself
+[ref-extending-views]: /docs/data-modeling/extending-cubes#extending-views
+[ref-recipe-reuse-view-measures]: /recipes/data-modeling/reusing-view-measures

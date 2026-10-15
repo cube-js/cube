@@ -73,7 +73,7 @@ export default function Header({ selectedKeys }: Props) {
 
           <StyledMenuButton
             key="docs"
-            href="https://cube.dev/docs/introduction"
+            href="https://docs.cube.dev/docs/introduction"
             target="_blank"
           >
             <FileFilled />
@@ -87,7 +87,7 @@ export default function Header({ selectedKeys }: Props) {
       {isMobileOrTable && (
         <div style={{ float: 'right' }}>
           <Dropdown
-            overlay={
+            overlay={(
               <Menu>
                 <Menu.Item key="/build">
                   <Link to="/build">Playground</Link>
@@ -97,7 +97,7 @@ export default function Header({ selectedKeys }: Props) {
                   <Link to="/schema">Data Model</Link>
                 </Menu.Item>
               </Menu>
-            }
+            )}
           >
             <MenuOutlined />
           </Dropdown>

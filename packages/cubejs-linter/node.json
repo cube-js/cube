@@ -1,0 +1,31 @@
+// The Node preset: Cube's shared oxlint configuration plus what only applies to the
+// backend packages. Frontend packages (@cubejs-client/*) extend the repo-root config or
+// airbnb-react.json instead, so nothing here reaches them.
+{
+  "$schema": "../../node_modules/oxlint/configuration_schema.json",
+  "extends": ["./.oxlintrc.json"],
+  "rules": {
+    // A control-flow block that opens right under an unrelated statement reads as part of
+    // it. Backend code is dense with them -- driver retry loops, connection teardown --
+    // so require the separating blank line. `for` covers for/for-in/for-of, `do` covers
+    // do/while; a plain `while` is left alone because its condition sits on the keyword
+    // line and already reads as its own statement.
+    "@stylistic/padding-line-between-statements": [
+      "warn",
+      { "blankLine": "always", "prev": "*", "next": ["try", "do", "for"] }
+    ]
+  },
+  "overrides": [
+    {
+      // A top-level `env` key is not inherited through `extends` -- oxlint treats it as
+      // per-config-file -- but an `overrides` entry's `env` is. Declaring the Node
+      // environment this way is what lets the backend packages extend this preset and get
+      // it, instead of each restating `{ "node": true, "es6": true }`.
+      "files": ["**"],
+      "env": {
+        "node": true,
+        "es6": true
+      }
+    }
+  ]
+}

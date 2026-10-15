@@ -42,9 +42,9 @@ type LogicalOrFilter = {
 export type GroupingSetType = 'Rollup' | 'Cube';
 
 type GroupingSet = {
-    groupType: GroupingSetType,
-    id: number,
-    subId?: null | number
+  groupType: GroupingSetType,
+  id: number,
+  subId?: null | number
 };
 
 export type EvalPatchMeasureFilterExpression = {

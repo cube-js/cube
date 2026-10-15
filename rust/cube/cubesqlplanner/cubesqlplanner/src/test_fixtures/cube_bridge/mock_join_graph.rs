@@ -260,6 +260,26 @@ impl MockJoinGraph {
         &self,
         cubes_to_join: Vec<JoinHintItem>,
     ) -> Result<Rc<MockJoinDefinition>, CubeError> {
+        self.try_build_join(cubes_to_join.clone())?.ok_or_else(|| {
+            let cube_names: Vec<String> = cubes_to_join
+                .iter()
+                .map(|hint| match hint {
+                    JoinHintItem::Single(name) => format!("'{}'", name),
+                    JoinHintItem::Vector(path) => format!("'{}'", path.join(",")),
+                })
+                .collect();
+            CubeError::user(format!(
+                "Can't find join path to join {}",
+                cube_names.join(", ")
+            ))
+        })
+    }
+
+    /// Like `build_join`, but `None` when no join path covers `cubes_to_join`.
+    pub fn try_build_join(
+        &self,
+        cubes_to_join: Vec<JoinHintItem>,
+    ) -> Result<Option<Rc<MockJoinDefinition>>, CubeError> {
         if cubes_to_join.is_empty() {
             return Err(CubeError::user(
                 "Cannot build join with empty cube list".to_string(),
@@ -273,7 +293,7 @@ impl MockJoinGraph {
         {
             let cache = self.built_joins.borrow();
             if let Some(cached) = cache.get(&cache_key) {
-                return Ok(cached.clone());
+                return Ok(Some(cached.clone()));
             }
         }
 
@@ -292,19 +312,9 @@ impl MockJoinGraph {
 
         join_trees.sort_by_key(|(_, joins)| joins.len());
 
-        let (root_name, joins) = join_trees.first().ok_or_else(|| {
-            let cube_names: Vec<String> = cubes_to_join
-                .iter()
-                .map(|hint| match hint {
-                    JoinHintItem::Single(name) => format!("'{}'", name),
-                    JoinHintItem::Vector(path) => format!("'{}'", path.join(".")),
-                })
-                .collect();
-            CubeError::user(format!(
-                "Can't find join path to join {}",
-                cube_names.join(", ")
-            ))
-        })?;
+        let Some((root_name, joins)) = join_trees.first() else {
+            return Ok(None);
+        };
 
         let mut multiplication_factor: HashMap<String, bool> = HashMap::new();
         for cube_hint in &cubes_to_join {
@@ -330,7 +340,7 @@ impl MockJoinGraph {
             .borrow_mut()
             .insert(cache_key, join_def.clone());
 
-        Ok(join_def)
+        Ok(Some(join_def))
     }
 
     fn join_edge_to_mock_join_item(

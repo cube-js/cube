@@ -1,4 +1,5 @@
 use crate::planner::BaseCube;
+use crate::planner::CubeId;
 use crate::planner::SqlCall;
 use std::collections::HashMap;
 use std::rc::Rc;
@@ -8,7 +9,7 @@ use std::rc::Rc;
 /// the join graph; the cube itself is the `original_to`.
 pub struct JoinTreeItem {
     cube: Rc<BaseCube>,
-    original_from: String,
+    original_from: CubeId,
     on_sql: Rc<SqlCall>,
     splits_rows: bool,
 }
@@ -16,7 +17,7 @@ pub struct JoinTreeItem {
 impl JoinTreeItem {
     pub fn new(
         cube: Rc<BaseCube>,
-        original_from: String,
+        original_from: CubeId,
         on_sql: Rc<SqlCall>,
         splits_rows: bool,
     ) -> Self {
@@ -32,7 +33,7 @@ impl JoinTreeItem {
         &self.cube
     }
 
-    pub fn original_from(&self) -> &str {
+    pub fn original_from(&self) -> &CubeId {
         &self.original_from
     }
 
@@ -59,14 +60,14 @@ impl JoinTreeItem {
 pub struct JoinTree {
     root: Rc<BaseCube>,
     joins: Vec<JoinTreeItem>,
-    multiplication_factor: HashMap<String, bool>,
+    multiplication_factor: HashMap<CubeId, bool>,
 }
 
 impl JoinTree {
     pub fn new(
         root: Rc<BaseCube>,
         joins: Vec<JoinTreeItem>,
-        multiplication_factor: HashMap<String, bool>,
+        multiplication_factor: HashMap<CubeId, bool>,
     ) -> Rc<Self> {
         Rc::new(Self {
             root,
@@ -83,10 +84,10 @@ impl JoinTree {
         &self.joins
     }
 
-    /// Whether joining `cube_name` into this tree multiplies its rows.
-    pub fn is_multiplied(&self, cube_name: &str) -> bool {
+    /// Whether joining `cube_id` into this tree multiplies its rows.
+    pub fn is_multiplied(&self, cube_id: &CubeId) -> bool {
         self.multiplication_factor
-            .get(cube_name)
+            .get(cube_id)
             .copied()
             .unwrap_or(false)
     }

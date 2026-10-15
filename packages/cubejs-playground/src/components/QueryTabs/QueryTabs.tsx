@@ -54,7 +54,6 @@ export const StyledTabs = styled(Tabs)`
   }
 `;
 
-
 type QueryTab = {
   id: string;
   query: Query;
@@ -62,7 +61,7 @@ type QueryTab = {
   name?: string;
 };
 
-type QueryTabs = {
+type QueryTabsState = {
   activeId: string;
   tabs: QueryTab[];
 };
@@ -103,7 +102,7 @@ export function QueryTabs({
   const [editableTabId, setEditableTabId] = useState<string>();
   const [editableTabValue, setEditableTabValue] = useState<string>('');
   const [ready, setReady] = useState<boolean>(false);
-  const [queryTabs, saveTabs] = useLocalStorage<QueryTabs>('queryTabs', {
+  const [queryTabs, saveTabs] = useLocalStorage<QueryTabsState>('queryTabs', {
     activeId: '1',
     tabs: [
       {
@@ -144,7 +143,9 @@ export function QueryTabs({
               }
 
               setSlowQueryFromCache(queryId, Boolean(loadResponse.slowQuery));
-              Boolean(loadResponse.slowQuery) && setSlowQuery(queryId, false);
+              if (loadResponse.slowQuery) {
+                setSlowQuery(queryId, false);
+              }
               setResultSetExists(queryId, true);
 
               isAggregated = Object.keys(usedPreAggregations).length > 0;
@@ -166,7 +167,7 @@ export function QueryTabs({
               const preAggregationType = Object.values(
                 result.usedPreAggregations || {}
               )[0]?.type;
-              const transformedQuery = result.transformedQuery;
+              const { transformedQuery } = result;
 
               setQueryStatus(queryId, {
                 resultSet,
@@ -194,16 +195,17 @@ export function QueryTabs({
               Boolean(progress?.stage?.stage.includes('pre-aggregation'))
             );
 
-            const isQuerySlow =
-              progress?.stage?.stage.includes('Executing query') &&
-              (progress.stage.timeElapsed || 0) >= 5000;
+            const isQuerySlow = progress?.stage?.stage.includes('Executing query')
+              && (progress.stage.timeElapsed || 0) >= 5000;
 
             setSlowQuery(queryId, isQuerySlow);
-            isQuerySlow && setSlowQueryFromCache(queryId, false);
+            if (isQuerySlow) {
+              setSlowQueryFromCache(queryId, false);
+            }
           },
-          onQueryDrilldown: (query, pivotConfig) => {
+          onQueryDrilldown: (drilldownQuery, pivotConfig) => {
             setDrilldownConfig({
-              query,
+              query: drilldownQuery,
               pivotConfig,
             });
           },
@@ -222,8 +224,8 @@ export function QueryTabs({
     );
 
     if (
-      query &&
-      !equals(validateQuery(currentTab?.query), validateQuery(query))
+      query
+      && !equals(validateQuery(currentTab?.query), validateQuery(query))
     ) {
       const id = getNextId();
 
@@ -241,7 +243,9 @@ export function QueryTabs({
       const activeTab = queryTabs.tabs.find(
         (tab) => tab.id === queryTabs.activeId
       );
-      activeTab && onTabChange?.(activeTab);
+      if (activeTab) {
+        onTabChange?.(activeTab);
+      }
     }
   }, [ready, queryTabs.activeId]);
 
@@ -262,33 +266,29 @@ export function QueryTabs({
   function handleTabSave(tab: Omit<QueryTab, 'id'>) {
     saveTabs({
       ...queryTabs,
-      tabs: tabs.map((currentTab) => {
-        return activeId === currentTab.id
-          ? {
-              ...currentTab,
-              ...tab,
-            }
-          : currentTab;
-      }),
+      tabs: tabs.map((currentTab) => (activeId === currentTab.id
+        ? {
+          ...currentTab,
+          ...tab,
+        }
+        : currentTab)),
     });
   }
 
   function setTabName(tabId: string, name: string) {
     saveTabs({
       ...queryTabs,
-      tabs: tabs.map((currentTab) => {
-        return tabId === currentTab.id
-          ? {
-              ...currentTab,
-              name
-            }
-          : currentTab;
-      }),
+      tabs: tabs.map((currentTab) => (tabId === currentTab.id
+        ? {
+          ...currentTab,
+          name
+        }
+        : currentTab)),
     });
   }
 
-  function setActiveId(activeId: string) {
-    saveTabs({ activeId, tabs });
+  function setActiveId(nextActiveId: string) {
+    saveTabs({ activeId: nextActiveId, tabs });
   }
 
   function handleDrilldownModalClose() {
@@ -309,14 +309,14 @@ export function QueryTabs({
       }}
       hideAdd={false}
       onChange={setActiveId}
-      onEdit={(event) => {
-        if (typeof event === 'string') {
+      onEdit={(editEvent) => {
+        if (typeof editEvent === 'string') {
           let closedIndex = Number.MAX_VALUE;
           const nextTabs = tabs.filter(({ id }, index) => {
-            if (id === event) {
+            if (id === editEvent) {
               closedIndex = index;
             }
-            return id !== event;
+            return id !== editEvent;
           });
 
           saveTabs({

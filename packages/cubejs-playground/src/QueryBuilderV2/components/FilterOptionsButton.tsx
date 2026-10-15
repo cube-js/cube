@@ -24,48 +24,48 @@ export interface FilterOptionsButtonProps {
 
 export function FilterOptionsButton({ type, disableKeys, onAction }: FilterOptionsButtonProps) {
   const items = useMemo(() => {
-    const items: { key: string; label: string; color?: string }[] = [];
+    const menuItems: { key: string; label: string; color?: string }[] = [];
 
     if (type === 'or' || type === 'and') {
       if (type === 'and') {
-        items.push({
+        menuItems.push({
           key: 'convert',
           label: 'Convert to OR Branch',
         });
       }
 
       if (type === 'or') {
-        items.push({
+        menuItems.push({
           key: 'convert',
           label: 'Convert to AND Branch',
         });
       }
 
-      items.push({
+      menuItems.push({
         key: 'unwrap',
         label: 'Unwrap Branch',
       });
     }
 
     if (type === 'member' || type === 'or' || type === 'and') {
-      items.push({
+      menuItems.push({
         key: 'wrapWithOr',
         label: 'Wrap with OR Branch',
       });
 
-      items.push({
+      menuItems.push({
         key: 'wrapWithAnd',
         label: 'Wrap with AND Branch',
       });
     }
 
-    items.push({
+    menuItems.push({
       key: 'remove',
       label: 'Remove',
       color: '#danger',
     });
 
-    return items.filter((item) => !disableKeys?.includes(item.key as FilterOptionsAction));
+    return menuItems.filter((item) => !disableKeys?.includes(item.key as FilterOptionsAction));
   }, [type, disableKeys]);
 
   return (

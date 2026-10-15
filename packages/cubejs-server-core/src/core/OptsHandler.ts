@@ -6,6 +6,7 @@ import {
   assertDataSource,
   isDockerImage,
   displayCLIWarning,
+  userPreAggregationsSchema,
 } from '@cubejs-backend/shared';
 import {
   isCubeStoreSupported,
@@ -286,6 +287,14 @@ export class OptsHandler {
   private initializeCoreOptions(
     opts: DriverDecoratedOptions
   ): ServerCoreInitializedOptions {
+    // Not getEnv: a schema this process pinned is not a user's choice, so a second
+    // instance resolves its own default rather than inheriting the first's
+    const preAggregationsSchema =
+      userPreAggregationsSchema() ||
+      (this.isDevMode()
+        ? 'dev_pre_aggregations'
+        : 'prod_pre_aggregations');
+
     const skipOnEnv = [
       // Default EXT_DB variables
       'CUBEJS_EXT_DB_URL',
@@ -307,7 +316,7 @@ export class OptsHandler {
     const externalDbType =
       opts.externalDbType ||
       <DatabaseType | undefined>process.env.CUBEJS_EXT_DB_TYPE ||
-      (getEnv('devMode') || definedExtDBVariables.length > 0) && 'cubestore' ||
+      (this.isDevMode() || definedExtDBVariables.length > 0) && 'cubestore' ||
       undefined;
 
     let externalDriverFactory =
@@ -333,7 +342,7 @@ export class OptsHandler {
       displayCLIWarning(
         'Cube Store is not found. Please follow this documentation ' +
         'to configure Cube Store ' +
-        'https://cube.dev/docs/caching/running-in-production'
+        'https://docs.cube.dev/cube-core/running-in-production'
       );
     }
 
@@ -341,7 +350,7 @@ export class OptsHandler {
       displayCLIWarning(
         `Using ${externalDbType} as an external database is deprecated. ` +
         'Please use Cube Store instead: ' +
-        'https://cube.dev/docs/caching/running-in-production'
+        'https://docs.cube.dev/cube-core/running-in-production'
       );
     }
 
@@ -408,11 +417,8 @@ export class OptsHandler {
       scheduledRefreshConcurrency: getEnv('scheduledRefreshQueriesPerAppId'),
       scheduledRefreshBatchSize: getEnv('scheduledRefreshBatchSize'),
       compilerCacheSize: getEnv('compilerCacheSize'),
-      preAggregationsSchema:
-        getEnv('preAggregationsSchema') ||
-        (this.isDevMode()
-          ? 'dev_pre_aggregations'
-          : 'prod_pre_aggregations'),
+      maxCompiledMembers: getEnv('maxCompiledMembers'),
+      preAggregationsSchema,
       schemaPath: getEnv('schemaPath'),
       scheduledRefreshTimer: getEnv('refreshWorkerMode'),
       sqlCache: true,
@@ -431,13 +437,24 @@ export class OptsHandler {
       fastReload: getEnv('fastReload'),
     };
 
+    if (
+      typeof options.scheduledRefreshTimer === 'number' &&
+      getEnv('scheduledRefreshTimerIntervalOnly') &&
+      !getEnv('refreshWorkerModeExplicit')
+    ) {
+      // The number is only an interval here: this instance runs the refresh
+      // worker only when CUBEJS_REFRESH_WORKER (or a deprecated alias) says so,
+      // not on the NODE_ENV-based default
+      options.scheduledRefreshTimer = false;
+    }
+
     if (opts.contextToAppId && !opts.scheduledRefreshContexts) {
       this.core.logger('Multitenancy Without ScheduledRefreshContexts', {
         warning: (
           'You are using multitenancy without configuring scheduledRefreshContexts, ' +
           'which can lead to issues where the security context will be undefined ' +
-          'while Cube.js will do background refreshing: ' +
-          'https://cube.dev/docs/config#options-reference-scheduled-refresh-contexts'
+          'while Cube will do background refreshing: ' +
+          'https://docs.cube.dev/reference/configuration/config#scheduled_refresh_contexts'
         ),
       });
     }
@@ -480,13 +497,11 @@ export class OptsHandler {
 
   /**
    * Determines whether current instance should be bootstraped in the
-   * dev mode or not.
+   * dev mode or not. CreateOptions.devServer if the embedder set it, otherwise
+   * CUBEJS_DEV_MODE; off by default, and NODE_ENV has no say in it.
    */
   private isDevMode(): boolean {
-    return (
-      process.env.NODE_ENV !== 'production' ||
-      getEnv('devMode')
-    );
+    return this.createOptions.devServer ?? getEnv('devMode');
   }
 
   /**

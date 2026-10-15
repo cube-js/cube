@@ -42,12 +42,12 @@ const MOCK_USERS_CUBE = {
     plan: {
       case: {
         when: {
-          '0': {
+          0: {
             // eslint-disable-next-line quotes
             sql: () => `tenantEnterpriseFlag = true`,
             label: 'Enterprise',
           },
-          '1': {
+          1: {
             // eslint-disable-next-line quotes
             sql: () => `stripe_customer_id IS NOT NULL`,
             label: 'Standard',

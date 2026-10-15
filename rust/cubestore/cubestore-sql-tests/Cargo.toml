@@ -5,7 +5,7 @@ authors = ["Cube Dev, Inc."]
 edition = "2021"
 license = "Apache-2.0"
 description = "Tests for CubeStore that can run in multiple configurations."
-documentation = "https://cube.dev/docs"
+documentation = "https://docs.cube.dev"
 homepage = "https://cube.dev"
 repository = "https://github.com/cube-js/cube.js"
 resolver = "2"
@@ -53,7 +53,7 @@ serde_derive = "1.0.115"
 tokio = { version = "1", features = ["full", "rt"] }
 indoc = "1.0"
 tempfile = "3.2.0"
-tar = "0.4.38"
+tar = "0.4.46"
 
 [dev-dependencies]
 criterion = { version = "0.5.1", features = ["async_tokio", "html_reports"] }

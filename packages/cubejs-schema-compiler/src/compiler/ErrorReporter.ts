@@ -194,6 +194,7 @@ export class ErrorReporter {
       messageParts.push(`${reportFileName}Errors:`);
 
       const plainMessagesForFile: string[] = [];
+
       for (const error of fileErrors) {
         messageParts.push(error.message);
         if (error.plainMessage) {

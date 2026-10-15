@@ -5,6 +5,7 @@ import {
   ContinueWaitError,
   DriverFactoryByDataSource,
   DriverType,
+  Query,
   QueryBody,
   QueryOrchestrator,
   QueryOrchestratorOptions,
@@ -284,7 +285,7 @@ export class OrchestratorApi {
     return this.orchestrator.getPreAggregationPreview(context.requestId, preAggregation);
   }
 
-  public async expandPartitionsInPreAggregations(queryBody) {
+  public async expandPartitionsInPreAggregations(queryBody: Query) {
     try {
       return await this.orchestrator.expandPartitionsInPreAggregations(queryBody);
     } catch (err) {
@@ -297,7 +298,7 @@ export class OrchestratorApi {
     }
   }
 
-  public async checkPartitionsBuildRangeCache(queryBody) {
+  public async checkPartitionsBuildRangeCache(queryBody: QueryBody) {
     return this.orchestrator.checkPartitionsBuildRangeCache(queryBody);
   }
 

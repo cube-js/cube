@@ -23,11 +23,12 @@ import { GraphQLSchema } from 'graphql';
 import { parse as uuidParse, v4 as uuidv4 } from 'uuid';
 import { LRUCache } from 'lru-cache';
 import { NativeInstance } from '@cubejs-backend/native';
-import { disposedProxy } from '@cubejs-backend/shared';
+import { disposedProxy, getEnv } from '@cubejs-backend/shared';
 import type { SchemaFileRepository } from '@cubejs-backend/shared';
 import { NormalizedQuery, MemberExpression } from '@cubejs-backend/api-gateway';
 import { DriverCapabilities } from '@cubejs-backend/base-driver';
 import { DbTypeInternalFn, DialectClassFn, LoggerFn } from './types';
+import { getSharedCompilerCaches, SHARED_COMPILER_CACHES_MAX } from './SharedCompilerCaches';
 
 type Context = any;
 
@@ -45,8 +46,15 @@ export interface CompilerApiOptions {
   sqlCache?: boolean;
   standalone?: boolean;
   compilerCacheSize?: number;
+  /** Called once a compile succeeds, so the owner can re-check its member budget. */
+  onCompiled?: () => void;
   maxCompilerCacheKeepAlive?: number;
   updateCompilerCacheKeepAlive?: boolean;
+  /**
+   * Process-wide script and YAML caches, shared VM realm and string interning, resolved once here
+   * for the caches and the compiler alike. Defaults to CUBEJS_COMPILER_MULTI_TENANT_SHARING.
+   */
+  multiTenantSharing?: boolean;
   externalDialectClass?: BaseQuery;
   externalDbType?: string;
   devServer?: boolean;
@@ -63,6 +71,9 @@ export interface GetSqlOptions {
   // Avoids building a rolling-window time series that would require a date range the
   // refresh path doesn't provide.
   preAggregationsOnly?: boolean;
+  // `canUseTransformedQuery` walks every multi-stage member, so only callers that
+  // return it ask for it.
+  includeTransformedQuery?: boolean;
 }
 
 export interface SqlResult {
@@ -77,7 +88,7 @@ export interface SqlResult {
   dataSource: string;
   aliasNameToMember: any;
   rollupMatchResults?: any;
-  canUseTransformedQuery: boolean;
+  canUseTransformedQuery?: TransformedQuery;
   memberNames: string[];
 }
 
@@ -130,6 +141,8 @@ export class CompilerApi {
 
   protected compiledScriptCacheInterval?: NodeJS.Timeout;
 
+  protected readonly multiTenantSharing: boolean;
+
   protected graphqlSchema?: GraphQLSchema;
 
   protected compilers?: Promise<Compiler>;
@@ -137,6 +150,15 @@ export class CompilerApi {
   protected compilerVersion?: string;
 
   protected queryFactory?: QueryFactory;
+
+  /**
+   * Each compile's own factory. A request holds `compilers` across awaits, and
+   * reading `this.queryFactory` then could pair them with a newer model's
+   * factory or, after eviction, with the disposed proxy.
+   */
+  private readonly queryFactories = new WeakMap<Compiler, QueryFactory>();
+
+  protected memberCount: number = 0;
 
   public constructor(repository: SchemaFileRepository, dbType: DbTypeInternalFn, options: CompilerApiOptions) {
     this.repository = repository;
@@ -159,28 +181,34 @@ export class CompilerApi {
     this.nativeInstance = this.createNativeInstance();
 
     // Caching stuff
-    this.compiledScriptCache = new LRUCache({
+    const cacheOptions = {
       max: options.compilerCacheSize || 250,
       ttl: options.maxCompilerCacheKeepAlive,
       updateAgeOnGet: options.updateCompilerCacheKeepAlive
-    });
-    this.compiledYamlCache = new LRUCache({
-      max: options.compilerCacheSize || 250,
-      ttl: options.maxCompilerCacheKeepAlive,
-      updateAgeOnGet: options.updateCompilerCacheKeepAlive
-    });
-    this.compiledJinjaCache = new LRUCache({
-      max: options.compilerCacheSize || 250,
-      ttl: options.maxCompilerCacheKeepAlive,
-      updateAgeOnGet: options.updateCompilerCacheKeepAlive
-    });
+    };
+    this.multiTenantSharing = options.multiTenantSharing ?? getEnv('compilerMultiTenantSharing');
+    if (this.multiTenantSharing) {
+      // Owned by the process (and purged by it), not by this app: dispose() leaves them alone
+      ({ compiledScriptCache: this.compiledScriptCache, compiledYamlCache: this.compiledYamlCache } = getSharedCompilerCaches({
+        max: Math.max(options.compilerCacheSize || 0, SHARED_COMPILER_CACHES_MAX),
+        ttl: options.maxCompilerCacheKeepAlive,
+        updateAgeOnGet: options.updateCompilerCacheKeepAlive,
+      }));
+    } else {
+      this.compiledScriptCache = new LRUCache(cacheOptions);
+      this.compiledYamlCache = new LRUCache(cacheOptions);
+    }
+    // Always per app: rendered Jinja depends on this app's COMPILE_CONTEXT and Python globals
+    this.compiledJinjaCache = new LRUCache(cacheOptions);
 
     // proactively free up old cache values occasionally
     if (this.options.maxCompilerCacheKeepAlive) {
       this.compiledScriptCacheInterval = setInterval(
         () => {
-          this.compiledScriptCache.purgeStale();
-          this.compiledYamlCache.purgeStale();
+          if (!this.multiTenantSharing) {
+            this.compiledScriptCache.purgeStale();
+            this.compiledYamlCache.purgeStale();
+          }
           this.compiledJinjaCache.purgeStale();
         },
         this.options.maxCompilerCacheKeepAlive
@@ -199,6 +227,11 @@ export class CompilerApi {
     this.compilers = disposedProxy('compilers', 'disposed CompilerApi instance');
     this.queryFactory = disposedProxy('queryFactory', 'disposed CompilerApi instance');
     this.graphqlSchema = undefined;
+
+    // A request can still hold this instance -- the gateway keeps one across
+    // several awaits. Clearing the version makes its next getCompilers()
+    // recompile rather than hand back the proxy, which throws on `.then`.
+    this.compilerVersion = undefined;
   }
 
   public setGraphQLSchema(schema: GraphQLSchema): void {
@@ -211,6 +244,14 @@ export class CompilerApi {
 
   public createNativeInstance(): NativeInstance {
     return new NativeInstance();
+  }
+
+  /**
+   * Members (measures, dimensions, segments) of the model this entry holds, across
+   * every cube and view. Zero while a compile is in flight or after one failed.
+   */
+  public get compiledMemberCount(): number {
+    return this.memberCount;
   }
 
   public async getCompilers(options: { requestId?: string } = {}): Promise<Compiler> {
@@ -251,11 +292,26 @@ export class CompilerApi {
       standalone: this.standalone,
       nativeInstance: this.nativeInstance,
       compiledScriptCache: this.compiledScriptCache,
+      multiTenantSharing: this.multiTenantSharing,
     });
+  }
+
+  /** Members across every cube and view, views included: that is where a wide model's usually are. */
+  private static countMembers(compilers: Compiler): number {
+    return compilers.cubeEvaluator.cubeList.reduce((total, cube) => total
+      + Object.keys(cube.measures || {}).length
+      + Object.keys(cube.dimensions || {}).length
+      + Object.keys(cube.segments || {}).length, 0);
   }
 
   public async compileSchema(compilerVersion: string, requestId?: string): Promise<Compiler> {
     const startCompilingTime = new Date().getTime();
+
+    // A recompile replaces `compilers` with the new promise, so the previous
+    // model is no longer held here -- and counting it would let the budget walk
+    // evict this entry while the compile it would throw away is still running.
+    this.memberCount = 0;
+
     try {
       this.logger(this.compilers ? 'Recompiling schema' : 'Compiling schema', {
         version: compilerVersion,
@@ -269,10 +325,27 @@ export class CompilerApi {
         standalone: this.standalone,
         nativeInstance: this.nativeInstance,
         compiledScriptCache: this.compiledScriptCache,
+        multiTenantSharing: this.multiTenantSharing,
         compiledJinjaCache: this.compiledJinjaCache,
         compiledYamlCache: this.compiledYamlCache,
       });
       this.queryFactory = await this.createQueryFactory(compilers);
+      this.queryFactories.set(compilers, this.queryFactory);
+      // A compile that a newer version superseded, or that finished on an
+      // evicted instance, no longer describes what this entry holds.
+      if (this.compilerVersion === compilerVersion) {
+        this.memberCount = CompilerApi.countMembers(compilers);
+
+        // Housekeeping for other entries: if it fails, this compile still stands.
+        try {
+          this.options.onCompiled?.();
+        } catch (e: any) {
+          this.logger('Compiler cache member budget pass failed', {
+            requestId,
+            error: (e.stack || e).toString(),
+          });
+        }
+      }
 
       this.logger('Compiling schema completed', {
         version: compilerVersion,
@@ -352,31 +425,48 @@ export class CompilerApi {
   }
 
   public async getSql(query: NormalizedQuery, options: GetSqlOptions = {}): Promise<SqlResult> {
-    const { includeDebugInfo, exportAnnotatedSql, preAggregationsOnly } = options;
+    const { includeDebugInfo, exportAnnotatedSql, preAggregationsOnly, includeTransformedQuery = false } = options;
     const { sqlGenerator, compilers } = await this.getSqlGenerator(query);
 
-    const getSqlFn = () => compilers.compiler.withQuery(sqlGenerator, () => ({
-      external: sqlGenerator.externalPreAggregationQuery(),
-      sql: preAggregationsOnly ? null : sqlGenerator.buildSqlAndParams(exportAnnotatedSql),
-      lambdaQueries: preAggregationsOnly ? [] : sqlGenerator.buildLambdaQuery(),
-      timeDimensionAlias: sqlGenerator.timeDimensions[0]?.unescapedAliasName(),
-      timeDimensionField: sqlGenerator.timeDimensions[0]?.dimension,
-      order: sqlGenerator.order,
-      cacheKeyQueries: sqlGenerator.cacheKeyQueries(),
-      preAggregations: sqlGenerator.preAggregations.preAggregationsDescription(),
-      dataSource: sqlGenerator.dataSource,
-      aliasNameToMember: sqlGenerator.aliasNameToMember,
-      rollupMatchResults: includeDebugInfo ?
-        sqlGenerator.preAggregations.rollupMatchResultDescriptions() : undefined,
-      canUseTransformedQuery: sqlGenerator.preAggregations.canUseTransformedQuery(),
-      memberNames: sqlGenerator.collectAllMemberNames(),
-    }));
+    const getSqlFn = () => compilers.compiler.withQuery(sqlGenerator, () => {
+      // Build first: Tesseract matches pre-aggregations during the build, so `external` and
+      // the descriptions below reuse that match instead of running the planner again
+      const sql = preAggregationsOnly ? null : sqlGenerator.buildSqlAndParams(exportAnnotatedSql);
+      return {
+        external: sqlGenerator.externalPreAggregationQuery(),
+        sql,
+        lambdaQueries: preAggregationsOnly ? [] : sqlGenerator.buildLambdaQuery(),
+        timeDimensionAlias: sqlGenerator.timeDimensions[0]?.unescapedAliasName(),
+        timeDimensionField: sqlGenerator.timeDimensions[0]?.dimension,
+        order: sqlGenerator.order,
+        cacheKeyQueries: sqlGenerator.cacheKeyQueries(),
+        preAggregations: sqlGenerator.preAggregations.preAggregationsDescription(),
+        dataSource: sqlGenerator.dataSource,
+        aliasNameToMember: sqlGenerator.aliasNameToMember,
+        rollupMatchResults: includeDebugInfo ?
+          sqlGenerator.preAggregations.rollupMatchResultDescriptions() : undefined,
+        canUseTransformedQuery: includeTransformedQuery ?
+          sqlGenerator.preAggregations.canUseTransformedQuery() : undefined,
+        memberNames: sqlGenerator.collectAllMemberNames(),
+      };
+    });
 
     if (this.sqlCache) {
       // eslint-disable-next-line @typescript-eslint/no-unused-vars
       const { requestId, ...keyOptions } = query;
       const key = { query: keyOptions, options };
-      return compilers.compilerCache.getQueryCache(key).cache(['sql'], getSqlFn);
+      const sql = await compilers.compilerCache.getQueryCache(key).cache(['sql'], getSqlFn);
+      // Relative date ranges in the data model resolve to the current time, so
+      // SQL reaching a cube with one is reused within the minute only.
+      const { relativeDateFilterCubes } = compilers.cubeEvaluator;
+      const isRelative = relativeDateFilterCubes.size > 0 &&
+        sql.memberNames?.some((member: string) => relativeDateFilterCubes.has(member.split('.')[0]));
+      if (!isRelative) {
+        return sql;
+      }
+      return compilers.compilerCache
+        .getQueryCache({ ...key, minute: Math.floor(Date.now() / 60000) })
+        .cache(['sql'], getSqlFn);
     } else {
       return getSqlFn();
     }
@@ -511,6 +601,7 @@ export class CompilerApi {
     // When a cube is accessed via a view, we skip the cube's member-level restrictions
     // and only apply row-level filters. The view controls what members are exposed.
     const cubesAccessedViaView = new Set<string>();
+
     for (const cubeName of queryCubes) {
       const cube = cubeEvaluator.cubeFromPath(cubeName);
       if (cube.isView) {
@@ -645,7 +736,9 @@ export class CompilerApi {
           const hasFullAccess = !policy.memberLevel ||
             (policy.memberLevel.includesMembers.includes(memberName) &&
              !policy.memberLevel.excludesMembers.includes(memberName));
-          if (hasFullAccess) return true;
+          if (hasFullAccess) {
+            return true;
+          }
 
           if (policy.memberMasking) {
             return policy.memberMasking.includesMembers.includes(memberName) &&
@@ -972,7 +1065,7 @@ export class CompilerApi {
         allowUngroupedWithoutPrimaryKey: this.allowUngroupedWithoutPrimaryKey,
         convertTzForRawTimeDimension: this.convertTzForRawTimeDimension,
         localRefreshKey: this.localRefreshKey,
-        queryFactory: this.queryFactory,
+        queryFactory: this.queryFactories.get(compilers) ?? this.queryFactory,
       }
     );
   }

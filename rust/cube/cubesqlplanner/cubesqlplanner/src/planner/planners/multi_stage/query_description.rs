@@ -96,7 +96,7 @@ impl MultiStageQueryDescription {
         self.collect_all_non_multi_stage_dimension_impl(&mut dimensions, &mut time_dimensions);
         let dimensions = dimensions
             .into_iter()
-            .unique_by(|d| d.full_name())
+            .unique_by(|d| d.id().clone())
             .filter_map(|d| match has_multi_stage_members(&d, true) {
                 Ok(true) => None,
                 Ok(false) => Some(Ok(d)),
@@ -106,7 +106,7 @@ impl MultiStageQueryDescription {
 
         let time_dimensions = time_dimensions
             .into_iter()
-            .unique_by(|d| d.full_name())
+            .unique_by(|d| d.id().clone())
             .filter_map(|d| match has_multi_stage_members(&d, true) {
                 Ok(true) => None,
                 Ok(false) => Some(Ok(d)),
@@ -137,6 +137,6 @@ impl MultiStageQueryDescription {
         member_node: &Rc<MemberSymbol>,
         state: &Rc<QueryProperties>,
     ) -> bool {
-        member_node.full_name() == self.member_name() && state.eq_as_state(&self.state)
+        member_node.id() == self.member_node().id() && state.eq_as_state(&self.state)
     }
 }

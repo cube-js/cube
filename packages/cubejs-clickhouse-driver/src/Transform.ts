@@ -291,6 +291,7 @@ export function buildTransformFromNamesAndTypes(names: Array<string>, types: Arr
   }
 
   const converters: Array<ColumnConverter | null> = new Array(names.length);
+
   for (let i = 0; i < names.length; i++) {
     converters[i] = getColumnConverter(types[i]);
   }

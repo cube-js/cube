@@ -138,6 +138,10 @@ enum Command {
     DataModel(commands::data_model::Args),
     /// Run a deployment's dbt sync (pull dbt models in as cubes)
     Dbt(commands::dbt::Args),
+    /// Convert between a Cube data model and Apache Ossie
+    Ossie(commands::ossie::Args),
+    /// Run and inspect AI agent evals
+    Evals(commands::evals::Args),
     /// Manage deployment environments and environment tokens
     #[command(alias = "environment", alias = "envs")]
     Environments(commands::environments::Args),
@@ -169,6 +173,9 @@ enum Command {
     /// Manage user attributes and their values
     #[command(alias = "attribute")]
     Attributes(commands::attributes::Args),
+    /// Manage custom roles
+    #[command(alias = "role")]
+    Roles(commands::roles::Args),
     /// Manage resource access policies
     #[command(alias = "policy")]
     Policies(commands::policies::Args),
@@ -229,6 +236,8 @@ impl Command {
             Github(_) => "github",
             DataModel(_) => "data-model",
             Dbt(_) => "dbt",
+            Ossie(_) => "ossie",
+            Evals(_) => "evals",
             Environments(_) => "environments",
             Variables(_) => "variables",
             Folders(_) => "folders",
@@ -239,6 +248,7 @@ impl Command {
             Users(_) => "users",
             Groups(_) => "groups",
             Attributes(_) => "attributes",
+            Roles(_) => "roles",
             Policies(_) => "policies",
             Tenant(_) => "tenant",
             Embed(_) => "embed",
@@ -340,6 +350,8 @@ async fn run(global: GlobalArgs, command: Command) -> Result<()> {
         Github(args) => commands::github::command(args, &ctx).await,
         DataModel(args) => commands::data_model::command(args, &ctx).await,
         Dbt(args) => commands::dbt::command(args, &ctx).await,
+        Ossie(args) => commands::ossie::command(args, &ctx).await,
+        Evals(args) => commands::evals::command(args, &ctx).await,
         Environments(args) => commands::environments::command(args, &ctx).await,
         Variables(args) => commands::variables::command(args, &ctx).await,
         Folders(args) => commands::folders::command(args, &ctx).await,
@@ -350,6 +362,7 @@ async fn run(global: GlobalArgs, command: Command) -> Result<()> {
         Users(args) => commands::users::command(args, &ctx).await,
         Groups(args) => commands::groups::command(args, &ctx).await,
         Attributes(args) => commands::attributes::command(args, &ctx).await,
+        Roles(args) => commands::roles::command(args, &ctx).await,
         Policies(args) => commands::policies::command(args, &ctx).await,
         Tenant(args) => commands::tenant::command(args, &ctx).await,
         Embed(args) => commands::embed::command(args, &ctx).await,

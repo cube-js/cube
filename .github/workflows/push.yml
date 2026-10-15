@@ -5,13 +5,14 @@ on:
     paths:
       - '.github/actions/smoke.sh'
       - '.github/actions/integration/**'
+      - '.github/actions/setup-yarn-1/**'
       - '.github/workflows/push.yml'
       - '.github/workflows/master.yml'
       - 'packages/**'
       - 'rust/cubestore/**'
       - 'rust/cubesql/**'
       - 'rust/cube/**'
-      - '.eslintrc.js'
+      - '.oxlintrc.json'
       - '.prettierrc'
       - 'package.json'
       - 'lerna.json'
@@ -24,13 +25,14 @@ on:
     paths:
       - '.github/actions/smoke.sh'
       - '.github/actions/integration/**'
+      - '.github/actions/setup-yarn-1/**'
       - '.github/workflows/push.yml'
       - '.github/workflows/master.yml'
       - 'packages/**'
       - 'rust/cubestore/**'
       - 'rust/cubesql/**'
       - 'rust/cube/**'
-      - '.eslintrc.js'
+      - '.oxlintrc.json'
       - '.prettierrc'
       - 'package.json'
       - 'lerna.json'
@@ -41,6 +43,9 @@ on:
 env:
   # Current user version for Python. Should be aligned between build-native & docker-dev
   PYTHON_VERSION_CURRENT: 3.13
+
+permissions:
+  contents: read
 
 jobs:
   latest-tag-sha:
@@ -75,10 +80,7 @@ jobs:
     strategy:
       matrix:
         # Current docker version + next LTS
-        # TODO: Re-add 26.x after cubejs-duckdb-driver migrates off the frozen `duckdb`
-        # package (no prebuilt binaries for Node.js 26)
-        # node-version: [24.x, 26.x]
-        node-version: [24.x]
+        node-version: [24.x, 26.x]
         # Don't forget to update build-native-release
         python-version: [3.13]
       fail-fast: false
@@ -118,7 +120,7 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-yarn-
       - name: Set Yarn version
-        run: yarn policies set-version v1.22.22
+        uses: ./.github/actions/setup-yarn-1
       - name: Yarn install
         uses: nick-fields/retry@v4
         env:
@@ -163,7 +165,7 @@ jobs:
       - name: Install Rust
         uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
-          toolchain: 1.90.0
+          toolchain: 1.98.1
           # override: true # this is by default on
           rustflags: ""
           components: rustfmt
@@ -183,7 +185,7 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-yarn-
       - name: Set Yarn version
-        run: yarn policies set-version v1.22.22
+        uses: ./.github/actions/setup-yarn-1
       - name: Yarn install
         uses: nick-fields/retry@v4
         env:
@@ -198,8 +200,14 @@ jobs:
         run: if [ "$(git status | grep nothing)x" = "x" ]; then echo "Non empty changeset after lerna bootstrap"; git status; exit 1; else echo "Nothing to commit. Proceeding"; fi;
       - name: NPM lint
         run: yarn lint:npm
-      - name: Lerna lint
-        run: yarn lerna run --concurrency 1 lint
+      - name: Oxlint
+        run: yarn lint:js
+      # The jest suite is transpile-only, so ng build is the only type check for
+      # this package. It needs @cubejs-client/core's declarations built first.
+      - name: Build client-ngx
+        run: |
+          yarn lerna run build:client-core
+          yarn workspace @cubejs-client/ngx build
       - name: Cargo fmt cube workspace
         run: |
           cargo fmt --manifest-path rust/cube/Cargo.toml --all -- --check
@@ -219,7 +227,7 @@ jobs:
       - name: Install Rust
         uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
-          toolchain: 1.90.0
+          toolchain: 1.98.1
           components: rustfmt
       # cubesqlplanner pre-aggregation tests run against this binary; the
       # resolver picks up target/release first (see cubestore_service.rs).
@@ -285,7 +293,7 @@ jobs:
       - name: Install Rust
         uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
-          toolchain: 1.90.0
+          toolchain: 1.98.1
           # override: true # this is by default on
           rustflags: ""
           components: rustfmt
@@ -303,7 +311,7 @@ jobs:
       - name: Install Yarn
         run: npm install -g yarn
       - name: Set Yarn version
-        run: yarn policies set-version v1.22.22
+        uses: ./.github/actions/setup-yarn-1
         # We don't need to install all yarn deps to build native
       - name: Install cargo-cp-artifact
         run: npm install -g cargo-cp-artifact@0.1
@@ -356,7 +364,7 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-yarn-
       - name: Set Yarn version
-        run: yarn policies set-version v1.22.22
+        uses: ./.github/actions/setup-yarn-1
       - name: Yarn install
         uses: nick-fields/retry@v4
         env:
@@ -405,10 +413,7 @@ jobs:
 
     strategy:
       matrix:
-        # TODO: Re-add 26.x after cubejs-duckdb-driver migrates off the frozen `duckdb`
-        # package (no prebuilt binaries for Node.js 26)
-        # node-version: [24.x, 26.x]
-        node-version: [24.x]
+        node-version: [24.x, 26.x]
         # Vertica tests are disabled because around 20.08.2025 someone
         # totally removed all vertica-ce docker repository from dockerhub.
         # @see https://github.com/vertica/vertica-containers/issues/64
@@ -449,7 +454,7 @@ jobs:
       - name: Install Rust
         uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
-          toolchain: 1.90.0
+          toolchain: 1.98.1
           # override: true # this is by default on
           rustflags: ""
           components: rustfmt
@@ -473,7 +478,7 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-yarn-
       - name: Set Yarn version
-        run: yarn policies set-version v1.22.22
+        uses: ./.github/actions/setup-yarn-1
       - name: Yarn install
         uses: nick-fields/retry@v4
         env:
@@ -523,7 +528,8 @@ jobs:
 
           # Snowflake
           DRIVERS_TESTS_SNOWFLAKE_CUBEJS_DB_USER: ${{ secrets.DRIVERS_TESTS_CUBEJS_DB_SNOWFLAKE_USER }}
-          DRIVERS_TESTS_SNOWFLAKE_CUBEJS_DB_PASS: ${{ secrets.DRIVERS_TESTS_CUBEJS_DB_SNOWFLAKE_PASS }}
+          DRIVERS_TESTS_SNOWFLAKE_CUBEJS_DB_PRIVATE_KEY: ${{ secrets.DRIVERS_TESTS_CUBEJS_DB_SNOWFLAKE_PRIVATE_KEY }}
+          DRIVERS_TESTS_SNOWFLAKE_CUBEJS_DB_PRIVATE_KEY_PASS: ${{ secrets.DRIVERS_TESTS_CUBEJS_DB_SNOWFLAKE_PRIVATE_KEY_PASS }}
       - name: Fix lcov paths
         if: (matrix.node-version == '24.x')
         run: |
@@ -583,7 +589,7 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-yarn-
       - name: Set Yarn version
-        run: yarn policies set-version v1.22.22
+        uses: ./.github/actions/setup-yarn-1
       - name: Yarn install
         uses: nick-fields/retry@v4
         env:
@@ -668,7 +674,7 @@ jobs:
       - name: Install Yarn
         run: npm install -g yarn
       - name: Set Yarn version
-        run: yarn policies set-version v1.22.22
+        uses: ./.github/actions/setup-yarn-1
       - name: Get yarn cache directory path
         id: yarn-cache-dir-path
         run: echo "dir=$(yarn cache dir)" >> "$GITHUB_OUTPUT"

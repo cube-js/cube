@@ -28,6 +28,7 @@ export class ColumnarChunkBuilder<T extends object> {
     }
 
     const { members, columns, rowCount } = this;
+
     for (let j = 0; j < members.length; j++) {
       columns[j][rowCount] = row[members[j] as keyof T];
     }

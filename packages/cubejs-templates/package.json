@@ -1,7 +1,7 @@
 {
   "name": "@cubejs-backend/templates",
-  "version": "1.7.35",
-  "description": "Cube.js Templates helpers",
+  "version": "1.8.6",
+  "description": "Cube Templates helpers",
   "author": "Cube Dev, Inc.",
   "repository": {
     "type": "git",
@@ -17,9 +17,7 @@
   "scripts": {
     "build": "rm -rf dist && npm run tsc",
     "tsc": "tsc",
-    "watch": "tsc -w",
-    "lint": "eslint src/* --ext .ts",
-    "lint:fix": "eslint --fix src/* --ext .ts"
+    "watch": "tsc -w"
   },
   "files": [
     "dist"
@@ -27,11 +25,8 @@
   "publishConfig": {
     "access": "public"
   },
-  "eslintConfig": {
-    "extends": "../cubejs-linter"
-  },
   "dependencies": {
-    "@cubejs-backend/shared": "1.7.35",
+    "@cubejs-backend/shared": "1.8.6",
     "cross-spawn": "^7.0.3",
     "fs-extra": "^11.1.1",
     "node-fetch": "^2.7.0",
@@ -40,7 +35,7 @@
     "tar": "^7.5.22"
   },
   "devDependencies": {
-    "@cubejs-backend/linter": "1.7.35",
+    "@cubejs-backend/linter": "1.8.6",
     "@types/node": "^22",
     "typescript": "~6.0.3"
   }

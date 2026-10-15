@@ -63,3 +63,109 @@ cubes:
             sql: amount
             filters:
               - sql: "{CUBE}.status = 'active'"
+          - name: shifted_total
+            type: sum
+            sql: "{CUBE.total}"
+            multi_stage: true
+            time_shift:
+              - interval: 1 year
+                type: prior
+          - name: shifted_total_as_number
+            type: number
+            sql: "{CUBE.total}"
+            multi_stage: true
+            time_shift:
+              - interval: 1 year
+                type: prior
+          - name: shifted_count_as_number
+            type: number
+            sql: "{CUBE.cnt}"
+            multi_stage: true
+            time_shift:
+              - name: prior_year
+          - name: shifted_shifted_total
+            type: number
+            sql: "{CUBE.shifted_total}"
+            multi_stage: true
+            time_shift:
+              - interval: 1 year
+                type: prior
+          - name: shifted_maximum
+            type: max
+            sql: "{CUBE.maximum}"
+            multi_stage: true
+            time_shift:
+              - time_dimension: created_at
+                interval: 1 month
+                type: prior
+          - name: shifted_maximum_as_number
+            type: number
+            sql: "{CUBE.maximum}"
+            multi_stage: true
+            time_shift:
+              - interval: 1 year
+                type: prior
+          - name: shifted_total_expression
+            type: number
+            sql: "{CUBE.total} * 2"
+            multi_stage: true
+            time_shift:
+              - interval: 1 year
+                type: prior
+          - name: shifted_average
+            type: number
+            sql: "{CUBE.average}"
+            multi_stage: true
+            time_shift:
+              - interval: 1 year
+                type: prior
+          - name: shifted_total_reduced
+            type: sum
+            sql: "{CUBE.total}"
+            multi_stage: true
+            reduce_by:
+              - status
+            time_shift:
+              - interval: 1 year
+                type: prior
+          - name: shifted_total_filtered
+            type: sum
+            sql: "{CUBE.total}"
+            multi_stage: true
+            filter:
+              include:
+                - member: test_measures.status
+                  operator: equals
+                  values:
+                    - active
+            time_shift:
+              - interval: 1 year
+                type: prior
+          - name: shifted_distinct_count
+            type: count_distinct
+            sql: "{CUBE.total}"
+            multi_stage: true
+            time_shift:
+              - interval: 1 year
+                type: prior
+          - name: shifted_approx_count
+            type: number
+            sql: "{CUBE.approx_count}"
+            multi_stage: true
+            time_shift:
+              - interval: 1 year
+                type: prior
+          - name: shifted_total_as_average
+            type: avg
+            sql: "{CUBE.total}"
+            multi_stage: true
+            time_shift:
+              - interval: 1 year
+                type: prior
+          - name: shifted_rolling_sum
+            type: number
+            sql: "{CUBE.rolling_sum}"
+            multi_stage: true
+            time_shift:
+              - interval: 1 year
+                type: prior

@@ -47,6 +47,21 @@ If you have developer or admin access, you can [apply a security context](/docs/
 
 Explore results carry the same [freshness and pre-aggregation indicators](/docs/explore-analyze/workbooks/querying-data#result-freshness-and-provenance) as workbook reports.
 
+## Querying source data
+
+You can also query your data sources directly with SQL, bypassing the
+semantic layer. Pick **Source SQL Query** in the query type picker at the top
+of the data pane, or click **Query Source Data** in an empty exploration.
+
+Source SQL in Explore works the same way as [Source SQL tabs](/docs/explore-analyze/workbooks/source-sql-tabs)
+in workbooks, with these differences:
+
+- Users with the Admin or Developer role can also query **Cube Store** to check
+  pre-aggregation contents.
+- Source SQL explorations can't be saved, converted to a workbook, or copied
+  to the clipboard. To share one, use **Copy shareable link**. To keep a
+  query, use a Source SQL tab in a workbook.
+
 ## Saving explorations
 
 You can save an exploration so you can return to it later without

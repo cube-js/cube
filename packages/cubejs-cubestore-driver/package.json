@@ -2,7 +2,7 @@
   "name": "@cubejs-backend/cubestore-driver",
   "description": "Cube Store driver",
   "author": "Cube Dev, Inc.",
-  "version": "1.7.35",
+  "version": "1.8.6",
   "repository": {
     "type": "git",
     "url": "https://github.com/cube-js/cube.git",
@@ -17,20 +17,27 @@
     "dist/codegen/*"
   ],
   "main": "index.js",
+  "exports": {
+    ".": {
+      "types": "./dist/src/index.d.ts",
+      "import": "./dist/src/index.js",
+      "require": "./index.js"
+    },
+    "./dist/*": "./dist/*",
+    "./package.json": "./package.json"
+  },
   "typings": "dist/src/index.d.ts",
   "scripts": {
     "build": "rm -rf dist && npm run tsc",
     "tsc": "tsc",
     "watch": "tsc -w",
-    "lint": "eslint src/*.ts test/*.ts",
-    "lint:fix": "eslint --fix src/*.ts test/*.ts",
     "unit": "jest --coverage"
   },
   "dependencies": {
-    "@cubejs-backend/base-driver": "1.7.35",
-    "@cubejs-backend/cubestore": "1.7.35",
-    "@cubejs-backend/native": "1.7.35",
-    "@cubejs-backend/shared": "1.7.35",
+    "@cubejs-backend/base-driver": "1.8.6",
+    "@cubejs-backend/cubestore": "1.8.6",
+    "@cubejs-backend/native": "1.8.6",
+    "@cubejs-backend/shared": "1.8.6",
     "csv-write-stream": "^2.0.0",
     "flatbuffers": "25.9.23",
     "fs-extra": "^11.1.1",
@@ -41,7 +48,7 @@
     "ws": "^7.5.3"
   },
   "devDependencies": {
-    "@cubejs-backend/linter": "1.7.35",
+    "@cubejs-backend/linter": "1.8.6",
     "@types/csv-write-stream": "^2.0.0",
     "@types/jest": "^29",
     "@types/node": "^22",
@@ -52,8 +59,5 @@
   "license": "Apache-2.0",
   "publishConfig": {
     "access": "public"
-  },
-  "eslintConfig": {
-    "extends": "../cubejs-linter"
   }
 }

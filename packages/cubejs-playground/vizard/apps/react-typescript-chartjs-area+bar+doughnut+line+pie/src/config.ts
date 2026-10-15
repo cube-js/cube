@@ -9,7 +9,7 @@ export function extractHashConfig<T extends Record<string, unknown>>(
         ...defaults,
         ...JSON.parse(atob(decodeURIComponent(hash))),
       };
-    } catch (e) {
+    } catch {
       console.error('Invalid hash', hash);
     }
   }

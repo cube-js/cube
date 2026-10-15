@@ -123,6 +123,8 @@ pub trait ConfigObj: DIService + Debug {
     fn no_implicit_order(&self) -> bool;
 
     fn enable_tesseract_sql_planner(&self) -> bool;
+
+    fn log_redaction(&self) -> bool;
 }
 
 #[derive(Debug, Clone)]
@@ -147,6 +149,7 @@ pub struct ConfigObjImpl {
     pub max_sessions: usize,
     pub no_implicit_order: bool,
     pub tesseract_sql_planner: bool,
+    pub log_redaction: bool,
 }
 
 impl ConfigObjImpl {
@@ -158,6 +161,10 @@ impl ConfigObjImpl {
         let sql_push_down = env_parse("CUBESQL_SQL_PUSH_DOWN", true);
 
         let db_query_limit: i32 = env_parse("CUBEJS_DB_QUERY_LIMIT", 50000);
+        // Only reached by an embedder of cubesql on its own: every registerInterface
+        // from Node passes the dev mode server-core resolved, which overrides this
+        // default in cubejs-native's config.rs
+        let dev_mode = env_parse_bool("CUBEJS_DEV_MODE", false);
         let non_streaming_query_max_row_limit =
             match env_optparse("CUBESQL_NON_STREAMING_QUERY_MAX_ROW_LIMIT") {
                 Some(limit) if limit > db_query_limit => {
@@ -212,6 +219,7 @@ impl ConfigObjImpl {
             max_sessions: env_parse("CUBEJS_MAX_SESSIONS", 1024),
             no_implicit_order: env_parse("CUBESQL_SQL_NO_IMPLICIT_ORDER", true),
             tesseract_sql_planner: env_parse("CUBEJS_TESSERACT_SQL_PLANNER", true),
+            log_redaction: env_parse_bool("CUBEJS_LOG_REDACTION", !dev_mode),
         }
     }
 }
@@ -294,6 +302,10 @@ impl ConfigObj for ConfigObjImpl {
     fn enable_tesseract_sql_planner(&self) -> bool {
         self.tesseract_sql_planner
     }
+
+    fn log_redaction(&self) -> bool {
+        self.log_redaction
+    }
 }
 
 impl Config {
@@ -330,6 +342,7 @@ impl Config {
                 max_sessions: 1024,
                 no_implicit_order: true,
                 tesseract_sql_planner: false,
+                log_redaction: false,
             }),
         }
     }
@@ -455,6 +468,43 @@ where
             "Could not parse environment variable '{}' with '{}' value: {}",
             name, x, e
         ),
+    })
+}
+
+/// The spellings a boolean variable is honoured in. One definition, so a caller asking
+/// whether one was set cannot drift from what setting it actually does.
+fn parse_bool(value: &str) -> Option<bool> {
+    match value.trim().to_lowercase().as_str() {
+        "true" => Some(true),
+        "false" => Some(false),
+        _ => None,
+    }
+}
+
+/// Whether `name` holds a value that would be honoured, as opposed to absent or
+/// unrecognised. The Node bridge asks this before moving a default of its own, so that
+/// a value this crate honours is never taken for a choice the user did not make.
+pub fn env_bool_is_set(name: &str) -> bool {
+    env::var(name)
+        .ok()
+        .as_deref()
+        .and_then(parse_bool)
+        .is_some()
+}
+
+/// An unrecognised value is reported and the default used; a variable that only
+/// picks a default must not fail startup.
+fn env_parse_bool(name: &str, default: bool) -> bool {
+    let Ok(value) = env::var(name) else {
+        return default;
+    };
+
+    parse_bool(&value).unwrap_or_else(|| {
+        warn!(
+            "Environment variable '{}' has value '{}', expected true or false; using {}",
+            name, value, default
+        );
+        default
     })
 }
 

@@ -25,12 +25,15 @@ ARG PYTHON_VERSION
 ARG PYTHON_VERSION_SUFFIX
 ARG PYTHON_RELEASE
 
+# pyo3-build-config's build script runs on the host, where it honours PYO3_PYTHON over the
+# PYO3_CROSS_* config below, so python$PYTHON_RELEASE has to stay on PATH in the final image
+COPY --from=build-python /opt/build-python /opt/build-python
+RUN ln -s /opt/build-python/bin/python${PYTHON_RELEASE} /usr/local/bin/python${PYTHON_RELEASE};
+
 # --enable-optimizations is disabled, because it's not supported with CROSS
 # 3.9/3.10 ignore --with-build-python and instead search PATH for python$VERSION, so the build
 # interpreter has to be reachable both ways
-RUN --mount=type=bind,from=build-python,source=/opt/build-python,target=/opt/build-python \
-    export PATH="/opt/build-python/bin:${PATH}" \
-    && wget https://www.python.org/ftp/python/${PYTHON_VERSION}/Python-${PYTHON_VERSION}${PYTHON_VERSION_SUFFIX}.tgz -O - | tar -xz \
+RUN wget https://www.python.org/ftp/python/${PYTHON_VERSION}/Python-${PYTHON_VERSION}${PYTHON_VERSION_SUFFIX}.tgz -O - | tar -xz \
     && cd Python-${PYTHON_VERSION}${PYTHON_VERSION_SUFFIX} \
     && touch config.site-aarch64 \
     && echo "ac_cv_buggy_getaddrinfo=no" >> config.site-aarch64 \

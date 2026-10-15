@@ -52,7 +52,7 @@ directory][ref-schema-path] that you can debug as usual Node.js code.
 
 ## Cube globals (cube and others)
 
-Cube defines `cube()`, `context()` and `asyncModule()` global variable functions
+Cube defines `cube()`, `context()`, `asyncModule()` and `memo()` global variable functions
 in order to provide API for data model configuration which aren't normally
 accessible outside of a Cube data model.
 
@@ -108,6 +108,17 @@ cube(`users`, {
 Data models can be externally stored and retrieved through an asynchronous
 operation using the `asyncModule()`. For more information, consult the [dynamic
 data model creation][ref-dynamic-schemas].
+
+## memo
+
+`memo(key, fn)` caches the result of `fn` by `key` for the whole data model
+compilation, across all of its stages. With the key omitted, `memo(fn)` caches
+it by its call site. `fn` should only return data: calling `cube()`, `view()`,
+`context()`, `view_group()` or `asyncModule()` from it is an error. Use it for API calls made from
+`asyncModule()`. For more information, consult [caching with
+`memo`][ref-memo].
+
+[ref-memo]: /docs/data-modeling/dynamic/javascript#caching-with-memo
 
 ## Context symbols transpile
 

@@ -53,14 +53,14 @@ configuration file:
 module.exports = {
   // Create a new appId for each team so that a separate data model is
   // compiled for each of them and `COMPILE_CONTEXT` can be used below
-  // https://cube.dev/docs/product/configuration/reference/config#context_to_app_id
+  // https://docs.cube.dev/reference/configuration/config#context_to_app_id
   contextToAppId: ({ securityContext }) => {
     return securityContext.team
   },
 
   // Enforce a default value for `team` if one is not provided
   // in the security context
-  // https://cube.dev/docs/product/configuration/reference/config#extendcontext
+  // https://docs.cube.dev/reference/configuration/config#extend_context
   extendContext: ({ securityContext }) => {
     if (!securityContext.team) {
       securityContext.team = "public"

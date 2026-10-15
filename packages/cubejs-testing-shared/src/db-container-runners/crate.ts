@@ -1,6 +1,7 @@
 import { GenericContainer, Wait } from 'testcontainers';
 
 import { DbRunnerAbstract, DBRunnerContainerOptions } from './db-runner.abstract';
+import { startContainerWithRetry } from './start-with-retry';
 
 const DEFAULT_VERSION = '6.3.5';
 
@@ -18,6 +19,6 @@ export class CrateDBRunner extends DbRunnerAbstract {
       container.withBindMounts(binds);
     }
 
-    return container.start();
+    return startContainerWithRetry(container);
   }
 }

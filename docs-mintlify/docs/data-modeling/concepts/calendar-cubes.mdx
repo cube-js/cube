@@ -20,7 +20,7 @@ engine][link-tesseract]. In versions before v1.7.0, it was not enabled by defaul
 ## Configuration
 
 Calendar cubes are [cubes][ref-cubes] where the [`calendar` parameter][ref-cubes-calendar]
-is set to `true`. This indicates that the cube is a calendar cube and allow the use of
+is set to `true`. This indicates that the cube is a calendar cube and allows the use of
 custom time shifts and granularities.
 
 <CodeGroup>
@@ -31,21 +31,16 @@ cubes:
     calendar: true
     sql: >
       SELECT
-        date_key,
         calendar_date,
         start_of_week, start_of_month, start_of_year,
         week_ago, month_ago, year_ago
       FROM calendar_table
     
     dimensions:
-      - name: date_key
-        sql: date
+      - name: date
+        sql: calendar_date
         type: time
         primary_key: true
-
-      - name: date
-        sql: date
-        type: time
 
         time_shift:
           - type: prior
@@ -72,11 +67,10 @@ cubes:
 ```
 
 ```javascript title="JavaScript"
-cube('fiscal_calendar', {
+cube(`fiscal_calendar`, {
   calendar: true,
   sql: `
     SELECT
-      date_key,
       calendar_date,
       start_of_week, start_of_month, start_of_year,
       week_ago, month_ago, year_ago
@@ -84,33 +78,36 @@ cube('fiscal_calendar', {
   `,
 
   dimensions: {
-    date_key: {
-      sql: 'date_key',
-      type: 'time',
-      primary_key: true
-    },
-
     date: {
-      sql: 'calendar_date',
-      type: 'time',
+      sql: `calendar_date`,
+      type: `time`,
+      primary_key: true,
 
       time_shift: [
-        { type: 'prior', interval: '1 week', sql: '{CUBE}.week_ago' },
-        { type: 'prior', interval: '1 month', sql: '{CUBE}.month_ago' },
-        { type: 'prior', interval: '1 year', sql: '{CUBE}.year_ago' }
+        { type: `prior`, interval: `1 week`, sql: `${CUBE}.week_ago` },
+        { type: `prior`, interval: `1 month`, sql: `${CUBE}.month_ago` },
+        { type: `prior`, interval: `1 year`, sql: `${CUBE}.year_ago` }
       ],
 
-      granularities: [
-        { name: 'week', sql: '{CUBE}.start_of_week' },
-        { name: 'month', sql: '{CUBE}.start_of_month' },
-        { name: 'year', sql: '{CUBE}.start_of_year' }
-      ]
+      granularities: {
+        week: { sql: `${CUBE}.start_of_week` },
+        month: { sql: `${CUBE}.start_of_month` },
+        year: { sql: `${CUBE}.start_of_year` }
+      }
     }
   }
 })
 ```
 
 </CodeGroup>
+
+<Warning>
+
+A calendar cube must have exactly one [`primary_key`][ref-primary-key] dimension. A second
+one compiles without error but makes every query that references the cube fail with
+`Cube '...' has multiple primary keys, but only one is allowed for calendar cubes`.
+
+</Warning>
 
 ### Joins
 
@@ -125,7 +122,7 @@ cubes:
 
     joins:
       - name: fiscal_calendar
-        sql: "{CUBE}.date = {fiscal_calendar.date_key}"
+        sql: "{CUBE}.date = {fiscal_calendar.date}"
         relationship: many_to_one
     
     # ...
@@ -137,7 +134,7 @@ cube(`sales`, {
 
   joins: {
     fiscal_calendar: {
-      sql: `${CUBE}.date = ${fiscal_calendar.date_key}`,
+      sql: `${CUBE}.date = ${fiscal_calendar.date}`,
       relationship: `many_to_one`
     }
   },
@@ -184,15 +181,11 @@ cubes:
       SELECT '2025-06-01' AS date, '2025-05-15' AS month_ago
     
     dimensions:
-      - name: date_key
+      - name: date
         sql: "{CUBE}.date::TIMESTAMP"
         type: time
         primary_key: true
 
-      - name: date
-        sql: "{CUBE}.date::TIMESTAMP"
-        type: time
-        
         time_shift:
           - type: prior
             interval: 1 month
@@ -213,7 +206,7 @@ cubes:
 
     joins:
       - name: custom_calendar
-        sql: "{CUBE}.date = {custom_calendar.date_key}"
+        sql: "{CUBE}.date = {custom_calendar.date}"
         relationship: many_to_one
 
     dimensions:
@@ -230,6 +223,7 @@ cubes:
       - name: total_sales_prior_month
         sql: "{total_sales}"
         type: number
+        multi_stage: true
         time_shift:
           - type: prior
             interval: 1 month
@@ -237,6 +231,7 @@ cubes:
       - name: total_sales_few_days_ago
         sql: "{total_sales}"
         type: number
+        multi_stage: true
         time_shift:
           - name: my_favorite_time_shift
 ```
@@ -254,15 +249,10 @@ cube(`custom_calendar`, {
   `,
 
   dimensions: {
-    date_key: {
-      sql: `${CUBE}.date::TIMESTAMP`,
-      type: `time`,
-      primary_key: true
-    },
-
     date: {
       sql: `${CUBE}.date::TIMESTAMP`,
       type: `time`,
+      primary_key: true,
 
       time_shift: [
         { type: `prior`, interval: `1 month`, sql: `${CUBE}.month_ago::TIMESTAMP` },
@@ -284,7 +274,7 @@ cube(`sales`, {
 
   joins: {
     custom_calendar: {
-      sql: `${CUBE}.date = ${custom_calendar.date_key}`,
+      sql: `${CUBE}.date = ${custom_calendar.date}`,
       relationship: `many_to_one`
     }
   },
@@ -304,16 +294,18 @@ cube(`sales`, {
     },
 
     total_sales_prior_month: {
-      sql: `{total_sales}`,
+      sql: `${total_sales}`,
       type: `number`,
+      multi_stage: true,
       time_shift: [
         { type: `prior`, interval: `1 month` }
       ]
     },
 
     total_sales_few_days_ago: {
-      sql: `{total_sales}`,
+      sql: `${total_sales}`,
       type: `number`,
+      multi_stage: true,
       time_shift: [
         { name: `my_favorite_time_shift` }
       ]
@@ -324,8 +316,8 @@ cube(`sales`, {
 
 </CodeGroup>
 
-Whe `sales.total_sales_prior_month` and `sales.total_sales_few_days_ago` measures are
-queried together with the `calendar.date` time dimension, the generate SQL will use the
+When the `sales.total_sales_prior_month` and `sales.total_sales_few_days_ago` measures are
+queried together with the `custom_calendar.date` time dimension, the generated SQL uses the
 custom time shifts defined in the `custom_calendar` cube: one with the `month_ago`
 column and another with `INTERVAL '42 days'`.
 
@@ -339,8 +331,8 @@ such as `day`, `month`, or `year`. However, custom calendars often have differen
 definitions for these periods, e.g., a retail calendar might use 4-5-4 week patterns.
 
 Calendar cubes allow you to define custom SQL expressions for each granularity.
-In the following example, the `fiscal_calendar` cube overrides the default `month`
-granularity to the to a pre-calculated `mid_month` column:
+In the following example, the `custom_calendar` cube overrides the default `month`
+granularity with a pre-calculated `mid_month` column:
 
 <CodeGroup>
 
@@ -357,16 +349,11 @@ cubes:
       SELECT '2025-06-30' AS date, '2025-06-15' AS mid_month
     
     dimensions:
-      - name: date_key
-        sql: date
+      - name: date
+        sql: "{CUBE}.date::TIMESTAMP"
         type: time
         primary_key: true
 
-      - name: date
-        sql: date
-        type: time
-        primary_key: true
-        
         granularities:
           - name: month
             sql: "{CUBE}.mid_month::TIMESTAMP"
@@ -410,20 +397,14 @@ cube(`custom_calendar`, {
   `,
 
   dimensions: {
-    date_key: {
-      sql: `date`,
-      type: `time`,
-      primary_key: true
-    },
-
     date: {
-      sql: `date`,
+      sql: `${CUBE}.date::TIMESTAMP`,
       type: `time`,
       primary_key: true,
 
-      granularities: [
-        { name: `month`, sql: `${CUBE}.mid_month::TIMESTAMP` }
-      ]
+      granularities: {
+        month: { sql: `${CUBE}.mid_month::TIMESTAMP` }
+      }
     }
   }
 })
@@ -468,6 +449,20 @@ When querying `sales.revenue` by `custom_calendar.date` with monthly granularity
 `mid_month` column will be used instead of the standard `DATE_TRUNC('month', date)`
 expression in the generated SQL.
 
+<Warning>
+
+**A [pre-aggregation][ref-pre-aggregations] must declare the overridden granularity
+itself.** A rollup that names it is built from the overriding column and serves those
+queries correctly.
+
+A rollup at a finer granularity is not a correct source. Cube can still match one through
+the granularity hierarchy — a `day` rollup for a `month` query — but the rollup holds
+`DATE_TRUNC` buckets that the overriding column cannot be recovered from, so the query
+either fails or returns Gregorian periods. Custom periods cannot be assembled from
+predefined ones.
+
+</Warning>
+
 ### Naming a granularity defined with `sql`
 
 A granularity defined with `sql` must be named after a default granularity: `second`,
@@ -502,14 +497,6 @@ length and cannot be derived arithmetically, such as the months and quarters of 
 retail calendar. The [custom calendar recipe][ref-recipe-custom-calendar] models a 4-5-4
 calendar in full.
 
-<Info>
-
-**A [pre-aggregation][ref-pre-aggregations] over an overridden granularity must declare
-that granularity.** A rollup on the `month` granularity above serves queries at `month`,
-and it is built from the `mid_month` column rather than `DATE_TRUNC`. A rollup at another
-granularity will not serve those queries correctly.
-
-</Info>
 
 
 [ref-time-shift]: /docs/data-modeling/measures#time-shift

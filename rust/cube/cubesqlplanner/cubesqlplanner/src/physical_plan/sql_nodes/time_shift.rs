@@ -10,7 +10,7 @@ use std::any::Any;
 use std::rc::Rc;
 
 /// Applies a per-dimension time shift to time dimensions whose
-/// full name is in `shifts`, by rendering the dimension expression
+/// id is in `shifts`, by rendering the dimension expression
 /// shifted by the configured interval.
 ///
 /// `substituted` names the dimensions rendered as a stored column instead
@@ -58,17 +58,13 @@ impl SqlNode for TimeShiftSqlNode {
                     // it here as well would add the interval twice. Only a
                     // substituted dimension, which is never expanded, resolves
                     // through the chain.
-                    let shift = self
-                        .shifts
-                        .dimensions_shifts
-                        .get(&ev.full_name())
-                        .or_else(|| {
-                            if self.substituted.contains_key(&ev.full_name()) {
-                                self.shifts.shift_for_substituted_column(node)
-                            } else {
-                                None
-                            }
-                        });
+                    let shift = self.shifts.dimensions_shifts.get(ev.id()).or_else(|| {
+                        if self.substituted.contains_key(&ev.full_name()) {
+                            self.shifts.shift_for_substituted_column(node)
+                        } else {
+                            None
+                        }
+                    });
                     if let Some(shift) = shift {
                         let shift = shift
                             .interval
@@ -109,7 +105,10 @@ impl SqlNode for TimeShiftSqlNode {
                     )?
                 }
             }
-            _ => self.input.to_sql(
+            MemberSymbol::TimeDimension(_)
+            | MemberSymbol::Measure(_)
+            | MemberSymbol::MemberExpression(_)
+            | MemberSymbol::Ref(_) => self.input.to_sql(
                 visitor,
                 node,
                 query_tools.clone(),

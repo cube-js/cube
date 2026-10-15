@@ -197,38 +197,37 @@ export class MySqlDriver extends BaseDriver implements DriverInterface {
   }
 
   protected primaryKeysQuery(conditionString?: string): string | null {
+    // The `columns` alias is what the conditionString from getColumnsForSpecificTables() refers to
     return `SELECT
-      TABLE_SCHEMA as ${this.quoteIdentifier('table_schema')},
-      TABLE_NAME as ${this.quoteIdentifier('table_name')},
-      COLUMN_NAME as ${this.quoteIdentifier('column_name')}
+      columns.table_schema as ${this.quoteIdentifier('table_schema')},
+      columns.table_name as ${this.quoteIdentifier('table_name')},
+      columns.column_name as ${this.quoteIdentifier('column_name')}
   FROM
-      information_schema.KEY_COLUMN_USAGE
+      information_schema.key_column_usage AS columns
   WHERE
-      CONSTRAINT_NAME = 'PRIMARY'
-      AND TABLE_SCHEMA NOT IN ('information_schema', 'mysql', 'performance_schema', 'sys')
+      columns.constraint_name = 'PRIMARY'
+      AND columns.table_schema NOT IN ('information_schema', 'mysql', 'performance_schema', 'sys')
       ${conditionString ? ` AND (${conditionString})` : ''}
   ORDER BY
-      TABLE_SCHEMA,
-      TABLE_NAME,
-      ORDINAL_POSITION;`;
+      columns.table_schema,
+      columns.table_name,
+      columns.ordinal_position;`;
   }
 
   protected foreignKeysQuery(conditionString?: string): string | null {
+    // In MySQL, key_column_usage.table_name/column_name is the referencing side of a foreign key,
+    // the referenced side lives in referenced_table_name/referenced_column_name
     return `SELECT
-        tc.table_schema as ${this.quoteIdentifier('table_schema')},
-        tc.table_name as ${this.quoteIdentifier('table_name')},
-        kcu.column_name as ${this.quoteIdentifier('column_name')},
-        columns.table_name as ${this.quoteIdentifier('target_table')},
-        columns.column_name as ${this.quoteIdentifier('target_column')}
+        columns.table_schema as ${this.quoteIdentifier('table_schema')},
+        columns.table_name as ${this.quoteIdentifier('table_name')},
+        columns.column_name as ${this.quoteIdentifier('column_name')},
+        columns.referenced_table_name as ${this.quoteIdentifier('target_table')},
+        columns.referenced_column_name as ${this.quoteIdentifier('target_column')}
     FROM
-        information_schema.table_constraints AS tc
-    JOIN information_schema.key_column_usage AS kcu
-        ON tc.constraint_name = kcu.constraint_name
-    JOIN information_schema.key_column_usage AS columns
-        ON columns.constraint_name = tc.constraint_name
+        information_schema.key_column_usage AS columns
     WHERE
-        columns.table_name NOT IN ('information_schema', 'mysql', 'performance_schema', 'sys')
-        AND tc.constraint_type = 'FOREIGN KEY'${conditionString ? ` AND (${conditionString})` : ''};`;
+        columns.referenced_table_name IS NOT NULL
+        AND columns.table_schema NOT IN ('information_schema', 'mysql', 'performance_schema', 'sys')${conditionString ? ` AND (${conditionString})` : ''};`;
   }
 
   public readOnly() {
@@ -442,6 +441,7 @@ export class MySqlDriver extends BaseDriver implements DriverInterface {
 
     try {
       const batchSize = 1000; // TODO make dynamic?
+
       for (let j = 0; j < Math.ceil(tableData.rows.length / batchSize); j++) {
         const currentBatchSize = Math.min(tableData.rows.length - j * batchSize, batchSize);
         const indexArray = Array.from({ length: currentBatchSize }, (v, i) => i);

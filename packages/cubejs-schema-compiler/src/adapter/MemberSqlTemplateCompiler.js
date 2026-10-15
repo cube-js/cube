@@ -57,6 +57,7 @@ function emptyRecording() {
 // value, so repeated references collapse to a single placeholder.
 function uniqueInsertPath(paths, path) {
   const key = JSON.stringify(path);
+
   for (let i = 0; i < paths.length; i++) {
     if (JSON.stringify(paths[i]) === key) {
       return i;
@@ -116,10 +117,12 @@ function declaredValueParams(fn) {
 
   let depth = 0;
   let close = -1;
+
   for (let i = open; i < source.length; i++) {
     const ch = source[i];
-    if (ch === '(' || ch === '[' || ch === '{') depth++;
-    else if (ch === ')' || ch === ']' || ch === '}') {
+    if (ch === '(' || ch === '[' || ch === '{') {
+      depth++;
+    } else if (ch === ')' || ch === ']' || ch === '}') {
       depth--;
       if (depth === 0 && ch === ')') {
         close = i;
@@ -135,13 +138,19 @@ function declaredValueParams(fn) {
   const params = [];
   let start = 0;
   depth = 0;
+
   for (let i = 0; i <= inner.length; i++) {
     const ch = inner[i];
-    if (ch === '(' || ch === '[' || ch === '{') depth++;
-    else if (ch === ')' || ch === ']' || ch === '}') depth--;
+    if (ch === '(' || ch === '[' || ch === '{') {
+      depth++;
+    } else if (ch === ')' || ch === ']' || ch === '}') {
+      depth--;
+    }
     if (i === inner.length || (ch === ',' && depth === 0)) {
       const param = inner.slice(start, i).trim();
-      if (param) params.push(param);
+      if (param) {
+        params.push(param);
+      }
       start = i + 1;
     }
   }
@@ -182,6 +191,7 @@ function compileColumnCallback(column, state) {
   }
 
   const values = [];
+
   for (let i = 0; i < count; i++) {
     values.push(placeholder(FILTER_VALUE_PREFIX, i));
   }
@@ -189,6 +199,7 @@ function compileColumnCallback(column, state) {
   const recording = emptyRecording();
   const outer = state.target;
   state.target = recording;
+
   try {
     const template = parseTemplateResult(column(...values));
     return { template, valueParamsCount: count, ...recording };
@@ -282,15 +293,23 @@ function filterGroupFn(state) {
 // ---- SECURITY_CONTEXT ------------------------------------------------------
 
 function coerceScalarToString(value) {
-  if (typeof value === 'string') return value;
-  if (typeof value === 'number') return `${value}`;
-  if (typeof value === 'boolean') return `${value}`;
+  if (typeof value === 'string') {
+    return value;
+  }
+  if (typeof value === 'number') {
+    return `${value}`;
+  }
+  if (typeof value === 'boolean') {
+    return `${value}`;
+  }
   throw new Error('Invalid param for security context');
 }
 
 // Coercion used by `.filter()` — falsy scalars collapse to "no value".
 function coerceFilterValue(value) {
-  if (value === undefined || value === null) return { kind: 'none' };
+  if (value === undefined || value === null) {
+    return { kind: 'none' };
+  }
   if (Array.isArray(value)) {
     return { kind: 'vec', values: value.map(coerceScalarToString) };
   }
@@ -308,11 +327,21 @@ function coerceFilterValue(value) {
 
 // Coercion used by toString/valueOf — keeps all non-null values.
 function coerceToStringValue(value) {
-  if (value === undefined || value === null) return null;
-  if (Array.isArray(value)) return value.map(coerceScalarToString);
-  if (typeof value === 'string') return [value];
-  if (typeof value === 'number') return [`${value}`];
-  if (typeof value === 'boolean') return [`${value}`];
+  if (value === undefined || value === null) {
+    return null;
+  }
+  if (Array.isArray(value)) {
+    return value.map(coerceScalarToString);
+  }
+  if (typeof value === 'string') {
+    return [value];
+  }
+  if (typeof value === 'number') {
+    return [`${value}`];
+  }
+  if (typeof value === 'boolean') {
+    return [`${value}`];
+  }
   return null;
 }
 
@@ -325,18 +354,28 @@ function securityFilterFn(value, required, state) {
   return (column) => {
     if (param.kind === 'string') {
       const ph = recordSecurityValue(param.value, state);
-      if (typeof column === 'function') return column(ph);
-      if (typeof column === 'string') return `${column} = ${ph}`;
+      if (typeof column === 'function') {
+        return column(ph);
+      }
+      if (typeof column === 'string') {
+        return `${column} = ${ph}`;
+      }
       return '';
     }
     if (param.kind === 'vec') {
       if (param.values.length === 0) {
-        if (typeof column === 'function') return column([]);
+        if (typeof column === 'function') {
+          return column([]);
+        }
         return '1 = 0';
       }
       const phs = param.values.map(v => recordSecurityValue(v, state));
-      if (typeof column === 'function') return column(phs);
-      if (typeof column === 'string') return `${column} IN (${phs.join(', ')})`;
+      if (typeof column === 'function') {
+        return column(phs);
+      }
+      if (typeof column === 'string') {
+        return `${column} IN (${phs.join(', ')})`;
+      }
       return '';
     }
     // none
@@ -350,7 +389,9 @@ function securityFilterFn(value, required, state) {
 function securityToStringFn(value, state) {
   const values = coerceToStringValue(value);
   return () => {
-    if (values === null) return '';
+    if (values === null) {
+      return '';
+    }
     return values.map(v => recordSecurityValue(v, state)).join(',');
   };
 }
@@ -358,13 +399,23 @@ function securityToStringFn(value, state) {
 function securityContextProxy(value, state) {
   return new Proxy({}, {
     get(_t, prop) {
-      if (typeof prop !== 'string') return undefined;
+      if (typeof prop !== 'string') {
+        return undefined;
+      }
       // Methods coerce the current value lazily — only on access, so reading a
       // nested object property does not attempt to coerce the object itself.
-      if (prop === 'filter') return securityFilterFn(value, false, state);
-      if (prop === 'requiredFilter') return securityFilterFn(value, true, state);
-      if (prop === 'unsafeValue') return () => value;
-      if (prop === 'toString' || prop === 'valueOf') return securityToStringFn(value, state);
+      if (prop === 'filter') {
+        return securityFilterFn(value, false, state);
+      }
+      if (prop === 'requiredFilter') {
+        return securityFilterFn(value, true, state);
+      }
+      if (prop === 'unsafeValue') {
+        return () => value;
+      }
+      if (prop === 'toString' || prop === 'valueOf') {
+        return securityToStringFn(value, state);
+      }
       const propertyValue = value != null && typeof value === 'object' ? value[prop] : undefined;
       return securityContextProxy(propertyValue, state);
     },
@@ -374,12 +425,18 @@ function securityContextProxy(value, state) {
 // ---- entry point -----------------------------------------------------------
 
 function buildArg(argName, state, securityContext, sqlUtils) {
-  if (argName === 'FILTER_PARAMS') return filterParamsProxy(state);
-  if (argName === 'FILTER_GROUP') return filterGroupFn(state);
+  if (argName === 'FILTER_PARAMS') {
+    return filterParamsProxy(state);
+  }
+  if (argName === 'FILTER_GROUP') {
+    return filterGroupFn(state);
+  }
   if (argName === 'SECURITY_CONTEXT' || argName === 'security_context' || argName === 'securityContext') {
     return securityContextProxy(securityContext, state);
   }
-  if (argName === 'SQL_UTILS') return sqlUtils;
+  if (argName === 'SQL_UTILS') {
+    return sqlUtils;
+  }
   return memberReferenceProxy([argName], state);
 }
 

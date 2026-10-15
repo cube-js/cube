@@ -6,4 +6,4 @@ orders__status | orders__count | customers__count
 ---------------+---------------+-----------------
 completed      | 5             | 3               
 pending        | 3             | 2               
-NULL           | NULL          | NULL
+NULL           | NULL          | 1

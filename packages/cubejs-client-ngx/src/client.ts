@@ -20,32 +20,40 @@ export type CubeConfig = {
 export class CubeClient {
   public ready$: BehaviorSubject<boolean> = new BehaviorSubject(false);
 
-  private cubeApi: CubeApi;
+  private cubeApi: CubeApi | undefined;
 
-  constructor(@Inject('config') private config: any | Observable<any>) {
+  private latestConfig: CubeConfig | undefined;
+
+  public constructor(@Inject('config') private config: any | Observable<any>) {
     if (this.config instanceof Observable) {
-      this.config.subscribe(() => {
+      // A single subscription keeps the last emitted config, so a cold source
+      // such as a bare Subject is not re-subscribed (and its already emitted
+      // value lost) on the first request.
+      this.config.subscribe((nextConfig) => {
+        this.latestConfig = nextConfig;
+        this.cubeApi = undefined;
         this.ready$.next(true);
       });
     } else {
+      this.latestConfig = this.config;
       this.ready$.next(true);
     }
   }
 
   private apiInstance(): CubeApi {
     if (!this.cubeApi) {
-      if (this.config instanceof Observable) {
-        this.config.subscribe((config) => {
-          this.cubeApi = cube(config.token, config.options);
+      if (!this.latestConfig) {
+        throw new Error(
+          'Cannot create CubeApi instance. The config observable has not emitted yet, use ready$ to wait for it.'
+        );
+      }
 
-          if (!this.cubeApi) {
-            throw new Error(
-              'Cannot create CubeApi instance. Please check that the config is passed correctly and contains all required options.'
-            );
-          }
-        });
-      } else {
-        this.cubeApi = cube(this.config.token, this.config.options);
+      this.cubeApi = cube(this.latestConfig.token, this.latestConfig.options);
+
+      if (!this.cubeApi) {
+        throw new Error(
+          'Cannot create CubeApi instance. Please check that the config is passed correctly and contains all required options.'
+        );
       }
     }
 
@@ -56,7 +64,7 @@ export class CubeClient {
     query: Query | Query[],
     options?: LoadMethodOptions
   ): Observable<ResultSet<any>> {
-    return from(<Promise<ResultSet<any>>>this.apiInstance().load(query, options));
+    return from(this.apiInstance().load(query, options) as Promise<ResultSet<any>>);
   }
 
   public sql(
@@ -78,18 +86,15 @@ export class CubeClient {
   }
 
   public watch(query, params = {}): Observable<ResultSet<any>> {
-    return new Observable((observer) =>
-      query.subscribe({
-        next: async (query) => {
-          try {
-            const resultSet = await this.apiInstance().load(query, params);
-            observer.next(resultSet);
-          } catch(err) {
-            observer.error(err);
-          }
-
-        },
-      })
-    );
+    return new Observable((observer) => query.subscribe({
+      next: async (currentQuery) => {
+        try {
+          const resultSet = await this.apiInstance().load(currentQuery, params);
+          observer.next(resultSet);
+        } catch (err) {
+          observer.error(err);
+        }
+      },
+    }));
   }
 }

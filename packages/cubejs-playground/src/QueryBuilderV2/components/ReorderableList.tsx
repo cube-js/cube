@@ -51,8 +51,8 @@ interface ReorderableListProps extends ListProps<ItemProps> {
   onMove: (newKeys: string[]) => void;
 }
 
-export function ReorderableList<T extends ItemProps = ItemProps>(props: ReorderableListProps) {
-  let {
+export function ReorderableList(props: ReorderableListProps) {
+  const {
     onMove,
     direction = 'horizontal',
     isDisabled,
@@ -60,9 +60,9 @@ export function ReorderableList<T extends ItemProps = ItemProps>(props: Reordera
     children,
     ...itemProps
   } = props;
-  let state = useListState(props);
-  let ref = useRef(null);
-  let { listBoxProps } = useListBox(
+  const state = useListState(props);
+  const ref = useRef(null);
+  const { listBoxProps } = useListBox(
     {
       ...itemProps,
       // Prevent dragging from changing selection.
@@ -104,7 +104,7 @@ export function ReorderableList<T extends ItemProps = ItemProps>(props: Reordera
   };
 
   // Setup drag state for the collection.
-  let dragState = useDraggableCollectionState({
+  const dragState = useDraggableCollectionState({
     // Pass through events from props.
     ...itemProps,
 
@@ -120,7 +120,7 @@ export function ReorderableList<T extends ItemProps = ItemProps>(props: Reordera
       }
 
       return [...keys].map((key: any) => {
-        let item = state.collection.getItem(key);
+        const item = state.collection.getItem(key);
 
         return {
           'text/plain': item?.textValue || '',
@@ -132,14 +132,14 @@ export function ReorderableList<T extends ItemProps = ItemProps>(props: Reordera
 
   useDraggableCollection(props, dragState, ref);
 
-  let dropState = useDroppableCollectionState({
+  const dropState = useDroppableCollectionState({
     ...itemProps,
     onReorder,
     collection: state.collection,
     selectionManager: state.selectionManager,
   });
 
-  let { collectionProps } = useDroppableCollection(
+  const { collectionProps } = useDroppableCollection(
     {
       ...itemProps,
       // Provide drop targets for keyboard and pointer-based drag and drop.
@@ -158,20 +158,18 @@ export function ReorderableList<T extends ItemProps = ItemProps>(props: Reordera
       })}
       ref={ref}
     >
-      {[...state.collection].map((item) => {
-        return (
-          <ReorderableItem
-            key={item.key}
-            item={item}
-            direction={direction}
-            state={state}
-            isDisabled={isDisabled}
-            hasDragButton={hasDragButton}
-            dragState={dragState}
-            dropState={dropState}
-          />
-        );
-      })}
+      {[...state.collection].map((item) => (
+        <ReorderableItem
+          key={item.key}
+          item={item}
+          direction={direction}
+          state={state}
+          isDisabled={isDisabled}
+          hasDragButton={hasDragButton}
+          dragState={dragState}
+          dropState={dropState}
+        />
+      ))}
     </ReorderableListElement>
   );
 }
@@ -209,12 +207,12 @@ function ReorderableItem({
   dropState,
 }: ReorderableItemProps) {
   // Set up the listbox option as normal. See useListBox docs for details.
-  let ref = useRef(null);
-  let { optionProps } = useOption({ key: item.key }, state, ref);
-  let { isFocusVisible, focusProps } = useFocusRing();
+  const ref = useRef(null);
+  const { optionProps } = useOption({ key: item.key }, state, ref);
+  const { isFocusVisible, focusProps } = useFocusRing();
 
   // Register the item as a drag source.
-  let { dragProps, dragButtonProps } = useDraggableItem(
+  const { dragProps, dragButtonProps } = useDraggableItem(
     {
       key: item.key,
       hasDragButton,
@@ -299,8 +297,8 @@ interface DropIndicatorProps {
 function DropIndicator(props: DropIndicatorProps) {
   const { position, direction = 'horizontal', target } = props;
 
-  let ref = useRef(null);
-  let { dropIndicatorProps, isHidden, isDropTarget } = useDropIndicator(
+  const ref = useRef(null);
+  const { dropIndicatorProps, isHidden, isDropTarget } = useDropIndicator(
     { target },
     props.dropState,
     ref
@@ -313,6 +311,7 @@ function DropIndicator(props: DropIndicatorProps) {
     <DropIndicatorElement
       ref={ref}
       role="option"
+      aria-selected={false}
       {...dropIndicatorProps}
       mods={{
         'drop-target': isDropTarget,

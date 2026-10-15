@@ -165,7 +165,7 @@ type SqlApiRequest = BaseRequest & {
  * Pre-aggregations selector object.
  */
 type PreAggsSelector = {
-  contexts: {securityContext: any}[],
+  contexts: { securityContext: any }[],
   timezones: string[],
   dataSources?: string[],
   cubes?: string[],
@@ -178,7 +178,7 @@ type PreAggsSelector = {
  */
 type PreAggJob = {
   request: string;
-  context: {securityContext: any};
+  context: { securityContext: any };
   preagg: string;
   table: string;
   target: string;

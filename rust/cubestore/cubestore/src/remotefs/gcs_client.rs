@@ -337,6 +337,27 @@ mod tests {
         server.abort();
     }
     #[tokio::test]
+    async fn delete_ignores_only_not_found() {
+        for (status, succeeds) in [(204, true), (404, true), (403, false), (500, false)] {
+            let route = warp::delete()
+                .and(warp::header::exact("authorization", "Bearer test-token"))
+                .map(move || {
+                    warp::reply::with_status("", warp::http::StatusCode::from_u16(status).unwrap())
+                });
+            let (addr, server) = warp::serve(route).bind_ephemeral(([127, 0, 0, 1], 0));
+            let server = tokio::spawn(server);
+            let client = client(Url::parse(&format!("http://{}", addr)).unwrap());
+            let result = client.delete("/object").await;
+            server.abort();
+            assert_eq!(
+                result.is_ok(),
+                succeeds,
+                "unexpected DELETE result for {status}"
+            );
+        }
+    }
+
+    #[tokio::test]
     async fn streams_uploads_and_downloads_and_handles_not_found() {
         use tokio::io::AsyncWriteExt;
         let route = warp::header::exact("authorization", "Bearer test-token")

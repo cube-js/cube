@@ -35,11 +35,11 @@ export type SecurityContextProviderProps = {
 let mutex = 0;
 let refreshingToken: string | null = null;
 
-export const SecurityContextProvider = memo(function SecurityContextProvider({
+export const SecurityContextProvider = memo(({
   children,
   tokenUpdater,
   onTokenPayloadChange,
-}: SecurityContextProviderProps) {
+}: SecurityContextProviderProps) => {
   const isMounted = useIsMounted();
   const [savedToken, setToken, removeToken] = useLocalStorage<string | null>(
     'cubejsToken',
@@ -56,9 +56,9 @@ export const SecurityContextProvider = memo(function SecurityContextProvider({
     const tokenToRefresh = removeSavedToken ? appToken : token;
 
     if (
-      tokenToRefresh != null &&
-      tokenUpdater &&
-      refreshingToken !== tokenToRefresh
+      tokenToRefresh != null
+      && tokenUpdater
+      && refreshingToken !== tokenToRefresh
     ) {
       refreshingToken = tokenToRefresh;
       const currentMutex = mutex;
@@ -80,9 +80,9 @@ export const SecurityContextProvider = memo(function SecurityContextProvider({
   useEffect(() => {
     if (token) {
       try {
-        const payload = jwtDecode(token);
-        setPayload(JSON.stringify(payload, null, 2));
-      } catch (error: any) {
+        const decodedPayload = jwtDecode(token);
+        setPayload(JSON.stringify(decodedPayload, null, 2));
+      } catch {
         setPayload('');
         console.error('Invalid JWT token', token);
       }
@@ -99,12 +99,12 @@ export const SecurityContextProvider = memo(function SecurityContextProvider({
         payload,
         isModalOpen,
         setIsModalOpen,
-        async saveToken(token) {
-          if (!token) {
+        async saveToken(nextToken) {
+          if (!nextToken) {
             await refreshToken(true);
             removeToken();
           } else {
-            setToken(token);
+            setToken(nextToken);
           }
         },
         refreshToken,

@@ -1,6 +1,6 @@
 use crate::cube_bridge::join_hints::JoinHintItem;
 use crate::planner::join_hints::JoinHints;
-use crate::planner::{CubeRef, MemberSymbol, TraversalVisitor};
+use crate::planner::{CubeId, CubeRef, MemberSymbol, TraversalVisitor};
 use cubenativeutils::CubeError;
 use itertools::Itertools;
 use std::rc::Rc;
@@ -26,6 +26,15 @@ impl TraversalVisitor for JoinHintsCollector {
         node: &Rc<MemberSymbol>,
         _: &Self::State,
     ) -> Result<Option<Self::State>, CubeError> {
+        if let MemberSymbol::Ref(ref_symbol) = node.as_ref() {
+            if !node.is_multi_stage() {
+                return Ok(Some(()));
+            }
+            if let Some(target) = ref_symbol.target_member() {
+                self.on_node_traverse(target, &())?;
+            }
+            return Ok(None);
+        }
         if node.is_multi_stage() {
             if let Ok(dim) = node.as_dimension() {
                 if let Some(include) = dim.multi_stage().and_then(|m| m.grain.include.as_ref()) {
@@ -47,16 +56,7 @@ impl TraversalVisitor for JoinHintsCollector {
         match node.as_ref() {
             MemberSymbol::Dimension(e) => {
                 if !e.is_view() {
-                    let path = node.path();
-                    if !path.is_empty() {
-                        if path.len() == 1 {
-                            self.hints.push(JoinHintItem::Single(path[0].clone()))
-                        } else {
-                            self.hints.push(JoinHintItem::Vector(path.clone()))
-                        }
-                    } else {
-                        self.hints.push(JoinHintItem::Single(e.cube_name().clone()));
-                    }
+                    self.hints.push(join_hint(node.path(), &e.cube_id()));
                 }
                 if e.is_sub_query() {
                     return Ok(None);
@@ -65,34 +65,28 @@ impl TraversalVisitor for JoinHintsCollector {
             MemberSymbol::TimeDimension(e) => return self.on_node_traverse(e.base_symbol(), &()),
             MemberSymbol::Measure(e) => {
                 if !e.is_view() {
-                    let path = node.path();
-                    if !path.is_empty() {
-                        if path.len() == 1 {
-                            self.hints.push(JoinHintItem::Single(path[0].clone()))
-                        } else {
-                            self.hints.push(JoinHintItem::Vector(path.clone()))
-                        }
-                    } else {
-                        self.hints.push(JoinHintItem::Single(e.cube_name().clone()));
-                    }
+                    self.hints.push(join_hint(node.path(), &e.cube_id()));
                 }
             }
-            MemberSymbol::MemberExpression(_) => {}
+            MemberSymbol::MemberExpression(_) | MemberSymbol::Ref(_) => {}
         };
         Ok(Some(()))
     }
 
     fn on_cube_ref(&mut self, cube_ref: &CubeRef, _state: &Self::State) -> Result<(), CubeError> {
         if let CubeRef::Name(symbol) = cube_ref {
-            let path = symbol.path();
-            if path.len() > 1 {
-                self.hints.push(JoinHintItem::Vector(path.clone()));
-            } else {
-                self.hints
-                    .push(JoinHintItem::Single(symbol.cube_name().clone()));
-            }
+            self.hints.push(join_hint(symbol.path(), symbol.cube_id()));
         }
         Ok(())
+    }
+}
+
+// Join hints go to the data-model join graph, so they name target cubes.
+fn join_hint(path: &[CubeId], cube: &CubeId) -> JoinHintItem {
+    match path {
+        [] => JoinHintItem::Single(cube.target().to_string()),
+        [single] => JoinHintItem::Single(single.target().to_string()),
+        _ => JoinHintItem::Vector(path.iter().map(|c| c.target().to_string()).collect()),
     }
 }
 

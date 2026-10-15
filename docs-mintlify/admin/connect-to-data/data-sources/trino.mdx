@@ -21,7 +21,7 @@ CUBEJS_DB_HOST=my.trino.host
 CUBEJS_DB_USER=trino_user
 CUBEJS_DB_PASS=**********
 CUBEJS_DB_PRESTO_CATALOG=my_trino_catalog
-CUBEJS_DB_SCHEMA=my_trino_schema
+CUBEJS_DB_NAME=my_trino_schema
 ```
 
 ## Environment Variables
@@ -34,7 +34,7 @@ CUBEJS_DB_SCHEMA=my_trino_schema
 | [`CUBEJS_DB_PASS`](/reference/configuration/environment-variables#cubejs_db_pass)           | The password used to connect to the database                                        | A valid database password                     |    ✅    |
 | [`CUBEJS_DB_PRESTO_CATALOG`](/reference/configuration/environment-variables#cubejs_db_presto_catalog) | The catalog within Presto to connect to                                             | A valid catalog name within a Presto database |    ✅    |
 | [`CUBEJS_DB_PRESTO_AUTH_TOKEN`](/reference/configuration/environment-variables#cubejs_db_presto_auth_token) | The authentication token to use when connecting to Presto/Trino. It will be sent in the `Authorization` header. | A valid authentication token |    ❌    |
-| [`CUBEJS_DB_SCHEMA`](/reference/configuration/environment-variables#cubejs_db_schema)         | The schema within the database to connect to                                        | A valid schema name within a Presto database  |    ✅    |
+| [`CUBEJS_DB_NAME`](/reference/configuration/environment-variables#cubejs_db_name)             | The schema within the database to connect to                                        | A valid schema name within a Presto database  |    ✅    |
 | [`CUBEJS_DB_SSL`](/reference/configuration/environment-variables#cubejs_db_ssl)            | If `true`, enables SSL encryption for database connections from Cube                | `true`, `false`                               |    ❌    |
 | [`CUBEJS_DB_MAX_POOL`](/reference/configuration/environment-variables#cubejs_db_max_pool)       | The maximum number of concurrent database connections to pool. Default is `8`       | A valid number                                |    ❌    |
 | [`CUBEJS_CONCURRENCY`](/reference/configuration/environment-variables#cubejs_concurrency) | The number of [concurrent queries][ref-data-source-concurrency] to the data source | A valid number |    ❌    |
@@ -120,6 +120,15 @@ To enable SSL-encrypted connections between Cube and Trino, set the
 [`CUBEJS_DB_SSL`](/reference/configuration/environment-variables#cubejs_db_ssl) environment variable to `true`. For more information on how to
 configure custom certificates, please check out [Enable SSL Connections to the
 Database][ref-recipe-enable-ssl].
+
+## Query attribution
+
+Cube sends the identifier shown for the query in Query History as the
+`X-Trino-Trace-Token` header of every statement it runs, so all statements of one Cube
+query share it. Trino records it as the session's trace token, returned as
+`session.traceToken` by the query info endpoint (`GET /v1/query/<query-id>`).
+It is also passed to [event listeners][trino-docs-event-listener] as the query context's
+`traceToken`.
 
 ## Custom headers
 
@@ -210,3 +219,4 @@ module.exports = {
   https://trino.io/docs/current/functions/aggregate.html#approximate-aggregate-functions
 [ref-recipe-enable-ssl]: /recipes/configuration/using-ssl-connections-to-data-source
 [ref-schema-ref-types-formats-countdistinctapprox]: /reference/data-modeling/measures#type
+[trino-docs-event-listener]: https://trino.io/docs/current/develop/event-listener.html

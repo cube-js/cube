@@ -91,8 +91,8 @@ export function LogicalFilter(props: LogicalFilterProps) {
 
   const filters = [...values];
 
-  const changeValues = (filters: Filter[]) => {
-    onChange({ [type]: filters } as LogicalAndFilter | LogicalOrFilter);
+  const changeValues = (nextFilters: Filter[]) => {
+    onChange({ [type]: nextFilters } as LogicalAndFilter | LogicalOrFilter);
   };
 
   const removeFilter = (index: number) => {
@@ -106,8 +106,8 @@ export function LogicalFilter(props: LogicalFilterProps) {
     changeValues(filters);
   };
 
-  const wrapFilter = useEvent((type: 'and' | 'or') => {
-    onChange({ [type]: [{ [type]: values }] } as LogicalAndFilter | LogicalOrFilter);
+  const wrapFilter = useEvent((wrapType: 'and' | 'or') => {
+    onChange({ [wrapType]: [{ [wrapType]: values }] } as LogicalAndFilter | LogicalOrFilter);
   });
 
   const unwrapFilter = (index: number) => {
@@ -146,6 +146,7 @@ export function LogicalFilter(props: LogicalFilterProps) {
       case 'wrapWithOr':
         wrapFilter('or');
         break;
+      // no default
     }
   });
 
@@ -164,6 +165,8 @@ export function LogicalFilter(props: LogicalFilterProps) {
           if ('and' in filter) {
             return (
               <LogicalFilter
+                // filters have no stable id, and a content-derived key would remount their inputs
+                // eslint-disable-next-line react/no-array-index-key
                 key={index}
                 type="and"
                 values={filter.and}
@@ -172,8 +175,8 @@ export function LogicalFilter(props: LogicalFilterProps) {
                 onRemove={() => {
                   removeFilter(index);
                 }}
-                onChange={(filter) => {
-                  updateFilter(index, filter);
+                onChange={(nextFilter) => {
+                  updateFilter(index, nextFilter);
                 }}
                 onUnwrap={() => {
                   unwrapFilter(index);
@@ -185,6 +188,8 @@ export function LogicalFilter(props: LogicalFilterProps) {
           if ('or' in filter) {
             return (
               <LogicalFilter
+                // filters have no stable id, and a content-derived key would remount their inputs
+                // eslint-disable-next-line react/no-array-index-key
                 key={index}
                 type="or"
                 values={filter.or}
@@ -193,8 +198,8 @@ export function LogicalFilter(props: LogicalFilterProps) {
                 onRemove={() => {
                   removeFilter(index);
                 }}
-                onChange={(filter) => {
-                  updateFilter(index, filter);
+                onChange={(nextFilter) => {
+                  updateFilter(index, nextFilter);
                 }}
                 onUnwrap={() => {
                   unwrapFilter(index);
@@ -210,11 +215,13 @@ export function LogicalFilter(props: LogicalFilterProps) {
           const member = members.measures[filter.member] || members.dimensions[filter.member];
           const memberFullName = filter.member;
           const cubeName = memberFullName.split('.')[0];
-          const cube = cubes.find((cube) => cube.name === cubeName);
+          const cube = cubes.find((candidateCube) => candidateCube.name === cubeName);
           const memberName = memberFullName.split('.')[1];
 
           return (
             <FilterMember
+              // filters have no stable id, and a content-derived key would remount their inputs
+              // eslint-disable-next-line react/no-array-index-key
               key={index}
               isMissing={!member}
               isCompact={isCompact}

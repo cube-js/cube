@@ -1,27 +1,35 @@
 #!/usr/bin/env bash
 #
-# Configures two narrowly-scoped `gh` aliases used by the Claude PR review workflow
+# Configures three narrowly-scoped `gh` aliases used by the Claude PR review workflow
 # to list and resolve review threads without granting `gh api graphql:*` broadly.
 #
 # Aliases installed:
-#   gh list-review-threads <owner> <repo> <pr>
+#   gh list-review-threads <owner> <repo> <pr> [thread-cursor]
+#   gh show-review-thread <thread-id> [comment-cursor]
+#   gh reply-to-thread <thread-id> <body>
 #   gh resolve-thread <thread-id>
 
 set -euo pipefail
 
-gh alias set --shell list-review-threads "$(cat <<'EOF'
+gh alias set --clobber --shell list-review-threads "$(cat <<'EOF'
 gh api graphql \
   -f query='
-    query($owner: String!, $repo: String!, $pr: Int!) {
+    query($owner: String!, $repo: String!, $pr: Int!, $cursor: String) {
       repository(owner: $owner, name: $repo) {
         pullRequest(number: $pr) {
-          reviewThreads(first: 100) {
+          reviewThreads(first: 100, after: $cursor) {
+            pageInfo { hasNextPage endCursor }
             nodes {
               id
               isResolved
               isOutdated
-              comments(first: 1) {
-                nodes { author { login } body path line }
+              path
+              line
+              originalLine
+              comments(first: 25) {
+                totalCount
+                pageInfo { hasNextPage endCursor }
+                nodes { author { login } body }
               }
             }
           }
@@ -29,11 +37,55 @@ gh api graphql \
       }
     }
   ' \
-  -F owner="$1" -F repo="$2" -F pr="$3"
+  -F owner="$1" -F repo="$2" -F pr="$3" -F cursor="${4:-null}" \
+  --jq '.data.repository.pullRequest.reviewThreads
+        | {pageInfo, nodes: [.nodes[] | select(.isResolved | not) | del(.isResolved)]}'
 EOF
 )"
 
-gh alias set --shell resolve-thread "$(cat <<'EOF'
+# Only needed past the 25 comments the listing already inlines.
+gh alias set --clobber --shell show-review-thread "$(cat <<'EOF'
+gh api graphql \
+  -f query='
+    query($id: ID!, $cursor: String) {
+      node(id: $id) {
+        ... on PullRequestReviewThread {
+          id
+          isResolved
+          isOutdated
+          path
+          line
+          comments(first: 25, after: $cursor) {
+            totalCount
+            pageInfo { hasNextPage endCursor }
+            nodes { author { login } body }
+          }
+        }
+      }
+    }
+  ' \
+  -F id="$1" -F cursor="${2:-null}" \
+  --jq '.data.node'
+EOF
+)"
+
+# The inline-comment MCP tool only opens new threads, so replying to one of our own
+# — withdrawing a finding, answering a pushback — has no other route.
+gh alias set --clobber --shell reply-to-thread "$(cat <<'EOF'
+gh api graphql \
+  -f query='
+    mutation($id: ID!, $body: String!) {
+      addPullRequestReviewThreadReply(input: { pullRequestReviewThreadId: $id, body: $body }) {
+        comment { url }
+      }
+    }
+  ' \
+  -F id="$1" -F body="$2" \
+  --jq '.data.addPullRequestReviewThreadReply.comment.url'
+EOF
+)"
+
+gh alias set --clobber --shell resolve-thread "$(cat <<'EOF'
 gh api graphql \
   -f query='
     mutation($id: ID!) {

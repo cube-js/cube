@@ -9,6 +9,7 @@ import { configureTypegenCommand } from './command/typegen';
 import { configureAuthCommand } from './command/auth';
 import { loadCliManifest } from './utils';
 import { configureValidateCommand } from './command/validate';
+import { displayDeprecationWarning } from './deprecation';
 
 const packageJson = loadCliManifest();
 
@@ -22,6 +23,8 @@ program
     console.log('Use cubejs <command> --help for more information about a command.');
     console.log('');
   });
+
+displayDeprecationWarning();
 
 (async () => {
   await configureAuthCommand(program);

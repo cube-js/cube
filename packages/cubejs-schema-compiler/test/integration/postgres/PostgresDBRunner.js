@@ -29,6 +29,7 @@ export class PostgresDBRunner extends BaseDbRunner {
           await tx.query('SET TIME ZONE \'UTC\'');
           await prepareDataSet(tx);
           let lastResult;
+
           for (const [query, params] of queries) {
             try {
               lastResult = await tx.query(query, params);

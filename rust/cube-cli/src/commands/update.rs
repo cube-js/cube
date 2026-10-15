@@ -28,7 +28,9 @@ pub async fn command(args: Args, _ctx: &Ctx) -> Result<()> {
         ));
         return Ok(());
     }
-    println!("Current version: {CURRENT_VERSION}");
+    if !update::is_unversioned(CURRENT_VERSION) {
+        println!("Current version: {CURRENT_VERSION}");
+    }
     println!("Latest release:  {}", latest.bold().green());
     if args.check {
         println!("Run {} to install it.", "cube update".bold().cyan());
@@ -57,7 +59,11 @@ pub async fn command(args: Args, _ctx: &Ctx) -> Result<()> {
     let new_binary = extract_binary(&bytes)?;
     replace_current_exe(&new_binary)?;
 
-    output::success(&format!("Updated Cube CLI {CURRENT_VERSION} → {latest}"));
+    if update::is_unversioned(CURRENT_VERSION) {
+        output::success(&format!("Updated Cube CLI to {latest}"));
+    } else {
+        output::success(&format!("Updated Cube CLI {CURRENT_VERSION} → {latest}"));
+    }
     Ok(())
 }
 

@@ -1,6 +1,6 @@
 {
   "name": "@cubejs-backend/cloud",
-  "version": "1.7.35",
+  "version": "1.8.6",
   "description": "Cube Cloud package",
   "main": "dist/src/index.js",
   "typings": "dist/src/index.d.ts",
@@ -9,9 +9,7 @@
     "tsc": "tsc",
     "watch": "tsc -w",
     "test": "npm run unit",
-    "unit": "jest dist/test",
-    "lint": "eslint --debug src/* --ext .ts",
-    "lint:fix": "eslint --fix src/* --ext .ts"
+    "unit": "jest dist/test"
   },
   "files": [
     "README.md",
@@ -30,7 +28,7 @@
   "devDependencies": {
     "@babel/core": "^7.24.5",
     "@babel/preset-env": "^7.24.5",
-    "@cubejs-backend/linter": "1.7.35",
+    "@cubejs-backend/linter": "1.8.6",
     "@types/fs-extra": "^11.0.4",
     "@types/jest": "^29",
     "@types/node": "^22",
@@ -39,7 +37,7 @@
   },
   "dependencies": {
     "@cubejs-backend/dotenv": "^9.0.2",
-    "@cubejs-backend/shared": "1.7.35",
+    "@cubejs-backend/shared": "1.8.6",
     "chokidar": "^3.5.1",
     "env-var": "^6.3.0",
     "form-data": "^4.0.0",
@@ -49,8 +47,5 @@
   },
   "publishConfig": {
     "access": "public"
-  },
-  "eslintConfig": {
-    "extends": "../cubejs-linter"
   }
 }

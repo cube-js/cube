@@ -52,7 +52,7 @@ export function evaluateLocalRefreshKey(
   return [{ refresh_key: String(Math.floor((utcOffset + nowMs / 1000 - dayOffset) / interval)) }];
 }
 
-export function isValidLocalRefreshKey(descriptor?: LocalRefreshKeyDescriptor): boolean {
+export function isValidLocalRefreshKey(descriptor?: LocalRefreshKeyDescriptor): descriptor is LocalRefreshKeyDescriptor {
   return !!descriptor &&
     Number.isFinite(descriptor.interval) && descriptor.interval > 0 &&
     Number.isFinite(descriptor.utcOffset) &&

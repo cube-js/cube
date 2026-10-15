@@ -590,6 +590,7 @@ describe('SQLInterface', () => {
     const write = jest.fn((chunk, _enc, callback) => {
       const raw = (buf + chunk.toString('utf-8')).split('\n');
       buf = raw.pop() || '';
+
       for (const l of raw) {
         if (l.trim().length) {
           lines.push(JSON.parse(l));
@@ -654,6 +655,7 @@ describe('SQLInterface', () => {
     const write = jest.fn((chunk, _enc, callback) => {
       const raw = (buf + chunk.toString('utf-8')).split('\n');
       buf = raw.pop() || '';
+
       for (const l of raw) {
         if (l.trim().length) {
           lines.push(JSON.parse(l));
@@ -754,6 +756,7 @@ describe('SQLInterface', () => {
       const write = jest.fn((chunk, _enc, callback) => {
         const raw = (buf + chunk.toString('utf-8')).split('\n');
         buf = raw.pop() || '';
+
         for (const l of raw) {
           if (l.trim().length) {
             lines.push(JSON.parse(l));
@@ -843,6 +846,7 @@ describe('SQLInterface', () => {
       const write = jest.fn((chunk, _enc, callback) => {
         const raw = (buf + chunk.toString('utf-8')).split('\n');
         buf = raw.pop() || '';
+
         for (const l of raw) {
           if (l.trim().length) {
             lines.push(JSON.parse(l));

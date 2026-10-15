@@ -442,10 +442,9 @@ describe('Multi-fact derived measure defined on a cube', () => {
   });
 });
 
-// The other reason a view measure spanning cubes wants `multi_stage`: even when
-// the cubes DO join, a plain calculated measure is evaluated inside the single
-// joined scan, so a `sum` on the one side is taken over rows the join has
-// multiplied. `multi_stage` aggregates each side first, then divides.
+// A view measure over cubes that DO join: plain or `multi_stage`, each side is
+// aggregated before the division, so the join cannot multiply the `sum`.
+// `multi_stage` is still needed when the cubes do not join (see above).
 describe('Derived view measure over a fanned-out join', () => {
   const fanOutModel = `
 cubes:
@@ -523,13 +522,14 @@ views:
     return sql;
   };
 
-  // Current behaviour, pinned: `sum` runs over the multiplied rows of the join,
-  // so the numerator is larger than the same measure queried on its own.
-  it('inlines a plain calculated measure into the multiplied join', () => {
+  // A plain calculated view measure is split like one declared on a cube:
+  // `sum` is taken where the join to line_items cannot multiply it, and the
+  // division runs over the two aggregated columns.
+  it('aggregates each side before dividing a plain calculated measure', () => {
     const sql = buildFanOutSql('orders_overview.average_line_value');
 
-    expect(sql).toMatch(/sum\("orders"\.amount\) \/ NULLIF\(count\("line_items"\.id\), 0\)/);
-    expect(sql).toContain('"orders".id = "line_items".order_id');
+    expect(sql).not.toMatch(/sum\("orders"\.amount\) \/ NULLIF/);
+    expect(sql).toMatch(/"orders__total_amount" \/ NULLIF\("[^"]+"\."line_items__count", 0\)/);
   });
 
   it('aggregates each side before dividing when the measure is multi_stage', () => {

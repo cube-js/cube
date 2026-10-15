@@ -1,8 +1,8 @@
 {
   "name": "@cubejs-backend/databricks-jdbc-driver",
-  "description": "Cube.js Databricks database driver",
+  "description": "Cube Databricks database driver",
   "author": "Cube Dev, Inc.",
-  "version": "1.7.35",
+  "version": "1.8.6",
   "license": "Apache-2.0",
   "repository": {
     "type": "git",
@@ -19,9 +19,8 @@
     "tsc": "tsc",
     "watch": "tsc -w",
     "test": "npm run unit-tests",
+    "unit": "npm run unit-tests",
     "unit-tests": "NODE_OPTIONS=--experimental-vm-modules jest dist/test --forceExit",
-    "lint": "eslint src/* --ext .ts",
-    "lint:fix": "eslint --fix src/* --ext .ts",
     "postinstall": "node bin/post-install"
   },
   "files": [
@@ -30,17 +29,17 @@
     "bin"
   ],
   "dependencies": {
-    "@cubejs-backend/base-driver": "1.7.35",
-    "@cubejs-backend/jdbc-driver": "1.7.35",
-    "@cubejs-backend/schema-compiler": "1.7.35",
-    "@cubejs-backend/shared": "1.7.35",
+    "@cubejs-backend/base-driver": "1.8.6",
+    "@cubejs-backend/jdbc-driver": "1.8.6",
+    "@cubejs-backend/schema-compiler": "1.8.6",
+    "@cubejs-backend/shared": "1.8.6",
     "node-fetch": "^2.7.0",
     "ramda": "^0.27.2",
     "source-map-support": "^0.5.19",
     "uuid": "^11.1.1"
   },
   "devDependencies": {
-    "@cubejs-backend/linter": "1.7.35",
+    "@cubejs-backend/linter": "1.8.6",
     "@types/jest": "^29",
     "@types/node": "^22",
     "@types/ramda": "^0.27.40",
@@ -49,8 +48,5 @@
   },
   "publishConfig": {
     "access": "public"
-  },
-  "eslintConfig": {
-    "extends": "../cubejs-linter"
   }
 }

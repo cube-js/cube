@@ -10,8 +10,14 @@ env:
   CARGO_NET_RETRY: 10
   RUSTUP_MAX_RETRIES: 10
 
+permissions:
+  contents: read
+
 jobs:
   npm:
+    # cubestore and native download their binaries from this release in post-install, so
+    # publishing before the Linux binaries are uploaded breaks `npm install` of the new version
+    needs: [cubestore_linux, native_linux]
     runs-on: ubuntu-24.04
     timeout-minutes: 60
     permissions:
@@ -23,7 +29,7 @@ jobs:
       - name: Install Rust
         uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
-          toolchain: 1.90.0
+          toolchain: 1.98.1
           # override: true # this is by default on
           rustflags: ""
           components: rustfmt
@@ -32,6 +38,12 @@ jobs:
         with:
           node-version: 24.x
           registry-url: 'https://registry.npmjs.org/'
+      # Publishing goes through OIDC trusted publishing, so no token is needed, but
+      # setup-node still writes _authToken=${NODE_AUTH_TOKEN} and since v7 no longer
+      # exports a placeholder value for it, which makes every yarn 1 command fail
+      # TODO: drop this once we move to a modern package manager (yarn 4 / pnpm)
+      - name: Drop unused _authToken from generated .npmrc
+        run: sed -i '/_authToken/d' "$NPM_CONFIG_USERCONFIG"
       - name: Upgrade npm for OIDC support
         run: npm install -g npm@11.7.0
       - name: Get yarn cache directory path
@@ -46,7 +58,7 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-yarn-
       - name: Set Yarn version
-        run: yarn policies set-version v1.22.22
+        uses: ./.github/actions/setup-yarn-1
       - name: Yarn install
         uses: nick-fields/retry@v4
         env:
@@ -104,7 +116,7 @@ jobs:
       - name: Install Rust
         uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
-          toolchain: 1.90.0
+          toolchain: 1.98.1
           # override: true # this is by default on
           rustflags: ""
           components: rustfmt
@@ -116,7 +128,7 @@ jobs:
       - name: Install Yarn
         run: npm install -g yarn
       - name: Set Yarn version
-        run: yarn policies set-version v1.22.22
+        uses: ./.github/actions/setup-yarn-1
         # We don't need to install all yarn deps to build native
       - name: Install cargo-cp-artifact
         run: npm install -g cargo-cp-artifact@0.1
@@ -193,7 +205,7 @@ jobs:
       - name: Install Rust
         uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
-          toolchain: 1.90.0
+          toolchain: 1.98.1
           # override: true # this is by default on
           rustflags: ""
           components: rustfmt
@@ -208,7 +220,7 @@ jobs:
         with:
           node-version: ${{ matrix.node-version }}
       - name: Set Yarn version
-        run: yarn policies set-version v1.22.22
+        uses: ./.github/actions/setup-yarn-1
         # We don't need to install all yarn deps to build native
       - name: Install cargo-cp-artifact
         run: npm install -g cargo-cp-artifact@0.1
@@ -268,7 +280,7 @@ jobs:
       - name: Install Rust
         uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
-          toolchain: 1.90.0
+          toolchain: 1.98.1
           # override: true # this is by default on
           rustflags: ""
           components: rustfmt
@@ -282,7 +294,7 @@ jobs:
         with:
           node-version: ${{ matrix.node-version }}
       - name: Set Yarn version
-        run: yarn policies set-version v1.22.22
+        uses: ./.github/actions/setup-yarn-1
         # We don't need to install all yarn deps to build native
       - name: Install cargo-cp-artifact
         run: npm install -g cargo-cp-artifact@0.1
@@ -641,6 +653,13 @@ jobs:
           key: target-${{ matrix.target }}
       - name: Build with Cargo
         run: |
+          # jemalloc bakes the page size in at build time. This runner has 4 KiB
+          # pages, but arm64 hosts can use up to 64 KiB (Raspberry Pi, Ubuntu
+          # arm64-largemem, Asahi), so build for the largest one there.
+          # TODO: drop once we are on jemalloc 5.3.1+, where this is the default.
+          case "${{ matrix.target }}" in
+            aarch64-*) export JEMALLOC_SYS_WITH_LG_PAGE=16 ;;
+          esac
           cd rust/cubestore && cargo build --release --target=${{ matrix.target }} -p cubestore
       - name: Compress binaries
         uses: svenstaro/upx-action@v3

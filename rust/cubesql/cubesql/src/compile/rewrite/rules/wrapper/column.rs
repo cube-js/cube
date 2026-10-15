@@ -70,7 +70,7 @@ impl WrapperRules {
                         "?input_data_source",
                     ),
                 ),
-                self.pushdown_simple_measure("?name", "?cube_members"),
+                self.pushdown_simple_measure("?name", "?cube_members", "?input_data_source"),
             ),
             // TODO time dimension support
             transforming_rewrite(
@@ -105,6 +105,7 @@ impl WrapperRules {
                     "?cube_members",
                     "?dimension",
                     "?grouped_subqueries",
+                    "?input_data_source",
                 ),
             ),
         ]);
@@ -117,16 +118,25 @@ impl WrapperRules {
         members_var: &'static str,
         dimension_var: &'static str,
         grouped_subqueries_var: &'static str,
+        input_data_source_var: &'static str,
     ) -> impl Fn(&mut CubeEGraph, &mut Subst) -> bool {
         let alias_to_cube_var = var!(alias_to_cube_var);
         let column_name_var = var!(column_name_var);
         let members_var = var!(members_var);
         let dimension_var = var!(dimension_var);
         let grouped_subqueries_var = var!(grouped_subqueries_var);
+        let input_data_source_var = var!(input_data_source_var);
+        let meta = self.meta_context.clone();
         move |egraph, subst| {
             let columns: Vec<_> = var_iter!(egraph[subst[column_name_var]], ColumnExprColumn)
                 .cloned()
                 .collect();
+            let Ok(context_data_source) =
+                Self::context_data_source(egraph, subst, input_data_source_var, &meta)
+            else {
+                return false;
+            };
+
             for column in columns.iter() {
                 for alias_to_cube in var_iter!(
                     egraph[subst[alias_to_cube_var]],
@@ -188,6 +198,17 @@ impl WrapperRules {
                             | Member::VirtualField { .. }
                             | Member::LiteralMember { .. }
                     ) {
+                        // A member with a name reaches a data source; the rest (literal
+                        // members, the change user) fit any context
+                        if let Some(member_name) = member.1.name() {
+                            if !Self::member_fits_data_source(
+                                context_data_source,
+                                &meta,
+                                member_name,
+                            ) {
+                                continue;
+                            }
+                        }
                         let column_expr_column = egraph.add(LogicalPlanLanguage::ColumnExprColumn(
                             ColumnExprColumn(column.clone()),
                         ));
@@ -207,19 +228,29 @@ impl WrapperRules {
         &self,
         column_name_var: &'static str,
         members_var: &'static str,
+        input_data_source_var: &'static str,
     ) -> impl Fn(&mut CubeEGraph, &mut Subst) -> bool {
         let column_name_var = var!(column_name_var);
         let members_var = var!(members_var);
+        let input_data_source_var = var!(input_data_source_var);
         let meta = self.meta_context.clone();
         move |egraph, subst| {
             let columns: Vec<_> = var_iter!(egraph[subst[column_name_var]], ColumnExprColumn)
                 .cloned()
                 .collect();
+            let Ok(context_data_source) =
+                Self::context_data_source(egraph, subst, input_data_source_var, &meta)
+            else {
+                return false;
+            };
             for column in columns {
                 if let Some(((Some(member), _, _), _)) = egraph[subst[members_var]]
                     .data
                     .find_member_by_alias(&column.name)
                 {
+                    if !Self::member_fits_data_source(context_data_source, &meta, member) {
+                        continue;
+                    }
                     if let Some(measure) = meta.find_measure_with_name(member) {
                         if measure.agg_type != Some("number".to_string()) {
                             return true;

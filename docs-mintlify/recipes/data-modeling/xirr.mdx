@@ -17,7 +17,9 @@ and DAX API. It means that queries to any of these APIs can use the this functio
 The `XIRR` function is also implemented in Cube Store, meaning that queries to the SQL API
 or the [REST (JSON) API][ref-rest-api] that hit pre-aggregations can also use this function.
 That function would need to be used in a measure that makes use of [multi-stage
-calculations][ref-multi-stage-calculations].
+calculations][ref-multi-stage-calculations]. For the function's arguments, the
+algorithm it uses, and how it behaves on edge cases, see the
+[XIRR function reference][ref-xirr-function].
 
 <Info>
 
@@ -188,3 +190,4 @@ All queries above would yield the same result:
 [ref-query-regular]: /reference/core-data-apis/queries#regular-query
 [link-tesseract]: https://cube.dev/blog/introducing-next-generation-data-modeling-engine
 [ref-multi-stage-calculations]: /docs/data-modeling/measures#multi-stage-measures
+[ref-xirr-function]: /reference/core-data-apis/xirr

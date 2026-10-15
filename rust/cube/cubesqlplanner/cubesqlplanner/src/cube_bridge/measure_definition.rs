@@ -53,6 +53,8 @@ pub struct MeasureDefinitionStatic {
     pub time_shift_references: Option<Vec<TimeShiftReference>>,
     #[serde(rename = "rollingWindow")]
     pub rolling_window: Option<RollingWindow>,
+    /// Re-exported by a view from its `includes`, rather than declared by it.
+    pub included: Option<bool>,
 }
 
 #[nativebridge::native_bridge(MeasureDefinitionStatic, with_static_meta)]

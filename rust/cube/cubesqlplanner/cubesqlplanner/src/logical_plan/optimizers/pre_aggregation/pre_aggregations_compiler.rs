@@ -13,7 +13,6 @@ use crate::planner::multi_fact_join_groups::{MeasuresJoinHints, MultiFactJoinGro
 use crate::planner::planners::JoinPlanner;
 use crate::planner::planners::ResolvedJoinItem;
 use crate::planner::state::State;
-use crate::planner::Compiler;
 use crate::planner::GranularityHelper;
 use crate::planner::MemberSymbol;
 use crate::planner::SqlCall;
@@ -21,11 +20,12 @@ use crate::planner::SqlCallReference;
 use crate::planner::SymbolPath;
 use crate::planner::SymbolPathType;
 use crate::planner::TimeDimensionSymbol;
+use crate::planner::{Compiler, CubeId, MemberId};
 use crate::utils::debug::DebugSql;
 use cubenativeutils::CubeError;
 use cubenativeutils::CubeErrorCauseType;
 use itertools::Itertools;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::fmt::Debug;
 use std::rc::Rc;
 
@@ -60,18 +60,24 @@ pub struct PreAggregationsCompiler {
     query_tools: Rc<State>,
     descriptions: Rc<Vec<(PreAggregationFullName, Rc<dyn PreAggregationDescription>)>>,
     compiled_cache: HashMap<PreAggregationFullName, Rc<CompiledPreAggregation>>,
+    /// Why a pre-aggregation couldn't be compiled, so a later request for it -
+    /// as a leg of a rollup join, say - fails the same way without recompiling.
+    failed_cache: HashMap<PreAggregationFullName, String>,
+    /// Pre-aggregations whose members the join graph has no path for, directly
+    /// or through a rollup they are built from. No query can use one of them.
+    unjoinable: HashSet<PreAggregationFullName>,
 }
 
 impl PreAggregationsCompiler {
-    pub fn try_new(query_tools: Rc<State>, cube_names: &Vec<String>) -> Result<Self, CubeError> {
+    pub fn try_new(query_tools: Rc<State>, cube_names: &Vec<CubeId>) -> Result<Self, CubeError> {
         let mut descriptions = Vec::new();
         for cube_name in cube_names.iter() {
             let pre_aggregations = query_tools
                 .cube_evaluator()
-                .pre_aggregations_for_cube_as_array(cube_name.clone())?;
+                .pre_aggregations_for_cube_as_array(cube_name.target().to_string())?;
             for pre_aggregation in pre_aggregations.iter() {
                 let full_name = PreAggregationFullName::new(
-                    cube_name.clone(),
+                    cube_name.target().to_string(),
                     pre_aggregation.static_data().name.clone(),
                 );
                 descriptions.push((full_name, pre_aggregation.clone()));
@@ -81,6 +87,8 @@ impl PreAggregationsCompiler {
             query_tools,
             descriptions: Rc::new(descriptions),
             compiled_cache: HashMap::new(),
+            failed_cache: HashMap::new(),
+            unjoinable: HashSet::new(),
         })
     }
 
@@ -91,7 +99,38 @@ impl PreAggregationsCompiler {
         if let Some(compiled) = self.compiled_cache.get(&name) {
             return Ok(compiled.clone());
         }
+        if let Some(reason) = self.failed_cache.get(name) {
+            return Err(CubeError::user(reason.clone()));
+        }
+        let result = self.compile_uncached_pre_aggregation(name);
+        // Only a failure raised on this side is kept: an exception thrown by the
+        // JS side stays pending there, and nothing may call into JS after it.
+        if let Err(err) = &result {
+            if matches!(err.cause, CubeErrorCauseType::User) {
+                self.failed_cache.insert(name.clone(), err.message.clone());
+            }
+        }
+        result
+    }
 
+    /// A rollup `referencing` is built from; one that can't be joined makes
+    /// `referencing` unjoinable too.
+    fn compile_referenced_pre_aggregation(
+        &mut self,
+        referencing: &PreAggregationFullName,
+        name: &PreAggregationFullName,
+    ) -> Result<Rc<CompiledPreAggregation>, CubeError> {
+        let result = self.compile_pre_aggregation(name);
+        if result.is_err() && self.unjoinable.contains(name) {
+            self.unjoinable.insert(referencing.clone());
+        }
+        result
+    }
+
+    fn compile_uncached_pre_aggregation(
+        &mut self,
+        name: &PreAggregationFullName,
+    ) -> Result<Rc<CompiledPreAggregation>, CubeError> {
         let description = if let Some((_, description)) =
             self.descriptions.clone().iter().find(|(n, _)| n == name)
         {
@@ -150,7 +189,7 @@ impl PreAggregationsCompiler {
                 let granularity_obj = GranularityHelper::make_granularity_obj(
                     self.query_tools.cube_evaluator().clone(),
                     &mut evaluator_compiler,
-                    &base_symbol.cube_name(),
+                    &base_symbol.cube_id(),
                     &base_symbol.name(),
                     Some(granularity.clone()),
                 )?;
@@ -174,7 +213,7 @@ impl PreAggregationsCompiler {
                 let granularity_obj = GranularityHelper::make_granularity_obj(
                     self.query_tools.cube_evaluator().clone(),
                     &mut evaluator_compiler,
-                    &base_symbol.cube_name(),
+                    &base_symbol.cube_id(),
                     &base_symbol.name(),
                     static_data.granularity.clone(),
                 )?;
@@ -206,8 +245,16 @@ impl PreAggregationsCompiler {
             .add_dimensions(&dimensions)
             .add_dimensions(&time_dimensions)
             .build(&measures)?;
-        let multi_fact_join_groups =
-            MultiFactJoinGroups::try_new(self.query_tools.clone(), measures_join_hints)?;
+        let multi_fact_join_groups = match MultiFactJoinGroups::try_new_if_joinable(
+            self.query_tools.clone(),
+            measures_join_hints,
+        )? {
+            Ok(groups) => groups,
+            Err(err) => {
+                self.unjoinable.insert(name.clone());
+                return Err(err);
+            }
+        };
 
         let rollups = if let Some(refs) = description.rollup_references()? {
             let r = self
@@ -292,7 +339,10 @@ impl PreAggregationsCompiler {
         let pre_aggrs_for_lambda = rollups
             .iter()
             .map(|item| -> Result<_, CubeError> {
-                self.compile_pre_aggregation(&PreAggregationFullName::from_string(item)?)
+                self.compile_referenced_pre_aggregation(
+                    name,
+                    &PreAggregationFullName::from_string(item)?,
+                )
             })
             .collect::<Result<Vec<_>, _>>()?;
 
@@ -402,9 +452,11 @@ impl PreAggregationsCompiler {
         for symbol in symbols {
             let path = symbol.path();
             if path.len() == 1 {
-                result.push(JoinHintItem::Single(path[0].clone()));
+                result.push(JoinHintItem::Single(path[0].target().to_string()));
             } else {
-                result.push(JoinHintItem::Vector(path.clone()));
+                result.push(JoinHintItem::Vector(
+                    path.iter().map(|cube| cube.target().to_string()).collect(),
+                ));
             }
         }
         result
@@ -427,7 +479,10 @@ impl PreAggregationsCompiler {
         let pre_aggrs_for_join = rollups
             .iter()
             .map(|item| -> Result<_, CubeError> {
-                self.compile_pre_aggregation(&PreAggregationFullName::from_string(item)?)
+                self.compile_referenced_pre_aggregation(
+                    rollup_join_name,
+                    &PreAggregationFullName::from_string(item)?,
+                )
             })
             .collect::<Result<Vec<_>, _>>()?;
 
@@ -484,21 +539,21 @@ impl PreAggregationsCompiler {
         items: &[PreAggregationJoinItem],
         rollup_join_name: &PreAggregationFullName,
     ) -> Result<(), CubeError> {
-        let mut columns: HashMap<String, String> = HashMap::new();
+        let mut columns: HashMap<MemberId, String> = HashMap::new();
         for member in items
             .iter()
             .flat_map(|item| item.from_members.iter().chain(item.to_members.iter()))
         {
-            let name = member.symbol.full_name();
-            if let Some(seen) = columns.get(&name) {
+            let id = member.symbol.id();
+            if let Some(seen) = columns.get(id) {
                 if seen != &member.column {
                     return Err(CubeError::user(format!(
                         "The \"{}\" pre-aggregation joins on {} through rollups storing it in different columns ({} and {}), so one of the joins would read a column that isn't there",
-                        rollup_join_name.name, name, seen, member.column,
+                        rollup_join_name.name, id, seen, member.column,
                     )));
                 }
             } else {
-                columns.insert(name, member.column.clone());
+                columns.insert(id.clone(), member.column.clone());
             }
         }
         Ok(())
@@ -736,13 +791,19 @@ impl PreAggregationsCompiler {
         members.iter().map(|m| m.full_name()).join(", ")
     }
 
+    /// One whose members can't be joined serves no query, so it is skipped; any
+    /// other failure is reported.
     pub fn compile_all_pre_aggregations(
         &mut self,
         disable_external_pre_aggregations: bool,
     ) -> Result<Vec<Rc<CompiledPreAggregation>>, CubeError> {
         let mut result = Vec::new();
         for (name, _) in self.descriptions.clone().iter() {
-            let pre_aggregation = self.compile_pre_aggregation(name)?;
+            let pre_aggregation = match self.compile_pre_aggregation(name) {
+                Ok(pre_aggregation) => pre_aggregation,
+                Err(_) if self.unjoinable.contains(name) => continue,
+                Err(err) => return Err(err),
+            };
             if !(disable_external_pre_aggregations && pre_aggregation.external == Some(true)) {
                 result.push(pre_aggregation);
             }
@@ -750,12 +811,32 @@ impl PreAggregationsCompiler {
         Ok(result)
     }
 
+    /// Only the pre-aggregation named by `id`, when it belongs to the cubes. It
+    /// was asked for by name, so failing to compile it is an error.
+    pub fn compile_requested_pre_aggregation(
+        &mut self,
+        id: &str,
+        disable_external_pre_aggregations: bool,
+    ) -> Result<Vec<Rc<CompiledPreAggregation>>, CubeError> {
+        let Ok(name) = PreAggregationFullName::from_string(id) else {
+            return Ok(Vec::new());
+        };
+        if !self.descriptions.iter().any(|(n, _)| n == &name) {
+            return Ok(Vec::new());
+        }
+        let pre_aggregation = self.compile_pre_aggregation(&name)?;
+        if disable_external_pre_aggregations && pre_aggregation.external == Some(true) {
+            return Ok(Vec::new());
+        }
+        Ok(vec![pre_aggregation])
+    }
+
     pub fn compile_origin_sql_pre_aggregation(
         &mut self,
-        cube_name: &String,
+        cube_id: &CubeId,
     ) -> Result<Option<Rc<CompiledPreAggregation>>, CubeError> {
         let res = if let Some((name, _)) = self.descriptions.clone().iter().find(|(name, descr)| {
-            &name.cube_name == cube_name
+            &CubeId::cube(name.cube_name.clone()) == cube_id
                 && &descr.static_data().pre_aggregation_type == "originalSql"
         }) {
             Some(self.compile_pre_aggregation(name)?)
@@ -765,7 +846,7 @@ impl PreAggregationsCompiler {
         Ok(res)
     }
 
-    fn symbols_from_ref<F: Fn(&MemberSymbol) -> Result<(), CubeError>>(
+    fn symbols_from_ref<F: Fn(&Rc<MemberSymbol>) -> Result<(), CubeError>>(
         query_tools: Rc<State>,
         name: &PreAggregationFullName,
         ref_func: Rc<dyn MemberSql>,
@@ -773,7 +854,8 @@ impl PreAggregationsCompiler {
     ) -> Result<Vec<Rc<MemberSymbol>>, CubeError> {
         let evaluator_compiler_cell = query_tools.compiler().clone();
         let mut evaluator_compiler = evaluator_compiler_cell.borrow_mut();
-        let sql_call = evaluator_compiler.compile_sql_call(&name.cube_name, ref_func)?;
+        let sql_call =
+            evaluator_compiler.compile_sql_call(&CubeId::cube(name.cube_name.clone()), ref_func)?;
         let symbols =
             Self::reference_symbols(&query_tools, &mut evaluator_compiler, name, &sql_call)?;
         for symbol in symbols.iter() {
@@ -789,7 +871,8 @@ impl PreAggregationsCompiler {
     ) -> Result<Rc<MemberSymbol>, CubeError> {
         let evaluator_compiler_cell = query_tools.compiler().clone();
         let mut evaluator_compiler = evaluator_compiler_cell.borrow_mut();
-        let sql_call = evaluator_compiler.compile_sql_call(&name.cube_name, ref_func)?;
+        let sql_call =
+            evaluator_compiler.compile_sql_call(&CubeId::cube(name.cube_name.clone()), ref_func)?;
 
         let symbols =
             Self::reference_symbols(&query_tools, &mut evaluator_compiler, name, &sql_call)?;
@@ -860,22 +943,23 @@ impl PreAggregationsCompiler {
         ))
     }
 
-    fn check_is_measure(symbol: &MemberSymbol) -> Result<(), CubeError> {
+    fn check_is_measure(symbol: &Rc<MemberSymbol>) -> Result<(), CubeError> {
         symbol
+            .peel_refs()
             .as_measure()
             .map_err(|_| CubeError::user(format!("Pre-aggregation measure must be a measure")))?;
         Ok(())
     }
 
-    fn check_is_dimension(symbol: &MemberSymbol) -> Result<(), CubeError> {
-        symbol.as_dimension().map_err(|_| {
+    fn check_is_dimension(symbol: &Rc<MemberSymbol>) -> Result<(), CubeError> {
+        symbol.peel_refs().as_dimension().map_err(|_| {
             CubeError::user(format!("Pre-aggregation dimension must be a dimension"))
         })?;
         Ok(())
     }
 
-    fn check_is_time_dimension(symbol: &MemberSymbol) -> Result<(), CubeError> {
-        let dimension = symbol.as_dimension().map_err(|_| {
+    fn check_is_time_dimension(symbol: &Rc<MemberSymbol>) -> Result<(), CubeError> {
+        let dimension = symbol.peel_refs().as_dimension().map_err(|_| {
             CubeError::user(format!(
                 "Pre-aggregation time dimension must be a dimension"
             ))
@@ -888,7 +972,7 @@ impl PreAggregationsCompiler {
         Ok(())
     }
 
-    fn check_is_segment(symbol: &MemberSymbol) -> Result<(), CubeError> {
+    fn check_is_segment(symbol: &Rc<MemberSymbol>) -> Result<(), CubeError> {
         symbol.as_member_expression().map_err(|_| {
             CubeError::user(
                 "Pre-aggregation segment reference must be a member expression".to_string(),
@@ -1010,7 +1094,7 @@ mod tests {
         ctx: &TestContext,
         pre_agg_name: &str,
     ) -> Result<Rc<CompiledPreAggregation>, CubeError> {
-        let cube_names = vec!["orders".to_string()];
+        let cube_names = vec![CubeId::cube("orders")];
         let mut compiler =
             PreAggregationsCompiler::try_new(ctx.query_tools().clone(), &cube_names).unwrap();
         let name = PreAggregationFullName::new("orders".to_string(), pre_agg_name.to_string());
@@ -1167,7 +1251,7 @@ mod tests {
         let test_context = TestContext::new(schema).unwrap();
         let query_tools = test_context.query_tools().clone();
 
-        let cube_names = vec!["visitors".to_string()];
+        let cube_names = vec![CubeId::cube("visitors")];
         let mut compiler = PreAggregationsCompiler::try_new(query_tools, &cube_names).unwrap();
 
         let pre_agg_name =
@@ -1202,7 +1286,7 @@ mod tests {
         let test_context = TestContext::new(schema).unwrap();
         let query_tools = test_context.query_tools().clone();
 
-        let cube_names = vec!["visitor_checkins".to_string()];
+        let cube_names = vec![CubeId::cube("visitor_checkins")];
         let mut compiler = PreAggregationsCompiler::try_new(query_tools, &cube_names).unwrap();
 
         let pre_agg_name = PreAggregationFullName::new(
@@ -1240,7 +1324,7 @@ mod tests {
         let test_context = TestContext::new(schema).unwrap();
         let query_tools = test_context.query_tools().clone();
 
-        let cube_names = vec!["visitors".to_string()];
+        let cube_names = vec![CubeId::cube("visitors")];
         let mut compiler = PreAggregationsCompiler::try_new(query_tools, &cube_names).unwrap();
 
         let pre_agg_name =
@@ -1270,13 +1354,51 @@ mod tests {
         );
     }
 
+    // A candidate whose members can't be joined is left out, and so is one built from
+    // it, whether its rollup failed just now or earlier.
+    #[test]
+    fn test_compile_all_skips_unjoinable_pre_aggregations() {
+        let schema = MockSchema::from_yaml_file("common/hub_spoke_join_path.yaml");
+        let test_context = TestContext::new(schema).unwrap();
+        let query_tools = test_context.query_tools().clone();
+
+        let mut compiler =
+            PreAggregationsCompiler::try_new(query_tools, &vec![CubeId::cube("hub")]).unwrap();
+        let compiled = compiler.compile_all_pre_aggregations(false).unwrap();
+
+        let compiled_names: Vec<String> = compiled.iter().map(|pa| pa.name.clone()).collect();
+        assert_eq!(
+            compiled_names,
+            vec!["hub_rollup", "income_by_category", "with_hub_join"]
+        );
+    }
+
+    // Only a candidate that can't be joined is skipped: a mistake in a definition that
+    // can be joined is still reported.
+    #[test]
+    fn test_compile_all_reports_a_definition_error() {
+        let schema = MockSchema::from_yaml_file("common/rollup_join_chain_missing_key.yaml");
+        let test_context = TestContext::new(schema).unwrap();
+        let query_tools = test_context.query_tools().clone();
+
+        let mut compiler =
+            PreAggregationsCompiler::try_new(query_tools, &vec![CubeId::cube("cube_w")]).unwrap();
+        let err = compiler
+            .compile_all_pre_aggregations(false)
+            .map(|_| ())
+            .expect_err("a rollup join missing its key is a definition error")
+            .to_string();
+
+        assert!(err.contains("chain_rollup_join"), "got: {}", err);
+    }
+
     #[test]
     fn test_compile_all_pre_aggregations() {
         let schema = MockSchema::from_yaml_file("common/pre_aggregations_test.yaml");
         let test_context = TestContext::new(schema).unwrap();
         let query_tools = test_context.query_tools().clone();
 
-        let cube_names = vec!["visitors".to_string(), "visitor_checkins".to_string()];
+        let cube_names = vec![CubeId::cube("visitors"), CubeId::cube("visitor_checkins")];
         let mut compiler = PreAggregationsCompiler::try_new(query_tools, &cube_names).unwrap();
 
         let compiled = compiler.compile_all_pre_aggregations(false).unwrap();
@@ -1304,7 +1426,7 @@ mod tests {
         let test_context = TestContext::new(schema).unwrap();
         let query_tools = test_context.query_tools().clone();
 
-        let cube_names = vec!["visitors".to_string()];
+        let cube_names = vec![CubeId::cube("visitors")];
         let mut compiler = PreAggregationsCompiler::try_new(query_tools, &cube_names).unwrap();
 
         let pre_agg_name =
@@ -1321,7 +1443,7 @@ mod tests {
         let query_tools = test_context.query_tools().clone();
 
         // Need both cubes for rollupJoin: visitor_checkins and visitors
-        let cube_names = vec!["visitor_checkins".to_string(), "visitors".to_string()];
+        let cube_names = vec![CubeId::cube("visitor_checkins"), CubeId::cube("visitors")];
         let mut compiler = PreAggregationsCompiler::try_new(query_tools, &cube_names).unwrap();
 
         let pre_agg_name = PreAggregationFullName::new(
@@ -1357,7 +1479,7 @@ mod tests {
         let test_context = TestContext::new(schema).unwrap();
         let query_tools = test_context.query_tools().clone();
 
-        let cube_names = vec!["visitor_checkins".to_string()];
+        let cube_names = vec![CubeId::cube("visitor_checkins")];
         let mut compiler = PreAggregationsCompiler::try_new(query_tools, &cube_names).unwrap();
 
         let pre_agg_name =
@@ -1415,7 +1537,7 @@ mod tests {
         let test_context = TestContext::new(schema).unwrap();
         let query_tools = test_context.query_tools().clone();
 
-        let cube_names = vec!["orders".to_string()];
+        let cube_names = vec![CubeId::cube("orders")];
         let mut compiler = PreAggregationsCompiler::try_new(query_tools, &cube_names).unwrap();
 
         let pre_agg_name =
@@ -1451,9 +1573,9 @@ mod tests {
         let query_tools = test_context.query_tools().clone();
 
         let cube_names = vec![
-            "line_items".to_string(),
-            "facts".to_string(),
-            "campaigns".to_string(),
+            CubeId::cube("line_items"),
+            CubeId::cube("facts"),
+            CubeId::cube("campaigns"),
         ];
         let mut compiler = PreAggregationsCompiler::try_new(query_tools, &cube_names).unwrap();
 
@@ -1509,7 +1631,7 @@ mod tests {
         let test_context = TestContext::new(schema).unwrap();
         let query_tools = test_context.query_tools().clone();
 
-        let cube_names = vec!["boards".to_string(), "locations".to_string()];
+        let cube_names = vec![CubeId::cube("boards"), CubeId::cube("locations")];
         let mut compiler = PreAggregationsCompiler::try_new(query_tools, &cube_names).unwrap();
 
         let pre_agg_name = PreAggregationFullName::new("boards".to_string(), "joined".to_string());

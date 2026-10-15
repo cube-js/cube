@@ -628,3 +628,102 @@ async fn test_multi_stage_time_shift_pre_agg_keeps_rollup_when_unshiftable_membe
         insta::assert_snapshot!(result);
     }
 }
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_multi_stage_value_types_combined_over_rollup() {
+    // A measure missing for one key (amount_mid_week at completed/NULL) stays NULL
+    // without hiding the others on that row, whatever their value type.
+    const MULTI_FACT_SEED: &str = "integration_multi_fact_tables.sql";
+    let yaml = "common/integration_multi_stage_value_types_pre_agg.yaml";
+    let query = indoc! {"
+        measures:
+          - orders.amount_total
+          - orders.amount_label
+          - orders.last_order_at
+          - orders.has_many_orders
+          - orders.amount_mid_week
+        dimensions:
+          - orders.status
+          - orders.size
+        order:
+          - id: orders.status
+          - id: orders.size
+        cubestore_union_full_key_aggregate: true
+    "};
+
+    let ctx = TestContext::new(MockSchema::from_yaml_file(yaml)).unwrap();
+    let (_sql, pre_aggrs) = ctx.build_sql_with_used_pre_aggregations(query).unwrap();
+    assert!(
+        !pre_aggrs.is_empty()
+            && pre_aggrs
+                .iter()
+                .all(|u| u.name() == "orders_by_status_size_day"),
+        "Every leaf must read the rollup; got {:?}",
+        pre_aggrs.iter().map(|u| u.name()).collect_vec()
+    );
+
+    // Same values as the query over the source tables on Postgres.
+    if let Some(result) = ctx.try_execute(query, MULTI_FACT_SEED).await {
+        insta::assert_snapshot!(result);
+    }
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_multi_stage_union_combine_with_time_dimension_key() {
+    // A time dimension with granularity is one of the keys the branches are combined on.
+    const MULTI_FACT_SEED: &str = "integration_multi_fact_tables.sql";
+    let yaml = "common/integration_multi_stage_value_types_pre_agg.yaml";
+    let query = indoc! {"
+        measures:
+          - orders.amount_total
+          - orders.amount_label
+          - orders.amount_mid_week
+        dimensions:
+          - orders.status
+        time_dimensions:
+          - dimension: orders.created_at
+            granularity: day
+        order:
+          - id: orders.created_at
+          - id: orders.status
+        cubestore_union_full_key_aggregate: true
+    "};
+
+    let ctx = TestContext::new_with_external_cubestore(MockSchema::from_yaml_file(yaml)).unwrap();
+    let sql = ctx.build_sql(query).unwrap();
+    assert!(sql.contains("UNION ALL") && !sql.contains("JOIN"), "{sql}");
+
+    // Same values as the query over the source tables on Postgres.
+    if let Some(result) = ctx.try_execute(query, MULTI_FACT_SEED).await {
+        insta::assert_snapshot!(result);
+    }
+}
+
+#[test]
+fn test_multi_stage_union_combine_can_be_turned_off() {
+    let yaml = "common/integration_multi_stage_value_types_pre_agg.yaml";
+    let query = |union: bool| {
+        format!(
+            indoc! {"
+                measures:
+                  - orders.amount_total
+                  - orders.amount_label
+                  - orders.amount_mid_week
+                dimensions:
+                  - orders.status
+                  - orders.size
+                order:
+                  - id: orders.status
+                  - id: orders.size
+                cubestore_union_full_key_aggregate: {}
+            "},
+            union
+        )
+    };
+
+    let ctx = TestContext::new_with_external_cubestore(MockSchema::from_yaml_file(yaml)).unwrap();
+    let union_sql = ctx.build_sql(&query(true)).unwrap();
+    let join_sql = ctx.build_sql(&query(false)).unwrap();
+    assert!(!union_sql.contains("JOIN"), "{union_sql}");
+    assert!(join_sql.contains("JOIN"), "{join_sql}");
+}

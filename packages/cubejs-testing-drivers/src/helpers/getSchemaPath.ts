@@ -50,7 +50,9 @@ export function getSchemaPath(type: string, suf?: string): [path: string, file: 
       if (preAggregations && preAggregations[cube.name]) {
         const preaggs = preAggregations[cube.name];
         preaggs.forEach((pa) => {
-          if (pa.refresh_key) delete pa.refresh_key;
+          if (pa.refresh_key) {
+            delete pa.refresh_key;
+          }
           pa.scheduled_refresh = false;
 
           const ext = { ...pa };

@@ -1,16 +1,16 @@
-<p align="center"><a href="https://cube.dev"><img src="https://i.imgur.com/zYHXm4o.png" alt="Cube.js" width="300px"></a></p>
+<p align="center"><a href="https://cube.dev"><img src="https://i.imgur.com/zYHXm4o.png" alt="Cube" width="300px"></a></p>
 
 [Website](https://cube.dev) • [Docs](https://docs.cube.dev) • [Blog](https://cube.dev/blog) • [Slack](https://slack.cube.dev) • [Twitter](https://twitter.com/the_cube_dev)
 
 [![npm version](https://badge.fury.io/js/%40cubejs-backend%2Ftemplates.svg)](https://badge.fury.io/js/%40cubejs-backend%2Ftemplates)
 [![GitHub Actions](https://github.com/cube-js/cube.js/workflows/Build/badge.svg)](https://github.com/cube-js/cube.js/actions?query=workflow%3ABuild+branch%3Amaster)
 
-# Cube.js Templates Installer
+# Cube Templates Installer
 
-Helpers for installing Cube.js templates.
+Helpers for installing Cube templates.
 
 [Learn more](https://github.com/cube-js/cube.js#getting-started)
 
 ### License
 
-Cube.js Templates is [Apache-2.0 licensed](./LICENSE).
+Cube Templates is [Apache-2.0 licensed](./LICENSE).

@@ -138,8 +138,12 @@ export class CubePropContextTranspiler implements TranspilerInterface {
       this.cubeSymbols.isCurrentCube(n);
 
     const keyName = (node: t.ObjectProperty): string | undefined => {
-      if (node.key.type === 'Identifier') return node.key.name;
-      if (node.key.type === 'StringLiteral') return node.key.value;
+      if (node.key.type === 'Identifier') {
+        return node.key.name;
+      }
+      if (node.key.type === 'StringLiteral') {
+        return node.key.value;
+      }
       return undefined;
     };
 
@@ -147,6 +151,7 @@ export class CubePropContextTranspiler implements TranspilerInterface {
       if (!valuePath.isArrayExpression()) {
         return;
       }
+
       for (const element of valuePath.get('elements')) {
         if (element.isObjectExpression()) {
           // Nested view group: recurse into its own `includes` only.
@@ -200,6 +205,7 @@ export class CubePropContextTranspiler implements TranspilerInterface {
         if ((path.node.key.type === 'Identifier' && transpiledFields.has(path.node.key.name)) ||
           (path.node.key.type === 'StringLiteral' && transpiledFields.has(path.node.key.value))) {
           const fullPath = CubePropContextTranspiler.fullPath(path);
+
           // eslint-disable-next-line no-restricted-syntax
           for (const p of transpiledFieldsPatterns) {
             if (fullPath.match(p)) {
@@ -263,7 +269,9 @@ export class CubePropContextTranspiler implements TranspilerInterface {
         // @ts-ignore
         fp = `${pp?.parentPath?.node?.key?.value || '0'}.${fp}`;
         pp = pp?.parentPath?.parentPath;
-      } else break;
+      } else {
+        break;
+      }
     }
 
     return fp;

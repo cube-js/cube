@@ -32,10 +32,10 @@ impl<'a> KeysFullKeyAggregateStrategy<'a> {
         schema: &crate::logical_plan::LogicalSchema,
         member: &Rc<MemberSymbol>,
     ) -> bool {
-        let target = member.clone().resolve_reference_chain().full_name();
+        let target = member.clone().resolve_reference_chain();
         schema
             .all_dimensions()
-            .any(|d| d.clone().resolve_reference_chain().full_name() == target)
+            .any(|d| d.clone().resolve_reference_chain().id() == target.id())
     }
 }
 

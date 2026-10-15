@@ -133,7 +133,11 @@ class AuroraServerlessMySqlDriver extends BaseDriver {
       .query(`CREATE TEMPORARY TABLE \`${this.config.database}\`.t_${tableName} AS ${query} LIMIT 0`, values)
       .query(`DESCRIBE \`${this.config.database}\`.t_${tableName}`)
       .query(`DROP TEMPORARY TABLE \`${this.config.database}\`.t_${tableName}`)
-      .rollback((error) => { if (error) throw new Error(error); });
+      .rollback((error) => {
+        if (error) {
+          throw new Error(error);
+        }
+      });
 
     const results = await transaction.commit();
     const columns = results[1].records;
@@ -166,8 +170,10 @@ class AuroraServerlessMySqlDriver extends BaseDriver {
       throw new Error(`${this.constructor} driver supports only rows upload`);
     }
     await this.createTable(table, columns);
+
     try {
       const batchSize = 1000; // TODO make dynamic?
+
       for (let j = 0; j < Math.ceil(tableData.rows.length / batchSize); j++) {
         const currentBatchSize = Math.min(tableData.rows.length - j * batchSize, batchSize);
         const indexArray = Array.from({ length: currentBatchSize }, (v, i) => i);
@@ -197,3 +203,4 @@ class AuroraServerlessMySqlDriver extends BaseDriver {
 }
 
 module.exports = AuroraServerlessMySqlDriver;
+module.exports.AuroraServerlessMySqlDriver = AuroraServerlessMySqlDriver;

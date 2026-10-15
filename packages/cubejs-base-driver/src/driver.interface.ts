@@ -168,6 +168,8 @@ export type UnloadOptions = {
   maxFileSize: number,
   query?: UnloadQuery;
   requestId?: string;
+  // Location within the export bucket to unload into, unique per build
+  prefix?: string;
 };
 
 export type QueryOptions = {

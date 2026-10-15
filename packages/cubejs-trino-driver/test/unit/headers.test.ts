@@ -85,4 +85,20 @@ describe('TrinoDriver headers', () => {
       'X-Trino-Routing-Group': 'etl',
     });
   });
+
+  it('adds X-Trino-Trace-Token from requestId on query()', async () => {
+    const driver = new TrinoDriver({
+      host: 'trino.local',
+      port: '8080',
+      headers: { 'X-Trino-Source': 'cube' },
+    });
+
+    await driver.query('SELECT 1', [], { requestId: 'req-42-span-3' });
+
+    const [executeOpts] = mockExecute.mock.calls[0];
+    expect(executeOpts.headers).toEqual({
+      'X-Trino-Source': 'cube',
+      'X-Trino-Trace-Token': 'req-42',
+    });
+  });
 });

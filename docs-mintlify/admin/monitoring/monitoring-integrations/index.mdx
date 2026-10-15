@@ -143,6 +143,22 @@ specified, only `error` and `info` logs will be exported.
 If you'd like to adjust severity levels of logs from API instances and the
 refresh scheduler, use the [`CUBEJS_LOG_LEVEL`](/reference/configuration/environment-variables#cubejs_log_level) environment variable.
 
+Filter values, SQL parameters, and string literals in SQL API statements are replaced
+with `redacted` before an event is logged; events sent to the agent endpoint, which is how
+Cube Cloud receives them for Query History, keep the original values. Member names, numeric literals, date ranges,
+and the query shape are kept, as is the security context. Error messages from a data
+source are logged as returned; a SQL API error that quotes the statement has it redacted.
+
+A redacted SQL API statement is re-printed from its parse tree, so comments and the
+original spacing are not kept. Every string argument is redacted, a granularity such as
+`'month'` or an `INTERVAL '1 day'` included. A statement that cannot be parsed is logged
+as it was received. A statement Cube could not redact at all, such as a malformed request
+body or a SQL API error raised before the statement was read, is logged as `redacted`.
+
+This is controlled by
+[`CUBEJS_LOG_REDACTION`](/reference/configuration/environment-variables#cubejs_log_redaction),
+which is on by default outside development mode.
+
 </Info>
 
 ### Fields in exported logs
@@ -282,7 +298,7 @@ Metrics are exported with the following Prometheus labels:
 | `pod_name` | `cube_cpu_usage_ratio`, `cube_memory_usage_ratio` | Name of the pod that the measurement was taken on. |
 | `deployment_id` | `cube_requests_*` | Identifier of the [deployment][ref-deployments]. |
 | `api_type` | `cube_requests_*` | Type of [data API][ref-apis] that served the requests (`rest`, `sql`, etc.), the same values as in [Query History][ref-query-history]. `unknown` if the API type is not known. |
-| `request_source` | `cube_requests_*` | Source of the requests: `ai-engineer` for requests coming from AI features, `other` for any other source, `unknown` if the requests carry no source. |
+| `request_source` | `cube_requests_*` | Source of the requests: `cube`, `sql-runner`, `playground`, `embedding`, `cube-excel-addin`, `cube-sheets-addon`, or `ai-engineer` (AI features), matching the **Source** filter in [Query History][ref-query-history]. `other` for any other source, `unknown` if the requests carry no source (both are shown as **Other** in Query History). |
 
 Request metrics are reported per `api_type` and `request_source` combination, so
 you can break down request counts and latency by data API:
