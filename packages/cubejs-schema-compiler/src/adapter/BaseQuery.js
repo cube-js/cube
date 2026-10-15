@@ -134,6 +134,16 @@ export class BaseQuery {
   join;
 
   /**
+   * Database type this dialect is written for, used when the driver can't
+   * report it (a driver instance returned by driverFactory without CUBEJS_DB_TYPE).
+   * Several db types share a dialect, so the result is the canonical one.
+   * @returns {string}
+   */
+  static dbType() {
+    throw new Error(`${this.name} must implement static dbType()`);
+  }
+
+  /**
    * BaseQuery class constructor.
    * @param {Compilers|*} compilers
    * @param {*} options

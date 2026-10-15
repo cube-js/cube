@@ -31,6 +31,10 @@ class ClickHouseFilter extends BaseFilter {
 }
 
 export class ClickHouseQuery extends BaseQuery {
+  public static override dbType(): string {
+    return 'clickhouse';
+  }
+
   public newFilter(filter) {
     return new ClickHouseFilter(this, filter);
   }

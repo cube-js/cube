@@ -1,6 +1,7 @@
 /* globals jest, describe, test, expect */
 
 import { BaseDriver as OriginalBaseDriver } from '@cubejs-backend/query-orchestrator';
+import { BaseQuery, MysqlQuery } from '@cubejs-backend/schema-compiler';
 import type {
   DatabaseType,
   DbTypeInternalFn,
@@ -183,6 +184,37 @@ describe('OptsHandler class', () => {
         JSON.stringify(createMockDriver('default')),
       );
     }
+  });
+
+  test('must take dbType from the dialect for a driver instance without CUBEJS_DB_TYPE', async () => {
+    class MockDriver extends OriginalBaseDriver {
+      public async testConnection() {
+        // nothing
+      }
+
+      public async query() {
+        return [];
+      }
+    }
+
+    class CustomDialect extends BaseQuery {}
+
+    const dialectFactory = jest.fn(({ dataSource }) => <any>(dataSource === 'custom' ? CustomDialect : MysqlQuery));
+    const core = new CubejsServerCoreExposed({
+      ...conf,
+      driverFactory: () => new MockDriver(),
+      dialectFactory,
+    });
+
+    expect(await core.options.dbType({ dataSource: 'default' } as DriverContext)).toEqual('mysql');
+    expect(dialectFactory).toHaveBeenLastCalledWith(expect.objectContaining({ dataSource: 'default', dbType: undefined }));
+    await expect(core.options.dbType({ dataSource: 'custom' } as DriverContext))
+      .rejects.toThrow('CustomDialect must implement static dbType()');
+
+    process.env.CUBEJS_DB_TYPE = 'mysqlauroraserverless';
+    dialectFactory.mockClear();
+    expect(await core.options.dbType({ dataSource: 'default' } as DriverContext)).toEqual('mysqlauroraserverless');
+    expect(dialectFactory).not.toHaveBeenCalled();
   });
 
   test('must handle valid CreateOptions', async () => {

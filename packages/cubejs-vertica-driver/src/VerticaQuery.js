@@ -24,6 +24,10 @@ class VerticaFilter extends BaseFilter {
 }
 
 class VerticaQuery extends BaseQuery {
+  static dbType() {
+    return 'vertica';
+  }
+
   newFilter(filter) {
     return new VerticaFilter(this, filter);
   }

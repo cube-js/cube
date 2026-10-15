@@ -22,6 +22,10 @@ class FireboltFilter extends BaseFilter {
 }
 
 export class FireboltQuery extends BaseQuery {
+  public static override dbType(): string {
+    return 'firebolt';
+  }
+
   public convertTz(field: string) {
     return `${field} AT TIME ZONE '${this.timezone}'`;
   }

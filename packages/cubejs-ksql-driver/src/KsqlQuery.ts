@@ -27,6 +27,10 @@ class KsqlFilter extends BaseFilter {
 type Granularity = 'year' | 'quarter' | 'month' | 'week' | 'day' | 'hour' | 'minute' | 'second';
 
 export class KsqlQuery extends BaseQuery {
+  public static override dbType(): string {
+    return 'ksql';
+  }
+
   public newFilter(filter: any) {
     return new KsqlFilter(this, filter);
   }

@@ -2,6 +2,10 @@ import { parseSqlInterval } from '@cubejs-backend/shared';
 import { PostgresQuery } from './PostgresQuery';
 
 export class RedshiftQuery extends PostgresQuery {
+  public static override dbType(): string {
+    return 'redshift';
+  }
+
   public seriesSql(timeDimension) {
     const values = timeDimension.timeSeries().map(
       ([from, to]) => `select '${from}' f, '${to}' t`

@@ -66,6 +66,10 @@ class PinotFilter extends BaseFilter {
 }
 
 export class PinotQuery extends BaseQuery {
+  public static override dbType(): string {
+    return 'pinot';
+  }
+
   public newFilter(filter: any): PinotFilter {
     return new PinotFilter(this, filter);
   }

@@ -74,6 +74,10 @@ class MssqlSegment extends BaseSegment {
 }
 
 export class MssqlQuery extends BaseQuery {
+  public static override dbType(): string {
+    return 'mssql';
+  }
+
   private readonly useNamedTimezones: boolean;
 
   public constructor(compilers: any, options: any) {

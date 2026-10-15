@@ -23,6 +23,10 @@ class HiveFilter extends BaseFilter {
 }
 
 export class HiveQuery extends BaseQuery {
+  public static override dbType(): string {
+    return 'hive';
+  }
+
   public newFilter(filter) {
     return new HiveFilter(this as BaseQuery, filter);
   }

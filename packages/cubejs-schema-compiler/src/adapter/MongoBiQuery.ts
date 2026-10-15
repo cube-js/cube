@@ -3,6 +3,10 @@ import moment from 'moment-timezone';
 import { MysqlQuery } from './MysqlQuery';
 
 export class MongoBiQuery extends MysqlQuery {
+  public static override dbType(): string {
+    return 'mongobi';
+  }
+
   public convertTz(field: string): string {
     const tz = moment().tz(this.timezone);
     // TODO respect day light saving

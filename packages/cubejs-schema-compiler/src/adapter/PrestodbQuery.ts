@@ -33,6 +33,10 @@ class PrestodbFilter extends BaseFilter {
 }
 
 export class PrestodbQuery extends BaseQuery {
+  public static override dbType(): string {
+    return 'prestodb';
+  }
+
   public newFilter(filter) {
     return new PrestodbFilter(this, filter);
   }

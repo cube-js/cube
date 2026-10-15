@@ -32,6 +32,10 @@ type RollingWindow = {
 };
 
 export class CubeStoreQuery extends BaseQuery {
+  public static override dbType(): string {
+    return 'cubestore';
+  }
+
   private readonly cubeStoreRollingWindowJoin: boolean;
 
   public constructor(compilers, options) {

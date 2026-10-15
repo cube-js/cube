@@ -20,6 +20,10 @@ class PostgresParamAllocator extends ParamAllocator {
 }
 
 export class PostgresQuery extends BaseQuery {
+  public static override dbType(): string {
+    return 'postgres';
+  }
+
   public newParamAllocator(expressionParams) {
     return new PostgresParamAllocator(expressionParams);
   }
