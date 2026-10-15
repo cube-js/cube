@@ -190,7 +190,7 @@ class MockDriver {
       throw new Error(`Can't drop table twice: ${tableName}`);
     }
     this.droppedTables.push(tableName);
-    console.log(`Driver drops ${tableName}`);
+    testLogger('Driver drops table', { tableName });
     if (!this.tablesObj.find(t => t.tableName === tableName)) {
       throw new Error(`Can't drop missing table: ${tableName}`);
     }
@@ -1824,7 +1824,7 @@ describe('QueryOrchestrator', () => {
     const streamingNode = (processUid: string) => new TestQueryOrchestrator(
       redisPrefix,
       () => mockDriver as unknown as BaseDriver,
-      (msg, params) => console.log(new Date().toJSON(), msg, params),
+      testLogger,
       {
         continueWaitTimeout: 1,
         queryCacheOptions: {
@@ -2002,7 +2002,7 @@ describe('QueryOrchestrator', () => {
       metadataOrchestrator = new TestQueryOrchestrator(
         'ORCHESTRATOR_TEST_METADATA',
         driverFactory,
-        console.log,
+        testLogger,
         {
           cacheAndQueueDriver: 'memory',
           continueWaitTimeout: 5,
