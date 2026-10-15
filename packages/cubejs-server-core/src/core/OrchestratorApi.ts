@@ -23,7 +23,7 @@ export interface OrchestratorApiOptions extends QueryOrchestratorOptions {
 export class OrchestratorApi {
   private seenDataSources: Record<string, boolean> = {};
 
-  private released = false;
+  protected released = false;
 
   protected orchestrator: QueryOrchestrator;
 
