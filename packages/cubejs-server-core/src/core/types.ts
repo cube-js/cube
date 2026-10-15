@@ -224,6 +224,7 @@ export interface CreateOptions {
   scheduledRefreshConcurrency?: number;
   scheduledRefreshBatchSize?: number;
   compilerCacheSize?: number;
+  maxCompiledMembers?: number;
   maxCompilerCacheKeepAlive?: number;
   updateCompilerCacheKeepAlive?: boolean;
   telemetry?: boolean;
