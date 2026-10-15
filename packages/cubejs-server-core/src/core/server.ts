@@ -872,7 +872,7 @@ export class CubejsServerCore {
     this.swappedDriverReleases.set(driver, entry);
   }
 
-  /** For a driver a factory that caches its instances handed out again. */
+  /** A caching driverFactory can return a driver still awaiting its delayed release; keep it open. */
   protected cancelSwappedDriverRelease(driver: BaseDriver) {
     const entry = this.swappedDriverReleases.get(driver);
 
@@ -969,7 +969,7 @@ export class CubejsServerCore {
       } catch (e) {
         // A factory that caches its instances can hand back a driver still serving queries
         if (driver && !keep?.(driver)) {
-          await driver.release();
+          await this.releaseDriverSafely(driver);
         }
 
         throw e;
