@@ -474,6 +474,8 @@ describe('driverVersion', () => {
     await waitFor(() => built.length === 2);
     await request('c');
     await request('d');
+    // The version already being built must not displace the newer one queued behind it
+    await request('b');
 
     testing.open();
     await swapped();
@@ -610,6 +612,68 @@ describe('driverVersion', () => {
     expect(await driver()).toMatchObject({ builtFrom: { password: 'a' } });
     expect(built).toHaveLength(1);
     expect(logged('Driver Swap')).toHaveLength(0);
+  });
+
+  // A factory with a service-credential fallback builds drivers for the readiness probe too
+  const probeFallbackFactory = (ctx: any) => ({ type: 'postgres', password: ctx.securityContext?.token ?? 'service' });
+
+  test('a request with a version waits for its own drivers instead of those the probe built', async () => {
+    const { request, driver } = createCore({ driverFactory: probeFallbackFactory });
+
+    await request();
+    expect(await driver()).toMatchObject({ builtFrom: { password: 'service' } });
+
+    const testing = gate();
+    onTestConnection = (d) => (d.builtFrom.password === 'a' ? testing.opened : undefined);
+
+    const pending = request('a');
+    await waitFor(() => built.length === 2);
+    expect(await Promise.race([pending.then(() => 'served'), flush().then(() => 'waiting')])).toBe('waiting');
+
+    testing.open();
+    await pending;
+
+    expect(await driver()).toMatchObject({ builtFrom: { password: 'a' } });
+  });
+
+  test('a request with a version fails rather than use the drivers the probe built', async () => {
+    const { request, driver } = createCore({ driverFactory: probeFallbackFactory });
+
+    await request();
+    const probeDriver = await driver();
+
+    onTestConnection = (d) => {
+      if (d.builtFrom.password === 'a') {
+        throw new Error('bad credential');
+      }
+    };
+
+    await expect(request('a')).rejects.toThrow('No drivers could be built for this driverVersion');
+    // Backing off, it still refuses rather than serve the probe's driver
+    await expect(request('a')).rejects.toThrow('No drivers could be built for this driverVersion');
+    expect(await driver()).toBe(probeDriver);
+  });
+
+  test('a throwing logger does not leave a failed swap rejected', async () => {
+    const logger = jest.fn((message: string) => {
+      if (message === 'Driver Swap Error') {
+        throw new Error('logger down');
+      }
+    });
+    const { core, request, swapTo, driver } = createCore({ logger });
+
+    await swapTo('a');
+    const first = await driver();
+
+    onTestConnection = (d) => {
+      if (d.builtFrom.password === 'b') {
+        throw new Error('bad credential');
+      }
+    };
+
+    await request('b');
+    await expect(core.swapsSettled()).resolves.toBeUndefined();
+    expect(await driver()).toBe(first);
   });
 
   test('a driverVersion error fails a request that carries a security context', async () => {
