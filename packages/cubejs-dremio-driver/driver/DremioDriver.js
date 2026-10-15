@@ -24,6 +24,10 @@ const applyParams = (query, params) => formatAnsi(query, params);
  * Dremio driver class.
  */
 class DremioDriver extends BaseDriver {
+  dbType() {
+    return 'dremio';
+  }
+
   static dialectClass() {
     return DremioQuery;
   }

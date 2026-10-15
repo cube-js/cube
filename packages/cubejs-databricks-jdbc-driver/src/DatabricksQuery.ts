@@ -53,10 +53,6 @@ class DatabricksFilter extends BaseFilter {
 }
 
 export class DatabricksQuery extends BaseQuery {
-  public static override dbType(): string {
-    return 'databricks-jdbc';
-  }
-
   public newFilter(filter: any): BaseFilter {
     return new DatabricksFilter(this, filter);
   }

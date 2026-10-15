@@ -12,10 +12,6 @@ const GRANULARITY_TO_INTERVAL = {
 };
 
 export class VerticaQuery extends BaseQuery {
-  public static override dbType(): string {
-    return 'vertica';
-  }
-
   public convertTz(field) {
     return `${field} AT TIME ZONE '${this.timezone}'`;
   }

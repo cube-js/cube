@@ -25,10 +25,6 @@ class DuckDBFilter extends BaseFilter {
 }
 
 export class DuckDBQuery extends BaseQuery {
-  public static override dbType(): string {
-    return 'duckdb';
-  }
-
   public newFilter(filter: any): BaseFilter {
     return new DuckDBFilter(this, filter);
   }

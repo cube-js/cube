@@ -33,10 +33,6 @@ class SnowflakeFilter extends BaseFilter {
 }
 
 export class SnowflakeQuery extends BaseQuery {
-  public static override dbType(): string {
-    return 'snowflake';
-  }
-
   public newFilter(filter) {
     return new SnowflakeFilter(this, filter);
   }

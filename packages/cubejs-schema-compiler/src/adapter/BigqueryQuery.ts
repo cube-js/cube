@@ -37,10 +37,6 @@ class BigqueryFilter extends BaseFilter {
 }
 
 export class BigqueryQuery extends BaseQuery {
-  public static override dbType(): string {
-    return 'bigquery';
-  }
-
   public castToString(sql) {
     return `CAST(${sql} as STRING)`;
   }

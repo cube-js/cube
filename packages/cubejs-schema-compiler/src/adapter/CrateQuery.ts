@@ -2,10 +2,6 @@ import { PostgresQuery } from './PostgresQuery';
 import { UserError } from '../compiler/UserError';
 
 export class CrateQuery extends PostgresQuery {
-  public static override dbType(): string {
-    return 'crate';
-  }
-
   public hllInit(_sql): string {
     throw new UserError('Not implemented yet');
   }

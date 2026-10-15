@@ -1,7 +1,6 @@
 import crypto from 'crypto';
 import cloneDeep from 'lodash.clonedeep';
 import { BaseDriver } from '@cubejs-backend/query-orchestrator';
-import type { BaseQuery } from '@cubejs-backend/schema-compiler';
 import {
   getEnv,
   assertDataSource,
@@ -195,23 +194,13 @@ export class OptsHandler {
         val = await driverFactory(ctx);
       }
 
-      if (
-        this.driverFactoryType === 'BaseDriver' &&
-        process.env.CUBEJS_DB_TYPE
-      ) {
-        type = <DatabaseType>process.env.CUBEJS_DB_TYPE;
+      if (this.driverFactoryType === 'BaseDriver') {
+        // Asks the orchestrator's cached driver: calling driverFactory here
+        // would create a new driver (and connection pool) on every call
+        type = <DatabaseType>process.env.CUBEJS_DB_TYPE ||
+          await (await this.core.getOrchestratorApi(ctx)).driverDbType(ctx.dataSource);
       } else if (this.driverFactoryType === 'DriverConfig') {
         type = (<DriverConfig>(val || await driverFactory(ctx))).type;
-      }
-
-      // A driver instance doesn't expose its type, but the dialect the user
-      // pairs it with does
-      if (!type && this.createOptions.dialectFactory) {
-        const dialectClass = <typeof BaseQuery | undefined><unknown> this.createOptions.dialectFactory({
-          ...ctx,
-          dbType: undefined,
-        });
-        type = <DatabaseType>dialectClass?.dbType();
       }
 
       return type;

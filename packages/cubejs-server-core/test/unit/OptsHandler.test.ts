@@ -1,7 +1,6 @@
 /* globals jest, describe, test, expect */
 
 import { BaseDriver as OriginalBaseDriver } from '@cubejs-backend/query-orchestrator';
-import { BaseQuery, MysqlQuery } from '@cubejs-backend/schema-compiler';
 import type {
   DatabaseType,
   DbTypeInternalFn,
@@ -97,14 +96,18 @@ describe('OptsHandler class', () => {
     }
 
     class MockDriver extends OriginalBaseDriver {
-      public readonly dbType: string;
+      public readonly type: string;
 
       public readonly dataSource: string;
 
-      public constructor(dbType: string, dataSource = 'default') {
+      public constructor(type: string, dataSource = 'default') {
         super();
-        this.dbType = dbType;
+        this.type = type;
         this.dataSource = dataSource;
+      }
+
+      public dbType() {
+        return this.type;
       }
 
       public async testConnection() {
@@ -186,8 +189,12 @@ describe('OptsHandler class', () => {
     }
   });
 
-  test('must take dbType from the dialect for a driver instance without CUBEJS_DB_TYPE', async () => {
+  test('must take dbType from a driver instance without CUBEJS_DB_TYPE', async () => {
     class MockDriver extends OriginalBaseDriver {
+      public dbType() {
+        return 'materialize';
+      }
+
       public async testConnection() {
         // nothing
       }
@@ -197,24 +204,19 @@ describe('OptsHandler class', () => {
       }
     }
 
-    class CustomDialect extends BaseQuery {}
-
-    const dialectFactory = jest.fn(({ dataSource }) => <any>(dataSource === 'custom' ? CustomDialect : MysqlQuery));
+    const driverFactory = jest.fn(() => new MockDriver());
     const core = new CubejsServerCoreExposed({
       ...conf,
-      driverFactory: () => new MockDriver(),
-      dialectFactory,
+      driverFactory,
     });
 
-    expect(await core.options.dbType({ dataSource: 'default' } as DriverContext)).toEqual('mysql');
-    expect(dialectFactory).toHaveBeenLastCalledWith(expect.objectContaining({ dataSource: 'default', dbType: undefined }));
-    await expect(core.options.dbType({ dataSource: 'custom' } as DriverContext))
-      .rejects.toThrow('CustomDialect must implement static dbType()');
+    expect(await core.options.dbType({ dataSource: 'default' } as DriverContext)).toEqual('materialize');
+    expect(await core.options.dbType({ dataSource: 'default' } as DriverContext)).toEqual('materialize');
+    // One call to detect the factory type, one for the orchestrator's cached driver
+    expect(driverFactory).toHaveBeenCalledTimes(2);
 
-    process.env.CUBEJS_DB_TYPE = 'mysqlauroraserverless';
-    dialectFactory.mockClear();
-    expect(await core.options.dbType({ dataSource: 'default' } as DriverContext)).toEqual('mysqlauroraserverless');
-    expect(dialectFactory).not.toHaveBeenCalled();
+    process.env.CUBEJS_DB_TYPE = 'postgres';
+    expect(await core.options.dbType({ dataSource: 'default' } as DriverContext)).toEqual('postgres');
   });
 
   test('must handle valid CreateOptions', async () => {
@@ -660,6 +662,10 @@ describe('OptsHandler class', () => {
 
   test('must determine correct driver type by the query context', async () => {
     class Driver1 extends OriginalBaseDriver {
+      public dbType() {
+        return 'postgres';
+      }
+
       public async testConnection() {
         //
       }
@@ -674,6 +680,10 @@ describe('OptsHandler class', () => {
     }
 
     class Driver2 extends OriginalBaseDriver {
+      public dbType() {
+        return 'postgres';
+      }
+
       public async testConnection() {
         //
       }

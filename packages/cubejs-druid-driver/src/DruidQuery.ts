@@ -23,10 +23,6 @@ class DruidFilter extends BaseFilter {
 }
 
 export class DruidQuery extends BaseQuery {
-  public static override dbType(): string {
-    return 'druid';
-  }
-
   public newFilter(filter) {
     return new DruidFilter(this, filter);
   }

@@ -68,10 +68,6 @@ class QuestFilter extends BaseFilter {
 }
 
 export class QuestQuery extends BaseQuery {
-  public static override dbType(): string {
-    return 'questdb';
-  }
-
   public newFilter(filter: any): BaseFilter {
     return new QuestFilter(this, filter);
   }

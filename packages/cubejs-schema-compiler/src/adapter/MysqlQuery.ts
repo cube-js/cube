@@ -25,10 +25,6 @@ class MysqlFilter extends BaseFilter {
 }
 
 export class MysqlQuery extends BaseQuery {
-  public static override dbType(): string {
-    return 'mysql';
-  }
-
   private readonly useNamedTimezones: boolean;
 
   private readonly useGeneratedTimeSeries: boolean;

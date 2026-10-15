@@ -193,6 +193,11 @@ export class OrchestratorApi {
     }
   }
 
+  public async driverDbType(dataSource: string = 'default'): Promise<DatabaseType> {
+    const driver = await this.driverFactory(dataSource);
+    return <DatabaseType>driver.dbType();
+  }
+
   /**
    * Tests connection to the data source specified by the driver factory
    * function and data source name.

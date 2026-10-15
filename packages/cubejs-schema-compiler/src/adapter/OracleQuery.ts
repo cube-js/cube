@@ -31,10 +31,6 @@ class OracleFilter extends BaseFilter {
 }
 
 export class OracleQuery extends BaseQuery {
-  public static override dbType(): string {
-    return 'oracle';
-  }
-
   /**
    * "LIMIT" on Oracle is illegal
    * TODO replace with limitOffsetClause override

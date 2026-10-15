@@ -70,6 +70,10 @@ const SUPPORTED_BUCKET_TYPES = ['gcs', 's3'];
  * Presto driver class.
  */
 export class PrestoDriver extends BaseDriver implements DriverInterface {
+  public dbType(): string {
+    return 'prestodb';
+  }
+
   /**
    * Returns default concurrency value.
    */

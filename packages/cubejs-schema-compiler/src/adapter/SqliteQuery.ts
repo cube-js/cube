@@ -29,10 +29,6 @@ class SqliteFilter extends BaseFilter {
 }
 
 export class SqliteQuery extends BaseQuery {
-  public static override dbType(): string {
-    return 'sqlite';
-  }
-
   public newFilter(filter) {
     return new SqliteFilter(this, filter);
   }
