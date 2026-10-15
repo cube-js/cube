@@ -219,6 +219,35 @@ describe('OptsHandler class', () => {
     expect(await core.options.dbType({ dataSource: 'default' } as DriverContext)).toEqual('postgres');
   });
 
+  test('must explain a driver instance without dbType() when CUBEJS_DB_TYPE is not set', async () => {
+    // A third-party JS driver built against a base-driver without the abstract dbType()
+    class LegacyDriver extends (<new () => object><unknown>OriginalBaseDriver) {
+      public async testConnection() {
+        // nothing
+      }
+
+      public async query() {
+        return [];
+      }
+
+      public async release() {
+        // nothing
+      }
+    }
+
+    const core = new CubejsServerCoreExposed({
+      ...conf,
+      driverFactory: () => <OriginalBaseDriver><unknown> new LegacyDriver(),
+    });
+
+    await expect(core.options.dbType({ dataSource: 'default' } as DriverContext)).rejects.toThrow(
+      'LegacyDriver (data source "default") must implement dbType()'
+    );
+
+    process.env.CUBEJS_DB_TYPE = 'postgres';
+    expect(await core.options.dbType({ dataSource: 'default' } as DriverContext)).toEqual('postgres');
+  });
+
   test('must handle valid CreateOptions', async () => {
     process.env.CUBEJS_DB_TYPE = 'postgres';
 
