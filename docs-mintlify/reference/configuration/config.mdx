@@ -574,8 +574,8 @@ that request's context in the background, tests their connections, and only
 then switches queries to them. Requests do not wait for this: until the switch,
 they are served by the cached drivers. Drivers built for no version, such as
 the readiness probe's, are the exception: a request with a version waits until a
-switch installs drivers for a version, and fails if its own cannot be built. Return `undefined` to keep the cached
-drivers.
+switch installs drivers for a version, and fails if its own cannot be built.
+Return `undefined` to keep the cached drivers.
 
 <Warning>
 
