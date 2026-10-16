@@ -412,6 +412,7 @@ impl Rewriter {
                             meta,
                             penalize_post_processing,
                             penalize_limitless_post_processing,
+                            pre_aggregations,
                             max_row_limit,
                             prefer_pre_aggregations,
                             rejected,

@@ -7380,6 +7380,51 @@ async fn test_wrapper_cube_store_pre_aggregation_split_post_processing() {
     assert!(source_sql.sql.contains("SqlFunction"));
 }
 
+/// Tableau's distinct count of a dimension is counted over a query grouped by the
+/// dimension, so it reads the rollup in Cube Store
+#[tokio::test]
+async fn test_wrapper_cube_store_pre_aggregation_count_distinct_dimension() {
+    if !Rewriter::sql_push_down_enabled() {
+        return;
+    }
+    init_testing_logger();
+
+    for query in [
+        r#"SELECT COUNT(DISTINCT CAST("t"."customer_gender" AS TEXT)) AS "ctd:customer_gender:ok" FROM "public"."KibanaSampleDataEcommerce" "t" HAVING (COUNT(1) > 0)"#,
+        r#"SELECT COUNT(DISTINCT "t"."customer_gender") AS c FROM "public"."KibanaSampleDataEcommerce" "t""#,
+        r#"SELECT "t"."order_date", COUNT(DISTINCT "t"."customer_gender") AS c FROM "public"."KibanaSampleDataEcommerce" "t" GROUP BY 1"#,
+        r#"SELECT COUNT(DISTINCT "t"."customer_gender") AS c, SUM("t"."sumPrice") AS s FROM "public"."KibanaSampleDataEcommerce" "t""#,
+    ] {
+        let context =
+            pre_aggregation_test_context(true, vec![cube_store_row_number_template()]).await;
+        context
+            .add_cube_store_pre_aggregation_mock_for_any_query(pre_aggregation_description())
+            .await;
+        let wrapped_sql = wrapped_sql(&context, query).await;
+        assert!(wrapped_sql.external, "{}", query);
+        assert!(wrapped_sql
+            .sql
+            .contains("dev_pre_aggregations.kibana_sample_data_ecommerce_main"));
+        assert!(wrapped_sql.sql.contains("COUNT(DISTINCT"));
+        assert_eq!(
+            wrapped_sql.pre_aggregations,
+            vec![pre_aggregation_description()]
+        );
+
+        // Without a matched rollup, or without the flag, the grouped query would be capped at
+        // the row limit before the count, so the count is pushed to Cube as a member expression
+        for flag in [true, false] {
+            let context =
+                pre_aggregation_test_context(flag, vec![cube_store_row_number_template()]).await;
+            let source_sql = self::wrapped_sql(&context, query).await;
+            assert!(!source_sql.external, "{}", query);
+            assert!(source_sql.pre_aggregations.is_empty());
+            assert!(source_sql.sql.contains("SqlFunction"));
+            assert!(source_sql.sql.contains("COUNT(DISTINCT"));
+        }
+    }
+}
+
 /// A join of two grouped queries is planned over the two rollups in Cube Store
 #[tokio::test]
 async fn test_wrapper_cube_store_pre_aggregation_grouped_join() {
