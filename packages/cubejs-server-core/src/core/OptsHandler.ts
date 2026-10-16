@@ -336,11 +336,17 @@ export class OptsHandler {
         })
       );
 
-    const externalDialectFactory = () => (
-      typeof externalDbType === 'string' &&
-      lookupDriverClass(externalDbType).dialectClass &&
-      lookupDriverClass(externalDbType).dialectClass()
-    );
+    // schema-compiler has no built-in dialect for Cube Store, so a per-context external db type
+    // must be resolved through its driver too.
+    const externalDialectFactory = (ctx: RequestContext) => {
+      const dbType = typeof externalDbType === 'function' ? externalDbType(ctx) : externalDbType;
+      if (typeof dbType !== 'string') {
+        return undefined;
+      }
+
+      const driverClass = lookupDriverClass(dbType);
+      return driverClass.dialectClass ? driverClass.dialectClass() : undefined;
+    };
 
     if (!this.isDevMode() && getEnv('externalDefault') && !externalDbType) {
       displayCLIWarning(

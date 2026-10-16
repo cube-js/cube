@@ -18,6 +18,7 @@
   "references": [
     { "path": "../cubejs-backend-shared" },
     { "path": "../cubejs-base-driver" },
-    { "path": "../cubejs-cubestore-driver" }
+    { "path": "../cubejs-cubestore-driver" },
+    { "path": "../cubejs-schema-compiler" }
   ]
 }

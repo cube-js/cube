@@ -25,6 +25,7 @@ import fetch from 'node-fetch';
 
 import { ConnectionConfig } from './types';
 import { WebSocketConnection } from './WebSocketConnection';
+import { CubeStoreQuery } from './CubeStoreQuery';
 import { QueryResultFormat } from '../codegen';
 
 const CubeStoreCapabilityMinVersion = {
@@ -78,6 +79,10 @@ export class CubeStoreDriver extends BaseDriver implements DriverInterface {
   protected readonly connection: WebSocketConnection;
 
   protected readonly baseUrl: string;
+
+  public static dialectClass() {
+    return CubeStoreQuery;
+  }
 
   public constructor(config?: Partial<ConnectionConfig>) {
     super();

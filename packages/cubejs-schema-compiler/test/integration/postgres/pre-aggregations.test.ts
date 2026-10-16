@@ -1,6 +1,6 @@
-import { PreAggregationPartitionRangeLoader } from '@cubejs-backend/query-orchestrator';
 import {
   getEnv,
+  TO_PARTITION_RANGE,
 } from '@cubejs-backend/shared';
 import { PostgresQuery } from '../../../src/adapter/PostgresQuery';
 import { BigqueryQuery } from '../../../src/adapter/BigqueryQuery';
@@ -2342,7 +2342,7 @@ describe('PreAggregations', () => {
 
     expect(preAggregationsDescription[0].invalidateKeyQueries[0][0]).toMatch(/NOW\(\) </);
     expect(preAggregationsDescription[0].invalidateKeyQueries[0][1][0]).toEqual(
-      PreAggregationPartitionRangeLoader.TO_PARTITION_RANGE
+      TO_PARTITION_RANGE
     );
 
     return dbRunner.evaluateQueryWithPreAggregations(query).then(res => {
@@ -2619,7 +2619,7 @@ describe('PreAggregations', () => {
     const queries = dbRunner.tempTablePreAggregations(preAggregationsDescription);
 
     const desc = preAggregationsDescription.find(e => e.tableName === 'visitors_multi_stage');
-    expect(desc.invalidateKeyQueries[0][1][0]).toEqual(PreAggregationPartitionRangeLoader.TO_PARTITION_RANGE);
+    expect(desc.invalidateKeyQueries[0][1][0]).toEqual(TO_PARTITION_RANGE);
 
     const vcMainDesc = preAggregationsDescription.find(e => e.tableName === 'vc_main');
     expect(vcMainDesc.invalidateKeyQueries.length).toEqual(1);

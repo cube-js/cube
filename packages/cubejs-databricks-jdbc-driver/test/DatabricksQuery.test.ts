@@ -1,4 +1,4 @@
-import { CubeStoreQuery, prepareCompiler as originalPrepareCompiler } from '@cubejs-backend/schema-compiler';
+import { prepareCompiler as originalPrepareCompiler } from '@cubejs-backend/schema-compiler';
 import { DatabricksQuery } from '../src/DatabricksQuery';
 
 const prepareCompiler = (content: string) => originalPrepareCompiler({
@@ -18,10 +18,6 @@ cube(\`sales\`, {
 
   measures: {
     count: {
-      type: 'count'
-    },
-    // Only the pre-aggregation test queries it, so no other query matches the rollup
-    rollupCount: {
       type: 'count'
     },
     lastSale: {
@@ -44,17 +40,11 @@ cube(\`sales\`, {
       sql: 'sold_day'
     },
   },
-  preAggregations: {
-    byDay: {
-      measures: [CUBE.rollupCount],
-      dimensions: [CUBE.soldAt],
-    }
-  }
 });
 `,
   );
 
-  const buildSqlAndParams = (filters: any[], useNativeSqlPlanner: boolean, options: any = {}) => {
+  const buildSqlAndParams = (filters: any[], useNativeSqlPlanner: boolean) => {
     const query = new DatabricksQuery(
       { joinGraph, cubeEvaluator, compiler },
       {
@@ -62,7 +52,6 @@ cube(\`sales\`, {
         filters,
         timezone: 'UTC',
         useNativeSqlPlanner,
-        ...options,
       }
     );
     return query.buildSqlAndParams();
@@ -140,18 +129,6 @@ cube(\`sales\`, {
 
       expect(sql).toContain('`sales`.category IN (?, ?)');
       expect(sql).toMatch(/max\((`sales`\.)?sold_at\)\)? IN \(\?, \?\)/);
-      expect(sql).not.toMatch(/cast\(/i);
-    });
-
-    it('leaves a time dimension list as is in Cube Store pre-aggregation SQL', () => {
-      const [sql] = buildSqlAndParams(
-        [{ member: 'sales.soldAt', operator: 'in', values: ISO_VALUES }],
-        useNativeSqlPlanner,
-        { measures: ['sales.rollupCount'], dimensions: ['sales.soldAt'], externalQueryClass: CubeStoreQuery },
-      );
-
-      expect(sql).toContain('sales_by_day');
-      expect(sql).toMatch(/sales__sold_at[`"] IN \(\?, \?\)/);
       expect(sql).not.toMatch(/cast\(/i);
     });
   });

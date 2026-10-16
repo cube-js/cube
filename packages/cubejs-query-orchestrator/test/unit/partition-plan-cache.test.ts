@@ -1,6 +1,7 @@
 import { FROM_PARTITION_RANGE, TO_PARTITION_RANGE, QueryDateRange } from '@cubejs-backend/shared';
-import { PreAggregationDescription, PreAggregationPartitionRangeLoader } from '@cubejs-backend/query-orchestrator';
-import { CompilerCache } from '../../src/compiler/CompilerCache';
+import { CompilerCache } from '@cubejs-backend/schema-compiler';
+
+import { PreAggregationDescription, PreAggregationPartitionRangeLoader } from '../../src';
 
 const preAggregation = (timezone: string): PreAggregationDescription => ({
   preAggregationsSchema: 'test',

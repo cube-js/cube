@@ -12,7 +12,6 @@ import { CrateQuery } from './CrateQuery';
 import { HiveQuery } from './HiveQuery';
 import { OracleQuery } from './OracleQuery';
 import { SqliteQuery } from './SqliteQuery';
-import { CubeStoreQuery } from './CubeStoreQuery';
 import { AthenaQuery } from './AthenaQuery';
 import { TrinoQuery } from './TrinoQuery';
 
@@ -36,7 +35,6 @@ const ADAPTERS = {
   oracle: OracleQuery,
   sqlite: SqliteQuery,
   materialize: PostgresQuery,
-  cubestore: CubeStoreQuery,
 };
 
 export const queryClass = (dbType: string, dialectClass) => dialectClass || ADAPTERS[dbType];

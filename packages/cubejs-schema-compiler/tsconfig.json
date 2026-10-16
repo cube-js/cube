@@ -20,7 +20,6 @@
   "references": [
     { "path": "../cubejs-backend-native" },
     { "path": "../cubejs-backend-shared" },
-    { "path": "../cubejs-mssql-driver" },
-    { "path": "../cubejs-query-orchestrator" }
+    { "path": "../cubejs-mssql-driver" }
   ]
 }

@@ -60,7 +60,6 @@
     "@clickhouse/client": "^1.23.1",
     "@cubejs-backend/linter": "1.8.7",
     "@cubejs-backend/mssql-driver": "1.8.7",
-    "@cubejs-backend/query-orchestrator": "1.8.7",
     "@types/babel__code-frame": "^7.0.6",
     "@types/babel__generator": "^7.6.8",
     "@types/babel__traverse": "^7.20.5",

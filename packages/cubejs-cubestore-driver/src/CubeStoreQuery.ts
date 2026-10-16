@@ -1,10 +1,6 @@
 import moment from 'moment-timezone';
 import { parseSqlInterval, getEnv, SQL_INTERVAL_UNITS } from '@cubejs-backend/shared';
-import { BaseQuery } from './BaseQuery';
-import { BaseFilter } from './BaseFilter';
-import { BaseMeasure } from './BaseMeasure';
-import { BaseSegment } from './BaseSegment';
-import { BaseGroupFilter } from './BaseGroupFilter';
+import { BaseQuery, BaseFilter, BaseMeasure, BaseSegment, BaseGroupFilter } from '@cubejs-backend/schema-compiler';
 
 const GRANULARITY_TO_INTERVAL: Record<string, string> = {
   day: 'day',

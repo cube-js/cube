@@ -1,3 +1,4 @@
+export * from './CompilerCache';
 export * from './PrepareCompiler';
 export * from './UserError';
 export * from './converters';

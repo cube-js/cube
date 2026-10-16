@@ -1,7 +1,6 @@
 /* eslint-disable no-restricted-syntax, quotes */
 import { BigqueryQuery } from '../../src/adapter/BigqueryQuery';
 import { ClickHouseQuery } from '../../src/adapter/ClickHouseQuery';
-import { CubeStoreQuery } from '../../src/adapter/CubeStoreQuery';
 import { MssqlQuery } from '../../src/adapter/MssqlQuery';
 import { MysqlQuery } from '../../src/adapter/MysqlQuery';
 import { OracleQuery } from '../../src/adapter/OracleQuery';
@@ -56,14 +55,12 @@ describe('LIKE filter wildcard escaping', () => {
   };
 
   // Dialects whose LIKE treats backslash as the escape character with no clause.
-  // Cube Store belongs here and cannot be moved: its parser rejects `ESCAPE '\'`
-  // outright, so an explicit clause would break every pre-aggregation query.
+  // Cube Store belongs here too (covered in cubestore-driver).
   const BACKSLASH_BY_DEFAULT: [string, any][] = [
     ['Postgres', PostgresQuery],
     ['MySQL', MysqlQuery],
     ['BigQuery', BigqueryQuery],
     ['ClickHouse', ClickHouseQuery],
-    ['Cube Store', CubeStoreQuery],
   ];
 
   // Dialects with no default escape character, which therefore have to say so.

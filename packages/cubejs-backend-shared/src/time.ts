@@ -310,6 +310,44 @@ export const timeSeriesBoundaries = (granularity: string, dateRange: QueryDateRa
 
 export const isPredefinedGranularity = (granularity: string): boolean => !!TIME_SERIES[granularity];
 
+const checkDateRangeType = (range: QueryDateRange | null) => {
+  if (!range) {
+    return;
+  }
+
+  if (range.length !== 2) {
+    throw new Error(`Date range expected to be an array with 2 elements but ${range} found`);
+  }
+
+  if (typeof range[0] !== 'string' || typeof range[1] !== 'string') {
+    throw new Error(`Date range expected to be a string array but ${range} found`);
+  }
+
+  if ((range[0].length !== 23 && range[0].length !== 26) || (range[1].length !== 23 && range[0].length !== 26)) {
+    throw new Error(`Date range expected to be in YYYY-MM-DDTHH:mm:ss.SSS format but ${range} found`);
+  }
+};
+
+export const intersectDateRanges = (rangeA: QueryDateRange | null, rangeB: QueryDateRange | null): QueryDateRange | null => {
+  checkDateRangeType(rangeA);
+  checkDateRangeType(rangeB);
+  if (!rangeB) {
+    return rangeA;
+  }
+  if (!rangeA) {
+    return rangeB;
+  }
+  const from = rangeA[0] > rangeB[0] ? rangeA[0] : rangeB[0];
+  const to = rangeA[1] < rangeB[1] ? rangeA[1] : rangeB[1];
+  if (from > to) {
+    return null;
+  }
+  return [
+    from,
+    to,
+  ];
+};
+
 export const FROM_PARTITION_RANGE = '__FROM_PARTITION_RANGE';
 
 export const TO_PARTITION_RANGE = '__TO_PARTITION_RANGE';
