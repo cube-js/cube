@@ -43,24 +43,34 @@ To use the right axis:
 
 ## Reference lines
 
-Add horizontal reference lines to mark a target, threshold, or benchmark value. Reference lines appear at a fixed Y value across the full width of the chart.
+Add reference lines to mark a target, threshold, or benchmark value. A line on a measure axis runs
+across the chart at a fixed value. A line on the X axis of a time series runs vertically, for
+example to mark a launch date.
 
 To add a reference line:
-1. In the **Y axis** section of the Style tab, click **Add reference line**.
-2. Set the **Value** — the Y position of the line.
-3. Optionally set a **Label** that appears next to the line.
-4. Configure **Color** and **Style** (solid, dashed, or dotted).
+1. In the Style tab, open the **⋮** menu of an axis section and choose **Add reference line**.
+2. The line starts at the axis's current maximum. Change the **Value** to move it. Clear the value
+   to keep the line at the maximum as the data changes.
+3. Optionally type a **Label**. Until you do, the field shows *Reference 1*, *Reference 2*, and so
+   on, and nothing is printed on the chart.
+4. Click the color swatch to change the line's color.
+5. Click the line button next to the swatch to set the line style (solid, dashed, or dotted), the
+   line width, and the label position.
 
 {/* TODO screenshot: chart with a dashed reference line and label (hidden — replace this comment with <Frame><img src="..." /></Frame> when image is ready) */}
 
-You can add multiple reference lines to the same axis. Each is configured independently.
+Each reference line is one row in its axis section, and you can add several to the same axis. To
+remove one, open the row's **⋮** menu and choose **Remove reference line**. The axis section's
+**Reset** button also returns every line's color, width, style, and label position to the
+defaults. The lines, their values, and their labels stay.
 
 ### Reference line labels
 
 A reference line with no label renders as a bare rule — the reader has to already know what it
 means. Type text into **Label** to name it, for example `Target 18k`.
 
-Once a label is set, two alignment controls appear next to it:
+Once a label is set, place it with **Label position** in the line button's popover. The six
+positions combine:
 
 | Control | Options | Description |
 |---|---|---|
@@ -77,5 +87,6 @@ automatically, so the text stays inside the chart area.
 </Tip>
 
 <Note>
-Reference lines are only available on the left Y axis. For right-axis reference lines, use a [custom Vega-Lite spec](/docs/explore-analyze/charts/custom).
+On a chart with a second Y axis, each side has its own reference lines, drawn against that side's
+scale.
 </Note>
