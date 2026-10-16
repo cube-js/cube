@@ -110,6 +110,16 @@ export class YamlSchemaFormatter extends BaseSchemaFormatter {
       return value;
     }
 
-    return value.match(/[{}"]/) ? `"${value.replace(/"/g, '\\"')}"` : value;
+    return YamlSchemaFormatter.needsQuotes(value) ? JSON.stringify(value) : value;
+  }
+
+  // A plain YAML scalar can't start with an indicator character (e.g. the backtick
+  // BigQuery and MySQL quote identifiers with), contain `: ` or ` #`, or end with `:`.
+  // JSON's double-quoted string is also a valid YAML one.
+  protected static needsQuotes(value: string): boolean {
+    return value === '' ||
+      /[{}"]/.test(value) ||
+      /^[-?:,[\]#&*!|>'%@`\s]/.test(value) ||
+      /:\s|\s#|:$|\s$/.test(value);
   }
 }
