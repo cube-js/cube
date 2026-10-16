@@ -82,4 +82,16 @@ describe('TrinoDriver', () => {
       expect(informationSchemaQuery).toContain('columns.table_schema = \'sf1\'');
     });
   });
+
+  it('should run queries in the UTC session time zone', async () => {
+    await doWithDriver(async (driver: any) => {
+      expect(await driver.query('SELECT current_timezone() AS tz', [])).toEqual([{ tz: 'UTC' }]);
+    });
+  });
+
+  it('should send a configured session time zone', async () => {
+    const driver = new TrinoDriver({ ...config, timezone: 'America/New_York' });
+
+    expect(await driver.query('SELECT current_timezone() AS tz', [])).toEqual([{ tz: 'America/New_York' }]);
+  });
 });

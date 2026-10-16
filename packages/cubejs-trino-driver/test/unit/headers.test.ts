@@ -101,4 +101,22 @@ describe('TrinoDriver headers', () => {
       'X-Trino-Trace-Token': 'req-42',
     });
   });
+
+  it('pins the session time zone to UTC on query()', async () => {
+    const driver = new TrinoDriver({ host: 'trino.local', port: '8080' });
+
+    await driver.query('SELECT 1', []);
+
+    const [executeOpts] = mockExecute.mock.calls[0];
+    expect(executeOpts.timezone).toBe('UTC');
+  });
+
+  it('allows overriding the session time zone', async () => {
+    const driver = new TrinoDriver({ host: 'trino.local', port: '8080', timezone: 'America/New_York' });
+
+    await driver.query('SELECT 1', []);
+
+    const [executeOpts] = mockExecute.mock.calls[0];
+    expect(executeOpts.timezone).toBe('America/New_York');
+  });
 });

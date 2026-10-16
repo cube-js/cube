@@ -7,7 +7,9 @@ export type TrinoDriverConfiguration = Omit<PrestoDriverConfiguration, 'engine'>
 
 export class TrinoDriver extends PrestoDriver {
   public constructor(options: TrinoDriverConfiguration = {}) {
-    super({ ...options, engine: 'trino' });
+    // TrinoQuery.convertTz relies on `AT TIME ZONE`, which reads a naive TIMESTAMP in the
+    // session time zone, while Cube treats naive timestamps as UTC.
+    super({ timezone: 'UTC', ...options, engine: 'trino' });
   }
 
   public static dialectClass() {
