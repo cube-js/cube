@@ -59,11 +59,11 @@ views:
       - member: d
         operator: lt
         values: ["1"]
-        unless: [level1]
+        unless: [level1, d]
       - member: d
         operator: lt
         values: ["2"]
-        unless: [level2]
+        unless: [level2, d]
   `);
 
   async function run(q: any) {
