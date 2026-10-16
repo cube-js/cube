@@ -123,7 +123,8 @@ To export a **single chart** instead of the whole dashboard, hover the chart
 widget, open its **⋮** menu, and choose **Download as PNG** or **Download as
 PDF** — the same menu also offers **Download as CSV** for the chart's
 underlying data. The image captures just that chart, named after the chart's
-title.
+title. On a table, the menu also offers [**Download print
+version**](#print-a-single-table), directly under **Download as PDF**.
 
 PNG and PDF downloads are server-rendered snapshots — Cube re-opens the
 dashboard (or, for a single chart, that chart on its own), waits for rendering
@@ -198,6 +199,26 @@ they are into **Download as PDF**, and it requires the same permission. A
 [notification][ref-notifications] can attach it too: choose **Print version**
 under **Attach dashboard as**. The [Control Plane API][ref-control-plane-api]
 offers it as `layout: print` on a PDF dashboard export.
+
+#### Print a single table {#print-a-single-table}
+
+To print one table rather than the whole dashboard, hover the table widget, open
+its **⋮** menu, and choose **Download print version**, directly under
+**Download as PDF**. The file is the same A4 document with that table alone:
+page 1 opens with the dashboard's title and the line stating the control
+selections, then the table prints every row as described above, and no other
+widget of the dashboard is in the file. The table and the line follow your
+current control selections, and a default [resolved from the
+data][ref-control-data-defaults], as the whole-dashboard print version does. It
+is named after the table's title.
+
+The item appears on table widgets only, including a table inside a [layout
+container][ref-layout]; other charts and KPIs keep **Download as PNG** and
+**Download as PDF**. It is shown to the same viewers as the chart's **Download
+as PDF**, under the **Download data** permission, and, like **Download as PNG**
+and **Download as PDF**, it is unavailable while a chart's PNG, PDF or print
+download on the dashboard is still being prepared. Notifications and the Control
+Plane API print the whole dashboard only.
 
 [ref-workbooks]: /docs/explore-analyze/workbooks
 [ref-widgets]: /docs/explore-analyze/dashboards/widgets
