@@ -827,6 +827,7 @@ Query parameters:
 | `offset` | Pagination offset. Defaults to `0` | No |
 | `limit` | Maximum number of items to return. Defaults to all items | No |
 | `include_private` | Set to `true` to include [private cubes, views, and members](#private-cubes-and-members). Requires the `meta-private` scope. Defaults to `false` | No |
+| `full_model` | Set to `true` for [privileged full-model export](#full-model-export), including definitions hidden by data access policies. Requires a verified token from `tokens-for-meta-sync` with `meta-private`. Defaults to `false` | No |
 
 Example request:
 
@@ -876,6 +877,7 @@ Query parameters:
 | Parameter | Description | Required |
 | --- | --- | --- |
 | `include_private` | Set to `true` to include [private cubes, views, and members](#private-cubes-and-members). Requires the `meta-private` scope. Defaults to `false` | No |
+| `full_model` | Set to `true` for [privileged full-model export](#full-model-export), including definitions hidden by data access policies. Requires a verified token from `tokens-for-meta-sync` with `meta-private`. Defaults to `false` | No |
 
 Response includes:
 
@@ -894,9 +896,9 @@ Response includes:
 - `joins` - Cubes only. The cube's [joins][ref-joins] to other cubes, sorted by
   `cube`, each with `cube`, `relationship` (`many_to_one`, `one_to_many`, or
   `one_to_one`), and `sql`, the join condition in the same form as member `sql`.
-  `sql` is omitted when a [data access policy][ref-dap] governs either cube, or
-  when that can't be determined, since the condition can name columns the policy
-  hides
+  Except in [full-model export](#full-model-export), `sql` is omitted when a
+  [data access policy][ref-dap] governs either cube, or when that can't be
+  determined, since the condition can name columns the policy hides
 - `measures` and `dimensions` - Arrays of members, sorted by name
 
 Each member includes:
@@ -1040,6 +1042,7 @@ Request body:
 | `cubes` | `array` | Array of cube names to retrieve | No |
 | `views` | `array` | Array of view names to retrieve | No |
 | `include_private` | `boolean` | Set to `true` to include [private cubes, views, and members](#private-cubes-and-members). Requires the `meta-private` scope. Defaults to `false` | No |
+| `full_model` | `boolean` | Set to `true` for [privileged full-model export](#full-model-export), including definitions hidden by data access policies. Requires a verified token from `tokens-for-meta-sync` with `meta-private`. Defaults to `false` | No |
 
 Query parameters:
 
@@ -1048,6 +1051,7 @@ Query parameters:
 | `offset` | Pagination offset. Defaults to `0` | No |
 | `limit` | Maximum number of items to return. Defaults to all items | No |
 | `include_private` | Same as the `include_private` request body property, which takes precedence when both are set | No |
+| `full_model` | Same as the `full_model` request body property, which takes precedence when both are set | No |
 
 If neither `cubes` nor `views` is provided, all cubes and views are returned.
 
@@ -1230,9 +1234,10 @@ References to anything it doesn't return are omitted: every entry in
 member that the Metadata API returns, though not necessarily in the same
 response.
 
-Data catalogs and lineage tools that need the complete data model can set
-`include_private` to `true`. Private cubes, views, and members are then returned
-with their full definitions and `public` set to `false`. A view's
+Data catalogs and lineage tools can set `include_private` to `true` to include
+private definitions that the token's data access policies permit. Private cubes,
+views, and members are then returned with their full definitions and `public`
+set to `false`. A view's
 `table_references`, and the `column_references` of its members, then include the
 tables and columns it reads through private cubes; by default, these are left out.
 
@@ -1258,6 +1263,45 @@ Example request:
 curl \
   -H "Authorization: Bearer TOKEN" \
   "https://example.cubecloud.dev/cubejs-api/v1/entities/customers?include_private=true"
+```
+
+### Full-model export
+
+For catalog integrations that need lineage through policy-hidden base cubes,
+set `full_model=true`. This separate, privileged mode exports every cube, view,
+measure, and dimension in the compiled model selected by the request's security
+context. It includes private and policy-hidden definitions, source-table and
+column lineage, member references, and join SQL. It does not evaluate metadata
+visibility policies for the caller. Query-time data access policies continue to
+apply when the token is used to query data.
+
+Full-model export requires a token issued by
+[`tokens-for-meta-sync`][ref-cpa-meta-sync-token] with both `meta` and
+`meta-private`. Request `"scopes": ["meta-private"]` when minting the token; the
+existing admin or `SchemaRead` permission requirement applies. The runtime
+verifies the export grant with its configured platform signing secrets.
+Self-issued API-secret tokens and customer identity-provider tokens cannot
+activate this mode by adding either `scope` or `cubeCloudScope`; the request
+returns `403`. A token with only `meta` also receives `403`.
+
+`full_model` defaults to `false` and is supported by all three entity endpoints.
+For `POST /v1/entities/all`, supply it in the request body or query string; the
+body value takes precedence, including an explicit `false`. For `GET` requests,
+supply it in the query string. A true value selects full-model export regardless
+of `include_private`; it does not require `include_private=true`. Entity filters,
+sorting, and pagination still apply. Malformed boolean flags return `400`.
+
+Leaving `full_model` unset or setting it to `false` preserves the existing
+behavior, including the guarantee that `include_private` does not bypass data
+access policies. Possessing a `meta-private` token alone never enables full-model
+export.
+
+```bash
+curl \
+  -H "Authorization: Bearer META_SYNC_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"full_model": true}' \
+  "https://example.cubecloud.dev/cubejs-api/v1/entities/all"
 ```
 
 ## Health checks
