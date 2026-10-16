@@ -1,5 +1,6 @@
 import { getEnv, SchemaFileRepository } from '@cubejs-backend/shared';
 import { NativeInstance } from '@cubejs-backend/native';
+import type { ModelContext } from '@cubejs-backend/native';
 import { v4 as uuidv4 } from 'uuid';
 import { LRUCache } from 'lru-cache';
 import vm from 'vm';
@@ -64,6 +65,11 @@ export type Compiler = {
   compilerCache: CompilerCache;
   headCommitId?: string;
   compilerId: string;
+  /**
+   * Native planner state of the compiled model, e.g. the compiled SQL templates of each
+   * data source. Created by the first query the native planner builds on these compilers.
+   */
+  modelContext?: ModelContext;
 };
 
 export const prepareCompiler = (repo: SchemaFileRepository, options: PrepareCompilerOptions = {}): Compiler => {

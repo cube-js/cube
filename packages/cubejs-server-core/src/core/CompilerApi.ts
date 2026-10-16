@@ -401,24 +401,27 @@ export class CompilerApi {
     // sqlGenerator.dataSource can return undefined for query without members
     // Queries like this are used by api-gateway to initialize SQL API
     // At the same time, those queries should use concrete dataSource, so we should be good to go with it
+    const dialectDataSource = dataSource ?? 'default';
     dataSource = compilers.compiler.withQuery(sqlGenerator, () => sqlGenerator.dataSource);
-    if (dataSource !== undefined) {
+    // Even with the same dbType, the dialect class and its per-data-source settings
+    // (and so the templates the native planner caches under the data source) can differ
+    if (dataSource !== undefined && dataSource !== dialectDataSource) {
       const _dbType = await this.getDbType(dataSource);
-      if (dataSource !== 'default' && dbType !== _dbType) {
-        // TODO consider more efficient way than instantiating query
-        sqlGenerator = await this.createQueryByDataSource(
-          compilers,
-          query,
-          dataSource,
-          _dbType
-        );
+      // TODO consider more efficient way than instantiating query
+      sqlGenerator = await this.createQueryByDataSource(
+        compilers,
+        query,
+        dataSource,
+        _dbType
+      );
 
-        if (!sqlGenerator) {
-          throw new Error(
-            `Can't find dialect for '${dataSource}' data source: ${_dbType}`
-          );
-        }
+      if (!sqlGenerator) {
+        throw new Error(
+          `Can't find dialect for '${dataSource}' data source: ${_dbType}`
+        );
       }
+      // Resolved before the build, which caches the templates under it
+      compilers.compiler.withQuery(sqlGenerator, () => sqlGenerator.dataSource);
     }
 
     return { sqlGenerator, compilers };

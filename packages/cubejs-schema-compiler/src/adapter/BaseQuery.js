@@ -13,6 +13,7 @@ import R from 'ramda';
 
 import {
   buildSqlAndParams as nativeBuildSqlAndParams,
+  newModelContext,
 } from '@cubejs-backend/native';
 import {
   FROM_PARTITION_RANGE,
@@ -658,6 +659,10 @@ export class BaseQuery {
     if (dataSources.length > 1 && !this.externalPreAggregationQuery()) {
       throw new UserError(`To join across data sources use rollupJoin with Cube Store. If rollupJoin is defined, this error indicates it doesn't match the query. Please use Rollup Designer to verify it's definition. Found data sources: ${dataSources.join(', ')}`);
     }
+    if (dataSources.length === 1) {
+      // See nativeDataSource()
+      [this.resolvedDataSource] = dataSources;
+    }
     return dataSources[0];
   }
 
@@ -1074,12 +1079,16 @@ export class BaseQuery {
       maskedMembers: this.options.maskedMembers,
       memberToAlias: this.options.memberToAlias,
       subqueryJoins: this.options.subqueryJoins,
+      dataSource: this.nativeDataSource(),
     };
 
     try {
       // Establish the current query context, JS extensions like Funnels/RefreshKeys can resolve compiler.contextQuery()
       // during the member-SQL callbacks the native planner makes back into JS.
-      const buildResult = this.compilers.compiler.withQuery(this, () => nativeBuildSqlAndParams(queryParams));
+      const buildResult = this.compilers.compiler.withQuery(
+        this,
+        () => nativeBuildSqlAndParams(queryParams, this.nativeModelContext())
+      );
 
       const [query, params, preAggResult] = buildResult;
       const paramsArray = [...params];
@@ -1141,12 +1150,48 @@ export class BaseQuery {
       // must see the same masked members as the SQL build.
       maskedMembers: this.options.maskedMembers,
       subqueryJoins: this.options.subqueryJoins,
+      dataSource: this.nativeDataSource(),
     };
 
-    const buildResult = nativeBuildSqlAndParams(queryParams);
+    const buildResult = nativeBuildSqlAndParams(queryParams, this.nativeModelContext());
 
     const [, , preAggResult] = buildResult;
     return this.applyNativePreAggResult(preAggResult);
+  }
+
+  /**
+   * The data source the native planner caches this query's templates under, kept by
+   * the `dataSource` getter. Not read here in general: the getter can match
+   * pre-aggregations, which builds natively, and collecting cube names recurses on
+   * some queries Tesseract plans fine. Without one, the templates are compiled for
+   * this query only.
+   * @returns {string | null}
+   */
+  nativeDataSource() {
+    // A pre-aggregation query doesn't match pre-aggregations, and its description
+    // reads the getter anyway
+    if (this.resolvedDataSource === undefined && this.options.preAggregationQuery) {
+      return this.dataSource ?? null;
+    }
+    return this.resolvedDataSource ?? null;
+  }
+
+  /**
+   * Shared by every query built on these compilers, i.e. per compiled model, unless
+   * `modelContext: null` asks for one of its own. Created on first use so that models
+   * planned only by the legacy planner never load the addon.
+   * @returns {import('@cubejs-backend/native').ModelContext}
+   */
+  nativeModelContext() {
+    if (!this.modelContext) {
+      if (this.options.modelContext === null) {
+        this.modelContext = newModelContext();
+      } else {
+        this.compilers.modelContext ??= newModelContext();
+        this.modelContext = this.compilers.modelContext;
+      }
+    }
+    return this.modelContext;
   }
 
   applyNativePreAggResult(preAggResult) {
@@ -1249,7 +1294,10 @@ export class BaseQuery {
     const ExternalQuery = this.externalQueryClass;
     return new ExternalQuery(this.compilers, {
       ...this.options,
-      externalQueryClass: null
+      externalQueryClass: null,
+      // The model context caches templates by data source, and this query
+      // renders the same data source in another dialect.
+      modelContext: null,
     });
   }
 
@@ -4550,6 +4598,8 @@ export class BaseQuery {
       queryFactory: this.options.queryFactory,
       useNativeSqlPlanner: this.options.useNativeSqlPlanner,
       localRefreshKey: this.options.localRefreshKey,
+      // Sub-queries of an external query keep its own model context
+      modelContext: this.options.modelContext,
       ...options,
     };
   }
