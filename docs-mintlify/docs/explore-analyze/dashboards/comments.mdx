@@ -1,6 +1,6 @@
 ---
 title: Comments
-description: Discuss a dashboard with your team in threaded comments. Reply, resolve, react, and mention teammates, on the whole dashboard or on one chart.
+description: Discuss a dashboard with your team in threaded comments. Reply, resolve, react, and mention teammates, on the whole dashboard, on one chart, or on one data point.
 ---
 
 Comments let your team discuss a [published dashboard][ref-dashboards] on the
@@ -71,6 +71,40 @@ chart. In the list, a thread about a chart shows the chart's name:
 - A chart that was removed from the dashboard shows as **Removed chart**. Its
   threads stay on the dashboard and you can still read them. If the chart comes
   back to the dashboard, its threads attach to it again.
+
+## Comments on a data point
+
+A thread can also be about one data point on a chart, for example one bar or one
+point on a line. Click the data point and choose **Comment on this point**. If
+the chart supports drill-down, the same menu also has **Drill down**. A popover
+opens next to the data point. It shows the data point and its value, and the box
+reads **Start a thread on this point…**.
+
+{/* TODO: screenshot — a bar chart with a pin above one bar and the point popover open */}
+
+A data point with threads shows a pin above it. The pin shows the number of open
+threads. A pin with only resolved threads shows a check mark. Hover the pin to
+see the counts, and click it to open the popover with all threads on that data
+point. To see the threads in the panel, click **Open in comments panel** in the
+popover.
+
+In the panel, a thread about a data point shows the data point under the chart's
+name. Click it to show the data point on the chart.
+
+The data point is identified by its measure and its dimension values, not by its
+position. When the chart changes, Cube finds the data point again:
+
+- If the value changed since the thread was started, the thread shows both
+  values, for example **12,480 (as seen on Oct 11, 2026)** and **14,020 (now)**.
+- If the data point is not on the chart, for example because a filter removed
+  it, the pin is not shown. In the panel, the data point is grey and shows the
+  value from when the thread was started. When the data point comes back, the
+  pin comes back too.
+- A change of time grain, for example from month to week, makes a different
+  data point. Threads on the old data point show as not on the chart.
+
+Comments on a data point are not available on **Table**, **KPI**, **Map**, and
+Sankey charts. On these charts, comment on the whole chart instead.
 
 ## Editing and deleting
 
