@@ -1309,6 +1309,110 @@
   },
   "redirects": [
     {
+      "source": "/admin/connect-to-data/aws-athena",
+      "destination": "/admin/connect-to-data/data-sources/aws-athena"
+    },
+    {
+      "source": "/admin/connect-to-data/aws-redshift",
+      "destination": "/admin/connect-to-data/data-sources/aws-redshift"
+    },
+    {
+      "source": "/admin/connect-to-data/clickhouse",
+      "destination": "/admin/connect-to-data/data-sources/clickhouse"
+    },
+    {
+      "source": "/admin/connect-to-data/databricks-jdbc",
+      "destination": "/admin/connect-to-data/data-sources/databricks-jdbc"
+    },
+    {
+      "source": "/admin/connect-to-data/druid",
+      "destination": "/admin/connect-to-data/data-sources/druid"
+    },
+    {
+      "source": "/admin/connect-to-data/duckdb",
+      "destination": "/admin/connect-to-data/data-sources/duckdb"
+    },
+    {
+      "source": "/admin/connect-to-data/firebolt",
+      "destination": "/admin/connect-to-data/data-sources/firebolt"
+    },
+    {
+      "source": "/admin/connect-to-data/google-bigquery",
+      "destination": "/admin/connect-to-data/data-sources/google-bigquery"
+    },
+    {
+      "source": "/admin/connect-to-data/hive",
+      "destination": "/admin/connect-to-data/data-sources/hive"
+    },
+    {
+      "source": "/admin/connect-to-data/ksqldb",
+      "destination": "/admin/connect-to-data/data-sources/ksqldb"
+    },
+    {
+      "source": "/admin/connect-to-data/materialize",
+      "destination": "/admin/connect-to-data/data-sources/materialize"
+    },
+    {
+      "source": "/admin/connect-to-data/mongodb",
+      "destination": "/admin/connect-to-data/data-sources/mongodb"
+    },
+    {
+      "source": "/admin/connect-to-data/ms-fabric",
+      "destination": "/admin/connect-to-data/data-sources/ms-fabric"
+    },
+    {
+      "source": "/admin/connect-to-data/ms-sql",
+      "destination": "/admin/connect-to-data/data-sources/ms-sql"
+    },
+    {
+      "source": "/admin/connect-to-data/mysql",
+      "destination": "/admin/connect-to-data/data-sources/mysql"
+    },
+    {
+      "source": "/admin/connect-to-data/oracle",
+      "destination": "/admin/connect-to-data/data-sources/oracle"
+    },
+    {
+      "source": "/admin/connect-to-data/pinot",
+      "destination": "/admin/connect-to-data/data-sources/pinot"
+    },
+    {
+      "source": "/admin/connect-to-data/postgres",
+      "destination": "/admin/connect-to-data/data-sources/postgres"
+    },
+    {
+      "source": "/admin/connect-to-data/presto",
+      "destination": "/admin/connect-to-data/data-sources/presto"
+    },
+    {
+      "source": "/admin/connect-to-data/questdb",
+      "destination": "/admin/connect-to-data/data-sources/questdb"
+    },
+    {
+      "source": "/admin/connect-to-data/risingwave",
+      "destination": "/admin/connect-to-data/data-sources/risingwave"
+    },
+    {
+      "source": "/admin/connect-to-data/singlestore",
+      "destination": "/admin/connect-to-data/data-sources/singlestore"
+    },
+    {
+      "source": "/admin/connect-to-data/snowflake",
+      "destination": "/admin/connect-to-data/data-sources/snowflake"
+    },
+    {
+      "source": "/admin/connect-to-data/sqlite",
+      "destination": "/admin/connect-to-data/data-sources/sqlite"
+    },
+    {
+      "source": "/admin/connect-to-data/trino",
+      "destination": "/admin/connect-to-data/data-sources/trino"
+    },
+    {
+      "source": "/admin/connect-to-data/vertica",
+      "destination": "/admin/connect-to-data/data-sources/vertica"
+    },
+    {
       "source": "/docs/workspace/saved-reports",
       "destination": "/docs/explore-analyze/explore#saving-explorations"
     },
