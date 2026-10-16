@@ -1463,6 +1463,34 @@
     {
       "source": "/api-reference/workbooks/update-published-dashboard-ai-widget-thread",
       "destination": "/api-reference/workbooks/update-workbook-dashboard"
+    },
+    {
+      "source": "/admin/connect-to-data/hive-sparksql",
+      "destination": "/admin/connect-to-data/data-sources/hive"
+    },
+    {
+      "source": "/admin/connect-to-data/mssql",
+      "destination": "/admin/connect-to-data/data-sources/ms-sql"
+    },
+    {
+      "source": "/admin/connect-to-data/prestodb",
+      "destination": "/admin/connect-to-data/data-sources/presto"
+    },
+    {
+      "source": "/docs/data-modeling/concepts/working-with-joins",
+      "destination": "/docs/data-modeling/joins"
+    },
+    {
+      "source": "/docs/data-modeling/concepts/code-reusability-extending-cubes",
+      "destination": "/docs/data-modeling/extending-cubes"
+    },
+    {
+      "source": "/docs/product/data-modeling/reference/context-variables",
+      "destination": "/reference/data-modeling/context-variables"
+    },
+    {
+      "source": "/recipes/data-modeling/non-additivity",
+      "destination": "/recipes/pre-aggregations/non-additivity"
     }
   ]
 }
