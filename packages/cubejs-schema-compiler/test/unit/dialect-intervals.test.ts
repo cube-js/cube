@@ -96,9 +96,9 @@ describe('interval rendering across dialects', () => {
     });
   });
 
-  // Athena takes its interval handling from Presto, so the fix has to reach it too.
-  it('AthenaQuery inherits the Presto spelling', () => {
-    expect(query(dialect('AthenaQuery')).subtractInterval('x', '3 month 14 day'))
+  // Trino and Athena take their interval handling from Presto, so the fix has to reach them too.
+  it.each(['TrinoQuery', 'AthenaQuery'])('%s inherits the Presto spelling', name => {
+    expect(query(dialect(name)).subtractInterval('x', '3 month 14 day'))
       .toEqual('x - interval \'3\' month - interval \'14\' day');
   });
 });

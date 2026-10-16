@@ -8,6 +8,7 @@ import { OracleQuery } from '../../src/adapter/OracleQuery';
 import { PostgresQuery } from '../../src/adapter/PostgresQuery';
 import { PrestodbQuery } from '../../src/adapter/PrestodbQuery';
 import { SnowflakeQuery } from '../../src/adapter/SnowflakeQuery';
+import { TrinoQuery } from '../../src/adapter/TrinoQuery';
 import { prepareJsCompiler } from './PrepareCompiler';
 
 /**
@@ -69,6 +70,7 @@ describe('LIKE filter wildcard escaping', () => {
   // Snowflake doubles the backslash because it also unescapes the clause itself.
   const NEEDS_EXPLICIT_CLAUSE: [string, any, string][] = [
     ['Presto', PrestodbQuery, "ESCAPE '\\'"],
+    ['Trino', TrinoQuery, "ESCAPE '\\'"],
     ['Oracle', OracleQuery, "ESCAPE '\\'"],
     ['MSSQL', MssqlQuery, "ESCAPE '\\'"],
     ['Snowflake', SnowflakeQuery, "ESCAPE '\\\\'"],

@@ -1,6 +1,7 @@
 /* eslint-disable no-restricted-syntax, quotes */
 import { AthenaQuery } from '../../src/adapter/AthenaQuery';
 import { PrestodbQuery } from '../../src/adapter/PrestodbQuery';
+import { TrinoQuery } from '../../src/adapter/TrinoQuery';
 import { prepareJsCompiler } from './PrepareCompiler';
 
 // Trino/Presto reject timezone arithmetic over DATE:
@@ -63,6 +64,8 @@ describe('Trino/Presto time dimensions over DATE columns', () => {
 
   const promoted = (column: string) => `COALESCE("events".${column}, CAST(NULL AS TIMESTAMP))`;
 
+  const trinoConvertTz = (column: string) => `CAST((${promoted(column)} AT TIME ZONE '${timezone}') AS TIMESTAMP)`;
+
   const prestoConvertTz = (column: string) => {
     const atTimezone = `${promoted(column)} AT TIME ZONE '${timezone}'`;
     return `CAST(date_add('minute', timezone_minute(${atTimezone}), ` +
@@ -70,6 +73,7 @@ describe('Trino/Presto time dimensions over DATE columns', () => {
   };
 
   const dialects = [
+    { name: 'TrinoQuery', QueryClass: TrinoQuery, convertTz: trinoConvertTz },
     { name: 'PrestodbQuery', QueryClass: PrestodbQuery, convertTz: prestoConvertTz },
     // Athena has no convertTz of its own; pin that it keeps inheriting the fix.
     { name: 'AthenaQuery', QueryClass: AthenaQuery, convertTz: prestoConvertTz }
