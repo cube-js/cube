@@ -1,7 +1,10 @@
+import YAML from 'js-yaml';
+
 import {
   ScaffoldingTemplate,
   SchemaFormat,
 } from '../../src/scaffolding/ScaffoldingTemplate';
+import { prepareCompiler } from './PrepareCompiler';
 
 const driver = {
   quoteIdentifier: (name) => `"${name}"`,
@@ -340,6 +343,33 @@ describe('ScaffoldingTemplate', () => {
       template.generateFilesByTableNames(['public.accounts']).forEach((it) => {
         expect(it.content).toMatchSnapshot(it.fileName);
       });
+    });
+
+    // https://github.com/cube-js/cube/issues/6656
+    it('quotes a sql_table that starts with a backtick', async () => {
+      const template = new ScaffoldingTemplate(
+        {
+          ODS: {
+            CAMPAIGN_EMAILS: [
+              { name: 'id', type: 'integer', attributes: [] },
+              { name: 'amount', type: 'integer', attributes: [] },
+            ],
+          },
+        },
+        mySqlDriver,
+        {
+          format: SchemaFormat.Yaml,
+          snakeCase: true
+        }
+      );
+
+      const [file] = template.generateFilesByTableNames(['ODS.CAMPAIGN_EMAILS']);
+
+      const parsed: any = YAML.load(file.content);
+      expect(parsed.cubes[0].sql_table).toEqual('`ODS`.`CAMPAIGN_EMAILS`');
+
+      const { compiler } = prepareCompiler(file);
+      await compiler.compile();
     });
 
     it('generates schema with a catalog', () => {
