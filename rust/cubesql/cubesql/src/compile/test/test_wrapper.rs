@@ -7130,3 +7130,55 @@ async fn test_wrapper_literal_first_over_joined_cubes_has_subquery_alias() {
         sql
     );
 }
+
+/// Top N over an aggregated column with a `NOT ... IS NULL` filter between the grouping
+/// and the outer `ORDER BY ... LIMIT` (the shape a BI tool generates): the `ORDER BY` must be
+/// rendered at the same level as the `LIMIT`, because databases like Trino may drop an
+/// `ORDER BY` in a subquery that has no `LIMIT` of its own
+#[tokio::test]
+async fn test_wrapper_top_n_over_filtered_aggregate_keeps_order_with_limit() {
+    if !Rewriter::sql_push_down_enabled() {
+        return;
+    }
+    init_testing_logger();
+
+    let query_plan = convert_select_to_query_plan(
+        // language=PostgreSQL
+        r#"
+        select "customer_gender", "a0" from (
+          select "_"."customer_gender", "_"."a0" from (
+            select "rows"."customer_gender" as "customer_gender", sum("rows"."taxful_total_price") as "a0"
+            from (select "_"."customer_gender", "_"."taxful_total_price" from "public"."KibanaSampleDataEcommerce" "_") "rows"
+            group by "customer_gender"
+          ) "_" where not "_"."a0" is null
+        ) "t" order by "a0" desc limit 2
+        ;"#
+        .to_string(),
+        DatabaseProtocol::PostgreSQL,
+    )
+    .await;
+
+    let physical_plan = query_plan.as_physical_plan().await.unwrap();
+    println!(
+        "Physical plan: {}",
+        displayable(physical_plan.as_ref()).indent()
+    );
+
+    let wrapped = query_plan.as_logical_plan().find_cube_scan_wrapped_sql();
+    let sql = wrapped.wrapped_sql.sql;
+    println!("Wrapped SQL: {sql}");
+    println!("Request: {:?}", wrapped.request);
+
+    // The `LIMIT` is applied in the wrapped select above the `NOT ... IS NULL` filter, so the
+    // `ORDER BY` must be rendered there as well. An order left only in the inner Cube query
+    // sits in a subquery without a `LIMIT`, which databases like Trino are free to ignore
+    assert!(
+        sql.contains("LIMIT"),
+        "LIMIT is expected in the wrapped select: {sql}"
+    );
+    assert!(
+        sql.contains("ORDER BY"),
+        "ORDER BY is not rendered at the level of LIMIT (request order: {:?}): {sql}",
+        wrapped.request.order
+    );
+}
