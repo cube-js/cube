@@ -3,6 +3,28 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.8.7](https://github.com/cube-js/cube/compare/v1.8.6...v1.8.7) (2026-10-16)
+
+### Bug Fixes
+
+- **cube-cli:** Hide placeholder version in update notice ([#12250](https://github.com/cube-js/cube/issues/12250)) ([2aaa580](https://github.com/cube-js/cube/commit/2aaa5805672ba92ffe22c6cef6e80b009e7872b9))
+- **cubesql:** Prefer member filters over SQL segments when pushing down to Cube ([#12238](https://github.com/cube-js/cube/issues/12238)) ([f9858e9](https://github.com/cube-js/cube/commit/f9858e93fb677d282f5fffa0a68ad9bab799ded3))
+- **cubesql:** Preserve fractional MSSQL literal arithmetic ([#12175](https://github.com/cube-js/cube/issues/12175)) ([d6251c7](https://github.com/cube-js/cube/commit/d6251c71ee7f413bc272fa731db73a24ce3ba811))
+- **cubesql:** Support timestamp and interval arithmetic on non-constant operands ([#12242](https://github.com/cube-js/cube/issues/12242)) ([d523ac5](https://github.com/cube-js/cube/commit/d523ac5e20ca794395e69fa58ad9bd2b0b68c60f))
+- **trino-driver:** Use TrinoQuery and pin the session time zone to UTC ([#12291](https://github.com/cube-js/cube/issues/12291)) ([02a1222](https://github.com/cube-js/cube/commit/02a1222f6a9cf8cfe655f1b0bde124f1ec6141ae)), closes [#10207](https://github.com/cube-js/cube/issues/10207)
+
+### Features
+
+- **cube-cli:** Add --security-context to cube evals run (CUB-5398) ([#12202](https://github.com/cube-js/cube/issues/12202)) ([f603ff7](https://github.com/cube-js/cube/commit/f603ff7cceddba06d765fb406d823e04c6b22f93))
+- **cubesql:** Plan COUNT(DISTINCT dimension) over Cube Store pre-aggregations ([#12294](https://github.com/cube-js/cube/issues/12294)) ([acbc539](https://github.com/cube-js/cube/commit/acbc539c89e690ea3c30a3da22419b9a79120fd7))
+- **cubesql:** Support SQL push down to Cube Store ([#12247](https://github.com/cube-js/cube/issues/12247)) ([7ab4308](https://github.com/cube-js/cube/commit/7ab4308c29185451d34ae31414453d302868e6af))
+- **server-core:** Bound the compiler cache by compiled members, not just model count ([#12203](https://github.com/cube-js/cube/issues/12203)) ([d5a2ad9](https://github.com/cube-js/cube/commit/d5a2ad9bc7d99c4dd526e4ef79c7a275074330f1)), closes [cubedevinc/cubejs-enterprise#16237](https://github.com/cubedevinc/cubejs-enterprise/issues/16237)
+- **tesseract:** Support join aliases ([#12097](https://github.com/cube-js/cube/issues/12097)) ([d37b2cf](https://github.com/cube-js/cube/commit/d37b2cf7ede07cb7a4ea825de5377890e60792d3))
+
+### Performance Improvements
+
+- **server-core:** Resolve query dialects once per data source ([#12268](https://github.com/cube-js/cube/issues/12268)) ([3f1cb35](https://github.com/cube-js/cube/commit/3f1cb356eeb4d8b10a200f878239d5cb7e104752))
+
 ## [1.8.6](https://github.com/cube-js/cube/compare/v1.8.5...v1.8.6) (2026-10-13)
 
 ### Bug Fixes
