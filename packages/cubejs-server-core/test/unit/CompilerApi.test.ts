@@ -288,6 +288,58 @@ views:
 
       expect(sqlTemplates).toHaveBeenCalledTimes(calls);
     });
+
+    test('renders a data source in its own dialect class when the dbType is the same', async () => {
+      class BacktickPostgresQuery extends PostgresQuery {
+        public sqlTemplates() {
+          const templates = super.sqlTemplates();
+          templates.quotes.identifiers = '`';
+          templates.quotes.escape = '\\`';
+          return templates;
+        }
+      }
+
+      const api = new CompilerApi(
+        {
+          localPath: () => '/mock/path',
+          dataSchemaFiles: () => Promise.resolve([{
+            fileName: 'cubes.js',
+            content: `
+              cube('pg_orders', {
+                sql: 'SELECT * FROM orders',
+                measures: { count: { type: 'count' } },
+                dimensions: { status: { sql: 'status', type: 'string' } },
+              });
+              cube('analytics_orders', {
+                sql: 'SELECT * FROM orders',
+                dataSource: 'analytics',
+                measures: { count: { type: 'count' } },
+                dimensions: { status: { sql: 'status', type: 'string' } },
+              });
+            `
+          }]),
+        },
+        async () => 'postgres',
+        {
+          logger: () => {}, // eslint-disable-line @typescript-eslint/no-empty-function
+          sqlCache: false,
+          // `DialectClassFn` is typed as returning an instance, but it returns the class
+          dialectClass: ({ dataSource }) => (dataSource === 'analytics' ? BacktickPostgresQuery : undefined) as unknown as BaseQuery,
+        }
+      );
+      const apiSql = async (cube: string) => (await api.getSql(
+        { measures: [`${cube}.count`], dimensions: [`${cube}.status`], timezone: 'UTC' } as any
+      )).sql[0];
+
+      try {
+        // Either one first must not leave its templates to the other
+        expect(await apiSql('analytics_orders')).toContain('`analytics_orders`.status');
+        expect(await apiSql('pg_orders')).toContain('"pg_orders".status');
+        expect(await apiSql('analytics_orders')).toContain('`analytics_orders`.status');
+      } finally {
+        api.dispose();
+      }
+    });
   });
 
   describe('getSql', () => {

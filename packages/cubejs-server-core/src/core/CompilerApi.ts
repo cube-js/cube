@@ -22,7 +22,7 @@ import {
 import { GraphQLSchema } from 'graphql';
 import { parse as uuidParse, v4 as uuidv4 } from 'uuid';
 import { LRUCache } from 'lru-cache';
-import { NativeInstance, newModelContext } from '@cubejs-backend/native';
+import { NativeInstance } from '@cubejs-backend/native';
 import { disposedProxy, getEnv } from '@cubejs-backend/shared';
 import type { SchemaFileRepository } from '@cubejs-backend/shared';
 import { NormalizedQuery, MemberExpression } from '@cubejs-backend/api-gateway';
@@ -331,7 +331,6 @@ export class CompilerApi {
       });
       this.queryFactory = await this.createQueryFactory(compilers);
       this.queryFactories.set(compilers, this.queryFactory);
-      compilers.modelContext = newModelContext();
       // A compile that a newer version superseded, or that finished on an
       // evicted instance, no longer describes what this entry holds.
       if (this.compilerVersion === compilerVersion) {
@@ -402,24 +401,27 @@ export class CompilerApi {
     // sqlGenerator.dataSource can return undefined for query without members
     // Queries like this are used by api-gateway to initialize SQL API
     // At the same time, those queries should use concrete dataSource, so we should be good to go with it
+    const dialectDataSource = dataSource ?? 'default';
     dataSource = compilers.compiler.withQuery(sqlGenerator, () => sqlGenerator.dataSource);
-    if (dataSource !== undefined) {
+    // Even with the same dbType, the dialect class and its per-data-source settings
+    // (and so the templates the native planner caches under the data source) can differ
+    if (dataSource !== undefined && dataSource !== dialectDataSource) {
       const _dbType = await this.getDbType(dataSource);
-      if (dataSource !== 'default' && dbType !== _dbType) {
-        // TODO consider more efficient way than instantiating query
-        sqlGenerator = await this.createQueryByDataSource(
-          compilers,
-          query,
-          dataSource,
-          _dbType
-        );
+      // TODO consider more efficient way than instantiating query
+      sqlGenerator = await this.createQueryByDataSource(
+        compilers,
+        query,
+        dataSource,
+        _dbType
+      );
 
-        if (!sqlGenerator) {
-          throw new Error(
-            `Can't find dialect for '${dataSource}' data source: ${_dbType}`
-          );
-        }
+      if (!sqlGenerator) {
+        throw new Error(
+          `Can't find dialect for '${dataSource}' data source: ${_dbType}`
+        );
       }
+      // Resolved before the build, which caches the templates under it
+      compilers.compiler.withQuery(sqlGenerator, () => sqlGenerator.dataSource);
     }
 
     return { sqlGenerator, compilers };
@@ -1204,16 +1206,10 @@ export class CompilerApi {
       dbType = await this.getDbType(dataSource);
     }
 
-    return this.createQuery(compilers, dbType, this.getDialectClass(dataSource, dbType), query, dataSource);
+    return this.createQuery(compilers, dbType, this.getDialectClass(dataSource, dbType), query);
   }
 
-  public createQuery(
-    compilers: Compiler,
-    dbType: string,
-    dialectClass: BaseQuery,
-    query: NormalizedQuery | {},
-    dataSource?: string,
-  ): BaseQuery {
+  public createQuery(compilers: Compiler, dbType: string, dialectClass: BaseQuery, query: NormalizedQuery | {}): BaseQuery {
     return createQuery(
       compilers,
       dbType,
@@ -1227,9 +1223,6 @@ export class CompilerApi {
         convertTzForRawTimeDimension: this.convertTzForRawTimeDimension,
         localRefreshKey: this.localRefreshKey,
         queryFactory: this.queryFactories.get(compilers) ?? this.queryFactory,
-        modelContext: compilers.modelContext,
-        // The data source the dialect was picked for, when the caller knows it
-        dataSource,
       }
     );
   }

@@ -67,8 +67,7 @@ export type Compiler = {
   compilerId: string;
   /**
    * Native planner state of the compiled model, e.g. the compiled SQL templates of each
-   * data source. Set by CompilerApi, whose dialect per data source is what the templates
-   * are cached under; queries built on compilers without one get their own.
+   * data source. Created by the first query the native planner builds on these compilers.
    */
   modelContext?: ModelContext;
 };
