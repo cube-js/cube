@@ -10,10 +10,11 @@ use std::{
 
 use crate::{
     compile::rewrite::{
-        rules::utils::granularity_str_to_int_order, CubeScanLimit, CubeScanUngrouped,
-        CubeScanWrapped, DimensionName, LogicalPlanLanguage, MemberErrorPriority, ScalarUDFExprFun,
-        ScanWrapping, TimeDimensionGranularity, WrappedSelectLimit, WrappedSelectPushToCube,
-        WrappedSelectUngroupedScan, WRAPPED_SELECT_LIMIT,
+        rules::utils::granularity_str_to_int_order, AggregateFunctionExprDistinct, CubeScanLimit,
+        CubeScanUngrouped, CubeScanWrapped, DimensionName, LogicalPlanLanguage,
+        MemberErrorPriority, ScalarUDFExprFun, ScanWrapping, TimeDimensionGranularity,
+        WrappedSelectLimit, WrappedSelectPushToCube, WrappedSelectUngroupedScan,
+        WRAPPED_SELECT_LIMIT,
     },
     transport::{MetaContext, V1CubeMetaDimensionExt},
 };
@@ -34,6 +35,9 @@ pub struct BestCubePlan {
     meta_context: Arc<MetaContext>,
     penalize_post_processing: bool,
     penalize_limitless_post_processing: bool,
+    // Whether a distinct aggregate over an unlimited Cube query counts as truncating post
+    // processing: only where pre-aggregations are planned
+    penalize_distinct_post_processing: bool,
     max_row_limit: usize,
     // Whether to extract the plan that reads Cube Store pre-aggregations wherever it can,
     // or the plan that never does
@@ -48,6 +52,7 @@ impl BestCubePlan {
         meta_context: Arc<MetaContext>,
         penalize_post_processing: bool,
         penalize_limitless_post_processing: bool,
+        penalize_distinct_post_processing: bool,
         max_row_limit: usize,
         prefer_pre_aggregations: bool,
         rejected_pre_aggregation_scans: HashSet<LogicalPlanLanguage>,
@@ -56,6 +61,7 @@ impl BestCubePlan {
             meta_context,
             penalize_post_processing,
             penalize_limitless_post_processing,
+            penalize_distinct_post_processing,
             max_row_limit,
             prefer_pre_aggregations,
             rejected_pre_aggregation_scans,
@@ -272,6 +278,13 @@ impl BestCubePlan {
             _ => 0,
         };
 
+        let distinct_aggregates = match enode {
+            LogicalPlanLanguage::AggregateFunctionExprDistinct(AggregateFunctionExprDistinct(
+                true,
+            )) => 1,
+            _ => 0,
+        };
+
         let wrapped_select_non_push_to_cube = match enode {
             LogicalPlanLanguage::WrappedSelectPushToCube(WrappedSelectPushToCube(false)) => 1,
             _ => 0,
@@ -345,6 +358,7 @@ impl BestCubePlan {
             ast_size_without_alias,
             ast_size: 1,
             ungrouped_nodes,
+            distinct_aggregates: Unordered(distinct_aggregates),
             unwrapped_subqueries,
             limitless_scans: Unordered(limitless_scans),
             // Will be filled in finalize
@@ -386,6 +400,7 @@ impl<T> Ord for Unordered<T> {
 pub struct CubePlanCostOptions {
     penalize_post_processing: bool,
     penalize_limitless_post_processing: bool,
+    penalize_distinct_post_processing: bool,
     prefer_pre_aggregations: bool,
 }
 
@@ -464,6 +479,8 @@ pub struct CubePlanCost {
     ast_size: usize,
     ast_size_inside_wrapper: usize,
     ungrouped_nodes: usize,
+    // Input for `limitless_post_processing`: distinct aggregates outside any wrapper
+    distinct_aggregates: Unordered<usize>,
     // Input for `limitless_post_processing`, which is what expresses the preference
     limitless_scans: Unordered<usize>,
     // Reported rather than preferred: extraction prices these through
@@ -564,6 +581,9 @@ impl CubePlanCost {
             ast_size: self.ast_size + other.ast_size,
             ast_size_inside_wrapper: self.ast_size_inside_wrapper + other.ast_size_inside_wrapper,
             ungrouped_nodes: self.ungrouped_nodes + other.ungrouped_nodes,
+            distinct_aggregates: Unordered(
+                self.distinct_aggregates.0 + other.distinct_aggregates.0,
+            ),
             unwrapped_subqueries: self.unwrapped_subqueries + other.unwrapped_subqueries,
             limitless_post_processing: self.limitless_post_processing
                 + other.limitless_post_processing,
@@ -701,7 +721,10 @@ impl CubePlanCost {
             //   client asked for rather than on hidden detail. A coarser rollup, such as
             //   `SUM(cnt)` over a scan grouped by city, does read a capped slice and is
             //   wrong - it is exempt here because pushing harder proved counterproductive,
-            //   full push down being ungrouped itself, not because it is safe
+            //   full push down being ungrouped itself, not because it is safe. Where
+            //   pre-aggregations are planned a distinct aggregate is not exempt: the distinct
+            //   values it counts are the very rows the cap drops, and pushing it down counts
+            //   them exactly
             //
             // Everything else reads the slice as if it were the whole population:
             //
@@ -723,6 +746,12 @@ impl CubePlanCost {
                         | LogicalPlanLanguage::CrossJoin(_)
                         | LogicalPlanLanguage::Union(_)
                         | LogicalPlanLanguage::Subquery(_) => 1,
+                        LogicalPlanLanguage::Aggregate(_)
+                            if options.penalize_distinct_post_processing
+                                && self.distinct_aggregates.0 > 0 =>
+                        {
+                            1
+                        }
                         _ => 0,
                     }
                 }
@@ -737,6 +766,13 @@ impl CubePlanCost {
             ast_size: self.ast_size,
             ast_size_inside_wrapper: self.ast_size_inside_wrapper,
             ungrouped_nodes: self.ungrouped_nodes,
+            // A wrapper renders its distinct aggregates as SQL, and an aggregate has already
+            // counted its own, so neither passes them further up
+            distinct_aggregates: match (state, enode) {
+                (CubePlanState::Wrapper, _)
+                | (CubePlanState::Unwrapped(_), LogicalPlanLanguage::Aggregate(_)) => Unordered(0),
+                _ => self.distinct_aggregates,
+            },
             // A limit above bounds every scan below it, so nothing there is left to be
             // truncated by the row limit
             limitless_scans: if under_limit {
@@ -1243,6 +1279,7 @@ impl TopDownCostFunction<LogicalPlanLanguage, CubePlanTopDownState, CubePlanCost
             CubePlanCostOptions {
                 penalize_post_processing: self.penalize_post_processing,
                 penalize_limitless_post_processing: self.penalize_limitless_post_processing,
+                penalize_distinct_post_processing: self.penalize_distinct_post_processing,
                 prefer_pre_aggregations: self.prefer_pre_aggregations,
             },
         )
