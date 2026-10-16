@@ -2,7 +2,7 @@ import inflection from 'inflection';
 import R from 'ramda';
 import { notEmpty } from '@cubejs-backend/shared';
 import { UserError } from '../compiler';
-import { toSnakeCase } from './utils';
+import { toIdentifier, toSnakeCase } from './utils';
 
 enum ColumnType {
   Time = 'time',
@@ -227,7 +227,7 @@ export class ScaffoldingSchema {
     const dimensions = this.dimensions(tableDefinition);
 
     return {
-      cube: this.options.snakeCase ? toSnakeCase(table) : inflection.camelize(table),
+      cube: this.cubeName(table),
       tableName,
       schema,
       table,
@@ -302,6 +302,12 @@ export class ScaffoldingSchema {
     return dimensionColumns.concat(timeColumns);
   }
 
+  private cubeName(table: string) {
+    return toIdentifier(
+      this.options.snakeCase ? toSnakeCase(table) : inflection.camelize(table.replace(/[^\p{L}\p{N}]+/gu, '_'))
+    );
+  }
+
   private fixCase(value: string) {
     if (this.options.snakeCase) {
       return toSnakeCase(value);
@@ -311,8 +317,6 @@ export class ScaffoldingSchema {
   }
 
   protected joins(tableName: TableName, tableDefinition: ColumnData[]): Join[] {
-    const cubeName = (name: string) => (this.options.snakeCase ? toSnakeCase(name) : inflection.camelize(name));
-
     return R.unnest(tableDefinition
       .map(column => {
         let columnsToJoin: ColumnsToJoin[] = [];
@@ -322,7 +326,7 @@ export class ScaffoldingSchema {
             const targetTableDefinition = this.tableNamesToTables[fk.target_table]?.find(t => t.table === fk.target_table);
             if (targetTableDefinition) {
               columnsToJoin.push({
-                cubeToJoin: cubeName(fk.target_table),
+                cubeToJoin: this.cubeName(fk.target_table),
                 columnToJoin: fk.target_column,
                 tableName: targetTableDefinition.tableName
               });
@@ -349,7 +353,7 @@ export class ScaffoldingSchema {
               return null;
             }
             return {
-              cubeToJoin: cubeName(definition.table),
+              cubeToJoin: this.cubeName(definition.table),
               columnToJoin: columnForJoin.name,
               tableName: definition.tableName
             };
