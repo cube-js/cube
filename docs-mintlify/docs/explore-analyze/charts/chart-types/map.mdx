@@ -6,7 +6,7 @@ description: Plot geographic data as point maps (latitude/longitude), density ma
 Map charts visualize geographic data in two modes:
 
 - **Point map** — plot rows at their latitude/longitude coordinates, optionally sized and colored by additional fields. A point map can also show its rows as a [density](#density) surface.
-- **Region map** — paint polygons (countries, US states, or any custom [GeoJSON](https://en.wikipedia.org/wiki/GeoJSON)) as a choropleth driven by a measure.
+- **Region map** — paint polygons (countries, US states, or any custom [GeoJSON](https://en.wikipedia.org/wiki/GeoJSON)) as a choropleth colored by a measure or a dimension.
 
 <Frame>
   <img src="https://lgo0ecceic.ucarecd.net/103102da-1470-4879-a8cf-6cf8917f9d1a/" />
@@ -81,7 +81,7 @@ The **Style** tab sets how the surface looks:
 | **Show from zoom** | Zoom level from which individual points replace the surface | 12 |
 | **Density scale** | The colors from low to high density, in the **Color** section | Plasma |
 
-Areas with no data stay transparent. When you zoom in, the surface fades out and the points fade in over the zoom level before **Show from zoom**. From there, the map shows the points with their size, color, and tooltips.
+Areas with no data stay transparent. When you zoom in, the surface fades out and the points fade in over the last zoom level before **Show from zoom** (from 11 to 12 by default). From there, the map shows the points with their size, color, and tooltips.
 
 ## Region map
 
@@ -90,7 +90,7 @@ A region map requires:
 - **Source** — the GeoJSON to render: `World countries`, `US states`, or `Custom`.
 - **Property** — which property in each GeoJSON feature acts as the join key (e.g. `name`, `ISO3166-1-Alpha-2`, `state_code`).
 - **Dimension** — which column from your query joins to **Property**.
-- **Color by** — the numeric measure that drives the choropleth fill.
+- **Color by** — the field that drives the choropleth fill: a measure for a color scale, or a dimension for distinct colors.
 
 Built-in sources expose a fixed list of allowed properties. **Custom** lets you point at any public GeoJSON URL; the property dropdown then enumerates every key present in the feature collection.
 
@@ -110,7 +110,7 @@ The fetched GeoJSON is cached for the session.
 
 ### Unmatched regions
 
-Regions in the GeoJSON with no matching data row are hidden by default. Toggle **Fill unmatched** on the **Style** tab to render them with the **Default** color at reduced opacity instead.
+Regions in the GeoJSON with no matching data row are hidden by default. Toggle **Fill unmatched** on the **Style** tab to render them with the **Default** color from the **Color** section at reduced opacity instead.
 
 ## Tooltip fields
 
@@ -125,7 +125,7 @@ The **Zoom** section on the **Style** tab sets where the map opens. Its **Defaul
 
 In **Custom**, **Level** and **Center** follow the map: pan or zoom the chart, and they update. Type a value, and the map moves. **Center** takes latitude and longitude in decimal degrees; south and west are negative.
 
-The saved zoom applies to the map's size. A chart on a dashboard can be smaller or larger than in the workbook, so it shows a smaller or larger area at the same zoom.
+The saved zoom is a zoom level, not an area. A chart on a dashboard can be smaller or larger than in the workbook, so it shows a smaller or larger area at the same zoom.
 
 ## Map interaction
 
