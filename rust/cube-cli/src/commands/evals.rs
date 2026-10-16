@@ -118,6 +118,15 @@ fn results_path(deployment: i64, evaluation: i64) -> String {
     format!("{}/results", run_path(deployment, evaluation))
 }
 
+/// The run endpoints 404 for an unknown run or deployment; name the command that lists the
+/// real run ids, so a caller stops guessing them.
+fn run_not_found(deployment: i64, evaluation: i64) -> anyhow::Error {
+    anyhow::anyhow!(
+        "no eval run {evaluation} on deployment {deployment}; find run ids with \
+         `cube evals list {deployment}`"
+    )
+}
+
 fn start_body(
     branch: &str,
     agent: &Option<String>,
@@ -152,7 +161,10 @@ async fn wait_for_run(
 ) -> Result<Value> {
     let path = run_path(deployment, evaluation);
     wait::poll(Wait::new("eval run", timeout, interval), || async {
-        let run = api.get(&path, &Query::new()).await?;
+        let run = api
+            .get_optional(&path, &Query::new())
+            .await?
+            .ok_or_else(|| run_not_found(deployment, evaluation))?;
         let status = util::status_of(&run, "status").to_ascii_lowercase();
         if status == COMPLETED || status == FAILED {
             return Ok(Progress::Done(run));
@@ -396,8 +408,9 @@ pub async fn command(args: Args, ctx: &Ctx) -> Result<()> {
             }
 
             let run = api
-                .get(&run_path(deployment, evaluation), &Query::new())
-                .await?;
+                .get_optional(&run_path(deployment, evaluation), &Query::new())
+                .await?
+                .ok_or_else(|| run_not_found(deployment, evaluation))?;
             if ctx.json {
                 output::print_json(&run);
             } else {
@@ -423,8 +436,9 @@ pub async fn command(args: Args, ctx: &Ctx) -> Result<()> {
             util::push(&mut query, "first", &first);
             util::push(&mut query, "after", &after);
             let results = api
-                .get(&results_path(deployment, evaluation), &query)
-                .await?;
+                .get_optional(&results_path(deployment, evaluation), &query)
+                .await?
+                .ok_or_else(|| run_not_found(deployment, evaluation))?;
             print_results(ctx.json, &results);
             if !ctx.json {
                 let command = format!("cube evals results {deployment} {evaluation}");
@@ -599,6 +613,14 @@ mod tests {
                 &json!({ "pageInfo": { "hasNextPage": false } })
             ),
             None
+        );
+    }
+
+    #[test]
+    fn an_unknown_run_points_at_the_list_command() {
+        assert_eq!(
+            run_not_found(7, 150).to_string(),
+            "no eval run 150 on deployment 7; find run ids with `cube evals list 7`"
         );
     }
 
