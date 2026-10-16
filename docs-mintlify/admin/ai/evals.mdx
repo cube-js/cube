@@ -174,6 +174,10 @@ artifact is uploaded. Add `--agent NAME` to test a configured agent or
 `--json` for a machine-readable document containing both the terminal run and
 its per-question results when the result set is complete.
 
+To inspect an earlier run, find its id with `cube evals list "$DEPLOYMENT_ID"`
+instead of guessing it, then pass it to `cube evals status` or
+`cube evals results`.
+
 #### With the Platform API
 
 If you do not want to install the CLI, call the same public endpoints directly.

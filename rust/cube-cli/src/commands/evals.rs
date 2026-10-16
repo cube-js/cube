@@ -63,11 +63,23 @@ enum Cmd {
         #[arg(long, default_value = "5s", value_parser = util::parse_duration, requires = "wait")]
         poll: Duration,
     },
+    /// List a deployment's eval runs, newest first
+    #[command(alias = "ls")]
+    List {
+        /// Deployment id
+        deployment: i64,
+        /// Maximum number of runs to return
+        #[arg(long)]
+        first: Option<u64>,
+        /// Cursor for the next page (from a previous pageInfo.endCursor)
+        #[arg(long)]
+        after: Option<String>,
+    },
     /// Show an eval run's status
     Status {
         /// Deployment id
         deployment: i64,
-        /// Eval run id, as returned by `run`
+        /// Eval run id, as returned by `run` or `list`
         evaluation: i64,
         /// Wait for the run and exit non-zero unless every question passes
         #[arg(long)]
@@ -83,7 +95,7 @@ enum Cmd {
     Results {
         /// Deployment id
         deployment: i64,
-        /// Eval run id, as returned by `run`
+        /// Eval run id, as returned by `run` or `list`
         evaluation: i64,
         /// Maximum number of results to return
         #[arg(long)]
@@ -183,17 +195,13 @@ fn print_results(json_output: bool, results: &Value) {
     output::table(&["VERDICT", "QUESTION", "SCORE"], rows);
 }
 
-fn next_page_hint(
-    deployment: i64,
-    evaluation: i64,
-    first: Option<u64>,
-    results: &Value,
-) -> Option<String> {
-    if results.pointer("/pageInfo/hasNextPage") != Some(&Value::Bool(true)) {
+/// `command` is the CLI invocation that fetched `page`, without its paging flags.
+fn next_page_hint(command: &str, first: Option<u64>, page: &Value) -> Option<String> {
+    if page.pointer("/pageInfo/hasNextPage") != Some(&Value::Bool(true)) {
         return None;
     }
 
-    let Some(cursor) = results
+    let Some(cursor) = page
         .pointer("/pageInfo/endCursor")
         .and_then(Value::as_str)
         .filter(|cursor| !cursor.is_empty())
@@ -203,7 +211,7 @@ fn next_page_hint(
 
     let first = first.map_or_else(String::new, |count| format!(" --first {count}"));
     Some(format!(
-        "More results: `cube evals results {deployment} {evaluation}{first} --after {}`",
+        "More results: `{command}{first} --after {}`",
         util::shell_quote(cursor)
     ))
 }
@@ -341,6 +349,41 @@ pub async fn command(args: Args, ctx: &Ctx) -> Result<()> {
             }
             Ok(())
         }
+        Cmd::List {
+            deployment,
+            first,
+            after,
+        } => {
+            let mut query = Query::new();
+            util::push(&mut query, "first", &first);
+            util::push(&mut query, "after", &after);
+            let runs = api.get(&base(deployment), &query).await?;
+            if ctx.json {
+                output::print_json(&runs);
+                return Ok(());
+            }
+
+            let rows = output::items(&runs)
+                .into_iter()
+                .map(|run| {
+                    let cell = |field: &str| util::one_cell(&output::field(&run, field));
+                    vec![
+                        cell("id"),
+                        cell("status"),
+                        cell("branchName"),
+                        cell("agentName"),
+                        cell("startedAt"),
+                    ]
+                })
+                .collect();
+            output::table(&["ID", "STATUS", "BRANCH", "AGENT", "STARTED"], rows);
+            let command = format!("cube evals list {deployment}");
+            if let Some(hint) = next_page_hint(&command, first, &runs) {
+                io::stdout().flush()?;
+                eprintln!("{hint}");
+            }
+            Ok(())
+        }
         Cmd::Status {
             deployment,
             evaluation,
@@ -384,7 +427,8 @@ pub async fn command(args: Args, ctx: &Ctx) -> Result<()> {
                 .await?;
             print_results(ctx.json, &results);
             if !ctx.json {
-                if let Some(hint) = next_page_hint(deployment, evaluation, first, &results) {
+                let command = format!("cube evals results {deployment} {evaluation}");
+                if let Some(hint) = next_page_hint(&command, first, &results) {
                     io::stdout().flush()?;
                     eprintln!("{hint}");
                 }
@@ -527,29 +571,61 @@ mod tests {
             "items": [{ "verdict": "pass" }],
             "pageInfo": { "hasNextPage": true, "endCursor": "a;b" }
         });
+        let command = "cube evals results 1 42";
         assert_eq!(
-            next_page_hint(1, 42, Some(5), &results),
+            next_page_hint(command, Some(5), &results),
             Some("More results: `cube evals results 1 42 --first 5 --after 'a;b'`".into())
         );
         assert_eq!(
             next_page_hint(
-                1,
-                42,
+                command,
                 None,
                 &json!({ "pageInfo": { "hasNextPage": true, "endCursor": "" } })
             ),
             Some("More results are available; use --json to read pageInfo.endCursor".into())
         );
         assert_eq!(
-            next_page_hint(1, 42, None, &json!({ "pageInfo": { "hasNextPage": true } })),
+            next_page_hint(
+                command,
+                None,
+                &json!({ "pageInfo": { "hasNextPage": true } })
+            ),
             Some("More results are available; use --json to read pageInfo.endCursor".into())
         );
         assert_eq!(
             next_page_hint(
-                1,
-                42,
+                command,
                 None,
                 &json!({ "pageInfo": { "hasNextPage": false } })
+            ),
+            None
+        );
+    }
+
+    #[test]
+    fn list_reads_the_deployment_runs() {
+        assert_eq!(base(7), "/api/v1/deployments/7/evaluations");
+    }
+
+    #[test]
+    fn paginated_runs_show_a_runnable_next_page_command() {
+        let runs = json!({
+            "items": [{ "id": 42 }],
+            "pageInfo": { "hasNextPage": true, "endCursor": "c1" }
+        });
+        assert_eq!(
+            next_page_hint("cube evals list 7", Some(20), &runs),
+            Some("More results: `cube evals list 7 --first 20 --after 'c1'`".into())
+        );
+        assert_eq!(
+            next_page_hint("cube evals list 7", None, &runs),
+            Some("More results: `cube evals list 7 --after 'c1'`".into())
+        );
+        assert_eq!(
+            next_page_hint(
+                "cube evals list 7",
+                None,
+                &json!({ "items": [], "pageInfo": { "hasNextPage": false, "endCursor": "c1" } })
             ),
             None
         );

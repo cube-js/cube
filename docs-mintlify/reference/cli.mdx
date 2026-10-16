@@ -178,7 +178,7 @@ Run `cube <command> --help` for the full options of any command.
 | `github` (`gh`) | GitHub integration: `status`, `installations`, `repos`, `branches`, `connect` |
 | `data-model` | Data model files and Git workflow: `list`, `get`, `put`, `delete`, `rename`, `file-hashes`, `branches`, `create-branch`, `delete-branch`, `enable-branch`/`disable-branch`, `dev-mode`, `commit`, `pull`, `merge`, `merge-to-default` |
 | `dbt` | dbt sync: `sync` (`--ref` or `--manifest`, `--wait`), `generate` (`--manifest`, `--out`, `--check`), `status`, `result`, `logs`, `history` (`--status`, `--trigger`), `cancel` |
-| `evals` | Agent evals: `run` (`--branch`, `--agent`, `--file`, `--security-context`, `--wait`), `status` (`--wait`), `results` (`--first`, `--after`) |
+| `evals` | Agent evals: `run` (`--branch`, `--agent`, `--file`, `--security-context`, `--wait`), `list` (`--first`, `--after`), `status` (`--wait`), `results` (`--first`, `--after`) |
 | `ossie` | [Apache Ossie](#apache-ossie) conversion: `export` (`--view`, `--strict-fanout`, `--from-dir`, `--wait`, `--out`), `import` (`--file`, `--dialect`, `--base-cube`, `--out`, `--check`), `status` (`--wait`), `result` (`--out`), `cancel` |
 | `environments` | Deployment environments and environment tokens |
 | `variables` | Deployment environment variables |
@@ -394,9 +394,11 @@ Omit `--agent` to use the auto agent. Pass
 evaluate under that security context; see
 [Run evals from CI](/admin/ai/evals#run-evals-from-ci) for which queries it
 applies to and the access it requires. Without `--wait`, the command returns
-immediately; use the returned id to inspect the run later:
+immediately; use the returned id to inspect the run later, or find it with
+`cube evals list`, which lists the deployment's eval runs newest first:
 
 ```bash
+cube evals list DEPLOYMENT_ID
 cube evals status DEPLOYMENT_ID EVAL_RUN_ID --wait
 cube evals results DEPLOYMENT_ID EVAL_RUN_ID
 ```
