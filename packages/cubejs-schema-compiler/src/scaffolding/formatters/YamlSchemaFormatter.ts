@@ -36,7 +36,8 @@ export class YamlSchemaFormatter extends BaseSchemaFormatter {
   protected render(
     value: SchemaDescriptor,
     level = 0,
-    parent?: SchemaDescriptor
+    parent?: SchemaDescriptor,
+    flow = false
   ) {
     const indent = Array(level * 2)
       .fill(0)
@@ -56,7 +57,13 @@ export class YamlSchemaFormatter extends BaseSchemaFormatter {
           (v) => typeof v !== 'object' || v instanceof MemberReference
         )
       ) {
-        return ` [${value.map(this.render).join(', ')}]\n`;
+        // The caller separates keys itself — a newline here doubles the blank line.
+        // Pass the array as parent so scalar elements skip the leading-space branch
+        // that indents a value after its key, and `flow` so they quote on the
+        // characters that would otherwise end an item in a flow sequence.
+        return ` [${value
+          .map((v) => this.render(v, level + 1, value, true))
+          .join(', ')}]`;
       }
 
       return `\n${value
@@ -85,8 +92,13 @@ export class YamlSchemaFormatter extends BaseSchemaFormatter {
             )}${newLine}`;
           }
 
+          const entries = Object.entries(value[key] || {});
+
+          // An empty object renders inline as `[]`, which the array branch leaves
+          // unseparated; a non-empty one ends in its own newline. Keep both apart
+          // from the next key.
           return `${indent}${key}:${this.render(
-            Object.entries(value[key] || {}).map(([ok, ov]) => ({
+            entries.map(([ok, ov]) => ({
               name: ok,
               // @ts-ignore
               ...Object.entries(ov)
@@ -95,21 +107,31 @@ export class YamlSchemaFormatter extends BaseSchemaFormatter {
             })),
             level + 1,
             value
-          )}`;
+          )}${entries.length ? '' : '\n'}`;
         })
         .join('\n');
 
       return `\n${content}`;
     }
 
-    return `${Array.isArray(parent) ? '' : ' '}${this.escapedValue(value)}`;
+    return `${Array.isArray(parent) ? '' : ' '}${this.escapedValue(
+      value,
+      flow
+    )}`;
   }
 
-  private escapedValue(value: string | number | boolean): string | number | boolean {
+  private escapedValue(
+    value: string | number | boolean,
+    flow = false
+  ): string | number | boolean {
     if (typeof value !== 'string') {
       return value;
     }
 
-    return value.match(/[{}"]/) ? `"${value.replace(/"/g, '\\"')}"` : value;
+    // `,` and `]` end an item inside a flow sequence, so a value carrying either
+    // has to be quoted there even though it is harmless in a block scalar.
+    const needsQuotes = flow ? /[{}",[\]]/ : /[{}"]/;
+
+    return value.match(needsQuotes) ? `"${value.replace(/"/g, '\\"')}"` : value;
   }
 }
