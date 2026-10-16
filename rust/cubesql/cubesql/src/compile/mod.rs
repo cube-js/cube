@@ -40,7 +40,7 @@ mod tests {
         compile::{
             engine::df::scan::{CacheMode, MemberField},
             rewrite::rewriter::Rewriter,
-            test::{get_sixteen_char_member_cube, get_string_cube_meta},
+            test::{get_sixteen_char_member_cube, get_string_cube_meta, get_test_meta},
         },
         CubeError,
     };
@@ -975,6 +975,76 @@ mod tests {
                 ungrouped: Some(true),
                 ..Default::default()
             }
+        );
+    }
+
+    /// Tableau's measure-only query on a cube without `count`. `COUNT(1)` goes to Cube as an
+    /// ad-hoc measure for the HAVING, but WHERE must stay a member filter so that
+    /// `FILTER_PARAMS` see it, rather than become an SQL segment.
+    #[tokio::test]
+    async fn tableau_having_count_with_filter_on_cube_without_count() {
+        if !Rewriter::sql_push_down_enabled() {
+            return;
+        }
+        init_testing_logger();
+
+        let meta = get_test_meta()
+            .into_iter()
+            .map(|mut cube| {
+                cube.measures
+                    .retain(|measure| measure.name != "KibanaSampleDataEcommerce.count");
+                cube
+            })
+            .collect();
+        let query_plan = convert_select_to_query_plan_with_meta(
+            r#"
+            SELECT
+                AVG("KibanaSampleDataEcommerce"."avgPrice") AS "avg:avgPrice:ok",
+                SUM("KibanaSampleDataEcommerce"."sumPrice") AS "sum:sumPrice:ok"
+            FROM "public"."KibanaSampleDataEcommerce" "KibanaSampleDataEcommerce"
+            WHERE (
+                ("KibanaSampleDataEcommerce"."order_date" >= (TIMESTAMP '2024-08-01 00:00:00.000'))
+                AND ("KibanaSampleDataEcommerce"."order_date" < (TIMESTAMP '2024-09-01 00:00:00.000'))
+            )
+            HAVING (COUNT(1) > 0)
+            "#
+            .to_string(),
+            meta,
+        )
+        .await;
+
+        let logical_plan = query_plan.as_logical_plan();
+        let wrapped_sql = logical_plan.find_cube_scan_wrapped_sql();
+        let request = wrapped_sql.request;
+        assert_eq!(
+            member_expression_sql(&request.measures),
+            [
+                "${KibanaSampleDataEcommerce.avgPrice}",
+                "${KibanaSampleDataEcommerce.sumPrice}",
+                "COUNT(*)",
+            ]
+        );
+        assert!(member_expression_sql(&request.segments).is_empty());
+        assert_eq!(request.filters, None);
+        assert_eq!(
+            request.time_dimensions,
+            Some(vec![V1LoadRequestQueryTimeDimension {
+                dimension: "KibanaSampleDataEcommerce.order_date".to_string(),
+                granularity: None,
+                date_range: Some(json!(vec![
+                    "2024-08-01T00:00:00.000Z",
+                    "2024-08-31T23:59:59.999Z"
+                ])),
+            }])
+        );
+        // No matching rows still means no rows: the HAVING runs over the ad-hoc count
+        let sql = wrapped_sql.wrapped_sql.sql;
+        assert!(
+            Regex::new(r#""count_[a-z0-9_]+" > 0"#)
+                .unwrap()
+                .is_match(&sql),
+            "HAVING is pushed down: {}",
+            sql
         );
     }
 
@@ -2190,16 +2260,27 @@ limit
             member_expression_sql(&request.measures),
             ["${KibanaSampleDataEcommerce.sumPrice}"]
         );
+        let part = |part: &str| {
+            format!(
+                "CASE WHEN (LEFT(CAST(EXTRACT({part} FROM ${{KibanaSampleDataEcommerce.order_date}}) AS STRING), 4000) IS NOT NULL) \
+                 THEN LEFT(CAST(EXTRACT({part} FROM ${{KibanaSampleDataEcommerce.order_date}}) AS STRING), 4000) ELSE $0$ END"
+            )
+        };
         assert_eq!(
             member_expression_sql(&request.dimensions),
-            ["${KibanaSampleDataEcommerce.order_date}"]
+            [format!("({} || ($1$ || {}))", part("year"), part("month"))]
         );
+        assert!(member_expression_sql(&request.segments).is_empty());
         assert_eq!(
-            member_expression_sql(&request.segments),
-            [
-                "((${KibanaSampleDataEcommerce.order_date} < timestamptz '2023-10-08T00:00:00.000Z') \
-                 AND (${KibanaSampleDataEcommerce.order_date} >= timestamptz '2023-07-08T00:00:00.000Z'))",
-            ]
+            request.time_dimensions,
+            Some(vec![V1LoadRequestQueryTimeDimension {
+                dimension: "KibanaSampleDataEcommerce.order_date".to_string(),
+                granularity: None,
+                date_range: Some(json!(vec![
+                    "2023-07-08T00:00:00.000Z",
+                    "2023-10-07T23:59:59.999Z"
+                ])),
+            }])
         );
 
         // The grouping, the `a0 IS NOT NULL` filter and the ordered LIMIT all run at the
@@ -9124,13 +9205,17 @@ ORDER BY "source"."str0" ASC
             member_expression_sql(&request.dimensions),
             vec!["${KibanaSampleDataEcommerce.customer_gender}"]
         );
-        // LEFT(...) = 'f' is only recognised as a `startsWith` filter on the member query
-        // path; pushed down it stays the expression QuickSight wrote
+        assert!(member_expression_sql(&request.segments).is_empty());
         assert_eq!(
-            member_expression_sql(&request.segments),
-            vec!["(LEFT(${KibanaSampleDataEcommerce.customer_gender}, 1) = $0$)"]
+            request.filters,
+            Some(vec![V1LoadRequestQueryFilterItem {
+                member: Some("KibanaSampleDataEcommerce.customer_gender".to_string()),
+                operator: Some("startsWith".to_string()),
+                values: Some(vec!["f".to_string()]),
+                or: None,
+                and: None,
+            }])
         );
-        assert_eq!(request.filters, None);
     }
 
     #[tokio::test]
@@ -9167,11 +9252,17 @@ ORDER BY "source"."str0" ASC
             member_expression_sql(&request.dimensions),
             vec!["${KibanaSampleDataEcommerce.customer_gender}"]
         );
+        assert!(member_expression_sql(&request.segments).is_empty());
         assert_eq!(
-            member_expression_sql(&request.segments),
-            vec!["(RIGHT(${KibanaSampleDataEcommerce.customer_gender}, 2) = $0$)"]
+            request.filters,
+            Some(vec![V1LoadRequestQueryFilterItem {
+                member: Some("KibanaSampleDataEcommerce.customer_gender".to_string()),
+                operator: Some("endsWith".to_string()),
+                values: Some(vec!["le".to_string()]),
+                or: None,
+                and: None,
+            }])
         );
-        assert_eq!(request.filters, None);
     }
 
     #[tokio::test]
@@ -16625,9 +16716,17 @@ LIMIT {{ limit }}{% endif %}"#.to_string(),
                 "EXTRACT(quarter FROM ${KibanaSampleDataEcommerce.order_date})",
             ]
         );
+        assert!(member_expression_sql(&request.segments).is_empty());
         assert_eq!(
-            member_expression_sql(&request.segments),
-            ["(${KibanaSampleDataEcommerce.order_date.year} = $0$)",]
+            request.time_dimensions,
+            Some(vec![V1LoadRequestQueryTimeDimension {
+                dimension: "KibanaSampleDataEcommerce.order_date".to_string(),
+                granularity: None,
+                date_range: Some(json!(vec![
+                    "2024-01-01T00:00:00.000Z",
+                    "2024-12-31T23:59:59.999Z"
+                ])),
+            }])
         );
     }
 

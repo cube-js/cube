@@ -103,6 +103,11 @@ impl BestCubePlan {
             _ => 0,
         };
 
+        let wrapped_select_filters = match enode {
+            LogicalPlanLanguage::WrappedSelectFilterExpr(list) if !list.is_empty() => 1,
+            _ => 0,
+        };
+
         let member_errors = match enode {
             LogicalPlanLanguage::MemberError(_) => 1,
             _ => 0,
@@ -259,6 +264,7 @@ impl BestCubePlan {
             table_scans,
             filters,
             filter_members,
+            wrapped_select_filters,
             non_detected_cube_scans,
             member_errors,
             non_pushed_down_window,
@@ -337,6 +343,7 @@ pub struct CubePlanCostOptions {
 /// - `non_detected_cube_scans` > other nodes - minimize cube scans without members
 /// - `filters` > `filter_members` - optimize for push down of filters
 /// - `zero_members_wrapper` > `filter_members` - prefer CubeScan(filters) to WrappedSelect(CubeScan(*), filters)
+/// - `wrapped_select_filters` > `filter_members` - prefer a member filter on CubeScan to the same filter in a WrappedSelect
 /// - `filter_members` > `cube_members` - optimize for `inDateRange` filter push down to time dimension
 /// - `member_errors` > `cube_members` - extra cube members may be required (e.g. CASE)
 /// - `member_errors` > `wrapper_nodes` - use SQL push down where possible if cube scan can't be detected
@@ -377,6 +384,9 @@ pub struct CubePlanCost {
     // And we want to select representation with less members
     // But only when members are present!
     zero_members_wrapper: i64,
+    // Filters evaluated in a wrapped select rather than as member filters. Pushed to Cube, they
+    // become SQL segments, which FILTER_PARAMS can't see
+    wrapped_select_filters: i64,
     filter_members: i64,
     cube_members: i64,
     errors: i64,
@@ -438,6 +448,7 @@ impl CubePlanCost {
                 0
             }) + other.non_detected_cube_scans,
             filter_members: self.filter_members + other.filter_members,
+            wrapped_select_filters: self.wrapped_select_filters + other.wrapped_select_filters,
             non_pushed_down_window: self.non_pushed_down_window + other.non_pushed_down_window,
             non_pushed_down_grouping_sets: self.non_pushed_down_grouping_sets
                 + other.non_pushed_down_grouping_sets,
@@ -522,6 +533,7 @@ impl CubePlanCost {
                 CubePlanState::Wrapper => 0,
             },
             filter_members: self.filter_members,
+            wrapped_select_filters: self.wrapped_select_filters,
             member_errors: self.member_errors,
             non_pushed_down_window: self.non_pushed_down_window,
             non_pushed_down_grouping_sets: match state {

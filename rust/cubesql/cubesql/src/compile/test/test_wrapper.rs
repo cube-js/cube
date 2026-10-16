@@ -4822,6 +4822,52 @@ async fn test_wrapper_multi_data_source_view_cross_source_query_stays_plain() {
     }
 }
 
+/// A pushed to Cube select keeps the named segments and member filters its scan consumed,
+/// and a `CURRENT_DATE - INTERVAL` bound there folds to a member filter.
+#[tokio::test]
+async fn test_wrapper_push_to_cube_keeps_scan_segments_and_filters() {
+    if !Rewriter::sql_push_down_enabled() {
+        return;
+    }
+    init_testing_logger();
+
+    // MAX over a dimension needs an ad-hoc measure, so the select is pushed to Cube
+    let logical_plan = convert_select_to_query_plan(
+        // language=PostgreSQL
+        r#"
+        SELECT
+            AVG(avgPrice) AS avg_price,
+            MAX(order_date) AS last_order
+        FROM KibanaSampleDataEcommerce
+        WHERE is_female AND order_date >= CURRENT_DATE - INTERVAL '28 days'
+        ;"#
+        .to_string(),
+        DatabaseProtocol::PostgreSQL,
+    )
+    .await
+    .as_logical_plan();
+
+    let request = logical_plan.find_cube_scan_wrapped_sql().request;
+    assert_eq!(
+        member_expression_sql(&request.measures),
+        [
+            "${KibanaSampleDataEcommerce.avgPrice}",
+            "MAX(${KibanaSampleDataEcommerce.order_date})",
+        ]
+    );
+    assert_eq!(
+        request.segments,
+        Some(vec!["KibanaSampleDataEcommerce.is_female".to_string()])
+    );
+    let filters = request.filters.unwrap();
+    assert_eq!(filters.len(), 1, "filters: {:?}", filters);
+    assert_eq!(
+        filters[0].member.as_deref(),
+        Some("KibanaSampleDataEcommerce.order_date")
+    );
+    assert_eq!(filters[0].operator.as_deref(), Some("afterOrOnDate"));
+}
+
 #[tokio::test]
 async fn test_wrapper_binary_expr_timestamp_computed_date_bound() {
     if !Rewriter::sql_push_down_enabled() {
@@ -4829,17 +4875,18 @@ async fn test_wrapper_binary_expr_timestamp_computed_date_bound() {
     }
     init_testing_logger();
 
-    // The window function forces the SQL push down of the `DATE - INTERVAL` bound.
+    // The window function forces the SQL push down. In a WHERE the `DATE - INTERVAL` bound would
+    // fold into a CubeScan filter, so it is tested in a grouped CASE that stays SQL.
     let query_plan = convert_select_to_query_plan(
         // language=PostgreSQL
         r#"
         SELECT
             customer_gender AS step,
+            CASE WHEN KibanaSampleDataEcommerce.order_date >= CURRENT_DATE - INTERVAL '28 days' THEN 1 ELSE 0 END AS recent,
             MEASURE(count) AS total_conversions,
             ROW_NUMBER() OVER (ORDER BY customer_gender) AS step_order
         FROM KibanaSampleDataEcommerce
-        WHERE KibanaSampleDataEcommerce.order_date >= CURRENT_DATE - INTERVAL '28 days'
-        GROUP BY customer_gender
+        GROUP BY 1, 2
         ORDER BY customer_gender
         ;"#
         .to_string(),
@@ -4876,11 +4923,11 @@ async fn test_wrapper_binary_expr_date_side_computed_date_bound() {
         r#"
         SELECT
             customer_gender AS step,
+            CASE WHEN CAST(KibanaSampleDataEcommerce.order_date AS DATE) >= CURRENT_DATE - INTERVAL '28 days' THEN 1 ELSE 0 END AS recent,
             MEASURE(count) AS total_conversions,
             ROW_NUMBER() OVER (ORDER BY customer_gender) AS step_order
         FROM KibanaSampleDataEcommerce
-        WHERE CAST(KibanaSampleDataEcommerce.order_date AS DATE) >= CURRENT_DATE - INTERVAL '28 days'
-        GROUP BY customer_gender
+        GROUP BY 1, 2
         ORDER BY customer_gender
         ;"#
         .to_string(),
@@ -4918,11 +4965,11 @@ async fn test_wrapper_binary_expr_computed_date_bound_bigquery_templates() {
         r#"
         SELECT
             customer_gender AS step,
+            CASE WHEN KibanaSampleDataEcommerce.order_date >= CURRENT_DATE - INTERVAL '28 days' THEN 1 ELSE 0 END AS recent,
             MEASURE(count) AS total_conversions,
             ROW_NUMBER() OVER (ORDER BY customer_gender) AS step_order
         FROM KibanaSampleDataEcommerce
-        WHERE KibanaSampleDataEcommerce.order_date >= CURRENT_DATE - INTERVAL '28 days'
-        GROUP BY customer_gender
+        GROUP BY 1, 2
         ORDER BY customer_gender
         ;"#
         .to_string(),
@@ -5080,8 +5127,8 @@ async fn boolean_context_wrapper_plans() {
         ("SELECT COUNT(DISTINCT customer_gender) = 2 AS flag FROM KibanaSampleDataEcommerce", "CAST(CASE WHEN"),
         ("SELECT has_subscription IS NULL AS missing, MEASURE(count) FROM KibanaSampleDataEcommerce GROUP BY 1", "CAST(CASE WHEN"),
         ("SELECT customer_gender, SUM(CASE WHEN has_subscription = TRUE THEN 1 ELSE 0 END) FROM KibanaSampleDataEcommerce GROUP BY 1", "= CAST(1 AS BIT)"),
-        ("SELECT customer_gender, SUM(CASE WHEN customer_gender IS NULL THEN 1 ELSE 0 END) FROM KibanaSampleDataEcommerce WHERE NOT (has_subscription = TRUE) GROUP BY 1", "= CAST(1 AS BIT)"),
-        ("SELECT customer_gender, SUM(CASE WHEN customer_gender IS NULL THEN 1 ELSE 0 END) FROM KibanaSampleDataEcommerce WHERE has_subscription = CAST(0 AS BOOLEAN) GROUP BY 1", "CAST(0 AS BIT)"),
+        ("SELECT customer_gender, SUM(CASE WHEN customer_gender IS NULL THEN 1 ELSE 0 END) FROM KibanaSampleDataEcommerce WHERE NOT (COALESCE(has_subscription, FALSE) = TRUE) GROUP BY 1", "= CAST(1 AS BIT)"),
+        ("SELECT customer_gender, SUM(CASE WHEN customer_gender IS NULL THEN 1 ELSE 0 END) FROM KibanaSampleDataEcommerce WHERE COALESCE(has_subscription, TRUE) = CAST(0 AS BOOLEAN) GROUP BY 1", "CAST(0 AS BIT)"),
     ] {
         let plan = context.convert_sql_to_cube_query(query).await.unwrap().as_logical_plan();
         let sql = plan.find_cube_scan_wrapped_sql().wrapped_sql.sql;
@@ -5116,6 +5163,30 @@ async fn boolean_context_segment_members() {
         let sql = plan.find_cube_scan_wrapped_sql().wrapped_sql.sql;
         let request: serde_json::Value =
             serde_json::from_str(&sql[sql.find('{').unwrap()..=sql.rfind('}').unwrap()]).unwrap();
+        // A predicate Cube can serve as named segments or member filters goes there, not to SQL
+        if !case["cubeSegments"].is_null() || !case["cubeFilters"].is_null() {
+            let empty = serde_json::json!([]);
+            let or_empty = |value: &serde_json::Value| {
+                if value.is_null() {
+                    empty.clone()
+                } else {
+                    value.clone()
+                }
+            };
+            assert_eq!(
+                (
+                    or_empty(&request["query"]["segments"]),
+                    or_empty(&request["query"]["filters"])
+                ),
+                (
+                    or_empty(&case["cubeSegments"]),
+                    or_empty(&case["cubeFilters"])
+                ),
+                "{}",
+                case["query"]
+            );
+            continue;
+        }
         let members = if case["predicate"].as_bool().unwrap() {
             "segments"
         } else {
@@ -5131,7 +5202,7 @@ async fn boolean_context_segment_members() {
                 member["expr"]["sql"].clone()
             })
             .collect::<Vec<_>>();
-        assert_eq!(expressions, vec![case["sql"].clone()]);
+        assert_eq!(expressions, vec![case["sql"].clone()], "{}", case["query"]);
     }
 }
 

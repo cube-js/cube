@@ -4633,12 +4633,18 @@ impl WrappedSelectNode {
                     }))
                     .collect::<Result<_>>()?,
             ),
+            // Segments the scan consumed are kept, like its filters below
             segments: Some(
-                filter
+                ungrouped_scan_node
+                    .request
+                    .segments
                     .iter()
-                    .map(|(m, used_members)| {
+                    .flatten()
+                    .cloned()
+                    .map(Ok)
+                    .chain(filter.iter().map(|(m, used_members)| {
                         Self::ungrouped_member_def(m, used_members, &ungrouped_scan_node.used_cubes)
-                    })
+                    }))
                     .collect::<Result<_>>()?,
             ),
             order: if !self.order_expr.is_empty() {
