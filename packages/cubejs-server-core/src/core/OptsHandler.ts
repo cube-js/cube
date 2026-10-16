@@ -29,6 +29,7 @@ import {
   OrchestratorInitedOptions,
   QueueOptions,
   QueueInitedOptions,
+  AggsInitedOptions,
 } from './types';
 import { lookupDriverClass, isDriver } from './DriverResolvers';
 import type { CubejsServerCore } from './server';
@@ -617,6 +618,8 @@ export class OptsHandler {
     const clone = cloneDeep(orchestratorOptions);
     const queryCacheOptions = clone.queryCacheOptions || {};
     const preAggregationsOptions = clone.preAggregationsOptions || {};
+    // Not a public option (Joi rejects it), but a function-form orchestratorOptions skips validation
+    const { maxSourceRowLimit } = preAggregationsOptions as AggsInitedOptions;
 
     return {
       ...clone,
@@ -649,8 +652,8 @@ export class OptsHandler {
         maxPartitions: preAggregationsOptions.maxPartitions !== undefined
           ? preAggregationsOptions.maxPartitions
           : getEnv('maxPartitionsPerCube'),
-        maxSourceRowLimit: preAggregationsOptions.maxSourceRowLimit !== undefined
-          ? preAggregationsOptions.maxSourceRowLimit
+        maxSourceRowLimit: maxSourceRowLimit !== undefined
+          ? maxSourceRowLimit
           : getEnv('maxSourceRowLimit'),
       },
     };
