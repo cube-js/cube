@@ -18,6 +18,7 @@ describe('TrinoDriver', () => {
   // eslint-disable-next-line consistent-return,func-names
   beforeAll(async () => {
     const authOpts = {
+      user: 'presto',
       basic_auth: {
         user: 'presto',
         password: ''
