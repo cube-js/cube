@@ -62,6 +62,10 @@ or [GraphQL API][ref-ref-graphql-api-args] to specify the time zone for a query.
 Also, you can use the [`SQL_UTILS` context variable][ref-sql-utils] to apply the
 time zone conversion to dimensions that are not used as time dimensions in a query.
 
+The `timezone` value must be a valid [IANA time zone name][wiki-tz-database]
+(e.g., `America/Los_Angeles`, `Europe/Rome`). A value that is not a valid IANA
+time zone name is rejected with an error rather than being silently ignored.
+
 Additionally, note that time zones have impact on [pre-aggregation
 matching][ref-matching-preaggs-time-dimensions].
 
@@ -400,6 +404,7 @@ called `count` to be defined in the cube or view. Please add one to resolve this
 
 
 [wiki-utc-time-zone]: https://en.wikipedia.org/wiki/Coordinated_Universal_Time
+[wiki-tz-database]: https://en.wikipedia.org/wiki/List_of_tz_database_time_zones
 [ref-data-model]: /docs/data-modeling/overview
 [ref-playground]: /docs/explore-analyze/playground
 [ref-apis]: /reference
