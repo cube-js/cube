@@ -30,6 +30,145 @@ use crate::{
     CubeError,
 };
 
+const MSSQL_FLOAT_LITERAL_TEMPLATE: &str =
+    "{% if is_int32 %}CAST({{ value }} AS DECIMAL(10, 0)){% else %}{{ value }}{% endif %}";
+
+#[test]
+fn test_mssql_integral_float_literal_rendering() {
+    use crate::compile::{
+        engine::df::wrapper::{SqlQuery, WrappedSelectNode},
+        test::sql_generator,
+    };
+    use datafusion::logical_plan::Expr;
+    use std::collections::HashMap;
+
+    for (literal, original, mssql) in [
+        (
+            ScalarValue::Float32(Some(100.0)),
+            "100",
+            "CAST(100 AS DECIMAL(10, 0))",
+        ),
+        (ScalarValue::Float32(Some(0.1)), "0.1", "0.1"),
+        (
+            ScalarValue::Float64(Some(100.0)),
+            "100",
+            "CAST(100 AS DECIMAL(10, 0))",
+        ),
+        (
+            ScalarValue::Float64(Some(-100.0)),
+            "-100",
+            "CAST(-100 AS DECIMAL(10, 0))",
+        ),
+        (
+            ScalarValue::Float64(Some(0.0)),
+            "0",
+            "CAST(0 AS DECIMAL(10, 0))",
+        ),
+        (
+            ScalarValue::Float64(Some(-0.0)),
+            "-0",
+            "CAST(-0 AS DECIMAL(10, 0))",
+        ),
+        (ScalarValue::Float64(Some(100.1)), "100.1", "100.1"),
+        (
+            ScalarValue::Float64(Some(2_147_483_647.0)),
+            "2147483647",
+            "CAST(2147483647 AS DECIMAL(10, 0))",
+        ),
+        (
+            ScalarValue::Float64(Some(-2_147_483_648.0)),
+            "-2147483648",
+            "CAST(-2147483648 AS DECIMAL(10, 0))",
+        ),
+        (
+            ScalarValue::Float64(Some(2_147_483_648.0)),
+            "2147483648",
+            "2147483648",
+        ),
+        (
+            ScalarValue::Float32(Some(2_147_483_648.0)),
+            "2147483600",
+            "CAST(2147483600 AS DECIMAL(10, 0))",
+        ),
+        (
+            ScalarValue::Float64(Some(1e37)),
+            "10000000000000000000000000000000000000",
+            "10000000000000000000000000000000000000",
+        ),
+        (
+            ScalarValue::Float32(None),
+            "CAST(NULL AS FLOAT)",
+            "CAST(NULL AS FLOAT)",
+        ),
+        (
+            ScalarValue::Float64(None),
+            "CAST(NULL AS DOUBLE)",
+            "CAST(NULL AS DOUBLE)",
+        ),
+        (ScalarValue::Int64(Some(100)), "100", "100"),
+    ] {
+        for (templates, expected) in [
+            (vec![], original),
+            (
+                vec![(
+                    "expressions/float_literal".into(),
+                    MSSQL_FLOAT_LITERAL_TEMPLATE.into(),
+                )],
+                mssql,
+            ),
+        ] {
+            let (sql, _) = WrappedSelectNode::generate_sql_for_expr(
+                SqlQuery::new(String::new(), vec![]),
+                sql_generator(templates),
+                Expr::Literal(literal.clone()),
+                None,
+                &HashMap::new(),
+            )
+            .unwrap();
+            assert_eq!(sql, expected, "{literal:?}");
+        }
+    }
+}
+
+#[tokio::test]
+async fn test_mssql_integral_float_literal_pushdown() {
+    if !Rewriter::sql_push_down_enabled() {
+        return;
+    }
+    let context = TestContext::with_custom_templates(
+        DatabaseProtocol::PostgreSQL,
+        vec![(
+            "expressions/float_literal".into(),
+            MSSQL_FLOAT_LITERAL_TEMPLATE.into(),
+        )],
+    )
+    .await;
+    for literal in [
+        "100.0",
+        "CAST(100 AS DOUBLE)",
+        "CAST(100 AS REAL)",
+        "CAST(50 + 50 AS DOUBLE)",
+    ] {
+        let query = format!(
+            "SELECT {literal} * COUNT(*) / NULLIF(3 * COUNT(*), 0) AS percentage \
+             FROM KibanaSampleDataEcommerce WHERE LOWER(customer_gender) <> 'invalid'"
+        );
+        let plan = context.convert_sql_to_cube_query(&query).await.unwrap();
+        let sql = plan
+            .as_logical_plan()
+            .find_cube_scan_wrapped_sql()
+            .wrapped_sql
+            .sql;
+        assert!(
+            sql.contains("CAST(100 AS DECIMAL(10, 0))"),
+            "{}: {}",
+            literal,
+            sql
+        );
+        plan.as_physical_plan().await.unwrap();
+    }
+}
+
 #[tokio::test]
 async fn test_simple_wrapper() {
     if !Rewriter::sql_push_down_enabled() {

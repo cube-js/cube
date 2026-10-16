@@ -3490,6 +3490,25 @@ impl WrappedSelectNode {
         Ok((resulting_sql, sql_query))
     }
 
+    fn generate_sql_for_float_literal(
+        sql_generator: Arc<dyn SqlGenerator>,
+        value: Option<String>,
+        literal: &ScalarValue,
+    ) -> Result<String> {
+        match value {
+            Some(value) => sql_generator
+                .get_sql_templates()
+                .float_literal_expr(value)
+                .map_err(|e| {
+                    DataFusionError::Internal(format!(
+                        "Can't generate SQL for literal float: {}",
+                        e
+                    ))
+                }),
+            None => Self::generate_null_for_literal(sql_generator, literal),
+        }
+    }
+
     #[inline(never)]
     fn generate_sql_for_literal(
         mut sql_query: SqlQuery,
@@ -3517,16 +3536,18 @@ impl WrappedSelectNode {
                 sql_query,
             ),
             ScalarValue::Float32(f) => (
-                f.map(|f| format!("{f}")).map_or_else(
-                    || Self::generate_null_for_literal(sql_generator, &literal),
-                    Ok,
+                Self::generate_sql_for_float_literal(
+                    sql_generator,
+                    f.map(|f| format!("{f}")),
+                    &literal,
                 )?,
                 sql_query,
             ),
             ScalarValue::Float64(f) => (
-                f.map(|f| format!("{f}")).map_or_else(
-                    || Self::generate_null_for_literal(sql_generator, &literal),
-                    Ok,
+                Self::generate_sql_for_float_literal(
+                    sql_generator,
+                    f.map(|f| format!("{f}")),
+                    &literal,
                 )?,
                 sql_query,
             ),
