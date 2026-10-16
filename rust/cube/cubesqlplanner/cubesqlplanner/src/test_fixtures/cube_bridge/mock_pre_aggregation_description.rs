@@ -55,12 +55,20 @@ pub struct MockPreAggregationDescription {
     #[builder(default)]
     #[cfg_attr(not(feature = "integration-postgres"), allow(dead_code))]
     build_range_end: Option<String>,
+    #[builder(default)]
+    #[cfg_attr(not(feature = "integration-cubestore"), allow(dead_code))]
+    partition_granularity: Option<String>,
 }
 
 impl MockPreAggregationDescription {
     #[cfg_attr(not(feature = "integration-cubestore"), allow(dead_code))]
     pub fn indexes(&self) -> &[MockPreAggregationIndex] {
         &self.indexes
+    }
+
+    #[cfg_attr(not(feature = "integration-cubestore"), allow(dead_code))]
+    pub fn partition_granularity(&self) -> Option<&str> {
+        self.partition_granularity.as_deref()
     }
 
     /// The SQL of `build_range_start` and `build_range_end`, when both are set.

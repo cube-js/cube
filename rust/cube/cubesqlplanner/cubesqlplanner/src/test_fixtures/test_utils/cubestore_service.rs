@@ -136,6 +136,11 @@ async fn init_cubestore() -> CubeStoreInstance {
         )
         .env("CUBESTORE_DATA_DIR", &data_dir)
         .env("CUBESTORE_SELECT_WORKERS", "0")
+        // Test rollups are tiny; let the disjoint UNION ALL rewrite run on them anyway.
+        .env(
+            "CUBESTORE_DISJOINT_UNION_AGGREGATE_MIN_ROWS_PER_BRANCH",
+            "0",
+        )
         .stdout(Stdio::null())
         .stderr(Stdio::null())
         .spawn()

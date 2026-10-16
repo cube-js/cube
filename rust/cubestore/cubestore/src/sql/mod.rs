@@ -3678,7 +3678,12 @@ mod tests {
 
     #[tokio::test]
     async fn union_rewrites_keep_columns() -> Result<(), CubeError> {
-        Config::test("union_rewrites_keep_columns").start_test(async move |services| {
+        Config::test("union_rewrites_keep_columns")
+            .update_config(|mut c| {
+                c.disjoint_union_aggregate = false;
+                c
+            })
+            .start_test(async move |services| {
             let service = services.sql_service;
             let _ = service.exec_query("CREATE SCHEMA foo").await?.collect().await?;
             let _ = service.exec_query("CREATE TABLE foo.a (a int, b int, c int)").await?.collect().await?;
@@ -3754,6 +3759,7 @@ mod tests {
         Config::test("union_planning_rewrites_off")
             .update_config(|mut c| {
                 c.union_planning_rewrites = false;
+                c.disjoint_union_aggregate = false;
                 c
             })
             .start_test(async move |services| {
