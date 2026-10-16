@@ -38,6 +38,7 @@
   "dependencies": {
     "@cubejs-backend/base-driver": "1.8.6",
     "@cubejs-backend/dotenv": "^9.0.2",
+    "@cubejs-backend/schema-compiler": "1.8.6",
     "@cubejs-backend/shared": "1.8.6",
     "@google-cloud/bigquery": "^7.7.0",
     "@google-cloud/storage": "^8.1.0",

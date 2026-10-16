@@ -25,6 +25,7 @@ import {
   TableColumn,
   createPoolName,
 } from '@cubejs-backend/base-driver';
+import { MysqlQuery } from '@cubejs-backend/schema-compiler';
 
 const GenericTypeToMySql: Record<GenericDataBaseType, string> = {
   string: 'varchar(255) CHARACTER SET utf8mb4',
@@ -89,6 +90,10 @@ interface MySQLConnection {
  * MySQL driver class.
  */
 export class MySqlDriver extends BaseDriver implements DriverInterface {
+  public static dialectClass() {
+    return MysqlQuery;
+  }
+
   /**
    * Returns default concurrency value.
    */

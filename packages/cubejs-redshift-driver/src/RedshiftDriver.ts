@@ -21,6 +21,7 @@ import {
   UnloadOptions
 } from '@cubejs-backend/base-driver';
 import crypto from 'crypto';
+import { RedshiftQuery } from '@cubejs-backend/schema-compiler';
 import { RedshiftCredentialsProvider, RedshiftPlainCredentialsProvider } from './RedshiftCredentialsProvider';
 import { RedshiftIAMCredentialsProvider } from './RedshiftIAMCredentialsProvider';
 
@@ -56,6 +57,10 @@ const IGNORED_SCHEMAS = ['pg_catalog', 'pg_internal', 'information_schema', 'mys
  */
 export class RedshiftDriver extends PostgresDriver<RedshiftDriverConfiguration> {
   private readonly credentials: RedshiftCredentialsProvider;
+
+  public static dialectClass() {
+    return RedshiftQuery;
+  }
 
   /**
    * Returns default concurrency value.

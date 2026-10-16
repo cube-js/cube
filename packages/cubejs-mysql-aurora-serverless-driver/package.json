@@ -22,6 +22,7 @@
   "dependencies": {
     "@aws-sdk/client-rds-data": "^3.1048.0",
     "@cubejs-backend/base-driver": "1.8.6",
+    "@cubejs-backend/schema-compiler": "1.8.6",
     "@cubejs-backend/shared": "1.8.6",
     "@types/mysql": "^2.15.19",
     "data-api-client": "^2.4.1"

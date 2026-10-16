@@ -37,6 +37,7 @@
   "dependencies": {
     "@aws-sdk/client-s3": "^3.726.0",
     "@cubejs-backend/base-driver": "1.8.6",
+    "@cubejs-backend/schema-compiler": "1.8.6",
     "@cubejs-backend/shared": "1.8.6",
     "snowflake-sdk": "^3.3.0"
   },

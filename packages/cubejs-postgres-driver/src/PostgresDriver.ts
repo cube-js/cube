@@ -14,6 +14,7 @@ import {
   GenericDataBaseType, IndexesSQL, TableStructure, StreamOptions,
   StreamTableDataWithTypes, QueryOptions, DownloadQueryResultsResult, DriverCapabilities, TableColumn, createPoolName,
 } from '@cubejs-backend/base-driver';
+import { PostgresQuery } from '@cubejs-backend/schema-compiler';
 import { QueryStream } from './QueryStream';
 import { PgClient, PgClientConfig } from './PgClient';
 import { ConnectionError, PostgresError } from './errors';
@@ -69,6 +70,10 @@ export type PostgresDriverConfiguration = PgClientConfig & PoolUserOptions & {
  */
 export class PostgresDriver<Config extends PostgresDriverConfiguration = PostgresDriverConfiguration>
   extends BaseDriver implements DriverInterface {
+  public static dialectClass() {
+    return PostgresQuery;
+  }
+
   /**
    * Returns default concurrency value.
    */

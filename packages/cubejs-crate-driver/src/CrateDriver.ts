@@ -5,8 +5,13 @@
  */
 
 import { PostgresDriver, PgClient } from '@cubejs-backend/postgres-driver';
+import { CrateQuery } from '@cubejs-backend/schema-compiler';
 
 export class CrateDriver extends PostgresDriver {
+  public static dialectClass() {
+    return CrateQuery;
+  }
+
   protected async prepareConnection(conn: PgClient, _options: any) {
     // Not supported by Crate yet... https://github.com/crate/crate/issues/12356
     // await conn.query(`SET TIME ZONE '${this.config.storeTimezone || 'UTC'}'`);

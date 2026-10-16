@@ -29,7 +29,7 @@ import {
   OrchestratorInitedOptions,
   QueueOptions,
 } from './types';
-import { lookupDriverClass, isDriver } from './DriverResolvers';
+import { lookupDriverClass, driverDialectClass, isDriver } from './DriverResolvers';
 import type { CubejsServerCore } from './server';
 import { validateOptions } from './optionsValidate';
 
@@ -334,8 +334,7 @@ export class OptsHandler {
 
     const externalDialectFactory = () => (
       typeof externalDbType === 'string' &&
-      lookupDriverClass(externalDbType).dialectClass &&
-      lookupDriverClass(externalDbType).dialectClass()
+      driverDialectClass(externalDbType)
     );
 
     if (!this.isDevMode() && getEnv('externalDefault') && !externalDbType) {
@@ -399,10 +398,7 @@ export class OptsHandler {
 
     const options: ServerCoreInitializedOptions = {
       devServer: this.isDevMode(),
-      dialectFactory: (ctx) => (
-        lookupDriverClass(ctx.dbType).dialectClass &&
-        lookupDriverClass(ctx.dbType).dialectClass()
-      ),
+      dialectFactory: (ctx) => driverDialectClass(ctx.dbType),
       externalDbType,
       externalDriverFactory,
       externalDialectFactory,

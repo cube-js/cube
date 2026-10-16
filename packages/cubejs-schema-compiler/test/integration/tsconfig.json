@@ -1,0 +1,23 @@
+{
+  "extends": "../../../../tsconfig.base.json",
+  "include": ["."],
+  "compilerOptions": {
+    "types": ["node", "jest"],
+    // Same as the package tsconfig, see the antlr4 note there.
+    "module": "commonjs",
+    "moduleResolution": "bundler",
+    "outDir": "../../dist/test/integration",
+    "rootDir": ".",
+    "allowJs": true,
+    "checkJs": false,
+    "noImplicitAny": false,
+    "resolveJsonModule": true,
+    "experimentalDecorators": true
+  },
+  "references": [
+    { "path": "../.." },
+    { "path": "../../../cubejs-backend-shared" },
+    { "path": "../../../cubejs-mssql-driver" },
+    { "path": "../../../cubejs-query-orchestrator" }
+  ]
+}

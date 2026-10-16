@@ -36,6 +36,7 @@
   "dependencies": {
     "@cubejs-backend/base-driver": "1.8.6",
     "@cubejs-backend/postgres-driver": "1.8.6",
+    "@cubejs-backend/schema-compiler": "1.8.6",
     "@cubejs-backend/shared": "1.8.6",
     "semver": "^7.6.3"
   },

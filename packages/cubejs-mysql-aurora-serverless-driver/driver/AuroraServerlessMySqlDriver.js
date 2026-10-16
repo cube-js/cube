@@ -12,6 +12,7 @@ const {
 const crypto = require('crypto');
 const dataApi = require('data-api-client');
 const { BaseDriver } = require('@cubejs-backend/base-driver');
+const { MysqlQuery } = require('@cubejs-backend/schema-compiler');
 
 const GenericTypeToMySql = {
   string: 'varchar(255) CHARACTER SET utf8mb4',
@@ -22,6 +23,10 @@ const GenericTypeToMySql = {
  * Aurora MySQL driver class.
  */
 class AuroraServerlessMySqlDriver extends BaseDriver {
+  static dialectClass() {
+    return MysqlQuery;
+  }
+
   /**
    * Returns default concurrency value.
    */

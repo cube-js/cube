@@ -78,6 +78,14 @@ export class JDBCDriver extends BaseDriver {
 
   protected jdbcProps: any;
 
+  /**
+   * The SQL dialect depends on the database behind the JDBC URL, so a generic JDBC data source
+   * needs a `dialectFactory`. Subclasses for a specific database must override this.
+   */
+  public static dialectClass(): unknown {
+    return undefined;
+  }
+
   public constructor(
     config: Partial<JDBCDriverConfiguration> & {
       /**

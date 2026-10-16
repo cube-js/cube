@@ -4554,6 +4554,9 @@ export class BaseQuery {
     };
   }
 
+  /**
+   * @param {Function} [transformFn]
+   */
   cacheKeyQueries(transformFn) { // TODO collect sub queries
     if (!this.safeEvaluateSymbolContext().preAggregationQuery) {
       const preAggregationForQuery = this.preAggregations.findPreAggregationForQuery();

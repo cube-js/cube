@@ -119,6 +119,9 @@
       "path": "packages/cubejs-pinot-driver"
     },
     {
+      "path": "packages/cubejs-schema-compiler/test/integration"
+    },
+    {
       "path": "packages/cubejs-server-core"
     },
     {

@@ -14,6 +14,7 @@
   "main": "driver/OracleDriver.js",
   "dependencies": {
     "@cubejs-backend/base-driver": "1.8.6",
+    "@cubejs-backend/schema-compiler": "1.8.6",
     "@cubejs-backend/shared": "1.8.6",
     "ramda": "^0.27.2"
   },

@@ -28,6 +28,7 @@ import type { ConnectionOptions as TLSConnectionOptions } from 'tls';
 import {
   map, zipObj, prop, concat
 } from 'ramda';
+import { PrestodbQuery } from '@cubejs-backend/schema-compiler';
 
 const presto = require('presto-client');
 
@@ -72,6 +73,10 @@ const SUPPORTED_BUCKET_TYPES = ['gcs', 's3'];
  * Presto driver class.
  */
 export class PrestoDriver extends BaseDriver implements DriverInterface {
+  public static dialectClass() {
+    return PrestodbQuery;
+  }
+
   /**
    * Returns default concurrency value.
    */

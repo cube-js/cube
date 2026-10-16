@@ -22,6 +22,7 @@ import {
 import { AsyncDebounce, getEnv, isVersionGte } from '@cubejs-backend/shared';
 import { escape, format as formatSql } from 'sqlstring';
 import fetch from 'node-fetch';
+import { CubeStoreQuery } from '@cubejs-backend/schema-compiler';
 
 import { ConnectionConfig } from './types';
 import { WebSocketConnection } from './WebSocketConnection';
@@ -78,6 +79,10 @@ export class CubeStoreDriver extends BaseDriver implements DriverInterface {
   protected readonly connection: WebSocketConnection;
 
   protected readonly baseUrl: string;
+
+  public static dialectClass() {
+    return CubeStoreQuery;
+  }
 
   public constructor(config?: Partial<ConnectionConfig>) {
     super();

@@ -28,6 +28,7 @@ import fs from 'fs/promises';
 import crypto from 'crypto';
 import { Readable } from 'stream';
 import { S3ClientConfig } from '@aws-sdk/client-s3';
+import { SnowflakeQuery } from '@cubejs-backend/schema-compiler';
 import { HydrationMap, HydrationStream } from './HydrationStream';
 import { hydrators } from './type-parsers';
 
@@ -133,6 +134,10 @@ export interface SnowflakeDriverOptions {
 type SessionParameterValue = string | number | boolean | undefined;
 
 export class SnowflakeDriver extends BaseDriver implements DriverInterface {
+  public static dialectClass() {
+    return SnowflakeQuery;
+  }
+
   public static getDefaultConcurrency(): number {
     return 8;
   }

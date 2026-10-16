@@ -10,11 +10,16 @@ const {
 } = require('@cubejs-backend/shared');
 const sqlite3 = require('sqlite3');
 const { BaseDriver } = require('@cubejs-backend/base-driver');
+const { SqliteQuery } = require('@cubejs-backend/schema-compiler');
 
 /**
  * SQLight driver class.
  */
 class SqliteDriver extends BaseDriver {
+  static dialectClass() {
+    return SqliteQuery;
+  }
+
   /**
    * Returns default concurrency value.
    */

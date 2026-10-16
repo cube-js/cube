@@ -33,6 +33,7 @@ import type {
   WarnLogParams,
 } from '@clickhouse/client';
 import { v4 as uuidv4 } from 'uuid';
+import { ClickHouseQuery } from '@cubejs-backend/schema-compiler';
 
 import { version } from '../package.json';
 
@@ -137,6 +138,10 @@ type ClickHouseDriverConfig = {
 };
 
 export class ClickHouseDriver extends BaseDriver implements DriverInterface {
+  public static dialectClass() {
+    return ClickHouseQuery;
+  }
+
   /**
    * Returns default concurrency value.
    */

@@ -20,6 +20,7 @@ import {
   TableColumnQueryResult,
   GenericDataBaseType,
 } from '@cubejs-backend/base-driver';
+import { MssqlQuery } from '@cubejs-backend/schema-compiler';
 import { QueryStream, transformRow } from './QueryStream';
 
 // ********* Value converters ***************** //
@@ -68,6 +69,10 @@ export class MSSqlDriver extends BaseDriver implements DriverInterface {
   private readonly initialConnectPromise: Promise<ConnectionPool>;
 
   private readonly config: MSSqlDriverConfiguration;
+
+  public static dialectClass() {
+    return MssqlQuery;
+  }
 
   /**
    * Returns default concurrency value.

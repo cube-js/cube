@@ -17,6 +17,7 @@ import {
 } from '@cubejs-backend/base-driver';
 import { Readable } from 'stream';
 import semver from 'semver';
+import { PostgresQuery } from '@cubejs-backend/schema-compiler';
 
 export type ReadableStreamTableDataWithTypes = StreamTableDataWithTypes & {
   /**
@@ -29,6 +30,10 @@ export type ReadableStreamTableDataWithTypes = StreamTableDataWithTypes & {
  * Materialize driver class.
  */
 export class MaterializeDriver extends PostgresDriver {
+  public static dialectClass() {
+    return PostgresQuery;
+  }
+
   /**
    * Returns default concurrency value.
    */
