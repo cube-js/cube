@@ -7,7 +7,7 @@ export type TrinoDriverConfiguration = Omit<PrestoDriverConfiguration, 'engine'>
 
 export class TrinoDriver extends PrestoDriver {
   public constructor(options: TrinoDriverConfiguration = {}) {
-    super({ ...options, timezone: options.timezone || 'UTC', engine: 'trino' });
+    super({ timezone: 'UTC', ...options, engine: 'trino' });
   }
 
   public static dialectClass() {
