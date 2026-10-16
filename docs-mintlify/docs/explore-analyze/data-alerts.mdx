@@ -80,10 +80,12 @@ refresh** in the sidebar. When you save, the dialog closes with "Scheduled
 refresh created", and the new schedule is listed in the
 [scheduled refreshes sidebar][ref-accessing].
 
-**Create alert** is offered only to people who can create schedules on the
-dashboard (see the note at the top of this page), and never on an
-[embedded dashboard][ref-embedding], published or in
-[Creator Mode][ref-creator-mode].
+**Create alert** is offered only to people with Edit or Manage permission on the
+workbook, and never on an [embedded dashboard][ref-embedding], published or in
+[Creator Mode][ref-creator-mode]. On a plan without scheduled refreshes (see
+the note at the top of this page), it is still listed, but pressing it opens
+the **Scheduled Refreshes** upgrade dialog instead of **New scheduled
+refresh**.
 
 In the [dashboard builder][ref-workbooks], a chart's menu offers **Create
 alert** too. An alert reads the published dashboard, so the item is enabled
