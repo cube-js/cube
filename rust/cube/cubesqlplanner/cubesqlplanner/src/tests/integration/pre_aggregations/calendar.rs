@@ -126,6 +126,39 @@ async fn calendar_sql_granularity_falls_back_to_source() {
     }
 }
 
+/// Without any shift in play, a calendar's `sql` week still cannot be
+/// assembled out of the day buckets a finer rollup stores.
+#[tokio::test(flavor = "multi_thread")]
+async fn calendar_sql_granularity_from_a_finer_rollup_falls_back() {
+    let query = query("demand.net_demand_a", "retail_calendar.retail_date", "week");
+    if let Some((rollup, source)) =
+        fallback_vs_source(&query, &["demand_by_item_hierarchies1"]).await
+    {
+        assert_eq!(rollup, source);
+    }
+}
+
+/// A rollup declaring the calendar's `sql` week stores the calendar column
+/// and serves the week from it.
+#[tokio::test(flavor = "multi_thread")]
+async fn calendar_sql_granularity_rollup_declaring_it_matches_source() {
+    let query = indoc! {r#"
+        measures:
+          - demand.net_demand_a
+        time_dimensions:
+          - dimension: retail_calendar.retail_date
+            granularity: week
+            dateRange:
+              - "2025-02-02"
+              - "2025-02-15"
+        order:
+          - id: retail_calendar.retail_date
+    "#};
+    if let Some((rollup, source)) = rollup_vs_source(query, &["demand_by_calendar_week"]).await {
+        assert_eq!(rollup, source);
+    }
+}
+
 /// Control: the same shift on the fact table's own date, where the stored
 /// column really can carry it.
 #[tokio::test(flavor = "multi_thread")]

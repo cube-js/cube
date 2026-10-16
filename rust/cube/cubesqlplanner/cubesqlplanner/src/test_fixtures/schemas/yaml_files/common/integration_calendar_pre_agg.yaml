@@ -169,6 +169,18 @@ cubes:
         time_dimension: retail_calendar.retail_date
         granularity: day
 
+      # The calendar's `sql`-overridden week itself.
+      - name: demand_by_calendar_week
+        type: rollup
+        allow_non_strict_date_range_match: true
+        measures:
+          - gross_demand
+          - cancellations
+        dimensions:
+          - item_dept
+        time_dimension: retail_calendar.retail_date
+        granularity: week
+
       # Same content rolled up by the fact table's own date.
       - name: demand_by_item_hierarchies_fact_date
         type: rollup
