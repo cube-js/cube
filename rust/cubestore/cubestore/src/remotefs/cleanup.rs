@@ -4,6 +4,7 @@ use crate::remotefs::RemoteFs;
 use crate::{app_metrics, CubeError};
 use chrono::Utc;
 use datafusion::cube_ext;
+use futures::StreamExt;
 use std::collections::HashSet;
 use std::path::Path;
 use std::sync::Arc;
@@ -55,6 +56,7 @@ impl RemoteFsCleanup {
         let mut files_to_remove: HashSet<String> = HashSet::new();
         let cleanup_enabled = self.config.enable_remove_orphaned_remote_files();
         let batch_size = self.config.remote_files_cleanup_batch_size();
+        let delete_concurrency = self.config.remote_files_cleanup_delete_concurrency().max(1);
         loop {
             // Do the cleanup every now and then.
             tokio::select! {
@@ -80,11 +82,29 @@ impl RemoteFsCleanup {
                 for f in files_from_metastore {
                     files_to_remove.remove(&f);
                 }
-                for f in files_to_remove.iter() {
-                    if let Err(e) = self.remote_fs.delete_file(f.clone()).await {
-                        log::error!("Error while deleting {} in remote fs: {}", f, e);
-                    }
-                }
+                let removed = futures::stream::iter(files_to_remove.iter().cloned())
+                    .map(|f| {
+                        let remote_fs = self.remote_fs.clone();
+                        async move {
+                            match remote_fs.delete_file(f.clone()).await {
+                                Ok(()) => 1,
+                                Err(e) => {
+                                    log::error!("Error while deleting {} in remote fs: {}", f, e);
+                                    0
+                                }
+                            }
+                        }
+                    })
+                    .buffer_unordered(delete_concurrency)
+                    .take_until(token.cancelled())
+                    .fold(0i64, |acc, n| async move { acc + n })
+                    .await;
+                log::info!(
+                    "Removed {} of {} orphaned files from remote fs",
+                    removed,
+                    files_to_remove.len()
+                );
+                app_metrics::REMOTE_FS_FILES_REMOVED.add_with_tags(removed, Some(&stat_tags));
             }
 
             files_to_remove.clear();
@@ -301,6 +321,111 @@ mod test {
             .into_iter()
             .filter(|name| !is_root_partition(name))
             .collect::<Vec<_>>()
+    }
+
+    fn plant_remote_file(remote_dir: &Path, name: &str) -> std::path::PathBuf {
+        let path = remote_dir.join(name);
+        std::fs::write(&path, b"orphan").unwrap();
+        path
+    }
+
+    async fn remote_cleanup_test(name: &str, enabled: bool) {
+        let name = name.to_string();
+        Config::test(&name)
+            .update_config(|mut c| {
+                c.enable_remove_orphaned_remote_files = enabled;
+                c.remote_files_cleanup_interval_secs = 1;
+                c.remote_files_cleanup_delay_secs = 0;
+                c.remote_files_cleanup_delete_concurrency = 4;
+                c
+            })
+            .start_test(async move |services| {
+                let service = services.sql_service;
+                let meta_store = services.meta_store;
+                let remote_dir =
+                    Config::test_remote_dir_path(&std::env::current_dir().unwrap(), &name);
+                for q in [
+                    "CREATE SCHEMA test",
+                    "CREATE TABLE test.tst (a int, b int)",
+                    "INSERT INTO test.tst (a, b) VALUES (10, 10), (20, 20)",
+                ] {
+                    service
+                        .exec_query(q)
+                        .await
+                        .unwrap()
+                        .collect()
+                        .await
+                        .unwrap();
+                }
+                // A just-created partition is referenced before it is ever uploaded.
+                let referenced = meta_store
+                    .get_all_filenames()
+                    .await
+                    .unwrap()
+                    .into_iter()
+                    .map(|f| remote_dir.join(f))
+                    .filter(|p| p.exists())
+                    .collect::<Vec<_>>();
+                assert!(!referenced.is_empty());
+
+                let orphans = (0..10)
+                    .map(|i| {
+                        plant_remote_file(&remote_dir, &format!("{}-orphan.parquet", 900000 + i))
+                    })
+                    .collect::<Vec<_>>();
+                let not_parquet = plant_remote_file(&remote_dir, "orphan.txt");
+
+                let cleanup = services
+                    .injector
+                    .get_service_typed::<RemoteFsCleanup>()
+                    .await;
+                let cleanup_to_move = cleanup.clone();
+                let handle = cube_ext::spawn(async move {
+                    cleanup_to_move.wait_remote_fs_cleanup_loop(vec![]).await
+                });
+
+                // Two passes: one lists the orphans, the next deletes them.
+                let deadline = std::time::Instant::now() + Duration::from_secs(20);
+                while enabled
+                    && orphans.iter().any(|o| o.exists())
+                    && std::time::Instant::now() < deadline
+                {
+                    Delay::new(Duration::from_millis(200)).await;
+                }
+                if !enabled {
+                    Delay::new(Duration::from_millis(3500)).await;
+                }
+                cleanup.stop();
+                handle.await.unwrap();
+
+                for o in orphans.iter() {
+                    assert_eq!(o.exists(), !enabled, "{:?}", o);
+                }
+                assert!(not_parquet.exists());
+                for f in referenced.iter() {
+                    assert!(f.exists(), "referenced {:?} was deleted", f);
+                }
+                let rows = service
+                    .exec_query("SELECT count(*) FROM test.tst")
+                    .await
+                    .unwrap()
+                    .collect()
+                    .await
+                    .unwrap();
+                assert_eq!(rows.get_rows().len(), 1);
+                Ok::<(), CubeError>(())
+            })
+            .await;
+    }
+
+    #[tokio::test]
+    async fn remote_cleanup_deletes_orphans_only() {
+        remote_cleanup_test("remote_cleanup_deletes_orphans_only", true).await;
+    }
+
+    #[tokio::test]
+    async fn remote_cleanup_disabled_deletes_nothing() {
+        remote_cleanup_test("remote_cleanup_disabled_deletes_nothing", false).await;
     }
 
     #[tokio::test]
