@@ -169,6 +169,9 @@ impl<'a> DimensionMatcher<'a> {
                         *found = true;
                     }
                     Ok(MatchState::Full)
+                } else if let Some(referenced) = me.reference_member() {
+                    // A bare `{member}` adds nothing on top of the member.
+                    self.try_match_symbol(&referenced, add_to_matched_dimension)
                 } else {
                     let dependencies = me.get_dependencies();
                     if dependencies.is_empty() {
@@ -812,6 +815,34 @@ mod tests {
                       - dimension: orders.created_at
                         granularity: day
                 "},
+            ),
+            MatchState::Full,
+        );
+    }
+
+    #[test]
+    fn test_reference_member_expression_segment_full_match() {
+        let ctx = create_test_context();
+        // A query expression that only references a rollup's segment, as the
+        // SQL API sends a segment filter, matches like the segment itself.
+        assert_eq!(
+            match_pre_agg_with_segments(
+                &ctx,
+                "segment_rollup",
+                indoc! {"
+                    measures:
+                      - orders.count
+                    dimensions:
+                      - orders.status
+                    time_dimensions:
+                      - dimension: orders.created_at
+                        granularity: day
+                "},
+                vec![const_expr_segment(
+                    "high_priority",
+                    "orders",
+                    "{orders.high_priority}"
+                )],
             ),
             MatchState::Full,
         );
