@@ -24,7 +24,7 @@ To create a bar + line chart:
 1. Add two measures to the Y axis.
 2. Find the second measure on the Fields tab.
 3. Set its mark type to **Line**.
-4. Optionally assign it to the **Right Y axis** in the same panel (see [Axes](/docs/explore-analyze/charts/configuration/axes)).
+4. Optionally set its Y axis to **Right axis** in the same place on the Fields tab (see [Axes](/docs/explore-analyze/charts/configuration/axes)).
 
 {/* TODO screenshot: second series with mark type set to Line (hidden — replace this comment with <Frame><img src="..." /></Frame> when image is ready) */}
 
@@ -59,7 +59,7 @@ When a series has a breakdown, each value of the breakdown gets its own trend li
 
 ## Y axis assignment
 
-For charts with a dual Y axis, assign each series to either the **Left** or **Right** Y axis. This controls which axis scale the series uses.
+For charts with a dual Y axis, assign each series to either the **Left axis** or the **Right axis** on the Fields tab. This controls which axis scale the series uses.
 
 See [Axes](/docs/explore-analyze/charts/configuration/axes) for configuring the right axis title, labels, and scale.
 
@@ -71,4 +71,4 @@ See [Data labels](/docs/explore-analyze/charts/configuration/data-labels) for th
 
 ## Stacking override
 
-On charts with multiple Y-axis series, you can set stacking behavior per series rather than globally. This lets you create grouped clusters where each cluster is internally stacked. On the Fields tab, use the placement control next to the series' **Break down by** field: stacked, side by side (bars), overlaid (areas), or stacked to 100%.
+On charts with multiple Y-axis series, you can set stacking behavior per series rather than globally. This lets you create grouped clusters where each cluster is internally stacked. On the Fields tab, set the series' **Break down by** field, then pick a placement with the icons next to it: **Stacked**, **Side by side** (bars only), **Overlaid** (areas only) or **Stacked to 100%**. The placement is available for bar and area series, and only when the series has a break-down.
