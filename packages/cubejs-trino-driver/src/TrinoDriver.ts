@@ -9,7 +9,8 @@ export class TrinoDriver extends PrestoDriver {
   public constructor(options: TrinoDriverConfiguration = {}) {
     // TrinoQuery.convertTz relies on `AT TIME ZONE`, which reads a naive TIMESTAMP in the
     // session time zone, while Cube treats naive timestamps as UTC.
-    super({ timezone: 'UTC', ...options, engine: 'trino' });
+    // `||` rather than a spread default: an explicit `undefined` or `''` would otherwise drop the header.
+    super({ ...options, timezone: options.timezone || 'UTC', engine: 'trino' });
   }
 
   public static dialectClass() {
