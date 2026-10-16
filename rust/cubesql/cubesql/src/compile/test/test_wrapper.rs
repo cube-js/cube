@@ -1,4 +1,7 @@
-use cubeclient::models::{V1CubeMetaType, V1LoadRequestQuery, V1LoadRequestQueryTimeDimension};
+use cubeclient::models::{
+    V1CubeMetaType, V1LoadRequestQuery, V1LoadRequestQueryFilterItem,
+    V1LoadRequestQueryTimeDimension,
+};
 use datafusion::{
     logical_plan::{plan::Extension, JoinType, LogicalPlan, PlanVisitor},
     physical_plan::displayable,
@@ -7412,5 +7415,155 @@ async fn test_wrapper_cube_store_pre_aggregation_grouped_join() {
     assert_eq!(
         wrapped_sql.pre_aggregations,
         vec![pre_aggregation_description()]
+    );
+}
+
+/// Power BI Top N filters the outer query by `IN (top N subquery)` next to the slicer
+/// filters. Those must stay member filters on the outer request, so FILTER_PARAMS see them;
+/// only the `IN` goes to Cube as an SQL segment.
+#[tokio::test]
+async fn test_wrapper_in_subquery_keeps_member_filters() {
+    if !Rewriter::sql_push_down_enabled() {
+        return;
+    }
+    init_testing_logger();
+
+    let query_plan = convert_select_to_query_plan(
+        // language=PostgreSQL
+        r#"
+SELECT
+    customer_gender,
+    notes,
+    MEASURE(sumPrice)
+FROM KibanaSampleDataEcommerce
+WHERE
+    customer_gender = 'female'
+    AND order_date >= '2025-01-01'
+    AND order_date < '2025-02-01'
+    AND notes IN (
+        SELECT
+            notes
+        FROM KibanaSampleDataEcommerce
+        WHERE customer_gender = 'female'
+        GROUP BY 1
+        ORDER BY MEASURE(sumPrice) DESC
+        LIMIT 10
+    )
+GROUP BY 1, 2
+;
+        "#
+        .to_string(),
+        DatabaseProtocol::PostgreSQL,
+    )
+    .await;
+
+    let physical_plan = query_plan.as_physical_plan().await.unwrap();
+    println!(
+        "Physical plan: {}",
+        displayable(physical_plan.as_ref()).indent()
+    );
+
+    let request = query_plan
+        .as_logical_plan()
+        .find_cube_scan_wrapped_sql()
+        .request;
+    assert_eq!(
+        request.filters,
+        Some(vec![V1LoadRequestQueryFilterItem {
+            member: Some("KibanaSampleDataEcommerce.customer_gender".to_string()),
+            operator: Some("equals".to_string()),
+            values: Some(vec!["female".to_string()]),
+            or: None,
+            and: None,
+        }])
+    );
+    assert_eq!(
+        request.time_dimensions,
+        Some(vec![V1LoadRequestQueryTimeDimension {
+            dimension: "KibanaSampleDataEcommerce.order_date".to_string(),
+            granularity: None,
+            date_range: Some(json!(vec![
+                "2025-01-01T00:00:00.000Z",
+                "2025-01-31T23:59:59.999Z"
+            ])),
+        }])
+    );
+    let segments = request.segments.unwrap();
+    assert_eq!(segments.len(), 1);
+    assert!(
+        segments[0].contains(r#""sql":"${KibanaSampleDataEcommerce.notes} IN (SELECT"#),
+        "only the IN subquery is an SQL segment: {}",
+        segments[0]
+    );
+}
+
+/// A conjunct over a scalar subquery column can't go below `Subquery`. It must stay in the
+/// same Filter as the `IN`, so the wrapper still pushes both down as one SQL segment.
+#[tokio::test]
+async fn test_wrapper_in_and_scalar_subquery_keeps_member_filters() {
+    if !Rewriter::sql_push_down_enabled() {
+        return;
+    }
+    init_testing_logger();
+
+    let query_plan = convert_select_to_query_plan(
+        // language=PostgreSQL
+        r#"
+SELECT
+    customer_gender,
+    notes,
+    MEASURE(sumPrice)
+FROM KibanaSampleDataEcommerce
+WHERE
+    customer_gender = 'female'
+    AND notes IN (
+        SELECT
+            notes
+        FROM KibanaSampleDataEcommerce
+        WHERE customer_gender = 'female'
+        GROUP BY 1
+        ORDER BY MEASURE(sumPrice) DESC
+        LIMIT 10
+    )
+    AND (
+        SELECT
+            MEASURE(sumPrice)
+        FROM KibanaSampleDataEcommerce
+    ) > 0
+GROUP BY 1, 2
+;
+        "#
+        .to_string(),
+        DatabaseProtocol::PostgreSQL,
+    )
+    .await;
+
+    let physical_plan = query_plan.as_physical_plan().await.unwrap();
+    println!(
+        "Physical plan: {}",
+        displayable(physical_plan.as_ref()).indent()
+    );
+
+    let request = query_plan
+        .as_logical_plan()
+        .find_cube_scan_wrapped_sql()
+        .request;
+    assert_eq!(
+        request.filters,
+        Some(vec![V1LoadRequestQueryFilterItem {
+            member: Some("KibanaSampleDataEcommerce.customer_gender".to_string()),
+            operator: Some("equals".to_string()),
+            values: Some(vec!["female".to_string()]),
+            or: None,
+            and: None,
+        }])
+    );
+    let segments = request.segments.unwrap();
+    assert_eq!(segments.len(), 1);
+    assert!(
+        segments[0].contains("${KibanaSampleDataEcommerce.notes} IN (SELECT")
+            && segments[0].contains(") > 0"),
+        "IN and scalar subquery stay one SQL segment: {}",
+        segments[0]
     );
 }
