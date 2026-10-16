@@ -6003,6 +6003,37 @@ ORDER BY
     }
 
     #[tokio::test]
+    async fn test_interval_sum_non_constant_timestamp() -> Result<(), CubeError> {
+        init_testing_logger();
+
+        // `CURRENT_TIMESTAMP` isn't constant folded, so the first offset returns an array
+        // and the next ones are evaluated as array + scalar.
+        insta::assert_snapshot!(
+            "interval_sum_non_constant_timestamp",
+            execute_query(
+                r#"
+                SELECT
+                    CURRENT_TIMESTAMP + INTERVAL '1 day' + INTERVAL '1 day'
+                        = CURRENT_TIMESTAMP + INTERVAL '2 day' AS plus,
+                    CURRENT_TIMESTAMP - INTERVAL '1 day' - INTERVAL '1 day'
+                        = CURRENT_TIMESTAMP - INTERVAL '2 day' AS minus,
+                    (
+                        DATE_TRUNC('day', CURRENT_TIMESTAMP AT TIME ZONE 'Africa/Johannesburg')
+                        + (-6 || ' day')::INTERVAL
+                    ) + (7 || ' day')::INTERVAL
+                        = DATE_TRUNC('day', CURRENT_TIMESTAMP AT TIME ZONE 'Africa/Johannesburg')
+                        + INTERVAL '1 day' AS looker_boundary
+                "#
+                .to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
     async fn test_like_escape_symbol() -> Result<(), CubeError> {
         insta::assert_snapshot!(
             "like_escape_symbol",
