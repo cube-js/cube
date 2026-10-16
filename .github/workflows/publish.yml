@@ -78,13 +78,16 @@ jobs:
       - name: NPM publish
         uses: nick-fields/retry@v4
         env:
-          NPM_CONFIG_PROVENANCE: false
+          NPM_CONFIG_PROVENANCE: true
         with:
           max_attempts: 5
           retry_on: error
           retry_wait_seconds: 30
           timeout_minutes: 15
           command: ./node_modules/.bin/lerna publish from-package --yes
+          # A failed attempt leaves the gitHead it wrote into every package.json, which fails
+          # the next attempt with EUNCOMMIT. from-package skips what was already published.
+          on_retry_command: git checkout -- .
 
   native_linux:
     # Please use minimal possible version of ubuntu, because it produces constraint on glibc
