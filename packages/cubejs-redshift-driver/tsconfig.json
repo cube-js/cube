@@ -11,6 +11,7 @@
   "references": [
     { "path": "../cubejs-backend-shared" },
     { "path": "../cubejs-base-driver" },
-    { "path": "../cubejs-postgres-driver" }
+    { "path": "../cubejs-postgres-driver" },
+    { "path": "../cubejs-schema-compiler" }
   ]
 }

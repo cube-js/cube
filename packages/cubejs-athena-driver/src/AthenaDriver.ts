@@ -40,6 +40,7 @@ import {
 import { AthenaClientConfig } from '@aws-sdk/client-athena/dist-types/AthenaClient';
 import { fromTemporaryCredentials } from '@aws-sdk/credential-providers';
 import { URL } from 'url';
+import { AthenaQuery } from '@cubejs-backend/schema-compiler';
 
 interface AthenaDriverOptions extends AthenaClientConfig {
   readOnly?: boolean
@@ -78,6 +79,10 @@ interface AthenaTable {
 }
 
 export class AthenaDriver extends BaseDriver implements DriverInterface {
+  public static dialectClass() {
+    return AthenaQuery;
+  }
+
   /**
    * Returns default concurrency value.
    */

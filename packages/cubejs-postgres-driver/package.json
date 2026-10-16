@@ -35,6 +35,7 @@
   },
   "dependencies": {
     "@cubejs-backend/base-driver": "1.8.6",
+    "@cubejs-backend/schema-compiler": "1.8.6",
     "@cubejs-backend/shared": "1.8.6",
     "@types/pg": "^8.16.0",
     "@types/pg-query-stream": "^1.0.3",

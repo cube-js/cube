@@ -12,6 +12,7 @@
   "references": [
     { "path": "../cubejs-backend-shared" },
     { "path": "../cubejs-base-driver" },
-    { "path": "../cubejs-testing-shared" }
+    { "path": "../cubejs-testing-shared" },
+    { "path": "../cubejs-schema-compiler" }
   ]
 }

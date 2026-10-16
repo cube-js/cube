@@ -10,6 +10,7 @@ const {
   Pool,
 } = require('@cubejs-backend/shared');
 const { BaseDriver, TableColumn, createPoolName } = require('@cubejs-backend/base-driver');
+const { OracleQuery } = require('@cubejs-backend/schema-compiler');
 const oracledb = require('oracledb');
 const { reduce } = require('ramda');
 
@@ -61,6 +62,10 @@ const reduceCb = (result, i) => {
 };
 
 class OracleDriver extends BaseDriver {
+  static dialectClass() {
+    return OracleQuery;
+  }
+
   static getDefaultConcurrency() {
     return 2;
   }

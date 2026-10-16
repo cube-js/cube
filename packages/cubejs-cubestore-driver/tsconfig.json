@@ -15,6 +15,7 @@
     { "path": "../../rust/cubestore" },
     { "path": "../cubejs-backend-native" },
     { "path": "../cubejs-backend-shared" },
-    { "path": "../cubejs-base-driver" }
+    { "path": "../cubejs-base-driver" },
+    { "path": "../cubejs-schema-compiler" }
   ]
 }

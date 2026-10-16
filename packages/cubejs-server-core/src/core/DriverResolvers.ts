@@ -28,12 +28,19 @@ export const driverDependencies = (dbType: DatabaseType) => {
 };
 
 /**
+ * Static side of a driver class. Every driver shipped in this repo must implement `dialectClass`
+ * (see test/unit/DriverDialects.test.ts); third-party drivers may still omit it at runtime and
+ * fall back to schema-compiler's built-in dialect for their db type.
+ */
+export type DriverClass = Constructor<BaseDriver> & {
+  dialectClass: () => any;
+  getDefaultConcurrency?: () => number;
+};
+
+/**
  * Resolve driver module object by db type.
  */
-export const lookupDriverClass = (dbType): Constructor<BaseDriver> & {
-  dialectClass?: () => any;
-  getDefaultConcurrency?: () => number;
-} => {
+export const lookupDriverClass = (dbType): DriverClass => {
   // eslint-disable-next-line global-require,import/no-dynamic-require
   const module = require(
     driverDependencies(dbType || process.env.CUBEJS_DB_TYPE)
@@ -42,6 +49,14 @@ export const lookupDriverClass = (dbType): Constructor<BaseDriver> & {
     return module.default;
   }
   return module;
+};
+
+/**
+ * Resolve the dialect (query class) of the driver for a db type.
+ */
+export const driverDialectClass = (dbType: string) => {
+  const driverClass = lookupDriverClass(dbType);
+  return typeof driverClass.dialectClass === 'function' ? driverClass.dialectClass() : undefined;
 };
 
 /**

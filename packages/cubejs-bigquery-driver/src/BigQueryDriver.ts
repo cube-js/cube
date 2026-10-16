@@ -34,6 +34,7 @@ import {
   TableCSVData,
 } from '@cubejs-backend/base-driver';
 import type { Query } from '@google-cloud/bigquery/build/src/bigquery';
+import { BigqueryQuery } from '@cubejs-backend/schema-compiler';
 
 import { HydrationStream, transformRow } from './HydrationStream';
 
@@ -68,6 +69,10 @@ const BigQueryToGenericType: Record<string, string> = {
  * BigQuery driver.
  */
 export class BigQueryDriver extends BaseDriver implements DriverInterface {
+  public static dialectClass() {
+    return BigqueryQuery;
+  }
+
   /**
    * Returns default concurrency value.
    */

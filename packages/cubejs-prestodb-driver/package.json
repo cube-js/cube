@@ -36,6 +36,7 @@
   },
   "dependencies": {
     "@cubejs-backend/base-driver": "1.8.6",
+    "@cubejs-backend/schema-compiler": "1.8.6",
     "@cubejs-backend/shared": "1.8.6",
     "presto-client": "^1.2.0",
     "ramda": "^0.27.2"

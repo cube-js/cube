@@ -19,6 +19,7 @@ import {
   DriverInterface,
   StreamOptions,
 } from '@cubejs-backend/base-driver';
+import { MongoBiQuery } from '@cubejs-backend/schema-compiler';
 import { getNativeTypeName } from './MySQLType';
 
 export interface MongoBIDriverConfiguration extends ConnectionOptions {
@@ -29,6 +30,10 @@ export interface MongoBIDriverConfiguration extends ConnectionOptions {
  * MongoBI driver class.
  */
 export class MongoBIDriver extends BaseDriver implements DriverInterface {
+  public static dialectClass() {
+    return MongoBiQuery;
+  }
+
   /**
    * Returns default concurrency value.
    */

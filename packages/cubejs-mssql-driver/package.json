@@ -33,6 +33,7 @@
   },
   "dependencies": {
     "@cubejs-backend/base-driver": "1.8.6",
+    "@cubejs-backend/schema-compiler": "1.8.6",
     "@cubejs-backend/shared": "1.8.6",
     "mssql": "^11.0.1"
   },

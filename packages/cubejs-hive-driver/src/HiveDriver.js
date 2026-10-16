@@ -12,6 +12,7 @@ const {
 const jshs2 = require('jshs2');
 const SqlString = require('sqlstring');
 const { BaseDriver, createPoolName } = require('@cubejs-backend/base-driver');
+const { HiveQuery } = require('@cubejs-backend/schema-compiler');
 const Connection = require('jshs2/lib/Connection');
 const IDLFactory = require('jshs2/lib/common/IDLFactory');
 
@@ -49,6 +50,10 @@ IDLFactory.extractConfig = (config) => {
 const TSaslTransport = require('./TSaslTransport');
 
 class HiveDriver extends BaseDriver {
+  static dialectClass() {
+    return HiveQuery;
+  }
+
   static getDefaultConcurrency() {
     return 2;
   }
