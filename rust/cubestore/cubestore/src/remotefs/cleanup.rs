@@ -105,6 +105,9 @@ impl RemoteFsCleanup {
                     files_to_remove.len()
                 );
                 app_metrics::REMOTE_FS_FILES_REMOVED.add_with_tags(removed, Some(&stat_tags));
+                if token.is_cancelled() {
+                    return;
+                }
             }
 
             files_to_remove.clear();

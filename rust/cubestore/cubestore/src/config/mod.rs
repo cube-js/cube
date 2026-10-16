@@ -2191,6 +2191,8 @@ impl Config {
                     "CUBESTORE_REMOTE_FILES_CLEANUP_BATCH_SIZE",
                     50000,
                 ),
+                // QueueRemoteFs runs deletes on its upload workers, so there the effective value is
+                // capped by CUBESTORE_MAX_ACTIVE_UPLOADS and deletes queue alongside uploads.
                 remote_files_cleanup_delete_concurrency: env_parse(
                     "CUBESTORE_REMOTE_FILES_CLEANUP_DELETE_CONCURRENCY",
                     1,
