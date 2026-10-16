@@ -1175,6 +1175,50 @@ describe('PreAggregations', () => {
 
       expect(downloadLambdaTable).toHaveBeenCalled();
     });
+
+    // FROM_PARTITION_RANGE skips tz conversion in SQL, so the source query must get it in UTC
+    // like partition builds do. @see https://github.com/cube-js/cube/issues/12286
+    test('binds the lambda lower bound in UTC for a non-UTC timezone', async () => {
+      const renewQuery = jest.fn().mockResolvedValue({ data: { rowCount: 0, types: [], csvRows: '' } });
+      const loader = new PreAggregationPartitionRangeLoader(
+        {} as any, // driverFactory
+        // eslint-disable-next-line @typescript-eslint/no-empty-function
+        () => {}, // logger
+        { options: {}, renewQuery } as any, // queryCache
+        {} as any, // preAggregations
+        mockPreAggregation({
+          preAggregationId: 'Orders.d',
+          rollupLambdaId: 'Orders.d_lambda',
+          lastRollupLambda: true,
+          unionWithSourceData: true,
+          timezone: 'Asia/Kolkata',
+          timestampFormat: 'YYYY-MM-DD[T]HH:mm:ss.SSS[Z]',
+        }) as any,
+        [],
+        { getTableColumnTypes: jest.fn().mockResolvedValue([{ name: 'ts', type: 'timestamp' }]) } as any,
+        {
+          lambdaQuery: {
+            sqlAndParams: ['SELECT * FROM public.orders WHERE ts > ?', [FROM_PARTITION_RANGE]],
+            cacheKeyQueries: [],
+          },
+        } as any,
+      );
+      jest.spyOn(loader as any, 'partitionRanges').mockResolvedValue({
+        buildRange: ['2024-01-01T00:00:00.000', buildRangeEnd],
+        partitionRanges: [['2024-01-02T00:00:00.000', buildRangeEnd]],
+      });
+      jest.spyOn(PreAggregationLoader.prototype, 'loadPreAggregation').mockResolvedValue({
+        targetTableName: 'stb_pre_aggregations.orders_d20240102_abc_def',
+        refreshKeyValues: [],
+        lastUpdatedAt: 1,
+        buildRangeEnd,
+      } as any);
+
+      await loader.loadPreAggregations();
+
+      // 2024-01-02T23:59:59.999 in Asia/Kolkata (UTC+5:30)
+      expect(renewQuery.mock.calls[0][1]).toEqual(['2024-01-02T18:29:59.999Z']);
+    });
   });
 
   describe('lambdaSourceDataCovered', () => {
