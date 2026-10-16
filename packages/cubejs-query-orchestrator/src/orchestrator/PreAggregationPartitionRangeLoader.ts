@@ -9,6 +9,7 @@ import {
   utcToLocalTimeZone,
   timeSeries,
   timeSeriesBoundaries,
+  intersectDateRanges as intersectDateRangesFn,
   localTimestampToUtc,
   parseUtcIntoLocalDate,
   LoggerFn,
@@ -595,42 +596,8 @@ export class PreAggregationPartitionRangeLoader {
     return dateRange;
   }
 
-  private static checkDataRangeType(range: QueryDateRange) {
-    if (!range) {
-      return;
-    }
-
-    if (range.length !== 2) {
-      throw new Error(`Date range expected to be an array with 2 elements but ${range} found`);
-    }
-
-    if (typeof range[0] !== 'string' || typeof range[1] !== 'string') {
-      throw new Error(`Date range expected to be a string array but ${range} found`);
-    }
-
-    if ((range[0].length !== 23 && range[0].length !== 26) || (range[1].length !== 23 && range[0].length !== 26)) {
-      throw new Error(`Date range expected to be in ${DEFAULT_TS_FORMAT} format but ${range} found`);
-    }
-  }
-
   public static intersectDateRanges(rangeA: QueryDateRange | null, rangeB: QueryDateRange | null): QueryDateRange | null {
-    PreAggregationPartitionRangeLoader.checkDataRangeType(rangeA);
-    PreAggregationPartitionRangeLoader.checkDataRangeType(rangeB);
-    if (!rangeB) {
-      return rangeA;
-    }
-    if (!rangeA) {
-      return rangeB;
-    }
-    const from = rangeA[0] > rangeB[0] ? rangeA[0] : rangeB[0];
-    const to = rangeA[1] < rangeB[1] ? rangeA[1] : rangeB[1];
-    if (from > to) {
-      return null;
-    }
-    return [
-      from,
-      to,
-    ];
+    return intersectDateRangesFn(rangeA, rangeB);
   }
 
   public static timeSeries(granularity: string, dateRange: QueryDateRange | null, timestampPrecision: number): QueryDateRange[] {

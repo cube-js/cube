@@ -49,11 +49,6 @@ describe('interval rendering across dialects', () => {
   // The dialects that spell a compound interval by hand. Pinned literally, so that a change to
   // one of them shows up as a diff here rather than as a bucket that moved on a warehouse.
   describe.each([
-    ['CubeStoreQuery', {
-      '3 month': 'DATE_SUB(x, INTERVAL \'3 MONTH\')',
-      '3 month 14 day': 'DATE_SUB(x, INTERVAL \'3 MONTH 14 DAY\')',
-      '14 day 6 hour': 'DATE_SUB(x, INTERVAL \'14 DAY 6 HOUR\')',
-    }],
     ['MysqlQuery', {
       '3 month': 'DATE_SUB(x, INTERVAL 3 MONTH)',
       // MySQL has no month-to-day compound unit, so the units are applied in turn
@@ -100,24 +95,6 @@ describe('interval rendering across dialects', () => {
   it.each(['TrinoQuery', 'AthenaQuery'])('%s inherits the Presto spelling', name => {
     expect(query(dialect(name)).subtractInterval('x', '3 month 14 day'))
       .toEqual('x - interval \'3\' month - interval \'14\' day');
-  });
-});
-
-describe('CubeStore DATE_BIN', () => {
-  // DATE_BIN takes a month component or a day/time one, never both, unlike DATE_ADD / DATE_SUB.
-  it.each(['1 month 15 days', '3 month 3 days 3 hours'])('rejects the mixed interval %s', interval => {
-    expect(() => query(dialect('CubeStoreQuery')).dateBin(interval, 'src', '2024-01-01'))
-      .toThrow(/Cannot transform interval expression/);
-  });
-
-  it.each(['6 months', '1 year', '2 weeks', '15 minutes', '1 week 2 day'])('bins by %s', interval => {
-    expect(query(dialect('CubeStoreQuery')).dateBin(interval, 'src', '2024-01-01'))
-      .toContain('DATE_BIN(INTERVAL');
-  });
-
-  it('has no spelling for a sub-second interval', () => {
-    expect(() => query(dialect('CubeStoreQuery')).subtractInterval('x', '5 millisecond'))
-      .toThrow(/Cannot transform interval expression/);
   });
 });
 

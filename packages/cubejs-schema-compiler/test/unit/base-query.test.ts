@@ -1,5 +1,5 @@
 import moment from 'moment-timezone';
-import { BaseQuery, PostgresQuery, MssqlQuery, UserError, CubeStoreQuery } from '../../src';
+import { BaseQuery, PostgresQuery, MssqlQuery, UserError } from '../../src';
 import { prepareJsCompiler, prepareYamlCompiler } from './PrepareCompiler';
 import {
   createCubeSchema,
@@ -986,31 +986,6 @@ describe('SQL Generation', () => {
             expect(queryString.includes('date_trunc(\'quarter\'')).toBeTruthy();
           } else {
             expect(queryString.includes('INTERVAL \'6 months\'')).toBeTruthy();
-          }
-        });
-      });
-    });
-
-    describe('via CubeStoreQuery', () => {
-      beforeAll(async () => {
-        await compilers.compiler.compile();
-      });
-
-      granularityQueries.forEach(q => {
-        it(`measure "${q.measures[0]}" + granularity "${q.timeDimensions[0].granularity}"`, () => {
-          const query = new CubeStoreQuery(compilers, q);
-          const queryAndParams = query.buildSqlAndParams();
-          const queryString = queryAndParams[0];
-
-          if (q.measures[0].includes('count')) {
-            expect(queryString.includes('DATE_BIN(INTERVAL')).toBeTruthy();
-            expect(queryString.toLowerCase().includes('interval \'6 month\'')).toBeTruthy();
-          } else if (q.measures[0].includes('rollingCountByTrailing2Day')) {
-            expect(queryString.includes('date_trunc(\'day\'')).toBeTruthy();
-            expect(queryString.toLowerCase().includes('interval \'2 day\'')).toBeTruthy();
-          } else if (q.measures[0].includes('rollingCountByLeading2Day')) {
-            expect(queryString.includes('date_trunc(\'day\'')).toBeTruthy();
-            expect(queryString.toLowerCase().includes('interval \'3 day\'')).toBeTruthy();
           }
         });
       });

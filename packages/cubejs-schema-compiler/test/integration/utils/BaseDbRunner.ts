@@ -1,6 +1,26 @@
 import R from 'ramda';
-import { PreAggregationPartitionRangeLoader } from '@cubejs-backend/query-orchestrator';
+import {
+  FROM_PARTITION_RANGE,
+  TO_PARTITION_RANGE,
+  intersectDateRanges,
+  localTimestampToUtc,
+  parseUtcIntoLocalDate,
+  QueryDateRange,
+  timeSeries,
+} from '@cubejs-backend/shared';
 import { BaseQuery } from '../../../src';
+
+// Mirrors PreAggregationPartitionRangeLoader.partitionTableName; query-orchestrator can't be imported
+// here, it depends on this package through cubestore-driver.
+const partitionTableName = (tableName: string, partitionGranularity: string, dateRange: QueryDateRange) => {
+  const dateLenCut = { hour: 13, minute: 16 }[partitionGranularity] ?? 10;
+  return `${tableName}${dateRange[0].substring(0, dateLenCut).replace(/[-T:]/g, '')}`;
+};
+
+const partitionRanges = (desc): QueryDateRange[] => {
+  const range = intersectDateRanges(desc.dateRange, desc.matchedTimeDimensionDateRange);
+  return range ? timeSeries(desc.partitionGranularity, range, { timestampPrecision: desc.timestampPrecision }) : [];
+};
 
 export class BaseDbRunner {
   protected containerLazyInitPromise: any = null;
@@ -87,12 +107,8 @@ export class BaseDbRunner {
     return [
       preAggregation.reduce(
         (replacedQuery, desc) => {
-          const partitionUnion = desc.dateRange && PreAggregationPartitionRangeLoader.timeSeries(
-            desc.partitionGranularity,
-            PreAggregationPartitionRangeLoader.intersectDateRanges(desc.dateRange, desc.matchedTimeDimensionDateRange),
-            desc.timestampPrecision
-          ).map(
-            range => `SELECT * FROM ${PreAggregationPartitionRangeLoader.partitionTableName(desc.tableName, desc.partitionGranularity, range)}_${suffix}`
+          const partitionUnion = desc.dateRange && partitionRanges(desc).map(
+            range => `SELECT * FROM ${partitionTableName(desc.tableName, desc.partitionGranularity, range)}_${suffix}`
           ).join(' UNION ALL ');
           const targetTableName = desc.dateRange ? `(${partitionUnion})` : `${desc.tableName}_${suffix}`;
           // Replace usage-suffixed placeholders first (e.g. tableName__usage_0)
@@ -124,21 +140,20 @@ export class BaseDbRunner {
     dateRange: [string, string] | null = null
   ) {
     const [toReplace, params] = query;
-    const tableName = partitionGranularity && dateRange ? PreAggregationPartitionRangeLoader.partitionTableName(
+    const tableName = partitionGranularity && dateRange ? partitionTableName(
       desc.tableName, partitionGranularity, dateRange
     ) : desc.tableName;
     const replaced = toReplace
       .replace(new RegExp(desc.tableName, 'g'), `${tableName}_${suffix}`)
       .replace(/CREATE INDEX (?!i_)/, `CREATE INDEX i_${suffix}_`);
-    // TODO can be reused from PreAggregationPartitionRangeLoader
     return [
       replaced,
       params.map(
         param => {
-          if (dateRange && param === PreAggregationPartitionRangeLoader.FROM_PARTITION_RANGE) {
-            return PreAggregationPartitionRangeLoader.inDbTimeZone(desc, dateRange[0]);
-          } else if (dateRange && param === PreAggregationPartitionRangeLoader.TO_PARTITION_RANGE) {
-            return PreAggregationPartitionRangeLoader.inDbTimeZone(desc, dateRange[1]);
+          if (dateRange && param === FROM_PARTITION_RANGE) {
+            return localTimestampToUtc(desc.timezone, desc.timestampFormat, dateRange[0]);
+          } else if (dateRange && param === TO_PARTITION_RANGE) {
+            return localTimestampToUtc(desc.timezone, desc.timestampFormat, dateRange[1]);
           } else {
             return param;
           }
@@ -151,11 +166,7 @@ export class BaseDbRunner {
     return R.unnest(preAggregationsDescriptions.map(
       desc => {
         const loadSql = this.tempTableSql(desc);
-        return desc.dateRange ? R.unnest(PreAggregationPartitionRangeLoader.timeSeries(
-          desc.partitionGranularity,
-          PreAggregationPartitionRangeLoader.intersectDateRanges(desc.dateRange, desc.matchedTimeDimensionDateRange),
-          desc.timestampPrecision
-        ).map(
+        return desc.dateRange ? R.unnest(partitionRanges(desc).map(
           range => desc.invalidateKeyQueries.map(
             (sql) => this.replacePartitionName(sql, desc, seed, desc.partitionGranularity, range)
           ).concat([this.replaceTableName(this.replacePartitionName([
@@ -187,11 +198,11 @@ export class BaseDbRunner {
       async desc => {
         if (desc.partitionGranularity) {
           desc.dateRange = [
-            PreAggregationPartitionRangeLoader.extractDate(
+            parseUtcIntoLocalDate(
               await this.testQueries([desc.preAggregationStartEndQueries[0]]),
               desc.timezone,
             ),
-            PreAggregationPartitionRangeLoader.extractDate(
+            parseUtcIntoLocalDate(
               await this.testQueries([desc.preAggregationStartEndQueries[1]]),
               desc.timezone,
             )
