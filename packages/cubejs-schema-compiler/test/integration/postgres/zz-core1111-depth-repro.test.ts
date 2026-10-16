@@ -115,7 +115,7 @@ views:
       })).toEqual([{ level0: 'R', amount: 7 }]);
     });
 
-    it('root grouped + leaf filter level1=A, level2=A2: both guards released -> all depths summed (-3-3+3, equals R's -3 only by coincidence; see SQL)', async () => {
+    it('root grouped + leaf filter level1=A, level2=A2: both guards released -> all depths summed (-3-3+3, equals the R value -3 only by coincidence; see SQL)', async () => {
       expect(await run({
         measures: ['acct_v.amount'],
         dimensions: lv(0),
