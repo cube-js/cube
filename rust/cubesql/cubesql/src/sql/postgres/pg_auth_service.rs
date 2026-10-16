@@ -78,6 +78,7 @@ impl PostgresAuthService for PostgresAuthServiceDefaultImpl {
         let sql_auth_request = SqlAuthServiceAuthenticateRequest {
             protocol: "postgres".to_string(),
             method: "password".to_string(),
+            database: parameters.get("database").cloned(),
         };
         let authenticate_response = service
             .authenticate(

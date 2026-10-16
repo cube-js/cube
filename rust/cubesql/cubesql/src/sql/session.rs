@@ -409,11 +409,13 @@ impl SessionState {
             None
         };
 
-        LoadRequestMeta::new(
+        let mut meta = LoadRequestMeta::new(
             self.protocol.get_name().to_string(),
             api_type.to_string(),
             application_name,
-        )
+        );
+        meta.set_database(self.database());
+        meta
     }
 }
 

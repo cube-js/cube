@@ -46,6 +46,8 @@ pub mod test_cube_join_views;
 #[cfg(test)]
 pub mod test_cube_scan;
 #[cfg(test)]
+pub mod test_database_meta;
+#[cfg(test)]
 pub mod test_df_execution;
 #[cfg(test)]
 pub mod test_filters;
