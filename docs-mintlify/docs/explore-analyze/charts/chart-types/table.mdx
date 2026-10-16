@@ -121,6 +121,24 @@ columns are also left empty. The toggle is disabled unless grouping is active an
 values are placed in columns, since the [values-as-rows layout](#pivot-presets) has no
 per-measure column for a subtotal to sit under.
 
+## Row grouping
+
+With two or more row dimensions and no pivot active, enable **Group rows** in the
+**Row grouping** section of the **Style** tab to nest rows under a collapsible
+header for each dimension value, instead of repeating that value on every row.
+
+{/* TODO screenshot: table with row grouping enabled — nested, collapsible group headers by dimension */}
+
+- Each group header shows its dimension value once; **Expand all groups** /
+  **Collapse all groups** toggle every level at once.
+- Per column, set whether its groups start **Expanded** or **Collapsed** from that
+  column's card in the **Row grouping** section.
+- Group headers have their own text color, background color, and text format,
+  set alongside the expand/collapse defaults.
+
+Row grouping is unavailable when the table has fewer than two row dimensions or
+when a column pivot is active.
+
 ## Column field options
 
 Configure individual columns in the **Columns** section of the **Style** tab (or via the dropdown arrow on a field in the **Fields** section):
