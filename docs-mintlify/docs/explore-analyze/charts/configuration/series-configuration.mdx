@@ -5,10 +5,10 @@ description: Configure individual series — mark type, color, and display optio
 
 Series configuration lets you override chart settings on a per-series basis. Each measure on a bar, line, area or scatter chart is one series:
 
-- On the **Fields** tab, set its mark type, its Y axis and its break-down.
+- On the **Fields** tab, set its mark type, its Y axis and its breakdown.
 - On the **Style** tab, under its Y axis, set its color, line style, point shape, interpolation and [trend line](#trend-line).
 
-{/* TODO screenshot: series configuration panel expanded for one series (hidden — replace this comment with <Frame><img src="..." /></Frame> when image is ready) */}
+{/* TODO screenshot: Fields and Style tabs for one series (hidden — replace this comment with <Frame><img src="..." /></Frame> when image is ready) */}
 
 ## Mark type override
 
@@ -36,7 +36,7 @@ This setting has no effect when a Color channel is active — in that case, colo
 
 ## Trend line
 
-A trend line summarizes the series with a dashed line. To add one, go to the Style tab and click the **Trend line** toggle on the line under the series' style controls. The toggle is available when the X axis shows a time or numeric dimension.
+A trend line summarizes the series with a dashed line. To add one, go to the Style tab and turn on the **Trend line** toggle below the series' style controls. The toggle is available when the X axis shows a time or numeric dimension.
 
 When the trend line is on, select its model:
 
@@ -45,7 +45,7 @@ When the trend line is on, select its model:
 | **Linear** | A straight line. This is the default. |
 | **Exponential** | A curve that grows or decays by a constant ratio. |
 | **Polynomial** | A curve of the **Degree** you set, from 2 to 8. The default is 3. |
-| **Moving average** | The average of each point and the points before it. The **Period** you set, from 2 to 100, is the number of points. The line starts at the first point that has a full period. The default is 3. |
+| **Moving average** | The average of the last **Period** points, from 2 to 100. The default is 3. The line starts at the first point with a full period. |
 | **Logarithmic** | A curve that rises or falls quickly, then levels off. |
 | **Power** | A curve of the form y = a·x<sup>b</sup>. |
 
@@ -55,7 +55,7 @@ When the trend line is on, select its model:
 
 Click the **Confidence band (95%)** toggle to show the 95% confidence interval of the fitted curve as a shaded band. The band is not available for **Moving average**.
 
-When a series has a break-down, each value of the break-down gets its own trend line and band, in its own color. When the chart has small multiples, each panel gets its own trend line.
+When a series has a breakdown, each value of the breakdown gets its own trend line and band, in its own color. When the chart has small multiples, each panel gets its own trend line and band.
 
 ## Y axis assignment
 
@@ -71,4 +71,4 @@ See [Data labels](/docs/explore-analyze/charts/configuration/data-labels) for th
 
 ## Stacking override
 
-On charts with multiple Y-axis series, you can set stacking behavior per-axis rather than globally. This lets you create grouped clusters where each cluster is internally stacked — expand the Y-axis settings for a specific series to access this option.
+On charts with multiple Y-axis series, you can set stacking behavior per series rather than globally. This lets you create grouped clusters where each cluster is internally stacked. On the Fields tab, use the placement control next to the series' **Break down by** field: stacked, side by side (bars), overlaid (areas), or stacked to 100%.
