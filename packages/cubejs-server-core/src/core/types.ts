@@ -69,6 +69,8 @@ export interface QueryInitedOptions {
 export interface AggsInitedOptions {
   queueOptions?: (dataSource: string) => Promise<QueueInitedOptions>;
   externalRefresh?: boolean;
+  maxPartitions?: number;
+  maxSourceRowLimit?: number;
 }
 
 export interface OrchestratorInitedOptions {

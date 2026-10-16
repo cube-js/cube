@@ -25,7 +25,7 @@ export class OrchestratorStorage {
 
   protected release(api: OrchestratorApi) {
     const pending: Promise<void> = api.release()
-      .then(() => undefined, () => undefined)
+      .then((): undefined => undefined, (): undefined => undefined)
       .then(() => {
         this.pendingReleases.delete(pending);
       });

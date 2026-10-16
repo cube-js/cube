@@ -29,10 +29,10 @@ import {
   withLogRedaction,
 } from '@cubejs-backend/shared';
 
-import type { Application as ExpressApplication } from 'express';
+import type { Application as ExpressApplication, Response as ExpressResponse, NextFunction as ExpressNextFunction } from 'express';
 
 import { BaseDriver, DriverFactoryByDataSource } from '@cubejs-backend/query-orchestrator';
-import type { SubscriptionServer, WebSocketSendMessageFn } from '@cubejs-backend/api-gateway';
+import type { Request as ApiGatewayRequest, SubscriptionServer, WebSocketSendMessageFn } from '@cubejs-backend/api-gateway';
 
 import { RefreshScheduler, ScheduledRefreshOptions } from './RefreshScheduler';
 import { OrchestratorApi, OrchestratorApiOptions } from './OrchestratorApi';
@@ -57,6 +57,7 @@ import type {
   ContextToAppIdFn,
   DatabaseType,
   DbTypeInternalFn,
+  DbTypeInternalContext,
   ExternalDbTypeFn,
   OrchestratorOptionsFn,
   OrchestratorInitedOptions,
@@ -539,7 +540,7 @@ export class CubejsServerCore {
     return new ApiGateway(apiSecret, getCompilerApi, getOrchestratorApi, logger, options);
   }
 
-  protected async contextRejectionMiddleware(req, res, next) {
+  protected async contextRejectionMiddleware(req: ApiGatewayRequest, res: ExpressResponse, next: ExpressNextFunction) {
     if (!this.standalone) {
       const result = await this.contextAcceptor.shouldAcceptHttp(req.context);
       if (!result.accepted) {
@@ -562,12 +563,12 @@ export class CubejsServerCore {
       compilerApi = this.createCompilerApi(
         this.repositoryFactory(context),
         {
-          dbType: async (dataSourceContext) => {
+          dbType: async (dataSourceContext: DbTypeInternalContext) => {
             const dbType = await this.contextToDbType({ ...context, ...dataSourceContext });
             return dbType;
           },
           externalDbType: this.contextToExternalDbType(context),
-          dialectClass: (dialectContext) => (
+          dialectClass: (dialectContext: { dataSource: string; dbType: string }) => (
             this.options.dialectFactory &&
             this.options.dialectFactory({ ...context, ...dialectContext })
           ),
@@ -845,7 +846,7 @@ export class CubejsServerCore {
     return orchestratorApi;
   }
 
-  protected createCompilerApi(repository, options: Record<string, any> = {}) {
+  protected createCompilerApi(repository: SchemaFileRepository, options: Record<string, any> = {}) {
     return new CompilerApi(
       repository,
       options.dbType || this.options.dbType,
@@ -895,7 +896,7 @@ export class CubejsServerCore {
   /**
    * @internal Please don't use this method directly, use refreshTimer
    */
-  public handleScheduledRefreshInterval = async (options) => {
+  public handleScheduledRefreshInterval = async (options: ScheduledRefreshOptions) => {
     const allContexts = await this.options.scheduledRefreshContexts();
     if (allContexts.length < 1) {
       this.logger('Refresh Scheduler Error', {
@@ -903,14 +904,14 @@ export class CubejsServerCore {
       });
     }
 
-    const contexts = [];
+    const contexts: RequestContext[] = [];
 
     for (const allContext of allContexts) {
       const resContext = this.migrateBackgroundContext(allContext);
       const res = await this.contextAcceptor.shouldAccept(resContext);
 
       if (res.accepted) {
-        contexts.push(resContext || {});
+        contexts.push(resContext || <RequestContext>{});
       }
     }
 
