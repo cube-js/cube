@@ -118,6 +118,20 @@ pub fn member_expression_sql(members: &Option<Vec<String>>) -> Vec<String> {
         .collect()
 }
 
+/// Asserts that the outermost select of a wrapped SQL ends with ORDER BY and `LIMIT limit`:
+/// an ORDER BY left in a subquery does not guarantee the result order.
+pub fn assert_outer_order_by_limit(sql: &str, limit: usize) {
+    let mut lines = sql.lines().rev().filter(|line| !line.trim().is_empty());
+    let last = lines.next().unwrap_or_default();
+    let before_last = lines.next().unwrap_or_default();
+    assert!(
+        last.trim_end() == format!("LIMIT {}", limit) && before_last.starts_with("ORDER BY "),
+        "expected ORDER BY and LIMIT {} on the outermost select:\n{}",
+        limit,
+        sql
+    );
+}
+
 pub fn find_cube_scans_deep_search(
     parent: Arc<LogicalPlan>,
     panic_if_empty: bool,
