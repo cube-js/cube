@@ -1,3 +1,5 @@
+import { Readable } from 'stream';
+
 import { CacheAction, CacheEntry, CacheQueryResultOptions, QueryCache } from '../../src';
 import { QueryCacheTest } from './QueryCache.abstract';
 
@@ -39,6 +41,10 @@ class QueryCacheOpened extends QueryCache {
       renewalThreshold,
       renewalKey,
     );
+  }
+
+  public csvQuery(client, q) {
+    return super.csvQuery(client, q);
   }
 }
 
@@ -287,5 +293,48 @@ describe('QueryCache.isMemoryEntryUsable', () => {
         QueryCacheOpened.isMemoryEntryUsable(entry, renewedAgo, expiration, renewalThreshold, renewalKey)
       ).toEqual(expected);
     });
+  });
+});
+
+describe('QueryCache.csvQuery', () => {
+  // Mimics drivers (e.g. ClickHouse) whose release() closes the connection backing the row stream,
+  // aborting it if it is still in flight: https://github.com/cube-js/cube/issues/12285
+  it('releases the stream only after all rows are consumed', async () => {
+    const totalRows = 1000;
+    let emitted = 0;
+    const rowStream = new Readable({
+      objectMode: true,
+      highWaterMark: 16,
+      read() {
+        setImmediate(() => {
+          if (emitted >= totalRows) {
+            this.push(null);
+          } else {
+            emitted++;
+            this.push({ id: emitted });
+          }
+        });
+      },
+    });
+
+    const client = {
+      stream: async () => ({
+        rowStream,
+        release: async () => {
+          if (!rowStream.readableEnded) {
+            rowStream.destroy(new Error('aborted'));
+          }
+        },
+      }),
+    };
+
+    const cache = new QueryCacheOpened('TEST', () => client as any, () => undefined, { cacheAndQueueDriver: 'memory' });
+    const result = await cache.csvQuery(client, {
+      query: 'SELECT 1',
+      values: [],
+      lambdaTypes: [{ name: 'id', type: 'int' }],
+    });
+
+    expect(result.rowCount).toEqual(totalRows);
   });
 });
