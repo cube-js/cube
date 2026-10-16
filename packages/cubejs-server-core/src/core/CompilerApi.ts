@@ -556,7 +556,7 @@ export class CompilerApi {
     if (filter.memberReference) {
       const evaluatedValues = cubeEvaluator.evaluateContextFunction(
         cube,
-        filter.values || (() => undefined),
+        filter.values || ((): undefined => undefined),
         context
       );
       result.member = filter.memberReference;
@@ -1097,7 +1097,7 @@ export class CompilerApi {
       ['externalPreAggregationMembers'],
       () => this.createQueryByDataSource(compilers, {})
         .then((query) => this.collectExternalPreAggregationMembers(compilers.cubeEvaluator, query))
-        .catch((e: any) => {
+        .catch((e: any): string[][] => {
           this.logger('Pre-aggregation Members Error', { error: e.stack || e.message || e.toString() });
           return [];
         }),

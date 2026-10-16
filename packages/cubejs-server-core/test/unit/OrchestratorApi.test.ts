@@ -4,7 +4,7 @@ describe('OrchestratorApi', () => {
   // https://github.com/cube-js/cube/issues/11313
   test('getPreAggregationQueueStates forwards dataSource to the orchestrator', async () => {
     const api = Object.create(OrchestratorApi.prototype);
-    const getPreAggregationQueueStates = jest.fn(async () => []);
+    const getPreAggregationQueueStates = jest.fn(async (): Promise<unknown[]> => []);
     api.orchestrator = { getPreAggregationQueueStates };
 
     await api.getPreAggregationQueueStates('test_ds');
