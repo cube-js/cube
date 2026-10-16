@@ -94,7 +94,7 @@ A region map requires:
 
 Built-in sources expose a fixed list of allowed properties. **Custom** lets you point at any public GeoJSON URL; the property dropdown then enumerates every key present in the feature collection.
 
-When the chart enters Region mode, the join dimension and measure are auto-picked when an unambiguous match exists in your query.
+When the chart enters Region mode, the join dimension and the **Color by** field are auto-picked when an unambiguous match exists in your query.
 
 The choropleth fill comes from a color scale on the **Style** tab. You can change its colors and pin each stop to a value such as the minimum, the median, a percentile, or a fixed number. When **Color by** is a dimension, each value gets a distinct color from the active palette instead, see [Color and stacking](/docs/explore-analyze/charts/configuration/color-and-stacking).
 
@@ -129,4 +129,4 @@ The saved zoom is a zoom level, not an area. A chart on a dashboard can be small
 
 ## Map interaction
 
-The map is interactive — users can pan and zoom. Viewport changes persist while you edit other settings. In **Auto**, a change of data or projection fits the map to the new bounds.
+The map is interactive — users can pan and zoom. In **Auto**, the viewport is kept while you edit other settings, and a change of data or projection fits the map to the new bounds. In **Custom**, panning or zooming saves the new view, and a change of data or projection keeps it.
