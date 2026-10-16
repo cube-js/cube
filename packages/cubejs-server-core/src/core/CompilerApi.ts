@@ -370,7 +370,10 @@ export class CompilerApi {
 
     const dataSourceToQueryClass = Object.fromEntries(
       await Promise.all(
-        [...dataSources].map(async (dataSource) => [dataSource, await this.resolveDialectClass(dataSource)])
+        [...dataSources].map(async (dataSource) => [
+          dataSource,
+          this.resolveDialectClass(dataSource, await this.getDbType(dataSource)),
+        ])
       )
     );
     return new QueryFactory(dataSourceToQueryClass);
@@ -385,17 +388,15 @@ export class CompilerApi {
    * `undefined` when neither is known, e.g. a `driverFactory` that returns a driver
    * instance without `CUBEJS_DB_TYPE` set and no `dialectFactory`.
    */
-  protected async resolveDialectClass(dataSource: string = 'default'): Promise<typeof BaseQuery | undefined> {
-    const dbType = await this.getDbType(dataSource);
+  protected resolveDialectClass(dataSource: string, dbType: string): typeof BaseQuery | undefined {
     return this.dialectClass?.({ dataSource, dbType }) || dialectByDbType(dbType);
   }
 
   public async getDialectClass(dataSource: string = 'default'): Promise<typeof BaseQuery> {
-    const dialectClass = await this.resolveDialectClass(dataSource);
+    const dbType = await this.getDbType(dataSource);
+    const dialectClass = this.resolveDialectClass(dataSource, dbType);
     if (!dialectClass) {
-      throw new Error(
-        `Can't find dialect for '${dataSource}' data source: ${await this.getDbType(dataSource)}`
-      );
+      throw new Error(`Can't find dialect for '${dataSource}' data source: ${dbType}`);
     }
 
     return dialectClass;
