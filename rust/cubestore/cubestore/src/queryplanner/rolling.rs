@@ -182,6 +182,33 @@ impl RollingWindowAggregate {
             input,
         )?;
 
+        // Dimension values missing from the input still produce a row, with null partition keys.
+        // The keys inherit their nullability from the input columns, which are often non-nullable
+        // (a calc-group dimension stored as a literal, say), so relax them or building the output
+        // batch fails on "declared as non-nullable but contains null values".
+        //
+        // The range below addresses the partition keys by position, so pin the layout the chain
+        // above produces: the dimension, then one field per partition key, then the aggregates.
+        debug_assert_eq!(
+            fields.len(),
+            1 + partition_by.len() + rolling_aggs.len().min(rolling_aggs_alias.len())
+        );
+        let partition_by_range = 1..1 + partition_by.len();
+        let fields = fields
+            .into_iter()
+            .enumerate()
+            .map(|(i, (relation, field))| {
+                if partition_by_range.contains(&i) && !field.is_nullable() {
+                    (
+                        relation,
+                        Arc::new(field.as_ref().clone().with_nullable(true)),
+                    )
+                } else {
+                    (relation, field)
+                }
+            })
+            .collect_vec();
+
         Ok(Arc::new(DFSchema::new_with_metadata(
             fields,
             input.schema().metadata().clone(),
