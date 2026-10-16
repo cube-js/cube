@@ -228,8 +228,10 @@ see every scheduled refresh in the deployment. Each row shows:
 
 - **Enable/disable toggle** — the untitled first column; turns the schedule on or
   off.
-- **Dashboard** — the dashboard's title. Click it to open the dashboard in the
-  Dashboard Builder.
+- **Dashboard** — the dashboard's title. On a row you can edit, hovering
+  anywhere on the row shows an **Edit** button at the end of this cell; click it
+  to open the dashboard in the Dashboard Builder, or open it in a new tab as you
+  would a link. The title itself is plain text, not a link.
 - **Schedule** — the human-readable schedule, like "At 09:00 AM", and the
   summary of its [data alert][ref-data-alerts] if it has one.
 - **Next run** — the next scheduled execution, or "Disabled" if the schedule is
@@ -241,7 +243,8 @@ see every scheduled refresh in the deployment. Each row shows:
   [control value](#control-values) the schedule sets, or "—" when it sets
   none.
 - **Subscribe** — the [subscribe toggle](#subscribing-to-notifications) for
-  schedules you can only view.
+  schedules you can only view. The column appears only when the list includes
+  at least one such schedule.
 
 Use the search box above the list to find a schedule by its dashboard title or
 its schedule text.
@@ -249,13 +252,16 @@ its schedule text.
 What a row offers depends on your permission on its workbook:
 
 - **Edit** or **Manage**, whether set on the workbook or inherited from its
-  [folder][ref-sharing] — the enable/disable toggle and a ⋯ menu, always shown,
-  with **Run now**, **Edit schedule**, **Duplicate schedule**, and **Delete**.
-  **Delete** asks for confirmation first. Admins get these controls on every
-  row.
-- **View only** — no toggle and no ⋯ menu. If the schedule sends email
-  notifications, the **Subscribe** column holds a toggle to subscribe or
-  unsubscribe yourself. A schedule that posts to Slack has no toggle.
+  [folder][ref-sharing] — the enable/disable toggle, plus two buttons shown
+  while the pointer is over the row: the **Edit** button in the **Dashboard**
+  column, and a ⋯ menu at the end of the row with **Run now**, **Edit
+  schedule**, **Duplicate schedule**, and **Delete**. The ⋯ button stays shown
+  while its menu is open. **Delete** asks for confirmation first. Admins get
+  these controls on every row.
+- **View only** — no toggle, no ⋯ menu, and no **Edit** button. If the
+  schedule sends email notifications, the **Subscribe** column holds a toggle to
+  subscribe or unsubscribe yourself. A schedule that posts to Slack has no
+  toggle.
 
 **Edit schedule** and **Duplicate schedule** open the same dialog as the
 sidebar, pre-filled from the schedule and tied to its dashboard. **Save as
