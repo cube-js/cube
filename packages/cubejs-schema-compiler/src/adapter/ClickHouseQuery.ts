@@ -3,6 +3,7 @@ import { BaseQuery } from './BaseQuery';
 import { BaseFilter } from './BaseFilter';
 import { UserError } from '../compiler/UserError';
 import { BaseTimeDimension } from './BaseTimeDimension';
+import { ParamAllocator } from './ParamAllocator';
 
 const GRANULARITY_TO_INTERVAL = {
   day: 'Day',
@@ -30,7 +31,22 @@ class ClickHouseFilter extends BaseFilter {
   }
 }
 
+// Params are bound by token, not `?`, so literal question marks in SQL survive
+export function paramToken(index: number | string): string {
+  return `___ClickHouseParam_${index}___`;
+}
+
+class ClickHouseParamAllocator extends ParamAllocator {
+  public paramPlaceHolder(paramIndex) {
+    return paramToken(paramIndex);
+  }
+}
+
 export class ClickHouseQuery extends BaseQuery {
+  public newParamAllocator(expressionParams) {
+    return new ClickHouseParamAllocator(expressionParams);
+  }
+
   public newFilter(filter) {
     return new ClickHouseFilter(this, filter);
   }
@@ -273,6 +289,8 @@ export class ClickHouseQuery extends BaseQuery {
 
   public sqlTemplates() {
     const templates = super.sqlTemplates();
+    // Tesseract and SQL API pushdown render params from this template, the legacy planner via ClickHouseParamAllocator
+    templates.params.param = paramToken('{{ param_index }}');
     templates.functions.DATETRUNC = 'DATE_TRUNC({{ args_concat }})';
     templates.functions.UTCTIMESTAMP = 'now(\'UTC\')';
     templates.functions.STRING_AGG = 'arrayStringConcat(group{% if distinct %}Uniq{% endif %}Array({{ args[0] }}), {{ args[1] }})';
