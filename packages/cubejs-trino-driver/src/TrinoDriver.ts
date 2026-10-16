@@ -1,7 +1,7 @@
 import fetch, { RequestInit } from 'node-fetch';
 import { Agent as HttpsAgent } from 'https';
 import { PrestoDriver, PrestoDriverConfiguration } from '@cubejs-backend/prestodb-driver';
-import { TrinoQuery } from '@cubejs-backend/schema-compiler';
+import { TrinoQuery } from './TrinoQuery';
 
 export type TrinoDriverConfiguration = Omit<PrestoDriverConfiguration, 'engine'>;
 

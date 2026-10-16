@@ -9,7 +9,7 @@ jest.mock('node-fetch', () => ({
 }));
 
 jest.mock('@cubejs-backend/schema-compiler', () => ({
-  TrinoQuery: class { },
+  PrestodbQuery: class { },
 }));
 
 jest.mock('presto-client', () => ({

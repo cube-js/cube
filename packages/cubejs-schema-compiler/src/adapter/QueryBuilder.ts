@@ -14,7 +14,6 @@ import { OracleQuery } from './OracleQuery';
 import { SqliteQuery } from './SqliteQuery';
 import { CubeStoreQuery } from './CubeStoreQuery';
 import { AthenaQuery } from './AthenaQuery';
-import { TrinoQuery } from './TrinoQuery';
 
 const ADAPTERS = {
   postgres: PostgresQuery,
@@ -27,7 +26,6 @@ const ADAPTERS = {
   prestodb: PrestodbQuery,
   qubole_prestodb: PrestodbQuery,
   athena: AthenaQuery,
-  trino: TrinoQuery,
   vertica: VerticaQuery,
   snowflake: SnowflakeQuery,
   clickhouse: ClickHouseQuery,
