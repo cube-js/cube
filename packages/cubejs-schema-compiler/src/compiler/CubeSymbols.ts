@@ -37,6 +37,7 @@ export type CubeSymbolDefinition = {
   format?: string;
   currency?: string;
   order?: 'asc' | 'desc';
+  values?: string[];
   key?: (...args: any[]) => ToString;
   keyReference?: string;
 };
@@ -1171,6 +1172,7 @@ export class CubeSymbols implements TranspilerSymbolResolver, CompilerInterface 
           format: memberRef.override?.format || resolvedMember.format,
           ...(propagatedCurrency ? { currency: propagatedCurrency } : {}),
           ...(resolvedMember.granularities ? { granularities: resolvedMember.granularities } : {}),
+          ...(resolvedMember.values ? { values: [...resolvedMember.values] } : {}),
           ...(resolvedMember.multiStage && { multiStage: resolvedMember.multiStage }),
           ...(resolvedMember.keyReference && this.processKeyReferenceForView(resolvedMember.keyReference, targetCube.name, viewAllMembers, memberRef.member)),
           ...(resolvedMember.mask !== undefined ? { mask: resolvedMember.mask } : {}),
