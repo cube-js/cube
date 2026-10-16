@@ -299,7 +299,11 @@ export class PreAggregationPartitionRangeLoader {
           const { buildRangeEnd, targetTableName } = loadResults[loadResults.length - 1];
           if (!this.lambdaSourceDataCovered(buildRangeEnd)) {
             const lambdaTypes = await this.loadCache.getTableColumnTypes(this.preAggregation, targetTableName);
-            lambdaTable = await this.downloadLambdaTable(buildRangeEnd, lambdaTypes);
+            // `buildRangeEnd` is local time (a `Z` suffix from the DB doesn't make it UTC). Bind it in the
+            // DB time zone like partition ranges, or the source union starts off by the UTC offset.
+            // @see https://github.com/cube-js/cube/issues/12286
+            const fromDate = PreAggregationPartitionRangeLoader.inDbTimeZone(this.preAggregation, buildRangeEnd.replace(/Z$/, ''));
+            lambdaTable = await this.downloadLambdaTable(fromDate, lambdaTypes);
           }
         }
         const rollupLambdaResults = this.preAggregationsTablesToTempTables.filter(tempTableResult => tempTableResult[1].rollupLambdaId === this.preAggregation.rollupLambdaId);
