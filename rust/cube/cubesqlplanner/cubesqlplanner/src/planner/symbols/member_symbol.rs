@@ -128,6 +128,12 @@ impl MemberSymbol {
         self.compiled_path().alias().clone()
     }
 
+    /// The name of the member's column in a pre-aggregation table: its alias with no
+    /// override asked for it, as the query that built the table asked for none
+    pub fn canonical_alias(&self) -> String {
+        self.compiled_path().canonical_alias().clone()
+    }
+
     pub fn name(&self) -> String {
         self.compiled_path().name().clone()
     }

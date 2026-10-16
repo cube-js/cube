@@ -520,6 +520,16 @@ macro_rules! variant_field_struct {
         );
     };
 
+    ($variant:ident, $var_field:ident, ScanWrapping) => {
+        $crate::variant_field_struct!(
+            @enum_struct $variant, $var_field, { ScanWrapping } -> {
+                ScanWrapping::None => "None",
+                ScanWrapping::DataSource => "DataSource",
+                ScanWrapping::PreAggregation => "PreAggregation",
+            }
+        );
+    };
+
     ($variant:ident, $var_field:ident, GroupingSetType) => {
         $crate::variant_field_struct!(
             @enum_struct $variant, $var_field, { GroupingSetType } -> {

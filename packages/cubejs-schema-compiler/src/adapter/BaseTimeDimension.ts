@@ -78,6 +78,18 @@ export class BaseTimeDimension extends BaseFilter {
     return `${this.query.aliasName(this.memberPath())}_${actualGranularity}`; // TODO date here for rollups
   }
 
+  /**
+   * The column this time dimension has in a pre-aggregation table at `granularity`,
+   * whatever alias the query asked for it.
+   */
+  public preAggregationColumnName(granularity?: string): string {
+    const actualGranularity = granularity || this.granularityObj?.granularity || 'day';
+
+    return this.query.escapeColumnName(
+      `${this.query.canonicalAliasName(this.dimension)}_${actualGranularity}`
+    );
+  }
+
   public dateSeriesAliasName() {
     return this.query.escapeColumnName(`${this.dimension}_series`);
   }

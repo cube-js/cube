@@ -90,6 +90,8 @@ fn register_interface<C: NodeConfiguration>(mut cx: FunctionContext) -> JsResult
     let check_sql_auth = get_function_from_options(options, "checkSqlAuth", &mut cx)?;
     let transport_sql_api_load = get_function_from_options(options, "sqlApiLoad", &mut cx)?;
     let transport_sql = get_function_from_options(options, "sql", &mut cx)?;
+    let transport_pre_aggregation_match =
+        get_function_from_options(options, "preAggregationMatch", &mut cx)?;
     let transport_meta = get_function_from_options(options, "meta", &mut cx)?;
     let transport_log_load_event = get_function_from_options(options, "logLoadEvent", &mut cx)?;
     let transport_sql_generator = get_function_from_options(options, "sqlGenerators", &mut cx)?;
@@ -131,6 +133,7 @@ fn register_interface<C: NodeConfiguration>(mut cx: FunctionContext) -> JsResult
         cx.channel(),
         transport_sql_api_load,
         transport_sql,
+        transport_pre_aggregation_match,
         transport_meta,
         transport_log_load_event,
         transport_sql_generator,

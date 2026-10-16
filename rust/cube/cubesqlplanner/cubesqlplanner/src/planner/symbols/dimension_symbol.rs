@@ -369,19 +369,24 @@ impl SymbolFactory for DimensionSymbolFactory {
         };
 
         let cube = cube_evaluator.cube_from_path(path.cube_id().target().to_string())?;
-        let alias = match compiler.alias_for_member(&path.full_name()) {
-            Some(alias) => alias,
-            None if path.cube_id().is_joined() => PlanSqlTemplates::member_alias_name(
+        // The alias a query asking for none gets names the member's column in a
+        // pre-aggregation table, however the query reading it aliases its own output
+        let canonical_alias = if path.cube_id().is_joined() {
+            PlanSqlTemplates::member_alias_name(
                 &compiler.model_cubes().alias_base(path.cube_id())?,
                 path.symbol_name(),
                 &None,
-            ),
-            None => PlanSqlTemplates::member_alias_name(
+            )
+        } else {
+            PlanSqlTemplates::member_alias_name(
                 cube.static_data().resolved_alias(),
                 path.symbol_name(),
                 &None,
-            ),
+            )
         };
+        let alias = compiler
+            .alias_for_member(&path.full_name())
+            .unwrap_or_else(|| canonical_alias.clone());
         let is_view = cube.static_data().is_view.unwrap_or(false);
 
         // A member a view re-exports from its `includes` is a `Ref`; one the
@@ -389,11 +394,12 @@ impl SymbolFactory for DimensionSymbolFactory {
         let included = definition.static_data().included.unwrap_or(false);
         if let Some(sql) = sql.as_ref().filter(|_| included) {
             let cube_symbol = compiler.add_cube_table_evaluator(path.cube_id().clone(), vec![])?;
-            let compiled_path = CompiledMemberPath::new(
+            let compiled_path = CompiledMemberPath::new_with_canonical_alias(
                 cube_symbol,
                 path.member_id()?,
                 path.symbol_name().clone(),
                 alias,
+                canonical_alias,
                 path.path().clone(),
             );
             let symbol = MemberSymbol::new_ref(RefSymbol::try_new(compiled_path, sql, mask_sql)?);
@@ -526,11 +532,12 @@ impl SymbolFactory for DimensionSymbolFactory {
 
         let cube_symbol = compiler.add_cube_table_evaluator(path.cube_id().clone(), vec![])?;
 
-        let compiled_path = CompiledMemberPath::new(
+        let compiled_path = CompiledMemberPath::new_with_canonical_alias(
             cube_symbol,
             path.member_id()?,
             path.symbol_name().clone(),
             alias,
+            canonical_alias,
             path.path().clone(),
         );
 

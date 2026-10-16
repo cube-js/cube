@@ -204,7 +204,7 @@ export class SQLServer {
           }
         });
       },
-      sqlApiLoad: async ({ request, session, query, queryKey, sqlQuery, streaming, cacheMode }) => {
+      sqlApiLoad: async ({ request, session, query, queryKey, sqlQuery, external, preAggregations, streaming, cacheMode }) => {
         const context = await contextByRequest(request, session);
 
         // eslint-disable-next-line no-async-promise-executor
@@ -214,6 +214,8 @@ export class SQLServer {
               queryKey,
               query,
               sqlQuery,
+              external,
+              preAggregations,
               streaming,
               cacheMode,
               context,
@@ -236,7 +238,7 @@ export class SQLServer {
           }
         });
       },
-      sql: async ({ request, session, query, memberToAlias, expressionParams }) => {
+      sql: async ({ request, session, query, memberToAlias, expressionParams, disableExternalPreAggregations }) => {
         const context = await contextByRequest(request, session);
 
         // eslint-disable-next-line no-async-promise-executor
@@ -248,7 +250,9 @@ export class SQLServer {
               expressionParams,
               exportAnnotatedSql: true,
               memberExpressions: true,
-              disableExternalPreAggregations: true,
+              // The SQL gets wrapped in the dialect of the data source it runs on, so a
+              // Cube Store rollup can serve it only when cubesql says it can render for Cube Store
+              disableExternalPreAggregations: disableExternalPreAggregations ?? true,
               queryType: 'multi',
               disableLimitEnforcing: true,
               context,
@@ -264,6 +268,32 @@ export class SQLServer {
                 resolve(response);
               },
               apiType: 'sql',
+            });
+          } catch (e) {
+            reject(e);
+          }
+        });
+      },
+      preAggregationMatch: async ({ request, session, queries }) => {
+        const context = await contextByRequest(request, session);
+
+        // eslint-disable-next-line no-async-promise-executor
+        return new Promise(async (resolve, reject) => {
+          try {
+            await this.apiGateway.preAggregationMatch({
+              queries,
+              context,
+              res: (response) => {
+                if ('error' in response) {
+                  reject({
+                    message: response.error
+                  });
+
+                  return;
+                }
+
+                resolve(response);
+              },
             });
           } catch (e) {
             reject(e);

@@ -19,6 +19,7 @@ pub use datafusion::{
         array::{
             ArrayRef, BooleanBuilder, Date32Builder, DecimalBuilder, Float32Builder,
             Float64Builder, Int16Builder, Int32Builder, Int64Builder, NullArray, StringBuilder,
+            UInt64Builder,
         },
         datatypes::{DataType, Schema, SchemaRef},
         error::{ArrowError, Result as ArrowResult},
@@ -125,6 +126,10 @@ pub struct CubeScanOptions {
     pub max_records: Option<usize>,
     pub cache_mode: Option<CacheMode>,
     pub throw_continue_wait: bool,
+    /// The scan is wrapped, and its SQL is to be generated over a Cube Store
+    /// pre-aggregation. Cube was asked at planning whether it matches one, so SQL
+    /// generation fails when it no longer does instead of falling back
+    pub pre_aggregation: bool,
 }
 
 #[derive(Debug, Clone)]
@@ -527,7 +532,9 @@ impl ExecutionPlan for CubeScanExecutionPlan {
         let query_limit = self.config_obj.non_streaming_query_max_row_limit();
         let max_batch_rows = self.config_obj.cube_scan_max_batch_rows();
 
-        let stream_mode = match (stream_mode, self.request.limit) {
+        // Cube Store serves a query over a pre-aggregation, and its driver does not stream
+        let streamable = !self.wrapped_sql.as_ref().is_some_and(|sql| sql.external);
+        let stream_mode = match (stream_mode && streamable, self.request.limit) {
             (true, None) => true,
             (true, Some(limit)) if limit > query_limit => true,
             (_, _) => false,
@@ -1110,6 +1117,33 @@ macro_rules! transform_response_body {
                         },
                         {
                             (ScalarValue::Int64(v), builder) => builder.append_option(*v)?,
+                        }
+                    )
+                }
+                // Cube Store answers a pushed down window function, like ROW_NUMBER, as
+                // an unsigned count, which the plan on top reads as such
+                DataType::UInt64 => {
+                    build_column!(
+                        DataType::UInt64,
+                        UInt64Builder,
+                        $response,
+                        field_name,
+                        {
+                            (FieldValue::Number(number), builder) => builder.append_value(number.round() as u64)?,
+                            (FieldValue::String(s), builder)  => match s.parse::<u64>() {
+                                Ok(v) => builder.append_value(v)?,
+                                Err(error) => {
+                                    warn!(
+                                        "Unable to parse value as u64: {}",
+                                        error.to_string()
+                                    );
+
+                                    builder.append_null()?
+                                }
+                            },
+                        },
+                        {
+                            (ScalarValue::UInt64(v), builder) => builder.append_option(*v)?,
                         }
                     )
                 }
@@ -1872,6 +1906,16 @@ mod tests {
                 todo!()
             }
 
+            async fn pre_aggregation_matches(
+                &self,
+                _span_id: Option<Arc<SpanId>>,
+                _queries: Vec<V1LoadRequestQuery>,
+                _ctx: AuthContextRef,
+                _meta_fields: LoadRequestMeta,
+            ) -> Result<Vec<bool>, CubeError> {
+                todo!()
+            }
+
             // Execute load query
             async fn load(
                 &self,
@@ -2043,6 +2087,7 @@ mod tests {
                 max_records: None,
                 cache_mode: None,
                 throw_continue_wait: false,
+                pre_aggregation: false,
             },
             transport: get_test_transport(),
             meta: get_test_load_meta(DatabaseProtocol::PostgreSQL),

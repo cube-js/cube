@@ -7,7 +7,9 @@ use crate::{
     },
     config::ConfigObj,
     sql::AuthContextRef,
-    transport::{MetaContext, TransportService},
+    transport::{
+        LoadRequestMeta, MetaContext, SpanId, TransportLoadRequestQuery, TransportService,
+    },
     utils::egraph_hash,
     CubeError, MutexAsync, RWLockAsync,
 };
@@ -15,6 +17,7 @@ use async_trait::async_trait;
 use datafusion::scalar::ScalarValue;
 use lru::LruCache;
 use moka::future::Cache as MokaCache;
+use sha2::{Digest, Sha256};
 use std::{collections::HashMap, fmt::Debug, num::NonZeroUsize, sync::Arc, time::Duration};
 use uuid::Uuid;
 
@@ -53,7 +56,22 @@ pub trait CompilerCache: Send + Sync + Debug {
         ctx: AuthContextRef,
         protocol: DatabaseProtocol,
     ) -> Result<Arc<CompilerCacheEntry>, CubeError>;
+
+    /// [`TransportService::pre_aggregation_matches`], remembered for the compiled model:
+    /// whether a rollup serves a cube query changes only with the model, which is a new
+    /// entry, or with the security context, which keys the answer along with the query
+    async fn pre_aggregation_matches(
+        &self,
+        cache_entry: Arc<CompilerCacheEntry>,
+        span_id: Option<Arc<SpanId>>,
+        queries: Vec<TransportLoadRequestQuery>,
+        ctx: AuthContextRef,
+        meta_fields: LoadRequestMeta,
+    ) -> Result<Vec<bool>, CubeError>;
 }
+
+// Rollup verdicts are small, so a model keeps many of them
+const PRE_AGGREGATION_MATCHES_CACHE_SIZE: u64 = 10_000;
 
 #[derive(Debug)]
 pub struct CompilerCacheImpl {
@@ -67,6 +85,7 @@ pub struct CompilerCacheEntry {
     rewrite_rules: RWLockAsync<HashMap<bool, Arc<Vec<CubeRewrite>>>>,
     parameterized_cache: MokaCache<[u8; 32], CubeEGraph>,
     queries_cache: MokaCache<[u8; 32], CubeEGraph>,
+    pre_aggregation_matches: MokaCache<[u8; 32], bool>,
 }
 
 crate::di_service!(CompilerCacheImpl, [CompilerCache]);
@@ -222,6 +241,12 @@ impl CompilerCache for CompilerCacheImpl {
                             .max_capacity(self.config_obj.query_cache_size())
                             .time_to_idle(ttl)
                             .build(),
+                        // A verdict can go stale (`queryRewrite`), so it is not renewed
+                        // on every read like the plans
+                        pre_aggregation_matches: MokaCache::builder()
+                            .max_capacity(PRE_AGGREGATION_MATCHES_CACHE_SIZE)
+                            .time_to_live(ttl)
+                            .build(),
                     });
                     compiler_id_to_entry.put(
                         (meta_context.compiler_id, protocol.clone()),
@@ -231,6 +256,91 @@ impl CompilerCache for CompilerCacheImpl {
                 })
         };
         Ok(cache_entry)
+    }
+
+    async fn pre_aggregation_matches(
+        &self,
+        cache_entry: Arc<CompilerCacheEntry>,
+        span_id: Option<Arc<SpanId>>,
+        queries: Vec<TransportLoadRequestQuery>,
+        ctx: AuthContextRef,
+        meta_fields: LoadRequestMeta,
+    ) -> Result<Vec<bool>, CubeError> {
+        // Hashed, so the entries stay small whatever the security context holds. The
+        // request meta is in: `queryRewrite` sees it too
+        let security_context = ctx
+            .security_context()
+            .map(serde_json::to_string)
+            .transpose()?
+            .unwrap_or_default();
+        let meta = serde_json::to_string(&meta_fields)?;
+        let mut keys: Vec<[u8; 32]> = Vec::with_capacity(queries.len());
+        for query in &queries {
+            let mut hasher = Sha256::new();
+            for part in [&security_context, &meta, &serde_json::to_string(query)?] {
+                hasher.update(part.as_bytes());
+                hasher.update(b"\0");
+            }
+            keys.push(hasher.finalize().into());
+        }
+
+        let mut matches = Vec::with_capacity(queries.len());
+        let mut unknown: Vec<(usize, [u8; 32])> = Vec::new();
+        for (index, key) in keys.iter().enumerate() {
+            match cache_entry.pre_aggregation_matches.get(key).await {
+                Some(matched) => matches.push(Some(matched)),
+                None => {
+                    matches.push(None);
+                    if !unknown.iter().any(|(_, known)| known == key) {
+                        unknown.push((index, *key));
+                    }
+                }
+            }
+        }
+        if !unknown.is_empty() {
+            let answers = self
+                .transport
+                .pre_aggregation_matches(
+                    span_id,
+                    unknown
+                        .iter()
+                        .map(|(index, _)| queries[*index].clone())
+                        .collect(),
+                    ctx,
+                    meta_fields,
+                )
+                .await?;
+            if answers.len() != unknown.len() {
+                return Err(CubeError::internal(format!(
+                    "Pre-aggregation match answered for {} queries, asked for {}",
+                    answers.len(),
+                    unknown.len()
+                )));
+            }
+            // The answers fill the verdicts themselves: the cache may not keep an entry
+            // it was just given
+            let answers: HashMap<[u8; 32], bool> =
+                unknown.iter().map(|(_, key)| *key).zip(answers).collect();
+            for (key, matched) in &answers {
+                cache_entry
+                    .pre_aggregation_matches
+                    .insert(*key, *matched)
+                    .await;
+            }
+            for (index, key) in keys.iter().enumerate() {
+                if matches[index].is_none() {
+                    matches[index] = answers.get(key).copied();
+                }
+            }
+        }
+        matches
+            .into_iter()
+            .map(|matched| {
+                matched.ok_or_else(|| {
+                    CubeError::internal("Pre-aggregation match verdict missing".to_string())
+                })
+            })
+            .collect()
     }
 }
 

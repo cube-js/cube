@@ -196,6 +196,33 @@ function publicUsedPreAggregations(
   );
 }
 
+/**
+ * Descriptions the pushed-down SQL reads, one per table: a rollup read by several cube
+ * queries has its name swapped in once, so one read over different periods is read whole.
+ * Copies them, as a cube query's descriptions are shared through the SQL cache.
+ */
+function mergePreAggregationDescriptions(
+  ...descriptions: (any[] | undefined)[]
+): any[] {
+  const merged: any[] = [];
+
+  for (const description of descriptions.flatMap((d) => d || [])) {
+    const known = description?.tableName !== undefined &&
+      merged.find((m) => m.tableName === description.tableName);
+    if (!known) {
+      merged.push({ ...description });
+    } else if (JSON.stringify(known) !== JSON.stringify(description)) {
+      // Every usage of either description reads every partition
+      delete known.matchedTimeDimensionDateRange;
+      const usages = Object.entries<any>({ ...known.usageMapping, ...description.usageMapping });
+      if (usages.length > 0) {
+        known.usageMapping = Object.fromEntries(usages.map(([suffix, usage]) => [suffix, { ...usage, dateRange: undefined }]));
+      }
+    }
+  }
+  return merged;
+}
+
 function hasDevTokenScope(securityContext: unknown): boolean {
   if (typeof securityContext !== 'object' || securityContext === null) {
     return false;
@@ -1825,6 +1852,44 @@ class ApiGateway {
     throw new Error(`Unexpected member expression to evaluate: ${memberExpression}`);
   }
 
+  /**
+   * Which of `queries` a Cube Store pre-aggregation would serve, in order: cubesql asks
+   * before it renders SQL for Cube Store. Matching only, with the normalization `sql` gets.
+   */
+  public async preAggregationMatch({ queries, context, res }: {
+    queries: Query[],
+    context: RequestContext,
+    res: ResponseResultFn,
+  }) {
+    const requestStarted = new Date();
+
+    try {
+      await this.assertApiScope('sql', context.securityContext);
+
+      const compilerApi = await this.getCompilerApi(context);
+      const matches = await Promise.all(queries.map(async (query) => {
+        const [, normalizedQueries] = await this.getNormalizedQueries(query, context, true, true);
+        const results = await Promise.all(normalizedQueries.map(async (normalizedQuery) => {
+          const sqlQuery = await compilerApi.getSql(
+            this.coerceForSqlQuery({ ...normalizedQuery, disableExternalPreAggregations: false }, context),
+            { preAggregationsOnly: true },
+          );
+          // A lambda rollup unioned with source data loads fresh rows with the filters of
+          // one cube query, which the pushed-down SQL does not have in general
+          return Boolean(sqlQuery.external) &&
+            !(sqlQuery.preAggregations || []).some((p: any) => p.unionWithSourceData);
+        }));
+        return results.every(Boolean);
+      }));
+
+      await res({ matches });
+    } catch (e: any) {
+      this.handleError({
+        e, context, query: queries, res, requestStarted
+      });
+    }
+  }
+
   public async sqlGenerators({ context, res }: { context: RequestContext, res: ResponseResultFn }) {
     const requestStarted = new Date();
 
@@ -1840,7 +1905,23 @@ class ApiGateway {
         [...dataSources].map(async dataSource => ({ [dataSource]: (await compilerApi.getSqlGenerator(query, dataSource)).sqlGenerator }))
       )).reduce((a, b) => ({ ...a, ...b }), {});
 
-      await res({ memberToDataSource, dataSourceToSqlGenerator });
+      // Cube Store is not a data source of the model, but SQL pushed down over a rollup
+      // is rendered in its dialect, so it needs templates of its own. cubesql plans such
+      // SQL only for scans whose members fit a rollup, so the rollups' members go along
+      const anySqlGenerator: any = Object.values(dataSourceToSqlGenerator)[0];
+      const externalPreAggregationMembers = getEnv('sqlPushDownPreAggregations') ?
+        await compilerApi.externalPreAggregationMembers() :
+        [];
+      const externalSqlGenerator = anySqlGenerator?.externalQueryClass && externalPreAggregationMembers.length > 0 ?
+        anySqlGenerator.externalQuery() :
+        undefined;
+
+      await res({
+        memberToDataSource,
+        dataSourceToSqlGenerator,
+        externalSqlGenerator,
+        externalPreAggregationMembers,
+      });
     } catch (e: any) {
       this.handleError({
         e, context, res, requestStarted
@@ -2380,10 +2461,14 @@ class ApiGateway {
         normalizedQueries.some(q => this.hasLongMemberPaths(q)) ? await this.memberPathResolver(context) : undefined
       );
 
+      // A pushed down `sqlQuery` is rendered in the dialect of the data source it runs
+      // on, so its cube query can only read a Cube Store rollup when cubesql rendered the
+      // SQL on top for Cube Store and says so with `external`
+      const external = Boolean(request.sqlQuery && request.external);
       const sqlQueries = await this
         .getSqlQueriesInternal(
           context,
-          normalizedQueries.map(q => ({ ...q, disableExternalPreAggregations: request.sqlQuery }))
+          normalizedQueries.map(q => ({ ...q, disableExternalPreAggregations: Boolean(request.sqlQuery) && !external }))
         );
 
       let results: any[];
@@ -2419,6 +2504,15 @@ class ApiGateway {
           ...sqlQueries[0],
           // TODO Can we just pass through data? Ensure hidden members can't be queried
           aliasNameToMember: null,
+          // The SQL can be built over several cube queries, and `sqlQueries[0]` describes
+          // one of them: the rollups the others read come along with the request
+          ...(external ? {
+            external: true,
+            preAggregations: mergePreAggregationDescriptions(
+              sqlQueries[0].preAggregations,
+              request.preAggregations,
+            ),
+          } : {}),
         };
 
         if (request.streaming) {
@@ -2458,11 +2552,6 @@ class ApiGateway {
             // which is not a Playground path, and its result object carries
             // none of the other dev-only fields either.
             usedPreAggregations: publicUsedPreAggregations(response.usedPreAggregations),
-            // Always false: this branch builds its sqlQuery with
-            // `disableExternalPreAggregations` set (above), which makes
-            // `externalPreAggregationQuery()` return false, and the
-            // orchestrator only echoes that flag back. Mirrored anyway for
-            // shape parity with `prepareResultTransformData`.
             external: response.external,
           }];
         }

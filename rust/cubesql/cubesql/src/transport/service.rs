@@ -52,6 +52,10 @@ pub struct LoadRequestMeta {
     // Optional fields
     #[serde(rename = "changeUser", skip_serializing_if = "Option::is_none")]
     change_user: Option<String>,
+    // Whether `sql()` may answer with a query over a Cube Store pre-aggregation.
+    // Not part of the request meta Cube sees, the transport sends it as its own field
+    #[serde(skip)]
+    external_pre_aggregations: bool,
 }
 
 impl LoadRequestMeta {
@@ -62,6 +66,7 @@ impl LoadRequestMeta {
             api_type,
             app_name,
             change_user: None,
+            external_pre_aggregations: false,
         }
     }
 
@@ -72,11 +77,28 @@ impl LoadRequestMeta {
     pub fn set_change_user(&mut self, change_user: Option<String>) {
         self.change_user = change_user;
     }
+
+    pub fn external_pre_aggregations(&self) -> bool {
+        self.external_pre_aggregations
+    }
+
+    pub fn set_external_pre_aggregations(&mut self, external_pre_aggregations: bool) {
+        self.external_pre_aggregations = external_pre_aggregations;
+    }
 }
 
 #[derive(Debug, Deserialize)]
 pub struct SqlResponse {
     pub sql: SqlQuery,
+    /// The SQL reads a Cube Store pre-aggregation, so it is in the Cube Store dialect
+    /// and has to run there
+    #[serde(default)]
+    pub external: bool,
+    /// Descriptions of the pre-aggregations the SQL reads, as Cube's `/v1/sql` reports
+    /// them; the load request carries them back so the orchestrator builds the rollups
+    /// and swaps their table names in
+    #[serde(default)]
+    pub pre_aggregations: Vec<serde_json::Value>,
 }
 
 #[derive(Debug)]
@@ -221,6 +243,19 @@ pub trait TransportService: Send + Sync + Debug {
         member_to_alias: Option<HashMap<String, String>>,
         expression_params: Option<Vec<Option<String>>>,
     ) -> Result<SqlResponse, CubeError>;
+
+    /// Which of `queries` Cube would serve from a Cube Store pre-aggregation, in order.
+    /// Matching only, no SQL: the rewrite asks this to settle which scans of a plan may
+    /// read a pre-aggregation before it generates any SQL. None by default
+    async fn pre_aggregation_matches(
+        &self,
+        _span_id: Option<Arc<SpanId>>,
+        queries: Vec<TransportLoadRequestQuery>,
+        _ctx: AuthContextRef,
+        _meta_fields: LoadRequestMeta,
+    ) -> Result<Vec<bool>, CubeError> {
+        Ok(vec![false; queries.len()])
+    }
 
     // Execute load query
     async fn load(

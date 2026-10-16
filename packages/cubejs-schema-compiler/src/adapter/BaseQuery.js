@@ -4485,6 +4485,18 @@ export class BaseQuery {
     if (this.options.memberToAlias && this.options.memberToAlias[name]) {
       return this.options.memberToAlias[name];
     }
+    return this.canonicalAliasName(name, isPreAggregationName);
+  }
+
+  /**
+   * Alias of a member when the query asks for none (`memberToAlias`). A pre-aggregation
+   * table is built by a query asking for none, so its columns go by these names however
+   * the query reading it aliases its own output.
+   * @param {string} name Property name.
+   * @param {boolean?} isPreAggregationName Pre-agg flag.
+   * @returns {string}
+   */
+  canonicalAliasName(name, isPreAggregationName = false) {
     const path = name.split('.');
     if (path[0] && this.cubeEvaluator.cubeExists(path[0]) && this.cubeEvaluator.cubeFromPath(path[0]).sqlAlias) {
       const cubeName = path[0];

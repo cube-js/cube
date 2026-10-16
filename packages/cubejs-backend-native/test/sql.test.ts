@@ -151,6 +151,7 @@ describe('SQLInterface', () => {
       pgPort: 5555,
       ...methods,
       canSwitchUserForSession: (_payload) => true,
+      preAggregationMatch: async ({ queries }) => ({ matches: queries.map(() => false) }),
     });
     console.log(instance);
 
@@ -308,6 +309,7 @@ describe('SQLInterface', () => {
         pgPort: 5555,
         ...interfaceMethods(),
         canSwitchUserForSession: (_payload) => true,
+        preAggregationMatch: async ({ queries }) => ({ matches: queries.map(() => false) }),
       });
 
       let buf = '';
@@ -359,6 +361,7 @@ describe('SQLInterface', () => {
     const instance = await native.registerInterface({
       ...interfaceMethods_,
       canSwitchUserForSession: (_payload) => true,
+      preAggregationMatch: async ({ queries }) => ({ matches: queries.map(() => false) }),
     });
 
     let schemaReceived = false;
@@ -476,6 +479,7 @@ describe('SQLInterface', () => {
       const instance = await native.registerInterface({
         ...methods,
         canSwitchUserForSession: (_payload: any) => true,
+        preAggregationMatch: async ({ queries }: any) => ({ matches: queries.map(() => false) }),
       });
 
       const chunks: string[] = [];
@@ -583,6 +587,7 @@ describe('SQLInterface', () => {
     const instance = await native.registerInterface({
       ...methods,
       canSwitchUserForSession: (_payload: any) => true,
+      preAggregationMatch: async ({ queries }: any) => ({ matches: queries.map(() => false) }),
     });
 
     let buf = '';
@@ -648,6 +653,7 @@ describe('SQLInterface', () => {
     const instance = await native.registerInterface({
       ...methods,
       canSwitchUserForSession: (_payload: any) => true,
+      preAggregationMatch: async ({ queries }: any) => ({ matches: queries.map(() => false) }),
     });
 
     let buf = '';
@@ -749,6 +755,7 @@ describe('SQLInterface', () => {
       const instance = await native.registerInterface({
         ...methods,
         canSwitchUserForSession: (_payload: any) => true,
+        preAggregationMatch: async ({ queries }: any) => ({ matches: queries.map(() => false) }),
       });
 
       let buf = '';
@@ -839,6 +846,7 @@ describe('SQLInterface', () => {
       const instance = await native.registerInterface({
         ...methods,
         canSwitchUserForSession: (_payload: any) => true,
+        preAggregationMatch: async ({ queries }: any) => ({ matches: queries.map(() => false) }),
       });
 
       let buf = '';
