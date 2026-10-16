@@ -10,6 +10,7 @@ import {
   ApiGatewayOptions,
   UserBackgroundContext
 } from '@cubejs-backend/api-gateway';
+import { dialectByDbType } from '@cubejs-backend/schema-compiler';
 import {
   CancelableInterval,
   createCancelableInterval,
@@ -568,10 +569,10 @@ export class CubejsServerCore {
             return dbType;
           },
           externalDbType: this.contextToExternalDbType(context),
-          dialectClass: (dialectContext: { dataSource: string; dbType: string }) => (
-            this.options.dialectFactory &&
-            this.options.dialectFactory({ ...context, ...dialectContext })
-          ),
+          dialectClass: async ({ dataSource }: { dataSource: string }) => {
+            const dbType = await this.contextToDbType({ ...context, dataSource });
+            return this.options.dialectFactory?.({ ...context, dataSource, dbType }) || dialectByDbType(dbType);
+          },
           externalDialectClass: this.options.externalDialectFactory && this.options.externalDialectFactory(context),
           schemaVersion: currentSchemaVersion,
           contextToGroups: this.options.contextToGroups,

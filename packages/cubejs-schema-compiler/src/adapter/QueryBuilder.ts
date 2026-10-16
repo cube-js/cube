@@ -1,3 +1,4 @@
+import type { BaseQuery } from './BaseQuery';
 import { PostgresQuery } from './PostgresQuery';
 import { MysqlQuery } from './MysqlQuery';
 import { MongoBiQuery } from './MongoBiQuery';
@@ -16,7 +17,7 @@ import { CubeStoreQuery } from './CubeStoreQuery';
 import { AthenaQuery } from './AthenaQuery';
 import { TrinoQuery } from './TrinoQuery';
 
-const ADAPTERS = {
+const ADAPTERS: Record<string, typeof BaseQuery> = {
   postgres: PostgresQuery,
   redshift: RedshiftQuery,
   mysql: MysqlQuery,
@@ -39,25 +40,6 @@ const ADAPTERS = {
   cubestore: CubeStoreQuery,
 };
 
-export const queryClass = (dbType: string, dialectClass) => dialectClass || ADAPTERS[dbType];
-
-export const createQuery = (compilers, dbType: string, queryOptions: any) => {
-  if (!queryOptions.dialectClass && !ADAPTERS[dbType]) {
-    return null;
-  }
-
-  let externalQueryClass = queryOptions.externalDialectClass;
-
-  if (!externalQueryClass && queryOptions.externalDbType) {
-    if (!ADAPTERS[queryOptions.externalDbType]) {
-      throw new Error(`Dialect for '${queryOptions.externalDbType}' is not found`);
-    }
-
-    externalQueryClass = ADAPTERS[queryOptions.externalDbType];
-  }
-
-  return new (queryClass(dbType, queryOptions.dialectClass))(compilers, {
-    ...queryOptions,
-    externalQueryClass,
-  });
-};
+export const dialectByDbType = (dbType: string | undefined): typeof BaseQuery | undefined => (
+  dbType ? ADAPTERS[dbType] : undefined
+);

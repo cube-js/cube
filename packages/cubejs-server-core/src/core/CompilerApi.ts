@@ -6,15 +6,14 @@ import {
   CanUsePreAggregationFn,
   compile,
   Compiler,
-  createQuery,
   CubeDefinition,
+  dialectByDbType,
   EvaluatedCube,
   PreAggregationFilters,
   PreAggregationInfo,
   PreAggregationReferences,
   PreAggregations,
   prepareCompiler,
-  queryClass,
   QueryFactory,
   TransformedQuery,
   ViewIncludedMember,
@@ -55,7 +54,7 @@ export interface CompilerApiOptions {
    * for the caches and the compiler alike. Defaults to CUBEJS_COMPILER_MULTI_TENANT_SHARING.
    */
   multiTenantSharing?: boolean;
-  externalDialectClass?: BaseQuery;
+  externalDialectClass?: typeof BaseQuery;
   externalDbType?: string;
   devServer?: boolean;
   fastReload?: boolean;
@@ -371,11 +370,10 @@ export class CompilerApi {
 
     const dataSourceToQueryClass = Object.fromEntries(
       await Promise.all(
-        [...dataSources].map(async (dataSource) => {
-          const dbType = await this.getDbType(dataSource);
-          const dialectClass = this.getDialectClass(dataSource, dbType);
-          return [dataSource, queryClass(dbType, dialectClass)];
-        })
+        [...dataSources].map(async (dataSource) => [
+          dataSource,
+          await this.getDialectClass(dataSource),
+        ])
       )
     );
     return new QueryFactory(dataSourceToQueryClass);
@@ -385,39 +383,52 @@ export class CompilerApi {
     return this.dbType({ dataSource });
   }
 
-  public getDialectClass(dataSource: string = 'default', dbType: string): BaseQuery {
-    return this.dialectClass?.({ dataSource, dbType });
+  /**
+   * The `dialectClass` hook wins; otherwise the built-in dialect for the data source's `dbType`.
+   */
+  public async getDialectClass(dataSource: string = 'default'): Promise<typeof BaseQuery> {
+    const dialectClass = await this.dialectClass?.({ dataSource });
+    if (dialectClass) {
+      return dialectClass;
+    }
+
+    const dbType = await this.getDbType(dataSource);
+    const builtInDialectClass = dialectByDbType(dbType);
+    if (!builtInDialectClass) {
+      throw new Error(`Can't find dialect for '${dataSource}' data source: ${dbType}`);
+    }
+
+    return builtInDialectClass;
+  }
+
+  protected getExternalDialectClass(): typeof BaseQuery | undefined {
+    const { externalDialectClass, externalDbType } = this.options;
+    if (externalDialectClass || !externalDbType) {
+      return externalDialectClass;
+    }
+
+    const dialectClass = dialectByDbType(externalDbType);
+    if (!dialectClass) {
+      throw new Error(`Dialect for '${externalDbType}' is not found`);
+    }
+
+    return dialectClass;
   }
 
   public async getSqlGenerator(query: NormalizedQuery, dataSource?: string): Promise<{ sqlGenerator: any; compilers: Compiler }> {
-    const dbType = await this.getDbType(dataSource);
+    const dialectClass = await this.getDialectClass(dataSource);
     const compilers = await this.getCompilers({ requestId: query.requestId });
-    let sqlGenerator = await this.createQueryByDataSource(compilers, query, dataSource, dbType);
-
-    if (!sqlGenerator) {
-      throw new Error(`Unknown dbType: ${dbType}`);
-    }
+    let sqlGenerator = this.createQuery(compilers, dialectClass, query);
 
     // sqlGenerator.dataSource can return undefined for query without members
     // Queries like this are used by api-gateway to initialize SQL API
     // At the same time, those queries should use concrete dataSource, so we should be good to go with it
     dataSource = compilers.compiler.withQuery(sqlGenerator, () => sqlGenerator.dataSource);
-    if (dataSource !== undefined) {
-      const _dbType = await this.getDbType(dataSource);
-      if (dataSource !== 'default' && dbType !== _dbType) {
+    if (dataSource !== undefined && dataSource !== 'default') {
+      const dataSourceDialectClass = await this.getDialectClass(dataSource);
+      if (dataSourceDialectClass !== dialectClass) {
         // TODO consider more efficient way than instantiating query
-        sqlGenerator = await this.createQueryByDataSource(
-          compilers,
-          query,
-          dataSource,
-          _dbType
-        );
-
-        if (!sqlGenerator) {
-          throw new Error(
-            `Can't find dialect for '${dataSource}' data source: ${_dbType}`
-          );
-        }
+        sqlGenerator = this.createQuery(compilers, dataSourceDialectClass, query);
       }
     }
 
@@ -1197,31 +1208,20 @@ export class CompilerApi {
     compilers: Compiler,
     query: NormalizedQuery | {},
     dataSource?: string,
-    dbType?: string
   ): Promise<BaseQuery> {
-    if (!dbType) {
-      dbType = await this.getDbType(dataSource);
-    }
-
-    return this.createQuery(compilers, dbType, this.getDialectClass(dataSource, dbType), query);
+    return this.createQuery(compilers, await this.getDialectClass(dataSource), query);
   }
 
-  public createQuery(compilers: Compiler, dbType: string, dialectClass: BaseQuery, query: NormalizedQuery | {}): BaseQuery {
-    return createQuery(
-      compilers,
-      dbType,
-      {
-        ...query,
-        dialectClass,
-        externalDialectClass: this.options.externalDialectClass,
-        externalDbType: this.options.externalDbType,
-        preAggregationsSchema: this.preAggregationsSchema,
-        allowUngroupedWithoutPrimaryKey: this.allowUngroupedWithoutPrimaryKey,
-        convertTzForRawTimeDimension: this.convertTzForRawTimeDimension,
-        localRefreshKey: this.localRefreshKey,
-        queryFactory: this.queryFactories.get(compilers) ?? this.queryFactory,
-      }
-    );
+  public createQuery(compilers: Compiler, DialectClass: typeof BaseQuery, query: NormalizedQuery | {}): BaseQuery {
+    return new DialectClass(compilers, {
+      ...query,
+      externalQueryClass: this.getExternalDialectClass(),
+      preAggregationsSchema: this.preAggregationsSchema,
+      allowUngroupedWithoutPrimaryKey: this.allowUngroupedWithoutPrimaryKey,
+      convertTzForRawTimeDimension: this.convertTzForRawTimeDimension,
+      localRefreshKey: this.localRefreshKey,
+      queryFactory: this.queryFactories.get(compilers) ?? this.queryFactory,
+    });
   }
 
   /**
