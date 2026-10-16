@@ -174,7 +174,8 @@ Promise<BaseDriver | DriverConfig>;
 
 export type DialectFactoryFn = (context: DialectContext) => typeof BaseQuery;
 
-export type DialectClassFn = (options: { dataSource: string; dbType: string }) => typeof BaseQuery;
+export type DialectClassFn = (options: { dataSource: string }) =>
+  Promise<typeof BaseQuery | undefined> | typeof BaseQuery | undefined;
 
 // external
 export type ExternalDbTypeFn = (context: RequestContext) => DatabaseType;

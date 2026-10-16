@@ -372,7 +372,7 @@ export class CompilerApi {
       await Promise.all(
         [...dataSources].map(async (dataSource) => [
           dataSource,
-          this.resolveDialectClass(dataSource, await this.getDbType(dataSource)),
+          await this.getDialectClass(dataSource),
         ])
       )
     );
@@ -384,22 +384,21 @@ export class CompilerApi {
   }
 
   /**
-   * `dialectFactory` wins; otherwise the built-in dialect for the data source's `dbType`.
-   * `undefined` when neither is known, e.g. a `driverFactory` that returns a driver
-   * instance without `CUBEJS_DB_TYPE` set and no `dialectFactory`.
+   * The `dialectClass` hook wins; otherwise the built-in dialect for the data source's `dbType`.
    */
-  protected resolveDialectClass(dataSource: string, dbType: string): typeof BaseQuery | undefined {
-    return this.dialectClass?.({ dataSource, dbType }) || dialectByDbType(dbType);
-  }
-
   public async getDialectClass(dataSource: string = 'default'): Promise<typeof BaseQuery> {
+    const dialectClass = await this.dialectClass?.({ dataSource });
+    if (dialectClass) {
+      return dialectClass;
+    }
+
     const dbType = await this.getDbType(dataSource);
-    const dialectClass = this.resolveDialectClass(dataSource, dbType);
-    if (!dialectClass) {
+    const builtInDialectClass = dialectByDbType(dbType);
+    if (!builtInDialectClass) {
       throw new Error(`Can't find dialect for '${dataSource}' data source: ${dbType}`);
     }
 
-    return dialectClass;
+    return builtInDialectClass;
   }
 
   protected getExternalDialectClass(): typeof BaseQuery | undefined {

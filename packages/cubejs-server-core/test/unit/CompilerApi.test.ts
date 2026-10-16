@@ -391,6 +391,17 @@ views:
       expect(sqlGenerator).toBeInstanceOf(OtherQuery);
     });
 
+    test('does not resolve dbType when the dialect factory resolves a dialect', async () => {
+      const dbType = jest.fn(async () => 'postgres');
+      compilerApi = new CompilerApi(repository, dbType as any, {
+        logger,
+        dialectClass: () => OtherQuery,
+      });
+
+      await expect(compilerApi.getDialectClass('other')).resolves.toBe(OtherQuery);
+      expect(dbType).not.toHaveBeenCalled();
+    });
+
     test('throws when neither dbType nor the dialect factory resolve a dialect', async () => {
       compilerApi = new CompilerApi(repository, async () => undefined as any, { logger });
 
