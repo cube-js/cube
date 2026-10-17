@@ -195,8 +195,8 @@ user whose role grants **Manage all scheduled tasks** on the deployment (see
 can edit, pause, run, check, share, or delete it, because every run executes as
 the creator (see [Reading the output](#reading-the-output)).
 
-That exception carries the creator's data access with it: an admin who edits
-another user's task changes what runs under that user's access. A run's chat
+That exception carries the creator's data access with it: an admin or a
+**Manage all scheduled tasks** holder who edits another user's task changes what runs under that user's access. A run's chat
 thread belongs to the task's creator, and only the creator, admins, users with
 the **Access chat history**
 [permission](/admin/users-and-permissions/custom-roles), and people the thread
@@ -307,8 +307,8 @@ to both scheduled runs and **Run now**. On a
 [conditional task](#conditional-tasks), a check that runs no agent sends
 nothing.
 
-The notification goes to the task's creator, even when an admin edits or runs
-the task. See [Inbox](/docs/inbox#notification-types) for what it shows.
+The notification goes to the task's creator, even when an admin or another user
+with **Manage all scheduled tasks** edits or runs the task. See [Inbox](/docs/inbox#notification-types) for what it shows.
 
 A task that you create with the agent or the Platform API has notifications
 off, unless you ask for them: for example, *"schedule a daily summary of
