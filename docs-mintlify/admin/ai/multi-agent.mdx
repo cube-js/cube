@@ -127,14 +127,17 @@ The properties available on each agent are the same as in the [single-agent setu
 
 ### Default agent and Auto
 
-Each deployment has a **default agent**: what a chat, [MCP client](/docs/integrations/mcp-server)
-or [scheduled task](/docs/explore-analyze/scheduled-tasks) runs on when it names no agent.
-An admin sets it in the deployment's **Settings → Configuration → Agents**. With no default
-set, those fall back to the **Auto** agent.
+Each deployment can have a **default agent**, set by an admin in the deployment's
+**Settings → Configuration → Agents**. New Analytics Chat conversations start on it, and an
+[MCP client](/docs/integrations/mcp-server) or
+[scheduled task](/docs/explore-analyze/scheduled-tasks) that names no agent runs on it.
+With no default set, they use the **Auto** agent.
 
 The same card can turn Auto off, so users can't pick it. Auto can be turned off only while a
 default agent is set, and that default can't be deleted or moved to another deployment until
-it's replaced. With Auto off, a request for Auto runs on the default agent instead.
+it's replaced. With Auto off, anything that asks for Auto runs on the default agent instead,
+including the [Chat API](/reference/embed-apis/chat-api)'s deployment-scoped URL, which
+otherwise always talks to Auto.
 
 ## Spaces
 
