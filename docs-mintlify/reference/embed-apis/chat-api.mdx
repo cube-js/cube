@@ -21,8 +21,9 @@ https://ai.{cloudRegion}.cubecloud.dev/api/v1/public/{accountName}/agents/{agent
 
 Copy the exact URL from your agent settings (**Chat API URL** field) in **Admin → Agents**.
 
-Addressed by deployment, it talks to the deployment's Auto agent — the agent
-used when no specific one is selected:
+Addressed by deployment, it talks to the deployment's Auto agent, or to its
+[default agent](/admin/ai/multi-agent#default-agent-and-auto) when an admin has
+turned Auto off:
 
 ```text
 https://ai.{cloudRegion}.cubecloud.dev/api/v1/public/{accountName}/deployments/{deploymentId}/chat/stream-chat-state
@@ -39,7 +40,7 @@ The two forms differ in which authentication they accept:
 | `/deployments/{deploymentId}/…` | — | ✓ |
 
 The deployment form is served **only** through the Cube token exchange, which is
-what resolves the Auto agent — an API key carries no agent, so a request without
+what resolves the deployment's agent — an API key carries no agent, so a request without
 `{agentId}` in the path is rejected with `403 agentId is required for Api-Key
 authentication`. Because [Cube token authentication](#cube-token-authentication)
 is disabled by default, the deployment form works only once it is enabled in
@@ -280,7 +281,7 @@ https://ai.{cloudRegion}.cubecloud.dev/api/v1/public/{accountName}/deployments/{
 <Info>
 
 Copy the complete Chat API URL from your agent settings (**Chat API URL** field)
-in **Admin → Agents**, or — for the deployment's Auto agent — from
+in **Admin → Agents**, or — for the deployment form — from
 **Settings → API credentials → Chat API**.
 
 </Info>
@@ -290,7 +291,7 @@ in **Admin → Agents**, or — for the deployment's Auto agent — from
 - **`cloudRegion`** (string): The cloud region identifier (e.g., "gcp-us-central1")
 - **`accountName`** (string, required): The account identifier (e.g., "acme"). It is in your account URL, e.g. https://acme.cubecloud.dev
 - **`agentId`** (string, required for the agent form): The AI agent identifier (e.g., "1"). You can find it in **Admin → Agents → Click on Agent row in the table**.
-- **`deploymentId`** (string, required for the deployment form): The deployment identifier (e.g., "9"). It is in the deployment URL, e.g. https://acme.cubecloud.dev/d/9. Resolves to the deployment's Auto agent.
+- **`deploymentId`** (string, required for the deployment form): The deployment identifier (e.g., "9"). It is in the deployment URL, e.g. https://acme.cubecloud.dev/d/9. Resolves to the deployment's Auto agent, or to its [default agent](/admin/ai/multi-agent#default-agent-and-auto) when Auto is turned off.
 
 ### Request Body
 
