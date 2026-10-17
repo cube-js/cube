@@ -61,11 +61,11 @@ class ClickHouseFilter extends BaseFilter {
     return `(${this.castParams().map(v => `(${column} < ${v} OR ${column} > ${v})`).join(' AND ')})${this.orIsNullCheck(column, true)}`;
   }
 
-  private isTimeMember(): boolean {
+  protected isTimeMember(): boolean {
     return !this.measure && this.definition().type === 'time';
   }
 
-  private castParams(): string[] {
+  protected castParams(): string[] {
     return this.filterParams().map(p => this.allocateCastParam(p));
   }
 }
