@@ -67,7 +67,7 @@ The Base Role is required. Save is disabled until one is selected.
 
 #### Auto-bump to Developer
 
-Six deployment-scoped actions can be checked at every tier: **Access deployment** (`DeploymentRead`), **Access AI agents** (`DeploymentAgentRead`), **Create scheduled tasks** (`ScheduledTasksCreate`), **Download data** (`DownloadData`), **Access chat history** (`ChatHistoryRead`) and **View pre-aggregations** (`PreAggregationRead`). Check any other action — for example **Edit deployment** or **Edit data model** — and the Base Role is automatically forced to **Developer**, with the Viewer and Explorer options disabled behind a tooltip:
+Eight deployment-scoped actions can be checked at every tier: **Access deployment** (`DeploymentRead`), **Access AI agents** (`DeploymentAgentRead`), **Create scheduled tasks** (`ScheduledTasksCreate`), **Download data** (`DownloadData`), **Access chat history** (`ChatHistoryRead`), **View pre-aggregations** (`PreAggregationRead`), **View all scheduled tasks** (`ScheduledTasksRead`) and **Manage all scheduled tasks** (`ScheduledTasksManage`). Check any other action — for example **Edit deployment** or **Edit data model** — and the Base Role is automatically forced to **Developer**, with the Viewer and Explorer options disabled behind a tooltip:
 
 > Selected actions require Developer role
 
@@ -329,6 +329,8 @@ As a custom role's Base Role, the action sets the license tier — see [Base Rol
 | `SqlRunnerRead`           | Access SQL Runner                                           |
 | `DeploymentAgentRead`     | Access AI agents                                            |
 | `ScheduledTasksCreate`    | Create scheduled tasks                                      |
+| `ScheduledTasksRead`      | View all scheduled tasks                                    |
+| `ScheduledTasksManage`    | Manage all scheduled tasks                                  |
 | `APMRead`                 | Access query history                                        |
 | `ChatHistoryRead`         | Access chat history                                         |
 | `DownloadData`            | Download data                                               |
