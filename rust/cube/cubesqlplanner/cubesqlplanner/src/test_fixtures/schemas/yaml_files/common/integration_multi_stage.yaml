@@ -437,6 +437,12 @@ cubes:
             sql: "CASE WHEN {CUBE.status} = 'completed' THEN {CUBE.total_amount} ELSE 0 END"
             multi_stage: true
 
+          # Reads two dimensions outside its grain at once.
+          - name: completed_amount_first_half_of_month
+            type: sum
+            sql: "CASE WHEN {CUBE.status} = 'completed' AND EXTRACT(DAY FROM {CUBE.created_at}) <= 15 THEN {CUBE.total_amount} ELSE 0 END"
+            multi_stage: true
+
           # Reads the very dimension its own `reduce_by` drops from the stage
           # grain. The dimension still reaches the CTE from the keys side the
           # JOIN-model builds on the parent grain, so this one plans.
