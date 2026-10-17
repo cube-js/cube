@@ -137,6 +137,10 @@ type ClickHouseDriverConfig = {
 };
 
 export class ClickHouseDriver extends BaseDriver implements DriverInterface {
+  public dbType(): string {
+    return 'clickhouse';
+  }
+
   /**
    * Returns default concurrency value.
    */

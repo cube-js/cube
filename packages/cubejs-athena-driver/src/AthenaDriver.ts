@@ -78,6 +78,10 @@ interface AthenaTable {
 }
 
 export class AthenaDriver extends BaseDriver implements DriverInterface {
+  public dbType(): string {
+    return 'athena';
+  }
+
   /**
    * Returns default concurrency value.
    */

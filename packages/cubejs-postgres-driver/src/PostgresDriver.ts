@@ -69,6 +69,10 @@ export type PostgresDriverConfiguration = PgClientConfig & PoolUserOptions & {
  */
 export class PostgresDriver<Config extends PostgresDriverConfiguration = PostgresDriverConfiguration>
   extends BaseDriver implements DriverInterface {
+  public dbType(): string {
+    return 'postgres';
+  }
+
   /**
    * Returns default concurrency value.
    */
