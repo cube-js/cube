@@ -344,6 +344,24 @@ and any [user group][ref-user-groups] delivering to you. This works for any
 recipient, including those added directly by an editor and embed users who have
 no Cube account of their own.
 
+## Managing schedules from chat
+
+You can also ask the agent in [Analytics Chat][ref-chat] to list a dashboard's
+scheduled refreshes, or to create, change, pause, resume, or delete one, along
+with its [data alert][ref-data-alerts] — for example, *"refresh the Sales
+dashboard every day at 9 and email it to me"* or *"what alerts are on the Sales
+dashboard?"* The agent works on the dashboard's published version.
+
+- The agent emails the notification to Cube users: you, unless you name others.
+  A Slack channel, user groups, and [control values](#control-values) are set in
+  the sidebar's dialog.
+- Creating, changing, or deleting a schedule takes the same Edit or Manage
+  permission on the workbook as the sidebar does; without it, the agent says the
+  change was refused. Anyone who can view the dashboard can ask what is
+  scheduled on it, and only a schedule's creator is told the values its alert's
+  last check read.
+- The chat on a published dashboard and embedded chat can't manage schedules.
+
 ## Run phases
 
 When a scheduled refresh runs, it progresses through these phases:
@@ -367,6 +385,7 @@ skipped.
 [ref-parent]: /docs/explore-analyze/dashboards/widgets/controls#parent
 [ref-visibility]: /docs/explore-analyze/dashboards/widgets/controls#visibility
 [ref-link-parameters]: /docs/explore-analyze/dashboards/widgets/controls#sharing-the-current-selection
+[ref-chat]: /docs/explore-analyze/analytics-chat
 [ref-data-alerts]: /docs/explore-analyze/data-alerts
 [ref-roles]: /admin/users-and-permissions/roles-and-permissions
 [ref-scheduled-tasks]: /docs/explore-analyze/scheduled-tasks
