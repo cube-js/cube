@@ -881,3 +881,69 @@ describe('SQLInterface', () => {
     }
   );
 });
+
+describe('security context argument of the native entry points', () => {
+  // The JS wrappers always pass a JSON string or null, so these call the
+  // native functions directly, the way an out-of-tree consumer could
+  const raw = native.loadNative();
+  let instance: native.SqlInterfaceInstance;
+
+  beforeAll(async () => {
+    instance = await native.registerInterface({
+      pgPort: 15556,
+      ...interfaceMethods(),
+      canSwitchUserForSession: (_payload: unknown) => true,
+      preAggregationMatch: async ({ queries }: any) => ({ matches: queries.map(() => false) }),
+    });
+  });
+
+  afterAll(async () => {
+    await native.shutdownInterface(instance, 'fast');
+  });
+
+  for (const [entryPoint, args] of [
+    ['rest4sql', (context: unknown) => [instance, 'SELECT 1', context]],
+    ['getSqlFilters', (context: unknown) => [instance, 'SELECT 1', context]],
+    ['addSqlFilters', (context: unknown) => [instance, 'SELECT 1', '[]', context]],
+    ['setSqlFilters', (context: unknown) => [instance, 'SELECT 1', '[]', context]],
+    ['deleteSqlFilters', (context: unknown) => [instance, 'SELECT 1', '[]', context]],
+    ['replaceSqlFilters', (context: unknown) => [instance, 'SELECT 1', '[]', '[]', context]],
+  ] as [string, (context: unknown) => unknown[]][]) {
+    it(`${entryPoint} refuses a security context that is not a JSON string`, () => {
+      expect(() => raw[entryPoint](...args(42))).toThrow('Security context must be a JSON string');
+      expect(() => raw[entryPoint](...args({ foo: 'bar' }))).toThrow('Security context must be a JSON string');
+      expect(() => raw[entryPoint](...args('{not json'))).toThrow('Security context is not valid JSON');
+    });
+
+    it(`${entryPoint} accepts a security context given as a JSON string`, async () => {
+      // Run under that context, each answers in band: `SELECT 1` has no rest
+      // query, and replace is given no filter to replace
+      const inBandErrors: Record<string, string> = {
+        rest4sql: 'can not be converted to rest query',
+        replaceSqlFilters: 'At least one filter to replace',
+      };
+      const response = await raw[entryPoint](...args('{"foo":"bar"}'));
+      expect(response).toEqual(entryPoint in inBandErrors
+        ? expect.objectContaining({ status: 'error', error: expect.stringContaining(inBandErrors[entryPoint]) })
+        : expect.objectContaining({ status: 'ok' }));
+    });
+  }
+
+  it('checks the security context before the filters', () => {
+    expect(() => raw.addSqlFilters(instance, 'SELECT 1', '{not json', 42))
+      .toThrow('Security context must be a JSON string');
+    expect(() => raw.replaceSqlFilters(instance, 'SELECT 1', '{not json', '[]', 42))
+      .toThrow('Security context must be a JSON string');
+  });
+
+  it('answers malformed filters in band when the security context is valid', async () => {
+    await expect(raw.addSqlFilters(instance, 'SELECT 1', '{not json', '{}')).resolves.toMatchObject({
+      status: 'error',
+      error: expect.stringContaining('Failed to parse filters'),
+    });
+    await expect(raw.replaceSqlFilters(instance, 'SELECT 1', '[]', '{not json', '{}')).resolves.toMatchObject({
+      status: 'error',
+      error: expect.stringContaining('Failed to parse new filters'),
+    });
+  });
+});
