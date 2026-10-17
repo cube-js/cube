@@ -1026,6 +1026,7 @@
                 "group": "Agents",
                 "openapi": "/api-reference/api.yaml",
                 "pages": [
+                  "GET /api/v1/deployments/{deploymentId}/agent-defaults",
                   "GET /api/v1/deployments/{deploymentId}/agent-suggestions"
                 ]
               },

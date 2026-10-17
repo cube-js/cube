@@ -7,15 +7,24 @@ rss: true
 {/* GENERATED FILE — do not edit by hand. */}
 {/* Run scripts/extract-changelog.mjs against the platform client CHANGELOG.md. */}
 
+<Update label="2026-10-17" description="v0.21.0" tags={["Added"]}>
+  ### Added
+
+  - `GET /api/v1/deployments/{deploymentId}/agent-defaults` (`AgentsPublicController.getAgentDefaults`) returns the deployment's default agent (`defaultAgentId`, or `null`) and whether users may pick Auto (`autoAgentEnabled`). Chats, MCP sessions and scheduled tasks that name no agent use the default. New schema: `AgentDefaultsResponse`; the deployment schemas carry the same two fields.
+  - Two deployment-scoped RBAC actions, `ScheduledTasksRead` and `ScheduledTasksManage`, in the action enums (`Policy.actions`, the resource user/group policy schemas and their inherited variants). With `ScheduledTasksRead` on a deployment, the scheduled-task endpoints and `GET /api/v1/deployments/{deploymentId}/report-deliveries` return every task and delivery there, not only the caller's own and those shared with them. `ScheduledTasksManage` also allows updating, pausing, running, deleting and sharing them, and transferring a delivery to another owner. A policy granting `All` on a deployment includes both. No built-in role grants either, and admins keep seeing everything.
+</Update>
+
 <Update label="2026-10-15" description="v0.20.0" tags={["Added","Changed"]}>
   ### Added
 
   - `GET /api/v1/users/{id}/roles` (`UsersAdminPublicController.getUserRoles`) lists every role a user holds, built-in and custom, whether assigned directly or through a group. Each role carries `direct` and `groupIds`, so you can tell whether `DELETE /api/v1/roles/{roleId}/users/{userId}` will remove it, and the response reports `isAdmin`. Administrator privileges required. New schemas: `UserRolesResponse`, `UserRoleAssignmentResponse`.
   - `GET /api/v1/roles/{roleId}/users` (`RolesPublicController.getRoleHolders`) lists the users holding a role, directly or through a group, with cursor pagination. It accepts built-in role ids, includes deactivated users, and returns each user's full set of roles, so a combination such as "holds Explorer but not my custom role" is one pass over the pages. Administrator privileges required. New schemas: `RoleHolder`, `RoleHoldersListResponse`.
-  - `condition` on scheduled tasks (`CreateScheduledTaskInput`, `UpdateScheduledTaskInput`, `ScheduledTaskResponse`): run the agent only when a measure crosses a `threshold`, moves by a `change` percentage, or is flagged as an `anomaly`, instead of on every fire. `ScheduledTaskResponse.lastConditionCheck` reports the latest check. Send `condition: null` on update to remove it. New schemas: `ScheduledTaskCondition`, `ScheduledTaskLastConditionCheck`.
+  - `condition` on scheduled tasks (`CreateScheduledTaskInput`, `UpdateScheduledTaskInput`, `ScheduledTaskResponse`): run the agent only when a measure crosses a `threshold`, moves by a `change` percentage, or turns `anomaly`-ous, instead of on every fire. `ScheduledTaskResponse.lastConditionCheck` reports the latest check. Send `condition: null` on update to remove it. New schemas: `ScheduledTaskCondition`, `ScheduledTaskLastConditionCheck`.
+  - `securityContext` on the body of the start-eval-run operation: evaluate under a security context merged over the caller's own.
+  - `agentResponse`, `agentSql`, `groundTruthSql`, `analysis` and `scoreReasons` on `EvaluationResultResponse`, so a result explains why a question failed or needs review.
   - `pdf_print` for `notificationFormat` on `CreateNotificationInput` and `UpdateNotificationInput`: deliver the paginated print version of a dashboard.
   - `in_month`, `not_in_month`, `in_quarter`, `not_in_quarter`, `in_year` and `not_in_year` dashboard filter operators.
-  - `memory.generateFromChats` on `UserSettingsInput`: let a user turn off background memory from their chats.
+  - `memory.generateFromChats` on `UserSettingsInput`, and `memoryGenerationEnabled` in the settings response: let a user turn off background memory from their chats.
 
   ### Changed
 

@@ -292,6 +292,25 @@ paths:
           sent. Choosing a version that is not the channel’s latest also sets
           `releaseChannelVersionHold` unless you send it explicitly, so auto-upgrade does not undo
           the pin.
+  /api/v1/deployments/{deploymentId}/agent-defaults:
+    get:
+      operationId: getAgentDefaults
+      parameters:
+        - in: path
+          name: deploymentId
+          required: true
+          schema:
+            type: number
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AgentDefaultsResponse'
+          description: ''
+      summary: Get agent defaults
+      tags:
+        - Agents
   /api/v1/deployments/{deploymentId}/agent-suggestions:
     get:
       operationId: getAgentSuggestions
@@ -2581,8 +2600,8 @@ paths:
       x-mint:
         content: >-
           In preview: ask Cube support to enable it. Newest first. Filter by `reportId`,
-          `ownerUserId`, `spreadsheet` or `status`. Admins see every delivery; others only their
-          own.
+          `ownerUserId`, `spreadsheet` or `status`. Admins and roles granting `ScheduledTasksRead`
+          or `ScheduledTasksManage` on the deployment see every delivery; others only their own.
     post:
       operationId: createReportDelivery
       parameters:
@@ -2671,8 +2690,9 @@ paths:
         - Report Deliveries
       x-mint:
         content: >-
-          In preview: ask Cube support to enable it. `404` if the caller cannot see it. Admins see
-          every delivery; others only their own.
+          In preview: ask Cube support to enable it. `404` if the caller cannot see it. Admins and
+          roles granting `ScheduledTasksRead` or `ScheduledTasksManage` on the deployment see every
+          delivery; others only their own.
     put:
       operationId: updateReportDelivery
       parameters:
@@ -2815,8 +2835,9 @@ paths:
       x-mint:
         content: >-
           In preview: ask Cube support to enable it. Newest first unless `sortDirection` says
-          otherwise, a running one included. `404` if the caller cannot see the delivery. Admins see
-          every delivery; others only their own.
+          otherwise, a running one included. `404` if the caller cannot see the delivery. Admins and
+          roles granting `ScheduledTasksRead` or `ScheduledTasksManage` on the deployment see every
+          delivery; others only their own.
     post:
       operationId: startReportDeliveryRun
       parameters:
@@ -3430,8 +3451,9 @@ paths:
       x-mint:
         content: >-
           The scheduled tasks in the deployment the caller can see — their own and those shared with
-          them, or every task for an admin — most recently updated first, with each next run time.
-          Needs access to the deployment; embed sessions get `403`.
+          them, or every task for an admin or a role granting `ScheduledTasksRead` or
+          `ScheduledTasksManage` — most recently updated first, with each next run time. Needs
+          access to the deployment; embed sessions get `403`.
     post:
       operationId: createScheduledTask
       parameters:
@@ -3487,7 +3509,8 @@ paths:
       x-mint:
         content: >-
           Deletes the task and its schedule; the chat threads of past runs are kept. Only the
-          creator or an admin may do this (`403` otherwise).
+          creator, an admin or a role granting `ScheduledTasksManage` on the deployment may do this
+          (`403` otherwise).
     get:
       operationId: getScheduledTask
       parameters:
@@ -3513,7 +3536,8 @@ paths:
         - Scheduled Tasks
       x-mint:
         content: >-
-          A task is visible to its creator, to admins and to whoever it is shared with; anyone else
+          A task is visible to its creator, to admins, to roles granting `ScheduledTasksRead` or
+          `ScheduledTasksManage` on the deployment, and to whoever it is shared with; anyone else
           gets `404`.
     put:
       operationId: updateScheduledTask
@@ -3547,9 +3571,10 @@ paths:
         - Scheduled Tasks
       x-mint:
         content: >-
-          Changes the fields sent; `cronExpression: null` makes the task Manual. Only the creator or
-          an admin may do this (`403` otherwise). A cron fires at most hourly (`400` otherwise), and
-          a user can have 20 active tasks (`409` past that).
+          Changes the fields sent; `cronExpression: null` makes the task Manual. Only the creator,
+          an admin or a role granting `ScheduledTasksManage` on the deployment may do this (`403`
+          otherwise). A cron fires at most hourly (`400` otherwise), and a user can have 20 active
+          tasks (`409` past that).
   /api/v1/deployments/{deploymentId}/scheduled-tasks/{taskId}/run:
     post:
       operationId: runScheduledTask
@@ -3577,7 +3602,8 @@ paths:
       x-mint:
         content: >-
           Starts one run now, even for a paused or Manual task, and returns its chat thread. Only
-          the creator or an admin may do this (`403` otherwise).
+          the creator, an admin or a role granting `ScheduledTasksManage` on the deployment may do
+          this (`403` otherwise).
   /api/v1/deployments/{deploymentId}/scheduled-tasks/{taskId}/runs:
     get:
       operationId: listScheduledTaskRuns
@@ -4919,35 +4945,8 @@ paths:
         - Workspace
       x-mint:
         content: >-
-          Move any workspace item — a workbook, report, or folder — into a folder, in one unified
-          endpoint. Returns the moved item.
-
-
-          Request body:
-
-          - `type` — the item type: `WORKBOOK`, `REPORT`, or `FOLDER`.
-
-          - `id` — the id of the item to move.
-
-          - `folderId` — the destination folder id, or `null` to move the item to the workspace
-          root. For a folder, this becomes its new parent.
-
-
-          Access requirements depend on the item type and mirror the per-type rules:
-
-          - **Workbook** — manage access to the workbook, plus edit access to the destination folder
-          when moving into one.
-
-          - **Report** — manage access to the report, plus edit access to the destination folder, which
-          must belong to the same deployment.
-
-          - **Folder** — manage access to the folder being moved, plus manage or edit access to the
-          destination parent folder.
-
-
-          Moving a folder into one of its own descendants, or exceeding the maximum folder depth, is
-          rejected with `400`. Returns `404` if the item does not exist or belongs to a different
-          deployment.
+          Move a workbook, report, or folder to folderId (null for root). Source and destination
+          permissions are checked, and a report's destination must be in the route deployment.
   /api/v1/embed-tenants:
     get:
       operationId: listEmbedTenants
@@ -6479,11 +6478,9 @@ paths:
           are the deployment ids as strings. A role usually also needs a `Global` policy naming the
           holder's license tier — `AIBIView`, `AIBIExplore` or `AIBIDevelop` — which is what the
           console calls the role's Base Role. Pick a tier that covers the deployment actions you
-          grant: apart from the handful of actions available at every tier, the console forces
-          Developer (`AIBIDevelop`), so a lower tier here produces a role its role builder would not
-          have let you save. The current list of those actions is in [Auto-bump to
-          Developer](https://docs.cube.dev/admin/users-and-permissions/custom-roles#auto-bump-to-developer).
-          For example:
+          grant: the console forces Developer (`AIBIDevelop`) for every deployment action except
+          `DeploymentRead`, `DeploymentAgentRead`, `DownloadData` and `ChatHistoryRead`, so a lower
+          tier here produces a role its role builder would not have let you save:
 
 
           ```json
@@ -7935,6 +7932,17 @@ components:
           $ref: '#/components/schemas/CreationStep'
       required:
         - creationStep
+      type: object
+    AgentDefaultsResponse:
+      properties:
+        autoAgentEnabled:
+          type: boolean
+        defaultAgentId:
+          oneOf:
+            - type: integer
+            - type: 'null'
+      required:
+        - autoAgentEnabled
       type: object
     AgentSuggestionsListResponse:
       properties:
@@ -11911,6 +11919,8 @@ components:
       type: object
     DeploymentSettings:
       properties:
+        autoAgentEnabled:
+          type: boolean
         autoDomain:
           oneOf:
             - type: string
@@ -11938,6 +11948,10 @@ components:
         customDomain:
           oneOf:
             - type: string
+            - type: 'null'
+        defaultAgentId:
+          oneOf:
+            - type: integer
             - type: 'null'
         defaultLaunchpadViewGroup:
           oneOf:
@@ -12020,6 +12034,7 @@ components:
         - deployBranchReadOnly
         - deployBranchMergeAllowed
         - deployProjectRoot
+        - autoAgentEnabled
         - isCubeSqlEnabled
         - isSupportPreAggregations
       type: object
@@ -14375,6 +14390,8 @@ components:
               - DeploymentAgentRead
               - ScheduledTasksCreate
               - ScheduledTaskRead
+              - ScheduledTasksRead
+              - ScheduledTasksManage
               - OAuthIntegrationsManage
               - OAuthIntegrationsIssueTokens
               - McpToolsManage
@@ -15841,6 +15858,8 @@ components:
               - DeploymentAgentRead
               - ScheduledTasksCreate
               - ScheduledTaskRead
+              - ScheduledTasksRead
+              - ScheduledTasksManage
               - OAuthIntegrationsManage
               - OAuthIntegrationsIssueTokens
               - McpToolsManage
@@ -16832,6 +16851,10 @@ components:
       type: object
     UpdateDeploymentInput:
       properties:
+        autoAgentEnabled:
+          oneOf:
+            - type: boolean
+            - type: 'null'
         cloudProvider:
           oneOf:
             - $ref: '#/components/schemas/UpdateDeploymentInputCloudProvider'
@@ -16847,6 +16870,10 @@ components:
         customDomain:
           oneOf:
             - type: string
+            - type: 'null'
+        defaultAgentId:
+          oneOf:
+            - type: integer
             - type: 'null'
         defaultLaunchpadViewGroup:
           oneOf:
