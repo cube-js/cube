@@ -270,12 +270,12 @@ alias). A per-call `agentId` on `chat` still overrides it for that one request. 
 id isn't checked at connect time: an id that doesn't exist on the deployment, or that you
 can't use, makes each `chat` call fail rather than fall back to another agent. An agent
 belongs to one deployment, so a `chat` call whose `deploymentId` targets another deployment
-ignores the pin and uses that deployment's default agent (or Auto) unless it passes its own `agentId`.
+ignores the pin and uses that deployment's default agent (or Auto) unless it passes its own
+`agentId`.
 
 When the client names no agent, the session uses the deployment's
-[default agent](/admin/ai/multi-agent#default-agent-and-auto), or **Auto** when no default
-is set. An admin can turn Auto off only while a default is set; a request for Auto
-(`agentId: null`) then runs on the default agent.
+[default agent](/admin/ai/multi-agent#default-agent-and-auto) (or Auto). With Auto turned
+off, `agentId: null` runs on the default agent too.
 
 ## Target a dev-mode branch
 
