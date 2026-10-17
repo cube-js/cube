@@ -72,6 +72,11 @@ A task has:
 - **Description** (optional) — a short summary shown in the list.
 - **Instructions** (required) — the natural-language prompt the agent runs on
   each execution.
+- **Agent** (optional) — the agent that runs the task. Left on **Deployment
+  default**, the task follows the deployment's default agent at run time, so
+  changing that default changes the agent future runs use. A task created from
+  chat records the agent of that chat. **Auto** is offered only while the
+  deployment allows it.
 - **Schedule** — how often the task runs (see below).
 - **Enabled** — a toggle to activate or pause a scheduled task.
 - **Notify me when a run finishes** — a toggle to get an
