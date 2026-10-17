@@ -111,7 +111,10 @@ switcher set to **Disabled** still takes its `tg_` or `ms_`.
 An empty value clears a control instead of setting it: `f_` with an empty
 `value` and no `type` (`{"value":[]}`), or an empty `tg_`
 (`tg_orders_transactions.created_at=`), opens that control cleared, and its
-default does not fill it back in. See [Controls → Sharing the current
+default does not fill it back in. An `f_` with nothing after the `=`
+(`f_orders_transactions.status=`), the form a viewer's own clear writes, clears
+the filter on a published dashboard, embedded or not; the dashboard builder
+ignores it. See [Controls → Sharing the current
 selection](/docs/explore-analyze/dashboards/widgets/controls#sharing-the-current-selection).
 
 The reverse direction is published-only: when a viewer changes a control — or
