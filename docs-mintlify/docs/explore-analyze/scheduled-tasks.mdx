@@ -343,14 +343,18 @@ notified, and the dialog says so.
 
 Each notification carries the task name, whether the run succeeded, the start
 of the agent's answer, and a link that opens the run. Each Slack post carries
-the same answer and link. Picking a person or group shares the task with them,
-view-only, so the link opens the run for them. Removing them from **Notify**
-leaves the share in place; remove it in the **Share** dialog. Besides the
-creator, a run notifies only people who can open the task (admins, and anyone
-it's shared with directly, through a group, or with the whole organization)
-and read its deployment. Anyone else picked is skipped, and the dialog marks
-them **Not shared: won't be notified**. Deactivated users and people outside
-the workspace get nothing.
+the same answer and link. Saving a task with a newly picked person or group
+shares the task with them, view-only, so the link opens the run for them,
+whether they were picked in the dialog, by the agent, or through the Platform
+API. Removing them from **Notify** leaves the share in place; remove it in the
+**Share** dialog. Besides the creator, a run notifies only people who can open
+the task (admins, and anyone it's shared with directly, through a group, or
+with the whole organization) and read its deployment. A picked person fails
+that in two ways: their share was removed in the **Share** dialog after they
+were picked (saving the task again doesn't share it back; remove them from
+**Notify** and pick them again), or they can't read the deployment. The run
+skips them, and the dialog marks them **Not shared: won't be notified** in
+both cases. Deactivated users and people outside the workspace get nothing.
 
 Notifications go to the task's recipients, whoever runs the task: an admin or
 a user with **Manage all scheduled tasks** who edits or runs it is notified
