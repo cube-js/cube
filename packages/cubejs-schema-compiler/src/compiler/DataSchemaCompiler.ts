@@ -301,6 +301,10 @@ export type DataSchemaCompilerOptions = {
    * Evaluate data model files in one realm shared by all compiles (prepareCompiler resolves it)
    */
   sharedVmContext?: boolean;
+  /**
+   * Transpiler worker pool to use instead of starting one per compile; the caller terminates it
+   */
+  transpilerWorkerPool?: workerpool.Pool;
 };
 
 export type TranspileOptions = {
@@ -382,6 +386,8 @@ export class DataSchemaCompiler {
 
   private workerPool: workerpool.Pool | null;
 
+  private readonly externalWorkerPool: workerpool.Pool | null;
+
   private readonly compilerId: string;
 
   private readonly compiledScriptCache: LRUCache<string, vm.Script>;
@@ -429,6 +435,7 @@ export class DataSchemaCompiler {
     this.yamlCompiler = options.yamlCompiler;
     this.pythonContext = null;
     this.workerPool = null;
+    this.externalWorkerPool = options.transpilerWorkerPool ?? null;
     this.compilerId = options.compilerId || 'default';
     this.compiledScriptCache = options.compiledScriptCache;
     this.compiledYamlCache = options.compiledYamlCache;
@@ -509,7 +516,7 @@ export class DataSchemaCompiler {
 
     if (!transpilationNative) {
       const wc = getEnv('transpilationWorkerThreadsCount');
-      this.workerPool = workerpool.pool(
+      this.workerPool = this.externalWorkerPool ?? workerpool.pool(
         path.join(__dirname, 'transpilers/transpiler_worker'),
         wc > 0 ? { maxWorkers: wc } : undefined,
       );
@@ -854,7 +861,7 @@ export class DataSchemaCompiler {
             errorsReport,
             { cubeNames: [], cubeSymbols: {}, transpilerNames: [], contextSymbols: {}, compilerId: this.compilerId, stage: 0 }
           ).then(() => undefined);
-        } else if (this.workerPool) {
+        } else if (this.workerPool && !this.externalWorkerPool) {
           this.workerPool.terminate();
         }
       })
