@@ -92,10 +92,11 @@ Once your saved combinations have loaded, the icon has four states:
 | Sliders with an exclamation mark | **Control values changed** | You changed a control, and the combination isn't saved. Clearing a control that has a default counts as a change. |
 | Sliders with a check mark | **Control values** | The controls match one of your saved combinations. |
 
-Until they load, the icon shows a spinner and pressing it does nothing. If they
-can't be loaded, it shows the sliders with the tooltip **Couldn't load saved
-control values. Click to retry**: pressing it loads them again instead of
-opening the menu.
+Until they load, and while the dashboard's data model is still loading, the
+icon shows a spinner and pressing it does nothing. If they can't be loaded,
+including when they're read again after you save or delete one, it shows the
+sliders with the tooltip **Couldn't load saved control values. Click to
+retry**: pressing it loads them again instead of opening the menu.
 
 Press the icon to open its menu:
 
@@ -107,6 +108,10 @@ Press the icon to open its menu:
 - Your saved combinations, oldest first, with a check on the one the controls
   match. Select one to load it. Its **Rename** and **Delete** buttons appear
   while you hover it; a name can't be empty.
+
+If a save, rename or delete fails, such as renaming a combination you have
+since deleted in another tab, you see **Couldn't update saved control values**.
+A rename that fails keeps its dialog open with the name you typed.
 
 A saved combination is named after what you changed: each control's title and
 its value, separated by commas — for example `Region: City contains new,
