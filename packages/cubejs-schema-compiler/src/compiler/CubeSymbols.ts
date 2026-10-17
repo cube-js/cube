@@ -1128,6 +1128,9 @@ export class CubeSymbols implements TranspilerSymbolResolver, CompilerInterface 
           description: memberRef.override?.description || resolvedMember.description,
           format: memberRef.override?.format || resolvedMember.format,
           ...(propagatedCurrency ? { currency: propagatedCurrency } : {}),
+          // Metadata only: view SQL still references the source measure, so
+          // `rollingWindow` itself is not copied.
+          ...((resolvedMember.cumulative || resolvedMember.rollingWindow) && { cumulative: true }),
           ...(resolvedMember.multiStage && { multiStage: resolvedMember.multiStage }),
           ...(resolvedMember.timeShift && { timeShift: resolvedMember.timeShift }),
           ...(resolvedMember.orderBy && { orderBy: resolvedMember.orderBy }),
