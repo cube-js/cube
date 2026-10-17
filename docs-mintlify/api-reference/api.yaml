@@ -16234,8 +16234,8 @@ components:
           type: string
         userId:
           description: >-
-            The creator. Every run executes as this user, and only they or an admin may change,
-            delete or run the task.
+            The creator. Every run executes as this user, and only they, an admin or a role granting
+            `ScheduledTasksManage` on the deployment may change, delete or run the task.
           type: integer
       required:
         - id
@@ -17244,7 +17244,7 @@ components:
         ownerUserId:
           description: >-
             Transfer the delivery to this active user, who must be able to read its report. They
-            become owner and run-as user. Admins only.
+            become owner and run-as user. Admins and roles granting `ScheduledTasksManage` only.
           oneOf:
             - type: integer
             - type: 'null'
