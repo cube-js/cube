@@ -123,6 +123,7 @@ pub fn get_test_meta() -> Vec<CubeMeta> {
                     format: None,
                     format_description: None,
                     currency: None,
+                    cumulative: None,
                 },
                 CubeMetaMeasure {
                     name: "KibanaSampleDataEcommerce.maxPrice".to_string(),
@@ -136,6 +137,7 @@ pub fn get_test_meta() -> Vec<CubeMeta> {
                     format: None,
                     format_description: None,
                     currency: None,
+                    cumulative: None,
                 },
                 CubeMetaMeasure {
                     name: "KibanaSampleDataEcommerce.sumPrice".to_string(),
@@ -149,6 +151,7 @@ pub fn get_test_meta() -> Vec<CubeMeta> {
                     format: None,
                     format_description: None,
                     currency: None,
+                    cumulative: None,
                 },
                 CubeMetaMeasure {
                     name: "KibanaSampleDataEcommerce.minPrice".to_string(),
@@ -162,6 +165,7 @@ pub fn get_test_meta() -> Vec<CubeMeta> {
                     format: None,
                     format_description: None,
                     currency: None,
+                    cumulative: None,
                 },
                 CubeMetaMeasure {
                     name: "KibanaSampleDataEcommerce.avgPrice".to_string(),
@@ -175,6 +179,7 @@ pub fn get_test_meta() -> Vec<CubeMeta> {
                     format: None,
                     format_description: None,
                     currency: None,
+                    cumulative: None,
                 },
                 CubeMetaMeasure {
                     name: "KibanaSampleDataEcommerce.countDistinct".to_string(),
@@ -188,6 +193,7 @@ pub fn get_test_meta() -> Vec<CubeMeta> {
                     format: None,
                     format_description: None,
                     currency: None,
+                    cumulative: None,
                 },
             ],
             segments: vec![
@@ -250,6 +256,7 @@ pub fn get_test_meta() -> Vec<CubeMeta> {
                     format: None,
                     format_description: None,
                     currency: None,
+                    cumulative: None,
                 },
                 CubeMetaMeasure {
                     name: "Logs.agentCountApprox".to_string(),
@@ -263,6 +270,7 @@ pub fn get_test_meta() -> Vec<CubeMeta> {
                     format: None,
                     format_description: None,
                     currency: None,
+                    cumulative: None,
                 },
             ],
             segments: vec![],
@@ -293,6 +301,7 @@ pub fn get_test_meta() -> Vec<CubeMeta> {
                 format: None,
                 format_description: None,
                 currency: None,
+                cumulative: None,
             }],
             segments: vec![],
             joins: None,
@@ -326,6 +335,7 @@ pub fn get_test_meta() -> Vec<CubeMeta> {
                     format: None,
                     format_description: None,
                     currency: None,
+                    cumulative: None,
                 })
                 .chain(
                     vec![
@@ -341,6 +351,7 @@ pub fn get_test_meta() -> Vec<CubeMeta> {
                             format: None,
                             format_description: None,
                             currency: None,
+                            cumulative: None,
                         },
                         CubeMetaMeasure {
                             name: "WideCube.maxPrice".to_string(),
@@ -354,6 +365,7 @@ pub fn get_test_meta() -> Vec<CubeMeta> {
                             format: None,
                             format_description: None,
                             currency: None,
+                            cumulative: None,
                         },
                         CubeMetaMeasure {
                             name: "WideCube.minPrice".to_string(),
@@ -367,6 +379,7 @@ pub fn get_test_meta() -> Vec<CubeMeta> {
                             format: None,
                             format_description: None,
                             currency: None,
+                            cumulative: None,
                         },
                         CubeMetaMeasure {
                             name: "WideCube.avgPrice".to_string(),
@@ -380,6 +393,7 @@ pub fn get_test_meta() -> Vec<CubeMeta> {
                             format: None,
                             format_description: None,
                             currency: None,
+                            cumulative: None,
                         },
                         CubeMetaMeasure {
                             name: "WideCube.countDistinct".to_string(),
@@ -393,6 +407,7 @@ pub fn get_test_meta() -> Vec<CubeMeta> {
                             format: None,
                             format_description: None,
                             currency: None,
+                            cumulative: None,
                         },
                     ]
                     .into_iter(),
@@ -449,6 +464,7 @@ pub fn get_test_meta() -> Vec<CubeMeta> {
                             format: None,
                             format_description: None,
                             currency: None,
+                            cumulative: None,
                         },
                         CubeMetaMeasure {
                             name: format!("MultiTypeCube.measure_str{}", i),
@@ -462,6 +478,7 @@ pub fn get_test_meta() -> Vec<CubeMeta> {
                             format: None,
                             format_description: None,
                             currency: None,
+                            cumulative: None,
                         },
                         CubeMetaMeasure {
                             name: format!("MultiTypeCube.measure_date{}", i),
@@ -475,6 +492,7 @@ pub fn get_test_meta() -> Vec<CubeMeta> {
                             format: None,
                             format_description: None,
                             currency: None,
+                            cumulative: None,
                         },
                     ]
                 })
@@ -492,6 +510,7 @@ pub fn get_test_meta() -> Vec<CubeMeta> {
                             format: None,
                             format_description: None,
                             currency: None,
+                            cumulative: None,
                         },
                         CubeMetaMeasure {
                             name: "MultiTypeCube.maxPrice".to_string(),
@@ -505,6 +524,7 @@ pub fn get_test_meta() -> Vec<CubeMeta> {
                             format: None,
                             format_description: None,
                             currency: None,
+                            cumulative: None,
                         },
                         CubeMetaMeasure {
                             name: "MultiTypeCube.minPrice".to_string(),
@@ -518,6 +538,7 @@ pub fn get_test_meta() -> Vec<CubeMeta> {
                             format: None,
                             format_description: None,
                             currency: None,
+                            cumulative: None,
                         },
                         CubeMetaMeasure {
                             name: "MultiTypeCube.avgPrice".to_string(),
@@ -531,6 +552,7 @@ pub fn get_test_meta() -> Vec<CubeMeta> {
                             format: None,
                             format_description: None,
                             currency: None,
+                            cumulative: None,
                         },
                         CubeMetaMeasure {
                             name: "MultiTypeCube.countDistinct".to_string(),
@@ -544,6 +566,7 @@ pub fn get_test_meta() -> Vec<CubeMeta> {
                             format: None,
                             format_description: None,
                             currency: None,
+                            cumulative: None,
                         },
                     ]
                     .into_iter(),
@@ -578,6 +601,7 @@ pub fn get_string_cube_meta() -> Vec<CubeMeta> {
             format_description: None,
             currency: None,
             alias_member: None,
+            cumulative: None,
         }],
         segments: vec![],
         joins: None,
@@ -608,6 +632,7 @@ pub fn get_sixteen_char_member_cube() -> Vec<CubeMeta> {
                 format_description: None,
                 currency: None,
                 alias_member: None,
+                cumulative: None,
             },
             CubeMetaMeasure {
                 name: "SixteenChar.sixteen_charchar_foo".to_string(),
@@ -621,6 +646,7 @@ pub fn get_sixteen_char_member_cube() -> Vec<CubeMeta> {
                 format_description: None,
                 currency: None,
                 alias_member: None,
+                cumulative: None,
             },
             CubeMetaMeasure {
                 name: "SixteenChar.sixteen_charchar_bar".to_string(),
@@ -634,6 +660,7 @@ pub fn get_sixteen_char_member_cube() -> Vec<CubeMeta> {
                 format_description: None,
                 currency: None,
                 alias_member: None,
+                cumulative: None,
             },
         ],
         segments: vec![],
@@ -981,6 +1008,7 @@ pub fn get_test_tenant_ctx_with_multi_data_source_view_and_templates(
         format: None,
         format_description: None,
         currency: None,
+        cumulative: None,
     };
 
     let mut meta = get_test_meta();

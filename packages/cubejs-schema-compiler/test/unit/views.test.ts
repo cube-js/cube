@@ -562,6 +562,69 @@ describe('Views YAML', () => {
     ]);
   });
 
+  it('marks view members over rolling window measures as cumulative', async () => {
+    const { compiler, cubeEvaluator, metaTransformer } = prepareYamlCompiler(`
+      cubes:
+        - name: orders
+          sql_table: orders
+          measures:
+            - name: total
+              sql: amount
+              type: sum
+            - name: running_total
+              sql: amount
+              type: sum
+              rolling_window:
+                trailing: unbounded
+          dimensions:
+            - name: id
+              sql: id
+              type: number
+              primary_key: true
+            - name: created_at
+              sql: created_at
+              type: time
+
+      views:
+        - name: orders_view
+          cubes:
+            - join_path: orders
+              includes:
+                - total
+                - running_total
+                - created_at
+
+        - name: orders_view_of_view
+          cubes:
+            - join_path: orders_view
+              includes:
+                - total
+                - running_total
+`);
+
+    await compiler.compile();
+
+    // The view member must not become a rolling window itself, or its SQL would change.
+    expect(cubeEvaluator.getCubeDefinition('orders_view').measures!.running_total).not.toHaveProperty('rollingWindow');
+
+    const measureMeta = (viewName: string) => Object.fromEntries(
+      metaTransformer.cubes
+        .map((def) => def.config)
+        .find((def) => def.name === viewName)!
+        .measures
+        .map((m) => [m.name, { cumulative: m.cumulative, cumulativeTotal: m.cumulativeTotal }])
+    );
+
+    expect(measureMeta('orders_view')).toEqual({
+      'orders_view.total': { cumulative: false, cumulativeTotal: false },
+      'orders_view.running_total': { cumulative: true, cumulativeTotal: true },
+    });
+    expect(measureMeta('orders_view_of_view')).toEqual({
+      'orders_view_of_view.total': { cumulative: false, cumulativeTotal: false },
+      'orders_view_of_view.running_total': { cumulative: true, cumulativeTotal: true },
+    });
+  });
+
   it('throws error for unresolved members', async () => {
     const { compiler } = prepareYamlCompiler(`
       cubes:
