@@ -149,8 +149,9 @@ The task notifies once each time the condition starts to hold:
   The message names the measure by the title picked in the task dialog, or by
   its full name (such as `orders.revenue`) on a task that has no title for
   it. Everyone else, and each Slack channel, is told that the condition
-  started to hold, without the figures, because the check read them with the
-  creator's data access.
+  started to hold, without the figures. The figures stay in the run's chat
+  thread, which everyone the task is shared with can open (see
+  [Managing tasks](#managing-tasks)).
 
 A task with a condition must notify someone: **Inbox** or **Email** on with at
 least one person or group picked, or **Slack** on with at least one channel.
