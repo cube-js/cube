@@ -266,12 +266,16 @@ https://cubecloud.dev/mcp?agentId=<agentId>
 
 A client that can't set a query parameter can send the same value as an
 `x-mcp-agent-id` header instead (checked first; `mcp-agent-id` is a lower-priority
-alias). A per-call `agentId` on `chat` still overrides it for that one request.
+alias). A per-call `agentId` on `chat` still overrides it for that one request. The pinned
+id isn't checked at connect time: an id that doesn't exist on the deployment, or that you
+can't use, makes each `chat` call fail rather than fall back to another agent. An agent
+belongs to one deployment, so a `chat` call whose `deploymentId` targets another deployment
+ignores the pin and uses that deployment's default agent unless it passes its own `agentId`.
 
-When the client names no agent, the session uses the deployment's **default agent**, which
-an admin sets in the deployment's **Settings → Configuration → Agents**. With no default
-set, it uses **Auto**. If the admin has turned Auto off, a request for Auto (`agentId:
-null`) runs on the default agent instead.
+When the client names no agent, the session uses the deployment's
+[default agent](/admin/ai/multi-agent#default-agent-and-auto), or **Auto** when no default
+is set. An admin can turn Auto off only while a default is set; a request for Auto
+(`agentId: null`) then runs on the default agent.
 
 ## Target a dev-mode branch
 

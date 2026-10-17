@@ -125,6 +125,17 @@ The properties available on each agent are the same as in the [single-agent setu
 | `description` | string | No       | Human-readable description.                                |
 | `space`       | string | Yes      | Name of the [space](#spaces) this agent belongs to.        |
 
+### Default agent and Auto
+
+Each deployment has a **default agent**: what a chat, [MCP client](/docs/integrations/mcp-server)
+or [scheduled task](/docs/explore-analyze/scheduled-tasks) runs on when it names no agent.
+An admin sets it in the deployment's **Settings → Configuration → Agents**. With no default
+set, those fall back to the **Auto** agent.
+
+The same card can turn Auto off, so users can't pick it. Auto can be turned off only while a
+default agent is set, and that default can't be deleted or moved to another deployment until
+it's replaced. With Auto off, a request for Auto runs on the default agent instead.
+
 ## Spaces
 
 A space is the context an agent operates in. Spaces own the rules, certified queries, and memories that the agents inside them share. Define spaces alongside agents:

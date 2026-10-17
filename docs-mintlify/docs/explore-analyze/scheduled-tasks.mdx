@@ -73,10 +73,12 @@ A task has:
 - **Instructions** (required) — the natural-language prompt the agent runs on
   each execution.
 - **Agent** (optional) — the agent that runs the task. Left on **Deployment
-  default**, the task follows the deployment's default agent at run time, so
-  changing that default changes the agent future runs use. A task created from
-  chat records the agent of that chat. **Auto** is offered only while the
-  deployment allows it.
+  default**, each run uses the deployment's
+  [default agent](/admin/ai/multi-agent#default-agent-and-auto) at run time, or
+  Auto when none is set, so changing the default moves future runs too. If the
+  task's owner can't run the default agent, the run falls back to Auto, or fails
+  when Auto is turned off. A task created from chat records that chat's agent; if
+  a picked agent is later deleted, the task's runs fail until you pick another.
 - **Schedule** — how often the task runs (see below).
 - **Enabled** — a toggle to activate or pause a scheduled task.
 - **Notify me when a run finishes** — a toggle to get an
