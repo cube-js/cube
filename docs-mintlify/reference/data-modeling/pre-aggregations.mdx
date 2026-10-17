@@ -1345,10 +1345,14 @@ in future versions.
 <Warning>
 
 Cube will **not** return results outside of the defined build range. Data will
-**only** be queried within this range, which can lead to an empty result set,
-depending on the query. Consider using [Lambda
-pre-aggregations][self-rolluplambda] if you want to query data outside of the
-build range.
+**only** be queried within this range, which can lead to an empty or partial
+result set, depending on the query. This includes queries that start before
+`build_range_start` and queries without a date range on the `time_dimension`.
+The response doesn't indicate that data was left out.
+
+Consider using [Lambda pre-aggregations][self-rolluplambda] if you want to
+query data after `build_range_end`. They don't add data before
+`build_range_start`.
 
 </Warning>
 
