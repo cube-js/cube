@@ -385,6 +385,7 @@ describe('ClickHouseDriver', () => {
 
       // KILL QUERY is asynchronous by default, so wait for ClickHouse to stop the query
       let running = await runningQueries(driver, requestId);
+
       for (let i = 0; i < 20 && running[0].c !== '0'; i++) {
         await new Promise((resolve) => setTimeout(resolve, 250));
         running = await runningQueries(driver, requestId);
