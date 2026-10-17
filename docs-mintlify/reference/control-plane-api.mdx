@@ -414,8 +414,11 @@ Rendering happens asynchronously, since a capture waits for every widget on
 the dashboard to finish querying: submit a job, poll it until `status` is
 `completed` — or `failed`, whose `error` says why — then download the file.
 The job and its file are dropped at the `expiresAt` the submit returns —
-5 minutes out — so download before then or submit again. Only the identity
-that submitted a job can poll or download it.
+5 minutes out, or 15 for `layout: print`, whose capture of a long table can
+take minutes — so download before then or submit again. A print version
+larger than the export size limit ends `failed`, its `error` asking you to
+narrow the dashboard's filters. Only the identity that submitted a job can
+poll or download it.
 
 ```bash
 # 1. Submit the export

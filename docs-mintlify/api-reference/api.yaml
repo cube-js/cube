@@ -700,7 +700,8 @@ paths:
           Returns as soon as the job is accepted, because a render waits for every widget to finish
           querying. Poll `GET /dashboard-exports/{jobId}` until `status` is `completed`, then fetch
           the file from `GET /dashboard-exports/{jobId}/download`. The job and its file are dropped
-          at `expiresAt` (5 minutes) — download before then or submit again.
+          at `expiresAt` (5 minutes; 15 for `layout: print`, which can take minutes on a long table)
+          — download before then or submit again.
 
 
           Pass `filters`, `timeGrains` and `memberSwitchers` to render the board with specific

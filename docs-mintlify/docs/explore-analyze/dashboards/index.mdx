@@ -128,13 +128,15 @@ version**](#print-a-single-table), directly under **Download as PDF**.
 
 PNG and PDF downloads are server-rendered snapshots — Cube re-opens the
 dashboard (or, for a single chart, that chart on its own), waits for rendering
-to finish, and captures the result. This can take up to a couple of minutes
-for large dashboards. The control selections you currently have applied in your
-browser are carried into a download you start yourself — filters, time
-granularity switchers and [field switchers][ref-controls] alike. A scheduled
-notification has no browser session, so its attachment renders the dashboard's
-own defaults, unless that notification carries selections of its own. (CSV is
-generated from the data already loaded in the chart and downloads immediately.)
+to finish, and captures the result. This can take up to a couple of minutes for
+large dashboards, and up to ten minutes for the [print version](#print-version)
+of a long table; the progress notice (`Preparing PDF…`) stays up until the file
+arrives. The control selections you currently have applied in your browser are
+carried into a download you start yourself — filters, time granularity
+switchers and [field switchers][ref-controls] alike. A scheduled notification
+has no browser session, so its attachment renders the dashboard's own defaults,
+unless that notification carries selections of its own. (CSV is generated from
+the data already loaded in the chart and downloads immediately.)
 
 Downloading the whole dashboard requires **Manage** permission on the workbook
 that owns it; exporting a single chart requires the **Download data**
@@ -193,6 +195,9 @@ appear once, above its first row, and are not repeated on the pages it
 continues onto.
 
 </Info>
+
+A print version larger than the export size limit isn't downloaded: the export
+fails with a message asking you to narrow the dashboard's filters.
 
 Your current control selections are carried into the print version exactly as
 they are into **Download as PDF**, and it requires the same permission. A
