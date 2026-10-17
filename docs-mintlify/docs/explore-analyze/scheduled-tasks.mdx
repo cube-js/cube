@@ -177,8 +177,9 @@ Check the **Scheduled** page of each deployment you work in to find them.
 
 ## Managing tasks
 
-A task is visible only to its creator, to admins, and to the people and
-groups it's shared with. The creator or an admin shares it with the **Share**
+A task is visible only to its creator, to admins, to roles granting **View all
+scheduled tasks** or **Manage all scheduled tasks** on the deployment, and to
+the people and groups it's shared with. The creator or an admin shares it with the **Share**
 button on its detail page. Sharing is view-only: the people it's shared with
 see the task, its schedule, and its run history, and its detail page shows
 a **Shared with you** tag in place of its actions. Creating a task needs the
@@ -187,12 +188,14 @@ a **Shared with you** tag in place of its actions. Creating a task needs the
 which every built-in role grants. Users without it, for example those whose
 only role is a custom role that leaves it out, get no **New task** button, and
 the agent and the Platform API refuse to create a task for them; tasks they
-already created stay theirs to manage. Only a task's creator, or a user with
-the **Admin** [role](/admin/users-and-permissions/roles-and-permissions), can
-edit, pause, run, check, share, or delete it, because every run executes as
+already created stay theirs to manage. Only a task's creator, a user with
+the **Admin** [role](/admin/users-and-permissions/roles-and-permissions), or a
+user whose role grants **Manage all scheduled tasks** on the deployment (see
+[custom roles](/admin/users-and-permissions/custom-roles#deployment-permissions))
+can edit, pause, run, check, share, or delete it, because every run executes as
 the creator (see [Reading the output](#reading-the-output)).
 
-The admin exception carries the creator's data access with it: an admin who edits
+That exception carries the creator's data access with it: an admin who edits
 another user's task changes what runs under that user's access. A run's chat
 thread belongs to the task's creator, and only the creator, admins, users with
 the **Access chat history**
