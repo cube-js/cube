@@ -360,6 +360,59 @@ describe('ClickHouseDriver', () => {
     });
   });
 
+  describe('cancellation', () => {
+    const runningQueries = async (driver: ClickHouseDriver, requestId: string) => driver.query<{ c: string }>(
+      'SELECT count() AS c FROM system.processes WHERE startsWith(query_id, ?)',
+      [requestId]
+    );
+
+    const expectCancellable = async (
+      driver: ClickHouseDriver,
+      requestId: string,
+      run: () => Promise<unknown>,
+    ) => {
+      const promise: any = run();
+      promise.catch(() => undefined);
+
+      expect(typeof promise.cancel).toBe('function');
+
+      // Let the query reach ClickHouse before killing it
+      await new Promise((resolve) => setTimeout(resolve, 500));
+      expect(await runningQueries(driver, requestId)).toEqual([{ c: '1' }]);
+
+      await promise.cancel();
+      await expect(promise).rejects.toThrow();
+
+      // KILL QUERY is asynchronous by default, so wait for ClickHouse to stop the query
+      let running = await runningQueries(driver, requestId);
+      for (let i = 0; i < 20 && running[0].c !== '0'; i++) {
+        await new Promise((resolve) => setTimeout(resolve, 250));
+        running = await runningQueries(driver, requestId);
+      }
+      expect(running).toEqual([{ c: '0' }]);
+    };
+
+    const SLOW_QUERY = 'SELECT sleep(3) FROM numbers(5) SETTINGS max_block_size = 1';
+
+    it('query() exposes cancel() that kills the query in ClickHouse', async () => {
+      await doWithDriver(async (driver) => {
+        const requestId = 'cancel-query';
+        await expectCancellable(driver, requestId, () => driver.query(SLOW_QUERY, [], { requestId }));
+      });
+    });
+
+    it('downloadQueryResults() exposes cancel() that kills the query in ClickHouse', async () => {
+      await doWithDriver(async (driver) => {
+        const requestId = 'cancel-download';
+        await expectCancellable(
+          driver,
+          requestId,
+          () => driver.downloadQueryResults(SLOW_QUERY, [], { requestId, highWaterMark: 100 })
+        );
+      });
+    });
+  });
+
   it('stream', async () => {
     await doWithDriver(async (driver) => {
       const tableData = await driver.stream('SELECT * FROM test.types_test ORDER BY int8', [], {
