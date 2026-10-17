@@ -177,8 +177,9 @@ Check the **Scheduled** page of each deployment you work in to find them.
 
 ## Managing tasks
 
-A task is visible only to its creator, to admins, and to the people and
-groups it's shared with. The creator or an admin shares it with the **Share**
+A task is visible only to its creator, to admins, to roles granting **View all
+scheduled tasks** or **Manage all scheduled tasks** on the deployment, and to
+the people and groups it's shared with. The creator, an admin, or a role granting **Manage all scheduled tasks** shares it with the **Share**
 button on its detail page. Sharing is view-only: the people it's shared with
 see the task, its schedule, and its run history, and its detail page shows
 a **Shared with you** tag in place of its actions. Creating a task needs the
@@ -187,13 +188,15 @@ a **Shared with you** tag in place of its actions. Creating a task needs the
 which every built-in role grants. Users without it, for example those whose
 only role is a custom role that leaves it out, get no **New task** button, and
 the agent and the Platform API refuse to create a task for them; tasks they
-already created stay theirs to manage. Only a task's creator, or a user with
-the **Admin** [role](/admin/users-and-permissions/roles-and-permissions), can
-edit, pause, run, check, share, or delete it, because every run executes as
+already created stay theirs to manage. Only a task's creator, a user with
+the **Admin** [role](/admin/users-and-permissions/roles-and-permissions), or a
+user whose role grants **Manage all scheduled tasks** on the deployment (see
+[custom roles](/admin/users-and-permissions/custom-roles#deployment-permissions))
+can edit, pause, run, check, share, or delete it, because every run executes as
 the creator (see [Reading the output](#reading-the-output)).
 
-The admin exception carries the creator's data access with it: an admin who edits
-another user's task changes what runs under that user's access. A run's chat
+That exception carries the creator's data access with it: an admin or a
+**Manage all scheduled tasks** holder who edits another user's task changes what runs under that user's access. A run's chat
 thread belongs to the task's creator, and only the creator, admins, users with
 the **Access chat history**
 [permission](/admin/users-and-permissions/custom-roles), and people the thread
@@ -256,7 +259,8 @@ The page shows:
   when it is checked. On a scheduled task, that line says each scheduled run
   checks the condition first and runs the agent only when it holds; on a
   **Manual** task, that the condition is checked only when **Check now** is
-  pressed, by you or, on a task you didn't create, by its owner or an admin.
+  pressed, by you or, on a task you didn't create, by its owner, an admin, or a role
+  granting **Manage all scheduled tasks**.
   Its **Last check** follows.
 
 The **Last check** shows when the last check ran, its result (**Condition not
@@ -303,8 +307,8 @@ to both scheduled runs and **Run now**. On a
 [conditional task](#conditional-tasks), a check that runs no agent sends
 nothing.
 
-The notification goes to the task's creator, even when an admin edits or runs
-the task. See [Inbox](/docs/inbox#notification-types) for what it shows.
+The notification goes to the task's creator, even when an admin or another user
+with **Manage all scheduled tasks** edits or runs the task. See [Inbox](/docs/inbox#notification-types) for what it shows.
 
 A task that you create with the agent or the Platform API has notifications
 off, unless you ask for them: for example, *"schedule a daily summary of

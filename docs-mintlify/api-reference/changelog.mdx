@@ -7,6 +7,13 @@ rss: true
 {/* GENERATED FILE — do not edit by hand. */}
 {/* Run scripts/extract-changelog.mjs against the platform client CHANGELOG.md. */}
 
+<Update label="2026-10-17" description="v0.21.0" tags={["Added"]}>
+  ### Added
+
+  - `GET /api/v1/deployments/{deploymentId}/agent-defaults` (`AgentsPublicController.getAgentDefaults`) returns the deployment's default agent (`defaultAgentId`, or `null`) and whether users may pick Auto (`autoAgentEnabled`). Chats, MCP sessions and scheduled tasks that name no agent use the default. New schema: `AgentDefaultsResponse`; the deployment schemas carry the same two fields.
+  - Two deployment-scoped RBAC actions, `ScheduledTasksRead` and `ScheduledTasksManage`, in the action enums (`Policy.actions`, the resource user/group policy schemas and their inherited variants). With `ScheduledTasksRead` on a deployment, the scheduled-task endpoints and `GET /api/v1/deployments/{deploymentId}/report-deliveries` return every task and delivery there, not only the caller's own and those shared with them. `ScheduledTasksManage` also allows updating, pausing, running, deleting and sharing them, and transferring a delivery to another owner. A policy granting `All` on a deployment includes both. No built-in role grants either, and admins keep seeing everything.
+</Update>
+
 <Update label="2026-10-15" description="v0.20.0" tags={["Added","Changed"]}>
   ### Added
 
