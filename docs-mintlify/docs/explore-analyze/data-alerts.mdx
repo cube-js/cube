@@ -80,30 +80,38 @@ suits whole-number measures such as counts.
 ### % change
 
 The condition is met when the measure **increases by ≥**, **decreases by ≥**,
-or **changes by ≥** (in either direction) the percentage you enter, comparing
-the chart's last complete period with the period before it.
+or **changes by ≥** (in either direction) the percentage you enter. On a chart
+with a time dimension, it compares the chart's last complete period with the
+period before it, and the field reads "vs the previous period". On a chart or
+KPI without one, it compares the value read now with the value the previous
+check read, and the field reads "vs the previous check" (see
+[Comparing with previous checks](#comparing-with-previous-checks)).
 
-When the previous period's value is 0 there is no percentage to compute, so the
-check can't run and nothing is sent.
+When the previous period's or previous check's value is 0 there is no
+percentage to compute, so the check can't run and nothing is sent.
 
 ### Anomaly
 
-The condition is met when the last complete period falls outside the normal
-range of the periods before it. The normal range is their median ± 3 × the
-median absolute deviation. If every earlier period has the same value, the range
-is that value alone, and any other value is outside it.
+On a chart with a time dimension, the condition is met when the last complete
+period falls outside the normal range of the periods before it. On a chart or
+KPI without one, it is met when the value read now falls outside the normal
+range of the values the alert read on its earlier checks. The normal range is
+their median ± 3 × the median absolute deviation. If every earlier value is the
+same, the range is that value alone, and any other value is outside it.
 
-The rule needs at least 8 complete periods before the latest one. Until the
-chart has them, the check can't run and nothing is sent.
+The rule needs at least 8 earlier values: complete periods before the latest
+one, or earlier checks on a chart without a time dimension. Until it has them,
+the check can't run and nothing is sent.
 
 ### Which charts support which rule
 
 The dialog offers a chart and a rule type only where the chart has the value it
 reads, and says why when it doesn't:
 
-- A chart or KPI **without a time dimension** supports **Threshold** only. **%
-  change** and **Anomaly** compare periods, so they are disabled, and the
-  reason shows under the rule types.
+- A chart or KPI **without a time dimension** supports every rule type. **%
+  change** and **Anomaly** compare its value with the values the alert read on
+  its previous checks, and the dialog says so under the condition: "Compares
+  with the values this alert read on its previous checks."
 - A chart **split by a dimension** besides its time dimension — a bar chart by
   category, or a line chart with one line per status — has no single value to
   check, so it is disabled in the **Chart** list. Its tooltip says why, for
@@ -135,10 +143,51 @@ the data holds, are skipped. A monthly chart checked on September 15 reads
 August. Periods follow the granularity the chart is drawn with, so a
 [time granularity switcher][ref-time-granularity] that changes it changes the
 period the alert reads. On a chart without a time dimension, the alert reads its
-single value.
+single value, and **% change** and **Anomaly** compare it with the values the
+alert read on its previous checks.
 
 **The schedule creator's access.** The check runs once per run, with the data
 access of the person who created the schedule.
+
+## Comparing with previous checks
+
+A chart or KPI without a time dimension has no earlier periods to compare with,
+so a **% change** or **Anomaly** alert on it remembers the value it reads on
+each check and compares the next value with those:
+
+- **% change** compares with the value the previous check read. The schedule's
+  frequency sets what "previous" means: on a daily schedule, a check compares
+  with yesterday's.
+- **Anomaly** compares with the normal range of the values the earlier checks
+  read, once there are at least 8 of them.
+
+The alert remembers the values of its last 30 checks. **Threshold** alerts, and
+alerts on a chart with a time dimension, remember nothing.
+
+The first check of a **% change** alert has nothing to compare with: it
+remembers its value and sends nothing. Its card reads "Last check: less than a
+minute ago, could not check", and hovering the line shows "could not check.
+There is no earlier check to compare with yet. Nothing sent." On an **Anomaly**
+alert's first check the hover reads "Needs 8 earlier checks, has 0.", and each
+later check counts up until there are 8. Only the schedule's creator sees the
+count; anyone else reads "Needs 8 earlier checks."
+
+**Run now** is a check like any other: it compares with the remembered values
+and adds its own, so the next scheduled run compares with it. Pressing it twice
+gives the second press a previous check.
+
+A check remembers nothing when it can't read a number (for example, the chart
+returned no rows or is now split by a dimension), or when it found the condition
+met but its notification reached no one. The next check then compares with the
+same earlier value.
+
+The remembered values are kept when you change the schedule's frequency, time,
+timezone, recipients, or Slack channel, and when you turn the schedule off and
+on again. They are discarded, and the alert starts over from its first check,
+when you change the alert's chart, measure, rule type, direction, or percentage,
+or the schedule's [control values][ref-control-values]. Republishing the
+dashboard keeps them: if you change the chart's filters and republish, the next
+check compares the new value with the values read before the change.
 
 ## When an alert notifies
 
@@ -160,7 +209,10 @@ back to "Last check: not run yet" — when you turn the schedule off, edit the
 alert's condition, or change the schedule's
 [control values][ref-control-values]: the next check notifies if the condition
 holds on what it now reads. Changing only the schedule's time keeps the
-history. A check that can't run leaves the history as it was.
+history. A check that can't run leaves the history as it was. Turning the
+schedule off doesn't discard the values an alert on a chart without a time
+dimension remembers (see
+[Comparing with previous checks](#comparing-with-previous-checks)).
 
 A run whose alert does not fire is a plain refresh: no screenshot is generated,
 no [AI summary][ref-ai-summary] is written, and nothing is sent.
@@ -174,10 +226,16 @@ what the alert found:
 - **Email** — the subject is `Alert: <chart> on <dashboard>`. The message names
   the condition, the chart, and the value read: the period it read, plus the
   previous period and the change for **% change**, or the normal range for
-  **Anomaly**.
+  **Anomaly**. On a chart without a time dimension, it names the previous
+  check's time and value instead of the previous period, or the normal range of
+  the earlier checks, and adds "Compared with the values this alert read on its
+  previous checks."
 - **Slack** — the message opens with the same `Alert: <chart> on <dashboard>`
   line, followed by what the alert read, for example "Count increased by 2.5%
-  from 157 in 2026-08 to 161 in 2026-09 (alert at 1% or more)."
+  from 157 in 2026-08 to 161 in 2026-09 (alert at 1% or more)." On a chart
+  without a time dimension it reads, for example, "Count decreased by 50%: it
+  was 20,003, from 40,000 at the previous check (2026-10-17 04:56 UTC) (alert at
+  10% or more)." and adds the same sentence as the email.
 
 Both state that the check used the dashboard's default filters and the
 schedule's saved filters, and that you will be notified again only after the
@@ -197,9 +255,10 @@ the dashboard with their own access.
 
 In the scheduled refreshes sidebar, a schedule with an alert carries an
 **Alert** badge beside its schedule and a summary of its rule, for example
-"Condition: Count is above 1,000 · Orders count". On the
-[Scheduled refreshes][ref-all-schedules] tab, the same summary, without
-"Condition:", fills the **Condition** column.
+"Condition: Count is above 1,000 · Orders count". A **% change** rule ends with
+"vs the previous period", or "vs the previous check" on a chart without a time
+dimension. On the [Scheduled refreshes][ref-all-schedules] tab, the same
+summary, without "Condition:", fills the **Condition** column.
 
 The card's last line shows the last check. Before the first one it reads "Last
 check: not run yet"; afterwards it says how long ago the check ran, what it
@@ -225,24 +284,33 @@ What came of it is one of these:
 How long ago is given in its largest unit, as for the next run: "less than a
 minute ago", "3 minutes ago", "1 hour ago", or "2 days ago".
 
-Hovering the line shows it whole and, under it, the whole check: when it ran,
-in your timezone and naming it, the value it read, and, for **% change**, the
+Hovering the line shows it whole and, under it, the whole check: when it ran, in
+your timezone and naming it, the value it read, and, for **% change**, the
 previous period and the change, for example "Last check Oct 17, 2026, 3:08 AM
-GMT+1: Count 339 (2026-09). Previous: 330 (2026-08), +2.7%. Condition not
-met." For **Anomaly**, it names the normal range, for example "Normal range: 8
-– 14." For a check that couldn't run, it says why. The **Last check** column
-of the [Scheduled refreshes][ref-all-schedules] tab shows the same line,
-without "Last check:", and the same text on hover.
+GMT+1: Count 339 (2026-09). Previous: 330 (2026-08), +2.7%. Condition not met."
+For **Anomaly**, it names the normal range, for example "Normal range: 8 – 14."
+On a chart without a time dimension, it names the previous check instead, for
+example "Count 20,003. Previous check Oct 19, 2026, 3:04 PM GMT+1: 40,000, -50%.",
+or "Normal range of the earlier checks: 8 – 14." For a check that couldn't run,
+it says why. The **Last check** column of the
+[Scheduled refreshes][ref-all-schedules] tab shows the same line, without "Last
+check:", and the same text on hover.
 
 The values are shown only to the schedule's creator. Anyone else sees how long
 ago the check ran and what came of it, for example "Last check: 1 minute ago,
 still met, not notified again", and on hover "values not shown, as it ran with
 the access of the schedule's creator."
 
+After **Run now**, leave the sidebar open: once the run has checked, the card's
+last line shows the new check by itself, with no reload. A run can take a few
+minutes.
+
 ### When a check can't run
 
 A check that can't run sends nothing and doesn't change whether the alert
-counts as holding. Hovering the last-check line shows why, for example:
+counts as holding. On a chart without a time dimension, it still remembers the
+value it read, if it read one. Hovering the last-check line shows why, for
+example:
 
 - The chart is no longer on the dashboard, or the measure is no longer in its
   query.
@@ -250,6 +318,9 @@ counts as holding. Hovering the last-check line shows why, for example:
 - The chart returned no rows, or there is no complete period yet.
 - An **Anomaly** rule has too few complete periods, or a **% change** rule's
   previous period was 0.
+- On a chart without a time dimension, a **% change** rule has no earlier check
+  yet or its previous check read 0, or an **Anomaly** rule has fewer than 8
+  earlier checks.
 
 When the chart or measure is gone, **Edit** shows the alert with the missing
 field flagged, for example "Count is no longer in “Orders by month”. Pick
@@ -267,8 +338,28 @@ send nothing while they do. Editing such a schedule shows only the **Alert
 condition** switch; turn it off to remove the alert. When data alerts are turned
 back on, the alerts resume where they left off.
 
+## Managing alerts from chat
+
+You can also ask the agent in [Analytics Chat][ref-chat] to add, change, or
+remove a dashboard's alert, or to list the alerts on a dashboard, in plain
+language — for example, *"email me when the Orders KPI on the Sales dashboard
+drops 10% from one check to the next, every day at 9"* or *"what alerts are on
+the Sales dashboard?"* See
+[Managing schedules from chat][ref-chat-schedules].
+
+## Managing alerts through the API
+
+The [Platform API][ref-api-update] sets an alert through a notification's
+`alert` field. An alert needs notifications switched on and at least one
+recipient, so create the notification, add its recipients, and then update it
+with `alert`. Setting `alert` to `null` removes the alert and keeps the
+notification.
+
 [ref-accessing]: /docs/explore-analyze/scheduled-refreshes#accessing-scheduled-refreshes
 [ref-ai-summary]: /docs/explore-analyze/notifications#ai-summary
+[ref-api-update]: /api-reference/notifications/update-a-scheduled-notification
+[ref-chat]: /docs/explore-analyze/analytics-chat
+[ref-chat-schedules]: /docs/explore-analyze/scheduled-refreshes#managing-schedules-from-chat
 [ref-all-schedules]: /docs/explore-analyze/scheduled-refreshes#viewing-all-scheduled-refreshes
 [ref-control-values]: /docs/explore-analyze/scheduled-refreshes#control-values
 [ref-duplicate]: /docs/explore-analyze/scheduled-refreshes#duplicating-a-schedule

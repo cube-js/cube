@@ -2092,7 +2092,8 @@ paths:
           `scheduleType` is `CUSTOM`; `timezone` defaults to UTC. Identify the target dashboard with
           either `dashboardId` (numeric) or `dashboardPublicId` (string) — supply exactly one; it
           must belong to this deployment, otherwise `404` is returned. The created notification has
-          no recipients — add them via `POST /notifications/{id}/recipients`.
+          no recipients — add them via `POST /notifications/{id}/recipients`. To make it a data
+          alert, create it, add its recipients, then set `alert` with an update.
   /api/v1/deployments/{deploymentId}/notifications/{id}:
     delete:
       operationId: deleteNotification
@@ -2202,10 +2203,11 @@ paths:
 
           Updates a notification’s schedule definition. Any subset of the schedule fields may be
           supplied (`scheduleType` + time fields or `customCron`, `timezone`), along with
-          `isEnabled`, `notificationEnabled`, and `notificationFormat`. Omitted fields are left
-          unchanged. This endpoint never modifies recipients — manage those through the
-          `/recipients` sub-resource. Returns `404` if the notification is not part of this
-          deployment.
+          `isEnabled`, `notificationEnabled`, `notificationFormat` and `alert`. Omitted fields are
+          left unchanged. This endpoint never modifies recipients — manage those through the
+          `/recipients` sub-resource. An `alert` needs notifications switched on and at least one
+          recipient, otherwise `400` is returned. Returns `404` if the notification is not part of
+          this deployment.
   /api/v1/deployments/{deploymentId}/notifications/{id}/recipients:
     delete:
       operationId: removeRecipients
@@ -10575,6 +10577,138 @@ components:
         - w
         - h
       type: object
+    DataAlertRule:
+      properties:
+        direction:
+          oneOf:
+            - type: string
+            - type: 'null'
+        grain:
+          oneOf:
+            - type: string
+            - type: 'null'
+        id:
+          type: string
+        measureColumn:
+          type: string
+        measureTitle:
+          type: string
+        operator:
+          oneOf:
+            - type: string
+            - type: 'null'
+        percent:
+          oneOf:
+            - type: number
+            - type: 'null'
+        reportId:
+          type: number
+        timeColumn:
+          description: >-
+            The chart's time dimension, which a % change or anomaly rule reads its periods from.
+            Without it, % change and anomaly compare the value with the values this alert read on
+            its previous checks.
+          oneOf:
+            - type: string
+            - type: 'null'
+        type:
+          type: string
+        value:
+          oneOf:
+            - type: number
+            - type: 'null'
+        widgetId:
+          type: string
+        widgetTitle:
+          type: string
+      required:
+        - id
+        - widgetId
+        - reportId
+        - widgetTitle
+        - measureColumn
+        - measureTitle
+        - type
+      type: object
+    DataAlertRuleInput:
+      properties:
+        direction:
+          oneOf:
+            - $ref: '#/components/schemas/DataAlertRuleInputDirection'
+            - type: 'null'
+        grain:
+          oneOf:
+            - $ref: '#/components/schemas/DataAlertRuleInputGrain'
+            - type: 'null'
+        measureColumn:
+          type: string
+        measureTitle:
+          type: string
+        operator:
+          oneOf:
+            - $ref: '#/components/schemas/DataAlertRuleInputOperator'
+            - type: 'null'
+        percent:
+          oneOf:
+            - type: number
+            - type: 'null'
+        reportId:
+          type: number
+        timeColumn:
+          description: >-
+            The chart's time dimension, which a % change or anomaly rule reads its periods from.
+            Without it, % change and anomaly compare the value with the values this alert read on
+            its previous checks.
+          oneOf:
+            - type: string
+            - type: 'null'
+        type:
+          $ref: '#/components/schemas/DataAlertRuleInputType'
+        value:
+          oneOf:
+            - type: number
+            - type: 'null'
+        widgetId:
+          type: string
+        widgetTitle:
+          type: string
+      required:
+        - widgetId
+        - reportId
+        - widgetTitle
+        - measureColumn
+        - measureTitle
+        - type
+      type: object
+    DataAlertRuleInputDirection:
+      enum:
+        - up
+        - down
+        - either
+      type: string
+    DataAlertRuleInputGrain:
+      enum:
+        - second
+        - minute
+        - hour
+        - day
+        - week
+        - month
+        - quarter
+        - year
+      type: string
+    DataAlertRuleInputOperator:
+      enum:
+        - gt
+        - lt
+        - eq
+      type: string
+    DataAlertRuleInputType:
+      enum:
+        - threshold
+        - change
+        - anomaly
+      type: string
     DataModelFileContent:
       properties:
         content:
@@ -13584,6 +13718,13 @@ components:
       type: string
     NotificationDto:
       properties:
+        alert:
+          description: >-
+            The data alert, present only when the notification has one: it is then sent only when
+            this condition starts to hold.
+          oneOf:
+            - $ref: '#/components/schemas/DataAlertRule'
+            - type: 'null'
         cronExpression:
           type: string
         dashboardId:
@@ -17062,6 +17203,16 @@ components:
       type: object
     UpdateNotificationInput:
       properties:
+        alert:
+          description: >-
+            A data alert: the notification is then sent only when this condition on one chart starts
+            to hold. Omit to leave the stored rule as it is; `null` removes it. Needs
+            `notificationEnabled` and at least one recipient, otherwise `400`. Data alerts are
+            currently in preview — reach out to the Cube support team to activate them for your
+            account.
+          oneOf:
+            - $ref: '#/components/schemas/DataAlertRuleInput'
+            - type: 'null'
         customCron:
           oneOf:
             - type: string
