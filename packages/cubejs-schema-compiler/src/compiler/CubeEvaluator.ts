@@ -317,9 +317,11 @@ export class CubeEvaluator extends CubeSymbols {
   protected prepareCube(cube, errorReporter: ErrorReporter): EvaluatedCube {
     this.prepareJoins(cube, errorReporter);
     this.preparePreAggregations(cube, errorReporter);
-    this.prepareMembers(cube.measures, cube, errorReporter);
-    this.prepareMembers(cube.dimensions, cube, errorReporter);
-    this.prepareMembers(cube.segments, cube, errorReporter);
+    const ownMemberReferences = new Map<string, string[]>();
+    this.prepareMembers(cube.measures, cube, errorReporter, ownMemberReferences);
+    this.prepareMembers(cube.dimensions, cube, errorReporter, ownMemberReferences);
+    this.prepareMembers(cube.segments, cube, errorReporter, ownMemberReferences);
+    this.checkCircularMemberReferences(cube, ownMemberReferences, errorReporter);
 
     this.evaluateMultiStageReferences(cube.name, cube.measures);
     this.evaluateMultiStageReferences(cube.name, cube.dimensions);
@@ -910,7 +912,53 @@ export class CubeEvaluator extends CubeSymbols {
     }
   }
 
-  protected prepareMembers(members: any, cube: any, errorReporter: ErrorReporter) {
+  /**
+   * Reports members whose `sql` references itself, directly (`foo: { sql: `${foo}` }`) or through
+   * other members of the same cube (`a -> b -> a`). Such a member can never be resolved, and without
+   * this check it only fails at query time, with an error about reference depth that doesn't say
+   * the member points back at itself.
+   */
+  protected checkCircularMemberReferences(
+    cube: any,
+    ownMemberReferences: Map<string, string[]>,
+    errorReporter: ErrorReporter
+  ): void {
+    const VISITING = 1;
+    const DONE = 2;
+    const state = new Map<string, number>();
+    const stack: string[] = [];
+
+    const visit = (memberName: string) => {
+      state.set(memberName, VISITING);
+      stack.push(memberName);
+
+      for (const referencedName of ownMemberReferences.get(memberName) || []) {
+        const referencedState = state.get(referencedName);
+        if (referencedState === VISITING) {
+          const cycle = stack.slice(stack.indexOf(referencedName)).concat(referencedName);
+          const path = cycle.map(name => `${cube.name}.${name}`).join(' -> ');
+          errorReporter.error(
+            cycle.length === 2 ?
+              `Member '${cube.name}.${referencedName}' references itself in its sql. A member can't reference itself.` :
+              `Member '${cube.name}.${referencedName}' has a circular reference: ${path}. A member can't reference itself through other members.`
+          );
+        } else if (referencedState === undefined && ownMemberReferences.has(referencedName)) {
+          visit(referencedName);
+        }
+      }
+
+      stack.pop();
+      state.set(memberName, DONE);
+    };
+
+    for (const memberName of ownMemberReferences.keys()) {
+      if (!state.has(memberName)) {
+        visit(memberName);
+      }
+    }
+  }
+
+  protected prepareMembers(members: any, cube: any, errorReporter: ErrorReporter, ownMemberReferences?: Map<string, string[]>) {
     members = members || {};
 
     for (const memberName of Object.keys(members)) {
@@ -936,6 +984,12 @@ export class CubeEvaluator extends CubeSymbols {
         // not the member of the cube it instantiates
         if (!ownedByCube && !joinAliasUsed && !member.filters && (!member.type || CubeSymbols.isCalculatedMeasureType(member.type)) && pathReferencesUsed.length === 1 && this.pathFromArray(pathReferencesUsed[0]) === evaluatedSql) {
           aliasMember = this.pathFromArray(pathReferencesUsed[0]);
+        }
+        if (ownMemberReferences) {
+          ownMemberReferences.set(
+            memberName,
+            pathReferencesUsed.filter(path => path[0] === cube.name && path.length > 1).map(path => path[1])
+          );
         }
         const foreignCubes = cubeReferencesUsed.filter(usedCube => usedCube !== cube.name);
         if (foreignCubes.length > 0) {
