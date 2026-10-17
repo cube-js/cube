@@ -196,34 +196,53 @@ the dashboard with their own access.
 ## Following an alert in the sidebar
 
 In the scheduled refreshes sidebar, a schedule with an alert carries an
-**Alert** badge and a summary of its rule, for example "Alert: Count is above
-1,000 · Orders count". The same summary appears in the **Schedule** column of
-the [Scheduled refreshes][ref-all-schedules] tab.
+**Alert** badge beside its schedule and a summary of its rule, for example
+"Condition: Count is above 1,000 · Orders count". On the
+[Scheduled refreshes][ref-all-schedules] tab, the same summary, without
+"Condition:", fills the **Condition** column.
 
-Below it, the card shows the last check. Before the first one it reads "Last
-check: not run yet"; afterwards it starts with "Last check" and the time of the
-check, followed by one of these:
+The card's last line shows the last check. Before the first one it reads "Last
+check: not run yet"; afterwards it says how long ago the check ran, what it
+read, and what came of it, for example "Last check: 3 minutes ago, Count
+increased by 2.7%, notified". What it read depends on the rule:
 
-| Last check | Meaning |
+- **Threshold** — the value, for example "Count was 20,003".
+- **% change** — the change, for example "Count increased by 2.7%" or "Count
+  decreased by 4%".
+- **Anomaly** — "Count outside its normal range" or "Count within its normal
+  range".
+
+What came of it is one of these:
+
+| Outcome | Meaning |
 | --- | --- |
-| Count 20,003. Condition met, notified. | The condition started to hold and the notification was sent. |
-| Count 20,003. Condition still met, not notified again. | The condition was already holding at the previous check. |
-| Count 20,003. Condition met, but no notification was sent. | The condition started to hold, but the notification reached no one. |
-| Count 20,003. Condition not met. | Nothing was sent. |
-| could not check. … Nothing sent. | The check couldn't run; the line says why. |
+| notified | The condition started to hold and the notification was sent. |
+| still met, not notified again | The condition was already holding at the previous check. |
+| met, nothing sent | The condition started to hold, but the notification reached no one. |
+| not met | Nothing was sent. |
+| could not check | The check couldn't run. Nothing was sent. |
 
-For **% change**, the line also names the previous period and the change, for
-example "Count 161 (2026-09). Previous: 157 (2026-08), +2.5%." For **Anomaly**,
-it names the normal range, for example "Normal range: 8 – 14."
+How long ago is given in its largest unit, as for the next run: "less than a
+minute ago", "3 minutes ago", "1 hour ago", or "2 days ago".
 
-The values are shown only to the schedule's creator. Anyone else who opens the
-sidebar sees whether the condition was met and whether a notification was sent,
-with "values not shown, as it ran with the access of the schedule's creator."
+Hovering the line shows it whole and, under it, the whole check: when it ran,
+in your timezone and naming it, the value it read, and, for **% change**, the
+previous period and the change, for example "Last check Oct 17, 2026, 3:08 AM
+GMT+1: Count 339 (2026-09). Previous: 330 (2026-08), +2.7%. Condition not
+met." For **Anomaly**, it names the normal range, for example "Normal range: 8
+– 14." For a check that couldn't run, it says why. The **Last check** column
+of the [Scheduled refreshes][ref-all-schedules] tab shows the same line,
+without "Last check:", and the same text on hover.
+
+The values are shown only to the schedule's creator. Anyone else sees how long
+ago the check ran and what came of it, for example "Last check: 1 minute ago,
+still met, not notified again", and on hover "values not shown, as it ran with
+the access of the schedule's creator."
 
 ### When a check can't run
 
 A check that can't run sends nothing and doesn't change whether the alert
-counts as holding. The last-check line says why, for example:
+counts as holding. Hovering the last-check line shows why, for example:
 
 - The chart is no longer on the dashboard, or the measure is no longer in its
   query.

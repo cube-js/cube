@@ -116,8 +116,8 @@ The timezone defaults to your browser's. Runs of one cron expression must be at 
 `#`, `?`, and `H` cron tokens aren't supported.
 
 To run on several unrelated schedules (up to 24 cron expressions), set them through
-the [API](#platform-api). The dialog shows such a schedule but can only replace it as a
-whole.
+the [API](#platform-api). The dialog shows such a schedule, each cron expression with the
+delivery's timezone, but can only replace it as a whole.
 
 ### Notifications
 
@@ -183,7 +183,10 @@ to another spreadsheet leaves the old block untouched.
 
 Open **Scheduled → Sheets deliveries**. Admins see every delivery in the deployment;
 everyone else sees only their own. Each row shows the report, spreadsheet, tab and start
-cell, schedule, next run, last run, and status.
+cell, schedule, next run, last run, and status. The schedule names each cron expression
+with the delivery's timezone, for example "Daily at 9:00 AM Europe/Berlin, Weekly on
+Monday at 8:00 AM Europe/Berlin". A schedule too long for its column is cut with "…",
+and hovering it shows the whole schedule.
 
 | Action | Description |
 | --- | --- |
