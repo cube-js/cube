@@ -133,9 +133,9 @@ Each deployment can have a **default agent**, set by an admin in the deployment'
 [scheduled task](/docs/explore-analyze/scheduled-tasks) that names no agent runs on it.
 With no default set, they use the **Auto** agent.
 
-The same card can turn Auto off, so users can't pick it. Auto can be turned off only while a
-default agent is set, and that default can't be deleted or moved to another deployment until
-it's replaced. With Auto off, anything that asks for Auto runs on the default agent instead,
+The same settings page can turn Auto off, so users can't pick it. Auto can be turned off only
+while a default agent is set. Whether Auto is on or off, the agent that is currently the default
+can't be deleted or moved to another deployment until you pick another default or clear it. With Auto off, anything that asks for Auto runs on the default agent instead,
 including the [Chat API](/reference/embed-apis/chat-api)'s deployment-scoped URL, which
 otherwise always talks to Auto.
 
