@@ -71,9 +71,11 @@ schedules, only the minute field is shown.
 
 ### Timezone
 
-Select from common timezones including UTC, US timezones, London, Paris, Berlin,
-Tokyo, Shanghai, Singapore, and Sydney. Defaults to your browser's timezone if
-it matches a common one, otherwise UTC.
+Pick the timezone the schedule runs in. The list holds every IANA timezone,
+each with its UTC offset, and you can search it by name or by offset, for
+example "New_York" or "GMT-5". Defaults to your browser's timezone. Wherever the
+schedule is shown, its timezone is named after it, for example "Daily at 9:00 AM
+America/New_York".
 
 ### Control values
 
@@ -172,17 +174,32 @@ Click **Save** to create or update the schedule.
 
 ## Managing schedules
 
-The sidebar lists all existing schedules with the following information:
+The sidebar lists all existing schedules. A card's first line holds the status
+indicator, the schedule, and the enable/disable toggle; the lines below it come
+in the order listed here:
 
 - **Status indicator** — current state: not run yet, last run succeeded, last
   run failed, or currently running with phase details.
-- **Schedule description** — human-readable text like "At 09:00 AM".
+- **Schedule** — when the schedule runs, followed by its
+  [timezone](#timezone): "Hourly at :05 UTC", "Daily at 9:00 AM UTC", "Weekly
+  on Monday at 9:00 AM America/New_York", or "Monthly on day 1 at 9:00 AM UTC".
+  A custom cron expression that matches none of these shows as written, for
+  example "0 9 * * 1-5 UTC". A schedule too long for the card is cut with "…",
+  and hovering it shows the whole schedule.
 - **Enable/disable toggle** — turn schedules on or off without deleting them.
-- **Next run time** — shows the next scheduled execution, or "Disabled" if the
-  schedule is off.
-- **Notification channel** — when a [notification][ref-notifications] is
-  configured, the card shows its delivery channel, for example "Notification:
-  Email" or "Notification: Slack (#channel)".
+- **Condition** — when the schedule has a [data alert][ref-data-alerts], an
+  **Alert** badge beside the schedule and a summary of its rule, for example
+  "Condition: Count is above 1,000 · Orders count".
+- **Next run** — how long until the next scheduled execution, counted from
+  your clock and given in its largest unit, for example "Next run: in 25
+  minutes", "Next run: in 7 hours", or "Next run: in 16 days". Hours and days
+  are rounded to the nearest, so a run 5 hours and 49 minutes away reads "in 6
+  hours"; minutes count down whole, and a run less than a minute away reads "in
+  less than a minute". A run whose time has passed reads "due now", or, after a
+  minute, how long ago it was due, for example "due 3 hours ago". The line
+  counts down as time passes, and hovering it shows the line with the date and
+  time of the run under it, in your timezone and naming it, for example "Oct
+  17, 2026, 11:00 AM GMT+1". It reads "Disabled" if the schedule is off.
 - **Control values** — when the schedule sets [control values](#control-values),
   a muted line names each control and what the schedule does with it, for
   example "Control values: Status is completed · Region cleared · Date grain:
@@ -195,9 +212,12 @@ The sidebar lists all existing schedules with the following information:
   still starting after a few seconds, a member the line names (the one a field
   switcher is set to, or a value no control uses) appears by its name in the
   data model instead of its title.
-- **Alert** — when the schedule has a [data alert][ref-data-alerts], the card
-  shows an **Alert** badge, a summary of its rule, and the outcome of its last
-  check.
+- **Notification channel** — when a [notification][ref-notifications] is
+  configured, its delivery channel, for example "Notification: Email" or
+  "Notification: Slack (#channel)".
+- **Last check** — when the schedule has a data alert, the outcome of its last
+  check, for example "Last check: 3 minutes ago, Count increased by 2.7%,
+  notified". See [Following an alert in the sidebar][ref-following-alert].
 
 ### Actions
 
@@ -231,23 +251,39 @@ see every scheduled refresh in the deployment. Each row shows:
 - **Dashboard** — the dashboard's title. On a row you can edit, hovering
   anywhere on the row shows an **Edit** button at the end of this cell; click it
   to open the dashboard in the Dashboard Builder, or open it in a new tab as you
-  would a link. The title itself is plain text, not a link.
-- **Schedule** — the human-readable schedule, like "At 09:00 AM", and the
-  summary of its [data alert][ref-data-alerts] if it has one.
-- **Next run** — the next scheduled execution, or "Disabled" if the schedule is
-  off.
-- **Notifications** — the delivery channel, for example "Notification: Email",
-  or "—" when no notification is configured. A Slack notification shows its
-  channel name only on rows you can edit; other rows show "Notification: Slack".
+  would a link. The title itself is plain text, not a link. A title too long
+  for the column is cut with "…", and hovering it shows the whole title.
+- **Schedule** — when the schedule runs, with its timezone, as on the
+  [sidebar card](#managing-schedules), for example "Daily at 9:00 AM UTC".
+- **Condition** — the summary of the schedule's [data alert][ref-data-alerts]
+  rule, for example "Count is above 1,000 · Orders count", or "—" when it has
+  none.
+- **Next run** — how long until the next scheduled execution, as on the
+  sidebar card, for example "in 7 hours" or "in 16 days", or "Disabled" if the
+  schedule is off. Hovering it shows the line with the date and time of the run
+  under it.
 - **Control values** — the same line as in the sidebar, naming each
   [control value](#control-values) the schedule sets, or "—" when it sets
   none.
+- **Notifications** — the delivery channel, for example "Notification: Email",
+  or "—" when no notification is configured. A Slack notification shows its
+  channel name only on rows you can edit; other rows show "Notification: Slack".
+- **Last check** — the outcome of the data alert's last check, for example "3
+  minutes ago, Count increased by 2.7%, notified", or "—" when the schedule has
+  no alert. A line too long for the column is cut with "…", and hovering it
+  shows the whole line with the whole check under it, as in the
+  [sidebar][ref-following-alert].
 - **Subscribe** — the [subscribe toggle](#subscribing-to-notifications) for
   schedules you can only view. The column appears only when the list includes
   at least one such schedule.
 
 Use the search box above the list to find a schedule by its dashboard title or
-its schedule text.
+its schedule text, such as "Weekly" or "UTC".
+
+Click the **Dashboard** or **Schedule** column header to sort the list; click it
+again to reverse the order. **Schedule** sorts by frequency (Hourly, Daily,
+Weekly, Monthly, then custom cron expressions), then by day, then by the time of
+day as written in each schedule's own timezone, and last by timezone.
 
 What a row offers depends on your permission on its workbook:
 
@@ -368,6 +404,7 @@ skipped.
 [ref-visibility]: /docs/explore-analyze/dashboards/widgets/controls#visibility
 [ref-link-parameters]: /docs/explore-analyze/dashboards/widgets/controls#sharing-the-current-selection
 [ref-data-alerts]: /docs/explore-analyze/data-alerts
+[ref-following-alert]: /docs/explore-analyze/data-alerts#following-an-alert-in-the-sidebar
 [ref-roles]: /admin/users-and-permissions/roles-and-permissions
 [ref-scheduled-tasks]: /docs/explore-analyze/scheduled-tasks
 [ref-sharing]: /docs/organize-content/sharing#permission-inheritance

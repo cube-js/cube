@@ -21,9 +21,44 @@ deployment it was created in.
 
 In the deployment sidebar, open **Scheduled** (the clock icon, below
 **Explore**). The **Scheduled tasks** tab of the
-**Scheduled tasks and refreshes** page lists the deployment's tasks with their
-name, schedule, status, condition, and description, and is searchable. The
-**Scheduled refreshes** tab lists the deployment's
+**Scheduled tasks and refreshes** page lists the deployment's tasks, and is
+searchable. Each row shows:
+
+- **Enable/disable toggle** — the untitled first column; pauses or resumes the
+  task (see [Managing tasks](#managing-tasks)).
+- **Name** and **Description**.
+- **Schedule** — when the task runs, followed by its timezone, for example
+  "Daily at 9:00 AM UTC" or "Weekly on Monday at 9:00 AM America/New_York", or
+  "Manual".
+- **Condition** — the task's [condition](#conditional-tasks) in plain
+  language, or "Every run" when it has none.
+- **Next run** — how long until the next run, counted from your clock and
+  given in its largest unit, for example "in 25 minutes", "in 7 hours", or "in
+  15 days", as on the
+  [Scheduled refreshes](/docs/explore-analyze/scheduled-refreshes#managing-schedules)
+  cards; a run whose time has passed reads "due now" or, for example, "due 3
+  hours ago". Hovering it shows the line with the date and time of the run
+  under it, in your timezone and naming it. It reads "Paused" for a paused
+  task, "Manual" for a manual one, and "Not scheduled" for an enabled task
+  that has no next run.
+- **Notifications** — "Inbox" when the task notifies its creator in the
+  [inbox](/docs/inbox) (see
+  [Getting notified when a run finishes](#getting-notified-when-a-run-finishes)),
+  otherwise "—".
+- **Last check** — on a conditional task, the outcome of its last check, for
+  example "3 minutes ago, Count increased by 2.7%, notified", or "Not checked
+  yet" before the first one; "—" on a task with no condition. Only the task's
+  creator sees what the check read; anyone else sees, for example, "3 minutes
+  ago, notified". Hovering it shows the whole line and the date and time of
+  the check, and the task's [detail page](#task-detail-page) tells the whole
+  check.
+
+Click the **Name**, **Description**, or **Schedule** column header to sort the
+list. The **Schedule** column sorts by frequency and time, as on the
+[Scheduled refreshes](/docs/explore-analyze/scheduled-refreshes#viewing-all-scheduled-refreshes)
+tab, with manual tasks last.
+
+The **Scheduled refreshes** tab lists the deployment's
 [dashboard scheduled refreshes](/docs/explore-analyze/scheduled-refreshes#viewing-all-scheduled-refreshes);
 if you can use only one of the two, the page shows it without tabs.
 
@@ -62,7 +97,8 @@ offering these frequencies:
   weekdays) works, while `*/15 * * * *` is rejected.
 
 A **timezone** selector (defaulting to your browser's timezone) controls when
-the schedule fires; it is stored per task.
+the schedule fires; it is stored per task, and the task's schedule is shown
+with it, for example "Daily at 9:00 AM UTC".
 
 ## Conditional tasks
 
@@ -176,7 +212,12 @@ From the list, you can:
   - **Set up manually** — opens the create dialog where you fill in the
     task's details yourself.
 - **Edit** an existing task's instructions, schedule, or details.
-- **Enable / Pause** a scheduled task to control whether it runs on schedule.
+- **Enable / Pause** a scheduled task with the switch at the start of its row:
+  a paused task stops running on its schedule, and its **Next run** reads
+  "Paused". A manual task's switch is off and disabled, because a manual task
+  runs only when started by hand. While the change saves, the switch and the
+  task's **Edit** are disabled; if it fails, an error message appears and the
+  switch keeps its previous state. A task shared with you has no switch.
 - **Run now** — trigger a one-off run immediately. This works for both manual
   and scheduled tasks. Triggering a run shows a toast with a **View**
   link straight to the run's chat thread, and the thread appears in the
@@ -207,7 +248,8 @@ The page shows:
   the latest 50 runs; a "Showing the latest 50 runs" note appears once the
   cap is hit.
 - **Instructions** — the task's prompt.
-- **Repeats** — the schedule in plain language.
+- **Repeats** — the schedule with its timezone, for example "Daily at 9:00
+  AM UTC".
 - **Condition** — on a conditional task only, after **Instructions** and
   **Repeats**: the condition in plain language (for example, *"When Count
   changes by ≥ 5 % vs the previous month"*), then, on a line of its own,
