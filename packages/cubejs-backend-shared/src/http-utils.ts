@@ -243,7 +243,10 @@ export async function downloadAndExtractFile(url: string, { cwd, skipExtract, ds
 
   const response = await fetch(request);
   if (!response.ok) {
-    throw new Error(`unexpected response ${response.statusText}`);
+    throw Object.assign(
+      new Error(`unexpected response ${response.status} ${response.statusText} (${url})`),
+      { status: response.status },
+    );
   }
 
   const bar = new SingleBar({
@@ -251,39 +254,46 @@ export async function downloadAndExtractFile(url: string, { cwd, skipExtract, ds
   });
   bar.start(100, 0);
 
+  // Callers may retry a failed attempt, so it must not leave a running bar or the temp file behind.
+  let savedFilePath: string | undefined;
+
   try {
-    mkdirpSync(cwd);
-  } catch (e: any) {
-    internalExceptions(e);
-  }
-
-  const savedFilePath = await streamWithProgress(response, ({ progress, speed, eta }) => {
-    bar.update(progress, {
-      speed,
-      eta,
-    });
-  });
-
-  if (skipExtract) {
-    if (dstFileName) {
-      fs.copyFileSync(savedFilePath, path.resolve(path.join(cwd, dstFileName)));
-    } else {
-      // We still need some name for a file
-      const tmpFileName = path.basename(savedFilePath);
-      const destPath = path.join(cwd, tmpFileName);
-      fs.copyFileSync(savedFilePath, destPath);
+    try {
+      mkdirpSync(cwd);
+    } catch (e: any) {
+      internalExceptions(e);
     }
-  } else {
-    await extractArchive(savedFilePath, cwd);
-  }
 
-  try {
-    fs.unlinkSync(savedFilePath);
-  } catch (e: any) {
-    internalExceptions(e);
-  }
+    savedFilePath = await streamWithProgress(response, ({ progress, speed, eta }) => {
+      bar.update(progress, {
+        speed,
+        eta,
+      });
+    });
 
-  bar.stop();
+    if (skipExtract) {
+      if (dstFileName) {
+        fs.copyFileSync(savedFilePath, path.resolve(path.join(cwd, dstFileName)));
+      } else {
+        // We still need some name for a file
+        const tmpFileName = path.basename(savedFilePath);
+        const destPath = path.join(cwd, tmpFileName);
+        fs.copyFileSync(savedFilePath, destPath);
+      }
+    } else {
+      await extractArchive(savedFilePath, cwd);
+    }
+  } finally {
+    if (savedFilePath) {
+      try {
+        fs.unlinkSync(savedFilePath);
+      } catch (e: any) {
+        internalExceptions(e);
+      }
+    }
+
+    bar.stop();
+  }
 }
 
 export async function downloadAndGunzip(url: string): Promise<string> {
