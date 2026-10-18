@@ -5,7 +5,7 @@ description: Context variables like CUBE, FILTER_PARAMS, SQL_UTILS, and COMPILE_
 
 - [`CUBE`](#cube) for [referencing members][ref-syntax-references] of the same cube.
 - [`FILTER_PARAMS`](#filter_params) and [`FILTER_GROUP`](#filter_group) for optimizing generated SQL queries.
-- [`SQL_UTILS`](#sql_utils) for SQL helpers and query grouping context.
+- [`SQL_UTILS`](#sql_utils) for time zone conversion.
 - [`COMPILE_CONTEXT`](#compile_context) for creation of [dynamic data models][ref-dynamic-data-models].
 
 ## `CUBE`
@@ -823,74 +823,6 @@ cube(`visitors`, {
 ```
 
 </CodeGroup>
-
-### `groupingDepth`
-
-`SQL_UTILS.groupingDepth(levels, overrideDimension, activeMeasures?)` returns the
-zero-based index of the deepest configured dimension grouped by the current
-aggregate query. It returns `0` when none of the configured levels is grouped.
-This supports sources that store observations at several hierarchy depths and
-must select exactly one depth before aggregation.
-
-- `levels`: nonempty ordered array of qualified dimension names, from root to
-  deepest level. The root occupies index `0`.
-- `overrideDimension`: qualified dimension name whose explicit query filter
-  disables automatic selection. A filter anywhere in an `AND`/`OR` tree causes
-  the helper to return `null`; Cube still applies the original filter.
-- `activeMeasures`: optional nonempty array of qualified measure names. When
-  provided, the helper returns `null` unless a selected measure or a measure in
-  `HAVING` depends on at least one of these measures. Simple view aliases and
-  derived measures are resolved.
-
-The result is a number or `null`, **not a SQL predicate**. The model chooses how
-to use it. For example, this JavaScript cube selects one depth only when its
-`value` measure participates:
-
-```javascript
-cube('observations', {
-  sql: `SELECT * FROM observation_rows WHERE ${
-    ((depth) => depth === null ? '1 = 1' : 'depth = ' + depth)(
-      SQL_UTILS.groupingDepth(
-        ['observations.root', 'observations.region', 'observations.site'],
-        'observations.depth',
-        ['observations.value']
-      )
-    )
-  }`,
-  dimensions: {
-    root: { sql: 'root', type: 'string' },
-    region: { sql: 'region', type: 'string' },
-    site: { sql: 'site', type: 'string' },
-    depth: { sql: 'depth', type: 'number' }
-  },
-  measures: {
-    value: { sql: 'value', type: 'sum' },
-    count: { type: 'count' }
-  }
-});
-```
-
-A query grouping by `region` selects `depth = 1`; a query grouping by `site`
-selects `depth = 2`. A hierarchy **filter** does not select a depth. Explicit
-filters on `depth`, including multiple values, take precedence. Each separate
-aggregate query receives its own grouping context, including separate subtotal
-queries. Inner multi-stage grouping does not replace that context.
-
-<Warning>
-
-A predicate in cube `sql` applies to **all measures using that source**. In the
-example, `count` alone sees every row, but selecting it alongside `value` counts
-only rows at the selected depth. Use a separate source when a measure must retain
-an independent row scope. This helper does not implement per-measure scoping.
-
-</Warning>
-
-This helper requires the Tesseract SQL planner. Active calls reject ungrouped
-queries, internal grouping sets, expression or join-path dimension identities,
-time dimensions as hierarchy levels, pre-aggregation/total-query modes, models
-containing pre-aggregations, and default filters on the override dimension.
-These restrictions prevent silently applying a grouping context to an unsupported
-query shape. Models that do not call the helper retain their existing behavior.
 
 ## `COMPILE_CONTEXT`
 

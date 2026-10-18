@@ -1,19 +1,16 @@
 // Entirely synthetic observations stored once at each hierarchy depth.
-export const groupingDepthModel = (selection?: string) => `
+export const groupingFilterModel = () => `
   cube('observations', {
+    groupingFilter: {dimension: 'depth', levels: ['root', 'region', 'site'], measures: ['value', 'weight']},
     sql: \`SELECT * FROM (VALUES
-      (1, 'All', 'North', 'Oak',  0, 120, 12),
-      (2, 'All', 'North', 'Oak',  1,  45,  3),
-      (3, 'All', 'South', 'Elm',  1,  75,  9),
-      (4, 'All', 'North', 'Oak',  2,  20,  1),
-      (5, 'All', 'North', 'Pine', 2,  25,  2),
-      (6, 'All', 'South', 'Elm',  2,  75,  9)
+      (1, 'All', 'North', 'Oak',  0, 400, 12),
+      (2, 'All', 'North', 'Oak',  1,  50,  3),
+      (3, 'All', 'South', 'Elm',  1, 100,  9),
+      (4, 'All', 'North', 'Oak',  2,   7,  1),
+      (5, 'All', 'North', 'Pine', 2,  11,  2),
+      (6, 'All', 'South', 'Elm',  2,  13,  9)
     ) AS source(id, root, region, site, depth, value, weight)
-    WHERE \${${selection ?? `((depth) => depth === null ? '1 = 1' : 'depth = ' + depth)(
-      SQL_UTILS.groupingDepth(
-        ['observations.root', 'observations.region', 'observations.site'],
-        'observations.depth', ['observations.value', 'observations.weight']
-      ))`}}\`,
+    WHERE 1 = 1\`,
     dimensions: {
       id: { sql: 'id', type: 'number', primaryKey: true },
       root: { sql: 'root', type: 'string' },

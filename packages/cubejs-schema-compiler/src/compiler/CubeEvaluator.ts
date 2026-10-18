@@ -186,6 +186,12 @@ export type EvaluatedFolder = {
   [key: string]: any;
 };
 
+export type GroupingFilterDefinition = {
+  dimension: string;
+  levels: string[];
+  measures: string[];
+};
+
 export type EvaluatedCube = {
   name: string;
   measures: Record<string, MeasureDefinition>;
@@ -246,6 +252,8 @@ const hasRelativeDateValue = (item: any): boolean => {
 };
 
 export class CubeEvaluator extends CubeSymbols {
+  public groupingFilters: GroupingFilterDefinition[] = [];
+
   public evaluatedCubes: Record<string, EvaluatedCube> = {};
 
   public primaryKeys: Record<string, string[]> = {};
@@ -269,6 +277,7 @@ export class CubeEvaluator extends CubeSymbols {
 
   public compile(cubes: any[], errorReporter: ErrorReporter) {
     this.relativeDateFilterCubes = new Set();
+    this.groupingFilters = [];
     super.compile(cubes, errorReporter);
     const validCubes = this.cubeList.filter(cube => this.cubeValidator.isCubeValid(cube)).sort((a, b) => {
       if (a.isView) {
@@ -329,6 +338,26 @@ export class CubeEvaluator extends CubeSymbols {
 
     this.prepareAccessPolicy(cube, errorReporter);
     this.prepareViewFilters(cube, errorReporter);
+    if (cube.groupingFilter) {
+      const rule = cube.groupingFilter as GroupingFilterDefinition;
+      const resolve = (name: string, kind: 'dimensions' | 'measures') => {
+        if (name.includes('.') || !cube[kind]?.[name]) {
+          errorReporter.error(`groupingFilter requires a local ${kind} member, got '${name}' in '${cube.name}'`);
+        }
+        return `${cube.name}.${name}`;
+      };
+      if (cube.dimensions?.[rule.dimension]?.type !== 'number' || rule.levels.includes(rule.dimension)) {
+        errorReporter.error('groupingFilter requires a separate numeric depth dimension');
+      }
+      if (rule.levels.some(name => cube.dimensions?.[name]?.type === 'time')) {
+        errorReporter.error('groupingFilter levels cannot be time dimensions');
+      }
+      this.groupingFilters.push({
+        dimension: resolve(rule.dimension, 'dimensions'),
+        levels: rule.levels.map(name => resolve(name, 'dimensions')),
+        measures: rule.measures.map(name => resolve(name, 'measures')),
+      });
+    }
 
     return cube;
   }

@@ -36,6 +36,7 @@ import { BaseMeasure } from './BaseMeasure';
 import { BaseSegment } from './BaseSegment';
 import { BaseTimeDimension } from './BaseTimeDimension';
 import { Granularity } from './Granularity';
+import { GroupingFilter } from './GroupingFilter';
 import { ParamAllocator } from './ParamAllocator';
 import { PreAggregations } from './PreAggregations';
 
@@ -264,39 +265,7 @@ export class BaseQuery {
       }
     }
     this.compilerCache = this.compilers.compiler.compilerCache;
-    this.queryCache = this.compilerCache.getQueryCache({
-      measures: this.options.measures,
-      dimensions: this.options.dimensions,
-      timeDimensions: this.options.timeDimensions,
-      filters: this.options.filters,
-      segments: this.options.segments,
-      order: this.options.order,
-      contextSymbols: this.options.contextSymbols,
-      timezone: this.options.timezone,
-      limit: this.options.limit,
-      offset: this.options.offset,
-      rowLimit: this.options.rowLimit,
-      preAggregationsSchema: this.options.preAggregationsSchema,
-      className: this.constructor.name,
-      externalClassName: this.options.externalQueryClass?.name,
-      preAggregationQuery: this.options.preAggregationQuery,
-      disableExternalPreAggregations: this.options.disableExternalPreAggregations,
-      useOriginalSqlPreAggregationsInPreAggregation: this.options.useOriginalSqlPreAggregationsInPreAggregation,
-      cubeLatticeCache: this.options.cubeLatticeCache, // TODO too heavy for key
-      historyQueries: this.options.historyQueries, // TODO too heavy for key
-      ungrouped: this.options.ungrouped,
-      memberToAlias: this.options.memberToAlias,
-      expressionParams: this.options.expressionParams,
-      convertTzForRawTimeDimension: this.options.convertTzForRawTimeDimension,
-      localRefreshKey: this.options.localRefreshKey,
-      from: this.options.from,
-      multiStageQuery: this.options.multiStageQuery,
-      multiStageDimensions: this.options.multiStageDimensions,
-      multiStageTimeDimensions: this.options.multiStageTimeDimensions,
-      subqueryJoins: this.options.subqueryJoins,
-      joinHints: this.options.joinHints,
-      maskedMembers: this.options.maskedMembers,
-    });
+    this.queryCache = this.newQueryCache();
     this.from = this.options.from;
     this.multiStageQuery = this.options.multiStageQuery;
     this.timezone = this.options.timezone;
@@ -368,6 +337,7 @@ export class BaseQuery {
     // byte-identical and nothing downstream re-hashes to a new cache key.
     this.localRefreshKey = this.options.localRefreshKey ?? getEnv('refreshKeyLocalTime');
     this.queryLevelJoinHints = this.options.joinHints ?? [];
+    this.applyGroupingFilters();
     this.prebuildJoin();
 
     this.cubeAliasPrefix = this.options.cubeAliasPrefix;
@@ -379,6 +349,57 @@ export class BaseQuery {
     this.order = this.options.order ?? this.defaultOrder();
 
     this.initUngrouped();
+  }
+
+  newQueryCache() {
+    return this.compilerCache.getQueryCache({
+      measures: this.options.measures,
+      dimensions: this.options.dimensions,
+      timeDimensions: this.options.timeDimensions,
+      filters: this.options.filters,
+      segments: this.options.segments,
+      order: this.options.order,
+      contextSymbols: this.options.contextSymbols,
+      timezone: this.options.timezone,
+      limit: this.options.limit,
+      offset: this.options.offset,
+      rowLimit: this.options.rowLimit,
+      preAggregationsSchema: this.options.preAggregationsSchema,
+      className: this.constructor.name,
+      externalClassName: this.options.externalQueryClass?.name,
+      preAggregationQuery: this.options.preAggregationQuery,
+      disableExternalPreAggregations: this.options.disableExternalPreAggregations,
+      useOriginalSqlPreAggregationsInPreAggregation: this.options.useOriginalSqlPreAggregationsInPreAggregation,
+      cubeLatticeCache: this.options.cubeLatticeCache, // TODO too heavy for key
+      historyQueries: this.options.historyQueries, // TODO too heavy for key
+      ungrouped: this.options.ungrouped,
+      memberToAlias: this.options.memberToAlias,
+      expressionParams: this.options.expressionParams,
+      convertTzForRawTimeDimension: this.options.convertTzForRawTimeDimension,
+      localRefreshKey: this.options.localRefreshKey,
+      from: this.options.from,
+      multiStageQuery: this.options.multiStageQuery,
+      multiStageDimensions: this.options.multiStageDimensions,
+      multiStageTimeDimensions: this.options.multiStageTimeDimensions,
+      subqueryJoins: this.options.subqueryJoins,
+      joinHints: this.options.joinHints,
+      maskedMembers: this.options.maskedMembers,
+    });
+  }
+
+  applyGroupingFilters() {
+    if (!this.cubeEvaluator.groupingFilters?.length || this.options.preAggregationQuery) {
+      return;
+    }
+    // Resolve once, before joins, planner input and SQL caches are finalized.
+    const additions = new GroupingFilter(this).filters();
+    if (!additions.length) {
+      return;
+    }
+    this.options = { ...this.options, filters: [...(this.options.filters || []), ...additions] };
+    this.filters.push(...additions.map(filter => this.initFilter({ ...filter, dimension: filter.member, measure: null })));
+    this.allFilters = this.timeDimensions.concat(this.segments).concat(this.filters);
+    this.queryCache = this.newQueryCache();
   }
 
   // Temporary workaround to avoid checking for multistage in CubeStoreQuery, since that could lead to errors when HLL functions are present in the query.
@@ -4019,6 +4040,7 @@ export class BaseQuery {
     const hints = this.cubeEvaluator.joinHints() || [];
     const steps = hints[hints.length - 1] === cubeName ? hints : [cubeName];
     let current = instance;
+
     for (const step of steps) {
       if (step !== current.cube) {
         if (!this.cubeEvaluator.joinsWithoutAlias(current.cube, step)) {
@@ -5518,8 +5540,7 @@ export class BaseQuery {
         filterGroup: this.filterGroupFunction(),
         sqlUtils: {
           convertTz: this.convertTz.bind(this),
-          urlEncode: this.urlEncode.bind(this),
-          groupingDepth: this.groupingDepth.bind(this)
+          urlEncode: this.urlEncode.bind(this)
         }
       }, R.map(
         (symbols) => this.contextSymbolsProxy(symbols),
@@ -5536,8 +5557,6 @@ export class BaseQuery {
       sqlUtils: {
         convertTz: (field) => field,
         urlEncode: (sql) => sql,
-        // Structural dependency inspection only; no query is executed here.
-        groupingDepth: () => 0,
       },
       securityContext: CubeSymbols.contextSymbolsProxyFrom({}, allocateParam),
     };
@@ -5550,25 +5569,8 @@ export class BaseQuery {
   sqlUtilsForRust() {
     return {
       convertTz: this.convertTz.bind(this),
-      urlEncode: this.urlEncode.bind(this),
-      groupingDepth: this.groupingDepth.bind(this)
+      urlEncode: this.urlEncode.bind(this)
     };
-  }
-
-  /**
-   * @param {string[]} levels
-   * @param {string} override
-   * @param {string[]} [activeMeasures]
-   * @returns {number | null}
-   */
-  groupingDepth(levels, override, activeMeasures) {
-    if (!this.groupingScopeResolver) {
-      // Loaded and initialized only when a model explicitly invokes the helper.
-      // eslint-disable-next-line global-require
-      const { GroupingScope } = require('./GroupingScope');
-      this.groupingScopeResolver = new GroupingScope(this);
-    }
-    return this.groupingScopeResolver.depth(levels, override, activeMeasures);
   }
 
   // Invoked from the native planner to compile a member's `sql` function: runs
