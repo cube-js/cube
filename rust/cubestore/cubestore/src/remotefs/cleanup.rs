@@ -82,6 +82,8 @@ impl RemoteFsCleanup {
                 for f in files_from_metastore {
                     files_to_remove.remove(&f);
                 }
+            }
+            if cleanup_enabled && !files_to_remove.is_empty() {
                 let delete_fs = &remote_fs;
                 let removed = futures::stream::iter(files_to_remove.iter().cloned())
                     .map(move |f| async move {
@@ -311,7 +313,10 @@ impl RemoteFsCleanup {
 mod test {
     use super::*;
     use crate::config::Config;
+    use crate::remotefs::RemoteFile;
+    use async_trait::async_trait;
     use futures_timer::Delay;
+    use std::sync::atomic::{AtomicUsize, Ordering};
 
     fn is_root_partition(name: &str) -> bool {
         name.starts_with("1-") && !name.ends_with(".chunk.parquet")
@@ -427,6 +432,133 @@ mod test {
     #[tokio::test]
     async fn remote_cleanup_disabled_deletes_nothing() {
         remote_cleanup_test("remote_cleanup_disabled_deletes_nothing", false).await;
+    }
+
+    const SLOW_FS_FILES: usize = 64;
+
+    #[derive(Debug, Default)]
+    struct SlowDeleteFs {
+        in_flight: AtomicUsize,
+        max_in_flight: AtomicUsize,
+        deleted: AtomicUsize,
+    }
+
+    crate::di_service!(SlowDeleteFs, [RemoteFs]);
+
+    #[async_trait]
+    impl RemoteFs for SlowDeleteFs {
+        async fn temp_upload_path(&self, _remote_path: String) -> Result<String, CubeError> {
+            unimplemented!()
+        }
+
+        async fn uploads_dir(&self) -> Result<String, CubeError> {
+            unimplemented!()
+        }
+
+        async fn check_upload_file(
+            &self,
+            _remote_path: String,
+            _expected_size: u64,
+        ) -> Result<(), CubeError> {
+            unimplemented!()
+        }
+
+        async fn upload_file(
+            &self,
+            _temp_upload_path: String,
+            _remote_path: String,
+        ) -> Result<u64, CubeError> {
+            unimplemented!()
+        }
+
+        async fn download_file(
+            &self,
+            _remote_path: String,
+            _expected_file_size: Option<u64>,
+        ) -> Result<String, CubeError> {
+            unimplemented!()
+        }
+
+        async fn delete_file(&self, _remote_path: String) -> Result<(), CubeError> {
+            let n = self.in_flight.fetch_add(1, Ordering::SeqCst) + 1;
+            self.max_in_flight.fetch_max(n, Ordering::SeqCst);
+            Delay::new(Duration::from_millis(200)).await;
+            self.in_flight.fetch_sub(1, Ordering::SeqCst);
+            self.deleted.fetch_add(1, Ordering::SeqCst);
+            Ok(())
+        }
+
+        async fn list(&self, _remote_prefix: String) -> Result<Vec<String>, CubeError> {
+            unimplemented!()
+        }
+
+        async fn list_with_metadata(
+            &self,
+            _remote_prefix: String,
+        ) -> Result<Vec<RemoteFile>, CubeError> {
+            Ok((0..SLOW_FS_FILES)
+                .map(|i| RemoteFile {
+                    remote_path: format!("{}-orphan.parquet", 900000 + i),
+                    updated: Utc::now(),
+                    file_size: 1,
+                })
+                .collect())
+        }
+
+        async fn local_path(&self) -> Result<String, CubeError> {
+            unimplemented!()
+        }
+
+        async fn local_file(&self, _remote_path: String) -> Result<String, CubeError> {
+            unimplemented!()
+        }
+    }
+
+    #[tokio::test]
+    async fn remote_cleanup_deletes_concurrently_and_stops_mid_batch() {
+        Config::test("remote_cleanup_deletes_concurrently_and_stops_mid_batch")
+            .update_config(|mut c| {
+                c.enable_remove_orphaned_remote_files = true;
+                c.remote_files_cleanup_interval_secs = 1;
+                c.remote_files_cleanup_delay_secs = 0;
+                c.remote_files_cleanup_delete_concurrency = 4;
+                c
+            })
+            .start_test(async move |services| {
+                let config = services.injector.get_service_typed::<dyn ConfigObj>().await;
+                let fs = Arc::new(SlowDeleteFs::default());
+                let cleanup = Arc::new(RemoteFsCleanup::new(
+                    config,
+                    fs.clone(),
+                    services.meta_store,
+                ));
+                let cleanup_to_move = cleanup.clone();
+                let handle = cube_ext::spawn(async move {
+                    cleanup_to_move.wait_remote_fs_cleanup_loop(vec![]).await
+                });
+
+                // The whole batch takes 3.2 s at 4-way; stop once the first wave has landed.
+                let deadline = std::time::Instant::now() + Duration::from_secs(20);
+                while fs.deleted.load(Ordering::SeqCst) < 4 && std::time::Instant::now() < deadline
+                {
+                    Delay::new(Duration::from_millis(50)).await;
+                }
+                cleanup.stop();
+                tokio::time::timeout(Duration::from_secs(5), handle)
+                    .await
+                    .expect("cleanup loop did not stop")
+                    .unwrap();
+
+                assert!(fs.max_in_flight.load(Ordering::SeqCst) > 1);
+                let deleted = fs.deleted.load(Ordering::SeqCst);
+                assert!(
+                    deleted >= 4 && deleted < SLOW_FS_FILES,
+                    "deleted {}",
+                    deleted
+                );
+                Ok::<(), CubeError>(())
+            })
+            .await;
     }
 
     #[tokio::test]
