@@ -627,6 +627,129 @@ When set to `true`, Cube will treat this cube as a calendar cube and allow to
 on its [time dimensions][ref-time-dimensions]. This can be useful for [time-shift
 calculations][ref-time-shift] with a custom calendar.
 
+### `grouping_filter`
+
+Use `grouping_filter` when a source stores overlapping observations at several
+hierarchy depths and each aggregate should read one depth. The compiler adds an
+ordinary query filter before planning and pre-aggregation matching. This parameter
+requires the [Tesseract SQL planner][ref-tesseract].
+
+For example, suppose an invented observations table has these totals:
+
+| Depth | Meaning | Sum of `value` |
+| --- | --- | --- |
+| 0 | Root | 400 |
+| 1 | Regions | 150 |
+| 2 | Sites | 31 |
+
+A root aggregate without grouping dimensions should return 400, a query grouped by region should sum the
+region observations to 150, and a query grouped by site should sum the site
+observations to 31. Summing all source rows would instead return 581.
+
+<CodeGroup>
+
+```yaml title="YAML"
+cubes:
+  - name: observations
+    sql_table: hierarchy_observations
+
+    grouping_filter:
+      dimension: depth
+      levels: [root, region, site]
+      measures: [value]
+
+    dimensions:
+      - name: root
+        sql: root
+        type: string
+      - name: region
+        sql: region
+        type: string
+      - name: site
+        sql: site
+        type: string
+      - name: depth
+        sql: depth
+        type: number
+
+    measures:
+      - name: value
+        sql: value
+        type: sum
+      - name: count
+        type: count
+
+    pre_aggregations:
+      - name: all_depths
+        measures: [value, count]
+        dimensions: [root, region, site, depth]
+```
+
+```javascript title="JavaScript"
+cube('observations', {
+  sql_table: 'hierarchy_observations',
+  groupingFilter: {
+    dimension: 'depth',
+    levels: ['root', 'region', 'site'],
+    measures: ['value']
+  },
+  dimensions: {
+    root: { sql: 'root', type: 'string' },
+    region: { sql: 'region', type: 'string' },
+    site: { sql: 'site', type: 'string' },
+    depth: { sql: 'depth', type: 'number' }
+  },
+  measures: {
+    value: { sql: 'value', type: 'sum' },
+    count: { type: 'count' }
+  },
+  pre_aggregations: {
+    all_depths: {
+      measures: [value, count],
+      dimensions: [root, region, site, depth]
+    }
+  }
+});
+```
+
+</CodeGroup>
+
+`dimension` must name a local numeric dimension containing zero-based depths.
+`levels` is a nonempty, ordered list of distinct local non-time dimensions, from
+root to deepest. The depth dimension must not also be a level. `measures` is a
+nonempty list of distinct local measure names that activate the rule. Member names
+in this configuration are strings, without cube prefixes.
+
+The rule activates when a selected measure, a derived measure dependency, or a
+measure filter uses a configured measure. It selects the deepest configured level
+present in the query's grouping, defaulting to depth zero when no level is grouped.
+Filtering a hierarchy level alone does not change the grouping depth. Simple view
+aliases resolve to their underlying members.
+
+An explicit filter on the depth dimension takes precedence, including a filter
+inside an `and` or `or` group. For example, `depth in [1, 2]` intentionally reads
+both depths. Queries that do not activate the rule, such as a dimension-only list
+or `count` by itself in this example, receive no additional filter.
+
+The filter applies to the whole query. A `count` selected alongside `value` counts
+rows at the chosen depth; this parameter does not provide independent per-measure
+row scopes. It is an overridable query default, not an access-control policy.
+
+Pre-aggregation builds retain all depths. A consumer query filters the resulting
+rollup through the existing planner. Keep `depth`, the required grouping dimensions
+and measures in a rollup that should serve these queries. A rollup missing a
+required dimension is not matched; normal source fallback or rollup-only rejection
+then applies. `original_sql` materializations also retain all depths. Existing
+refresh and partition semantics still apply.
+
+The initial implementation rejects active legacy-planner queries, the API's
+`ungrouped` and `totalQuery` modes, expression dimensions/internal grouping sets,
+custom subquery joins, and activation through aliased join instances. A root
+aggregate with no grouping dimensions is supported; it is distinct from the API's
+`ungrouped` mode. Active rules also reject a model default filter targeting the same
+canonical depth dimension, rather than silently intersecting two defaults. Defaults
+on other dimensions retain their existing behavior.
+
 ### `pre_aggregations`
 
 The `pre_aggregations` parameter is used to configure [pre-aggregations][ref-ref-pre-aggs].
@@ -676,3 +799,4 @@ The `access_policy` parameter is used to configure [access policies][ref-ref-dap
 [ref-calendar-cubes-granularities]: /docs/data-modeling/concepts/calendar-cubes#overriding-granularities
 [ref-time-dimensions]: /docs/data-modeling/dimensions#time-dimensions
 [ref-time-shift]: /docs/data-modeling/measures#time-shift
+[ref-tesseract]: /reference/configuration/environment-variables#cubejs_tesseract_sql_planner
