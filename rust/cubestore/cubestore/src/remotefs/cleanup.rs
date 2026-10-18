@@ -82,16 +82,14 @@ impl RemoteFsCleanup {
                 for f in files_from_metastore {
                     files_to_remove.remove(&f);
                 }
+                let delete_fs = &remote_fs;
                 let removed = futures::stream::iter(files_to_remove.iter().cloned())
-                    .map(|f| {
-                        let remote_fs = self.remote_fs.clone();
-                        async move {
-                            match remote_fs.delete_file(f.clone()).await {
-                                Ok(()) => 1,
-                                Err(e) => {
-                                    log::error!("Error while deleting {} in remote fs: {}", f, e);
-                                    0
-                                }
+                    .map(move |f| async move {
+                        match delete_fs.delete_file(f.clone()).await {
+                            Ok(()) => 1,
+                            Err(e) => {
+                                log::error!("Error while deleting {} in remote fs: {}", f, e);
+                                0
                             }
                         }
                     })
