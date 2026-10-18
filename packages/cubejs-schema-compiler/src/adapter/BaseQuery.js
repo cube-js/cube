@@ -5518,7 +5518,8 @@ export class BaseQuery {
         filterGroup: this.filterGroupFunction(),
         sqlUtils: {
           convertTz: this.convertTz.bind(this),
-          urlEncode: this.urlEncode.bind(this)
+          urlEncode: this.urlEncode.bind(this),
+          groupingDepth: this.groupingDepth.bind(this)
         }
       }, R.map(
         (symbols) => this.contextSymbolsProxy(symbols),
@@ -5535,6 +5536,8 @@ export class BaseQuery {
       sqlUtils: {
         convertTz: (field) => field,
         urlEncode: (sql) => sql,
+        // Structural dependency inspection only; no query is executed here.
+        groupingDepth: () => 0,
       },
       securityContext: CubeSymbols.contextSymbolsProxyFrom({}, allocateParam),
     };
@@ -5547,8 +5550,25 @@ export class BaseQuery {
   sqlUtilsForRust() {
     return {
       convertTz: this.convertTz.bind(this),
-      urlEncode: this.urlEncode.bind(this)
+      urlEncode: this.urlEncode.bind(this),
+      groupingDepth: this.groupingDepth.bind(this)
     };
+  }
+
+  /**
+   * @param {string[]} levels
+   * @param {string} override
+   * @param {string[]} [activeMeasures]
+   * @returns {number | null}
+   */
+  groupingDepth(levels, override, activeMeasures) {
+    if (!this.groupingScopeResolver) {
+      // Loaded and initialized only when a model explicitly invokes the helper.
+      // eslint-disable-next-line global-require
+      const { GroupingScope } = require('./GroupingScope');
+      this.groupingScopeResolver = new GroupingScope(this);
+    }
+    return this.groupingScopeResolver.depth(levels, override, activeMeasures);
   }
 
   // Invoked from the native planner to compile a member's `sql` function: runs

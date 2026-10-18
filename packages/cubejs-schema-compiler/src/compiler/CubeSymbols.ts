@@ -1410,7 +1410,8 @@ export class CubeSymbols implements TranspilerSymbolResolver, CompilerInterface 
       filterGroup: this.filterGroupFunctionDep(),
       securityContext: CubeSymbols.contextSymbolsProxyFrom({}, (param) => param),
       sqlUtils: {
-        convertTz: (f) => f
+        convertTz: (f) => f,
+        groupingDepth: () => 0
       },
     };
   }
