@@ -1318,7 +1318,7 @@ export class CubeSymbols implements TranspilerSymbolResolver, CompilerInterface 
     }
   }
 
-  protected resolveSymbolsCall<T>(
+  public resolveSymbolsCall<T>(
     func: (...args: Array<unknown>) => T | DynamicReference<T>,
     nameResolver: (id: string) => unknown,
     context?: unknown,
@@ -1364,7 +1364,7 @@ export class CubeSymbols implements TranspilerSymbolResolver, CompilerInterface 
     return this.funcArgumentsValues[funcDefinition];
   }
 
-  protected joinHints(): string | string[] | undefined {
+  public joinHints(): string | string[] | undefined {
     const { joinHints } = this.resolveSymbolsCallContext || {};
     if (Array.isArray(joinHints)) {
       return R.uniq(joinHints);

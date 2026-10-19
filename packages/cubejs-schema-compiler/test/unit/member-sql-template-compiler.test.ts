@@ -1,5 +1,12 @@
-// eslint-disable-next-line @typescript-eslint/no-var-requires
-const { compileMemberSql, uniqueInsertPath } = require('../../src/adapter/MemberSqlTemplateCompiler');
+import {
+  CompiledColumnCallback,
+  CompiledMemberSql,
+  compileMemberSql,
+  uniqueInsertPath,
+} from '../../src/adapter/MemberSqlTemplateCompiler';
+
+// A column callback with a fixed parameter list compiles to a recording of its own.
+const compiledColumn = (res: CompiledMemberSql) => res.filterParams[0].column as CompiledColumnCallback;
 
 describe('MemberSqlTemplateCompiler — member reference path', () => {
   it('records a single member reference via string coercion', () => {
@@ -99,9 +106,9 @@ describe('MemberSqlTemplateCompiler — FILTER_PARAMS / FILTER_GROUP', () => {
     expect(res.filterParams[0].cube_name).toBe('orders');
     expect(res.filterParams[0].name).toBe('status');
     // The filter value it takes becomes a placeholder of its own.
-    expect(res.filterParams[0].column.template).toBe('{fpv:0} > 0');
-    expect(res.filterParams[0].column.valueParamsCount).toBe(1);
-    expect(res.filterParams[0].column.symbolPaths).toEqual([]);
+    expect(compiledColumn(res).template).toBe('{fpv:0} > 0');
+    expect(compiledColumn(res).valueParamsCount).toBe(1);
+    expect(compiledColumn(res).symbolPaths).toEqual([]);
   });
 
   // What a callback references belongs to the callback, not to the member whose
@@ -113,9 +120,9 @@ describe('MemberSqlTemplateCompiler — FILTER_PARAMS / FILTER_GROUP', () => {
     );
     expect(res.template).toBe('{fp:0}');
     expect(res.symbolPaths).toEqual([]);
-    expect(res.filterParams[0].column.template)
+    expect(compiledColumn(res).template)
       .toBe('{arg:0} >= {fpv:0} AND {arg:0} < {fpv:1}');
-    expect(res.filterParams[0].column.symbolPaths).toEqual([['CUBE', 'createdAt']]);
+    expect(compiledColumn(res).symbolPaths).toEqual([['CUBE', 'createdAt']]);
   });
 
   it('numbers callback references separately from the enclosing template', () => {
@@ -125,8 +132,8 @@ describe('MemberSqlTemplateCompiler — FILTER_PARAMS / FILTER_GROUP', () => {
     );
     expect(res.template).toBe('{arg:0} AND {fp:0}');
     expect(res.symbolPaths).toEqual([['CUBE', 'a']]);
-    expect(res.filterParams[0].column.template).toBe('{arg:0} = {fpv:0}');
-    expect(res.filterParams[0].column.symbolPaths).toEqual([['CUBE', 'b']]);
+    expect(compiledColumn(res).template).toBe('{arg:0} = {fpv:0}');
+    expect(compiledColumn(res).symbolPaths).toEqual([['CUBE', 'b']]);
   });
 
   it('records a binding addressing a named time shift', () => {
@@ -139,7 +146,7 @@ describe('MemberSqlTemplateCompiler — FILTER_PARAMS / FILTER_GROUP', () => {
     expect(res.filterParams[0].cube_name).toBe('calendar');
     expect(res.filterParams[0].name).toBe('d');
     expect(res.filterParams[0].time_shift_name).toBe('prev_fy');
-    expect(res.filterParams[0].column.template).toBe('c >= {fpv:0} AND c <= {fpv:1}');
+    expect(compiledColumn(res).template).toBe('c >= {fpv:0} AND c <= {fpv:1}');
   });
 
   it('accepts timeShifts as well as time_shifts', () => {
@@ -187,7 +194,7 @@ describe('MemberSqlTemplateCompiler — FILTER_PARAMS / FILTER_GROUP', () => {
       (FILTER_PARAMS) => `${FILTER_PARAMS.orders.a.filter((from, to = 1) => `d BETWEEN ${from} AND ${to}`)}`,
       ['FILTER_PARAMS']
     );
-    expect(res.filterParams[0].column.template).toBe('d BETWEEN {fpv:0} AND {fpv:1}');
+    expect(compiledColumn(res).template).toBe('d BETWEEN {fpv:0} AND {fpv:1}');
   });
 
   // A rest parameter takes as many values as the query supplies, which a fixed
@@ -230,7 +237,7 @@ describe('MemberSqlTemplateCompiler — FILTER_PARAMS / FILTER_GROUP', () => {
       (FILTER_PARAMS) => `${FILTER_PARAMS.orders.a.filter((from = 1, to) => `d >= ${from} AND d < ${to}`)}`,
       ['FILTER_PARAMS']
     );
-    expect(res.filterParams[0].column.template).toBe('d >= {fpv:0} AND d < {fpv:1}');
+    expect(compiledColumn(res).template).toBe('d >= {fpv:0} AND d < {fpv:1}');
   });
 
   it('records a security context value referenced from a column callback into the callback', () => {
@@ -240,8 +247,8 @@ describe('MemberSqlTemplateCompiler — FILTER_PARAMS / FILTER_GROUP', () => {
       { tenantId: 'acme' }
     );
     expect(res.securityContextValues).toEqual([]);
-    expect(res.filterParams[0].column.template).toBe('t = {sv:0} AND a = {fpv:0}');
-    expect(res.filterParams[0].column.securityContextValues).toEqual(['acme']);
+    expect(compiledColumn(res).template).toBe('t = {sv:0} AND a = {fpv:0}');
+    expect(compiledColumn(res).securityContextValues).toEqual(['acme']);
   });
 
   it('records a filter group from filter-param args and yields {fg:0}', () => {

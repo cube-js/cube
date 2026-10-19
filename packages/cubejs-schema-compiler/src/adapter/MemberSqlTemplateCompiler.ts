@@ -35,7 +35,52 @@ const FILTER_GROUP_PREFIX = 'fg';
 const SECURITY_VALUE_PREFIX = 'sv';
 const FILTER_VALUE_PREFIX = 'fpv';
 
-function placeholder(prefix, index) {
+type AnyFunction = (...args: any[]) => any;
+
+export type FilterParamColumn = string | CompiledColumnCallback | AnyFunction;
+
+export type FilterParamItem = {
+  cube_name: string;
+  name: string;
+  time_shift_name: string | null;
+  column: FilterParamColumn;
+};
+
+export type FilterGroupItem = {
+  filterParams: FilterParamItem[];
+};
+
+export type Recording = {
+  symbolPaths: string[][];
+  filterParams: FilterParamItem[];
+  filterGroups: FilterGroupItem[];
+  securityContextValues: string[];
+};
+
+export type CompiledColumnCallback = Recording & {
+  template: string | string[];
+  valueParamsCount: number;
+};
+
+export type CompiledMemberSql = Recording & {
+  template: string | string[];
+};
+
+type RecordingState = {
+  target: Recording;
+};
+
+type FilterParamBinding = {
+  __member: FilterParamItem;
+  toString: () => string;
+};
+
+type SecurityParam =
+  | { kind: 'none' }
+  | { kind: 'string'; value: string }
+  | { kind: 'vec'; values: string[] };
+
+function placeholder(prefix: string, index: number): string {
   return `{${prefix}:${index}}`;
 }
 
@@ -43,7 +88,7 @@ function placeholder(prefix, index) {
 // `FILTER_PARAMS` column callback it declares, so a nested compile cannot hand
 // them a different state. They record into `state.target`, which
 // `compileColumnCallback` swaps for the duration of that compile.
-function emptyRecording() {
+function emptyRecording(): Recording {
   return {
     symbolPaths: [],
     filterParams: [],
@@ -55,7 +100,7 @@ function emptyRecording() {
 // Returns the index of an equal path if it already exists, otherwise appends
 // and returns the new index. Paths are short arrays of strings, compared by
 // value, so repeated references collapse to a single placeholder.
-function uniqueInsertPath(paths, path) {
+export function uniqueInsertPath(paths: string[][], path: string[]): number {
   const key = JSON.stringify(path);
 
   for (let i = 0; i < paths.length; i++) {
@@ -67,7 +112,7 @@ function uniqueInsertPath(paths, path) {
   return paths.length - 1;
 }
 
-function uniqueInsertString(values, value) {
+export function uniqueInsertString(values: string[], value: string): number {
   const i = values.indexOf(value);
   if (i !== -1) {
     return i;
@@ -78,7 +123,7 @@ function uniqueInsertString(values, value) {
 
 // ---- member reference (`{CUBE}` / nested paths / `.sql`) --------------------
 
-function memberReferenceProxy(path, state) {
+function memberReferenceProxy(path: string[], state: RecordingState): object {
   return new Proxy({}, {
     get(_target, prop) {
       if (typeof prop !== 'string') {
@@ -106,7 +151,7 @@ function memberReferenceProxy(path, state) {
 // Declared parameters of a column callback: how many filter values it can take,
 // and whether it takes them as a rest parameter. `Function.length` stops at the
 // first defaulted parameter, so the parameter list is read from the source.
-function declaredValueParams(fn) {
+function declaredValueParams(fn: AnyFunction): { count: number; rest: boolean; inner: string } {
   const source = fn.toString();
   const open = source.indexOf('(');
   const arrow = source.indexOf('=>');
@@ -135,7 +180,7 @@ function declaredValueParams(fn) {
   }
 
   const inner = source.slice(open + 1, close);
-  const params = [];
+  const params: string[] = [];
   let start = 0;
   depth = 0;
 
@@ -168,7 +213,7 @@ function declaredValueParams(fn) {
 // there only the text can vouch: a list holding neither a string nor a comment
 // has nothing for the scan to trip over. A list that does holds a callback back
 // to the render-time path, where every unreadable list already goes.
-function valueParamsAreCertain(fn, count, inner) {
+function valueParamsAreCertain(fn: AnyFunction, count: number, inner: string): boolean {
   if (fn.toString().includes('[native code]')) {
     return false;
   }
@@ -184,13 +229,13 @@ function valueParamsAreCertain(fn, count, inner) {
 // the enclosing member's. A rest parameter consumes as many values as the query
 // happens to supply, which a fixed set of placeholders cannot express, so such a
 // callback is left for the caller to invoke at render time.
-function compileColumnCallback(column, state) {
+function compileColumnCallback(column: AnyFunction, state: RecordingState): CompiledColumnCallback | AnyFunction {
   const { count, rest, inner } = declaredValueParams(column);
   if (rest || !valueParamsAreCertain(column, count, inner)) {
     return column;
   }
 
-  const values = [];
+  const values: string[] = [];
 
   for (let i = 0; i < count; i++) {
     values.push(placeholder(FILTER_VALUE_PREFIX, i));
@@ -216,9 +261,9 @@ const NOT_SHIFT_NAMES = new Set(['toString', 'valueOf', 'filter']);
 
 // A `.filter(...)` binding on one member, optionally addressing one of the
 // member's time shifts.
-function filterBinding(cubeName, name, timeShiftName, state) {
-  return (column) => {
-    const item = {
+function filterBinding(cubeName: string, name: string, timeShiftName: string | null, state: RecordingState) {
+  return (column: string | AnyFunction): FilterParamBinding => {
+    const item: FilterParamItem = {
       cube_name: cubeName,
       name,
       time_shift_name: timeShiftName,
@@ -238,7 +283,7 @@ function filterBinding(cubeName, name, timeShiftName, state) {
 // `FILTER_PARAMS.<cube>.<member>` binds the member as the query filters it;
 // `.time_shifts.<name>` under it binds the member as a stage shifted by that
 // name reads it.
-function filterParamsItemProxy(cubeName, name, state) {
+function filterParamsItemProxy(cubeName: string, name: string, state: RecordingState): object {
   return new Proxy({}, {
     get(_t, prop) {
       if (prop === 'filter') {
@@ -264,20 +309,20 @@ function filterParamsItemProxy(cubeName, name, state) {
   });
 }
 
-function filterParamsProxy(state) {
+function filterParamsProxy(state: RecordingState): object {
   return new Proxy({}, {
     get(_t, cubeName) {
       return new Proxy({}, {
         get(_t2, memberName) {
-          return filterParamsItemProxy(cubeName, memberName, state);
+          return filterParamsItemProxy(cubeName as string, memberName as string, state);
         },
       });
     },
   });
 }
 
-function filterGroupFn(state) {
-  return (...args) => {
+function filterGroupFn(state: RecordingState) {
+  return (...args: FilterParamBinding[]): string => {
     const filterParams = args.map(arg => {
       if (!arg || typeof arg.__member === 'undefined') {
         throw new Error('FILTER_GROUP expects FILTER_PARAMS args to be passed.');
@@ -292,7 +337,7 @@ function filterGroupFn(state) {
 
 // ---- SECURITY_CONTEXT ------------------------------------------------------
 
-function coerceScalarToString(value) {
+function coerceScalarToString(value: unknown): string {
   if (typeof value === 'string') {
     return value;
   }
@@ -306,7 +351,7 @@ function coerceScalarToString(value) {
 }
 
 // Coercion used by `.filter()` — falsy scalars collapse to "no value".
-function coerceFilterValue(value) {
+function coerceFilterValue(value: unknown): SecurityParam {
   if (value === undefined || value === null) {
     return { kind: 'none' };
   }
@@ -326,7 +371,7 @@ function coerceFilterValue(value) {
 }
 
 // Coercion used by toString/valueOf — keeps all non-null values.
-function coerceToStringValue(value) {
+function coerceToStringValue(value: unknown): string[] | null {
   if (value === undefined || value === null) {
     return null;
   }
@@ -345,13 +390,13 @@ function coerceToStringValue(value) {
   return null;
 }
 
-function recordSecurityValue(value, state) {
+function recordSecurityValue(value: string, state: RecordingState): string {
   return placeholder(SECURITY_VALUE_PREFIX, uniqueInsertString(state.target.securityContextValues, value));
 }
 
-function securityFilterFn(value, required, state) {
+function securityFilterFn(value: unknown, required: boolean, state: RecordingState) {
   const param = coerceFilterValue(value);
-  return (column) => {
+  return (column: string | AnyFunction): string => {
     if (param.kind === 'string') {
       const ph = recordSecurityValue(param.value, state);
       if (typeof column === 'function') {
@@ -386,7 +431,7 @@ function securityFilterFn(value, required, state) {
   };
 }
 
-function securityToStringFn(value, state) {
+function securityToStringFn(value: unknown, state: RecordingState) {
   const values = coerceToStringValue(value);
   return () => {
     if (values === null) {
@@ -396,7 +441,7 @@ function securityToStringFn(value, state) {
   };
 }
 
-function securityContextProxy(value, state) {
+function securityContextProxy(value: unknown, state: RecordingState): object {
   return new Proxy({}, {
     get(_t, prop) {
       if (typeof prop !== 'string') {
@@ -416,7 +461,7 @@ function securityContextProxy(value, state) {
       if (prop === 'toString' || prop === 'valueOf') {
         return securityToStringFn(value, state);
       }
-      const propertyValue = value != null && typeof value === 'object' ? value[prop] : undefined;
+      const propertyValue = value != null && typeof value === 'object' ? (value as Record<string, unknown>)[prop] : undefined;
       return securityContextProxy(propertyValue, state);
     },
   });
@@ -424,7 +469,7 @@ function securityContextProxy(value, state) {
 
 // ---- entry point -----------------------------------------------------------
 
-function buildArg(argName, state, securityContext, sqlUtils) {
+function buildArg(argName: string, state: RecordingState, securityContext: unknown, sqlUtils: unknown): unknown {
   if (argName === 'FILTER_PARAMS') {
     return filterParamsProxy(state);
   }
@@ -440,7 +485,7 @@ function buildArg(argName, state, securityContext, sqlUtils) {
   return memberReferenceProxy([argName], state);
 }
 
-function parseTemplateResult(result) {
+function parseTemplateResult(result: unknown): string | string[] {
   if (Array.isArray(result)) {
     return result.map(r => `${r}`);
   }
@@ -451,12 +496,17 @@ function parseTemplateResult(result) {
 }
 
 /**
- * @param {Function} sqlFn the member's `sql` function from the data model
- * @param {string[]} argNames its argument names (CUBE, FILTER_PARAMS, ...)
- * @param {object} securityContext the request security context object
- * @param {object} sqlUtils the SQL_UTILS object passed through to the template
+ * @param sqlFn the member's `sql` function from the data model
+ * @param argNames its argument names (CUBE, FILTER_PARAMS, ...)
+ * @param securityContext the request security context object
+ * @param sqlUtils the SQL_UTILS object passed through to the template
  */
-function compileMemberSql(sqlFn, argNames, securityContext, sqlUtils) {
+export function compileMemberSql(
+  sqlFn: AnyFunction,
+  argNames: string[],
+  securityContext?: unknown,
+  sqlUtils?: unknown,
+): CompiledMemberSql {
   const root = emptyRecording();
   const state = { target: root };
 
@@ -465,7 +515,3 @@ function compileMemberSql(sqlFn, argNames, securityContext, sqlUtils) {
 
   return { template, ...root };
 }
-
-exports.compileMemberSql = compileMemberSql;
-exports.uniqueInsertPath = uniqueInsertPath;
-exports.uniqueInsertString = uniqueInsertString;
