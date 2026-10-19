@@ -85,6 +85,38 @@ describe('ClickHouseDriver statement path', () => {
       .rejects.toThrow('ClickHouse aborted after 2 row(s): Code: 395. DB::Exception: boom');
   });
 
+  it.each([
+    'CREATE TABLE pre.t ENGINE = MergeTree() ORDER BY (a) AS SELECT a FROM src WHERE b = ?',
+    '  ALTER TABLE pre.t ADD INDEX idx (a) TYPE minmax GRANULARITY 1',
+    'insert into pre.t SELECT a FROM src WHERE b = ?',
+  ])('runs %s, which has no result set, as a command', async (sql) => {
+    expect(await createDriver().query(sql, ['x'])).toEqual([]);
+
+    expect(client.query).not.toHaveBeenCalled();
+    expect(client.command).toHaveBeenCalledWith(expect.objectContaining({
+      query: sql.replace('?', "'x'"),
+    }));
+  });
+
+  it('builds a non-external pre-aggregation through a command', async () => {
+    await createDriver().loadPreAggregationIntoTable(
+      'pre.t',
+      'CREATE TABLE pre.t ENGINE = MergeTree() ORDER BY (a) AS SELECT a FROM src',
+      [],
+      {},
+    );
+
+    expect(client.query).not.toHaveBeenCalled();
+    expect(client.command).toHaveBeenCalledTimes(1);
+  });
+
+  it('still reads a SELECT that mentions a DDL keyword as a result set', async () => {
+    await createDriver().query('SELECT 1 AS one -- CREATE', []);
+
+    expect(client.query).toHaveBeenCalledTimes(1);
+    expect(client.command).not.toHaveBeenCalled();
+  });
+
   it('does not run a health check per command or insert', async () => {
     const driver = createDriver();
 
