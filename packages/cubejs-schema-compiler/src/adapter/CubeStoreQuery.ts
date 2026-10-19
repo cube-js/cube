@@ -179,7 +179,9 @@ export class CubeStoreQuery extends BaseQuery {
     const timeDimension = this.timeDimensions.find(d => d.granularity || d.dateRange);
     const timeDimensionWithGranularity = timeDimension?.granularity ? timeDimension : null;
     const baseQueryAlias = this.cubeAlias('base');
-    const maxRollingWindow = cumulativeMeasuresWithoutMultiplied.reduce((a, b) => this.maxRollingWindow(a, b.rollingWindowDefinition()), <FixedRollingWindow><unknown>null);
+    const maxRollingWindow = cumulativeMeasuresWithoutMultiplied
+      .map(m => m.rollingWindowDefinition())
+      .reduce((a, b) => this.maxRollingWindow(a, b));
     const commonDateCondition =
       this.rollingWindowDateJoinCondition(maxRollingWindow.trailing, maxRollingWindow.leading, maxRollingWindow.offset);
     const filters: FilterToWhere[] = [...this.segments, ...this.filters, ...(
@@ -243,12 +245,6 @@ export class CubeStoreQuery extends BaseQuery {
   }
 
   public maxRollingWindow(a: FixedRollingWindow, b: FixedRollingWindow): FixedRollingWindow {
-    if (!a) {
-      return b;
-    }
-    if (!b) {
-      return a;
-    }
     let trailing;
     if (a.trailing === 'unbounded' || b.trailing === 'unbounded') {
       trailing = 'unbounded';
