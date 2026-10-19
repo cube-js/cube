@@ -42,6 +42,7 @@ import { BaseTimeDimension } from './BaseTimeDimension';
 import { Granularity } from './Granularity';
 import { ParamAllocator } from './ParamAllocator';
 import { PreAggregationForQuery, PreAggregations } from './PreAggregations';
+import type { QueryFactory } from './QueryFactory';
 import { compileMemberSql } from './MemberSqlTemplateCompiler';
 
 const DEFAULT_PREAGGREGATIONS_SCHEMA = 'stb_pre_aggregations';
@@ -69,6 +70,62 @@ export type Compilers = {
   compiler: DataSchemaCompiler;
   cubeEvaluator: CubeEvaluator;
   joinGraph: JoinGraph;
+};
+
+export type MaskedMember = {
+  member: string;
+  filter?: unknown;
+};
+
+export type QueryFrom = {
+  sql: string;
+  alias: string;
+};
+
+export type BaseQueryOptions = {
+  measures?: any[];
+  dimensions?: any[];
+  timeDimensions?: any[];
+  segments?: any[];
+  filters?: any[];
+  order?: any[];
+  limit?: number | string | null;
+  rowLimit?: number | string | null;
+  offset?: number | string | null;
+  timezone?: string;
+  ungrouped?: boolean;
+  allowUngroupedWithoutPrimaryKey?: boolean;
+  totalQuery?: boolean;
+  contextSymbols?: Record<string, any>;
+  maskedMembers?: MaskedMember[];
+  memberToAlias?: Record<string, string>;
+  joinHints?: (string | string[])[];
+  subqueryJoins?: CustomSubQueryJoin[];
+  cubeAliasPrefix?: string;
+  paramAllocator?: ParamAllocator | null;
+  expressionParams?: unknown[];
+  from?: QueryFrom;
+  multiStageQuery?: boolean;
+  multiStageDimensions?: any[];
+  multiStageTimeDimensions?: any[];
+  preAggregationQuery?: boolean;
+  preAggregationId?: string | null;
+  preAggregationsSchema?: string;
+  disableExternalPreAggregations?: boolean;
+  useOriginalSqlPreAggregationsInPreAggregation?: boolean;
+  historyQueries?: any[];
+  cubeLatticeCache?: any;
+  externalQueryClass?: typeof BaseQuery | null;
+  queryFactory?: Pick<QueryFactory, 'createQuery'>;
+  useNativeSqlPlanner?: boolean;
+  localRefreshKey?: boolean;
+  convertTzForRawTimeDimension?: boolean;
+  multiStageLeafMerge?: boolean;
+  cubestoreSupportMultistage?: boolean;
+  cubestoreUnionFullKeyAggregate?: boolean;
+  maxMultiStageDepth?: number;
+  maxMultiStageStages?: number;
+  maxMemberResolutionDepth?: number;
 };
 
 export type JoinRoot = {
@@ -132,7 +189,7 @@ export class BaseQuery {
 
   public readonly joinGraph: JoinGraph;
 
-  public readonly options: any;
+  public readonly options: BaseQueryOptions;
 
   public readonly paramAllocator: ParamAllocator;
 
@@ -197,7 +254,7 @@ export class BaseQuery {
 
   public parametrizedContextSymbolsValue!: any;
 
-  public constructor(compilers: Compilers, options: any) {
+  public constructor(compilers: Compilers, options: BaseQueryOptions) {
     this.compilers = compilers;
     this.cubeEvaluator = compilers.cubeEvaluator;
     this.joinGraph = compilers.joinGraph;
@@ -2477,7 +2534,7 @@ export class BaseQuery {
       filters,
       segments,
       timeDimensions,
-      order: {}
+      order: []
     });
     return { prefix, subQuery, cubeName };
   }
@@ -4245,12 +4302,12 @@ export class BaseQuery {
     return inflection.underscore(name).replace(/\./g, isPreAggregationName ? '_' : '__');
   }
 
-  public newSubQuery(options: unknown): this {
+  public newSubQuery(options: BaseQueryOptions): this {
     const QueryClass = this.constructor as any;
     return new QueryClass(this.compilers, this.subQueryOptions(options));
   }
 
-  public newSubQueryForCube(cube, options) {
+  public newSubQueryForCube(cube: string, options: BaseQueryOptions) {
     options = { ...options };
     if (this.options.queryFactory) {
       // When dealing with rollup joins, it's crucial to use the correct parameter allocator for the specific cube in use.
@@ -4263,7 +4320,7 @@ export class BaseQuery {
     return this.newSubQuery(options);
   }
 
-  public subQueryOptions(options) {
+  public subQueryOptions(options: BaseQueryOptions): BaseQueryOptions {
     return {
       paramAllocator: this.paramAllocator,
       timezone: this.timezone,

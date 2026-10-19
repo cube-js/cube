@@ -1,6 +1,6 @@
 import moment from 'moment-timezone';
 import { getEnv, parseSqlInterval, splitSqlInterval } from '@cubejs-backend/shared';
-import { BaseQuery } from './BaseQuery';
+import { BaseQuery, type BaseQueryOptions, type Compilers } from './BaseQuery';
 import { BaseFilter } from './BaseFilter';
 import { UserError } from '../compiler/UserError';
 import { BaseTimeDimension } from './BaseTimeDimension';
@@ -25,11 +25,11 @@ class MysqlFilter extends BaseFilter {
 }
 
 export class MysqlQuery extends BaseQuery {
-  private readonly useNamedTimezones: boolean;
+  protected readonly useNamedTimezones: boolean;
 
-  private readonly useGeneratedTimeSeries: boolean;
+  protected readonly useGeneratedTimeSeries: boolean;
 
-  public constructor(compilers: any, options: any) {
+  public constructor(compilers: Compilers, options: BaseQueryOptions) {
     super(compilers, options);
 
     this.useNamedTimezones = getEnv('mysqlUseNamedTimezones', { dataSource: this.dataSource });

@@ -99,7 +99,6 @@ describe('Trino/Presto time dimensions over DATE columns', () => {
 
         const query = new QueryClass({ joinGraph, cubeEvaluator, compiler }, {
           measures: ['events.count'],
-          timezone: null
         });
 
         expect(query.convertTz('"events".d')).toBe('"events".d');

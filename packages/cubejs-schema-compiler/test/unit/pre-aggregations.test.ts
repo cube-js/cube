@@ -958,7 +958,6 @@ describe('pre-aggregations', () => {
         dateRange: ['2023-01-01', '2023-01-10']
       }],
       timezone: 'America/Los_Angeles',
-      cacheMode: 'no-cache',
     });
 
     const queryPreAggs: any = query.preAggregations?.preAggregationsDescription();
@@ -1014,7 +1013,6 @@ describe('pre-aggregations', () => {
         granularity: 'day',
         dateRange: ['2023-01-01', '2023-01-10']
       }],
-      cacheMode: 'no-cache',
       externalQueryClass: PostgresQuery,
     });
 

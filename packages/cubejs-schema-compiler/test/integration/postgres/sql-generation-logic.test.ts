@@ -407,9 +407,10 @@ describe('SQL Generation', () => {
         measures: [
           'visitors.visitor_count'
         ],
-        order: {
-          'visitors.visitor_count': 'desc'
-        },
+        order: [{
+          id: 'visitors.visitor_count',
+          desc: true
+        }],
         filters: [
           {
             or: [

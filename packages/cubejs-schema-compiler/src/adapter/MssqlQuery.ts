@@ -2,7 +2,7 @@ import R from 'ramda';
 import moment from 'moment-timezone';
 
 import { getEnv, QueryAlias, parseSqlInterval } from '@cubejs-backend/shared';
-import { BaseQuery } from './BaseQuery';
+import { BaseQuery, type BaseQueryOptions, type Compilers } from './BaseQuery';
 import { BaseFilter } from './BaseFilter';
 import { BaseSegment } from './BaseSegment';
 import { ParamAllocator } from './ParamAllocator';
@@ -74,9 +74,9 @@ class MssqlSegment extends BaseSegment {
 }
 
 export class MssqlQuery extends BaseQuery {
-  private readonly useNamedTimezones: boolean;
+  protected readonly useNamedTimezones: boolean;
 
-  public constructor(compilers: any, options: any) {
+  public constructor(compilers: Compilers, options: BaseQueryOptions) {
     super(compilers, options);
 
     this.useNamedTimezones = getEnv('mssqlUseNamedTimezones', { dataSource: this.dataSource });
