@@ -1,6 +1,7 @@
 import R from 'ramda';
 import { PreAggregationPartitionRangeLoader } from '@cubejs-backend/query-orchestrator';
 import { BaseQuery } from '../../../src';
+import type { Compilers } from '../../../src';
 
 export class BaseDbRunner {
   protected containerLazyInitPromise: any = null;
@@ -17,7 +18,7 @@ export class BaseDbRunner {
     return this.testQueries([query], fixture);
   }
 
-  protected newTestQuery(_compilers: any, _query: any): BaseQuery {
+  protected newTestQuery(_compilers: Compilers, _query: any): BaseQuery {
     throw new Error('newTestQuery not implemented');
   }
 

@@ -27,10 +27,8 @@ import {
 } from '@cubejs-backend/shared';
 
 import type { CompilerCache } from '../compiler/CompilerCache';
-import type { ContextEvaluator } from '../compiler/ContextEvaluator';
 import type { CubeEvaluator } from '../compiler/CubeEvaluator';
 import { CubeSymbols } from '../compiler/CubeSymbols';
-import type { CubeToMetaTransformer } from '../compiler/CubeToMetaTransformer';
 import type { DataSchemaCompiler } from '../compiler/DataSchemaCompiler';
 import type { FinishedJoinTree, JoinGraph } from '../compiler/JoinGraph';
 import { JoinPathNotFoundError, UserError } from '../compiler/UserError';
@@ -69,12 +67,8 @@ const SecondsDurations = {
 
 export type Compilers = {
   compiler: DataSchemaCompiler;
-  metaTransformer: CubeToMetaTransformer;
   cubeEvaluator: CubeEvaluator;
-  contextEvaluator: ContextEvaluator;
   joinGraph: JoinGraph;
-  compilerCache: CompilerCache;
-  headCommitId: any;
 };
 
 export type JoinRoot = {
@@ -132,7 +126,7 @@ export class BaseQuery {
 
   public join!: FinishedJoinTree;
 
-  public readonly compilers: Compilers | any;
+  public readonly compilers: Compilers;
 
   public readonly cubeEvaluator: CubeEvaluator;
 
@@ -148,7 +142,7 @@ export class BaseQuery {
 
   public memberMaskFilters!: Record<string, any>;
 
-  public compilerCache!: any;
+  public compilerCache!: CompilerCache;
 
   public queryCache!: any;
 
@@ -203,7 +197,7 @@ export class BaseQuery {
 
   public parametrizedContextSymbolsValue!: any;
 
-  public constructor(compilers: Compilers | any, options: any) {
+  public constructor(compilers: Compilers, options: any) {
     this.compilers = compilers;
     this.cubeEvaluator = compilers.cubeEvaluator;
     this.joinGraph = compilers.joinGraph;

@@ -7,6 +7,7 @@ import { v4 as uuidv4 } from 'uuid';
 import moment from 'moment';
 
 import { ClickHouseQuery } from '../../../src/adapter/ClickHouseQuery';
+import type { Compilers } from '../../../src/adapter/BaseQuery';
 import { BaseDbRunner } from '../utils/BaseDbRunner';
 
 process.env.TZ = 'GMT';
@@ -185,7 +186,7 @@ export class ClickHouseDbRunner extends BaseDbRunner {
     return 8123;
   }
 
-  protected override newTestQuery(compilers: unknown, query: unknown): ClickHouseQuery {
+  protected override newTestQuery(compilers: Compilers, query: unknown): ClickHouseQuery {
     return new ClickHouseQuery(compilers, query);
   }
 
