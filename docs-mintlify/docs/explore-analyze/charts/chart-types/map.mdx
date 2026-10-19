@@ -1,12 +1,12 @@
 ---
 title: Map
-description: Plot geographic data as point maps (latitude/longitude) or region maps (choropleth from GeoJSON polygons).
+description: Plot geographic data as point maps (latitude/longitude), density maps, or region maps (choropleth from GeoJSON polygons).
 ---
 
 Map charts visualize geographic data in two modes:
 
-- **Point map** — plot rows at their latitude/longitude coordinates, optionally sized and colored by additional fields.
-- **Region map** — paint polygons (countries, US states, or any custom [GeoJSON](https://en.wikipedia.org/wiki/GeoJSON)) as a choropleth driven by a measure.
+- **Point map** — plot rows at their latitude/longitude coordinates, optionally sized and colored by additional fields. A point map can also show its rows as a [density](#density) surface.
+- **Region map** — paint polygons (countries, US states, or any custom [GeoJSON](https://en.wikipedia.org/wiki/GeoJSON)) as a choropleth colored by a measure or a dimension.
 
 <Frame>
   <img src="https://lgo0ecceic.ucarecd.net/103102da-1470-4879-a8cf-6cf8917f9d1a/" />
@@ -15,11 +15,19 @@ Map charts visualize geographic data in two modes:
 ## When to use
 
 - **Point map** — locations with known coordinates (stores, shipments, sign-ups), geographic clusters and outliers.
+- **Density** — many locations that overlap, where individual points pile up and hot spots matter more than single rows.
 - **Region map** — measures aggregated by country, state, postcode, sales territory, or any user-defined polygon set.
+
+## Settings panel
+
+The chart settings panel has two tabs:
+
+- **Fields** — the projection, the map type, and the fields the map is built on: geography, **Size by**, **Color by**, the [density](#density) toggle and its weight, and tooltips.
+- **Style** — how the map looks: [zoom](#zoom), point size, clustering, density settings, and colors.
 
 ## Chart type
 
-Pick **Point** or **Region** in the chart settings panel's **Type** row. The default is **Point**.
+Pick **Point** or **Region** in the **Type** row of the **Fields** tab. The default is **Point**.
 
 ## Projection
 
@@ -39,20 +47,41 @@ A point map requires:
 
 Optional:
 
-- **Size** — numeric measure that scales point radius proportionally.
-- **Color** — dimension or measure that colors points by category or value.
+- **Size by** — numeric measure that scales point radius proportionally.
+- **Color by** — dimension or measure that colors points by category or value.
 
 ### Point color
 
-When no **Color** field is assigned, all points render in the configurable **Default color**. When a dimension is assigned, each unique value gets a distinct color from the active palette — pick from the built-in palettes or supply a custom one, see [Color and stacking](/docs/explore-analyze/charts/configuration/color-and-stacking).
+When **Color by** is empty, all points render in the **Point color**. When a dimension is assigned, each unique value gets a distinct color from the active palette — pick from the built-in palettes or supply a custom one, see [Color and stacking](/docs/explore-analyze/charts/configuration/color-and-stacking). When a measure is assigned, points are colored by a color scale, and you can pin each stop of the scale to a value such as the minimum, the median, a percentile, or a fixed number.
 
 ### Point size
 
-Assign a numeric measure to the **Size** channel to scale point radius by value. The size range (minimum and maximum radius in pixels) is configurable in the settings panel.
+**Default size** sets the radius of every point, from 2 to 20 pixels. Assign a measure to **Size by** to scale point radius by value, starting from the default size.
 
 ### Clustering
 
-Clustering groups nearby points into a single circle that expands on zoom. It is **off by default** and can be enabled in the settings panel.
+Clustering groups nearby points into a single circle that expands on zoom. It is **off by default** and can be enabled on the **Style** tab. **Cluster until zoom** sets the zoom level up to which points stay clustered; the default is 14. Clustering is not available while [density](#density) is on.
+
+## Density
+
+A density map draws a continuous heat surface from the latitude and longitude of the rows, so dense areas show as hot spots. Use it when many points overlap.
+
+Turn it on with the **Density** toggle on the **Fields** tab. Beside the toggle, **Weight** sets what each row adds to the surface:
+
+- **Count of rows** — every row adds the same amount. This is the default.
+- A measure — rows with a larger value add more. Rows where the measure is empty, zero, or negative add nothing.
+
+The **Style** tab sets how the surface looks:
+
+| Setting | Description | Default |
+|---|---|---|
+| **Radius** | How far each row spreads, from 5 to 100 pixels | 20 px |
+| **Intensity** | A multiplier on the whole surface, from 0.5 to 5 | 1 |
+| **Opacity** | Opacity of the surface, from 10% to 100% | 80% |
+| **Show from zoom** | Zoom level from which individual points replace the surface | 12 |
+| **Density scale** | The colors from low to high density, in the **Color** section | Plasma |
+
+Areas with no data stay transparent. When you zoom in, the surface fades out and the points fade in over the last zoom level before **Show from zoom** (from 11 to 12 by default). From there, the map shows the points with their size, color, and tooltips.
 
 ## Region map
 
@@ -61,13 +90,13 @@ A region map requires:
 - **Source** — the GeoJSON to render: `World countries`, `US states`, or `Custom`.
 - **Property** — which property in each GeoJSON feature acts as the join key (e.g. `name`, `ISO3166-1-Alpha-2`, `state_code`).
 - **Dimension** — which column from your query joins to **Property**.
-- **Measure** — the numeric measure that drives the choropleth fill.
+- **Color by** — the field that drives the choropleth fill: a measure for a color scale, or a dimension for distinct colors.
 
 Built-in sources expose a fixed list of allowed properties. **Custom** lets you point at any public GeoJSON URL; the property dropdown then enumerates every key present in the feature collection.
 
-When the chart enters Region mode, the join dimension and measure are auto-picked when an unambiguous match exists in your query.
+When the chart enters Region mode, the join dimension and the **Color by** field are auto-picked when an unambiguous match exists in your query.
 
-The choropleth gradient comes from the active palette — pick from the built-in palettes or supply a custom one, see [Color and stacking](/docs/explore-analyze/charts/configuration/color-and-stacking).
+The choropleth fill comes from a color scale on the **Style** tab. You can change its colors and pin each stop to a value such as the minimum, the median, a percentile, or a fixed number. When **Color by** is a dimension, each value gets a distinct color from the active palette instead, see [Color and stacking](/docs/explore-analyze/charts/configuration/color-and-stacking).
 
 ### Custom GeoJSON
 
@@ -81,12 +110,23 @@ The fetched GeoJSON is cached for the session.
 
 ### Unmatched regions
 
-Regions in the GeoJSON with no matching data row are hidden by default. Toggle **Fill unmatched** in the settings panel to render them with the **Default color** at reduced opacity instead.
+Regions in the GeoJSON with no matching data row are hidden by default. Toggle **Fill unmatched** on the **Style** tab to render them with the **Default** color from the **Color** section at reduced opacity instead.
 
 ## Tooltip fields
 
 The **Tooltips** section controls which fields appear when a user hovers over a point or region. See [Tooltips](/docs/explore-analyze/charts/configuration/tooltips).
 
+## Zoom
+
+The **Zoom** section on the **Style** tab sets where the map opens. Its **Default** row has two options:
+
+- **Auto** — the map fits the data every time it opens. The number next to it, for example **Auto (9)**, is the zoom level that fit lands on for the current data. This is the default.
+- **Custom** — the map opens at a saved **Level** and **Center** for every viewer. Switching to **Custom** saves the view on screen, so the map does not move.
+
+In **Custom**, **Level** and **Center** follow the map: pan or zoom the chart, and they update. Type a value, and the map moves. **Center** takes latitude and longitude in decimal degrees; south and west are negative.
+
+The saved zoom is a zoom level, not an area. A chart on a dashboard can be smaller or larger than in the workbook, so it shows a smaller or larger area at the same zoom.
+
 ## Map interaction
 
-The map is interactive — users can pan and zoom. Viewport changes persist while you edit other settings; switching the data source or projection re-fits the camera to the new bounds.
+The map is interactive — users can pan and zoom. In **Auto**, the viewport is kept while you edit other settings, and a change of data or projection fits the map to the new bounds. In **Custom**, panning or zooming saves the new view, and a change of data or projection keeps it.
