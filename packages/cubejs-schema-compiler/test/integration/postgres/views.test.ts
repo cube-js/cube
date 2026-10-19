@@ -4,7 +4,7 @@ import { prepareJsCompiler } from '../../unit/PrepareCompiler';
 import { dbRunner } from './PostgresDBRunner';
 
 // TODO: move into utils
-async function runQueryTest(prepareCompilerResult, { cubeQuery, expectedResult }) {
+async function runQueryTest(prepareCompilerResult: any, { cubeQuery, expectedResult }: any) {
   await prepareCompilerResult.compiler.compile();
   const query = new PostgresQuery(prepareCompilerResult, cubeQuery);
 

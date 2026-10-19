@@ -128,7 +128,7 @@ const getCube = (
   });
 `;
 
-const getQueries = (compiler, joinGraph, cubeEvaluator) => ([
+const getQueries = (compiler: any, joinGraph: any, cubeEvaluator: any) => ([
   // month query
   new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
     measures: ['cube.totalQuantity', 'cube.totalProfit'],

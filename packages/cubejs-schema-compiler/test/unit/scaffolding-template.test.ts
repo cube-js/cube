@@ -4,18 +4,18 @@ import {
 } from '../../src/scaffolding/ScaffoldingTemplate';
 
 const driver = {
-  quoteIdentifier: (name) => `"${name}"`,
+  quoteIdentifier: (name: string) => `"${name}"`,
 };
 
 const mySqlDriver = {
-  quoteIdentifier: (name) => `\`${name}\``,
+  quoteIdentifier: (name: string) => `\`${name}\``,
 };
 
 const bigQueryDriver = {
-  quoteIdentifier(identifier) {
+  quoteIdentifier(identifier: string) {
     const nestedFields = identifier.split('.');
     return nestedFields
-      .map((name) => {
+      .map((name: string) => {
         if (name.match(/^[a-z0-9_]+$/)) {
           return name;
         }

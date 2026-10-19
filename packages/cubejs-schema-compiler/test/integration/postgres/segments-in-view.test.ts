@@ -97,7 +97,7 @@ view(\`accountOverview\`, {
 });
   `);
 
-  async function runQueryTest(q, expectedResult) {
+  async function runQueryTest(q: any, expectedResult: any) {
     await compiler.compile();
     const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, q);
 

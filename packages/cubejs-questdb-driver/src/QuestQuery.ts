@@ -54,7 +54,7 @@ class QuestParamAllocator extends ParamAllocator {
 }
 
 class QuestFilter extends BaseFilter {
-  public orIsNullCheck(column: string, not: string): string {
+  public orIsNullCheck(column: string, not: boolean): string {
     return `${this.shouldAddOrIsNull(not) ? ` OR ${column} = NULL` : ''}`;
   }
 
@@ -193,7 +193,14 @@ export class QuestQuery extends BaseQuery {
     return query;
   }
 
-  public renderSqlMeasure(name: string, evaluateSql: string, symbol: any, cubeName: string, parentMeasure: string, orderBySql: string[]): string {
+  public renderSqlMeasure(
+    name: string,
+    evaluateSql: string,
+    symbol: any,
+    cubeName: string,
+    parentMeasure: string | undefined,
+    orderBySql: { sql: string, dir: string }[]
+  ): string {
     // QuestDB doesn't support COUNT(column_name) syntax.
     // COUNT() or COUNT(*) should be used instead.
 

@@ -326,12 +326,12 @@ describe('PreAggregationsAlias', () => {
 
     `);
 
-  function replaceTableName(query, preAggregation, suffix) {
+  function replaceTableName(query: any[], preAggregation: any, suffix: string | number) {
     const [toReplace, params] = query;
     preAggregation = Array.isArray(preAggregation) ? preAggregation : [preAggregation];
     return [
       preAggregation.reduce(
-        (replacedQuery, desc) => replacedQuery
+        (replacedQuery: string, desc: any) => replacedQuery
           .replace(new RegExp(desc.tableName, 'g'), `${desc.tableName}_${suffix}`)
           .replace(/CREATE INDEX (?!i_)/, `CREATE INDEX i_${suffix}_`),
         toReplace
@@ -340,12 +340,12 @@ describe('PreAggregationsAlias', () => {
     ];
   }
 
-  function tempTablePreAggregations(preAggregationsDescriptions) {
+  function tempTablePreAggregations(preAggregationsDescriptions: any[]) {
     return R.unnest(preAggregationsDescriptions.map(
-      desc => desc.invalidateKeyQueries.concat([
+      (desc: any) => desc.invalidateKeyQueries.concat([
         [desc.loadSql[0].replace('CREATE TABLE', 'CREATE TEMP TABLE'), desc.loadSql[1]]
       ]).concat(
-        (desc.indexesSql || []).map(({ sql }) => sql)
+        (desc.indexesSql || []).map(({ sql }: any) => sql)
       )
     ));
   }

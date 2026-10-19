@@ -32,7 +32,7 @@ const memoKeyReplacer = (_key: string, value: unknown) => {
     return { $memoNumber: String(value) };
   }
   if (value && typeof value === 'object' && !Array.isArray(value)) {
-    return Object.fromEntries(Object.keys(value).sort().map((k) => [k, value[k]]));
+    return Object.fromEntries(Object.keys(value).sort().map((k) => [k, (value as Record<string, unknown>)[k]]));
   }
   return value;
 };
@@ -190,7 +190,7 @@ const createSharedCompileScope = (globals: Record<string, any>): SharedCompileSc
   });
   Object.defineProperty(vars, 'globalThis', { value: compileGlobal, writable: true, configurable: true, enumerable: false });
 
-  const scopeTraps = {
+  const scopeTraps: ProxyHandler<Record<PropertyKey, any>> = {
     get: (_t, key) => read(key),
     set: (t, key, value) => {
       t[key] = value;
@@ -230,7 +230,7 @@ const createSharedCompileScope = (globals: Record<string, any>): SharedCompileSc
 
 const NATIVE_IS_SUPPORTED = isNativeSupported();
 
-const moduleFileCache = {};
+const moduleFileCache: Record<string, any> = {};
 
 const JINJA_SYNTAX = /{%|%}|{{|}}/ig;
 const JINJA_MACRO_DEFINITION = /{%[-+]?\s*macro\s/;
@@ -436,7 +436,7 @@ export class DataSchemaCompiler {
     this.sharedVmContext = !!options.sharedVmContext;
   }
 
-  public compileObjects(compileServices: CompilerInterface[], objects, errorsReport: ErrorReporter) {
+  public compileObjects(compileServices: CompilerInterface[], objects: any[], errorsReport: ErrorReporter) {
     try {
       return compileServices
         .map((compileService) => (() => compileService.compile(objects, errorsReport)))
@@ -630,7 +630,7 @@ export class DataSchemaCompiler {
     };
 
     const compileGlobals = {
-      view: (name, cube) => {
+      view: (name: any, cube?: any) => {
         const file = ctxFileStorage.getStore();
         if (!file) {
           throw new Error('No file stored in context');
@@ -642,7 +642,7 @@ export class DataSchemaCompiler {
           this.cubeFactory({ ...name, fileName: file.fileName, isView: true }) :
           cubes.push({ ...cube, name, fileName: file.fileName, isView: true });
       },
-      cube: (name, cube) => {
+      cube: (name: any, cube?: any) => {
         const file = ctxFileStorage.getStore();
         if (!file) {
           throw new Error('No file stored in context');
@@ -654,7 +654,7 @@ export class DataSchemaCompiler {
           this.cubeFactory({ ...name, fileName: file.fileName }) :
           cubes.push({ ...cube, name, fileName: file.fileName });
       },
-      context: (name: string, context) => {
+      context: (name: string, context: Record<string, any>) => {
         const file = ctxFileStorage.getStore();
         if (!file) {
           throw new Error('No file stored in context');
@@ -662,7 +662,7 @@ export class DataSchemaCompiler {
         assertOutsideMemo('context');
         return contexts.push({ ...context, name, fileName: file.fileName });
       },
-      view_group: (name: string, viewGroup) => {
+      view_group: (name: string, viewGroup: Record<string, any>) => {
         const file = ctxFileStorage.getStore();
         if (!file) {
           throw new Error('No file stored in context');
@@ -676,7 +676,7 @@ export class DataSchemaCompiler {
         }
         return name;
       },
-      addExport: (obj) => {
+      addExport: (obj: Record<string, any>) => {
         const file = ctxFileStorage.getStore();
         if (!file) {
           throw new Error('No file stored in context');
@@ -684,14 +684,14 @@ export class DataSchemaCompiler {
         exports[file.fileName] = exports[file.fileName] || {};
         exports[file.fileName] = Object.assign(exports[file.fileName], obj);
       },
-      setExport: (obj) => {
+      setExport: (obj: Record<string, any>) => {
         const file = ctxFileStorage.getStore();
         if (!file) {
           throw new Error('No file stored in context');
         }
         exports[file.fileName] = obj;
       },
-      asyncModule: (fn) => {
+      asyncModule: (fn: () => unknown) => {
         const file = ctxFileStorage.getStore();
         if (!file) {
           throw new Error('No file stored in context');
@@ -1048,12 +1048,14 @@ export class DataSchemaCompiler {
     const chunkCount = Math.min(files.length, (this.workerPool!.maxWorkers || 1) * 4);
     const chunkSize = Math.ceil(files.length / chunkCount);
     const chunks: FileContent[][] = [];
+
     for (let i = 0; i < files.length; i += chunkSize) {
       chunks.push(files.slice(i, i + chunkSize));
     }
 
     const results = await Promise.all(chunks.map(async (chunk) => {
       let res: ({ content: string; errors: any[]; warnings: any[] } | null)[];
+
       try {
         res = await this.workerPool!.exec('transpileJsBulk', [{
           files: chunk.map(({ fileName, content }) => ({ fileName, content })),
@@ -1257,7 +1259,7 @@ export class DataSchemaCompiler {
     });
   }
 
-  public withQuery(query, fn) {
+  public withQuery<T>(query: any, fn: () => T): T {
     const oldQuery = this.currentQuery;
     this.currentQuery = query;
 
@@ -1399,7 +1401,7 @@ export class DataSchemaCompiler {
 
   // Alias "securityContext" with "security_context" (snake case version)
   // to support snake case based data models
-  private cloneCompileContextWithGetterAlias(compileContext) {
+  private cloneCompileContextWithGetterAlias(compileContext: any) {
     const ctx = compileContext || {};
     const clone = R.clone(ctx);
     clone.security_context = ctx.securityContext;

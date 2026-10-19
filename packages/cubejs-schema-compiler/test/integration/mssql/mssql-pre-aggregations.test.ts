@@ -165,22 +165,22 @@ describe('MSSqlPreAggregations', () => {
 
   const joinedSchemaCompilers = prepareJsCompiler(createJoinedCubesSchema());
 
-  function replaceTableName(query, preAggregation, suffix) {
+  function replaceTableName(query: any[], preAggregation: any, suffix: string | number) {
     const [toReplace, params] = query;
     console.log(toReplace);
     preAggregation = Array.isArray(preAggregation) ? preAggregation : [preAggregation];
     return [
       preAggregation.reduce(
-        (replacedQuery, desc) => replacedQuery.replace(new RegExp(desc.tableName, 'g'), `##${desc.tableName}_${suffix}`),
+        (replacedQuery: string, desc: any) => replacedQuery.replace(new RegExp(desc.tableName, 'g'), `##${desc.tableName}_${suffix}`),
         toReplace
       ),
       params,
     ];
   }
 
-  function tempTablePreAggregations(preAggregationsDescriptions) {
+  function tempTablePreAggregations(preAggregationsDescriptions: any[]) {
     return R.unnest(
-      preAggregationsDescriptions.map((desc) => desc.invalidateKeyQueries.concat([[desc.loadSql[0], desc.loadSql[1]]]))
+      preAggregationsDescriptions.map((desc: any) => desc.invalidateKeyQueries.concat([[desc.loadSql[0], desc.loadSql[1]]]))
     );
   }
 

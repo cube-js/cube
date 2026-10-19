@@ -338,7 +338,7 @@ describe('ClickHouse JoinGraph', () => {
     return result;
   });
 
-  async function runQueryTest(q, expectedResult) {
+  async function runQueryTest(q: any, expectedResult: any) {
     await compiler.compile();
 
     const query = new ClickHouseQuery({ joinGraph, cubeEvaluator, compiler }, q);

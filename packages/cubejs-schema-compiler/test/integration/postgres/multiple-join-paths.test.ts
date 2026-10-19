@@ -6,7 +6,7 @@ import { CubeEvaluator } from '../../../src/compiler/CubeEvaluator';
 import { testWithPreAggregation } from './pre-aggregation-utils';
 
 class TestPostgresQuery extends PostgresQuery {
-  public enrichedJoinHintsFromJoinTree(joinTree, joinHints) {
+  public enrichedJoinHintsFromJoinTree(joinTree: any, joinHints: any) {
     return super.enrichedJoinHintsFromJoinTree(joinTree, joinHints);
   }
 }
@@ -433,7 +433,7 @@ describe('Multiple join paths', () => {
       });
 
       const preAggregationsDescription: any = query.preAggregations?.preAggregationsDescription();
-      const { loadSql } = preAggregationsDescription.find(p => p.preAggregationId === 'A.adex_with_join_paths');
+      const { loadSql } = preAggregationsDescription.find((p: any) => p.preAggregationId === 'A.adex_with_join_paths');
 
       expect(loadSql[0]).toMatch(/ON 'A' = 'D'/);
       expect(loadSql[0]).toMatch(/ON 'D' = 'E'/);
@@ -462,7 +462,7 @@ describe('Multiple join paths', () => {
       });
 
       const preAggregationsDescription: any = query.preAggregations?.preAggregationsDescription();
-      const preAggregation = preAggregationsDescription.find(p => p.preAggregationId === 'A.adex_with_join_paths');
+      const preAggregation = preAggregationsDescription.find((p: any) => p.preAggregationId === 'A.adex_with_join_paths');
       expect(preAggregation).toBeDefined();
     });
 
@@ -488,7 +488,7 @@ describe('Multiple join paths', () => {
       });
 
       const preAggregationsDescription: any = query.preAggregations?.preAggregationsDescription();
-      const preAggregation = preAggregationsDescription.find(p => p.preAggregationId === 'A.adex_with_join_paths');
+      const preAggregation = preAggregationsDescription.find((p: any) => p.preAggregationId === 'A.adex_with_join_paths');
       expect(preAggregation).toBeDefined();
     });
 
@@ -513,7 +513,7 @@ describe('Multiple join paths', () => {
       });
 
       const preAggregationsDescription: any = query.preAggregations?.preAggregationsDescription();
-      const preAggregation = preAggregationsDescription.find(p => p.preAggregationId === 'A.ad_without_join_paths');
+      const preAggregation = preAggregationsDescription.find((p: any) => p.preAggregationId === 'A.ad_without_join_paths');
       expect(preAggregation).toBeDefined();
     });
 
@@ -538,7 +538,7 @@ describe('Multiple join paths', () => {
       });
 
       const preAggregationsDescription: any = query.preAggregations?.preAggregationsDescription();
-      const preAggregation = preAggregationsDescription.find(p => p.preAggregationId === 'A.ad_without_join_paths');
+      const preAggregation = preAggregationsDescription.find((p: any) => p.preAggregationId === 'A.ad_without_join_paths');
       expect(preAggregation).toBeDefined();
     });
 
@@ -625,7 +625,7 @@ describe('Multiple join paths', () => {
         const query = makeReferenceQueryFor(preAggregationId);
 
         const preAggregationsDescription: any = query.preAggregations?.preAggregationsDescription();
-        const preAggregationFromQuery = preAggregationsDescription.find(p => p.preAggregationId === preAggregationId);
+        const preAggregationFromQuery = preAggregationsDescription.find((p: any) => p.preAggregationId === preAggregationId);
         if (preAggregationFromQuery === undefined) {
           throw expect(preAggregationFromQuery).toBeDefined();
         }
@@ -636,7 +636,7 @@ describe('Multiple join paths', () => {
         const query = makeReferenceQueryFor(preAggregationId, addTimeRange);
 
         const preAggregationsDescription: any = query.preAggregations?.preAggregationsDescription();
-        const preAggregationFromQuery = preAggregationsDescription.find(p => p.preAggregationId === preAggregationId);
+        const preAggregationFromQuery = preAggregationsDescription.find((p: any) => p.preAggregationId === preAggregationId);
         if (preAggregationFromQuery === undefined) {
           throw expect(preAggregationFromQuery).toBeDefined();
         }

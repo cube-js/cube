@@ -3,6 +3,8 @@ import { PreAggregationPartitionRangeLoader } from '@cubejs-backend/query-orches
 import { BaseQuery } from '../../../src';
 import type { BaseQueryOptions, Compilers } from '../../../src';
 
+export type QueryWithParams = [string, unknown[]];
+
 export class BaseDbRunner {
   protected containerLazyInitPromise: any = null;
 
@@ -14,7 +16,7 @@ export class BaseDbRunner {
 
   protected nextSeed: number = 1;
 
-  public testQuery(query, fixture: any = null) {
+  public testQuery(query: unknown[], fixture: any = null) {
     return this.testQueries([query], fixture);
   }
 
@@ -22,7 +24,7 @@ export class BaseDbRunner {
     throw new Error('newTestQuery not implemented');
   }
 
-  public async runQueryTest(q, expectedResult, { compiler, joinGraph, cubeEvaluator }) {
+  public async runQueryTest(q: any, expectedResult: any, { compiler, joinGraph, cubeEvaluator }: any) {
     await compiler.compile();
     const query = this.newTestQuery({ joinGraph, cubeEvaluator, compiler }, q);
 
@@ -38,7 +40,7 @@ export class BaseDbRunner {
     return sqlAndParams;
   }
 
-  public async testQueries(queries, fixture: any = null) {
+  public async testQueries(queries: unknown[][], fixture: any = null) {
     queries.forEach(q => {
       console.log(q[0]);
       console.log(q[1]);
@@ -82,12 +84,12 @@ export class BaseDbRunner {
     return this.connection.testQueries(queries, fixture);
   }
 
-  public replaceTableName(query, preAggregation, suffix) {
+  public replaceTableName(query: QueryWithParams, preAggregation: any, suffix: string | number): QueryWithParams {
     const [toReplace, params] = query;
     preAggregation = Array.isArray(preAggregation) ? preAggregation : [preAggregation];
     return [
       preAggregation.reduce(
-        (replacedQuery, desc) => {
+        (replacedQuery: string, desc: any) => {
           const partitionUnion = desc.dateRange && PreAggregationPartitionRangeLoader.timeSeries(
             desc.partitionGranularity,
             PreAggregationPartitionRangeLoader.intersectDateRanges(desc.dateRange, desc.matchedTimeDimensionDateRange),
@@ -118,12 +120,12 @@ export class BaseDbRunner {
   }
 
   public replacePartitionName(
-    query,
-    desc,
-    suffix,
+    query: QueryWithParams,
+    desc: any,
+    suffix: string | number,
     partitionGranularity: string | null = null,
     dateRange: [string, string] | null = null
-  ) {
+  ): QueryWithParams {
     const [toReplace, params] = query;
     const tableName = partitionGranularity && dateRange ? PreAggregationPartitionRangeLoader.partitionTableName(
       desc.tableName, partitionGranularity, dateRange
@@ -135,7 +137,7 @@ export class BaseDbRunner {
     return [
       replaced,
       params.map(
-        param => {
+        (param: unknown) => {
           if (dateRange && param === PreAggregationPartitionRangeLoader.FROM_PARTITION_RANGE) {
             return PreAggregationPartitionRangeLoader.inDbTimeZone(desc, dateRange[0]);
           } else if (dateRange && param === PreAggregationPartitionRangeLoader.TO_PARTITION_RANGE) {
@@ -148,9 +150,9 @@ export class BaseDbRunner {
     ];
   }
 
-  public tempTablePreAggregations(preAggregationsDescriptions, seed = this.nextSeed++) {
+  public tempTablePreAggregations(preAggregationsDescriptions: any, seed = this.nextSeed++) {
     return R.unnest(preAggregationsDescriptions.map(
-      desc => {
+      (desc: any) => {
         const loadSql = this.tempTableSql(desc);
         return desc.dateRange ? R.unnest(PreAggregationPartitionRangeLoader.timeSeries(
           desc.partitionGranularity,
@@ -158,34 +160,34 @@ export class BaseDbRunner {
           desc.timestampPrecision
         ).map(
           range => desc.invalidateKeyQueries.map(
-            (sql) => this.replacePartitionName(sql, desc, seed, desc.partitionGranularity, range)
+            (sql: QueryWithParams) => this.replacePartitionName(sql, desc, seed, desc.partitionGranularity, range)
           ).concat([this.replaceTableName(this.replacePartitionName([
             loadSql,
             desc.loadSql[1]
           ], desc, seed, desc.partitionGranularity, range), preAggregationsDescriptions, seed)]).concat(
             (desc.indexesSql || []).map(
-              ({ sql }) => this.replacePartitionName(sql, desc, seed, desc.partitionGranularity, range)
+              ({ sql }: { sql: QueryWithParams }) => this.replacePartitionName(sql, desc, seed, desc.partitionGranularity, range)
             ),
           )
         )) : desc.invalidateKeyQueries.map(
-          (sql) => this.replacePartitionName(sql, desc, seed)
+          (sql: QueryWithParams) => this.replacePartitionName(sql, desc, seed)
         ).concat([this.replaceTableName(this.replacePartitionName(
           [loadSql, desc.loadSql[1]], desc, seed
         ), preAggregationsDescriptions, seed)]).concat(
-          (desc.indexesSql || []).map(({ sql }) => this.replacePartitionName(sql, desc, seed)),
+          (desc.indexesSql || []).map(({ sql }: { sql: QueryWithParams }) => this.replacePartitionName(sql, desc, seed)),
         );
       }
     ));
   }
 
-  protected tempTableSql(desc) {
+  protected tempTableSql(desc: any): string {
     return desc.loadSql[0].replace('CREATE TABLE', 'CREATE TEMP TABLE');
   }
 
-  public async evaluateQueryWithPreAggregations(query, seed = this.nextSeed++) {
+  public async evaluateQueryWithPreAggregations(query: any, seed = this.nextSeed++) {
     const preAggregationsDescription = query.preAggregations?.preAggregationsDescription();
     await Promise.all(preAggregationsDescription.map(
-      async desc => {
+      async (desc: any) => {
         if (desc.partitionGranularity) {
           desc.dateRange = [
             PreAggregationPartitionRangeLoader.extractDate(
@@ -248,7 +250,7 @@ export class BaseDbRunner {
   }
 
   // eslint-disable-next-line no-unused-vars,@typescript-eslint/no-unused-vars
-  public async connectionLazyInit(port) {
+  public async connectionLazyInit(port: number): Promise<any> {
     throw new Error('Not implemented connectionLazyInit');
   }
 

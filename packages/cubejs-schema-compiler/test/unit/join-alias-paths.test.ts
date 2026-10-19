@@ -270,16 +270,16 @@ views:
           - city
 `);
     const view = compilers.cubeEvaluator.cubeFromPath('staff_view') as any;
-    expect(view.evaluatedHierarchies.map(h => [h.name, h.levels])).toEqual([
+    expect(view.evaluatedHierarchies.map((h: any) => [h.name, h.levels])).toEqual([
       ['customer_geo', ['staff_view.customer_city']],
       ['manager_geo', ['staff_view.manager_city']],
     ]);
-    expect(view.defaultFilters.map(f => f.memberReference)).toEqual(['staff_view.manager_city']);
-    expect(view.folders[0].includes.map(m => m.name)).toEqual(['manager_geo', 'manager_city']);
+    expect(view.defaultFilters.map((f: any) => f.memberReference)).toEqual(['staff_view.manager_city']);
+    expect(view.folders[0].includes.map((m: any) => m.name)).toEqual(['manager_geo', 'manager_city']);
 
     // A level included through another alias is not this instance's level
     const partial = compilers.cubeEvaluator.cubeFromPath('partial_view') as any;
-    expect(partial.evaluatedHierarchies.map(h => [h.name, h.levels])).toEqual([
+    expect(partial.evaluatedHierarchies.map((h: any) => [h.name, h.levels])).toEqual([
       ['customer_geo', ['partial_view.customer_city']],
     ]);
   });
@@ -361,7 +361,7 @@ views:
           - name
 `);
     const view = compilers.cubeEvaluator.cubeFromPath('geo_view') as any;
-    expect(view.evaluatedHierarchies.map(h => [h.name, h.levels])).toEqual([
+    expect(view.evaluatedHierarchies.map((h: any) => [h.name, h.levels])).toEqual([
       ['customer_geo', ['geo_view.customer_city']],
     ]);
   });
@@ -373,7 +373,7 @@ views:
           - join_path: orders.manager.departments
 `);
     const view = compilers.cubeEvaluator.cubeFromPath('orders_view') as any;
-    expect(view.folders[0].includes.map(m => m.name)).toEqual(['departments_name']);
+    expect(view.folders[0].includes.map((m: any) => m.name)).toEqual(['departments_name']);
   });
 
   it('keeps a view join map to cube names, up to the first alias', async () => {

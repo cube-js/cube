@@ -323,7 +323,7 @@ export class CubeEvaluator extends CubeSymbols {
     }
   }
 
-  protected prepareCube(cube, errorReporter: ErrorReporter): EvaluatedCube {
+  protected prepareCube(cube: any, errorReporter: ErrorReporter): EvaluatedCube {
     this.prepareJoins(cube, errorReporter);
     this.preparePreAggregations(cube, errorReporter);
     this.prepareMembers(cube.measures, cube, errorReporter);
@@ -640,16 +640,18 @@ export class CubeEvaluator extends CubeSymbols {
     }
 
     if (cube.isView && (cube.includedMembers || []).length) {
-      const includedMemberPaths: string[] = R.uniq(cube.includedMembers.map(it => it.memberPath));
+      const includedMemberPaths: string[] = R.uniq(cube.includedMembers.map((it: ViewIncludedMember) => it.memberPath));
       const includedCubeNames: string[] = R.uniq(includedMemberPaths.map(it => it.split('.')[0]));
 
-      const hierarchyIncludes = cube.includedMembers.filter(it => it.type === 'hierarchies');
-      const includedHierarchyNames = hierarchyIncludes.map(it => it.memberPath.split('.')[1]);
+      const hierarchyIncludes = cube.includedMembers.filter((it: ViewIncludedMember) => it.type === 'hierarchies');
+      const includedHierarchyNames = hierarchyIncludes.map((it: ViewIncludedMember) => it.memberPath.split('.')[1]);
       // The instance a member is included through: a cube may be included
       // once per join alias, and a hierarchy reached through one reads its
       // levels from that instance or the cubes it joins, never another instance
       const instanceOf = (member: ViewIncludedMember) => member.path?.split('.').slice(0, -1).join('.');
-      const plainMember = (level: string) => cube.includedMembers.find(m => m.memberPath === level && m.path === undefined);
+      const plainMember = (level: string) => cube.includedMembers.find(
+        (m: ViewIncludedMember) => m.memberPath === level && m.path === undefined
+      );
       const levelMember = (level: string, hierarchyCube: string, instance?: string) => {
         if (instance === undefined) {
           return plainMember(level);
@@ -665,7 +667,7 @@ export class CubeEvaluator extends CubeSymbols {
             return joined;
           });
         };
-        return cube.includedMembers.find(m => {
+        return cube.includedMembers.find((m: ViewIncludedMember) => {
           const memberInstance = instanceOf(m);
           return m.memberPath === level && memberInstance !== undefined && (memberInstance === instance ||
             (levelCube !== hierarchyCube && memberInstance.startsWith(`${instance}.`) && plainlyBelow(memberInstance)));
@@ -683,12 +685,14 @@ export class CubeEvaluator extends CubeSymbols {
             .filter(it => includedHierarchyNames.includes(it.name))
             .flatMap(it => {
               const aliasMember = [cubeName, it.name].join('.');
-              const includes = hierarchyIncludes.filter(include => include.memberPath === aliasMember);
+              const includes = hierarchyIncludes.filter(
+                (include: ViewIncludedMember) => include.memberPath === aliasMember
+              );
               if (!includes.length) {
                 throw new UserError(`Hierarchy '${it.name}' not found in cube '${cubeName}'`);
               }
 
-              return includes.map(include => {
+              return includes.map((include: ViewIncludedMember) => {
                 const instance = instanceOf(include);
                 const levels = it.levels.filter(level => {
                   const member = levelMember(level, cubeName, instance);
@@ -721,10 +725,11 @@ export class CubeEvaluator extends CubeSymbols {
       }
 
       cube.evaluatedHierarchies = [
-        ...(cube.evaluatedHierarchies || []).map((hierarchy) => ({
+        ...(cube.evaluatedHierarchies || []).map((hierarchy: EvaluatedHierarchy) => ({
           ...hierarchy,
           levels: hierarchy.levels.map((level) => {
-            const member = plainMember(level) ?? cube.includedMembers.find(m => m.memberPath === level);
+            const member = plainMember(level) ??
+              cube.includedMembers.find((m: ViewIncludedMember) => m.memberPath === level);
 
             if (!member) {
               return null;
@@ -909,10 +914,12 @@ export class CubeEvaluator extends CubeSymbols {
         if (preAggregation.outputColumnTypes) {
           cube.preAggregations[preAggregationName] = {
             ...preAggregation,
-            outputColumnTypes: preAggregation.outputColumnTypes.map(column => ({
-              ...column,
-              name: this.evaluateReferences(cube.name, column.member, { originalSorting: true }),
-            })),
+            outputColumnTypes: preAggregation.outputColumnTypes.map(
+              (column: { member: () => ToString, type: string }) => ({
+                ...column,
+                name: this.evaluateReferences(cube.name, column.member, { originalSorting: true }),
+              })
+            ),
           };
         }
       }
@@ -991,7 +998,7 @@ export class CubeEvaluator extends CubeSymbols {
     }
   }
 
-  public cubesByFileName(fileName): CubeDefinitionExtended[] {
+  public cubesByFileName(fileName: string): CubeDefinitionExtended[] {
     return this.byFileName[fileName] || [];
   }
 
@@ -1044,7 +1051,9 @@ export class CubeEvaluator extends CubeSymbols {
    */
   public preAggregations(filter: PreAggregationFilters): Array<PreAggregationInfo> {
     const { scheduled, dataSources, cubes, preAggregationIds } = filter || {};
-    const idFactory = ({ cube, preAggregationName }) => `${cube}.${preAggregationName}`;
+    const idFactory = ({ cube, preAggregationName }: { cube: string, preAggregationName: string }) => (
+      `${cube}.${preAggregationName}`
+    );
 
     return Object.keys(this.evaluatedCubes)
       .filter((cube) => (
@@ -1083,7 +1092,7 @@ export class CubeEvaluator extends CubeSymbols {
               dataSource: this.cubeDataSource(cube),
               references: this.evaluatePreAggregationReferences(cube, preAggregations[preAggregationName]),
               refreshKey,
-              indexesReferences: indexes && Object.keys(indexes).reduce((obj, indexName) => {
+              indexesReferences: indexes && Object.keys(indexes).reduce<Record<string, unknown>>((obj, indexName) => {
                 obj[indexName] = {
                   columns: this.evaluateReferences(
                     cube,

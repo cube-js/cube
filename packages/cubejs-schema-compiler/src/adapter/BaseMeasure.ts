@@ -162,7 +162,7 @@ export class BaseMeasure {
     return [`${this.measureSql()} ${this.aliasName()}`];
   }
 
-  public hasNoRemapping() {
+  public hasNoRemapping(): boolean {
     return this.measureSql() === this.aliasName();
   }
 
@@ -187,7 +187,7 @@ export class BaseMeasure {
   }
 
   // We need this for measures however we don't for filters for performance reasons
-  public convertTzForRawTimeDimensionIfNeeded(sql) {
+  public convertTzForRawTimeDimensionIfNeeded(sql: () => string): string {
     if (this.query.options.convertTzForRawTimeDimension) {
       return this.query.evaluateSymbolSqlWithContext(sql, {
         convertTzForRawTimeDimension: true
@@ -279,7 +279,7 @@ export class BaseMeasure {
       definition.type === 'min' || definition.type === 'max';
   }
 
-  public static isCumulative(definition): boolean {
+  public static isCumulative(definition: Record<string, any>): boolean {
     return !!definition.rollingWindow;
   }
 
