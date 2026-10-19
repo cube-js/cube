@@ -17,6 +17,7 @@ import {
   prepareCompiler,
   queryClass,
   QueryFactory,
+  QueryPlan,
   TransformedQuery,
   ViewIncludedMember,
 } from '@cubejs-backend/schema-compiler';
@@ -391,39 +392,30 @@ export class CompilerApi {
   }
 
   public async getSqlGenerator(query: NormalizedQuery, dataSource?: string): Promise<{ sqlGenerator: any; compilers: Compiler }> {
-    const dbType = await this.getDbType(dataSource);
     const compilers = await this.getCompilers({ requestId: query.requestId });
-    let sqlGenerator = await this.createQueryByDataSource(compilers, query, dataSource, dbType);
-
-    if (!sqlGenerator) {
-      throw new Error(`Unknown dbType: ${dbType}`);
+    const plan = this.planQuery(compilers, query);
+    // A query without members has no data source of its own: the api-gateway builds those to
+    // initialize the SQL API, so they keep the requested one
+    if (plan.dataSource !== undefined && plan.dataSource !== 'default') {
+      dataSource = plan.dataSource;
     }
 
-    // sqlGenerator.dataSource can return undefined for query without members
-    // Queries like this are used by api-gateway to initialize SQL API
-    // At the same time, those queries should use concrete dataSource, so we should be good to go with it
-    dataSource = compilers.compiler.withQuery(sqlGenerator, () => sqlGenerator.dataSource);
-    if (dataSource !== undefined) {
-      const _dbType = await this.getDbType(dataSource);
-      if (dataSource !== 'default' && dbType !== _dbType) {
-        // The plan doesn't depend on the dialect, so the rebuild doesn't collect it again
-        const plan = compilers.compiler.withQuery(sqlGenerator, () => sqlGenerator.plan());
-        sqlGenerator = await this.createQueryByDataSource(
-          compilers,
-          { ...query, plan },
-          dataSource,
-          _dbType
-        );
-
-        if (!sqlGenerator) {
-          throw new Error(
-            `Can't find dialect for '${dataSource}' data source: ${_dbType}`
-          );
-        }
-      }
+    const dbType = await this.getDbType(dataSource);
+    const sqlGenerator = await this.createQueryByDataSource(compilers, { ...query, plan }, dataSource, dbType);
+    if (!sqlGenerator) {
+      throw new Error(`Can't find dialect for '${dataSource ?? 'default'}' data source: ${dbType}`);
     }
 
     return { sqlGenerator, compilers };
+  }
+
+  /**
+   * Plans the query with BaseQuery itself: the plan doesn't depend on the dialect, and only the
+   * plan tells which data source, and so which dialect, renders the query.
+   */
+  public planQuery(compilers: Compiler, query: NormalizedQuery): QueryPlan {
+    const planner = this.createQuery(compilers, '', BaseQuery, query);
+    return compilers.compiler.withQuery(planner, () => planner.plan());
   }
 
   public async getSql(query: NormalizedQuery, options: GetSqlOptions = {}): Promise<SqlResult> {

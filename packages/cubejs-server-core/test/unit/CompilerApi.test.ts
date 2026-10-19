@@ -393,7 +393,7 @@ views:
       return { sqlGenerator, sql, dataSource };
     };
 
-    // Built straight in the right dialect, so it collects its plan itself
+    // Built straight in the right dialect, so it plans the query itself
     const generateWithoutPlan = async (query: Record<string, unknown>, dataSource: string) => {
       const compilers = await compilerApi.getCompilers();
       const sqlGenerator = await compilerApi.createQueryByDataSource(compilers, { timezone: 'UTC', ...query }, dataSource);
@@ -422,25 +422,25 @@ views:
             ],
           }],
         }],
-      ])('rebuilds a query on %s in its data source\'s dialect with the same plan', async (_, query) => {
+      ])('builds a query on %s once, in its data source\'s dialect from the plan', async (_, query) => {
         const { sqlGenerator, sql, dataSource } = await generate({ ...query, useNativeSqlPlanner });
 
         expect(sqlGenerator.constructor.name).toEqual('BigqueryQuery');
         expect(dataSource).toEqual('analytics');
-        expect(builtDataSources()).toEqual([undefined, 'analytics']);
-        expect(builds.mock.calls[1][1].plan).toBeDefined();
+        expect(builtDataSources()).toEqual(['analytics']);
+        expect(builds.mock.calls[0][1].plan.dataSource).toEqual('analytics');
         expect(sql).toEqual(await generateWithoutPlan({ ...query, useNativeSqlPlanner }, 'analytics'));
       });
     });
 
-    test('rebuilds a query on a masked member, which reads only its own cube', async () => {
+    test('builds a query on a masked member, which reads only its own cube, in its dialect', async () => {
       const { sqlGenerator } = await compilerApi.getSqlGenerator({
         dimensions: ['bq_masked.status'],
         maskedMembers: [{ member: 'bq_masked.status' }],
       } as any);
 
       expect(sqlGenerator.constructor.name).toEqual('BigqueryQuery');
-      expect(builtDataSources()).toEqual([undefined, 'analytics']);
+      expect(builtDataSources()).toEqual(['analytics']);
     });
 
     test('builds a rollupJoin query across data sources once, in the first one\'s dialect', async () => {

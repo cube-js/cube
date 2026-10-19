@@ -137,7 +137,7 @@ export type BaseQueryOptions = {
   maskedMembers?: MaskedMember[];
   memberToAlias?: Record<string, string>;
   joinHints?: (string | string[])[];
-  /** Taken from a query built for the same options in another dialect, see `plan()` */
+  /** Planned for the same options without the dialect, see `plan()` */
   plan?: QueryPlan;
   subqueryJoins?: CustomSubQueryJoin[];
   cubeAliasPrefix?: string;
@@ -168,14 +168,16 @@ export type BaseQueryOptions = {
 };
 
 /**
- * The part of a query that doesn't depend on its dialect: the cubes it reads and how they join.
- * The query picks its data source from it.
+ * The part of a query that doesn't depend on its dialect: the cubes it reads, how they join and
+ * so the data source, whose dialect then renders the query. `undefined` for a query without members.
  */
 export type QueryPlan = {
-  joinHints: (string | string[])[];
+  /** `undefined` when they don't make a join, which only Tesseract tolerates, see `prebuildJoin()` */
+  joinHints: (string | string[])[] | undefined;
   join: FinishedJoinTree | undefined;
   joinGraphPaths: Record<string, string[]> | undefined;
   cubeNames: string[];
+  dataSource: string | undefined;
 };
 
 export type JoinRoot = {
@@ -781,10 +783,11 @@ export class BaseQuery {
 
   public plan(): QueryPlan {
     return {
-      joinHints: this.allJoinHints,
+      joinHints: this.collectedJoinHints,
       join: this.join,
       joinGraphPaths: this.joinGraphPaths,
       cubeNames: this.allCubeNames,
+      dataSource: this.dataSource,
     };
   }
 
