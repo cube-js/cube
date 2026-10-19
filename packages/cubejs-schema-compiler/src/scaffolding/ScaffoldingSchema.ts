@@ -122,7 +122,8 @@ type ScaffoldingSchemaOptions = {
 };
 
 export class ScaffoldingSchema {
-  private tableNamesToTables: Record<string, TableData[]> = {};
+  // Table names like `constructor` or `__proto__` must not resolve to Object.prototype
+  private tableNamesToTables: Map<string, TableData[]> = new Map();
 
   public constructor(
     private readonly dbSchema: DatabaseSchema,
@@ -201,14 +202,15 @@ export class ScaffoldingSchema {
       return names.map((n): [string, TableData] => [n, definition]);
     });
 
-    this.tableNamesToTables = {};
+    this.tableNamesToTables = new Map();
 
     for (const [name, definition] of nameToDefinitions) {
-      // Own-key check: a table named `constructor` or `toString` would otherwise resolve to Object.prototype
-      if (!Object.hasOwn(this.tableNamesToTables, name)) {
-        this.tableNamesToTables[name] = [];
+      const definitions = this.tableNamesToTables.get(name);
+      if (definitions) {
+        definitions.push(definition);
+      } else {
+        this.tableNamesToTables.set(name, [definition]);
       }
-      this.tableNamesToTables[name].push(definition);
     }
   }
 
@@ -321,7 +323,7 @@ export class ScaffoldingSchema {
 
         if (column.foreign_keys?.length) {
           column.foreign_keys.forEach(fk => {
-            const targetTableDefinition = this.tableNamesToTables[fk.target_table]?.find(t => t.table === fk.target_table);
+            const targetTableDefinition = this.tableNamesToTables.get(fk.target_table)?.find(t => t.table === fk.target_table);
             if (targetTableDefinition) {
               columnsToJoin.push({
                 cubeToJoin: cubeName(fk.target_table),
@@ -332,10 +334,10 @@ export class ScaffoldingSchema {
           });
         } else if ((column.name.match(new RegExp(idRegex, 'i')) && this.fixCase(column.name) !== 'id')) {
           const withoutId = column.name.replace(new RegExp(idRegex, 'i'), '');
-          const tablesToJoin = this.tableNamesToTables[withoutId] ||
-          this.tableNamesToTables[inflection.tableize(withoutId)] ||
-          this.tableNamesToTables[this.fixCase(withoutId)] ||
-          this.tableNamesToTables[(inflection.tableize(this.fixCase(withoutId)))];
+          const tablesToJoin = this.tableNamesToTables.get(withoutId) ||
+          this.tableNamesToTables.get(inflection.tableize(withoutId)) ||
+          this.tableNamesToTables.get(this.fixCase(withoutId)) ||
+          this.tableNamesToTables.get(inflection.tableize(this.fixCase(withoutId)));
 
           if (!tablesToJoin) {
             return null;

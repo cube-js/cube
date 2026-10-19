@@ -1106,11 +1106,10 @@ export class PreAggregationLoader {
         actualTables,
       );
       const versionEntriesToSave = R.uniqBy(v => v.table_name, versionEntries);
+      const structureVersionCutoff = Date.now() - this.structureVersionPersistTime * 1000;
       const structureVersionsToSave = R.uniqBy(
         v => `${v.table_name}_${v.structure_version}`,
-        versionEntries.filter(
-          v => new Date().getTime() - v.last_updated_at < this.structureVersionPersistTime * 1000
-        )
+        versionEntries.filter(v => v.last_updated_at > structureVersionCutoff)
       );
 
       const refreshEndReached = await this.preAggregations.getRefreshEndReached();

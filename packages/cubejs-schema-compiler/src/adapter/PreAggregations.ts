@@ -5,7 +5,6 @@ import { FinishedJoinTree, JoinEdge } from '../compiler/JoinGraph';
 import { UserError } from '../compiler/UserError';
 import { BaseQuery } from './BaseQuery';
 import {
-  PreAggregationDefinitions,
   PreAggregationReferences,
   PreAggregationTimeDimensionReference
 } from '../compiler/CubeEvaluator';
@@ -1005,7 +1004,7 @@ export class PreAggregations {
     this.preAggregationMatch = preAggregationForQuery ?? null;
   }
 
-  private findAutoRollupPreAggregationsForCube(cube: string, preAggregations: PreAggregationDefinitions): PreAggregationForQuery[] {
+  private findAutoRollupPreAggregationsForCube(cube: string, preAggregations: Record<string, PreAggregationDefinitionExtended>): PreAggregationForQuery[] {
     if (
       this.query.measures.some((m) => {
         const path = m.path();
@@ -1071,22 +1070,23 @@ export class PreAggregations {
     )(query.collectCubeNames());
   }
 
-  private findRollupPreAggregationsForCube(cube: string, canUsePreAggregation: CanUsePreAggregationFn, preAggregations: PreAggregationDefinitions): PreAggregationForQuery[] {
+  protected static isRollupType(preAggregation: PreAggregationDefinitionExtended): boolean {
+    return preAggregation.type === 'rollup' || preAggregation.type === 'rollupJoin' || preAggregation.type === 'rollupLambda';
+  }
+
+  private findRollupPreAggregationsForCube(cube: string, canUsePreAggregation: CanUsePreAggregationFn, preAggregations: Record<string, PreAggregationDefinitionExtended>): PreAggregationForQuery[] {
     return Object.entries(preAggregations)
-      .filter(([_k, a]) => a.type === 'rollup' || a.type === 'rollupJoin' || a.type === 'rollupLambda')
-      .map(([preAggregationName, preAggregation]) => this.evaluatedPreAggregationObj(cube, preAggregationName, preAggregation as PreAggregationDefinitionExtended, canUsePreAggregation));
+      .filter(([_k, a]) => PreAggregations.isRollupType(a))
+      .map(([preAggregationName, preAggregation]) => this.evaluatedPreAggregationObj(cube, preAggregationName, preAggregation, canUsePreAggregation));
   }
 
   public getRollupPreAggregationByName(cube, preAggregationName): PreAggregationForQueryWithTableName | {} {
     const canUsePreAggregation: CanUsePreAggregationFn = () => ({ canUse: true, leafMeasureMatch: false });
-    const preAggregation = R.pipe(
-      R.toPairs,
-      R.filter(([_, a]) => a.type === 'rollup' || a.type === 'rollupJoin' || a.type === 'rollupLambda'),
-      R.find(([k, _]) => k === preAggregationName)
-    )(this.query.cubeEvaluator.preAggregationsForCube(cube));
-    if (preAggregation) {
-      const tableName = this.preAggregationTableName(cube, preAggregation[0], preAggregation[1]);
-      const preAggObj = preAggregation ? this.evaluatedPreAggregationObj(cube, preAggregation[0], preAggregation[1], canUsePreAggregation) : {};
+    const preAggregations = this.query.cubeEvaluator.preAggregationsForCube(cube);
+    const preAggregation = Object.hasOwn(preAggregations, preAggregationName) ? preAggregations[preAggregationName] : undefined;
+    if (preAggregation && PreAggregations.isRollupType(preAggregation)) {
+      const tableName = this.preAggregationTableName(cube, preAggregationName, preAggregation);
+      const preAggObj = this.evaluatedPreAggregationObj(cube, preAggregationName, preAggregation, canUsePreAggregation);
       return {
         tableName,
         ...preAggObj

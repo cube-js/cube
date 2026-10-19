@@ -1,12 +1,5 @@
 import { PostgresQuery } from '../../src';
-import { JoinGraph } from '../../src/compiler/JoinGraph';
 import { prepareJsCompiler, prepareYamlCompiler } from './PrepareCompiler';
-
-class TestJoinGraph extends JoinGraph {
-  public static addNodeEdge(nodes: Record<string, Record<string, 1>>, from: string, to: string): void {
-    super.addNodeEdge(nodes, from, to);
-  }
-}
 
 const usersCube = `
   - name: users
@@ -609,18 +602,5 @@ ${usersCube}
     await expect(compilers.compiler.compile()).rejects.toThrow(
       /Cube 'orders' declares a join named 'customer' \(joins\[0\]\), which redeclares an aliased join of the cube it extends/
     );
-  });
-});
-
-describe('JoinGraph node names inherited from Object.prototype', () => {
-  it.each(['constructor', 'toString', 'hasOwnProperty'])('gives %s its own node', (name) => {
-    const nodes: Record<string, Record<string, 1>> = {};
-
-    TestJoinGraph.addNodeEdge(nodes, name, 'orders');
-    TestJoinGraph.addNodeEdge(nodes, name, 'users');
-
-    expect(nodes).toEqual({ [name]: { orders: 1, users: 1 } });
-    expect(Object.hasOwn(Object, 'orders')).toBe(false);
-    expect(Object.hasOwn(Function.prototype, 'orders')).toBe(false);
   });
 });

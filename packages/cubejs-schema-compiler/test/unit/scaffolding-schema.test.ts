@@ -567,6 +567,23 @@ describe('ScaffoldingSchema', () => {
       .toEqual(['constructor', 'toString']);
   });
 
+  it('infers joins from columns named like Object.prototype members', () => {
+    const schema = new ScaffoldingSchema({
+      public: {
+        results: [
+          { name: 'id', type: 'integer', attributes: [] },
+          { name: 'constructor_id', type: 'integer', attributes: [] },
+          { name: 'to_string_id', type: 'integer', attributes: [] },
+        ],
+        constructors: [{ name: 'id', type: 'integer', attributes: [] }],
+        ['__proto__']: [{ name: 'id', type: 'integer', attributes: [] }],
+      }
+    });
+
+    const [results] = schema.generateForTables(['public.results', 'public.constructors', 'public.__proto__']);
+    expect(results.joins.map(j => j.cubeToJoin)).toEqual(['Constructors']);
+  });
+
   describe('columnType mapping for numeric types', () => {
     it('should map FLOAT types to number', () => {
       const floatSchemas = {

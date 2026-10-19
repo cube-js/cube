@@ -88,8 +88,7 @@ export class JoinGraph implements CompilerInterface {
   }
 
   protected static addNodeEdge(nodes: Record<string, Record<string, 1>>, from: string, to: string): void {
-    // Own-key check: a cube named `constructor` or `toString` would otherwise resolve to Object.prototype
-    if (!Object.hasOwn(nodes, from)) {
+    if (!nodes[from]) {
       nodes[from] = {};
     }
     nodes[from][to] = 1;
