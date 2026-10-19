@@ -452,15 +452,22 @@ views:
       expect(sqlGenerator.constructor.name).toEqual('PostgresQuery');
       expect(dataSource).toEqual('default');
       expect(sql).toContain('pg_orders_by_status');
-      expect(builtDataSources()).toEqual([undefined]);
+      expect(builtDataSources()).toEqual(['default']);
+    });
+
+    test('builds a query without members in the default data source', async () => {
+      const { sqlGenerator } = await compilerApi.getSqlGenerator({} as any);
+
+      expect(sqlGenerator.constructor.name).toEqual('PostgresQuery');
+      expect(builtDataSources()).toEqual(['default']);
     });
 
     // The api-gateway builds those to initialize the SQL API of each data source
-    test('builds a query without members in the requested data source', async () => {
-      const { sqlGenerator } = await compilerApi.getSqlGenerator({} as any, 'analytics');
+    test('builds a query without members in the given data source', async () => {
+      const compilers = await compilerApi.getCompilers();
+      const sqlGenerator = await compilerApi.createQueryByDataSource(compilers, {}, 'analytics');
 
       expect(sqlGenerator.constructor.name).toEqual('BigqueryQuery');
-      expect(builtDataSources()).toEqual(['analytics']);
     });
   });
 

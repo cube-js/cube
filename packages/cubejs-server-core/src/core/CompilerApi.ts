@@ -391,20 +391,14 @@ export class CompilerApi {
     return this.dialectClass?.({ dataSource, dbType });
   }
 
-  public async getSqlGenerator(query: NormalizedQuery, dataSource?: string): Promise<{ sqlGenerator: any; compilers: Compiler }> {
+  public async getSqlGenerator(query: NormalizedQuery): Promise<{ sqlGenerator: any; compilers: Compiler }> {
     const compilers = await this.getCompilers({ requestId: query.requestId });
-    let dbType = await this.getDbType(dataSource);
-    const plan = this.planQuery(compilers, dbType, query);
-    // A query without members has no data source of its own: the api-gateway builds those to
-    // initialize the SQL API, so they keep the requested one
-    if (plan.dataSource !== null && plan.dataSource !== 'default' && plan.dataSource !== dataSource) {
-      dataSource = plan.dataSource;
-      dbType = await this.getDbType(dataSource);
-    }
-
+    const plan = this.planQuery(compilers, await this.getDbType(), query);
+    const dataSource = plan.dataSource ?? 'default';
+    const dbType = await this.getDbType(dataSource);
     const sqlGenerator = await this.createQueryByDataSource(compilers, { ...query, plan }, dataSource, dbType);
     if (!sqlGenerator) {
-      throw new Error(`Can't find dialect for '${dataSource ?? 'default'}' data source: ${dbType}`);
+      throw new Error(`Can't find dialect for '${dataSource}' data source: ${dbType}`);
     }
 
     return { sqlGenerator, compilers };
