@@ -68,7 +68,7 @@ enum Cmd {
     List {
         /// Deployment id
         deployment: i64,
-        /// Maximum number of runs to return
+        /// Maximum number of runs to return (default 100, at most 200)
         #[arg(long)]
         first: Option<u64>,
         /// Cursor for the next page (from a previous pageInfo.endCursor)
