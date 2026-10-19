@@ -5,7 +5,7 @@ import { CubejsServerCore } from '../../src';
 import { OrchestratorApi, OrchestratorApiOptions } from '../../src/core/OrchestratorApi';
 
 class FakeDriver extends BaseDriver {
-  /** Every call, in order: `test`, or the token handed over. */
+  /** Every call, in order: `test`, or the token handed over (`-` for none). */
   public readonly events: string[] = [];
 
   public constructor(public readonly builtFrom: Record<string, unknown> = {}) {
@@ -20,12 +20,16 @@ class FakeDriver extends BaseDriver {
     return [];
   }
 
-  public override setOAuthToken(token: string): void {
-    this.events.push(`token:${token}`);
+  public override setOAuthToken(token: string | undefined): void {
+    this.events.push(`token:${token ?? '-'}`);
   }
 
   public get tokens(): string[] {
     return this.events.filter((event) => event.startsWith('token:')).map((event) => event.slice('token:'.length));
+  }
+
+  public get tests(): number {
+    return this.events.filter((event) => event === 'test').length;
   }
 }
 
@@ -77,8 +81,16 @@ function createCore(options: Record<string, unknown> = {}) {
 }
 
 describe('OAuth token passthrough', () => {
+  let created: FakeDriver[];
+
   beforeEach(() => {
-    jest.spyOn(CubejsServerCore, 'createDriver').mockImplementation((_type, options) => new FakeDriver(<any>options));
+    created = [];
+    jest.spyOn(CubejsServerCore, 'createDriver').mockImplementation((_type, options) => {
+      const driver = new FakeDriver(<any>options);
+      created.push(driver);
+
+      return driver;
+    });
   });
 
   afterEach(async () => {
@@ -103,13 +115,15 @@ describe('OAuth token passthrough', () => {
     expect(first.tokens).toEqual(['a', 'b']);
   });
 
-  test('a context without a token leaves the driver on its own credentials', async () => {
+  test('a context without a token puts the driver back on its own credentials, even after a token', async () => {
     process.env.CUBEJS_DB_OAUTH_TOKEN_PASSTHROUGH = 'true';
     const { request, driver, contextToOAuthToken } = createCore();
 
+    await request('a');
+    await driver();
     await request();
 
-    expect((await driver()).tokens).toEqual([]);
+    expect((await driver()).tokens).toEqual(['a', '-']);
     expect(contextToOAuthToken).toHaveBeenCalledWith(expect.objectContaining({ dataSource: 'default' }));
   });
 
@@ -151,8 +165,22 @@ describe('OAuth token passthrough', () => {
     const preAggregations = await driver('default', true);
 
     expect(preAggregations).not.toBe(regular);
+    expect(await driver('default', true)).toBe(preAggregations);
     expect(regular.tokens).toEqual(['a']);
     expect(preAggregations.tokens).toEqual([]);
+  });
+
+  test('pre-aggregation lookups that come first build one driver, not one per lookup', async () => {
+    const { request, driver } = createCore({
+      driverFactory: () => ({ type: 'postgres', oauthTokenPassthrough: true }),
+    });
+
+    await request('a');
+    const first = await driver('default', true);
+
+    expect(await driver('default', true)).toBe(first);
+    expect(created).toEqual([first]);
+    expect(first.tokens).toEqual([]);
   });
 
   test('refuses a pre-aggregation lookup of a shared driver that holds a token', async () => {
@@ -164,6 +192,25 @@ describe('OAuth token passthrough', () => {
     await driver();
 
     await expect(driver('default', true)).rejects.toThrow(/can't be built with a passed-through OAuth token/);
+  });
+
+  test('health checks skip a driver while it holds a token, and test it on its own credentials otherwise', async () => {
+    process.env.CUBEJS_DB_OAUTH_TOKEN_PASSTHROUGH = 'true';
+    const { request, driver } = createCore();
+
+    const userApi = await request('a');
+    const passthrough = await driver();
+    userApi.addDataSeenSource('default');
+
+    await userApi.testConnection();
+    expect(passthrough.tests).toEqual(1);
+
+    // The readiness probe's own context carries no token
+    const probeApi = await request();
+    await probeApi.testConnection();
+
+    expect(passthrough.tests).toEqual(2);
+    expect(passthrough.tokens).toEqual(['a', 'a', '-']);
   });
 
   test('fails a lookup whose token hook throws, rather than use the driver\'s own credentials', async () => {
@@ -179,21 +226,18 @@ describe('OAuth token passthrough', () => {
     await expect(driver()).rejects.toThrow('no token for this user');
   });
 
-  test('refuses passthrough without contextToOAuthToken', async () => {
+  const misconfigurations: Array<[string, Record<string, unknown>, RegExp]> = [
+    ['contextToOAuthToken', { contextToOAuthToken: undefined }, /contextToOAuthToken is not configured/],
+    ['contextToOrchestratorId', { contextToOrchestratorId: undefined }, /contextToOrchestratorId is not configured/],
+    ['a driver that supports it', { driverFactory: () => new NoPassthroughDriver() }, /NoPassthroughDriver does not support it/],
+  ];
+
+  test.each(misconfigurations)('refuses passthrough without %s', async (_name, options, error) => {
     process.env.CUBEJS_DB_OAUTH_TOKEN_PASSTHROUGH = 'true';
-    const { request, driver } = createCore({ contextToOAuthToken: undefined });
+    const { request, driver } = createCore(options);
 
     await request('a');
 
-    await expect(driver()).rejects.toThrow(/contextToOAuthToken is not configured/);
-  });
-
-  test('refuses passthrough on a driver that does not support it', async () => {
-    process.env.CUBEJS_DB_OAUTH_TOKEN_PASSTHROUGH = 'true';
-    const { request, driver } = createCore({ driverFactory: () => new NoPassthroughDriver() });
-
-    await request('a');
-
-    await expect(driver()).rejects.toThrow(/NoPassthroughDriver does not support it/);
+    await expect(driver()).rejects.toThrow(error);
   });
 });
