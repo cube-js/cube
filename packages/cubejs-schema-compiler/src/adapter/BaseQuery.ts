@@ -4932,7 +4932,7 @@ export class BaseQuery {
     let utcOffset = 0;
 
     if (refreshKey.timezone || this.timezone) {
-      utcOffset = moment.tz(refreshKey.timezone).utcOffset() * 60;
+      utcOffset = moment.tz(refreshKey.timezone || this.timezone).utcOffset() * 60;
     }
 
     return {
