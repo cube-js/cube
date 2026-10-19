@@ -1394,6 +1394,13 @@ describe('SQL Generation', () => {
         .toEqual({ utcOffset, interval: 86400, dayOffset: 36000, cron: true });
       expect(query.everyRefreshKeyParts({ every: '30 5 * * 5', timezone }))
         .toEqual({ utcOffset, interval: 604800, dayOffset: 106200, cron: true });
+
+      // A cron refresh key without its own timezone follows the query timezone,
+      // and its own timezone takes precedence over the query's.
+      expect(query.everyRefreshKeyParts({ every: '0 10 * * *' }))
+        .toEqual({ utcOffset, interval: 86400, dayOffset: 36000, cron: true });
+      expect(query.everyRefreshKeyParts({ every: '0 10 * * *', timezone: 'Asia/Tokyo' }))
+        .toEqual({ utcOffset: 9 * 3600, interval: 86400, dayOffset: 36000, cron: true });
     });
 
     it('everyRefreshKeyParts agrees with the SQL it renders', async () => {
@@ -1424,6 +1431,7 @@ describe('SQL Generation', () => {
         { every: '7 day' },
         { every: '0 * * * *', timezone },
         { every: '0 10 * * *', timezone },
+        { every: '0 10 * * *' },
         { every: '30 5 * * 5', timezone },
       ];
 
