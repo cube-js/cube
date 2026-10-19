@@ -143,6 +143,15 @@ export class CubejsServerCore {
    */
   protected readonly buildingOrchestratorApis: Map<string, Promise<OrchestratorApi>> = new Map();
 
+  /** Drivers with OAuth token passthrough on, flagged by `resolveDriver`. */
+  protected readonly oauthTokenDrivers: WeakSet<BaseDriver> = new WeakSet();
+
+  /** Passthrough drivers that have been given a token, which a pre-aggregation build must never use. */
+  protected readonly oauthTokenHolders: WeakSet<BaseDriver> = new WeakSet();
+
+  /** Each orchestrator's newest request context, which its passthrough drivers take tokens from. */
+  protected readonly requestContexts: WeakMap<OrchestratorApi, { current: RequestContext }> = new WeakMap();
+
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   protected repositoryFactory: ((context: RequestContext) => SchemaFileRepository) | (() => FileRepository);
 
@@ -676,13 +685,13 @@ export class CubejsServerCore {
     const orchestratorId = await this.contextToOrchestratorId(context);
 
     if (this.orchestratorStorage.has(orchestratorId)) {
-      return this.orchestratorStorage.get(orchestratorId);
+      return this.rememberRequestContext(this.orchestratorStorage.get(orchestratorId), context);
     }
 
     const building = this.buildingOrchestratorApis.get(orchestratorId);
 
     if (building) {
-      return building;
+      return building.then((orchestratorApi) => this.rememberRequestContext(orchestratorApi, context));
     }
 
     // Registered before the first `await` in the build, so nothing can interleave
@@ -703,6 +712,16 @@ export class CubejsServerCore {
     return pending;
   }
 
+  protected rememberRequestContext(orchestratorApi: OrchestratorApi, context: RequestContext): OrchestratorApi {
+    const contextRef = this.requestContexts.get(orchestratorApi);
+
+    if (contextRef) {
+      contextRef.current = context;
+    }
+
+    return orchestratorApi;
+  }
+
   protected async buildOrchestratorApi(orchestratorId: string, context: RequestContext): Promise<OrchestratorApi> {
     /**
      * Hash table to store promises which will be resolved with the
@@ -715,6 +734,7 @@ export class CubejsServerCore {
 
     const contextToDbType: DbTypeInternalFn = this.contextToDbType.bind(this);
     const externalDbType = this.contextToExternalDbType(context);
+    const contextRef = { current: context };
 
     // orchestrator options can be empty, if user didn't define it.
     // so we are adding default and configuring queues concurrency.
@@ -731,7 +751,7 @@ export class CubejsServerCore {
       async (dataSource = 'default', preAggregations = false) => {
         const factoryKey = preAggregations ? `${dataSource}@pre_agg` : dataSource;
         if (driverPromise[factoryKey]) {
-          return driverPromise[factoryKey];
+          return this.withOAuthToken(await driverPromise[factoryKey], contextRef.current, dataSource, preAggregations);
         }
 
         const hasSeparatePreAggEnv = hasPreAggregationsEnvVars(dataSource);
@@ -762,6 +782,12 @@ export class CubejsServerCore {
                 driver.setLogger(this.logger);
               }
 
+              // A factory can turn passthrough on; its pre-aggregations then need their own driver
+              if (this.oauthTokenDrivers.has(driver) && driverPromise[`${dataSource}@pre_agg`] === driverPromise[factoryKey]) {
+                driverPromise[`${dataSource}@pre_agg`] = null;
+              }
+
+              await this.withOAuthToken(driver, contextRef.current, dataSource, preAggregations);
               await driver.testConnection();
 
               return driver;
@@ -785,8 +811,9 @@ export class CubejsServerCore {
           }
         })();
 
-        // No separate pre-agg driver needed — share the same promise for both keys
-        if (!preAggregations && !hasSeparatePreAggEnv) {
+        // No separate pre-agg driver needed — share the same promise for both keys.
+        // Passthrough drivers hold user tokens, which pre-aggregation builds must not use.
+        if (!preAggregations && !hasSeparatePreAggEnv && !getEnv('dbOAuthTokenPassthrough', { dataSource })) {
           driverPromise[`${dataSource}@pre_agg`] = driverPromise[factoryKey];
         }
 
@@ -841,9 +868,59 @@ export class CubejsServerCore {
       }
     );
 
+    this.requestContexts.set(orchestratorApi, contextRef);
     this.orchestratorStorage.set(orchestratorId, orchestratorApi);
 
     return orchestratorApi;
+  }
+
+  /**
+   * Hands a passthrough driver the token for `context` before each use. Pre-aggregation
+   * lookups get none: their builds run with the driver's own credentials.
+   */
+  protected async withOAuthToken(
+    driver: BaseDriver,
+    context: RequestContext,
+    dataSource: string,
+    preAggregations: boolean,
+  ): Promise<BaseDriver> {
+    if (!this.oauthTokenDrivers.has(driver)) {
+      return driver;
+    }
+
+    if (preAggregations) {
+      if (this.oauthTokenHolders.has(driver)) {
+        throw new Error(
+          `Pre-aggregations on data source "${dataSource}" can't be built with a passed-through OAuth token`
+        );
+      }
+
+      return driver;
+    }
+
+    const token = await this.options.contextToOAuthToken?.({ ...context, dataSource });
+    if (token) {
+      driver.setOAuthToken(token);
+      this.oauthTokenHolders.add(driver);
+    }
+
+    return driver;
+  }
+
+  protected enableOAuthTokenPassthrough(driver: BaseDriver, dataSource: string): void {
+    if (!this.options.contextToOAuthToken) {
+      throw new Error(
+        `OAuth token passthrough is on for data source "${dataSource}", but contextToOAuthToken is not configured`
+      );
+    }
+
+    if (!driver.supportsOAuthTokenPassthrough?.()) {
+      throw new Error(
+        `OAuth token passthrough is on for data source "${dataSource}", but ${driver.constructor.name} does not support it`
+      );
+    }
+
+    this.oauthTokenDrivers.add(driver);
   }
 
   protected createCompilerApi(repository: SchemaFileRepository, options: Record<string, any> = {}) {
@@ -1014,11 +1091,15 @@ export class CubejsServerCore {
     context: DriverContext,
     options?: OrchestratorInitedOptions,
   ): Promise<BaseDriver> {
+    const dataSource = assertDataSource(context.dataSource);
     const val = await this.options.driverFactory(context);
+    let driver: BaseDriver;
+    let oauthTokenPassthrough: boolean | undefined;
+
     if (isDriver(val)) {
-      return <BaseDriver>val;
+      driver = <BaseDriver>val;
     } else {
-      const { type, ...rest } = <DriverConfig>val;
+      const { type, oauthTokenPassthrough: passthrough, ...rest } = <DriverConfig>val;
       const opts = Object.keys(rest).length
         ? rest
         : {
@@ -1026,10 +1107,17 @@ export class CubejsServerCore {
             await CubejsServerCore.getDriverMaxPool(context, options),
           testConnectionTimeout: options?.testConnectionTimeout,
         };
-      opts.dataSource = assertDataSource(context.dataSource);
+      opts.dataSource = dataSource;
       opts.preAggregations = context.preAggregations || false;
-      return CubejsServerCore.createDriver(type, opts);
+      driver = CubejsServerCore.createDriver(type, opts);
+      oauthTokenPassthrough = passthrough;
     }
+
+    if (oauthTokenPassthrough ?? getEnv('dbOAuthTokenPassthrough', { dataSource })) {
+      this.enableOAuthTokenPassthrough(driver, dataSource);
+    }
+
+    return driver;
   }
 
   public async testConnections() {

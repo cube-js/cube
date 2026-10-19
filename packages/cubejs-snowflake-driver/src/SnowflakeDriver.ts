@@ -165,6 +165,9 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
 
   protected connection: Promise<Connection> | null = null;
 
+  /** From `setOAuthToken`: new connections log in with it over OAuth. */
+  protected passthroughOAuthToken: string | undefined;
+
   protected readonly config: SnowflakeDriverOptions;
 
   public constructor(
@@ -402,7 +405,23 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
     return token.trim();
   }
 
-  private async prepareConnectOptions(): Promise<snowflake.ConnectionOptions> {
+  /**
+   * An open session outlives its token, so a newer token only reaches new
+   * connections. The first token drops a connection opened with the configured
+   * credentials, which must not serve the token's holder.
+   */
+  public override setOAuthToken(token: string): void {
+    const first = this.passthroughOAuthToken === undefined;
+    this.passthroughOAuthToken = token;
+
+    if (first && this.connection) {
+      const replaced = this.connection;
+      this.connection = null;
+      replaced.then((connection) => connection.destroy(() => undefined), () => undefined);
+    }
+  }
+
+  protected async prepareConnectOptions(): Promise<snowflake.ConnectionOptions> {
     const config: Record<string, any> = {
       account: this.config.account,
       region: this.config.region,
@@ -420,7 +439,10 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
       config.queryTag = this.config.queryTag;
     }
 
-    if (this.config.authenticator?.toUpperCase() === 'OAUTH') {
+    if (this.passthroughOAuthToken) {
+      config.authenticator = 'OAUTH';
+      config.token = this.passthroughOAuthToken;
+    } else if (this.config.authenticator?.toUpperCase() === 'OAUTH') {
       config.token = this.config.oauthToken || await this.readOAuthToken();
     } else if (this.config.authenticator?.toUpperCase() === 'SNOWFLAKE_JWT') {
       config.username = this.config.username;
