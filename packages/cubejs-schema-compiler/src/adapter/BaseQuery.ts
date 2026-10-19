@@ -169,15 +169,15 @@ export type BaseQueryOptions = {
 
 /**
  * The part of a query that doesn't depend on its dialect: the cubes it reads, how they join and
- * so the data source, whose dialect then renders the query. `undefined` for a query without members.
+ * so the data source, whose dialect then renders the query. `null` for a query without members.
  */
 export type QueryPlan = {
-  /** `undefined` when they don't make a join, which only Tesseract tolerates, see `prebuildJoin()` */
-  joinHints: (string | string[])[] | undefined;
-  join: FinishedJoinTree | undefined;
-  joinGraphPaths: Record<string, string[]> | undefined;
+  /** `null` when they don't make a join, which only Tesseract tolerates, see `prebuildJoin()` */
+  joinHints: (string | string[])[] | null;
+  join: FinishedJoinTree | null;
+  joinGraphPaths: Record<string, string[]> | null;
   cubeNames: string[];
-  dataSource: string | undefined;
+  dataSource: string | null;
 };
 
 export type JoinRoot = {
@@ -242,7 +242,7 @@ export class BaseQuery {
 
   public timeDimensions!: BaseTimeDimension[];
 
-  public join!: FinishedJoinTree;
+  public join: FinishedJoinTree | null = null;
 
   public readonly compilers: Compilers;
 
@@ -299,11 +299,11 @@ export class BaseQuery {
 
   public order!: any;
 
-  public joinGraphPaths!: Record<string, string[]>;
+  public joinGraphPaths: Record<string, string[]> | null = null;
 
-  public collectedCubeNames: string[] | undefined;
+  public collectedCubeNames: string[] | null = null;
 
-  public collectedJoinHints: (string | string[])[] | undefined;
+  public collectedJoinHints: (string | string[])[] | null = null;
 
   public ungrouped!: any;
 
@@ -528,8 +528,8 @@ export class BaseQuery {
     this.queryLevelJoinHints = this.options.joinHints ?? [];
     if (this.options.plan) {
       this.collectedJoinHints = this.options.plan.joinHints;
-      this.join = this.options.plan.join as FinishedJoinTree;
-      this.joinGraphPaths = this.options.plan.joinGraphPaths as Record<string, string[]>;
+      this.join = this.options.plan.join;
+      this.joinGraphPaths = this.options.plan.joinGraphPaths;
       this.collectedCubeNames = this.options.plan.cubeNames;
     } else {
       this.prebuildJoin();
@@ -787,7 +787,7 @@ export class BaseQuery {
       join: this.join,
       joinGraphPaths: this.joinGraphPaths,
       cubeNames: this.allCubeNames,
-      dataSource: this.dataSource,
+      dataSource: this.dataSource ?? null,
     };
   }
 
@@ -2544,7 +2544,7 @@ export class BaseQuery {
   }
 
   public query() {
-    return this.from && this.joinSql([this.from]) || this.joinQuery(this.join, this.collectFromMembers(
+    return this.from && this.joinSql([this.from]) || this.joinQuery(this.join!, this.collectFromMembers(
       false,
       this.collectSubQueryDimensionsFor.bind(this),
       'collectSubQueryDimensionsFor'
@@ -2701,7 +2701,7 @@ export class BaseQuery {
     const inlineWhereConditions: FilterToWhere[] = [];
 
     const query = this.rewriteInlineWhere(() => this.joinQuery(
-      this.join,
+      this.join!,
       this.collectFrom(
         (this.dimensionsForSelect() as any[]).concat(measures).concat(this.allFilters),
         this.collectSubQueryDimensionsFor.bind(this),
@@ -2858,7 +2858,7 @@ export class BaseQuery {
   public keysQuery(primaryKeyDimensions: BaseDimension[], filters: FilterToWhere[]) {
     const inlineWhereConditions: FilterToWhere[] = [];
     const query = this.rewriteInlineWhere(() => this.joinQuery(
-      this.join,
+      this.join!,
       this.collectFrom(
         this.keyDimensions(primaryKeyDimensions),
         this.collectSubQueryDimensionsFor.bind(this),
@@ -4374,7 +4374,7 @@ export class BaseQuery {
 
   public multipliedJoinRowResult(cubeName: string): boolean | undefined {
     // this.join not initialized on collectCubeNamesForSql
-    return this.join && this.join.multiplicationFactor[cubeName];
+    return this.join?.multiplicationFactor[cubeName];
   }
 
   public inDbTimeZone(date: string) {
@@ -5951,7 +5951,7 @@ export class BaseQuery {
         }
         visited.add(node);
 
-        const neighbors = query.joinGraphPaths[node] || [];
+        const neighbors = query.joinGraphPaths?.[node] || [];
 
         for (const neighbor of neighbors) {
           if (dfs(neighbor)) {

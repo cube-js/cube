@@ -393,14 +393,15 @@ export class CompilerApi {
 
   public async getSqlGenerator(query: NormalizedQuery, dataSource?: string): Promise<{ sqlGenerator: any; compilers: Compiler }> {
     const compilers = await this.getCompilers({ requestId: query.requestId });
-    const plan = this.planQuery(compilers, query);
+    let dbType = await this.getDbType(dataSource);
+    const plan = this.planQuery(compilers, dbType, query);
     // A query without members has no data source of its own: the api-gateway builds those to
     // initialize the SQL API, so they keep the requested one
-    if (plan.dataSource !== undefined && plan.dataSource !== 'default') {
+    if (plan.dataSource !== null && plan.dataSource !== 'default' && plan.dataSource !== dataSource) {
       dataSource = plan.dataSource;
+      dbType = await this.getDbType(dataSource);
     }
 
-    const dbType = await this.getDbType(dataSource);
     const sqlGenerator = await this.createQueryByDataSource(compilers, { ...query, plan }, dataSource, dbType);
     if (!sqlGenerator) {
       throw new Error(`Can't find dialect for '${dataSource ?? 'default'}' data source: ${dbType}`);
@@ -413,8 +414,8 @@ export class CompilerApi {
    * Plans the query with BaseQuery itself: the plan doesn't depend on the dialect, and only the
    * plan tells which data source, and so which dialect, renders the query.
    */
-  public planQuery(compilers: Compiler, query: NormalizedQuery): QueryPlan {
-    const planner = this.createQuery(compilers, '', BaseQuery, query);
+  public planQuery(compilers: Compiler, dbType: string, query: NormalizedQuery): QueryPlan {
+    const planner = this.createQuery(compilers, dbType, BaseQuery, query);
     return compilers.compiler.withQuery(planner, () => planner.plan());
   }
 
