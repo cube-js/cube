@@ -187,11 +187,8 @@ export type MemberOrderBy = {
 };
 
 /**
- * The fields BaseQuery reads off a member definition when rendering it. A
- * measure, dimension or segment definition, or the stand-in a member
- * expression builds, all fit. `type` and `sql` are required as in those
- * definitions, though a segment has no `type` and a count measure or a case,
- * geo or switch dimension has no `sql`.
+ * Fields BaseQuery reads off a member definition. `type` and `sql` are typed required,
+ * though segments have no `type` and count measures / case, geo, switch dimensions no `sql`.
  */
 export type MemberSymbolDefinition = {
   type: string;
