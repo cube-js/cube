@@ -20,7 +20,7 @@ function isMemberExpression(member: unknown): member is MemberExpression {
     typeof (member as MemberExpression).expression === 'function';
 }
 
-export class QueryDataSourcePredictor {
+export class QueryDataSourceResolver {
   protected readonly compilers: Compilers;
 
   protected readonly cubes = new Set<string>();
@@ -31,7 +31,7 @@ export class QueryDataSourcePredictor {
     this.compilers = compilers;
   }
 
-  public predict(query: QueryMembers): string | undefined {
+  public resolve(query: QueryMembers): string | undefined {
     for (const member of [...(query.measures || []), ...(query.dimensions || []), ...(query.segments || [])]) {
       this.addMember(member);
     }
@@ -103,7 +103,7 @@ export class QueryDataSourcePredictor {
     this.cubes.add(cube);
 
     const references: CubeReferences = this.compilers.compiler.compilerCache.cache(
-      ['predictQueryDataSource', 'memberReferences', path],
+      ['resolveQueryDataSource', 'memberReferences', path],
       () => this.memberReferences(cube, member)
     );
     this.addReferences(references);
@@ -154,7 +154,7 @@ export class QueryDataSourcePredictor {
 
   protected hasCrossDataSourceJoins(): boolean {
     return this.compilers.compiler.compilerCache.cache(
-      ['predictQueryDataSource', 'crossDataSourceJoins'],
+      ['resolveQueryDataSource', 'crossDataSourceJoins'],
       // Wrapped: the cache treats a falsy value as a miss
       () => [this.findCrossDataSourceJoin()]
     )[0];
@@ -172,15 +172,13 @@ export class QueryDataSourcePredictor {
 }
 
 /**
- * Picks the data source of a query from the data model alone, before a dialect is chosen.
- *
- * It's a prediction: `undefined` when the query has no members, or when the cubes it can see
- * span several data sources. The `dataSource` getter of the built query stays the source of
- * truth and is compared against it, so a cube this misses costs another build, not wrong SQL.
+ * The data source of a query, from the data model alone: the dialect to build the query with
+ * depends on it. `undefined` when the query has no members, or when its cubes span several
+ * data sources, as a rollupJoin does.
  */
-export function predictQueryDataSource(compilers: Compilers, query: QueryMembers): string | undefined {
+export function resolveQueryDataSource(compilers: Compilers, query: QueryMembers): string | undefined {
   try {
-    return new QueryDataSourcePredictor(compilers).predict(query);
+    return new QueryDataSourceResolver(compilers).resolve(query);
   } catch {
     // The build reports the error of an invalid query in its own terms
     return undefined;

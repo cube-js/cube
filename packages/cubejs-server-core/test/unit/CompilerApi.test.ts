@@ -353,20 +353,11 @@ views:
       });
     `;
 
-    // Lets a test hand the build a data source the model doesn't lead to
-    class CompilerApiWithPrediction extends CompilerApi {
-      public prediction: ((query: any) => string | undefined) | undefined;
-
-      protected predictDataSource(compilers: Compiler, query: any): string | undefined {
-        return this.prediction ? this.prediction(query) : super.predictDataSource(compilers, query);
-      }
-    }
-
-    let compilerApi: CompilerApiWithPrediction;
+    let compilerApi: CompilerApi;
     let builds: jest.SpyInstance;
 
     beforeEach(() => {
-      compilerApi = new CompilerApiWithPrediction(
+      compilerApi = new CompilerApi(
         {
           localPath: () => '/mock/path',
           dataSchemaFiles: () => Promise.resolve([{ fileName: 'model.js', content: model }]),
@@ -461,22 +452,12 @@ views:
       expect(builtDataSources()).toEqual([undefined]);
     });
 
-    test('builds a query again when the prediction misses its data source', async () => {
-      compilerApi.prediction = () => undefined;
-      const { sqlGenerator, sql } = await generate({ measures: ['bq_orders.count'], dimensions: ['bq_orders.status'] });
+    // The api-gateway builds those to initialize the SQL API of each data source
+    test('builds a query without members in the requested data source', async () => {
+      const { sqlGenerator } = await compilerApi.getSqlGenerator({} as any, 'analytics');
 
       expect(sqlGenerator.constructor.name).toEqual('BigqueryQuery');
-      expect(sql).toContain('`bq_orders`.status');
-      expect(builtDataSources()).toEqual([undefined, 'analytics']);
-    });
-
-    test('builds a query again in the requested dialect when the prediction is wrong', async () => {
-      compilerApi.prediction = () => 'analytics';
-      const { sqlGenerator, sql } = await generate({ measures: ['pg_orders.count'], dimensions: ['pg_orders.id'] });
-
-      expect(sqlGenerator.constructor.name).toEqual('PostgresQuery');
-      expect(sql).toContain('"pg_orders".id');
-      expect(builtDataSources()).toEqual(['analytics', undefined]);
+      expect(builtDataSources()).toEqual(['analytics']);
     });
   });
 

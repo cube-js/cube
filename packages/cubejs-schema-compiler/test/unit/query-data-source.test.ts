@@ -1,4 +1,4 @@
-import { predictQueryDataSource } from '../../src/adapter/QueryDataSource';
+import { resolveQueryDataSource } from '../../src/adapter/QueryDataSource';
 import { prepareJsCompiler } from './PrepareCompiler';
 
 const model = `
@@ -60,24 +60,24 @@ view('bq_view', {
 });
 `;
 
-describe('predictQueryDataSource', () => {
+describe('resolveQueryDataSource', () => {
   const compilers = prepareJsCompiler(model);
 
   beforeAll(() => compilers.compiler.compile());
 
-  const predict = (query: Record<string, unknown>) => predictQueryDataSource(compilers, query);
+  const resolve = (query: Record<string, unknown>) => resolveQueryDataSource(compilers, query);
 
   it('takes the data source of the cubes of the members', () => {
-    expect(predict({ measures: ['pg_orders.count'] })).toEqual('default');
-    expect(predict({ measures: ['bq_orders.count'], dimensions: ['bq_customers.name'] })).toEqual('analytics');
+    expect(resolve({ measures: ['pg_orders.count'] })).toEqual('default');
+    expect(resolve({ measures: ['bq_orders.count'], dimensions: ['bq_customers.name'] })).toEqual('analytics');
   });
 
   it('takes the data source of the cubes behind a view', () => {
-    expect(predict({ measures: ['bq_view.count'], dimensions: ['bq_view.bq_customers_name'] })).toEqual('analytics');
+    expect(resolve({ measures: ['bq_view.count'], dimensions: ['bq_view.bq_customers_name'] })).toEqual('analytics');
   });
 
   it('collects time dimensions, segments and nested filters', () => {
-    expect(predict({
+    expect(resolve({
       timeDimensions: [{ dimension: 'bq_view.created_at', granularity: 'day' }],
       segments: ['bq_orders.named'],
       filters: [{ and: [{ or: [{ member: 'bq_customers.name', operator: 'set' }] }] }],
@@ -85,13 +85,13 @@ describe('predictQueryDataSource', () => {
   });
 
   it('collects the cubes member SQL references', () => {
-    expect(predict({ dimensions: ['mixed.status'] })).toBeUndefined();
-    expect(predict({ dimensions: ['mixed.id'] })).toEqual('analytics');
-    expect(predict({ measures: ['bq_orders.named_count'] })).toEqual('analytics');
+    expect(resolve({ dimensions: ['mixed.status'] })).toBeUndefined();
+    expect(resolve({ dimensions: ['mixed.id'] })).toEqual('analytics');
+    expect(resolve({ measures: ['bq_orders.named_count'] })).toEqual('analytics');
   });
 
   it('collects the cubes a member expression references', () => {
-    expect(predict({
+    expect(resolve({
       measures: [{
         cubeName: 'bq_view',
         name: 'expr',
@@ -101,20 +101,20 @@ describe('predictQueryDataSource', () => {
     })).toEqual('analytics');
   });
 
-  it('predicts nothing across data sources', () => {
-    expect(predict({ measures: ['pg_orders.count'], dimensions: ['bq_customers.name'] })).toBeUndefined();
-    expect(predict({
+  it('resolves nothing across data sources', () => {
+    expect(resolve({ measures: ['pg_orders.count'], dimensions: ['bq_customers.name'] })).toBeUndefined();
+    expect(resolve({
       measures: ['bq_orders.count'],
       filters: [{ member: 'pg_orders.status', operator: 'set' }],
     })).toBeUndefined();
   });
 
-  it('predicts nothing without members', () => {
-    expect(predict({})).toBeUndefined();
+  it('resolves nothing without members', () => {
+    expect(resolve({})).toBeUndefined();
   });
 
-  it('predicts nothing for an unknown member', () => {
-    expect(predict({ measures: ['bq_orders.unknown'] })).toBeUndefined();
-    expect(predict({ measures: ['unknown.count'] })).toBeUndefined();
+  it('resolves nothing for an unknown member', () => {
+    expect(resolve({ measures: ['bq_orders.unknown'] })).toBeUndefined();
+    expect(resolve({ measures: ['unknown.count'] })).toBeUndefined();
   });
 });
