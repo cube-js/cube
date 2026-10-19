@@ -342,6 +342,96 @@ views:
       }
     });
   });
+
+  describe('dialect resolution', () => {
+    const repository: SchemaFileRepository = {
+      localPath: () => '/mock/path',
+      dataSchemaFiles: () => Promise.resolve([
+        {
+          fileName: 'cubes.js',
+          content: `
+            cube('orders', {
+              sql: 'SELECT 1 AS id',
+              measures: { count: { type: 'count' } },
+            });
+
+            cube('events', {
+              dataSource: 'other',
+              sql: 'SELECT 1 AS id',
+              measures: { count: { type: 'count' } },
+            });
+          `
+        }
+      ])
+    };
+
+    class OtherQuery extends PostgresQuery {}
+
+    const logger = () => {}; // eslint-disable-line @typescript-eslint/no-empty-function
+
+    let compilerApi: CompilerApi;
+
+    afterEach(() => {
+      compilerApi.dispose();
+    });
+
+    const sqlGeneratorFor = (measure: string) => compilerApi.getSqlGenerator(
+      { measures: [measure], timezone: 'UTC' } as any,
+    );
+
+    // A driverFactory returning a driver instance without CUBEJS_DB_TYPE leaves dbType unknown
+    test('uses the dialect factory when dbType is unknown', async () => {
+      compilerApi = new CompilerApi(repository, async () => undefined as any, {
+        logger,
+        dialectClass: () => OtherQuery,
+      });
+
+      const { sqlGenerator } = await sqlGeneratorFor('orders.count');
+
+      expect(sqlGenerator).toBeInstanceOf(OtherQuery);
+    });
+
+    test('does not resolve dbType when the dialect factory resolves a dialect', async () => {
+      const dbType = jest.fn(async () => 'postgres');
+      compilerApi = new CompilerApi(repository, dbType as any, {
+        logger,
+        dialectClass: () => OtherQuery,
+      });
+
+      await expect(compilerApi.getDialectClass('other')).resolves.toBe(OtherQuery);
+      expect(dbType).not.toHaveBeenCalled();
+    });
+
+    test('throws when neither dbType nor the dialect factory resolve a dialect', async () => {
+      compilerApi = new CompilerApi(repository, async () => undefined as any, { logger });
+
+      await expect(sqlGeneratorFor('orders.count'))
+        .rejects.toThrow("Can't find dialect for 'default' data source: undefined");
+    });
+
+    test('switches to the dialect of the query data source even when dbType is the same', async () => {
+      compilerApi = new CompilerApi(repository, async () => 'postgres', {
+        logger,
+        dialectClass: ({ dataSource }) => (dataSource === 'other' ? OtherQuery : undefined),
+      });
+
+      const { sqlGenerator: orders } = await sqlGeneratorFor('orders.count');
+      const { sqlGenerator: events } = await sqlGeneratorFor('events.count');
+
+      expect(orders.constructor).toBe(PostgresQuery);
+      expect(events).toBeInstanceOf(OtherQuery);
+    });
+
+    test('throws on an unknown external dbType', async () => {
+      compilerApi = new CompilerApi(repository, async () => 'postgres', {
+        logger,
+        externalDbType: 'unknown',
+      });
+
+      await expect(sqlGeneratorFor('orders.count'))
+        .rejects.toThrow("Dialect for 'unknown' is not found");
+    });
+  });
 });
 
 describe('CompilerApi externalPreAggregationMembers', () => {
