@@ -15,7 +15,7 @@
   "dependencies": {
     "@cubejs-backend/base-driver": "1.8.8",
     "@cubejs-backend/shared": "1.8.8",
-    "ramda": "^0.27.2"
+    "ramda": "^0.32.0"
   },
   "devDependencies": {
     "@types/oracledb": "^6.2.3"

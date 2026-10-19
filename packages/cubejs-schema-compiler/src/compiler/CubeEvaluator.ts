@@ -250,7 +250,7 @@ export class CubeEvaluator extends CubeSymbols {
 
   public primaryKeys: Record<string, string[]> = {};
 
-  public byFileName: Record<string, CubeDefinitionExtended[]> = {};
+  public byFileName: Partial<Record<string, CubeDefinitionExtended[]>> = {};
 
   private isRbacEnabledCache: boolean | null = null;
 
@@ -987,13 +987,9 @@ export class CubeEvaluator extends CubeSymbols {
   }
 
   public timeDimensionPathsForCube(cube: string): string[] {
-    return R.compose(
-      R.map(dimName => `${cube}.${dimName}`),
-      R.keys,
-      // @ts-ignore
-      R.filter((d: any) => d.type === 'time')
-      // @ts-ignore
-    )(this.evaluatedCubes[cube].dimensions || {});
+    return Object.entries(this.evaluatedCubes[cube].dimensions || {})
+      .filter(([_, d]) => d.type === 'time')
+      .map(([dimName]) => `${cube}.${dimName}`);
   }
 
   public measuresForCube(cube: string): Record<string, MeasureDefinition> {

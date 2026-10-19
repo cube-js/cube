@@ -122,7 +122,8 @@ type ScaffoldingSchemaOptions = {
 };
 
 export class ScaffoldingSchema {
-  private tableNamesToTables: Record<string, TableData[]> = {};
+  // Table names like `constructor` or `__proto__` must not resolve to Object.prototype
+  private tableNamesToTables: Map<string, TableData[]> = new Map();
 
   public constructor(
     private readonly dbSchema: DatabaseSchema,
@@ -188,26 +189,29 @@ export class ScaffoldingSchema {
   }
 
   protected prepareTableNamesToTables(tableNames: TableName[]) {
-    this.tableNamesToTables = R.pipe(
-      // @ts-ignore
-      R.unnest,
-      R.groupBy(n => n[0]),
-      R.map(groupedNameToDef => groupedNameToDef.map(nameToDef => nameToDef[1]))
-    )(
-      // @ts-ignore
-      tableNames.map(tableName => {
-        const [schema, table] = this.parseTableName(tableName);
-        const tableDefinition = this.resolveTableDefinition(tableName);
-        const definition: TableData = {
-          schema, table, tableDefinition, tableName
-        };
-        const tableizeName = inflection.tableize(this.fixCase(table));
-        const parts = tableizeName.split('_');
-        const tableNamesFromParts = R.range(0, parts.length - 1).map(toDrop => inflection.tableize(R.drop(toDrop, parts).join('_')));
-        const names = R.uniq([table, tableizeName].concat(tableNamesFromParts));
-        return names.map(n => [n, definition]);
-      })
-    ) as any;
+    const nameToDefinitions = tableNames.flatMap(tableName => {
+      const [schema, table] = this.parseTableName(tableName);
+      const tableDefinition = this.resolveTableDefinition(tableName);
+      const definition: TableData = {
+        schema, table, tableDefinition, tableName
+      };
+      const tableizeName = inflection.tableize(this.fixCase(table));
+      const parts = tableizeName.split('_');
+      const tableNamesFromParts = R.range(0, parts.length - 1).map(toDrop => inflection.tableize(R.drop(toDrop, parts).join('_')));
+      const names = R.uniq([table, tableizeName].concat(tableNamesFromParts));
+      return names.map((n): [string, TableData] => [n, definition]);
+    });
+
+    this.tableNamesToTables = new Map();
+
+    for (const [name, definition] of nameToDefinitions) {
+      const definitions = this.tableNamesToTables.get(name);
+      if (definitions) {
+        definitions.push(definition);
+      } else {
+        this.tableNamesToTables.set(name, [definition]);
+      }
+    }
   }
 
   public resolveTableDefinition(tableName: TableName) {
@@ -319,7 +323,7 @@ export class ScaffoldingSchema {
 
         if (column.foreign_keys?.length) {
           column.foreign_keys.forEach(fk => {
-            const targetTableDefinition = this.tableNamesToTables[fk.target_table]?.find(t => t.table === fk.target_table);
+            const targetTableDefinition = this.tableNamesToTables.get(fk.target_table)?.find(t => t.table === fk.target_table);
             if (targetTableDefinition) {
               columnsToJoin.push({
                 cubeToJoin: cubeName(fk.target_table),
@@ -330,10 +334,10 @@ export class ScaffoldingSchema {
           });
         } else if ((column.name.match(new RegExp(idRegex, 'i')) && this.fixCase(column.name) !== 'id')) {
           const withoutId = column.name.replace(new RegExp(idRegex, 'i'), '');
-          const tablesToJoin = this.tableNamesToTables[withoutId] ||
-          this.tableNamesToTables[inflection.tableize(withoutId)] ||
-          this.tableNamesToTables[this.fixCase(withoutId)] ||
-          this.tableNamesToTables[(inflection.tableize(this.fixCase(withoutId)))];
+          const tablesToJoin = this.tableNamesToTables.get(withoutId) ||
+          this.tableNamesToTables.get(inflection.tableize(withoutId)) ||
+          this.tableNamesToTables.get(this.fixCase(withoutId)) ||
+          this.tableNamesToTables.get(inflection.tableize(this.fixCase(withoutId)));
 
           if (!tablesToJoin) {
             return null;

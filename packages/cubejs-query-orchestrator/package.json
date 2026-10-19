@@ -33,13 +33,13 @@
     "@cubejs-backend/shared": "1.8.8",
     "csv-write-stream": "^2.0.0",
     "lru-cache": "^11.1.0",
-    "ramda": "^0.27.2"
+    "ramda": "^0.32.0"
   },
   "devDependencies": {
     "@cubejs-backend/linter": "1.8.8",
     "@types/jest": "^29",
     "@types/node": "^22",
-    "@types/ramda": "^0.27.40",
+    "@types/ramda": "^0.32.0",
     "@types/yargs": "^17.0.31",
     "jest": "^29",
     "ts-jest": "^29.4.12",

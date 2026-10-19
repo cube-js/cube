@@ -9,7 +9,7 @@ import {
   QueryKey
 } from '@cubejs-backend/base-driver';
 
-import { QueryCache, Query, QueryBody, TempTable, PreAggTableToTempTable, QueryWithParams, CacheKey } from './QueryCache';
+import { QueryCache, Query, QueryBody, TempTable, QueryWithParams, CacheKey } from './QueryCache';
 import { PreAggregations, PreAggregationDescription, getLastUpdatedAtTimestamp } from './PreAggregations';
 import { DriverFactory, DriverFactoryByDataSource } from './DriverFactory';
 import { QueryStream } from './QueryStream';
@@ -225,20 +225,16 @@ export class QueryOrchestrator {
       };
     }
 
-    const usedPreAggregations = R.pipe<
-      PreAggTableToTempTable[],
-      Record<string, TempTable>,
-      Record<string, unknown>
-    >(
-      R.fromPairs,
-      R.mapObjIndexed((pa: TempTable) => ({
+    const usedPreAggregations: Record<string, unknown> = R.mapObjIndexed(
+      (pa: TempTable) => ({
         targetTableName: pa.targetTableName,
         refreshKeyValues: pa.refreshKeyValues,
         lastUpdatedAt: pa.lastUpdatedAt,
         preAggregationId: pa.preAggregationId,
         type: pa.type,
-      })),
-    )(preAggregationsTablesToTempTables);
+      }),
+      R.fromPairs(preAggregationsTablesToTempTables),
+    );
 
     if (this.rollupOnlyMode && Object.keys(usedPreAggregations).length === 0) {
       throw new Error(
