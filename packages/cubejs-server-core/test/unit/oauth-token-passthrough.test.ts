@@ -37,6 +37,13 @@ class FakeDriver extends BaseDriver {
   }
 }
 
+class RejectingDriver extends FakeDriver {
+  public async testConnection(): Promise<void> {
+    this.events.push('test');
+    throw new Error('token expired');
+  }
+}
+
 class NoPassthroughDriver extends BaseDriver {
   public async testConnection(): Promise<void> {
     return undefined;
@@ -143,6 +150,7 @@ describe('OAuth token passthrough', () => {
 
   test('leaves a factory free to serve a data source missing from CUBEJS_DATASOURCES', async () => {
     process.env.CUBEJS_DATASOURCES = 'default,crm';
+
     try {
       const { request, driver } = createCore({ driverFactory: () => new FakeDriver() });
 
@@ -247,6 +255,29 @@ describe('OAuth token passthrough', () => {
     const deploymentDriver = <FakeDriver>(await core.driverFactories[1]('default'));
     expect(deploymentDriver.tests).toEqual(2);
     expect(deploymentDriver.tokens).toEqual([]);
+  });
+
+  test('a health check builds a driver no query has built yet without asking for a token', async () => {
+    process.env.CUBEJS_DB_OAUTH_TOKEN_PASSTHROUGH = 'true';
+    const { core, request, contextToOAuthToken } = createCore();
+
+    (await request('a')).addDataSeenSource('default');
+
+    await expect(core.testConnections()).resolves.toBeDefined();
+
+    expect(contextToOAuthToken).not.toHaveBeenCalled();
+    expect(created.map((driver) => driver.events)).toEqual([['test', 'test']]);
+  });
+
+  test('releases a new driver whose first connection test fails with the token', async () => {
+    process.env.CUBEJS_DB_OAUTH_TOKEN_PASSTHROUGH = 'true';
+    const rejecting = new RejectingDriver();
+    const { request, driver } = createCore({ driverFactory: () => rejecting });
+
+    await request('a');
+
+    await expect(driver()).rejects.toThrow('token expired');
+    expect(rejecting.events).toEqual(['token:a', 'test', 'release']);
   });
 
   test('fails a lookup whose token hook throws, rather than use the driver\'s own credentials', async () => {

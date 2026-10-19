@@ -745,12 +745,18 @@ export class CubejsServerCore {
       );
 
     /**
-     * Driver factory function `DriverFactoryByDataSource`.
+     * Driver factory function `DriverFactoryByDataSource`. `healthCheck` returns or builds the
+     * driver without handing it a token.
      */
-    const getDriver: DriverFactoryByDataSource = async (dataSource = 'default', preAggregations = false) => {
+    const getDriver = async (
+      dataSource: string = 'default',
+      preAggregations: boolean = false,
+      healthCheck: boolean = false,
+    ): Promise<BaseDriver> => {
       const factoryKey = preAggregations ? `${dataSource}@pre_agg` : dataSource;
       if (driverPromise[factoryKey]) {
-        return this.withOAuthToken(await driverPromise[factoryKey], contextRef.current, dataSource, preAggregations);
+        const cached = await driverPromise[factoryKey];
+        return healthCheck ? cached : this.withOAuthToken(cached, contextRef.current, dataSource, preAggregations);
       }
 
       const hasSeparatePreAggEnv = hasPreAggregationsEnvVars(dataSource);
@@ -781,7 +787,9 @@ export class CubejsServerCore {
               driver.setLogger(this.logger);
             }
 
-            await this.withOAuthToken(driver, contextRef.current, dataSource, preAggregations);
+            if (!healthCheck) {
+              await this.withOAuthToken(driver, contextRef.current, dataSource, preAggregations);
+            }
             await driver.testConnection();
 
             return driver;
@@ -797,8 +805,8 @@ export class CubejsServerCore {
             driverPromise[`${dataSource}@pre_agg`] = null;
           }
 
-          // A factory's shared instance may be serving queries under another key
-          if (driver && !this.oauthTokenHolders.has(driver)) {
+          // A refused pre-aggregation lookup of a factory's shared instance: it serves queries elsewhere
+          if (driver && !(preAggregations && this.oauthTokenHolders.has(driver))) {
             await driver.release();
           }
 
@@ -927,7 +935,7 @@ export class CubejsServerCore {
    */
   protected async healthCheckDriver(
     driverPromise: Record<string, Promise<BaseDriver> | null>,
-    getDriver: DriverFactoryByDataSource,
+    getDriver: (dataSource: string, preAggregations: boolean, healthCheck: boolean) => Promise<BaseDriver>,
     dataSource: string,
   ): Promise<BaseDriver | null> {
     const cached = driverPromise[dataSource];
@@ -936,7 +944,7 @@ export class CubejsServerCore {
       return this.oauthTokenHolders.has(driver) ? null : driver;
     }
 
-    return getDriver(dataSource);
+    return getDriver(dataSource, false, true);
   }
 
   /** `CUBEJS_DB_OAUTH_TOKEN_PASSTHROUGH` for a data source, false for one not declared. */
