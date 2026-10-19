@@ -335,8 +335,6 @@ export class ClickHouseDriver extends BaseDriver implements DriverInterface {
   }
 
   public async query<R = unknown>(query: string, values: unknown[], options?: QueryOptions): Promise<R[]> {
-    // Non-external pre-aggregation builds (`loadPreAggregationIntoTable`, index creation) send
-    // CREATE TABLE ... AS SELECT and ALTER TABLE ... ADD INDEX through here.
     if (NO_RESULT_SET_STATEMENT.test(query)) {
       await this.command(formatMySql(query, values), options);
       return [];

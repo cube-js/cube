@@ -8,11 +8,7 @@ import { ClickHouseDriver } from '../../src';
 import type { ClickHouseDriverOptions } from '../../src';
 
 // https://github.com/cube-js/cube/issues/9074
-// Non-external (`original_sql` or any not stored in Cube Store) pre-aggregations are built in
-// ClickHouse with `CREATE TABLE ... AS SELECT` and indexed with `ALTER TABLE ... ADD INDEX`, both sent
-// through `ClickHouseDriver.query()`. DDL has no result set: on a Replicated database ClickHouse
-// answers with the distributed DDL status as TabSeparated, on an Atomic database with an empty body,
-// and both used to be rejected after ClickHouse had already created the table.
+// Non-external pre-aggregation DDL used to fail on both Replicated (TabSeparated DDL status) and Atomic (empty body) databases.
 const KEEPER_CONFIG = `<clickhouse>
   <keeper_server>
     <tcp_port>9181</tcp_port>
@@ -51,6 +47,8 @@ describe('issue #9074: non-external pre-aggregation build on ClickHouse', () => 
     fs.chmodSync(path.join(configDir, 'keeper.xml'), 0o644);
 
     container = await ClickhouseDBRunner.startContainer({
+      // The runner's 23.11 default only creates Replicated databases behind an experimental setting
+      version: '24.8',
       volumes: [{
         source: path.join(configDir, 'keeper.xml'),
         target: '/etc/clickhouse-server/config.d/keeper.xml',
