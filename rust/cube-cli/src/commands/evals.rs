@@ -213,8 +213,9 @@ fn print_results(json_output: bool, results: &Value) {
     output::table(&["VERDICT", "QUESTION", "SCORE"], rows);
 }
 
-/// `command` is the CLI invocation that fetched `page`, without its paging flags.
-fn next_page_hint(command: &str, first: Option<u64>, page: &Value) -> Option<String> {
+/// `command` is the CLI invocation that fetched `page`, without its paging flags, and `noun`
+/// names what the page holds.
+fn next_page_hint(command: &str, noun: &str, first: Option<u64>, page: &Value) -> Option<String> {
     if page.pointer("/pageInfo/hasNextPage") != Some(&Value::Bool(true)) {
         return None;
     }
@@ -224,12 +225,14 @@ fn next_page_hint(command: &str, first: Option<u64>, page: &Value) -> Option<Str
         .and_then(Value::as_str)
         .filter(|cursor| !cursor.is_empty())
     else {
-        return Some("More results are available; use --json to read pageInfo.endCursor".into());
+        return Some(format!(
+            "More {noun} are available; use --json to read pageInfo.endCursor"
+        ));
     };
 
     let first = first.map_or_else(String::new, |count| format!(" --first {count}"));
     Some(format!(
-        "More results: `{command}{first} --after {}`",
+        "More {noun}: `{command}{first} --after {}`",
         util::shell_quote(cursor)
     ))
 }
@@ -395,7 +398,7 @@ pub async fn command(args: Args, ctx: &Ctx) -> Result<()> {
                 .collect();
             output::table(&["ID", "STATUS", "BRANCH", "AGENT", "STARTED"], rows);
             let command = format!("cube evals list {deployment}");
-            if let Some(hint) = next_page_hint(&command, first, &runs) {
+            if let Some(hint) = next_page_hint(&command, "runs", first, &runs) {
                 io::stdout().flush()?;
                 eprintln!("{hint}");
             }
@@ -450,7 +453,7 @@ pub async fn command(args: Args, ctx: &Ctx) -> Result<()> {
             print_results(ctx.json, &results);
             if !ctx.json {
                 let command = format!("cube evals results {deployment} {evaluation}");
-                if let Some(hint) = next_page_hint(&command, first, &results) {
+                if let Some(hint) = next_page_hint(&command, "results", first, &results) {
                     io::stdout().flush()?;
                     eprintln!("{hint}");
                 }
@@ -595,12 +598,13 @@ mod tests {
         });
         let command = "cube evals results 1 42";
         assert_eq!(
-            next_page_hint(command, Some(5), &results),
+            next_page_hint(command, "results", Some(5), &results),
             Some("More results: `cube evals results 1 42 --first 5 --after 'a;b'`".into())
         );
         assert_eq!(
             next_page_hint(
                 command,
+                "results",
                 None,
                 &json!({ "pageInfo": { "hasNextPage": true, "endCursor": "" } })
             ),
@@ -609,6 +613,7 @@ mod tests {
         assert_eq!(
             next_page_hint(
                 command,
+                "results",
                 None,
                 &json!({ "pageInfo": { "hasNextPage": true } })
             ),
@@ -617,6 +622,7 @@ mod tests {
         assert_eq!(
             next_page_hint(
                 command,
+                "results",
                 None,
                 &json!({ "pageInfo": { "hasNextPage": false } })
             ),
@@ -684,16 +690,26 @@ mod tests {
             "pageInfo": { "hasNextPage": true, "endCursor": "c1" }
         });
         assert_eq!(
-            next_page_hint("cube evals list 7", Some(20), &runs),
-            Some("More results: `cube evals list 7 --first 20 --after 'c1'`".into())
+            next_page_hint("cube evals list 7", "runs", Some(20), &runs),
+            Some("More runs: `cube evals list 7 --first 20 --after 'c1'`".into())
         );
         assert_eq!(
-            next_page_hint("cube evals list 7", None, &runs),
-            Some("More results: `cube evals list 7 --after 'c1'`".into())
+            next_page_hint("cube evals list 7", "runs", None, &runs),
+            Some("More runs: `cube evals list 7 --after 'c1'`".into())
         );
         assert_eq!(
             next_page_hint(
                 "cube evals list 7",
+                "runs",
+                None,
+                &json!({ "pageInfo": { "hasNextPage": true } })
+            ),
+            Some("More runs are available; use --json to read pageInfo.endCursor".into())
+        );
+        assert_eq!(
+            next_page_hint(
+                "cube evals list 7",
+                "runs",
                 None,
                 &json!({ "items": [], "pageInfo": { "hasNextPage": false, "endCursor": "c1" } })
             ),
