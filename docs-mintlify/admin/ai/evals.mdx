@@ -106,7 +106,7 @@ You can gate a pull request with either the Cube CLI or the public Platform
 API. In both cases, store the tenant URL and deployment ID as repository
 variables, store the API key as a secret, and pass the branch under review.
 The API key needs `SchemaUpdate` access to start a run and either `SchemaRead`
-or `SchemaUpdate` access to poll it and read its results.
+or `SchemaUpdate` access to list runs, poll a run, and read its results.
 
 This capability is currently in preview. Contact Cube support to activate it
 for your account.
@@ -173,6 +173,9 @@ artifact is uploaded. Add `--agent NAME` to test a configured agent or
 `--file eval_questions/revenue.yml` to limit the run to one question file. Pass
 `--json` for a machine-readable document containing both the terminal run and
 its per-question results when the result set is complete.
+
+To inspect an earlier run, find its id with `cube evals list "$DEPLOYMENT_ID"`,
+then pass it to `cube evals status` or `cube evals results`.
 
 #### With the Platform API
 
@@ -267,6 +270,10 @@ The `POST` body also accepts `agentName`, `questionFile`, and
 `securityContext`. Omitting the pagination parameters on the results request
 returns the complete result set; if `pageInfo.hasNextPage` is anything other
 than `false`, do not use that page as a CI verdict.
+
+To find an earlier run's id, send a `GET` to the same `evaluations` path. It
+lists the deployment's runs newest first, 100 per page by default (`first` goes
+up to 200); pass `pageInfo.endCursor` as `after` for the next page.
 
 Both recipes require every selected question to return `pass`. A `review`
 verdict, including one caused by missing ground truth, fails the CI gate. Keep
