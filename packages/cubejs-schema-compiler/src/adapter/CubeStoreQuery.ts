@@ -189,7 +189,7 @@ export class CubeStoreQuery extends BaseQuery {
       this.rollingWindowDateJoinCondition(maxRollingWindow.trailing, maxRollingWindow.leading, maxRollingWindow.offset);
     const filters: (BaseSegment | BaseFilter | BaseGroupFilter)[] = [...this.segments, ...this.filters, ...(
       timeDimension?.dateRange && this.dateFromStartToEndConditionSql(
-        commonDateCondition as [BaseTimeDimension, DateJoinConditionFn][],
+        commonDateCondition,
         true,
         true
       ) || []
