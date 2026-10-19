@@ -67,9 +67,6 @@ const SecondsDurations = {
   second: 1
 };
 
-/**
- * Set of the schema compilers.
- */
 export type Compilers = {
   compiler: DataSchemaCompiler;
   metaTransformer: CubeToMetaTransformer;
@@ -206,9 +203,6 @@ export class BaseQuery {
 
   public parametrizedContextSymbolsValue!: any;
 
-  /**
-   * BaseQuery class constructor.
-   */
   public constructor(compilers: Compilers | any, options: any) {
     this.compilers = compilers;
     this.cubeEvaluator = compilers.cubeEvaluator;
@@ -3725,9 +3719,8 @@ export class BaseQuery {
   /**
    * Evaluate escaped SQL-alias for cube or cube's property
    * (measure, dimension).
-   * @returns string
    */
-  public cubeAlias(cubeName: string) {
+  public cubeAlias(cubeName: string): string {
     const prefix = this.safeEvaluateSymbolContext().cubeAliasPrefix || this.cubeAliasPrefix;
     return this.escapeColumnName(
       this.aliasName(
@@ -4134,10 +4127,7 @@ export class BaseQuery {
     );
   }
 
-  /**
-   * @returns Boolean
-   */
-  public multipliedJoinRowResult(cubeName) {
+  public multipliedJoinRowResult(cubeName: string): boolean | undefined {
     // this.join not initialized on collectCubeNamesForSql
     return this.join && this.join.multiplicationFactor[cubeName];
   }
@@ -4231,8 +4221,6 @@ export class BaseQuery {
 
   /**
    * Evaluate alias for specific cube's property.
-   * @param name Property name.
-   * @param isPreAggregationName Pre-agg flag.
    */
   public aliasName(name: string, isPreAggregationName: boolean | null = false): string {
     if (this.options.memberToAlias && this.options.memberToAlias[name]) {
@@ -4245,8 +4233,6 @@ export class BaseQuery {
    * Alias of a member when the query asks for none (`memberToAlias`). A pre-aggregation
    * table is built by a query asking for none, so its columns go by these names however
    * the query reading it aliases its own output.
-   * @param name Property name.
-   * @param isPreAggregationName Pre-agg flag.
    */
   public canonicalAliasName(name: string, isPreAggregationName: boolean | null = false): string {
     const path = name.split('.');
