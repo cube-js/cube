@@ -1,7 +1,7 @@
 /**
  * Shapes of the plain objects BaseQuery and its dialects pass around: query
  * members and filters as they come in, the multi-stage CTE plan and refresh
- * key tuples. Types only.
+ * key tuples.
  */
 import type { MemberOrderBy } from '../compiler/CubeEvaluator';
 import type { SqlDefinition, SqlFn } from '../compiler/CubeSymbols';
@@ -35,10 +35,6 @@ export type MemberExpression = {
   originalCubeName?: string;
 };
 
-/**
- * A measure, dimension or segment of an incoming query: a path, or a member
- * expression.
- */
 export type QueryMember = string | MemberExpression;
 
 export type QueryTimeDimension = {
@@ -99,9 +95,6 @@ export type GroupFilterInput = {
   dimension?: string | null;
 };
 
-/**
- * The query a multi-stage member is evaluated in.
- */
 export type MultiStageQueryContext = {
   dimensions: QueryMember[];
   multiStageDimensions: QueryMember[];
@@ -123,17 +116,11 @@ export type MultiStageWithQuery = MultiStageQueryContext & {
   alias?: string;
 };
 
-/**
- * A multi-stage measure `orderBy` item with its SQL evaluated.
- */
 export type RenderedOrderBy = {
   sql: string;
   dir: MemberOrderBy['dir'];
 };
 
-/**
- * The context the measure hierarchy is collected in.
- */
 export type MeasureCollectionContext = {
   hasMultipliedForPreAggregation?: boolean;
 };
