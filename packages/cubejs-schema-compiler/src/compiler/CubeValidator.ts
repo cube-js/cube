@@ -1216,6 +1216,13 @@ const baseSchema = {
 };
 
 const cubeSchema = inherit(baseSchema, {
+  groupingFilter: Joi.object().keys({
+    dimension: Joi.string().required(),
+    levels: Joi.array().items(Joi.string().required()).min(1).unique()
+      .required(),
+    measures: Joi.array().items(Joi.string().required()).min(1).unique()
+      .required(),
+  }),
   sql: Joi.func(),
   sqlTable: Joi.func(),
   calendar: Joi.boolean().strict(),
